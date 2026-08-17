@@ -24,6 +24,57 @@ function tempRoot() {
   return d;
 }
 
+// ── La busta del lavoro ─────────────────────────────────────────────────────
+//
+// REGRESSIONE VERA (trovata dalla verifica di #477.3): chi ritira il lavoro
+// teneva solo il payload e buttava via ruolo, indirizzo, numero e ramo. Chi
+// guida il giro li legge tutti: senza ruolo consegnava al lavoratore una busta
+// VUOTA e usciva dicendo che era andato tutto bene — un guasto totale
+// travestito da giro riuscito. Nessun test lo vedeva, perché nessuno
+// esercitava la catena vera biglietto → lavoro.
+
+const rispostaFinta = (status, body) => async () => ({
+  status, ok: status >= 200 && status < 300, text: async () => JSON.stringify(body),
+});
+
+test('chi ritira il lavoro riceve la busta INTERA, non solo il contenuto', async () => {
+  const fetchImpl = rispostaFinta(200, {
+    ok: true, role: 'fixer', id: 'fid-1', num: '#500.2', branch: 'worker/500.2',
+    payload: { role: 'fixer', feedback: { text: 'il sintomo' }, critique: 'non compare', loopCount: 2 },
+  });
+  const w = await work('biglietto', { fetchImpl, sleep: async () => {}, attempts: 1 });
+  assert.equal(w.ok, true);
+  assert.equal(w.role, 'fixer', 'senza il ruolo il giro non sa nemmeno che lavoro sta facendo');
+  assert.equal(w.id, 'fid-1');
+  assert.equal(w.num, '#500.2');
+  assert.equal(w.branch, 'worker/500.2', 'senza il ramo non ci si posiziona, e si lavora sull albero sbagliato');
+  assert.equal(w.payload.critique, 'non compare');
+});
+
+test('una risposta "riuscita" ma senza ruolo è un guasto, non un lavoro', async () => {
+  // È la forma esatta in cui il difetto si presentava: ok:true, payload magari
+  // pieno, ma niente ruolo. Consegnarla vuol dire mandare un lavoratore allo
+  // sbaraglio; va trattata come il server che non risponde.
+  const fetchImpl = rispostaFinta(200, { ok: true, payload: { feedback: { text: 'x' } } });
+  const w = await work('biglietto', { fetchImpl, sleep: async () => {}, attempts: 1 });
+  assert.equal(w.ok, false);
+  assert.equal(w.reason, 'busta_incompleta');
+});
+
+test('i ruoli senza feedback portano comunque la loro busta', async () => {
+  // Il controllo di sicurezza riceve solo il ramo: il payload è quasi vuoto, ma
+  // ruolo e ramo devono arrivare lo stesso.
+  const fetchImpl = rispostaFinta(200, {
+    ok: true, role: 'secaudit', id: 'fid-2', num: '#366.2', branch: 'worker/366.2-v3',
+    payload: { role: 'secaudit', branch: 'worker/366.2-v3' },
+  });
+  const w = await work('biglietto', { fetchImpl, sleep: async () => {}, attempts: 1 });
+  assert.equal(w.ok, true);
+  assert.equal(w.role, 'secaudit');
+  assert.equal(w.branch, 'worker/366.2-v3');
+  assert.equal(w.payload.feedback, undefined, 'e del feedback continua a non vedere niente');
+});
+
 test('un rifiuto NON è un guasto: sono due esiti diversi', () => {
   assert.equal(classifyReply(200, { ok: true }), 'ok');
   // Il server ha guardato e ha detto no.
