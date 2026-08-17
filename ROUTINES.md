@@ -38,8 +38,11 @@ Le routine schedulate su claude.ai partono con un prompt minimo
    binario Electron ~102MB, `scrot`): se il giro non è in grado di lavorare, va
    scoperto **prima** di averlo pagato.
    ```bash
-   FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs --preflight
+   node scripts/routine-channel.mjs probe "<parola-d-ordine>"
    ```
+   Chiede al server se c'è lavoro **senza legare niente**: nessun biglietto,
+   nessun semaforo preso. (Un biglietto vero, chiesto adesso, terrebbe fermo un
+   feedback per tutta l'installazione e scadrebbe prima che qualcuno inizi.)
    - **0** → prosegui col passo 1.
    - **2** → **le routine autonome sono spente** dall'owner (tab Automazioni):
      **chiudi la sessione subito** riportando `niente da fare`. Non è un guasto e
