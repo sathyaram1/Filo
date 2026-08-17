@@ -596,6 +596,8 @@
     fixer:      'Correzione',
     secaudit:   'Audit sicurezza',
     prober:     'Esplorazione',
+    idle:       'Fermo',
+    off:        'Routine spente',
   };
   function roleLabel(role) {
     const r = String(role || '').trim();
