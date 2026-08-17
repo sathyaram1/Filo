@@ -974,12 +974,16 @@ async function recordFixed(id, report = '') {
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
+
+  // Il server prima dello stato locale: vedi il commento in recordVerifier.
+  const sent = await deliverToChannel('fixed', { report: String(report || ''), branch: next.branch || '' });
+  if (sent.outcome === 'refused') {
+    return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
+  }
+
   sealTransition(next, 'fixer:consegna');
   persistStateToGit(id, `feedback: fixed ${id}`);
-
-  const sent = await deliverToChannel('fixed', { report: String(report || ''), branch: next.branch || '' });
   if (sent.outcome === 'ok') return next;
-  if (sent.outcome === 'refused') return { rejected: true, message: `il server ha rifiutato la consegna (${sent.reason})` };
 
   // Ripiego: fix ri-applicato → torna in attesa della verifica comportamentale.
   // Il report (cosa ha corretto e come) va nella chat del feedback: senza, la
