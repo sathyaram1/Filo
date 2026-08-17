@@ -310,6 +310,18 @@ if (isMain) {
       console.error('Il report va in --notes "…", il testo di un feedback nuovo in --text "…".');
       process.exit(1);
     }
+    // La versione in cui il fix confluisce la sa solo questa macchina (è quella
+    // in costruzione, nel manifesto del progetto). Va timbrata da sola: è ciò
+    // che regge il "questo è arrivato agli utenti" nella bacheca e
+    // l'archiviazione automatica, e chiedere a chi lavora di ricordarsene
+    // significa perderla.
+    if (intento === 'status' && data.status === 'done' && !data.resolvedInVersion) {
+      try {
+        const { readFileSync } = await import('node:fs');
+        const pkg = JSON.parse(readFileSync(resolve(fileURLToPath(new URL('..', import.meta.url)), 'package.json'), 'utf8'));
+        if (pkg.version) data.resolvedInVersion = pkg.version;
+      } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
+    }
     const r = await deliver(biglietto, intento, data);
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
