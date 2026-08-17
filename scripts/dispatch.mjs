@@ -1110,6 +1110,52 @@ export async function run() {
     return { exit: 0 };
   }
 
+  // ── Con un biglietto, il lavoro lo sceglie il SERVER ──────────────────────
+  //
+  // Non è una preferenza: il biglietto è legato a un feedback preciso, e ogni
+  // consegna fatta con quel biglietto parla di QUEL feedback. Se qui si
+  // scegliesse per conto proprio, si lavorerebbe una cosa e si consegnerebbe
+  // un'altra — e il controllo del server, che è tutto il punto, direbbe sempre
+  // sì sul feedback sbagliato.
+  //
+  // Senza biglietto resta il cammino di prima, identico.
+  const ticket = readRoutineTicket(ROOT);
+  if (ticket) {
+    const cap0 = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: automation.loopCap ?? null });
+    const opts0 = { proberWhenIdle: automation.proberWhenIdle };
+    let w;
+    try {
+      const ch = await import('./routine-channel.mjs');
+      w = await ch.work(ticket);
+    } catch (e) {
+      return emitHalt('transient', `canale non utilizzabile: ${e?.message || e}`);
+    }
+    if (!w.ok) {
+      // In dubbio ci si ferma: un biglietto che non apre il proprio lavoro non
+      // è una giornata tranquilla, è un giro che non deve partire.
+      return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);
+    }
+    const bucket = {
+      role: w.role,
+      id: w.id || undefined,
+      num: w.num || '',
+      branch: w.branch || '',
+      loopCount: Number(w.payload && w.payload.loopCount) || 0,
+    };
+    if (bucket.id) {
+      // Lo stato locale resta il ripiego quando il server non risponde: si
+      // allinea a ciò che il server ha appena detto, così le due copie non
+      // divergono in silenzio.
+      const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
+      bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
+      if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
+        bucket.state.verifierCritique = w.payload.critique;
+      }
+    }
+    const empty = { reviews: [], todoWinner: null };
+    return finalizeBucket(bucket, empty, cap0, opts0, { server: w });
+  }
+
   let snapshot;
   try {
     snapshot = await buildSnapshot();
