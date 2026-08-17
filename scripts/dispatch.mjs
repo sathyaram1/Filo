@@ -1346,13 +1346,18 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
+  //
+  // Col biglietto il feedback arriva GIÀ DECIFRATO dal server, ritagliato a ciò
+  // che il ruolo può vedere: non lo si va a rileggere da soli, o si
+  // rimetterebbe in piedi proprio il cammino che la spec vuole togliere.
   const ctx = {};
+  const served = fromServer && fromServer.payload;
   if (bucket.role === 'secaudit') {
     ctx.diff = diffForBranch(bucket.branch);
   } else if (bucket.role === 'verifier' || bucket.role === 'fixer') {
-    ctx.feedback = await decryptOne(bucket.id);
+    ctx.feedback = (served && served.feedback) || (await decryptOne(bucket.id));
   } else if (bucket.role === 'new-work') {
-    ctx.feedback = snapshot.todoWinner?._full || (await decryptOne(bucket.id));
+    ctx.feedback = (served && served.feedback) || snapshot.todoWinner?._full || (await decryptOne(bucket.id));
   }
 
   emit(bucket, ctx);
