@@ -578,14 +578,9 @@ test('preflight: config illeggibile → non pronto (fail closed)', async () => {
   assert.equal(r.kind, 'transient');
 });
 
-test('preflight: routine accese → si passa al controllo dello stato', async () => {
-  let visto = false;
-  const r = await preflight(
-    async () => { visto = true; return { reviews: [], todoWinner: null }; },
-    async () => ({ enabled: true }),
-  );
+test('preflight: routine accese → pronto', async () => {
+  const r = await preflight(null, async () => ({ enabled: true }));
   assert.deepEqual(r, { ok: true });
-  assert.ok(visto, 'con le routine accese la prontezza deve guardare anche lo stato');
 });
 
 test('preflightExitCode: il contratto 0 / 2 / 3 dell\'orchestratore', () => {
