@@ -118,6 +118,25 @@ export async function ticket(passphrase, opts) {
   return readTicketReply(status, body);
 }
 
+/**
+ * Prontezza: c'è lavoro? Non lega niente e non prende semafori.
+ *
+ * Va chiesto PRIMA del setup dell'ambiente, che costa parecchio (installazione,
+ * binario da un centinaio di mega): se il giro non è in grado di lavorare va
+ * scoperto prima di averlo pagato. Un biglietto vero, chiesto in quel momento,
+ * terrebbe un feedback fermo per tutta l'installazione e scadrebbe prima che
+ * qualcuno inizi a lavorarci.
+ *
+ * @returns {{ outcome:'work'|'nothing'|'fault', reason?: string }}
+ */
+export async function probe(passphrase, opts) {
+  const { status, body } = await call('routineTicket', { passphrase, probe: true }, opts);
+  const b = body || {};
+  if (status === 200 && b.ok && b.work === true) return { outcome: 'work' };
+  if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
+  return { outcome: 'fault', reason: String(b.reason || `http_${status}`) };
+}
+
 export async function work(t, opts) {
   const { status, body } = await call('routineWork', { ticket: t }, opts);
   if (status === 200 && body && body.ok) return { ok: true, payload: body.payload };
