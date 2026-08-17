@@ -979,13 +979,10 @@ async function recordFixed(id, report = '') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
   }
 
+  if (sent.outcome !== 'ok') {
+    return { rejected: true, fromChannel: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
+  }
   sealTransition(next, 'fixer:consegna');
-  if (sent.outcome === 'ok') return next;
-
-  // Ripiego: fix ri-applicato → torna in attesa della verifica comportamentale.
-  // Il report (cosa ha corretto e come) va nella chat del feedback: senza, la
-  // correzione è invisibile all'owner.
-  queueStatus(id, 'revision_capability', String(report || ''));
   return next;
 }
 async function recordSecaudit(id, verdict) {
