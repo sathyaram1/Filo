@@ -486,13 +486,16 @@ feature spezzata in `#N.M` NON fonde i pezzi su `main` uno a uno.
 
 ## Convenzioni operative
 
-Coda su git (`queue-triage`/`queue-feedback`), claim, decifratura S1, priorità,
-tono dei report, sintomo-vs-causa, invarianti UX, "insistere prima di mollare":
+Tono dei report, sintomo-vs-causa, invarianti UX, "insistere prima di mollare":
 **tutto in `routines/shared.md`** (lo legge il worker, non l'orchestratore).
 
 Solo i punti che toccano l'orchestratore:
 
-- **Mai PATCH diretta su Firestore** (l'account robot è bloccato): ogni decisione
-  passa dalla coda git e dalla GitHub Action `apply-triage.yml` (~1-2 min).
-- **Claim**: lo fa `dispatch.mjs`. L'orchestratore non claima a mano.
-- **Numerazione**: ogni feedback ha `#N` + titolo; i sub ereditano `#N.M`.
+- **Ogni decisione passa dal server**, che la valida prima di scriverla. Non
+  esiste più né una coda su git, né un automatismo che la applica, né un modo
+  per scrivere su Firestore senza passare dai controlli.
+- **Il semaforo lo prende il server** rilasciando il biglietto: non ci sono più
+  lucchetti come file, e non c'è niente da rilasciare a mano se non il biglietto.
+- **Numerazione**: ogni feedback ha `#N` + titolo; i sub ereditano `#N.M`. Il
+  numero lo assegna il server dentro una transazione, così due creazioni
+  simultanee non si sovrappongono.
