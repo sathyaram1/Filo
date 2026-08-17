@@ -124,8 +124,8 @@ export async function release(t, opts) {
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || '') };
 }
 
-export async function compare(passphrase, mine, opts) {
-  const { status, body } = await call('routineCompare', { passphrase, mine }, opts);
+export async function compare(t, mine, opts) {
+  const { status, body } = await call('routineCompare', { ticket: t, mine }, opts);
   return { ok: status === 200 && !!(body && body.ok), same: !!(body && body.same) };
 }
 
