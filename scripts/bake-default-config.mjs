@@ -90,6 +90,29 @@ async function main() {
     tavily: pick('tavily', 'FILO_DEFAULT_TAVILY_KEY'),
   };
 
+  // ⚠️ La domanda "resta qualcosa?" si fa PRIMA di scrivere.
+  //
+  // Metterla dopo la scrittura lasciava una scappatoia: se la scrittura falliva
+  // (disco pieno, permesso negato) si finiva nel ripiego in coda al file, che
+  // scrive un file a chiavi VUOTE ed esce contento — cioè proprio la versione
+  // muta che questa regola esiste per impedire, e per giunta senza segnalazione.
+  // Decidere prima toglie a un guasto di scrittura il potere di riscrivere la
+  // risposta.
+  //
+  // NESSUNA chiave da nessuna fonte non è un degrado accettabile: è una versione
+  // che arriva agli utenti senza niente di preimpostato, e nessuno se ne
+  // accorgerebbe finché non prova a usarla. Degradare va bene finché resta
+  // qualcosa.
+  if (!Object.values(apiKeys).some(Boolean)) {
+    console.error('::error::Nessuna chiave di default da nessuna fonte: la versione uscirebbe senza chiavi.');
+    // Si prova comunque ad avvisare — ma è un di più: nel caso peggiore (parola
+    // d'ordine mancante del tutto) l'allarme non può suonare, perché si apre con
+    // quella stessa parola d'ordine. È il motivo per cui serve fermarsi: una
+    // pubblicazione che fallisce si vede, una riga rossa in un registro no.
+    await avvisa();
+    process.exit(1);
+  }
+
   mkdirSync(dirname(OUT_PATH), { recursive: true });
   writeFileSync(OUT_PATH, JSON.stringify({ apiKeys, bakedAt: new Date().toISOString() }, null, 2) + '\n', 'utf8');
 
@@ -98,24 +121,6 @@ async function main() {
     Object.entries(apiKeys).map(([k, v]) => [k, v ? 'presente' : 'assente'])
   );
   console.log(`[bake] scritto ${OUT_PATH}:`, JSON.stringify(summary));
-
-  // NESSUNA chiave da nessuna fonte non è un degrado accettabile: è una
-  // versione che arriverà agli utenti senza chiavi di default, e nessuno se ne
-  // accorgerebbe finché non prova a usarla. Degradare in silenzio va bene
-  // quando resta qualcosa; qui non resta niente, e va detto ad alta voce.
-  if (!Object.values(apiKeys).some(Boolean)) {
-    console.error('::error::Nessuna chiave di default da nessuna fonte: la versione uscirebbe senza chiavi.');
-    await avvisa();
-    // E qui ci si FERMA. Degradare andava bene finché restava qualcosa; senza
-    // nessuna chiave la versione arriva agli utenti muta — chi la installa non
-    // trova niente di preimpostato — e nessuno se ne accorge.
-    //
-    // Fermarsi è anche l'unica via che regge il caso peggiore: se la parola
-    // d'ordine manca DEL TUTTO, l'allarme non può suonare (si apre con quella
-    // stessa parola d'ordine). Restava solo una riga rossa in un registro che
-    // nessuno guarda. Una pubblicazione che fallisce, invece, si vede.
-    process.exit(1);
-  }
 }
 
 /** Apre un feedback quando la costruzione sta per produrre una versione monca. */
