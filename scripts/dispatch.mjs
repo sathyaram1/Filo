@@ -1292,6 +1292,13 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
     const { acquire } = await import('./claim-feedback.mjs');
     const res = acquire(bucket.id, { num: bucket.num });
     if (res.status === 'taken') {
+      if (fromServer) {
+        // Col biglietto il semaforo vero l'ha già preso il server: trovare qui
+        // un lucchetto della vecchia strada vuol dire che le due contabilità
+        // non concordano. Non si sceglie un altro lavoro (il biglietto vale per
+        // questo e per nessun altro): ci si ferma.
+        return emitHalt('transient', 'il feedback assegnato dal server risulta preso da un altra routine sulla vecchia strada');
+      }
       // Già in lavorazione da un'altra routine: escludilo e ri-scegli.
       const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
       return finalizeBucket(chooseBucket(next, cap, opts), next, cap, opts);
@@ -1301,10 +1308,13 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
     // presa in carico di un lavoro nuovo (todo→working): i bucket dell'iter di
     // revisione hanno già il loro status revision_*.
     if (bucket.role === 'new-work') {
-      try {
-        execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'working', ''],
-          { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-      } catch (_) { /* best-effort: il lock vero è il claim */ }
+      const sent = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+      if (sent.outcome !== 'ok' && sent.outcome !== 'refused') {
+        try {
+          execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'working', ''],
+            { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+        } catch (_) { /* best-effort: il lock vero è il claim */ }
+      }
     }
   }
 
