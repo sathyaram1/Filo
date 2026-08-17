@@ -1449,21 +1449,21 @@ if (isMainModule) {
       const [, id, verdict, ...rest] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|fail> ["critica"]'); process.exit(1); }
       const s = await recordVerifier(id, verdict, rest.join(' '));
-      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
+      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = argv;
       if (!id) { console.error('Uso: --record-fixed <id> ["report"]'); process.exit(1); }
       const s = await recordFixed(id, rest.join(' '));
-      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
+      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       const [, id, verdict] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
       const s = await recordSecaudit(id, verdict);
-      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
+      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
       process.exit(0);
     } else if (flag === '--preflight') {

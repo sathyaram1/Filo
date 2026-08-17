@@ -209,8 +209,12 @@ if (isMain) {
   // stesso il fogliettino vorrebbe dire far scrivere quella decisione a un
   // automatismo che quei controlli non li fa — cioè esattamente il difetto (b)
   // da cui parte ROUTINE-AUTH-SPEC.md.
+  // `--no-git` dice "non toccare git", non "non passare dal server": tenerlo
+  // fuori dal canale ne farebbe una porta laterale per scrivere decisioni senza
+  // controlli. Chi non ha un biglietto (i test, l'owner a mano) non passa di
+  // qui comunque.
   const noteText = noteParts.length ? noteParts.join(' ') : '';
-  if (!noGit) {
+  {
     const ticket = readRoutineTicket(ROOT);
     if (ticket) {
       try {
