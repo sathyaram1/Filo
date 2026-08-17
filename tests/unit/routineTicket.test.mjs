@@ -17,6 +17,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const { classifyReply, work } = await import('../../scripts/routine-channel.mjs');
+const { serverCtx, checkEnvelope } = await import('../../scripts/dispatch.mjs');
 const { readTicket, writeTicket, clearTicket, isFresh, ticketFile, MAX_AGE_MS } =
   await import('../../scripts/lib/routine-ticket.mjs');
 
