@@ -1265,6 +1265,13 @@ async function decryptOne(id) {
   }
 }
 
+// L'ultima scelta consegnata, per il confronto col canale del server (#477.1).
+// La scrive `emit`, che è il punto unico in cui dispatch dichiara cosa ha
+// scelto: legarla lì significa che il confronto non può parlare di un lavoro
+// diverso da quello davvero consegnato.
+let lastEmitted = null;
+export function lastChoice() { return lastEmitted; }
+
 export function emit(bucket, ctx) {
   // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443). Da qui lo
   // rilegge `queue-feedback.mjs`: così un feedback aperto da un'automazione
