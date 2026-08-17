@@ -43,6 +43,11 @@
 //   node scripts/routine-channel.mjs release <biglietto>
 //       → fine lavoro: il biglietto muore e il semaforo si libera.
 //
+//   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
+//       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
+//         note, feedback. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
+//         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
+//
 //   node scripts/routine-channel.mjs compare <biglietto> <ruolo> <numero>
 //       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
 //         scelto il server, e consuma il biglietto. Serve solo nella fase in
