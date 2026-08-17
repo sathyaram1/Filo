@@ -105,7 +105,7 @@ jobs:
           TESTO="${PREMESSA}
 
           ${TAIL}"
-          node scripts/queue-feedback.mjs --name "Controlli automatici rossi: nessuna versione pubblicata" --priority 3 --status todo "$TESTO" || echo "::warning::feedback non accodato"
+          node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" || echo "::warning::allarme non consegnato"
           exit 1
 
       - name: Bump patch version e push su main
