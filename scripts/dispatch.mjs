@@ -1291,6 +1291,7 @@ export function emit(bucket, ctx) {
     loopCount: bucket.loopCount || 0,
     instructions: readRoleInstructions(bucket.role),
   };
+  lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }
 
