@@ -126,6 +126,21 @@ test('un file illeggibile non fa saltare niente: si lavora senza biglietto', () 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('il marcatore del biglietto NON deve entrare nella storia: questo repo è pubblico', () => {
+  // Il salvataggio automatico committa e spedisce a ogni modifica di file. Il
+  // biglietto è un segreto: senza questa riga nel .gitignore finirebbe nella
+  // storia pubblica — cioè il difetto che la spec viene a togliere, ricreato
+  // proprio dal marcatore che serve a toglierlo. È già successo una volta.
+  const repo = resolve(new URL('../..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+  const rel = '.claude/routine-ticket.json';
+  let ignorato = false;
+  try {
+    execFileSync('git', ['check-ignore', '-q', rel], { cwd: repo, stdio: 'ignore' });
+    ignorato = true;
+  } catch (_) { ignorato = false; }
+  assert.equal(ignorato, true, `${rel} deve essere gitignorato`);
+});
+
 test('scrivere un biglietto vuoto non crea un marcatore fasullo', () => {
   const root = tempRoot();
   try {
