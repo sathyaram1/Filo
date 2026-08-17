@@ -212,7 +212,8 @@ Ripeti finché il budget è quasi pieno:
 
    > «Esporta SUBITO nell'ambiente la chiave che ti incollo qui sotto, e
    > prefissala a OGNI invocazione degli script di routine:
-   > `FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs`. Ti stampa un
+   > `FILO_FEEDBACK_PRIVKEY=<chiave> node scripts/dispatch.mjs --ticket <biglietto>`
+   > (il `--ticket` mettilo solo se te l'ho dato). Ti stampa un
    > JSON `{ role, payload, claim, loopCount, instructions }`. Diventa quel
    > ruolo: le `instructions` sono il tuo file-ruolo, il `payload` è ciò su cui
    > lavori. Esegui il compito fino in fondo (report per l'utente → nelle
