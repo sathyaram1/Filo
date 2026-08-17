@@ -282,8 +282,25 @@ if (isMain) {
     const r = await release(args[0]);
     console.log(r.ok ? 'OK: biglietto rilasciato.' : `rilascio non riuscito (${r.reason})`);
   } else if (cmd === 'deliver') {
-    // deliver <biglietto> <intento> [--campo valore ...]
-    const r = await deliver(args[0], args[1] || '', data);
+    // deliver [<biglietto>] <intento> [--campo valore …]
+    //
+    // Il biglietto si può omettere: lo ritrova da solo (lo ha messo il
+    // dispatcher dove chi consegna lo trova). Chiedere a chi lavora di
+    // ricopiarlo a ogni consegna è la scommessa già persa sulla provenienza dei
+    // feedback — su decine di ritrovamenti, uno solo risultava firmato giusto.
+    const INTENTI = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+    let biglietto = args[0];
+    let intento = args[1] || '';
+    if (INTENTI.includes(args[0])) {
+      intento = args[0];
+      const { readTicket } = await import('./lib/routine-ticket.mjs');
+      biglietto = readTicket(resolve(fileURLToPath(new URL('..', import.meta.url))));
+      if (!biglietto) {
+        console.error('Nessun biglietto: questa consegna non ha un lavoro a cui riferirsi.');
+        process.exit(3);
+      }
+    }
+    const r = await deliver(biglietto, intento, data);
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
