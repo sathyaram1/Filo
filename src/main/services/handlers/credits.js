@@ -282,12 +282,28 @@ module.exports = function register(on, ctx) {
     return s.startsWith('owner:') ? s.slice(6) : s;
   }
 
-  // Spiegazione NON tecnica della risoluzione: i turni "modello" (report scritti
-  // dalla routine, per l'utente) estratti dal blob note. Niente turni utente.
-  function resolutionExplanation(notes) {
-    const raw = String(notes || '').trim();
+  // Cosa legge chi ha mandato il feedback, quando gli viene detto che è risolto.
+  //
+  // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8). `userNote` è la frase scritta
+  // per lui: breve, in chiaro, e leggibile sulla SUA macchina, che non ha —
+  // giustamente — nessuna chiave. `notes` è un'altra cosa: è il report per
+  // l'owner, con le scelte della lavorazione, e da qui in avanti viaggia
+  // cifrato. Mostrargli quello era il motivo per cui il report non poteva
+  // essere protetto.
+  //
+  // RETROCOMPATIBILITÀ: i feedback già chiusi hanno un testo solo, in chiaro,
+  // dentro `notes`. Per quelli si continua a estrarre i turni del modello, come
+  // prima — altrimenti chi torna su un feedback vecchio non leggerebbe più
+  // niente. Se invece `notes` è cifrato e non c'è la frase, non si mostra il
+  // ciphertext: si tace, che è meglio di un blob.
+  function resolutionExplanation(f) {
+    const frase = String((f && f.userNote) || '').trim();
+    if (frase) return frase;
+
+    const raw = String((f && f.notes) || '').trim();
+    if (!raw || raw.startsWith('FENC')) return '';
     const FBT = globalThis.SN_FEEDBACK_THREAD;
-    if (!raw || !FBT?.splitNotes) return raw;
+    if (!FBT?.splitNotes) return raw;
     return FBT.splitNotes(raw)
       .filter((s) => s.role === 'model' && s.body)
       .map((s) => s.body)
