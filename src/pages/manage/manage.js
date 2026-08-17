@@ -673,7 +673,88 @@
       console.error('[manage] caricamento log worker fallito:', err);
       setLogView('empty');
     }
+    loadChannelLog();
     logLoading = false;
+  }
+
+  // ── Canale autenticato delle routine (stessa scheda, secondo blocco) ──────
+  // Rifiuti e confronti vivono in collezioni che nessun client può leggere: il
+  // main passa dalla callable owner-only del backend di sicurezza. Se il canale
+  // non è ancora in uso i due registri sono vuoti e il blocco resta nascosto —
+  // una sezione vuota che non spiega perché è peggio di nessuna sezione.
+  const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
+
+  // Perché una richiesta è stata respinta, detto all'owner e non al codice.
+  const DENY_LABELS = {
+    bad_passphrase: 'parola d’ordine non valida o revocata',
+    bad_ticket: 'biglietto inesistente',
+    dead_ticket: 'biglietto scaduto o già rilasciato',
+    role_forbids: 'azione fuori dal ruolo',
+    branch_mismatch: 'ramo diverso da quello assegnato',
+    illegal_transition: 'passaggio di stato non permesso',
+    rate_limited: 'troppe richieste',
+    malformed: 'richiesta non interpretabile',
+    routines_off: 'routine spente',
+  };
+
+  function renderChannelLog(rejections, comparisons) {
+    if (!mgChannelSection || !mgChannelList) return;
+    const rows = [];
+    for (const r of (Array.isArray(rejections) ? rejections : [])) {
+      rows.push({
+        at: r && r.at,
+        kind: 'deny',
+        label: 'Respinto',
+        text: `${DENY_LABELS[String(r && r.reason)] || String((r && r.reason) || '—')}`
+          + `${r && r.slug ? ` · ${r.slug}` : ''}${r && r.action ? ` · ${r.action}` : ''}`,
+      });
+    }
+    for (const c of (Array.isArray(comparisons) ? comparisons : [])) {
+      const git = (c && c.git) || {};
+      const srv = (c && c.server) || {};
+      rows.push({
+        at: c && c.at,
+        kind: 'cmp',
+        label: c && c.same ? 'Accordo' : 'Scelte diverse',
+        text: c && c.same
+          ? `${roleLabel(git.role)}${git.num ? ` · ${git.num}` : ''}`
+          : `routine: ${roleLabel(git.role)}${git.num ? ` ${git.num}` : ''}`
+            + ` — server: ${roleLabel(srv.role)}${srv.num ? ` ${srv.num}` : ''}`
+            + (c && c.serverBlindToBranchState ? ' (il server non vede ancora lo stato dei rami)' : ''),
+      });
+    }
+    if (!rows.length) {
+      mgChannelSection.hidden = false;
+      if (mgChannelEmpty) mgChannelEmpty.hidden = false;
+      mgChannelList.hidden = true;
+      mgChannelList.innerHTML = '';
+      return;
+    }
+    rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+    mgChannelList.innerHTML = rows.slice(0, 60).map((row) => {
+      const abs = formatDateTime(row.at);
+      const cls = row.kind === 'deny' ? ' mg-log-role--deny' : '';
+      return `<li class="mg-log-row" title="${esc(abs)}">`
+        + `<span class="mg-log-role${cls}">${esc(row.label)}</span>`
+        + `<span class="mg-log-when">${esc(row.text)}</span>`
+        + (abs ? `<span class="mg-log-abs">${esc(timeAgo(row.at))}</span>` : '')
+        + `</li>`;
+    }).join('');
+    if (mgChannelEmpty) mgChannelEmpty.hidden = true;
+    mgChannelList.hidden = false;
+    mgChannelSection.hidden = false;
+  }
+
+  async function loadChannelLog() {
+    if (!mgChannelSection || !isAdmin) return;
+    try {
+      const r = await sendToMain({ type: ROUTINE_LOG_GET });
+      if (!r || r.ok === false) { mgChannelSection.hidden = true; return; }
+      renderChannelLog(r.rejections, r.comparisons);
+    } catch (err) {
+      console.error('[manage] caricamento registri canale fallito:', err);
+      mgChannelSection.hidden = true;
+    }
   }
 
   // ── Tab bar ───────────────────────────────────────────────────────────────
