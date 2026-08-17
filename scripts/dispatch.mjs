@@ -958,14 +958,13 @@ async function recordVerifier(id, verdict, critique) {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
 
+  if (sent.outcome !== 'ok') {
+    // Il server non risponde. Non c'è più una seconda strada su cui posare il
+    // verdetto: dirlo è l'unica cosa onesta, perché un verdetto che nessuno ha
+    // registrato ma che il ramo dà per dato è peggio di un verdetto mancante.
+    return { rejected: true, fromChannel: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+  }
   sealTransition(next, `verifier:${verdict}`);
-  if (sent.outcome === 'ok') return next;
-
-  // Ripiego: PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica
-  // fix (il 3° FAIL → design lo gestisce il giro dopo). La nota con l'esito va
-  // nella chat del feedback, senza sovrascrivere lo storico.
-  queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability',
-    verifierNoteText(verdict, critique));
   return next;
 }
 async function recordFixed(id, report = '') {
