@@ -136,11 +136,9 @@ async function avvisa() {
 }
 
 main().catch((e) => {
-  // Un errore INATTESO non deve fermare la pubblicazione (le chiavi vuote sono
-  // gestite dentro main, che si ferma da sé): qui si scrive un file valido e si
-  // prosegue.
-  // Anche in caso di errore inatteso, scriviamo un file vuoto valido così il
-  // build non si rompe e l'app parte (chiavi vuote = utente configura le sue).
+  // Un errore INATTESO (rete strana, disco pieno) non deve far saltare la
+  // pubblicazione: si scrive un file valido e si prosegue. Il caso "nessuna
+  // chiave da nessuna fonte" NON passa di qui — lo gestisce main, che si ferma.
   console.warn('[bake] errore non fatale:', e.message);
   try {
     mkdirSync(dirname(OUT_PATH), { recursive: true });
