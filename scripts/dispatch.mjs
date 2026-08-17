@@ -1463,6 +1463,14 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
         clearState(bucket.id);
         persistStateToGit(bucket.id, `feedback: clear-state ${bucket.id}`);
         process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
+        if (fromServer) {
+          // Col biglietto non si ripiega su un altro lavoro: il biglietto vale
+          // per QUESTO feedback e per nessun altro, e mettersi a esplorare
+          // tenendoselo in mano lascia il semaforo preso su un lavoro che
+          // nessuno sta facendo — con il giro che esce dicendo che è andato
+          // tutto bene.
+          return emitHalt('permanent', pos.message);
+        }
         const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
         return finalizeBucket(chooseBucket(next, cap), next, cap);
       }
