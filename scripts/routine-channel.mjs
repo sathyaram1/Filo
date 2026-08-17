@@ -126,6 +126,41 @@ export async function release(t, opts) {
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || '') };
 }
 
+/**
+ * Distingue un RIFIUTO da un GUASTO. PURA, ed è la distinzione che regge tutto
+ * il ripiego sulla coda su git.
+ *
+ * Un rifiuto è una RISPOSTA: il server ha guardato e ha detto no (il ruolo non
+ * può, il passaggio di stato è illegale, il ramo non combacia, il biglietto è
+ * morto). Ripiegare sulla vecchia strada dopo un rifiuto vorrebbe dire fare
+ * lo stesso a dispetto del controllo — cioè rimettere in piedi esattamente il
+ * buco che questa spec viene a chiudere.
+ *
+ * Un guasto è il server che non risponde. Lì la vecchia strada è un ripiego
+ * legittimo, ma va detto ad alta voce.
+ */
+export function classifyReply(status, body) {
+  if (status === 200 && body && body.ok) return 'ok';
+  if (status === 0 || status >= 500) return 'fault';
+  return 'refused';
+}
+
+/**
+ * Consegna un intento al server. `data` NON contiene mai il feedback su cui si
+ * agisce: quello il server lo legge dal biglietto.
+ * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num? }}
+ */
+export async function deliver(t, intent, data, opts) {
+  const { status, body } = await call('routineDeliver', { ticket: t, intent, data: data || {} }, opts);
+  const outcome = classifyReply(status, body);
+  return {
+    outcome,
+    reason: String((body && body.reason) || (outcome === 'ok' ? '' : `http_${status}`)),
+    id: body && body.id,
+    num: body && body.num,
+  };
+}
+
 export async function compare(t, mine, opts) {
   const { status, body } = await call('routineCompare', { ticket: t, mine }, opts);
   return { ok: status === 200 && !!(body && body.ok), same: !!(body && body.same) };
