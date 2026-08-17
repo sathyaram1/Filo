@@ -300,6 +300,16 @@ if (isMain) {
         process.exit(3);
       }
     }
+    // Un posizionale avanzato NON viene ignorato in silenzio. È la trappola in
+    // cui questa riscrittura è già caduta: le ricette passavano il report come
+    // ultimo argomento, il canale lo scartava, e la consegna usciva OK con le
+    // note vuote — il feedback si chiudeva senza che l'owner leggesse niente.
+    const avanzati = args.slice(INTENTI.includes(args[0]) ? 1 : 2);
+    if (avanzati.length) {
+      console.error(`Argomento non capito: "${avanzati[0].slice(0, 40)}". I dati si passano come --campo valore.`);
+      console.error('Il report va in --notes "…", il testo di un feedback nuovo in --text "…".');
+      process.exit(1);
+    }
     const r = await deliver(biglietto, intento, data);
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
