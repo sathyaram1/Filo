@@ -511,17 +511,20 @@ test('preflight: esiste ed è invocabile (il ramo --preflight non deve crashare)
   assert.deepEqual(await preflight(async () => ({ reviews: [], todoWinner: null }), routineAccese), { ok: true });
 });
 
-test('preflight: guasto dichiarato → non pronto, col suo tipo', async () => {
-  const r = await preflight(async () => { throw routineFault('transient', 'coda illeggibile'); }, routineAccese);
-  assert.deepEqual(r, { ok: false, kind: 'transient', message: 'coda illeggibile' });
+test('preflight: un guasto sull\'interruttore → non pronto, col suo tipo', async () => {
+  const r = await preflight(null, async () => { throw routineFault('transient', 'documento irraggiungibile'); });
+  assert.deepEqual(r, { ok: false, kind: 'transient', message: 'documento irraggiungibile' });
 });
 
-test('preflight: guasto generico → pronto (run() lì ripiega sull\'audit)', async () => {
-  // Non deve essere più severo del giro vero: fermerebbe giri che avrebbero
-  // lavorato comunque.
-  // (il messaggio del guasto finisce su stderr: è traccia per il debug, non rumore da zittire)
-  const r = await preflight(async () => { throw new Error('rete ballerina'); }, routineAccese);
+test('preflight NON legge la coda: quella domanda vuole la chiave, che qui non c\'è più', async () => {
+  // Invariante di #477.3. Se un giorno qualcuno rimettesse qui la lettura della
+  // coda, si riporterebbe sulla macchina della routine la chiave che apre TUTTI
+  // i feedback — cioè il difetto da cui la spec parte. Questo test diventa
+  // rosso se succede.
+  let toccata = false;
+  const r = await preflight(async () => { toccata = true; return { reviews: [], todoWinner: null }; }, routineAccese);
   assert.deepEqual(r, { ok: true });
+  assert.equal(toccata, false, 'la prontezza non deve andare a leggere la coda');
 });
 
 // ─── Interruttore master delle routine ───────────────────────────────────────
