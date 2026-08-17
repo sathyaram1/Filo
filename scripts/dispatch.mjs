@@ -1411,18 +1411,8 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
   return { exit: 0 };
 }
 
-// Decifra il corpo completo di UN feedback (per verifier/fixer/new-work).
-async function decryptOne(id) {
-  try {
-    const { fetchOpenCandidates } = await import('./next-feedback.mjs');
-    const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
-    const raw = await fetchOpenCandidates();
-    const doc = raw.find((d) => d._id === id);
-    return doc ? await decryptFeedbackFields(doc) : null;
-  } catch (_) {
-    return null;
-  }
-}
+// (Qui viveva la decifratura del feedback su questa macchina. È stata tolta con
+// la chiave: il testo arriva già in chiaro dal server, ritagliato al ruolo.)
 
 // L'ultima scelta consegnata, per il confronto col canale del server (#477.1).
 // La scrive `emit`, che è il punto unico in cui dispatch dichiara cosa ha
