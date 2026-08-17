@@ -183,6 +183,29 @@ Ripeti finché il budget è quasi pieno:
      facendo trapelare all'orchestratore dettagli specifici che dovrebbe ignorare.
      → i file-ruolo devono ribadire: **ultima riga = solo il verdetto**.
 
+1b. **Chiedi un biglietto al server** (canale nuovo, spec `ROUTINE-AUTH-SPEC.md`).
+   È l'unica cosa che l'orchestratore fa con la **parola d'ordine**, che gli
+   arriva nel prompt della schedulazione e **non va mai esportata
+   nell'ambiente** (l'ambiente lo eredita ogni worker: è il difetto che questa
+   spec viene a togliere).
+
+   ```bash
+   node scripts/routine-channel.mjs ticket "<parola-d-ordine>"
+   ```
+   - **exit 0** → stampa il **biglietto** su stdout: passalo al worker nel suo
+     prompt (vedi passo 2). Non sai su cosa si lavorerà, ed è voluto: se lo
+     sapessi saresti manipolabile anche tu, e la parola d'ordine ce l'hai tu.
+   - **exit 2** → niente da fare secondo il server: **prosegui lo stesso** col
+     giro normale. In questa fase l'autorità è ancora del cammino su git, e il
+     server non vede lo stato dei rami (vive nei file su git): una differenza è
+     attesa, non un guasto.
+   - **exit 3** → il canale non risponde. **Prosegui lo stesso**, senza
+     biglietto: finché il canale è in affiancamento un suo guasto non deve
+     fermare il lavoro vero.
+
+   Se non hai una parola d'ordine, salta questo passo: il giro funziona
+   identico, si perde solo il confronto fra i due cammini.
+
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "opus"` — sempre Opus, mai Fable: consuma crediti — vedi
    § Sequenziale) con un prompt minimo:
