@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,11 +63,19 @@ async function giro(rispostaLavoro) {
     // dice "la ricetta deve arrivare non vuota" fallirebbe per il motivo
     // sbagliato.
     cpSync(resolve(REPO, 'routines', 'roles'), resolve(casa, 'routines', 'roles'), { recursive: true });
-    // Un deposito git minimo: serve solo perché il giro non inciampi.
-    execFileSync('git', ['init', '-q'], { cwd: casa });
+    // Un deposito git minimo CON un suo "altrove" dove spedire: il giro prende
+    // il semaforo spedendo un file, e se non ha dove spedirlo si tira indietro
+    // credendo che il lavoro sia di qualcun altro. Serve finto, ma completo.
+    const altrove = resolve(casa, 'altrove.git');
+    execFileSync('git', ['init', '-q', '--bare', altrove]);
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
     execFileSync('git', ['add', '-A'], { cwd: casa });
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'init'], { cwd: casa });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
+    execFileSync('git', ['remote', 'add', 'origin', altrove], { cwd: casa });
+    execFileSync('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: casa });
 
     const out = await new Promise((risolvi) => {
       const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--ticket', 'biglietto-di-prova'], {
@@ -82,6 +90,7 @@ async function giro(rispostaLavoro) {
           // dovrebbe sorvegliare.
           FILO_REPO_ROOT: casa,
           FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
+          FILO_SPOOL_DIR: resolve(casa, 'coda'),
           // Interruttore acceso senza chiedere niente alla rete.
           FILO_ROUTINES_ENABLED: '1',
           // La chiave NON deve servire: se servisse, questo test lo direbbe.
