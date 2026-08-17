@@ -145,7 +145,11 @@ export function resolveLoopCap({ envRaw, remote } = {}) {
  */
 async function fetchRoutineConfig() {
   const fa = await import('./lib/firestore-auth.mjs');
-  const url = `${fa.FIRESTORE_BASE}/${ROUTINES_DOC}?key=${fa.FIREBASE_API_KEY}`;
+  // `FILO_ROUTINE_CONFIG_URL`: da dove si legge l'interruttore. Esiste per i
+  // controlli, che devono poter esercitare il giro intero senza rete — non è
+  // un segreto e non cambia niente in produzione, dove non è impostata.
+  const url = process.env.FILO_ROUTINE_CONFIG_URL
+    || `${fa.FIRESTORE_BASE}/${ROUTINES_DOC}?key=${fa.FIREBASE_API_KEY}`;
   const read = async () => {
     const res = await fetch(url);
     if (res.status === 404) return {};            // mai scritto: default
