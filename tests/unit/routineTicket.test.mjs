@@ -78,6 +78,68 @@ test('i ruoli senza feedback portano comunque la loro busta', async () => {
   assert.equal(w.payload.feedback, undefined, 'e del feedback continua a non vedere niente');
 });
 
+// ── Dalla busta al pacchetto per il lavoratore ──────────────────────────────
+//
+// SECONDA REGRESSIONE VERA (stessa famiglia della prima): la busta arrivava
+// intera, ma il contenuto veniva cercato un livello troppo in alto e quindi era
+// sempre assente. Il lavoratore riceveva un pacchetto vuoto e il giro usciva
+// dicendo che era andato tutto bene — dopo aver pure dichiarato al server che
+// quel feedback era "in lavorazione".
+
+const BUSTA = Object.freeze({
+  ok: true, role: 'new-work', id: 'fid-9', num: '#500', branch: '',
+  payload: { role: 'new-work', feedback: { name: 'Titolo', text: 'il sintomo dell utente' } },
+});
+
+test('il feedback del server arriva davvero nel pacchetto del lavoratore', () => {
+  const ctx = serverCtx({ role: 'new-work' }, BUSTA);
+  assert.equal(ctx.feedback.text, 'il sintomo dell utente');
+});
+
+test('chi verifica e chi corregge ricevono il feedback allo stesso modo', () => {
+  for (const role of ['verifier', 'fixer']) {
+    const ctx = serverCtx({ role }, Object.assign({}, BUSTA, { role }));
+    assert.equal(ctx.feedback.text, 'il sintomo dell utente', `${role} deve ricevere il sintomo`);
+  }
+});
+
+test('il controllo di sicurezza riceve le differenze e NIENTE del feedback', () => {
+  const ctx = serverCtx({ role: 'secaudit' }, BUSTA, 'diff --git a/x b/x');
+  assert.equal(ctx.diff, 'diff --git a/x b/x');
+  assert.equal(ctx.feedback, undefined);
+  assert.equal(JSON.stringify(ctx).includes('sintomo'), false);
+});
+
+test('busta assente o incartata male → pacchetto vuoto, mai un feedback inventato', () => {
+  assert.equal(serverCtx({ role: 'new-work' }, null).feedback, null);
+  // È la forma esatta del difetto: la busta esiste ma è dentro un altro
+  // involucro, quindi il contenuto non si trova dove lo si cerca.
+  assert.equal(serverCtx({ role: 'new-work' }, { server: BUSTA }).feedback, null);
+});
+
+test('chi esplora non riceve niente', () => {
+  assert.deepEqual(serverCtx({ role: 'prober' }, BUSTA), {});
+});
+
+test('una busta con un ruolo sconosciuto NON si consegna', () => {
+  assert.match(checkEnvelope({ role: 'capo', id: 'x' }), /non sa eseguire/);
+  assert.match(checkEnvelope({ role: '', id: 'x' }), /non sa eseguire/);
+  assert.match(checkEnvelope({}), /non sa eseguire/);
+});
+
+test('un lavoro dell iter senza il suo ramo NON si consegna', () => {
+  for (const role of ['secaudit', 'verifier', 'fixer']) {
+    assert.match(checkEnvelope({ role, id: 'x', branch: '' }), /senza il ramo/, role);
+    assert.equal(checkEnvelope({ role, id: 'x', branch: 'worker/1' }), null, `${role} col ramo va bene`);
+  }
+});
+
+test('un lavoro senza il feedback a cui si riferisce NON si consegna', () => {
+  assert.match(checkEnvelope({ role: 'new-work', id: '' }), /senza il feedback/);
+  // L'esplorazione è l'unica che non ha un feedback: quella passa.
+  assert.equal(checkEnvelope({ role: 'prober', id: '' }), null);
+});
+
 test('un rifiuto NON è un guasto: sono due esiti diversi', () => {
   assert.equal(classifyReply(200, { ok: true }), 'ok');
   // Il server ha guardato e ha detto no.
