@@ -34,6 +34,7 @@ import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guardTransition, escalationNote } from './lib/branch-integrity.mjs';
 import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
+import { readTicket as readRoutineTicket } from './lib/routine-ticket.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -200,9 +201,46 @@ if (isMain) {
     }
   }
 
+  // ── La strada principale è il canale del server (#477.2) ──────────────────
+  //
+  // Il fogliettino su git resta come RIPIEGO per il solo caso in cui il server
+  // non risponda, e il ripiego si dichiara. Un RIFIUTO invece ferma tutto: il
+  // server ha guardato ruolo, ramo e stato vero e ha detto no, e depositare lo
+  // stesso il fogliettino vorrebbe dire far scrivere quella decisione a un
+  // automatismo che quei controlli non li fa — cioè esattamente il difetto (b)
+  // da cui parte ROUTINE-AUTH-SPEC.md.
+  // `--no-git` dice "non toccare git", non "non passare dal server": tenerlo
+  // fuori dal canale ne farebbe una porta laterale per scrivere decisioni senza
+  // controlli. Chi non ha un biglietto (i test, l'owner a mano) non passa di
+  // qui comunque.
+  const noteText = noteParts.length ? noteParts.join(' ') : '';
+  {
+    const ticket = readRoutineTicket(ROOT);
+    if (ticket) {
+      try {
+        const ch = await import('./routine-channel.mjs');
+        const sent = await ch.deliver(ticket, 'status', {
+          status, notes: noteText, branch: branch || '', reason: reason || '',
+        });
+        if (sent.outcome === 'ok') {
+          console.log(`OK: decisione consegnata al server (${status}).`);
+          process.exit(0);
+        }
+        if (sent.outcome === 'refused') {
+          console.error(`[queue-triage] RIFIUTATA dal server: ${sent.reason}`);
+          console.error('[queue-triage] La decisione NON è stata registrata, e NON viene depositata sulla coda su git: un rifiuto è una risposta, non un guasto.');
+          process.exit(4);
+        }
+        console.warn(`  ! canale non raggiungibile (${sent.reason}): ripiego sulla coda su git`);
+      } catch (e) {
+        console.warn(`  ! canale non utilizzabile (${e?.message || e}): ripiego sulla coda su git`);
+      }
+    }
+  }
+
   try {
     // S1.2: usa la versione cifrata per proteggere la history git pubblica.
-    const file = await queueTriageEncrypted(id, status, noteParts.length ? noteParts.join(' ') : '', undefined, branch, starred, reason);
+    const file = await queueTriageEncrypted(id, status, noteText, undefined, branch, starred, reason);
     console.log(`OK: triage accodato → ${file}`);
     if (noGit) console.log('   (--no-git: file scritto ma non committato)');
     else commitAndPush(file);

@@ -34,6 +34,15 @@ copia incorporata nei loro prompt: se modifichi `filo_filosofia.txt`, riallinea
 la copia in `filo-security/functions/src/l2/principles.js` e rideploya le
 functions.
 
+**Stessa cura per la macchina a stati.** Da quando le consegne delle routine
+passano dal server (spec `ROUTINE-AUTH-SPEC.md`), le transizioni legali vivono
+in due copie: `src/shared/feedbackStatus.js` qui e
+`filo-security/functions/src/routine/stateMachine.js` là. Se cambi le
+transizioni, il riempimento dello status cifrato o il tetto delle note,
+**riallinea l'altra copia e rideploya**: due copie che divergono sono peggio di
+una sola permissiva, perché la dashboard mostrerebbe una regola e il server ne
+applicherebbe un'altra.
+
 ## PRIMA DI TUTTO: sync con `origin/main`
 
 Routine remote pushano su `origin/main` durante la giornata. Prima di iniziare

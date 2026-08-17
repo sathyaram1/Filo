@@ -72,6 +72,7 @@ import {
   writeExpectation, clearExpectation, stateDir, IDENTITY_REJECT_LIMIT,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole } from './lib/routine-role.mjs';
+import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -840,6 +841,40 @@ function queueStatus(id, status, note = '', reason = '') {
 }
 
 /**
+ * Consegna una decisione al canale del server (#477.2). È la strada
+ * PRINCIPALE: il server legge il feedback dal biglietto, controlla ruolo, ramo
+ * e macchina a stati sullo stato VERO, e scrive lui.
+ *
+ * Ritorna l'esito così com'è, perché la differenza fra i tre casi cambia cosa
+ * si fa dopo:
+ *   'ok'       → fatto, e NON si scrive anche sulla coda su git (sarebbe la
+ *                stessa decisione due volte, con la seconda non controllata);
+ *   'refused'  → il server ha guardato e ha detto no. Ci si FERMA: ripiegare
+ *                sulla coda vorrebbe dire scrivere lo stesso a dispetto del
+ *                controllo, che è il buco da cui nasce tutta questa spec;
+ *   'fault'    → il server non risponde: la coda su git è il ripiego, e lo si
+ *                dice ad alta voce;
+ *   'absent'   → nessun biglietto (giro senza canale): cammino vecchio, muto.
+ */
+async function deliverToChannel(intent, data) {
+  const ticket = readRoutineTicket(ROOT);
+  if (!ticket) return { outcome: 'absent' };
+  try {
+    const ch = await import('./routine-channel.mjs');
+    const r = await ch.deliver(ticket, intent, data);
+    if (r.outcome === 'fault') {
+      process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): ripiego sulla coda su git\n`);
+    } else if (r.outcome === 'refused') {
+      process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${r.reason}): non ripiego, la decisione non viene registrata\n`);
+    }
+    return r;
+  } catch (e) {
+    process.stderr.write(`[dispatch] canale non utilizzabile (${e?.message || e}): ripiego sulla coda su git\n`);
+    return { outcome: 'fault', reason: String(e?.message || e) };
+  }
+}
+
+/**
  * Nota per la chat del feedback con l'esito del verifier. PURA (testata in
  * tests/unit/dispatch.test.mjs). Prima l'esito viveva SOLO nel file di stato su
  * git e l'owner non lo vedeva mai in dashboard: ora ogni verdetto (pass e fail)
@@ -905,42 +940,73 @@ function sealTransition(state, by) {
   return sealed;
 }
 
-function recordVerifier(id, verdict, critique) {
+async function recordVerifier(id, verdict, critique) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(guard.state || {}), id }, verdict, critique);
   next.id = id;
+
+  // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
+  // locale finisce su git, e se lo si scrivesse prima, un verdetto RIFIUTATO
+  // lascerebbe scritto "verificato" da una parte e niente dall'altra — con i
+  // due cammini che divergono nella direzione più permissiva, che è
+  // esattamente quella da cui questa spec viene a togliere l'autorità.
+  const sent = await deliverToChannel('verdict', {
+    verdict, critique: verifierNoteText(verdict, critique), branch: next.branch || '',
+  });
+  if (sent.outcome === 'refused') {
+    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+  }
+
   sealTransition(next, `verifier:${verdict}`);
   persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
-  // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
-  // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
-  // blocked-loop). Idempotente se lo status è già quello. La nota con l'esito
-  // va nella chat del feedback (apply-triage la appende come turno, senza
-  // sovrascrivere lo storico).
+  if (sent.outcome === 'ok') return next;
+
+  // Ripiego: PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica
+  // fix (il 3° FAIL → design lo gestisce il giro dopo). La nota con l'esito va
+  // nella chat del feedback, senza sovrascrivere lo storico.
   queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability',
     verifierNoteText(verdict, critique));
   return next;
 }
-function recordFixed(id, report = '') {
+async function recordFixed(id, report = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
+
+  // Il server prima dello stato locale: vedi il commento in recordVerifier.
+  const sent = await deliverToChannel('fixed', { report: String(report || ''), branch: next.branch || '' });
+  if (sent.outcome === 'refused') {
+    return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
+  }
+
   sealTransition(next, 'fixer:consegna');
   persistStateToGit(id, `feedback: fixed ${id}`);
-  // Fix ri-applicato → torna in attesa della verifica comportamentale. Il
-  // report del fixer (cosa ha corretto e come) va nella chat del feedback,
-  // come per verifier e new-work: senza, la correzione è invisibile all'owner.
+  if (sent.outcome === 'ok') return next;
+
+  // Ripiego: fix ri-applicato → torna in attesa della verifica comportamentale.
+  // Il report (cosa ha corretto e come) va nella chat del feedback: senza, la
+  // correzione è invisibile all'owner.
   queueStatus(id, 'revision_capability', String(report || ''));
   return next;
 }
-function recordSecaudit(id, verdict) {
+async function recordSecaudit(id, verdict) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
   next.id = id;
+
+  // Il server prima dello stato locale: vedi il commento in recordVerifier.
+  const sent = await deliverToChannel('secaudit', { verdict, branch: next.branch || '' });
+  if (sent.outcome === 'refused') {
+    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+  }
+
   sealTransition(next, `secaudit:${verdict}`);
   persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
+  // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
+  // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
   return next;
 }
 
@@ -1030,6 +1096,21 @@ export function rejectionText(message) {
 }
 
 /**
+ * Il rifiuto arriva dal SERVER, non dalla guardia sull'identità della directory.
+ * Sono due cose diverse e vanno dette diverse: chi legge "la directory non
+ * corrisponde al branch" quando il problema è il ruolo o la macchina a stati
+ * insegue per mezz'ora il problema sbagliato.
+ */
+export function channelRejectionText(message) {
+  return [
+    `[dispatch] RIFIUTATO dal server: ${message}`,
+    'La decisione NON è stata registrata da nessuna parte, e non va aggirata',
+    'depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato',
+    "vero e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati.",
+  ].join('\n');
+}
+
+/**
  * Emette un GUASTO: nessun lavoro consegnato, e il worker lo dice
  * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
  * il giro senza travestirlo da giornata tranquilla.
@@ -1056,6 +1137,52 @@ export async function run() {
     process.stderr.write('[dispatch] routine autonome SPENTE dalla tab Automazioni: niente da fare\n');
     emit({ role: 'off' }, {});   // emit() cancella da sé il marcatore di ruolo
     return { exit: 0 };
+  }
+
+  // ── Con un biglietto, il lavoro lo sceglie il SERVER ──────────────────────
+  //
+  // Non è una preferenza: il biglietto è legato a un feedback preciso, e ogni
+  // consegna fatta con quel biglietto parla di QUEL feedback. Se qui si
+  // scegliesse per conto proprio, si lavorerebbe una cosa e si consegnerebbe
+  // un'altra — e il controllo del server, che è tutto il punto, direbbe sempre
+  // sì sul feedback sbagliato.
+  //
+  // Senza biglietto resta il cammino di prima, identico.
+  const ticket = readRoutineTicket(ROOT);
+  if (ticket) {
+    const cap0 = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: automation.loopCap ?? null });
+    const opts0 = { proberWhenIdle: automation.proberWhenIdle };
+    let w;
+    try {
+      const ch = await import('./routine-channel.mjs');
+      w = await ch.work(ticket);
+    } catch (e) {
+      return emitHalt('transient', `canale non utilizzabile: ${e?.message || e}`);
+    }
+    if (!w.ok) {
+      // In dubbio ci si ferma: un biglietto che non apre il proprio lavoro non
+      // è una giornata tranquilla, è un giro che non deve partire.
+      return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);
+    }
+    const bucket = {
+      role: w.role,
+      id: w.id || undefined,
+      num: w.num || '',
+      branch: w.branch || '',
+      loopCount: Number(w.payload && w.payload.loopCount) || 0,
+    };
+    if (bucket.id) {
+      // Lo stato locale resta il ripiego quando il server non risponde: si
+      // allinea a ciò che il server ha appena detto, così le due copie non
+      // divergono in silenzio.
+      const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
+      bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
+      if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
+        bucket.state.verifierCritique = w.payload.critique;
+      }
+    }
+    const empty = { reviews: [], todoWinner: null };
+    return finalizeBucket(bucket, empty, cap0, opts0, { server: w });
   }
 
   let snapshot;
@@ -1170,7 +1297,7 @@ function positionOnBranch(bucket) {
   return { ok: true, branch };
 }
 
-async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
+async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromServer = null) {
   // Coda vuota con l'esplorazione spenta dall'owner (#448): non c'è niente da
   // fare, e non c'è niente da riparare. Nessun worker, nessun claim, nessun
   // ritorno alla linea principale: il giro finisce sereno con exit 0.
@@ -1194,6 +1321,13 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
     const { acquire } = await import('./claim-feedback.mjs');
     const res = acquire(bucket.id, { num: bucket.num });
     if (res.status === 'taken') {
+      if (fromServer) {
+        // Col biglietto il semaforo vero l'ha già preso il server: trovare qui
+        // un lucchetto della vecchia strada vuol dire che le due contabilità
+        // non concordano. Non si sceglie un altro lavoro (il biglietto vale per
+        // questo e per nessun altro): ci si ferma.
+        return emitHalt('transient', 'il feedback assegnato dal server risulta preso da un altra routine sulla vecchia strada');
+      }
       // Già in lavorazione da un'altra routine: escludilo e ri-scegli.
       const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
       return finalizeBucket(chooseBucket(next, cap, opts), next, cap, opts);
@@ -1203,10 +1337,13 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
     // presa in carico di un lavoro nuovo (todo→working): i bucket dell'iter di
     // revisione hanno già il loro status revision_*.
     if (bucket.role === 'new-work') {
-      try {
-        execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'working', ''],
-          { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-      } catch (_) { /* best-effort: il lock vero è il claim */ }
+      const sent = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+      if (sent.outcome !== 'ok' && sent.outcome !== 'refused') {
+        try {
+          execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'working', ''],
+            { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
+        } catch (_) { /* best-effort: il lock vero è il claim */ }
+      }
     }
   }
 
@@ -1238,13 +1375,18 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}) {
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
+  //
+  // Col biglietto il feedback arriva GIÀ DECIFRATO dal server, ritagliato a ciò
+  // che il ruolo può vedere: non lo si va a rileggere da soli, o si
+  // rimetterebbe in piedi proprio il cammino che la spec vuole togliere.
   const ctx = {};
+  const served = fromServer && fromServer.payload;
   if (bucket.role === 'secaudit') {
     ctx.diff = diffForBranch(bucket.branch);
   } else if (bucket.role === 'verifier' || bucket.role === 'fixer') {
-    ctx.feedback = await decryptOne(bucket.id);
+    ctx.feedback = (served && served.feedback) || (await decryptOne(bucket.id));
   } else if (bucket.role === 'new-work') {
-    ctx.feedback = snapshot.todoWinner?._full || (await decryptOne(bucket.id));
+    ctx.feedback = (served && served.feedback) || snapshot.todoWinner?._full || (await decryptOne(bucket.id));
   }
 
   emit(bucket, ctx);
@@ -1306,22 +1448,22 @@ if (isMainModule) {
     if (flag === '--record-verifier') {
       const [, id, verdict, ...rest] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|fail> ["critica"]'); process.exit(1); }
-      const s = recordVerifier(id, verdict, rest.join(' '));
-      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
+      const s = await recordVerifier(id, verdict, rest.join(' '));
+      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = argv;
       if (!id) { console.error('Uso: --record-fixed <id> ["report"]'); process.exit(1); }
-      const s = recordFixed(id, rest.join(' '));
-      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
+      const s = await recordFixed(id, rest.join(' '));
+      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
       const [, id, verdict] = argv;
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
-      const s = recordSecaudit(id, verdict);
-      if (s.rejected) { console.error(rejectionText(s.message)); process.exit(3); }
+      const s = await recordSecaudit(id, verdict);
+      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
       process.exit(0);
     } else if (flag === '--preflight') {
@@ -1344,29 +1486,21 @@ if (isMainModule) {
     } else {
       // Default: sceglie il bucket e stampa il JSON.
       //
-      // `--ticket <biglietto>` (#477.1, fase in cui i due canali convivono):
-      // registra sul server la differenza fra la scelta appena fatta qui e
-      // quella che il server aveva legato al biglietto. È un confronto, non una
-      // consegna: l'autorità resta a questo cammino, e se il canale non
-      // risponde non cambia niente per il giro in corso.
-      //
-      // Lo fa dispatch e non il worker perché il worker se ne dimenticherebbe:
-      // è la stessa lezione della provenienza dei feedback, dove su decine di
-      // ritrovamenti uno solo risultava firmato giusto finché a firmare doveva
-      // pensarci chi lavorava.
+      // `--ticket <biglietto>` (#477.2): con un biglietto il lavoro lo sceglie
+      // il SERVER e le consegne passano di lì. Il biglietto viene messo dove
+      // chi consegna lo ritrova da solo (vedi lib/routine-ticket.mjs): le
+      // consegne le fanno script diversi in momenti diversi, e pretendere che
+      // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
+      // provenienza dei feedback.
       const ti = argv.indexOf('--ticket');
       const ticket = ti !== -1 ? argv[ti + 1] : '';
-      run().then(async (r) => {
-        if (ticket) {
-          try {
-            const ch = await import('./routine-channel.mjs');
-            const mine = lastChoice() || { role: '', num: '' };
-            const res = await ch.compare(ticket, mine);
-            process.stderr.write(`[dispatch] confronto col canale: ${res.ok ? (res.same ? 'stessa scelta' : 'scelte diverse (registrato)') : 'non registrato'}\n`);
-          } catch (e) {
-            process.stderr.write(`[dispatch] confronto col canale non riuscito: ${e?.message || e}\n`);
-          }
-        }
+      // Il biglietto viene messo dove chi consegna lo ritrova da solo: le
+      // consegne le fanno script diversi, in momenti diversi, e pretendere che
+      // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
+      // provenienza dei feedback. Un giro senza biglietto cancella il
+      // marcatore, o quello del giro prima sopravvivrebbe a questo.
+      if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
+      run().then((r) => {
         process.exit(r?.exit ?? 0);
       }).catch((e) => {
         process.stderr.write(`[dispatch] errore fatale: ${e.message}\n`);

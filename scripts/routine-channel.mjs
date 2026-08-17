@@ -12,11 +12,15 @@
 //   semaforo solo. Il lavoratore, col biglietto, ottiene il proprio lavoro già
 //   in chiaro — e nient'altro.
 //
-// STATO (pezzo #477.1): il canale c'è e funziona, ma NON ha ancora autorità.
-//   Le decisioni continuano a passare dalla coda su git. Qui si può già
-//   chiedere un biglietto, ritirare il lavoro, battere il cuore e rilasciare;
-//   il confronto fra la scelta del server e quella del cammino su git viene
-//   registrato per l'owner. La consegna passerà di qui col pezzo successivo.
+// STATO (pezzo #477.2): le decisioni passano DA QUI. La coda su git resta come
+//   ripiego per il solo caso in cui il server non risponda, ed è un ripiego
+//   dichiarato: un RIFIUTO del server non fa ripiegare su niente.
+//
+//   La differenza non è una sfumatura. Un rifiuto è una risposta — il server ha
+//   guardato ruolo, ramo e stato e ha detto no; ripiegare sulla vecchia strada
+//   dopo un rifiuto vorrebbe dire scrivere lo stesso a dispetto del controllo,
+//   cioè rimettere in piedi il buco che questa spec viene a chiudere. Un guasto
+//   è il server che non c'è: lì la vecchia strada serve, ma va detto.
 //
 // I SEGRETI NON PASSANO DALL'AMBIENTE
 //   Parola d'ordine e biglietto si passano come ARGOMENTO, mai come variabile
@@ -38,6 +42,11 @@
 //
 //   node scripts/routine-channel.mjs release <biglietto>
 //       → fine lavoro: il biglietto muore e il semaforo si libera.
+//
+//   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
+//       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
+//         note, feedback. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
+//         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //
 //   node scripts/routine-channel.mjs compare <biglietto> <ruolo> <numero>
 //       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
@@ -126,6 +135,41 @@ export async function release(t, opts) {
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || '') };
 }
 
+/**
+ * Distingue un RIFIUTO da un GUASTO. PURA, ed è la distinzione che regge tutto
+ * il ripiego sulla coda su git.
+ *
+ * Un rifiuto è una RISPOSTA: il server ha guardato e ha detto no (il ruolo non
+ * può, il passaggio di stato è illegale, il ramo non combacia, il biglietto è
+ * morto). Ripiegare sulla vecchia strada dopo un rifiuto vorrebbe dire fare
+ * lo stesso a dispetto del controllo — cioè rimettere in piedi esattamente il
+ * buco che questa spec viene a chiudere.
+ *
+ * Un guasto è il server che non risponde. Lì la vecchia strada è un ripiego
+ * legittimo, ma va detto ad alta voce.
+ */
+export function classifyReply(status, body) {
+  if (status === 200 && body && body.ok) return 'ok';
+  if (status === 0 || status >= 500) return 'fault';
+  return 'refused';
+}
+
+/**
+ * Consegna un intento al server. `data` NON contiene mai il feedback su cui si
+ * agisce: quello il server lo legge dal biglietto.
+ * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num? }}
+ */
+export async function deliver(t, intent, data, opts) {
+  const { status, body } = await call('routineDeliver', { ticket: t, intent, data: data || {} }, opts);
+  const outcome = classifyReply(status, body);
+  return {
+    outcome,
+    reason: String((body && body.reason) || (outcome === 'ok' ? '' : `http_${status}`)),
+    id: body && body.id,
+    num: body && body.num,
+  };
+}
+
 export async function compare(t, mine, opts) {
   const { status, body } = await call('routineCompare', { ticket: t, mine }, opts);
   return { ok: status === 200 && !!(body && body.ok), same: !!(body && body.same) };
@@ -136,11 +180,24 @@ export async function compare(t, mine, opts) {
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
-  const flags = rest.filter((a) => a.startsWith('--'));
-  const args = rest.filter((a) => !a.startsWith('--'));
+  // Un passaggio solo: i `--campo valore` diventano dati dell'intento, il resto
+  // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
+  // valore che assomiglia a un comando non viene scambiato per tale.
+  const args = [];
+  const flags = [];
+  const data = {};
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (!a.startsWith('--')) { args.push(a); continue; }
+    flags.push(a);
+    const key = a.slice(2);
+    const next = rest[i + 1];
+    if (next === undefined || next.startsWith('--')) data[key] = true;
+    else { data[key] = next; i += 1; }
+  }
 
   const usage = () => {
-    console.error('Uso: node scripts/routine-channel.mjs <ticket|work|heartbeat|release|compare> <segreto> [...]');
+    console.error('Uso: node scripts/routine-channel.mjs <ticket|work|heartbeat|release|deliver|compare> <segreto> [...]');
     process.exit(1);
   };
 
@@ -173,6 +230,12 @@ if (isMain) {
   } else if (cmd === 'release') {
     const r = await release(args[0]);
     console.log(r.ok ? 'OK: biglietto rilasciato.' : `rilascio non riuscito (${r.reason})`);
+  } else if (cmd === 'deliver') {
+    // deliver <biglietto> <intento> [--campo valore ...]
+    const r = await deliver(args[0], args[1] || '', data);
+    if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
+    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
     const r = await compare(args[0], { role: args[1] || '', num: args[2] || '' });
     if (!r.ok) { console.error('confronto non registrato'); process.exit(0); }
