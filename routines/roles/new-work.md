@@ -23,7 +23,7 @@ NON implementare tutto in una volta.
    chi la lavora non ha contesto — includi dettagli, vincoli, criterio di
    "fatto"):
    ```bash
-   node scripts/queue-feedback.mjs --parent <id> \
+   node scripts/routine-channel.mjs deliver feedback --parentId <id> \
      --name "titolo breve" --priority <0-3> "descrizione self-contained"
    ```
    Se un punto è ambiguo, crea quel sub-feedback con `--status clarify` e scrivi

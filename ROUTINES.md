@@ -137,7 +137,7 @@ Ripeti finché il budget è quasi pieno:
    - Rete di sicurezza: a un **429** o a un **`session limit`** su un worker →
      checkpoint + rilascio claim + termina. Se un worker è morto tagliato,
      **bonifica prima di terminare**: `git status` pulito, claim orfano rilasciato
-     (`node scripts/claim-feedback.mjs release <id>` e/o
+     (`node scripts/routine-channel.mjs release <biglietto>` e/o
      `node scripts/dispatch.mjs --clear-state <id>`), stato del branch coerente col
      vero verdetto raggiunto.
    - **REGOLA DURA — un `session limit` CHIUDE il run, niente ripresa.** Appena un
@@ -335,7 +335,7 @@ leggendo solo lo STATO e stampa il JSON per il worker:
   `general-purpose`. Non serve che il cloud onori `.claude/agents/`.
 - **Provenienza dei feedback (#443)**: consegnando il lavoro, dispatch scrive
   anche **chi sei** in `.claude/routine-role.json` (effimero e gitignorato, come
-  `branch-expect.json`). `queue-feedback.mjs` lo rilegge da solo: un feedback
+  `branch-expect.json`). chi apre un feedback lo rilegge da solo: un feedback
   aperto durante il tuo giro arriva firmato `routine:<ruolo>` e in dashboard si
   distingue esplorazione / sviluppo / verifica. **Non passare `--role` a mano**:
   la firma è automatica proprio perché prima dipendeva dalla memoria del worker,
@@ -474,7 +474,7 @@ feature spezzata in `#N.M` NON fonde i pezzi su `main` uno a uno.
   verifica + secaudit.
 - Il **merge verso `main` avviene UNA volta sola**, a feature finita: chiudendo
   l'ultimo `#N.M`, auto-genera **`#N.final`** via
-  `node scripts/queue-feedback.mjs --parent <idN>` — una verifica d'integrazione
+  `node scripts/routine-channel.mjs deliver feedback --parentId <idN>` — una verifica d'integrazione
   dell'intera `feature/N` contro la spec, poi gate `feature/N`→`main` con un L4
   d'integrazione cieco sul diff cumulato.
 - Appena parte una feature multipla le si dà priorità massima e la flotta lavora

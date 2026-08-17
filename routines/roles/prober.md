@@ -56,7 +56,7 @@ Non limitarti a leggere il codice. Esercita un flusso reale cercando di romperlo
 ## Come accodi
 
 ```bash
-node scripts/queue-feedback.mjs --status new --name "titolo breve" \
+node scripts/routine-channel.mjs deliver feedback --name "titolo breve" \
   [--priority 0-3] [--image tests/.shots/audit-<slug>.png] \
   "PARTE UTENTE: cosa si rompe e passi per riprodurlo.
 
