@@ -76,8 +76,8 @@ tu** a registrare l'esito e a far girare il gate (L5 deterministico + il tuo L4)
    superato, la modifica è stata pubblicata", oppure il motivo del blocco e cosa
    deve decidere l'owner). Mai frammenti di diff, mai la ridescrizione della
    feature:
-   - `0` → fuso sul target → `node scripts/queue-triage.mjs <id> done "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 o L4) → `node scripts/queue-triage.mjs <id> design "<nota del gate>" --branch <branch> --reason secaudit`
+   - `0` → fuso sul target → `node scripts/routine-channel.mjs deliver status --status done --notes "<report>"` + `node scripts/dispatch.mjs --clear-state <id>`
+   - `10` → BLOCCATO (L5 o L4) → `node scripts/routine-channel.mjs deliver status --status design --notes "<nota del gate>" --branch <branch> --reason secaudit`
    - `20` → conflitto → risolvi o accoda `design` (come sopra).
    - `1` → errore tecnico.
 
@@ -87,7 +87,7 @@ non qui. Tu sei solo L4 (il giudizio LLM). I due livelli si completano.
 
 L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
 controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
-all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+all'utente va nelle `notes` del feedback (via il canale del server), NON nella riga
 di ritorno.
 
 La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
@@ -102,10 +102,10 @@ deve ignorare: è un bug del ruolo, non un extra utile.
 
 ## Se il server RIFIUTA una consegna
 
-Gli script che consegnano (queue-triage, queue-feedback, i `--record-*`) passano
+Gli script che consegnano (le consegne del canale e i `--record-*`) passano
 dal canale del server. Se escono con **4** ("RIFIUTATO dal server") la tua
-decisione **non è stata registrata da nessuna parte**, e non va aggirata
-depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato vero
+decisione **non è stata registrata da nessuna parte**, e non c'è nessun
+altro posto dove depositarla: il server ha guardato ruolo, ramo e stato vero
 e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati e riportalo
 nella riga finale come guasto. Uscita **3** invece è il server che non risponde:
-lì il ripiego sulla coda parte da solo.
+lì la decisione NON è stata registrata: fermati e riportalo.

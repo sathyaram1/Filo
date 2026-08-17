@@ -39,10 +39,6 @@ const {
   verifierNoteText,
   reconcileState,
   withRetry,
-  persistStateToGit,
-  appendWorkerLog,
-  buildWorkerLogEntry,
-  workerLogFileName,
   emit,
   preflight,
   preflightExitCode,
@@ -292,12 +288,6 @@ test('readState: id inesistente → null', () => {
 // perdeva il verdetto e dispatch re-instradava all'infinito lo stesso feedback.
 // Sotto FILO_DISPATCH_STATE_DIR (test) la persistenza deve essere un NO-OP: mai
 // toccare git col repo reale mentre gira la suite.
-test('persistStateToGit: no-op sotto FILO_DISPATCH_STATE_DIR (non tocca git)', () => {
-  const before = process.env.FILO_DISPATCH_STATE_DIR;
-  assert.ok(before, 'la STATE_DIR di test deve essere impostata');
-  // Non deve lanciare né eseguire alcun comando git: ritorna senza effetti.
-  assert.doesNotThrow(() => persistStateToGit('DISK-GIT', 'test: no-op'));
-});
 
 // ─── resolveLoopCap: precedenza env > remoto > default, con clamp ─────────────
 
@@ -430,34 +420,9 @@ test('withRetry: nessun retry se il primo tentativo riesce', async () => {
 
 // ─── appendWorkerLog: accoda + cap sulle più recenti ──────────────────────────
 
-test('appendWorkerLog: accoda in coda e conserva l ordine cronologico', () => {
-  const a = { role: 'new-work', startedAt: '2026-07-29T10:00:00.000Z', num: '374' };
-  const b = { role: 'verifier', startedAt: '2026-07-29T10:05:00.000Z', num: '374' };
-  const out = appendWorkerLog([a], b, 200);
-  assert.deepEqual(out, [a, b]); // append in coda, il più recente per ultimo
-});
 
-test('appendWorkerLog: taglia le voci più VECCHIE quando supera il cap', () => {
-  const mk = (i) => ({ role: 'prober', startedAt: `t${i}`, num: '' });
-  const seed = [mk(1), mk(2), mk(3)];
-  const out = appendWorkerLog(seed, mk(4), 3);
-  assert.equal(out.length, 3);
-  // Restano le 3 più recenti: la testa (mk(1)) è stata tagliata.
-  assert.deepEqual(out.map((e) => e.startedAt), ['t2', 't3', 't4']);
-});
 
-test('appendWorkerLog: ignora voci malformate e senza ruolo', () => {
-  const good = { role: 'fixer', startedAt: 't1', num: '' };
-  // Voce senza ruolo → non aggiunta; input sporco → filtrato.
-  const out = appendWorkerLog([null, good, 'x', 5], { startedAt: 't2' }, 200);
-  assert.deepEqual(out, [good]);
-});
 
-test('appendWorkerLog: input non-array → parte da lista vuota', () => {
-  const e = { role: 'secaudit', startedAt: 't1', num: '' };
-  assert.deepEqual(appendWorkerLog(undefined, e, 200), [e]);
-  assert.deepEqual(appendWorkerLog(null, null, 200), []);
-});
 
 // ─── #443: la consegna del lavoro firma anche CHI lo sta facendo ─────────────
 //
@@ -598,31 +563,8 @@ test('preflightExitCode: il contratto 0 / 2 / 3 dell\'orchestratore', () => {
 
 // ─── Voci del registro dei worker (#451) ─────────────────────────────────────
 
-test('buildWorkerLogEntry: voce completa per la coda', () => {
-  const e = buildWorkerLogEntry({ role: 'new-work', num: '#22.1' }, new Date('2026-08-13T12:00:00.000Z'));
-  assert.equal(e.op, 'worker-log');
-  assert.equal(e.role, 'new-work');
-  assert.equal(e.num, '#22.1');
-  assert.equal(e.startedAt, '2026-08-13T12:00:00.000Z');
-  assert.equal(e.queuedAt, '2026-08-13T12:00:00.000Z');
-});
 
-test('buildWorkerLogEntry: senza ruolo non c\'è niente da registrare', () => {
-  assert.equal(buildWorkerLogEntry({}), null);
-  assert.equal(buildWorkerLogEntry(null), null);
-});
 
-test('workerLogFileName: ordinabile per istante e non collidibile', () => {
-  const a = workerLogFileName({ startedAt: '2026-08-13T12:00:00.000Z' }, 'aaaaaa');
-  const b = workerLogFileName({ startedAt: '2026-08-13T12:00:01.000Z' }, 'bbbbbb');
-  assert.ok(a.startsWith('wl-') && a.endsWith('.json'));
-  assert.ok(a < b, 'i nomi devono ordinarsi come gli istanti');
-  assert.notEqual(
-    workerLogFileName({ startedAt: '2026-08-13T12:00:00.000Z' }, 'aaaaaa'),
-    workerLogFileName({ startedAt: '2026-08-13T12:00:00.000Z' }, 'zzzzzz'),
-  );
-  assert.ok(!a.includes(':'), 'i due punti non sono ammessi nei nomi file su Windows');
-});
 
 // ─── teardown ─────────────────────────────────────────────────────────────────
 

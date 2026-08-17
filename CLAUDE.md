@@ -513,10 +513,23 @@ firebase deploy --only storage              # solo le regole Storage
 firebase deploy                             # entrambe
 ```
 
-Per le convenzioni di scrittura su Firestore (coda su git, `queue-triage.mjs`,
-GitHub Action) e la macchina a stati dei feedback (`todo`→`working`→
-`revision_*`→`done`, spec completa in **`FEEDBACK-STATES.md`**) → vedi
-`ROUTINES.md` e `routines/shared.md`.
+**Chi scrive sui feedback, e come.** Ci sono due strade, e una sola per ciascuno:
+
+- **tu (sessione locale)** → `npm run feedback -- <id> <status> "nota"`. Scrive
+  direttamente con le tue credenziali e valida il passaggio di stato leggendo lo
+  stato VERO. Se stai chiudendo a mano una pratica dell'iter di lavorazione
+  (presa in carico, consegna, chiusura di un fix) aggiungi `--come-routine`: la
+  macchina a stati distingue chi scrive, e quei passaggi appartengono alle
+  routine;
+- **le routine** → il canale autenticato verso il server, che valida ogni
+  consegna. Non hanno, e non devono avere, un altro modo.
+
+La coda su git, l'automatismo che la applicava e i semafori come file **non
+esistono più** (spec `ROUTINE-AUTH-SPEC.md`): le note — cioè i report scritti per
+te — ci passavano in chiaro dentro un repo pubblico, e ci restavano anche dopo.
+
+Macchina a stati dei feedback (`todo`→`working`→`revision_*`→`done`): spec
+completa in **`FEEDBACK-STATES.md`**; il flusso delle routine in `ROUTINES.md`.
 
 ## Workflow worktree
 

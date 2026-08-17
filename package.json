@@ -20,14 +20,12 @@
     "test:shoot": "node tests/agent/shoot.mjs",
     "finish": "node scripts/finish-local.mjs",
     "finish:check": "node scripts/finish-local.mjs --check",
-    "feedback:queue": "node scripts/queue-triage.mjs",
-    "feedback:new": "node scripts/queue-feedback.mjs",
-    "feedback:apply": "node scripts/apply-triage.mjs",
     "feedback:backfill": "node scripts/backfill-feedback-numbers.mjs",
     "feedback:auto-archive": "node scripts/auto-archive.mjs",
     "feedback:login": "node scripts/admin-login.mjs",
     "build": "electron-builder --win",
-    "release": "electron-builder --win --publish always"
+    "release": "electron-builder --win --publish always",
+    "feedback": "node scripts/owner-feedback.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

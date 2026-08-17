@@ -73,11 +73,10 @@ import {
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
-import { pushFileToMainWithRetry } from './lib/isolated-push.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
-// Lo stato vive accanto ai claim, sotto feedback-triage/state/ (override per i test).
+// Lo stato locale e' solo un ripiego: quello vero vive sul server. Sta fra i
 const STATE_DIR = stateDir(ROOT);
 const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
@@ -218,109 +217,6 @@ export function resolveRoutinesEnabled({ envRaw, remote } = {}) {
  * RESTA nella coda (e viene ritentato dal giro successivo, vedi
  * `drainWorkerLogQueue`) e il motivo finisce su stderr.
  */
-async function recordWorkerSpawn(bucket) {
-  const entry = buildWorkerLogEntry(bucket, new Date());
-  if (!entry) return;
-  // Nei test la STATE_DIR è sovrascritta: lì non si tocca né git né la coda.
-  if (process.env.FILO_DISPATCH_STATE_DIR) return;
-  try {
-    mkdirSync(SPOOL_DIR, { recursive: true });
-    const file = resolve(SPOOL_DIR, workerLogFileName(entry));
-    writeFileSync(file, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
-    flushWorkerLogFile(file);
-  } catch (e) {
-    process.stderr.write(`[dispatch] registro worker: voce NON accodata (${e?.message || e})\n`);
-  }
-  drainWorkerLogQueue();
-}
-
-/**
- * Spedisce UN fogliettino del registro sul ramo principale e, se ci riesce, lo
- * toglie da qui: da lì in poi la copia che conta è quella su `main`, che la
- * Action applica e cancella. Se non ci riesce lo lascia dov'è — un giro
- * successivo lo ritenta — e dice perché.
- */
-function flushWorkerLogFile(file) {
-  const res = pushFileToMainWithRetry(ROOT, file, `feedback: registro worker ${basename(file)}`, 4, MAIN_BRANCH);
-  if (res.ok) {
-    try { rmSync(file, { force: true }); } catch (_) { /* resterà, e il giro dopo lo ripesca */ }
-    return true;
-  }
-  process.stderr.write(`[dispatch] registro worker: spedizione fallita (${res.reason}) — la voce resta in coda e verrà ritentata\n`);
-  return false;
-}
-
-/** I fogliettini del registro rimasti indietro (spedizione fallita in passato). */
-function pendingWorkerLogFiles() {
-  try {
-    return readdirSync(SPOOL_DIR)
-      .filter((f) => f.startsWith(WORKER_LOG_PREFIX) && f.endsWith('.json'))
-      .sort()
-      .map((f) => resolve(SPOOL_DIR, f));
-  } catch (_) {
-    return [];
-  }
-}
-
-/**
- * Ritenta le voci rimaste indietro. È qui che un guasto passeggero della rete
- * si ripara da solo: la voce non è persa, arriva col giro dopo. Se invece i
- * fogliettini si accumulano il messaggio lo dice, perché un registro che non
- * arriva in dashboard va visto, non dedotto dal fatto che è vuoto.
- */
-function drainWorkerLogQueue(max = 20) {
-  const pending = pendingWorkerLogFiles();
-  if (!pending.length) return;
-  let stuck = 0;
-  for (const f of pending.slice(0, max)) {
-    if (!flushWorkerLogFile(f)) { stuck++; break; } // se una fallisce falliscono tutte: inutile insistere
-  }
-  const left = pendingWorkerLogFiles().length;
-  if (left) {
-    process.stderr.write(`[dispatch] registro worker: ${left} voci ancora in coda (non arrivate in dashboard)${stuck ? '' : ' — riprovo al prossimo giro'}\n`);
-  }
-}
-
-// Quante voci del log dei worker conservare (le più recenti). Deve restare
-// allineato a SN_CONST.AUTOMATION.WORKER_LOG_CAP (src/shared/constants.js): il
-// log vive come campo del doc config/automation, cappato per non gonfiarlo.
-const WORKER_LOG_CAP = 200;
-
-// La coda su git dove finiscono triage, semafori e — da #451 — le voci del
-// registro dei worker. Il prefisso distingue le voci del registro dai file di
-// triage (`<id>.json`) e dalle creazioni (`new-*.json`).
-const SPOOL_DIR = resolve(ROOT, 'feedback-triage');
-const WORKER_LOG_PREFIX = 'wl-';
-
-/**
- * La voce del registro per un worker che sta per partire, o null se non c'è
- * niente da registrare (bucket senza ruolo). Pura: la costruzione è separata
- * dalla spedizione, così il formato si testa senza toccare git.
- */
-export function buildWorkerLogEntry(bucket, now = new Date()) {
-  const role = String(bucket?.role || '');
-  if (!role) return null;
-  const startedAt = (now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date()).toISOString();
-  return {
-    op: 'worker-log',
-    role,
-    startedAt,
-    num: bucket?.num != null ? String(bucket.num) : '',
-    queuedAt: startedAt,
-    queuedBy: 'dispatch',
-  };
-}
-
-/**
- * Nome del fogliettino. Contiene l'istante (ordinabile alfabeticamente, che è
- * anche l'ordine in cui l'applier le applica) e una coda casuale, perché due
- * giri partiti nello stesso secondo non si sovrascrivano a vicenda.
- */
-export function workerLogFileName(entry, rand = Math.random().toString(36).slice(2, 8)) {
-  const ts = String(entry?.startedAt || new Date().toISOString()).replace(/[:.]/g, '-');
-  return `${WORKER_LOG_PREFIX}${ts}-${rand}.json`;
-}
-
 // ─── Logica pura (esportata, testata in tests/unit/dispatch.test.mjs) ─────────
 
 /**
@@ -502,104 +398,6 @@ export function writeState(state) {
 export function clearState(id) {
   const f = stateFile(id);
   if (existsSync(f)) rmSync(f, { force: true });
-}
-
-// ─── Persistenza su git del file di stato (mirror di claim-feedback.mjs) ──────
-//
-// I record-* scrivono il file di stato con writeState (fs), ma NON lo committano:
-// prima si affidavano all'hook di auto-commit. Quell'hook però scatta SOLO su
-// Edit|Write|NotebookEdit, MAI su Bash (vedi .claude/settings.local.json). Un
-// verifier/secaudit è di sola lettura: non fa alcun Edit/Write, lancia
-// `--record-*` via Bash, e la sua scrittura resta NON committata → il primo
-// `git reset`/rebase la cancella. Risultato: il verdetto va perso e dispatch
-// re-instrada all'infinito lo STESSO feedback al verifier (incident #289,
-// 2026-07-11: due verifier PASS di fila mai persistiti). Quindi ogni record-*
-// committa e pusha il PROPRIO file di stato su origin/main, esattamente come i
-// claim (che infatti atterrano puliti su main). Best-effort: un guasto git non
-// deve mai far fallire il record (lo stato locale resta scritto comunque).
-// Nota: `tryGit` è definita più sotto (§ git) e riusata qui.
-export function persistStateToGit(id, message) {
-  // Nei test la STATE_DIR è sovrascritta (FILO_DISPATCH_STATE_DIR): lì non si
-  // tocca git — lo stato è un file temporaneo, non il repo reale.
-  if (process.env.FILO_DISPATCH_STATE_DIR) return;
-  const rel = relative(ROOT, stateFile(id)).split(sep).join('/');
-  if (!tryGit(['add', '--', rel]).ok) return;
-  // Niente in stage per questo file → già allineato, nulla da pushare.
-  if (tryGit(['diff', '--cached', '--quiet', '--', rel]).ok) return;
-  // Commit LOCALE path-limited: il verdetto deve sopravvivere a un reset/rebase
-  // sul branch corrente (incident #289). Questo resta com'era.
-  if (!tryGit(['commit', '-q', '-m', message, '--', rel]).ok) return;
-  pushStateFileToMain(rel, message);
-}
-
-/**
- * Porta il file di stato su `main` **senza pubblicare il branch corrente**.
- *
- * Prima qui c'era `git push origin HEAD:main`. Su un branch worker HEAD NON è il
- * commit del file di stato: è tutta la lavorazione non ancora esaminata. E i
- * branch worker nascono da main, quindi main ne è antenato e il push
- * fast-forwarda — cioè fonde in silenzio l'intero lavoro sulla linea che ogni 6
- * ore viene costruita e distribuita a TUTTI gli utenti, scavalcando verifier,
- * secaudit e cancello di merge. È la stessa perdita del 24 luglio 2026, per una
- * via diversa: là mancava la marcatura di routine, qui è il record del verdetto
- * a fare da cavallo di Troia.
- *
- * Il verdetto però su main ci deve arrivare (è lì che i giri successivi lo
- * rileggono, come i claim). Quindi si costruisce un commit **sintetico** che
- * contiene SOLO il file di stato, sopra la punta di origin/main, e si pusha
- * QUELLO: niente checkout, niente merge, l'albero di lavoro non viene toccato e
- * nessun altro file può salire per sbaglio.
- *
- * Best-effort come prima: un guasto git non deve mai far fallire il record — lo
- * stato locale è già scritto e committato.
- */
-function pushStateFileToMain(rel, message) {
-  const abs = resolve(ROOT, rel);
-  // Un `--clear-state` RIMUOVE il file: la persistenza deve saper cancellare,
-  // non solo aggiungere. Prima il push di HEAD portava con sé anche le
-  // rimozioni; costruendo l'albero a mano il caso va gestito, o lo stato
-  // sopravvive su main e la sessione dopo — che parte da lì — resuscita un
-  // feedback già chiuso.
-  const removing = !existsSync(abs);
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (!tryGit(['fetch', 'origin', MAIN_BRANCH]).ok) return;
-    const base = tryGit(['rev-parse', 'FETCH_HEAD']);
-    if (!base.ok) return;
-    let blob = null;
-    if (!removing) {
-      blob = tryGit(['hash-object', '-w', '--', abs]);
-      if (!blob.ok) return;
-    }
-    // Indice temporaneo: `read-tree`/`update-index` non devono toccare l'indice
-    // vero del repo, o il worker si ritroverebbe lo stage riscritto sotto i piedi.
-    const idx = resolve(STATE_DIR, `.push-index-${process.pid}`);
-    const env = { ...process.env, GIT_INDEX_FILE: idx };
-    const g = (args) => {
-      try { return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', env }).trim() }; }
-      catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
-    };
-    try {
-      if (!g(['read-tree', base.out]).ok) return;
-      if (removing) {
-        if (!g(['update-index', '--force-remove', rel]).ok) return;
-      } else if (!g(['update-index', '--add', '--cacheinfo', `100644,${blob.out},${rel}`]).ok) return;
-      const tree = g(['write-tree']);
-      if (!tree.ok) return;
-      // Albero identico alla punta: su main non c'è niente da cambiare (tipico
-      // di una rimozione già avvenuta). Un commit vuoto sarebbe solo rumore.
-      const baseTree = tryGit(['rev-parse', `${base.out}^{tree}`]);
-      if (baseTree.ok && baseTree.out === tree.out) return;
-      const commit = tryGit(['commit-tree', tree.out, '-p', base.out, '-m', message]);
-      if (!commit.ok) return;
-      // ff-only per costruzione: il padre È la punta di main appena letta. Se
-      // main si è mosso nel frattempo il push viene rifiutato → si rilegge la
-      // punta nuova e si ricostruisce. Nessun rebase, nessun conflitto possibile:
-      // l'unico file toccato è questo.
-      if (tryGit(['push', 'origin', `${commit.out}:${MAIN_BRANCH}`]).ok) return;
-    } finally {
-      rmSync(idx, { force: true });
-    }
-  }
 }
 
 // ─── Payload per-ruolo + inlining del file-ruolo ──────────────────────────────
@@ -838,16 +636,9 @@ async function buildSnapshot() {
 
 // ─── Sotto-comandi --record-* (li chiamano i ruoli) ──────────────────────────
 
-// Riflesso della macchina a stati (best-effort): l'esito del verifier muove lo
-// status persistito, così la dashboard vede l'iter avanzare senza aspettare i
-// report dei ruoli. Il lock/iter vero resta nei file di stato locali.
-function queueStatus(id, status, note = '', reason = '') {
-  try {
-    const args = [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, status, note];
-    if (reason) args.push('--reason', reason);
-    execFileSync('node', args, { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-  } catch (_) { /* best-effort */ }
-}
+// (Qui viveva il ripiego sulla coda su git. È sparito con la coda: adesso o la
+// decisione la registra il server, o non è stata registrata — e chi lavora lo
+// sa, invece di credere che sia andata.)
 
 /**
  * Consegna una decisione al canale del server (#477.2). È la strada
@@ -858,12 +649,13 @@ function queueStatus(id, status, note = '', reason = '') {
  * si fa dopo:
  *   'ok'       → fatto, e NON si scrive anche sulla coda su git (sarebbe la
  *                stessa decisione due volte, con la seconda non controllata);
- *   'refused'  → il server ha guardato e ha detto no. Ci si FERMA: ripiegare
- *                sulla coda vorrebbe dire scrivere lo stesso a dispetto del
- *                controllo, che è il buco da cui nasce tutta questa spec;
- *   'fault'    → il server non risponde: la coda su git è il ripiego, e lo si
- *                dice ad alta voce;
- *   'absent'   → nessun biglietto (giro senza canale): cammino vecchio, muto.
+ *   'refused'  → il server ha guardato e ha detto no. Ci si FERMA, e si legge
+ *                il motivo: era proprio scrivere lo stesso a dispetto del
+ *                controllo il buco da cui nasce tutta questa spec;
+ *   'fault'    → il server non risponde. Anche qui ci si ferma: non esiste più
+ *                una seconda strada su cui posare la decisione, e dirlo ad alta
+ *                voce è l'unica cosa onesta;
+ *   'absent'   → nessun biglietto: non c'è un lavoro a cui riferire la consegna.
  */
 async function deliverToChannel(intent, data) {
   const ticket = readRoutineTicket(ROOT);
@@ -872,13 +664,13 @@ async function deliverToChannel(intent, data) {
     const ch = await import('./routine-channel.mjs');
     const r = await ch.deliver(ticket, intent, data);
     if (r.outcome === 'fault') {
-      process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): ripiego sulla coda su git\n`);
+      process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): la decisione NON è stata registrata\n`);
     } else if (r.outcome === 'refused') {
       process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${r.reason}): non ripiego, la decisione non viene registrata\n`);
     }
     return r;
   } catch (e) {
-    process.stderr.write(`[dispatch] canale non utilizzabile (${e?.message || e}): ripiego sulla coda su git\n`);
+    process.stderr.write(`[dispatch] canale non utilizzabile (${e?.message || e}): la decisione NON è stata registrata\n`);
     return { outcome: 'fault', reason: String(e?.message || e) };
   }
 }
@@ -921,18 +713,14 @@ function guardIdentity(id) {
   b.state.id = id;
   const base = `transizione rifiutata su ${id}: ${v.reason}`;
   if (b.escalate) {
-    try {
-      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), id, 'design',
-        `La lavorazione automatica si è disallineata ${b.count} volte di seguito: chi doveva scrivere l'esito stava guardando un'altra versione del codice, quindi il risultato non sarebbe attendibile. Sospendo i tentativi automatici; serve una tua decisione su come procedere.`,
-        '--reason', 'loop'],
-        { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-    } catch (_) { /* la nota resta in coda al prossimo giro */ }
+    deliverToChannel('status', {
+      status: 'design', reason: 'loop',
+      notes: `La lavorazione automatica si è disallineata ${b.count} volte di seguito: chi doveva scrivere l'esito stava guardando un'altra versione del codice, quindi il risultato non sarebbe attendibile. Sospendo i tentativi automatici; serve una tua decisione su come procedere.`,
+    }).catch(() => { /* se il server non risponde il feedback resta dov'è: lo ripesca il giro dopo */ });
     clearState(id);
-    persistStateToGit(id, `feedback: clear-state ${id}`);
     return { ok: false, message: `${base} — terzo rifiuto consecutivo: feedback portato in design` };
   }
   writeState(b.state);
-  persistStateToGit(id, `feedback: identita non corrispondente ${id}`);
   return { ok: false, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
 }
 
@@ -967,15 +755,13 @@ async function recordVerifier(id, verdict, critique) {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
 
+  if (sent.outcome !== 'ok') {
+    // Il server non risponde. Non c'è più una seconda strada su cui posare il
+    // verdetto: dirlo è l'unica cosa onesta, perché un verdetto che nessuno ha
+    // registrato ma che il ramo dà per dato è peggio di un verdetto mancante.
+    return { rejected: true, fromChannel: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+  }
   sealTransition(next, `verifier:${verdict}`);
-  persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
-  if (sent.outcome === 'ok') return next;
-
-  // Ripiego: PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica
-  // fix (il 3° FAIL → design lo gestisce il giro dopo). La nota con l'esito va
-  // nella chat del feedback, senza sovrascrivere lo storico.
-  queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability',
-    verifierNoteText(verdict, critique));
   return next;
 }
 async function recordFixed(id, report = '') {
@@ -990,14 +776,10 @@ async function recordFixed(id, report = '') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
   }
 
+  if (sent.outcome !== 'ok') {
+    return { rejected: true, fromChannel: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
+  }
   sealTransition(next, 'fixer:consegna');
-  persistStateToGit(id, `feedback: fixed ${id}`);
-  if (sent.outcome === 'ok') return next;
-
-  // Ripiego: fix ri-applicato → torna in attesa della verifica comportamentale.
-  // Il report (cosa ha corretto e come) va nella chat del feedback: senza, la
-  // correzione è invisibile all'owner.
-  queueStatus(id, 'revision_capability', String(report || ''));
   return next;
 }
 async function recordSecaudit(id, verdict) {
@@ -1013,7 +795,6 @@ async function recordSecaudit(id, verdict) {
   }
 
   sealTransition(next, `secaudit:${verdict}`);
-  persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
   // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
   // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
   return next;
@@ -1226,55 +1007,10 @@ export async function run() {
       'nessun biglietto: il lavoro lo sceglie il server, e senza biglietto questo giro non può sapere cosa fare');
   }
 
-  let snapshot;
-  try {
-    snapshot = await buildSnapshot();
-  } catch (e) {
-    // Guasto dichiarato (coda illeggibile): fermarsi è l'esito giusto — un
-    // audit al posto del lavoro vero è esattamente il travestimento che ha
-    // prodotto l'ondata #310+.
-    if (e?.faultKind) return emitHalt(e.faultKind, e.message);
-    // Guasto generico dopo i retry: per scelta dell'owner NON ci si ferma (un
-    // giro a vuoto non risolve nulla): si ripiega sull'audit, lasciando in
-    // stderr la traccia del guasto vero per il debugging.
-    process.stderr.write(`[dispatch] stato illeggibile anche dopo i retry (${e?.message || e}) → fallback prober\n`);
-    const proberBucket = { role: 'prober' };
-    prepareForProber();
-    emit(proberBucket, {});
-    await recordWorkerSpawn(proberBucket);
-    return { exit: 0 };
-  }
-  // Il resto della config dell'owner, già letta qui sopra insieme
-  // all'interruttore. Cap EFFETTIVO: env > config/routines > default.
-  const cap = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: automation.loopCap ?? null });
-  const opts = { proberWhenIdle: automation.proberWhenIdle };
-  let bucket = chooseBucket(snapshot, cap, opts);
-
-  // Escalation gestite inline da dispatch (nessun worker da spawnare): accodano
-  // `design` (decide l'owner), puliscono lo stato e si ri-sceglie. In loop:
-  // possono essercene più d'una in attesa nello stesso snapshot.
-  //   - blocked-loop: fix fallito `cap` volte (spec §5). Motivo `loop` sia nella
-  //     nota (con l'ultima critica del verifier) sia come `--reason` strutturato
-  //     → `statusReason` sul doc (sottotesto in dashboard).
-  //   - blocked-secaudit: il controllo di sicurezza ha bocciato ma il worker
-  //     non ha scalato a `design` come da recipe → lo fa dispatch (senza, il
-  //     feedback resta incagliato per sempre).
-  let guard = 0;
-  while ((bucket.role === 'blocked-loop' || bucket.role === 'blocked-secaudit') && guard++ < 50) {
-    const isLoop = bucket.role === 'blocked-loop';
-    const note = isLoop
-      ? `Fix fermato dopo ${bucket.loopCount} verifiche fallite (loop). Ultima critica: ${bucket.state?.verifierCritique || '—'}`
-      : 'Il controllo di sicurezza ha bocciato questa modifica e la pratica era rimasta in sospeso senza che nessuno la portasse alla tua attenzione: serve una tua decisione su come procedere.';
-    try {
-      execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'design', note, '--branch', bucket.branch || '', '--reason', isLoop ? 'loop' : 'secaudit'],
-        { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-    } catch (_) { /* la nota resta in coda al prossimo giro */ }
-    clearState(bucket.id);
-    // Ricostruisci lo snapshot senza questo feedback e ri-scegli.
-    snapshot = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner };
-    bucket = chooseBucket(snapshot, cap, opts);
-  }
-
+  // (Qui viveva la scelta del lavoro fatta da questa macchina, con il ripiego
+  // sull'esplorazione e le escalation accodate su git. È irraggiungibile da
+  // quando senza biglietto ci si ferma, ed è sparita con la coda: sceglie il
+  // server, che quelle escalation le scrive lui.)
   return finalizeBucket(bucket, snapshot, cap, opts);
 }
 
@@ -1330,7 +1066,6 @@ function positionOnBranch(bucket) {
     res.head, `${bucket.role}:checkout`,
   );
   writeState(state);
-  persistStateToGit(bucket.id, `feedback: branch ${branch} per ${bucket.id}`);
   // Esposta alla guardia fuori sessione (.claude/hooks/branch-guard.sh).
   writeExpectation(ROOT, { branch, id: bucket.id });
   bucket.branch = branch;
@@ -1421,39 +1156,17 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
     // Log del worker spawnato (best-effort): stdout è già stato scritto, quindi
     // l'orchestratore ha già il suo JSON; qui aspettiamo solo la scrittura del
     // log (cappata da un timeout) prima che il processo esca.
-    await recordWorkerSpawn(bucket);
     return { exit: 0 };
   }
 
-  // Claim per i bucket legati a un feedback (mai per prober).
-  if (bucket.id) {
-    const { acquire } = await import('./claim-feedback.mjs');
-    const res = acquire(bucket.id, { num: bucket.num });
-    if (res.status === 'taken') {
-      if (fromServer) {
-        // Col biglietto il semaforo vero l'ha già preso il server: trovare qui
-        // un lucchetto della vecchia strada vuol dire che le due contabilità
-        // non concordano. Non si sceglie un altro lavoro (il biglietto vale per
-        // questo e per nessun altro): ci si ferma.
-        return emitHalt('transient', 'il feedback assegnato dal server risulta preso da un altra routine sulla vecchia strada');
-      }
-      // Già in lavorazione da un'altra routine: escludilo e ri-scegli.
-      const next = { reviews: snapshot.reviews.filter((r) => r.id !== bucket.id), todoWinner: snapshot.todoWinner?.id === bucket.id ? null : snapshot.todoWinner };
-      return finalizeBucket(chooseBucket(next, cap, opts), next, cap, opts);
-    }
-    // Macchina a stati (spec §6): il claim su git è il lock PRIMARIO; lo status
-    // `working` è il suo riflesso persistito per la dashboard. Solo per la
-    // presa in carico di un lavoro nuovo (todo→working): i bucket dell'iter di
-    // revisione hanno già il loro status revision_*.
-    if (bucket.role === 'new-work') {
-      const sent = await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
-      if (sent.outcome !== 'ok' && sent.outcome !== 'refused') {
-        try {
-          execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'working', ''],
-            { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-        } catch (_) { /* best-effort: il lock vero è il claim */ }
-      }
-    }
+  // Il semaforo è del SERVER: l'ha preso lui rilasciando il biglietto, e vale
+  // per un feedback solo. Il lucchetto su git non esiste più — era il modo che
+  // avevano macchine senza credenziali di mettersi d'accordo fra loro.
+  //
+  // La presa in carico (`working`) la si dichiara al server: è il riflesso che
+  // la dashboard mostra come "in lavorazione".
+  if (bucket.id && bucket.role === 'new-work') {
+    await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
   }
 
   // A + D: la directory viene messa sul branch giusto PRIMA di consegnare, e il
@@ -1462,19 +1175,14 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
   if (bucket.id && bucket.role !== 'prober') {
     const pos = positionOnBranch(bucket);
     if (!pos.ok) {
-      const { release } = await import('./claim-feedback.mjs');
-      try { release(bucket.id); } catch (_) { /* best-effort */ }
       if (pos.kind === 'permanent') {
         // Riprovare ogni 6h all'infinito è inutile: il feedback esce dal giro
         // automatico e compare in dashboard, dove l'owner può decidere.
-        try {
-          execFileSync('node', [resolve(ROOT, 'scripts', 'queue-triage.mjs'), bucket.id, 'design',
-            `La lavorazione automatica non può proseguire: il ramo di lavoro di questa modifica non esiste più, quindi non c'è nulla su cui continuare. Serve una tua decisione (rimetterlo in coda per rifarlo da capo, oppure archiviarlo).`,
-            '--reason', 'branch'],
-            { cwd: ROOT, encoding: 'utf8', stdio: 'ignore' });
-        } catch (_) { /* la nota resta in coda al prossimo giro */ }
+        await deliverToChannel('status', {
+          status: 'design', reason: 'branch',
+          notes: "La lavorazione automatica non può proseguire: il ramo di lavoro di questa modifica non esiste più, quindi non c'è nulla su cui continuare. Serve una tua decisione (rimetterlo in coda per rifarlo da capo, oppure archiviarlo).",
+        });
         clearState(bucket.id);
-        persistStateToGit(bucket.id, `feedback: clear-state ${bucket.id}`);
         process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
         if (fromServer) {
           // Col biglietto non si ripiega su un altro lavoro: il biglietto vale
@@ -1496,7 +1204,6 @@ async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromS
     bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
 
   emit(bucket, ctx);
-  await recordWorkerSpawn(bucket);
   return { exit: 0 };
 }
 
@@ -1576,7 +1283,6 @@ if (isMainModule) {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
       clearState(id);
-      persistStateToGit(id, `feedback: clear-state ${id}`);
       console.log(`stato ${id}: rimosso`);
       process.exit(0);
     } else {

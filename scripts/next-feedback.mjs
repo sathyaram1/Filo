@@ -271,9 +271,10 @@ export async function run() {
 
   const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
 
-  // 1. Claim vivi da escludere.
-  const { liveClaims } = await import('./claim-feedback.mjs');
-  const claimed = new Set(liveClaims().map((c) => c.id));
+  // I semafori vivono sul server: questo strumento serve all'owner per vedere
+  // cosa c'è in coda, non alle routine per prendersi il lavoro. Quello che il
+  // server ha già assegnato lo sa il server.
+  const claimed = new Set();
 
   // 2. Fetch candidati open da Firestore.
   let rawCandidates;

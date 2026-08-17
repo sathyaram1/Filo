@@ -137,7 +137,7 @@ Ripeti finché il budget è quasi pieno:
    - Rete di sicurezza: a un **429** o a un **`session limit`** su un worker →
      checkpoint + rilascio claim + termina. Se un worker è morto tagliato,
      **bonifica prima di terminare**: `git status` pulito, claim orfano rilasciato
-     (`node scripts/claim-feedback.mjs release <id>` e/o
+     (`node scripts/routine-channel.mjs release <biglietto>` e/o
      `node scripts/dispatch.mjs --clear-state <id>`), stato del branch coerente col
      vero verdetto raggiunto.
    - **REGOLA DURA — un `session limit` CHIUDE il run, niente ripresa.** Appena un
@@ -335,16 +335,17 @@ leggendo solo lo STATO e stampa il JSON per il worker:
   `general-purpose`. Non serve che il cloud onori `.claude/agents/`.
 - **Provenienza dei feedback (#443)**: consegnando il lavoro, dispatch scrive
   anche **chi sei** in `.claude/routine-role.json` (effimero e gitignorato, come
-  `branch-expect.json`). `queue-feedback.mjs` lo rilegge da solo: un feedback
+  `branch-expect.json`). chi apre un feedback lo rilegge da solo: un feedback
   aperto durante il tuo giro arriva firmato `routine:<ruolo>` e in dashboard si
   distingue esplorazione / sviluppo / verifica. **Non passare `--role` a mano**:
   la firma è automatica proprio perché prima dipendeva dalla memoria del worker,
   e infatti su decine di ritrovamenti uno solo risultava "esplorazione". Un
   `guasto` cancella il marcatore (nessun lavoro consegnato = nessuna firma).
 
-Lo **stato per branch** vive in `feedback-triage/state/<id>.json` (su git, come i
-claim: ogni iterazione è un worker fresco, lo stato dev'essere persistito). I
-ruoli lo aggiornano coi sotto-comandi:
+Lo **stato per branch** (verdetti, contatore delle bocciature, esito del
+controllo di sicurezza) vive **sul server**: ogni iterazione è un worker fresco,
+e quello stato deve sopravvivergli. I ruoli lo aggiornano coi sotto-comandi, che
+lo consegnano al canale:
 
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "critica"
@@ -363,7 +364,7 @@ dashboard** — sono l'unica traccia dell'iter che l'owner vede.
 ## Il canale del server (spec `ROUTINE-AUTH-SPEC.md`)
 
 Con un biglietto, **il lavoro lo sceglie il server e le decisioni passano di
-lì**. La coda su git resta solo come ripiego per quando il server non risponde.
+lì**. Non c'è nessun ripiego: se il server non risponde, la decisione non viene registrata e chi lavora lo sa.
 
 | Chi | Cosa ha | Cosa ci fa |
 |---|---|---|
@@ -390,12 +391,12 @@ per l'utente dal report cifrato per l'owner.
 
 - **Rifiutato** (uscita `4`, "RIFIUTATO dal server"): il server ha guardato
   ruolo, ramo e stato vero e ha detto **no**. La decisione **non** è stata
-  registrata e **non** viene depositata sulla coda su git. Non insistere e non
-  aggirare: leggi il motivo, correggi, oppure fermati. Depositare lo stesso il
-  fogliettino significherebbe far scrivere quella decisione a un automatismo che
-  quei controlli non li fa — cioè il difetto da cui parte tutta la spec.
-- **Guasto** (uscita `3`, "canale non raggiungibile"): il server non c'è. Lì il
-  ripiego sulla coda su git parte da solo, e lo dice.
+  registrata, e non c'è nessun altro posto dove depositarla. Non insistere e non
+  aggirare: leggi il motivo, correggi, oppure fermati.
+- **Guasto** (uscita `3`, "canale non raggiungibile"): il server non c'è. Anche
+  qui la decisione **non** è stata registrata: fermati e riportalo. Prima esisteva
+  una seconda strada — un fogliettino nel repo che un automatismo applicava senza
+  fare quei controlli — ed era il difetto da cui parte tutta la spec.
 
 ### Cosa controlla il server, a ogni consegna
 
@@ -435,9 +436,9 @@ todo
 - **Niente arriva su `main` prima del PASS del verifier + secaudit.** Le modifiche
   restano su `worker/*`; l'hook le committa e pusha sul branch ma NON le fonde su
   `main` — solo `merge-gate.mjs` (lanciato dal worker secaudit) lo fa.
-- I cambi di stato (`working`/`revision_*`/`done`/`design`) li accoda **il worker**
-  via `queue-triage.mjs` (vocabolario completo in `FEEDBACK-STATES.md`);
-  l'orchestratore non tocca Firestore.
+- I cambi di stato (`working`/`revision_*`/`done`/`design`) li consegna **il
+  worker** al server, che li valida prima di scriverli (vocabolario completo in
+  `FEEDBACK-STATES.md`); l'orchestratore non tocca niente.
 
 ---
 
@@ -473,7 +474,7 @@ feature spezzata in `#N.M` NON fonde i pezzi su `main` uno a uno.
   verifica + secaudit.
 - Il **merge verso `main` avviene UNA volta sola**, a feature finita: chiudendo
   l'ultimo `#N.M`, auto-genera **`#N.final`** via
-  `node scripts/queue-feedback.mjs --parent <idN>` — una verifica d'integrazione
+  `node scripts/routine-channel.mjs deliver feedback --parentId <idN>` — una verifica d'integrazione
   dell'intera `feature/N` contro la spec, poi gate `feature/N`→`main` con un L4
   d'integrazione cieco sul diff cumulato.
 - Appena parte una feature multipla le si dà priorità massima e la flotta lavora
@@ -486,13 +487,16 @@ feature spezzata in `#N.M` NON fonde i pezzi su `main` uno a uno.
 
 ## Convenzioni operative
 
-Coda su git (`queue-triage`/`queue-feedback`), claim, decifratura S1, priorità,
-tono dei report, sintomo-vs-causa, invarianti UX, "insistere prima di mollare":
+Tono dei report, sintomo-vs-causa, invarianti UX, "insistere prima di mollare":
 **tutto in `routines/shared.md`** (lo legge il worker, non l'orchestratore).
 
 Solo i punti che toccano l'orchestratore:
 
-- **Mai PATCH diretta su Firestore** (l'account robot è bloccato): ogni decisione
-  passa dalla coda git e dalla GitHub Action `apply-triage.yml` (~1-2 min).
-- **Claim**: lo fa `dispatch.mjs`. L'orchestratore non claima a mano.
-- **Numerazione**: ogni feedback ha `#N` + titolo; i sub ereditano `#N.M`.
+- **Ogni decisione passa dal server**, che la valida prima di scriverla. Non
+  esiste più né una coda su git, né un automatismo che la applica, né un modo
+  per scrivere su Firestore senza passare dai controlli.
+- **Il semaforo lo prende il server** rilasciando il biglietto: non ci sono più
+  lucchetti come file, e non c'è niente da rilasciare a mano se non il biglietto.
+- **Numerazione**: ogni feedback ha `#N` + titolo; i sub ereditano `#N.M`. Il
+  numero lo assegna il server dentro una transazione, così due creazioni
+  simultanee non si sovrappongono.

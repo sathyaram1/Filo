@@ -68,12 +68,12 @@ node scripts/dispatch.mjs --record-fixed <id> "[il tuo report]"
 ```
 
 Infine **rilascia il claim** (se resta vivo, il prossimo giro non può instradare
-il verifier su questo feedback finché il TTL non scade — la GitHub Action
+il verifier su questo feedback finché il semaforo non scade —
 riconcilia i claim solo quando cambia lo status su Firestore, e il fixer non lo
 cambia):
 
 ```bash
-node scripts/claim-feedback.mjs release <id>
+node scripts/routine-channel.mjs release <biglietto>
 ```
 
 ## Limite loop
@@ -86,7 +86,7 @@ fare in quel caso — è dispatch a gestirlo.
 
 L'orchestratore è **cieco** e legge **solo la tua ultima riga** — è un *dato di
 controllo* (continua/fermati), non un canale di report. Tutto ciò che vuoi dire
-all'utente va nelle `notes` del feedback (via `queue-triage.mjs`), NON nella riga
+all'utente va nelle `notes` del feedback (via il canale del server), NON nella riga
 di ritorno.
 
 La tua **ultima riga** deve essere **ESATTAMENTE** una di queste, senza
@@ -101,10 +101,10 @@ deve ignorare: è un bug del ruolo, non un extra utile.
 
 ## Se il server RIFIUTA una consegna
 
-Gli script che consegnano (queue-triage, queue-feedback, i `--record-*`) passano
+Gli script che consegnano (le consegne del canale e i `--record-*`) passano
 dal canale del server. Se escono con **4** ("RIFIUTATO dal server") la tua
-decisione **non è stata registrata da nessuna parte**, e non va aggirata
-depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato vero
+decisione **non è stata registrata da nessuna parte**, e non c'è nessun
+altro posto dove depositarla: il server ha guardato ruolo, ramo e stato vero
 e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati e riportalo
 nella riga finale come guasto. Uscita **3** invece è il server che non risponde:
-lì il ripiego sulla coda parte da solo.
+lì la decisione NON è stata registrata: fermati e riportalo.

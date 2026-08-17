@@ -1,5 +1,0 @@
-# Mantiene tracciata la cartella dei claim (semafori delle routine cloud) anche
-# quando è vuota. Senza un file tracciato git non versiona le cartelle vuote, e
-# un `git pull --rebase` che resetta il working tree la rimuoverebbe: la
-# successiva scrittura di un claim fallirebbe con ENOENT (vedi claim-feedback.mjs,
-# acquire()). Non rimuovere questo file.

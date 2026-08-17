@@ -12,15 +12,14 @@
 //   semaforo solo. Il lavoratore, col biglietto, ottiene il proprio lavoro già
 //   in chiaro — e nient'altro.
 //
-// STATO (pezzo #477.2): le decisioni passano DA QUI. La coda su git resta come
-//   ripiego per il solo caso in cui il server non risponda, ed è un ripiego
-//   dichiarato: un RIFIUTO del server non fa ripiegare su niente.
+// STATO: le decisioni passano DA QUI, e da nessun'altra parte. La coda su git
+//   è stata smontata: non esiste più una seconda strada su cui posare una
+//   decisione che il server non ha accettato.
 //
-//   La differenza non è una sfumatura. Un rifiuto è una risposta — il server ha
-//   guardato ruolo, ramo e stato e ha detto no; ripiegare sulla vecchia strada
-//   dopo un rifiuto vorrebbe dire scrivere lo stesso a dispetto del controllo,
-//   cioè rimettere in piedi il buco che questa spec viene a chiudere. Un guasto
-//   è il server che non c'è: lì la vecchia strada serve, ma va detto.
+//   Resta la distinzione fra RIFIUTO e GUASTO, perché cambia cosa deve fare chi
+//   lavora: un rifiuto è una risposta (il server ha guardato ruolo, ramo e stato
+//   e ha detto no) e va letto e corretto; un guasto è il server che non c'è, e lì
+//   ci si ferma. In nessuno dei due casi la decisione risulta registrata.
 //
 // I SEGRETI NON PASSANO DALL'AMBIENTE
 //   Parola d'ordine e biglietto si passano come ARGOMENTO, mai come variabile
@@ -183,7 +182,7 @@ export async function release(t, opts) {
 
 /**
  * Distingue un RIFIUTO da un GUASTO. PURA, ed è la distinzione che regge tutto
- * il ripiego sulla coda su git.
+ * cosa deve fare chi lavora quando il server dice no.
  *
  * Un rifiuto è una RISPOSTA: il server ha guardato e ha detto no (il ruolo non
  * può, il passaggio di stato è illegale, il ramo non combacia, il biglietto è
@@ -282,8 +281,47 @@ if (isMain) {
     const r = await release(args[0]);
     console.log(r.ok ? 'OK: biglietto rilasciato.' : `rilascio non riuscito (${r.reason})`);
   } else if (cmd === 'deliver') {
-    // deliver <biglietto> <intento> [--campo valore ...]
-    const r = await deliver(args[0], args[1] || '', data);
+    // deliver [<biglietto>] <intento> [--campo valore …]
+    //
+    // Il biglietto si può omettere: lo ritrova da solo (lo ha messo il
+    // dispatcher dove chi consegna lo trova). Chiedere a chi lavora di
+    // ricopiarlo a ogni consegna è la scommessa già persa sulla provenienza dei
+    // feedback — su decine di ritrovamenti, uno solo risultava firmato giusto.
+    const INTENTI = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+    let biglietto = args[0];
+    let intento = args[1] || '';
+    if (INTENTI.includes(args[0])) {
+      intento = args[0];
+      const { readTicket } = await import('./lib/routine-ticket.mjs');
+      biglietto = readTicket(resolve(fileURLToPath(new URL('..', import.meta.url))));
+      if (!biglietto) {
+        console.error('Nessun biglietto: questa consegna non ha un lavoro a cui riferirsi.');
+        process.exit(3);
+      }
+    }
+    // Un posizionale avanzato NON viene ignorato in silenzio. È la trappola in
+    // cui questa riscrittura è già caduta: le ricette passavano il report come
+    // ultimo argomento, il canale lo scartava, e la consegna usciva OK con le
+    // note vuote — il feedback si chiudeva senza che l'owner leggesse niente.
+    const avanzati = args.slice(INTENTI.includes(args[0]) ? 1 : 2);
+    if (avanzati.length) {
+      console.error(`Argomento non capito: "${avanzati[0].slice(0, 40)}". I dati si passano come --campo valore.`);
+      console.error('Il report va in --notes "…", il testo di un feedback nuovo in --text "…".');
+      process.exit(1);
+    }
+    // La versione in cui il fix confluisce la sa solo questa macchina (è quella
+    // in costruzione, nel manifesto del progetto). Va timbrata da sola: è ciò
+    // che regge il "questo è arrivato agli utenti" nella bacheca e
+    // l'archiviazione automatica, e chiedere a chi lavora di ricordarsene
+    // significa perderla.
+    if (intento === 'status' && data.status === 'done' && !data.resolvedInVersion) {
+      try {
+        const { readFileSync } = await import('node:fs');
+        const pkg = JSON.parse(readFileSync(resolve(fileURLToPath(new URL('..', import.meta.url)), 'package.json'), 'utf8'));
+        if (pkg.version) data.resolvedInVersion = pkg.version;
+      } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
+    }
+    const r = await deliver(biglietto, intento, data);
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);

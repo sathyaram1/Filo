@@ -117,8 +117,12 @@ clarify`); (3) fix fallito 3× (dispatch appende l'ultima critica del verifier +
 - Presa in carico: `todo → working` + `workingSince: <now ISO>`.
 - **TTL 60 minuti**: `working` con `workingSince` più vecchio = istanza morta → chiunque
   (dispatch al giro dopo, o l'Action in riconciliazione) lo riporta a `todo`.
-- I **claim file su git restano il lock primario** anti-collisione (push atomico);
-  `working` è il riflesso persistito per dashboard e istanze non-routine.
+- ⚠️ **Superato dal 2026-08-17** (spec `ROUTINE-AUTH-SPEC.md`): il lock non è più
+  un file su git. Lo prende il **server** rilasciando il biglietto, dura quanto
+  il semaforo e si tiene vivo col battito. `working` resta il riflesso persistito
+  che la dashboard mostra. Tutto ciò che qui sotto parla di file di claim, di
+  coda e dell'automatismo che la applicava descrive un meccanismo **smontato**:
+  resta come storia di come ci si è arrivati, non come istruzione.
 - Se un'istanza trova `working` fresco: NON aspetta, passa al prossimo `todo`; se non
   c'è altro, termina con "niente da fare".
 - L'Action apply-triage **riconcilia**: rilascia claim orfani e resetta i `working`
