@@ -12,11 +12,15 @@
 //   semaforo solo. Il lavoratore, col biglietto, ottiene il proprio lavoro già
 //   in chiaro — e nient'altro.
 //
-// STATO (pezzo #477.1): il canale c'è e funziona, ma NON ha ancora autorità.
-//   Le decisioni continuano a passare dalla coda su git. Qui si può già
-//   chiedere un biglietto, ritirare il lavoro, battere il cuore e rilasciare;
-//   il confronto fra la scelta del server e quella del cammino su git viene
-//   registrato per l'owner. La consegna passerà di qui col pezzo successivo.
+// STATO (pezzo #477.2): le decisioni passano DA QUI. La coda su git resta come
+//   ripiego per il solo caso in cui il server non risponda, ed è un ripiego
+//   dichiarato: un RIFIUTO del server non fa ripiegare su niente.
+//
+//   La differenza non è una sfumatura. Un rifiuto è una risposta — il server ha
+//   guardato ruolo, ramo e stato e ha detto no; ripiegare sulla vecchia strada
+//   dopo un rifiuto vorrebbe dire scrivere lo stesso a dispetto del controllo,
+//   cioè rimettere in piedi il buco che questa spec viene a chiudere. Un guasto
+//   è il server che non c'è: lì la vecchia strada serve, ma va detto.
 //
 // I SEGRETI NON PASSANO DALL'AMBIENTE
 //   Parola d'ordine e biglietto si passano come ARGOMENTO, mai come variabile
