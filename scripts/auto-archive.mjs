@@ -12,10 +12,10 @@
 //   è interamente unit-testata in tests/unit/boardArchive.test.mjs. Questo
 //   script è solo il "filo" che la collega a: 1) la lettura rete dei feedback
 //   con voti, 2) `releasedVersion` (versione corrente di package.json, stessa
-//   fonte di apply-triage.mjs), 3) la coda di triage esistente.
+//   fonte del numero di versione), 3) la scrittura diretta sul feedback.
 //
 // USO:
-//   node scripts/auto-archive.mjs              applica (accoda + push) e stampa il riepilogo
+//   node scripts/auto-archive.mjs              archivia e stampa il riepilogo
 //   node scripts/auto-archive.mjs --dry-run    mostra solo cosa farebbe, non scrive nulla
 //
 // COSA NON FA (di proposito, fuori scope DC3):
