@@ -649,12 +649,13 @@ async function buildSnapshot() {
  * si fa dopo:
  *   'ok'       → fatto, e NON si scrive anche sulla coda su git (sarebbe la
  *                stessa decisione due volte, con la seconda non controllata);
- *   'refused'  → il server ha guardato e ha detto no. Ci si FERMA: ripiegare
- *                sulla coda vorrebbe dire scrivere lo stesso a dispetto del
- *                controllo, che è il buco da cui nasce tutta questa spec;
- *   'fault'    → il server non risponde: la coda su git è il ripiego, e lo si
- *                dice ad alta voce;
- *   'absent'   → nessun biglietto (giro senza canale): cammino vecchio, muto.
+ *   'refused'  → il server ha guardato e ha detto no. Ci si FERMA, e si legge
+ *                il motivo: era proprio scrivere lo stesso a dispetto del
+ *                controllo il buco da cui nasce tutta questa spec;
+ *   'fault'    → il server non risponde. Anche qui ci si ferma: non esiste più
+ *                una seconda strada su cui posare la decisione, e dirlo ad alta
+ *                voce è l'unica cosa onesta;
+ *   'absent'   → nessun biglietto: non c'è un lavoro a cui riferire la consegna.
  */
 async function deliverToChannel(intent, data) {
   const ticket = readRoutineTicket(ROOT);
