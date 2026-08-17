@@ -223,6 +223,39 @@ if (isMain) {
         console.error(`   ! screenshot "${p}" non allegato: ${e.message}`);
       }
     }
+    // ── La strada principale è il canale del server (#477.2) ────────────────
+    //
+    // Un feedback nuovo è la cosa che di più NON deve passare per il repo
+    // pubblico: il testo di un ritrovamento descrive un problema dell'app, e
+    // sul cammino su git resta nella storia anche dopo che il fogliettino è
+    // stato consumato. Il server lo scrive cifrato e gli assegna il numero
+    // dentro una transazione — niente buchi e niente sovrapposizioni quando
+    // arrivano più creazioni insieme.
+    if (!args.noGit) {
+      const ticket = readRoutineTicket(ROOT);
+      if (ticket) {
+        try {
+          const ch = await import('./routine-channel.mjs');
+          const sent = await ch.deliver(ticket, 'feedback', {
+            name: args.name, text: args._.join(' '),
+            priority: args.priority, parentId: args.parentId || '',
+          });
+          if (sent.outcome === 'ok') {
+            console.log(`OK: feedback aperto sul server${sent.num ? ` → ${sent.num}` : ''}.`);
+            if (imageUrls.length) console.warn('   ! le immagini non sono ancora supportate dal canale: questo feedback parte senza.');
+            process.exit(0);
+          }
+          if (sent.outcome === 'refused') {
+            console.error(`[queue-feedback] RIFIUTATO dal server: ${sent.reason}`);
+            process.exit(4);
+          }
+          console.warn(`  ! canale non raggiungibile (${sent.reason}): ripiego sulla coda su git`);
+        } catch (e) {
+          console.warn(`  ! canale non utilizzabile (${e?.message || e}): ripiego sulla coda su git`);
+        }
+      }
+    }
+
     // S1.2: usa la versione cifrata per proteggere la history git pubblica.
     const file = await queueFeedbackCreateEncrypted({
       text: args._.join(' '),
