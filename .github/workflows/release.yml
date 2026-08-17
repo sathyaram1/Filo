@@ -108,6 +108,31 @@ jobs:
           node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" || echo "::warning::allarme non consegnato"
           exit 1
 
+      - name: Incastona le chiavi di default nel build (bake)
+        # Chiede al server di sicurezza l'override admin più recente (con una
+        # parola d'ordine che apre SOLO quello) oppure usa i secret
+        # FILO_DEFAULT_* del job, e scrive il file
+        # generato che finisce dentro l'eseguibile. Così la rotazione chiavi
+        # dell'admin si propaga a TUTTI gli utenti al prossimo build, anche senza
+        # login. Non stampa mai i valori (solo presente/assente).
+        #
+        # È anche un CANCELLO: se non trova nessuna chiave da nessuna fonte si
+        # ferma, perché una versione senza chiavi arriva agli utenti muta e
+        # nessuno se ne accorge finché non prova a usarla. Per questo sta PRIMA
+        # del bump, come l'altro cancello: un giro fermato non deve consumare un
+        # numero di versione né lasciare sul ramo principale un "release: vX"
+        # che non corrisponde a niente di pubblicato.
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          # Parola d'ordine che apre SOLO le chiavi di default, e nient'altro.
+          # Prima qui c'era il token dell'account robot: una credenziale piena,
+          # con cui si arrivava alle chiavi API a pagamento dell'owner.
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          FILO_DEFAULT_OPENROUTER_KEY: ${{ secrets.FILO_DEFAULT_OPENROUTER_KEY }}
+          FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
+          FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
+        run: node scripts/bake-default-config.mjs
+
       - name: Bump patch version e push su main
         if: steps.check.outputs.should_release == 'true'
         id: bump
@@ -125,25 +150,6 @@ jobs:
           done
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-
-      - name: Incastona le chiavi di default nel build (bake)
-        # Chiede al server di sicurezza l'override admin più recente (con una
-        # parola d'ordine che apre SOLO quello) oppure usa i secret
-        # FILO_DEFAULT_* del job, e scrive il file
-        # generato che finisce dentro l'eseguibile. Così la rotazione chiavi
-        # dell'admin si propaga a TUTTI gli utenti al prossimo build, anche senza
-        # login. Non stampa mai i valori (solo presente/assente) e non fallisce
-        # il build se le fonti mancano.
-        if: steps.check.outputs.should_release == 'true'
-        env:
-          # Parola d'ordine che apre SOLO le chiavi di default, e nient'altro.
-          # Prima qui c'era il token dell'account robot: una credenziale piena,
-          # con cui si arrivava alle chiavi API a pagamento dell'owner.
-          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
-          FILO_DEFAULT_OPENROUTER_KEY: ${{ secrets.FILO_DEFAULT_OPENROUTER_KEY }}
-          FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
-          FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
-        run: node scripts/bake-default-config.mjs
 
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
