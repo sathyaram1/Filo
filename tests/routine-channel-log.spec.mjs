@@ -28,6 +28,8 @@ test('i rifiuti del canale compaiono all owner, col motivo in chiaro e la routin
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  // La scheda va aperta: il blocco vive dentro il pannello "Log".
+  await page.locator('.mg-tab[data-tab="log"]').click();
 
   await page.evaluate(({ rej, cmp }) => window.__mgTest.renderChannelLog(rej, cmp), { rej: REJECTIONS, cmp: COMPARISONS });
 
@@ -54,6 +56,8 @@ test('i confronti dicono quando le due strade scelgono lo stesso lavoro e quando
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  // La scheda va aperta: il blocco vive dentro il pannello "Log".
+  await page.locator('.mg-tab[data-tab="log"]').click();
 
   await page.evaluate(({ rej, cmp }) => window.__mgTest.renderChannelLog(rej, cmp), { rej: [], cmp: COMPARISONS });
 
@@ -80,6 +84,8 @@ test('senza rifiuti e senza confronti il blocco lo dice, invece di restare vuoto
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  // La scheda va aperta: il blocco vive dentro il pannello "Log".
+  await page.locator('.mg-tab[data-tab="log"]').click();
 
   await page.evaluate(() => window.__mgTest.renderChannelLog([], []));
 
