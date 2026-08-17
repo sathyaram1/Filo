@@ -37,8 +37,6 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cfg = require(resolve(__dirname, '..', 'src', 'main', 'auth', 'config.js'));
 
-const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${cfg.firebaseProjectId}/databases/(default)/documents`;
-const SECRETS_DOC = 'config/secrets';
 const OUT_PATH = resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
 // Chiede al server le chiavi di default. Ritorna { openrouter?, gemini?, tavily? }
