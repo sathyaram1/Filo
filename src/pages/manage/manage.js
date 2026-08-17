@@ -2495,6 +2495,7 @@
   // ri-lettura via IPC per gli spec che stubbano la risposta.
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
   window.__mgTest.loadWorkerLog = loadWorkerLog;
+  window.__mgTest.renderChannelLog = renderChannelLog;
 
   // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
   // (SVG outline, currentColor) invece di un glifo emoji.
