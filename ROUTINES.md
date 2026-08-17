@@ -342,9 +342,10 @@ leggendo solo lo STATO e stampa il JSON per il worker:
   e infatti su decine di ritrovamenti uno solo risultava "esplorazione". Un
   `guasto` cancella il marcatore (nessun lavoro consegnato = nessuna firma).
 
-Lo **stato per branch** vive in `feedback-triage/state/<id>.json` (su git, come i
-claim: ogni iterazione è un worker fresco, lo stato dev'essere persistito). I
-ruoli lo aggiornano coi sotto-comandi:
+Lo **stato per branch** (verdetti, contatore delle bocciature, esito del
+controllo di sicurezza) vive **sul server**: ogni iterazione è un worker fresco,
+e quello stato deve sopravvivergli. I ruoli lo aggiornano coi sotto-comandi, che
+lo consegnano al canale:
 
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "critica"
