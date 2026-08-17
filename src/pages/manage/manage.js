@@ -49,6 +49,9 @@
   const mgLogDenied  = document.getElementById('mgLogDenied');
   const mgLogEmpty   = document.getElementById('mgLogEmpty');
   const mgLogList    = document.getElementById('mgLogList');
+  const mgChannelSection = document.getElementById('mgChannelSection');
+  const mgChannelEmpty   = document.getElementById('mgChannelEmpty');
+  const mgChannelList    = document.getElementById('mgChannelList');
 
   // Lista (tab corrente)
   const mgListHead     = document.getElementById('mgListHead');
