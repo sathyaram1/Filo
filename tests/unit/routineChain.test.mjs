@@ -70,6 +70,13 @@ async function giro(rispostaLavoro) {
         env: {
           ...process.env,
           FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          // ⚠️ SENZA QUESTE DUE il giro lavora sul deposito VERO: il percorso
+          // se lo ricava da dove sta lo script, non dalla cartella da cui è
+          // stato lanciato. Lanciarlo senza ha già creato un ramo e un semaforo
+          // veri, spediti sul ramo principale — un test che sporca ciò che
+          // dovrebbe sorvegliare.
+          FILO_REPO_ROOT: casa,
+          FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
           // Interruttore acceso senza chiedere niente alla rete.
           FILO_ROUTINES_ENABLED: '1',
           // La chiave NON deve servire: se servisse, questo test lo direbbe.
