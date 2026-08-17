@@ -223,16 +223,7 @@ if (isMain) {
     console.log(r.ok ? 'OK: biglietto rilasciato.' : `rilascio non riuscito (${r.reason})`);
   } else if (cmd === 'deliver') {
     // deliver <biglietto> <intento> [--campo valore ...]
-    const intent = args[1] || '';
-    const data = {};
-    for (let i = 0; i < rest.length; i++) {
-      if (!rest[i].startsWith('--')) continue;
-      const key = rest[i].slice(2);
-      const val = rest[i + 1];
-      if (val === undefined || val.startsWith('--')) data[key] = true;
-      else { data[key] = val; i += 1; }
-    }
-    const r = await deliver(args[0], intent, data);
+    const r = await deliver(args[0], args[1] || '', data);
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
