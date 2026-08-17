@@ -198,6 +198,7 @@ if (isMain) {
   const branch = flag('branch');
   const reason = flag('reason');
   const dryRun = argv.includes('--dry-run');
+  const attore = argv.includes('--come-routine') ? 'routine' : 'owner';
   let starred;
   if (argv.includes('--starred')) starred = true;
   else if (argv.includes('--unstar')) starred = false;
