@@ -206,8 +206,10 @@ Ripeti finché il budget è quasi pieno:
      sessione riportando `guasto <X>`. Meglio un giro saltato che un giro che
      scrive senza controlli.
 
-   Se non hai una parola d'ordine, salta questo passo: il giro ripiega sul
-   cammino vecchio (la coda su git), che funziona come prima.
+   **Senza parola d'ordine il giro non parte.** Non c'è più un cammino vecchio
+   su cui ripiegare: sceglierne uno vorrebbe dire leggere la coda, e per leggere
+   la coda serve la chiave che apre tutti i feedback — che da queste macchine è
+   uscita. Se non ce l'hai, chiudi la sessione riportando `guasto`.
 
 2. **Spawna UN worker generico** (tool Agent, `subagent_type: general-purpose`,
    `model: "opus"` — sempre Opus, mai Fable: consuma crediti — vedi
