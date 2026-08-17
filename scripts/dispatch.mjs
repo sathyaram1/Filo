@@ -1471,17 +1471,7 @@ if (isMainModule) {
       // provenienza dei feedback. Un giro senza biglietto cancella il
       // marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
-      run().then(async (r) => {
-        if (ticket) {
-          try {
-            const ch = await import('./routine-channel.mjs');
-            const mine = lastChoice() || { role: '', num: '' };
-            const res = await ch.compare(ticket, mine);
-            process.stderr.write(`[dispatch] confronto col canale: ${res.ok ? (res.same ? 'stessa scelta' : 'scelte diverse (registrato)') : 'non registrato'}\n`);
-          } catch (e) {
-            process.stderr.write(`[dispatch] confronto col canale non riuscito: ${e?.message || e}\n`);
-          }
-        }
+      run().then((r) => {
         process.exit(r?.exit ?? 0);
       }).catch((e) => {
         process.stderr.write(`[dispatch] errore fatale: ${e.message}\n`);
