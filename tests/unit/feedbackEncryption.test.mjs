@@ -129,50 +129,9 @@ test('senza privkey: campi cifrati diventano placeholder leggibile, niente crash
 
 // ─── Test 5: queueFeedbackCreateEncrypted scrive file con campi cifrati ─────────
 
-test('queueFeedbackCreateEncrypted: con attivazione ON cifra SOLO text; name/notes restano in chiaro (Fase 1)', async () => {
-  const { pub, priv } = await genTestKeys();
-  // Fase 1: la cifratura via queue è gated dall'interruttore di attivazione.
-  // Inietta pubkey di test + accendi il flag SOLO per questo test.
-  const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
-  const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
-  globalThis.SN_FEEDBACK_PUBKEY = pub;
-  globalThis.SN_FEEDBACK_ENC_ENABLED = true;
-
-  const tmp = mkdtempSync(join(tmpdir(), 'filo-enc-test-'));
-  const savedSpool = process.env.FILO_SPOOL_DIR;
-  process.env.FILO_SPOOL_DIR = tmp;
-
-  try {
-    const { readFileSync, readdirSync } = await import('node:fs');
-    const { queueFeedbackCreateEncrypted } = await import(toFileUrl(join(ROOT, 'scripts', 'queue-feedback.mjs')));
-
-    await queueFeedbackCreateEncrypted({
-      text: 'Fix critico nel gestore eventi',
-      name: 'gestore eventi rotto',
-      notes: 'riprodotto su Windows',
-      status: 'todo',
-    });
-
-    const files = readdirSync(tmp).filter((f) => f.endsWith('.json'));
-    assert.equal(files.length, 1, 'deve essere stato creato esattamente un file');
-
-    const entry = JSON.parse(readFileSync(join(tmp, files[0]), 'utf8'));
-    assert.ok(C.isEncrypted(entry.text), 'text nel file deve essere FENC1:');
-    assert.ok(!C.isEncrypted(entry.name), 'name NON deve essere cifrato in Fase 1 (user-facing C5)');
-    assert.ok(!C.isEncrypted(entry.notes), 'notes NON deve essere cifrato in Fase 1 (user-facing C5)');
-
-    // Round-trip su text; name/notes già in chiaro.
-    const plain = await decryptFeedbackFields(entry, priv);
-    assert.equal(plain.text, 'Fix critico nel gestore eventi', 'text decifrato deve tornare al valore originale');
-    assert.equal(plain.name, 'gestore eventi rotto', 'name resta il valore originale (mai cifrato)');
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-    if (savedSpool !== undefined) process.env.FILO_SPOOL_DIR = savedSpool;
-    else delete process.env.FILO_SPOOL_DIR;
-    globalThis.SN_FEEDBACK_PUBKEY = savedPub;
-    globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
-  }
-});
+// (Qui viveva il controllo sulla cifratura nel FILE della coda su git. La coda
+// non c'è più: il feedback lo scrive il server, che cifra testo e priorità
+// prima di posarli sul documento pubblico.)
 
 // ─── Test 7: gate di attivazione dormiente — pubkey presente ma flag OFF ────────
 

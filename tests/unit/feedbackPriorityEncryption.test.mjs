@@ -34,7 +34,6 @@ const C = require(join(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
 
 // Import DOPO aver impostato FILO_SPOOL_DIR (lo script risolve SPOOL_DIR al load).
 const { decryptFeedbackFields } = await import('../../scripts/lib/decrypt-feedback-fields.mjs');
-const { queueFeedbackCreateEncrypted } = await import('../../scripts/queue-feedback.mjs');
 
 // Genera una coppia di chiavi ECDH P-256 di test.
 async function genTestKeys() {
@@ -116,94 +115,7 @@ test('S1.priority: decryptFeedbackFields — senza chiave il ciphertext resta in
   }
 });
 
-// ─── Test d: queueFeedbackCreateEncrypted con gate ON → priority = FENC1: ───
-
-test('S1.priority: queueFeedbackCreateEncrypted con gate ON — priority nel file è FENC1:', async () => {
-  const { pub } = await genTestKeys();
-  const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
-  const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
-  // Inietta la pubkey DI TEST su SN_FEEDBACK_PUBKEY: il modulo encrypt-feedback-fields
-  // usa questo per caricare la chiave pubblica. Con pub iniettato E flag=true, isEnabled()=true.
-  globalThis.SN_FEEDBACK_PUBKEY = pub;
-  globalThis.SN_FEEDBACK_ENC_ENABLED = true;
-
-  try {
-    assert.ok(C.isEnabled(), 'gate deve essere ON prima del test');
-
-    const file = await queueFeedbackCreateEncrypted({
-      text: 'test per cifratura priority',
-      name: 'test priority',
-      priority: 2,
-    });
-
-    const saved = JSON.parse(readFileSync(file, 'utf8'));
-    assert.ok(
-      typeof saved.priority === 'string' && saved.priority.startsWith('FENC1:'),
-      `priority nel file deve essere FENC1: con gate ON, ma è: ${JSON.stringify(saved.priority)}`,
-    );
-  } finally {
-    globalThis.SN_FEEDBACK_PUBKEY = savedPub;
-    globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
-  }
-});
-
-// ─── Test e: queueFeedbackCreateEncrypted con gate OFF → priority = intero ───
-
-test('S1.priority: queueFeedbackCreateEncrypted con gate OFF — priority nel file è intero', async () => {
-  const savedPub = globalThis.SN_FEEDBACK_PUBKEY;
-  const savedFlag = globalThis.SN_FEEDBACK_ENC_ENABLED;
-  globalThis.SN_FEEDBACK_PUBKEY = null;
-  globalThis.SN_FEEDBACK_ENC_ENABLED = false;
-
-  try {
-    assert.ok(!C.isEnabled(), 'gate deve essere OFF per questo test');
-
-    const file = await queueFeedbackCreateEncrypted({
-      text: 'test senza cifratura priority',
-      name: 'test no-enc',
-      priority: 3,
-    });
-
-    const saved = JSON.parse(readFileSync(file, 'utf8'));
-    assert.equal(typeof saved.priority, 'number', 'priority deve essere number con gate OFF');
-    assert.equal(saved.priority, 3, 'priority deve essere 3 (invariata) con gate OFF');
-  } finally {
-    globalThis.SN_FEEDBACK_PUBKEY = savedPub;
-    globalThis.SN_FEEDBACK_ENC_ENABLED = savedFlag;
-  }
-});
-
-// ─── Test f: logica toFsValue per priority in apply-triage ──────────────────
-// toFsValue è definita localmente in apply-triage.mjs (non esportata).
-// Testiamo la logica equivalente direttamente qui (specchio del comportamento).
-
-test('S1.priority: apply-triage — priority FENC1: scrive stringValue, intero scrive integerValue', () => {
-  // Specchio della logica in createFeedback/apply-triage.mjs (righe 228-234).
-  function simulateApplyPriority(entry) {
-    if (typeof entry.priority === 'string' && entry.priority.startsWith('FENC1:')) {
-      return { stringValue: entry.priority };
-    }
-    const prio = Number(entry.priority);
-    if (Number.isInteger(prio) && prio >= 1 && prio <= 3) {
-      return { integerValue: String(prio) };
-    }
-    return null; // 0 o non valido: non scritto
-  }
-
-  // Caso ciphertext → stringValue.
-  const cipher = 'FENC1:abc123xyz';
-  const fsValCipher = simulateApplyPriority({ priority: cipher });
-  assert.deepEqual(fsValCipher, { stringValue: 'FENC1:abc123xyz' }, 'priority FENC1: deve diventare stringValue');
-
-  // Caso intero 1-3 → integerValue.
-  for (const p of [1, 2, 3]) {
-    const fsVal = simulateApplyPriority({ priority: p });
-    assert.deepEqual(fsVal, { integerValue: String(p) }, `priority ${p} deve diventare integerValue`);
-  }
-
-  // Caso 0 → non scritto (nessuna priority).
-  assert.equal(simulateApplyPriority({ priority: 0 }), null, 'priority 0 non deve essere scritta');
-
-  // Caso assente → non scritto.
-  assert.equal(simulateApplyPriority({ priority: undefined }), null, 'priority undefined non deve essere scritta');
-});
+// (Qui vivevano i controlli sulla cifratura nel FILE della coda su git. La coda
+// non c'è più: adesso il feedback lo scrive il server, che cifra testo e
+// priorità prima di posarli — e lo fa dentro una transazione, così anche la
+// numerazione non si sovrappone.)

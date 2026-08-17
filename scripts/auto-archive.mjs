@@ -4,10 +4,9 @@
 //   Legge i feedback da Firestore (FB.list, pubblica), calcola con la logica
 //   PURA di src/shared/boardArchive.js (SN_BOARD_ARCHIVE.applyAutoArchive)
 //   chi va archiviato e chi va solo segnalato come "gli utenti dicono che non
-//   va", e per ognuno da archiviare accoda `archived` nella stessa coda su git
-//   usata dal triage manuale (scripts/queue-triage.mjs) — NON scrive mai
-//   direttamente su Firestore: la GitHub Action `apply-triage.yml` applicherà
-//   la decisione entro 1-2 minuti, come ogni altra voce della coda.
+//   va", e per ognuno da archiviare scrive `archived` DIRETTAMENTE, con le
+//   credenziali dell'owner: è una sua decisione delegata a un punteggio, non
+//   una consegna di routine, e la coda su git non esiste più.
 //
 //   La decisione PURA (chi archiviare, chi segnalare) è in boardArchive.js ed
 //   è interamente unit-testata in tests/unit/boardArchive.test.mjs. Questo
@@ -30,7 +29,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { queueTriageEncrypted, commitAndPush } from './queue-triage.mjs';
+// L'auto-archiviazione è una decisione dell'OWNER delegata a un punteggio, non
+// una consegna di routine: scrive con le sue credenziali, direttamente.
+import { scrivi } from './owner-feedback.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -66,8 +67,8 @@ export async function runAutoArchive({ dryRun = false, now = Date.now(), release
     const note = `auto-archiviato (DC3): punteggio ${score} dopo 24h+ dalla messa in produzione (${ver || 'n/d'}).`;
     archivedDetails.push({ id, num: fb ? FB.formatNum(fb.seq, fb.subSeq) : '', score, note });
     if (!dryRun) {
-      const file = await queueTriageEncrypted(id, 'archived', note, 'routine:auto-archive');
-      commitAndPush(file);
+      const r = await scrivi(id, 'archived', note, { attore: 'owner' });
+      if (!r.ok) console.warn(`  ! ${id} non archiviato: ${r.motivo}`);
     }
   }
 
