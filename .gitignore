@@ -40,3 +40,11 @@ test-results/
 # Ruolo dell'istanza al lavoro (esplorazione/sviluppo/verifica): stessa natura,
 # lo scrive il dispatcher e lo rilegge chi accoda un feedback per firmarlo.
 .claude/routine-role.json
+
+# Il biglietto del giro in corso. Stessa natura effimera degli altri marcatori,
+# ma qui l'ignoranza NON è solo pulizia: è un SEGRETO, e questo repo è pubblico.
+# Il salvataggio automatico committa e spedisce a ogni modifica di file: senza
+# questa riga, un biglietto vivo finirebbe nella storia pubblica — cioè
+# esattamente il difetto che la spec ROUTINE-AUTH-SPEC.md viene a togliere,
+# ricreato dal marcatore che serve a toglierlo.
+.claude/routine-ticket.json
