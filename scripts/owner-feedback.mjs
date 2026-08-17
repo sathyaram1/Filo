@@ -23,7 +23,17 @@
 //   node scripts/owner-feedback.mjs <id> <status> "nota"  [--branch <nome>]
 //                                                         [--reason <slug>]
 //                                                         [--starred|--unstar]
+//                                                         [--come-routine]
 //                                                         [--dry-run]
+//
+//   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
+//   sui feedback che aspettano lui (approvare, riaprire, archiviare); i passaggi
+//   dell'ITER di lavorazione — prendere in carico, consegnare, chiudere un fix —
+//   appartengono alle routine. Quando l'owner li fa al posto loro (chiude a mano
+//   una pratica lavorata in locale) sta agendo come routine, e deve DIRLO. Non è
+//   burocrazia: senza, chiudere a mano una pratica passerebbe da una tabella
+//   che quel passaggio non contempla, e il controllo direbbe no per il motivo
+//   sbagliato — oppure, se lo si allargasse, non direbbe più no a niente.
 //
 //   status ∈ todo | working | revision_capability | revision_security |
 //            done | design | archived | attack_confirmed | spam_confirmed
