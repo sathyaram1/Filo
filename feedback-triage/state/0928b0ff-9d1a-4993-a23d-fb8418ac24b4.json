@@ -1,9 +1,0 @@
-{
-  "id": "0928b0ff-9d1a-4993-a23d-fb8418ac24b4",
-  "branch": "",
-  "loopCount": 0,
-  "verifierVerdict": "pass",
-  "verifierCritique": "",
-  "secauditDone": true,
-  "secauditVerdict": "fail"
-}
