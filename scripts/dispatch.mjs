@@ -939,42 +939,59 @@ function sealTransition(state, by) {
   return sealed;
 }
 
-function recordVerifier(id, verdict, critique) {
+async function recordVerifier(id, verdict, critique) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(guard.state || {}), id }, verdict, critique);
   next.id = id;
   sealTransition(next, `verifier:${verdict}`);
   persistStateToGit(id, `feedback: verifier ${verdict} ${id}`);
-  // PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica fix
-  // (il caso 3° FAIL → design lo gestisce il giro dopo: chooseBucket →
-  // blocked-loop). Idempotente se lo status è già quello. La nota con l'esito
-  // va nella chat del feedback (apply-triage la appende come turno, senza
-  // sovrascrivere lo storico).
+
+  // Strada principale: il verdetto lo registra il server, che tiene anche il
+  // contatore delle bocciature e decide da sé quando il tetto è sfondato.
+  const sent = await deliverToChannel('verdict', {
+    verdict, critique: verifierNoteText(verdict, critique), branch: next.branch || '',
+  });
+  if (sent.outcome === 'ok') return next;
+  if (sent.outcome === 'refused') return { rejected: true, message: `il server ha rifiutato il verdetto (${sent.reason})` };
+
+  // Ripiego: PASS → aspetta l'audit di sicurezza; FAIL → resta/torna in verifica
+  // fix (il 3° FAIL → design lo gestisce il giro dopo). La nota con l'esito va
+  // nella chat del feedback, senza sovrascrivere lo storico.
   queueStatus(id, verdict === 'pass' ? 'revision_security' : 'revision_capability',
     verifierNoteText(verdict, critique));
   return next;
 }
-function recordFixed(id, report = '') {
+async function recordFixed(id, report = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
   sealTransition(next, 'fixer:consegna');
   persistStateToGit(id, `feedback: fixed ${id}`);
-  // Fix ri-applicato → torna in attesa della verifica comportamentale. Il
-  // report del fixer (cosa ha corretto e come) va nella chat del feedback,
-  // come per verifier e new-work: senza, la correzione è invisibile all'owner.
+
+  const sent = await deliverToChannel('fixed', { report: String(report || ''), branch: next.branch || '' });
+  if (sent.outcome === 'ok') return next;
+  if (sent.outcome === 'refused') return { rejected: true, message: `il server ha rifiutato la consegna (${sent.reason})` };
+
+  // Ripiego: fix ri-applicato → torna in attesa della verifica comportamentale.
+  // Il report (cosa ha corretto e come) va nella chat del feedback: senza, la
+  // correzione è invisibile all'owner.
   queueStatus(id, 'revision_capability', String(report || ''));
   return next;
 }
-function recordSecaudit(id, verdict) {
+async function recordSecaudit(id, verdict) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
   next.id = id;
   sealTransition(next, `secaudit:${verdict}`);
   persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
+
+  const sent = await deliverToChannel('secaudit', { verdict, branch: next.branch || '' });
+  if (sent.outcome === 'refused') return { rejected: true, message: `il server ha rifiutato il verdetto (${sent.reason})` };
+  // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
+  // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
   return next;
 }
 
