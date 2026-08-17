@@ -95,6 +95,32 @@ async function main() {
     Object.entries(apiKeys).map(([k, v]) => [k, v ? 'presente' : 'assente'])
   );
   console.log(`[bake] scritto ${OUT_PATH}:`, JSON.stringify(summary));
+
+  // NESSUNA chiave da nessuna fonte non è un degrado accettabile: è una
+  // versione che arriverà agli utenti senza chiavi di default, e nessuno se ne
+  // accorgerebbe finché non prova a usarla. Degradare in silenzio va bene
+  // quando resta qualcosa; qui non resta niente, e va detto ad alta voce.
+  if (!Object.values(apiKeys).some(Boolean)) {
+    console.error('::error::Nessuna chiave di default da nessuna fonte: la versione uscirebbe senza chiavi.');
+    await avvisa();
+  }
+}
+
+/** Apre un feedback quando la costruzione sta per produrre una versione monca. */
+async function avvisa() {
+  const passphrase = process.env.FILO_BUILD_PASSPHRASE;
+  if (!passphrase) return;
+  try {
+    await fetch(`${CANALE}/buildAlarm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        passphrase,
+        name: 'Versione costruita senza chiavi di default',
+        text: 'La costruzione non ha trovato nessuna chiave di default: né dal server (parola d\'ordine assente, sbagliata o revocata) né fra i segreti del job. La versione esce comunque, ma chi la installa non trova nessuna chiave preimpostata e deve mettere le sue. Controlla la parola d\'ordine della costruzione e i segreti di riserva.',
+      }),
+    });
+  } catch (_) { /* se non si riesce ad avvisare, resta l'errore nei log */ }
 }
 
 main().catch((e) => {
