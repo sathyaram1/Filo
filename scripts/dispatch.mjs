@@ -1180,7 +1180,10 @@ export async function run() {
       }
     }
     const empty = { reviews: [], todoWinner: null };
-    return finalizeBucket(bucket, empty, cap0, opts0, { server: w });
+    // La busta si passa COM'È: incartarla in un altro oggetto ha già fatto
+    // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
+    // dicendo che era tutto a posto.
+    return finalizeBucket(bucket, empty, cap0, opts0, w);
   }
 
   // ── Senza biglietto non si sceglie più niente ─────────────────────────────
