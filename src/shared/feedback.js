@@ -526,18 +526,37 @@
       fields.statusPublic = toFsValue(publicStatus);
       mask.push('statusPublic');
     }
-    // Fase 1: `notes` NON è cifrato — è la spiegazione mostrata all'utente nel
-    // popup ricompense (C5) sulla sua macchina, che non ha la chiave privata.
-    // Cifrarlo (insieme a status/verdetti) è Fase 2, con una proiezione
-    // sanitizzata user-facing separata.
+    // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8). `notes` è la conversazione
+    // della lavorazione — il report per l'OWNER — e viaggia CIFRATO: il
+    // documento è a lettura pubblica, e quel testo prima o poi racconta come è
+    // stato chiuso un fix di sicurezza, cioè cosa non funzionava, prima che la
+    // correzione arrivi sui computer degli utenti.
+    //
+    // Fino a qui non si poteva cifrare per un motivo solo: era anche il testo
+    // che l'utente leggeva nel popup delle ricompense, sulla sua macchina, che
+    // la chiave non ce l'ha. Ora quella è una frase a parte (`userNote`), in
+    // chiaro, e il report può essere protetto.
+    //
     // La conversazione ha un tetto (SN_FEEDBACK_THREAD.capNotes): oltre quello
     // le regole respingono OGNI scrittura successiva sul feedback, non solo
     // quella sulle note — il feedback resterebbe immobile. Tagliamo i turni più
-    // vecchi qui, così il caso non si presenta mai da questo cammino.
+    // vecchi qui, PRIMA di cifrare, così il caso non si presenta mai.
     if (notes !== undefined) {
       const T = global.SN_FEEDBACK_THREAD;
       const capped = T && T.capNotes ? T.capNotes(notes) : notes;
-      fields.notes = toFsValue(capped); mask.push('notes');
+      const C = global.SN_FEEDBACK_CRYPTO;
+      let value = capped;
+      if (C && C.isEnabled && C.isEnabled() && capped && !C.isEncrypted(capped)) {
+        // Fail-safe: se la cifratura non riesce NON si scrive il report in
+        // chiaro. Si lascia la conversazione com'era.
+        try { value = await C.encryptForOwner(capped); } catch (_) { value = undefined; }
+      }
+      if (value !== undefined) { fields.notes = toFsValue(value); mask.push('notes'); }
+    }
+    // La frase per chi ha mandato il feedback: in chiaro per forza (la legge
+    // senza chiave) e corta per costruzione.
+    if (userNote !== undefined) {
+      fields.userNote = toFsValue(String(userNote || '').slice(0, 500)); mask.push('userNote');
     }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
     // #476 — LA REVISIONE DELL'OWNER VIAGGIA TUTTA CIFRATA.
