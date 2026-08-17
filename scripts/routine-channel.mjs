@@ -222,7 +222,12 @@ if (isMain) {
 
   if (!cmd || !args[0]) usage();
 
-  if (cmd === 'ticket') {
+  if (cmd === 'probe') {
+    const r = await probe(args[0]);
+    if (r.outcome === 'work') { console.log('c’è lavoro'); process.exit(0); }
+    if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'ticket') {
     const r = await ticket(args[0]);
     if (r.outcome === 'work') { console.log(r.ticket); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
