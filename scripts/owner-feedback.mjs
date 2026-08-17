@@ -46,6 +46,10 @@ import { readFileSync } from 'node:fs';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
+// La PUBBLICA va caricata PRIMA della cifratura: senza, il gate risulta spento e
+// lo stato verrebbe riscritto IN CHIARO su un documento pubblico — cioè si
+// disferebbe, un feedback alla volta, la cifratura che protegge lo stato.
+import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
