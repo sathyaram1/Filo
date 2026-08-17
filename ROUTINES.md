@@ -369,8 +369,20 @@ lì**. La coda su git resta solo come ripiego per quando il server non risponde.
 | Worker | il **biglietto**, passato dall'orchestratore | lo gira a `dispatch.mjs --ticket …`; da lì in poi lo ritrovano da soli tutti gli script che consegnano |
 | Server | la chiave privata in cassaforte + il database | sceglie il lavoro, decifra, tiene i semafori, valida ogni consegna |
 
-Comandi (`scripts/routine-channel.mjs`): `ticket` · `work` · `heartbeat` ·
-`release` · `deliver` · `compare`. **Segreti come argomento, mai nell'ambiente.**
+Comandi (`scripts/routine-channel.mjs`): `probe` · `ticket` · `work` ·
+`heartbeat` · `release` · `deliver` · `compare`. **Segreti come argomento, mai
+nell'ambiente.**
+
+**La chiave dei feedback non vive più qui.** Nessuno script di routine ne ha
+bisogno: il lavoro arriva già in chiaro dal server, ritagliato al ruolo. Se una
+recipe vecchia la nomina, quella recipe è scaduta.
+
+⚠️ **Fin dove arriva l'isolamento, per essere onesti.** Senza chiave, il
+**testo** dei feedback recenti è illeggibile per chi non deve vederlo. Ma le
+**note** della lavorazione, i **titoli** e il testo dei feedback più vecchi sono
+ancora in chiaro su un database a lettura pubblica: lì il confine è ancora una
+regola scritta, non un muro. Chiuderlo davvero è il pezzo che separa la frase
+per l'utente dal report cifrato per l'owner.
 
 ### RIFIUTO ≠ GUASTO (la regola che regge tutto)
 
