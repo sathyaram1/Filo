@@ -29,6 +29,10 @@
 //   fermati: stai ricreando il problema.
 //
 // USO
+//   node scripts/routine-channel.mjs probe <parola-d-ordine>
+//       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
+//         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
+//
 //   node scripts/routine-channel.mjs ticket <parola-d-ordine>
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
 //         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
