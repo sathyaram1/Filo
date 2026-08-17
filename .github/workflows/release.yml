@@ -135,7 +135,10 @@ jobs:
         # il build se le fonti mancano.
         if: steps.check.outputs.should_release == 'true'
         env:
-          FILO_ROUTINE_REFRESH_TOKEN: ${{ secrets.FILO_ROUTINE_REFRESH_TOKEN }}
+          # Parola d'ordine che apre SOLO le chiavi di default, e nient'altro.
+          # Prima qui c'era il token dell'account robot: una credenziale piena,
+          # con cui si arrivava alle chiavi API a pagamento dell'owner.
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           FILO_DEFAULT_OPENROUTER_KEY: ${{ secrets.FILO_DEFAULT_OPENROUTER_KEY }}
           FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}

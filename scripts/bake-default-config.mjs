@@ -28,14 +28,11 @@
 //     ambiente lo eredita chiunque ci passi. Adesso il segreto fa una cosa sola
 //     (spec ROUTINE-AUTH-SPEC.md, "un segreto, un potere").
 
-import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const cfg = require(resolve(__dirname, '..', 'src', 'main', 'auth', 'config.js'));
 
 const OUT_PATH = resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
