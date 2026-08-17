@@ -996,11 +996,15 @@ async function recordSecaudit(id, verdict) {
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applySecaudit({ ...(guard.state || defaultState(id, '')), id }, verdict);
   next.id = id;
+
+  // Il server prima dello stato locale: vedi il commento in recordVerifier.
+  const sent = await deliverToChannel('secaudit', { verdict, branch: next.branch || '' });
+  if (sent.outcome === 'refused') {
+    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+  }
+
   sealTransition(next, `secaudit:${verdict}`);
   persistStateToGit(id, `feedback: secaudit ${verdict} ${id}`);
-
-  const sent = await deliverToChannel('secaudit', { verdict, branch: next.branch || '' });
-  if (sent.outcome === 'refused') return { rejected: true, message: `il server ha rifiutato il verdetto (${sent.reason})` };
   // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
   // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
   return next;
