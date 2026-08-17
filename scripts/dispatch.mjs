@@ -1408,6 +1408,12 @@ if (isMainModule) {
       // pensarci chi lavorava.
       const ti = argv.indexOf('--ticket');
       const ticket = ti !== -1 ? argv[ti + 1] : '';
+      // Il biglietto viene messo dove chi consegna lo ritrova da solo: le
+      // consegne le fanno script diversi, in momenti diversi, e pretendere che
+      // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
+      // provenienza dei feedback. Un giro senza biglietto cancella il
+      // marcatore, o quello del giro prima sopravvivrebbe a questo.
+      if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       run().then(async (r) => {
         if (ticket) {
           try {
