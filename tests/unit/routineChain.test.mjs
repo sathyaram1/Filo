@@ -76,6 +76,13 @@ async function giro(rispostaLavoro) {
     execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
     execFileSync('git', ['remote', 'add', 'origin', altrove], { cwd: casa });
     execFileSync('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: casa });
+    // I lavori dell'iter arrivano con un ramo già esistente: se non c'è, il
+    // giro si ferma — giustamente, ma per un motivo che non è quello in prova.
+    const ramo = String(rispostaLavoro.branch || '');
+    if (ramo) {
+      execFileSync('git', ['branch', ramo], { cwd: casa });
+      execFileSync('git', ['push', '-q', 'origin', ramo], { cwd: casa });
+    }
 
     const out = await new Promise((risolvi) => {
       const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--ticket', 'biglietto-di-prova'], {
