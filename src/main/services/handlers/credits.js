@@ -367,7 +367,7 @@ module.exports = function register(on, ctx) {
           id: fid,
           num: FB.formatNum ? FB.formatNum(f.seq, f.subSeq) : '',
           name: String(f.name || '').slice(0, 200),
-          explanation: resolutionExplanation(f.notes),
+          explanation: resolutionExplanation(f),
           credits,
           priority,
         });
