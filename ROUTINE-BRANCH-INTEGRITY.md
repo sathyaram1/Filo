@@ -113,8 +113,8 @@ una correzione, verdetto del verifier, verdetto del secaudit.
   transizione se non corrisponde al branch assegnato. Non chiede all'istanza dove
   si trova.
 - Punti da coprire: `dispatch.mjs --record-verifier`, `--record-fixed`,
-  `--record-secaudit`, e `scripts/queue-triage.mjs` per le transizioni di
-  consegna.
+  `--record-secaudit`, e le consegne di stato al canale del server
+  (`routine-channel.mjs`).
 - Ogni transizione **accettata** lascia un **punto fermo**: l'identità del
   contenuto in quel momento, salvata nello stato del branch.
 
