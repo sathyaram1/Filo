@@ -102,7 +102,7 @@ Poi metti il feedback in `revision_capability` col branch — il prossimo giro d
 dispatch lo instraderà al **verifier**:
 
 ```bash
-node scripts/routine-channel.mjs deliver status --status revision_capability --notes "[il tuo report]" --branch worker/<id>
+node scripts/routine-channel.mjs deliver status --status revision_capability --notes "[il tuo report]" --frase "[la frase per chi ha segnalato]" --branch worker/<id>
 ```
 
 Se il feedback è ambiguo / richiede una decisione di design / mancano
