@@ -1226,8 +1226,20 @@ if (isMainModule) {
       // Prontezza: gira PRIMA del setup dell'ambiente (npm install, binario
       // Electron ~102MB, scrot). Se il giro deve fermarsi, deve scoprirlo prima
       // di aver pagato il setup.
+      //
+      // Su "si può lavorare" l'output CONSEGNA le istruzioni dell'orchestratore
+      // (SPEC-RIDISEGNO-MAX.md §8): in cloud nessuno legge file di istruzioni
+      // da sé — orchestratore ← preflight, worker ← dispatch. Il prompt salvato
+      // della routine resta di due righe e non si tocca più quando si
+      // ritoccano i ruoli.
       preflight().then((r) => {
-        if (r.ok) { console.log('[dispatch] prontezza OK'); process.exit(0); }
+        if (r.ok) {
+          const f = resolve(ROLES_DIR, 'orchestrator.md');
+          const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
+          console.log('[dispatch] prontezza OK. Le tue istruzioni:\n');
+          console.log(brief || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
+          process.exit(0);
+        }
         if (r.kind === 'off') console.log(`[dispatch] SPENTO: ${r.message}`);
         else console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
         process.exit(preflightExitCode(r));
