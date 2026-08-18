@@ -790,7 +790,7 @@
     list,
     updateStatus,
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
-    // Esportata perché apply-triage.mjs (script .mjs) la riusa per scrivere statusPublic.
+    // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.
     statusToPublic,
     // Voti di verifica (DB4): substrato letto da board (DC*) e archiviazione (DC3).
     castVote,
