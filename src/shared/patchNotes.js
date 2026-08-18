@@ -23,6 +23,7 @@
         'Nelle Opzioni puoi spegnere tutti i modelli proprietari con un interruttore: Filo lavora solo con modelli a pesi aperti serviti da fornitori indipendenti, anche quando usi i crediti di Filo.',
       ],
       fixes: [
+        'Quando un feedback che hai mandato viene risolto, la spiegazione che leggi e’ scritta apposta per te invece di essere il resoconto tecnico della lavorazione.',
         'Quando chiedi a Filo di fare una cosa che sa fare e lui invece ti spiega come farla a mano, la segnalazione a chi sviluppa Filo compare da sola, già scritta e pronta da confermare.',
         'Se apri un file scaricato che nel frattempo hai spostato o cancellato, Filo te lo dice e ti apre la cartella dov’era, invece di non fare niente; nell’elenco degli scaricamenti quelle voci si riconoscono subito.',
         'Il suggerimento di correzione compare col tasto destro — e cliccandolo la parola viene corretta davvero, senza perdere il punto in cui stavi scrivendo — anche nelle aree di scrittura con formattazione (webmail, editor online) costruite con i componenti che usano molti siti moderni: prima lì la parola sbagliata non veniva riconosciuta.',
