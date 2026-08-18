@@ -886,108 +886,83 @@ function emitHalt(kind, message) {
 }
 
 export async function run() {
-  // L'INTERRUTTORE MASTER, prima di tutto il resto: spente le routine, il giro
-  // non legge la coda, non prende in carico niente, non tocca nessun ramo. È il
-  // secondo cancello dopo `--preflight` (che risparmia anche il setup): serve a
-  // chi spegne a sessione già avviata — il worker in corso finisce il suo
-  // compito, il successivo non parte.
-  let automation;
-  try {
-    automation = await fetchRoutineConfig();
-  } catch (e) {
-    return emitHalt(e?.faultKind || 'transient', e?.message || String(e));
-  }
-  if (!resolveRoutinesEnabled({ envRaw: process.env.FILO_ROUTINES_ENABLED, remote: automation.enabled })) {
-    process.stderr.write('[dispatch] routine autonome SPENTE dalla tab Automazioni: niente da fare\n');
-    emit({ role: 'off' }, {});   // emit() cancella da sé il marcatore di ruolo
-    return { exit: 0 };
-  }
+  // Niente controllo dell'interruttore master qui: lo guarda il preflight
+  // (prima del setup) e lo applica il SERVER, che da spento non emette
+  // biglietti nuovi. Un biglietto già in mano si porta a termine: il feedback
+  // in corso finisce e viene consegnato, mai troncato (SPEC-RIDISEGNO-MAX.md
+  // §6) — e un worker con un lavoro valido non deve morire perché il
+  // documento di config è momentaneamente illeggibile.
 
-  // ── Con un biglietto, il lavoro lo sceglie il SERVER ──────────────────────
+  // ── Il lavoro lo sceglie il SERVER, col biglietto ──────────────────────────
   //
-  // Non è una preferenza: il biglietto è legato a un feedback preciso, e ogni
-  // consegna fatta con quel biglietto parla di QUEL feedback. Se qui si
-  // scegliesse per conto proprio, si lavorerebbe una cosa e si consegnerebbe
-  // un'altra — e il controllo del server, che è tutto il punto, direbbe sempre
-  // sì sul feedback sbagliato.
+  // Il biglietto è legato a un feedback preciso, e ogni consegna fatta con
+  // quel biglietto parla di QUEL feedback. Se qui si scegliesse per conto
+  // proprio, si lavorerebbe una cosa e si consegnerebbe un'altra — e il
+  // controllo del server, che è tutto il punto, direbbe sempre sì sul
+  // feedback sbagliato.
   //
-  // Senza biglietto resta il cammino di prima, identico.
+  // Senza biglietto non si sceglie niente: scegliere da qui vorrebbe dire
+  // leggere la coda, e leggere la coda vuole la chiave che apre TUTTI i
+  // feedback — chiave che non vive più su queste macchine
+  // (ROUTINE-AUTH-SPEC.md). Ci si ferma con un guasto DICHIARATO, non si
+  // ripiega sull'esplorazione: travestire un giro cieco da audit è già
+  // costato un'ondata di lavoro fantasma.
   const ticket = readRoutineTicket(ROOT);
-  if (ticket) {
-    const cap0 = resolveLoopCap({ envRaw: process.env.FILO_LOOP_CAP, remote: automation.loopCap ?? null });
-    const opts0 = { proberWhenIdle: automation.proberWhenIdle };
-    let w;
-    try {
-      const ch = await import('./routine-channel.mjs');
-      w = await ch.work(ticket);
-    } catch (e) {
-      return emitHalt('transient', `canale non utilizzabile: ${e?.message || e}`);
-    }
-    if (!w.ok) {
-      // In dubbio ci si ferma: un biglietto che non apre il proprio lavoro non
-      // è una giornata tranquilla, è un giro che non deve partire.
-      return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);
-    }
-    // La busta va guardata PRIMA di consegnarla. Un ruolo che qui non esiste
-    // arriverebbe al lavoratore senza istruzioni e senza contenuto; un ruolo
-    // dell'iter senza il suo ramo farebbe lavorare sull'albero sbagliato. In
-    // entrambi i casi ci si ferma: consegnare mezza busta è peggio che non
-    // consegnarne nessuna, perché sembra un giro riuscito.
-    const bad = checkEnvelope(w);
-    if (bad) return emitHalt('transient', bad);
-
-    const bucket = {
-      role: w.role,
-      id: w.id || undefined,
-      num: w.num || '',
-      branch: w.branch || '',
-      loopCount: Number(w.payload && w.payload.loopCount) || 0,
-    };
-    if (bucket.id) {
-      // Lo stato locale resta il ripiego quando il server non risponde: si
-      // allinea a ciò che il server ha appena detto, così le due copie non
-      // divergono in silenzio.
-      const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
-      bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
-      // La critica di chi ha bocciato la tiene il SERVER: è lui che registra i
-      // verdetti. Il fogliettino su git resta come tappabuchi finché esiste —
-      // ma quando sparirà, se non si leggesse quella del server la correzione
-      // partirebbe alla cieca senza che nessuno se ne accorga.
-      //
-      // Va tenuta sul bucket, NON nello stato: lo stato viene riscritto da capo
-      // quando la cartella si posiziona sul ramo, e lì la critica del server si
-      // perdeva in silenzio.
-      if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
-        bucket.serverCritique = w.payload.critique;
-      }
-    }
-    const empty = { reviews: [], todoWinner: null };
-    // La busta si passa COM'È: incartarla in un altro oggetto ha già fatto
-    // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
-    // dicendo che era tutto a posto.
-    return finalizeBucket(bucket, empty, cap0, opts0, w);
-  }
-
-  // ── Senza biglietto non si sceglie più niente ─────────────────────────────
-  //
-  // Scegliere il lavoro da qui vorrebbe dire leggere la coda, e leggere la coda
-  // vuole la chiave che apre TUTTI i feedback. Quella chiave non vive più su
-  // queste macchine (spec ROUTINE-AUTH-SPEC.md): chi legge testo scritto da
-  // sconosciuti non tiene segreti che valgono.
-  //
-  // Ci si ferma con un guasto DICHIARATO, non si ripiega sull'esplorazione: un
-  // giro che non riesce a sapere se c'è lavoro non è una giornata tranquilla, e
-  // travestirlo da audit è già costato un'ondata di lavoro fantasma.
   if (!ticket) {
     return emitHalt('transient',
       'nessun biglietto: il lavoro lo sceglie il server, e senza biglietto questo giro non può sapere cosa fare');
   }
 
-  // (Qui viveva la scelta del lavoro fatta da questa macchina, con il ripiego
-  // sull'esplorazione e le escalation accodate su git. È irraggiungibile da
-  // quando senza biglietto ci si ferma, ed è sparita con la coda: sceglie il
-  // server, che quelle escalation le scrive lui.)
-  return finalizeBucket(bucket, snapshot, cap, opts);
+  let w;
+  try {
+    const ch = await import('./routine-channel.mjs');
+    w = await ch.work(ticket);
+  } catch (e) {
+    return emitHalt('transient', `canale non utilizzabile: ${e?.message || e}`);
+  }
+  if (!w.ok) {
+    // In dubbio ci si ferma: un biglietto che non apre il proprio lavoro non
+    // è una giornata tranquilla, è un giro che non deve partire.
+    return emitHalt('transient', `il canale non consegna il lavoro (${w.reason})`);
+  }
+  // La busta va guardata PRIMA di consegnarla. Un ruolo che qui non esiste
+  // arriverebbe al lavoratore senza istruzioni e senza contenuto; un ruolo
+  // dell'iter senza il suo ramo farebbe lavorare sull'albero sbagliato. In
+  // entrambi i casi ci si ferma: consegnare mezza busta è peggio che non
+  // consegnarne nessuna, perché sembra un giro riuscito.
+  const bad = checkEnvelope(w);
+  if (bad) return emitHalt('transient', bad);
+
+  const bucket = {
+    role: w.role,
+    id: w.id || undefined,
+    num: w.num || '',
+    branch: w.branch || '',
+    loopCount: Number(w.payload && w.payload.loopCount) || 0,
+  };
+  if (bucket.id) {
+    // Lo stato locale resta il ripiego quando il server non risponde: si
+    // allinea a ciò che il server ha appena detto, così le due copie non
+    // divergono in silenzio.
+    const prev = readState(bucket.id) || defaultState(bucket.id, bucket.branch);
+    bucket.state = { ...prev, id: bucket.id, branch: bucket.branch || prev.branch || '' };
+    // La critica di chi ha bocciato la tiene il SERVER: è lui che registra i
+    // verdetti. Il fogliettino su git resta come tappabuchi finché esiste —
+    // ma quando sparirà, se non si leggesse quella del server la correzione
+    // partirebbe alla cieca senza che nessuno se ne accorga.
+    //
+    // Va tenuta sul bucket, NON nello stato: lo stato viene riscritto da capo
+    // quando la cartella si posiziona sul ramo, e lì la critica del server si
+    // perdeva in silenzio.
+    if (w.payload && typeof w.payload.critique === 'string' && w.payload.critique) {
+      bucket.serverCritique = w.payload.critique;
+    }
+  }
+  const empty = { reviews: [], todoWinner: null };
+  // La busta si passa COM'È: incartarla in un altro oggetto ha già fatto
+  // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
+  // dicendo che era tutto a posto.
+  return finalizeBucket(bucket, empty, LOOP_CAP, {}, w);
 }
 
 // Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
