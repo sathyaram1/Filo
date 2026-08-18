@@ -297,16 +297,23 @@ quali alternative ha scartato, cosa costa in chiamate a pagamento e cosa ha
 deciso di lasciare fuori: un'istanza successiva quelle cose può solo
 ricostruirle a naso, e in genere le riempie di dettagli inutili.
 
-Nella stessa passata quell'istanza produce **due testi distinti**:
+Nella stessa passata quell'istanza produce **tre testi distinti**:
 
 1. **il report per l'owner** — la nota che accompagna il feedback (struttura qui
-   sopra);
-2. **la riga di changelog** — vedi "Patch notes" più sotto. **Una riga**, molto
+   sopra). **Viene cifrato**: lo legge solo l'owner, nessun altro;
+2. **la frase per chi ha mandato il feedback** — **una riga** in chiaro, che dice
+   cosa può fare adesso, senza scelte tecniche né alternative scartate. Chi ha
+   segnalato non ha la chiave del report: senza questa frase vede solo "risolto".
+   Si consegna con `--frase "…"` (owner: `npm run feedback -- … --frase "…"`).
+   Se il lavoro non cambia niente di visibile per chi ha segnalato, non si
+   scrive;
+3. **la riga di changelog** — vedi "Patch notes" più sotto. **Una riga**, molto
    più asciutta del report, e **spesso nessuna**: se il lavoro tocca solo
    superfici riservate all'owner o parti interne, non si scrive niente.
 
-Non sono lo stesso testo accorciato: il report parla all'owner di scelte, la riga
-di changelog parla a un utente qualunque di cosa può fare adesso.
+Non sono lo stesso testo accorciato: il report parla all'owner di scelte, la
+frase parla a chi ha segnalato di quel problema lì, la riga di changelog parla a
+un utente qualunque di cosa può fare adesso.
 
 **I ruoli a valle non riscrivono il report.** `verifier`, `secaudit` e chi chiude
 la pratica aggiungono **al massimo una riga** sull'esito del proprio passaggio
