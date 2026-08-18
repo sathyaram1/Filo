@@ -1703,8 +1703,18 @@
     if (!reply) { mgClarifyText.focus(); return; }
     const fb = allFeedbacks.find((f) => f._id === id);
     const oldNotes = (fb && fb.notes) || '';
-    const newNotes = window.SN_FEEDBACK_THREAD
-      ? window.SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply, {})
+    // Da quando il report viaggia cifrato, la conversazione può arrivare qui
+    // illeggibile (chiave assente, o decifratura fallita e al suo posto un
+    // segnaposto). Appenderci sopra la risposta e risalvare cancellerebbe il
+    // report vero: si scrive solo su ciò che si è potuto leggere.
+    const T = window.SN_FEEDBACK_THREAD;
+    if (T && T.reportUnreadable && T.reportUnreadable(oldNotes)) {
+      setClarifyMsg('La conversazione di questo feedback non è leggibile su questo computer (manca la chiave privata): '
+        + 'rispondere adesso la sostituirebbe. Configura la chiave e riprova.', 'err');
+      return;
+    }
+    const newNotes = T
+      ? T.appendUserTurn(oldNotes, reply, {})
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
     mgClarifyBtn.disabled = true;
