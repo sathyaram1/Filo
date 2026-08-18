@@ -128,3 +128,25 @@ test('il tetto in chiaro lascia spazio all’espansione del cifrato', async () =
     `il testo tagliato, una volta cifrato, occupa ${cifrato.length} caratteri e il tetto delle regole è ${limite}: `
     + 'la prossima scrittura verrebbe respinta e il feedback resterebbe immobile');
 });
+
+test('il tetto tiene anche se il feedback NON è scritto in italiano', async () => {
+  // Il tetto contato in CARATTERI regge finché il testo è quasi tutto ASCII, e
+  // cade in silenzio appena qualcuno scrive con accenti fitti, in cirillico o
+  // in giapponese: le stesse 40.000 lettere lì sono il doppio o il triplo dei
+  // byte, e il cifrato cresce sui BYTE. Il feedback passava il taglio e da quel
+  // momento la dashboard non poteva più scriverci nulla.
+  require(join(ROOT, 'src', 'shared', 'feedbackPublicKey.js'));
+  require(join(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
+  const CRYPTO = globalThis.SN_FEEDBACK_CRYPTO;
+  const limite = await tettoDelleRegole();
+
+  for (const [lingua, lettera] of [['cirillico', 'я'], ['giapponese', 'あ'], ['accentato', 'è'], ['emoji', '😀']]) {
+    const tagliato = TH.capNotes(lettera.repeat(60000));
+    const cifrato = await CRYPTO.encryptForOwner(tagliato);
+    assert.ok(cifrato.length <= limite,
+      `${lingua}: dopo il taglio il cifrato occupa ${cifrato.length}, oltre il tetto delle regole (${limite})`);
+    // E il taglio non deve spezzare un carattere a metà.
+    assert.equal(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(tagliato), false,
+      `${lingua}: il taglio ha lasciato mezzo carattere in coda`);
+  }
+});
