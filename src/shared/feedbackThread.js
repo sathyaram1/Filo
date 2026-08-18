@@ -378,19 +378,18 @@
   //
   // Difesa: TUTTI i cammini di scrittura passano da qui e tagliano i turni PIÙ
   // VECCHI finché il blob rientra, lasciando una riga che dichiara il taglio
-  // (meglio perdere i turni antichi che perdere il feedback). Il tetto sta anche
-  // nelle regole: se cambi NOTES_MAX qui, riallinea `firestore.rules` (ramo
-  // update admin E ramo routine) e rideploya.
+  // (meglio perdere i turni antichi che perdere il feedback). Se cambi NOTES_MAX
+  // qui, riallinea la copia del server (filo-security, routine/notes.js) e
+  // rideploya.
   //
-  // ⚠️ IL TAGLIO SI FA IN CHIARO, MA SU FIRESTORE CI VA IL CIFRATO. Da quando il
-  // report viaggia cifrato (spec ROUTINE-AUTH-SPEC.md §8) il testo cresce di un
-  // terzo abbondante — misurato: 59.990 caratteri diventano 80.118. Con il tetto
-  // uguale a quello delle regole, una conversazione lunga passava il taglio e
-  // veniva respinta dalle regole subito dopo: il feedback diventava immobile
-  // (nessun cambio di stato, nessun commento) mentre il server, che le regole
-  // le bypassa, continuava a gonfiarlo. Cioè esattamente il guaio che questo
-  // tetto esiste per impedire. Perciò il tetto in CHIARO sta sotto quello delle
-  // regole con il margine dell'espansione: 40.000 → ~53.500 cifrati.
+  // ⚠️ IL TETTO È IN BYTE, E STA SOTTO QUELLO DELLE REGOLE. Il taglio si fa sul
+  // testo in chiaro, ma su Firestore ci va il CIFRATO (spec ROUTINE-AUTH-SPEC.md
+  // §8), che è più lungo di un terzo: 6 + ceil(4*(94+byte)/3). Con il tetto
+  // uguale a quello delle regole la conversazione passava il taglio e veniva
+  // respinta dalle regole subito dopo: il feedback diventava immobile (nessun
+  // cambio di stato, nessun commento) mentre il server, che le regole le
+  // bypassa, continuava a gonfiarlo — cioè il guaio che questo tetto esiste per
+  // impedire. 44.000 byte diventano 58.798 cifrati: ci stanno.
   const NOTES_MAX = 44000;
   const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
 
