@@ -447,12 +447,15 @@ test('emit: un GUASTO cancella il marcatore invece di lasciare quello vecchio', 
   assert.equal(readRole(TMP), '');
 });
 
-test('emit: un giro a vuoto (idle) non lascia una firma di lavoro', () => {
+test('emit: un giro che non lavora non lascia una firma di lavoro', () => {
+  // I ruoli `idle`/`off` non esistono più (SPEC-RIDISEGNO-MAX.md §12: coda
+  // vuota o interruttore spento = exit 2 alla richiesta di biglietto, prima
+  // dello spawn): l'unico giro che non lavora è il guasto, e il marcatore del
+  // giro prima non deve sopravvivergli — finirebbe nella provenienza del primo
+  // feedback aperto da qualcun altro.
   silently(() => emit({ role: 'new-work', id: 'z' }, {}));
   assert.equal(readRole(TMP), 'new-work');
-  // Nessun worker è partito: il marcatore del giro prima non deve sopravvivere,
-  // o finirebbe nella provenienza del primo feedback aperto da qualcun altro.
-  silently(() => emit({ role: 'idle' }, {}));
+  silently(() => emit({ role: 'halt', kind: 'transient', message: 'canale giù' }, {}));
   assert.equal(readRole(TMP), '');
 });
 
