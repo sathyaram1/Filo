@@ -599,7 +599,8 @@
       // bozze/agente. "Ricevuti" è incluso così si può COMMENTARE un feedback
       // appena arrivato e poi spostarlo in "Da risolvere" (il commento viaggia
       // col cambio di stato — vedi il gestore .fb-act).
-      const notesEditable = isAdmin && (currentTab === 'inbox' || currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
+      const notesEditable = isAdmin && !f.reportIllegibile
+        && (currentTab === 'inbox' || currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
       const clarifyReply = isAdmin && currentTab === 'clarify';
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
