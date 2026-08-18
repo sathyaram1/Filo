@@ -160,9 +160,11 @@ test('due salvataggi in volo sullo stesso feedback: comanda l ultimo, non quello
 
   await open(page, 'A');
   await box(page).fill('uno');
-  await btn(page).click();
+  await box(page).press('Enter');
+  // Il bottone si disabilita durante l'attesa, ma Invio salva lo stesso: e'
+  // questa la strada per avere due invii in volo insieme.
   await box(page).fill('due');
-  await btn(page).click();
+  await box(page).press('Enter');
   expect(await nsent(page)).toBe(2);
 
   // Le risposte tornano al CONTRARIO: prima la seconda, poi la prima.
