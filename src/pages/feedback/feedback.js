@@ -680,7 +680,7 @@
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" data-tail="${escapeHtml(tailStr)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(headText || '')}</textarea>
            </label>
            <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>
-           <label class="fb-notes-label">Frase per chi ha segnalato:
+           <label class="fb-usernote-label">Frase per chi ha segnalato:
              <input type="text" class="fb-usernote" data-id="${escapeHtml(f._id)}" maxlength="500"
                     placeholder="Una riga in chiaro: cosa può fare adesso. La casella qui sopra la legge solo tu."
                     value="${escapeHtml(String(f.userNote || ''))}">

@@ -68,14 +68,14 @@ async function setupAdmin(app, page, feedback) {
   });
 
   await page.locator('#refresh').click();
+  // I feedback di prova sono "da risolvere": la scheda aperta all'avvio e' un'altra.
+  await page.locator('.fb-tab[data-tab="todo"]').click();
   await page.waitForFunction(() => document.querySelectorAll('.fb-card').length > 0, null, { timeout: 10_000 });
 }
 
 test('la frase per chi ha segnalato si scrive dalla dashboard e arriva a destinazione', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
-  await page.locator('.fb-tab[data-tab="todo"]').click().catch(() => {});
   await setupAdmin(app, page, DA_RISOLVERE);
-  await page.locator('.fb-tab[data-tab="todo"]').click();
 
   const campo = page.locator('.fb-usernote[data-id="mock-due-testi"]');
   await expect(campo).toBeVisible();
@@ -100,7 +100,6 @@ test('report illeggibile: non si può riscriverlo, e al suo posto si legge la fr
     notes: 'FENC1:blob-che-questa-macchina-non-sa-leggere',
     userNote: 'Ora puoi rimuovere un modello dalle impostazioni.',
   });
-  await page.locator('.fb-tab[data-tab="todo"]').click();
 
   // Nessuna casella su cui scrivere: sovrascriverebbe un report mai letto.
   await expect(page.locator('.fb-notes[data-id="mock-due-testi"]')).toHaveCount(0);
