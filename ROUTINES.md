@@ -333,14 +333,14 @@ leggendo solo lo STATO e stampa il JSON per il worker:
 - L'output JSON **inlina** il file-ruolo in `instructions`: i ruoli sono letti
   come **dati**, non registrati come tipi di agente — il worker resta sempre
   `general-purpose`. Non serve che il cloud onori `.claude/agents/`.
-- **Provenienza dei feedback (#443)**: consegnando il lavoro, dispatch scrive
-  anche **chi sei** in `.claude/routine-role.json` (effimero e gitignorato, come
-  `branch-expect.json`). chi apre un feedback lo rilegge da solo: un feedback
-  aperto durante il tuo giro arriva firmato `routine:<ruolo>` e in dashboard si
-  distingue esplorazione / sviluppo / verifica. **Non passare `--role` a mano**:
-  la firma è automatica proprio perché prima dipendeva dalla memoria del worker,
-  e infatti su decine di ritrovamenti uno solo risultava "esplorazione". Un
-  `guasto` cancella il marcatore (nessun lavoro consegnato = nessuna firma).
+- **Provenienza dei feedback (#443)**: la firma `routine:<ruolo>` la mette il
+  **server**, leggendo il ruolo dal biglietto della consegna: un feedback aperto
+  durante il tuo giro arriva firmato e in dashboard si distingue esplorazione /
+  sviluppo / verifica. **Non passare `--role` a mano**: la firma è automatica
+  proprio perché prima dipendeva dalla memoria del worker, e infatti su decine
+  di ritrovamenti uno solo risultava "esplorazione". Dispatch scrive anche
+  `.claude/routine-role.json` (effimero e gitignorato, come `branch-expect.json`):
+  è la traccia locale di chi sta girando adesso; un `guasto` la cancella.
 
 Lo **stato per branch** (verdetti, contatore delle bocciature, esito del
 controllo di sicurezza) vive **sul server**: ogni iterazione è un worker fresco,
