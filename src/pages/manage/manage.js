@@ -1680,7 +1680,6 @@
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
       // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
       // Il feedback cambia tab: chiudi il dettaglio e ricalcola la lista corrente.
       selectedId = null;
       mgDetail.hidden = true;
@@ -1739,7 +1738,6 @@
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
       // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
       // Il feedback non è più in chiarimento: esce dalla tab Ricevuti.
       selectedId = null;
       mgDetail.hidden = true;
@@ -1793,7 +1791,6 @@
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
       // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
       // Il feedback non è più in revisione: torna allo stato vuoto del dettaglio.
       selectedId = null;
       mgDetail.hidden = true;
@@ -1837,7 +1834,6 @@
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
       // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
       selectedId = null;
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
