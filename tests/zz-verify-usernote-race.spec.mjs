@@ -194,6 +194,22 @@ test('SONDA: salvo, cambio feedback e TORNO INDIETRO prima che la risposta atter
   expect(dopo, 'un secondo Salva non deve rimandare la frase vecchia').toBe(1);
 });
 
+test('SONDA: la stella nello STESSO giro (via, e ritorno prima della risposta)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await boot(page, [fbFix('d6', 986), fbFix('d7', 987)]);
+  await open(page, 'd6');
+  const stella = page.locator('#mgStarBtn');
+  await stella.click();
+  await waitPending(page, 1);
+  await open(page, 'd7');
+  await open(page, 'd6');
+  await resolveAt(page, 0);
+  await page.waitForTimeout(250);
+  // la stella si riallinea da sola al ritorno: è la simmetria che manca alla frase
+  await expect(stella).toHaveText('★ Preferito');
+  await expect(stella).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('SONDA: doppio salvataggio ravvicinato (click + Invio) mentre il primo è in volo', async ({ openTab }) => {
   const page = await openTab(URL);
   await boot(page, [fbFix('d3', 983)]);
