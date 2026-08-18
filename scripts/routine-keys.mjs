@@ -82,10 +82,14 @@ async function main() {
     const r = await chiama({ op: 'issue', slug: nome, scope: potere, label: resto.join(' ') });
     console.log(`\nParola d'ordine per "${r.slug}" (potere: ${r.scope}):\n`);
     console.log(`    ${r.passphrase}\n`);
-    console.log('Copiala ADESSO dove gira quella routine: non si potrà più rileggere.');
+    console.log('Copiala ADESSO dove serve: non si potrà più rileggere.');
     console.log(potere === 'build'
       ? "Va nell'ambiente della costruzione, come FILO_BUILD_PASSPHRASE."
-      : "Va nell'ambiente della routine, come FILO_ROUTINE_PASSPHRASE.");
+      // Una parola d'ordine di routine NON va nell'ambiente: l'ambiente lo
+      // eredita ogni lavoratore che parte da lì. Sta solo nel prompt della
+      // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
+      : 'Va nel PROMPT della routine schedulata: "routine automatica. <parola d\'ordine>".\n'
+        + "Mai nell'ambiente: da lì la erediterebbe ogni lavoratore che parte.");
     return;
   }
 
