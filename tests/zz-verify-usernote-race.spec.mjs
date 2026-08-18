@@ -15,7 +15,7 @@ function fbB(extra) { return { ...BASE, _id: 'fb-b', seq: 901, name: 'Feedback B
 
 // Canale verso il main sotto controllo del test: ogni feedback_update viene
 // registrato e la sua risposta resta SOSPESA finché il test non la sblocca.
-async function prepara(page, data, tab = 'todo') {
+async function prepara(page, data, tab = 'inbox') {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
