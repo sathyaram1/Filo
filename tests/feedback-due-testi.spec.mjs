@@ -16,8 +16,12 @@
 // esisteva (primo controllo rosso), e sulle note illeggibili la casella di
 // modifica compariva lo stesso (secondo controllo rosso).
 //
-// Come le altre spec della dashboard feedback: lista mockata e `window.filo.message`
-// intercettato, così restiamo offline e deterministici.
+// COME SI INIETTANO I DATI: con l'aggancio window.__fbTest (stesso pattern di
+// manage). La pagina all'apertura carica DAVVERO da Firestore, e su una lista
+// vera quel caricamento dura secondi: qualsiasi mock "sostituisci la lista e
+// aspetta un tempo fisso" gareggia con lui e perde a caso. setData invalida il
+// caricamento in volo, quindi i dati finti non possono essere sovrascritti.
+// window.filo.message resta intercettato per catturare i salvataggi in uscita.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -32,50 +36,26 @@ const DA_RISOLVERE = {
   notes: 'Report della lavorazione: ho scartato la strada A.',
 };
 
-async function setupAdmin(app, page, feedback) {
-  await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
+async function setupAdmin(page, feedback) {
+  await page.waitForFunction(() => Boolean(window.__fbTest), null, { timeout: 10_000 });
   await page.evaluate((fb) => {
-    window.SN_FEEDBACK.list = async () => [fb];
     window.__updates = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
-      if (msg && msg.type === 'auth_status') {
-        return { ok: true, isAdmin: true, profile: { email: 'owner@example.com' } };
-      }
-      // La decifratura in-app: qui non c'è chiave, quindi si limita a
-      // restituire la lista com'è (è il caso vero di una macchina senza chiave).
-      if (msg && msg.type === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
       return orig(msg);
     };
+    window.__fbTest.setAdmin(true, { email: 'owner@example.com' });
+    window.__fbTest.setData([fb]);
+    // I feedback di prova sono "da risolvere": la scheda aperta all'avvio è un'altra.
+    window.__fbTest.setTab('todo');
   }, feedback);
-
-  await page.waitForFunction(() => {
-    const e = document.querySelector('.fb-empty');
-    return !e || !/Caricamento/.test(e.textContent || '');
-  }, null, { timeout: 10_000 });
-
-  await app.evaluate(async ({ webContents }) => {
-    for (const wc of webContents.getAllWebContents()) {
-      let url = '';
-      try { url = wc.getURL(); } catch (_) {}
-      if (url.includes('feedback')) {
-        wc.send('filo:broadcast', {
-          type: 'auth_changed', signedIn: true, isAdmin: true, profile: { email: 'owner@example.com' },
-        });
-      }
-    }
-  });
-
-  await page.locator('#refresh').click();
-  // I feedback di prova sono "da risolvere": la scheda aperta all'avvio e' un'altra.
-  await page.locator('.fb-tab[data-tab="todo"]').click();
   await page.waitForFunction(() => document.querySelectorAll('.fb-card').length > 0, null, { timeout: 10_000 });
 }
 
-test('la frase per chi ha segnalato si scrive dalla dashboard e arriva a destinazione', async ({ app, openTab }) => {
+test('la frase per chi ha segnalato si scrive dalla dashboard e arriva a destinazione', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
-  await setupAdmin(app, page, DA_RISOLVERE);
+  await setupAdmin(page, DA_RISOLVERE);
 
   const campo = page.locator('.fb-usernote[data-id="mock-due-testi"]');
   await expect(campo).toBeVisible();
@@ -93,14 +73,14 @@ test('la frase per chi ha segnalato si scrive dalla dashboard e arriva a destina
   expect(upd.notes).toBeUndefined();
 });
 
-test('il salvataggio automatico non tocca quello che si sta scrivendo', async ({ app, openTab }) => {
+test('il salvataggio automatico non tocca quello che si sta scrivendo', async ({ openTab }) => {
   // Il salvataggio parte da solo dopo una pausa. Se ripulisse il testo e
   // ridisegnasse la scheda, lo farebbe SOTTO LE DITA: lo spazio appena battuto
   // sparisce e la parola dopo si incolla alla precedente ("ciao " + pausa +
   // "mondo" = "ciaomondo"). E sporcherebbe proprio il testo che legge chi ha
   // mandato il feedback.
   const page = await openTab(FEEDBACK_URL);
-  await setupAdmin(app, page, DA_RISOLVERE);
+  await setupAdmin(page, DA_RISOLVERE);
 
   const campo = page.locator('.fb-usernote[data-id="mock-due-testi"]');
   await campo.click();
@@ -112,12 +92,12 @@ test('il salvataggio automatico non tocca quello che si sta scrivendo', async ({
   await expect(campo).toHaveValue('ciao mondo');
 });
 
-test('chiudendo il feedback la frase viaggia con la chiusura', async ({ app, openTab }) => {
+test('chiudendo il feedback la frase viaggia con la chiusura', async ({ openTab }) => {
   // Il momento in cui quella riga serve è proprio quando si chiude: se il
   // pulsante non se la porta dietro, chi ha segnalato riceve la chiusura e
   // nient'altro.
   const page = await openTab(FEEDBACK_URL);
-  await setupAdmin(app, page, DA_RISOLVERE);
+  await setupAdmin(page, DA_RISOLVERE);
 
   await page.locator('.fb-usernote[data-id="mock-due-testi"]').fill('Ora puoi rimuovere un modello.');
   await page.locator('.fb-act[data-id="mock-due-testi"][data-to="done"]').click();
@@ -129,9 +109,9 @@ test('chiudendo il feedback la frase viaggia con la chiusura', async ({ app, ope
   expect(chiusura.userNote).toBe('Ora puoi rimuovere un modello.');
 });
 
-test('report illeggibile: non si può riscriverlo, e al suo posto si legge la frase', async ({ app, openTab }) => {
+test('report illeggibile: non si può riscriverlo, e al suo posto si legge la frase', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
-  await setupAdmin(app, page, {
+  await setupAdmin(page, {
     ...DA_RISOLVERE,
     notes: 'FENC1:blob-che-questa-macchina-non-sa-leggere',
     userNote: 'Ora puoi rimuovere un modello dalle impostazioni.',
