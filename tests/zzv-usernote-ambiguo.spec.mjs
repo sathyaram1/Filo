@@ -301,8 +301,8 @@ test('fallimento su un feedback mentre un ALTRO sta salvando: nessun travaso', a
   // A invece riparte sempre.
   await open(page, 'fb-a');
   expect(await box(page)).toBe('V0');
-  await saveBtn(page, 'V0'); await waitSent(page, 5);
-  expect(await sent(page)).toEqual(['fb-a:A1', 'fb-a:A2', 'fb-b:B1', 'fb-b:B1', 'fb-a:V0']);
+  await saveBtn(page, 'V0'); await waitSent(page, 4);
+  expect(await sent(page)).toEqual(['fb-a:A1', 'fb-a:A2', 'fb-b:B1', 'fb-a:V0']);
 });
 
 test('la casella c\'e\' su tutte le schede e sui feedback chiusi; non-admin esclusa', async ({ openTab }) => {
