@@ -1192,6 +1192,25 @@
     });
   }
 
+  // ── Aggancio di test (stesso pattern di manage: window.__mgTest) ──────────
+  // Gli spec iniettano dati DOPO l'apertura della pagina, senza gareggiare col
+  // caricamento reale: setData invalida (via loadGen) qualsiasi load in volo,
+  // così il risultato vero — che arriva secondi dopo — viene buttato invece di
+  // sovrascrivere i dati finti. È lo stesso rimedio che tiene stabile manage.
+  window.__fbTest = {
+    setAdmin(v, profile) {
+      isAdmin = !!v;
+      renderAuthState(profile || null);
+      applyFilter();
+    },
+    setData(fbs) {
+      loadGen++; // il caricamento reale in volo, se c'è, viene scartato
+      all = (Array.isArray(fbs) ? fbs : []).map(sanitizeReportForReader);
+      applyFilter();
+    },
+    setTab(tab) { selectTab(tab); },
+  };
+
   // Carica prima lo stato admin, poi i feedback: così il primo render già
   // mostra (o nasconde) i controlli di gestione in modo coerente.
   refreshAuth().finally(load);
