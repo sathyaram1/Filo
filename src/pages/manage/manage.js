@@ -1793,6 +1793,11 @@
   // si sentiva dire "Nessuna modifica", non partiva niente, e a destinazione
   // restava quella che aveva appena ritirato.
   const userNoteSpedito = new Map();
+  // Quando una scrittura fallisce non si torna a fidarsi del valore
+  // memorizzato: se una scrittura precedente era andata a buon fine, quello
+  // che c’è a destinazione non lo sa più nessuno. Si marca IGNOTO, che non
+  // combacia con niente, così il salvataggio dopo riparte comunque.
+  const FRASE_IGNOTA = Symbol('frase ignota');
 
   function setUserNoteMsg(text, kind) {
     if (!mgUserNoteMsg) return;
@@ -1850,10 +1855,15 @@
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
     } catch (e) {
-      if (selectedId !== id || mio !== userNoteInvii.get(id)) return;
-      // Non è arrivato a destinazione: dimenticare che era partito, o
-      // riprovare la stessa frase risulterebbe "nessuna modifica".
-      if (userNoteInvii.get(id) === mio) userNoteSpedito.delete(id);
+      // Superata da un invio più recente: comanda quello, qui non si tocca
+      // niente.
+      if (mio !== userNoteInvii.get(id)) return;
+      // Non è arrivato a destinazione, e una scrittura precedente potrebbe
+      // esserci arrivata: da qui in poi non sappiamo cosa ci sia. Va marcato
+      // SEMPRE, anche se intanto si sta guardando un altro feedback, o il
+      // salvataggio successivo verrebbe di nuovo inghiottito.
+      userNoteSpedito.set(id, FRASE_IGNOTA);
+      if (selectedId !== id) return;
       setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
     } finally {
       mgUserNoteBtn.disabled = false;

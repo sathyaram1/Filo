@@ -326,6 +326,48 @@ test('ritirare la frase subito dopo averla salvata: il ripensamento parte davver
   await expect(page.locator('#mgUserNoteText')).toHaveValue('');
 });
 
+test('il primo salvataggio riesce e il ripensamento fallisce: si può riprovare', async ({ openTab }) => {
+  // Il caso peggiore: la frase è ARRIVATA, il ritiro no. Da lì la pagina non
+  // sa più cosa ci sia a destinazione. Se torna a fidarsi di quello che si
+  // ricorda, il tentativo successivo di ritirare la frase viene inghiottito
+  // ("Nessuna modifica") e il mittente continua a leggere una frase ritirata.
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') {
+        window.__updates.push(msg);
+        const n = window.__updates.length;
+        // Il primo (la frase) riesce; il secondo (il ritiro) viene rifiutato.
+        await new Promise((r) => setTimeout(r, n === 1 ? 700 : 200));
+        return n === 2 ? { ok: false, error: 'rete assente' } : { ok: true };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([{ ...f, _id: 'fb-meta', userNote: '' }]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail('fb-meta');
+  }, RISOLTO);
+
+  await page.locator('#mgUserNoteText').fill('zeta');
+  await page.locator('#mgUserNoteText').press('Enter');
+  await page.locator('#mgUserNoteText').fill('');
+  await page.locator('#mgUserNoteText').press('Enter');
+  await page.waitForTimeout(1200);
+
+  // Riprovare il ritiro deve PARTIRE: nessuno sa più cosa ci sia a destinazione.
+  await page.locator('#mgUserNoteText').press('Enter');
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(3);
+  const inviate = await page.evaluate(() => window.__updates.map((u) => u.userNote));
+  expect(inviate).toEqual(['zeta', '', '']);
+});
+
 test('senza admin la casella non compare', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
