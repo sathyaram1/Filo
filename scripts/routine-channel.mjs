@@ -50,6 +50,9 @@
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
 //         note, feedback. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
+//         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
+//         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
+//         mandato il feedback, che la vede nella sua bacheca.
 //
 //   node scripts/routine-channel.mjs compare <biglietto> <ruolo> <numero>
 //       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
