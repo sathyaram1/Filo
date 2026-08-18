@@ -24,8 +24,8 @@
   // (`resolvedInVersion` + gate `isShipped`).
   //
   // Lo schema attuale del feedback NON ha un campo "spedito il" dedicato:
-  // l'unico timestamp vicino è `resolvedAt` (scritto al passaggio a `done`,
-  // vedi apply-triage.mjs). Per i feedback "in produzione" (isShipped===true)
+  // l'unico timestamp vicino è `resolvedAt` (scritto al passaggio a `done`
+  // da updateStatus, qui accanto in feedback.js). Per i feedback "in produzione" (isShipped===true)
   // usiamo `resolvedAt` come proxy della data di produzione — è scritto nello
   // stesso istante in cui `resolvedInVersion` viene fissato, quindi per i fix
   // shippati nella stessa sessione coincide; per quelli rimasti in coda
