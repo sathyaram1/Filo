@@ -567,6 +567,59 @@ test('preflightExitCode: il contratto 0 / 2 / 3 dell\'orchestratore', () => {
 
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
+// ─── Ruolo unico resolver + contratto comune (SPEC-RIDISEGNO-MAX.md §12) ──────
+
+test('buildPayload: new-work e fixer dichiarano il caso del resolver', () => {
+  // Il server distingue ancora i due nomi nel protocollo; il worker riceve le
+  // stesse istruzioni (resolver.md) e capisce da `case` da dove parte.
+  const nw = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' } });
+  assert.equal(nw.case, 'primo-passaggio');
+  const fx = buildPayload(
+    { role: 'fixer', id: 'a', num: '7', branch: 'worker/a', serverCritique: 'si rompe X' },
+    { feedback: { text: 't' } },
+  );
+  assert.equal(fx.case, 'correzione');
+  assert.equal(fx.verifierCritique, 'si rompe X');
+});
+
+test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comune', () => {
+  // Prima il contratto viveva copiato byte-per-byte in fondo a ogni file-ruolo,
+  // e le copie divergevano: ora è un file solo, accodato da dispatch.
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'resolver.md'), '# ruolo resolver\ncorpo del ruolo\n');
+  writeFileSync(resolve(dir, 'halt.md'), '# guasto\nfermati\n');
+  writeFileSync(resolve(dir, '_contratto-worker.md'), '# Contratto comune dei worker\nregole\n');
+  const nw = readRoleInstructions('new-work');
+  assert.ok(nw.includes('# ruolo resolver'), 'new-work riceve le istruzioni del resolver');
+  assert.ok(nw.includes('# Contratto comune dei worker'), 'col contratto accodato in fondo');
+  const fx = readRoleInstructions('fixer');
+  assert.ok(fx.includes('# ruolo resolver'), 'fixer riceve le STESSE istruzioni (caso nel payload)');
+  assert.ok(fx.includes('# Contratto comune dei worker'));
+  // Il guasto non è un ruolo lavorante: niente contratto.
+  const halt = readRoleInstructions('halt');
+  assert.ok(halt.includes('# guasto') && !halt.includes('Contratto comune'));
+  // idle e off non esistono più: coda vuota o interruttore spento fermano il
+  // giro PRIMA dello spawn (exit 2 alla richiesta di biglietto), quindi nessun
+  // worker deve mai ricevere quelle istruzioni.
+  assert.equal(readRoleInstructions('idle'), '');
+  assert.equal(readRoleInstructions('off'), '');
+});
+
+test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', () => {
+  // Il preflight consegna orchestrator.md, dispatch consegna gli altri: un file
+  // spostato o svuotato è un ruolo che parte senza istruzioni.
+  const realDir = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  for (const f of ['orchestrator.md', 'resolver.md', 'verifier.md', 'secaudit.md', 'prober.md', 'halt.md', '_contratto-worker.md']) {
+    const p = resolve(realDir, f);
+    assert.ok(existsSync(p), `${f} deve esistere`);
+    assert.ok(readFileSync(p, 'utf8').length > 300, `${f} non deve essere uno stub`);
+  }
+  for (const f of ['new-work.md', 'fixer.md', 'idle.md', 'off.md']) {
+    assert.ok(!existsSync(resolve(realDir, f)), `${f} è abolito e non deve riapparire`);
+  }
+});
+
 test('cleanup STATE_DIR temporanea', () => {
   rmSync(TMP, { recursive: true, force: true });
   assert.ok(!existsSync(TMP));
