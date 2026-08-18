@@ -63,8 +63,12 @@ async function main() {
     const { keys = [] } = await chiama({ op: 'list' });
     if (!keys.length) { console.log('Nessuna parola d\'ordine attiva.'); return; }
     for (const k of keys) {
-      const stato = k.revokedAt ? `REVOCATA il ${quando(k.revokedAt)}` : 'attiva';
+      // Il server dice `revoked`: guardare un campo che non manda (una data di
+      // revoca) faceva sembrare attive anche quelle spente — e su un elenco di
+      // credenziali quello e' l'errore peggiore possibile.
+      const stato = k.revoked ? 'REVOCATA' : 'attiva';
       console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(8)} ${stato}`
+        + (k.lastUsedAt ? `  ultimo uso ${quando(k.lastUsedAt)}` : '')
         + (k.label ? `  — ${k.label}` : ''));
     }
     return;
