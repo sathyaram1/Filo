@@ -218,6 +218,9 @@ service cloud.firestore {
                     'name', 'seq', 'subSeq', 'branch', 'blockReason', 'starred',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum',
                     'reviewDecision', 'reviewComment', 'reviewedAt', 'resolvedInVersion',
+                    // I DUE TESTI: 'notes' e' il report per l'owner (cifrato),
+                    // 'userNote' la frase in chiaro per chi ha mandato il feedback.
+                    'userNote',
                     'archiveOverride', 'reopenRequests',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
@@ -250,6 +253,10 @@ service cloud.firestore {
         // taglia i turni più vecchi lato scrittura.
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 60000
+        // La frase per l'utente e' corta per costruzione: e' l'unico dei due
+        // testi che resta leggibile da tutti, e un tetto stretto la tiene tale.
+        && request.resource.data.get('userNote', '') is string
+        && request.resource.data.get('userNote', '').size() <= 500
         // S1.priority: priority accetta int 0-3 (legacy in chiaro) OPPURE
         // una stringa ciphertext FENC1: (gate on). Retrocompatibile.
         && (

@@ -163,10 +163,23 @@ export async function scrivi(id, to, nota, opts = {}) {
   set('statusPublic', statusToPublic ? statusToPublic(to) : 'open');
   set('workingSince', to === 'working' ? new Date().toISOString() : '');
 
+  // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8): il report per te viaggia
+  // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
+  // sulla sua macchina, che la chiave non ce l'ha.
   if (typeof nota === 'string' && nota.trim()) {
-    const esistenti = doc.fields?.notes?.stringValue || '';
+    // Si fonde e si taglia sul testo IN CHIARO, poi si cifra.
+    const esistenti = await notePrecedentiInChiaro(doc);
     const fuse = THREAD ? THREAD.mergeModelReport(esistenti, nota) : nota;
-    set('notes', THREAD?.capNotes ? THREAD.capNotes(fuse) : fuse);
+    const capped = THREAD?.capNotes ? THREAD.capNotes(fuse) : fuse;
+    if (CRYPTO?.isEnabled?.()) {
+      try { set('notes', await CRYPTO.encryptForOwner(capped)); }
+      catch (e) { return { ok: false, motivo: `cifratura del report fallita: ${e?.message || e}` }; }
+    } else {
+      set('notes', capped);
+    }
+  }
+  if (typeof opts.frase === 'string' && opts.frase.trim()) {
+    set('userNote', opts.frase.trim().slice(0, 500));
   }
   if (typeof opts.branch === 'string') set('branch', opts.branch.slice(0, 200));
   if (typeof opts.reason === 'string') {
