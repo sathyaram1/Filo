@@ -202,9 +202,9 @@ service cloud.firestore {
       // Triage admin (pieno): campi di stato/note/priorità/timestamp, più
       // numero e titolo (per backfill/rinomina). Il resto resta immutabile.
       // `claimedBy`/`claimedAt`/`claimExpiresAt`/`claimNum` = "semaforo" che una
-      // routine ha preso in carico il feedback (vedi scripts/claim-feedback.mjs).
-      // Il lock vero vive su git; questi campi servono SOLO alla dashboard per
-      // mostrare "in lavorazione". Sono stringhe (ISO/etichetta); '' = libero.
+      // routine ha preso in carico il feedback. Il lock vero lo tiene il server
+      // (il semaforo del biglietto); questi campi servono SOLO alla dashboard
+      // per mostrare "in lavorazione". Stringhe (ISO/etichetta); '' = libero.
       allow update: if
         isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys()
