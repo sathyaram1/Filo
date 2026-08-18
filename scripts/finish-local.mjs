@@ -79,7 +79,11 @@ export function specsForChangedFiles(changed) {
 function main() {
   const argv = process.argv.slice(2);
   const checkOnly = argv.includes('--check');
-  const skipVerify = argv.includes('--no-verify');
+  if (argv.includes('--no-verify')) {
+    console.error('La scorciatoia --no-verify non esiste più: i controlli e la verifica');
+    console.error('indipendente girano sempre (SPEC-RIDISEGNO-MAX.md §8).');
+    process.exit(1);
+  }
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
