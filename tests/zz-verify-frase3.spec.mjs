@@ -19,7 +19,7 @@ test('diagnostico travaso', async ({ openTab }) => {
     window.filo.message = async (msg) => {
       window.__sent.push(JSON.parse(JSON.stringify(msg)));
       if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: true };
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 400));
       return { ok: true };
     };
   });
@@ -34,7 +34,7 @@ test('diagnostico travaso', async ({ openTab }) => {
     casella: await page.inputValue('#mgUserNoteText'),
     conversazione: (await page.locator('#mgThread').innerText()).slice(0, 120),
   };
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(1200);
   const dopo = {
     casella: await page.inputValue('#mgUserNoteText'),
     conversazione: (await page.locator('#mgThread').innerText()).slice(0, 120),
@@ -46,7 +46,7 @@ test('diagnostico travaso', async ({ openTab }) => {
 
   // Ora l-owner preme di nuovo Salva credendo di lavorare su B.
   await page.click('#mgUserNoteBtn');
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(1200);
   const inviati = await page.evaluate(() => window.__sent.filter((m) => m.type === 'feedback_update'));
   console.log('>>> SCRITTURE INVIATE:', JSON.stringify(inviati, null, 2));
   expect(true).toBe(true);
