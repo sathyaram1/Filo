@@ -67,9 +67,10 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync
 import { basename, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  prepareBranch, newWorkBranch, preferredBase, checkDelivery, withCheckpoint,
-  lastCheckpoint, bumpRejects, clearRejects, headSha, currentBranch,
-  writeExpectation, clearExpectation, stateDir, IDENTITY_REJECT_LIMIT,
+  prepareBranch, newWorkBranch, preferredBase, withCheckpoint,
+  lastCheckpoint, clearRejects, headSha, currentBranch,
+  guardTransition, escalationNote,
+  writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
@@ -701,27 +702,19 @@ export function verifierNoteText(verdict, critique = '') {
  * disallineamenti a ripetizione non deve girare a vuoto all'infinito: al terzo
  * rifiuto il feedback va in `design`, come per i reset `working`→`todo`.
  *
- * @returns {{ok:true, state:object}|{ok:false, message:string}}
+ * La regola vive in `guardTransition` (branch-integrity.mjs), che è anche la
+ * versione coperta dagli unit test: qui si attacca solo la consegna al canale.
+ *
+ * @returns {{ok:true, state:object|null}|{ok:false, message:string}}
  */
 function guardIdentity(id) {
-  const prev = readState(id);
-  const assigned = prev?.branch || '';
-  const v = checkDelivery(ROOT, assigned);
-  if (v.ok) return { ok: true, state: prev };
-
-  const b = bumpRejects(prev || defaultState(id, assigned));
-  b.state.id = id;
-  const base = `transizione rifiutata su ${id}: ${v.reason}`;
-  if (b.escalate) {
-    deliverToChannel('status', {
-      status: 'design', reason: 'loop',
-      notes: `La lavorazione automatica si è disallineata ${b.count} volte di seguito: chi doveva scrivere l'esito stava guardando un'altra versione del codice, quindi il risultato non sarebbe attendibile. Sospendo i tentativi automatici; serve una tua decisione su come procedere.`,
-    }).catch(() => { /* se il server non risponde il feedback resta dov'è: lo ripesca il giro dopo */ });
-    clearState(id);
-    return { ok: false, message: `${base} — terzo rifiuto consecutivo: feedback portato in design` };
-  }
-  writeState(b.state);
-  return { ok: false, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+  return guardTransition(ROOT, id, {
+    escalate: () => {
+      deliverToChannel('status', { status: 'design', reason: 'loop', notes: escalationNote() })
+        .catch(() => { /* se il server non risponde il feedback resta dov'è: lo ripesca il giro dopo */ });
+    },
+    clear: () => clearState(id),
+  });
 }
 
 /**

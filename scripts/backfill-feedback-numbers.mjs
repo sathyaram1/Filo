@@ -63,7 +63,7 @@ async function patchSeq(id, seq, bearer) {
 }
 
 // Esegue il backfill. `bearer` null = dry-run (solo lettura, che è pubblica).
-export async function backfillNumbers(bearer) {
+async function backfillNumbers(bearer) {
   const dry = !bearer;
   const docs = await listAll(bearer || '');
   const withSeq = docs.filter((d) => intField(d, 'seq') > 0);

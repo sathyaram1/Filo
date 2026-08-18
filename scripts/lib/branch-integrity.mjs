@@ -346,12 +346,10 @@ export function checkDelivery(root, assignedBranch) {
 /**
  * Guardia COMPLETA di una transizione della macchina a stati: verifica
  * l'identità, e in caso di rifiuto incrementa il contatore e — alla soglia —
- * chiede l'escalation all'owner. Nata per essere condivisa fra i due punti che
- * scrivevano nella macchina a stati; da quando le consegne delle routine
- * passano tutte dal canale autenticato verso il server, di punti ne è rimasto
- * uno solo — `guardIdentity` in dispatch.mjs, che ripete questa stessa forma
- * con la consegna al canale attaccata. Qui resta la versione parametrica, che
- * è quella coperta dagli unit test.
+ * chiede l'escalation all'owner. Da quando le consegne delle routine passano
+ * tutte dal canale autenticato verso il server, il punto di scrittura è uno
+ * solo — `guardIdentity` in dispatch.mjs — e delega qui: la regola sta in un
+ * posto solo, ed è quello coperto dagli unit test.
  *
  * Non chiede all'istanza dove si trova: lo guarda. `escalate` viene invocata
  * solo alla soglia (porta il feedback in `design`); `persist` salva lo stato
