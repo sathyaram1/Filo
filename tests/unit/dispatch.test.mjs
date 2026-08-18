@@ -418,12 +418,6 @@ test('withRetry: nessun retry se il primo tentativo riesce', async () => {
   assert.equal(calls, 1);
 });
 
-// ─── appendWorkerLog: accoda + cap sulle più recenti ──────────────────────────
-
-
-
-
-
 // ─── #443: la consegna del lavoro firma anche CHI lo sta facendo ─────────────
 //
 // La provenienza non può dipendere dal fatto che il worker si ricordi di
