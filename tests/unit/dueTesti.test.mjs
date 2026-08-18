@@ -140,6 +140,24 @@ test('report cifrato e nessuna frase → non si mostra il blob, si tace', () => 
     'un ciphertext mostrato a chi ha segnalato è peggio del silenzio');
 });
 
+test('report illeggibile: si riconoscono ENTRAMBE le forme', () => {
+  // Due forme, e riconoscerne una sola è come non averne nessuna: il testo
+  // cifrato così com'è, e il SEGNAPOSTO che l'app mette quando ha provato a
+  // decifrare e non ci è riuscita. Su quest'ultimo la casella di modifica
+  // restava aperta, e il primo salvataggio cancellava il report vero.
+  assert.equal(THREAD.reportUnreadable('FENC1:blob'), true);
+  assert.equal(THREAD.reportUnreadable('[cifrato — chiave privata non configurata]'), true);
+  assert.equal(THREAD.reportUnreadable('Risolto: ora il pulsante compare.'), false);
+  assert.equal(THREAD.reportUnreadable(''), false);
+});
+
+test('col segnaposto al posto del report, a chi legge non si mostra il segnaposto', () => {
+  assert.equal(THREAD.explanationForReporter({ notes: '[cifrato — chiave privata non configurata]' }), '');
+  assert.equal(
+    THREAD.explanationForReporter({ notes: '[cifrato — chiave privata non configurata]', userNote: 'Ora la scheda si chiude.' }),
+    'Ora la scheda si chiude.');
+});
+
 test('feedback storici: un solo testo in chiaro → si continua a leggerlo', () => {
   // Prima della separazione il report stava tutto in `notes`, in chiaro. Chi
   // torna su un feedback vecchio deve continuare a vedere qualcosa.
