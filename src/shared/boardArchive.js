@@ -140,10 +140,9 @@
 
   // Applicatore sottile: dato un elenco di feedback "Risolti" + opts, ritorna
   // SOLO gli id da archiviare (decisione pura) — la mutazione vera (PATCH
-  // Firestore / queue-triage) resta al chiamante, che segue il percorso
-  // esistente: in routine cloud `node scripts/queue-triage.mjs <id> archived
-  // "auto-archiviato: punteggio <score> dopo 24h+"`; in sessione locale/owner
-  // lo stesso `feedback_update` usato da "Archivia" in dashboard.
+  // Firestore) resta al chiamante, che segue il percorso esistente: in routine
+  // cloud la consegna `status archived` sul canale del server; in sessione
+  // locale/owner lo stesso `feedback_update` usato da "Archivia" in dashboard.
   // PURA (non scrive nulla): { toArchive: [...id], toFlag: [...id] } dove
   // `toFlag` sono i feedback "fortemente negativi" da segnalare (badge owner),
   // SENZA toccarne lo stato.
