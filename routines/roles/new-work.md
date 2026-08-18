@@ -83,7 +83,16 @@ aveva uno screenshot che indicava un punto della UI e tu hai scelto un altro
 punto, quella è una deviazione da dichiarare — anche se a parole l'owner non
 aveva scritto dove.
 
-**2. La riga di changelog** in `src/shared/patchNotes.js`. Regole complete in
+**2. La frase per chi ha mandato il feedback.** Il report qui sopra lo legge
+**solo l'owner**: viene cifrato, e chi ha segnalato non ha la chiave. Se non
+scrivi questa frase, a chi ha segnalato arriva "risolto" e basta.
+
+**Una riga**, in italiano semplice, che dica *cosa può fare adesso* — niente
+scelte tecniche, niente alternative scartate, niente nomi di file: quella roba è
+per l'owner e sta nel report. Se il lavoro non cambia niente di visibile per chi
+ha segnalato (parti interne, superfici riservate all'owner) → **non scriverla**.
+
+**3. La riga di changelog** in `src/shared/patchNotes.js`. Regole complete in
 `CLAUDE.md` § "Patch notes". Filtro prima di scriverla: *un utente qualsiasi può
 usare questa cosa?* Se tocca solo superfici riservate all'owner (dashboard di
 gestione, statistiche, automazioni, log) o parti interne → **non scrivere
