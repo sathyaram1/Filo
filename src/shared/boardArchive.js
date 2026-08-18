@@ -5,7 +5,7 @@
 // pesati per credibilità, vedi SN_FEEDBACK.tallyVotes) e da quanto tempo è
 // spedito. NON tocca Firestore: il chiamante (routine cloud / dashboard
 // owner) applica la decisione con lo stesso percorso usato per l'archiviazione
-// manuale (queue-triage.mjs status `archived` / feedback_update).
+// manuale (la consegna `archived` sul canale del server / feedback_update).
 //
 // Espone SN_BOARD_ARCHIVE = { shouldAutoArchive, usersSayBroken,
 // hasOwnerOverride, applyAutoArchive, DEFAULTS } su globalThis.
