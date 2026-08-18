@@ -242,7 +242,7 @@ if (isMain) {
   const [id, status, ...nota] = posizionali;
 
   if (!id || !status) {
-    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "per l'utente"] [--starred|--unstar] [--come-routine] [--dry-run]');
+    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
     process.exit(1);
   }
