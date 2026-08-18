@@ -66,8 +66,8 @@ NON implementare tutto in una volta.
 
 ## Come riporti
 
-Sei tu — non un ruolo a valle — a scrivere **entrambi** i testi che l'owner
-leggerà. Nessuno dopo di te li riscriverà.
+Sei tu — non un ruolo a valle — a scrivere i testi che l'owner e chi ha mandato
+il feedback leggeranno. Nessuno dopo di te li riscriverà.
 
 **1. Il report per l'owner** (la nota del feedback in dashboard). È **minimo**:
 struttura, contenuti obbligatori e lista di ciò che NON va scritto sono in
