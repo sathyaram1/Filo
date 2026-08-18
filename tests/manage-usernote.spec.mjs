@@ -237,6 +237,51 @@ test('uscire e rientrare durante il salvataggio non fa tornare indietro la frase
   expect(inviate).toEqual(['frase nuova', 'frase nuova corretta']);
 });
 
+test('due salvataggi in volo: comanda l\'ultimo spedito, non l\'ultimo che risponde', async ({ openTab }) => {
+  // Le risposte possono tornare in ordine diverso da come sono partite. Se a
+  // comandare è quella che arriva per ultima, il pannello si riempie di parole
+  // già sostituite: rientrando nel feedback l'owner rilegge il testo vecchio, e
+  // la pagina gli risponde "Nessuna modifica" su una frase che a destinazione
+  // non è mai arrivata. Vede una cosa, il mittente ne legge un'altra.
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+
+  // Canale che risponde AL CONTRARIO: il primo invio è il più lento.
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') {
+        window.__updates.push(msg);
+        const ritardo = window.__updates.length === 1 ? 1200 : 100;
+        await new Promise((r) => setTimeout(r, ritardo));
+        return { ok: true };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([{ ...f, _id: 'fb-conc', userNote: 'vecchia' }]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail('fb-conc');
+  }, RISOLTO);
+
+  await page.locator('#mgUserNoteText').fill('nuova');
+  await page.locator('#mgUserNoteBtn').click();
+  await page.locator('#mgUserNoteText').fill('corretta');
+  await page.locator('#mgUserNoteText').press('Enter');
+  await page.waitForTimeout(1800);
+
+  // Riaprendo il feedback deve esserci l'ultima spedita, non l'ultima arrivata.
+  await page.evaluate(() => window.__mgTest.openDetail('fb-conc'));
+  await expect(page.locator('#mgUserNoteText')).toHaveValue('corretta');
+
+  const inviate = await page.evaluate(() => window.__updates.map((u) => u.userNote));
+  expect(inviate).toEqual(['nuova', 'corretta']);
+});
+
 test('senza admin la casella non compare', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');

@@ -1600,6 +1600,10 @@
       mgUserNote.hidden = !isAdmin;
       mgUserNoteText.value = String(fb.userNote || '');
       userNoteToccata = false;
+      // Il salvataggio di un ALTRO feedback può essere ancora in volo: il
+      // bottone è uno solo, e lasciarlo spento qui bloccherebbe una scrittura
+      // che con quell'attesa non c'entra niente.
+      mgUserNoteBtn.disabled = false;
       setUserNoteMsg('', '');
     }
 
@@ -1768,7 +1772,10 @@
   // quale invio e' l'ultimo partito (le risposte possono tornare in ordine
   // diverso, e una vecchia non deve rimettere in campo un testo superato).
   let userNoteToccata = false;
-  let userNoteInvio = 0;
+  // Uno per feedback: due salvataggi su feedback diversi sono indipendenti,
+  // due sullo stesso si scavalcano e comanda il più recente SPEDITO — non
+  // quello che per caso risponde per ultimo.
+  const userNoteInvii = new Map();
 
   function setUserNoteMsg(text, kind) {
     if (!mgUserNoteMsg) return;
@@ -1788,36 +1795,42 @@
     // Da qui in poi quello che c'è nella casella è "partito": se l'owner ci
     // rimette mano, quello che scrive lui vince sulla risposta che arriverà.
     userNoteToccata = false;
-    const mio = ++userNoteInvio;
+    const mio = (userNoteInvii.get(id) || 0) + 1;
+    userNoteInvii.set(id, mio);
 
     mgUserNoteBtn.disabled = true;
     setUserNoteMsg('Salvataggio…', '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, userNote: frase });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      // L’ORDINE DI QUESTE TRE GUARDIE È IL PUNTO.
+      //
+      // 1) Una risposta superata da un salvataggio più recente non tocca
+      //    niente, né la schermata né il dato: il pannello ridipinge dal dato,
+      //    quindi lasciarcela scrivere faceva ricomparire, rientrando nel
+      //    feedback, parole già sostituite — e da lì la pagina rispondeva
+      //    "Nessuna modifica" su un testo che a destinazione non c'era mai
+      //    arrivato.
+      if (mio !== userNoteInvii.get(id)) return;
+      // 2) Il dato si aggiorna SEMPRE, anche se intanto l’owner è passato a un
+      //    altro feedback: la scrittura è andata a buon fine davvero, e
+      //    rientrando deve trovare quello che ha salvato.
       if (fb) fb.userNote = frase;
-      // Nell'attesa l'owner puo' aver aperto un ALTRO feedback. Il dato si
-      // aggiorna comunque (è salvato davvero), ma il pannello NON si tocca:
-      // riscriverlo qui ci metterebbe dentro la frase e la conversazione del
-      // feedback precedente lasciando selezionato il secondo — e il
-      // salvataggio dopo manderebbe il messaggio di uno al mittente
-      // dell'altro.
+      // 3) La SCHERMATA invece si tocca solo se è ancora quella di questo
+      //    feedback: altrimenti ci finirebbe dentro la frase di un altro, e il
+      //    salvataggio dopo manderebbe il messaggio di uno al mittente
+      //    dell’altro.
       if (selectedId !== id) return;
-      // Se nel frattempo e' partito un altro salvataggio comanda quello: una
-      // risposta vecchia non deve rimettere in campo un testo superato.
-      if (mio !== userNoteInvio) return;
-      // La casella si riallinea SOLO se l'owner non ci ha messo mano dopo
-      // l'invio, altrimenti gli cancellerebbe la correzione sotto le dita.
-      // Non basta confrontare il testo con quello inviato: uscendo dal
-      // feedback e rientrandoci il pannello lo ha già ridipinto col valore
-      // VECCHIO, e il confronto lo scambierebbe per una correzione. La
-      // casella resterebbe indietro, e il salvataggio successivo disferebbe
-      // questo, in silenzio.
+      // La casella si riallinea solo se l’owner non ci ha messo mano dopo
+      // l’invio, altrimenti gli cancellerebbe la correzione sotto le dita. Non
+      // basta confrontare il testo con quello inviato: uscendo dal feedback e
+      // rientrandoci il pannello lo ha già ridipinto col valore VECCHIO, e il
+      // confronto lo scambierebbe per una correzione.
       if (!userNoteToccata) mgUserNoteText.value = frase;
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
     } catch (e) {
-      if (selectedId !== id || mio !== userNoteInvio) return;
+      if (selectedId !== id || mio !== userNoteInvii.get(id)) return;
       setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
     } finally {
       mgUserNoteBtn.disabled = false;
