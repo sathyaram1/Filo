@@ -189,6 +189,44 @@ test('due salvataggi in volo sullo stesso feedback: comanda l ultimo, non quello
   expect(visto).toBe('due');
 });
 
+test('uscita/rientro e correzione: la risposta VECCHIA in ritardo rimette in campo il testo superato', async ({ openTab }) => {
+  const page = await prepara(openTab);
+
+  // 1) A ha "vecchia": l'owner scrive "nuova" e salva.
+  await open(page, 'A');
+  await box(page).fill('nuova');
+  await box(page).press('Enter');
+
+  // 2) Mentre e' in volo esce su B e rientra su A: il pannello ridipinge "vecchia".
+  await open(page, 'B');
+  await open(page, 'A');
+  await expect(box(page)).toHaveValue('vecchia');
+
+  // 3) L'owner corregge e risalva (il bottone e' bloccato dall'invio ancora in
+  //    volo, quindi usa Invio).
+  await box(page).fill('corretta');
+  await box(page).press('Enter');
+  expect(await nsent(page)).toBe(2);
+
+  // 4) Risponde prima la SECONDA, poi la prima (in ritardo).
+  await settle(page, 1, { ok: true });
+  await expect(box(page)).toHaveValue('corretta');
+  await settle(page, 0, { ok: true });
+  await expect(box(page)).toHaveValue('corretta');
+
+  // 5) L'owner esce e rientra: deve vedere l'ultima cosa spedita ("corretta"),
+  //    cioe' quella che il mittente leggera'.
+  await open(page, 'B');
+  await open(page, 'A');
+  const visto = await box(page).inputValue();
+  await btn(page).click();
+  console.log('RIENTRO DOPO CORREZIONE →', JSON.stringify({
+    mostrato: visto, messaggio: await msg(page).textContent(),
+    spediti: (await sent(page)).map((s) => s.userNote),
+  }));
+  expect(visto).toBe('corretta');
+});
+
 test('salvataggio, uscita e ritorno su un TERZO feedback: il pannello mostra il terzo, non il primo', async ({ openTab }) => {
   const page = await prepara(openTab);
 
