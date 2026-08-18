@@ -138,9 +138,10 @@ export function lastCheckpoint(state) {
 }
 
 // Quanti rifiuti d'identità consecutivi tollerare prima di chiedere all'owner.
-// Stessa soglia e stesso esito del contatore `workingResets` (apply-triage) e
-// del loop verifier→fixer: un ambiente che produce disallineamenti a ripetizione
-// deve smettere di girare a vuoto, non insistere per sempre.
+// Stessa soglia e stesso esito del contatore `workingResets` (i reset
+// `working`→`todo`) e del loop verifier→fixer: un ambiente che produce
+// disallineamenti a ripetizione deve smettere di girare a vuoto, non insistere
+// per sempre.
 export const IDENTITY_REJECT_LIMIT = 3;
 
 /**
@@ -345,9 +346,12 @@ export function checkDelivery(root, assignedBranch) {
 /**
  * Guardia COMPLETA di una transizione della macchina a stati: verifica
  * l'identità, e in caso di rifiuto incrementa il contatore e — alla soglia —
- * chiede l'escalation all'owner. Condivisa fra i due punti di scrittura
- * (i verdetti in dispatch.mjs e le consegne in queue-triage.mjs): la stessa
- * regola scritta due volte diventa due regole diverse al primo ritocco.
+ * chiede l'escalation all'owner. Nata per essere condivisa fra i due punti che
+ * scrivevano nella macchina a stati; da quando le consegne delle routine
+ * passano tutte dal canale autenticato verso il server, di punti ne è rimasto
+ * uno solo — `guardIdentity` in dispatch.mjs, che ripete questa stessa forma
+ * con la consegna al canale attaccata. Qui resta la versione parametrica, che
+ * è quella coperta dagli unit test.
  *
  * Non chiede all'istanza dove si trova: lo guarda. `escalate` viene invocata
  * solo alla soglia (porta il feedback in `design`); `persist` salva lo stato
@@ -376,8 +380,8 @@ export function guardTransition(root, id, { escalate, persist, clear } = {}) {
 
 /**
  * Il testo che l'owner legge in dashboard quando la lavorazione automatica
- * viene sospesa per disallineamento ripetuto. Vive qui perché lo usano
- * entrambi i punti di scrittura, e perché è per l'OWNER: niente branch, niente
+ * viene sospesa per disallineamento ripetuto. Vive qui, accanto alla soglia che
+ * lo fa scattare, ed è scritto per l'OWNER: niente branch, niente
  * SHA, niente nomi di file (vedi CLAUDE.md § Tono dei report).
  */
 export function escalationNote(count = IDENTITY_REJECT_LIMIT) {

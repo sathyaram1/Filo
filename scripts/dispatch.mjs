@@ -1220,11 +1220,11 @@ let lastEmitted = null;
 export function lastChoice() { return lastEmitted; }
 
 export function emit(bucket, ctx) {
-  // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443). Da qui lo
-  // rilegge `queue-feedback.mjs`: così un feedback aperto da un'automazione
-  // porta la provenienza giusta anche se il worker non ci pensa. Un guasto
-  // (`halt`) non è un ruolo: si cancella, altrimenti il marcatore del giro
-  // precedente sopravvivrebbe a un giro che non ha lavorato.
+  // Chi sta per lavorare, scritto DA CHI LO SA (feedback #443): resta come
+  // traccia locale di chi sta girando adesso in questa directory. La
+  // provenienza di un feedback aperto da un'automazione NON dipende più da
+  // questo file: la timbra il server dal biglietto, quando la consegna arriva
+  // dal canale autenticato.
   // Un guasto (`halt`) e un giro a vuoto (`idle`) non sono ruoli: si cancella il
   // marcatore, altrimenti quello del giro precedente sopravviverebbe a un giro
   // che non ha lavorato e finirebbe nella provenienza di un feedback altrui.

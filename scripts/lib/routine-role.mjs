@@ -13,7 +13,9 @@
 //   passare una bandierina: è esattamente il motivo per cui, prima di questo,
 //   un solo feedback su decine risultava "esplorazione" — l'unica volta che
 //   qualcuno se ne era ricordato. Quindi la scrive il dispatcher, che il ruolo
-//   lo SA per costruzione, e chi accoda la rilegge da qui senza doverci pensare.
+//   lo SA per costruzione. Da quando le consegne passano dal canale autenticato
+//   è il server a timbrare la provenienza, leggendola dal biglietto: qui resta
+//   la traccia locale di chi sta girando adesso in questa directory.
 //
 // IL FILE
 //   `.claude/routine-role.json`, accanto a `.claude/branch-expect.json` e con la

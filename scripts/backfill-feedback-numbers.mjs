@@ -1,7 +1,7 @@
 // Assegna il numero progressivo (#1, #2, …) ai feedback ESISTENTI che non ne
-// hanno ancora uno. Da eseguire UNA VOLTA (in locale dall'owner, o in CI col
-// service account) dopo l'introduzione della numerazione: i feedback nuovi si
-// numerano da soli all'invio.
+// hanno ancora uno. Da eseguire UNA VOLTA, in locale dall'owner, dopo
+// l'introduzione della numerazione: i feedback nuovi si numerano da soli
+// all'invio.
 //
 // Ordina per createdAt crescente, così i numeri rispecchiano l'ordine storico
 // di arrivo. I documenti che hanno già `seq` restano intatti; la numerazione
@@ -10,10 +10,10 @@
 // USO:
 //   node scripts/backfill-feedback-numbers.mjs            applica
 //   node scripts/backfill-feedback-numbers.mjs --dry-run  mostra cosa farebbe
+//   npm run feedback:backfill                             lo stesso, dal manifesto
 //
-// In alternativa si può accodare un file `{"op":"backfill"}` nella coda
-// feedback-triage/: la GitHub Action lo esegue col service account (utile
-// quando in locale non c'è nessuna credenziale admin).
+// Serve il token admin dell'owner (vedi scripts/admin-login.mjs), ed è l'unica
+// strada rimasta: non c'è più modo di farlo eseguire da un'automazione.
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -63,7 +63,6 @@ async function patchSeq(id, seq, bearer) {
 }
 
 // Esegue il backfill. `bearer` null = dry-run (solo lettura, che è pubblica).
-// Esportata perché apply-triage.mjs la richiama per l'op di coda "backfill".
 export async function backfillNumbers(bearer) {
   const dry = !bearer;
   const docs = await listAll(bearer || '');
