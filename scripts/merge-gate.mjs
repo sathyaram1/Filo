@@ -36,7 +36,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // FILO_REPO_ROOT: override della root del repo (cwd di git). Esiste SOLO per i
 // test, che simulano l'ambiente delle routine su cloni temporanei di un origin
-// finto, senza toccare il repo/origin reale (stesso pattern di claim-feedback).
+// finto, senza toccare il repo/origin reale (stesso pattern degli altri script
+// delle routine).
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
 
 // ─── logica pura (testabile) ────────────────────────────────────────────────
