@@ -43,6 +43,12 @@
   // I 'ignored' restano nascosti (raggiungibili solo riaprendoli via DB).
   let all = [];
   let currentTab = 'inbox';
+  // Numero di generazione dei caricamenti: ogni load() ne prende uno nuovo, e
+  // butta il proprio risultato se nel frattempo ne è partito un altro (o un
+  // test ha iniettato dati con __fbTest.setData). Senza questo, il caricamento
+  // reale partito all'apertura — che sui feedback veri richiede secondi —
+  // atterrerebbe DOPO e sovrascriverebbe quello più recente.
+  let loadGen = 0;
 
   // Ritrovamenti automatici → categoria "Agente". Due fonti:
   //   - agente esploratore LLM: clientId "agent:<model>" (vedi tests/agent/feedback.mjs);
