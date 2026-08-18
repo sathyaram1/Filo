@@ -959,6 +959,11 @@
           if (r && r.ok && Array.isArray(r.list)) all = r.list;
         } catch (_) { /* fallback: render con valori cifrati */ }
       }
+      // I DUE TESTI. Il report della lavorazione da qui in avanti è cifrato: chi
+      // non è l'owner non ha la chiave, e non deve averla. Al posto del blob
+      // illeggibile mostriamo la frase scritta per chi ha segnalato — e se non
+      // c'è, niente: una bolla vuota è meglio di una bolla di ciphertext.
+      all = all.map(sanitizeReportForReader);
       applyFilter();
     } catch (e) {
       // Errore di caricamento: frase per l'utente (mai il "Failed to fetch"

@@ -21,7 +21,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -100,9 +100,6 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
     writeFileSync(resolve(casa, 'stato', 'fid-900.json'), JSON.stringify({
       id: 'fid-900', branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
     }), 'utf8');
-    mkdirSync(resolve(casa, '.claude'), { recursive: true });
-    writeFileSync(resolve(casa, '.claude', 'routine-ticket.json'),
-      JSON.stringify({ ticket: 'biglietto-di-prova' }), 'utf8');
 
     const r = await esegui('dispatch.mjs', [
       '--record-fixed', 'fid-900',
@@ -114,6 +111,7 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
       FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
       FILO_SPOOL_DIR: resolve(casa, 'coda'),
       FILO_ROUTINES_ENABLED: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-di-prova',
     });
 
     const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
