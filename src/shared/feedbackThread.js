@@ -453,6 +453,10 @@
       const troppi = byteLen(tagliato) - spazio;
       tagliato = tagliato.slice(0, Math.max(0, tagliato.length - Math.max(1, Math.ceil(troppi / 4))));
     }
+    // Un carattere fuori dal piano base (un'emoji) in JS sono DUE unità: se il
+    // taglio cade in mezzo resta mezza emoji, che non è più un carattere.
+    const ultimo = tagliato.charCodeAt(tagliato.length - 1);
+    if (ultimo >= 0xD800 && ultimo <= 0xDBFF) tagliato = tagliato.slice(0, -1);
     return head + tagliato + '…';
   }
 

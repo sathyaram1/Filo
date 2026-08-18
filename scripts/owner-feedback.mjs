@@ -145,7 +145,11 @@ async function notePrecedentiInChiaro(doc) {
     // Se non si decifra, meglio ripartire dal solo testo nuovo che appiccicare
     // un blob illeggibile davanti: quello che c'era resta comunque perso, ma
     // almeno quello che scrivi adesso si legge.
-    return chiaro.startsWith('FENC') ? '' : chiaro;
+    // Due forme di "non si legge", non una: il testo cifrato così com'è e il
+    // SEGNAPOSTO che l'helper mette quando ha provato a decifrare e non ci è
+    // riuscito. Riconoscerne una sola vuol dire fondere il segnaposto dentro la
+    // conversazione e ricifrarcelo sopra.
+    return THREAD?.reportUnreadable?.(chiaro) ? '' : chiaro;
   } catch (_) { return ''; }
 }
 
