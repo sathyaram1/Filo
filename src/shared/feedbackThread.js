@@ -438,12 +438,25 @@
    * niente. Se invece `notes` è cifrato e la frase non c'è, non si mostra il
    * ciphertext: si tace, che è meglio di un blob.
    */
+  /**
+   * Il report NON è leggibile da chi sta guardando? Due forme, e vanno
+   * riconosciute entrambe: il testo cifrato così com'è (nessuna chiave in
+   * giro), e il SEGNAPOSTO che l'app mette al suo posto quando ha provato a
+   * decifrare e non ci è riuscita. Riconoscerne una sola è come non averne
+   * nessuna: nel caso scoperto la casella di modifica resta aperta su un
+   * segnaposto, e il primo salvataggio cancella il report vero.
+   */
+  function reportUnreadable(notes) {
+    const s = String(notes || '').trim();
+    return s.startsWith('FENC') || s.startsWith('[cifrato');
+  }
+
   function explanationForReporter(f) {
     const frase = String((f && f.userNote) || '').trim();
     if (frase) return frase;
 
     const raw = String((f && f.notes) || '').trim();
-    if (!raw || raw.startsWith('FENC')) return '';
+    if (!raw || reportUnreadable(raw)) return '';
     return splitNotes(raw)
       .filter((s) => s.role === 'model' && s.body)
       .map((s) => s.body)
