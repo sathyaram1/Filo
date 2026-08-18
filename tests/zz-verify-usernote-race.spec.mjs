@@ -179,9 +179,19 @@ test('SONDA: salvo, cambio feedback e TORNO INDIETRO prima che la risposta atter
 
   await resolveAt(page, 0);
   await expect(page.locator('#mgUserNoteMsg')).toHaveText('Salvata');
-  // QUI il punto: la casella deve mostrare la frase DAVVERO salvata,
-  // non quella vecchia. Altrimenti il prossimo "Salva" la fa tornare indietro.
-  await expect(campo).toHaveValue('frase nuova');
+
+  // CONSEGUENZA CONCRETA: se la casella resta sulla frase vecchia, il
+  // salvataggio successivo rimanda al mittente la frase vecchia, disfacendo
+  // in silenzio quella appena salvata.
+  const mostrato = await campo.inputValue();
+  await page.click('#mgUserNoteBtn');
+  await page.waitForTimeout(300);
+  const dopo = await page.evaluate(() => window.__pending());
+  const u = await updates(page);
+  console.log('[SONDA ritorno] mostrato in casella:', JSON.stringify(mostrato),
+    '| richieste partite:', JSON.stringify(u.map((x) => x.userNote)));
+  expect(mostrato, 'la casella deve mostrare la frase davvero salvata').toBe('frase nuova');
+  expect(dopo, 'un secondo Salva non deve rimandare la frase vecchia').toBe(1);
 });
 
 test('SONDA: doppio salvataggio ravvicinato (click + Invio) mentre il primo è in volo', async ({ openTab }) => {
