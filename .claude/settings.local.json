@@ -17,8 +17,7 @@
       "Bash(npx playwright:*)",
       "Bash(node tests/smoke.mjs)",
       "Bash(git -C \"C:/Users/agenti AI/Desktop/Filo/Filo\" pull --rebase origin main)",
-      "PowerShell(git -C \"C:/Users/agenti AI/Desktop/Filo/Filo\" pull --rebase origin main)",
-      "Bash(node scripts/apply-triage.mjs)"
+      "PowerShell(git -C \"C:/Users/agenti AI/Desktop/Filo/Filo\" pull --rebase origin main)"
     ]
   },
   "hooks": {
