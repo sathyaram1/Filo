@@ -182,6 +182,24 @@ test('ritiro fallito dopo un salvataggio andato a buon fine: si puo riprovare', 
   expect((await sent(page)).map((s) => s.note)).toEqual(['zeta', '', '']);
 });
 
+test('ritiro fallito PRIMA che torni il salvataggio riuscito: si puo riprovare', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await prepara(page, [A({ userNote: '' }), B({})]);
+
+  await salva(page, 'zeta');
+  await attendiInvii(page, 1);
+  await salva(page, '');
+  expect(await attendiInvii(page, 2)).toBe(2);
+  await page.evaluate(() => window.__ko(1));   // il ritiro fallisce per primo
+  await page.evaluate(() => window.__ok(0));   // poi arriva l'ok della prima
+  await expect(msg(page)).toHaveText(/rifiutato/);
+
+  await box(page).press('Enter');
+  const n = await attendiInvii(page, 3);
+  expect(await msg(page).innerText()).not.toBe('Nessuna modifica');
+  expect(n).toBe(3);
+});
+
 test('ripensamento su un feedback mentre un altro ha un salvataggio in volo', async ({ openTab }) => {
   const page = await openTab(URL);
   await prepara(page, [A({ userNote: '' }), B({ userNote: '' })]);
