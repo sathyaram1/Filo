@@ -1171,10 +1171,10 @@ export function emit(bucket, ctx) {
   // provenienza di un feedback aperto da un'automazione NON dipende più da
   // questo file: la timbra il server dal biglietto, quando la consegna arriva
   // dal canale autenticato.
-  // Un guasto (`halt`) e un giro a vuoto (`idle`) non sono ruoli: si cancella il
-  // marcatore, altrimenti quello del giro precedente sopravviverebbe a un giro
-  // che non ha lavorato e finirebbe nella provenienza di un feedback altrui.
-  if (bucket.role === 'halt' || bucket.role === 'idle' || bucket.role === 'off') clearRole(ROOT);
+  // Un guasto (`halt`) non è un ruolo: si cancella il marcatore, altrimenti
+  // quello del giro precedente sopravviverebbe a un giro che non ha lavorato e
+  // finirebbe nella provenienza di un feedback altrui.
+  if (bucket.role === 'halt') clearRole(ROOT);
   else writeRole(ROOT, bucket.role);
   const payload = buildPayload(bucket, ctx);
   const out = {
