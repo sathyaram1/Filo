@@ -391,7 +391,7 @@
   // le bypassa, continuava a gonfiarlo. Cioè esattamente il guaio che questo
   // tetto esiste per impedire. Perciò il tetto in CHIARO sta sotto quello delle
   // regole con il margine dell'espansione: 40.000 → ~53.500 cifrati.
-  const NOTES_MAX = 40000;
+  const NOTES_MAX = 44000;
   const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
 
   // Spezza il blob in blocchi grezzi: il primo è il testo prima di qualsiasi
@@ -414,23 +414,47 @@
     return blocks.filter((b, i) => i === 0 || b.length > 0);
   }
 
+  /**
+   * Quanto OCCUPA questo testo. In BYTE UTF-8, non in caratteri.
+   *
+   * È la differenza che ha fatto saltare il tetto: le regole Firestore contano
+   * i byte del testo cifrato, che è ASCII e cresce in proporzione ai byte del
+   * chiaro. Una conversazione di 40.000 CARATTERI accentati, o in cirillico o
+   * in giapponese, sono 60.000-120.000 byte: passava il taglio e veniva
+   * respinta dalle regole subito dopo. Con l'italiano quasi non si vede — ed è
+   * il motivo per cui un tetto contato in caratteri sembra funzionare finché
+   * qualcuno non scrive un feedback in un'altra lingua.
+   */
+  function byteLen(s) {
+    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s).length;
+    return Buffer.byteLength(s, 'utf8');
+  }
+
   function capNotes(notes, max) {
     const limit = Number(max) > 0 ? Number(max) : NOTES_MAX;
     const s = String(notes == null ? '' : notes);
-    if (s.length <= limit) return s;
+    if (byteLen(s) <= limit) return s;
     const blocks = rawBlocks(s);
     // Toglie i blocchi più vecchi finché il resto (+ la riga che dichiara il
     // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno.
     while (blocks.length > 1) {
       blocks.shift();
       const candidate = `${TRIM_MARK}\n\n${blocks.join('\n').replace(/^\n+/, '')}`;
-      if (candidate.length <= limit) return candidate;
+      if (byteLen(candidate) <= limit) return candidate;
     }
     // Un turno solo, più lungo del tetto: tiene l'inizio (marcatore compreso) e
-    // taglia la coda.
+    // taglia la coda. Si taglia a byte e si arretra finché non si è spezzato un
+    // carattere a metà: un troncamento in mezzo a una lettera accentata
+    // lascerebbe un carattere rotto in coda alla conversazione.
     const head = `${TRIM_MARK}\n\n`;
     const body = blocks.join('\n').replace(/^\n+/, '');
-    return head + body.slice(0, Math.max(0, limit - head.length - 1)) + '…';
+    const spazio = Math.max(0, limit - byteLen(head) - byteLen('…'));
+    let tagliato = body;
+    while (byteLen(tagliato) > spazio) {
+      const troppi = byteLen(tagliato) - spazio;
+      tagliato = tagliato.slice(0, Math.max(0, tagliato.length - Math.max(1, Math.ceil(troppi / 4))));
+    }
+    return head + tagliato + '…';
   }
 
   /**
