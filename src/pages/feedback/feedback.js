@@ -403,6 +403,16 @@
     }
     const item = all.find((f) => f._id === id);
     if (!item) return;
+    // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano
+    // sta QUI e non sui singoli pulsanti perché i cammini che scrivono le note
+    // sono più d'uno (la casella, gli allegati, la risposta ai chiarimenti): uno
+    // solo lasciato scoperto basta a sostituire il report vero con quello che era
+    // rimasto sullo schermo. Gli altri campi (stato, priorità) restano liberi.
+    if (item.reportIllegibile && payload && typeof payload.notes === 'string') {
+      alert('Il report di questo feedback non è leggibile su questo computer: manca la chiave privata. '
+        + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
+      return;
+    }
     const prev = { status: item.status, notes: item.notes, priority: item.priority };
     Object.assign(item, optimistic);
     applyFilter();
