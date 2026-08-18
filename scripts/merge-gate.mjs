@@ -89,7 +89,7 @@ function tryGit(args) {
 // il feedback in `blocked` (attende revisione umana).
 
 // Path (relativi alla root del repo) il cui cambiamento richiede sempre revisione
-// umana: regole/config di sicurezza, infrastruttura delle routine, deploy/triage,
+// umana: regole/config di sicurezza, infrastruttura delle routine, deploy,
 // auth, segreti. La lista è volutamente conservativa: meglio un blocco di troppo
 // (l'utente sblocca) che un file sensibile fuso senza occhi umani.
 export const SENSITIVE_PATTERNS = [
@@ -98,9 +98,9 @@ export const SENSITIVE_PATTERNS = [
   /^firebase\.json$/,                    // config deploy Firebase
   /^\.firebaserc$/,                      // progetto Firebase di default
   /^\.claude\/hooks\//,                  // l'auto-commit/merge su cui girano le routine
-  /^\.github\/workflows\//,              // la Action che applica i triage col service account
-  /^scripts\/(apply-triage|merge-gate|claim-feedback|queue-triage|queue-feedback|admin-login)\.mjs$/,
-  /^scripts\/lib\//,                     // firestore-auth, feedback-storage (auth + scrittura)
+  /^\.github\/workflows\//,              // i workflow (build e release verso gli utenti)
+  /^scripts\/(merge-gate|admin-login|routine-channel|owner-feedback)\.mjs$/,
+  /^scripts\/lib\//,                     // firestore-auth e le altre librerie d'accesso
   /^src\/main\/services\/handlers\/auth\.js$/, // flusso di login/admin
   /^src\/shared\/feedback\.js$/,         // client Firestore (porta API key + scritture)
   /(^|\/)\.env($|\.)/,                   // segreti d'ambiente
