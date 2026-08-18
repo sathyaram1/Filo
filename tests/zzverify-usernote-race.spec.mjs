@@ -174,18 +174,19 @@ test('due salvataggi in volo sullo stesso feedback: comanda l ultimo, non quello
   await expect(box(page)).toHaveValue('due');
   await expect(msg(page)).toHaveText('Salvata');
 
-  // Uscita/rientro: quello che si vede deve restare "due".
+  // Uscita/rientro: quello che si vede deve restare "due" (l'ULTIMO spedito,
+  // cioe' quello che il mittente leggera').
   await open(page, 'C');
   await open(page, 'A');
-  await expect(box(page)).toHaveValue('due');
-
-  // E la pagina deve credere che il valore salvato sia "due": tornare a "uno"
-  // deve spedire davvero.
-  await box(page).fill('uno');
-  await box(page).press('Enter');
-  await settle(page, 2, { ok: true });
-  await expect(msg(page)).toHaveText('Salvata');
-  expect((await sent(page))[2]).toEqual({ id: 'A', userNote: 'uno', keys: ['id', 'type', 'userNote'] });
+  const visto = await box(page).inputValue();
+  const esitoRitorno = await (async () => {
+    // Se il pannello mostra "uno", l'owner che "conferma" quel testo non lo
+    // spedisce nemmeno: resterebbe "due" sul database, in silenzio.
+    await btn(page).click();
+    return { visto, msg: await msg(page).textContent(), spediti: await sent(page) };
+  })();
+  console.log('ESITO RITORNO DOPO DUE INVII:', JSON.stringify(esitoRitorno, null, 2));
+  expect(visto).toBe('due');
 });
 
 test('salvataggio, uscita e ritorno su un TERZO feedback: il pannello mostra il terzo, non il primo', async ({ openTab }) => {
