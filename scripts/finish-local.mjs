@@ -128,7 +128,7 @@ function main() {
   //    trova i lavori "verdi ma sbagliati": i test qui sopra li ha scritti chi
   //    ha fatto il lavoro, quindi hanno i suoi stessi punti ciechi. In cloud
   //    questo passaggio c'è da sempre; qui mancava, e si pubblicava senza.
-  if (!skipVerify) {
+  {
     const v = verdictForCurrentBranch(ROOT);
     if (!v.ok) {
       console.error(`\n✗ Verifica mancante o non superata: ${v.reason}`);
@@ -136,7 +136,7 @@ function main() {
       console.error('    node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"');
       console.error('  poi consegna il testo stampato a un\'ISTANZA NUOVA (non a te stesso:');
       console.error('  chi ha scritto il codice non può verificarlo), e lascia che registri');
-      console.error('  l\'esito. Solo se serve davvero: `npm run finish -- --no-verify`.');
+      console.error('  l\'esito.');
       process.exit(1);
     }
     console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
