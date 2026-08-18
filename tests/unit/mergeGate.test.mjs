@@ -119,8 +119,9 @@ test('L5: un diff che tocca un file sensibile viene bloccato', () => {
   for (const f of [
     'firestore.rules',
     '.claude/hooks/auto-commit-merge.sh',
-    '.github/workflows/apply-triage.yml',
-    'scripts/apply-triage.mjs',
+    '.github/workflows/release.yml',
+    'scripts/routine-channel.mjs',
+    'scripts/owner-feedback.mjs',
     'scripts/lib/firestore-auth.mjs',
     'src/shared/feedback.js',
     'tests/agent/.env',
