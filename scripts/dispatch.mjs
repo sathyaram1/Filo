@@ -403,11 +403,11 @@ export function readRoleInstructions(role) {
  * Costruisce il payload che il worker riceve, rispettando l'ISOLAMENTO:
  *   - secaudit: SOLO il diff, MAI il feedback (isolamento strutturale).
  *   - verifier: il feedback (sintomo), MAI il diff (isolamento comportamentale).
- *   - fixer:    il feedback + la critica del verifier.
- *   - new-work: il feedback completo decifrato.
+ *   - fixer    (resolver, caso `correzione`): feedback + critica del verifier.
+ *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
  *   - prober:   niente.
  *
- * @param {object} bucket  output di chooseBucket
+ * @param {object} bucket  bucket costruito dalla busta del server
  * @param {object} ctx     { diff?, feedback? } dati già raccolti dal chiamante
  */
 export function buildPayload(bucket, ctx = {}) {
@@ -420,6 +420,9 @@ export function buildPayload(bucket, ctx = {}) {
       return { branch: bucket.branch, id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
     case 'fixer':
       return {
+        // È il resolver nel caso `correzione`: stesse istruzioni del primo
+        // passaggio, ma parte dalla critica di chi ha bocciato.
+        case: 'correzione',
         branch: bucket.branch,
         id: bucket.id,
         num: bucket.num,
@@ -433,7 +436,7 @@ export function buildPayload(bucket, ctx = {}) {
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
-      return { id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      return { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
       return { kind: bucket.kind || 'transient', message: bucket.message || '' };
