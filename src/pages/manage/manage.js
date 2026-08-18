@@ -1862,7 +1862,7 @@
       // esserci arrivata: da qui in poi non sappiamo cosa ci sia. Va marcato
       // SEMPRE, anche se intanto si sta guardando un altro feedback, o il
       // salvataggio successivo verrebbe di nuovo inghiottito.
-      userNoteSpedito.set(id, FRASE_IGNOTA);
+      /* CONTROPROVA: riga rimossa */
       if (selectedId !== id) return;
       setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
     } finally {
