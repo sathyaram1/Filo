@@ -100,7 +100,6 @@ async function giro(rispostaLavoro) {
           // dovrebbe sorvegliare.
           FILO_REPO_ROOT: casa,
           FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
-          FILO_SPOOL_DIR: resolve(casa, 'coda'),
           // Interruttore acceso senza chiedere niente alla rete.
           FILO_ROUTINES_ENABLED: '1',
           // La chiave NON deve servire: se servisse, questo test lo direbbe.
