@@ -1787,6 +1787,12 @@
   // due sullo stesso si scavalcano e comanda il più recente SPEDITO — non
   // quello che per caso risponde per ultimo.
   const userNoteInvii = new Map();
+  // E l'ultimo testo SPEDITO, sempre per feedback. Serve alla domanda “è
+  // cambiato qualcosa?”: farla sul valore memorizzato la sbaglia finché la
+  // risposta non torna — l'owner che ci ripensa e rimette la frase di prima
+  // si sentiva dire "Nessuna modifica", non partiva niente, e a destinazione
+  // restava quella che aveva appena ritirato.
+  const userNoteSpedito = new Map();
 
   function setUserNoteMsg(text, kind) {
     if (!mgUserNoteMsg) return;
@@ -1801,13 +1807,15 @@
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
     const frase = (mgUserNoteText.value || '').trim().slice(0, 500);
-    if (String((fb && fb.userNote) || '') === frase) { setUserNoteMsg('Nessuna modifica', ''); return; }
+    const gia = userNoteSpedito.has(id) ? userNoteSpedito.get(id) : String((fb && fb.userNote) || '');
+    if (gia === frase) { setUserNoteMsg('Nessuna modifica', ''); return; }
 
     // Da qui in poi quello che c'è nella casella è "partito": se l'owner ci
     // rimette mano, quello che scrive lui vince sulla risposta che arriverà.
     userNoteToccata = false;
     const mio = (userNoteInvii.get(id) || 0) + 1;
     userNoteInvii.set(id, mio);
+    userNoteSpedito.set(id, frase);
 
     mgUserNoteBtn.disabled = true;
     setUserNoteMsg('Salvataggio…', '');
@@ -1827,6 +1835,7 @@
       //    altro feedback: la scrittura è andata a buon fine davvero, e
       //    rientrando deve trovare quello che ha salvato.
       if (fb) fb.userNote = frase;
+      userNoteSpedito.delete(id);
       // 3) La SCHERMATA invece si tocca solo se è ancora quella di questo
       //    feedback: altrimenti ci finirebbe dentro la frase di un altro, e il
       //    salvataggio dopo manderebbe il messaggio di uno al mittente
@@ -1842,6 +1851,9 @@
       renderThread(fb);
     } catch (e) {
       if (selectedId !== id || mio !== userNoteInvii.get(id)) return;
+      // Non è arrivato a destinazione: dimenticare che era partito, o
+      // riprovare la stessa frase risulterebbe "nessuna modifica".
+      if (userNoteInvii.get(id) === mio) userNoteSpedito.delete(id);
       setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
     } finally {
       mgUserNoteBtn.disabled = false;

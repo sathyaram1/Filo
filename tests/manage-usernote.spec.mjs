@@ -282,6 +282,50 @@ test('due salvataggi in volo: comanda l\'ultimo spedito, non l\'ultimo che rispo
   expect(inviate).toEqual(['nuova', 'corretta']);
 });
 
+test('ritirare la frase subito dopo averla salvata: il ripensamento parte davvero', async ({ openTab }) => {
+  // Il caso più naturale di tutti: salvo, ci ripenso, svuoto e risalvo prima
+  // che la prima risposta torni. Se la domanda "è cambiato qualcosa?" guarda il
+  // valore memorizzato — che è ancora quello di prima, perché la risposta non è
+  // tornata — il ripensamento viene inghiottito in silenzio: la pagina dice
+  // "Nessuna modifica", non parte niente, e al mittente resta la frase che
+  // l'owner aveva appena ritirato.
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') {
+        window.__updates.push(msg);
+        await new Promise((r) => setTimeout(r, 900));
+        return { ok: true };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([{ ...f, _id: 'fb-ripensamento', userNote: '' }]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail('fb-ripensamento');
+  }, RISOLTO);
+
+  await page.locator('#mgUserNoteText').fill('Ci ho lavorato, riprova.');
+  await page.locator('#mgUserNoteText').press('Enter');
+  // Ci ripensa e la ritira, mentre il primo salvataggio è ancora in volo.
+  await page.locator('#mgUserNoteText').fill('');
+  await page.locator('#mgUserNoteText').press('Enter');
+  await page.waitForTimeout(1500);
+
+  const inviate = await page.evaluate(() => window.__updates.map((u) => u.userNote));
+  expect(inviate).toEqual(['Ci ho lavorato, riprova.', '']);
+
+  // E rientrando nel feedback la frase deve risultare ritirata davvero.
+  await page.evaluate(() => window.__mgTest.openDetail('fb-ripensamento'));
+  await expect(page.locator('#mgUserNoteText')).toHaveValue('');
+});
+
 test('senza admin la casella non compare', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
