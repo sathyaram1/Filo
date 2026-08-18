@@ -372,19 +372,31 @@ export function clearState(id) {
 const ROLE_FILE = {
   secaudit: 'secaudit.md',
   verifier: 'verifier.md',
-  fixer: 'fixer.md',
-  'new-work': 'new-work.md',
+  // new-work e fixer sono lo stesso mestiere con un punto di partenza diverso
+  // (SPEC-RIDISEGNO-MAX.md §12): il server distingue ancora i due nomi nel
+  // protocollo, il worker riceve UN ruolo (resolver) e il caso nel payload.
+  fixer: 'resolver.md',
+  'new-work': 'resolver.md',
+  resolver: 'resolver.md',
   prober: 'prober.md',
   halt: 'halt.md',
-  idle: 'idle.md',
-  off: 'off.md',
 };
+
+// Il contratto comune dei worker (testo di ritorno non è un canale,
+// rifiuto ≠ guasto): UNA copia, accodata qui a ogni ruolo lavorante — prima
+// viveva duplicata byte-per-byte in fondo a ogni file-ruolo, e le copie
+// divergevano.
+const WORKER_CONTRACT_FILE = '_contratto-worker.md';
 
 export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
-  return existsSync(f) ? readFileSync(f, 'utf8') : '';
+  const base = existsSync(f) ? readFileSync(f, 'utf8') : '';
+  if (!base || !RUOLI_LAVORABILI.includes(role)) return base;
+  const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
+  const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
+  return contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
 }
 
 /**
