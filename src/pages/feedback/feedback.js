@@ -1014,28 +1014,33 @@
   }
 
   async function load() {
+    const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
-      all = await SN_FEEDBACK.list({ pageSize: 500, timeoutMs: 8000 });
+      let list = await SN_FEEDBACK.list({ pageSize: 500, timeoutMs: 8000 });
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).
-      if (isAdmin && all.length > 0) {
+      if (isAdmin && list.length > 0) {
         try {
-          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: all });
-          if (r && r.ok && Array.isArray(r.list)) all = r.list;
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list });
+          if (r && r.ok && Array.isArray(r.list)) list = r.list;
         } catch (_) { /* fallback: render con valori cifrati */ }
       }
+      // Se nel frattempo è partito un caricamento più recente (o un test ha
+      // iniettato dati), questo risultato è vecchio: si butta.
+      if (gen !== loadGen) return;
       // I DUE TESTI. Il report della lavorazione da qui in avanti è cifrato: chi
       // non è l'owner non ha la chiave, e non deve averla. Al posto del blob
       // illeggibile mostriamo la frase scritta per chi ha segnalato — e se non
       // c'è, niente: una bolla vuota è meglio di una bolla di ciphertext.
-      all = all.map(sanitizeReportForReader);
+      all = list.map(sanitizeReportForReader);
       applyFilter();
     } catch (e) {
+      if (gen !== loadGen) return;
       // Errore di caricamento: frase per l'utente (mai il "Failed to fetch"
       // grezzo) + un tasto per riprovare, invece di lasciare l'utente bloccato a
       // chiudere e riaprire la pagina. Stesso pattern della bacheca (SN_CHAT_ERRORS).
