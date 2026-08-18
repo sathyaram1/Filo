@@ -349,7 +349,7 @@ lo consegnano al canale:
 
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "critica"
-node scripts/dispatch.mjs --record-fixed <id> "report"
+node scripts/dispatch.mjs --record-fixed <id> "report" --frase "riga per chi ha segnalato"
 node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
 node scripts/dispatch.mjs --clear-state <id>
 ```

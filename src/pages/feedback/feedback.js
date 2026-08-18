@@ -511,7 +511,8 @@
     const id = el.dataset && el.dataset.id;
     if (!id) return null;
     // Distingue le textarea con stesso data-id (es. note) dalla classe.
-    const cls = el.classList && el.classList.contains('fb-notes') ? 'fb-notes' : null;
+    const cls = el.classList && el.classList.contains('fb-notes') ? 'fb-notes'
+      : (el.classList && el.classList.contains('fb-usernote') ? 'fb-usernote' : null);
     if (!cls) return null;
     return {
       cls,
