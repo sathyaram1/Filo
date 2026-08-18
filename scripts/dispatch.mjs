@@ -1259,8 +1259,13 @@ if (isMainModule) {
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = argv;
-      if (!id) { console.error('Uso: --record-fixed <id> ["report"]'); process.exit(1); }
-      const s = await recordFixed(id, rest.join(' '));
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"]'); process.exit(1); }
+      // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
+      // resto è il report per l'owner, che il server cifra.
+      const fi = rest.indexOf('--frase');
+      const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
+      const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
+      const s = await recordFixed(id, report, frase);
       if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
