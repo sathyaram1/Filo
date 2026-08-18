@@ -307,11 +307,21 @@ test('fallimento su un feedback mentre un ALTRO sta salvando: nessun travaso', a
 
 test('la casella c\'e\' su tutte le schede e sui feedback chiusi; non-admin esclusa', async ({ openTab }) => {
   const page = await boot(openTab);
-  // fb-b e' 'done' → scheda Risolti
-  await page.evaluate(() => window.__mgTest.setTab('done'));
-  await open(page, 'fb-b');
-  await expect(page.locator('#mgUserNote')).toBeVisible();
-  expect(await box(page)).toBe('W0');
+  // fb-b e' 'done' → scheda Risolti (feedback gia' chiuso)
+  for (const tab of ['inbox', 'queue', 'resolved', 'archived']) {
+    await page.evaluate((t) => window.__mgTest.setTab(t), tab);
+    await open(page, 'fb-b');
+    await expect(page.locator('#mgUserNote')).toBeVisible();
+    expect(await box(page)).toBe('W0');
+    // e ci si puo' scrivere davvero
+    await saveBtn(page, `da-${tab}`);
+    await page.waitForFunction(() => window.__upd.length > 0);
+    await page.evaluate(() => window.__settle(window.__upd.length - 1, true));
+    await expect(page.locator('#mgUserNoteMsg')).toHaveText('Salvata');
+  }
+  expect(await sent(page)).toEqual([
+    'fb-b:da-inbox', 'fb-b:da-queue', 'fb-b:da-resolved', 'fb-b:da-archived',
+  ]);
 
   await page.evaluate(() => window.__mgTest.setAdmin(false));
   await open(page, 'fb-b');
