@@ -423,9 +423,38 @@
     return head + body.slice(0, Math.max(0, limit - head.length - 1)) + '…';
   }
 
+  /**
+   * Cosa legge CHI HA MANDATO il feedback, quando gli viene detto che è risolto.
+   *
+   * I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8). `userNote` è la frase scritta
+   * per lui: breve, in chiaro, leggibile sulla SUA macchina, che non ha — giusta-
+   * mente — nessuna chiave. `notes` è un'altra cosa: è il report per l'owner,
+   * con le scelte della lavorazione, e da qui in avanti viaggia cifrato.
+   * Mostrargli quello era il motivo per cui il report non poteva essere protetto.
+   *
+   * RETROCOMPATIBILITÀ: i feedback già chiusi hanno un testo solo, in chiaro,
+   * dentro `notes`. Per quelli si continuano a estrarre i turni del modello, come
+   * prima — altrimenti chi torna su un feedback vecchio non leggerebbe più
+   * niente. Se invece `notes` è cifrato e la frase non c'è, non si mostra il
+   * ciphertext: si tace, che è meglio di un blob.
+   */
+  function explanationForReporter(f) {
+    const frase = String((f && f.userNote) || '').trim();
+    if (frase) return frase;
+
+    const raw = String((f && f.notes) || '').trim();
+    if (!raw || raw.startsWith('FENC')) return '';
+    return splitNotes(raw)
+      .filter((s) => s.role === 'model' && s.body)
+      .map((s) => s.body)
+      .join('\n\n')
+      .trim();
+  }
+
   global.SN_FEEDBACK_THREAD = {
     parse,
     splitNotes,
+    explanationForReporter,
     isFromModel,
     isFromOwner,
     originOf,
