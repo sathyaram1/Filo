@@ -24,9 +24,13 @@ const BASE = {
   images: [],
 };
 
-// B è sempre lo stesso: un feedback qualunque, aperto mentre il comando su A
-// è ancora in volo. È lui che deve restare sotto gli occhi dell'owner.
-const B = { ...BASE, _id: 'fb-b', seq: 801, name: 'Feedback B', text: 'testo del feedback B', status: 'todo' };
+// B è il feedback aperto mentre il comando su A è ancora in volo: è lui che
+// deve restare sotto gli occhi dell'owner. Vive nella STESSA scheda di A (una
+// scheda mostra solo i feedback nel suo stato), così la lista lo contiene
+// davvero e si può controllare anche che resti quello selezionato.
+function feedbackB(extra) {
+  return { ...BASE, _id: 'fb-b', seq: 801, name: 'Feedback B', text: 'testo del feedback B', ...extra };
+}
 
 // Pipeline che fa risultare il feedback "bloccato" (attacco): sblocco e
 // conferma del blocco vivono solo su questi.
@@ -43,7 +47,7 @@ const PIPELINE_ATTACCO = {
 // Prepara la pagina: aspetta che il caricamento VERO (Firestore) sia finito —
 // altrimenti atterra a metà controllo e sovrascrive i dati finti — poi rallenta
 // il canale verso il main di 400ms e inietta i due feedback aprendo A.
-async function preparaConCanaleLento(page, a, tab) {
+async function preparaConCanaleLento(page, a, b, tab) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
@@ -66,7 +70,7 @@ async function preparaConCanaleLento(page, a, tab) {
     window.__mgTest.setData([fa, fb]);
     window.__mgTest.setTab(t);
     window.__mgTest.openDetail(fa._id);
-  }, { fa: a, fb: B, t: tab });
+  }, { fa: a, fb: b, t: tab });
 }
 
 // Dopo il comando: apri B senza aspettare la risposta, lascia atterrare quella
@@ -87,7 +91,7 @@ async function apriBeVerifica(page) {
 test('archiviare un feedback non chiude il dettaglio di quello aperto nel frattempo', async ({ openTab }) => {
   const page = await openTab(URL);
   const A = { ...BASE, _id: 'fb-a', name: 'Feedback A', text: 'testo del feedback A', status: 'todo' };
-  await preparaConCanaleLento(page, A, 'queue');
+  await preparaConCanaleLento(page, A, feedbackB({ status: 'todo' }), 'queue');
 
   await page.locator('#mgArchiveBtn').click();
   await apriBeVerifica(page);
@@ -105,7 +109,7 @@ test('rispondere a un chiarimento non chiude il dettaglio di quello aperto nel f
     status: 'clarify',
     notes: '--- Filo ---\nQuale pulsante intendi?',
   };
-  await preparaConCanaleLento(page, A, 'inbox');
+  await preparaConCanaleLento(page, A, feedbackB({ status: 'clarify', notes: '--- Filo ---\nE questo dove lo vedi?' }), 'inbox');
 
   await page.locator('#mgClarifyText').fill('Intendo quello in alto a destra.');
   await page.locator('#mgClarifyBtn').click();
@@ -122,7 +126,7 @@ test('sbloccare un feedback non chiude il dettaglio di quello aperto nel frattem
     ...BASE, _id: 'fb-a', name: 'Feedback A', text: 'testo del feedback A',
     pipeline: PIPELINE_ATTACCO,
   };
-  await preparaConCanaleLento(page, A, 'inbox');
+  await preparaConCanaleLento(page, A, feedbackB({ pipeline: PIPELINE_ATTACCO }), 'inbox');
 
   await page.locator('#mgAcceptBtn').click();
   await apriBeVerifica(page);
@@ -138,7 +142,7 @@ test('confermare un blocco non chiude il dettaglio di quello aperto nel frattemp
     ...BASE, _id: 'fb-a', name: 'Feedback A', text: 'testo del feedback A',
     pipeline: PIPELINE_ATTACCO,
   };
-  await preparaConCanaleLento(page, A, 'inbox');
+  await preparaConCanaleLento(page, A, feedbackB({ pipeline: PIPELINE_ATTACCO }), 'inbox');
 
   await page.locator('#mgConfirmBtn').click();
   await apriBeVerifica(page);
