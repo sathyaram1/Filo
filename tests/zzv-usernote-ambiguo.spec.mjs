@@ -111,6 +111,12 @@ test('PRIMO riesce, SECONDO fallisce: da li in poi ogni salvataggio parte comunq
   await settle(page, 0, true);   // A1 arriva a destinazione
   await settle(page, 1, false);  // A2 no  → a destinazione c'e' A1, ma la pagina non lo sa
   await expect(page.locator('#mgUserNoteMsg')).toHaveClass(/mg-err/);
+  // Subito: la casella tiene quello che l'owner ha scritto (non gli viene
+  // cancellato sotto le dita); rientrando ridipinge il valore vecchio.
+  expect(await box(page)).toBe('A2');
+  await open(page, 'fb-b');
+  await open(page, 'fb-a');
+  expect(await box(page)).toBe('V0');
 
   // 1) stesso testo dell'ULTIMO spedito, cioe' il ritentativo naturale (A2):
   //    deve partire, perche' quella scrittura NON e' arrivata.
