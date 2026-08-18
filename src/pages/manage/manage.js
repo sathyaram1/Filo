@@ -1774,9 +1774,14 @@
     if (!selectedId) return;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
-    const scritto = mgUserNoteText.value || '';
-    const frase = scritto.trim().slice(0, 500);
+    const frase = (mgUserNoteText.value || '').trim().slice(0, 500);
     if (String((fb && fb.userNote) || '') === frase) { setUserNoteMsg('Nessuna modifica', ''); return; }
+
+    // Da qui in poi quello che c'è nella casella è "partito": se l'owner ci
+    // rimette mano, quello che scrive lui vince sulla risposta che arriverà.
+    userNoteToccata = false;
+    const mio = ++userNoteInvio;
+
     mgUserNoteBtn.disabled = true;
     setUserNoteMsg('Salvataggio…', '');
     try {
