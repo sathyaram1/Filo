@@ -903,6 +903,27 @@
       });
     });
 
+    // La frase per chi ha segnalato: stesso salvataggio delle note (debounce +
+    // blur). È l'altra metà dei due testi, e senza questa casella la dashboard
+    // era l'unica strada da cui quella metà si perdeva: chiudendo un feedback
+    // col pulsante, a chi l'aveva mandato restava solo la riga generica.
+    listEl.querySelectorAll('.fb-usernote').forEach((input) => {
+      let timer;
+      const flush = () => {
+        const id = input.dataset.id;
+        const item = all.find((f) => f._id === id);
+        if (!item) return;
+        const v = input.value.trim().slice(0, 500);
+        if (String(item.userNote || '') === v) return;
+        patch(id, { userNote: v }, { userNote: v });
+      };
+      input.addEventListener('blur', flush);
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(flush, 1500);
+      });
+    });
+
     // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
     // captureFocus): salvare le note non deve più "deselezionare" il campo.
     restoreFocus(focusSnap);
