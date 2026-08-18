@@ -381,7 +381,17 @@
   // (meglio perdere i turni antichi che perdere il feedback). Il tetto sta anche
   // nelle regole: se cambi NOTES_MAX qui, riallinea `firestore.rules` (ramo
   // update admin E ramo routine) e rideploya.
-  const NOTES_MAX = 60000;
+  //
+  // ⚠️ IL TAGLIO SI FA IN CHIARO, MA SU FIRESTORE CI VA IL CIFRATO. Da quando il
+  // report viaggia cifrato (spec ROUTINE-AUTH-SPEC.md §8) il testo cresce di un
+  // terzo abbondante — misurato: 59.990 caratteri diventano 80.118. Con il tetto
+  // uguale a quello delle regole, una conversazione lunga passava il taglio e
+  // veniva respinta dalle regole subito dopo: il feedback diventava immobile
+  // (nessun cambio di stato, nessun commento) mentre il server, che le regole
+  // le bypassa, continuava a gonfiarlo. Cioè esattamente il guaio che questo
+  // tetto esiste per impedire. Perciò il tetto in CHIARO sta sotto quello delle
+  // regole con il margine dell'espansione: 40.000 → ~53.500 cifrati.
+  const NOTES_MAX = 40000;
   const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
 
   // Spezza il blob in blocchi grezzi: il primo è il testo prima di qualsiasi
