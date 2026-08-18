@@ -46,6 +46,9 @@ async function boot(openTab) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest);
   await stubChannel(page);
+  // Il caricamento VERO da Firestore rimpiazza allFeedbacks: aspetta che sia
+  // finito prima di iniettare i dati finti, o li sovrascriverebbe a metà test.
+  await page.waitForSelector('#mgListLoading', { state: 'hidden', timeout: 30000 });
   await page.evaluate((fbs) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData(fbs);
