@@ -112,13 +112,14 @@ test('PRIMO riesce, SECONDO fallisce: da li in poi ogni salvataggio parte comunq
   await settle(page, 1, false);  // A2 no  → a destinazione c'e' A1, ma la pagina non lo sa
   await expect(page.locator('#mgUserNoteMsg')).toHaveClass(/mg-err/);
 
-  // 1) stesso testo che la pagina RICORDA (V0): deve partire.
-  await saveBtn(page, 'V0');
+  // 1) stesso testo dell'ULTIMO spedito, cioe' il ritentativo naturale (A2):
+  //    deve partire, perche' quella scrittura NON e' arrivata.
+  await saveBtn(page, 'A2');
   await waitSent(page, 3);
   await settle(page, 2, false);  // fallisce di nuovo: restiamo nell'ignoto
 
-  // 2) stesso testo dell'ULTIMO spedito (A2): deve partire.
-  await saveBtn(page, 'A2');
+  // 2) stesso testo che la pagina RICORDA (V0): deve partire.
+  await saveBtn(page, 'V0');
   await waitSent(page, 4);
   await settle(page, 3, false);
 
@@ -128,7 +129,7 @@ test('PRIMO riesce, SECONDO fallisce: da li in poi ogni salvataggio parte comunq
   await settle(page, 4, true);
 
   expect(await sent(page)).toEqual([
-    'fb-a:A1', 'fb-a:A2', 'fb-a:V0', 'fb-a:A2', 'fb-a:A1',
+    'fb-a:A1', 'fb-a:A2', 'fb-a:A2', 'fb-a:V0', 'fb-a:A1',
   ]);
   // Ora la pagina sa di nuovo cosa c'e' a destinazione: no-op legittimo.
   await saveBtn(page, 'A1');
