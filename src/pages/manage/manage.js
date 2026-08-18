@@ -2682,6 +2682,10 @@
     await loadData();
   }
 
-  init();
+  const bootDone = init().catch((e) => { console.error('[manage] init:', e); });
+  // Gli spec devono poter aspettare la FINE del caricamento vero (Firestore)
+  // prima di iniettare dati finti: se il caricamento atterra a metà test, li
+  // sovrascrive e il test diventa rumore.
+  window.__mgTest.whenReady = () => bootDone;
 
 })();
