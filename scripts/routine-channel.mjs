@@ -314,7 +314,7 @@ if (isMain) {
     const avanzati = args.slice(INTENTI.includes(args[0]) ? 1 : 2);
     if (avanzati.length) {
       console.error(`Argomento non capito: "${avanzati[0].slice(0, 40)}". I dati si passano come --campo valore.`);
-      console.error('Il report va in --notes "…", il testo di un feedback nuovo in --text "…".');
+      console.error('Il report va in --notes "…", la frase per chi ha mandato il feedback in --frase "…", il testo di un feedback nuovo in --text "…".');
       process.exit(1);
     }
     // La versione in cui il fix confluisce la sa solo questa macchina (è quella
