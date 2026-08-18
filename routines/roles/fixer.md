@@ -54,7 +54,18 @@ hai verificato, **non** vantare comportamenti attesi.
 prima riga**, col perché — comprese le richieste **implicite** (uno screenshot
 che indicava un punto preciso della UI e tu ne hai scelto un altro).
 
-**2. La riga di changelog** in `src/shared/patchNotes.js`, regole in `CLAUDE.md`
+**2. La frase per chi ha mandato il feedback.** Il report qui sopra lo legge
+**solo l'owner**: viene cifrato, e chi ha segnalato il problema non ha la chiave.
+Se non scrivi questa frase, a chi ha segnalato arriva "risolto" e basta.
+
+**Una riga**, in italiano semplice, che dica *cosa può fare adesso* — niente
+scelte tecniche, niente alternative scartate, niente nomi di file: quella roba
+è per l'owner e sta nel report. Esempi: *"Ora puoi incollare un'immagine
+direttamente nella chat."*, *"Le schede con audio si riconoscono a colpo
+d'occhio."* Se il lavoro non cambia niente di visibile per chi ha segnalato
+(parti interne, superfici riservate all'owner) → **non scriverla**.
+
+**3. La riga di changelog** in `src/shared/patchNotes.js`, regole in `CLAUDE.md`
 § "Patch notes". Se il lavoro tocca solo superfici riservate all'owner o parti
 interne → **niente riga**. Altrimenti **una riga sola**, più asciutta del report.
 
@@ -64,7 +75,7 @@ dispatch lo re-instraderà al **verifier** (il contatore loop è già stato
 incrementato quando hai ricevuto questo lavoro).
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[il tuo report]"
+node scripts/dispatch.mjs --record-fixed <id> "[il tuo report]" --frase "[la frase per chi ha segnalato]"
 ```
 
 Infine **rilascia il claim** (se resta vivo, il prossimo giro non può instradare
