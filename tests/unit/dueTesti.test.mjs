@@ -85,7 +85,17 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
   const casa = mkdtempSync(resolve(tmpdir(), 'filo-due-testi-'));
   try {
     // `--record-fixed` passa dallo stato locale del giro: gli si dà una cartella
-    // usa-e-getta, così non tocca niente di reale.
+    // usa-e-getta, così non tocca niente di reale. Deve essere un deposito git
+    // POSIZIONATO sul ramo del lavoro: la guardia sull'identità rifiuta le
+    // consegne fatte da un'altra versione del codice, e senza questo il test
+    // fallirebbe per un motivo che non è quello in prova.
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
+    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
+    execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
+    writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
+    execFileSync('git', ['add', '-A'], { cwd: casa });
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
+    execFileSync('git', ['checkout', '-q', '-b', 'worker/900'], { cwd: casa });
     mkdirSync(resolve(casa, 'stato'), { recursive: true });
     writeFileSync(resolve(casa, 'stato', 'fid-900.json'), JSON.stringify({
       id: 'fid-900', branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
