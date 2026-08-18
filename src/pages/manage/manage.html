@@ -602,6 +602,12 @@
     .mg-action-msg.mg-ok  { color: #2e9e5b; }
     .mg-action-msg.mg-err { color: #c0392b; }
 
+    /* ── Frase per chi ha segnalato, owner-only ─────────────────────────── */
+    .mg-usernote[hidden] { display: none; }
+    .mg-usernote-label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--sn-fg); }
+    .mg-usernote-hint { color: var(--sn-muted); font-size: 12px; }
+    #mgUserNoteText { margin-bottom: 8px; }
+
     /* ── Gestione feedback (⭐ + archivia/ripristina), owner-only ────────── */
     .mg-manage[hidden] { display: none; }
     .mg-star-btn {
