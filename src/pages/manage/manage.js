@@ -1657,6 +1657,9 @@
       // Se il filtro ⭐ è attivo, un feedback de-preferito deve sparire dalla lista.
       if (currentTab === 'archived' && starredOnly) renderList();
     } catch (e) {
+      // Come il ramo di successo: se il pannello è passato a un altro
+      // feedback, l'errore di questo non va scritto sopra quello.
+      if (selectedId !== id) return;
       setManageMsg(e.message || 'Errore', 'err');
     } finally {
       mgStarBtn.disabled = false;
@@ -1771,7 +1774,8 @@
     if (!selectedId) return;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
-    const frase = (mgUserNoteText.value || '').trim().slice(0, 500);
+    const scritto = mgUserNoteText.value || '';
+    const frase = scritto.trim().slice(0, 500);
     if (String((fb && fb.userNote) || '') === frase) { setUserNoteMsg('Nessuna modifica', ''); return; }
     mgUserNoteBtn.disabled = true;
     setUserNoteMsg('Salvataggio…', '');
@@ -1786,7 +1790,10 @@
       // salvataggio dopo manderebbe il messaggio di uno al mittente
       // dell'altro.
       if (selectedId !== id) return;
-      mgUserNoteText.value = frase;
+      // Nemmeno se l'owner ha corretto il testo nell'attesa: rimetterci dentro
+      // il valore appena salvato gli cancellerebbe la correzione sotto le dita.
+      // La correzione la salverà lui, o il prossimo salvataggio.
+      if (mgUserNoteText.value === scritto) mgUserNoteText.value = frase;
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
     } catch (e) {

@@ -156,6 +156,40 @@ test('cambiando feedback durante il salvataggio, la frase non travasa sull\'altr
   expect(secondo.userNote).toBe('Frase destinata a B.');
 });
 
+test('correggere la frase mentre il salvataggio è in volo non cancella la correzione', async ({ openTab }) => {
+  // Scrivi, salva, ti accorgi del refuso, correggi: con la rete lenta la
+  // risposta arriva DOPO la correzione. Se rimettesse dentro il valore salvato,
+  // quello che l'owner ha appena scritto sparirebbe sotto le dita.
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') {
+        window.__updates.push(msg);
+        await new Promise((r) => setTimeout(r, 600));
+        return { ok: true };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail(f._id);
+  }, RISOLTO);
+
+  await page.locator('#mgUserNoteText').fill('Ora puoi rimuovere un modelo.');
+  await page.locator('#mgUserNoteBtn').click();
+  await page.locator('#mgUserNoteText').fill('Ora puoi rimuovere un modello.');
+  await page.waitForTimeout(1000);
+
+  await expect(page.locator('#mgUserNoteText')).toHaveValue('Ora puoi rimuovere un modello.');
+});
+
 test('senza admin la casella non compare', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
