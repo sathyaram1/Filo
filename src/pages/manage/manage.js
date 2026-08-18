@@ -2011,6 +2011,14 @@
     // hanno implementato, gli esiti del controllo funzionalità e le risposte
     // dell'owner ai chiarimenti, in ordine. Il parser condiviso li separa.
     const notes = String(fb.notes || '');
+    // Report illeggibile su questo computer: al posto del blob si dice perché,
+    // e si mostra la frase scritta per chi ha segnalato, che è in chiaro.
+    if (TH && TH.reportUnreadable && TH.reportUnreadable(notes)) {
+      const frase = String(fb.userNote || '').trim();
+      if (frase) appendBubble('model', 'Filo (per chi ha segnalato)', esc(frase));
+      appendBubble('model', 'Filo', esc('Il report della lavorazione è cifrato e questo computer non ha la chiave privata per leggerlo.'));
+      return;
+    }
     if (!TH) {
       // Fallback senza parser: mostra il blob intero come un turno unico.
       if (notes.trim()) appendBubble('model', 'Filo (lavorazione)', esc(notes));
