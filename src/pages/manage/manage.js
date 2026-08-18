@@ -1634,11 +1634,17 @@
       const r = await sendToMain({ type: 'feedback_update', id, starred: next });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.starred = next;
+      // Nell'attesa il pannello può essere passato a un altro feedback:
+      // ridipingerlo con lo stato di questo direbbe il falso su quello aperto.
+      if (selectedId !== id) { if (currentTab === 'archived' && starredOnly) renderList(); return; }
       reflectManage(fb);
       setManageMsg(next ? 'Aggiunto ai preferiti.' : 'Rimosso dai preferiti.', 'ok');
       // Se il filtro ⭐ è attivo, un feedback de-preferito deve sparire dalla lista.
       if (currentTab === 'archived' && starredOnly) renderList();
     } catch (e) {
+      // Come il ramo di successo: se il pannello è passato a un altro feedback,
+      // l'errore di questo non va scritto sopra quello.
+      if (selectedId !== id) return;
       setManageMsg(e.message || 'Errore', 'err');
     } finally {
       mgStarBtn.disabled = false;
@@ -1670,6 +1676,11 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.status = next;
       fb.archiveOverride = nextOverride;
+      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
+      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
+      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
+      // sparirebbe sotto le mani senza motivo apparente.
+      if (selectedId !== id) { renderList(); return; }
       // Il feedback cambia tab: chiudi il dettaglio e ricalcola la lista corrente.
       selectedId = null;
       mgDetail.hidden = true;
@@ -1680,8 +1691,9 @@
       closeSidebar();
       renderList();
     } catch (e) {
-      setManageMsg(e.message || 'Errore', 'err');
       mgArchiveBtn.disabled = false;
+      if (selectedId !== id) return;
+      setManageMsg(e.message || 'Errore', 'err');
     }
   }
 
@@ -1723,6 +1735,11 @@
       const r = await sendToMain({ type: 'feedback_update', id, status: 'todo', notes: newNotes });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (fb) { fb.status = 'todo'; fb.notes = newNotes; }
+      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
+      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
+      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
+      // sparirebbe sotto le mani senza motivo apparente.
+      if (selectedId !== id) { renderList(); return; }
       // Il feedback non è più in chiarimento: esce dalla tab Ricevuti.
       selectedId = null;
       mgDetail.hidden = true;
@@ -1731,6 +1748,7 @@
       closeSidebar();
       renderList();
     } catch (e) {
+      if (selectedId !== id) return;
       setClarifyMsg(e.message || 'Errore nell\'invio', 'err');
     } finally {
       mgClarifyBtn.disabled = false;
@@ -1771,6 +1789,11 @@
       const fb = allFeedbacks.find((f) => f._id === id);
       if (fb) { fb.reviewDecision = 'accepted'; fb.reviewComment = comment; fb.status = 'todo'; }
 
+      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
+      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
+      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
+      // sparirebbe sotto le mani senza motivo apparente.
+      if (selectedId !== id) { renderList(); return; }
       // Il feedback non è più in revisione: torna allo stato vuoto del dettaglio.
       selectedId = null;
       mgDetail.hidden = true;
@@ -1780,6 +1803,7 @@
       closeSidebar();
       renderList();
     } catch (e) {
+      if (selectedId !== id) return;
       setActionMsg(e.message || (wasBlocked ? 'Errore nello sblocco' : 'Errore nell\'approvazione'), 'err');
     } finally {
       mgAcceptBtn.disabled = false;
@@ -1809,6 +1833,11 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       const fb = allFeedbacks.find((f) => f._id === id);
       if (fb) { fb.reviewDecision = 'rejected'; fb.reviewComment = comment; fb.status = to; }
+      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
+      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
+      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
+      // sparirebbe sotto le mani senza motivo apparente.
+      if (selectedId !== id) { renderList(); return; }
       selectedId = null;
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
@@ -1817,6 +1846,7 @@
       closeSidebar();
       renderList();
     } catch (e) {
+      if (selectedId !== id) return;
       setActionMsg(e.message || 'Errore nella conferma', 'err');
     } finally {
       mgConfirmBtn.disabled = false;
