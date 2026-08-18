@@ -953,7 +953,10 @@
   function sanitizeReportForReader(f) {
     const raw = String((f && f.notes) || '');
     if (!raw.startsWith('FENC')) return f;
-    return { ...f, notes: String((f && f.userNote) || '').trim() };
+    // `reportIllegibile` spegne la casella di modifica: riscrivere una nota che
+    // non si è potuta leggere significherebbe cancellare il report vero con
+    // quello che è rimasto sullo schermo.
+    return { ...f, notes: String((f && f.userNote) || '').trim(), reportIllegibile: true };
   }
 
   async function load() {
