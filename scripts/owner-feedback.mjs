@@ -23,6 +23,7 @@
 //   node scripts/owner-feedback.mjs <id> <status> "nota"  [--branch <nome>]
 //                                                         [--reason <slug>]
 //                                                         [--starred|--unstar]
+//                                                         [--frase "per l'utente"]
 //                                                         [--come-routine]
 //                                                         [--dry-run]
 //
@@ -229,23 +230,24 @@ if (isMain) {
   };
   const branch = flag('branch');
   const reason = flag('reason');
+  const frase = flag('frase');
   const dryRun = argv.includes('--dry-run');
   const attore = argv.includes('--come-routine') ? 'routine' : 'owner';
   let starred;
   if (argv.includes('--starred')) starred = true;
   else if (argv.includes('--unstar')) starred = false;
 
-  const valoriDiFlag = new Set([branch, reason].filter((v) => v !== undefined));
+  const valoriDiFlag = new Set([branch, reason, frase].filter((v) => v !== undefined));
   const posizionali = argv.filter((a) => !a.startsWith('--') && !valoriDiFlag.has(a));
   const [id, status, ...nota] = posizionali;
 
   if (!id || !status) {
-    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--starred|--unstar] [--dry-run]');
+    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "per l'utente"] [--starred|--unstar] [--come-routine] [--dry-run]');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
     process.exit(1);
   }
 
-  const r = await scrivi(id, status, nota.join(' '), { branch, reason, starred, dryRun, attore });
+  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, dryRun, attore });
   if (!r.ok) {
     console.error(`RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {

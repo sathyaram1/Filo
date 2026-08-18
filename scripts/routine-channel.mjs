@@ -241,6 +241,14 @@ if (isMain) {
     else { data[key] = next; i += 1; }
   }
 
+  // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8) hanno destinatari diversi: il
+  // report va cifrato per l'owner, la frase resta in chiaro per chi ha mandato
+  // il feedback. Chi consegna scrive `--frase`, una parola sola in italiano come
+  // il resto delle ricette; il server la riceve col suo nome. Un solo nome per
+  // la stessa cosa: due (uno qui e uno lì) è come si perde un testo per strada.
+  if (typeof data.frase === 'string') { data.userNote = data.frase; }
+  delete data.frase;
+
   const usage = () => {
     console.error('Uso: node scripts/routine-channel.mjs <ticket|work|heartbeat|release|deliver|compare> <segreto> [...]');
     process.exit(1);
