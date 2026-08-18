@@ -32,6 +32,7 @@ const {
   applyFixed,
   applySecaudit,
   buildPayload,
+  readRoleInstructions,
   defaultState,
   readState,
   writeState,
