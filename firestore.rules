@@ -100,8 +100,8 @@ service cloud.firestore {
     //     true): quali mittenti entrano in coda da soli quando `enabled` è true
     //     (#446). La legge il backend di sicurezza via Admin SDK.
     //   - `workerLog` (array di { role, startedAt, num }): il registro dei worker
-    //     mostrato in dashboard. Lo scrive la GitHub Action apply-triage col
-    //     service account (le routine non hanno credenziali: #451).
+    //     mostrato in dashboard. Lo scrive il server (functions, Admin SDK) al
+    //     rilascio di ogni biglietto (le routine non hanno credenziali: #451).
     // Le regole NON enumerano i campi (read/write admin-only): nuovi campi non
     // richiedono redeploy. Riservato agli admin: nessun utente normale legge/scrive.
     match /config/automation {
