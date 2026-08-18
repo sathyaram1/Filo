@@ -23,7 +23,10 @@
 // USO:
 //   node scripts/finish-local.mjs                 # controlli + fusione + push
 //   node scripts/finish-local.mjs --check         # solo i controlli
-//   node scripts/finish-local.mjs --no-verify     # salta controlli E verifica (sconsigliato)
+//
+//   La scorciatoia --no-verify NON esiste più (SPEC-RIDISEGNO-MAX.md §8): la
+//   verifica indipendente non si salta — un controllo che si può saltare
+//   finisce saltato proprio nei casi in cui serviva.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
