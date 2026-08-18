@@ -95,6 +95,10 @@
   const mgClarifyText = document.getElementById('mgClarifyText');
   const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
   const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
+  const mgUserNote     = document.getElementById('mgUserNote');
+  const mgUserNoteText = document.getElementById('mgUserNoteText');
+  const mgUserNoteBtn  = document.getElementById('mgUserNoteBtn');
+  const mgUserNoteMsg  = document.getElementById('mgUserNoteMsg');
 
   // Gestione feedback: preferito ⭐ + archivia/ripristina (owner-only)
   const mgManage     = document.getElementById('mgManage');
@@ -783,6 +787,7 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
+      if (mgUserNote) mgUserNote.hidden = true;
       mgManage.hidden = true;
       closeSidebar();
       renderList();
@@ -1588,6 +1593,15 @@
 
     // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
     // feedback selezionato, accanto alle azioni contestuali.
+    // La frase per chi ha segnalato: su qualunque feedback, anche già chiuso.
+    // E' in chiaro, quindi si legge e si scrive anche su una macchina senza
+    // la chiave privata — al contrario del resto della conversazione.
+    if (mgUserNote) {
+      mgUserNote.hidden = !isAdmin;
+      mgUserNoteText.value = String(fb.userNote || '');
+      setUserNoteMsg('', '');
+    }
+
     mgManage.hidden = !isAdmin;
     reflectManage(fb);
     setManageMsg('', '');
@@ -1676,6 +1690,7 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
+      if (mgUserNote) mgUserNote.hidden = true;
       mgManage.hidden = true;
       closeSidebar();
       renderList();
@@ -1728,6 +1743,7 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgClarify.hidden = true;
+      if (mgUserNote) mgUserNote.hidden = true;
       closeSidebar();
       renderList();
     } catch (e) {
@@ -1738,6 +1754,43 @@
   }
 
   mgClarifyBtn.addEventListener('click', sendClarifyReply);
+
+  function setUserNoteMsg(text, kind) {
+    if (!mgUserNoteMsg) return;
+    mgUserNoteMsg.textContent = text || '';
+    mgUserNoteMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+  }
+
+  // Salva SOLO la frase: non tocca la conversazione, quindi si può scrivere
+  // anche quando il report non è leggibile su questo computer.
+  async function saveUserNote() {
+    if (!selectedId) return;
+    const id = selectedId;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    const frase = (mgUserNoteText.value || '').trim().slice(0, 500);
+    if (String((fb && fb.userNote) || '') === frase) { setUserNoteMsg('Nessuna modifica', ''); return; }
+    mgUserNoteBtn.disabled = true;
+    setUserNoteMsg('Salvataggio…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, userNote: frase });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      if (fb) fb.userNote = frase;
+      mgUserNoteText.value = frase;
+      setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
+      renderThread(fb);
+    } catch (e) {
+      setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
+    } finally {
+      mgUserNoteBtn.disabled = false;
+    }
+  }
+
+  if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', saveUserNote);
+  if (mgUserNoteText) {
+    mgUserNoteText.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); saveUserNote(); }
+    });
+  }
 
   // ── Azione: accetta e sblocca un feedback bloccato ──────────────────────────
   function setActionMsg(text, kind) {
@@ -1777,6 +1830,7 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
+      if (mgUserNote) mgUserNote.hidden = true;
       closeSidebar();
       renderList();
     } catch (e) {
@@ -1814,6 +1868,7 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
+      if (mgUserNote) mgUserNote.hidden = true;
       closeSidebar();
       renderList();
     } catch (e) {
