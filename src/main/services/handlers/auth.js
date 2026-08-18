@@ -222,10 +222,13 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const { id, status, notes, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
+      // `userNote` è la frase in chiaro per chi ha mandato il feedback: l'altra
+      // metà dei due testi (il report, cifrato, è `notes`). Va inoltrata, o la
+      // dashboard resta l'unica strada da cui quella metà si perde.
+      const { id, status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride },
         { idToken },
       );
       return { ok: true };

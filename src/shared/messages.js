@@ -310,7 +310,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, priority?, archiveOverride? }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride? }
     // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
     // mai il main process). Il renderer manda i campi con valori potenzialmente
     // cifrati; il main li decifra e torna il plaintext. Owner-only.

@@ -678,7 +678,12 @@
         ? `<label class="fb-notes-label">${notesLabelText}
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" data-tail="${escapeHtml(tailStr)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(headText || '')}</textarea>
            </label>
-           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>`
+           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>
+           <label class="fb-notes-label">Frase per chi ha segnalato:
+             <input type="text" class="fb-usernote" data-id="${escapeHtml(f._id)}" maxlength="500"
+                    placeholder="Una riga in chiaro: cosa può fare adesso. La casella qui sopra la legge solo tu."
+                    value="${escapeHtml(String(f.userNote || ''))}">
+           </label>`
         : '';
       // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
       // risposta si APPENDE allo storico (conserva la domanda) e il feedback
