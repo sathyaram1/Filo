@@ -190,6 +190,53 @@ test('correggere la frase mentre il salvataggio è in volo non cancella la corre
   await expect(page.locator('#mgUserNoteText')).toHaveValue('Ora puoi rimuovere un modello.');
 });
 
+test('uscire e rientrare durante il salvataggio non fa tornare indietro la frase', async ({ openTab }) => {
+  // Il caso che rompeva la protezione: rientrando nel feedback il pannello
+  // ridipinge la casella col valore VECCHIO. Se la risposta che arriva dopo non
+  // la riallinea, resta indietro — e il salvataggio successivo rispedisce il
+  // testo vecchio, disfacendo in silenzio quello appena salvato.
+  const A = { ...RISOLTO, _id: 'fb-a', seq: 920, name: 'Feedback A', userNote: 'frase vecchia' };
+  const B = { ...RISOLTO, _id: 'fb-b', seq: 921, name: 'Feedback B' };
+
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') {
+        window.__updates.push(msg);
+        await new Promise((r) => setTimeout(r, 600));
+        return { ok: true };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate(({ a, b }) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([a, b]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail('fb-a');
+  }, { a: A, b: B });
+
+  await page.locator('#mgUserNoteText').fill('frase nuova');
+  await page.locator('#mgUserNoteBtn').click();
+  // Esci e rientra mentre la risposta è ancora in volo.
+  await page.evaluate(() => window.__mgTest.openDetail('fb-b'));
+  await page.evaluate(() => window.__mgTest.openDetail('fb-a'));
+  await page.waitForTimeout(1000);
+
+  await expect(page.locator('#mgUserNoteText')).toHaveValue('frase nuova');
+
+  // E un salvataggio successivo non deve rispedire quella vecchia.
+  await page.locator('#mgUserNoteText').fill('frase nuova corretta');
+  await page.locator('#mgUserNoteBtn').click();
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(2);
+  const inviate = await page.evaluate(() => window.__updates.map((u) => u.userNote));
+  expect(inviate).toEqual(['frase nuova', 'frase nuova corretta']);
+});
+
 test('senza admin la casella non compare', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');

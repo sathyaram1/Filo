@@ -1599,6 +1599,7 @@
     if (mgUserNote) {
       mgUserNote.hidden = !isAdmin;
       mgUserNoteText.value = String(fb.userNote || '');
+      userNoteToccata = false;
       setUserNoteMsg('', '');
     }
 
@@ -1762,6 +1763,13 @@
 
   mgClarifyBtn.addEventListener('click', sendClarifyReply);
 
+  // La casella della frase ha due cose da ricordare: se l'owner ci ha messo
+  // mano dopo l'ultimo invio (allora comanda quello che ha scritto lui), e
+  // quale invio e' l'ultimo partito (le risposte possono tornare in ordine
+  // diverso, e una vecchia non deve rimettere in campo un testo superato).
+  let userNoteToccata = false;
+  let userNoteInvio = 0;
+
   function setUserNoteMsg(text, kind) {
     if (!mgUserNoteMsg) return;
     mgUserNoteMsg.textContent = text || '';
@@ -1795,14 +1803,21 @@
       // salvataggio dopo manderebbe il messaggio di uno al mittente
       // dell'altro.
       if (selectedId !== id) return;
-      // Nemmeno se l'owner ha corretto il testo nell'attesa: rimetterci dentro
-      // il valore appena salvato gli cancellerebbe la correzione sotto le dita.
-      // La correzione la salverà lui, o il prossimo salvataggio.
-      if (mgUserNoteText.value === scritto) mgUserNoteText.value = frase;
+      // Se nel frattempo e' partito un altro salvataggio comanda quello: una
+      // risposta vecchia non deve rimettere in campo un testo superato.
+      if (mio !== userNoteInvio) return;
+      // La casella si riallinea SOLO se l'owner non ci ha messo mano dopo
+      // l'invio, altrimenti gli cancellerebbe la correzione sotto le dita.
+      // Non basta confrontare il testo con quello inviato: uscendo dal
+      // feedback e rientrandoci il pannello lo ha già ridipinto col valore
+      // VECCHIO, e il confronto lo scambierebbe per una correzione. La
+      // casella resterebbe indietro, e il salvataggio successivo disferebbe
+      // questo, in silenzio.
+      if (!userNoteToccata) mgUserNoteText.value = frase;
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
     } catch (e) {
-      if (selectedId !== id) return;
+      if (selectedId !== id || mio !== userNoteInvio) return;
       setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
     } finally {
       mgUserNoteBtn.disabled = false;
@@ -1811,6 +1826,7 @@
 
   if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', saveUserNote);
   if (mgUserNoteText) {
+    mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; });
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); saveUserNote(); }
     });
