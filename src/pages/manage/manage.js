@@ -1648,6 +1648,10 @@
       const r = await sendToMain({ type: 'feedback_update', id, starred: next });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.starred = next;
+      // Vedi la guardia sulla frase: nell’attesa il pannello può essere
+      // passato a un altro feedback, e ridipingerlo con lo stato di questo
+      // direbbe il falso su quello aperto.
+      if (selectedId !== id) { if (currentTab === 'archived' && starredOnly) renderList(); return; }
       reflectManage(fb);
       setManageMsg(next ? 'Aggiunto ai preferiti.' : 'Rimosso dai preferiti.', 'ok');
       // Se il filtro ⭐ è attivo, un feedback de-preferito deve sparire dalla lista.
@@ -1775,10 +1779,18 @@
       const r = await sendToMain({ type: 'feedback_update', id, userNote: frase });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (fb) fb.userNote = frase;
+      // Nell'attesa l'owner puo' aver aperto un ALTRO feedback. Il dato si
+      // aggiorna comunque (è salvato davvero), ma il pannello NON si tocca:
+      // riscriverlo qui ci metterebbe dentro la frase e la conversazione del
+      // feedback precedente lasciando selezionato il secondo — e il
+      // salvataggio dopo manderebbe il messaggio di uno al mittente
+      // dell'altro.
+      if (selectedId !== id) return;
       mgUserNoteText.value = frase;
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
     } catch (e) {
+      if (selectedId !== id) return;
       setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
     } finally {
       mgUserNoteBtn.disabled = false;
