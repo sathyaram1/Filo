@@ -215,8 +215,8 @@ test('TRE invii con fallimenti in mezzo', async ({ openTab }) => {
   await settle(page, 4, false);
   await saveBtn(page, 'A3');   // testo vecchio, diverso da tutto: deve partire
   await waitSent(page, 6);
-  await saveBtn(page, 'A5');   // e anche l'ultimo spedito, se ritentato
-  // (il precedente e' ancora in volo: questo e' un nuovo invio)
+  // (il precedente e' ancora in volo: il bottone e' spento, si usa Invio)
+  await saveEnter(page, 'A5');  // e anche l'ultimo spedito, se ritentato
   await waitSent(page, 7);
   expect(await sent(page)).toEqual([
     'fb-a:A1', 'fb-a:A2', 'fb-a:A3', 'fb-a:A4', 'fb-a:A5', 'fb-a:A3', 'fb-a:A5',
