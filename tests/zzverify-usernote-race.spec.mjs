@@ -182,7 +182,7 @@ test('due salvataggi in volo sullo stesso feedback: comanda l ultimo, non quello
   // E la pagina deve credere che il valore salvato sia "due": tornare a "uno"
   // deve spedire davvero.
   await box(page).fill('uno');
-  await btn(page).click();
+  await box(page).press('Enter');
   await settle(page, 2, { ok: true });
   await expect(msg(page)).toHaveText('Salvata');
   expect((await sent(page))[2]).toEqual({ id: 'A', userNote: 'uno', keys: ['id', 'type', 'userNote'] });
