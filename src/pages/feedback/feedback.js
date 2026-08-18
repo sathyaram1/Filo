@@ -943,6 +943,19 @@
     }
   }
 
+  /**
+   * Il feedback come lo può leggere CHI STA GUARDANDO. Se il report è ancora
+   * cifrato (non siamo l'owner, o la decifratura non è riuscita) al suo posto
+   * va la frase in chiaro scritta per chi ha segnalato. Non tocca niente
+   * quando il report è leggibile: i feedback storici, che hanno un solo testo
+   * in chiaro, restano esattamente com'erano.
+   */
+  function sanitizeReportForReader(f) {
+    const raw = String((f && f.notes) || '');
+    if (!raw.startsWith('FENC')) return f;
+    return { ...f, notes: String((f && f.userNote) || '').trim() };
+  }
+
   async function load() {
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
