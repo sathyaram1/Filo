@@ -822,7 +822,8 @@ export async function preflight(_unused = null, readConfig = fetchRoutineConfig)
 
 /**
  * L'esito della prontezza tradotto nel codice d'uscita che l'orchestratore
- * legge. È il CONTRATTO documentato in ROUTINES.md, e sta qui — pura, testata —
+ * legge. È il CONTRATTO documentato in routines/roles/orchestrator.md, e sta
+ * qui — pura, testata —
  * perché è la parte che si può sbagliare senza accorgersene: il ramo
  * `--preflight` è morto per mesi restituendo 1, che non è né "prosegui" né
  * "fermati", e nessuno se n'era accorto (feedback #452).
