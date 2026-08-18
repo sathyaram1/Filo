@@ -1065,14 +1065,18 @@
     }
   }
 
+  function selectTab(tab) {
+    currentTab = tab;
+    tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
+      b.classList.toggle('fb-tab--active', b.dataset.tab === tab);
+    });
+    applyFilter();
+  }
+
   tabsEl.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
     if (!btn) return;
-    currentTab = btn.dataset.tab;
-    tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
-      b.classList.toggle('fb-tab--active', b === btn);
-    });
-    applyFilter();
+    selectTab(btn.dataset.tab);
   });
 
   function closeLightbox() {
