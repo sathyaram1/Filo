@@ -308,11 +308,13 @@ test('fallimento su un feedback mentre un ALTRO sta salvando: nessun travaso', a
 test('la casella c\'e\' su tutte le schede e sui feedback chiusi; non-admin esclusa', async ({ openTab }) => {
   const page = await boot(openTab);
   // fb-b e' 'done' → scheda Risolti (feedback gia' chiuso)
+  let atteso = 'W0';
   for (const tab of ['inbox', 'queue', 'resolved', 'archived']) {
     await page.evaluate((t) => window.__mgTest.setTab(t), tab);
     await open(page, 'fb-b');
     await expect(page.locator('#mgUserNote')).toBeVisible();
-    expect(await box(page)).toBe('W0');
+    expect(await box(page)).toBe(atteso);
+    atteso = `da-${tab}`;
     // e ci si puo' scrivere davvero
     await saveBtn(page, `da-${tab}`);
     await page.waitForFunction(() => window.__upd.length > 0);
