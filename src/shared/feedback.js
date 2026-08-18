@@ -555,6 +555,11 @@
     }
     // La frase per chi ha mandato il feedback: in chiaro per forza (la legge
     // senza chiave) e corta per costruzione.
+    //
+    // Il tetto e' in CARATTERI, e combacia con quello delle regole: provato dal
+    // vivo su un documento-cavia — 500 lettere accentate (1000 byte) passano,
+    // 501 lettere ASCII no. Diverso dal tetto della conversazione, che invece e'
+    // in byte perche' li' quello che finisce sul documento e' il testo CIFRATO.
     if (userNote !== undefined) {
       // Il taglio degli spazi si fa QUI, alla consegna, e non mentre l'owner
       // scrive: riscrivere la casella sotto le dita gli mangia lo spazio appena
