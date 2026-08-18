@@ -586,8 +586,8 @@
 
   // ── Tab "Log" (worker delle routine) ──────────────────────────────────────
   // Elenco degli ultimi worker spawnati (ruolo + istante d'avvio). Fonte:
-  // config/automation.workerLog, scritto dalle routine (scripts/dispatch.mjs) a
-  // ogni spawn; qui è di sola lettura via il canale main (owner-gated).
+  // config/automation.workerLog, scritto dal server al rilascio di ogni
+  // biglietto; qui è di sola lettura via il canale main (owner-gated).
   const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
   // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
   const ROLE_LABELS = {
