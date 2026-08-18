@@ -879,6 +879,24 @@
               </div>
             </div>
 
+            <!-- La frase per chi ha mandato il feedback (owner-only). È l'unico
+                 testo che il mittente legge quando il suo feedback viene
+                 risolto: il resto della conversazione è cifrato e la chiave ce
+                 l'ha solo l'owner. Sta qui, accanto alla gestione, perché deve
+                 essere scrivibile su QUALUNQUE feedback selezionato — anche su
+                 uno già chiuso, per correggerla dopo. -->
+            <div class="mg-actions mg-usernote" id="mgUserNote" hidden>
+              <label class="mg-usernote-label" for="mgUserNoteText">Frase per chi ha segnalato
+                <span class="mg-usernote-hint">— è quello che legge lui quando il feedback si chiude</span>
+              </label>
+              <input type="text" id="mgUserNoteText" class="mg-accept-comment" maxlength="500"
+                placeholder="Una riga: cosa può fare adesso.">
+              <div class="mg-actions-row">
+                <button type="button" class="sn-btn" id="mgUserNoteBtn">Salva la frase</button>
+                <span class="mg-action-msg" id="mgUserNoteMsg" role="status"></span>
+              </div>
+            </div>
+
             <!-- Gestione del feedback (owner-only): preferito ⭐ + archivia /
                  ripristina. Visibile per QUALUNQUE feedback selezionato, accanto
                  alle azioni contestuali (sblocco / risposta ai chiarimenti). -->
