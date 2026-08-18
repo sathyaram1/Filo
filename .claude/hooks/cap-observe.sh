@@ -55,7 +55,10 @@ let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
 
 [ -z "$LINE" ] && exit 0
 
-OBS="feedback-triage/cap-observations.jsonl"
+# NOTA: prima scriveva in feedback-triage/ (la coda su git, smontata con la
+# spec ROUTINE-AUTH-SPEC.md); il diagnostico resta su git perché è l'unica cosa
+# che sopravvive al container effimero, ma vive in .claude/, non nella coda.
+OBS=".claude/cap-observations.jsonl"
 printf '%s\n' "$LINE" >> "$OBS"
 git add "$OBS" 2>/dev/null
 git -c user.email=claude@local -c user.name=claude-local commit -q -m "cap-observe: session-limit diagnostic" -- "$OBS" 2>/dev/null
