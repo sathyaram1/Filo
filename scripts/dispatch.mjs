@@ -764,14 +764,16 @@ async function recordVerifier(id, verdict, critique) {
   sealTransition(next, `verifier:${verdict}`);
   return next;
 }
-async function recordFixed(id, report = '') {
+async function recordFixed(id, report = '', frase = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
 
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
-  const sent = await deliverToChannel('fixed', { report: String(report || ''), branch: next.branch || '' });
+  // Due testi, due destinatari: il report lo cifra il server per l'owner, la
+  // frase resta leggibile per chi ha mandato il feedback (spec §8).
+  const sent = await deliverToChannel('fixed', { report: String(report || ''), userNote: String(frase || ''), branch: next.branch || '' });
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
   }
