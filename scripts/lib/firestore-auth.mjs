@@ -1,5 +1,5 @@
-// Autenticazione Firestore per gli script Node del repo (apply-triage,
-// backfill-feedback-numbers). Due modalità, scelte in automatico da
+// Autenticazione Firestore per gli script Node del repo (owner-feedback,
+// backfill e migrazioni). Due modalità, scelte in automatico da
 // acquireBearer():
 //
 //   A) SERVICE ACCOUNT (GitHub Action): chiave JSON inline in `FILO_SA_KEY`
