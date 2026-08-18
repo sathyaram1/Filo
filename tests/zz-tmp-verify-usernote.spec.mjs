@@ -227,7 +227,7 @@ test('la casella e visibile su ogni scheda e sui chiusi, e non per il non-admin'
   await prepara(page, [A({}), B({}), chiuso], 'queue', 'fb-a');
   await expect(page.locator('#mgUserNote')).toBeVisible();
 
-  for (const t of ['inbox', 'queue', 'working', 'done', 'archived']) {
+  for (const t of ['inbox', 'queue', 'resolved', 'archived']) {
     await page.evaluate((x) => window.__mgTest.setTab(x), t);
     await page.evaluate(() => window.__mgTest.openDetail('fb-c'));
     await expect(page.locator('#mgUserNote')).toBeVisible();
