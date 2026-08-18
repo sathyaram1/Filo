@@ -4,35 +4,23 @@
 //   a. decryptFeedbackFields: round-trip intero cifrato → torna lo stesso numero
 //   b. decryptFeedbackFields: priority in chiaro (legacy) → invariata
 //   c. decryptFeedbackFields: senza chiave privata → ciphertext lasciato invariato (no crash)
-//   d. queueFeedbackCreateEncrypted: con gate ON → priority diventa FENC1: nel file
-//   e. queueFeedbackCreateEncrypted: con gate OFF → priority rimane intero nel file
-//   f. apply-triage.mjs toFsValue: priority ciphertext FENC1: → stringValue; intero → integerValue
 //
 // Gira senza Electron in millisecondi (node:test, nessuna dipendenza da UI).
 
-import { test, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto as crypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const require = createRequire(import.meta.url);
 
-// Spool temporaneo (non tocca feedback-triage/ reale).
-const tmp = mkdtempSync(join(tmpdir(), 'filo-prio-enc-'));
-process.env.FILO_SPOOL_DIR = tmp;
-
-after(() => { rmSync(tmp, { recursive: true, force: true }); });
-
 // Carica feedbackCrypto (IIFE su globalThis) — pubkey di test iniettata esplicitamente.
 const C = require(join(ROOT, 'src', 'shared', 'feedbackCrypto.js'));
 
-// Import DOPO aver impostato FILO_SPOOL_DIR (lo script risolve SPOOL_DIR al load).
 const { decryptFeedbackFields } = await import('../../scripts/lib/decrypt-feedback-fields.mjs');
 
 // Genera una coppia di chiavi ECDH P-256 di test.
