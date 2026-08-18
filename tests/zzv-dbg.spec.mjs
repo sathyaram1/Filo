@@ -1,23 +1,19 @@
 import { test } from './fixtures/electron.mjs';
 
-test('dbg', async ({ openTab }) => {
-  const page = await openTab('filo://manage/manage.html');
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
-  await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(() => {
-    window.__mgTest.setAdmin(true);
-    window.__mgTest.setData([{ _id: 'fb-b', name: 'Beta', text: 't', seq: 901, subSeq: 0, status: 'done', clientId: 'x@y.z', createdAt: '2026-06-02T10:00:00Z', images: [], userNote: 'W0' }]);
+// Sonda: quanto ci mette il caricamento VERO (Firestore + decifratura) della
+// pagina feedback a lasciare lo stato "Caricamento…".
+for (const n of [1, 2, 3]) {
+  test(`sonda caricamento ${n}`, async ({ openTab }) => {
+    const page = await openTab('filo://feedback/feedback.html');
+    const t0 = Date.now();
+    try {
+      await page.waitForFunction(() => {
+        const e = document.querySelector('.fb-empty');
+        return !e || !/Caricamento/.test(e.textContent || '');
+      }, null, { timeout: 40000 });
+      console.log(`SONDA ${n}: caricamento finito in ${Date.now() - t0} ms`);
+    } catch (_) {
+      console.log(`SONDA ${n}: ancora "Caricamento…" dopo 40000 ms`);
+    }
   });
-  console.log('DBG after setData', await page.evaluate(() => ({
-    un: document.getElementById('mgUserNote').hidden,
-  })));
-  await page.evaluate(() => window.__mgTest.setTab('done'));
-  await page.evaluate(() => window.__mgTest.openDetail('fb-b'));
-  console.log('DBG after open', await page.evaluate(() => ({
-    unHidden: document.getElementById('mgUserNote').hidden,
-    detailHidden: document.getElementById('mgDetail').hidden,
-    val: document.getElementById('mgUserNoteText').value,
-    banner: document.getElementById('mgBanner').hidden,
-  })));
-});
+}
