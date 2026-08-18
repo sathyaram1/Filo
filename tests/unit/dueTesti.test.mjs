@@ -109,7 +109,6 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
       FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
       FILO_REPO_ROOT: casa,
       FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
-      FILO_SPOOL_DIR: resolve(casa, 'coda'),
       FILO_ROUTINES_ENABLED: '1',
       FILO_ROUTINE_TICKET: 'biglietto-di-prova',
     });
