@@ -141,8 +141,8 @@
     JUDGE_TIMEOUT_MAX_S: 300,
     // Quante voci del log dei worker tenere (le più recenti). Il log vive come
     // campo `workerLog` del doc config/automation: cappato per non gonfiare il
-    // documento. Scritto da scripts/dispatch.mjs a ogni worker spawnato, letto
-    // dalla tab "Log" della dashboard Gestione.
+    // documento. Lo scrive il server al rilascio di ogni biglietto (stesso cap
+    // lato server), letto dalla tab "Log" della dashboard Gestione.
     WORKER_LOG_CAP: 200,
   };
 
