@@ -953,7 +953,11 @@
    */
   function sanitizeReportForReader(f) {
     const raw = String((f && f.notes) || '');
-    if (!raw.startsWith('FENC')) return f;
+    const T = window.SN_FEEDBACK_THREAD;
+    const illeggibile = T && T.reportUnreadable
+      ? T.reportUnreadable(raw)
+      : (raw.startsWith('FENC') || raw.startsWith('[cifrato'));
+    if (!illeggibile) return f;
     // `reportIllegibile` spegne la casella di modifica: riscrivere una nota che
     // non si è potuta leggere significherebbe cancellare il report vero con
     // quello che è rimasto sullo schermo.
