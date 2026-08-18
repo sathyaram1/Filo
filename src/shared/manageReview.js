@@ -192,8 +192,8 @@
   //   → trattiamo il feedback come spedito (preserva il comportamento storico
   //   done→Risolti per chi non passa la versione: nessuna regressione).
   // - `resolvedInVersion` viene stampato sul feedback al momento del `done`
-  //   (apply-triage.mjs lo mette = versione corrente di `package.json`, cioè
-  //   quella in cui il fix è confluito). Un `done` con `resolvedInVersion` futura
+  //   (chi consegna il `done` lo timbra = versione corrente di `package.json`,
+  //   cioè quella in cui il fix è confluito). Un `done` con `resolvedInVersion` futura
   //   (non ancora rilasciata) NON è in produzione: resta in "In coda" finché
   //   quella versione esce. Un `done` storico SENZA `resolvedInVersion` è
   //   considerato già spedito (i fix chiusi prima di DB3 sono quasi certamente
