@@ -1,9 +1,11 @@
 // One-time: ottieni il refresh token Firebase dell'account OWNER (admin) per
-// applicare in locale le decisioni di triage accodate dalle routine.
+// scrivere su Firestore dagli script che l'owner lancia in locale.
 //
 // PERCHÉ ESISTE
-//   `scripts/apply-triage.mjs` scrive su Firestore come admin pieno e ha bisogno
-//   di un refresh token Firebase di lunga durata da scambiare per un ID token.
+//   `scripts/owner-feedback.mjs` (le scritture dell'owner sui feedback), i
+//   backfill e le migrazioni passano tutti da `scripts/lib/firestore-auth.mjs`,
+//   che scrive su Firestore come admin pieno e ha bisogno di un refresh token
+//   Firebase di lunga durata da scambiare per un ID token.
 //   Questo script esegue UNA VOLTA, in locale, il login interattivo
 //   Google→Firebase e stampa quel refresh token, da salvare nella variabile
 //   d'ambiente `FILO_ADMIN_REFRESH_TOKEN` (o nel file `tests/agent/.env` della
@@ -12,8 +14,9 @@
 // USA L'ACCOUNT OWNER (quello in `adminEmails` di src/main/auth/config.js, cioè
 // nella collezione `admins` su Firebase). NON l'account robot delle routine
 // (è stato bloccato da Google). Il token admin resta SOLO sulla tua macchina:
-// le routine cloud non lo vedono mai — depositano le decisioni su git e questo
-// applier le scrive con le tue credenziali.
+// le routine cloud non lo vedono mai — consegnano le loro decisioni al canale
+// autenticato verso il server (`scripts/routine-channel.mjs`), che le valida e
+// le scrive per conto loro.
 //
 // USO:
 //   node scripts/admin-login.mjs
