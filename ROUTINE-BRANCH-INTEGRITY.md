@@ -261,23 +261,23 @@ misurare quante volte la Via 2 fosse scattata davvero.
 
 ## Via 2 — la spedizione della decisione portava con sé tutto il ramo
 
-Le routine non scrivono nel database dei feedback: depositano la decisione in un
-file su git e la spediscono al ramo principale. Il comando usato diceva «prendi
-il punto in cui mi trovo e mettilo sul ramo principale» — ma "il punto in cui mi
-trovo" non è il file: è **tutta la storia accumulata sul ramo**. Se il ramo
-principale non si era mosso, quella spedizione era un avanzamento regolare e
-veniva accettata in blocco, codice compreso. Nella storia non si distingueva da
-una fusione legittima.
+All'epoca le routine depositavano la decisione in un file su git e la spedivano
+al ramo principale. Il comando usato diceva «prendi il punto in cui mi trovo e
+mettilo sul ramo principale» — ma "il punto in cui mi trovo" non è il file: è
+**tutta la storia accumulata sul ramo**. Se il ramo principale non si era mosso,
+quella spedizione era un avanzamento regolare e veniva accettata in blocco,
+codice compreso. Nella storia non si distingueva da una fusione legittima.
 
 Non scattava sempre: serviva che nessun altro avesse pubblicato nel frattempo.
 Ma un cancello che si può saltare a seconda del tempismo non è un cancello —
 non puoi guardare il risultato e dire "questo è stato esaminato".
 
-**Ora** (`scripts/lib/isolated-push.mjs`): il commit viene **costruito sopra lo
-stato remoto attuale**, in un indice temporaneo che contiene solo quel file, e
-si spedisce l'oggetto commit. Non c'è nessuna storia locale attaccata: la
-garanzia è per costruzione, non per disciplina. Vale anche per la rimozione dei
-semafori di lavorazione.
+**Il rimedio dell'epoca** (`isolated-push`): il commit veniva **costruito sopra
+lo stato remoto attuale**, in un indice temporaneo che conteneva solo quel file,
+e si spediva l'oggetto commit — nessuna storia locale attaccata, garanzia per
+costruzione. **Oggi questa via non esiste più in nessuna forma**: le decisioni
+viaggiano sul canale autenticato verso il server (spec `ROUTINE-AUTH-SPEC.md`)
+e su git salgono solo i rami di lavoro, che passano dal cancello.
 
 ## Via 3 — rete di sicurezza (non una via)
 
