@@ -195,43 +195,12 @@ export function resolveRoutinesEnabled({ envRaw, remote } = {}) {
   return remote !== false;
 }
 
-/**
- * Registra un worker appena spawnato nel log dei worker, che la dashboard
- * mostra nella tab Automazioni.
- *
- * PERCHÉ NON SCRIVE PIÙ SU FIRESTORE (feedback #451)
- *   Fino al 2026-08-13 questa funzione patchava `config/automation.workerLog`
- *   con un bearer admin, in silenzio se il bearer mancava. Nelle macchine delle
- *   routine cloud quella credenziale non c'è MAI (né service account né refresh
- *   token dell'owner: `tests/agent/.env` è gitignorato e l'ambiente della
- *   schedulazione porta solo la chiave privata dei feedback). Risultato: il
- *   campo non è mai esistito e il registro è nato vuoto e vuoto è rimasto,
- *   senza che nessuno protestasse.
- *
- *   Ora la voce prende la strada che le routine possono già percorrere SENZA
- *   credenziali — la stessa dei triage e dei semafori: un fogliettino su git,
- *   spedito da solo sul ramo principale, che la GitHub Action applica a
- *   Firestore col service account. Non c'è più nessuna credenziale da avere,
- *   quindi non c'è più niente che possa mancare in silenzio.
- *
- * Il fallimento NON è silenzioso: se la spedizione non riesce il fogliettino
- * RESTA nella coda (e viene ritentato dal giro successivo, vedi
- * `drainWorkerLogQueue`) e il motivo finisce su stderr.
- */
+// Il log dei worker (`config/automation.workerLog`, tab Automazioni della
+// dashboard) lo scrive il SERVER al rilascio di ogni biglietto (feedback #451):
+// è l'unico che sa per certo che un worker sta partendo e con che ruolo, e le
+// macchine delle routine non hanno credenziali Firestore. Qui non c'è più
+// niente da scrivere.
 // ─── Logica pura (esportata, testata in tests/unit/dispatch.test.mjs) ─────────
-
-/**
- * Accoda una voce al log dei worker e tiene solo le `cap` PIÙ RECENTI. Pura
- * (testata in tests/unit/dispatch.test.mjs). Le voci arrivano in ordine
- * cronologico (append in coda); il cap taglia le più vecchie dalla testa, così
- * il documento non cresce all'infinito. Ignora voci malformate.
- */
-export function appendWorkerLog(entries, entry, cap = WORKER_LOG_CAP) {
-  const list = Array.isArray(entries) ? entries.filter((e) => e && typeof e === 'object') : [];
-  if (entry && typeof entry === 'object' && entry.role) list.push(entry);
-  const n = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : WORKER_LOG_CAP;
-  return list.length > n ? list.slice(list.length - n) : list;
-}
 
 /** Stato di default per un branch in `review` senza file di stato. */
 export function defaultState(id, branch) {
