@@ -98,7 +98,7 @@ function main() {
     process.exit(1);
   }
 
-  if (!skipVerify) {
+  {
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
       console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
