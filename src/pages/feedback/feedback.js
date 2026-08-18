@@ -396,7 +396,11 @@
     return { head: s, tail: '' };
   }
 
-  async function patch(id, payload, optimistic) {
+  // `silenzioso`: salva senza ridisegnare la lista. Serve alle caselle di
+  // testo che si salvano da sole mentre ci si scrive dentro: ridisegnare
+  // rimpiazza la casella sotto le dita — mangia gli spazi appena battuti e fa
+  // sparire il pulsante che si stava per premere, così il primo clic va perso.
+  async function patch(id, payload, optimistic, { silenzioso = false } = {}) {
     if (!isAdmin) {
       alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
       return;
@@ -413,9 +417,9 @@
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
       return;
     }
-    const prev = { status: item.status, notes: item.notes, priority: item.priority };
+    const prev = { status: item.status, notes: item.notes, userNote: item.userNote, priority: item.priority };
     Object.assign(item, optimistic);
-    applyFilter();
+    if (!silenzioso) applyFilter();
     try {
       // Instradata dal main process, che allega il Firebase ID token come
       // Bearer e rifiuta se l'utente loggato non è admin (i token non sono mai
@@ -754,7 +758,9 @@
         // già scritti (notesValueOf ricompone capo modificato + coda intatta).
         const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
         if (ta) payload.notes = notesValueOf(ta);
-        patch(id, payload, { status: to, notes: payload.notes });
+        const frase = listEl.querySelector(`.fb-usernote[data-id="${cssEsc(id)}"]`);
+        if (frase) payload.userNote = frase.value.slice(0, 500);
+        patch(id, payload, { status: to, notes: payload.notes, userNote: payload.userNote });
       });
     });
 
@@ -895,7 +901,7 @@
         if (!item) return;
         const v = notesValueOf(ta);
         if (item.notes === v) return;
-        patch(id, { notes: v }, { notes: v });
+        patch(id, { notes: v }, { notes: v }, { silenzioso: true });
       };
       ta.addEventListener('blur', flush);
       ta.addEventListener('input', () => {
@@ -914,9 +920,9 @@
         const id = input.dataset.id;
         const item = all.find((f) => f._id === id);
         if (!item) return;
-        const v = input.value.trim().slice(0, 500);
+        const v = input.value.slice(0, 500);
         if (String(item.userNote || '') === v) return;
-        patch(id, { userNote: v }, { userNote: v });
+        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true });
       };
       input.addEventListener('blur', flush);
       input.addEventListener('input', () => {

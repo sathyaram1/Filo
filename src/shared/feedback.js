@@ -556,7 +556,10 @@
     // La frase per chi ha mandato il feedback: in chiaro per forza (la legge
     // senza chiave) e corta per costruzione.
     if (userNote !== undefined) {
-      fields.userNote = toFsValue(String(userNote || '').slice(0, 500)); mask.push('userNote');
+      // Il taglio degli spazi si fa QUI, alla consegna, e non mentre l'owner
+      // scrive: riscrivere la casella sotto le dita gli mangia lo spazio appena
+      // battuto e gli incolla insieme due parole.
+      fields.userNote = toFsValue(String(userNote || '').trim().slice(0, 500)); mask.push('userNote');
     }
     // Override di revisione (owner sblocca un feedback fermato dalla sicurezza).
     // #476 — LA REVISIONE DELL'OWNER VIAGGIA TUTTA CIFRATA.

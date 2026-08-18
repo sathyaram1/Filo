@@ -93,6 +93,42 @@ test('la frase per chi ha segnalato si scrive dalla dashboard e arriva a destina
   expect(upd.notes).toBeUndefined();
 });
 
+test('il salvataggio automatico non tocca quello che si sta scrivendo', async ({ app, openTab }) => {
+  // Il salvataggio parte da solo dopo una pausa. Se ripulisse il testo e
+  // ridisegnasse la scheda, lo farebbe SOTTO LE DITA: lo spazio appena battuto
+  // sparisce e la parola dopo si incolla alla precedente ("ciao " + pausa +
+  // "mondo" = "ciaomondo"). E sporcherebbe proprio il testo che legge chi ha
+  // mandato il feedback.
+  const page = await openTab(FEEDBACK_URL);
+  await setupAdmin(app, page, DA_RISOLVERE);
+
+  const campo = page.locator('.fb-usernote[data-id="mock-due-testi"]');
+  await campo.click();
+  await campo.type('ciao ');
+  // Più della pausa dopo cui il salvataggio parte da solo.
+  await page.waitForTimeout(2200);
+  await campo.type('mondo');
+
+  await expect(campo).toHaveValue('ciao mondo');
+});
+
+test('chiudendo il feedback la frase viaggia con la chiusura', async ({ app, openTab }) => {
+  // Il momento in cui quella riga serve è proprio quando si chiude: se il
+  // pulsante non se la porta dietro, chi ha segnalato riceve la chiusura e
+  // nient'altro.
+  const page = await openTab(FEEDBACK_URL);
+  await setupAdmin(app, page, DA_RISOLVERE);
+
+  await page.locator('.fb-usernote[data-id="mock-due-testi"]').fill('Ora puoi rimuovere un modello.');
+  await page.locator('.fb-act[data-id="mock-due-testi"][data-to="done"]').click();
+
+  await expect.poll(() => page.evaluate(
+    () => (window.__updates || []).filter((u) => u.status === 'done').length,
+  )).toBeGreaterThan(0);
+  const chiusura = await page.evaluate(() => window.__updates.find((u) => u.status === 'done'));
+  expect(chiusura.userNote).toBe('Ora puoi rimuovere un modello.');
+});
+
 test('report illeggibile: non si può riscriverlo, e al suo posto si legge la frase', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, {
