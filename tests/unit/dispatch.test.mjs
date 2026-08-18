@@ -13,9 +13,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
 const TMP = mkdtempSync(resolve(tmpdir(), 'filo-dispatch-'));
