@@ -283,32 +283,17 @@ module.exports = function register(on, ctx) {
   }
 
   // Cosa legge chi ha mandato il feedback, quando gli viene detto che è risolto.
-  //
-  // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8). `userNote` è la frase scritta
-  // per lui: breve, in chiaro, e leggibile sulla SUA macchina, che non ha —
-  // giustamente — nessuna chiave. `notes` è un'altra cosa: è il report per
-  // l'owner, con le scelte della lavorazione, e da qui in avanti viaggia
-  // cifrato. Mostrargli quello era il motivo per cui il report non poteva
-  // essere protetto.
-  //
-  // RETROCOMPATIBILITÀ: i feedback già chiusi hanno un testo solo, in chiaro,
-  // dentro `notes`. Per quelli si continua a estrarre i turni del modello, come
-  // prima — altrimenti chi torna su un feedback vecchio non leggerebbe più
-  // niente. Se invece `notes` è cifrato e non c'è la frase, non si mostra il
-  // ciphertext: si tace, che è meglio di un blob.
+  // La scelta (la frase in chiaro sì, il report cifrato mai) sta nella logica
+  // pura accanto al resto del parsing della conversazione, dove si può provare.
   function resolutionExplanation(f) {
+    const FBT = globalThis.SN_FEEDBACK_THREAD;
+    if (FBT?.explanationForReporter) return FBT.explanationForReporter(f);
+    // Senza il modulo condiviso: la frase se c'è, altrimenti niente. Mai il
+    // ciphertext.
     const frase = String((f && f.userNote) || '').trim();
     if (frase) return frase;
-
     const raw = String((f && f.notes) || '').trim();
-    if (!raw || raw.startsWith('FENC')) return '';
-    const FBT = globalThis.SN_FEEDBACK_THREAD;
-    if (!FBT?.splitNotes) return raw;
-    return FBT.splitNotes(raw)
-      .filter((s) => s.role === 'model' && s.body)
-      .map((s) => s.body)
-      .join('\n\n')
-      .trim();
+    return raw.startsWith('FENC') ? '' : raw;
   }
 
   on(MSG.GET_FEEDBACK_REWARDS, async () => {
