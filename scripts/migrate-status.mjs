@@ -12,7 +12,7 @@
 //   node scripts/migrate-status.mjs            # DRY-RUN: stampa cosa farebbe
 //   node scripts/migrate-status.mjs --apply    # scrive davvero
 //
-// Serve il token admin (come feedback:apply): acquireBearer.
+// Serve il token admin dell'owner (vedi scripts/admin-login.mjs): acquireBearer.
 
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
