@@ -104,7 +104,7 @@
   }
 
   // Badge "in lavorazione": una routine cloud ha preso in carico il feedback
-  // (semaforo in scripts/claim-feedback.mjs, specchiato su Firestore dall'applier).
+  // (il semaforo lo tiene il server, che lo specchia su Firestore).
   // Mostrato solo finché il claim non è scaduto; '' / scaduto = libero.
   function claimBadgeHtml(f) {
     const exp = Date.parse(f.claimExpiresAt || '');
