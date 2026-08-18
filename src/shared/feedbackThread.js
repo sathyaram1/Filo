@@ -468,6 +468,7 @@
     parse,
     splitNotes,
     explanationForReporter,
+    reportUnreadable,
     isFromModel,
     isFromOwner,
     originOf,
