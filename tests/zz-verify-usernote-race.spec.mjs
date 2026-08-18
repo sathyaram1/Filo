@@ -152,7 +152,105 @@ test('correzione parziale, cancellazione totale e incolla durante il volo: vince
   await expect(campo).toHaveValue('Testo incollato dagli appunti');
 
   const u = await updates(page);
-  expect(u.map((x) => x.userNote)).toEqual(['Risolto nella versione', '', '', 'bozza']);
+  expect(u.map((x) => x.userNote)).toEqual([
+    'Risolto nella versione',            // il primo salvataggio parte col testo di allora
+    'Risolto nella versione 1.2.3',      // il secondo parte con la correzione, com'è giusto
+    '',                                  // la frase svuotata
+    'bozza',
+  ]);
+});
+
+// ── sonde aggiuntive: dove mi sembra fragile ───────────────────────────────
+
+test('SONDA: salvo, cambio feedback e TORNO INDIETRO prima che la risposta atterri', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await boot(page, [fbFix('d1', 981, { userNote: 'frase vecchia' }), fbFix('d2', 982)]);
+  await open(page, 'd1');
+  const campo = page.locator('#mgUserNoteText');
+  await expect(campo).toHaveValue('frase vecchia');
+
+  await campo.fill('frase nuova');
+  await page.click('#mgUserNoteBtn');
+  await waitPending(page, 1);
+
+  await open(page, 'd2');          // vado altrove…
+  await open(page, 'd1');          // …e torno indietro, sempre in volo
+  await expect(campo).toHaveValue('frase vecchia');   // ridipinto col dato non ancora aggiornato
+
+  await resolveAt(page, 0);
+  await expect(page.locator('#mgUserNoteMsg')).toHaveText('Salvata');
+  // QUI il punto: la casella deve mostrare la frase DAVVERO salvata,
+  // non quella vecchia. Altrimenti il prossimo "Salva" la fa tornare indietro.
+  await expect(campo).toHaveValue('frase nuova');
+});
+
+test('SONDA: doppio salvataggio ravvicinato (click + Invio) mentre il primo è in volo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await boot(page, [fbFix('d3', 983)]);
+  await open(page, 'd3');
+  const campo = page.locator('#mgUserNoteText');
+
+  await campo.fill('primo');
+  await page.click('#mgUserNoteBtn');
+  await waitPending(page, 1);
+  await campo.fill('secondo');
+  await campo.press('Enter');                 // il bottone è disabilitato, l'Invio no
+  const inVolo = await page.evaluate(() => window.__pending());
+
+  if (inVolo === 2) {
+    // due richieste concorrenti: le risolvo AL CONTRARIO (la prima atterra dopo)
+    await resolveAt(page, 1);
+    await resolveAt(page, 0);
+    await page.waitForTimeout(200);
+    await expect(campo).toHaveValue('secondo');
+    // e il modello locale non deve essere rimasto indietro: risalvando
+    // non deve dire "Nessuna modifica" su un valore diverso da quello salvato
+    await page.click('#mgUserNoteBtn');
+    await page.waitForTimeout(200);
+    const dopo = await page.evaluate(() => window.__pending());
+    if (dopo > 2) await resolveAt(page, 2);
+    const u = await updates(page);
+    expect(u[u.length - 1].userNote).toBe('secondo');
+  } else {
+    // l'Invio è stato ignorato durante il volo: va benissimo
+    await resolveAt(page, 0);
+    await expect(campo).toHaveValue('secondo');
+  }
+  await expect(page.locator('#mgUserNoteBtn')).toBeEnabled();
+});
+
+test('SONDA: salvare due volte lo stesso testo dice "Nessuna modifica" e non riparte', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await boot(page, [fbFix('d4', 984)]);
+  await open(page, 'd4');
+  const campo = page.locator('#mgUserNoteText');
+  await campo.fill('identica');
+  await page.click('#mgUserNoteBtn');
+  await waitPending(page, 1);
+  await resolveAt(page, 0);
+  await expect(page.locator('#mgUserNoteMsg')).toHaveText('Salvata');
+  await page.click('#mgUserNoteBtn');
+  await expect(page.locator('#mgUserNoteMsg')).toHaveText('Nessuna modifica');
+  expect(await page.evaluate(() => window.__pending())).toBe(1);
+});
+
+test('SONDA: preferito premuto due volte con risposte fuori ordine', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await boot(page, [fbFix('d5', 985)]);
+  await open(page, 'd5');
+  const stella = page.locator('#mgStarBtn');
+
+  await stella.click();
+  await waitPending(page, 1);
+  await expect(stella).toBeDisabled();     // niente doppio invio dallo stesso bottone
+  await resolveAt(page, 0);
+  await expect(stella).toHaveText('★ Preferito');
+  await stella.click();
+  await waitPending(page, 2);
+  await resolveAt(page, 1);
+  await expect(stella).toHaveText('☆ Preferito');
+  const u = await updates(page);
+  expect(u.map((x) => x.starred)).toEqual([true, false]);
 });
 
 test('due correzioni di fila durante lo stesso volo, e con l\'invio da tastiera', async ({ openTab }) => {
