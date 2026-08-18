@@ -133,6 +133,21 @@ export function transizioneAmmessa(from, to, attore = 'owner') {
 /**
  * Scrive la decisione. Ritorna { ok, from, to } oppure { ok:false, motivo }.
  */
+/** Le note esistenti, in chiaro: la fusione non si fa mai sul cifrato. */
+async function notePrecedentiInChiaro(doc) {
+  const grezzo = doc.fields?.notes?.stringValue || '';
+  if (!CRYPTO?.isEncrypted?.(grezzo)) return grezzo;
+  try {
+    const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
+    const dec = await decryptFeedbackFields({ _id: doc.name, notes: grezzo });
+    const chiaro = String(dec.notes || '');
+    // Se non si decifra, meglio ripartire dal solo testo nuovo che appiccicare
+    // un blob illeggibile davanti: quello che c'era resta comunque perso, ma
+    // almeno quello che scrivi adesso si legge.
+    return chiaro.startsWith('FENC') ? '' : chiaro;
+  } catch (_) { return ''; }
+}
+
 export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
   const bearer = await acquireBearer();
