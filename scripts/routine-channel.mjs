@@ -63,6 +63,11 @@
 //       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
 //         scelto il server, e consuma il biglietto. Serve solo nella fase in
 //         cui i due canali convivono.
+//
+//   La FUSIONE su main non ha un sottocomando qui: passa da
+//   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
+//   merge lo fa il SERVER (SPEC-RIDISEGNO-MAX.md §10): verdetti registrati,
+//   L5 sul diff che scarica lui, fusione via API con la sua identità.
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
