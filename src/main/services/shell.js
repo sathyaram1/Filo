@@ -358,7 +358,10 @@ function runProbe({ file, args }, cwd) {
     let proc;
     const finish = (val) => { if (done) return; done = true; try { proc.kill(); } catch (_) {} resolve(val); };
     try {
-      proc = spawn(file, args, { cwd: cwd || undefined, windowsHide: true, stdio: 'ignore' });
+      // `env` del probe: il nome del comando da controllare viaggia qui (mai
+      // sulla riga di comando di PowerShell), così non può essere eseguito.
+      const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
+      proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve(false); return; }
     // Timeout difensivo: un resolver che si impalla non deve restare appeso.
     // Largo di proposito (10s): qui un falso negativo è il danno vero — un
