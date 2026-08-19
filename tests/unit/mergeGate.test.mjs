@@ -74,12 +74,17 @@ const { parseArgs, isValidBranch, runSecurityGate, changedPaths, l5SensitiveHits
   '../../scripts/merge-gate.mjs'
 );
 
-test('parseArgs: source + target di default main', () => {
-  assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', target: 'main', dryRun: false });
+test('parseArgs: source + target sempre main', () => {
+  assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', target: 'main', dryRun: false, unknown: [] });
+  assert.deepEqual(parseArgs(['worker/1', '--dry-run']),
+    { source: 'worker/1', target: 'main', dryRun: true, unknown: [] });
 });
-test('parseArgs: --into e --dry-run', () => {
-  assert.deepEqual(parseArgs(['worker/1.2', '--into', 'feature/1', '--dry-run']),
-    { source: 'worker/1.2', target: 'feature/1', dryRun: true });
+test('parseArgs: --into non esiste più (Modello B abolito) → opzione sconosciuta', () => {
+  // I pezzi #N.M non si fondono più su feature/N: il target è SEMPRE main.
+  // Il vecchio flag non deve né funzionare né passare in silenzio.
+  const p = parseArgs(['worker/1.2', '--into', 'feature/1']);
+  assert.equal(p.target, 'main', 'il target resta main qualunque cosa si passi');
+  assert.ok(p.unknown.includes('--into'), 'il flag va segnalato, non ignorato: il CLI rifiuta di partire');
 });
 test('isValidBranch: accetta nomi tipici, rifiuta injection', () => {
   assert.ok(isValidBranch('worker/12'));
