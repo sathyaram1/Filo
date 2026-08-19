@@ -169,6 +169,10 @@
     prober:   { icon: '🔍', label: 'Claude (esplorazione)' },
     worker:   { icon: '🔧', label: 'Claude (sviluppo)' },
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
+    // Rilievi rimasti aperti quando un lavoro «migliorabile» viene promosso
+    // (SPEC-RIDISEGNO-MAX.md §13): categoria propria, così leggendo la coda si
+    // vede che nasce dal declassamento di una verifica, non da un'esplorazione.
+    residuo:  { icon: '🧹', label: 'Claude — rilievo residuo' },
     claude:   { icon: '🤖', label: 'Claude' },
   };
   function authorKindOf(fb) {
