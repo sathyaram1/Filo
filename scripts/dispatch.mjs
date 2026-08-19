@@ -814,7 +814,9 @@ function positionOnBranch(bucket) {
     root: ROOT,
     branch,
     create: isNew,
-    base: isNew ? preferredBase(bucket.num, MAIN_BRANCH) : '',
+    // Un lavoro nuovo nasce SEMPRE dalla linea principale: le basi feature/N
+    // erano il Modello B dei sotto-feedback, abolito (SPEC-RIDISEGNO-MAX.md §1).
+    base: '',
     mainBranch: MAIN_BRANCH,
     checkpoint: isNew ? null : lastCheckpoint(prev),
   });
