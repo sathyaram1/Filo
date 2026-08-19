@@ -113,7 +113,7 @@ function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
 test('merged → exit 0, e al server arrivano SOLO biglietto e branch', async () => {
   const { srv, richieste, port } = await fintoServer({ ok: true, result: 'merged', sha: 'abc123def456' });
   try {
-    const r = gate(port, ['worker/7']);
+    const r = await gate(port, ['worker/7']);
     assert.equal(r.status, 0, `exit 0 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stdout, /fuso su main dal server/);
     assert.equal(richieste.length, 1);
@@ -129,7 +129,7 @@ test('merged → exit 0, e al server arrivano SOLO biglietto e branch', async ()
 test('blocked (L5 sul server) → exit 10, col motivo del blocco', async () => {
   const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' });
   try {
-    const r = gate(port, ['worker/13']);
+    const r = await gate(port, ['worker/13']);
     assert.equal(r.status, 10, `exit 10 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /BLOCKED/);
     assert.match(r.stderr, /firestore\.rules/);
@@ -139,7 +139,7 @@ test('blocked (L5 sul server) → exit 10, col motivo del blocco', async () => {
 test('conflict → exit 20', async () => {
   const { srv, port } = await fintoServer({ ok: true, result: 'conflict', reason: 'conflitto di merge: serve risoluzione manuale' });
   try {
-    const r = gate(port, ['worker/9']);
+    const r = await gate(port, ['worker/9']);
     assert.equal(r.status, 20, `exit 20 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /CONFLICT/);
   } finally { srv.close(); }
@@ -148,7 +148,7 @@ test('conflict → exit 20', async () => {
 test('rifiuto del server (verdetti non registrati) → exit 1, col motivo', async () => {
   const { srv, port } = await fintoServer({ ok: false, reason: 'not_approved' }, 401);
   try {
-    const r = gate(port, ['worker/11']);
+    const r = await gate(port, ['worker/11']);
     assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /not_approved/);
   } finally { srv.close(); }
@@ -157,7 +157,7 @@ test('rifiuto del server (verdetti non registrati) → exit 1, col motivo', asyn
 test('senza biglietto → exit 1 SENZA nemmeno chiamare il server', async () => {
   const { srv, richieste, port } = await fintoServer({ ok: true, result: 'merged' });
   try {
-    const r = gate(port, ['worker/7'], { ticket: '' });
+    const r = await gate(port, ['worker/7'], { ticket: '' });
     assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /biglietto/);
     assert.equal(richieste.length, 0, 'senza biglietto non c’è niente da chiedere');
@@ -167,7 +167,7 @@ test('senza biglietto → exit 1 SENZA nemmeno chiamare il server', async () => 
 test('il vecchio --into viene rifiutato prima di qualunque chiamata', async () => {
   const { srv, richieste, port } = await fintoServer({ ok: true, result: 'merged' });
   try {
-    const r = gate(port, ['worker/9.1', '--into', 'feature/9']);
+    const r = await gate(port, ['worker/9.1', '--into', 'feature/9']);
     assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /--into/);
     assert.equal(richieste.length, 0);
@@ -177,7 +177,7 @@ test('il vecchio --into viene rifiutato prima di qualunque chiamata', async () =
 test('branch con injection → exit 1 senza chiamate', async () => {
   const { srv, richieste, port } = await fintoServer({ ok: true, result: 'merged' });
   try {
-    const r = gate(port, ['a;rm -rf /']);
+    const r = await gate(port, ['a;rm -rf /']);
     assert.equal(r.status, 1);
     assert.equal(richieste.length, 0);
   } finally { srv.close(); }

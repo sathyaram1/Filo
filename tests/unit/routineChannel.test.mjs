@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const mod = await import('../../scripts/routine-channel.mjs');
-const { readTicketReply, call, release } = mod;
+const { readTicketReply, call, release, merge } = mod;
 
 const reply = (status, body) => ({
   status,
