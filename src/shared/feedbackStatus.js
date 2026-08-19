@@ -88,83 +88,11 @@
   }
 
   // ── Transizioni legali (spec §3) ───────────────────────────────────────────
-  // from → { to: [attori autorizzati] }. Attori:
-  //   'owner'    dashboard di gestione (solo l'owner fa uscire dagli stati di
-  //              revisione umana);
-  //   'pipeline' filo-security (giudici + gate file): è l'UNICO che fa uscire
-  //              da `unlabeled`;
-  //   'routine'  routine Claude via coda triage/Action (iter di lavorazione).
-  // Una coppia (from,to) assente = transizione ILLEGALE: il writer la rifiuta.
-  const TRANSITIONS = {
-    unlabeled: {
-      suspicious_file: ['pipeline'], // gate file (corre prima dei giudici)
-      attack:          ['pipeline'],
-      spam:            ['pipeline'],
-      design:          ['pipeline'],
-      todo:            ['pipeline'], // sicuro + automatica ON (letta al giudizio)
-      aligned:         ['pipeline'], // sicuro + automatica OFF
-    },
-    suspicious_file: {
-      todo:             ['owner'],
-      attack_confirmed: ['owner'],
-      spam_confirmed:   ['owner'],
-      archived:         ['owner'],
-    },
-    attack: {
-      attack_confirmed: ['owner'],
-      todo:             ['owner'],   // falso positivo
-      unlabeled:        ['pipeline'], // mittente fidato flaggato per errore → ri-giudizio
-    },
-    spam: {
-      spam_confirmed: ['owner'],
-      todo:           ['owner'],
-      unlabeled:      ['pipeline'],
-    },
-    design: {
-      todo:     ['owner'],  // l'owner risponde in chat e rimette in coda
-      archived: ['owner'],  // oppure decide che non si fa
-    },
-    aligned: {
-      todo: ['owner'],      // approvazione manuale (anche bulk)
-    },
-    todo: {
-      working: ['routine'], // presa in carico (il semaforo lo tiene il server)
-      design:  ['routine'], // la routine ha domande → chat + statusReason clarify
-      // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
-      // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
-      // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
-      // manuali senza branch (npm run feedback -- <id> done --come-routine)
-      // restano legali come CATENA di passi (canReach attraversa l'iter).
-    },
-    working: {
-      revision_capability: ['routine'], // fix pronto su branch
-      design:              ['routine'], // domande a metà lavorazione
-      todo:                ['routine'], // TTL 60min scaduto → riconciliazione
-    },
-    revision_capability: {
-      revision_security: ['routine'], // PASS verifica comportamentale
-      design:            ['routine'], // FAIL×3 → statusReason loop
-    },
-    revision_security: {
-      done:   ['routine'], // PASS secaudit + merge-gate fonde su main
-      design: ['routine'], // FAIL fixer-loop → statusReason loop
-    },
-    done: {
-      archived: ['owner'],  // verifica umana ok
-      todo:     ['owner'],  // "manca qualcosa" → riapertura
-    },
-    archived: {
-      todo: ['owner'],      // ripristino
-    },
-    attack_confirmed: {
-      todo: ['owner'],      // "era legittimo"
-    },
-    spam_confirmed: {
-      todo: ['owner'],
-    },
-  };
+  // La tabella from → { to: [attori] } vive nei DATI (feedbackTransitions.js),
+  // insieme ai commenti sul perché di ogni riga. Qui solo l'API sopra di essa.
+  const TRANSITIONS = DATA.TRANSITIONS;
 
-  const ACTORS = ['owner', 'pipeline', 'routine'];
+  const ACTORS = DATA.ACTORS;
 
   /**
    * Una transizione è legale? PURA: nessun default permissivo — stato o attore
