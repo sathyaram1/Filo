@@ -2839,7 +2839,7 @@
     applyAutoModeGate();
     await loadAutoMode();
     await loadSortMode();
-    await loadLoopCap();
+    await loadCaps();
     await loadJudgeTimeout();
     await loadData();
   }
