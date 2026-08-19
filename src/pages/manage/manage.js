@@ -2415,8 +2415,8 @@
       renderList();
     },
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
-    // Ri-legge il loop cap dalla fonte (IPC) — usato dai test dopo aver stubbato.
-    loadLoopCap,
+    // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
+    loadCaps,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
