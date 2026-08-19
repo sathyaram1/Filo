@@ -242,3 +242,45 @@ girava dentro un worker già spawnato, che aveva bisogno di istruzioni anche per
 `{ ok:true, work:false, reason:'idle'|'off' }` all'emissione del biglietto —
 exit 2 per il client, **prima** che un worker venga spawnato. Nessun biglietto
 può nascere con un ruolo senza lavoro.
+
+## 11. Il merge lo fa il server (2026-08-19, SPEC-RIDISEGNO-MAX.md §10)
+
+Il §7 di questa spec dichiarava il limite: "il ramo principale non è protetto
+da questa spec". Il limite era reale — i controlli (verifica, secaudit, L5)
+giravano solo sul **cammino onesto**: niente impediva fisicamente a un'istanza
+catturata da una prompt injection di pushare dritta su `main`, saltandoli
+tutti. "Difficile" non è una difesa: **l'ultimo livello deve essere non
+convincibile**, cioè un posto dove non c'è nessun LLM da persuadere e nessun
+ambiente da avvelenare.
+
+Da oggi la fusione è una consegna del canale come le altre:
+
+- **`routineMerge` `{ ticket, branch }`** — la chiede solo il controllo di
+  sicurezza, a verdetto registrato. Il server, in ordine e fail-closed:
+  1. biglietto vivo, ruolo `secaudit`, ramo = quello **del biglietto** (un
+     messaggio che ne nomina un altro è respinto e registrato, non corretto);
+  2. **stato vero**: PASS della verifica e PASS del controllo di sicurezza
+     **registrati** da consegne validate — e registrati su *quel* ramo. Un
+     verdetto raccontato nel corpo (il vecchio `FILO_L4_VERDICT`) non esiste
+     come input: nessuno lo legge;
+  3. **L5 deterministico** sul diff `main...ramo` che il server **scarica da
+     GitHub** — mai su un diff consegnato dal chiamante. Qualunque trip →
+     `blocked`, con l'elenco dei trip, e il blocco finisce nel registro dei
+     rifiuti;
+  4. fusione **via API GitHub con l'identità del server** (token nei Secret
+     delle functions, letto in un punto solo: oggi un PAT di un account
+     macchina, domani una GitHub App senza toccare il resto). Conflitto →
+     `conflict`, niente fusione.
+- **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
+  e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
+  1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
+  sono spariti da questa macchina: qui non c'è più niente da convincere.
+
+Il pezzo che rende il muro fisico è un **passo dell'owner**, fuori da questa
+spec: la ruleset su `main` nel repo GitHub, con bypass per la sola identità
+del server (e per l'owner). Da lì in poi il push diretto da una sessione non è
+vietato: è **impossibile**. Finché la ruleset non c'è, il rischio residuo resta
+quello documentato dall'incidente #378 — il cancello ora è non convincibile,
+ma la porta accanto è ancora fisicamente aperta. (`npm run finish` locale
+continua col push diretto dell'owner finché la ruleset non esiste; la sua
+migrazione si decide con l'owner presente.)
