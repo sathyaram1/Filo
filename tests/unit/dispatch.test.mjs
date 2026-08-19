@@ -26,8 +26,6 @@ process.env.FILO_DISPATCH_STATE_DIR = TMP;
 process.env.FILO_REPO_ROOT = TMP;
 
 const {
-  classifyReview,
-  chooseBucket,
   applyVerifierVerdict,
   applyFixed,
   applySecaudit,
@@ -39,7 +37,6 @@ const {
   clearState,
   resolveLoopCap,
   verifierNoteText,
-  reconcileState,
   withRetry,
   emit,
   preflight,
@@ -50,138 +47,9 @@ const {
 } = await import('../../scripts/dispatch.mjs');
 const { readRole } = await import('../../scripts/lib/routine-role.mjs');
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-
-// review item per chooseBucket: { id, num, branch, state }
-function review(id, state) {
-  return { id, num: id, branch: `worker/${id}`, state };
-}
-
-// ─── classifyReview ───────────────────────────────────────────────────────────
-
-test('classifyReview: nessuno stato o verdetto null → verifier', () => {
-  assert.equal(classifyReview(null), 'verifier');
-  assert.equal(classifyReview({ verifierVerdict: null }), 'verifier');
-  assert.equal(classifyReview(defaultState('x', 'worker/x')), 'verifier');
-});
-
-test('classifyReview: verifier pass + secaudit non fatto → secaudit', () => {
-  assert.equal(classifyReview({ verifierVerdict: 'pass', secauditDone: false }), 'secaudit');
-});
-
-test('classifyReview: verifier pass + secaudit fatto → null (tocca al gate)', () => {
-  assert.equal(classifyReview({ verifierVerdict: 'pass', secauditDone: true }), null);
-});
-
-test('classifyReview: verifier fail sotto al cap → fixer', () => {
-  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 1 }, 3), 'fixer');
-  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 2 }, 3), 'fixer');
-});
-
-test('classifyReview: verifier fail al cap → blocked-loop', () => {
-  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 3 }, 3), 'blocked-loop');
-  assert.equal(classifyReview({ verifierVerdict: 'fail', loopCount: 5 }, 3), 'blocked-loop');
-});
-
-// ─── chooseBucket: precedenza ─────────────────────────────────────────────────
-
-test('chooseBucket: snapshot vuoto → prober', () => {
-  assert.equal(chooseBucket({ reviews: [], todoWinner: null }).role, 'prober');
-  assert.equal(chooseBucket({}).role, 'prober');
-});
-
-// ─── Esplorazione automatica a coda vuota (interruttore owner, #448) ──────────
-
-test('chooseBucket: coda vuota con esplorazione spenta → idle, non prober', () => {
-  const opts = { proberWhenIdle: false };
-  assert.equal(chooseBucket({ reviews: [], todoWinner: null }, undefined, opts).role, 'idle');
-  assert.equal(chooseBucket({}, undefined, opts).role, 'idle');
-});
-
-test("l'interruttore spento NON tocca il lavoro vero", () => {
-  // Ferma solo il ripiego a coda vuota: finché c'è da lavorare si lavora.
-  const opts = { proberWhenIdle: false };
-  assert.equal(
-    chooseBucket({ reviews: [], todoWinner: { id: 'F1', num: '#5' } }, undefined, opts).role,
-    'new-work',
-  );
-  assert.equal(
-    chooseBucket({ reviews: [review('A', { verifierVerdict: null })], todoWinner: null }, undefined, opts).role,
-    'verifier',
-  );
-});
-
-test('solo un false esplicito spegne: assente o true → prober come sempre', () => {
-  const empty = { reviews: [], todoWinner: null };
-  assert.equal(chooseBucket(empty, undefined, {}).role, 'prober');
-  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: true }).role, 'prober');
-  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: undefined }).role, 'prober');
-  assert.equal(chooseBucket(empty, undefined, { proberWhenIdle: null }).role, 'prober');
-});
-
-test('chooseBucket: solo todo → new-work col vincitore', () => {
-  const b = chooseBucket({ reviews: [], todoWinner: { id: 'F1', num: '#5' } });
-  assert.equal(b.role, 'new-work');
-  assert.equal(b.id, 'F1');
-  assert.equal(b.num, '#5');
-});
-
-test('chooseBucket: review da verificare batte un todo', () => {
-  const b = chooseBucket({
-    reviews: [review('A', { verifierVerdict: null })],
-    todoWinner: { id: 'F1' },
-  });
-  assert.equal(b.role, 'verifier');
-  assert.equal(b.id, 'A');
-});
-
-test('chooseBucket: secaudit batte verifier batte fixer', () => {
-  const reviews = [
-    review('FX', { verifierVerdict: 'fail', loopCount: 1 }), // fixer
-    review('VF', { verifierVerdict: null }),                  // verifier
-    review('SA', { verifierVerdict: 'pass', secauditDone: false }), // secaudit
-  ];
-  const b = chooseBucket({ reviews, todoWinner: { id: 'F1' } });
-  assert.equal(b.role, 'secaudit');
-  assert.equal(b.id, 'SA');
-  assert.equal(b.branch, 'worker/SA');
-});
-
-test('chooseBucket: senza secaudit, verifier batte fixer', () => {
-  const reviews = [
-    review('FX', { verifierVerdict: 'fail', loopCount: 1 }),
-    review('VF', { verifierVerdict: null }),
-  ];
-  assert.equal(chooseBucket({ reviews, todoWinner: null }).role, 'verifier');
-});
-
-test('chooseBucket: solo un fail sotto cap → fixer; passa la critica nello stato', () => {
-  const b = chooseBucket({
-    reviews: [review('FX', { verifierVerdict: 'fail', loopCount: 2, verifierCritique: 'si rompe X' })],
-    todoWinner: null,
-  });
-  assert.equal(b.role, 'fixer');
-  assert.equal(b.loopCount, 2);
-  assert.equal(b.state.verifierCritique, 'si rompe X');
-});
-
-test('chooseBucket: fail al cap → blocked-loop (non fixer)', () => {
-  const b = chooseBucket({
-    reviews: [review('FX', { verifierVerdict: 'fail', loopCount: 3 })],
-    todoWinner: { id: 'F1' },
-  });
-  assert.equal(b.role, 'blocked-loop');
-  assert.equal(b.id, 'FX');
-});
-
-test('chooseBucket: review già passato secaudit non viene ridispatchato → resta il todo', () => {
-  const b = chooseBucket({
-    reviews: [review('DONE', { verifierVerdict: 'pass', secauditDone: true })],
-    todoWinner: { id: 'F1' },
-  });
-  assert.equal(b.role, 'new-work');
-  assert.equal(b.id, 'F1');
-});
+// (Qui vivevano i test di classifyReview, chooseBucket e reconcileState: la
+// scelta del lavoro è del server dal ridisegno — SPEC-RIDISEGNO-MAX.md §1 — e
+// le sue regole sono testate in filo-security, functions/test/routine-select.)
 
 // ─── Transizioni di stato ─────────────────────────────────────────────────────
 
