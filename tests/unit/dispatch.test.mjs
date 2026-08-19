@@ -95,6 +95,31 @@ test('applySecaudit: marca secauditDone e il verdetto', () => {
   assert.equal(sa.secauditVerdict, 'pass');
 });
 
+// ─── Il terzo esito: migliorabile (SPEC-RIDISEGNO-MAX.md §13) ────────────────
+
+test('VERIFIER_VERDICTS: i tre esiti accettati da --record-verifier', async () => {
+  const { VERIFIER_VERDICTS } = await import('../../scripts/dispatch.mjs');
+  assert.deepEqual(VERIFIER_VERDICTS, ['pass', 'migliorabile', 'fail']);
+});
+
+test('applyVerifierVerdict migliorabile: contatore SEPARATO dal loop, critica salvata', () => {
+  let s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'migliorabile', 'manca la parità col menu');
+  assert.equal(s.verifierVerdict, 'migliorabile');
+  assert.equal(s.improvableCount, 1);
+  assert.equal(s.loopCount, 0, 'un migliorabile NON è una bocciatura: il loop non si muove');
+  assert.equal(s.verifierCritique, 'manca la parità col menu');
+  // fail successivo: ciascun contatore conta il suo
+  s = applyVerifierVerdict(s, 'fail', 'rotto');
+  assert.equal(s.loopCount, 1);
+  assert.equal(s.improvableCount, 1);
+});
+
+test('applyFixed conserva anche il contatore dei migliorabile', () => {
+  const s = applyFixed(applyVerifierVerdict(defaultState('A', 'worker/A'), 'migliorabile', 'x'));
+  assert.equal(s.improvableCount, 1, 'il server confronta questo numero con N: il fix non lo azzera');
+  assert.equal(s.verifierVerdict, null);
+});
+
 // ─── buildPayload: ISOLAMENTO ─────────────────────────────────────────────────
 
 test('buildPayload secaudit: vede il diff, MAI il feedback', () => {
