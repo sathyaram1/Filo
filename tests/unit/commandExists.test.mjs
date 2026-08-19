@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const { commandExists } = require(
+const { commandExists, existenceProbes } = require(
   join(__dirname, '..', '..', 'src', 'main', 'services', 'shell.js'),
 );
 
@@ -34,12 +34,22 @@ test('riconosce uno shim npm (npm) — guard regressione "firebase rosso"', asyn
   // npm è sempre installato (serve a far girare l'app). Sul vecchio resolver
   // PowerShell via Get-Command tornava false per questo shim: questo assert è
   // proprio ciò che diventa rosso senza il fix.
-  const t = Date.now();
-  const exists = await commandExists({ shell: SHELL, command: 'npm' });
-  assert.equal(exists, true);
-  // E deve essere veloce: il vecchio camminio andava in timeout (~4s) sugli
-  // shim pesanti. `where` risolve in ~100ms.
-  assert.ok(Date.now() - t < 3000, 'la verifica deve risolvere ben sotto il timeout');
+  assert.equal(await commandExists({ shell: SHELL, command: 'npm' }), true);
+});
+
+test('il probe veloce (where.exe) viene PRIMA di Get-Command — guard "firebase rosso"', () => {
+  // Il guard sulla velocità era un assert col cronometro (<3s), ma su una
+  // macchina carica (suite in parallelo, antivirus su node_modules fresco)
+  // anche `where.exe` può metterci secondi: misurava il carico, non la
+  // regressione. La regressione vera era l'ORDINE dei probe: Get-Command per
+  // primo analizza gli shim .ps1 (~5s) e colorava di rosso comandi validi.
+  // Qui si inchioda la struttura, che è ciò che il fix aveva cambiato.
+  const probes = existenceProbes({ shell: 'powershell', cmd: 'npm' });
+  assert.equal(probes[0].file, 'where.exe', 'where.exe deve essere il primo probe');
+  assert.ok(
+    probes.slice(1).every((p) => p.file !== 'where.exe'),
+    'Get-Command resta solo come fallback',
+  );
 });
 
 test('NON riconosce un nome palesemente inventato', async () => {
