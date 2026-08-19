@@ -128,6 +128,13 @@ accorciato:
   tolta. Un manifesto che mente è peggio di uno assente. Una sentinella negli
   unit test confronta le voci verificabili (scorciatoie, pagine interne) col
   codice reale e diventa rossa se derivano.
+- **`src/shared/feedbackTransitions.js`** — le TABELLE della macchina a stati
+  (stati, transizioni, statusPublic, imbottitura, default dei contatori del
+  verificatore N/M) come DATI. La dashboard le legge da qui; il server di
+  filo-security le INCORPORA al deploy (predeploy `bake-shared`), insieme a
+  **`filo_filosofia.txt`** per i prompt dei giudici L2. Niente copie a mano:
+  se tocchi transizioni o filosofia, l'unica cura è **rideployare le
+  functions**.
 
 ## Run / test
 
