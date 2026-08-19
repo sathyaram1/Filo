@@ -48,13 +48,16 @@ export function isValidBranch(name) {
     && !name.includes('..');
 }
 
-// Parsing degli argomenti CLI: <source> [--into <target>] [--dry-run].
+// Parsing degli argomenti CLI: <source> [--dry-run]. Il target è SEMPRE main:
+// un flag sconosciuto (compreso il vecchio `--into`) finisce in `unknown` e il
+// CLI si rifiuta di partire — meglio un errore chiaro che fondere su un target
+// che non esiste più come concetto.
 export function parseArgs(argv) {
-  const out = { source: '', target: 'main', dryRun: false };
+  const out = { source: '', target: 'main', dryRun: false, unknown: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--into') { out.target = argv[++i] || ''; }
-    else if (a === '--dry-run') { out.dryRun = true; }
+    if (a === '--dry-run') { out.dryRun = true; }
+    else if (typeof a === 'string' && a.startsWith('-')) { out.unknown.push(a); }
     else if (!out.source) { out.source = a; }
   }
   return out;
