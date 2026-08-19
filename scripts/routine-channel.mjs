@@ -95,7 +95,12 @@ export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fe
       const text = await res.text();
       let body = {};
       try { body = text ? JSON.parse(text) : {}; } catch (_) { body = { ok: false, reason: 'malformed_response' }; }
-      if (res.status >= 500 && i < attempts) { last = { status: res.status, body }; await sleep(baseDelayMs * i); continue; }
+      // Un guasto DICHIARATO da un worker viaggia come 5xx (il giro si deve
+      // fermare), ma è una RISPOSTA deterministica, non un'interruzione che
+      // può passare da sola: ritentarla darebbe tre volte lo stesso no.
+      if (res.status >= 500 && i < attempts && (body && body.reason) !== 'fault_declared') {
+        last = { status: res.status, body }; await sleep(baseDelayMs * i); continue;
+      }
       return { status: res.status, body };
     } catch (e) {
       last = { status: 0, body: { ok: false, reason: 'network', detail: String((e && e.message) || e) } };
