@@ -527,68 +527,80 @@ test('il timeout dei giudici viene clampato nel range consentito', async ({ open
   expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(10000);
 });
 
-test('il numero di tentativi del loop è editabile e il salvataggio lo scrive nella config delle routine', async ({ openTab }) => {
+test('i due contatori del verificatore sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
   await page.locator('.mg-tab[data-tab="automation"]').click();
-  const input = page.locator('#mgLoopCap');
-  await expect(input).toBeVisible();
+  const fail = page.locator('#mgFailCap');
+  const impr = page.locator('#mgImprovableCap');
+  await expect(fail).toBeVisible();
+  await expect(impr).toBeVisible();
 
-  // Da non-admin il campo è in sola lettura (stesso contratto dello switch).
-  await expect(input).toBeDisabled();
-  await expect(page.locator('#mgLoopCapSave')).toBeDisabled();
+  // Da non-admin i campi sono in sola lettura (stesso contratto dello switch).
+  await expect(fail).toBeDisabled();
+  await expect(page.locator('#mgFailCapSave')).toBeDisabled();
+  await expect(impr).toBeDisabled();
+  await expect(page.locator('#mgImprovableCapSave')).toBeDisabled();
 
-  // Simula l'owner: stub della config (valore corrente 7) + abilita i controlli.
-  await stubLoopCap(page, 7);
+  // Simula l'owner: stub della config + abilita i controlli.
+  await stubCaps(page, { failCap: 7, improvableCap: 2 });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
-  await page.evaluate(() => window.__mgTest.loadLoopCap()); // rilegge dalla config stubbata
-  await expect(input).toBeEnabled();
-  // Il campo riflette il valore della config, non un default locale.
-  await expect(input).toHaveValue('7');
+  await page.evaluate(() => window.__mgTest.loadCaps()); // rilegge dalla config stubbata
+  await expect(fail).toBeEnabled();
+  await expect(impr).toBeEnabled();
+  // I campi riflettono il valore della config, non un default locale.
+  await expect(fail).toHaveValue('7');
+  await expect(impr).toHaveValue('2');
 
-  // Cambia il valore e salva.
-  await input.fill('5');
-  await page.locator('#mgLoopCapSave').click();
-  await expect(page.locator('#mgLoopCapMsg')).toHaveText('Salvato.');
+  // Cambia i valori e salva (ogni campo col suo bottone).
+  await fail.fill('5');
+  await page.locator('#mgFailCapSave').click();
+  await expect(page.locator('#mgFailCapMsg')).toHaveText('Salvato.');
+  await impr.fill('4');
+  await page.locator('#mgImprovableCapSave').click();
+  await expect(page.locator('#mgImprovableCapMsg')).toHaveText('Salvato.');
 
-  // Il valore è stato SCRITTO nella config (l'IPC che le routine leggono): è qui
-  // che "ha effetto", non solo in una cache locale.
-  await expect.poll(() => page.evaluate(() => window.__loopCapSets)).toEqual([5]);
-  expect(await page.evaluate(() => window.__loopCapValue)).toBe(5);
+  // I valori sono stati SCRITTI nella config (l'IPC che il server dei verdetti
+  // legge): è qui che "hanno effetto", non solo in una cache locale. Ogni
+  // salvataggio tocca SOLO il suo campo.
+  await expect.poll(() => page.evaluate(() => window.__capsSets))
+    .toEqual([{ failCap: 5 }, { improvableCap: 4 }]);
+  expect(await page.evaluate(() => window.__capsValue)).toEqual({ failCap: 5, improvableCap: 4 });
 
-  // È anche specchiato nella cache locale (display istantaneo all'avvio).
+  // Sono anche specchiati nella cache locale (display istantaneo all'avvio).
   const cached = await page.evaluate(async () => {
-    const key = window.SN_CONST.STORAGE_KEYS.AUTOMATION_LOOP_CAP;
-    const d = await window.chrome.storage.local.get(key);
-    return d[key];
+    const kFail = window.SN_CONST.STORAGE_KEYS.AUTOMATION_LOOP_CAP;
+    const kImpr = window.SN_CONST.STORAGE_KEYS.AUTOMATION_IMPROVABLE_CAP;
+    const d = await window.chrome.storage.local.get([kFail, kImpr]);
+    return [d[kFail], d[kImpr]];
   });
-  expect(cached).toBe(5);
+  expect(cached).toEqual([5, 4]);
 });
 
-test('il numero di tentativi del loop viene clampato nel range [1, 10] al salvataggio', async ({ openTab }) => {
+test('i contatori del verificatore vengono clampati nel range [1, 10] al salvataggio', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
   await page.locator('.mg-tab[data-tab="automation"]').click();
-  await stubLoopCap(page, 3);
+  await stubCaps(page);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
 
-  const input = page.locator('#mgLoopCap');
+  const fail = page.locator('#mgFailCap');
 
   // Sopra il massimo → riportato a 10 (e 10 è ciò che viene scritto).
-  await input.fill('99');
-  await page.locator('#mgLoopCapSave').click();
-  await expect(input).toHaveValue('10');
-  expect(await page.evaluate(() => window.__loopCapValue)).toBe(10);
+  await fail.fill('99');
+  await page.locator('#mgFailCapSave').click();
+  await expect(fail).toHaveValue('10');
+  expect(await page.evaluate(() => window.__capsValue.failCap)).toBe(10);
 
   // Sotto il minimo → riportato a 1.
-  await input.fill('0');
-  await page.locator('#mgLoopCapSave').click();
-  await expect(input).toHaveValue('1');
-  expect(await page.evaluate(() => window.__loopCapValue)).toBe(1);
+  await fail.fill('0');
+  await page.locator('#mgFailCapSave').click();
+  await expect(fail).toHaveValue('1');
+  expect(await page.evaluate(() => window.__capsValue.failCap)).toBe(1);
 });
 
 test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo) — DA2', async ({ openTab }) => {
