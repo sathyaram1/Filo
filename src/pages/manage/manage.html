@@ -1163,19 +1163,34 @@
           </p>
         </section>
 
-        <!-- Numero di cicli del loop di correzione. Anche questo vale solo se
-             le routine lavorano. -->
-        <section class="mg-auto-block" id="mgLoopCapBlock">
-          <label class="mg-auto-field-label" for="mgLoopCap">Tentativi del loop di correzione</label>
+        <!-- I due contatori del verificatore a tre esiti (SPEC-RIDISEGNO-MAX.md
+             §13). Valgono solo se le routine lavorano. -->
+        <section class="mg-auto-block" id="mgFailCapBlock">
+          <label class="mg-auto-field-label" for="mgFailCap">Bocciature prima di fermarsi</label>
           <p class="mg-auto-block-desc">
-            Quante volte di fila una correzione può fallire la verifica prima che
-            Filo la metta da parte e chieda a te di decidere.
+            Quante volte una correzione può essere bocciata dalla verifica prima
+            che Filo la metta da parte e chieda a te di decidere.
           </p>
           <div class="mg-auto-field-row">
-            <input type="number" id="mgLoopCap" class="mg-auto-number"
+            <input type="number" id="mgFailCap" class="mg-auto-number"
               min="1" max="10" step="1" inputmode="numeric" />
-            <button type="button" class="sn-btn" id="mgLoopCapSave">Salva</button>
-            <span class="mg-action-msg" id="mgLoopCapMsg" role="status"></span>
+            <button type="button" class="sn-btn" id="mgFailCapSave">Salva</button>
+            <span class="mg-action-msg" id="mgFailCapMsg" role="status"></span>
+          </div>
+        </section>
+
+        <section class="mg-auto-block" id="mgImprovableCapBlock">
+          <label class="mg-auto-field-label" for="mgImprovableCap">Giri «migliorabile» prima di promuovere</label>
+          <p class="mg-auto-block-desc">
+            Quante volte un lavoro che funziona ma è migliorabile torna in
+            correzione. Al giro successivo passa comunque, e i rilievi rimasti
+            aperti diventano un nuovo feedback (rilievo residuo).
+          </p>
+          <div class="mg-auto-field-row">
+            <input type="number" id="mgImprovableCap" class="mg-auto-number"
+              min="1" max="10" step="1" inputmode="numeric" />
+            <button type="button" class="sn-btn" id="mgImprovableCapSave">Salva</button>
+            <span class="mg-action-msg" id="mgImprovableCapMsg" role="status"></span>
           </div>
         </section>
 
