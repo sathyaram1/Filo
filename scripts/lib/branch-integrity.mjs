@@ -259,8 +259,8 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     const wanted = base || mainBranch;
     g(['fetch', 'origin', wanted]);
     g(['fetch', 'origin', mainBranch]);
-    // Base: il branch chiesto se esiste (Modello B: feature/N), altrimenti la
-    // linea principale. MAI HEAD: se il giro precedente ci ha lasciati su un
+    // Base: il branch chiesto se esiste, altrimenti la linea principale.
+    // MAI HEAD: se il giro precedente ci ha lasciati su un
     // altro branch di lavoro, partire da HEAD erediterebbe il lavoro altrui.
     const baseRef = [`origin/${wanted}`, wanted, `origin/${mainBranch}`, mainBranch].find((r) => refExists(g, r));
     if (!baseRef) return { ok: false, kind: 'transient', message: `nessuna base utilizzabile (${wanted}/${mainBranch} irraggiungibili)` };
