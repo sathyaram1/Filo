@@ -233,11 +233,26 @@ export function defaultState(id, branch) {
 
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
 
-/** Il verifier ha prodotto un verdetto. FAIL incrementa il contatore loop. */
+// I tre esiti della verifica (SPEC-RIDISEGNO-MAX.md §13): fail = la cosa
+// chiesta non si ottiene; migliorabile = funziona, ma pattern/estetica/
+// completezza. I contatori EFFETTIVI (e la promozione del migliorabile al giro
+// N+1) li applica il SERVER quando registra il verdetto: questo stato locale è
+// solo lo specchio di ripiego.
+export const VERIFIER_VERDICTS = ['pass', 'migliorabile', 'fail'];
+
+/**
+ * Il verifier ha prodotto un verdetto. FAIL incrementa il contatore delle
+ * bocciature; MIGLIORABILE il suo contatore separato (e instrada una correzione
+ * come un fail, finché il server non lo promuove).
+ */
 export function applyVerifierVerdict(state, verdict, critique = '') {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
   if (verdict === 'pass') {
     s.verifierVerdict = 'pass';
+  } else if (verdict === 'migliorabile') {
+    s.verifierVerdict = 'migliorabile';
+    s.improvableCount = (Number(s.improvableCount) || 0) + 1;
+    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
   } else {
     s.verifierVerdict = 'fail';
     s.loopCount = (Number(s.loopCount) || 0) + 1;
