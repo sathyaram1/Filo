@@ -231,6 +231,14 @@ test('verifierNoteText: fail con critica → incipit NON superato + passi', () =
 test("verifierNoteText: senza critica → solo l'esito (mai nota vuota)", () => {
   assert.equal(verifierNoteText('pass'), 'Controllo funzionalità superato.');
   assert.equal(verifierNoteText('fail'), 'Controllo funzionalità NON superato.');
+  assert.equal(verifierNoteText('migliorabile'), 'Verifica: funziona, ma migliorabile.');
+});
+
+test('verifierNoteText: migliorabile → incipit "funziona, ma migliorabile" (senza prefisso)', () => {
+  const n = verifierNoteText('migliorabile', "MIGLIORABILE — l'evidenziazione non si vede sul tema scuro");
+  assert.match(n, /^Verifica: funziona, ma migliorabile — /);
+  assert.match(n, /tema scuro/);
+  assert.ok(!/MIGLIORABILE —/.test(n)); // il prefisso ridondante viene tolto
 });
 
 // ─── withRetry: i guasti transitori non svuotano la coda ─────────────────────
