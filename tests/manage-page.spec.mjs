@@ -375,12 +375,14 @@ test('l\'interruttore master spegne le routine e rende inerti le impostazioni ch
   await expect.poll(() => page.evaluate(() => window.__automation.routinesEnabled)).toBe(false);
   await expect(page.locator('#mgRoutinesState')).toHaveText('Off');
 
-  // 2. Le due impostazioni che senza routine non decidono niente diventano
+  // 2. Le impostazioni che senza routine non decidono niente diventano
   //    inerti — e si vede, invece di restare lì a promettere un effetto.
   await expect(page.locator('#mgProberIdle')).toBeDisabled();
-  await expect(page.locator('#mgLoopCap')).toBeDisabled();
+  await expect(page.locator('#mgFailCap')).toBeDisabled();
+  await expect(page.locator('#mgImprovableCap')).toBeDisabled();
   await expect(page.locator('#mgProberIdleBlock')).toHaveClass(/mg-auto-block--off/);
-  await expect(page.locator('#mgLoopCapBlock')).toHaveClass(/mg-auto-block--off/);
+  await expect(page.locator('#mgFailCapBlock')).toHaveClass(/mg-auto-block--off/);
+  await expect(page.locator('#mgImprovableCapBlock')).toHaveClass(/mg-auto-block--off/);
   // Il timeout dei giudici NON dipende dalle routine: resta usabile.
   await expect(page.locator('#mgJudgeTimeout')).toBeEnabled();
 
@@ -391,7 +393,8 @@ test('l\'interruttore master spegne le routine e rende inerti le impostazioni ch
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await expect(page.locator('#mgProberIdle')).toBeEnabled();
-  await expect(page.locator('#mgLoopCap')).toBeEnabled();
+  await expect(page.locator('#mgFailCap')).toBeEnabled();
+  await expect(page.locator('#mgImprovableCap')).toBeEnabled();
 });
 
 test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano spente', async ({ openTab }) => {
