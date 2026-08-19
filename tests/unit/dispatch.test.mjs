@@ -2,14 +2,14 @@
 // deterministico delle routine).
 //
 // COSA TESTIAMO (tutto puro, niente rete né Electron, gira in ms):
-//   - classifyReview: stato di un feedback `review` → ruolo
-//   - chooseBucket: precedenza secaudit > verifier > fixer > new-work > prober
 //   - applyVerifierVerdict / applyFixed / applySecaudit: transizioni di stato
-//   - il contatore loop e il cap (3 FAIL → blocked-loop)
 //   - buildPayload: ISOLAMENTO (secaudit non vede il feedback; verifier non vede il diff)
 //   - readState/writeState/clearState su una STATE_DIR temporanea
+//   - preflight / interruttore master / resolveLoopCap
 //
-// La parte di rete (buildSnapshot/fetchOpenCandidates) NON è testata qui: thin.
+// La SCELTA del lavoro non vive più qui: la fa il server col biglietto
+// (SPEC-RIDISEGNO-MAX.md §1; la copia viva delle regole è
+// filo-security/functions/src/routine/select.js, coi suoi test).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
