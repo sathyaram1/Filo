@@ -82,21 +82,32 @@ function fintoServer(risposta, status = 200) {
   return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, richieste, port: srv.address().port })));
 }
 
-/** Lancia il CLI vero contro il server finto, col biglietto in env. */
+/**
+ * Lancia il CLI vero contro il server finto, col biglietto in env.
+ *
+ * ⚠️ spawn ASINCRONO, mai spawnSync: il server finto vive in QUESTO processo,
+ * e spawnSync bloccherebbe l'event loop — il CLI aspetterebbe una risposta che
+ * il test non può più servire. Deadlock silenzioso, già successo qui.
+ */
 function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
   const casa = mkdtempSync(join(tmpdir(), 'filo-mg-client-'));
-  try {
-    const env = {
-      ...process.env,
-      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
-      FILO_REPO_ROOT: casa, // il biglietto si cerca qui: cartella pulita
-    };
-    if (ticket) env.FILO_ROUTINE_TICKET = ticket;
-    else delete env.FILO_ROUTINE_TICKET;
-    return spawnSync(process.execPath, [MERGE_GATE, ...args], { encoding: 'utf8', env });
-  } finally {
-    rmSync(casa, { recursive: true, force: true });
-  }
+  const env = {
+    ...process.env,
+    FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+    FILO_REPO_ROOT: casa, // il biglietto si cerca qui: cartella pulita
+  };
+  if (ticket) env.FILO_ROUTINE_TICKET = ticket;
+  else delete env.FILO_ROUTINE_TICKET;
+  return new Promise((risolvi) => {
+    const p = spawn(process.execPath, [MERGE_GATE, ...args], { env });
+    let stdout = ''; let stderr = '';
+    p.stdout.on('data', (c) => { stdout += c; });
+    p.stderr.on('data', (c) => { stderr += c; });
+    p.on('close', (status) => {
+      rmSync(casa, { recursive: true, force: true });
+      risolvi({ status, stdout, stderr });
+    });
+  });
 }
 
 test('merged → exit 0, e al server arrivano SOLO biglietto e branch', async () => {
