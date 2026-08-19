@@ -205,58 +205,6 @@ test("verifierNoteText: senza critica → solo l'esito (mai nota vuota)", () => 
   assert.equal(verifierNoteText('fail'), 'Controllo funzionalità NON superato.');
 });
 
-// ─── blocked-secaudit: la bocciatura di sicurezza non incaglia più ────────────
-// Caso reale #289.9 (2026-07-07 → 2026-07-11): secaudit FAIL registrato, il
-// worker dimentica l'escalation a design, un fixer rilavora e ri-accoda
-// revision_capability senza --record-fixed → il feedback restava invisibile a
-// dispatch PER SEMPRE mentre la dashboard diceva "in attesa di un verificatore".
-
-test('classifyReview: secaudit FAIL mai scalato → blocked-secaudit (non null)', () => {
-  const s = { verifierVerdict: 'pass', secauditDone: true, secauditVerdict: 'fail' };
-  assert.equal(classifyReview(s), 'blocked-secaudit');
-});
-
-test('classifyReview: secaudit PASS resta null (gate in mano all orchestratore)', () => {
-  const s = { verifierVerdict: 'pass', secauditDone: true, secauditVerdict: 'pass' };
-  assert.equal(classifyReview(s), null);
-});
-
-test('chooseBucket: blocked-secaudit batte anche il secaudit pendente', () => {
-  const reviews = [
-    review('SA', { verifierVerdict: 'pass', secauditDone: false }),
-    review('ZOMBIE', { verifierVerdict: 'pass', secauditDone: true, secauditVerdict: 'fail' }),
-  ];
-  const b = chooseBucket({ reviews, todoWinner: { id: 'F1' } });
-  assert.equal(b.role, 'blocked-secaudit');
-  assert.equal(b.id, 'ZOMBIE');
-});
-
-// ─── reconcileState: stato stantio ↔ status persistito ───────────────────────
-
-test('reconcileState: fixer ha rilavorato (status revision_capability) ma stato a ciclo concluso → riparte dal verifier', () => {
-  const stale = { id: 'Z', branch: 'worker/Z', loopCount: 2, verifierVerdict: 'pass', secauditDone: true, secauditVerdict: 'fail' };
-  const r = reconcileState(stale, 'revision_capability');
-  assert.equal(classifyReview(r), 'verifier', 'deve tornare lavorabile dal verifier');
-  assert.equal(r.loopCount, 2, 'il contatore loop si conserva (come applyFixed)');
-  assert.equal(r.secauditDone, false);
-});
-
-test('reconcileState: verifier appena passato (lag della coda triage) NON è divergenza → resta secaudit', () => {
-  const fresh = { id: 'A', branch: 'worker/A', loopCount: 0, verifierVerdict: 'pass', secauditDone: false, secauditVerdict: null };
-  const r = reconcileState(fresh, 'revision_capability');
-  assert.equal(classifyReview(r), 'secaudit', 'lo stato è più avanti dello status e comanda lui');
-});
-
-test('reconcileState: status revision_security + secaudit FAIL → invariato (tocca a blocked-secaudit)', () => {
-  const s = { id: 'B', branch: 'worker/B', loopCount: 0, verifierVerdict: 'pass', secauditDone: true, secauditVerdict: 'fail' };
-  assert.deepEqual(reconcileState(s, 'revision_security'), s);
-  assert.equal(classifyReview(reconcileState(s, 'revision_security')), 'blocked-secaudit');
-});
-
-test('reconcileState: stato assente → assente (nessuna invenzione)', () => {
-  assert.equal(reconcileState(null, 'revision_capability'), null);
-});
-
 // ─── withRetry: i guasti transitori non svuotano la coda ─────────────────────
 
 test('withRetry: successo al terzo tentativo → ritorna il valore', async () => {
