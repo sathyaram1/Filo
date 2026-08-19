@@ -97,19 +97,18 @@
       todo: ['owner'],      // approvazione manuale (anche bulk)
     },
     todo: {
-      working: ['routine'], // presa in carico (claim git = lock primario)
+      working: ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:  ['routine'], // la routine ha domande → chat + statusReason clarify
-      // Estensione oltre la spec §3 (documentata in FEEDBACK-STATES.md): i
-      // lavori SENZA branch da verificare (es. il pianificatore che spezza una
-      // spec in sub-feedback) chiudono direttamente — l'iter revision_* vale
-      // solo per i fix su branch.
-      done:    ['routine'],
+      // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
+      // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
+      // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
+      // manuali senza branch (npm run feedback -- <id> done --come-routine)
+      // restano legali come CATENA di passi (canReach attraversa l'iter).
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
       design:              ['routine'], // domande a metà lavorazione
       todo:                ['routine'], // TTL 60min scaduto → riconciliazione
-      done:                ['routine'], // lavoro senza branch (vedi todo→done)
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
