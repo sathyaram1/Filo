@@ -309,8 +309,12 @@ if (isMain) {
       }
     }
   } else if (cmd === 'release') {
-    const r = await release(args[0]);
-    console.log(r.ok ? 'OK: biglietto rilasciato.' : `rilascio non riuscito (${r.reason})`);
+    // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
+    // parole nel testo di ritorno (che nessuna macchina legge).
+    const guasto = typeof data.guasto === 'string' ? data.guasto : '';
+    const r = await release(args[0], guasto);
+    if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
+    else console.log(`rilascio non riuscito (${r.reason})`);
   } else if (cmd === 'deliver') {
     // deliver [<biglietto>] <intento> [--campo valore …]
     //
