@@ -422,23 +422,28 @@ test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano sp
   await expect(page.locator('#mgRoutinesMsg')).toContainText('NON');
 });
 
-// Stub dell'IPC del loop cap: simula il doc Firestore config/automation senza
-// rete/main. Cattura ogni `set` per provare che il valore LASCIA il client (è la
-// fonte che le routine leggono → "il cambiamento ha effetto").
-async function stubLoopCap(page, initial = 3) {
+// Stub dell'IPC dei contatori del verificatore: simula il doc Firestore
+// config/routines senza rete/main. Cattura ogni `set` per provare che il valore
+// LASCIA il client (è la config che il server dei verdetti legge → "il
+// cambiamento ha effetto").
+async function stubCaps(page, initial = { failCap: 10, improvableCap: 3 }) {
   await page.evaluate((init) => {
-    window.__loopCapValue = init;
-    window.__loopCapSets = [];
+    window.__capsValue = { ...init };
+    window.__capsSets = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
-      if (msg && msg.type === 'automation_loop_cap_get') {
-        return { ok: true, loopCap: window.__loopCapValue };
+      if (msg && msg.type === 'automation_caps_get') {
+        return { ok: true, ...window.__capsValue };
       }
-      if (msg && msg.type === 'automation_loop_cap_set') {
-        const v = Math.min(10, Math.max(1, Math.round(Number(msg.loopCap))));
-        window.__loopCapValue = v;
-        window.__loopCapSets.push(v);
-        return { ok: true, loopCap: v };
+      if (msg && msg.type === 'automation_caps_set') {
+        const clamp = (n) => Math.min(10, Math.max(1, Math.round(Number(n))));
+        for (const field of ['failCap', 'improvableCap']) {
+          if (msg[field] != null) {
+            window.__capsValue[field] = clamp(msg[field]);
+            window.__capsSets.push({ [field]: window.__capsValue[field] });
+          }
+        }
+        return { ok: true, ...window.__capsValue };
       }
       return orig(msg);
     };
