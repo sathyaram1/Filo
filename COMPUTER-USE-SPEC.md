@@ -451,8 +451,11 @@ Rimandi a `PATTERNS.md` per lo stile; qui solo i pezzi nuovi.
 
 ## 12. Il lavoro, in ordine
 
-Ogni voce è un feedback a sé (sotto-feedback di un padre "Filo usa il
-computer"). L'ordine è di dipendenza, non di importanza.
+Ogni voce è un feedback a sé. *(Nota 2026-08-19: i sotto-feedback #N.x sono
+aboliti — SPEC-RIDISEGNO-MAX.md §1 — quindi niente padre "Filo usa il
+computer" con figli numerati: voci come feedback distinti, eventualmente
+collegati via `parentId`, "collegato a #N".)* L'ordine è di dipendenza, non di
+importanza.
 
 **CU1 — La catena dentro il browser.** Prima di uscire da Filo: piano +
 perimetro + tabella del consenso (§6) applicati alle azioni che Filo **già ha**
