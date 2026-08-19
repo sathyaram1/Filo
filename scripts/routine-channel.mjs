@@ -188,8 +188,18 @@ export async function heartbeat(t, opts) {
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
 }
 
-export async function release(t, opts) {
-  const { status, body } = await call('routineRelease', { ticket: t }, opts);
+/**
+ * Fine lavoro. `fault`, se presente, è il GUASTO DICHIARATO: il motivo per cui
+ * questo giro non può lavorare, registrato AL CANALE invece che raccontato a
+ * parole (il testo di ritorno di un worker non lo legge nessuna macchina). Il
+ * server lo tronca e non lo interpreta; da lì in poi l'emissione dei biglietti
+ * risponde `fault_declared` per il periodo di rispetto.
+ */
+export async function release(t, fault = '', opts) {
+  const payload = { ticket: t };
+  const motivo = String(fault || '').trim();
+  if (motivo) payload.fault = motivo;
+  const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || '') };
 }
 
