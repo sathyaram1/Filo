@@ -773,11 +773,10 @@ export async function run() {
       bucket.serverCritique = w.payload.critique;
     }
   }
-  const empty = { reviews: [], todoWinner: null };
   // La busta si passa COM'È: incartarla in un altro oggetto ha già fatto
   // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
   // dicendo che era tutto a posto.
-  return finalizeBucket(bucket, empty, LOOP_CAP, {}, w);
+  return finalizeBucket(bucket, w);
 }
 
 // Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
