@@ -116,3 +116,42 @@ test('release normale: NESSUN campo fault nel corpo (un rilascio pulito non è u
   await release('tkt-1', '', { fetchImpl, sleep: async () => {} });
   assert.equal('fault' in sent, false);
 });
+
+// ── La fusione la fa il SERVER (SPEC-RIDISEGNO-MAX.md §10) ──────────────────
+
+test('merge: nel corpo viaggiano SOLO biglietto e ramo — nessun verdetto', async () => {
+  // È il contratto che chiude il buco del push diretto: il verdetto L4 il
+  // server ce l'ha già registrato, e da qui non si può nemmeno esprimere.
+  let sent = null; let url = '';
+  const fetchImpl = async (u, init) => { url = u; sent = JSON.parse(init.body); return reply(200, { ok: true, result: 'merged', sha: 'abc' }); };
+  const r = await merge('tkt-1', 'worker/42', { fetchImpl, sleep: async () => {} });
+  assert.deepEqual(r, { ok: true, result: 'merged', reason: '', sha: 'abc' });
+  assert.match(url, /\/routineMerge$/);
+  assert.deepEqual(Object.keys(sent).sort(), ['branch', 'ticket']);
+});
+
+test('merge: blocked e conflict arrivano col motivo; una risposta senza esito è un guasto', async () => {
+  const blocked = await merge('t', 'worker/1', {
+    fetchImpl: async () => reply(200, { ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }),
+    sleep: async () => {},
+  });
+  assert.equal(blocked.result, 'blocked');
+  assert.match(blocked.reason, /firestore\.rules/);
+  const conflict = await merge('t', 'worker/1', {
+    fetchImpl: async () => reply(200, { ok: true, result: 'conflict' }), sleep: async () => {},
+  });
+  assert.equal(conflict.result, 'conflict');
+  // "ok" senza result non è una fusione: è una busta vuota, mai un successo.
+  const vuota = await merge('t', 'worker/1', {
+    fetchImpl: async () => reply(200, { ok: true }), sleep: async () => {},
+  });
+  assert.equal(vuota.ok, false);
+});
+
+test('merge: un rifiuto del server non si ritenta (il no è una risposta)', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return reply(401, { ok: false, reason: 'not_approved' }); };
+  const r = await merge('t', 'worker/1', { fetchImpl, sleep: async () => {}, attempts: 3 });
+  assert.equal(calls, 1);
+  assert.deepEqual(r, { ok: false, reason: 'not_approved' });
+});
