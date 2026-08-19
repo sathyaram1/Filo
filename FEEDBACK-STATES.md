@@ -84,6 +84,15 @@ e `revision_*→design(loop)`. Transizioni non elencate = illegali: il writer le
 **Mittenti fidati** (`owner:`/`routine:`/`agent:`): mai `attack`/`spam`; se un livello
 identità li flagga è un errore → `unlabeled` per ri-giudizio.
 
+**Aggiornamento 2026-08-19 (smontaggio sotto-feedback, SPEC-RIDISEGNO-MAX.md §1).**
+L'estensione `todo→done` / `working→done` (attore routine), introdotta in F3 per il
+pianificatore che spezzava le spec in sub-feedback, è RITIRATA da entrambe le copie
+della macchina a stati: il pianificatore non esiste più. Le chiusure manuali senza
+branch (`npm run feedback -- <id> done "…" --come-routine`) restano legali come
+CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done). I
+sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
+possibilità di crearne di nuovi.
+
 ## 4. Tab dashboard (deriva SOLO da `status`)
 
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
