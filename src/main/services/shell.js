@@ -352,7 +352,11 @@ function runProbe({ file, args }, cwd) {
       proc = spawn(file, args, { cwd: cwd || undefined, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve(false); return; }
     // Timeout difensivo: un resolver che si impalla non deve restare appeso.
-    const timer = setTimeout(() => finish(false), 4000);
+    // Largo di proposito (10s): qui un falso negativo è il danno vero — un
+    // comando valido colorato di rosso — mentre una risposta lenta è solo
+    // lenta. Sotto carico (antivirus su node_modules fresco, suite di test in
+    // parallelo) anche `where.exe` può metterci secondi.
+    const timer = setTimeout(() => finish(false), 10000);
     proc.on('error', () => { clearTimeout(timer); finish(false); });
     proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
   });
