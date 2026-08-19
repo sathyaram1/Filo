@@ -248,6 +248,35 @@ export async function compare(t, mine, opts) {
   return { ok: status === 200 && !!(body && body.ok), same: !!(body && body.same) };
 }
 
+/**
+ * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
+ *
+ * Qui non si decide niente: il server verifica dallo stato VERO (verdetti di
+ * verifica e sicurezza REGISTRATI), fa girare L5 sul diff che scarica lui da
+ * GitHub, e fonde con la SUA identità. Il ramo passato può solo CONFERMARE
+ * quello legato al biglietto: nominarne un altro è un rifiuto registrato, non
+ * una correzione silenziosa. Nessun verdetto viaggia nel corpo — il vecchio
+ * FILO_L4_VERDICT per il server non esiste.
+ *
+ * Stessi ritentativi di call(): i guasti transienti (rete, 5xx) si ritentano,
+ * un rifiuto no.
+ *
+ * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha? }
+ *           | { ok:false, reason }}
+ */
+export async function merge(t, branch, opts) {
+  const { status, body } = await call('routineMerge', { ticket: t, branch: String(branch || '') }, opts);
+  if (status === 200 && body && body.ok && body.result) {
+    return {
+      ok: true,
+      result: String(body.result),
+      reason: String(body.reason || ''),
+      sha: String(body.sha || ''),
+    };
+  }
+  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
