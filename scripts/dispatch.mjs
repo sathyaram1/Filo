@@ -906,15 +906,10 @@ export function serverCtx(bucket, fromServer, diff = '') {
   return {};
 }
 
-async function finalizeBucket(bucket, snapshot, cap = LOOP_CAP, opts = {}, fromServer = null) {
-  // Coda vuota con l'esplorazione spenta dall'owner (#448): non c'è niente da
-  // fare, e non c'è niente da riparare. Nessun worker, nessun claim, nessun
-  // ritorno alla linea principale: il giro finisce sereno con exit 0.
-  if (bucket.role === 'idle') {
-    emit(bucket, {});
-    return { exit: 0 };
-  }
-
+async function finalizeBucket(bucket, fromServer) {
+  // Il ruolo `idle` non esiste più (SPEC-RIDISEGNO-MAX.md §12): coda vuota o
+  // interruttore spento sono un exit 2 alla richiesta di biglietto, PRIMA che
+  // un worker venga spawnato. Qui arrivano solo buste con un lavoro dentro.
   if (bucket.role === 'prober') {
     prepareForProber();
     emit(bucket, {});
