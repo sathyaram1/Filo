@@ -341,9 +341,12 @@ function existenceProbes({ shell, cmd }) {
     { file: 'where.exe', args: [cmd] },
     {
       file: 'powershell.exe',
+      // Il nome NON è un argomento della riga `-Command` (in 5.1 verrebbe
+      // eseguito, non passato in $args): entra come env, che PowerShell tratta
+      // come dato. `-Name` prende una stringa, non la rivaluta.
       args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
-        'if (Get-Command -Name $args[0] -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }',
-        cmd],
+        'if (Get-Command -Name $env:FILO_WHICH_CMD -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }'],
+      env: { FILO_WHICH_CMD: cmd },
     },
   ];
 }
