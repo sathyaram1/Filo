@@ -217,6 +217,7 @@ export function defaultState(id, branch) {
     id,
     branch: branch || '',
     loopCount: 0,
+    improvableCount: 0,
     verifierVerdict: null,
     verifierCritique: '',
     secauditDone: false,
