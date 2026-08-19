@@ -78,15 +78,14 @@ test('applyFixed: ri-mette in coda verifier ma conserva il loop', () => {
   assert.equal(fixed.loopCount, 1, 'il contatore loop NON si azzera col fix');
 });
 
-test('ciclo completo: fail→fix→fail→fix→fail = loop 3 → blocked-loop', () => {
+test('ciclo completo: fail→fix→fail→fix→fail = il contatore arriva a 3', () => {
   let s = defaultState('A', 'worker/A');
   s = applyVerifierVerdict(s, 'fail', '1');
   s = applyFixed(s);
   s = applyVerifierVerdict(s, 'fail', '2');
   s = applyFixed(s);
   s = applyVerifierVerdict(s, 'fail', '3');
-  assert.equal(s.loopCount, 3);
-  assert.equal(classifyReview(s, 3), 'blocked-loop');
+  assert.equal(s.loopCount, 3, 'è il numero che il server confronta col tetto');
 });
 
 test('applySecaudit: marca secauditDone e il verdetto', () => {
@@ -94,7 +93,6 @@ test('applySecaudit: marca secauditDone e il verdetto', () => {
   const sa = applySecaudit(passed, 'pass');
   assert.equal(sa.secauditDone, true);
   assert.equal(sa.secauditVerdict, 'pass');
-  assert.equal(classifyReview(sa), null);
 });
 
 // ─── buildPayload: ISOLAMENTO ─────────────────────────────────────────────────
