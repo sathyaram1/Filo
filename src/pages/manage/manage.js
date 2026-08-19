@@ -36,10 +36,15 @@
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
-  const mgLoopCapBlock = document.getElementById('mgLoopCapBlock');
-  const mgLoopCap    = document.getElementById('mgLoopCap');
-  const mgLoopCapSave = document.getElementById('mgLoopCapSave');
-  const mgLoopCapMsg  = document.getElementById('mgLoopCapMsg');
+  // I due contatori del verificatore (SPEC-RIDISEGNO-MAX.md §13):
+  // failCap (M) = bocciature prima di fermarsi; improvableCap (N) = giri
+  // «migliorabile» prima di promuovere e aprire il rilievo residuo.
+  const mgFailCap     = document.getElementById('mgFailCap');
+  const mgFailCapSave = document.getElementById('mgFailCapSave');
+  const mgFailCapMsg  = document.getElementById('mgFailCapMsg');
+  const mgImprovableCap     = document.getElementById('mgImprovableCap');
+  const mgImprovableCapSave = document.getElementById('mgImprovableCapSave');
+  const mgImprovableCapMsg  = document.getElementById('mgImprovableCapMsg');
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
