@@ -222,28 +222,26 @@ test('merge-gate.mjs porta il branch worker/* su main', { skip }, () => {
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 
-test('merge-gate.mjs fonde su un target diverso da main (--into feature/N)', { skip }, () => {
+test('merge-gate.mjs RIFIUTA il vecchio --into e non fonde niente', { skip }, () => {
+  // Il Modello B è abolito (SPEC-RIDISEGNO-MAX.md §1): il target è sempre main.
+  // Chi invocasse ancora la forma vecchia deve ricevere un errore chiaro, non
+  // una fusione su un target scelto in silenzio.
   const base = mkdtempSync(join(tmpdir(), 'filo-mg-into-'));
   try {
     const origin = setupOrigin(base);
-    // Crea feature/9 su origin partendo da main.
-    const seed = freshClone(base, origin, 'seedfeat');
-    git(seed, ['checkout', '-q', '-b', 'feature/9']);
-    git(seed, ['push', '-q', 'origin', 'feature/9']);
-
-    // Un pezzo worker/9.1 con una modifica.
     const r = freshClone(base, origin, 'routine');
     git(r, ['checkout', '-q', '-b', 'worker/9.1']);
-    writeFileSync(join(r, 'piece.txt'), 'piece of feature 9\n');
+    writeFileSync(join(r, 'piece.txt'), 'piece\n');
     runHook(r);
 
     const gate = spawnSync(process.execPath, [MERGE_GATE, 'worker/9.1', '--into', 'feature/9'], {
       encoding: 'utf8',
       env: { ...process.env, FILO_REPO_ROOT: r, FILO_MAIN_BRANCH: 'main' },
     });
-    assert.equal(gate.status, 0, `merge-gate exit 0 (stdout: ${gate.stdout} stderr: ${gate.stderr})`);
-    assert.ok(originHasFile(origin, 'feature/9', 'piece.txt'), 'il pezzo va su feature/9');
-    assert.ok(!originHasFile(origin, 'main', 'piece.txt'), 'il pezzo NON deve toccare main (solo #N.final lo fa)');
+    assert.equal(gate.status, 1, `merge-gate deve uscire 1 (stdout: ${gate.stdout} stderr: ${gate.stderr})`);
+    assert.match(gate.stderr, /--into/, 'l errore deve nominare il flag rifiutato');
+    assert.ok(!originHasFile(origin, 'main', 'piece.txt'), 'niente deve essere stato fuso');
+    assert.ok(!originHasBranch(origin, 'feature/9'), 'nessun branch feature/* deve nascere');
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 
