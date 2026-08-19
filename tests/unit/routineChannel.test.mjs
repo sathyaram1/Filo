@@ -81,3 +81,38 @@ test('una risposta non interpretabile è un guasto, non un successo vuoto', asyn
   assert.equal(r.body.ok, false);
   assert.equal(readTicketReply(r.status, r.body).outcome, 'fault');
 });
+
+// ── Guasto dichiarato (SPEC-RIDISEGNO-MAX.md §12) ───────────────────────────
+
+test('guasto dichiarato da un worker → la richiesta di biglietto esce con GUASTO (il giro si ferma)', () => {
+  // Il server risponde fault_declared quando un worker ha dichiarato un guasto
+  // nel rilascio: per l'orchestratore è exit 3 — chiudi, MAI rispawnare (con
+  // una causa deterministica i worker morirebbero in fila).
+  const r = readTicketReply(503, { ok: false, reason: 'fault_declared' });
+  assert.equal(r.outcome, 'fault');
+  assert.equal(r.reason, 'fault_declared');
+});
+
+test('un guasto DICHIARATO non si ritenta: è una risposta, non un interruzione di rete', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return reply(503, { ok: false, reason: 'fault_declared' }); };
+  const r = await call('routineTicket', {}, { fetchImpl, sleep: async () => {}, attempts: 3 });
+  assert.equal(calls, 1, 'ritentarlo darebbe tre volte lo stesso no, consumando solo tempo');
+  assert.equal(readTicketReply(r.status, r.body).outcome, 'fault');
+});
+
+test('release con guasto: il motivo viaggia nel corpo, col suo nome', async () => {
+  let sent = null;
+  const fetchImpl = async (url, init) => { sent = JSON.parse(init.body); return reply(200, { ok: true }); };
+  const r = await release('tkt-1', 'la coda dei feedback è illeggibile', { fetchImpl, sleep: async () => {} });
+  assert.equal(r.ok, true);
+  assert.equal(sent.ticket, 'tkt-1');
+  assert.equal(sent.fault, 'la coda dei feedback è illeggibile');
+});
+
+test('release normale: NESSUN campo fault nel corpo (un rilascio pulito non è un guasto)', async () => {
+  let sent = null;
+  const fetchImpl = async (url, init) => { sent = JSON.parse(init.body); return reply(200, { ok: true }); };
+  await release('tkt-1', '', { fetchImpl, sleep: async () => {} });
+  assert.equal('fault' in sent, false);
+});
