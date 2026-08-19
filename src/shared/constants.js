@@ -107,19 +107,22 @@
     // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).
     // Booleano persistito; default false (spento).
     AUTO_MODE: 'filo_auto_mode',
-    // Cache locale del numero di tentativi del loop di correzione (tab
-    // Automazioni). La FONTE DI VERITÀ è il doc Firestore config/routines
-    // (campo loopCap), che le routine leggono in scripts/dispatch.mjs; questa
-    // chiave serve solo a mostrare subito un valore all'avvio / come ripiego
-    // offline. Default AUTOMATION.LOOP_CAP_DEFAULT.
-    AUTOMATION_LOOP_CAP: 'filo_automation_loop_cap',
+    // Cache locali dei contatori del verificatore (tab Automazioni). La FONTE
+    // DI VERITÀ è il doc Firestore config/routines (campi `failCap` e
+    // `improvableCap`; li applica il server dei verdetti): queste chiavi
+    // servono solo a mostrare subito un valore all'avvio / come ripiego
+    // offline. La prima tiene il nome storico (ci vive il valore che l'owner
+    // aveva già scelto come "loop cap": stessa cosa col nome nuovo).
+    AUTOMATION_LOOP_CAP: 'filo_automation_loop_cap',            // failCap (M)
+    AUTOMATION_IMPROVABLE_CAP: 'filo_automation_improvable_cap', // improvableCap (N)
   };
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
-  // dashboard Gestione). `LOOP_CAP_DEFAULT` deve restare allineato al default di
-  // `scripts/dispatch.mjs` (LOOP_CAP, quante FAIL del verifier prima del blocco).
+  // dashboard Gestione). Il RANGE dei due contatori del verificatore vive qui;
+  // i DEFAULT (failCap 10, improvableCap 3) vivono con le transizioni promosse
+  // a dati (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS): una sola
+  // sorgente, letta dalla dashboard e incorporata dal server al deploy.
   const AUTOMATION = {
-    LOOP_CAP_DEFAULT: 3,
     LOOP_CAP_MIN: 1,
     LOOP_CAP_MAX: 10,
     // Timeout di ogni giudice di sicurezza (secondi). I modelli "thinking"
