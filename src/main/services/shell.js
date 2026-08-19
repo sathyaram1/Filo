@@ -352,7 +352,7 @@ function existenceProbes({ shell, cmd }) {
 }
 
 // Esegue UN probe e risolve true se il processo esce con codice 0.
-function runProbe({ file, args }, cwd) {
+function runProbe({ file, args, env: probeEnv }, cwd) {
   return new Promise((resolve) => {
     let done = false;
     let proc;
