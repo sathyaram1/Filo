@@ -377,4 +377,8 @@ async function commandExists({ shell, cwd, command } = {}) {
   return false;
 }
 
-module.exports = { createSession, defaultCwd, commandExists };
+// `existenceProbes` è esportata SOLO per il guard di regressione nei test
+// ("firebase rosso"): l'ordine dei probe — `where.exe` prima di Get-Command —
+// è ciò che tiene veloci gli shim npm, e un assert sul cronometro era rumore
+// su una macchina carica.
+module.exports = { createSession, defaultCwd, commandExists, existenceProbes };
