@@ -189,6 +189,11 @@ qualcuno l'ha cancellato, o l'omonimia (risolta da A).
 allarme — è già costato un'ondata di lavoro fantasma. Deve diventare un **guasto
 dichiarato** (passeggero: la chiave può tornare), non un risultato.
 
+*(Aggiornamento 2026-08-19: `next-feedback.mjs` è stato ritirato — la coda si
+legge SOLO sul server, `filo-security/functions/src/routine/queue.js`, dove vive
+anche questa distinzione. In locale resta il principio: senza biglietto dispatch
+dichiara un guasto, non "niente da fare".)*
+
 ### Il controllo di prontezza gira per primo
 
 L'orchestratore (`ROUTINES.md` § Avvio) spende parecchio in preparazione
