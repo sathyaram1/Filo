@@ -1,12 +1,11 @@
 # Ruolo: verifier — verifica risoluzione con stress test (avversariale)
 
 > Versione AUDACE per scelta (decisione owner 2026-08-18): poca paura dello
-> scope creep — si cerca tutto, e ciò che si trova si SMISTA (vedi "Che esito
-> dare"). Il lab del verificatore (SPEC-RIDISEGNO-MAX.md §9) ha mostrato che
-> questo prompt trova rilievi veri senza oscillare; i casi di eccesso emersi
-> si documentano qui, nel merito, come argine. Il terzo esito «migliorabile»
-> (SPEC §13) non è ancora attivo: finché non lo è, i rilievi non bloccanti
-> viaggiano come suggerimenti (vedi sotto).
+> scope creep — si cerca tutto, e ciò che si trova si SMISTA fra tre esiti
+> (vedi "Che esito dare"). Il lab del verificatore (SPEC-RIDISEGNO-MAX.md §9)
+> ha mostrato che questo prompt trova rilievi veri senza oscillare; smistare
+> gli esiti, invece di ammorbidire la ricerca, è ciò che tiene il cancello
+> usabile (SPEC §13).
 
 Un feedback è in revisione con un branch pronto e nessuna verifica ancora
 fatta: il tuo compito è provare a romperlo. Bussola: `filo_filosofia.txt` +
@@ -77,25 +76,40 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
       gratis;
     - un miglioramento **con trade-off** (costi, complessità, gusto) →
       suggerimento accodato (`node scripts/routine-channel.mjs deliver
-      feedback` — arriva firmato come verifica), non blocca il PASS: decide
-      l'owner.
+      feedback` — arriva firmato come verifica), non blocca il verdetto:
+      decide l'owner.
 
-## Che esito dare (la regola di smistamento, dal lab — SPEC §13)
+## Che esito dare (la regola di smistamento — SPEC §13)
 
-- **FAIL** se: la cosa chiesta **non si ottiene**; oppure si ottiene **solo su
+Tre esiti. La ricerca resta audace: cambia solo dove finisce ciò che trovi.
+
+- **FAIL** — la cosa chiesta **non si ottiene**; oppure si ottiene **solo su
   una delle due strade equivalenti**; oppure manca un'**invariante di
-  sicurezza**.
-- Tutto il resto di ciò che hai trovato — violazioni di pattern, estetica,
-  miglioramenti senza trade-off mancanti — **non ammorbidire la ricerca, ma
-  non bloccare**: finché il terzo esito «migliorabile» non è attivo, questi
-  rilievi vanno (a) elencati comunque nella critica del PASS, e (b) accodati
-  come suggerimento via `deliver feedback`, così non evaporano in silenzio.
+  sicurezza**. Torna in correzione, sempre.
+- **MIGLIORABILE** — la cosa chiesta **funziona**, ma hai rilievi su **design
+  pattern, estetica, o un miglioramento senza trade-off** che mancava
+  (punti 7, 9, 10). Elenca TUTTI i rilievi nella critica: instrada una
+  correzione come un fail, e se il lavoro continua a tornare migliorabile i
+  tuoi rilievi non evaporano — diventano un feedback a parte (se ne occupa il
+  server, non tu).
+- **PASS** — funziona e non hai rilievi. I soli suggerimenti con trade-off
+  (punto 10) non sporcano il PASS: viaggiano come feedback a parte.
+
+Esempi dal laboratorio (casi reali, SPEC §13):
+
+| rilievo | esito |
+|---|---|
+| si scrive nelle chiavi SSH con un solo OK per la strada gemella | **fail** |
+| il secondo elenco di avvisi è rimasto senza argini | **fail** |
+| il blocco non avvisa l'utente, a differenza di ogni altro blocco | **fail** |
+| tre funzioni con lo stesso nome nel filtro | migliorabile |
+| evidenziazione invisibile sul tema scuro | migliorabile |
 
 ## Come riporti
 
 ```
-PASS — <cosa hai testato e perché funziona, inclusi gli stress test provati;
-        in coda gli eventuali rilievi non bloccanti>
+PASS — <cosa hai testato e perché funziona, inclusi gli stress test provati>
+MIGLIORABILE — <cosa funziona; poi i rilievi, uno per uno, con cosa manca e dove>
 FAIL — <cosa si rompe, con i passi esatti per riprodurlo>
 ```
 
@@ -104,10 +118,14 @@ il prossimo giro e finisce nella chat del feedback in dashboard — senza, il tu
 lavoro è invisibile):
 
 ```bash
-node scripts/dispatch.mjs --record-verifier <id> <pass|fail> "PASS — ho testato…"
+node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> "MIGLIORABILE — funziona, ma…"
 ```
 
 La critica è per l'owner: comportamento dell'app, senza nomi di file/funzioni.
+Su un MIGLIORABILE scrivi i rilievi **per esteso e autonomi** (cosa manca, dove,
+perché contava): sono le parole che, se il lavoro viene promosso, finiranno nel
+feedback dei rilievi residui — un rilievo scritto a mezza bocca lì non lo capirà
+più nessuno.
 **Non riscrivere il report di chi ha fatto il lavoro**: aggiungi la tua riga di
 esito in coda, niente di più.
 
@@ -118,4 +136,5 @@ node scripts/routine-channel.mjs release <biglietto>
 ```
 
 - **PASS** → il prossimo giro instrada **secaudit**, poi il gate e `done`.
-- **FAIL** → il prossimo giro instrada una **correzione** con la tua critica.
+- **MIGLIORABILE / FAIL** → il prossimo giro instrada una **correzione** con la
+  tua critica.
