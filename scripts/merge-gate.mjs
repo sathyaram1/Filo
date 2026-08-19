@@ -12,15 +12,12 @@
 //   (vedi auto-commit-merge.sh): restano sul loro branch finché l'orchestratore,
 //   dopo la verifica avversariale (PASS), chiama QUESTO script per fonderli.
 //
-//   Topologia (Modello B, vedi ROUTINES.md § Feature spezzate):
-//     - feedback standalone: `worker/<id>`  → gate → `main`
-//     - feature spezzata:    `worker/<N.M>` → gate → `feature/N`   (per-pezzo)
-//                            `feature/N`    → gate → `main`         (#N.final)
-//   Il target di default è `main`; per i pezzi di una feature si passa
-//   `--into feature/N`.
+//   Topologia: `worker/<...>` → gate → `main`. Il target è SEMPRE la linea
+//   principale: il supporto `--into feature/N` era il "Modello B" delle feature
+//   spezzate in sotto-feedback, abolito col ridisegno (SPEC-RIDISEGNO-MAX.md §1).
 //
 // USO:
-//   node scripts/merge-gate.mjs <sourceBranch> [--into <targetBranch>] [--dry-run]
+//   node scripts/merge-gate.mjs <sourceBranch> [--dry-run]
 //
 //   Exit code:
 //     0  → fuso e pushato su <target>
