@@ -361,11 +361,16 @@
     // Insieme viaggiano `autoApprove` e `proberWhenIdle`.
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled } | { ok:false, error }
     AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled? } → { ok, … } | { ok:false, error }
-    // Tentativi del loop di correzione (doc config/routines, campo `loopCap`):
-    // quante FAIL del verifier prima del blocco `loop`. Letto dalle routine
-    // (scripts/dispatch.mjs). Owner-only.
-    AUTOMATION_LOOP_CAP_GET: 'automation_loop_cap_get', // → { ok, loopCap } | { ok:false, error }
-    AUTOMATION_LOOP_CAP_SET: 'automation_loop_cap_set', // { loopCap } → { ok, loopCap } | { ok:false, error }
+    // Contatori del verificatore a tre esiti (doc config/routines, campi
+    // `failCap` e `improvableCap` — SPEC-RIDISEGNO-MAX.md §13):
+    //   failCap (M)       quante bocciature «fail» prima di fermare la pratica
+    //                     e chiamare l'owner (il campo legacy `loopCap` resta
+    //                     scritto come alias, per i lettori non ancora aggiornati);
+    //   improvableCap (N) quanti giri «migliorabile» prima di promuovere il
+    //                     lavoro e aprire il feedback dei rilievi residui.
+    // Li applica il SERVER quando registra i verdetti. Owner-only.
+    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, failCap, improvableCap } | { ok:false, error }
+    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { failCap?, improvableCap? } → { ok, failCap, improvableCap } | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
