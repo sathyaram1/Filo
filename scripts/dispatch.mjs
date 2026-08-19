@@ -85,15 +85,30 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
 
-// Quante FAIL consecutive del verifier prima di bloccare con motivo `loop`.
-// Precedenza: override d'ambiente FILO_LOOP_CAP > valore scelto dall'owner nella
-// tab Automazioni (doc Firestore config/automation, campo `loopCap`) > default 3.
+// Quante bocciature del verifier prima di bloccare con motivo `loop` (failCap,
+// SPEC-RIDISEGNO-MAX.md §13). Precedenza: override d'ambiente FILO_LOOP_CAP >
+// valore scelto dall'owner nella tab Automazioni (doc Firestore config/routines,
+// campo `failCap`; il legacy `loopCap` è un alias) > default dalla fonte unica.
 // Range [1, 10], allineato a SN_CONST.AUTOMATION. Il tetto EFFETTIVO lo applica
-// il SERVER quando registra i verdetti (config/routines.loopCap): qui resta solo
-// resolveLoopCap, la regola di precedenza pura, per gli strumenti e per i test.
+// il SERVER quando registra i verdetti: qui resta solo resolveLoopCap, la
+// regola di precedenza pura, per gli strumenti e per i test.
+//
+// I DEFAULT dei contatori (failCap/improvableCap) vivono con le transizioni
+// promosse a dati (src/shared/feedbackTransitions.js): una sorgente sola,
+// incorporata anche dal server al deploy. Se il checkout non ce l'ha ancora
+// (clone vecchio), i letterali qui sotto sono il paracadute.
 const LOOP_CAP_MIN = 1;
 const LOOP_CAP_MAX = 10;
-const LOOP_CAP_DEFAULT = 3;
+export const VERIFIER_CAPS = (() => {
+  try {
+    const req = createRequire(import.meta.url);
+    req(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
+    const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
+    if (caps && Number.isFinite(caps.failCap) && Number.isFinite(caps.improvableCap)) return caps;
+  } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
+  return { improvableCap: 3, failCap: 10 };
+})();
+const LOOP_CAP_DEFAULT = VERIFIER_CAPS.failCap;
 
 /**
  * Risolve il cap EFFETTIVO data la precedenza env > remoto > default, con clamp
