@@ -27,6 +27,14 @@
 //   La scorciatoia --no-verify NON esiste più (SPEC-RIDISEGNO-MAX.md §8): la
 //   verifica indipendente non si salta — un controllo che si può saltare
 //   finisce saltato proprio nei casi in cui serviva.
+//
+// ⚠️ QUESTO SCRIPT PUSHA ANCORA SU MAIN DIRETTAMENTE (identità dell'owner).
+//   Per le ROUTINE il merge lo fa ormai il SERVER (SPEC-RIDISEGNO-MAX.md §10:
+//   verdetti registrati + L5 sul diff + fusione via API); quando l'owner
+//   attiverà la ruleset su `main` (scrivono solo la sua identità e quella del
+//   server), questo push diretto smetterà di passare e ANCHE il finish locale
+//   dovrà passare dal server — migrazione da fare con l'owner presente, non
+//   di iniziativa.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
