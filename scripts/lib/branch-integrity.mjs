@@ -82,19 +82,10 @@ export function newWorkBranch(id, nowMs = Date.now()) {
   return `worker/${safe}-${attemptStamp(nowMs)}`;
 }
 
-/**
- * Base da cui far nascere il branch di un lavoro nuovo. Modello B (ROUTINES.md
- * § Feature spezzate): i pezzi `#N.M` di una feature spezzata NON nascono da
- * `main` ma da `feature/N`, e lì si rifondono. Qui si calcola solo il CANDIDATO
- * dal numero del feedback; se quel branch non esiste, prepareBranch ripiega su
- * `main` (un pezzo isolato su main è recuperabile, un pezzo nato dal branch
- * sbagliato no).
- * @param {string|number} num  es. "#146.3" oppure "146.3"
- */
-export function preferredBase(num, mainBranch = 'main') {
-  const m = String(num == null ? '' : num).match(/^#?(\d+)\.(\d+)$/);
-  return m ? `feature/${m[1]}` : mainBranch;
-}
+// (Qui viveva preferredBase: col "Modello B" i pezzi #N.M di una feature
+// spezzata nascevano da `feature/N` invece che da main. I sotto-feedback sono
+// aboliti — SPEC-RIDISEGNO-MAX.md §1 — e la base di un lavoro nuovo è SEMPRE
+// la linea principale.)
 
 /**
  * Verdetto di identità: la directory è sul branch assegnato?
