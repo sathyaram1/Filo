@@ -246,8 +246,12 @@
     }
     return arr;
   }
-  const LOOP_CAP_KEY  = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_LOOP_CAP) || 'filo_automation_loop_cap';
-  const AUTOMATION = window.SN_CONST?.AUTOMATION || { LOOP_CAP_DEFAULT: 3, LOOP_CAP_MIN: 1, LOOP_CAP_MAX: 10 };
+  const FAIL_CAP_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_LOOP_CAP) || 'filo_automation_loop_cap';
+  const IMPROVABLE_CAP_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_IMPROVABLE_CAP) || 'filo_automation_improvable_cap';
+  const AUTOMATION = window.SN_CONST?.AUTOMATION || { LOOP_CAP_MIN: 1, LOOP_CAP_MAX: 10 };
+  // Default dei contatori dalla fonte unica (feedbackTransitions.js): la stessa
+  // che il server incorpora al deploy. Mai due copie a mano.
+  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { improvableCap: 3, failCap: 10 };
 
   // ── Canale main process ───────────────────────────────────────────────────
   function sendToMain(msg) {
