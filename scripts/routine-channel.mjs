@@ -43,8 +43,13 @@
 //       → tiene vivo il semaforo. Con --loop batte finché il biglietto vive
 //         (da lanciare in sottofondo per le sessioni lunghe).
 //
-//   node scripts/routine-channel.mjs release <biglietto>
-//       → fine lavoro: il biglietto muore e il semaforo si libera.
+//   node scripts/routine-channel.mjs release <biglietto> [--guasto "motivo"]
+//       → fine lavoro: il biglietto muore e il semaforo si libera. Con
+//         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
+//         è così che il server smette di dare lavoro per il giro — le
+//         richieste di biglietto successive escono con 3 — e il pacemaker
+//         rispetta una pausa prima di riaccendere. Non "riportarlo" a parole:
+//         il tuo testo di ritorno non lo legge nessuna macchina.
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
