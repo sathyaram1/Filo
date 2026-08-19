@@ -180,6 +180,8 @@ clarify`); (3) fix fallito 3× (dispatch appende l'ultima critica del verifier +
   `working` scaduti; scrittura `workingSince`/`statusReason`.
 - **`scripts/next-feedback.mjs`**: seleziona `todo` (invariato) ma ora la pipeline
   scrive `todo` → la coda si riempie davvero; ignora `working` freschi.
+  *(Ritirato il 2026-08-19: la selezione vive solo nel server,
+  `filo-security/functions/src/routine/select.js`.)*
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`.
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
