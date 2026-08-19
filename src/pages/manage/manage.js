@@ -578,9 +578,10 @@
     mgJudgeTimeout.min = String(JT_MIN);
     mgJudgeTimeout.max = String(JT_MAX);
   }
-  if (mgLoopCap) {
-    mgLoopCap.min = String(AUTOMATION.LOOP_CAP_MIN);
-    mgLoopCap.max = String(AUTOMATION.LOOP_CAP_MAX);
+  for (const f of Object.values(CAP_FIELDS)) {
+    if (!f.input) continue;
+    f.input.min = String(AUTOMATION.LOOP_CAP_MIN);
+    f.input.max = String(AUTOMATION.LOOP_CAP_MAX);
   }
   function clampJudgeTimeoutS(n) {
     const v = Math.round(Number(n));
