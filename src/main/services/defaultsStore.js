@@ -525,7 +525,7 @@ module.exports = {
   setAutomationProberIdle,
   getRoutinesEnabled,
   setRoutinesEnabled,
-  getAutomationLoopCap,
-  setAutomationLoopCap,
+  getRoutineCaps,
+  setRoutineCaps,
   getWorkerLog,
 };
