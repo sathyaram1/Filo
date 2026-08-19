@@ -88,16 +88,12 @@ const ROUTINES_DOC = 'config/routines';
 // Quante FAIL consecutive del verifier prima di bloccare con motivo `loop`.
 // Precedenza: override d'ambiente FILO_LOOP_CAP > valore scelto dall'owner nella
 // tab Automazioni (doc Firestore config/automation, campo `loopCap`) > default 3.
-// Range [1, 10], allineato a SN_CONST.AUTOMATION. `LOOP_CAP` qui sotto è solo il
-// fallback sincrono (env o 3) usato come default dei param delle funzioni pure;
-// il valore EFFETTIVO si risolve in run() con resolveLoopCap (include il remoto).
+// Range [1, 10], allineato a SN_CONST.AUTOMATION. Il tetto EFFETTIVO lo applica
+// il SERVER quando registra i verdetti (config/routines.loopCap): qui resta solo
+// resolveLoopCap, la regola di precedenza pura, per gli strumenti e per i test.
 const LOOP_CAP_MIN = 1;
 const LOOP_CAP_MAX = 10;
 const LOOP_CAP_DEFAULT = 3;
-const LOOP_CAP = (() => {
-  const n = Number(process.env.FILO_LOOP_CAP);
-  return Number.isFinite(n) && n > 0 ? Math.min(LOOP_CAP_MAX, Math.max(LOOP_CAP_MIN, Math.round(n))) : LOOP_CAP_DEFAULT;
-})();
 
 /**
  * Risolve il cap EFFETTIVO data la precedenza env > remoto > default, con clamp
