@@ -61,6 +61,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { basename, dirname, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
