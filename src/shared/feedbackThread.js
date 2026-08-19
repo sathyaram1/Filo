@@ -131,6 +131,14 @@
   //                                      è nato mentre scriveva il codice
   //   …:verifier / :secaudit→ 'verifier' un'istanza che VERIFICA il lavoro di
   //                                      un'altra: parla del lavoro appena fatto
+  //   routine:residuo       → 'residuo'  i rilievi RESIDUI di una verifica: un
+  //                                      lavoro promosso dopo N giri «migliorabile»
+  //                                      (SPEC-RIDISEGNO-MAX.md §13) lascia i
+  //                                      rilievi non risolti in un feedback nuovo,
+  //                                      aperto dal SERVER. Categoria propria, NON
+  //                                      prober e NON verifier: spacciarlo per uno
+  //                                      dei due falserebbe la lettura di dove
+  //                                      nascono i ritrovamenti
   //   agent:/routine:<altro>→ 'claude'   automazione di ruolo ignoto (storico: fino
   //                                      al 2026-08-08 nessuno si firmava)
   //   <altro>               → 'user'     un utente / alpha tester esterno
@@ -148,6 +156,7 @@
     fixer: 'worker',
     verifier: 'verifier',
     secaudit: 'verifier',
+    residuo: 'residuo',
   };
   function authorKind(clientId) {
     var c = String(clientId || '');
