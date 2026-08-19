@@ -273,7 +273,7 @@ if (isMain) {
   delete data.frase;
 
   const usage = () => {
-    console.error('Uso: node scripts/routine-channel.mjs <ticket|work|heartbeat|release|deliver|compare> <segreto> [...]');
+    console.error('Uso: node scripts/routine-channel.mjs <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]');
     process.exit(1);
   };
 
