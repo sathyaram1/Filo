@@ -426,43 +426,68 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
-// Tentativi del loop di correzione (config/routines, campo `loopCap`): quante
-// FAIL consecutive del verifier prima di bloccare un fix con motivo `loop`. È la
-// fonte di verità letta dalle routine (scripts/dispatch.mjs). Default e range da
-// SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura.
+// Contatori del verificatore a tre esiti (config/routines, campi `failCap` e
+// `improvableCap` — SPEC-RIDISEGNO-MAX.md §13). Li applica il SERVER quando
+// registra i verdetti; qui la dashboard li legge e li scrive. I DEFAULT vengono
+// dalla fonte unica (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS: la
+// stessa che il server incorpora al deploy); il range da SN_CONST.AUTOMATION.
+// Clamp prudente sia in lettura sia in scrittura.
 function automationDefaults() {
   const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
+  const CAPS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS) || {};
   return {
-    def: Number.isFinite(A.LOOP_CAP_DEFAULT) ? A.LOOP_CAP_DEFAULT : 3,
+    failDef: Number.isFinite(CAPS.failCap) ? CAPS.failCap : 10,
+    improvableDef: Number.isFinite(CAPS.improvableCap) ? CAPS.improvableCap : 3,
     min: Number.isFinite(A.LOOP_CAP_MIN) ? A.LOOP_CAP_MIN : 1,
     max: Number.isFinite(A.LOOP_CAP_MAX) ? A.LOOP_CAP_MAX : 10,
   };
 }
 
-function clampLoopCap(n) {
-  const { def, min, max } = automationDefaults();
+function clampCap(n, def) {
+  const { min, max } = automationDefaults();
   const v = Math.round(Number(n));
   if (!Number.isFinite(v)) return def;
   return Math.min(max, Math.max(min, v));
 }
 
-async function getAutomationLoopCap(idToken) {
-  const { def } = automationDefaults();
+async function getRoutineCaps(idToken) {
+  const { failDef, improvableDef } = automationDefaults();
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  if (doc && doc.loopCap != null) return clampLoopCap(doc.loopCap);
-  // Non ancora migrato: il valore scelto dall'owner sta nel documento vecchio.
-  const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
-  if (legacy && legacy.loopCap != null) return clampLoopCap(legacy.loopCap);
-  // doc === {} (404) o campo assente ⇒ default. null (lettura negata/fallita) ⇒
-  // default prudente (non rompere il loop per un errore di rete).
-  return def;
+  const out = { failCap: failDef, improvableCap: improvableDef };
+  // `loopCap` è il nome VECCHIO di failCap: il valore che l'owner aveva già
+  // scelto resta valido sotto il nome nuovo (si migra il valore visuale, non i
+  // dati). Cerca anche nel documento legacy config/automation, per lo storico.
+  if (doc && doc.failCap != null) out.failCap = clampCap(doc.failCap, failDef);
+  else if (doc && doc.loopCap != null) out.failCap = clampCap(doc.loopCap, failDef);
+  else {
+    const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
+    if (legacy && legacy.loopCap != null) out.failCap = clampCap(legacy.loopCap, failDef);
+  }
+  if (doc && doc.improvableCap != null) out.improvableCap = clampCap(doc.improvableCap, improvableDef);
+  return out;
 }
 
-async function setAutomationLoopCap(loopCap, idToken) {
-  if (!idToken) throw new Error('Serve un ID token admin per cambiare i tentativi del loop.');
-  const v = clampLoopCap(loopCap);
-  await patchDoc(ROUTINES_DOC, { loopCap: toFsValue(v) }, ['loopCap'], idToken);
-  return v;
+async function setRoutineCaps(patch, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare i contatori del verificatore.');
+  const { failDef, improvableDef } = automationDefaults();
+  const p = patch && typeof patch === 'object' ? patch : {};
+  const fields = {};
+  const mask = [];
+  if (p.failCap != null) {
+    const v = clampCap(p.failCap, failDef);
+    fields.failCap = toFsValue(v);
+    // Alias legacy: chi legge ancora `loopCap` (server non ancora rideployato)
+    // deve vedere lo stesso valore, o la dashboard mostrerebbe una regola e il
+    // server ne applicherebbe un'altra.
+    fields.loopCap = toFsValue(v);
+    mask.push('failCap', 'loopCap');
+  }
+  if (p.improvableCap != null) {
+    fields.improvableCap = toFsValue(clampCap(p.improvableCap, improvableDef));
+    mask.push('improvableCap');
+  }
+  if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
+  return getRoutineCaps(idToken);
 }
 
 // Log dei worker delle routine (config/automation, campo `workerLog`): elenco
