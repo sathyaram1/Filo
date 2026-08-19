@@ -101,9 +101,10 @@ function readPrivKey() {
   return null;
 }
 
-// Esportato: i chiamanti (dispatch/next-feedback) lo usano per DISTINGUERE
-// "campo davvero con questo valore" da "campo illeggibile per chiave assente"
-// — senza distinzione, una chiave mancante fa sembrare vuota una coda piena.
+// Esportato: i chiamanti (es. owner-feedback, feedbackThread) lo usano per
+// DISTINGUERE "campo davvero con questo valore" da "campo illeggibile per
+// chiave assente" — senza distinzione, un testo non decifrato passerebbe per
+// il valore vero (es. verrebbe fuso e ricifrato dentro una conversazione).
 export const PLACEHOLDER = '[cifrato — chiave privata non configurata]';
 
 /**
