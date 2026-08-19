@@ -60,6 +60,18 @@
 
   const CANONICAL = Object.keys(STATUSES);
 
+  // La lista canonica è quella dei DATI: se la presentazione qui sopra non la
+  // copre esattamente (uno stato nuovo aggiunto di là e dimenticato di qua, o
+  // viceversa), fermarsi al caricamento è meglio di una dashboard che mostra
+  // "undefined" su uno stato vero.
+  {
+    const a = CANONICAL.slice().sort().join(',');
+    const b = DATA.STATUSES.slice().sort().join(',');
+    if (a !== b) {
+      throw new Error(`feedbackStatus.js e feedbackTransitions.js non coprono gli stessi stati: [${a}] vs [${b}]`);
+    }
+  }
+
   function isCanonical(status) {
     return Object.prototype.hasOwnProperty.call(STATUSES, String(status || ''));
   }
