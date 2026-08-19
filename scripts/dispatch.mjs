@@ -208,99 +208,11 @@ export function defaultState(id, branch) {
   };
 }
 
-/**
- * Classifica un singolo feedback in `review` (con branch) in base al suo stato.
- * Ritorna il nome del ruolo che gli compete, oppure null se non c'è nulla da
- * fare per dispatch (es. secaudit già fatto: tocca al gate dell'orchestratore).
- *
- *   verifierVerdict null              → 'verifier'   (mai verificato, o ri-coda dopo fix)
- *   'pass' && !secauditDone           → 'secaudit'   (passato verifier, attende L4)
- *   'pass' && secauditDone && 'fail'  → 'blocked-secaudit' (bocciato ma mai scalato)
- *   'pass' && secauditDone            → null         (gate in mano all'orchestratore)
- *   'fail' && loopCount  < cap        → 'fixer'
- *   'fail' && loopCount >= cap        → 'blocked-loop'
- */
-export function classifyReview(state, loopCap = LOOP_CAP) {
-  const s = state || {};
-  const v = s.verifierVerdict ?? null;
-  if (v === null) return 'verifier';
-  if (v === 'pass') {
-    if (!s.secauditDone) return 'secaudit';
-    // Rete di sicurezza: dopo un FAIL del secaudit il ruolo deve scalare a
-    // `design` (decide l'owner), ma se il worker se lo dimentica il feedback
-    // resterebbe incagliato PER SEMPRE (nessun ruolo lo riprenderebbe: è il
-    // caso reale del #289.9, fermo dal 2026-07-07). Lo scala dispatch stesso.
-    return s.secauditVerdict === 'fail' ? 'blocked-secaudit' : null;
-  }
-  if (v === 'fail') return (Number(s.loopCount) || 0) >= loopCap ? 'blocked-loop' : 'fixer';
-  return null;
-}
-
-/**
- * Riconcilia il file di stato locale con lo STATUS persistito su Firestore (la
- * verità che vede l'owner in dashboard). Caso reale (#289.9): il secaudit
- * boccia, un fixer rilavora il branch e ri-accoda `revision_capability`, ma
- * dimentica `--record-fixed` → lo stato dice ancora "verificato e bocciato" e
- * dispatch salterebbe il feedback per sempre, mentre la dashboard mostra
- * "in attesa di un verificatore". Se lo status dice che il feedback aspetta il
- * verifier ma lo stato è rimasto a un ciclo GIÀ CONCLUSO (secaudit fatto), si
- * riparte come dopo un fix registrato: verdetti azzerati, loopCount conservato.
- * Pura e idempotente: il reset non va persistito, ogni run lo ricalcola.
- * NB: status `revision_capability` + stato {pass, secauditDone:false} NON è
- * divergenza, è il normale lag della coda triage (verifier appena passato):
- * lo stato è più avanti dello status e comanda lui → 'secaudit'.
- */
-export function reconcileState(state, status) {
-  if (!state) return state;
-  if (status === 'revision_capability' && state.verifierVerdict === 'pass' && state.secauditDone) {
-    return applyFixed(state);
-  }
-  return state;
-}
-
-// Rango di precedenza tra i ruoli "review" (più alto = scelto prima).
-// `blocked-*` sono escalation gestite INLINE da dispatch (nessun worker):
-// costano zero, quindi si sbrigano per prime.
-const REVIEW_RANK = { 'blocked-secaudit': 5, secaudit: 4, verifier: 3, fixer: 2, 'blocked-loop': 1 };
-
-/**
- * Sceglie il bucket dato uno snapshot dello STATO. Funzione pura.
- *
- * @param {{ reviews: Array<{id,num,branch,state}>, todoWinner: {id,num}|null }} snapshot
- * @param {number} loopCap
- * @param {{ proberWhenIdle?: boolean }} opts
- *   `proberWhenIdle: false` (interruttore dell'owner, feedback #448): finito il
- *   lavoro vero il giro NON ripiega sull'esplorazione, si ferma con `idle`.
- *   Riguarda SOLO la coda vuota: il ripiego sul prober quando lo stato è
- *   illeggibile è un GUASTO travestito da audit e resta com'è (vedi run()).
- * @returns {{ role: string, id?: string, num?: string, branch?: string,
- *             loopCount?: number, state?: object }}
- *   role ∈ secaudit | verifier | fixer | blocked-loop | new-work | prober | idle
- */
-export function chooseBucket(snapshot, loopCap = LOOP_CAP, opts = {}) {
-  const reviews = Array.isArray(snapshot?.reviews) ? snapshot.reviews : [];
-
-  // Classifica ogni review e tieni il candidato col rango più alto.
-  let best = null;
-  for (const r of reviews) {
-    const role = classifyReview(r.state, loopCap);
-    if (!role) continue;
-    const rank = REVIEW_RANK[role] || 0;
-    if (!best || rank > best.rank) {
-      best = { role, rank, id: r.id, num: r.num, branch: r.branch, state: r.state, loopCount: Number(r.state?.loopCount) || 0 };
-    }
-  }
-  if (best) {
-    const { rank, ...bucket } = best;
-    return bucket;
-  }
-
-  // Nessun lavoro su branch in review → lavoro nuovo, poi audit.
-  if (snapshot?.todoWinner?.id) {
-    return { role: 'new-work', id: snapshot.todoWinner.id, num: snapshot.todoWinner.num || '' };
-  }
-  return { role: opts?.proberWhenIdle === false ? 'idle' : 'prober' };
-}
+// (Qui vivevano classifyReview, reconcileState e chooseBucket: il "vecchio
+// cervello" che leggeva la coda e sceglieva il lavoro da questa macchina. È
+// stato smontato col ridisegno (SPEC-RIDISEGNO-MAX.md §1): il lavoro arriva
+// SOLO dal server col biglietto, e la copia viva di quelle regole è
+// filo-security/functions/src/routine/select.js.)
 
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
 
