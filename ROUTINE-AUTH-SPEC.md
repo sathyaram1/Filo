@@ -205,3 +205,40 @@ l'utente, il report cifrato per l'owner).
 - **Niente valore nuovo per "bloccato"** in ciò che è visibile da fuori: sarebbe
   lo stesso segnale con un altro nome (vedi #476).
 - **Server irraggiungibile = routine ferme**, come per l'interruttore master.
+
+---
+
+## 10. Aggiornamenti del 2026-08-19 (ridisegno piano Max, SPEC-RIDISEGNO-MAX.md §5 e §12)
+
+**Il guasto si dichiara nel rilascio, non a parole.** `release` accetta
+`{ ticket, fault: "motivo" }` (dal client:
+`routine-channel.mjs release <biglietto> --guasto "motivo"`). Il testo di
+ritorno di un worker non lo legge nessuna macchina: un guasto raccontato lì non
+esiste. Il motivo è testo di worker — dato non fidato: il server lo tronca e lo
+deposita, mai lo interpreta. Da quel momento l'emissione dei biglietti risponde
+`fault_declared` per un **periodo di rispetto** (1h), poi il blocco scade da
+solo: il paracadute giornaliero deve sempre poter lavorare. Per il client
+`fault_declared` è un **guasto** (exit 3): l'orchestratore chiude senza
+rispawnare — con una causa deterministica i worker morirebbero in fila — e non
+lo ritenta, perché è una risposta, non un'interruzione di rete.
+
+**I giri li accende il pacemaker.** Una funzione schedulata nel progetto
+filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
+(`config/routines.enabled`) acceso? nessun **battito di sistema** fresco
+(qualcuno sta già lavorando)? run giornalieri rimasti (tetto di default 12,
+`config/routines.pacemakerDailyCap`)? l'ultimo giro non è **nato morto** e
+nessun guasto è stato dichiarato (periodo di rispetto ≥ 1h)? c'è lavoro (stessa
+domanda del sondaggio di prontezza, fatta dentro il server)? Solo se tutto dice
+sì, una POST accende la routine su claude.ai (id in
+`config/routines.routineId`, token nei Secret delle functions — mai negli
+ambienti delle sessioni). Il battito di sistema lo scrivono gli ingressi del
+canale (biglietto, heartbeat, consegna, rilascio) ed è l'**unica** definizione
+di "qualcuno sta lavorando": nessun flag che una sessione morta lascia in giro.
+L'orchestratore non riaccende mai il giro successivo: chiude e basta.
+
+**I ruoli `idle` e `off` non esistono più.** Esistevano perché lo smistamento
+girava dentro un worker già spawnato, che aveva bisogno di istruzioni anche per
+"non fare niente". Oggi coda vuota e interruttore spento sono una risposta
+`{ ok:true, work:false, reason:'idle'|'off' }` all'emissione del biglietto —
+exit 2 per il client, **prima** che un worker venga spawnato. Nessun biglietto
+può nascere con un ruolo senza lavoro.
