@@ -779,9 +779,8 @@ export async function run() {
   return finalizeBucket(bucket, w);
 }
 
-// Raccoglie il payload (diff/feedback), fa il claim per i bucket feedback-bound,
-// e stampa il JSON. Ritorna { exit }. `cap` è il loop cap effettivo (per le
-// ri-scelte dopo un claim già preso).
+// Raccoglie il payload (diff/feedback) della busta del server e stampa il JSON.
+// Ritorna { exit }.
 // Il prober non lavora su un branch: la directory torna alla LINEA PRINCIPALE
 // e l'identità attesa viene rilasciata. Senza, resteremmo sul branch del
 // compito precedente e le modifiche del prober finirebbero là dentro, dove
