@@ -612,7 +612,7 @@ async function recordSecaudit(id, verdict) {
  * giorno spento costa così quattro letture di un documento, non quattro
  * installazioni complete.
  *
- * @param {() => Promise<any>} [build] iniettabile per i test (default: snapshot vero)
+ * @param {any} [_unused] posto del vecchio builder dello snapshot (mai più letto qui)
  * @param {() => Promise<object>} [readConfig] iniettabile per i test
  * @returns {Promise<{ok:true}|{ok:false, kind:string, message:string}>}
  */
