@@ -471,78 +471,98 @@
     applyAutoApproveGate();
   }
 
-  // ── Tentativi del loop di correzione (tab Automazioni) ────────────────────
-  // Intero persistito in chrome.storage.local; default AUTOMATION.LOOP_CAP_DEFAULT
-  // (allineato a scripts/dispatch.mjs). Limitato a [MIN, MAX].
-  function clampLoopCap(n) {
+  // ── Contatori del verificatore a tre esiti (tab Automazioni) ──────────────
+  // Due campi sul doc Firestore config/routines (SPEC-RIDISEGNO-MAX.md §13):
+  //   failCap (M)       bocciature «fail» prima di fermarsi e chiamare l'owner;
+  //   improvableCap (N) giri «migliorabile» prima di promuovere il lavoro e
+  //                     aprire il feedback dei rilievi residui.
+  // Li applica il SERVER quando registra i verdetti; chrome.storage.local è
+  // solo una CACHE per mostrare subito un valore (e un ripiego offline).
+  function clampCap(n, def) {
     n = Math.round(Number(n));
-    if (!Number.isFinite(n)) return AUTOMATION.LOOP_CAP_DEFAULT;
+    if (!Number.isFinite(n)) return def;
     return Math.min(AUTOMATION.LOOP_CAP_MAX, Math.max(AUTOMATION.LOOP_CAP_MIN, n));
   }
 
-  // Fonte di verità: il doc Firestore config/routines (campo loopCap), che le
-  // routine leggono in dispatch.mjs — così cambiarlo qui ha effetto sul loop.
-  // chrome.storage.local è solo una CACHE locale per mostrare subito un valore
-  // (e un ripiego se l'IPC non risponde / non si è admin).
-  const LOOP_CAP_GET = (window.SN_MSG?.MSG?.AUTOMATION_LOOP_CAP_GET) || 'automation_loop_cap_get';
-  const LOOP_CAP_SET = (window.SN_MSG?.MSG?.AUTOMATION_LOOP_CAP_SET) || 'automation_loop_cap_set';
+  const CAPS_GET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_GET) || 'automation_caps_get';
+  const CAPS_SET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_SET) || 'automation_caps_set';
 
-  async function loadLoopCap() {
-    if (!mgLoopCap) return;
-    let val = AUTOMATION.LOOP_CAP_DEFAULT;
-    let fromRemote = false;
+  // I due campi condividono il meccanismo: descrizione una volta sola.
+  const CAP_FIELDS = {
+    failCap: {
+      input: mgFailCap, save: mgFailCapSave, msg: mgFailCapMsg,
+      def: VERIFIER_CAPS.failCap, cacheKey: FAIL_CAP_KEY,
+    },
+    improvableCap: {
+      input: mgImprovableCap, save: mgImprovableCapSave, msg: mgImprovableCapMsg,
+      def: VERIFIER_CAPS.improvableCap, cacheKey: IMPROVABLE_CAP_KEY,
+    },
+  };
+
+  function setCapMsg(field, text, kind) {
+    const el = CAP_FIELDS[field].msg;
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('mg-ok', kind === 'ok');
+    el.classList.toggle('mg-err', kind === 'err');
+  }
+
+  async function loadCaps() {
+    const remote = {};
     // Sorgente autorevole: Firestore via main (owner-gated).
     try {
-      const r = await sendToMain({ type: LOOP_CAP_GET });
-      if (r && r.ok && r.loopCap != null) {
-        val = clampLoopCap(r.loopCap);
-        fromRemote = true;
-        chrome.storage.local.set({ [LOOP_CAP_KEY]: val }).catch(() => {});
+      const r = await sendToMain({ type: CAPS_GET });
+      if (r && r.ok) {
+        if (r.failCap != null) remote.failCap = r.failCap;
+        if (r.improvableCap != null) remote.improvableCap = r.improvableCap;
       }
     } catch (_) {}
-    // Ripiego sulla cache locale se il remoto non ha risposto (non admin/offline).
-    if (!fromRemote) {
-      try {
-        const data = await chrome.storage.local.get(LOOP_CAP_KEY);
-        if (data[LOOP_CAP_KEY] != null) val = clampLoopCap(data[LOOP_CAP_KEY]);
-      } catch (_) {}
+    for (const [field, f] of Object.entries(CAP_FIELDS)) {
+      if (!f.input) continue;
+      let val = f.def;
+      if (remote[field] != null) {
+        val = clampCap(remote[field], f.def);
+        chrome.storage.local.set({ [f.cacheKey]: val }).catch(() => {});
+      } else {
+        // Ripiego sulla cache locale (non admin / offline).
+        try {
+          const data = await chrome.storage.local.get(f.cacheKey);
+          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.def);
+        } catch (_) {}
+      }
+      f.input.value = String(val);
     }
-    mgLoopCap.value = String(val);
   }
 
-  function setLoopCapMsg(text, kind) {
-    if (!mgLoopCapMsg) return;
-    mgLoopCapMsg.textContent = text || '';
-    mgLoopCapMsg.classList.toggle('mg-ok', kind === 'ok');
-    mgLoopCapMsg.classList.toggle('mg-err', kind === 'err');
-  }
-
-  async function saveLoopCap() {
-    if (!mgLoopCap) return;
-    const val = clampLoopCap(mgLoopCap.value);
-    mgLoopCap.value = String(val); // normalizza eventuali fuori-range
+  async function saveCap(field) {
+    const f = CAP_FIELDS[field];
+    if (!f.input) return;
+    const val = clampCap(f.input.value, f.def);
+    f.input.value = String(val); // normalizza eventuali fuori-range
     try {
-      // Scrive su Firestore (fonte di verità delle routine); il main applica il
-      // gate admin e ri-clampa. Usa il valore confermato dal main.
-      const r = await sendToMain({ type: LOOP_CAP_SET, loopCap: val });
+      // Scrive su Firestore (la config che il server dei verdetti legge); il
+      // main applica il gate admin e ri-clampa. Usa il valore confermato.
+      const r = await sendToMain({ type: CAPS_SET, [field]: val });
       if (!r || !r.ok) {
-        setLoopCapMsg(r?.error ? 'Salvataggio fallito.' : 'Salvataggio fallito.', 'err');
-        if (r?.error) console.error('[manage] salvataggio tentativi loop:', r.error);
+        setCapMsg(field, 'Salvataggio fallito.', 'err');
+        if (r?.error) console.error(`[manage] salvataggio ${field}:`, r.error);
         return;
       }
-      const saved = clampLoopCap(r.loopCap != null ? r.loopCap : val);
-      mgLoopCap.value = String(saved);
-      chrome.storage.local.set({ [LOOP_CAP_KEY]: saved }).catch(() => {});
-      setLoopCapMsg('Salvato.', 'ok');
+      const saved = clampCap(r[field] != null ? r[field] : val, f.def);
+      f.input.value = String(saved);
+      chrome.storage.local.set({ [f.cacheKey]: saved }).catch(() => {});
+      setCapMsg(field, 'Salvato.', 'ok');
     } catch (err) {
-      setLoopCapMsg('Salvataggio fallito.', 'err');
-      console.error('[manage] salvataggio tentativi loop fallito:', err);
+      setCapMsg(field, 'Salvataggio fallito.', 'err');
+      console.error(`[manage] salvataggio ${field} fallito:`, err);
     }
   }
 
-  if (mgLoopCapSave) mgLoopCapSave.addEventListener('click', saveLoopCap);
-  // Digitando si azzera il messaggio di esito precedente.
-  if (mgLoopCap) mgLoopCap.addEventListener('input', () => setLoopCapMsg('', null));
+  for (const [field, f] of Object.entries(CAP_FIELDS)) {
+    if (f.save) f.save.addEventListener('click', () => saveCap(field));
+    // Digitando si azzera il messaggio di esito precedente.
+    if (f.input) f.input.addEventListener('input', () => setCapMsg(field, '', null));
+  }
 
   // ── Timeout dei giudici ────────────────────────────────────────────────────
   // Fonte di verità: config/supportModels (campo `judgeTimeoutMs`, in MS), che il
