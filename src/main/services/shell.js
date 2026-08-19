@@ -297,8 +297,14 @@ function createSession({ shell, cwd } = {}) {
 // persistente (che è in streaming) per non interferire con essa.
 //
 // SICUREZZA: il nome del comando NON viene mai interpolato in una stringa di
-// shell. Lo passiamo SEMPRE come argomento posizionale ($1 / $args[0]) al
-// resolver (`command -v`, `Get-Command`, `where`), così non può iniettare altro.
+// shell né appeso a un `-Command`. Sui resolver POSIX e su `where.exe` viaggia
+// come argomento (argv), che non passa da nessuna shell. Su PowerShell viaggia
+// in una VARIABILE D'AMBIENTE (`$env:FILO_WHICH_CMD`): il valore di un env non
+// viene mai rivalutato come codice, quindi `node;calc` resta la stringa
+// "node;calc", non due comandi. (Trappola di Windows PowerShell 5.1: i token
+// messi DOPO `-Command '<script>'` NON finiscono in `$args` — vengono
+// concatenati ed ESEGUITI. Per questo il nome non tocca mai la riga di
+// `-Command`.)
 //
 // Builtin di cmd.exe che `where` non vede (non sono eseguibili nel PATH).
 const CMD_BUILTINS = new Set(['cd', 'dir', 'echo', 'cls', 'copy', 'del', 'move',
