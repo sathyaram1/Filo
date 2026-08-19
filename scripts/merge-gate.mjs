@@ -31,11 +31,12 @@
 //
 //   Exit code (contratto invariato):
 //     0  → fuso su main (dal server)
-//     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff, o verdetti non
-//          registrati): il feedback va messo in stato `blocked`/`design`,
-//          decide l'utente. Nessuna fusione.
+//     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff): il feedback va
+//          messo in stato `design`, decide l'utente. Nessuna fusione.
 //     20 → conflitto di merge: serve risoluzione manuale. Nessuna fusione.
-//     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù)
+//     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
+//          richiesta RIFIUTATA dal server (verdetti non registrati, ramo che
+//          non combacia col biglietto): il server l'ha già messa a registro.
 
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
