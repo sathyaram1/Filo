@@ -158,10 +158,13 @@ test('readState: id inesistente → null', () => {
 // toccare git col repo reale mentre gira la suite.
 
 // ─── resolveLoopCap: precedenza env > remoto > default, con clamp ─────────────
+// Il default è il failCap della fonte unica (feedbackTransitions.js,
+// VERIFIER_CAPS.failCap = 10 — SPEC-RIDISEGNO-MAX.md §13): i documenti che
+// dicevano "3" erano già stantii, e il numero non vive più nei prompt.
 
-test('resolveLoopCap: niente env né remoto → default 3', () => {
-  assert.equal(resolveLoopCap({}), 3);
-  assert.equal(resolveLoopCap({ envRaw: undefined, remote: null }), 3);
+test('resolveLoopCap: niente env né remoto → default failCap (10)', () => {
+  assert.equal(resolveLoopCap({}), 10);
+  assert.equal(resolveLoopCap({ envRaw: undefined, remote: null }), 10);
 });
 
 test('resolveLoopCap: il valore remoto (scelto dall owner) si usa se manca l env', () => {
@@ -175,13 +178,13 @@ test('resolveLoopCap: l env override vince sul remoto', () => {
 
 test('resolveLoopCap: clamp nel range [1, 10] sia env sia remoto', () => {
   assert.equal(resolveLoopCap({ remote: 99 }), 10);
-  assert.equal(resolveLoopCap({ remote: 0 }), 3);   // 0 non valido → default
+  assert.equal(resolveLoopCap({ remote: 0 }), 10);  // 0 non valido → default
   assert.equal(resolveLoopCap({ envRaw: 50 }), 10);
   assert.equal(resolveLoopCap({ remote: 7.4 }), 7); // arrotonda a 7
 });
 
 test('resolveLoopCap: valori non numerici → default', () => {
-  assert.equal(resolveLoopCap({ envRaw: 'abc', remote: 'xyz' }), 3);
+  assert.equal(resolveLoopCap({ envRaw: 'abc', remote: 'xyz' }), 10);
 });
 
 // ─── verifierNoteText: l'esito del verifier nella chat del feedback ──────────
