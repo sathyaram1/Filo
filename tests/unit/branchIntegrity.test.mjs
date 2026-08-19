@@ -18,7 +18,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  attemptStamp, newWorkBranch, preferredBase, identityVerdict,
+  attemptStamp, newWorkBranch, identityVerdict,
   withCheckpoint, lastCheckpoint, CHECKPOINT_CAP,
   bumpRejects, clearRejects, IDENTITY_REJECT_LIMIT,
   discardedBranchName, prepareBranch, checkDelivery, guardTransition,
