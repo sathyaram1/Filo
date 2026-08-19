@@ -45,34 +45,29 @@ diff e tieni tu il giudizio d'insieme.
 
 ## Come riporti
 
-Verdetto L4 in una delle due forme:
-
-```
-FILO_L4_VERDICT=pass
-FILO_L4_REASON="Nessun problema di sicurezza rilevato."
-```
-
-```
-FILO_L4_VERDICT=fail
-FILO_L4_REASON="<descrizione concisa>"
-```
-
-**Sei tu** a registrare l'esito e a far girare il gate (L5 deterministico + il
-tuo L4):
+Il tuo verdetto è `pass` o `fail`, e si REGISTRA al server — non viaggia in
+nessuna variabile d'ambiente (il vecchio `FILO_L4_VERDICT` non esiste più: il
+server un verdetto raccontato non lo legge).
 
 1. `node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>`
-2. Su **pass**, esegui il gate (su **fail** non fondere: accoda `design` con
-   la tua spiegazione nella nota — decide l'owner):
+2. Su **pass**, chiedi la fusione (su **fail** non fondere: accoda `design`
+   con la tua spiegazione nella nota — decide l'owner):
    ```bash
-   FILO_L4_VERDICT=pass FILO_L4_REASON="..." node scripts/merge-gate.mjs <branch>
+   node scripts/merge-gate.mjs <branch>
    ```
+   Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
+   verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
+   sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira
+   nessun git e non si passa nessun verdetto: se il tuo `pass` non è stato
+   registrato al passo 1, la fusione viene rifiutata.
 3. Chiudi in base all'exit del gate:
    - `0` → fuso → `deliver status --status done --notes "<riga>"` +
      `dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 o L4) → `deliver status --status design
+   - `10` → BLOCCATO (L5 sul diff) → `deliver status --status design
      --notes "<spiegazione>" --branch <branch> --reason secaudit`
    - `20` → conflitto → risolvi o accoda `design` (come sopra)
-   - `1` → errore tecnico.
+   - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
+     nell'output e il tentativo è già a registro).
 
 **Quanto scrivere nella nota — dipende dall'esito:**
 
