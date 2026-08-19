@@ -219,10 +219,11 @@
   }
 
   // ---- numerazione progressiva ----
-  // Ogni feedback ha un numero leggibile: `seq` (intero progressivo) per i
-  // feedback top-level, `seq`+`subSeq` per i sub-feedback creati dalle routine
-  // quando spezzano una spec (es. #22 → #22.1, #22.2). formatNum produce la
-  // forma mostrata in dashboard.
+  // Ogni feedback ha un numero leggibile: `seq` (intero progressivo). Il campo
+  // `subSeq` (#22.1, #22.2) è SOLO STORICO: lo scrivevano le routine quando
+  // spezzavano una spec, meccanica abolita col ridisegno (SPEC-RIDISEGNO-MAX.md
+  // §1). I sub-feedback esistenti restano visibili, quindi formatNum continua a
+  // produrre anche la forma #N.M per la dashboard.
   function formatNum(seq, subSeq) {
     const s = Number(seq);
     if (!Number.isInteger(s) || s <= 0) return '';
