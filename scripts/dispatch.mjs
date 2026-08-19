@@ -1039,10 +1039,10 @@ if (isMainModule) {
   try {
     if (flag === '--record-verifier') {
       const [, id, verdict, ...rest] = argv;
-      if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|fail> ["critica"]'); process.exit(1); }
+      if (!id || !VERIFIER_VERDICTS.includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|migliorabile|fail> ["critica"]'); process.exit(1); }
       const s = await recordVerifier(id, verdict, rest.join(' '));
       if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
-      console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount}`);
+      console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount} migliorabile=${Number(s.improvableCount) || 0}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = argv;
