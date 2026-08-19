@@ -184,7 +184,12 @@
   function autoApproveGroup(clientId) {
     var k = authorKind(clientId);
     if (k === 'owner' || k === 'filo' || k === 'user') return k;
-    return 'claude'; // prober | worker | verifier | claude
+    // prober | worker | verifier | residuo | claude. Il `residuo` cade in
+    // `claude` per DECISIONE, non per inerzia (SPEC-RIDISEGNO-MAX.md §13): è
+    // un'automazione dell'owner come le altre tre, quindi stesso trattamento
+    // (l'interruttore "claude" dell'auto-approvazione decide se entra in coda
+    // da solo). Un test la inchioda su entrambi i repo.
+    return 'claude';
   }
 
   // Decide se un feedback SICURO (giudicato allineato) può entrare in coda da
