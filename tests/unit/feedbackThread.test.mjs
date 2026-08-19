@@ -82,6 +82,25 @@ test('authorKind: distingue le tre automazioni fra loro e Filo dall’utente', (
   assert.equal(TH.authorKind('routine: verifier '), 'verifier');
 });
 
+// SPEC-RIDISEGNO-MAX.md §13: i rilievi RESIDUI di una verifica (un lavoro
+// promosso dopo N giri «migliorabile») sono una categoria PROPRIA. Spacciarli
+// per prober (o per una verifica qualunque) falserebbe la lettura di dove
+// nascono i ritrovamenti — che è il motivo per cui le automazioni sono separate.
+test('authorKind: routine:residuo è una categoria propria, non prober né verifier', () => {
+  assert.equal(TH.authorKind('routine:residuo'), 'residuo');
+  assert.notEqual(TH.authorKind('routine:residuo'), 'prober');
+  assert.notEqual(TH.authorKind('routine:residuo'), 'verifier');
+});
+
+// Decisione presa APPOSTA (SPEC §13, non subìta per inerzia): il residuo è
+// un'automazione dell'owner come le altre tre, quindi ai fini dell'ingresso
+// automatico in coda cade nel gruppo `claude` — lo stesso interruttore della
+// dashboard decide per tutte. Gemello del test in filo-security
+// (functions/test/autoApprove.test.js), che è la copia che decide davvero.
+test('autoApproveGroup: routine:residuo cade nel gruppo claude (deciso, SPEC §13)', () => {
+  assert.equal(TH.autoApproveGroup('routine:residuo'), 'claude');
+});
+
 test('isFromOwner: vero solo per il prefisso owner:', () => {
   assert.equal(TH.isFromOwner('owner:abc'), true);
   assert.equal(TH.isFromOwner('routine:x'), false);
