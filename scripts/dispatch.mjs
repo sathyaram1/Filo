@@ -369,8 +369,9 @@ function diffForBranch(branch) {
   // ref `main`), quindi un `git diff main...branch` userebbe un main vecchio di
   // decine di versioni: il diff si gonfia con modifiche GIÀ in main e fa scattare
   // falsi positivi L5/secaudit (file sensibili "toccati" che in realtà erano già
-  // su main). merge-gate.mjs infatti fetcha origin e confronta con origin/target;
-  // qui allineiamo la stessa logica per il diff che alimenta il secaudit.
+  // su main). Il cancello di fusione (sul server) confronta con il main VERO di
+  // GitHub per lo stesso motivo; qui allineiamo la stessa logica per il diff
+  // che alimenta il secaudit.
   tryGit(['fetch', 'origin', MAIN_BRANCH]);
   const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
     ? `origin/${MAIN_BRANCH}`
