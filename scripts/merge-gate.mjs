@@ -209,10 +209,10 @@ function mergeAndPush(source, target, { dryRun } = {}) {
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 function main() {
-  const { source, target, dryRun } = parseArgs(process.argv.slice(2));
-  if (!source) { console.error('uso: node scripts/merge-gate.mjs <sourceBranch> [--into <target>] [--dry-run]'); process.exit(1); }
+  const { source, target, dryRun, unknown } = parseArgs(process.argv.slice(2));
+  if (unknown.length) { console.error(`opzioni sconosciute: ${unknown.join(' ')} (il target è sempre main: --into non esiste più)`); process.exit(1); }
+  if (!source) { console.error('uso: node scripts/merge-gate.mjs <sourceBranch> [--dry-run]'); process.exit(1); }
   if (!isValidBranch(source)) { console.error(`branch sorgente non valido: "${source}"`); process.exit(1); }
-  if (!isValidBranch(target)) { console.error(`branch target non valido: "${target}"`); process.exit(1); }
   if (source === target) { console.error('source e target coincidono'); process.exit(1); }
 
   const { code, msg } = mergeAndPush(source, target, { dryRun });
