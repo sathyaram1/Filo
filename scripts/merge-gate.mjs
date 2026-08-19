@@ -73,13 +73,13 @@ export function parseArgs(argv) {
 /**
  * Dalla risposta del server all'exit code del contratto. PURA.
  *
- *   merged   → 0    blocked → 10    conflict → 20    tutto il resto → 1
+ *   merged → 0    blocked → 10    conflict → 20    tutto il resto → 1
  *
- * `blocked` copre sia il trip L5 sul diff sia i rifiuti "non approvato"
- * (verdetti non registrati)? NO: un rifiuto del server (`ok:false`) è un
- * errore del chiamante o un tentativo fuori perimetro, e qui vale 1 — il
- * server l'ha già registrato nel suo log. Il 10 è riservato all'esito
- * `blocked`, che arriva solo dal cancello L5: è il caso "decide l'owner".
+ * Il 10 è riservato all'esito `blocked`, che arriva solo dal cancello L5: è
+ * il caso "decide l'owner". Un RIFIUTO del server (`ok:false`: verdetti non
+ * registrati, ramo che non combacia, biglietto morto) vale 1 — non è un
+ * blocco di sicurezza da spiegare all'owner, è una richiesta fuori perimetro
+ * che il server ha già messo a registro.
  */
 export function exitCodeFor(reply) {
   const r = reply || {};
