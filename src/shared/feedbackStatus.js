@@ -3,6 +3,13 @@
 // mappatura status→tab della dashboard, tabella delle transizioni legali con
 // l'attore autorizzato, mappatura degli stati legacy ritirati.
 //
+// LE TABELLE (stati canonici, transizioni, PUBLIC_MAP, CIPHER_PAD) NON vivono
+// più qui: sono DATI in `src/shared/feedbackTransitions.js`, la fonte unica
+// che anche il server di filo-security incorpora al deploy
+// (SPEC-RIDISEGNO-MAX.md §7). Questo modulo le CONSUMA e ci costruisce sopra
+// l'API di sempre (canTransition, canReach, tabFor, padForCipher, …): per i
+// chiamanti non cambia niente.
+//
 // Il campo `status` persistito su Firestore è la SOLA fonte di verità dello
 // stato di un feedback. Chi scrive uno status passa da canTransition; chi legge
 // deriva la tab con tabFor. NESSUN consumer ricalcola lo stato da `pipeline.*`,
@@ -14,6 +21,18 @@
 
 (function (global) {
   'use strict';
+
+  // La fonte dei dati. In Node (main process, script, unit test) questo file
+  // se la carica da solo; in una pagina filo:// `require` non esiste e serve
+  // il <script> di feedbackTransitions.js PRIMA di questo — se manca, meglio
+  // fermarsi subito con un errore chiaro che lavorare con tabelle vuote.
+  if (!global.SN_FB_TRANSITIONS && typeof require === 'function') {
+    require('./feedbackTransitions.js');
+  }
+  const DATA = global.SN_FB_TRANSITIONS;
+  if (!DATA) {
+    throw new Error('SN_FB_TRANSITIONS mancante: carica shared/feedbackTransitions.js prima di feedbackStatus.js');
+  }
 
   // ── Stati canonici (lista CHIUSA — spec §2) ────────────────────────────────
   // tab: 'inbox' Ricevuti | 'queue' In coda | 'resolved' Risolti |
