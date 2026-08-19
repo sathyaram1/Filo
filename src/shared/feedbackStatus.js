@@ -34,7 +34,7 @@
     throw new Error('SN_FB_TRANSITIONS mancante: carica shared/feedbackTransitions.js prima di feedbackStatus.js');
   }
 
-  // ── Stati canonici (lista CHIUSA — spec §2) ────────────────────────────────
+  // ── Stati canonici: la PRESENTAZIONE (la lista vive in feedbackTransitions) ─
   // tab: 'inbox' Ricevuti | 'queue' In coda | 'resolved' Risolti |
   //      'archived' Archiviati. `done` è l'unico ambivalente (queue finché il
   //      fix non è in una versione rilasciata, poi resolved): tabFor accetta
