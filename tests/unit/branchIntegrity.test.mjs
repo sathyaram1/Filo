@@ -361,25 +361,15 @@ describe('B — l’identità attesa esposta alla guardia', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('E — coda vuota ≠ coda illeggibile', () => {
-  test('next-feedback distingue i due casi con exit diversi', () => {
-    const src = readFileSync(resolve(ROOT, 'scripts', 'next-feedback.mjs'), 'utf8');
-    // Il comportamento vero richiede Firestore: qui assicuriamo che il ramo
-    // "illeggibile" esista e sia SEPARATO da quello "vuota" — senza, il guasto
-    // torna a travestirsi da giornata tranquilla (incidente #310+).
-    assert.match(src, /function exitEmpty/, 'l’uscita "non ho lavoro" deve passare da un punto solo');
-    assert.match(src, /process\.exit\(3\)/, 'coda illeggibile ⇒ guasto dichiarato');
-    assert.match(src, /process\.exit\(2\)/, 'coda davvero vuota ⇒ stop sereno');
-    // Nessuna uscita "vuota" deve scavalcare exitEmpty.
-    const afterHelper = src.slice(src.indexOf('export async function run()'));
-    const bareExit2 = afterHelper.match(/process\.exit\(2\)/g) || [];
-    assert.equal(bareExit2.length, 0,
-      'ogni "niente da fare" deve passare da exitEmpty, altrimenti resta una strada che nasconde il guasto');
-  });
-
-  test('dispatch propaga il guasto invece di ripiegare su "niente da fare"', () => {
+describe('E — un guasto non si traveste da giornata tranquilla', () => {
+  // La distinzione "coda vuota ≠ coda illeggibile" (incidente #310+) vive nel
+  // SERVER dal ridisegno (SPEC-RIDISEGNO-MAX.md §1): la coda si legge solo là,
+  // functions/src/routine/queue.js + select.js. Qui resta il presidio locale.
+  test('dispatch senza biglietto dichiara il guasto invece di scegliere da sé', () => {
     const src = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
-    assert.match(src, /status === 3|status \?\?|=== 3/, 'exit 3 di next-feedback va intercettato');
-    assert.match(src, /routineFault/, 'e tradotto in un guasto dichiarato, non in una coda vuota');
+    assert.match(src, /routineFault/, 'i guasti si dichiarano con la loro specie, non si inghiottono');
+    assert.match(src, /nessun biglietto/, 'senza biglietto non si lavora: nessun cammino alternativo');
+    assert.ok(!src.includes('next-feedback'),
+      'la scelta locale del lavoro è smontata: se riappare, la chiave della coda torna su questa macchina');
   });
 });
