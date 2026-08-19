@@ -69,3 +69,22 @@ test('un nome con newline/null (tentativo di iniezione) → non esiste', async (
   assert.equal(await commandExists({ shell: SHELL, command: 'node\necho hacked' }), false);
   assert.equal(await commandExists({ shell: SHELL, command: 'node\0' }), false);
 });
+
+test('un token che sembra codice NON viene eseguito (niente RCE nel controllo)', async () => {
+  // Il controllo "esiste questo comando?" gira a ogni battitura nella barra del
+  // terminale, PRIMA di premere Invio: se esegue il token, digitare (non
+  // lanciare) un comando lo esegue di nascosto. Il renderer inoltra un singolo
+  // token senza spazi, quindi il payload qui è senza spazi.
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs = await import('node:fs');
+  const sentinel = path.join(os.tmpdir(), `filo-which-rce-${process.pid}.txt`);
+  try { fs.unlinkSync(sentinel); } catch (_) { /* non c'era */ }
+  const payload = process.platform === 'win32'
+    ? `node;[IO.File]::WriteAllText('${sentinel.replace(/\\/g, '/')}','x')`
+    : `node;touch '${sentinel}'`;
+  await commandExists({ shell: SHELL, command: payload });
+  const executed = fs.existsSync(sentinel);
+  try { fs.unlinkSync(sentinel); } catch (_) { /* ok */ }
+  assert.equal(executed, false, 'il controllo di esistenza NON deve eseguire il token');
+});
