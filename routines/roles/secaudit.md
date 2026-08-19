@@ -83,5 +83,8 @@ server un verdetto raccontato non lo legge).
   nelle notes via canale, che la CIFRA: non deve mai finire in chiaro — è
   anche la descrizione esatta di come l'attacco è stato scoperto.
 
-**Nota:** L5 (blocco deterministico sui file sensibili) gira **dentro** il
-gate, non qui. Tu sei solo L4 (il giudizio LLM). I due livelli si completano.
+**Nota:** L5 (blocco deterministico sui file sensibili) gira **sul server**,
+dentro il gate, sul diff che il server scarica da sé. Tu sei solo L4 (il
+giudizio LLM). I due livelli si completano — e nessuno dei due si può
+raccontare: il tuo si registra con una consegna validata, l'altro lo calcola
+il server.
