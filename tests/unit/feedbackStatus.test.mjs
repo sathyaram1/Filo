@@ -108,12 +108,17 @@ test('l\'iter di lavorazione è delle routine', () => {
   assert.ok(!FS.canTransition('revision_security', 'done', 'owner'));
 });
 
-test('lavori senza branch: la routine può chiudere direttamente (estensione §3)', () => {
-  // Es. il pianificatore che spezza una spec in sub-feedback: nessun branch da
-  // verificare, chiude il padre con done.
-  assert.ok(FS.canTransition('todo', 'done', 'routine'));
-  assert.ok(FS.canTransition('working', 'done', 'routine'));
+test('il passo diretto todo/working→done è ritirato (era del pianificatore)', () => {
+  // Il pianificatore che spezzava le spec in sotto-feedback non esiste più
+  // (SPEC-RIDISEGNO-MAX.md §1): nessun singolo passo porta da todo a done.
+  assert.ok(!FS.canTransition('todo', 'done', 'routine'));
+  assert.ok(!FS.canTransition('working', 'done', 'routine'));
   assert.ok(!FS.canTransition('todo', 'done', 'owner'));
+  // Ma la chiusura manuale di una pratica (npm run feedback --come-routine)
+  // resta legale come CATENA: attraversa l'iter, non lo salta. Se questo
+  // diventa rosso, lo strumento dell'owner smette di poter chiudere i fix.
+  assert.ok(FS.canReach('todo', 'done', 'routine'));
+  assert.ok(FS.canReach('working', 'done', 'routine'));
 });
 
 test('transizioni NON elencate = illegali (nessun default permissivo)', () => {
