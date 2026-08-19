@@ -511,11 +511,14 @@ async function deliverToChannel(intent, data) {
  * finisce nelle note, così la conversazione del feedback racconta l'intero iter.
  */
 export function verifierNoteText(verdict, critique = '') {
-  // Il ruolo scrive la critica come "PASS — …"/"FAIL — …": il prefisso è
-  // ridondante col nostro incipit, toglilo (resta solo la sostanza).
-  const c = String(critique || '').trim().replace(/^(PASS|FAIL)\s*[—–:\-]\s*/i, '').slice(0, 4000);
+  // Il ruolo scrive la critica come "PASS — …"/"MIGLIORABILE — …"/"FAIL — …":
+  // il prefisso è ridondante col nostro incipit, toglilo (resta la sostanza).
+  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, 4000);
   if (verdict === 'pass') {
     return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
+  }
+  if (verdict === 'migliorabile') {
+    return c ? `Verifica: funziona, ma migliorabile — ${c}` : 'Verifica: funziona, ma migliorabile.';
   }
   return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
 }
