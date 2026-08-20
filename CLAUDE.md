@@ -24,8 +24,12 @@ ruolo che ti viene consegnato.
 - **Salvataggio automatico**: a ogni modifica di file un hook committa e pusha
   il TUO ramo, da solo. È il trasporto del lavoro — rende il ramo visibile a
   verifica e server — oltre che il paracadute se la sessione muore.
-- **Su `main` si arriva SOLO dal cancello di merge** (routine) **o da
-  `npm run finish`** (locale). Mai un push diretto su `main`.
+- **Su `main` scrive SOLO il server.** Non è una regola di buona condotta: da
+  nessuna macchina che ospita un'istanza esiste una credenziale capace di
+  scriverci. Le due strade — il cancello di merge (routine) e `npm run finish`
+  (locale) — sono due modi di CHIEDERE al server di fondere; lui scarica il
+  diff, fa girare i controlli deterministici e fonde con un'identità sua. Un
+  push diretto su `main` non è vietato: non funziona.
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
   `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
   tracciato: `git rm --cached <file>`.
