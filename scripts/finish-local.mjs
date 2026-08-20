@@ -94,11 +94,16 @@ async function main() {
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
-  // Lavorare direttamente sul ramo principale è sconsigliato ma capita (una
-  // correzione di una riga). Da quando l'hook non pubblica più niente da solo,
-  // anche quel caso deve passare di qui: niente da fondere, ma i controlli si
-  // fanno lo stesso — sono il motivo per cui questo comando esiste.
-  const onMain = branch === MAIN;
+  // Lavorare direttamente sul ramo principale non ha più senso: da questa
+  // macchina su main non scrive più nessuno, quindi un lavoro fatto lì non ha
+  // nessun modo di arrivare agli utenti. Meglio dirlo adesso che dopo mezz'ora
+  // di controlli verdi seguiti da un rifiuto.
+  if (branch === MAIN) {
+    console.error(`Sei su '${MAIN}', e da qui su '${MAIN}' non scrive più nessuno: la fusione la fa`);
+    console.error('il server, e fonde un RAMO. Sposta il lavoro in una cartella dedicata:');
+    console.error('  git worktree add .claude/worktrees/<nome> -b claude/<nome>');
+    process.exit(1);
+  }
 
   if (!git(['diff', '--quiet']).ok || !git(['diff', '--cached', '--quiet']).ok) {
     console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');
