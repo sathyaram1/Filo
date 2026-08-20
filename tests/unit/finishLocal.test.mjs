@@ -1,14 +1,27 @@
-// Chiusura di un lavoro locale — spec: ROUTINE-BRANCH-INTEGRITY.md §Sessioni locali
+// Chiusura di un lavoro locale — SPEC-RIDISEGNO-MAX.md §10
 //
-// Logica pura di `scripts/finish-local.mjs`. Il caso che conta è il secondo: in
-// locale il ramo principale è quasi sempre GIÀ aperto in un'altra cartella di
-// lavoro (una per compito), e git rifiuta di aprire lo stesso ramo due volte.
-// Senza riconoscerlo, il comando fallirebbe proprio nel setup normale.
+// Logica pura di `scripts/finish-local.mjs`. Due cose:
+//
+//   · quali spec mirati lanciare per le aree toccate;
+//   · la SENTINELLA sul fatto che questa macchina non scrive più sul ramo
+//     principale. Da quando la fusione la fa il server, una riga che rimettesse
+//     qui un `push origin main` (o un passaggio sul ramo principale per fondere
+//     in locale) riaprirebbe esattamente il buco che la spec chiude — e nessun
+//     test di comportamento se ne accorgerebbe, perché il lavoro arriverebbe su
+//     main lo stesso.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, mainWorktree } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles } from '../../scripts/finish-local.mjs';
+
+const SORGENTE = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'finish-local.mjs'),
+  'utf8'
+);
 
 describe('quali spec lanciare', () => {
   test('una pagina toccata porta con sé il suo spec', () => {
@@ -34,30 +47,32 @@ describe('quali spec lanciare', () => {
   });
 });
 
-describe('dove fondere', () => {
-  const porcelain = [
-    'worktree C:/repo',
-    'HEAD abc',
-    'branch refs/heads/main',
-    '',
-    'worktree C:/repo/.claude/worktrees/task',
-    'HEAD def',
-    'branch refs/heads/claude/task',
-    '',
-  ].join('\n');
+describe('da qui sul ramo principale non si scrive', () => {
+  // Le righe di commento raccontano la storia (e nominano main di continuo):
+  // la sentinella deve guardare il CODICE.
+  const codice = SORGENTE.split('\n')
+    .filter((l) => !l.trim().startsWith('//'))
+    .join('\n');
 
-  test('trova la cartella che ha già aperto il ramo principale', () => {
-    assert.equal(mainWorktree(porcelain, 'main'), 'C:/repo',
-      'la fusione va fatta lì: git non apre lo stesso ramo due volte');
+  test('nessuna spedizione verso il ramo principale', () => {
+    assert.ok(!/push['"\s,\]]+.*MAIN/.test(codice) && !/push[^\n]*origin[^\n]*main/i.test(codice),
+      'il finish locale non deve poter spingere sul ramo principale: la fusione la fa il server');
   });
 
-  test('se nessuno lo tiene aperto, si fonde sul posto', () => {
-    const solo = 'worktree C:/repo\nHEAD abc\nbranch refs/heads/claude/task\n';
-    assert.equal(mainWorktree(solo, 'main'), null);
+  test('nessuna fusione fatta in locale', () => {
+    assert.ok(!/'merge'/.test(codice) && !/"merge"/.test(codice),
+      'nessun git merge da questa macchina: il diff da fondere lo guarda il server');
+    assert.ok(!/checkout/.test(codice),
+      'niente passaggi sul ramo principale per fondere: non serve più, e cambiare ramo sotto i piedi del lavoro è un rischio in sé');
   });
 
-  test('una cartella in stato staccato non viene scambiata per il ramo principale', () => {
-    const detached = 'worktree C:/repo\nHEAD abc\ndetached\n';
-    assert.equal(mainWorktree(detached, 'main'), null);
+  test('la fusione si CHIEDE, e il ramo viene spedito prima', () => {
+    assert.match(codice, /askServerMerge/, 'la fusione passa dal server');
+    assert.match(codice, /push['"\s,\]]+.*branch/, 'il ramo va spedito, o il server non ha niente da guardare');
+  });
+
+  test('lavorare direttamente sul ramo principale si ferma subito', () => {
+    assert.match(codice, /branch === MAIN/,
+      'un lavoro fatto sul ramo principale non ha più modo di arrivare agli utenti: va detto prima dei controlli');
   });
 });
