@@ -204,6 +204,21 @@ Chiusura (si incastra nell'architettura del canale #477):
 - finché non è implementato, il rischio residuo resta documentato (è la coda
   dell'incidente #378 / spec integrità dei rami).
 
+**Fatto il 2026-08-20** (dettaglio in `ROUTINE-AUTH-SPEC.md` §11). Le due cose
+da decidere all'implementazione sono decise così:
+
+- l'identità del server è una **GitHub App** installata sul solo repo pubblico
+  (il PAT resta come ripiego): non è l'account di nessuno e il token con cui
+  parla dura un'ora;
+- **anche il finish locale passa dal server** (`ownerMerge`): niente più
+  fusione né push da questa macchina. Non pretende i verdetti registrati — quelli
+  sono il vocabolario delle routine — ma **L5 gira lo stesso**, e lo `sha`
+  dichiarato deve combaciare con la punta vera del ramo.
+
+Resta il passo dell'owner: la **ruleset su `main`**. Finché non c'è, nessuno
+*passa* più di lì per lavorare, ma un push diretto sarebbe ancora accettato dal
+repo.
+
 Collegato (18/08, revisione del ruolo secaudit con l'owner):
 
 - **bonifica dello storico in chiaro su Firestore**: i testi dei feedback
