@@ -189,4 +189,6 @@ async function main() {
 }
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
-if (isMainModule) main();
+// Un guasto imprevisto deve FERMARE, non finire in un errore che nessuno legge:
+// senza questo, una promessa rifiutata uscirebbe con un codice che sembra un ok.
+if (isMainModule) main().catch((e) => { console.error(`\n✗ ${(e && e.message) || e}`); process.exit(1); });
