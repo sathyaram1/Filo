@@ -1,4 +1,4 @@
-# Release automatica di Filo (Windows).
+# Release automatica di Filo (Windows + Mac).
 #
 # COSA FA
 #   A intervalli regolari (cron) controlla se su `main` ci sono commit nuovi
@@ -17,7 +17,7 @@
 #   Si puo' lanciare a mano dalla tab "Actions" del repo (Run workflow),
 #   utile per pubblicare subito senza aspettare il cron.
 
-name: Release Filo (Windows)
+name: Release Filo (Windows + Mac)
 
 on:
   schedule:
@@ -34,6 +34,9 @@ concurrency:
 jobs:
   release:
     runs-on: windows-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.bump.outputs.version }}
     steps:
       - name: Checkout main (con storia e tag completi)
         uses: actions/checkout@v4
@@ -173,3 +176,60 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         shell: bash
         run: echo "Pubblicata ${{ steps.bump.outputs.version }}"
+
+  # ─── SECONDA META': LA VERSIONE PER MAC ──────────────────────────────────
+  # Un pacchetto per Mac lo puo' costruire SOLO un Mac (serve `lipo` per fondere
+  # Intel e Apple Silicon in un file solo, e gli strumenti di firma di Apple):
+  # per questo e' un lavoro a se', su una macchina Apple, e non un passo in piu'
+  # di quello per Windows.
+  #
+  # Parte DOPO che la versione per Windows e' stata pubblicata, e si attacca
+  # alla STESSA pubblicazione: stesso numero di versione, stessa pagina di
+  # download, due file. Cosi' il collegamento "scarica per Mac" del sito punta
+  # sempre all'ultima versione, come quello per Windows.
+  #
+  # Se questa meta' fallisce, quella per Windows resta pubblicata e valida: e'
+  # marcata `continue-on-error` apposta: un problema sui Mac non deve togliere
+  # l'aggiornamento a chi e' su Windows.
+  release-mac:
+    needs: release
+    if: needs.release.outputs.should_release == 'true' && needs.release.outputs.version != ''
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout della versione appena pubblicata
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.version }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        run: npm ci
+
+      # Stesso passo dell'altra meta', e per lo stesso motivo: senza le chiavi
+      # incastonate l'app arriva muta. Va rifatto qui perche' il file generato
+      # non sta nel repo: vive solo dentro la macchina che costruisce.
+      - name: Incastona le chiavi di default nel build (bake)
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          FILO_DEFAULT_OPENROUTER_KEY: ${{ secrets.FILO_DEFAULT_OPENROUTER_KEY }}
+          FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
+          FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
+        run: node scripts/bake-default-config.mjs
+
+      # `identity: null` nel package.json fa firmare l'app "alla buona" (firma
+      # locale, senza certificato Apple). Non toglie l'avviso al primo avvio, ma
+      # e' obbligatoria sui Mac con chip Apple: senza, l'app non parte proprio.
+      - name: Build e upload sulla release esistente
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run release:mac
+
+      - name: Riepilogo
+        run: echo "Aggiunto il pacchetto Mac a ${{ needs.release.outputs.version }}"

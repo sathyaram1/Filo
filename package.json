@@ -25,7 +25,9 @@
     "feedback:login": "node scripts/admin-login.mjs",
     "build": "electron-builder --win",
     "release": "electron-builder --win --publish always",
-    "feedback": "node scripts/owner-feedback.mjs"
+    "feedback": "node scripts/owner-feedback.mjs",
+    "build:mac": "electron-builder --mac",
+    "release:mac": "electron-builder --mac --publish always"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
@@ -56,8 +58,25 @@
       "uninstallerIcon": "assets/icons/icon.ico"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "assets/icons/icon-256.png"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "artifactName": "Filo-Mac.${ext}",
+      "icon": "assets/icons/icon-1024.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "darkModeSupport": true
     },
     "linux": {
       "target": "AppImage",
