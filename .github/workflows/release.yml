@@ -222,9 +222,9 @@ jobs:
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
         run: node scripts/bake-default-config.mjs
 
-      # `identity: null` nel package.json fa firmare l'app "alla buona" (firma
-      # locale, senza certificato Apple). Non toglie l'avviso al primo avvio, ma
-      # e' obbligatoria sui Mac con chip Apple: senza, l'app non parte proprio.
+      # Senza certificato Apple lo strumento di impacchettamento salta la firma
+      # del tutto: ci pensa scripts/after-pack-mac.js a metterne una locale, che
+      # sui Mac con chip Apple e' obbligatoria perche' l'app parta.
       - name: Build e upload sulla release esistente
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
