@@ -154,45 +154,38 @@ async function main() {
     console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
   }
 
-  if (checkOnly) { console.log('\n✓ Controlli passati (--check: non fondo).'); return; }
+  if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
 
-  if (onMain) {
-    git(['pull', '--rebase', 'origin', MAIN]);
-    const p = git(['push', 'origin', MAIN]);
-    if (!p.ok) { console.error(`Spedizione rifiutata:\n${p.out.slice(0, 300)}`); process.exit(1); }
-    console.log(`\n✓ '${MAIN}' pubblicato.`);
-    return;
-  }
-
-  // Fusione: una volta, a lavoro finito.
+  // 4. Il ramo dev'essere SU ORIGIN: il server fonde ciò che vede lui, non ciò
+  //    che c'è su questo disco. L'hook di salvataggio di solito l'ha già
+  //    spedito, ma se per qualsiasi motivo non è andato, il server guarderebbe
+  //    una versione vecchia — o un ramo che per lui non esiste.
   const cur = git(['rev-parse', 'HEAD']).out;
-  if (!git(['fetch', 'origin', MAIN]).ok) { console.error(`Non riesco a leggere origin/${MAIN}.`); process.exit(1); }
-
-  // Il ramo principale può essere GIÀ aperto in un'altra cartella di lavoro (è
-  // il setup normale in locale: una cartella per compito). git rifiuta di
-  // aprire lo stesso ramo due volte, quindi la fusione si fa LÀ invece di
-  // spostare questa cartella. Così, tra l'altro, il lavoro appena verificato
-  // resta esattamente com'era sotto i nostri piedi.
-  const where = mainWorktree() || ROOT;
-  const inPlace = where === ROOT;
-  const at = (args) => git(args, { cwd: where });
-
-  if (inPlace && !git(['checkout', MAIN]).ok) { console.error(`Non riesco a passare su ${MAIN}.`); process.exit(1); }
-  at(['pull', '--rebase', 'origin', MAIN]);
-  const merged = at(['merge', '--no-edit', cur]);
-  if (!merged.ok) {
-    at(['merge', '--abort']);
-    if (inPlace) git(['checkout', branch]);
-    console.error(`Fusione in conflitto:\n${merged.out.slice(0, 400)}\nRisolvi e rilancia.`);
-    process.exit(1);
+  {
+    const pushed = git(['push', 'origin', branch]);
+    if (!pushed.ok) {
+      console.error(`\n✗ Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`);
+      console.error('  Senza il ramo su origin il server non ha niente da fondere.');
+      process.exit(1);
+    }
+    const remote = git(['rev-parse', `origin/${branch}`]).out;
+    if (remote && remote !== cur) {
+      console.error(`\n✗ Su origin '${branch}' è a ${remote.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`);
+      console.error('  Il server fonderebbe una versione diversa da quella controllata.');
+      process.exit(1);
+    }
   }
-  const pushed = at(['push', 'origin', MAIN]);
-  if (!pushed.ok) {
-    console.error(`Spedizione rifiutata (${MAIN} è avanzato): fai un pull --rebase e rilancia.\n${pushed.out.slice(0, 300)}`);
-    process.exit(1);
-  }
-  if (inPlace) git(['checkout', branch]);
-  console.log(`\n✓ '${branch}' fuso su ${MAIN} e pubblicato.${inPlace ? ` Sei di nuovo su '${branch}'.` : ''}`);
+
+  // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
+  //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
+  //    codice appena controllato.
+  process.stdout.write('\n▸ Chiedo al server di fondere\n');
+  const reply = await askServerMerge({ branch, sha: cur });
+  const code = exitCodeForOwnerMerge(reply);
+  const message = messageForOwnerMerge(reply, branch);
+  if (code === 0) console.log(`\n${message}`);
+  else console.error(`\n${message}`);
+  process.exit(code);
 }
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
