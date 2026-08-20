@@ -267,20 +267,60 @@ Da oggi la fusione è una consegna del canale come le altre:
      GitHub** — mai su un diff consegnato dal chiamante. Qualunque trip →
      `blocked`, con l'elenco dei trip, e il blocco finisce nel registro dei
      rifiuti;
-  4. fusione **via API GitHub con l'identità del server** (token nei Secret
-     delle functions, letto in un punto solo: oggi un PAT di un account
-     macchina, domani una GitHub App senza toccare il resto). Conflitto →
+  4. fusione **via API GitHub con l'identità del server**. Conflitto →
      `conflict`, niente fusione.
 - **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
   e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
   1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
   sono spariti da questa macchina: qui non c'è più niente da convincere.
 
-Il pezzo che rende il muro fisico è un **passo dell'owner**, fuori da questa
-spec: la ruleset su `main` nel repo GitHub, con bypass per la sola identità
-del server (e per l'owner). Da lì in poi il push diretto da una sessione non è
-vietato: è **impossibile**. Finché la ruleset non c'è, il rischio residuo resta
-quello documentato dall'incidente #378 — il cancello ora è non convincibile,
-ma la porta accanto è ancora fisicamente aperta. (`npm run finish` locale
-continua col push diretto dell'owner finché la ruleset non esiste; la sua
-migrazione si decide con l'owner presente.)
+### L'identità del server: una GitHub App (2026-08-20)
+
+Il token di fusione era un PAT di un account macchina: l'identità di *qualcuno*,
+con i suoi permessi e la sua storia. Adesso è una **GitHub App** installata sul
+solo repo pubblico, con i permessi minimi (contenuti in scrittura, metadati in
+lettura). Non appartiene a nessuno, si revoca senza toccare persone, e il token
+con cui parla **dura un'ora e se lo rigenera da sé**: l'unico segreto di lunga
+vita è la chiave privata, che vive nei Secret delle functions.
+
+- Segreti: `GH_APP_ID` (l'App ID numerico **oppure** il Client ID — per GitHub
+  è solo la stringa nel mittente del JWT) e `GH_APP_PRIVATE_KEY` (il PEM
+  intero). `GH_APP_INSTALLATION_ID` è **facoltativo**: senza, il server chiede a
+  GitHub qual è l'installazione sul repo e se la ricorda; con, la inchioda e
+  risparmia una chiamata.
+- `GH_MERGE_TOKEN` resta come **ripiego**. La scelta fra le due identità sta in
+  un punto solo (`src/routine/github.js`): App se c'è, altrimenti PAT,
+  altrimenti `github_no_token` — e nessuna fusione tentata alla cieca.
+
+### Anche il finish locale passa dal server: `ownerMerge` (2026-08-20)
+
+Il cancello aveva tolto alla macchina delle routine il potere di scrivere su
+`main`, ma restava la **porta accanto**: `npm run finish` fondeva e pubblicava
+dalla sessione locale, con le credenziali dell'owner — sulla stessa macchina
+dove gira un LLM che legge testo di sconosciuti. Finché quella porta c'era, il
+muro non era un muro.
+
+- **`ownerMerge` `{ branch, sha? }`** — chiamata riservata all'owner
+  autenticato (stesso perimetro di `routineKeys`/`routineStateAdmin`). Il
+  server: valida il nome del ramo → se lo `sha` è dichiarato verifica che la
+  **punta vera** del ramo su GitHub sia quella (diversa → `stale`, niente
+  fusione: i controlli locali riguardavano un altro codice) → fa girare **L5**
+  sul diff che scarica lui (trip → `blocked`) → fonde con l'identità dell'App
+  (409 → `conflict`). Esiti e guasti nello stesso vocabolario di `routineMerge`.
+- **Cosa NON chiede**: i verdetti registrati di verifica e sicurezza. Quelli
+  sono il vocabolario delle routine; il lavoro locale ha i suoi controlli
+  (logica pura, spec mirati, verifica indipendente) che girano prima. **L5
+  invece gira lo stesso**: è il livello che nessuno può raccontare, e vale
+  anche per l'owner.
+- **`npm run finish`** non fa più `checkout`, `merge`, `push origin main`:
+  spedisce il ramo, chiede la fusione, traduce l'esito. Esce con zero **solo**
+  se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
+  senso e viene fermato subito.
+
+Il pezzo che rende il muro fisico resta un **passo dell'owner**, fuori da questa
+spec: la ruleset su `main` nel repo GitHub, che lascia scrivere la sola identità
+dell'App. Da lì in poi il push diretto da una sessione non è vietato: è
+**impossibile**. Finché la ruleset non c'è, il rischio residuo è quello
+documentato dall'incidente #378 — nessuno *passa* più di lì per lavorare, ma un
+`git push origin main` da una shell con le credenziali dell'owner in memoria
+sarebbe ancora accettato dal repo.
