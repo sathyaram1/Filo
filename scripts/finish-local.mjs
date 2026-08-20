@@ -21,25 +21,34 @@
 //   volta, quando il lavoro è finito, e dopo i controlli.
 //
 // USO:
-//   node scripts/finish-local.mjs                 # controlli + fusione + push
+//   node scripts/finish-local.mjs                 # controlli + richiesta di fusione
 //   node scripts/finish-local.mjs --check         # solo i controlli
 //
 //   La scorciatoia --no-verify NON esiste più (SPEC-RIDISEGNO-MAX.md §8): la
 //   verifica indipendente non si salta — un controllo che si può saltare
 //   finisce saltato proprio nei casi in cui serviva.
 //
-// ⚠️ QUESTO SCRIPT PUSHA ANCORA SU MAIN DIRETTAMENTE (identità dell'owner).
-//   Per le ROUTINE il merge lo fa ormai il SERVER (SPEC-RIDISEGNO-MAX.md §10:
-//   verdetti registrati + L5 sul diff + fusione via API); quando l'owner
-//   attiverà la ruleset su `main` (scrivono solo la sua identità e quella del
-//   server), questo push diretto smetterà di passare e ANCHE il finish locale
-//   dovrà passare dal server — migrazione da fare con l'owner presente, non
-//   di iniziativa.
+// LA FUSIONE NON LA FA PIÙ QUESTA MACCHINA (SPEC-RIDISEGNO-MAX.md §10)
+//   Fino al 2026-08-20 questo script fondeva e pubblicava da qui, con le
+//   credenziali dell'owner. Ma su questa macchina gira un LLM che legge testo
+//   scritto da sconosciuti: finché una credenziale capace di scrivere sul ramo
+//   principale vive qui, il cancello di sicurezza è aggirabile senza convincere
+//   nessuno — basta spingere il ramo principale.
+//
+//   Adesso il ramo si SPEDISCE e la fusione si CHIEDE al server, che scarica
+//   lui il diff, fa girare i controlli deterministici e fonde con un'identità
+//   propria (una GitHub App). Qui non resta nessuna credenziale che scriva su
+//   main: la protezione non dipende più dal fatto che qualcuno si comporti bene.
+//
+//   I controlli locali e la verifica indipendente restano identici, e restano
+//   obbligatori: sono quelli che dicono se il lavoro è finito. Il server non
+//   li rifà e non ci crede — controlla altro.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch } from './verify-local.mjs';
+import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MAIN = process.env.FILO_MAIN_BRANCH || 'main';
