@@ -61,16 +61,6 @@ function git(args, opts = {}) {
   }
 }
 
-/** La cartella di lavoro che ha già aperto il ramo principale, se esiste. */
-export function mainWorktree(porcelain = git(['worktree', 'list', '--porcelain']).out, main = MAIN) {
-  let wt = null;
-  for (const line of String(porcelain || '').split('\n')) {
-    if (line.startsWith('worktree ')) wt = line.slice(9).trim();
-    else if (line.trim() === `branch refs/heads/${main}` && wt) return wt;
-  }
-  return null;
-}
-
 function run(cmd, args, label) {
   process.stdout.write(`\n▸ ${label}\n`);
   const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
