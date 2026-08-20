@@ -316,8 +316,14 @@ L'hook faceva **due cose** che vanno separate: salvare e spedire il proprio ramo
 (prezioso — è ciò che ha salvato questo stesso lavoro dopo due interruzioni), e
 fondere sul ramo principale (il problema). Solo la seconda è cambiata.
 
-`npm run finish` esegue i controlli e **solo se sono verdi** fonde e pubblica.
+`npm run finish` esegue i controlli e **solo se sono verdi** chiede la fusione.
 `npm run finish:check` esegue i soli controlli.
+
+**Dal 2026-08-20 non fonde più lui**: spedisce il ramo e chiede al server, che
+è l'unico a poter scrivere sul ramo principale (`ROUTINE-AUTH-SPEC.md` §11).
+Restava infatti la porta accanto — una credenziale capace di pubblicare, viva
+sulla macchina dove gira un'istanza — e finché c'era, tutto il resto di questa
+spec era aggirabile senza convincere nessuno.
 
 La regola "non lanciare mai la suite completa in locale" è stata **rimossa** da
 `CLAUDE.md`: nasceva da quando il grosso del lavoro si faceva in locale. Oggi in
