@@ -283,11 +283,20 @@ lettura). Non appartiene a nessuno, si revoca senza toccare persone, e il token
 con cui parla **dura un'ora e se lo rigenera da sé**: l'unico segreto di lunga
 vita è la chiave privata, che vive nei Secret delle functions.
 
-- Segreti: `GH_APP_ID` (l'App ID numerico **oppure** il Client ID — per GitHub
-  è solo la stringa nel mittente del JWT) e `GH_APP_PRIVATE_KEY` (il PEM
-  intero). `GH_APP_INSTALLATION_ID` è **facoltativo**: senza, il server chiede a
-  GitHub qual è l'installazione sul repo e se la ricorda; con, la inchioda e
-  risparmia una chiamata.
+- Segreti, **due soli**: `GH_APP_ID` (l'App ID numerico **oppure** il Client ID
+  — per GitHub è solo la stringa nel mittente del JWT) e `GH_APP_PRIVATE_KEY`
+  (il PEM intero).
+- Il **numero dell'installazione** (oggi `155205894`) **non è un segreto** e non
+  è un Secret: dice solo "questa App, su questo repo", e senza la chiave privata
+  non apre niente. Il server se lo scopre chiedendolo a GitHub e se lo ricorda —
+  è il cammino normale. Dichiararlo come segreto costringerebbe a crearne uno in
+  Secret Manager solo per far passare il deploy, e a lasciare in giro un
+  segnaposto che qualcuno domani scambia per una credenziale. Chi vuole
+  risparmiare quella chiamata lo inchioda con `FILO_GH_INSTALLATION_ID`
+  (variabile d'ambiente normale); un valore che non è un numero viene ignorato e
+  si torna a scoprire — è un'ottimizzazione, non un confine.
+- Permessi dell'App: **contenuti in scrittura** (per fondere) e **metadati in
+  lettura**. Nient'altro.
 - `GH_MERGE_TOKEN` resta come **ripiego**. La scelta fra le due identità sta in
   un punto solo (`src/routine/github.js`): App se c'è, altrimenti PAT,
   altrimenti `github_no_token` — e nessuna fusione tentata alla cieca.
