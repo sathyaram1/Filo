@@ -83,7 +83,7 @@ export function specsForChangedFiles(changed) {
   return [...specs];
 }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2);
   const checkOnly = argv.includes('--check');
   if (argv.includes('--no-verify')) {
