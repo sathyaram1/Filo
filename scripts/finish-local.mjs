@@ -133,9 +133,10 @@ async function main() {
   // macchina su main non scrive più nessuno, quindi un lavoro fatto lì non ha
   // nessun modo di arrivare agli utenti. Meglio dirlo adesso che dopo mezz'ora
   // di controlli verdi seguiti da un rifiuto.
-  if (branch === MAIN) {
-    console.error(`Sei su '${MAIN}', e da qui su '${MAIN}' non scrive più nessuno: la fusione la fa`);
-    console.error('il server, e fonde un RAMO. Sposta il lavoro in una cartella dedicata:');
+  const principale = defaultBranch();
+  if (isProtectedBranch(branch, principale)) {
+    console.error(`Sei su '${branch}', e da qui sul ramo principale non scrive più nessuno: la fusione`);
+    console.error('la fa il server, e fonde un RAMO. Sposta il lavoro in una cartella dedicata:');
     console.error('  git worktree add .claude/worktrees/<nome> -b claude/<nome>');
     process.exit(1);
   }
