@@ -198,6 +198,15 @@ async function main() {
   //    una versione vecchia — o un ramo che per lui non esiste.
   const cur = git(['rev-parse', 'HEAD']).out;
   {
+    // Ultimo controllo prima dell'unica riga di questo script che scrive su
+    // origin: qualunque cosa sia successa sopra, quello che si spedisce non
+    // può essere il ramo principale. È una guardia doppia, e va bene così: è
+    // l'unico punto in cui questa macchina potrebbe scrivere sul ramo da cui
+    // si costruiscono le versioni degli utenti.
+    if (isProtectedBranch(branch, principale)) {
+      console.error(`\n✗ '${branch}' è il ramo principale: da qui non si spedisce.`);
+      process.exit(1);
+    }
     const pushed = git(['push', 'origin', branch]);
     if (!pushed.ok) {
       console.error(`\n✗ Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`);
