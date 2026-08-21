@@ -214,3 +214,17 @@ describe('il CLI', () => {
     } finally { srv.close(); }
   });
 });
+
+describe('il lavoro di pubblicazione non scrive su main', () => {
+  test('nel workflow non è rimasto nessun comando che scriva su git', () => {
+    const yml = readFileSync(resolve(__dirname, '..', '..', '.github', 'workflows', 'release.yml'), 'utf8');
+    // I commenti raccontano com'era prima: si guardano solo i comandi.
+    const comandi = yml.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
+    for (const vietato of [/git\s+push/, /git\s+commit/, /npm\s+version/]) {
+      assert.ok(!vietato.test(comandi),
+        `il workflow è tornato a scrivere su git (${vietato}): su main scrive solo il server.`);
+    }
+    // E chiede il numero a chi lo può scrivere.
+    assert.match(comandi, /release-bump\.mjs/);
+  });
+});
