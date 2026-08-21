@@ -381,6 +381,12 @@ senza chiedersi quale fosse. Chiusi entrambi:
   toccato niente, e proseguono. Un automatismo che si ferma in silenzio è la
   classe di guasto che ha già prodotto un ramo non salvato per giorni.
 
+La guardia riguarda **la linea principale**, non "tutto ciò che non è un ramo di
+lavoro": in una cartella a HEAD staccata il salvataggio locale resta (è l'unica
+rete che hanno le sessioni isolate), e a non spedire ci pensa il fatto che non
+esista un ramo dove far atterrare niente. Una guardia scritta larga avrebbe
+smesso di salvare anche il lavoro vero — rimedio peggiore del male.
+
 ### Dove sta il muro, per esattezza
 
 La ruleset su `main` **c'è** (verificato sul campo il 2026-08-21: un push
