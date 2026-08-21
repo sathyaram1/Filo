@@ -59,7 +59,13 @@ export function classifyOwnerMerge(status, body) {
 
   if (status === 200 && r.ok === true) {
     if (r.result === 'merged') return { outcome: 'merged', sha: String(r.sha || '') };
-    if (r.result === 'blocked') return { outcome: 'blocked', reason: String(r.reason || '') };
+    // Bloccata dai controlli: il server non l'ha respinta e basta, ha aperto
+    // una richiesta in attesa. `requestId` vuoto significa che non c'è riuscito
+    // (deposito non raggiungibile, oppure server non ancora rideployato): sono
+    // due situazioni diverse per chi legge, e vanno dette diverse.
+    if (r.result === 'blocked') {
+      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || '') };
+    }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
     return { outcome: 'fault', reason: `risposta inattesa: ${String(r.result || '')}` };
