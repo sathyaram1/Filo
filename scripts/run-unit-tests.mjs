@@ -102,7 +102,10 @@ function main() {
 
   if (listOnly) {
     for (const f of files) console.log(f);
-    process.exit(0);
+    // `exitCode` e non `exit()`: su Windows lo stdout verso una pipe è
+    // asincrono, e uscire di colpo troncherebbe l'elenco.
+    process.exitCode = 0;
+    return;
   }
 
   const r = spawnSync(process.execPath, ['--test', ...flags, ...files], {
