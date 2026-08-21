@@ -92,9 +92,10 @@ describe('da qui sul ramo principale non si scrive', () => {
     // mezz'ora di controlli, questa a non spedire mai il ramo principale.
     const push = codice.indexOf("'push', 'origin'");
     assert.ok(push > 0, 'la spedizione del ramo deve esistere');
-    const prima = codice.slice(0, push);
-    assert.ok(/isProtectedBranch\(branch[^)]*\)\s*\)\s*\{[^}]*exit\(1\)/s.test(prima.slice(prima.lastIndexOf('isProtectedBranch'))),
-      'subito prima della spedizione ci deve essere il rifiuto di spedire il ramo principale');
+    const guardia = codice.lastIndexOf('isProtectedBranch(branch', push);
+    assert.ok(guardia > 0, 'prima di spedire si controlla che non sia il ramo principale');
+    assert.match(codice.slice(guardia, push), /exit\(1\)/, 'e il controllo deve FERMARE, non avvisare');
+    assert.ok(push - guardia < 400, 'la guardia sta attaccata alla spedizione, non a mezzo file di distanza');
   });
 });
 
