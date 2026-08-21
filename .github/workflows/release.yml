@@ -2,20 +2,38 @@
 #
 # COSA FA
 #   A intervalli regolari (cron) controlla se su `main` ci sono commit nuovi
-#   rispetto all'ultima release pubblicata. Se sì: alza la patch version,
-#   builda l'installer NSIS per Windows e lo pubblica come nuova GitHub Release.
-#   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
-#   Se NON ci sono commit nuovi, non fa nulla (niente release inutili).
+#   rispetto all'ultima release pubblicata. Se sì: CHIEDE AL SERVER il numero
+#   della versione nuova, builda l'installer NSIS per Windows e lo pubblica come
+#   nuova GitHub Release. L'auto-update dentro Filo (electron-updater) la vede e
+#   aggiorna i tester. Se NON ci sono commit nuovi, non fa nulla (niente release
+#   inutili).
+#
+# QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
+#   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
+#   adesso scrive UNA SOLA identità, quella del server di sicurezza: la ruleset
+#   non lascia passare nessun altro, e questo lavoro gira su una macchina
+#   qualunque con un token che eredita chiunque ci passi.
+#   Quindi il numero lo chiede: `scripts/release-bump.mjs` bussa al server, che
+#   legge il manifesto vero su `main`, calcola lui il numero successivo e
+#   scrive lui il commit. Da qui non parte nessun `git push`, e non deve
+#   tornarci: se un giorno serve cambiare qualcosa su `main`, si aggiunge al
+#   server, non qui.
 #
 # AUTENTICAZIONE
-#   Usa il GITHUB_TOKEN effimero fornito da Actions a ogni run. NON serve
-#   nessun Personal Access Token salvato. Perché possa creare release e
-#   pushare il bump di versione, le "Workflow permissions" del repo devono
-#   essere su "Read and write" (Settings -> Actions -> General).
+#   · GITHUB_TOKEN effimero di Actions: crea e pubblica la Release. Le
+#     "Workflow permissions" del repo devono essere su "Read and write"
+#     (Settings -> Actions -> General).
+#   · FILO_BUILD_PASSPHRASE: la parola d'ordine di scopo `build`, la stessa che
+#     apre le chiavi di default e l'allarme. Apre SOLO quelle tre cose, e
+#     l'aumento di versione non accetta da qui nessun numero e nessun
+#     contenuto: li decide il server.
 #
 # AVVIO MANUALE
 #   Si puo' lanciare a mano dalla tab "Actions" del repo (Run workflow),
-#   utile per pubblicare subito senza aspettare il cron.
+#   utile per pubblicare subito senza aspettare il cron. Attenzione: il server
+#   ha un freno anti-raffica sull'aumento di versione (un aumento ogni ~20
+#   minuti, al massimo 12 al giorno), quindi due avvii a mano ravvicinati
+#   trovano un rifiuto — voluto, non un guasto.
 
 name: Release Filo (Windows)
 
@@ -25,7 +43,7 @@ on:
   workflow_dispatch: {}      # pulsante "Run workflow" manuale
 
 permissions:
-  contents: write            # creare release + pushare il bump di versione su main
+  contents: write            # creare e pubblicare la Release (non serve piu' per scrivere su main)
 
 concurrency:
   group: filo-release
@@ -133,23 +151,47 @@ jobs:
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
         run: node scripts/bake-default-config.mjs
 
-      - name: Bump patch version e push su main
+      # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────
+      # Prima qui si faceva `npm version patch` + `git push origin HEAD:main`.
+      # Su `main` adesso scrive solo l'identità del server (ruleset), e questo
+      # lavoro non deve poterci scrivere: chiede, e basta.
+      #
+      # Il server legge il manifesto vero su `main`, calcola lui il numero
+      # successivo e scrive lui il commit `release: vX.Y.Z [skip ci]`. Da qui
+      # non parte nessun numero e nessun contenuto.
+      #
+      # Codici d'uscita dello script: 0 fatto · 2 rifiutato (freno anti-raffica,
+      # parola d'ordine, manifesto) · 3 server non raggiungibile. In tutti e tre
+      # i casi diversi da zero il lavoro si ferma: costruire senza sapere quale
+      # numero è su `main` pubblicherebbe sopra una release già esistente.
+      - name: Chiedi al server il numero della versione nuova
         if: steps.check.outputs.should_release == 'true'
         id: bump
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
         shell: bash
         run: |
-          git config user.name "filo-release-bot"
-          git config user.email "release-bot@users.noreply.github.com"
-          npm version patch --no-git-tag-version
-          VERSION=v$(node -p "require('./package.json').version")
-          git commit -am "release: ${VERSION} [skip ci]"
-          # Atterra su main, rifacendo il rebase se nel frattempo la routine ha pushato.
-          for i in 1 2 3; do
-            if git push origin HEAD:main; then break; fi
-            git pull --rebase origin main || exit 1
-          done
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          set -e
+          VERSION=$(node scripts/release-bump.mjs)
+          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
 
+      # La copia di lavoro è rimasta a prima del commit del server: senza questa
+      # lettura, electron-builder costruirebbe col numero VECCHIO e pubblicherebbe
+      # sopra una release già esistente. È una lettura e basta — nessuna scrittura
+      # su main parte da qui.
+      - name: Allinea la copia di lavoro a main (lettura)
+        if: steps.check.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          set -e
+          git pull --rebase origin main
+          LOCALE=$(node -p "require('./package.json').version")
+          ATTESA="${{ steps.bump.outputs.version }}"
+          if [ "v${LOCALE}" != "$ATTESA" ]; then
+            echo "::error::il manifesto qui dice v${LOCALE}, il server ha scritto ${ATTESA}: non costruisco alla cieca."
+            exit 1
+          fi
+          echo "Si costruisce ${ATTESA}."
 
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'

@@ -24,8 +24,23 @@ ruolo che ti viene consegnato.
 - **Salvataggio automatico**: a ogni modifica di file un hook committa e pusha
   il TUO ramo, da solo. È il trasporto del lavoro — rende il ramo visibile a
   verifica e server — oltre che il paracadute se la sessione muore.
-- **Su `main` si arriva SOLO dal cancello di merge** (routine) **o da
-  `npm run finish`** (locale). Mai un push diretto su `main`.
+- **Su `main` scrive SOLO il server.** Il muro sta su GitHub: una regola di
+  protezione del repo lascia scrivere la sola identità del server (una GitHub
+  App). Le credenziali locali capaci di fare un push esistono ancora — quello
+  che non esiste più è un push su `main` che vada a buon fine: **viene
+  respinto** (verificato sul campo). Le due strade — il cancello di merge
+  (routine) e `npm run finish` (locale) — sono due modi di CHIEDERE al server di
+  fondere; lui scarica il diff, fa girare i controlli deterministici e fonde con
+  un'identità sua.
+- **Anche gli automatismi locali si astengono da `main`**, e non perché servano
+  al muro: un automatismo che tenta e viene respinto in silenzio è un guasto
+  invisibile (è già successo — un ramo che non si salvava più da giorni senza
+  che nessuno lo sapesse), e una difesa appesa a un muro solo cade con quel
+  muro. Salvataggio automatico e diagnostico non committano e non spediscono un
+  ramo protetto (`main`, `master`, il default di origin): lo scrivono nei log e
+  proseguono. Conseguenza pratica: **se lavori in una cartella che si trova su
+  `main`, il tuo lavoro non viene salvato**. Spostalo su un ramo suo:
+  `git worktree add .claude/worktrees/<nome> -b claude/<nome>`.
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
   `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
   tracciato: `git rm --cached <file>`.

@@ -61,6 +61,38 @@ export function headSha(root) {
 // ─── Logica pura (unit-testata) ──────────────────────────────────────────────
 
 /**
+ * I nomi che NON sono rami di lavoro. Il valore è INCHIODATO, non preso
+ * dall'ambiente: qui è una guardia, e una guardia che si sposta con una
+ * variabile non è una guardia (stessa regola di scripts/finish-local.mjs).
+ * `master` c'è perché il repo potrebbe cambiare convenzione senza che questo
+ * file lo sappia: la guardia sbaglia in direzione sicura.
+ */
+export const RAMI_PROTETTI = Object.freeze(['main', 'master']);
+
+/**
+ * Questo nome è la linea principale invece che un ramo di lavoro? PURA.
+ *
+ * Gli endpoint di fusione del server rifiutano già `main`; qui il controllo
+ * mancava, e una routine poteva ritrovarsi a PRODURRE direttamente sulla linea
+ * principale — dove il lavoro non ha modo di arrivare agli utenti (il cancello
+ * fonde un RAMO) e dove sporcherebbe la copia locale. È l'incidente #378 preso
+ * un passo prima: non "il verdetto è stato dato sull'albero sbagliato", ma "il
+ * lavoro è stato fatto sull'albero sbagliato".
+ *
+ * `mainBranch` (la linea principale dichiarata dal chiamante) si AGGIUNGE ai
+ * nomi inchiodati, non li sostituisce. Un nome vuoto conta come protetto: nel
+ * dubbio non ci si lavora.
+ */
+export function isProtectedBranch(name, mainBranch = '') {
+  const norm = (s) => String(s || '').trim()
+    .replace(/^refs\/heads\//, '').replace(/^origin\//, '').toLowerCase();
+  const b = norm(name);
+  if (!b || b === 'head') return true;
+  const m = norm(mainBranch);
+  return RAMI_PROTETTI.includes(b) || (!!m && b === m);
+}
+
+/**
  * Marcatore di tentativo: `20260807T195800Z`. Sta dentro i caratteri ammessi da
  * merge-gate.isValidBranch e ordina cronologicamente come stringa.
  */
@@ -253,6 +285,12 @@ function commitExists(g, sha) {
 export function prepareBranch({ root, branch, create = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
   const g = gitIn(root);
   if (!branch) return { ok: false, kind: 'transient', message: 'nessun branch da preparare' };
+  // Sulla linea principale non si LAVORA: il cancello fonde un ramo, quindi un
+  // lavoro fatto lì non ha modo di arrivare agli utenti — e intanto sporcherebbe
+  // la copia locale. Guasto PERMANENTE: riprovare ogni 6 ore non lo aggiusta.
+  if (isProtectedBranch(branch, mainBranch)) {
+    return { ok: false, kind: 'permanent', message: `"${branch}" è la linea principale, non un ramo di lavoro` };
+  }
   if (!g(['rev-parse', '--git-dir']).ok) return { ok: false, kind: 'transient', message: 'la directory non è un repo git' };
 
   if (create) {
@@ -309,7 +347,11 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     const reset = g(['reset', '--hard', target]);
     if (!reset.ok) return { ok: false, kind: 'transient', message: `ripristino di ${branch} fallito: ${reset.out.slice(0, 200)}` };
     // Riallinea origin SOLO se i commit scartati sono al sicuro anche là.
-    if (pushed) g(['push', '--force-with-lease', 'origin', `${branch}:${branch}`]);
+    // Destinazione pienamente qualificata come sopra: `origin <ramo>:<ramo>`
+    // già non è dirottabile dalla configurazione, ma la forma refs/heads/… è
+    // l'unica che si può controllare a colpo d'occhio (e con cui una sentinella
+    // può dire "qui nessuno spedisce senza dire dove").
+    if (pushed) g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
     if (!parked) discarded = null;
   } else {
     g(['reset', '--hard', target]);

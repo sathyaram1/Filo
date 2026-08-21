@@ -10,7 +10,7 @@
     "predev": "git -c user.email=claude@local -c user.name=claude-local pull --rebase --autostash origin main || git rebase --abort || echo \"[predev] git pull saltato\"",
     "dev": "electron . --enable-logging",
     "test:smoke": "node tests/smoke.mjs",
-    "test:unit": "node --test \"tests/unit/**/*.test.mjs\"",
+    "test:unit": "node scripts/run-unit-tests.mjs",
     "transparency": "node scripts/build-transparency.mjs",
     "test": "playwright test",
     "test:headed": "playwright test --headed",

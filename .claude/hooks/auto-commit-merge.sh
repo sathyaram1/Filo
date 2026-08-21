@@ -1,29 +1,59 @@
 #!/bin/bash
-# Auto-commit + merge + push hook.
+# Hook di SALVATAGGIO: committa e spedisce il ramo di lavoro, a ogni modifica.
 #
-# Two modes of operation:
+# Cosa fa, e basta: per ogni cartella di lavoro del repo, se ci sono modifiche
+# le committa sul ramo che quella cartella ha sotto i piedi e spedisce QUEL ramo
+# su origin. E' il trasporto del lavoro (lo rende visibile a verifica e server)
+# e il paracadute se la sessione muore di colpo.
 #
-# 1) MULTI-WORKTREE (local Windows setup): there's a dedicated worktree on the
-#    integration branch (TARGET_BRANCH, default "main"). Feature branches in
-#    other worktrees get auto-committed and merged into TARGET_BRANCH in that
-#    worktree, which is then pushed to origin.
+# Cosa NON fa (e non deve tornare a fare): fondere, e toccare il ramo
+# principale. La fusione automatica c'era fino al 2026-08-07 ed e' stata tolta
+# (il perche' e' scritto piu' sotto); sul ramo principale questo hook non
+# committa e non spedisce, in nessuna forma del repo — vedi is_main_line.
 #
-# 2) SINGLE-WORKTREE (claude.ai cloud routines): only one worktree exists,
-#    checked out on a feature branch. The merge-into-other-worktree path is
-#    impossible. Instead we auto-commit, push the feature branch (for
-#    traceability) AND push HEAD directly to origin/TARGET_BRANCH (fast-forward
-#    only). This lands the routine's work on main without needing a PR.
-#
-# Designed to be idempotent and safe: silently does nothing if there's nothing
-# to commit. Failures are logged to stderr but never fail the hook itself.
+# Idempotente e silenzioso: se non c'e' niente da salvare non fa niente. Non
+# fallisce mai per contratto (esce sempre 0); quando si astiene lo dice su
+# stderr e prosegue.
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR" || exit 0
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
-# The integration branch. Default "main". Override via FILO_MAIN_BRANCH.
-TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"
+# ─── I RAMI CHE QUESTO AUTOMATISMO NON TOCCA MAI ─────────────────────────────
+#
+# Fino al 2026-08-21 qui c'era `TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"`: il
+# nome del ramo principale preso dall'AMBIENTE, e usato come guardia. Una
+# guardia che si sposta con una variabile non e' una guardia — bastava
+# esportarne una perche' "sei sul ramo principale" diventasse falso e la riga
+# che spedisce il ramo spedisse il ramo principale, a ogni singola modifica.
+# E' la stessa forma tolta da scripts/finish-local.mjs, rimasta nel file accanto.
+#
+# Adesso i nomi sono INCHIODATI: `main` e `master` (il repo potrebbe cambiare
+# convenzione senza che questo file lo sappia — la guardia sbaglia in direzione
+# sicura). Il default DICHIARATO da origin si AGGIUNGE ai due, non li
+# sostituisce: se qualcuno riuscisse a raccontare un default diverso, main e
+# master resterebbero comunque protetti.
+#
+RAMO_DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+
+# La linea principale, comunque sia scritto il nome. Una HEAD staccata NON e' la
+# linea principale: e' "nessun ramo", e si tratta a parte (is_spedibile) — li' il
+# salvataggio locale resta, e' il paracadute, e non c'e' niente da spedire.
+is_main_line() {
+  local b="${1#refs/heads/}"; b="${b#origin/}"
+  b=$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')
+  [ -z "$b" ] && return 1
+  case "$b" in main|master) return 0 ;; esac
+  [ -n "$RAMO_DEFAULT" ] && [ "$b" = "$(printf '%s' "$RAMO_DEFAULT" | tr '[:upper:]' '[:lower:]')" ] && return 0
+  return 1
+}
+
+# Un ramo che questo automatismo puo' spedire: deve essere un ramo (non una HEAD
+# staccata) e non essere la linea principale. Nel dubbio: no.
+is_spedibile() {
+  [ -n "$1" ] && [ "$1" != "HEAD" ] && ! is_main_line "$1"
+}
 
 # ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
 #
@@ -67,24 +97,40 @@ else
   COMMIT_AS_EMAIL="claude@local"
 fi
 
-# Find a worktree (if any) that has TARGET_BRANCH checked out.
-TARGET_WT=$(git worktree list --porcelain | awk -v tb="refs/heads/$TARGET_BRANCH" '
-  /^worktree /{wt=substr($0,10)}
-  /^branch /{if ($2 == tb) {print wt; exit}}
-')
+# (Qui si cercava la cartella che aveva il ramo principale, per fonderci dentro
+# i rami di lavoro. La fusione automatica non esiste piu' dal 2026-08-07 e quella
+# ricerca non serviva piu' a nessuno.)
 
-# 1) Commit pending changes in every worktree, and (multi-worktree mode only)
-#    merge each feature branch into the TARGET worktree.
+# 1) Commit pending changes in every worktree.
 git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while IFS= read -r wt; do
   [ -d "$wt" ] || continue
   cd "$wt" || continue
+
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+  # ─── SUL RAMO PRINCIPALE NON SI COMMITTA ───────────────────────────────────
+  #
+  # Se una sessione modifica file mentre la cartella si trova sul ramo
+  # principale, questo hook ci committava sopra. Quel lavoro non ha nessun modo
+  # di arrivare agli utenti — al ramo principale ci si arriva solo dal cancello,
+  # che fonde un RAMO — e intanto sporca la copia locale del ramo principale,
+  # che al prossimo `git pull` diverge o si trascina dietro commit che nessuno
+  # ha esaminato.
+  #
+  # Astenersi non e' un errore: le modifiche restano nella cartella (niente e'
+  # perso), lo si dice a voce chiara e si prosegue.
+  if is_main_line "$BRANCH"; then
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+      echo "[auto-commit] '$wt' si trova sul ramo principale ('$BRANCH'): NON committo e NON spedisco. Le modifiche sono ancora li'. Spostale in una cartella dedicata: git worktree add .claude/worktrees/<nome> -b claude/<nome>" >&2
+    fi
+    continue
+  fi
 
   git add -A 2>/dev/null
   if git diff --cached --quiet 2>/dev/null; then
     continue
   fi
 
-  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
   # Commit message: list the changed files (first 3 + count) instead of a bare
   # timestamp, so `git log` stays useful for archaeology. Git already records
   # the date; the file list is the only signal the hook can cheaply provide.
@@ -109,14 +155,24 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   # Durabilita': ogni ramo di lavoro viene spedito subito. E' il pezzo che ha
   # salvato il lavoro dopo le interruzioni improvvise, e vale anche in locale
   # ora che la fusione sul ramo principale e' differita.
-  if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ] && [ "$BRANCH" != "$TARGET_BRANCH" ]; then
-    git push origin "$BRANCH" >/dev/null 2>&1 || true
+  #
+  # LA DESTINAZIONE SI DICHIARA. `git push origin "$BRANCH"` dice a git COSA
+  # spedire ma non DOVE: la destinazione la sceglie la configurazione locale.
+  # Con `push.default=upstream` (o `tracking`) e
+  # `branch.<ramo>.merge=refs/heads/main` — che git imposta DA SE' quando un
+  # ramo nasce da origin/main, cioe' gia' cosi' su ogni ramo di lavoro — questa
+  # riga scriverebbe su refs/heads/main. A OGNI Edit. Sono `git config`: un file
+  # non versionato, nessuna credenziale, invisibile a chi guarda il diff.
+  # Il refspec sorgente:destinazione pienamente qualificato toglie la scelta
+  # alla configurazione.
+  #
+  # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
+  # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
+  if is_spedibile "$BRANCH"; then
+    git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
   fi
 
 done
-
-# 2) Push to origin. Logic differs per mode.
-git remote get-url origin >/dev/null 2>&1 || exit 0
 
 # ─── NESSUNA pubblicazione automatica sul ramo principale ────────────────────
 #
@@ -124,7 +180,7 @@ git remote get-url origin >/dev/null 2>&1 || exit 0
 # su un ramo di lavoro), questo hook NON fa mai atterrare niente sul ramo
 # principale. Ci si arriva solo da:
 #
-#   - `npm run finish`            (locale: controlli, poi fusione e push)
+#   - `npm run finish`            (locale: controlli, poi si chiede la fusione)
 #   - `scripts/merge-gate.mjs`    (routine: dopo verifica e controlli di sicurezza)
 #
 # La regola non dipende da FILO_ROUTINE: quella marcatura distingue le
@@ -133,11 +189,8 @@ git remote get-url origin >/dev/null 2>&1 || exit 0
 # 24 luglio 2026 in persona, quando un'istanza che lavorava sul ramo principale
 # ha pubblicato senza passare dal cancello.
 #
-# Il lavoro non si perde: ogni ramo e' gia' stato committato e spedito qui sopra.
-cd "$PROJECT_DIR" || exit 0
-CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
-  echo "[auto-commit] Sei sul ramo '$TARGET_BRANCH': il lavoro e' salvato ma NON pubblicato. Lancia 'npm run finish' quando hai finito (esegue i controlli e pubblica)." >&2
-fi
+# Il lavoro non si perde: ogni ramo di lavoro e' gia' stato committato e spedito
+# qui sopra. Una cartella che si trova sul ramo principale non viene toccata, e
+# l'hook lo dice riga per riga nel ciclo — qui non serve ripeterlo.
 
 exit 0

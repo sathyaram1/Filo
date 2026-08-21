@@ -316,8 +316,24 @@ L'hook faceva **due cose** che vanno separate: salvare e spedire il proprio ramo
 (prezioso — è ciò che ha salvato questo stesso lavoro dopo due interruzioni), e
 fondere sul ramo principale (il problema). Solo la seconda è cambiata.
 
-`npm run finish` esegue i controlli e **solo se sono verdi** fonde e pubblica.
+`npm run finish` esegue i controlli e **solo se sono verdi** chiede la fusione.
 `npm run finish:check` esegue i soli controlli.
+
+**Dal 2026-08-20 non fonde più lui**: spedisce il ramo e chiede al server, che
+è l'unico a poter scrivere sul ramo principale (`ROUTINE-AUTH-SPEC.md` §11).
+Restava infatti la porta accanto — una credenziale capace di pubblicare, viva
+sulla macchina dove gira un'istanza — e finché c'era, tutto il resto di questa
+spec era aggirabile senza convincere nessuno.
+
+**Dove sta il muro, per esattezza**: su GitHub. La credenziale locale non è
+stata tolta e non si può togliere (serve a spedire i rami); a respingere il push
+è la **regola di protezione del repo**, che lascia scrivere sul ramo principale
+la sola identità del server. Verificato sul campo il 2026-08-21: un push diretto
+su `main` da questa macchina viene rifiutato (`push declined due to repository
+rule violations`). Le guardie locali — negli script e negli hook — restano, e
+non come ridondanza inutile: un automatismo che tenta e viene respinto **in
+silenzio** è un guasto invisibile, ed è già costato un ramo che non si salvava
+più da giorni senza che nessuno lo sapesse.
 
 La regola "non lanciare mai la suite completa in locale" è stata **rimossa** da
 `CLAUDE.md`: nasceva da quando il grosso del lavoro si faceva in locale. Oggi in

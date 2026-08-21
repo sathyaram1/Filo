@@ -21,7 +21,7 @@ import {
   attemptStamp, newWorkBranch, identityVerdict,
   withCheckpoint, lastCheckpoint, CHECKPOINT_CAP,
   bumpRejects, clearRejects, IDENTITY_REJECT_LIMIT,
-  discardedBranchName, prepareBranch, checkDelivery, guardTransition,
+  discardedBranchName, prepareBranch, checkDelivery, guardTransition, isProtectedBranch,
   escalationNote, currentBranch, headSha,
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
@@ -138,6 +138,39 @@ describe('A — posizionarsi sul branch (prepareBranch)', () => {
     git(work, ['branch', 'worker/gia-usato']);
     const r = prepareBranch({ root: work, branch: 'worker/gia-usato', create: true });
     assert.equal(r.ok, false, 'riusare un nome riporterebbe il guasto che il nome unico elimina');
+  });
+
+  // Gli endpoint di fusione del server rifiutano già `main`; qui il controllo
+  // mancava, e la directory poteva essere posizionata sulla linea principale
+  // per PRODURRE. Il lavoro fatto lì non ha modo di arrivare agli utenti (il
+  // cancello fonde un ramo) e intanto sporca la copia locale.
+  test('la linea principale NON è un ramo di lavoro: non ci si posiziona sopra', () => {
+    const { work } = makeRepo();
+    git(work, ['checkout', '-q', '-b', 'worker/dove-siamo-adesso']);
+    for (const nome of ['main', 'master', 'refs/heads/main', 'origin/main', 'MAIN']) {
+      const r = prepareBranch({ root: work, branch: nome });
+      assert.equal(r.ok, false, `"${nome}" non deve essere accettato come ramo di lavoro`);
+      assert.equal(r.kind, 'permanent', 'riprovare ogni 6 ore non aggiusta un ramo che non è un ramo di lavoro');
+    }
+    assert.equal(currentBranch(work), 'worker/dove-siamo-adesso',
+      'e la directory non deve essere stata spostata mentre ci provava');
+  });
+
+  test('vale anche in creazione, e anche per la linea principale dichiarata dal chiamante', () => {
+    const { work } = makeRepo();
+    assert.equal(prepareBranch({ root: work, branch: 'main', create: true }).ok, false);
+    assert.equal(prepareBranch({ root: work, branch: 'produzione', mainBranch: 'produzione' }).ok, false,
+      'la linea principale è protetta comunque si chiami');
+  });
+
+  test('isProtectedBranch: i due nomi inchiodati non dipendono da cosa dichiara il chiamante', () => {
+    assert.equal(isProtectedBranch('main'), true);
+    assert.equal(isProtectedBranch('master'), true);
+    assert.equal(isProtectedBranch('main', 'qualcosaltro'), true,
+      'se qualcuno raccontasse una linea principale diversa, main resterebbe protetto');
+    assert.equal(isProtectedBranch(''), true, 'nel dubbio è protetto');
+    assert.equal(isProtectedBranch('worker/12-20260821T120000Z'), false);
+    assert.equal(isProtectedBranch('claude/ridisegno-max'), false);
   });
 });
 

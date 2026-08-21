@@ -263,24 +263,185 @@ Da oggi la fusione è una consegna del canale come le altre:
      **registrati** da consegne validate — e registrati su *quel* ramo. Un
      verdetto raccontato nel corpo (il vecchio `FILO_L4_VERDICT`) non esiste
      come input: nessuno lo legge;
-  3. **L5 deterministico** sul diff `main...ramo` che il server **scarica da
+  3. la **punta vera** del ramo, risolta una volta sola: da qui in poi si parla
+     di quello sha e mai più del nome (vedi "si esamina e si fonde lo stesso
+     commit", più sotto);
+  4. **L5 deterministico** sul diff `main...<sha>` che il server **scarica da
      GitHub** — mai su un diff consegnato dal chiamante. Qualunque trip →
      `blocked`, con l'elenco dei trip, e il blocco finisce nel registro dei
      rifiuti;
-  4. fusione **via API GitHub con l'identità del server** (token nei Secret
-     delle functions, letto in un punto solo: oggi un PAT di un account
-     macchina, domani una GitHub App senza toccare il resto). Conflitto →
-     `conflict`, niente fusione.
+  5. fusione di **quello sha**, via API GitHub con l'identità del server.
+     Conflitto → `conflict`, niente fusione.
 - **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
   e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
   1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
   sono spariti da questa macchina: qui non c'è più niente da convincere.
 
-Il pezzo che rende il muro fisico è un **passo dell'owner**, fuori da questa
-spec: la ruleset su `main` nel repo GitHub, con bypass per la sola identità
-del server (e per l'owner). Da lì in poi il push diretto da una sessione non è
-vietato: è **impossibile**. Finché la ruleset non c'è, il rischio residuo resta
-quello documentato dall'incidente #378 — il cancello ora è non convincibile,
-ma la porta accanto è ancora fisicamente aperta. (`npm run finish` locale
-continua col push diretto dell'owner finché la ruleset non esiste; la sua
-migrazione si decide con l'owner presente.)
+### L'identità del server: una GitHub App (2026-08-20)
+
+Il token di fusione era un PAT di un account macchina: l'identità di *qualcuno*,
+con i suoi permessi e la sua storia. Adesso è una **GitHub App** installata sul
+solo repo pubblico, con i permessi minimi (contenuti in scrittura, metadati in
+lettura). Non appartiene a nessuno, si revoca senza toccare persone, e il token
+con cui parla **dura un'ora e se lo rigenera da sé**: l'unico segreto di lunga
+vita è la chiave privata, che vive nei Secret delle functions.
+
+- Segreti, **due soli**: `GH_APP_ID` (l'App ID numerico **oppure** il Client ID
+  — per GitHub è solo la stringa nel mittente del JWT) e `GH_APP_PRIVATE_KEY`
+  (il PEM intero).
+- Il **numero dell'installazione** (oggi `155205894`) **non è un segreto** e non
+  è un Secret: dice solo "questa App, su questo repo", e senza la chiave privata
+  non apre niente. Il server se lo scopre chiedendolo a GitHub e se lo ricorda —
+  è il cammino normale. Dichiararlo come segreto costringerebbe a crearne uno in
+  Secret Manager solo per far passare il deploy, e a lasciare in giro un
+  segnaposto che qualcuno domani scambia per una credenziale. Chi vuole
+  risparmiare quella chiamata lo inchioda con `FILO_GH_INSTALLATION_ID`
+  (variabile d'ambiente normale); un valore che non è un numero viene ignorato e
+  si torna a scoprire — è un'ottimizzazione, non un confine.
+- Permessi dell'App: **contenuti in scrittura** (per fondere) e **metadati in
+  lettura**. Nient'altro.
+- `GH_MERGE_TOKEN` resta come **ripiego**. La scelta fra le due identità sta in
+  un punto solo (`src/routine/github.js`): App se c'è, altrimenti PAT,
+  altrimenti `github_no_token` — e nessuna fusione tentata alla cieca.
+
+### Anche il finish locale passa dal server: `ownerMerge` (2026-08-20)
+
+Il cancello aveva tolto alla macchina delle routine il potere di scrivere su
+`main`, ma restava la **porta accanto**: `npm run finish` fondeva e pubblicava
+dalla sessione locale, con le credenziali dell'owner — sulla stessa macchina
+dove gira un LLM che legge testo di sconosciuti. Finché quella porta c'era, il
+muro non era un muro.
+
+- **`ownerMerge` `{ branch, sha? }`** — chiamata riservata all'owner
+  autenticato (stesso perimetro di `routineKeys`/`routineStateAdmin`). Il
+  server: valida il nome del ramo → risolve la **punta vera** del ramo su
+  GitHub (e se lo `sha` è dichiarato pretende che combaci: diverso → `stale`,
+  niente fusione, i controlli locali riguardavano un altro codice) → fa girare
+  **L5** sul diff di quella punta, che scarica lui (trip → `blocked`) → fonde
+  quella punta con l'identità dell'App (409 → `conflict`). Esiti e guasti nello
+  stesso vocabolario di `routineMerge`.
+- **Cosa NON chiede**: i verdetti registrati di verifica e sicurezza. Quelli
+  sono il vocabolario delle routine; il lavoro locale ha i suoi controlli
+  (logica pura, spec mirati, verifica indipendente) che girano prima. **L5
+  invece gira lo stesso**: è il livello che nessuno può raccontare, e vale
+  anche per l'owner.
+- **`npm run finish`** non fa più `checkout`, `merge`, `push origin main`:
+  spedisce il ramo, chiede la fusione, traduce l'esito. Esce con zero **solo**
+  se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
+  senso e viene fermato subito.
+
+### Si esamina e si fonde LO STESSO commit (2026-08-21, verifica avversariale)
+
+La prima versione del cancello scaricava il diff di `main...<ramo>` e poi
+chiedeva a GitHub di fondere **il ramo per nome**. Fra le due chiamate la punta
+del ramo può spostarsi — e chi lavora ha per costruzione il permesso di
+spingere sul proprio ramo: bastava spingere un commit in quella finestra (e
+riprovare finché non riusciva) per far atterrare su `main` codice che L5 non
+aveva mai visto. Il difetto valeva su entrambi i cammini, `routineMerge` e
+`ownerMerge`, e lo `sha` dichiarato non lo chiudeva: veniva confrontato prima,
+ma la fusione continuava a partire dal nome.
+
+Da oggi, su **tutti e due** i cammini:
+
+- la punta del ramo si **risolve una volta sola**, all'inizio del giro; da lì
+  in poi il nome del ramo non decide più niente;
+- il confronto (l'input di L5) e la fusione lavorano su **quello sha**. Le due
+  chiamate a GitHub rifiutano un nome di ramo: se ne arriva uno, è un errore
+  dichiarato, non una fusione alla cieca;
+- il **messaggio** del commit di fusione continua a dire il nome del ramo:
+  serve a leggere la storia, non a scegliere cosa fondere;
+- lo `sha` **dichiarato** dal cammino owner resta, ma è solo un controllo in
+  più ("i controlli locali giravano su questo"): non combacia → `stale`. La
+  sicurezza non dipende dal fatto che il chiamante lo dichiari — la punta vera
+  si chiede comunque.
+- il cammino delle routine registra anche **quale punta è stata fusa**,
+  accanto al commit di fusione: è l'unica risposta possibile a "quale contenuto
+  è atterrato su `main`".
+
+Stesso giro, dal lato locale: il nome del ramo principale in `npm run finish`
+**non si prende più dall'ambiente**. Era una guardia appesa a una variabile:
+impostandola, "sei sul ramo principale" diventava falso e il passo che spedisce
+il ramo spediva `main` su `origin` con le credenziali della macchina, prima
+ancora di parlare col server. Adesso il valore è inchiodato, e la spedizione
+rifiuta esplicitamente `main`, `master` e il ramo di default del repo.
+
+### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
+
+La stessa forma — `TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"` — era rimasta nel
+file accanto, l'hook di salvataggio (`.claude/hooks/auto-commit-merge.sh`), e il
+diagnostico dei limiti (`.claude/hooks/cap-observe.sh`) spediva il ramo corrente
+senza chiedersi quale fosse. Chiusi entrambi:
+
+- il nome del ramo principale è **inchiodato** nei due hook (`main`, `master`,
+  più il default dichiarato da origin, che si aggiunge e non sostituisce);
+- una cartella che si trova sul ramo principale non viene più **committata**:
+  quel lavoro non ha modo di arrivare agli utenti (si fonde un RAMO) e intanto
+  sporcava la copia locale. Le modifiche restano dove sono;
+- astenersi **si dice**: entrambi gli hook scrivono su stderr perché non hanno
+  toccato niente, e proseguono. Un automatismo che si ferma in silenzio è la
+  classe di guasto che ha già prodotto un ramo non salvato per giorni.
+
+La guardia riguarda **la linea principale**, non "tutto ciò che non è un ramo di
+lavoro": in una cartella a HEAD staccata il salvataggio locale resta (è l'unica
+rete che hanno le sessioni isolate), e a non spedire ci pensa il fatto che non
+esista un ramo dove far atterrare niente. Una guardia scritta larga avrebbe
+smesso di salvare anche il lavoro vero — rimedio peggiore del male.
+
+### Dove sta il muro, per esattezza
+
+La ruleset su `main` **c'è** (verificato sul campo il 2026-08-21: un push
+diretto da questa macchina viene respinto con `push declined due to repository
+rule violations`), e l'unica identità ammessa è quella della GitHub App.
+
+Il muro sta quindi **su GitHub**, non su questa macchina: le credenziali locali
+capaci di fare un push esistono ancora — servono a spedire i rami di lavoro — e
+non è vero, come si è scritto altrove, che da qui non ci sia più niente in grado
+di scrivere. Quello che non c'è più è un push su `main` che **riesca**.
+
+Le guardie locali (`finish-local.mjs`, i due hook, `branch-integrity.mjs`)
+restano per due motivi, entrambi indipendenti dal muro: un tentativo respinto in
+silenzio è un guasto invisibile, e una difesa che dipende da un solo muro cade
+con quel muro.
+
+## 12. Anche il numero di versione lo scrive il server: `releaseBump` (2026-08-21)
+
+Con la ruleset su `main` attiva, l'ultimo che ci scriveva senza passare dal
+server era il **lavoro di pubblicazione**: ogni sei ore alzava la patch version
+con `npm version patch` e faceva `git push origin HEAD:main`. Quel push adesso
+verrebbe respinto — e non deve nemmeno essere tentato: quel lavoro gira su una
+macchina qualunque, con un token che eredita chiunque ci passi.
+
+Il numero **resta nel manifesto del repo** (le note di rilascio per l'utente
+sono organizzate per versione: senza quel numero non lo raggiungerebbero più),
+ma a scriverlo è il server.
+
+- **`releaseBump` `{ passphrase }` → `{ ok, version, previous, sha }`** — stessa
+  **parola d'ordine di scopo `build`** di `buildKeys` e `buildAlarm`, e nessun
+  potere in più. Il server, in ordine e fail-closed:
+  1. riconosce la parola d'ordine (scopo `build`, non il nome della chiave);
+  2. **freno anti-raffica** prima di toccare GitHub: al massimo un aumento ogni
+     20 minuti e 12 al giorno, con lo stato su Firestore
+     (`routine-state/release`) e non in memoria — le istanze muoiono e si
+     moltiplicano, e un freno che si azzera a ogni riavvio non frena. Il cron
+     pubblica ogni sei ore: nessuno dei due tetti intralcia l'uso onesto;
+  3. legge `package.json` **da `main`, via API**, col suo `sha` di blob;
+  4. **calcola lui** il numero successivo (aumento della patch). Nessun numero
+     che arrivi dal chiamante viene letto;
+  5. **costruisce lui** il contenuto nuovo partendo da quello vecchio, e
+     verifica due volte che cambi SOLO la versione (una riga sola diversa nel
+     testo; manifesto identico una volta riletto come dati). Se una delle due
+     non torna, non si scrive niente;
+  6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
+     legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
+     GitHub risponde 409 e non si scrive.
+- **Perché non si accetta il contenuto dal chiamante**: sarebbe un push diretto
+  su `main` travestito da aumento di versione — cioè il buco che §11 ha chiuso,
+  riaperto da un'altra porta.
+- **`scripts/release-bump.mjs`** è il citofono: chiede, stampa il numero nuovo
+  su stdout e basta. Exit `0` fatto · `2` rifiutato (freno, parola d'ordine,
+  manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
+  pubblicazione poi **rilegge** `main` (una lettura, `git pull --rebase`) e si
+  ferma se il numero non combacia: costruire col numero vecchio pubblicherebbe
+  sopra una release già esistente.
+- Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
+  o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.

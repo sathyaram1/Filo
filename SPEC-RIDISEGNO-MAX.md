@@ -204,6 +204,53 @@ Chiusura (si incastra nell'architettura del canale #477):
 - finché non è implementato, il rischio residuo resta documentato (è la coda
   dell'incidente #378 / spec integrità dei rami).
 
+**Fatto il 2026-08-20** (dettaglio in `ROUTINE-AUTH-SPEC.md` §11). Le due cose
+da decidere all'implementazione sono decise così:
+
+- l'identità del server è una **GitHub App** installata sul solo repo pubblico
+  (il PAT resta come ripiego): non è l'account di nessuno e il token con cui
+  parla dura un'ora;
+- **anche il finish locale passa dal server** (`ownerMerge`): niente più
+  fusione né push da questa macchina. Non pretende i verdetti registrati — quelli
+  sono il vocabolario delle routine — ma **L5 gira lo stesso**, e lo `sha`
+  dichiarato deve combaciare con la punta vera del ramo.
+
+La **ruleset su `main`** (passo dell'owner) è stata messa il **2026-08-20**: da
+lì il push diretto da una sessione non è più vietato a parole. Riverificato sul
+campo il **2026-08-21**: un push da questa macchina con le credenziali
+dell'owner viene **respinto** (`push declined due to repository rule
+violations`); l'unica identità ammessa è la GitHub App del server.
+
+Il muro sta quindi su GitHub, **non** sulla macchina: le credenziali locali
+esistono ancora (servono a spedire i rami di lavoro). Per questo le difese
+locali restano, e sono state completate il 2026-08-21 anche sugli **automatismi**
+— salvataggio e diagnostico non committano né spediscono un ramo protetto, e
+quando si astengono lo dicono. Due motivi, nessuno dei quali è il muro: un
+tentativo respinto in silenzio è un guasto invisibile, e una difesa appesa a un
+muro solo cade con quel muro.
+
+### Il numero di versione lo scrive il server (2026-08-21, variante)
+
+Con la ruleset attiva, l'ultimo che scriveva su `main` senza passare dal server
+era il lavoro di **pubblicazione**: ogni sei ore alzava la patch version e la
+pushava. Deciso con l'owner: il numero **resta nel manifesto del repo** — le
+note di rilascio per l'utente sono organizzate per versione, e senza quel
+numero smetterebbero di raggiungerlo — ma a scriverlo su `main` è il server,
+l'unico che può.
+
+- **`releaseBump`** (filo-security, parola d'ordine di scopo `build` come
+  `buildKeys`/`buildAlarm`): legge il manifesto vero su `main`, calcola lui il
+  numero successivo, e scrive lui un commit che cambia **solo** il campo della
+  versione. Dal chiamante non si accetta niente — né il numero, né il
+  contenuto, né il ramo: accettarli sarebbe un push diretto travestito.
+- **Freno anti-raffica** con lo stato sul server: al massimo un aumento ogni 20
+  minuti e 12 al giorno (il cron pubblica ogni sei ore: non intralcia).
+- Il lavoro di pubblicazione **chiede** il numero, poi rilegge `main` e
+  costruisce. Non fa più nessun `git push`, e una sentinella negli unit test
+  diventa rossa se ci torna.
+
+Dettaglio in `ROUTINE-AUTH-SPEC.md` §12.
+
 Collegato (18/08, revisione del ruolo secaudit con l'owner):
 
 - **bonifica dello storico in chiaro su Firestore**: i testi dei feedback
