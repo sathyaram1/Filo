@@ -43,7 +43,7 @@ on:
   workflow_dispatch: {}      # pulsante "Run workflow" manuale
 
 permissions:
-  contents: write            # creare release + pushare il bump di versione su main
+  contents: write            # creare e pubblicare la Release (non serve piu' per scrivere su main)
 
 concurrency:
   group: filo-release
