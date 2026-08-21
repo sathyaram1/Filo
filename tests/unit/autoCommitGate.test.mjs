@@ -236,6 +236,26 @@ describe('…ma su un ramo di lavoro continuano a fare il loro mestiere', () => 
       'il trasporto del lavoro: se il ramo non arriva su origin, verifica e server guardano una versione vecchia');
   });
 
+  test('HEAD staccata: il paracadute locale resta (si committa, non si spedisce)', () => {
+    // La guardia riguarda LA LINEA PRINCIPALE, non "tutto ciò che non è un ramo
+    // di lavoro". Le cartelle a HEAD staccata sono la forma che usano le
+    // sessioni isolate: lì il commit locale è l'unica rete che hanno, e
+    // toglierla sarebbe un rimedio peggiore del male. Spedire invece non si
+    // può: non c'è nessun ramo dove far atterrare il lavoro.
+    const { work } = scene();
+    const staccato = git(work, ['rev-parse', 'HEAD']);
+    git(work, ['checkout', '-q', '--detach', staccato]);
+    writeFileSync(resolve(work, 'sessione-isolata.js'), 'x\n', 'utf8');
+
+    runHook(work);
+
+    assert.equal(git(work, ['status', '--porcelain']), '',
+      'una sessione interrotta di colpo non deve perdere il lavoro nemmeno a HEAD staccata');
+    assert.notEqual(git(work, ['rev-parse', 'HEAD']), staccato, 'il commit deve esserci');
+    assert.equal(shaOf(work, 'origin/main'), staccato,
+      'e non deve essere finito sul ramo principale di origin');
+  });
+
   test('il diagnostico registra E spedisce il suo ramo', () => {
     const { work } = scene({ poison: true });
     git(work, ['checkout', '-q', '-b', 'claude/diagnostica']);
