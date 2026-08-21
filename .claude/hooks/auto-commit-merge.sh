@@ -167,16 +167,13 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
 
 done
 
-# 2) Push to origin. Logic differs per mode.
-git remote get-url origin >/dev/null 2>&1 || exit 0
-
 # ─── NESSUNA pubblicazione automatica sul ramo principale ────────────────────
 #
 # Qualunque sia la forma del repo (una cartella o venti, sul ramo principale o
 # su un ramo di lavoro), questo hook NON fa mai atterrare niente sul ramo
 # principale. Ci si arriva solo da:
 #
-#   - `npm run finish`            (locale: controlli, poi fusione e push)
+#   - `npm run finish`            (locale: controlli, poi si chiede la fusione)
 #   - `scripts/merge-gate.mjs`    (routine: dopo verifica e controlli di sicurezza)
 #
 # La regola non dipende da FILO_ROUTINE: quella marcatura distingue le
@@ -185,11 +182,8 @@ git remote get-url origin >/dev/null 2>&1 || exit 0
 # 24 luglio 2026 in persona, quando un'istanza che lavorava sul ramo principale
 # ha pubblicato senza passare dal cancello.
 #
-# Il lavoro non si perde: ogni ramo e' gia' stato committato e spedito qui sopra.
-cd "$PROJECT_DIR" || exit 0
-CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-if [ "$CUR_BRANCH" = "$TARGET_BRANCH" ]; then
-  echo "[auto-commit] Sei sul ramo '$TARGET_BRANCH': il lavoro e' salvato ma NON pubblicato. Lancia 'npm run finish' quando hai finito (esegue i controlli e pubblica)." >&2
-fi
+# Il lavoro non si perde: ogni ramo di lavoro e' gia' stato committato e spedito
+# qui sopra. Una cartella che si trova sul ramo principale non viene toccata, e
+# l'hook lo dice riga per riga nel ciclo — qui non serve ripeterlo.
 
 exit 0
