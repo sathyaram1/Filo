@@ -147,7 +147,10 @@ async function main() {
   // Su stdout SOLO il numero, e solo se c'è: è quello che il lavoro di
   // pubblicazione cattura.
   if (code === 0) console.log(reply.version);
-  process.exit(code);
+  // `exitCode` e non `exit()`: su Windows lo stdout verso una pipe è
+  // asincrono, e uscire di colpo può TRONCARE la riga appena scritta — cioè
+  // proprio il numero che il lavoro di pubblicazione deve leggere.
+  process.exitCode = code;
 }
 
 // Esegui solo se invocato come script (non quando importato dai test).
