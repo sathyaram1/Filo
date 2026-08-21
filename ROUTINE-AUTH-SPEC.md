@@ -326,6 +326,46 @@ muro non era un muro.
   se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
   senso e viene fermato subito.
 
+### Si esamina e si fonde LO STESSO commit (2026-08-21, verifica avversariale)
+
+La prima versione del cancello scaricava il diff di `main...<ramo>` e poi
+chiedeva a GitHub di fondere **il ramo per nome**. Fra le due chiamate la punta
+del ramo può spostarsi — e chi lavora ha per costruzione il permesso di
+spingere sul proprio ramo: bastava spingere un commit in quella finestra (e
+riprovare finché non riusciva) per far atterrare su `main` codice che L5 non
+aveva mai visto. Il difetto valeva su entrambi i cammini, `routineMerge` e
+`ownerMerge`, e lo `sha` dichiarato non lo chiudeva: veniva confrontato prima,
+ma la fusione continuava a partire dal nome.
+
+Da oggi, su **tutti e due** i cammini:
+
+- la punta del ramo si **risolve una volta sola**, all'inizio del giro; da lì
+  in poi il nome del ramo non decide più niente;
+- il confronto (l'input di L5) e la fusione lavorano su **quello sha**. Le due
+  chiamate a GitHub rifiutano un nome di ramo: se ne arriva uno, è un errore
+  dichiarato, non una fusione alla cieca;
+- il **messaggio** del commit di fusione continua a dire il nome del ramo:
+  serve a leggere la storia, non a scegliere cosa fondere;
+- lo `sha` **dichiarato** dal cammino owner resta, ma è solo un controllo in
+  più ("i controlli locali giravano su questo"): non combacia → `stale`. La
+  sicurezza non dipende dal fatto che il chiamante lo dichiari — la punta vera
+  si chiede comunque.
+- il cammino delle routine registra anche **quale punta è stata fusa**,
+  accanto al commit di fusione: è l'unica risposta possibile a "quale contenuto
+  è atterrato su `main`".
+
+Stesso giro, dal lato locale: il nome del ramo principale in `npm run finish`
+**non si prende più dall'ambiente**. Era una guardia appesa a una variabile:
+impostandola, "sei sul ramo principale" diventava falso e il passo che spedisce
+il ramo spediva `main` su `origin` con le credenziali della macchina, prima
+ancora di parlare col server. Adesso il valore è inchiodato, e la spedizione
+rifiuta esplicitamente `main`, `master` e il ramo di default del repo.
+
+**Nota (aperta, per l'owner)**: l'hook di salvataggio automatico
+(`.claude/hooks/auto-commit-merge.sh`) ha ancora la stessa forma —
+`TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"` e il push del ramo condizionato a
+quel valore. Vale lo stesso ragionamento, ma è un file dell'owner.
+
 Il pezzo che rende il muro fisico resta un **passo dell'owner**, fuori da questa
 spec: la ruleset su `main` nel repo GitHub, che lascia scrivere la sola identità
 dell'App. Da lì in poi il push diretto da una sessione non è vietato: è
