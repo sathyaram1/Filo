@@ -263,12 +263,15 @@ Da oggi la fusione è una consegna del canale come le altre:
      **registrati** da consegne validate — e registrati su *quel* ramo. Un
      verdetto raccontato nel corpo (il vecchio `FILO_L4_VERDICT`) non esiste
      come input: nessuno lo legge;
-  3. **L5 deterministico** sul diff `main...ramo` che il server **scarica da
+  3. la **punta vera** del ramo, risolta una volta sola: da qui in poi si parla
+     di quello sha e mai più del nome (vedi "si esamina e si fonde lo stesso
+     commit", più sotto);
+  4. **L5 deterministico** sul diff `main...<sha>` che il server **scarica da
      GitHub** — mai su un diff consegnato dal chiamante. Qualunque trip →
      `blocked`, con l'elenco dei trip, e il blocco finisce nel registro dei
      rifiuti;
-  4. fusione **via API GitHub con l'identità del server**. Conflitto →
-     `conflict`, niente fusione.
+  5. fusione di **quello sha**, via API GitHub con l'identità del server.
+     Conflitto → `conflict`, niente fusione.
 - **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
   e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
   1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
