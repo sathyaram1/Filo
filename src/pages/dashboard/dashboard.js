@@ -2296,6 +2296,55 @@
       isOwner = false;
       applyAccountProfile(null);
     }
+    refreshMergeApprovals();
+  }
+
+  // ===== Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) =====
+  //
+  // I controlli di sicurezza del server fermano le fusioni che toccano le parti
+  // protette. Il lavoro locale dell'owner ci finisce quasi sempre, e senza
+  // questa superficie non avrebbe nessuna strada per arrivare agli utenti: sul
+  // ramo principale scrive solo il server, e il server vuole un via libera dato
+  // da una persona — non dal terminale da cui è partita la richiesta.
+  //
+  // DUE CONDIZIONI PER VEDERLO, entrambe necessarie: essere il proprietario, e
+  // avere davvero qualcosa in attesa. Per tutti gli altri (e per l'owner nei
+  // giorni normali) questa parte della home non esiste: nessun riquadro vuoto,
+  // nessuna riga che scende.
+  //
+  // Il disegno e i comandi vengono dal modulo condiviso con Gestione →
+  // Automazioni: i due cammini devono fare la stessa identica cosa.
+  async function refreshMergeApprovals() {
+    const host = mergeApprovalsEl;
+    const UI = self.SN_MERGE_APPROVALS;
+    if (!host || !UI) return 0;
+    const spegni = () => {
+      host.replaceChildren();
+      host.hidden = true;
+      if (dashEl) dashEl.classList.remove('dash--notice');
+      return 0;
+    };
+    if (!isOwner) return spegni();
+    let r;
+    try {
+      r = await send({ type: MSG.MERGE_APPROVALS_GET });
+    } catch (_) {
+      // Il server non risponde: non è il posto per dirlo. Chi ha una fusione in
+      // sospeso lo scopre dal terminale, e riempire la home di un errore che
+      // non si può risolvere da qui sarebbe rumore.
+      return spegni();
+    }
+    if (!r || r.ok === false) return spegni();
+    const n = UI.render(host, {
+      requests: r.pending || [],
+      // Dopo un esito buono la lista si rilegge: la richiesta appena decisa non
+      // deve restare lì a farsi ricliccare.
+      onDone: () => { setTimeout(refreshMergeApprovals, 1200); },
+      onApprove: (req) => send({ type: MSG.MERGE_APPROVAL_APPROVE, id: req.id }),
+      onDiscard: (req) => send({ type: MSG.MERGE_APPROVAL_DISCARD, id: req.id }),
+    });
+    if (dashEl) dashEl.classList.toggle('dash--notice', n > 0);
+    return n;
   }
 
   // ===== Recap aggiornamento (C4) =====
