@@ -285,6 +285,12 @@ function commitExists(g, sha) {
 export function prepareBranch({ root, branch, create = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
   const g = gitIn(root);
   if (!branch) return { ok: false, kind: 'transient', message: 'nessun branch da preparare' };
+  // Sulla linea principale non si LAVORA: il cancello fonde un ramo, quindi un
+  // lavoro fatto lì non ha modo di arrivare agli utenti — e intanto sporcherebbe
+  // la copia locale. Guasto PERMANENTE: riprovare ogni 6 ore non lo aggiusta.
+  if (isProtectedBranch(branch, mainBranch)) {
+    return { ok: false, kind: 'permanent', message: `"${branch}" è la linea principale, non un ramo di lavoro` };
+  }
   if (!g(['rev-parse', '--git-dir']).ok) return { ok: false, kind: 'transient', message: 'la directory non è un repo git' };
 
   if (create) {
