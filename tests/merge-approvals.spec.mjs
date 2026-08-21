@@ -173,19 +173,26 @@ test('il main rifiuta lettura, approvazione e scarto a chi non è il proprietari
   }
 });
 
-test('una pagina web NON può chiedere se c’è una fusione in attesa, né approvarla', async ({ openTab, testServer }) => {
-  // Il canale dei messaggi è uno solo: senza il gate d'origine, un sito
-  // visitato saprebbe su cosa sta lavorando l'owner e potrebbe tentare di far
-  // approvare una fusione mentre lui guarda altrove.
-  const page = await openTab(`${testServer.url}/`);
-  await page.waitForLoadState('domcontentloaded');
-  for (const type of ['merge_approvals_get', 'merge_approval_approve', 'merge_approval_discard']) {
-    const r = await page.evaluate((t) => window.filo?.message?.({ type: t, id: 'ab12cd34ef56ab12cd34ef56' })
-      ?? window.chrome?.runtime?.sendMessage?.({ type: t }), type);
-    expect(r, type).toBeTruthy();
-    expect(r.ok, type).toBe(false);
-    expect(String(r.error || ''), type).toBe('forbidden');
-  }
+test('una pagina web NON può chiedere se c’è una fusione in attesa, né approvarla', async ({ app, shell }) => {
+  // Il canale dei messaggi è UNO solo e ci arrivano anche i content script dei
+  // siti visitati. Senza il gate d'origine, un sito saprebbe su cosa sta
+  // lavorando l'owner (il nome del ramo, i file toccati) e potrebbe tentare di
+  // far approvare una fusione mentre lui guarda altrove — cioè esattamente la
+  // cosa che questa superficie esiste per impedire.
+  void shell; // attende il boot: SN_HANDLE_MESSAGE dev'essere montato
+  const out = await app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const web = { url: 'https://sito-ostile.example/pagina' };
+    const send = (type) => globalThis.SN_HANDLE_MESSAGE({ type, id: 'ab12cd34ef56ab12cd34ef56' }, web);
+    return {
+      get: await send(MSG.MERGE_APPROVALS_GET),
+      approve: await send(MSG.MERGE_APPROVAL_APPROVE),
+      discard: await send(MSG.MERGE_APPROVAL_DISCARD),
+    };
+  });
+  expect(out.get).toEqual({ ok: false, error: 'forbidden' });
+  expect(out.approve).toEqual({ ok: false, error: 'forbidden' });
+  expect(out.discard).toEqual({ ok: false, error: 'forbidden' });
 });
 
 // ── 4. I due cammini fanno la stessa cosa ───────────────────────────────────
