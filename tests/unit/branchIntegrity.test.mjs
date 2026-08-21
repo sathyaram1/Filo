@@ -21,7 +21,7 @@ import {
   attemptStamp, newWorkBranch, identityVerdict,
   withCheckpoint, lastCheckpoint, CHECKPOINT_CAP,
   bumpRejects, clearRejects, IDENTITY_REJECT_LIMIT,
-  discardedBranchName, prepareBranch, checkDelivery, guardTransition,
+  discardedBranchName, prepareBranch, checkDelivery, guardTransition, isProtectedBranch,
   escalationNote, currentBranch, headSha,
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
