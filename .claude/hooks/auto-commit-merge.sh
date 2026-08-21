@@ -1,21 +1,19 @@
 #!/bin/bash
-# Auto-commit + merge + push hook.
+# Hook di SALVATAGGIO: committa e spedisce il ramo di lavoro, a ogni modifica.
 #
-# Two modes of operation:
+# Cosa fa, e basta: per ogni cartella di lavoro del repo, se ci sono modifiche
+# le committa sul ramo che quella cartella ha sotto i piedi e spedisce QUEL ramo
+# su origin. E' il trasporto del lavoro (lo rende visibile a verifica e server)
+# e il paracadute se la sessione muore di colpo.
 #
-# 1) MULTI-WORKTREE (local Windows setup): there's a dedicated worktree on the
-#    integration branch (TARGET_BRANCH, default "main"). Feature branches in
-#    other worktrees get auto-committed and merged into TARGET_BRANCH in that
-#    worktree, which is then pushed to origin.
+# Cosa NON fa (e non deve tornare a fare): fondere, e toccare il ramo
+# principale. La fusione automatica c'era fino al 2026-08-07 ed e' stata tolta
+# (il perche' e' scritto piu' sotto); sul ramo principale questo hook non
+# committa e non spedisce, in nessuna forma del repo — vedi is_protected_branch.
 #
-# 2) SINGLE-WORKTREE (claude.ai cloud routines): only one worktree exists,
-#    checked out on a feature branch. The merge-into-other-worktree path is
-#    impossible. Instead we auto-commit, push the feature branch (for
-#    traceability) AND push HEAD directly to origin/TARGET_BRANCH (fast-forward
-#    only). This lands the routine's work on main without needing a PR.
-#
-# Designed to be idempotent and safe: silently does nothing if there's nothing
-# to commit. Failures are logged to stderr but never fail the hook itself.
+# Idempotente e silenzioso: se non c'e' niente da salvare non fa niente. Non
+# fallisce mai per contratto (esce sempre 0); quando si astiene lo dice su
+# stderr e prosegue.
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR" || exit 0
