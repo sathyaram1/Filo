@@ -2190,6 +2190,9 @@
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       isOwner = !!(msg.signedIn && msg.isAdmin);
       applyAccountProfile(msg.signedIn ? msg.profile : null);
+      // Un login/logout cambia chi sei: l'avviso deve comparire (o sparire)
+      // subito, non alla prossima apertura della home.
+      refreshMergeApprovals();
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
