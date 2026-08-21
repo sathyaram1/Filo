@@ -215,9 +215,30 @@ da decidere all'implementazione sono decise così:
   sono il vocabolario delle routine — ma **L5 gira lo stesso**, e lo `sha`
   dichiarato deve combaciare con la punta vera del ramo.
 
-Resta il passo dell'owner: la **ruleset su `main`**. Finché non c'è, nessuno
-*passa* più di lì per lavorare, ma un push diretto sarebbe ancora accettato dal
-repo.
+La **ruleset su `main`** (passo dell'owner) è stata messa il **2026-08-20**: da
+lì il push diretto da una sessione non è più vietato a parole, è impossibile.
+
+### Il numero di versione lo scrive il server (2026-08-21, variante)
+
+Con la ruleset attiva, l'ultimo che scriveva su `main` senza passare dal server
+era il lavoro di **pubblicazione**: ogni sei ore alzava la patch version e la
+pushava. Deciso con l'owner: il numero **resta nel manifesto del repo** — le
+note di rilascio per l'utente sono organizzate per versione, e senza quel
+numero smetterebbero di raggiungerlo — ma a scriverlo su `main` è il server,
+l'unico che può.
+
+- **`releaseBump`** (filo-security, parola d'ordine di scopo `build` come
+  `buildKeys`/`buildAlarm`): legge il manifesto vero su `main`, calcola lui il
+  numero successivo, e scrive lui un commit che cambia **solo** il campo della
+  versione. Dal chiamante non si accetta niente — né il numero, né il
+  contenuto, né il ramo: accettarli sarebbe un push diretto travestito.
+- **Freno anti-raffica** con lo stato sul server: al massimo un aumento ogni 20
+  minuti e 12 al giorno (il cron pubblica ogni sei ore: non intralcia).
+- Il lavoro di pubblicazione **chiede** il numero, poi rilegge `main` e
+  costruisce. Non fa più nessun `git push`, e una sentinella negli unit test
+  diventa rossa se ci torna.
+
+Dettaglio in `ROUTINE-AUTH-SPEC.md` §12.
 
 Collegato (18/08, revisione del ruolo secaudit con l'owner):
 

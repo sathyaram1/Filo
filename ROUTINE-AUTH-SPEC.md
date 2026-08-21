@@ -377,3 +377,46 @@ dell'App. Da lì in poi il push diretto da una sessione non è vietato: è
 documentato dall'incidente #378 — nessuno *passa* più di lì per lavorare, ma un
 `git push origin main` da una shell con le credenziali dell'owner in memoria
 sarebbe ancora accettato dal repo.
+
+## 12. Anche il numero di versione lo scrive il server: `releaseBump` (2026-08-21)
+
+Con la ruleset su `main` attiva, l'ultimo che ci scriveva senza passare dal
+server era il **lavoro di pubblicazione**: ogni sei ore alzava la patch version
+con `npm version patch` e faceva `git push origin HEAD:main`. Quel push adesso
+verrebbe respinto — e non deve nemmeno essere tentato: quel lavoro gira su una
+macchina qualunque, con un token che eredita chiunque ci passi.
+
+Il numero **resta nel manifesto del repo** (le note di rilascio per l'utente
+sono organizzate per versione: senza quel numero non lo raggiungerebbero più),
+ma a scriverlo è il server.
+
+- **`releaseBump` `{ passphrase }` → `{ ok, version, previous, sha }`** — stessa
+  **parola d'ordine di scopo `build`** di `buildKeys` e `buildAlarm`, e nessun
+  potere in più. Il server, in ordine e fail-closed:
+  1. riconosce la parola d'ordine (scopo `build`, non il nome della chiave);
+  2. **freno anti-raffica** prima di toccare GitHub: al massimo un aumento ogni
+     20 minuti e 12 al giorno, con lo stato su Firestore
+     (`routine-state/release`) e non in memoria — le istanze muoiono e si
+     moltiplicano, e un freno che si azzera a ogni riavvio non frena. Il cron
+     pubblica ogni sei ore: nessuno dei due tetti intralcia l'uso onesto;
+  3. legge `package.json` **da `main`, via API**, col suo `sha` di blob;
+  4. **calcola lui** il numero successivo (aumento della patch). Nessun numero
+     che arrivi dal chiamante viene letto;
+  5. **costruisce lui** il contenuto nuovo partendo da quello vecchio, e
+     verifica due volte che cambi SOLO la versione (una riga sola diversa nel
+     testo; manifesto identico una volta riletto come dati). Se una delle due
+     non torna, non si scrive niente;
+  6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
+     legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
+     GitHub risponde 409 e non si scrive.
+- **Perché non si accetta il contenuto dal chiamante**: sarebbe un push diretto
+  su `main` travestito da aumento di versione — cioè il buco che §11 ha chiuso,
+  riaperto da un'altra porta.
+- **`scripts/release-bump.mjs`** è il citofono: chiede, stampa il numero nuovo
+  su stdout e basta. Exit `0` fatto · `2` rifiutato (freno, parola d'ordine,
+  manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
+  pubblicazione poi **rilegge** `main` (una lettura, `git pull --rebase`) e si
+  ferma se il numero non combacia: costruire col numero vecchio pubblicherebbe
+  sopra una release già esistente.
+- Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
+  o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
