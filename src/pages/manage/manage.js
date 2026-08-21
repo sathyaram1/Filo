@@ -2899,6 +2899,7 @@
     await loadSortMode();
     await loadCaps();
     await loadJudgeTimeout();
+    await loadMergeApprovals();
     await loadData();
   }
 
