@@ -15,15 +15,25 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const HOOK = resolve(ROOT, '.claude', 'hooks', 'auto-commit-merge.sh');
+const HOOKS_DIR = resolve(ROOT, '.claude', 'hooks');
+// Gli automatismi che girano da soli a ogni modifica: il salvataggio e il
+// diagnostico dei limiti di sessione. Sono due file diversi, ma rispondono
+// entrambi alla stessa domanda — "questo ramo lo posso toccare?" — e devono
+// rispondere allo stesso modo.
+const HOOKS = ['auto-commit-merge.sh', 'cap-observe.sh'];
 
 const made = [];
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
-/** Repo isolato con finto origin, e una copia dell'hook vero da eseguire. */
-function scene() {
+/**
+ * Repo isolato con finto origin, e una copia degli hook veri da eseguire.
+ * `poison` avvelena la configurazione locale di git come nello scenario reale:
+ * `push.default=upstream` + `branch.<ramo>.merge=refs/heads/main` è ciò che git
+ * imposta DA SÉ su ogni ramo nato da origin/main.
+ */
+function scene({ poison = false } = {}) {
   const base = mkdtempSync(resolve(tmpdir(), 'filo-hook-'));
   made.push(base);
   const origin = resolve(base, 'origin.git');
@@ -32,24 +42,41 @@ function scene() {
   git(origin, ['init', '--bare', '-q', '--initial-branch=main']);
   git(work, ['init', '-q', '--initial-branch=main']);
   git(work, ['remote', 'add', 'origin', origin]);
+  if (poison) {
+    git(work, ['config', 'push.default', 'upstream']);
+    git(work, ['config', 'branch.main.merge', 'refs/heads/main']);
+    git(work, ['config', 'branch.main.remote', 'origin']);
+  }
   writeFileSync(resolve(work, 'README.md'), 'base\n', 'utf8');
   git(work, ['add', '-A']);
   git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'base']);
   git(work, ['push', '-q', 'origin', 'main']);
 
   mkdirSync(resolve(work, '.claude', 'hooks'), { recursive: true });
-  copyFileSync(HOOK, resolve(work, '.claude', 'hooks', 'auto-commit-merge.sh'));
+  for (const h of HOOKS) copyFileSync(resolve(HOOKS_DIR, h), resolve(work, '.claude', 'hooks', h));
   return { base, origin, work };
 }
 
-function runHook(work, env = {}) {
+function runHook(work, env = {}, hook = 'auto-commit-merge.sh', stdin = '') {
   try {
-    execFileSync('bash', [resolve(work, '.claude', 'hooks', 'auto-commit-merge.sh')], {
-      cwd: work, encoding: 'utf8',
+    execFileSync('bash', [resolve(work, '.claude', 'hooks', hook)], {
+      cwd: work, encoding: 'utf8', input: stdin,
       env: { ...process.env, CLAUDE_PROJECT_DIR: work, ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
   } catch (_) { /* l'hook non fallisce mai per contratto */ }
+}
+
+/** Il messaggio che una sessione limitata consegna a cap-observe.sh. */
+const LIMITE = JSON.stringify({
+  hook_event_name: 'StopFailure',
+  error_type: 'usage_limit',
+  error_message: 'session limit reached',
+});
+
+/** SHA locale di un ramo ('' se non esiste). */
+function shaOf(work, ref) {
+  try { return git(work, ['rev-parse', ref]); } catch (_) { return ''; }
 }
 
 function filesOnMain(work) {
