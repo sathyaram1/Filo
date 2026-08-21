@@ -237,15 +237,26 @@ async function main() {
       console.error(`\n✗ '${branch}' è il ramo principale: da qui non si spedisce.`);
       process.exit(1);
     }
-    const pushed = git(['push', 'origin', branch]);
+    // La DESTINAZIONE è dichiarata dentro pushArgs: non la sceglie la
+    // configurazione locale di git (vedi il commento lì sopra).
+    const pushed = git(pushArgs(branch));
     if (!pushed.ok) {
       console.error(`\n✗ Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`);
       console.error('  Senza il ramo su origin il server non ha niente da fondere.');
       process.exit(1);
     }
-    const remote = git(['rev-parse', `origin/${branch}`]).out;
-    if (remote && remote !== cur) {
-      console.error(`\n✗ Su origin '${branch}' è a ${remote.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`);
+    // L'esito di questa lettura VA GUARDATO: se `origin/<ramo>` non si risolve,
+    // `out` è il testo dell'errore di git, e finiva stampato all'utente come se
+    // fosse uno sha ("è a origin/c"). Un ramo appena spedito che origin non
+    // mostra è un guasto vero, non un dettaglio: si ferma.
+    const rem = git(['rev-parse', `origin/${branch}`]);
+    if (!rem.ok) {
+      console.error(`\n✗ Ho spedito '${branch}' ma su origin non lo trovo:\n${rem.out.slice(0, 300)}`);
+      console.error('  Il server non avrebbe la versione appena controllata.');
+      process.exit(1);
+    }
+    if (rem.out !== cur) {
+      console.error(`\n✗ Su origin '${branch}' è a ${rem.out.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`);
       console.error('  Il server fonderebbe una versione diversa da quella controllata.');
       process.exit(1);
     }
