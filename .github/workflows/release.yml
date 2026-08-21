@@ -193,7 +193,6 @@ jobs:
           fi
           echo "Si costruisce ${ATTESA}."
 
-
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:
