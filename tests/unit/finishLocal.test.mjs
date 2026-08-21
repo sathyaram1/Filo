@@ -72,7 +72,55 @@ describe('da qui sul ramo principale non si scrive', () => {
   });
 
   test('lavorare direttamente sul ramo principale si ferma subito', () => {
-    assert.match(codice, /branch === MAIN/,
+    assert.match(codice, /isProtectedBranch\(branch/,
       'un lavoro fatto sul ramo principale non ha più modo di arrivare agli utenti: va detto prima dei controlli');
+  });
+
+  test('la guardia non si sposta con una variabile d’ambiente', () => {
+    // Il buco: con il ramo principale letto dall'ambiente bastava esportare un
+    // nome diverso perché "sei sul ramo principale" diventasse falso — e la
+    // riga che spedisce il ramo spedisse il ramo PRINCIPALE su origin con le
+    // credenziali di questa macchina, prima ancora di parlare col server.
+    assert.ok(!/process\.env\.FILO_MAIN_BRANCH/.test(SORGENTE),
+      'il nome del ramo principale è una guardia: non si prende dall’ambiente');
+    assert.match(codice, /const MAIN = 'main'/,
+      'il ramo principale è un valore inchiodato, non configurabile');
+  });
+
+  test('la spedizione del ramo è protetta anche lei, non solo il controllo iniziale', () => {
+    // Due guardie sulla stessa cosa: quella all'inizio serve a non far perdere
+    // mezz'ora di controlli, questa a non spedire mai il ramo principale.
+    const push = codice.indexOf("'push', 'origin'");
+    assert.ok(push > 0, 'la spedizione del ramo deve esistere');
+    const prima = codice.slice(0, push);
+    assert.ok(/isProtectedBranch\(branch[^)]*\)\s*\)\s*\{[^}]*exit\(1\)/s.test(prima.slice(prima.lastIndexOf('isProtectedBranch'))),
+      'subito prima della spedizione ci deve essere il rifiuto di spedire il ramo principale');
+  });
+});
+
+describe('quale ramo NON si spedisce mai', () => {
+  test('il ramo principale non si spedisce, comunque si chiami', () => {
+    for (const b of ['main', 'master', 'MAIN', ' main ', 'refs/heads/main', 'origin/main']) {
+      assert.equal(isProtectedBranch(b), true, `"${b}" non deve essere spedibile`);
+    }
+  });
+
+  test('anche il default dichiarato dal repo è protetto, oltre ai nomi inchiodati', () => {
+    assert.equal(isProtectedBranch('produzione', 'origin/produzione'), true);
+    // …ma il default non SOSTITUISCE i nomi inchiodati: se qualcuno riuscisse a
+    // raccontare un default diverso, main resterebbe protetto lo stesso.
+    assert.equal(isProtectedBranch('main', 'origin/qualcosaltro'), true);
+  });
+
+  test('un ramo di lavoro normale si spedisce', () => {
+    for (const b of ['claude/ridisegno-max', 'worker/42', 'mainline', 'feature/main-menu']) {
+      assert.equal(isProtectedBranch(b, 'origin/main'), false, `"${b}" deve essere spedibile`);
+    }
+  });
+
+  test('un ramo che non si sa qual è conta come protetto (nel dubbio non si spedisce)', () => {
+    for (const b of ['', null, undefined, '   ', 'HEAD']) {
+      assert.equal(isProtectedBranch(b, 'origin/main'), true);
+    }
   });
 });
