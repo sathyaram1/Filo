@@ -109,8 +109,18 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   # Durabilita': ogni ramo di lavoro viene spedito subito. E' il pezzo che ha
   # salvato il lavoro dopo le interruzioni improvvise, e vale anche in locale
   # ora che la fusione sul ramo principale e' differita.
+  #
+  # LA DESTINAZIONE SI DICHIARA. `git push origin "$BRANCH"` dice a git COSA
+  # spedire ma non DOVE: la destinazione la sceglie la configurazione locale.
+  # Con `push.default=upstream` (o `tracking`) e
+  # `branch.<ramo>.merge=refs/heads/main` — che git imposta DA SE' quando un
+  # ramo nasce da origin/main, cioe' gia' cosi' su ogni ramo di lavoro — questa
+  # riga scriverebbe su refs/heads/main. A OGNI Edit. Sono `git config`: un file
+  # non versionato, nessuna credenziale, invisibile a chi guarda il diff.
+  # Il refspec sorgente:destinazione pienamente qualificato toglie la scelta
+  # alla configurazione.
   if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ] && [ "$BRANCH" != "$TARGET_BRANCH" ]; then
-    git push origin "$BRANCH" >/dev/null 2>&1 || true
+    git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
   fi
 
 done
