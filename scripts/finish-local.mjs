@@ -106,7 +106,7 @@ export function pushArgs(branch) {
   if (!branch || isProtectedBranch(branch)) {
     throw new Error(`spedizione rifiutata: '${branch}' non è un ramo di lavoro`);
   }
-  return ['push', 'origin', branch]; // TEMPORANEO: dimostrazione del rosso, si ripristina subito
+  return ['push', 'origin', `refs/heads/${branch}:refs/heads/${branch}`];
 }
 
 function git(args, opts = {}) {
