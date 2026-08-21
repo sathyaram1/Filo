@@ -37,8 +37,15 @@
 //
 //   Adesso il ramo si SPEDISCE e la fusione si CHIEDE al server, che scarica
 //   lui il diff, fa girare i controlli deterministici e fonde con un'identità
-//   propria (una GitHub App). Qui non resta nessuna credenziale che scriva su
-//   main: la protezione non dipende più dal fatto che qualcuno si comporti bene.
+//   propria (una GitHub App).
+//
+//   DOV'È IL MURO: su GitHub, non su questa macchina. Le credenziali per fare
+//   un push da qui esistono ancora; è la regola di protezione del repo a
+//   respingere chiunque non sia l'identità del server (provato: un push diretto
+//   su main da questa macchina viene rifiutato). Le guardie qui sotto non sono
+//   quindi il muro — sono la seconda difesa: un automatismo che tenta e viene
+//   respinto in silenzio è un guasto invisibile, e una protezione appesa a un
+//   muro solo cade con quel muro.
 //
 //   I controlli locali e la verifica indipendente restano identici, e restano
 //   obbligatori: sono quelli che dicono se il lavoro è finito. Il server non
