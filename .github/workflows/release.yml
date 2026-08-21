@@ -151,22 +151,47 @@ jobs:
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
         run: node scripts/bake-default-config.mjs
 
-      - name: Bump patch version e push su main
+      # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────
+      # Prima qui si faceva `npm version patch` + `git push origin HEAD:main`.
+      # Su `main` adesso scrive solo l'identità del server (ruleset), e questo
+      # lavoro non deve poterci scrivere: chiede, e basta.
+      #
+      # Il server legge il manifesto vero su `main`, calcola lui il numero
+      # successivo e scrive lui il commit `release: vX.Y.Z [skip ci]`. Da qui
+      # non parte nessun numero e nessun contenuto.
+      #
+      # Codici d'uscita dello script: 0 fatto · 2 rifiutato (freno anti-raffica,
+      # parola d'ordine, manifesto) · 3 server non raggiungibile. In tutti e tre
+      # i casi diversi da zero il lavoro si ferma: costruire senza sapere quale
+      # numero è su `main` pubblicherebbe sopra una release già esistente.
+      - name: Chiedi al server il numero della versione nuova
         if: steps.check.outputs.should_release == 'true'
         id: bump
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
         shell: bash
         run: |
-          git config user.name "filo-release-bot"
-          git config user.email "release-bot@users.noreply.github.com"
-          npm version patch --no-git-tag-version
-          VERSION=v$(node -p "require('./package.json').version")
-          git commit -am "release: ${VERSION} [skip ci]"
-          # Atterra su main, rifacendo il rebase se nel frattempo la routine ha pushato.
-          for i in 1 2 3; do
-            if git push origin HEAD:main; then break; fi
-            git pull --rebase origin main || exit 1
-          done
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          set -e
+          VERSION=$(node scripts/release-bump.mjs)
+          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # La copia di lavoro è rimasta a prima del commit del server: senza questa
+      # lettura, electron-builder costruirebbe col numero VECCHIO e pubblicherebbe
+      # sopra una release già esistente. È una lettura e basta — nessuna scrittura
+      # su main parte da qui.
+      - name: Allinea la copia di lavoro a main (lettura)
+        if: steps.check.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          set -e
+          git pull --rebase origin main
+          LOCALE=$(node -p "require('./package.json').version")
+          ATTESA="${{ steps.bump.outputs.version }}"
+          if [ "v${LOCALE}" != "$ATTESA" ]; then
+            echo "::error::il manifesto qui dice v${LOCALE}, il server ha scritto ${ATTESA}: non costruisco alla cieca."
+            exit 1
+          fi
+          echo "Si costruisce ${ATTESA}."
 
 
       - name: Build e upload su GitHub Releases (come bozza)
