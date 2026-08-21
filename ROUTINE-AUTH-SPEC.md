@@ -365,18 +365,37 @@ il ramo spediva `main` su `origin` con le credenziali della macchina, prima
 ancora di parlare col server. Adesso il valore è inchiodato, e la spedizione
 rifiuta esplicitamente `main`, `master` e il ramo di default del repo.
 
-**Nota (aperta, per l'owner)**: l'hook di salvataggio automatico
-(`.claude/hooks/auto-commit-merge.sh`) ha ancora la stessa forma —
-`TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"` e il push del ramo condizionato a
-quel valore. Vale lo stesso ragionamento, ma è un file dell'owner.
+### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
-Il pezzo che rende il muro fisico resta un **passo dell'owner**, fuori da questa
-spec: la ruleset su `main` nel repo GitHub, che lascia scrivere la sola identità
-dell'App. Da lì in poi il push diretto da una sessione non è vietato: è
-**impossibile**. Finché la ruleset non c'è, il rischio residuo è quello
-documentato dall'incidente #378 — nessuno *passa* più di lì per lavorare, ma un
-`git push origin main` da una shell con le credenziali dell'owner in memoria
-sarebbe ancora accettato dal repo.
+La stessa forma — `TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"` — era rimasta nel
+file accanto, l'hook di salvataggio (`.claude/hooks/auto-commit-merge.sh`), e il
+diagnostico dei limiti (`.claude/hooks/cap-observe.sh`) spediva il ramo corrente
+senza chiedersi quale fosse. Chiusi entrambi:
+
+- il nome del ramo principale è **inchiodato** nei due hook (`main`, `master`,
+  più il default dichiarato da origin, che si aggiunge e non sostituisce);
+- una cartella che si trova sul ramo principale non viene più **committata**:
+  quel lavoro non ha modo di arrivare agli utenti (si fonde un RAMO) e intanto
+  sporcava la copia locale. Le modifiche restano dove sono;
+- astenersi **si dice**: entrambi gli hook scrivono su stderr perché non hanno
+  toccato niente, e proseguono. Un automatismo che si ferma in silenzio è la
+  classe di guasto che ha già prodotto un ramo non salvato per giorni.
+
+### Dove sta il muro, per esattezza
+
+La ruleset su `main` **c'è** (verificato sul campo il 2026-08-21: un push
+diretto da questa macchina viene respinto con `push declined due to repository
+rule violations`), e l'unica identità ammessa è quella della GitHub App.
+
+Il muro sta quindi **su GitHub**, non su questa macchina: le credenziali locali
+capaci di fare un push esistono ancora — servono a spedire i rami di lavoro — e
+non è vero, come si è scritto altrove, che da qui non ci sia più niente in grado
+di scrivere. Quello che non c'è più è un push su `main` che **riesca**.
+
+Le guardie locali (`finish-local.mjs`, i due hook, `branch-integrity.mjs`)
+restano per due motivi, entrambi indipendenti dal muro: un tentativo respinto in
+silenzio è un guasto invisibile, e una difesa che dipende da un solo muro cade
+con quel muro.
 
 ## 12. Anche il numero di versione lo scrive il server: `releaseBump` (2026-08-21)
 
