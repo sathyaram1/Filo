@@ -9,11 +9,15 @@
 //   muro: un'istanza catturata non doveva convincere nessuno, le bastava
 //   spingere il ramo principale.
 //
-//   Da qui in poi anche il finish locale CHIEDE. Su `main` scrive una sola
-//   identità, che sta nei segreti del server e su nessuna macchina con un LLM
-//   sopra. Quello che parte da questo file è una domanda, non un'azione: il
-//   server guarda il diff che scarica lui, fa girare i controlli deterministici
-//   e decide.
+//   Da qui in poi anche il finish locale CHIEDE. Quello che parte da questo
+//   file è una domanda, non un'azione: il server guarda il diff che scarica
+//   lui, fa girare i controlli deterministici e decide.
+//
+//   La porta accanto non è stata murata togliendo la credenziale — quella su
+//   questa macchina c'è ancora — ma **su GitHub**: una regola di protezione del
+//   repo lascia scrivere su `main` la sola identità del server, e respinge
+//   tutto il resto (provato). Quello che è cambiato qui è che non si tenta più:
+//   un tentativo respinto in silenzio non è una difesa, è un guasto invisibile.
 //
 // COSA VIAGGIA
 //   Il ramo e lo SHA della sua punta — cioè esattamente il codice su cui i
