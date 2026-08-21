@@ -119,9 +119,9 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   #
   # Astenersi non e' un errore: le modifiche restano nella cartella (niente e'
   # perso), lo si dice a voce chiara e si prosegue.
-  if is_protected_branch "$BRANCH"; then
+  if is_main_line "$BRANCH"; then
     if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-      echo "[auto-commit] '$wt' si trova sul ramo principale ('${BRANCH:-HEAD staccata}'): NON committo e NON spedisco. Le modifiche sono ancora li'. Spostale in una cartella dedicata: git worktree add .claude/worktrees/<nome> -b claude/<nome>" >&2
+      echo "[auto-commit] '$wt' si trova sul ramo principale ('$BRANCH'): NON committo e NON spedisco. Le modifiche sono ancora li'. Spostale in una cartella dedicata: git worktree add .claude/worktrees/<nome> -b claude/<nome>" >&2
     fi
     continue
   fi
