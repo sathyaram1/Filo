@@ -309,7 +309,11 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     const reset = g(['reset', '--hard', target]);
     if (!reset.ok) return { ok: false, kind: 'transient', message: `ripristino di ${branch} fallito: ${reset.out.slice(0, 200)}` };
     // Riallinea origin SOLO se i commit scartati sono al sicuro anche là.
-    if (pushed) g(['push', '--force-with-lease', 'origin', `${branch}:${branch}`]);
+    // Destinazione pienamente qualificata come sopra: `origin <ramo>:<ramo>`
+    // già non è dirottabile dalla configurazione, ma la forma refs/heads/… è
+    // l'unica che si può controllare a colpo d'occhio (e con cui una sentinella
+    // può dire "qui nessuno spedisce senza dire dove").
+    if (pushed) g(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]);
     if (!parked) discarded = null;
   } else {
     g(['reset', '--hard', target]);
