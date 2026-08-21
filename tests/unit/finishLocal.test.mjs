@@ -54,9 +54,15 @@ describe('quali spec lanciare', () => {
 
 describe('da qui sul ramo principale non si scrive', () => {
   // Le righe di commento raccontano la storia (e nominano main di continuo):
-  // la sentinella deve guardare il CODICE.
+  // la sentinella deve guardare il CODICE. Vanno via anche i blocchi `/* */`,
+  // non solo le righe `//`: un commento che spiega il buco nomina per forza
+  // main, origin e push, e non deve poter far passare (né far fallire) una
+  // sentinella che parla del codice.
   const codice = SORGENTE.split('\n')
-    .filter((l) => !l.trim().startsWith('//'))
+    .filter((l) => {
+      const t = l.trim();
+      return !(t.startsWith('//') || t.startsWith('/*') || t.startsWith('*'));
+    })
     .join('\n');
 
   test('nessuna spedizione verso il ramo principale', () => {
