@@ -160,9 +160,10 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   # non versionato, nessuna credenziale, invisibile a chi guarda il diff.
   # Il refspec sorgente:destinazione pienamente qualificato toglie la scelta
   # alla configurazione.
-  if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ] && [ "$BRANCH" != "$TARGET_BRANCH" ]; then
-    git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
-  fi
+  #
+  # Quale ramo si spedisce l'ha gia' deciso is_protected_branch qui sopra: se
+  # fossimo sul ramo principale non saremmo arrivati fin qui.
+  git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
 
 done
 
