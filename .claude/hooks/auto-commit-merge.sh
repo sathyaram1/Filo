@@ -35,17 +35,24 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # sostituisce: se qualcuno riuscisse a raccontare un default diverso, main e
 # master resterebbero comunque protetti.
 #
-# Un nome vuoto o una HEAD staccata contano come protetti: nel dubbio non si
-# tocca.
 RAMO_DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
-is_protected_branch() {
+
+# La linea principale, comunque sia scritto il nome. Una HEAD staccata NON e' la
+# linea principale: e' "nessun ramo", e si tratta a parte (is_spedibile) — li' il
+# salvataggio locale resta, e' il paracadute, e non c'e' niente da spedire.
+is_main_line() {
   local b="${1#refs/heads/}"; b="${b#origin/}"
   b=$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')
-  [ -z "$b" ] && return 0
-  [ "$b" = "head" ] && return 0
+  [ -z "$b" ] && return 1
   case "$b" in main|master) return 0 ;; esac
   [ -n "$RAMO_DEFAULT" ] && [ "$b" = "$(printf '%s' "$RAMO_DEFAULT" | tr '[:upper:]' '[:lower:]')" ] && return 0
   return 1
+}
+
+# Un ramo che questo automatismo puo' spedire: deve essere un ramo (non una HEAD
+# staccata) e non essere la linea principale. Nel dubbio: no.
+is_spedibile() {
+  [ -n "$1" ] && [ "$1" != "HEAD" ] && ! is_main_line "$1"
 }
 
 # ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
@@ -112,9 +119,9 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   #
   # Astenersi non e' un errore: le modifiche restano nella cartella (niente e'
   # perso), lo si dice a voce chiara e si prosegue.
-  if is_protected_branch "$BRANCH"; then
+  if is_main_line "$BRANCH"; then
     if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-      echo "[auto-commit] '$wt' si trova sul ramo principale ('${BRANCH:-HEAD staccata}'): NON committo e NON spedisco. Le modifiche sono ancora li'. Spostale in una cartella dedicata: git worktree add .claude/worktrees/<nome> -b claude/<nome>" >&2
+      echo "[auto-commit] '$wt' si trova sul ramo principale ('$BRANCH'): NON committo e NON spedisco. Le modifiche sono ancora li'. Spostale in una cartella dedicata: git worktree add .claude/worktrees/<nome> -b claude/<nome>" >&2
     fi
     continue
   fi
@@ -159,9 +166,11 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   # Il refspec sorgente:destinazione pienamente qualificato toglie la scelta
   # alla configurazione.
   #
-  # Quale ramo si spedisce l'ha gia' deciso is_protected_branch qui sopra: se
-  # fossimo sul ramo principale non saremmo arrivati fin qui.
-  git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
+  # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
+  # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
+  if is_spedibile "$BRANCH"; then
+    git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
+  fi
 
 done
 

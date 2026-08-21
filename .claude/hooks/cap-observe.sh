@@ -38,17 +38,23 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # guardia sbaglia in direzione sicura. Il default DICHIARATO da origin si
 # AGGIUNGE ai due, non li sostituisce.
 #
-# Un nome vuoto o una HEAD staccata contano come protetti: nel dubbio non si
-# spedisce.
 RAMO_DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
-is_protected_branch() {
+
+# La linea principale, comunque sia scritto il nome. Una HEAD staccata NON e' la
+# linea principale: e' "nessun ramo", e si tratta a parte (is_spedibile).
+is_main_line() {
   local b="${1#refs/heads/}"; b="${b#origin/}"
   b=$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')
-  [ -z "$b" ] && return 0
-  [ "$b" = "head" ] && return 0
+  [ -z "$b" ] && return 1
   case "$b" in main|master) return 0 ;; esac
   [ -n "$RAMO_DEFAULT" ] && [ "$b" = "$(printf '%s' "$RAMO_DEFAULT" | tr '[:upper:]' '[:lower:]')" ] && return 0
   return 1
+}
+
+# Un ramo che questo automatismo puo' spedire: deve essere un ramo (non una HEAD
+# staccata) e non essere la linea principale. Nel dubbio: no.
+is_spedibile() {
+  [ -n "$1" ] && [ "$1" != "HEAD" ] && ! is_main_line "$1"
 }
 
 INPUT=$(cat)
@@ -96,8 +102,8 @@ CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 #
 # Astenersi non e' un errore: la nota diagnostica resta scritta nella cartella,
 # lo si dice a voce chiara e si prosegue.
-if is_protected_branch "$CUR_BRANCH"; then
-  echo "[cap-observe] Ramo '${CUR_BRANCH:-sconosciuto}' non spedibile (e' il ramo principale, o la HEAD e' staccata): la nota diagnostica resta in $OBS, non committata e non spedita." >&2
+if is_main_line "$CUR_BRANCH"; then
+  echo "[cap-observe] La cartella si trova sul ramo principale ('$CUR_BRANCH'): la nota diagnostica resta scritta in $OBS, non committata e non spedita." >&2
   exit 0
 fi
 
@@ -108,6 +114,8 @@ git -c user.email=claude@local -c user.name=claude-local commit -q -m "cap-obser
 # qualificato, cosi' dove atterra non lo decide la configurazione locale di git.
 # `git push origin HEAD` regge ai veleni provati (push.default, remote.*.push),
 # ma la regola vale senza eccezioni proprio per non doverla riverificare a ogni
-# forma nuova.
-git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
+# forma nuova. Se la HEAD e' staccata non c'e' ramo da spedire: si salta.
+if is_spedibile "$CUR_BRANCH"; then
+  git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
+fi
 exit 0
