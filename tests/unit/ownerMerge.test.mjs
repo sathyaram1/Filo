@@ -34,6 +34,13 @@ describe('leggere la risposta del server', () => {
     assert.match(r.reason, /firestore\.rules/);
   });
 
+  test('bloccato: si porta dietro la richiesta aperta dal server (o il fatto che non c’è)', () => {
+    const con = classifyOwnerMerge(200, risposta({ ok: true, result: 'blocked', reason: 'x', requestId: 'ab12cd34ef56ab12cd34ef56' }));
+    assert.equal(con.requestId, 'ab12cd34ef56ab12cd34ef56');
+    const senza = classifyOwnerMerge(200, risposta({ ok: true, result: 'blocked', reason: 'x' }));
+    assert.equal(senza.requestId, '');
+  });
+
   test('conflitto e ramo cambiato sono esiti DIVERSI: portano a due gesti diversi', () => {
     assert.equal(classifyOwnerMerge(200, risposta({ ok: true, result: 'conflict' })).outcome, 'conflict');
     const stale = classifyOwnerMerge(200, risposta({ ok: true, result: 'stale', headSha: 'ff00ff00' }));
