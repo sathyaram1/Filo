@@ -216,7 +216,18 @@ da decidere all'implementazione sono decise così:
   dichiarato deve combaciare con la punta vera del ramo.
 
 La **ruleset su `main`** (passo dell'owner) è stata messa il **2026-08-20**: da
-lì il push diretto da una sessione non è più vietato a parole, è impossibile.
+lì il push diretto da una sessione non è più vietato a parole. Riverificato sul
+campo il **2026-08-21**: un push da questa macchina con le credenziali
+dell'owner viene **respinto** (`push declined due to repository rule
+violations`); l'unica identità ammessa è la GitHub App del server.
+
+Il muro sta quindi su GitHub, **non** sulla macchina: le credenziali locali
+esistono ancora (servono a spedire i rami di lavoro). Per questo le difese
+locali restano, e sono state completate il 2026-08-21 anche sugli **automatismi**
+— salvataggio e diagnostico non committano né spediscono un ramo protetto, e
+quando si astengono lo dicono. Due motivi, nessuno dei quali è il muro: un
+tentativo respinto in silenzio è un guasto invisibile, e una difesa appesa a un
+muro solo cade con quel muro.
 
 ### Il numero di versione lo scrive il server (2026-08-21, variante)
 
