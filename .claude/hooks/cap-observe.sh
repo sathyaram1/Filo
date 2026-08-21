@@ -29,6 +29,28 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR" || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+# ─── I RAMI CHE QUESTO AUTOMATISMO NON TOCCA MAI ─────────────────────────────
+#
+# Il nome del ramo principale NON si prende dall'ambiente: qui e' una GUARDIA, e
+# una guardia che si sposta con una variabile non e' una guardia (stessa regola
+# di scripts/finish-local.mjs). I nomi inchiodati sono due: `master` c'e' perche'
+# il repo potrebbe cambiare convenzione senza che questo file lo sappia — la
+# guardia sbaglia in direzione sicura. Il default DICHIARATO da origin si
+# AGGIUNGE ai due, non li sostituisce.
+#
+# Un nome vuoto o una HEAD staccata contano come protetti: nel dubbio non si
+# spedisce.
+RAMO_DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+is_protected_branch() {
+  local b="${1#refs/heads/}"; b="${b#origin/}"
+  b=$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')
+  [ -z "$b" ] && return 0
+  [ "$b" = "head" ] && return 0
+  case "$b" in main|master) return 0 ;; esac
+  [ -n "$RAMO_DEFAULT" ] && [ "$b" = "$(printf '%s' "$RAMO_DEFAULT" | tr '[:upper:]' '[:lower:]')" ] && return 0
+  return 1
+}
+
 INPUT=$(cat)
 
 # One node pass: parse stdin, apply the re-entrancy guard + failure filter, and
@@ -60,6 +82,25 @@ let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
 # che sopravvive al container effimero, ma vive in .claude/, non nella coda.
 OBS=".claude/cap-observations.jsonl"
 printf '%s\n' "$LINE" >> "$OBS"
+
+CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+# ─── IL RAMO PRINCIPALE NON SI SPEDISCE, MAI ─────────────────────────────────
+#
+# Questo hook spediva il ramo corrente senza chiedersi QUALE fosse. Se una
+# sessione lavora in una cartella che si trova sul ramo principale, la riga qui
+# sotto provava a pubblicarlo — e il commit della diagnostica ci sarebbe finito
+# sopra. Oggi GitHub lo rifiuterebbe (sul ramo principale scrive solo l'identita'
+# del server), ma un automatismo che tenta e viene respinto in silenzio e' un
+# guasto invisibile, e la difesa non deve dipendere da un solo muro.
+#
+# Astenersi non e' un errore: la nota diagnostica resta scritta nella cartella,
+# lo si dice a voce chiara e si prosegue.
+if is_protected_branch "$CUR_BRANCH"; then
+  echo "[cap-observe] Ramo '${CUR_BRANCH:-sconosciuto}' non spedibile (e' il ramo principale, o la HEAD e' staccata): la nota diagnostica resta in $OBS, non committata e non spedita." >&2
+  exit 0
+fi
+
 git add "$OBS" 2>/dev/null
 git -c user.email=claude@local -c user.name=claude-local commit -q -m "cap-observe: session-limit diagnostic" -- "$OBS" 2>/dev/null
 # LA DESTINAZIONE SI DICHIARA (stessa regola di auto-commit-merge.sh): il ramo
@@ -67,9 +108,6 @@ git -c user.email=claude@local -c user.name=claude-local commit -q -m "cap-obser
 # qualificato, cosi' dove atterra non lo decide la configurazione locale di git.
 # `git push origin HEAD` regge ai veleni provati (push.default, remote.*.push),
 # ma la regola vale senza eccezioni proprio per non doverla riverificare a ogni
-# forma nuova. Se la HEAD e' staccata non c'e' ramo da spedire: si salta.
-CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-if [ -n "$CUR_BRANCH" ] && [ "$CUR_BRANCH" != "HEAD" ]; then
-  git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
-fi
+# forma nuova.
+git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
 exit 0
