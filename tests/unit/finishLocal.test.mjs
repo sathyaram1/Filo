@@ -190,10 +190,11 @@ describe('la spedizione dice DOVE, non solo cosa', () => {
     // Successo dal punto di vista dell'owner: il lavoro è su origin sul SUO
     // ramo, pronto perché il server lo guardi — e il ramo principale è dove
     // l'ha lasciato il server, non dove l'ha spinto questa macchina.
-    assert.equal(g(origin, ['rev-parse', `refs/heads/${ramo}`]), atteso,
-      'il ramo di lavoro deve arrivare su origin col suo nome');
-    assert.equal(g(origin, ['rev-parse', 'refs/heads/main']), mainPrima,
+    const suOrigin = (ref) => { try { return g(origin, ['rev-parse', ref]); } catch (_) { return '(non esiste)'; } };
+    assert.equal(suOrigin('refs/heads/main'), mainPrima,
       'il ramo principale non si deve muovere: da questa macchina non ci scrive nessuno');
+    assert.equal(suOrigin(`refs/heads/${ramo}`), atteso,
+      'il ramo di lavoro deve arrivare su origin col suo nome');
   });
 });
 
