@@ -14,4 +14,4 @@ echo ""
 echo "### Branch"
 git branch -v 2>/dev/null
 echo ""
-echo "Convenzione: per ogni nuovo task crea un worktree dedicato con 'git worktree add ../filo-<slug> -b <slug>' e lavora lì dentro. Auto-commit e auto-merge su main avvengono via hook a ogni Edit/Write."
+echo "Convenzione: per ogni nuovo task crea un worktree dedicato con 'git worktree add .claude/worktrees/<slug> -b claude/<slug>' e lavora lì dentro. A ogni Edit/Write un hook committa e pusha IL TUO RAMO (solo quello). Su main non arriva piu' niente da solo: si chiude con 'npm run finish', che fa i controlli e CHIEDE la fusione al server."
