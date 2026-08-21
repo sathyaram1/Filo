@@ -102,8 +102,8 @@ CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 #
 # Astenersi non e' un errore: la nota diagnostica resta scritta nella cartella,
 # lo si dice a voce chiara e si prosegue.
-if is_protected_branch "$CUR_BRANCH"; then
-  echo "[cap-observe] Ramo '${CUR_BRANCH:-sconosciuto}' non spedibile (e' il ramo principale, o la HEAD e' staccata): la nota diagnostica resta in $OBS, non committata e non spedita." >&2
+if is_main_line "$CUR_BRANCH"; then
+  echo "[cap-observe] La cartella si trova sul ramo principale ('$CUR_BRANCH'): la nota diagnostica resta scritta in $OBS, non committata e non spedita." >&2
   exit 0
 fi
 
