@@ -117,6 +117,25 @@ describe('cosa legge l’owner', () => {
     }
   });
 
+  test('bloccato con richiesta aperta: dice DOVE approvarla, non "decidi tu"', () => {
+    // Il lavoro locale tocca le aree protette quasi sempre. Un messaggio che si
+    // ferma al blocco lascia chi legge senza nessuna mossa possibile: su main,
+    // da questa macchina, non scrive più nessuno.
+    const msg = messageForOwnerMerge(
+      { outcome: 'blocked', reason: 'guard_the_guards: firestore.rules', requestId: 'ab12cd34ef56ab12cd34ef56' },
+      'claude/x'
+    );
+    assert.match(msg, /in attesa/i);
+    assert.match(msg, /prima schermata/i);
+    assert.match(msg, /Gestione → Automazioni/);
+  });
+
+  test('bloccato SENZA richiesta: non promette un avviso che non comparirà mai', () => {
+    const msg = messageForOwnerMerge({ outcome: 'blocked', reason: 'x' }, 'claude/x');
+    assert.doesNotMatch(msg, /approvala da Filo/i);
+    assert.match(msg, /non comparirà niente|non sono riuscito/i);
+  });
+
   test('un esito diverso da "fuso" non dice mai che è stato pubblicato', () => {
     for (const outcome of ['blocked', 'conflict', 'stale', 'unreachable', 'fault', 'no_credential']) {
       const msg = messageForOwnerMerge({ outcome }, 'claude/x');
