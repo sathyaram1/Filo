@@ -62,5 +62,14 @@ OBS=".claude/cap-observations.jsonl"
 printf '%s\n' "$LINE" >> "$OBS"
 git add "$OBS" 2>/dev/null
 git -c user.email=claude@local -c user.name=claude-local commit -q -m "cap-observe: session-limit diagnostic" -- "$OBS" 2>/dev/null
-git push origin HEAD >/dev/null 2>&1 || true
+# LA DESTINAZIONE SI DICHIARA (stessa regola di auto-commit-merge.sh): il ramo
+# di lavoro si spedisce con un refspec sorgente:destinazione pienamente
+# qualificato, cosi' dove atterra non lo decide la configurazione locale di git.
+# `git push origin HEAD` regge ai veleni provati (push.default, remote.*.push),
+# ma la regola vale senza eccezioni proprio per non doverla riverificare a ogni
+# forma nuova. Se la HEAD e' staccata non c'e' ramo da spedire: si salta.
+CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ -n "$CUR_BRANCH" ] && [ "$CUR_BRANCH" != "HEAD" ]; then
+  git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
+fi
 exit 0
