@@ -22,8 +22,33 @@ cd "$PROJECT_DIR" || exit 0
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
-# The integration branch. Default "main". Override via FILO_MAIN_BRANCH.
-TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"
+# ─── I RAMI CHE QUESTO AUTOMATISMO NON TOCCA MAI ─────────────────────────────
+#
+# Fino al 2026-08-21 qui c'era `TARGET_BRANCH="${FILO_MAIN_BRANCH:-main}"`: il
+# nome del ramo principale preso dall'AMBIENTE, e usato come guardia. Una
+# guardia che si sposta con una variabile non e' una guardia — bastava
+# esportarne una perche' "sei sul ramo principale" diventasse falso e la riga
+# che spedisce il ramo spedisse il ramo principale, a ogni singola modifica.
+# E' la stessa forma tolta da scripts/finish-local.mjs, rimasta nel file accanto.
+#
+# Adesso i nomi sono INCHIODATI: `main` e `master` (il repo potrebbe cambiare
+# convenzione senza che questo file lo sappia — la guardia sbaglia in direzione
+# sicura). Il default DICHIARATO da origin si AGGIUNGE ai due, non li
+# sostituisce: se qualcuno riuscisse a raccontare un default diverso, main e
+# master resterebbero comunque protetti.
+#
+# Un nome vuoto o una HEAD staccata contano come protetti: nel dubbio non si
+# tocca.
+RAMO_DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+is_protected_branch() {
+  local b="${1#refs/heads/}"; b="${b#origin/}"
+  b=$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')
+  [ -z "$b" ] && return 0
+  [ "$b" = "head" ] && return 0
+  case "$b" in main|master) return 0 ;; esac
+  [ -n "$RAMO_DEFAULT" ] && [ "$b" = "$(printf '%s' "$RAMO_DEFAULT" | tr '[:upper:]' '[:lower:]')" ] && return 0
+  return 1
+}
 
 # ─── Chi sta lavorando? (spec ROUTINE-BRANCH-INTEGRITY.md §Via 1) ────────────
 #
