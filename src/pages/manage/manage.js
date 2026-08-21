@@ -790,6 +790,52 @@
     mgChannelSection.hidden = false;
   }
 
+  // ── Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) ─────────
+  //
+  // Lo STESSO comando che vive nella prima schermata di Filo. Non una copia:
+  // il disegno e i bottoni li costruisce il modulo condiviso
+  // (src/shared/mergeApprovals.js), qui c'è solo il posto dove appenderlo e la
+  // lettura via IPC. Cammini equivalenti fanno la stessa cosa — e con due
+  // implementazioni, prima o poi non sarebbe più vero.
+  //
+  // Quando non c'è niente in attesa il blocco resta invisibile: una sezione
+  // vuota in una pagina di gestione è rumore, non informazione. Le decisioni
+  // già prese restano invece elencate qui (e solo qui): un'eccezione ai
+  // controlli di sicurezza deve lasciare una traccia che si può guardare.
+  const mgMergeApprovals = document.getElementById('mgMergeApprovals');
+  const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
+
+  async function loadMergeApprovals() {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!mgMergeApprovals || !UI) return 0;
+    const spegni = () => {
+      mgMergeApprovals.replaceChildren();
+      mgMergeApprovals.hidden = true;
+      if (mgMergeApprovalsRecent) {
+        mgMergeApprovalsRecent.replaceChildren();
+        mgMergeApprovalsRecent.hidden = true;
+      }
+      return 0;
+    };
+    if (!isAdmin) return spegni();
+    let r;
+    try {
+      r = await sendToMain({ type: MERGE_APPROVALS_GET });
+    } catch (err) {
+      console.error('[manage] fusioni in attesa:', err);
+      return spegni();
+    }
+    if (!r || r.ok === false) return spegni();
+    const n = UI.render(mgMergeApprovals, {
+      requests: r.pending || [],
+      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
+      onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
+    });
+    UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
+    return n;
+  }
+
   async function loadChannelLog() {
     if (!mgChannelSection || !isAdmin) return;
     try {
