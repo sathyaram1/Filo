@@ -728,6 +728,9 @@
   // non è ancora in uso i due registri sono vuoti e il blocco resta nascosto —
   // una sezione vuota che non spiega perché è peggio di nessuna sezione.
   const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
+  const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
+  const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
+  const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
 
   // Perché una richiesta è stata respinta, detto all'owner e non al codice.
   const DENY_LABELS = {
