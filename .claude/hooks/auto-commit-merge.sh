@@ -9,7 +9,7 @@
 # Cosa NON fa (e non deve tornare a fare): fondere, e toccare il ramo
 # principale. La fusione automatica c'era fino al 2026-08-07 ed e' stata tolta
 # (il perche' e' scritto piu' sotto); sul ramo principale questo hook non
-# committa e non spedisce, in nessuna forma del repo — vedi is_protected_branch.
+# committa e non spedisce, in nessuna forma del repo — vedi is_main_line.
 #
 # Idempotente e silenzioso: se non c'e' niente da salvare non fa niente. Non
 # fallisce mai per contratto (esce sempre 0); quando si astiene lo dice su
