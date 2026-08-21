@@ -1,6 +1,6 @@
 // Chiusura di un lavoro locale — SPEC-RIDISEGNO-MAX.md §10
 //
-// Logica pura di `scripts/finish-local.mjs`. Due cose:
+// Logica pura di `scripts/finish-local.mjs`. Tre cose:
 //
 //   · quali spec mirati lanciare per le aree toccate;
 //   · la SENTINELLA sul fatto che questa macchina non scrive più sul ramo
@@ -9,19 +9,24 @@
 //     in locale) riaprirebbe esattamente il buco che la spec chiude — e nessun
 //     test di comportamento se ne accorgerebbe, perché il lavoro arriverebbe su
 //     main lo stesso.
+//   · la DESTINAZIONE della spedizione. Le guardie qui sopra validano il NOME
+//     del ramo di partenza; la destinazione, con `git push origin <ramo>`, la
+//     sceglie la configurazione locale di git — che è un file non versionato.
+//     Il test comportamentale qui sotto avvelena quella configurazione in un
+//     repo usa-e-getta e pretende che il ramo principale non si muova.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, isProtectedBranch } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles, isProtectedBranch, pushArgs } from '../../scripts/finish-local.mjs';
 
-const SORGENTE = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'finish-local.mjs'),
-  'utf8'
-);
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SORGENTE = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
 
 describe('quali spec lanciare', () => {
   test('una pagina toccata porta con sé il suo spec', () => {
