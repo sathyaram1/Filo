@@ -51,7 +51,36 @@ import { verdictForCurrentBranch } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const MAIN = process.env.FILO_MAIN_BRANCH || 'main';
+
+// IL NOME DEL RAMO PRINCIPALE NON SI PRENDE DALL'AMBIENTE.
+//   Qui è una GUARDIA, e una guardia che si sposta con una variabile non è una
+//   guardia: bastava esportarne una perché "sei sul ramo principale" diventasse
+//   falso, e il passo che spedisce il ramo spedisse il ramo principale con le
+//   credenziali di questa macchina — prima ancora di parlare col server, cioè
+//   scavalcando l'intero cancello. Il valore è inchiodato qui.
+const MAIN = 'main';
+// I nomi che questa macchina non spedisce MAI, qualunque cosa dica chiunque.
+// `master` c'è perché il repo potrebbe cambiare convenzione senza che questo
+// file lo sappia: la guardia sbaglia in direzione sicura.
+const RAMI_PROTETTI = Object.freeze(['main', 'master']);
+
+/**
+ * Questo ramo è il ramo principale (di qualunque nome)? PURA.
+ *
+ * `defaultBranch` è quello che il repo dice essere il default di origin: si
+ * aggiunge ai nomi inchiodati, non li sostituisce — se qualcuno riuscisse a
+ * raccontare un default diverso, la guardia proteggerebbe comunque main e
+ * master. Un nome vuoto o illeggibile conta come protetto: nel dubbio non si
+ * spedisce.
+ */
+export function isProtectedBranch(name, defaultBranch = '') {
+  const norm = (s) => String(s || '').trim()
+    .replace(/^refs\/heads\//, '').replace(/^origin\//, '').toLowerCase();
+  const b = norm(name);
+  if (!b || b === 'head') return true;
+  const d = norm(defaultBranch);
+  return RAMI_PROTETTI.includes(b) || (!!d && b === d);
+}
 
 function git(args, opts = {}) {
   try {
@@ -59,6 +88,12 @@ function git(args, opts = {}) {
   } catch (e) {
     return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message };
   }
+}
+
+/** Il ramo di default di origin secondo il repo ('' se non lo sa). */
+function defaultBranch() {
+  const r = git(['rev-parse', '--abbrev-ref', 'origin/HEAD']);
+  return r.ok ? r.out : '';
 }
 
 function run(cmd, args, label) {
