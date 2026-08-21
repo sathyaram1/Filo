@@ -311,11 +311,12 @@ muro non era un muro.
 
 - **`ownerMerge` `{ branch, sha? }`** — chiamata riservata all'owner
   autenticato (stesso perimetro di `routineKeys`/`routineStateAdmin`). Il
-  server: valida il nome del ramo → se lo `sha` è dichiarato verifica che la
-  **punta vera** del ramo su GitHub sia quella (diversa → `stale`, niente
-  fusione: i controlli locali riguardavano un altro codice) → fa girare **L5**
-  sul diff che scarica lui (trip → `blocked`) → fonde con l'identità dell'App
-  (409 → `conflict`). Esiti e guasti nello stesso vocabolario di `routineMerge`.
+  server: valida il nome del ramo → risolve la **punta vera** del ramo su
+  GitHub (e se lo `sha` è dichiarato pretende che combaci: diverso → `stale`,
+  niente fusione, i controlli locali riguardavano un altro codice) → fa girare
+  **L5** sul diff di quella punta, che scarica lui (trip → `blocked`) → fonde
+  quella punta con l'identità dell'App (409 → `conflict`). Esiti e guasti nello
+  stesso vocabolario di `routineMerge`.
 - **Cosa NON chiede**: i verdetti registrati di verifica e sicurezza. Quelli
   sono il vocabolario delle routine; il lavoro locale ha i suoi controlli
   (logica pura, spec mirati, verifica indipendente) che girano prima. **L5
