@@ -82,9 +82,39 @@ export function isProtectedBranch(name, defaultBranch = '') {
   return RAMI_PROTETTI.includes(b) || (!!d && b === d);
 }
 
+/**
+ * GLI ARGOMENTI PER SPEDIRE UN RAMO SU ORIGIN. PURA.
+ *
+ * `git push origin <ramo>` dice a git COSA spedire ma non DOVE: la
+ * destinazione la sceglie la configurazione locale. Con
+ * `push.default=upstream` (o `tracking`) e `branch.<ramo>.merge=refs/heads/main`
+ * — che git imposta DA SÉ quando un ramo nasce da origin/main, quindi è già
+ * così su ogni ramo di lavoro di questo repo — quella riga scrive su
+ * refs/heads/main mentre il nome del ramo resta innocuo e OGNI guardia qui
+ * sopra passa: le guardie validano il nome della partenza, non l'arrivo.
+ * Riprodotto: `d5fb818..160af59  claude/innocuo -> main`. Stessa cosa con un
+ * `remote.origin.push` avvelenato. Sono `git config`: un file non versionato,
+ * nessuna credenziale, invisibile a chi guarda il diff.
+ *
+ * Il refspec sorgente:destinazione PIENAMENTE QUALIFICATO toglie la scelta alla
+ * configurazione — è la forma già usata da scripts/lib/branch-integrity.mjs.
+ * La guardia sul nome resta (è giusta, era solo insufficiente) e vale anche
+ * qui: da questa macchina il ramo principale non si spedisce mai, comunque lo
+ * si chiami e da qualunque punto si chiami questa funzione.
+ */
+export function pushArgs(branch) {
+  if (!branch || isProtectedBranch(branch)) {
+    throw new Error(`spedizione rifiutata: '${branch}' non è un ramo di lavoro`);
+  }
+  return ['push', 'origin', `refs/heads/${branch}:refs/heads/${branch}`];
+}
+
 function git(args, opts = {}) {
   try {
-    return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', ...opts }).trim() };
+    // stderr CATTURATO, non a schermo: quando una lettura fallisce l'esito lo
+    // gestiamo qui sotto, e il `fatal:` di git a video sembrava un guasto senza
+    // esserlo (il caso tipico: origin/HEAD non impostato).
+    return { ok: true, out: execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim() };
   } catch (e) {
     return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message };
   }
