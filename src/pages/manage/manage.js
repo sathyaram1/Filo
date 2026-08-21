@@ -2764,6 +2764,9 @@
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
   window.__mgTest.loadWorkerLog = loadWorkerLog;
   window.__mgTest.renderChannelLog = renderChannelLog;
+  // Fusioni in attesa: rilettura via IPC dopo lo stub (in test non c'è né una
+  // sessione da proprietario né il server di sicurezza).
+  window.__mgTest.loadMergeApprovals = loadMergeApprovals;
 
   // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
   // (SVG outline, currentColor) invece di un glifo emoji.
