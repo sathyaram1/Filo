@@ -166,9 +166,11 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   # Il refspec sorgente:destinazione pienamente qualificato toglie la scelta
   # alla configurazione.
   #
-  # Quale ramo si spedisce l'ha gia' deciso is_protected_branch qui sopra: se
-  # fossimo sul ramo principale non saremmo arrivati fin qui.
-  git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
+  # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
+  # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
+  if is_spedibile "$BRANCH"; then
+    git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH" >/dev/null 2>&1 || true
+  fi
 
 done
 
