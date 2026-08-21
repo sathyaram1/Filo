@@ -61,6 +61,38 @@ export function headSha(root) {
 // ─── Logica pura (unit-testata) ──────────────────────────────────────────────
 
 /**
+ * I nomi che NON sono rami di lavoro. Il valore è INCHIODATO, non preso
+ * dall'ambiente: qui è una guardia, e una guardia che si sposta con una
+ * variabile non è una guardia (stessa regola di scripts/finish-local.mjs).
+ * `master` c'è perché il repo potrebbe cambiare convenzione senza che questo
+ * file lo sappia: la guardia sbaglia in direzione sicura.
+ */
+export const RAMI_PROTETTI = Object.freeze(['main', 'master']);
+
+/**
+ * Questo nome è la linea principale invece che un ramo di lavoro? PURA.
+ *
+ * Gli endpoint di fusione del server rifiutano già `main`; qui il controllo
+ * mancava, e una routine poteva ritrovarsi a PRODURRE direttamente sulla linea
+ * principale — dove il lavoro non ha modo di arrivare agli utenti (il cancello
+ * fonde un RAMO) e dove sporcherebbe la copia locale. È l'incidente #378 preso
+ * un passo prima: non "il verdetto è stato dato sull'albero sbagliato", ma "il
+ * lavoro è stato fatto sull'albero sbagliato".
+ *
+ * `mainBranch` (la linea principale dichiarata dal chiamante) si AGGIUNGE ai
+ * nomi inchiodati, non li sostituisce. Un nome vuoto conta come protetto: nel
+ * dubbio non ci si lavora.
+ */
+export function isProtectedBranch(name, mainBranch = '') {
+  const norm = (s) => String(s || '').trim()
+    .replace(/^refs\/heads\//, '').replace(/^origin\//, '').toLowerCase();
+  const b = norm(name);
+  if (!b || b === 'head') return true;
+  const m = norm(mainBranch);
+  return RAMI_PROTETTI.includes(b) || (!!m && b === m);
+}
+
+/**
  * Marcatore di tentativo: `20260807T195800Z`. Sta dentro i caratteri ammessi da
  * merge-gate.isValidBranch e ordina cronologicamente come stringa.
  */
