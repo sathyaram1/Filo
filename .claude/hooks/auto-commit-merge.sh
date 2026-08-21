@@ -92,24 +92,40 @@ else
   COMMIT_AS_EMAIL="claude@local"
 fi
 
-# Find a worktree (if any) that has TARGET_BRANCH checked out.
-TARGET_WT=$(git worktree list --porcelain | awk -v tb="refs/heads/$TARGET_BRANCH" '
-  /^worktree /{wt=substr($0,10)}
-  /^branch /{if ($2 == tb) {print wt; exit}}
-')
+# (Qui si cercava la cartella che aveva il ramo principale, per fonderci dentro
+# i rami di lavoro. La fusione automatica non esiste piu' dal 2026-08-07 e quella
+# ricerca non serviva piu' a nessuno.)
 
-# 1) Commit pending changes in every worktree, and (multi-worktree mode only)
-#    merge each feature branch into the TARGET worktree.
+# 1) Commit pending changes in every worktree.
 git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while IFS= read -r wt; do
   [ -d "$wt" ] || continue
   cd "$wt" || continue
+
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+  # ─── SUL RAMO PRINCIPALE NON SI COMMITTA ───────────────────────────────────
+  #
+  # Se una sessione modifica file mentre la cartella si trova sul ramo
+  # principale, questo hook ci committava sopra. Quel lavoro non ha nessun modo
+  # di arrivare agli utenti — al ramo principale ci si arriva solo dal cancello,
+  # che fonde un RAMO — e intanto sporca la copia locale del ramo principale,
+  # che al prossimo `git pull` diverge o si trascina dietro commit che nessuno
+  # ha esaminato.
+  #
+  # Astenersi non e' un errore: le modifiche restano nella cartella (niente e'
+  # perso), lo si dice a voce chiara e si prosegue.
+  if is_protected_branch "$BRANCH"; then
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+      echo "[auto-commit] '$wt' si trova sul ramo principale ('${BRANCH:-HEAD staccata}'): NON committo e NON spedisco. Le modifiche sono ancora li'. Spostale in una cartella dedicata: git worktree add .claude/worktrees/<nome> -b claude/<nome>" >&2
+    fi
+    continue
+  fi
 
   git add -A 2>/dev/null
   if git diff --cached --quiet 2>/dev/null; then
     continue
   fi
 
-  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
   # Commit message: list the changed files (first 3 + count) instead of a bare
   # timestamp, so `git log` stays useful for archaeology. Git already records
   # the date; the file list is the only signal the hook can cheaply provide.
