@@ -2735,8 +2735,10 @@
     renderActions,
     applyCommandCwd,
     getCwd: () => currentCwd,
-    // Fusioni in attesa: gli spec rileggono l'elenco dopo aver stubbato l'IPC
-    // (in test non c'è né una sessione da proprietario né il server).
+    // Fusioni in attesa: gli spec ripercorrono il cammino VERO (chi sono →
+    // cosa c'è in attesa) dopo aver stubbato l'IPC, perché in test non c'è né
+    // una sessione da proprietario né il server di sicurezza.
+    refreshAccountControl,
     refreshMergeApprovals,
   };
 })();
