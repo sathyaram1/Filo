@@ -114,6 +114,8 @@ git -c user.email=claude@local -c user.name=claude-local commit -q -m "cap-obser
 # qualificato, cosi' dove atterra non lo decide la configurazione locale di git.
 # `git push origin HEAD` regge ai veleni provati (push.default, remote.*.push),
 # ma la regola vale senza eccezioni proprio per non doverla riverificare a ogni
-# forma nuova.
-git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
+# forma nuova. Se la HEAD e' staccata non c'e' ramo da spedire: si salta.
+if is_spedibile "$CUR_BRANCH"; then
+  git push origin "refs/heads/$CUR_BRANCH:refs/heads/$CUR_BRANCH" >/dev/null 2>&1 || true
+fi
 exit 0
