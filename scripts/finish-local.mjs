@@ -50,6 +50,24 @@
 //   I controlli locali e la verifica indipendente restano identici, e restano
 //   obbligatori: sono quelli che dicono se il lavoro è finito. Il server non
 //   li rifà e non ci crede — controlla altro.
+//
+// SE IL SERVER BLOCCA, NON È UN VICOLO CIECO (SPEC-RIDISEGNO-MAX.md §10)
+//   I controlli deterministici del server fermano chi tocca le aree protette
+//   (guardie, automatismi, regole del database, chiavi, dipendenze nuove) — e
+//   il lavoro locale ci cade dentro quasi sempre, perché in locale si lavora
+//   proprio su quelle cose. Da qui non si aggirano, e su main da questa
+//   macchina non scrive nessuno: senza una via d'uscita quel lavoro non
+//   arriverebbe mai agli utenti.
+//
+//   La via d'uscita non è un permesso in più per questo script: il server APRE
+//   UNA RICHIESTA IN ATTESA, e l'owner la approva DENTRO FILO (l'avviso in
+//   cima alla prima schermata, o Gestione → Automazioni). Serve una persona
+//   davanti allo schermo, su una superficie diversa da questo terminale: è
+//   l'unica cosa che una sessione catturata non può procurarsi da sola.
+//
+//   Qui l'unico compito è DIRLO bene (messageForOwnerMerge in
+//   scripts/lib/owner-merge.mjs): l'esito porta il nome della richiesta aperta,
+//   e il messaggio nomina dove approvarla invece di fermarsi al blocco.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
