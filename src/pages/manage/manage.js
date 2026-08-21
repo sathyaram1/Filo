@@ -2742,6 +2742,15 @@
     loadWorkerLog();
   });
 
+  // Tab "Automazioni": le fusioni in attesa si rileggono a OGNI apertura. Sono
+  // richieste che scadono in mezz'ora — mostrarne una vecchia di ore, o
+  // nascondere una appena arrivata, renderebbe la sezione inutile.
+  mgTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mg-tab');
+    if (!btn || btn.dataset.tab !== 'automation') return;
+    loadMergeApprovals();
+  });
+
   // Esponi per gli spec Playwright (hook di test).
   window.__mgTest.loadSupportModels = loadSupportModels;
   window.__mgTest.getSmChains = () => smChains;
