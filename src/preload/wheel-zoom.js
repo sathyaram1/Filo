@@ -109,6 +109,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       try { webFrame.setZoomFactor(factor); } catch (_) {}
     }
     if (percentInput) percentInput.value = String(currentPercent());
+    syncBadgeScale();
   }
 
   function makeBadge() {
