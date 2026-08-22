@@ -433,7 +433,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -696,7 +696,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
     });
   }
 
@@ -972,7 +972,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
   }) {
     const items = [];
 
@@ -1004,7 +1004,7 @@
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory,
     });
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
@@ -1106,7 +1106,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory,
   }) {
     const items = [];
 
@@ -1151,14 +1151,21 @@
       // queste voci non avrebbe nessun modo di aprirlo, copiarlo o salvarlo
       // (#434). Stessa forma del ramo immagine: contenuto in cima, separatore,
       // collegamento sotto.
-      if (linkEl) {
+      //
+      // Il collegamento non è sempre un antenato: nelle home dei siti video e
+      // dei social l'anteprima che parte al passaggio del mouse si STENDE SOPRA
+      // la scheda, e il link della scheda resta sotto (#444). Per chi guarda è
+      // la stessa identica scheda: se occupano lo stesso rettangolo, le voci del
+      // collegamento vanno messe lo stesso.
+      const link = linkEl || (sameCardArea(mediaEl, linkUnder) ? linkUnder : null);
+      if (link) {
         items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+        for (const it of buildLinkActionItems(link)) items.push(it);
         items.push({ type: 'separator' });
         // Il media non ha una sua sezione "Spiega": quella del collegamento è
         // l'unica, quindi resta (nessuna seconda chiamata AI, e il menu del
         // link è completo come quando lo si clicca da solo).
-        items.push(Actions.buildInlineExplainLink(linkEl));
+        items.push(Actions.buildInlineExplainLink(link));
       }
       return items;
     }
