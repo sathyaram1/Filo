@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.198', date: '2026-08-22',
+      fixes: [
+        'Nelle home dei siti video e dei social, quando passando il mouse su una scheda parte l\'anteprima animata, il tasto destro continua a offrire le azioni sul collegamento — «Apri in nuova tab», «Copia URL», «Salva link per dopo», «Condividi link» — invece delle sole azioni sul filmato: non serve più spostare il mouse e aspettare che l\'anteprima finisca.',
+      ],
+    },
+    {
       version: '0.2.196', date: '2026-08-08',
       features: [
         'Nuova pagina «Trasparenza»: quali modelli AI usa Filo e perché, con le fonti. La trovi anche senza connessione, e puoi chiederne conto a Filo in chat.',
