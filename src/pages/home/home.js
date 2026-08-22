@@ -280,6 +280,12 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // #442 — un'importazione da backup ha rimesso dentro le pagine salvate:
+    // questa scheda le rilegge invece di restare all'elenco di prima.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { load(); },
+      ['savedPages', 'categories', 'settings'],
+    );
     $('search').addEventListener('input', render);
     $('back').addEventListener('click', () => {
       currentCategoryId = null;
