@@ -275,6 +275,10 @@
     return {
       type: 'row',
       dropTarget: 'primary',
+      // #445 — quando il menu di un riquadro viene disegnato dalla pagina, la
+      // riga la ricostruisce lei (col SUO layout e il SUO trascinamento): di qui
+      // le serve solo sapere se avanti/indietro sono percorribili.
+      navState: navState || null,
       onDrop: (e) => { applyIconDrop(e); redrawIconRows(); },
       items: buildPrimaryRowItems(navState),
     };
