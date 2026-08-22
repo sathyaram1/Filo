@@ -80,16 +80,64 @@ test('due invocazioni con lo stesso biglietto accendono UN battito solo', () => 
   }
 });
 
-test('biglietto nuovo: il battito si riaccende anche se il vecchio è ancora vivo', () => {
+test('biglietto nuovo: il battito si riaccende, e il vecchio non resta orfano', () => {
+  // Il marcatore sta per essere sovrascritto: se il battito del biglietto
+  // precedente non lo si spegne adesso, resta vivo e IRRAGGIUNGIBILE — nessuno
+  // sa più che processo sia — a tenere in piedi un semaforo che non serve.
   const casa = casaFinta();
+  const uccisi = [];
+  const killVero = process.kill.bind(process);
+  process.kill = (pid, sig) => { uccisi.push(pid); if (sig === 0) return killVero(pid, sig); };
   try {
     let avvii = 0;
-    const finto = () => { avvii += 1; return { pid: 4242, unref() {} }; };
+    const finto = () => { avvii += 1; return { pid: 4242 + avvii, unref() {} }; };
     startBeat(casa, 'b-1', { spawnImpl: finto, alive: () => true });
     const r = startBeat(casa, 'b-2', { spawnImpl: finto, alive: () => true });
     assert.equal(r.started, true);
     assert.equal(avvii, 2);
+    assert.deepEqual(uccisi, [4243], 'il battito del biglietto vecchio va spento prima di perderne le tracce');
   } finally {
+    process.kill = killVero;
+    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+// ── Lo spegnimento: solo il proprio battito ────────────────────────────────
+
+test('rilasciare un biglietto NON spegne il battito di un altro lavoro', () => {
+  // Riprodotto sul campo: il rilascio spegneva "il battito che c'è" senza
+  // guardare a quale biglietto fosse appeso, e un lavoro vivo restava senza
+  // battito — cioè col semaforo che cade mentre sta ancora lavorando.
+  const casa = casaFinta();
+  const uccisi = [];
+  const killVero = process.kill.bind(process);
+  process.kill = (pid, sig) => { uccisi.push(pid); if (sig === 0) return killVero(pid, sig); };
+  try {
+    startBeat(casa, 'b-vivo', { spawnImpl: () => ({ pid: 5150, unref() {} }), alive: () => true });
+    const r = stopBeat(casa, { ticket: 'b-altro', alive: () => true });
+    assert.equal(r.stopped, false);
+    assert.equal(r.why, 'other_ticket');
+    assert.deepEqual(uccisi, [], 'nessuno deve essere ammazzato');
+    assert.equal(readBeat(casa).ticket, 'b-vivo', 'e il marcatore resta quello di chi lavora');
+  } finally {
+    process.kill = killVero;
+    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test('rilasciare il PROPRIO biglietto spegne il battito', () => {
+  const casa = casaFinta();
+  const uccisi = [];
+  const killVero = process.kill.bind(process);
+  process.kill = (pid, sig) => { uccisi.push(pid); if (sig === 0) return killVero(pid, sig); };
+  try {
+    startBeat(casa, 'b-mio', { spawnImpl: () => ({ pid: 5151, unref() {} }), alive: () => true });
+    const r = stopBeat(casa, { ticket: 'b-mio', alive: () => true });
+    assert.equal(r.stopped, true);
+    assert.deepEqual(uccisi, [5151]);
+    assert.equal(readBeat(casa), null);
+  } finally {
+    process.kill = killVero;
     rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
   }
 });
