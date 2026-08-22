@@ -1207,8 +1207,10 @@ se lo scriviamo noi, dobbiamo saperlo rileggere noi.
   non deve poter aprire un file dialog né riscrivere lo storage.
 - **Dove:** `readExportZip` / `mergeImportedData` in
   `src/main/services/exportData.js`, handler in
-  `src/main/services/handlers/storage.js`, UI in `src/pages/security/`. Test
-  `tests/unit/importData.test.mjs`, `tests/import-data.spec.mjs`.
+  `src/main/services/handlers/storage.js`, UI in `src/pages/security/`,
+  `onDataImported` in `src/shared/pageBootstrap.js`. Test
+  `tests/unit/importData.test.mjs`, `tests/import-data.spec.mjs`,
+  `tests/import-refresh-open-tabs.spec.mjs`.
 
 ## Un mittente nuovo si classifica su DUE assi: da dove viene, e quanto ci si fida
 
