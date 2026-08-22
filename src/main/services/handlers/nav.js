@@ -271,7 +271,7 @@ module.exports = function register(on, ctx) {
     // riquadro, dal riquadro si va al frame principale. Un terzo frame che
     // conoscesse il token non otterrebbe comunque niente.
     if (from === main) {
-      if (phase === 'close') wc._filoProjectedMenu = null;
+      if (phase === 'close' || phase === 'refused') wc._filoProjectedMenu = null;
       return send(link.frame, { phase, token: link.token, id: msg?.id, arg: msg?.arg });
     }
     if (from !== link.frame) return { ok: false, error: 'not-the-owner' };
