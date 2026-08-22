@@ -260,7 +260,10 @@
     var when = el('span', 'sn-mac-when', timeAgo(req.createdAtMs, now));
     head.appendChild(when);
     var exp = el('span', 'sn-mac-expiry', expiresIn(req.expiresAtMs, now));
-    exp.title = 'Vale per il commit esaminato e per un giorno: passata la scadenza si rilancia npm run finish.';
+    // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro:
+    // mandare l'owner a lanciare la pubblicazione locale per un ramo scritto da
+    // un'automazione è un consiglio che non porta a niente.
+    exp.title = 'Vale per il commit esaminato e per un giorno. Passata la scadenza: ' + howToRetry(req);
     head.appendChild(exp);
     card.appendChild(head);
 
@@ -285,7 +288,7 @@
     var actions = el('div', 'sn-mac-actions');
     var discardBtn = el('button', 'sn-mac-btn sn-mac-btn-quiet', 'Scarta');
     discardBtn.type = 'button';
-    discardBtn.title = 'Toglila dall’elenco senza fondere niente. Si rifà con npm run finish.';
+    discardBtn.title = 'Toglila dall’elenco senza fondere niente. ' + howToRetry(req);
     var approveBtn = el('button', 'sn-mac-btn sn-mac-btn-go', 'Approva e fondi');
     approveBtn.type = 'button';
     approveBtn.title = 'Fonde su main esattamente il commit esaminato.';

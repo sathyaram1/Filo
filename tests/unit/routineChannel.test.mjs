@@ -125,7 +125,7 @@ test('merge: nel corpo viaggiano SOLO biglietto e ramo — nessun verdetto', asy
   let sent = null; let url = '';
   const fetchImpl = async (u, init) => { url = u; sent = JSON.parse(init.body); return reply(200, { ok: true, result: 'merged', sha: 'abc' }); };
   const r = await merge('tkt-1', 'worker/42', { fetchImpl, sleep: async () => {} });
-  assert.deepEqual(r, { ok: true, result: 'merged', reason: '', sha: 'abc' });
+  assert.deepEqual(r, { ok: true, result: 'merged', reason: '', sha: 'abc', approval: '' });
   assert.match(url, /\/routineMerge$/);
   assert.deepEqual(Object.keys(sent).sort(), ['branch', 'ticket']);
 });
@@ -137,6 +137,15 @@ test('merge: blocked e conflict arrivano col motivo; una risposta senza esito è
   });
   assert.equal(blocked.result, 'blocked');
   assert.match(blocked.reason, /firestore\.rules/);
+
+  // Su un blocco il server dice anche che ha aperto la richiesta per l'owner:
+  // se quel campo si perdesse per strada, chi legge il registro crederebbe che
+  // il ramo sia perduto proprio quando invece basta un via libera.
+  const conRichiesta = await merge('t', 'worker/1', {
+    fetchImpl: async () => reply(200, { ok: true, result: 'blocked', reason: 'guard_the_guards', approval: 'req-7' }),
+    sleep: async () => {},
+  });
+  assert.equal(conRichiesta.approval, 'req-7');
   const conflict = await merge('t', 'worker/1', {
     fetchImpl: async () => reply(200, { ok: true, result: 'conflict' }), sleep: async () => {},
   });
