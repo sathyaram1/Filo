@@ -188,10 +188,15 @@
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
     sha.title = 'Il commit esaminato: ' + String(req.sha || '');
     head.appendChild(sha);
+    // Chi ha chiesto: il dato arriva dal server e senza di lui la separazione
+    // fra chi chiede e chi approva resta a metà.
+    var who = el('span', 'sn-mac-who', requestedBy(req.who));
+    who.title = 'La richiesta è arrivata con questa identità; approvarla è un gesto tuo, qui.';
+    head.appendChild(who);
     var when = el('span', 'sn-mac-when', timeAgo(req.createdAtMs, now));
     head.appendChild(when);
     var exp = el('span', 'sn-mac-expiry', expiresIn(req.expiresAtMs, now));
-    exp.title = 'Passata la scadenza la richiesta non vale più: si rilancia npm run finish.';
+    exp.title = 'Vale per il commit esaminato e per un giorno: passata la scadenza si rilancia npm run finish.';
     head.appendChild(exp);
     card.appendChild(head);
 
