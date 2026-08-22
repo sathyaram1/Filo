@@ -45,19 +45,31 @@
   // coordinate dell'evento nella scheda, il riquadro conosce le proprie, e la
   // differenza è l'origine del riquadro.
   let lastLocalPoint = null;
+  let pendingViewPos = null;
   let viewOffset = null;
 
+  function pairUp() {
+    if (!lastLocalPoint || !pendingViewPos) return;
+    viewOffset = {
+      dx: pendingViewPos.x - lastLocalPoint.x,
+      dy: pendingViewPos.y - lastLocalPoint.y,
+      t: Date.now(),
+    };
+    pendingViewPos = null;
+  }
+
+  // Le due metà della misura arrivano in ordine non garantito: al PRIMO click
+  // destro dentro un riquadro i content script si stanno ancora montando e il
+  // clic viene rigiocato con qualche millisecondo di ritardo, quindi la
+  // posizione nella scheda può arrivare per prima. Chi arriva aspetta l'altra.
   function noteLocalPoint(x, y) {
     lastLocalPoint = { x: Number(x) || 0, y: Number(y) || 0 };
+    pairUp();
   }
 
   function noteViewPos(x, y) {
-    if (!lastLocalPoint) return;
-    viewOffset = {
-      dx: (Number(x) || 0) - lastLocalPoint.x,
-      dy: (Number(y) || 0) - lastLocalPoint.y,
-      t: Date.now(),
-    };
+    pendingViewPos = { x: Number(x) || 0, y: Number(y) || 0 };
+    pairUp();
   }
 
   // L'offset invecchia: se la pagina scorre fra un click destro e l'altro il
