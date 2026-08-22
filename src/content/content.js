@@ -423,10 +423,9 @@
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
     // recuperiamola dal nodo stesso così Taglia/Copia compaiono nel menu.
     if (!selInfo) selInfo = getInputSelectionInfo(target);
-    const linkEl = target?.closest?.('a[href]');
-    const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
-    const { mediaEl, mediaUnder } = findMedia(target, e.clientX, e.clientY);
-    const editable = isEditable(target);
+    const {
+      linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable,
+    } = detectContext(target, e.clientX, e.clientY);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
     const [clipboardHistory, navState] = await Promise.all([
