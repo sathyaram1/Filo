@@ -22,11 +22,18 @@
   const mgAutoApproveBlock = document.getElementById('mgAutoApproveBlock');
   // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
   // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
+  // Un interruttore per ogni categoria d'autore che la lista mostra come icona
+  // (AUTHOR_META più sotto): chi si vede separato si regola separato.
   const mgAutoApprove = {
-    owner:  document.getElementById('mgAutoApproveOwner'),
-    filo:   document.getElementById('mgAutoApproveFilo'),
-    claude: document.getElementById('mgAutoApproveClaude'),
-    user:   document.getElementById('mgAutoApproveUser'),
+    owner:    document.getElementById('mgAutoApproveOwner'),
+    user:     document.getElementById('mgAutoApproveUser'),
+    local:    document.getElementById('mgAutoApproveLocal'),
+    worker:   document.getElementById('mgAutoApproveWorker'),
+    verifier: document.getElementById('mgAutoApproveVerifier'),
+    residuo:  document.getElementById('mgAutoApproveResiduo'),
+    prober:   document.getElementById('mgAutoApproveProber'),
+    claude:   document.getElementById('mgAutoApproveClaude'),
+    filo:     document.getElementById('mgAutoApproveFilo'),
   };
   // Interruttore master delle routine autonome (config/routines).
   const mgRoutinesSwitch = document.getElementById('mgRoutinesSwitch');
