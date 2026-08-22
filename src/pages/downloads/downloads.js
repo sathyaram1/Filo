@@ -401,5 +401,9 @@
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();
       });
     }
+
+    // #442 — un'importazione da backup ha rimesso dentro gli scaricamenti:
+    // stessa rilettura degli aggiornamenti live, così la lista non resta ferma.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => scheduleReload(), ['downloads']);
   });
 })();
