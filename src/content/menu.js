@@ -415,7 +415,17 @@
       root.appendChild(el);
     }
 
-    if (keepFocus) keepPageFocus(root);
+    // #445 — menu disegnato per conto di un altro frame: il campo su cui
+    // l'utente stava scrivendo vive LÌ, e un clic qui glielo toglierebbe
+    // insieme alla parola che il correttore di sistema teneva sotto al cursore.
+    // Le sezioni di testo restano fuori dalla regola: lì il gesto del mouse
+    // serve a selezionare la spiegazione, non ad agire.
+    if (keepFocus) {
+      root.addEventListener('mousedown', (e) => {
+        if (e.target?.closest?.('.sn-menu-inline')) return;
+        e.preventDefault();
+      });
+    }
     menuHost().appendChild(root);
 
     // #405 — su una pagina con riquadri incorporati il menu può nascere dentro

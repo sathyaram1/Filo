@@ -128,3 +128,58 @@ test('la spiegazione inline compare nel menu disegnato dalla pagina', async ({ o
   const txt = (await menu.textContent()) || '';
   expect(txt).toContain('Copia');
 });
+
+test('con la pagina ingrandita il menu compare comunque sotto al cursore', async ({ app, openTab, testServer }) => {
+  // Le coordinate che il main conosce sono in pixel della scheda NON ingrandita,
+  // quelle dei frame in pixel CSS: con lo zoom sono due misure diverse. Senza la
+  // conversione il menu si spostava in proporzione allo zoom e a 1.5× finiva
+  // mezzo fuori dalla finestra.
+  const inner = `<!doctype html><html><body style="margin:0;padding:0;background:#111">
+    <div id="bersaglio" style="position:absolute;left:100px;top:40px;width:20px;height:20px;background:#0f0"></div>
+  </body></html>`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:0">
+    <iframe id="embed" src="${testServer.html(inner)}" width="520" height="110"
+            style="border:0;position:absolute;left:60px;top:50px"></iframe>
+    <div style="height:900px"></div></body></html>`);
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tabs = win._filoTabs.tabs;
+    tabs[tabs.length - 1].view.webContents.setZoomFactor(1.5);
+  });
+  await page.waitForTimeout(400);
+  await page.frameLocator('#embed').locator('#bersaglio').click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 8000 });
+
+  const pos = await page.evaluate(() => {
+    const m = document.querySelector('.sn-menu').getBoundingClientRect();
+    return { left: m.left, top: m.top, right: m.right, vw: window.innerWidth };
+  });
+  // Il centro del bersaglio è a (60+110, 50+50) = (170, 100) nella pagina.
+  expect(Math.abs(pos.left - 170)).toBeLessThan(12);
+  expect(Math.abs(pos.top - 100)).toBeLessThan(12);
+  expect(pos.right).toBeLessThanOrEqual(pos.vw);
+});
+
+test('«Incolla» dal menu disegnato dalla pagina scrive nel campo del riquadro', async ({ app, openTab, testServer }) => {
+  // Il campo su cui si sta scrivendo vive nel RIQUADRO, il menu nella PAGINA:
+  // se il clic sul menu portasse via il fuoco (o il punto in cui si scriveva),
+  // l'incolla finirebbe nel vuoto.
+  const inner = `<!doctype html><html><body style="margin:0;padding:6px;font:14px sans-serif">
+    <textarea id="campo" rows="2" cols="40">ciao </textarea>
+  </body></html>`;
+  const page = await testServer.openReady(openTab, outer(testServer.html(inner)));
+  await app.evaluate(({ clipboard }) => clipboard.writeText('mondo'));
+
+  const frame = page.frameLocator('#embed');
+  await frame.locator('#campo').click();
+  await page.keyboard.press('End');
+  await frame.locator('#campo').click({ button: 'right' });
+
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 8000 });
+  await menu.getByText('Incolla', { exact: true }).click();
+
+  await expect.poll(async () => frame.locator('#campo').inputValue(), { timeout: 6000 })
+    .toContain('mondo');
+});
