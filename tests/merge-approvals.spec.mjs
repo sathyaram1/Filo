@@ -149,6 +149,124 @@ test('prima schermata: due richieste = due schede, e il titolo lo dice', async (
   await expect(page.locator('#mergeApprovals .sn-mac')).toContainText('2 fusioni aspettano');
 });
 
+test('la scheda dice CHI ha chiesto la fusione, su ENTRAMBE le superfici', async ({ openTab }) => {
+  // Questa superficie esiste per separare chi chiede da chi approva: il server
+  // manda già l'identità della richiesta, e non mostrarla le toglieva metà del
+  // senso. Deve dirlo la prima schermata E Gestione, con le stesse parole.
+  for (const [dove, url, host] of [
+    ['prima schermata', NEWTAB, '#mergeApprovals'],
+    ['Gestione', MANAGE, '#mgMergeApprovals'],
+  ]) {
+    const page = await openTab(url);
+    if (url === NEWTAB) await apriHome(page, { pending: [richiesta({ who: 'sathya@esempio.it' })] });
+    else await apriAutomazioni(page, { pending: [richiesta({ who: 'sathya@esempio.it' })] });
+
+    const chi = page.locator(`${host} .sn-mac-who`);
+    await expect(chi, dove).toBeVisible({ timeout: 8_000 });
+    await expect(chi, dove).toHaveText('chiesta da sathya@esempio.it');
+  }
+});
+
+test('una richiesta senza email non stampa un identificativo tecnico', async ({ openTab }) => {
+  // Una stringa opaca non dice niente a chi deve decidere: si dice cosa
+  // significa, non la si mostra.
+  const page = await openTab(NEWTAB);
+  await apriHome(page, { pending: [richiesta({ who: 'K3nD9xQw1aZ7mB2pL0rT' })] });
+  const chi = page.locator('#mergeApprovals .sn-mac-who');
+  await expect(chi).toBeVisible({ timeout: 8_000 });
+  await expect(chi).toContainText(/senza email/i);
+  await expect(page.locator('#mergeApprovals .sn-mac')).not.toContainText('K3nD9xQw1aZ7mB2pL0rT');
+});
+
+// ── 1 bis. Una schermata GIÀ APERTA se ne accorge ───────────────────────────
+//
+// Il guasto vero, e ci si è cascati subito: il terminale dice "approvala dalla
+// prima schermata", ma quella schermata leggeva l'elenco solo all'apertura. Con
+// la home già aperta — cioè sempre, è la pagina iniziale del browser — non
+// compariva niente finché non se ne apriva una nuova.
+
+test('la prima schermata già aperta vede arrivare una richiesta nuova, senza riaprire niente', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  // La situazione vera: home aperta da un pezzo, niente in sospeso.
+  await apriHome(page, { pending: [] });
+  await expect(page.locator('#mergeApprovals')).toBeHidden();
+
+  // …e adesso `npm run finish` viene bloccato dai controlli. Nessuno tocca
+  // questa pagina: è il main ad avvisarla.
+  await avvisaDalMain(app, { pending: [richiesta()] });
+
+  const avviso = page.locator('#mergeApprovals .sn-mac');
+  await expect(avviso).toBeVisible({ timeout: 8_000 });
+  await expect(avviso).toContainText('claude/approvazione-fusioni');
+  await expect(avviso).toContainText('Tocca aree protette');
+  // E la riga in cima si accende davvero (non un riquadro che si sovrappone).
+  await expect(page.locator('#dash')).toHaveClass(/dash--notice/);
+});
+
+test('e sparisce da sola quando la richiesta non c’è più', async ({ app, openTab }) => {
+  // L'owner può averla decisa da un'altra finestra: un avviso che resta lì
+  // dopo che non c'è più niente da approvare fa cliccare a vuoto.
+  const page = await openTab(NEWTAB);
+  await apriHome(page, { pending: [richiesta()] });
+  await expect(page.locator('#mergeApprovals .sn-mac')).toBeVisible({ timeout: 8_000 });
+
+  await avvisaDalMain(app, { pending: [] });
+  await expect(page.locator('#mergeApprovals')).toBeHidden({ timeout: 8_000 });
+  await expect(page.locator('#dash')).not.toHaveClass(/dash--notice/);
+});
+
+test('anche Gestione già aperta se ne accorge: i due cammini restano pari', async ({ app, openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriAutomazioni(page, { pending: [] });
+  await expect(page.locator('#mgMergeApprovals')).toBeHidden();
+
+  await avvisaDalMain(app, { pending: [richiesta()], recent: [] });
+  await expect(page.locator('#mgMergeApprovals .sn-mac')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovals .sn-mac')).toContainText('claude/approvazione-fusioni');
+});
+
+test('chi non è il proprietario non vede comparire niente, nemmeno se il main avvisa', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await apriHome(page, { admin: false, pending: [] });
+  await avvisaDalMain(app, { pending: [richiesta()] });
+  // Un attimo per essere sicuri che l'avviso sia stato consegnato e ignorato.
+  await page.waitForTimeout(500);
+  await expect(page.locator('#mergeApprovals')).toBeHidden();
+  await expect(page.locator('.sn-mac')).toHaveCount(0);
+});
+
+test('l’avviso NON arriva alle schede su siti qualunque', async ({ app, openTab, testServer }) => {
+  // Il messaggio porta nomi di rami e percorsi di file: dice su cosa sta
+  // lavorando l'owner. È la stessa regola del gate d'origine sugli handler,
+  // vista dal verso opposto — se un sito non lo può chiedere, non glielo si
+  // manda nemmeno da soli.
+  await openTab(NEWTAB);
+  await testServer.openReady(openTab, '<html><body><p>sito qualunque</p></body></html>');
+
+  const conteggi = await app.evaluate(({ BrowserWindow }) => {
+    const spie = [];
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win._filoTabs) continue;
+      for (const t of win._filoTabs.tabs) {
+        const wc = t.view.webContents;
+        const spia = { url: String(wc.getURL() || ''), n: 0 };
+        const orig = wc.send.bind(wc);
+        wc.send = (...a) => { spia.n++; return orig(...a); };
+        spie.push(spia);
+      }
+    }
+    globalThis.SN_BROADCAST_FILO({ type: 'merge_approvals_changed', pending: [], recent: [] });
+    return spie.map((s) => ({ url: s.url, n: s.n }));
+  });
+
+  const filo = conteggi.filter((c) => c.url.startsWith('filo://'));
+  const web = conteggi.filter((c) => c.url.startsWith('http://'));
+  expect(filo.length, 'serve almeno una pagina filo:// aperta').toBeGreaterThan(0);
+  expect(web.length, 'serve almeno una scheda su un sito qualunque').toBeGreaterThan(0);
+  for (const c of filo) expect(c.n, c.url).toBeGreaterThan(0);
+  for (const c of web) expect(c.n, c.url).toBe(0);
+});
+
 // ── 2. Niente in attesa = niente avviso ─────────────────────────────────────
 
 test('prima schermata: senza richieste non compare NIENTE, e la griglia resta quella di prima', async ({ openTab }) => {
