@@ -142,6 +142,19 @@
   //                                      è nato mentre scriveva il codice
   //   …:verifier / :secaudit→ 'verifier' un'istanza che VERIFICA il lavoro di
   //                                      un'altra: parla del lavoro appena fatto
+  //   local:<qualsiasi>     → 'local'    la SESSIONE LOCALE: Claude che lavora
+  //                                      sulla macchina dell'owner, in chat con
+  //                                      lui. Categoria PROPRIA, non 'prober' e
+  //                                      non 'claude': quello che nasce lì nasce
+  //                                      da un lavoro fatto insieme all'owner —
+  //                                      contesto diverso sia dall'esploratore
+  //                                      (che gira da solo sull'app) sia dalle
+  //                                      automazioni in cloud (che girano senza
+  //                                      nessuno davanti). Se collassasse su una
+  //                                      delle due, leggendo la coda non si
+  //                                      saprebbe più da dove viene un
+  //                                      ritrovamento — ed è l'unica cosa che il
+  //                                      mittente serve a dire
   //   routine:residuo       → 'residuo'  i rilievi RESIDUI di una verifica: un
   //                                      lavoro promosso dopo N giri «migliorabile»
   //                                      (SPEC-RIDISEGNO-MAX.md §13) lascia i
