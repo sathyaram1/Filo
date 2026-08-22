@@ -40,7 +40,7 @@
 
   /**
    * "adesso" / "N minuti fa" / "N ore fa". PURA.
-   * Le richieste vivono mezz'ora: la scala che conta sono i minuti.
+   * Una richiesta vive un giorno: servono sia i minuti sia le ore.
    */
   function timeAgo(atMs, nowMs) {
     var at = Number(atMs);
