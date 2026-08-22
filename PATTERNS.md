@@ -762,6 +762,36 @@ irraggiungibili.
   `.sn-toasts` in `src/content/popup.js` e `src/styles/popup.css` — ci passano
   toast, `.sn-dictate-pill` e `.sn-save-confirm`. Test `tests/toast-stack.spec.mjs`.
 
+## Riscontro effimero: sparisce da solo, ma non mentre ci stai interagendo
+
+Un indicatore che compare per un'azione e se ne va da solo (il badge della
+percentuale di zoom, la pill dello zoom nell'editor) deve **sospendere il conto
+alla rovescia finché l'utente ci sta sopra col puntatore o dentro con il
+cursore**, e farlo ripartire quando smette.
+
+- **Perché:** un riscontro spesso è anche un comando (la percentuale dello zoom
+  la puoi riscrivere per tornare al 100%). Un timer cieco lo fa svanire proprio
+  mentre lo stai raggiungendo: un campo che scappa non è un campo. Il conto si
+  sospende, non si annulla — appena il puntatore va altrove riparte, altrimenti
+  basta lasciare il mouse fermo lì per ritrovarsi un pezzo di interfaccia
+  permanente che non hai chiesto.
+- **Il timer che scade non nasconde e basta: ricontrolla.** Alla scadenza, se
+  l'utente è ancora lì, il timer si riarma — non serve stare a inseguire
+  `mouseenter`/`mouseleave` (`badge.matches(':hover')` al momento buono basta).
+- **Stesso elemento, due vite.** Se l'indicatore esiste già come parte
+  permanente di una modalità (il badge della modalità zoom con la rotella),
+  riusa **quello**, cambiando solo cosa promette: le istruzioni della modalità
+  ("rotella per zoomare") fuori da quella modalità sarebbero false, e vanno
+  nascoste. Entrando nella modalità il conto alla rovescia si annulla.
+- **Attenzione all'angolo:** un riscontro effimero non è un toast, ma occupa
+  spazio come loro. Se vive in un contesto che non può agganciarsi alla pila
+  (il badge dello zoom sta nel **preload**, la pila degli avvisi nel content
+  script), tienilo in un angolo diverso da quello della pila — vedi § "Stack di
+  overlay impilati".
+- **Dove:** `src/preload/wheel-zoom.js` (badge dello zoom, condiviso fra
+  modalità rotella e zoom con Ctrl), `.ed-zoom-pill` in
+  `src/pages/editor/editor.{js,css}`. Test: `tests/page-ctrl-zoom.spec.mjs`.
+
 ## Un cancello automatico che blocca deve avere una via d'uscita, e la via d'uscita è una PERSONA
 
 Un controllo deterministico che dice di no a un caso legittimo — e lo dice
