@@ -61,7 +61,7 @@ test('#442 — la lista delle pagine salvate aperta si riallinea da sola dopo un
     // La scheda che l'utente ha già aperta mentre importa.
     const home = await openTab('filo://home/home.html');
     await expect(home.locator('#empty')).toBeVisible();
-    await expect(home.locator('#list')).not.toContainText('Ricetta del backup');
+    await expect(home.locator('#grid')).not.toContainText('Ricetta del backup');
     await stampNoReloadMark(home);
 
     // …e la scheda da cui lancia l'importazione.
@@ -69,7 +69,7 @@ test('#442 — la lista delle pagine salvate aperta si riallinea da sola dopo un
     await runImport(security);
 
     // Il dato del backup arriva all'utente SENZA che debba toccare niente.
-    await expect(home.locator('#list')).toContainText('Ricetta del backup', { timeout: 10000 });
+    await expect(home.locator('#grid')).toContainText('Ricetta del backup', { timeout: 10000 });
     expect(await markSurvived(home), 'riallineata, non ricaricata').toBe(true);
   } finally {
     rmSync(backup.dir, { recursive: true, force: true });
