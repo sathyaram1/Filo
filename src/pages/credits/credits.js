@@ -199,5 +199,14 @@
     });
   }
 
+  // #442 — un'importazione da backup ha riscritto i crediti: rileggili, invece
+  // di lasciare a schermo il saldo di prima.
+  try {
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { load().catch(() => {}); },
+      ['credits', 'settings'],
+    );
+  } catch (_) {}
+
   load().catch((e) => { console.error('[credits] load fallito', e); });
 })();
