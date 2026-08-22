@@ -419,12 +419,58 @@ Tre regole quando si tocca qualcosa che vive nel content script:
   raggiunge **solo** il frame principale: per parlare a tutti serve
   `mainFrame.framesInSubtree`.
 
-Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
-diventa scorrevole invece di essere tagliato.
-
 **Dove:** `_makeView` in `src/main/tabs.js`, `src/preload/page-preload.js`,
 `IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
 `src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`.
+
+## Un menu più alto del riquadro lo disegna la pagina, non il riquadro
+
+Un menu dentro un iframe non può uscire dai bordi dell'iframe: su un player o un
+banner alti 100-350 px — la misura più comune sul web vero — il menu del tasto
+destro diventava una fessura da scorrere, mentre lo stesso menu due centimetri
+più in là si vedeva tutto (#445). Renderlo scorrevole era onesto ma restava
+attrito. Ora, quando non ci sta, il riquadro **non lo disegna**: manda alla
+pagina la DESCRIZIONE del menu e la pagina lo disegna sopra al riquadro, con
+tutta l'altezza della finestra. Le voci restano quelle dell'elemento cliccato nel
+riquadro: la pagina rimanda indietro la scelta, il riquadro la esegue — è lui a
+conoscere il link, l'immagine, il campo.
+
+Le regole che tengono in piedi la cosa:
+
+- **Solo quando serve.** Si misura il menu vero: se ci sta, resta dov'è (nessun
+  giro attraverso il main, nessun cambio di comportamento). Se la pagina non può
+  disegnarlo — a tutto schermo, o non sappiamo dove si trova il riquadro nella
+  finestra — si ricade sul menu scorrevole di prima. **Meglio stretto che
+  assente.**
+- **Fra i due frame passano DATI, mai nodi né HTML.** Etichette e testo entrano
+  come `textContent`; le icone valgono solo se coincidono con una che il registro
+  di Filo sa produrre (whitelist); le sezioni che si riempiono dopo (spiegazione
+  AI, anteprima di un link) mandano il loro STATO `{ state, text, markdown }` e a
+  disegnarlo è `menu.js` dall'altra parte. Il markdown si rende **di là**, dal
+  testo. Un riquadro ostile non ha un canale per iniettare markup nella pagina.
+- **Chi produce una sezione inline non tocca il DOM.** È la ragione per cui
+  `onMount(el, update)` consegna uno stato: la stessa sezione deve poter essere
+  disegnata da un frame diverso da quello che la produce. Se aggiungi una sezione
+  inline, passa da `update`.
+- **Il montaggio è rimandato alla conferma.** Le sezioni che chiamano un modello
+  partono solo quando la pagina conferma di aver disegnato il menu: se ricadi sul
+  menu locale la spiegazione non deve essere chiesta (e pagata) due volte.
+- **Chiudere prima, agire dopo.** `menu.js` chiude il menu e poi esegue la voce:
+  a quel punto il menu non c'è più, quindi l'avviso di chiusura al riquadro è
+  rimandato di un microtask, altrimenti scioglie il ponte prima che la scelta
+  passi e "Copia URL" non copia niente.
+- **Dove si trova il riquadro nella finestra** non è ricavabile da dentro un
+  iframe di un'altra origine. Lo dice il main: al click destro conosce le
+  coordinate nella scheda (`params.x/y`), il riquadro conosce le proprie, la
+  differenza è l'origine del riquadro. Le due metà arrivano in ordine non
+  garantito: chi apre un menu aspetta quel poco (`waitForViewPos`).
+- **I clic non attraversano il confine**: finché il menu è disegnato di là, il
+  riquadro ascolta `mousedown`/`Esc`/scroll da sé e lo chiude.
+
+**Dove:** `src/content/menuRemote.js`, `open()` e `renderInline()` in
+`src/content/menu.js`, `MSG.PROJECT_MENU` in `src/main/services/handlers/nav.js`,
+`MSG.FRAME_VIEW_POS` in `wc.on('context-menu')` di `src/main/tabs.js`.
+Test: `tests/iframe-menu-projection.spec.mjs`, `tests/unit/menuRemote.test.mjs`.
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
