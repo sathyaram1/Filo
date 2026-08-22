@@ -89,12 +89,21 @@
     return list.map(serializeAttachment).filter(Boolean).join('\n');
   }
 
-  // true se il feedback è stato inviato da un modello (issue d'agente o
-  // sub-feedback creato da una routine): in quel caso anche la segnalazione
-  // originale è "lato Filo", non "lato utente".
+  // I prefissi di `clientId` che dicono "questo testo l'ha scritto un'istanza di
+  // Claude, non una persona". Tre, e restano TRE cose diverse (vedi authorKind):
+  //   agent:   l'agente esploratore che gira sull'app in cerca di problemi;
+  //   routine: le automazioni in cloud, col loro ruolo dopo i due punti;
+  //   local:   la sessione locale — Claude che lavora sulla macchina dell'owner,
+  //            in chat con lui. È la provenienza di chi apre un feedback da lì.
+  const MODEL_PREFIXES = ['agent:', 'routine:', 'local:'];
+
+  // true se il feedback è stato inviato da un modello (issue d'agente,
+  // sub-feedback creato da una routine, ritrovamento di una sessione locale):
+  // in quel caso anche la segnalazione originale è "lato Filo", non
+  // "lato utente".
   function isFromModel(clientId) {
     const c = String(clientId || '');
-    return c.startsWith('agent:') || c.startsWith('routine:');
+    return MODEL_PREFIXES.some(function (p) { return c.indexOf(p) === 0; });
   }
 
   // true se il feedback è un invio MANUALE dell'owner (admin loggato). L'identità
