@@ -2370,9 +2370,33 @@
   // L'editor zooma il foglio, non la finestra: il preload deve stare fuori
   // (altrimenti Ctrl+rotella e Ctrl+/- zoomerebbero due volte).
   try { document.documentElement.dataset.filoOwnZoom = '1'; } catch (_) {}
+  // Riscontro della percentuale (#427.1). Filo non ha barra degli indirizzi:
+  // chi zooma con Ctrl non ha nessun posto dove leggere quanto ha ingrandito.
+  // Sulle altre pagine ci pensa il badge del preload; qui il preload sta fuori
+  // (zoomiamo il foglio, non la finestra), quindi la percentuale la mostriamo
+  // noi, con una pill che sparisce da sola.
+  const ZOOM_PILL_MS = 2000;
+  let zoomPill = null;
+  let zoomPillTimer = null;
+  function showZoomPill() {
+    if (!zoomPill || !zoomPill.isConnected) {
+      zoomPill = document.createElement('div');
+      zoomPill.className = 'ed-zoom-pill';
+      zoomPill.setAttribute('role', 'status');
+      document.body.appendChild(zoomPill);
+    }
+    zoomPill.textContent = `zoom ${Math.round(zoomLevel * 100)}%`;
+    zoomPill.classList.add('show');
+    clearTimeout(zoomPillTimer);
+    zoomPillTimer = setTimeout(() => {
+      if (zoomPill) zoomPill.classList.remove('show');
+    }, ZOOM_PILL_MS);
+  }
+
   function applyZoom() {
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomLevel * 100) / 100));
     docEl.style.zoom = zoomLevel === 1 ? '' : String(zoomLevel);
+    showZoomPill();
   }
   function handleZoomKey(e) {
     const k = e.key;
