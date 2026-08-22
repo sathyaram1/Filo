@@ -188,3 +188,164 @@ test('filo://editor: Ctrl + scala il foglio e NON la finestra', async ({ app, op
   await expect.poll(async () => parseFloat(await sheetZoom()) || 1).toBeGreaterThan(1);
   expect(await zoomFactorOf(app, 'editor')).toBeCloseTo(1, 1);
 });
+
+// ── L'indicatore della percentuale anche zoomando con Ctrl (#427.1) ───────
+// FEEDBACK: "Quando si ingrandisce con Ctrl +, Ctrl - o Ctrl con la rotella non
+// compare da nessuna parte a che percentuale si è arrivati. Entrando invece in
+// modalità zoom col clic sulla rotella, il badge con la percentuale c'è ed è
+// anche modificabile a mano." Filo non ha barra degli indirizzi: senza badge
+// non esiste NESSUN posto dove leggere lo zoom né un appiglio per tornare
+// indietro.
+//
+// Pre-condizione che senza il fix fallirebbe: zoomando con Ctrl il badge
+// #__filo-zoom-badge non veniva mai attaccato al documento → i locator qui
+// sotto restano a zero elementi.
+
+// Fotografa badge + percentuale in un colpo solo: il badge di passaggio dura
+// un paio di secondi, leggerli con due chiamate separate sarebbe una corsa.
+async function badgeSnapshot(page) {
+  return page.evaluate(() => {
+    const b = document.getElementById('__filo-zoom-badge');
+    if (!b) return null;
+    const i = document.getElementById('__filo-zoom-percent');
+    return { text: b.innerText, value: i ? i.value : null };
+  });
+}
+
+async function waitBadgeSnapshot(page) {
+  for (let i = 0; i < 60; i++) {
+    const snap = await badgeSnapshot(page);
+    if (snap) return snap;
+    await page.waitForTimeout(50);
+  }
+  return null;
+}
+
+test('Ctrl +: compare il badge con la percentuale, e sparisce da solo', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, TALL_PAGE);
+  await page.bringToFront();
+  await page.locator('body').click(); // focus sulla pagina, puntatore lontano dal badge
+
+  const badge = page.locator('#__filo-zoom-badge');
+  await expect(badge).toHaveCount(0); // finché non si zooma, niente badge
+
+  await page.keyboard.press('Control+=');
+  const snap = await waitBadgeSnapshot(page);
+  expect(snap, 'nessun badge dopo Ctrl +').not.toBeNull();
+  expect(snap.text).toMatch(/zoom/i);
+  expect(Number(snap.value)).toBeGreaterThan(100); // la percentuale è quella vera
+  // Fuori dalla modalità rotella "rotella per zoomare" sarebbe un'istruzione falsa.
+  expect(snap.text).not.toMatch(/rotella per zoomare/i);
+
+  // Se ne va da solo: è un riscontro di passaggio, non un pezzo di interfaccia.
+  await expect(badge).toHaveCount(0, { timeout: 8000 });
+
+  await page.keyboard.press('Control+0');
+});
+
+test('Ctrl+rotella (e pinch del trackpad): compare la percentuale', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, TALL_PAGE);
+  await page.bringToFront();
+  await page.locator('body').click();
+
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -300);
+  await page.keyboard.up('Control');
+
+  const snap = await waitBadgeSnapshot(page);
+  expect(snap, 'nessun badge dopo Ctrl+rotella').not.toBeNull();
+  expect(Number(snap.value)).toBeGreaterThan(100);
+
+  await page.keyboard.press('Control+0');
+});
+
+// L'appiglio per tornare indietro: la percentuale del badge di passaggio si
+// scrive a mano come quella della modalità rotella (stesso badge, stesse cose).
+test('Ctrl +: la percentuale del badge si può scrivere a mano', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, TALL_PAGE);
+  await page.bringToFront();
+  await page.locator('body').click();
+
+  await page.keyboard.press('Control+=');
+  await page.keyboard.press('Control+=');
+  await expect.poll(async () => zoomFactorOf(app, '127.0.0.1')).toBeGreaterThan(1.1);
+
+  const percent = page.locator('#__filo-zoom-percent');
+  await percent.click();
+  await percent.fill('100');
+  await percent.press('Enter');
+
+  await expect.poll(async () => zoomFactorOf(app, '127.0.0.1')).toBeCloseTo(1, 1);
+});
+
+// Col puntatore sopra il badge il conto alla rovescia si ferma: un campo che
+// svanisce mentre lo stai usando non è un campo.
+test('Ctrl +: il badge resta finché il puntatore ci sta sopra', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, TALL_PAGE);
+  await page.bringToFront();
+  await page.locator('body').click();
+
+  await page.keyboard.press('Control+=');
+  const badge = page.locator('#__filo-zoom-badge');
+  await expect(badge).toBeVisible();
+  await badge.hover();
+
+  await page.waitForTimeout(3500); // oltre il doppio dell'attesa di sparizione
+  await expect(badge).toBeVisible();
+
+  // Spostato il puntatore, riparte e sparisce.
+  await page.mouse.move(400, 400);
+  await expect(badge).toHaveCount(0, { timeout: 8000 });
+
+  await page.keyboard.press('Control+0');
+});
+
+test('filo://: anche sulle pagine interne Ctrl + mostra la percentuale', async ({ openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.bringToFront();
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+
+  await page.keyboard.press('Control+=');
+  const snap = await waitBadgeSnapshot(page);
+  expect(snap, 'nessun badge dopo Ctrl + su filo://manage').not.toBeNull();
+  expect(Number(snap.value)).toBeGreaterThan(100);
+
+  await page.keyboard.press('Control+0');
+});
+
+// Terza strada per lo stesso zoom: i tasti premuti col focus sulla barra di
+// Filo, inoltrati dal main. Anche lì l'utente deve vedere la percentuale.
+test('Col focus sulla barra di Filo, Ctrl + mostra comunque la percentuale', async ({ app, openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  await pressCtrlOnShell(app, '=');
+  const snap = await waitBadgeSnapshot(page);
+  expect(snap, 'nessun badge dopo Ctrl + dalla barra').not.toBeNull();
+  expect(Number(snap.value)).toBeGreaterThan(100);
+
+  await pressCtrlOnShell(app, '0');
+});
+
+// L'editor zooma il foglio da sé (il preload sta fuori): la percentuale la
+// mostra lui, altrimenti resterebbe l'unica strada di zoom senza riscontro.
+test('filo://editor: Ctrl + mostra la percentuale del foglio', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.bringToFront();
+  await page.click('#doc');
+
+  const pill = page.locator('.ed-zoom-pill');
+  await expect(pill).toHaveCount(0);
+
+  await page.keyboard.press('Control+=');
+  await expect(pill).toBeVisible();
+  await expect(pill).toHaveText(/zoom\s*110\s*%/);
+  await expect(pill).toHaveClass(/show/);
+
+  // Sparisce da sola.
+  await expect(pill).not.toHaveClass(/show/, { timeout: 8000 });
+
+  await page.keyboard.press('Control+0');
+});
