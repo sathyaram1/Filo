@@ -25,7 +25,7 @@ const ORA = 1_700_000_000_000; // "adesso" nei test (l'istante, non la durata)
 
 test('si registra su globalThis con la sua API', () => {
   assert.ok(UI, 'SN_MERGE_APPROVALS assente');
-  for (const f of ['render', 'renderRecent', 'headline', 'expiresIn', 'timeAgo', 'outcomeMessage']) {
+  for (const f of ['render', 'renderRecent', 'headline', 'expiresIn', 'timeAgo', 'outcomeMessage', 'requestedBy']) {
     assert.equal(typeof UI[f], 'function', `manca ${f}`);
   }
 });
