@@ -2154,6 +2154,15 @@
   inputEl.addEventListener('input', () => { updateInputClass(); autoGrowInput(); });
 
   // ===== Bridge cambio stato live dal background =====
+  // #442 — un'importazione da backup ha rimesso dentro timer e notifiche: la
+  // colonna live si rilegge da sola, come fa già a ogni cambio di stato.
+  try {
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { refreshLive().catch(() => {}); },
+      ['filo_timers', 'filo_notifications', 'filo_memory', 'filo_session'],
+    );
+  } catch (_) {}
+
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
