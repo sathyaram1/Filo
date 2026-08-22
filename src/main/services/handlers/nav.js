@@ -250,6 +250,13 @@ module.exports = function register(on, ctx) {
       // Solo un riquadro può CHIEDERE la proiezione: il frame principale ha già
       // tutta la finestra e non ha niente da delegare.
       if (from === main) return { ok: false, error: 'not-a-subframe' };
+      // E solo dopo un click destro VERO in quel riquadro: senza questa
+      // condizione un riquadro potrebbe far comparire un menu con la faccia di
+      // Filo sopra la pagina che lo ospita, quando vuole lui.
+      const lastClick = wc._filoLastContextMenu;
+      if (!lastClick || lastClick.frame !== from || Date.now() - lastClick.t > CONTEXT_MENU_WINDOW_MS) {
+        return { ok: false, error: 'no-context-menu' };
+      }
       const token = String(msg?.token || '');
       if (!token) return { ok: false, error: 'no-token' };
       wc._filoProjectedMenu = { token, frame: from };
