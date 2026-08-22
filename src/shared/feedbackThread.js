@@ -567,6 +567,11 @@
     isFromOwner,
     originOf,
     authorKind,
+    // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
+    // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
+    // possano divergere su una stringa copiata a mano.
+    LOCAL_CLIENT_ID: 'local:claude',
+    MODEL_PREFIXES,
     // Auto-approvazione per mittente (#446). La LOGICA è specchiata nel backend
     // di sicurezza (filo-security: functions/src/autoApprove.js), che è l'unico
     // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.
