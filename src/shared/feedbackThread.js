@@ -211,11 +211,27 @@
   function autoApproveGroup(clientId) {
     var k = authorKind(clientId);
     if (k === 'owner' || k === 'filo' || k === 'user') return k;
-    // prober | worker | verifier | residuo | claude. Il `residuo` cade in
-    // `claude` per DECISIONE, non per inerzia (SPEC-RIDISEGNO-MAX.md §13): è
-    // un'automazione dell'owner come le altre tre, quindi stesso trattamento
-    // (l'interruttore "claude" dell'auto-approvazione decide se entra in coda
-    // da solo). Un test la inchioda su entrambi i repo.
+    // prober | worker | verifier | residuo | local | claude.
+    //
+    // Il `residuo` cade in `claude` per DECISIONE, non per inerzia
+    // (SPEC-RIDISEGNO-MAX.md §13): è un'automazione dell'owner come le altre
+    // tre, quindi stesso trattamento.
+    //
+    // `local` (la sessione locale) cade in `claude` per DECISIONE PRESA
+    // APPOSTA dall'owner, non perché sia caduta qui da sola. COSA SUCCEDE: un
+    // feedback aperto da una sessione locale, se i giudici lo dichiarano
+    // sicuro, entra in coda da solo senza che l'owner lo approvi a mano.
+    // PERCHÉ VA BENE: (1) il giudizio gira comunque — l'auto-approvazione
+    // salta l'approvazione manuale, non i controlli di sicurezza; (2) è una
+    // manopola, non un privilegio: l'interruttore "Claude" della tab
+    // Automazioni la spegne quando l'owner vuole. Cioè un default comodo e
+    // revocabile, non una porta che resta aperta.
+    // Conseguenza da conoscere: quell'interruttore è lo STESSO delle
+    // automazioni in cloud — spegnerlo spegne entrambe. Distinguere la
+    // provenienza (authorKind, sopra) e distinguere la FIDUCIA sono due assi
+    // diversi: sul secondo la sessione locale e le automazioni in cloud sono
+    // la stessa cosa, i processi dell'owner.
+    // Un test la inchioda su entrambi i repo.
     return 'claude';
   }
 
