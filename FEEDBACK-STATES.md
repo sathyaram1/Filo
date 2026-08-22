@@ -113,17 +113,21 @@ dalla dashboard (azione bulk `aligned→todo`, da aggiungere alla UI).
 **Per mittente (#446).** "ON" non è più un sì/no per tutti: l'interruttore master
 (`config/automation.enabled`) abilita l'auto-approvazione, e la mappa
 `config/automation.autoApprove` dice QUALI categorie di mittente ne beneficiano
-(`owner` / `filo` / `claude` / `user`, dal prefisso del `clientId`). Master spento ⇒
+(una per categoria d'autore, dal prefisso e dal ruolo nel `clientId`). Master spento ⇒
 nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti, come prima che esistesse.
 La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackThread.js`
 (dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
 
-I gruppi sono QUATTRO e le categorie d'autore sono di più: `claude` raccoglie tutte le
-istanze di Claude (esplorazione, sviluppo, verifica, rilievo residuo **e la sessione
-locale**). Provenienza e fiducia sono due assi diversi: la dashboard distingue da dove
-nasce un ritrovamento, l'auto-approvazione decide di chi ci si fida — e su quel secondo
-asse le istanze dell'owner sono la stessa cosa. Conseguenza pratica: l'interruttore
-"Claude" spegne insieme le automazioni in cloud e la sessione locale.
+C'È UN GRUPPO PER OGNI CATEGORIA D'AUTORE, quelle che la coda mostra con un'icona:
+`owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`,
+`claude` (automazioni che non dichiarano il ruolo) e `filo`. Fino al 2026-08-22 le cinque
+istanze di Claude stavano dietro un interruttore solo: la coda le distingueva ma la
+fiducia era una sola, quindi per fermare l'esploratore si fermava anche la sessione
+locale. Adesso i due assi coincidono — chi si vede separato si regola separato.
+
+**Compatibilità:** un documento salvato prima, che ha il solo `claude`, fa ereditare quel
+valore a tutte le sue istanze (`resolveAutoApprove`, in entrambe le copie). Senza,
+sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiuso.
 
 ## 5. Chat del feedback distingue i sotto-casi di `design`
 

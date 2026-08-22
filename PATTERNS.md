@@ -1201,16 +1201,18 @@ ci sono **due domande diverse** e vanno risposte separatamente:
   mittente serve a dare.
 - **Quanto ci si fida** — serve a DECIDERE se entra in coda da sola
   (`autoApproveGroup`, specchiato in `filo-security/functions/src/autoApprove.js`) e se è
-  un'identità fidata che non va mai flaggata come attacco/spam (`identities.js`). Qui i
-  gruppi sono pochi apposta: tutte le istanze di Claude sono lo stesso grado di fiducia,
-  perché sono i processi dell'owner.
+  un'identità fidata che non va mai flaggata come attacco/spam (`identities.js`). Dal
+  2026-08-22 i due assi COINCIDONO per l'ingresso in coda: un interruttore per ogni
+  categoria d'autore, sessione locale e istanze cloud comprese. Prima ne bastava uno per
+  tutte le istanze di Claude, e non ci si poteva fidare di una senza fidarsi delle altre.
 
-**Regola operativa:** una provenienza nuova aggiunge una categoria d'autore, e **sceglie
-esplicitamente** un gruppo di fiducia esistente — con la motivazione scritta accanto al
-codice e un test che la inchioda su entrambi i repo. Un gruppo di fiducia nuovo si crea
-solo se serve una manopola separata in dashboard (costa: interruttore in `manage.html`,
-copia sul server, rideploy delle functions); altrimenti l'interruttore esistente dice
-onestamente cosa copre (l'etichetta va aggiornata).
+**Regola operativa:** una provenienza nuova aggiunge una categoria d'autore E il suo
+interruttore di fiducia — con un test che lo inchioda su entrambi i repo, e ricordando
+che costa: voce in `manage.html`, copia sul server, rideploy delle functions. Se per una
+volta si sceglie di NON dargliene uno proprio, la motivazione va scritta accanto al
+codice e l'etichetta dell'interruttore che la copre deve dire onestamente cosa copre.
+Una mappa salvata prima non deve mai riaccendere da sola ciò che l'owner aveva spento:
+chi sdoppia un interruttore scrive anche il ripiego sul vecchio.
 
 **Perché il test:** senza, la scelta la fa il `return` in fondo alla funzione — e "è
 finita lì da sola" e "l'abbiamo deciso" diventano indistinguibili il giorno dopo.

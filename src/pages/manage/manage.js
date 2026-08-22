@@ -184,12 +184,12 @@
     // Rilievi rimasti aperti quando un lavoro «migliorabile» viene promosso
     // (SPEC-RIDISEGNO-MAX.md §13): categoria propria, così leggendo la coda si
     // vede che nasce dal declassamento di una verifica, non da un'esplorazione.
-    residuo:  { icon: '🧹', label: 'Claude — rilievo residuo' },
+    residuo:  { icon: '🧹', label: 'Claude (rilievi residui)' },
     // Sessione locale: Claude in chat con l'owner, sulla sua macchina. Icona
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
-    claude:   { icon: '🤖', label: 'Claude' },
+    claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
   };
   function authorKindOf(fb) {
     return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
