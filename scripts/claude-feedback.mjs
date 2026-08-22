@@ -186,7 +186,10 @@ export async function main(argv) {
   const posizionali = argv.filter((a) => !a.startsWith('--') && !valoriDiFlag.has(a));
   const titolo = posizionali[0];
   let testo = posizionali.slice(1).join(' ');
-  if (testo === '-' || (!testo && !process.stdin.isTTY)) testo = leggiStdin();
+  // Solo su "-" esplicito: leggere stdin "quando non è un terminale" fa
+  // restare lo strumento appeso ogni volta che lo lancia qualcosa che non è
+  // una shell interattiva (un test, uno script) e che stdin non lo chiuderà mai.
+  if (testo === '-') testo = leggiStdin();
 
   const p = parsePriorita(prioritaRaw);
   if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo}`); return EXIT.USO; }
