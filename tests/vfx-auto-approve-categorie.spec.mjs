@@ -91,6 +91,17 @@ async function openAutomation(page) {
   await page.evaluate(() => window.__mgTest.loadAutoMode());
 }
 
+// Clic da UTENTE: la casella vera è invisibile (levetta disegnata), si clicca
+// la levetta.
+function track(page, group) {
+  return page.locator(`label.mg-switch--sm:has(${IDS[group]}) .mg-switch-track`);
+}
+async function flip(page, group) {
+  const t = track(page, group);
+  await t.scrollIntoViewIfNeeded();
+  await t.click();
+}
+
 async function states(page) {
   return page.evaluate((ids) => {
     const out = {};
