@@ -233,3 +233,26 @@ test('doppio clic rapido su una categoria: lo stato finale è coerente col salva
   const saved = await page.evaluate(() => window.__vfx.store.autoApprove.worker);
   expect(uiChecked, 'schermo e salvato divergono dopo due clic rapidi').toBe(saved);
 });
+
+test('accendere la modalità automatica sblocca le categorie senza riaprire la pagina', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  // Parte spenta, con la scelta vecchia già salvata.
+  await fakeChannel(page, { enabled: false, autoApprove: { owner: true, filo: true, claude: false, user: true } });
+  await openAutomation(page);
+  expect((await states(page)).prober.disabled).toBe(true);
+
+  // L'owner accende l'automatica dalla levetta grande.
+  const master = page.locator('label#mgAutoSwitch .mg-switch-track');
+  await master.scrollIntoViewIfNeeded();
+  await master.click();
+  await expect(page.locator('#mgAutoState')).toHaveText('On');
+
+  const s = await states(page);
+  for (const g of Object.keys(IDS)) expect(s[g].disabled, `«${g}» resta bloccato`).toBe(false);
+  // E mostrano la scelta vera, non tutto acceso.
+  for (const g of ['local', 'worker', 'verifier', 'residuo', 'prober', 'claude']) {
+    expect(s[g].checked, `«${g}» si è riacceso accendendo l'automatica`).toBe(false);
+  }
+  await expect(page.locator('#mgAutoApproveBlock')).not.toHaveClass(/mg-auto-sub--off/);
+});
