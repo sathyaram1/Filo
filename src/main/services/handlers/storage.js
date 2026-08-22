@@ -242,7 +242,22 @@ module.exports = function register(on, ctx) {
         if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
       }
       if (Object.keys(rest).length) await DiskStorage.set(rest);
+      const settingsChanged = settings && typeof settings === 'object'
+        && JSON.stringify(settings) !== JSON.stringify(current[SETTINGS_KEY]);
       if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+
+      // #442 — le SCHEDE APERTE si riallineano da sole. Le impostazioni lo
+      // facevano già (applySettingsUpdate manda SETTINGS_UPDATED a tutti); i
+      // contenuti no, perché li scriviamo diretti sul disco e nessuno lo
+      // annunciava: una lista delle pagine salvate lasciata aperta continuava a
+      // mostrare l'elenco di prima, e senza niente che lo dicesse l'import
+      // sembrava non aver funzionato. Il messaggio porta le sezioni davvero
+      // cambiate: se non è cambiato niente non si tocca nessuna pagina.
+      const changedKeys = Object.keys(rest);
+      if (settingsChanged) changedKeys.push(SETTINGS_KEY);
+      if (changedKeys.length) {
+        try { ctx.broadcastToFiloPages({ type: MSG.DATA_IMPORTED, keys: changedKeys }); } catch (_) {}
+      }
 
       return { ok: true, added: stats.added, updated: stats.updated, unchanged: stats.unchanged };
     } catch (e) {
