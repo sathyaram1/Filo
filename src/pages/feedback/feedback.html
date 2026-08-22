@@ -118,6 +118,12 @@
       background: color-mix(in srgb, var(--sn-accent) 10%, var(--sn-bg, transparent));
       border-color: color-mix(in srgb, var(--sn-accent) 32%, var(--sn-border));
     }
+    /* Sessione locale di Claude (viola): senza una tinta sua ricadrebbe sul
+       neutro e sembrerebbe una segnalazione senza provenienza. */
+    .fb-bubble--report.fb-bubble--origin-local {
+      background: color-mix(in srgb, #8b5cd6 12%, var(--sn-bg, transparent));
+      border-color: color-mix(in srgb, #8b5cd6 34%, var(--sn-border));
+    }
     /* Le immagini/allegati vivono dentro la bolla della segnalazione. */
     .fb-bubble .fb-imgs, .fb-bubble .fb-files { margin-top: 8px; }
     /* Composer "Rispondi" del tab Chiarimenti (e riapertura): stesso look. */
