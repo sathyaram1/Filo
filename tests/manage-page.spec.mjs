@@ -349,7 +349,9 @@ test('#446 — con l\'automatica spenta gli interruttori per mittente non decido
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
 
-  for (const id of ['mgAutoApproveOwner', 'mgAutoApproveFilo', 'mgAutoApproveClaude', 'mgAutoApproveUser']) {
+  for (const id of ['mgAutoApproveOwner', 'mgAutoApproveUser', 'mgAutoApproveLocal',
+    'mgAutoApproveWorker', 'mgAutoApproveVerifier', 'mgAutoApproveResiduo',
+    'mgAutoApproveProber', 'mgAutoApproveClaude', 'mgAutoApproveFilo']) {
     await expect(page.locator('#' + id)).toBeDisabled();
   }
   await expect(page.locator('#mgAutoApproveBlock')).toHaveClass(/mg-auto-sub--off/);
