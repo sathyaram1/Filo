@@ -428,7 +428,7 @@
       if (t === 'sep') { items.push({ type: 'separator', hidden: !!s.hidden }); continue; }
       if (t === 'row') {
         const Icons = global.SN_MENU_ICONS;
-        if (Icons && typeof Icons.buildGlobalIconRow === 'function') {
+        if (s.kind === 'globalIcons' && Icons && typeof Icons.buildGlobalIconRow === 'function') {
           try { items.push(Icons.buildGlobalIconRow(s.navState || null)); } catch (_) {}
         }
         continue;
