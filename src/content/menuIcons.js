@@ -274,6 +274,10 @@
     lastNavState = navState || null;
     return {
       type: 'row',
+      // Nome della riga: quando il menu di un riquadro lo disegna la pagina, è
+      // questo che le dice QUALE riga ricostruire. Una riga senza nome non
+      // viene indovinata: sparisce, invece di diventare quella sbagliata.
+      kind: 'globalIcons',
       dropTarget: 'primary',
       // #445 — quando il menu di un riquadro viene disegnato dalla pagina, la
       // riga la ricostruisce lei (col SUO layout e il SUO trascinamento): di qui
