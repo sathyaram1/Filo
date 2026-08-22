@@ -270,7 +270,11 @@ function start(deps) {
   let offFocus = null;
   try {
     const { app } = require('electron');
-    const onFocus = () => { poker.poke('focus'); };
+    // Solo la finestra vera del browser (`_filoTabs`): il popup dei menu è una
+    // BrowserWindow sua, e ogni menu aperto e richiuso conterebbe come un
+    // rientro. Qui "rientro" vuol dire "l'owner è tornato su Filo", non "ha
+    // cliccato su qualcosa dentro Filo".
+    const onFocus = (_e, win) => { if (win && win._filoTabs) poker.poke('focus'); };
     app.on('browser-window-focus', onFocus);
     offFocus = () => { try { app.off('browser-window-focus', onFocus); } catch (_) {} };
   } catch (_) { /* fuori da Electron resta il solo campanello */ }
