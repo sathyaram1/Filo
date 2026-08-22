@@ -229,6 +229,12 @@ module.exports = function register(on, ctx) {
   // il menu resta aperto; ogni messaggio successivo deve portare lo stesso
   // token, altrimenti non va da nessuna parte. Nessun altro frame è
   // raggiungibile, e un frame non può parlare a se stesso.
+  // Quanto vale un click destro come permesso di aprire un menu sulla pagina.
+  // Largo abbastanza per il giro completo (il riquadro monta i suoi script,
+  // legge la cronologia degli appunti e compone il menu), stretto abbastanza da
+  // non restare aperto a lungo dopo che l'utente ha smesso.
+  const CONTEXT_MENU_WINDOW_MS = 10000;
+
   on(MSG.PROJECT_MENU, async (msg, sender) => {
     const wc = sender && sender.wc;
     const from = sender && sender.frame;
