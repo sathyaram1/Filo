@@ -783,24 +783,79 @@ chiede, ma **spostare la decisione su una superficie diversa da quella da cui
   resta in attesa. Il click nella finestra dell'app non lo può dare una
   sessione catturata. È questo — non la fiducia in chi chiede — a rendere
   l'eccezione accettabile.
-- **Tre invarianti non negoziabili sull'eccezione:** si applica solo a ciò che
-  è stato ESAMINATO (si registra lo `sha`, e si fonde quello, non "il ramo");
-  vale **una volta sola** (la presa è una transazione, così due click non
-  passano entrambi); **scade da sé** (una richiesta vecchia non deve poter
-  essere approvata su un contenuto che chi approva non ricorda più).
+- **Due invarianti non negoziabili, e una scadenza che non è una di loro.**
+  Reggono l'eccezione: si applica solo a ciò che è stato ESAMINATO (si registra
+  lo `sha`, e si fonde quello, non "il ramo"; se il ramo si muove la richiesta
+  decade), e vale **una volta sola** (la presa è una transazione, così due
+  click non passano entrambi). Nessuna delle due si indebolisce col tempo.
+- **La scadenza è comodità, non difesa: tararla come tale.** Era di mezz'ora,
+  contro l'"approvo a memoria" — ma a quello risponde già la scheda, che dice
+  cosa è stato bloccato: chi approva non deve ricordare, deve **leggere**. Il
+  costo invece era vero: rifare la richiesta costa un giro di controlli intero
+  (~15 minuti), e sul campo la prima è scaduta prima che l'owner riuscisse a
+  cliccare. Ora è di 24 ore. **Regola generale:** una scadenza corta si paga
+  con quanto costa rifare la cosa scaduta — se il costo è alto e la sicurezza
+  che aggiunge è zero, è solo un modo per far smontare la difesa.
 - **Chi approva deve leggere COSA sta scavalcando, in parole sue.** Le frasi
   che traducono i controlli scattati vivono dove vive la tabella dei controlli
   (il server privato) e viaggiano col dato: ricopiarle nel client le farebbe
   divergere, e un controllo nuovo comparirebbe come voce muta. Un blocco senza
   frase si mostra comunque col suo nome grezzo — nascondere una voce
-  dell'elenco fa approvare più di quel che si crede.
+  dell'elenco fa approvare più di quel che si crede. Vale anche per **chi ha
+  chiesto**: su una superficie che esiste per separare chi chiede da chi
+  approva, tacerlo le toglie metà del senso (e un identificativo tecnico non si
+  stampa — si dice cosa significa).
 - **Un'eccezione lascia traccia** dove l'owner la può guardare (chi, cosa,
   quando, quali blocchi scavalcati), non solo nei log del server.
 - **Dove:** decisione pura + I/O in `filo-security/functions/src/routine/
   mergeApprovals.js`; avviso condiviso in `src/shared/mergeApprovals.js` +
-  `src/styles/mergeApprovals.css`. Test:
+  `src/styles/mergeApprovals.css`; campanello in
+  `src/main/services/mergeApprovalSignal.js`. Test:
   `functions/test/routine-merge-approvals.test.js`,
-  `tests/unit/mergeApprovals.test.mjs`, `tests/merge-approvals.spec.mjs`.
+  `tests/unit/mergeApprovals.test.mjs`,
+  `tests/unit/mergeApprovalSignal.test.mjs`, `tests/merge-approvals.spec.mjs`.
+
+## "Vai a guardare in quell'altro posto": quel posto deve accorgersene DA APERTO
+
+Quando una superficie manda l'utente su un'altra (il terminale che dice
+"approvala dalla prima schermata di Filo"), la seconda è quasi sempre **già
+aperta** — è la home del browser, la pagina di gestione lasciata lì. Se carica
+il suo elenco solo all'apertura, l'avviso compare soltanto a chi pensa di
+riaprirla: cioè a nessuno. È successo il giorno stesso in cui l'indicazione è
+stata scritta.
+
+- **Chi PRODUCE l'evento lo dice; nessuno chiede a ripetizione.** Se il
+  produttore gira sulla stessa macchina (qui `npm run finish`), gli basta
+  scrivere un file in un punto che main e script calcolano **allo stesso modo**
+  (`FILO_USER_DATA` nei test, la cartella temporanea fuori — mai il percorso
+  dell'app: uno script Node non sa come si chiama). Il main guarda la
+  **cartella** dedicata, non il file (che può ancora non esistere) e non la
+  cartella temporanea intera (si sveglierebbe a ogni file del sistema).
+  Costo a riposo: zero. Se i due percorsi divergessero, il campanello non
+  suonerebbe **in silenzio** — per questo il calcolo sta in un posto solo, con
+  uno unit test sopra.
+- **La rilettura la fa il MAIN, non ogni pagina.** Una lettura sola con dieci
+  schede aperte, il cancello del proprietario in un punto solo, e il dato
+  viaggia **dentro** il messaggio di broadcast: la pagina ridisegna senza
+  richiedere niente.
+- **Un broadcast che porta dati dell'utente va SOLO alle pagine `filo://`**
+  (`broadcastToFiloPages`, il gemello di `broadcastToTabs`): `broadcastToTabs`
+  raggiunge anche il content script del sito visitato. È il gate d'origine
+  visto dal verso opposto — se un sito non lo può *chiedere*, non glielo si
+  manda nemmeno da soli.
+- **Rete di sicurezza guidata da una persona, non da un orologio.** Il
+  campanello può mancare (app chiusa quando è arrivato l'evento, cartella
+  ripulita, un domani un produttore remoto). Il ripiego è il **rientro nella
+  finestra** (`browser-window-focus`), non più di una volta al minuto: chi resta
+  sulla pagina per ore non genera nemmeno una chiamata, e chi torna dal
+  terminale trova l'avviso già lì. Un intervallo fisso invece paga sempre,
+  soprattutto quando non c'è niente da mostrare.
+- **Se l'elenco non è cambiato, non si tocca la pagina**: un avviso che si
+  ridisegna sotto le dita (magari con "Confermi?" già armato) è rumore.
+- **Dove:** `src/main/services/mergeApprovalSignal.js` (campanello + decisione
+  con l'I/O iniettato), `broadcastToFiloPages` in
+  `src/main/services/handlers.js`, `MSG.MERGE_APPROVALS_CHANGED`. Test:
+  `tests/unit/mergeApprovalSignal.test.mjs`, `tests/merge-approvals.spec.mjs`.
 
 ## Superficie owner in evidenza sulla home: una riga in più, accesa da una classe
 
