@@ -82,6 +82,42 @@ test('authorKind: distingue le tre automazioni fra loro e Filo dall’utente', (
   assert.equal(TH.authorKind('routine: verifier '), 'verifier');
 });
 
+// La SESSIONE LOCALE (Claude che lavora sulla macchina dell'owner, in chat con
+// lui) è una provenienza sua. Senza il ramo dedicato cadrebbe in 'user' — cioè
+// un ritrovamento fatto insieme all'owner arriverebbe in coda indistinguibile
+// da quello di uno sconosciuto — e confonderla con l'esploratore o con le
+// automazioni in cloud farebbe leggere male il contesto in cui è nato.
+test('authorKind: la sessione locale è una categoria propria (né esploratore né automazione cloud)', () => {
+  assert.equal(TH.authorKind('local:claude'), 'local');
+  // Il costante condiviso e la classificazione non possono divergere.
+  assert.equal(TH.authorKind(TH.LOCAL_CLIENT_ID), 'local');
+  // Qualunque suffisso resta 'local': dopo i due punti non c'è un ruolo da
+  // mappare (a differenza di routine:<ruolo>).
+  assert.equal(TH.authorKind('local:qualsiasi-cosa'), 'local');
+  // Le tre cose che NON deve diventare.
+  assert.notEqual(TH.authorKind('local:claude'), 'user');
+  assert.notEqual(TH.authorKind('local:claude'), 'prober');
+  assert.notEqual(TH.authorKind('local:claude'), 'claude');
+  // …e nessun'altra provenienza deve diventare 'local'.
+  for (const id of ['routine:prober', 'routine:new-work', 'agent:gemini', 'owner:x', 'filo:chat', 'tester-123']) {
+    assert.notEqual(TH.authorKind(id), 'local', id);
+  }
+});
+
+test('la sessione locale è "lato Filo", non "lato utente"', () => {
+  // Il testo l'ha scritto un modello: la bolla della segnalazione sta dalla
+  // parte di Filo, come per l'esploratore e le routine.
+  assert.equal(TH.isFromModel('local:claude'), true);
+  assert.equal(TH.originOf('local:claude'), 'local');
+  assert.notEqual(TH.originOf('local:claude'), 'agent');
+  assert.notEqual(TH.originOf('local:claude'), 'routine');
+  // E ownerize non ci mette il cappello dell'owner sopra: non è un invio suo.
+  assert.equal(TH.ownerize('local:claude'), 'local:claude');
+  // La segnalazione originale finisce nel turno del modello.
+  const turni = TH.parse({ text: 'trovato un problema', clientId: 'local:claude' });
+  assert.equal(turni[0].role, 'model');
+});
+
 // SPEC-RIDISEGNO-MAX.md §13: i rilievi RESIDUI di una verifica (un lavoro
 // promosso dopo N giri «migliorabile») sono una categoria PROPRIA. Spacciarli
 // per prober (o per una verifica qualunque) falserebbe la lettura di dove
