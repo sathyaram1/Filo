@@ -298,6 +298,12 @@ async function main() {
   //    codice appena controllato.
   process.stdout.write('\n▸ Chiedo al server di fondere\n');
   const reply = await askServerMerge({ branch, sha: cur });
+  // Il server ha aperto una richiesta: suona il campanello, così una finestra
+  // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
+  // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
+  // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
+  // di comparire soltanto a chi apre una scheda nuova.
+  if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
   const message = messageForOwnerMerge(reply, branch);
   if (code === 0) console.log(`\n${message}`);
