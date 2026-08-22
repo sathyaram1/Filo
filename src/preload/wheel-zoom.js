@@ -284,10 +284,14 @@ module.exports = function setupWheelZoom(webFrame, opts) {
       catch (_) { return false; }
     }
 
+    // Punto unico da cui passa OGNI zoom con Ctrl (tasti, rotella, pinch,
+    // inoltro dalla barra): qui si aggiorna la percentuale e si mostra il badge
+    // di passaggio, così nessuna delle strade resta senza riscontro (#427.1).
     function setLevel(level) {
       const clamped = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
       try { webFrame.setZoomLevel(clamped); } catch (_) {}
       refreshPercent();
+      flashBadge();
     }
 
     // Pinch del trackpad e Ctrl+rotella → wheel con ctrlKey=true. Passo
