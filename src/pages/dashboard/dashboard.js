@@ -2322,7 +2322,12 @@
   //
   // Il disegno e i comandi vengono dal modulo condiviso con Gestione →
   // Automazioni: i due cammini devono fare la stessa identica cosa.
-  async function refreshMergeApprovals() {
+  //
+  // `already` è l'elenco già pronto, quando ad avvisare è stato il main
+  // (MERGE_APPROVALS_CHANGED): una richiesta nuova arriva mentre la schermata è
+  // già aperta, e il dato viaggia col messaggio. Senza, se lo va a prendere lei
+  // — è il cammino di quando la pagina si apre o cambia l'account.
+  async function refreshMergeApprovals(already) {
     const host = mergeApprovalsEl;
     const UI = self.SN_MERGE_APPROVALS;
     if (!host || !UI) return 0;
@@ -2333,9 +2338,9 @@
       return 0;
     };
     if (!isOwner) return spegni();
-    let r;
+    let r = already || null;
     try {
-      r = await send({ type: MSG.MERGE_APPROVALS_GET });
+      if (!r) r = await send({ type: MSG.MERGE_APPROVALS_GET });
     } catch (_) {
       // Il server non risponde: non è il posto per dirlo. Chi ha una fusione in
       // sospeso lo scopre dal terminale, e riempire la home di un errore che
