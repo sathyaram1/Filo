@@ -2748,14 +2748,24 @@
     loadWorkerLog();
   });
 
-  // Tab "Automazioni": le fusioni in attesa si rileggono a OGNI apertura. Sono
-  // richieste che scadono in mezz'ora — mostrarne una vecchia di ore, o
-  // nascondere una appena arrivata, renderebbe la sezione inutile.
+  // Tab "Automazioni": le fusioni in attesa si rileggono a OGNI apertura —
+  // una richiesta già decisa o appena arrivata renderebbe la sezione una
+  // fotografia vecchia.
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
     if (!btn || btn.dataset.tab !== 'automation') return;
     loadMergeApprovals();
   });
+
+  // …e anche a pagina ferma: il main avvisa quando l'elenco cambia (una
+  // fusione bloccata da `npm run finish`, o una decisa da un'altra finestra).
+  // Senza questo, una pagina di Gestione lasciata aperta continuerebbe a
+  // mostrare lo stato di quando è stata aperta.
+  if (window.filo?.onBroadcast) {
+    window.filo.onBroadcast((m) => {
+      if (m && m.type === MERGE_APPROVALS_CHANGED) loadMergeApprovals(m);
+    });
+  }
 
   // Esponi per gli spec Playwright (hook di test).
   window.__mgTest.loadSupportModels = loadSupportModels;
