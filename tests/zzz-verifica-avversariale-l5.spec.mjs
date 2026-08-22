@@ -167,6 +167,35 @@ test('i suggerimenti sotto il puntatore sono giusti per la provenienza', async (
   expect(sbagliati, 'su una richiesta di automazione nessun suggerimento deve parlare di npm run finish').toEqual([]);
 });
 
+test('roba lunghissima e strana non sfonda il riquadro', async ({ openTab }) => {
+  const mostro = {
+    ...ROUTINE,
+    id: '9'.repeat(24),
+    branch: 'claude/' + 'x'.repeat(180),
+    who: '🙂'.repeat(60),
+    num: '512🙂<b>',
+    blocks: [
+      { gate: 'g', label: 'Blocco con ' + 'parole '.repeat(200), items: Array.from({ length: 12 }, (_, i) => 'src/molto/lungo/percorso/numero-' + i + '/' + 'y'.repeat(60)), more: 28 },
+    ],
+  };
+  const page = await apri(openTab, { pending: [mostro] });
+  await expect(page.locator('#mgMergeApprovals .sn-mac-card')).toHaveCount(1);
+  const larghezza = await page.evaluate(() => ({
+    doc: document.documentElement.scrollWidth,
+    win: window.innerWidth,
+  }));
+  console.log('larghezza documento/finestra: ' + JSON.stringify(larghezza));
+  await page.screenshot({ path: 'tests/agent/.out/verifica-l5-mostro.png' });
+  expect(larghezza.doc).toBeLessThanOrEqual(larghezza.win + 2);
+});
+
+test('una voce rotta nell elenco non fa sparire tutto', async ({ openTab }) => {
+  const page = await apri(openTab, { pending: [null, ROUTINE] });
+  const n = await page.evaluate(() => document.querySelectorAll('#mgMergeApprovals .sn-mac-card').length);
+  console.log('schede disegnate con una voce nulla in mezzo: ' + n);
+  expect(n).toBeGreaterThan(0);
+});
+
 test('chi non è owner non vede niente', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
