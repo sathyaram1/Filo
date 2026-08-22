@@ -111,6 +111,36 @@
     return 'chiesta da un accesso senza email';
   }
 
+  /**
+   * Da dove arriva il lavoro fermato. PURA.
+   *
+   * Le due provenienze finiscono nello STESSO elenco — un blocco che non si
+   * vede è un lavoro fermo per sempre — ma non sono la stessa cosa da leggere:
+   * il lavoro locale l'owner l'ha fatto con le sue mani, quello di
+   * un'automazione l'ha scritto un modello partendo dal testo di uno
+   * sconosciuto. Chi approva deve saperlo prima di dire di sì.
+   *
+   * Origine assente = `locale`: è il caso storico (le richieste esistevano
+   * solo per il finish locale), e va letto così, non come "non si sa".
+   */
+  function originOf(req) {
+    return String((req && req.origin) || '') === 'routine' ? 'routine' : 'locale';
+  }
+
+  /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
+  function originLabel(req) {
+    if (originOf(req) !== 'routine') return 'lavoro tuo, da questo computer';
+    var num = String((req && req.num) || '').trim();
+    return num ? 'automazione · feedback #' + num : 'automazione';
+  }
+
+  /** Cosa spiegare all'owner sulla provenienza, sotto il puntatore. PURA. */
+  function originHint(req) {
+    return originOf(req) === 'routine'
+      ? 'Questo ramo l’ha scritto un’automazione partendo da una segnalazione: guarda cosa è stato bloccato prima di approvarlo.'
+      : 'Questo ramo l’hai scritto tu su questo computer.';
+  }
+
   /** Un blocco, in una riga leggibile. PURA. Un blocco senza frase si NOMINA lo stesso. */
   function blockLabel(block) {
     var b = block || {};
