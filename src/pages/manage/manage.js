@@ -808,7 +808,12 @@
   const mgMergeApprovals = document.getElementById('mgMergeApprovals');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
 
-  async function loadMergeApprovals() {
+  //
+  // `already` è l'elenco già pronto, quando ad avvisare è stato il main
+  // (MERGE_APPROVALS_CHANGED). Vale la stessa cosa detta nella prima
+  // schermata: una pagina già aperta deve accorgersi di una richiesta nuova,
+  // altrimenti l'avviso lo vede solo chi riapre la pagina.
+  async function loadMergeApprovals(already) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!mgMergeApprovals || !UI) return 0;
     const spegni = () => {
@@ -821,9 +826,9 @@
       return 0;
     };
     if (!isAdmin) return spegni();
-    let r;
+    let r = already || null;
     try {
-      r = await sendToMain({ type: MERGE_APPROVALS_GET });
+      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET });
     } catch (err) {
       console.error('[manage] fusioni in attesa:', err);
       return spegni();
