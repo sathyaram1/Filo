@@ -771,13 +771,13 @@ cursore**, e farlo ripartire quando smette.
 
 - **Perché:** un riscontro spesso è anche un comando (la percentuale dello zoom
   la puoi riscrivere per tornare al 100%). Un timer cieco lo fa svanire proprio
-  mentre lo stai raggiungendo: un campo che scappa non è un campo. Il conto si
-  sospende, non si annulla — appena il puntatore va altrove riparte, altrimenti
+  mentre lo stai raggiungendo, e un campo che scappa non è un campo. Il conto si
+  sospende, non si annulla. Appena il puntatore va altrove riparte, altrimenti
   basta lasciare il mouse fermo lì per ritrovarsi un pezzo di interfaccia
   permanente che non hai chiesto.
 - **Il timer che scade non nasconde e basta: ricontrolla.** Alla scadenza, se
-  l'utente è ancora lì, il timer si riarma — non serve stare a inseguire
-  `mouseenter`/`mouseleave` (`badge.matches(':hover')` al momento buono basta).
+  l'utente è ancora lì, il timer si riarma. Non serve inseguire
+  `mouseenter`/`mouseleave`: `badge.matches(':hover')` al momento buono basta.
 - **Stesso elemento, due vite.** Se l'indicatore esiste già come parte
   permanente di una modalità (il badge della modalità zoom con la rotella),
   riusa **quello**, cambiando solo cosa promette: le istruzioni della modalità
