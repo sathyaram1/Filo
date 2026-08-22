@@ -581,7 +581,7 @@
   function findMedia(target, x, y) {
     const direct = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
       ? target
-      : target?.closest?.('video, audio');
+      : closestAcrossShadow(target, 'video, audio');
     if (direct) return { mediaEl: direct, mediaUnder: null };
     let under = null;
     try {
@@ -590,6 +590,40 @@
       }
     } catch (_) {}
     return { mediaEl: null, mediaUnder: under };
+  }
+
+  // Collegamento SOTTO il punto cliccato, quando non ce n'è uno fra gli antenati
+  // (#444). È il gemello di `mediaUnder`: le schede delle home video/social sono
+  // fatte di strati sovrapposti, e il link della scheda tanto spesso sta SOTTO
+  // l'anteprima (l'anteprima video parte al passaggio del mouse e si stende
+  // sopra la copertina) quanto sopra. Senza questo ripiego, appena il filmatino
+  // parte la scheda diventa irraggiungibile col tasto destro.
+  function findLinkUnder(x, y) {
+    try {
+      for (const el of document.elementsFromPoint(x, y) || []) {
+        const a = closestAcrossShadow(el, 'a[href]');
+        if (a) return a;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Due elementi impilati sono "la stessa scheda" per chi guarda quando occupano
+  // lo stesso rettangolo: la copertina/filmato e il collegamento che la avvolge.
+  // Serve a tenere fuori il caso opposto — un video di sfondo a tutta pagina, o
+  // un link che passa di sotto per caso — dove i due rettangoli non hanno
+  // niente a che vedere l'uno con l'altro. Misura quanta parte del MEDIA cade
+  // dentro il link: metà basta (le copertine hanno bordi, ritagli, sfumature).
+  function sameCardArea(mediaEl, linkEl) {
+    if (!mediaEl || !linkEl) return false;
+    if (linkEl.contains?.(mediaEl)) return true;
+    const m = mediaEl.getBoundingClientRect?.();
+    const l = linkEl.getBoundingClientRect?.();
+    if (!m || !l || !(m.width > 0) || !(m.height > 0)) return false;
+    const w = Math.min(m.right, l.right) - Math.max(m.left, l.left);
+    const h = Math.min(m.bottom, l.bottom) - Math.max(m.top, l.top);
+    if (w <= 0 || h <= 0) return false;
+    return (w * h) >= (m.width * m.height) / 2;
   }
 
   function isEditable(el) {
