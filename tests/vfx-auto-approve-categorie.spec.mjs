@@ -151,9 +151,9 @@ test('la scelta di una categoria non tocca le altre e viene salvata', async ({ o
   await fakeChannel(page, { enabled: true, autoApprove: { owner: true, filo: true, claude: false, user: true } });
   await openAutomation(page);
 
-  // Accendo SOLO la verifica.
-  await page.uncheck(IDS.verifier, { force: true }).catch(() => {});
-  await page.check(IDS.verifier, { force: true });
+  // Accendo SOLO la verifica (parte spenta per eredità del vecchio no).
+  expect((await states(page)).verifier.checked).toBe(false);
+  await flip(page, 'verifier');
   await page.waitForFunction(() => window.__vfx.sent.length > 0);
 
   const sent = await page.evaluate(() => window.__vfx.sent[window.__vfx.sent.length - 1]);
@@ -180,13 +180,13 @@ test('spegnere una categoria e riaccenderla (si può disfare)', async ({ openTab
   await fakeChannel(page, { enabled: true, autoApprove: null });
   await openAutomation(page);
 
-  await page.uncheck(IDS.prober, { force: true });
+  await flip(page, 'prober');
   await page.waitForFunction(() => window.__vfx.sent.length === 1);
   await page.evaluate(() => window.__mgTest.loadAutoMode());
   await page.waitForTimeout(150);
   expect((await states(page)).prober.checked).toBe(false);
 
-  await page.check(IDS.prober, { force: true });
+  await flip(page, 'prober');
   await page.waitForFunction(() => window.__vfx.sent.length === 2);
   await page.evaluate(() => window.__mgTest.loadAutoMode());
   await page.waitForTimeout(150);
@@ -200,7 +200,7 @@ test('salvataggio che fallisce: l interruttore torna indietro e lo dice', async 
   await openAutomation(page);
 
   expect((await states(page)).prober.checked).toBe(true);
-  await page.uncheck(IDS.prober, { force: true });
+  await flip(page, 'prober');
   await page.waitForFunction(() => window.__vfx.sent.length > 0);
   await expect(page.locator(IDS.prober)).toBeChecked();          // ripristinato
   await expect(page.locator('#mgAutoMsg')).toContainText(/NON è cambiata/i);
@@ -223,12 +223,13 @@ test('doppio clic rapido su una categoria: lo stato finale è coerente col salva
   await fakeChannel(page, { enabled: true, autoApprove: null });
   await openAutomation(page);
 
-  const el = page.locator(IDS.worker);
-  await el.click({ force: true });
-  await el.click({ force: true });
+  const t = track(page, 'worker');
+  await t.scrollIntoViewIfNeeded();
+  await t.click();
+  await t.click();
   await page.waitForFunction(() => window.__vfx.sent.length >= 2);
-  await page.waitForTimeout(300);
-  const uiChecked = await el.isChecked();
+  await page.waitForTimeout(400);
+  const uiChecked = await page.locator(IDS.worker).isChecked();
   const saved = await page.evaluate(() => window.__vfx.store.autoApprove.worker);
   expect(uiChecked, 'schermo e salvato divergono dopo due clic rapidi').toBe(saved);
 });
