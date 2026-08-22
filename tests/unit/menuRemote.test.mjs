@@ -129,6 +129,9 @@ test('le sezioni dinamiche mandano il loro stato, non contenuto già disegnato',
   assert.equal(reg.inline.size, 1);
 });
 
-test('fuori da un riquadro non c\'è niente da delegare', () => {
+test('senza sapere dove si trova il riquadro non si delega niente alla pagina', () => {
+  // La misura ("dove sono nella finestra") arriva dal main al click destro.
+  // Finché non c'è, il menu resta dove è sempre stato: meglio stretto che in
+  // un punto sbagliato della pagina.
   assert.equal(Remote.canProject(), false);
 });
