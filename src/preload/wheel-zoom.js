@@ -193,7 +193,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   function enter() {
     if (zoomMode) return;
     zoomMode = true;
-    cancelHide();                // se era di passaggio, ora è dell'ospite
+    cancelHide();                // era di passaggio: da ora resta
     try {
       mountBadge(true);
       document.documentElement.style.cursor = 'zoom-in';
