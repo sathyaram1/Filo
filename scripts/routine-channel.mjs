@@ -187,10 +187,17 @@ export async function work(t, opts) {
   return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
+// I motivi per cui il battito NON va ritentato: il server ha guardato il
+// biglietto e ha detto che non vale più. Qualunque altro motivo (rete giù, 5xx,
+// risposta illeggibile) è un intoppo che può passare da solo, e mollare lì
+// vorrebbe dire far cadere il semaforo di un lavoro ancora vivo.
+const BATTITO_FINITO = new Set(['bad_ticket', 'dead_ticket']);
+
 export async function heartbeat(t, opts) {
   const { status, body } = await call('routineHeartbeat', { ticket: t }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
-  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
+  const reason = String((body && body.reason) || `http_${status}`);
+  return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
 }
 
 /**
