@@ -351,3 +351,38 @@ test('filo://editor: Ctrl + mostra la percentuale del foglio', async ({ openTab 
 
   await page.keyboard.press('Control+0');
 });
+
+// Il badge è interfaccia di Filo, non contenuto della pagina: zoomando non deve
+// ingrandirsi insieme al testo (al 500% coprirebbe mezza pagina, proprio mentre
+// stai cercando di leggere quello che c'è sotto). Stessa regola dei menu di
+// Filo, che compensano lo zoom. Senza la compensazione la larghezza sullo
+// schermo cresce come il fattore di zoom e questo test diventa rosso.
+test('Ctrl +: il badge resta della stessa dimensione anche a zoom alto', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, TALL_PAGE);
+  await page.bringToFront();
+  await page.locator('body').click();
+
+  const badgeWidth = () => page.evaluate(() => {
+    const b = document.getElementById('__filo-zoom-badge');
+    return b ? b.getBoundingClientRect().width : null;
+  });
+
+  await page.keyboard.press('Control+0'); // zoom invariato, ma il badge compare
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  const w100 = await badgeWidth();
+  const f100 = await zoomFactorOf(app, '127.0.0.1');
+
+  await page.keyboard.press('Control+=');
+  await page.keyboard.press('Control+=');
+  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+  const wZoom = await badgeWidth();
+  const fZoom = await zoomFactorOf(app, '127.0.0.1');
+  expect(fZoom).toBeGreaterThan(f100 + 0.1);
+
+  // Larghezza sullo schermo = larghezza in pixel CSS × fattore di zoom.
+  const onScreen100 = w100 * f100;
+  const onScreenZoom = wZoom * fZoom;
+  expect(Math.abs(onScreenZoom - onScreen100) / onScreen100).toBeLessThan(0.05);
+
+  await page.keyboard.press('Control+0');
+});
