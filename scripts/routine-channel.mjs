@@ -39,9 +39,12 @@
 //   node scripts/routine-channel.mjs work <biglietto>
 //       → stampa il JSON del proprio lavoro { role, ... }.
 //
-//   node scripts/routine-channel.mjs heartbeat <biglietto> [--loop]
-//       → tiene vivo il semaforo. Con --loop batte finché il biglietto vive
-//         (da lanciare in sottofondo per le sessioni lunghe).
+//   node scripts/routine-channel.mjs heartbeat [<biglietto>] [--loop]
+//       → tiene vivo il semaforo. Con --loop batte finché il biglietto vive.
+//         NON serve lanciarlo a mano: il ciclo lo avvia dispatch nel momento in
+//         cui riceve il biglietto (lib/routine-beat.mjs), perché una cosa che
+//         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
+//         gli argomenti lo ritrova da solo, come le consegne.
 //
 //   node scripts/routine-channel.mjs release <biglietto> [--guasto "motivo"]
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
