@@ -410,6 +410,7 @@
       root.appendChild(el);
     }
 
+    if (keepFocus) keepPageFocus(root);
     menuHost().appendChild(root);
 
     // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
@@ -417,25 +418,49 @@
     // menu aperto dall'altra parte non si accorgerebbe mai di doverlo chiudere.
     // Un avviso agli altri frame della scheda tiene la regola di sempre — un
     // solo menu alla volta. Nessun costo sulle pagine senza riquadri.
+    // Parte PRIMA della proiezione (#445): se il menu lo disegnerà la pagina,
+    // questo è ciò che le fa chiudere il suo prima di aprire quello nuovo.
     try {
       const nested = window.top !== window.self || (window.frames && window.frames.length > 0);
       const T = global.SN_MSG?.MSG?.CLOSE_OTHER_MENUS;
-      if (nested && T) Promise.resolve(chrome.runtime.sendMessage({ type: T })).catch(() => {});
+      if (nested && T && !noProject) Promise.resolve(chrome.runtime.sendMessage({ type: T })).catch(() => {});
     } catch (_) {}
+
+    // Misura prima di decidere: è l'altezza vera del menu a dire se ci sta.
+    let h = root.offsetHeight;
+    const w = root.offsetWidth;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const tooTall = h + 16 > vh;
+    const tooWide = w + 16 > vw;
+
+    // #445 — dentro un riquadro incorporato il menu non può uscire dai bordi del
+    // riquadro: in un player o in un banner alti poche centinaia di pixel
+    // diventa una fessura da scorrere. Quando non ci sta, lo fa disegnare alla
+    // PAGINA, sopra al riquadro, dove c'è tutta l'altezza della finestra — le
+    // azioni restano quelle dell'elemento cliccato qui dentro. Se la pagina non
+    // può (non sappiamo dove siamo nella finestra, o siamo a tutto schermo),
+    // si ricade sul menu scorrevole di prima.
+    const Remote = global.SN_MENU_REMOTE;
+    if (!noProject && (tooTall || tooWide) && Remote?.canProject?.()) {
+      root.remove();
+      const projected = Remote.project({
+        items, x, y, keepOnScroll,
+        onFallback: () => open({ x, y, items, keepOnScroll, noProject: true }),
+      });
+      if (projected) return;
+      menuHost().appendChild(root);
+    }
 
     // Compensazione zoom (così il menu non scala con Ctrl+/-)
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(root);
 
-    // Posizionamento: misura, flip se necessario.
-    let h = root.offsetHeight;
-    const w = root.offsetWidth;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
-    // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
-    // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
-    // aiuto — sarebbero irraggiungibili. Sopra una finestra normale non cambia
-    // nulla: la condizione è falsa.
-    if (h + 16 > vh) {
+    for (const m of mounts) { try { m(); } catch (e) { console.error(e); } }
+
+    // #405 — se lo spazio verticale è meno dell'altezza del menu (una finestra
+    // bassa, o un riquadro che non ha potuto delegare alla pagina): scorrevole
+    // invece che tagliato, così le voci in fondo — feedback, aiuto — restano
+    // raggiungibili. Sopra una finestra normale la condizione è falsa.
+    if (tooTall) {
       root.style.maxHeight = `${Math.max(96, vh - 16)}px`;
       root.style.overflowY = 'auto';
       h = root.offsetHeight;
