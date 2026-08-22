@@ -445,6 +445,8 @@ test('Gestione elenca le decisioni già prese: un’eccezione deve lasciare trac
   await expect(recenti).toContainText('approvata e fusa');
   await expect(recenti).toContainText('scartata');
   await expect(recenti).toContainText('claude/scartato');
+  // Chi, cosa, quando: senza il "chi" la traccia risponde a due domande su tre.
+  await expect(recenti).toContainText('chiesta da owner@esempio');
   // La prima schermata NON la mostra: lì sarebbe rumore.
   const home = await openTab(NEWTAB);
   await apriHome(home, { pending: [], recent: [richiesta({ used: true, outcome: 'merged' })] });
