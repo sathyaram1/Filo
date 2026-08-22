@@ -1798,6 +1798,20 @@ class TabManager {
           });
         } catch (_) {}
       }
+
+      // #445 — dove si trova, dentro la finestra, il riquadro che ha ricevuto il
+      // click destro. `params.x/y` sono in coordinate della scheda; il riquadro
+      // conosce solo le proprie. La differenza fra le due è l'origine del
+      // riquadro, e serve a chiedere alla pagina di disegnare il menu sopra al
+      // punto giusto quando dentro al riquadro non ci sta (un player alto 110 px).
+      // Un iframe di un'altra origine non può ricavarla da sé: la posizione del
+      // frame nel genitore non è leggibile attraverso quel confine.
+      try {
+        const f = params.frame;
+        if (f && !f.detached && f !== wc.mainFrame) {
+          f.send('filo:broadcast', { type: MSG.FRAME_VIEW_POS, x: params.x, y: params.y });
+        }
+      } catch (_) {}
     });
 
     // Apertura nuove tab: tutto resta dentro Filo come nuovo tab — a meno che
