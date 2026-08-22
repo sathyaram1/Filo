@@ -1180,6 +1180,29 @@ se lo scriviamo noi, dobbiamo saperlo rileggere noi.
   tema, sicurezza, cookie e fingerprint del backup valgono subito senza
   riavviare. E si riscrivono **solo le chiavi davvero cambiate**: rimettere a
   posto valori identici sveglia per niente i listener `onChanged`.
+- **Attivo vale anche per le SCHEDE GIÀ APERTE, non solo per i settings** (#442).
+  Le impostazioni si riallineavano ovunque perché `applySettingsUpdate` le
+  annuncia; i contenuti no, perché li scrivevamo diretti sul disco e nessuno lo
+  diceva a nessuno. Chi aveva aperta la lista delle pagine salvate continuava a
+  vedere l'elenco di prima e concludeva che l'import non avesse funzionato. È la
+  **simmetria mancante** classica: due cammini che scrivono gli stessi dati e
+  solo uno avvisa. L'import manda quindi `MSG.DATA_IMPORTED` con le sezioni
+  davvero cambiate (`broadcastToFiloPages`: dice cosa c'è nel backup
+  dell'utente, un sito non lo deve sapere), e ogni pagina interna dichiara come
+  si rilegge tramite `SN_PAGE_BOOTSTRAP.onDataImported(fn, keys)`. L'iscrizione
+  al canale la fa `pageBootstrap.js`, che tutte le pagine `filo://` caricano:
+  così la regola non è una riga da ricordarsi venti volte e una pagina nuova la
+  eredita registrando il proprio ricaricamento.
+- **Riallineare NON è ricaricare.** La pagina Sicurezza faceva
+  `location.reload()` 1,2s dopo l'import per rileggere le impostazioni: portava
+  via il proprio messaggio "Importazione completata" prima che si finisse di
+  leggerlo. Una ricarica butta anche ricerca, filtri, scroll e pannelli aperti
+  di chiunque altro stesse guardando quella scheda, ed è per questo che il
+  ripiego "ricarico tutte le pagine `filo://`" è sbagliato pur essendo completo
+  per costruzione: nell'editor si porterebbe via il testo non salvato. Ogni
+  pagina rilegge con la sua funzione di caricamento, che dev'essere idempotente.
+  Il test lo inchioda piantando un marcatore su `window` prima dell'import e
+  pretendendolo vivo dopo.
 - **Stesso confine d'origine dell'export**: `filo://` soltanto — una pagina web
   non deve poter aprire un file dialog né riscrivere lo storage.
 - **Dove:** `readExportZip` / `mergeImportedData` in
