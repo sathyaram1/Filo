@@ -20,7 +20,8 @@ require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
 const UI = globalThis.SN_MERGE_APPROVALS;
 
 const MIN = 60 * 1000;
-const ORA = 1_700_000_000_000;
+const ORE = 60 * MIN;
+const ORA = 1_700_000_000_000; // "adesso" nei test (l'istante, non la durata)
 
 test('si registra su globalThis con la sua API', () => {
   assert.ok(UI, 'SN_MERGE_APPROVALS assente');
