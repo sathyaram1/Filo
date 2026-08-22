@@ -401,10 +401,11 @@ Nome proposto per la categoria: **`residuo`** («Claude — rilievo residuo»), 
 cui proviene e riportare i rilievi rimasti **con le parole della verifica**, non
 riassunti.
 
-⚠️ Da guardare mentre si implementa: `autoApproveGroup()` fa cadere ogni ruolo
-non-owner/filo/user nel gruppo `claude`. Il tipo nuovo ci finirebbe dentro per
-inerzia — probabilmente è giusto (è un'automazione dell'owner), ma va deciso
-apposta, non subìto: da lì dipende se questi feedback entrano in coda da soli.
+⚠️ Da guardare mentre si implementa: dal 2026-08-22 il gruppo di fiducia È la
+categoria d'autore, una per una (`autoApproveGroup()` = `authorKind()`), quindi
+una categoria nuova vuole anche il SUO interruttore in dashboard e la copia sul
+server. Prima cadevano tutte in `claude` per inerzia — che è esattamente ciò
+che rendeva impossibile fidarsi di un'istanza senza fidarsi delle altre.
 
 ### Dove vivono i contatori
 

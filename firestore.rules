@@ -96,9 +96,10 @@ service cloud.firestore {
     //     dell'ingresso automatico in coda (un feedback giudicato sicuro entra
     //     da solo). NON è l'interruttore delle routine: quello sta in
     //     config/routines, vedi sotto.
-    //   - `autoApprove` (mappa owner/filo/claude/user → bool; assente = tutti
-    //     true): quali mittenti entrano in coda da soli quando `enabled` è true
-    //     (#446). La legge il backend di sicurezza via Admin SDK.
+    //   - `autoApprove` (mappa categoria d'autore → bool, una voce per ogni
+    //     icona che la coda mostra; assente = tutti true): quali mittenti
+    //     entrano in coda da soli quando `enabled` è true (#446). La legge il
+    //     backend di sicurezza via Admin SDK.
     //   - `workerLog` (array di { role, startedAt, num }): il registro dei worker
     //     mostrato in dashboard. Lo scrive il server (functions, Admin SDK) al
     //     rilascio di ogni biglietto (le routine non hanno credenziali: #451).
