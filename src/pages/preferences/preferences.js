@@ -615,6 +615,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // #442 — un'importazione da backup ha ripristinato le preferenze: i
+    // controlli di questa scheda mostrano i valori nuovi, non quelli di prima.
+    Bootstrap.onDataImported(() => { load(); }, ['settings']);
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
