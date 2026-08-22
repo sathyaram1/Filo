@@ -1224,6 +1224,15 @@
     // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
     if (mediaUnder) {
       for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
+      // Scheda a strati: sopra un velo trasparente che non è né link né media,
+      // sotto il filmato e il link della scheda (#444). Se filmato e link
+      // occupano lo stesso rettangolo, il menu è quello della scheda intera.
+      if (sameCardArea(mediaUnder, linkUnder)) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+        items.push({ type: 'separator' });
+        items.push(Actions.buildInlineExplainLink(linkUnder));
+      }
       return items;
     }
 
