@@ -492,6 +492,82 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // ── Fusioni bloccate, in attesa dell'owner (SPEC-RIDISEGNO-MAX.md §10) ─────
+  //
+  // I controlli deterministici del server fermano le fusioni che toccano le
+  // aree protette. Il lavoro LOCALE dell'owner ci cade dentro quasi sempre —
+  // in locale si lavora proprio su quelle cose — e senza una via d'uscita non
+  // avrebbe nessuna strada verso il ramo principale (nemmeno a mano: là scrive
+  // solo l'identità del server). Il blocco apre quindi una richiesta in attesa,
+  // e l'owner la decide da queste tre chiamate.
+  //
+  // DUE CANCELLI, non uno:
+  //   · `isAdmin()` — è il potere dell'owner, e il server lo ricontrolla;
+  //   · l'ORIGINE — solo pagine `filo://`. Il canale dei messaggi è uno solo e
+  //     ci arrivano anche i content script dei siti visitati: senza questo, un
+  //     sito qualunque potrebbe chiedere se c'è una fusione in attesa (e
+  //     scoprire su cosa sta lavorando l'owner) o provare a farla approvare
+  //     mentre lui guarda altrove. Il gesto che vale è quello fatto sulla
+  //     superficie di Filo: è tutto il senso di questa superficie.
+  const isFiloOrigin = (origin, sender) => String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
+
+  function ownerOnly(handler) {
+    return async (msg, sender, origin) => {
+      if (!isFiloOrigin(origin, sender)) return { ok: false, error: 'forbidden' };
+      if (!auth.isAdmin()) {
+        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+      }
+      try {
+        return await handler(msg);
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    };
+  }
+
+  async function listMergeApprovals() {
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'list' });
+    return {
+      ok: true,
+      pending: (r && r.pending) || [],
+      recent: (r && r.recent) || [],
+      ttlMs: Number(r && r.ttlMs) || 0,
+    };
+  }
+
+  on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
+
+  // Una prima schermata GIÀ APERTA deve accorgersi di una richiesta nuova.
+  // Prima l'elenco si leggeva solo all'apertura di una pagina: il terminale
+  // diceva "approvala dalla home" e sulla home aperta non compariva niente.
+  //
+  // Chi avvisa è il main, non la pagina, e per due motivi: la lettura è UNA
+  // sola anche con dieci schede aperte, e il cancello del proprietario resta in
+  // un posto solo. Il campanello e il perché di questa forma stanno in
+  // services/mergeApprovalSignal.js.
+  try {
+    require('../mergeApprovalSignal').start({
+      isAdmin: () => auth.isAdmin(),
+      read: listMergeApprovals,
+      broadcast: (m) => ctx.broadcastToFiloPages(m),
+      type: MSG.MERGE_APPROVALS_CHANGED,
+    });
+  } catch (e) {
+    console.warn('[Filo] campanello fusioni non agganciato:', e?.message || e);
+  }
+
+  on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
+    if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Fusione non riuscita.' };
+    return { ok: true, result: (r && r.result) || '', sha: (r && r.sha) || '', headSha: (r && r.headSha) || '' };
+  }));
+
+  on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
+    const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
+    if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
+    return { ok: true, result: 'discarded' };
+  }));
+
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
   // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   on(MSG.SUPPORT_MODELS_GET, async () => {

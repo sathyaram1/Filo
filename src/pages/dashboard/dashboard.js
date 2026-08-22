@@ -39,6 +39,8 @@
   const inputEl = $('input');
   const sendBtn = $('sendBtn');
   const dashDir = $('dashDir');
+  const dashEl = $('dash');
+  const mergeApprovalsEl = $('mergeApprovals');
 
   // ===== Stato locale =====
   let suggestions = [];
@@ -2188,6 +2190,14 @@
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       isOwner = !!(msg.signedIn && msg.isAdmin);
       applyAccountProfile(msg.signedIn ? msg.profile : null);
+      // Un login/logout cambia chi sei: l'avviso deve comparire (o sparire)
+      // subito, non alla prossima apertura della home.
+      refreshMergeApprovals();
+    } else if (msg?.type === MSG.MERGE_APPROVALS_CHANGED) {
+      // È arrivata (o è sparita) una fusione da approvare mentre questa
+      // schermata era già aperta. Il main manda anche il DATO, quindi qui non
+      // si richiede niente a nessuno: si ridisegna e basta.
+      refreshMergeApprovals(msg);
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
@@ -2294,6 +2304,60 @@
       isOwner = false;
       applyAccountProfile(null);
     }
+    refreshMergeApprovals();
+  }
+
+  // ===== Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) =====
+  //
+  // I controlli di sicurezza del server fermano le fusioni che toccano le parti
+  // protette. Il lavoro locale dell'owner ci finisce quasi sempre, e senza
+  // questa superficie non avrebbe nessuna strada per arrivare agli utenti: sul
+  // ramo principale scrive solo il server, e il server vuole un via libera dato
+  // da una persona — non dal terminale da cui è partita la richiesta.
+  //
+  // DUE CONDIZIONI PER VEDERLO, entrambe necessarie: essere il proprietario, e
+  // avere davvero qualcosa in attesa. Per tutti gli altri (e per l'owner nei
+  // giorni normali) questa parte della home non esiste: nessun riquadro vuoto,
+  // nessuna riga che scende.
+  //
+  // Il disegno e i comandi vengono dal modulo condiviso con Gestione →
+  // Automazioni: i due cammini devono fare la stessa identica cosa.
+  //
+  // `already` è l'elenco già pronto, quando ad avvisare è stato il main
+  // (MERGE_APPROVALS_CHANGED): una richiesta nuova arriva mentre la schermata è
+  // già aperta, e il dato viaggia col messaggio. Senza, se lo va a prendere lei
+  // — è il cammino di quando la pagina si apre o cambia l'account.
+  async function refreshMergeApprovals(already) {
+    const host = mergeApprovalsEl;
+    const UI = self.SN_MERGE_APPROVALS;
+    if (!host || !UI) return 0;
+    const spegni = () => {
+      host.replaceChildren();
+      host.hidden = true;
+      if (dashEl) dashEl.classList.remove('dash--notice');
+      return 0;
+    };
+    if (!isOwner) return spegni();
+    let r = already || null;
+    try {
+      if (!r) r = await send({ type: MSG.MERGE_APPROVALS_GET });
+    } catch (_) {
+      // Il server non risponde: non è il posto per dirlo. Chi ha una fusione in
+      // sospeso lo scopre dal terminale, e riempire la home di un errore che
+      // non si può risolvere da qui sarebbe rumore.
+      return spegni();
+    }
+    if (!r || r.ok === false) return spegni();
+    const n = UI.render(host, {
+      requests: r.pending || [],
+      // Dopo un esito buono la lista si rilegge: la richiesta appena decisa non
+      // deve restare lì a farsi ricliccare.
+      onDone: () => { setTimeout(refreshMergeApprovals, 1200); },
+      onApprove: (req) => send({ type: MSG.MERGE_APPROVAL_APPROVE, id: req.id }),
+      onDiscard: (req) => send({ type: MSG.MERGE_APPROVAL_DISCARD, id: req.id }),
+    });
+    if (dashEl) dashEl.classList.toggle('dash--notice', n > 0);
+    return n;
   }
 
   // ===== Recap aggiornamento (C4) =====
@@ -2677,5 +2741,14 @@
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
   // nell'editor): permette di renderizzare azioni come farebbe una bolla di
   // chat senza dover pilotare l'LLM.
-  window.__filoDashActions = { renderActions, applyCommandCwd, getCwd: () => currentCwd };
+  window.__filoDashActions = {
+    renderActions,
+    applyCommandCwd,
+    getCwd: () => currentCwd,
+    // Fusioni in attesa: gli spec ripercorrono il cammino VERO (chi sono →
+    // cosa c'è in attesa) dopo aver stubbato l'IPC, perché in test non c'è né
+    // una sessione da proprietario né il server di sicurezza.
+    refreshAccountControl,
+    refreshMergeApprovals,
+  };
 })();

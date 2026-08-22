@@ -5,6 +5,9 @@
   <title>Filo — Nuova scheda</title>
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
+  <!-- Avviso delle fusioni in attesa: stesso foglio della gemella in Gestione,
+       così le due superfici non possono divergere. -->
+  <link rel="stylesheet" href="filo://style/mergeApprovals.css" />
   <link rel="stylesheet" href="dashboard.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/aestheticRefiner.js"></script>
@@ -20,6 +23,7 @@
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
+  <script src="filo://shared/mergeApprovals.js"></script>
 </head>
 <body data-state="home">
   <!-- Controlli del browser spostati dentro la home (la barra in alto di Filo è
@@ -27,6 +31,12 @@
        icona aziona il comando reale della shell via MSG.SHELL_ACTION. -->
   <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
   <main class="dash" id="dash">
+    <!-- Fusioni in attesa del via libera dell'owner (SPEC-RIDISEGNO-MAX.md §10).
+         SOLO owner, e solo se ce n'è almeno una: quando è vuoto resta `hidden`
+         e la griglia torna esattamente com'era per tutti gli altri (la riga in
+         più la accende la classe `dash--notice`, che si mette solo qui). -->
+    <div class="dash-notice" id="mergeApprovals" hidden></div>
+
     <!-- Left column: suggested actions -->
     <aside class="dash-left" id="left">
       <ul class="dash-suggestions" id="suggestions"></ul>

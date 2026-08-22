@@ -50,12 +50,36 @@
 //   I controlli locali e la verifica indipendente restano identici, e restano
 //   obbligatori: sono quelli che dicono se il lavoro è finito. Il server non
 //   li rifà e non ci crede — controlla altro.
+//
+// SE IL SERVER BLOCCA, NON È UN VICOLO CIECO (SPEC-RIDISEGNO-MAX.md §10)
+//   I controlli deterministici del server fermano chi tocca le aree protette
+//   (guardie, automatismi, regole del database, chiavi, dipendenze nuove) — e
+//   il lavoro locale ci cade dentro quasi sempre, perché in locale si lavora
+//   proprio su quelle cose. Da qui non si aggirano, e su main da questa
+//   macchina non scrive nessuno: senza una via d'uscita quel lavoro non
+//   arriverebbe mai agli utenti.
+//
+//   La via d'uscita non è un permesso in più per questo script: il server APRE
+//   UNA RICHIESTA IN ATTESA, e l'owner la approva DENTRO FILO (l'avviso in
+//   cima alla prima schermata, o Gestione → Automazioni). Serve una persona
+//   davanti allo schermo, su una superficie diversa da questo terminale: è
+//   l'unica cosa che una sessione catturata non può procurarsi da sola.
+//
+//   Qui i compiti sono due. DIRLO bene (messageForOwnerMerge in
+//   scripts/lib/owner-merge.mjs): l'esito porta il nome della richiesta aperta,
+//   e il messaggio nomina dove approvarla invece di fermarsi al blocco. E
+//   SUONARE IL CAMPANELLO: se Filo è già aperto — cioè quasi sempre, è il
+//   browser — la sua prima schermata non si accorgerebbe di niente, perché
+//   l'elenco lo legge solo quando la si apre. Una riga qui e l'avviso compare
+//   sotto gli occhi di chi lo sta aspettando (src/main/services/
+//   mergeApprovalSignal.js).
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
+import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -274,6 +298,12 @@ async function main() {
   //    codice appena controllato.
   process.stdout.write('\n▸ Chiedo al server di fondere\n');
   const reply = await askServerMerge({ branch, sha: cur });
+  // Il server ha aperto una richiesta: suona il campanello, così una finestra
+  // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
+  // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
+  // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
+  // di comparire soltanto a chi apre una scheda nuova.
+  if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
   const message = messageForOwnerMerge(reply, branch);
   if (code === 0) console.log(`\n${message}`);

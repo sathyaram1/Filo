@@ -59,7 +59,13 @@ export function classifyOwnerMerge(status, body) {
 
   if (status === 200 && r.ok === true) {
     if (r.result === 'merged') return { outcome: 'merged', sha: String(r.sha || '') };
-    if (r.result === 'blocked') return { outcome: 'blocked', reason: String(r.reason || '') };
+    // Bloccata dai controlli: il server non l'ha respinta e basta, ha aperto
+    // una richiesta in attesa. `requestId` vuoto significa che non c'è riuscito
+    // (deposito non raggiungibile, oppure server non ancora rideployato): sono
+    // due situazioni diverse per chi legge, e vanno dette diverse.
+    if (r.result === 'blocked') {
+      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || '') };
+    }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
     return { outcome: 'fault', reason: `risposta inattesa: ${String(r.result || '')}` };
@@ -89,10 +95,22 @@ export function messageForOwnerMerge(reply, branch = 'il ramo') {
     case 'merged':
       return `✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`;
     case 'blocked':
+      // Il blocco NON è più un vicolo cieco. Il lavoro locale tocca le aree
+      // protette quasi sempre (in locale si lavora proprio sulle guardie): un
+      // messaggio che si ferma a "decidi tu cosa farne" lascia chi legge senza
+      // nessuna mossa possibile — e su main, da qui, non scrive più nessuno.
+      // La mossa c'è, ed è una sola: approvarla in Filo, dove serve una persona.
       return `✗ Fusione BLOCCATA dai controlli di sicurezza del server: ${r.reason || 'motivo non riportato'}\n`
         + '  Sono controlli automatici sul contenuto delle modifiche (aree protette,\n'
-        + '  dipendenze nuove, segreti). Non si aggirano da qui: se la modifica è\n'
-        + '  legittima serve una tua decisione.';
+        + '  dipendenze nuove, segreti), e da qui non si aggirano.\n'
+        + (r.requestId
+          ? '\n  L\'ho messa IN ATTESA: approvala da Filo, prima schermata (l\'avviso in\n'
+            + '  cima alla home), oppure Gestione → Automazioni. Da lì puoi anche scartarla.\n'
+            + '  Se Filo è già aperto l\'avviso compare da solo, non serve riaprire niente.\n'
+            + '  Vale per il commit appena controllato e per 24 ore: se scade, o se il\n'
+            + '  ramo si muove, rilancia npm run finish.'
+          : '\n  Non sono riuscito a metterla in attesa: nell\'app non comparirà niente da\n'
+            + '  approvare. Riprova, e se non torna vanno rideployate le funzioni di sicurezza.');
     case 'conflict':
       return `✗ Conflitto: main è andato avanti e le modifiche non si incastrano da sole.\n`
         + '  Fai: git pull --rebase origin main, risolvi, e rilancia npm run finish.';

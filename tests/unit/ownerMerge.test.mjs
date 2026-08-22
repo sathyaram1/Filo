@@ -34,6 +34,13 @@ describe('leggere la risposta del server', () => {
     assert.match(r.reason, /firestore\.rules/);
   });
 
+  test('bloccato: si porta dietro la richiesta aperta dal server (o il fatto che non c’è)', () => {
+    const con = classifyOwnerMerge(200, risposta({ ok: true, result: 'blocked', reason: 'x', requestId: 'ab12cd34ef56ab12cd34ef56' }));
+    assert.equal(con.requestId, 'ab12cd34ef56ab12cd34ef56');
+    const senza = classifyOwnerMerge(200, risposta({ ok: true, result: 'blocked', reason: 'x' }));
+    assert.equal(senza.requestId, '');
+  });
+
   test('conflitto e ramo cambiato sono esiti DIVERSI: portano a due gesti diversi', () => {
     assert.equal(classifyOwnerMerge(200, risposta({ ok: true, result: 'conflict' })).outcome, 'conflict');
     const stale = classifyOwnerMerge(200, risposta({ ok: true, result: 'stale', headSha: 'ff00ff00' }));
@@ -108,6 +115,33 @@ describe('cosa legge l’owner', () => {
       const msg = messageForOwnerMerge({ outcome, reason: 'motivo', sha: 'abcdef1234', headSha: 'ff00ff00' }, 'claude/x');
       assert.match(msg, re, `l’esito "${outcome}" non dice all’owner cosa sta succedendo`);
     }
+  });
+
+  test('bloccato con richiesta aperta: dice DOVE approvarla, non "decidi tu"', () => {
+    // Il lavoro locale tocca le aree protette quasi sempre. Un messaggio che si
+    // ferma al blocco lascia chi legge senza nessuna mossa possibile: su main,
+    // da questa macchina, non scrive più nessuno.
+    const msg = messageForOwnerMerge(
+      { outcome: 'blocked', reason: 'guard_the_guards: firestore.rules', requestId: 'ab12cd34ef56ab12cd34ef56' },
+      'claude/x'
+    );
+    assert.match(msg, /in attesa/i);
+    assert.match(msg, /prima schermata/i);
+    assert.match(msg, /Gestione → Automazioni/);
+    // Quanto dura si dice QUI: è l'unico posto dove l'owner sta guardando nel
+    // momento in cui la richiesta nasce, e sapere se deve correre o no cambia
+    // cosa fa dopo. Un giorno, non mezz'ora: rifarla costa un giro intero.
+    assert.match(msg, /24 ore/);
+    assert.doesNotMatch(msg, /mezz'ora|mezz’ora/);
+    // E che una finestra già aperta se ne accorge da sola: senza questa riga
+    // l'owner chiude e riapre una scheda per far comparire l'avviso.
+    assert.match(msg, /già aperto/i);
+  });
+
+  test('bloccato SENZA richiesta: non promette un avviso che non comparirà mai', () => {
+    const msg = messageForOwnerMerge({ outcome: 'blocked', reason: 'x' }, 'claude/x');
+    assert.doesNotMatch(msg, /approvala da Filo/i);
+    assert.match(msg, /non comparirà niente|non sono riuscito/i);
   });
 
   test('un esito diverso da "fuso" non dice mai che è stato pubblicato', () => {

@@ -728,6 +728,10 @@
   // non è ancora in uso i due registri sono vuoti e il blocco resta nascosto —
   // una sezione vuota che non spiega perché è peggio di nessuna sezione.
   const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
+  const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
+  const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
+  const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
+  const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
 
   // Perché una richiesta è stata respinta, detto all'owner e non al codice.
   const DENY_LABELS = {
@@ -788,6 +792,56 @@
     if (mgChannelEmpty) mgChannelEmpty.hidden = true;
     mgChannelList.hidden = false;
     mgChannelSection.hidden = false;
+  }
+
+  // ── Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) ─────────
+  //
+  // Lo STESSO comando che vive nella prima schermata di Filo. Non una copia:
+  // il disegno e i bottoni li costruisce il modulo condiviso
+  // (src/shared/mergeApprovals.js), qui c'è solo il posto dove appenderlo e la
+  // lettura via IPC. Cammini equivalenti fanno la stessa cosa — e con due
+  // implementazioni, prima o poi non sarebbe più vero.
+  //
+  // Quando non c'è niente in attesa il blocco resta invisibile: una sezione
+  // vuota in una pagina di gestione è rumore, non informazione. Le decisioni
+  // già prese restano invece elencate qui (e solo qui): un'eccezione ai
+  // controlli di sicurezza deve lasciare una traccia che si può guardare.
+  const mgMergeApprovals = document.getElementById('mgMergeApprovals');
+  const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
+
+  // `already` è l'elenco già pronto, quando ad avvisare è stato il main
+  // (MERGE_APPROVALS_CHANGED). Vale la stessa cosa detta nella prima
+  // schermata: una pagina già aperta deve accorgersi di una richiesta nuova,
+  // altrimenti l'avviso lo vede solo chi riapre la pagina.
+  async function loadMergeApprovals(already) {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (!mgMergeApprovals || !UI) return 0;
+    const spegni = () => {
+      mgMergeApprovals.replaceChildren();
+      mgMergeApprovals.hidden = true;
+      if (mgMergeApprovalsRecent) {
+        mgMergeApprovalsRecent.replaceChildren();
+        mgMergeApprovalsRecent.hidden = true;
+      }
+      return 0;
+    };
+    if (!isAdmin) return spegni();
+    let r = already || null;
+    try {
+      if (!r) r = await sendToMain({ type: MERGE_APPROVALS_GET });
+    } catch (err) {
+      console.error('[manage] fusioni in attesa:', err);
+      return spegni();
+    }
+    if (!r || r.ok === false) return spegni();
+    const n = UI.render(mgMergeApprovals, {
+      requests: r.pending || [],
+      onDone: () => { setTimeout(loadMergeApprovals, 1200); },
+      onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
+      onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
+    });
+    UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
+    return n;
   }
 
   async function loadChannelLog() {
@@ -2693,6 +2747,25 @@
     loadWorkerLog();
   });
 
+  // Tab "Automazioni": le fusioni in attesa si rileggono a OGNI apertura —
+  // una richiesta già decisa o appena arrivata renderebbe la sezione una
+  // fotografia vecchia.
+  mgTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mg-tab');
+    if (!btn || btn.dataset.tab !== 'automation') return;
+    loadMergeApprovals();
+  });
+
+  // …e anche a pagina ferma: il main avvisa quando l'elenco cambia (una
+  // fusione bloccata da `npm run finish`, o una decisa da un'altra finestra).
+  // Senza questo, una pagina di Gestione lasciata aperta continuerebbe a
+  // mostrare lo stato di quando è stata aperta.
+  if (window.filo?.onBroadcast) {
+    window.filo.onBroadcast((m) => {
+      if (m && m.type === MERGE_APPROVALS_CHANGED) loadMergeApprovals(m);
+    });
+  }
+
   // Esponi per gli spec Playwright (hook di test).
   window.__mgTest.loadSupportModels = loadSupportModels;
   window.__mgTest.getSmChains = () => smChains;
@@ -2706,6 +2779,9 @@
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
   window.__mgTest.loadWorkerLog = loadWorkerLog;
   window.__mgTest.renderChannelLog = renderChannelLog;
+  // Fusioni in attesa: rilettura via IPC dopo lo stub (in test non c'è né una
+  // sessione da proprietario né il server di sicurezza).
+  window.__mgTest.loadMergeApprovals = loadMergeApprovals;
 
   // Icone della ricerca (lente): iniettate da JS così restano nel tema di Filo
   // (SVG outline, currentColor) invece di un glifo emoji.
@@ -2841,6 +2917,7 @@
     await loadSortMode();
     await loadCaps();
     await loadJudgeTimeout();
+    await loadMergeApprovals();
     await loadData();
   }
 

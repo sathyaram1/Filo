@@ -382,6 +382,29 @@
     // cammino su git e quella del server. Vivono in collezioni che nessun client
     // può leggere: si passa dalla callable owner-only del backend di sicurezza.
     ROUTINE_LOG_GET: 'routine_log_get',            // → { ok, rejections:[…], comparisons:[…] } | { ok:false, error }
+    // Fusioni bloccate dai controlli di sicurezza del server, in attesa
+    // dell'owner (SPEC-RIDISEGNO-MAX.md §10). Il server non le respinge e
+    // basta: apre una richiesta, e l'owner la approva DENTRO Filo — su una
+    // superficie diversa dal terminale, dove serve una persona davanti allo
+    // schermo. Vivono in una collezione che nessun client può leggere: si passa
+    // dalla callable owner-only del backend di sicurezza.
+    //
+    // ORIGINE: solo pagine `filo://`. Un sito visitato non deve poter né sapere
+    // che c'è una fusione in attesa (dice cosa sta facendo l'owner) né tentare
+    // di approvarla o scartarla.
+    MERGE_APPROVALS_GET: 'merge_approvals_get',        // → { ok, pending:[…], recent:[…], ttlMs } | { ok:false, error }
+    MERGE_APPROVAL_APPROVE: 'merge_approval_approve',  // { id } → { ok, result:'merged'|'conflict'|'stale', sha? } | { ok:false, error }
+    MERGE_APPROVAL_DISCARD: 'merge_approval_discard',  // { id } → { ok, result:'discarded' } | { ok:false, error }
+    // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
+    // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
+    // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
+    // rientra nella finestra. Serve perché una prima schermata GIÀ APERTA se ne
+    // accorga: prima l'elenco si leggeva solo all'apertura, e l'avviso di cui
+    // parla il terminale non compariva mai sotto gli occhi di chi lo stava
+    // aspettando. Porta il dato con sé (una lettura sola per tutte le pagine
+    // aperte, invece di una per pagina) e va SOLO alle pagine filo://: dentro
+    // ci sono nomi di rami e percorsi di file.
+    MERGE_APPROVALS_CHANGED: 'merge_approvals_changed', // { pending:[…], recent:[…], ttlMs }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===

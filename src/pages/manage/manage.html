@@ -6,6 +6,9 @@
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
+  <!-- Avviso delle fusioni in attesa: stesso foglio della gemella nella prima
+       schermata, così le due superfici non possono divergere. -->
+  <link rel="stylesheet" href="filo://style/mergeApprovals.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/constants.js"></script>
@@ -24,6 +27,7 @@
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/manageSearch.js"></script>
   <script src="filo://shared/boardArchive.js"></script>
+  <script src="filo://shared/mergeApprovals.js"></script>
   <style>
     /* La dashboard di gestione sfrutta tutta la larghezza: override locale del
        limite globale `.sn-page { max-width: 960px }` di pages.css (che serve alle
@@ -676,6 +680,11 @@
     }
     .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css (lo stesso
+       che usa la prima schermata). Qui solo la spaziatura nella pagina. */
+    .mg-merge-approvals { margin: 0 0 20px; }
+    .mg-merge-approvals-recent { margin: 0 0 20px; }
+
     /* ── Sezione "Modelli di supporto" (DD1) ────────────────────────────── */
     .mg-support-models {
       max-width: 760px;
@@ -1090,6 +1099,13 @@
           Controlla l'operatività automatica di Filo: attivala o disattivala e
           regola i parametri delle routine.
         </p>
+
+        <!-- Fusioni fermate dai controlli di sicurezza, in attesa del tuo via
+             libera (SPEC-RIDISEGNO-MAX.md §10). È lo STESSO comando della prima
+             schermata — stesso modulo, stesso foglio di stile: cammini
+             equivalenti fanno la stessa cosa. Vuoto = invisibile. -->
+        <div class="mg-merge-approvals" id="mgMergeApprovals" hidden></div>
+        <div class="mg-merge-approvals-recent" id="mgMergeApprovalsRecent" hidden></div>
 
         <!-- Interruttore master delle routine autonome. -->
         <section class="mg-auto-block">
