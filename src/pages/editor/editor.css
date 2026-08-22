@@ -744,6 +744,26 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 }
 .ed-doc-new:hover { background: var(--sn-hover); }
 
+/* Percentuale dello zoom del foglio (#427.1): compare zoomando con Ctrl e
+   sparisce da sola. In basso a SINISTRA: a destra ci sono già gli avvisi, in
+   alto la barra del documento. Non intercetta i click (è solo un riscontro). */
+.ed-zoom-pill {
+  position: fixed; left: 18px; bottom: 18px;
+  background: var(--sn-bg);
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  box-shadow: var(--sn-shadow);
+  padding: 6px 12px;
+  font-size: 12px; line-height: 1.3; color: var(--sn-fg);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none; z-index: 200;
+}
+.ed-zoom-pill.show { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .ed-zoom-pill { transition: none; }
+}
+
 /* Menu contestuale del titolo (tasto destro): ancorato alle coordinate del
    click, quindi position:fixed (le .sn-select-pop di default sono absolute). */
 .ed-title-ctxmenu {
