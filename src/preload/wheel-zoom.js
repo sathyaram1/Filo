@@ -78,11 +78,26 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     catch (_) { return 100; }
   }
 
+  // Il badge è interfaccia di Filo, non contenuto della pagina: come i menu
+  // (`attachZoomCompensation` in src/content/popup.js) tiene la sua dimensione
+  // invece di scalare con lo zoom. Al 500% un badge scalato coprirebbe mezza
+  // pagina, e a zoomare si va proprio quando serve leggere quello che c'è sotto.
+  function syncBadgeScale() {
+    if (!badge) return;
+    let factor = 1;
+    try { factor = webFrame.getZoomFactor() || 1; } catch (_) {}
+    try {
+      badge.style.transformOrigin = 'top right';
+      badge.style.transform = factor === 1 ? '' : `scale(${1 / factor})`;
+    } catch (_) {}
+  }
+
   function refreshPercent() {
     // Non sovrascrivere mentre l'utente sta digitando nel campo.
     if (percentInput && document.activeElement !== percentInput) {
       percentInput.value = String(currentPercent());
     }
+    syncBadgeScale();
   }
 
   // Applica la percentuale digitata nel campo come fattore di zoom esatto.
