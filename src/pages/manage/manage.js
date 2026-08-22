@@ -809,7 +809,6 @@
   const mgMergeApprovals = document.getElementById('mgMergeApprovals');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
 
-  //
   // `already` è l'elenco già pronto, quando ad avvisare è stato il main
   // (MERGE_APPROVALS_CHANGED). Vale la stessa cosa detta nella prima
   // schermata: una pagina già aperta deve accorgersi di una richiesta nuova,
