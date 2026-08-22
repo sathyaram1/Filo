@@ -84,7 +84,9 @@
     working: {
       revision_capability: ['routine'], // fix pronto su branch
       design:              ['routine'], // domande a metà lavorazione
-      todo:                ['routine'], // TTL 60min scaduto → riconciliazione
+      // Arenato: il ramo non avanza da un'ora → il pacemaker lo rimette in coda
+      // da solo (FEEDBACK-STATES.md §6a). Alla terza volta va in `design`.
+      todo:                ['routine'],
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
