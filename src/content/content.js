@@ -316,6 +316,12 @@
     // scheda) la manda il main. Serve a far disegnare il menu alla pagina quando
     // qui dentro non ci starebbe.
     try { self.SN_MENU_REMOTE?.noteLocalPoint?.(e.clientX, e.clientY); } catch (_) {}
+    // L'altra metà arriva dal main con qualche millisecondo di ritardo: qui la
+    // aspettiamo (solo dentro un riquadro, e solo finché non arriva), perché è
+    // ciò che decide se il menu può uscire dai bordi del riquadro o no.
+    if (IS_SUBFRAME) {
+      try { await self.SN_MENU_REMOTE?.waitForViewPos?.(250); } catch (_) {}
+    }
 
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto

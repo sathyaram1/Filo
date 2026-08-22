@@ -48,14 +48,40 @@
   let pendingViewPos = null;
   let viewOffset = null;
 
+  let waiters = [];
+
   function pairUp() {
     if (!lastLocalPoint || !pendingViewPos) return;
     viewOffset = {
       dx: pendingViewPos.x - lastLocalPoint.x,
       dy: pendingViewPos.y - lastLocalPoint.y,
       t: Date.now(),
+      point: lastLocalPoint,
     };
     pendingViewPos = null;
+    const pending = waiters;
+    waiters = [];
+    for (const fn of pending) { try { fn(); } catch (_) {} }
+  }
+
+  // La misura vale per QUESTO click destro (non per uno precedente).
+  function measured() {
+    return !!(viewOffset && lastLocalPoint && viewOffset.point === lastLocalPoint);
+  }
+
+  // Le due metà si incontrano nell'ordine che capita, e la parte che arriva dal
+  // main può essere in ritardo di qualche millisecondo sul click. Chi sta per
+  // aprire un menu aspetta quel poco: senza la misura il menu resterebbe dentro
+  // il riquadro anche quando non ci sta. L'attesa finisce appena la misura
+  // arriva; il tetto è solo la garanzia che il menu si apra comunque.
+  function waitForViewPos(ms) {
+    if (!IS_SUBFRAME || measured()) return Promise.resolve(measured());
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => { if (settled) return; settled = true; resolve(measured()); };
+      waiters.push(finish);
+      setTimeout(finish, Number(ms) > 0 ? Number(ms) : 250);
+    });
   }
 
   // Le due metà della misura arrivano in ordine non garantito: al PRIMO click
@@ -615,6 +641,7 @@
 
   global.SN_MENU_REMOTE = {
     canProject,
+    waitForViewPos,
     project,
     closeProjected,
     hasProjection,
