@@ -18,6 +18,18 @@
 //   Invio per impostare lo zoom esatto. Niente emoji, niente menzione di Esc.
 //   Uscendo NON si azzera lo zoom raggiunto: si torna solo a scrollare.
 //
+//   LO STESSO BADGE ANCHE ZOOMANDO CON CTRL (#427.1)
+//   Filo non ha barra degli indirizzi: senza il badge, chi zooma con Ctrl (+/-,
+//   rotella, pinch) non ha NESSUN posto dove leggere a che percentuale è
+//   arrivato né un appiglio per tornare al 100%. Lo stesso badge compare quindi
+//   anche su quella strada, ma "di passaggio": sparisce da solo dopo un paio di
+//   secondi (la modalità rotella invece lo tiene, perché lì è l'indicatore di
+//   una modalità attiva). Di passaggio resta comunque editabile — è lo stesso
+//   badge, non un avviso — e il conto alla rovescia si ferma finché il puntatore
+//   ci sta sopra o si sta scrivendo dentro, altrimenti sarebbe un campo che
+//   svanisce mentre lo usi. Cambia solo la coda "rotella per zoomare", che fuori
+//   dalla modalità rotella sarebbe un'istruzione falsa.
+//
 // Gira nel contesto del preload (ha accesso a `webFrame` di Electron), sia sulle
 // pagine web (page-preload) sia sulle pagine interne filo:// (internal-preload).
 //
