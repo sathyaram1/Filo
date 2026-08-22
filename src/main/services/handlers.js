@@ -2249,6 +2249,37 @@ function broadcastToTabs(message) {
   } catch (_) {}
 }
 
+// Broadcast alle sole pagine INTERNE (`filo://`) e alla shell.
+//
+// `broadcastToTabs` parla a tutte le schede, e in una scheda esterna il
+// messaggio arriva al content script del sito visitato. Va benissimo per le
+// impostazioni o il tema — sono cose che quel content script deve applicare —
+// ma NON per un messaggio che porta un dato dell'owner: l'elenco delle fusioni
+// in attesa contiene nomi di rami e percorsi di file, cioè su cosa sta
+// lavorando. La regola è la stessa del gate d'origine sugli handler, vista dal
+// verso opposto: se un sito non lo può CHIEDERE, non glielo si può nemmeno
+// mandare da soli.
+//
+// Il frame principale basta: qui non ci sono destinatari nei riquadri
+// incorporati (le pagine filo:// non ne ospitano di privilegiati).
+function broadcastToFiloPages(message) {
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win._filoTabs) {
+        for (const t of win._filoTabs.tabs) {
+          try {
+            const wc = t.view.webContents;
+            if (!wc || wc.isDestroyed?.()) continue;
+            if (!String(wc.getURL() || '').startsWith('filo://')) continue;
+            wc.send('filo:broadcast', message);
+          } catch (_) {}
+        }
+      }
+      try { win.webContents.send('filo:broadcast', message); } catch (_) {}
+    }
+  } catch (_) {}
+}
+
 // #405 — `webContents.send` consegna SOLO al frame principale. Da quando i
 // content script girano anche dentro i riquadri incorporati, un riquadro che
 // non riceve gli aggiornamenti di impostazioni (tema, colori, correttore) o lo
