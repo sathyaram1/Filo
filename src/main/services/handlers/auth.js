@@ -525,7 +525,7 @@ module.exports = function register(on, ctx) {
     };
   }
 
-  on(MSG.MERGE_APPROVALS_GET, ownerOnly(async () => {
+  async function listMergeApprovals() {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'list' });
     return {
       ok: true,
@@ -533,7 +533,28 @@ module.exports = function register(on, ctx) {
       recent: (r && r.recent) || [],
       ttlMs: Number(r && r.ttlMs) || 0,
     };
-  }));
+  }
+
+  on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
+
+  // Una prima schermata GIÀ APERTA deve accorgersi di una richiesta nuova.
+  // Prima l'elenco si leggeva solo all'apertura di una pagina: il terminale
+  // diceva "approvala dalla home" e sulla home aperta non compariva niente.
+  //
+  // Chi avvisa è il main, non la pagina, e per due motivi: la lettura è UNA
+  // sola anche con dieci schede aperte, e il cancello del proprietario resta in
+  // un posto solo. Il campanello e il perché di questa forma stanno in
+  // services/mergeApprovalSignal.js.
+  try {
+    require('../mergeApprovalSignal').start({
+      isAdmin: () => auth.isAdmin(),
+      read: listMergeApprovals,
+      broadcast: (m) => ctx.broadcastToFiloPages(m),
+      type: MSG.MERGE_APPROVALS_CHANGED,
+    });
+  } catch (e) {
+    console.warn('[Filo] campanello fusioni non agganciato:', e?.message || e);
+  }
 
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
