@@ -190,4 +190,6 @@ src/content/    content scripts
 
 Macchina a stati dei feedback: spec in **`FEEDBACK-STATES.md`**; il canale
 autenticato delle routine in **`ROUTINE-AUTH-SPEC.md`**; il ridisegno in corso
-in **`SPEC-RIDISEGNO-MAX.md`**.
+in **`SPEC-RIDISEGNO-MAX.md`**; la piattaforma app (creazione, governance,
+sicurezza dei dati — solo design, non ancora implementata) in
+**`APP-PLATFORM-SPEC.md`**.
