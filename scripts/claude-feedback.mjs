@@ -162,8 +162,7 @@ export async function applicaPriorita(id, valore) {
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
-const isMain = process.argv[1]
-  && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href.replace(/^file:\/\/(?=[A-Za-z]:)/, 'file:///');
+const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 
 function leggiStdin() {
   try { return readFileSync(0, 'utf8'); } catch (_) { return ''; }
