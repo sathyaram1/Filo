@@ -395,6 +395,16 @@
     MERGE_APPROVALS_GET: 'merge_approvals_get',        // → { ok, pending:[…], recent:[…], ttlMs } | { ok:false, error }
     MERGE_APPROVAL_APPROVE: 'merge_approval_approve',  // { id } → { ok, result:'merged'|'conflict'|'stale', sha? } | { ok:false, error }
     MERGE_APPROVAL_DISCARD: 'merge_approval_discard',  // { id } → { ok, result:'discarded' } | { ok:false, error }
+    // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
+    // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
+    // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
+    // rientra nella finestra. Serve perché una prima schermata GIÀ APERTA se ne
+    // accorga: prima l'elenco si leggeva solo all'apertura, e l'avviso di cui
+    // parla il terminale non compariva mai sotto gli occhi di chi lo stava
+    // aspettando. Porta il dato con sé (una lettura sola per tutte le pagine
+    // aperte, invece di una per pagina) e va SOLO alle pagine filo://: dentro
+    // ci sono nomi di rami e percorsi di file.
+    MERGE_APPROVALS_CHANGED: 'merge_approvals_changed', // { pending:[…], recent:[…], ttlMs }
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
