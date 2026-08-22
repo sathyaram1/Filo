@@ -274,6 +274,21 @@
       } catch (e) { console.error('[SN] correzione proiettata', e); }
     }
 
+    // Il menu è disegnato di là, ma l'utente continua a usare QUESTO riquadro:
+    // un clic o un Esc qui dentro devono chiuderlo come se fosse qui. Gli eventi
+    // del mouse non attraversano il confine dell'iframe, quindi la pagina non li
+    // vedrebbe mai e il menu resterebbe appeso sopra il video mentre lo si usa.
+    const dismiss = () => { try { global.SN_MENU?.close?.(); } catch (_) {} };
+    const onKey = (e) => { if (e && e.key === 'Escape') dismiss(); };
+    try {
+      document.addEventListener('mousedown', dismiss, true);
+      document.addEventListener('keydown', onKey, true);
+      state.cleanups.push(() => {
+        document.removeEventListener('mousedown', dismiss, true);
+        document.removeEventListener('keydown', onKey, true);
+      });
+    } catch (_) {}
+
     // Le sezioni che chiedono qualcosa al modello partono SOLO quando la pagina
     // conferma di aver disegnato il menu: se non ce l'ha fatta ricadiamo sul
     // menu locale, e la spiegazione non deve essere chiesta (e pagata) due volte.
