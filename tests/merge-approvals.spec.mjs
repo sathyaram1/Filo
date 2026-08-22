@@ -130,8 +130,9 @@ test('prima schermata: con una fusione in attesa l’avviso c’è, e dice ramo,
   await expect(avviso).toContainText('Tocca aree protette');
   await expect(avviso).toContainText('firestore.rules');
   await expect(avviso).toContainText('Cambia le dipendenze del progetto');
-  // La scadenza si dice PRIMA, non premendo il bottone.
-  await expect(avviso.locator('.sn-mac-expiry')).toContainText(/scade fra/);
+  // La scadenza si dice PRIMA, non premendo il bottone — e la finestra è di un
+  // giorno, quindi si legge in ore.
+  await expect(avviso.locator('.sn-mac-expiry')).toContainText(/scade fra \d+ ore/);
 
   // L'avviso occupa una riga sua in cima: la home non gli si accavalla.
   const box = await avviso.boundingBox();
