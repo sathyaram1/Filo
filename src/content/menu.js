@@ -32,6 +32,9 @@
   function close() {
     try { hideTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
+    // #445 — il menu di questo frame può essere disegnato dalla pagina che lo
+    // ospita: chiuderlo significa chiudere anche quello.
+    try { global.SN_MENU_REMOTE?.closeProjected?.(); } catch (_) {}
     if (activeMenu) {
       activeMenu.root.remove();
       try { activeMenu.subRoot?.remove(); } catch (_) {}
