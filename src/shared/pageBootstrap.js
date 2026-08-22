@@ -87,6 +87,43 @@
     });
   } catch (_) {}
 
+  // ── #442 — un'importazione ha riscritto lo storage ─────────────────────
+  // Ogni pagina interna dichiara qui come si rilegge i dati; l'iscrizione al
+  // canale la fa questo bootstrap una volta sola, perché tutte le pagine
+  // filo:// lo caricano. Così la regola "le schede aperte si riallineano da
+  // sole dopo un import" non è una riga da ricordarsi venti volte, e una
+  // pagina nuova la eredita registrando il proprio ricaricamento.
+  //
+  // Come per `settings_updated` qui sopra il tipo è scritto a mano: questo
+  // file è caricato prima di messages.js e non può leggere SN_MSG. La
+  // definizione vera (con il commento) sta in MSG.DATA_IMPORTED.
+  const DATA_IMPORTED = 'data_imported';
+  const importListeners = new Set();
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== DATA_IMPORTED) return;
+      const keys = Array.isArray(msg.keys) ? msg.keys : [];
+      for (const fn of [...importListeners]) {
+        try { fn({ keys }); } catch (e) { console.warn('[Filo] onDataImported', e); }
+      }
+    });
+  } catch (_) {}
+
+  // Registra un ricaricamento da eseguire quando un import cambia i dati.
+  // `keys` (opzionale) restringe l'iscrizione alle sezioni di storage che
+  // questa pagina mostra davvero: senza, il ricaricamento parte a ogni import.
+  // Ritorna la funzione per disiscriversi.
+  function onDataImported(fn, keys) {
+    if (typeof fn !== 'function') return () => {};
+    const wanted = Array.isArray(keys) && keys.length ? new Set(keys) : null;
+    const entry = (info) => {
+      if (wanted && !info.keys.some((k) => wanted.has(k))) return;
+      fn(info);
+    };
+    importListeners.add(entry);
+    return () => importListeners.delete(entry);
+  }
+
   // ───────────────────────────────────────────────────────────────────────
   // Dropdown custom per i <select> (feedback alpha).
   //
