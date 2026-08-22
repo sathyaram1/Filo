@@ -235,7 +235,15 @@
     card.dataset.requestId = String(req.id || '');
     card.dataset.branch = String(req.branch || '');
 
+    card.dataset.origin = originOf(req);
+
     var head = el('div', 'sn-mac-head');
+    // Da dove viene il lavoro, PRIMA del resto: le due provenienze stanno nello
+    // stesso elenco, e chi approva deve sapere subito quale delle due sta
+    // guardando.
+    var origin = el('span', 'sn-mac-origin', originLabel(req));
+    origin.title = originHint(req);
+    head.appendChild(origin);
     head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
     sha.title = 'Il commit esaminato: ' + String(req.sha || '');
@@ -312,13 +320,13 @@
       say({ kind: 'wait', text: 'Chiedo al server di fondere…' });
       Promise.resolve(o.onApprove ? o.onApprove(req) : null)
         .then(function (reply) {
-          var msg = outcomeMessage(reply);
+          var msg = outcomeMessage(reply, req);
           say(msg);
           if (msg.kind === 'ok' && o.onDone) o.onDone();
           else setBusy(false);
         })
         .catch(function (e) {
-          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }));
+          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
     });
@@ -328,13 +336,13 @@
       setBusy(true);
       Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
         .then(function (reply) {
-          var msg = outcomeMessage(reply);
+          var msg = outcomeMessage(reply, req);
           if (msg.kind === 'ok' && o.onDone) { o.onDone(); return; }
           say(msg);
           setBusy(false);
         })
         .catch(function (e) {
-          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }));
+          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
     });
