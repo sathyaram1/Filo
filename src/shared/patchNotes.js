@@ -18,7 +18,7 @@
     {
       version: '0.2.198', date: '2026-08-22',
       fixes: [
-        'Il tasto destro dentro un riquadro incorporato — un video, una mappa, una pubblicità — mostra tutto il menu anche quando il riquadro è alto pochi centimetri: prima si riduceva a una fessura da scorrere.',
+        'Il tasto destro dentro un video, una mappa o una pubblicità incorporati in una pagina apre tutto il menu anche quando il riquadro è alto pochi centimetri. Prima il menu si riduceva a una fessura da scorrere.',
       ],
     },
     {
