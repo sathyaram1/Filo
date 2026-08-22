@@ -530,6 +530,13 @@
     // Broadcast da background -> dashboard: lo stato live è cambiato
     // (nuovo timer, notifica, ecc.) e va re-renderizzato.
     FILO_LIVE_UPDATED: 'filo_live_updated',
+    // #442 — un'importazione da backup ha riscritto lo storage: le pagine
+    // filo:// già aperte rileggono i loro dati invece di restare ferme
+    // all'elenco di prima. Porta `keys` (le sezioni di primo livello
+    // realmente cambiate) così una pagina può decidere se la riguarda.
+    // SOLO alle pagine interne (broadcastToFiloPages): dice all'utente cosa
+    // c'è nel suo backup, e un sito non deve saperlo. { keys: string[] }
+    DATA_IMPORTED: 'data_imported',
     // Broadcast da background -> dashboard (#155): il ricalcolo in background
     // della home è pronto. La scheda aggiorna messaggio + suggerimenti senza
     // rifare la chiamata all'LLM. { message, suggestions, ts }
