@@ -517,6 +517,25 @@
     // solo un id del registro icone o il nome di un pannello.
     RUN_IN_TOP_FRAME: 'run_in_top_frame',
 
+    // #445 — il menu del tasto destro aperto dentro un riquadro incorporato non
+    // può uscire dai bordi del riquadro: in un player o in un banner alti 100-350
+    // px diventa una fessura da scorrere. Quando non ci sta, il riquadro chiede
+    // alla PAGINA di disegnarlo lei, sopra al riquadro, dove c'è tutta l'altezza
+    // della finestra. Le azioni restano riferite all'elemento cliccato: la pagina
+    // rimanda indietro il click, il riquadro esegue.
+    // { phase, token, ... } — vedi src/content/menuRemote.js:
+    //   'open'  (riquadro → pagina): { spec, x, y, keepOnScroll }
+    //   'patch' (riquadro → pagina): { path, props } — la spiegazione AI arrivata
+    //   'event' (pagina → riquadro): { id, arg } — voce scelta
+    //   'close' (entrambe le direzioni): il menu si è chiuso di là
+    //
+    // ORIGINE: come RUN_IN_TOP_FRAME, lo manda il content script di una pagina
+    // web. Il ponte instrada SOLO fra i frame della stessa scheda e SOLO verso
+    // il frame che ha aperto il menu (il token deve corrispondere). Il contenuto
+    // è dati, mai HTML: etichette e testo entrano come testo, le icone valgono
+    // solo se coincidono con una del registro di Filo.
+    PROJECT_MENU: 'project_menu',
+
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
