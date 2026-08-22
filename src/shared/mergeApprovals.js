@@ -171,6 +171,12 @@
    * da questo computer, quello di un'automazione no — lì la segnalazione torna
    * in attesa di una sua decisione.
    */
+  /** La prima lettera minuscola, per incastrare una frase dentro un'altra. PURA. */
+  function lowerFirst(text) {
+    var s = String(text || '');
+    return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+  }
+
   function howToRetry(req) {
     return originOf(req) === 'routine'
       ? 'Il lavoro resta fermo e la segnalazione torna a te.'
@@ -263,7 +269,7 @@
     // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro:
     // mandare l'owner a lanciare la pubblicazione locale per un ramo scritto da
     // un'automazione è un consiglio che non porta a niente.
-    exp.title = 'Vale per il commit esaminato e per un giorno. Passata la scadenza: ' + howToRetry(req);
+    exp.title = 'Vale per il commit esaminato e per un giorno. Passata la scadenza, ' + lowerFirst(howToRetry(req));
     head.appendChild(exp);
     card.appendChild(head);
 
