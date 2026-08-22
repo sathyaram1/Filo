@@ -255,7 +255,7 @@ module.exports = function register(on, ctx) {
       // cambiate: se non è cambiato niente non si tocca nessuna pagina.
       const changedKeys = Object.keys(rest);
       if (settingsChanged) changedKeys.push(SETTINGS_KEY);
-      if (changedKeys.length && false) {
+      if (changedKeys.length) {
         try { ctx.broadcastToFiloPages({ type: MSG.DATA_IMPORTED, keys: changedKeys }); } catch (_) {}
       }
 
