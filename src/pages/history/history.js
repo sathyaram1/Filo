@@ -221,6 +221,12 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // #442 — dopo un'importazione la cronologia del backup c'è: rileggila qui,
+    // senza costringere a chiudere e riaprire la scheda.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { load(); },
+      ['aiHistory', 'settings'],
+    );
     $('search').addEventListener('input', render);
     $('filter').addEventListener('change', render);
     $('clear').addEventListener('click', async () => {
