@@ -80,6 +80,12 @@ const BASE = process.env.FILO_ROUTINE_API
 // Il battito va più fitto della scadenza del semaforo (30 minuti lato server):
 // dieci minuti lasciano il margine per due battiti persi di fila.
 const BEAT_EVERY_MS = 10 * 60 * 1000;
+// Quanto dura il semaforo lato server senza battito. Serve come tetto
+// all'insistenza: oltre, il biglietto è morto comunque.
+const LEASE_TTL_MS = 30 * 60 * 1000;
+// Su un intoppo si ribatte più fitto: dentro mezz'ora ci stanno quindici
+// tentativi, abbastanza per attraversare un buco di rete senza perdere il lavoro.
+const RETRY_EVERY_MS = 2 * 60 * 1000;
 
 /**
  * Una chiamata al canale. Ritenta solo sui guasti che possono passare da soli
