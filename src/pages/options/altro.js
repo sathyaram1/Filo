@@ -132,6 +132,12 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // #442 — categorie, domini esclusi e conteggi delle pagine salvate tornati
+    // da un backup si vedono qui senza chiudere e riaprire la scheda.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { load(); },
+      ['settings', 'categories', 'savedPages'],
+    );
     $('blocklist').addEventListener('change', saveDebounced);
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
