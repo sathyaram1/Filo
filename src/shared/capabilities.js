@@ -89,7 +89,7 @@
     {
       id: 'page-zoom', title: 'Ingrandisci o rimpicciolisci la pagina', category: 'navigation',
       desc: 'Cambia la dimensione di tutta la pagina — testo e immagini — sia sui siti sia sulle pagine di Filo (home, impostazioni, cronologia…). Lo zoom resta com’è finché non lo riporti al 100%.',
-      invoke: 'Ctrl + per ingrandire, Ctrl - per rimpicciolire, Ctrl 0 per tornare al 100%; oppure tieni Ctrl e usa la rotella, o pizzica sul trackpad. In alternativa un clic sulla rotella entra in modalità zoom: la rotella da sola ingrandisce e rimpicciolisce, e un badge in alto mostra la percentuale, che puoi anche scrivere a mano.',
+      invoke: 'Ctrl + per ingrandire, Ctrl - per rimpicciolire, Ctrl 0 per tornare al 100%; oppure tieni Ctrl e usa la rotella, o pizzica sul trackpad. A ogni cambio, in alto compare per qualche secondo un badge con la percentuale: puoi anche scriverci dentro il valore che vuoi (passaci sopra il puntatore e resta lì finché lo usi). In alternativa un clic sulla rotella entra in modalità zoom: la rotella da sola ingrandisce e rimpicciolisce, e lì il badge resta finché non esci.',
       doesNot: 'Non cambia la dimensione della barra delle schede di Filo: per quella c’è la dimensione del testo nelle impostazioni. Nell’editor di testo lo zoom scala il foglio del documento, non la finestra.',
     },
     {
