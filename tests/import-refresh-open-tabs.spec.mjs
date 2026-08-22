@@ -24,8 +24,6 @@ const { buildExportZip } = require('../src/main/services/exportData.js');
 
 // Pianta un marcatore sulla pagina: se sopravvive all'import, la scheda si è
 // riallineata da sé invece di ricaricarsi.
-const MARK = () => 'window.__filoNoReload = 1';
-
 async function stampNoReloadMark(page) {
   await page.evaluate(() => { window.__filoNoReload = 1; });
 }
