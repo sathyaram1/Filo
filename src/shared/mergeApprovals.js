@@ -104,10 +104,14 @@
    * email"), che è l'informazione vera: la richiesta è arrivata da una sessione
    * autenticata di cui non si conosce l'intestatario.
    */
-  function requestedBy(who) {
+  function requestedBy(who, req) {
     var s = String(who == null ? '' : who).trim().slice(0, 120);
     if (!s) return 'chi l’ha chiesta non risulta';
     if (s.indexOf('@') > 0) return 'chiesta da ' + s;
+    // Un'automazione un'email non ce l'ha e non l'avrà mai: quello che il
+    // server manda è il ruolo che stava lavorando, e quello SÌ dice qualcosa a
+    // chi decide. Dirgli "un accesso senza email" sarebbe vero e inutile.
+    if (originOf(req) === 'routine') return 'chiesta da ' + s;
     return 'chiesta da un accesso senza email';
   }
 
@@ -250,7 +254,7 @@
     head.appendChild(sha);
     // Chi ha chiesto: il dato arriva dal server e senza di lui la separazione
     // fra chi chiede e chi approva resta a metà.
-    var who = el('span', 'sn-mac-who', requestedBy(req.who));
+    var who = el('span', 'sn-mac-who', requestedBy(req.who, req));
     who.title = 'La richiesta è arrivata con questa identità; approvarla è un gesto tuo, qui.';
     head.appendChild(who);
     var when = el('span', 'sn-mac-when', timeAgo(req.createdAtMs, now));
@@ -420,7 +424,7 @@
       li.appendChild(el('span', 'sn-mac-recent-what', esito));
       // La traccia serve a rispondere a "chi, cosa, quando": senza il chi
       // risponde a due domande su tre.
-      li.appendChild(el('span', 'sn-mac-recent-who', requestedBy(r.who)));
+      li.appendChild(el('span', 'sn-mac-recent-who', requestedBy(r.who, r)));
       li.appendChild(el('span', 'sn-mac-recent-when', timeAgo(r.decidedAtMs || r.expiresAtMs, now)));
       li.dataset.outcome = esito;
       ul.appendChild(li);
