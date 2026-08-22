@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.198', date: '2026-08-22',
+      features: [],
+      fixes: [
+        'Quando ingrandisci con Ctrl + / Ctrl - o tenendo Ctrl con la rotella, in alto compare per qualche secondo la percentuale di zoom: prima si vedeva solo entrando in modalità zoom col clic sulla rotella. Ci puoi anche scrivere dentro la percentuale che vuoi. Nell\'editor, la percentuale del foglio compare in basso a sinistra.',
+      ],
+    },
+    {
       version: '0.2.196', date: '2026-08-08',
       features: [
         'Nuova pagina «Trasparenza»: quali modelli AI usa Filo e perché, con le fonti. La trovi anche senza connessione, e puoi chiederne conto a Filo in chat.',
