@@ -342,8 +342,15 @@ if (isMain) {
   } else if (cmd === 'heartbeat') {
     // Il ciclo lo avvia dispatch, che passa il biglietto nell'ambiente: la riga
     // di comando di un processo la legge chiunque sulla macchina.
-    const biglietto = args[0] || readTicket(ROOT);
-    if (!biglietto) { console.error('guasto: nessun biglietto'); process.exit(3); }
+    let biglietto = args[0];
+    if (!biglietto) {
+      const { readTicket } = await import('./lib/routine-ticket.mjs');
+      biglietto = readTicket(resolve(fileURLToPath(new URL('..', import.meta.url))));
+    }
+    if (!biglietto) {
+      console.error('Nessun biglietto: non c’è nessun semaforo da tenere vivo.');
+      process.exit(3);
+    }
     if (!flags.includes('--loop')) {
       const r = await heartbeat(biglietto);
       if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
