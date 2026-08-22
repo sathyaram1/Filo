@@ -82,7 +82,7 @@ async function stubApprovals(page, { admin = true, pending = [], recent = [], ap
       if (t === 'auth_status') return { ok: true, signedIn: cfg.admin, isAdmin: cfg.admin, profile: null };
       if (t === 'merge_approvals_get') {
         if (!cfg.admin) return { ok: false, error: 'Operazione riservata agli amministratori.' };
-        return { ok: true, pending: cfg.pending, recent: cfg.recent, ttlMs: 30 * 60 * 1000 };
+        return { ok: true, pending: cfg.pending, recent: cfg.recent, ttlMs: 24 * 60 * 60 * 1000 };
       }
       if (t === 'merge_approval_approve') {
         window.__macCalls.push({ op: 'approve', id: msg.id });
