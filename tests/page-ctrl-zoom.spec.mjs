@@ -344,6 +344,7 @@ test('filo://editor: Ctrl + mostra la percentuale del foglio', async ({ openTab 
   await expect(pill).toBeVisible();
   await expect(pill).toHaveText(/zoom\s*110\s*%/);
   await expect(pill).toHaveClass(/show/);
+  await page.screenshot({ path: 'tests/.shots/editor-zoom-pill.png' });
 
   // Sparisce da sola.
   await expect(pill).not.toHaveClass(/show/, { timeout: 8000 });
