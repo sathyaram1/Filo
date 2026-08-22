@@ -7,13 +7,19 @@
 //   ramo principale. Quella superficie deve rispettare quattro cose:
 //
 //     1. l'owner con una richiesta in attesa la trova nella PRIMA SCHERMATA,
-//        senza cercarla;
+//        senza cercarla — e ANCHE SE quella schermata era già aperta: prima
+//        l'elenco si leggeva solo all'apertura, quindi l'avviso di cui parla il
+//        terminale non compariva mai sotto gli occhi di chi lo aspettava;
 //     2. l'owner SENZA richieste non vede niente (la home non si rovina per
 //        una cosa che non c'è) — e la griglia resta quella di prima;
 //     3. un utente qualunque non la vede MAI, e il main gli risponde di no
-//        anche se prova a chiamare il comando a mano;
+//        anche se prova a chiamare il comando a mano; una scheda su un sito
+//        qualunque non riceve nemmeno l'avviso di aggiornamento (dice su cosa
+//        sta lavorando l'owner);
 //     4. i due cammini — prima schermata e Gestione → Automazioni — fanno la
-//        STESSA cosa: stesse informazioni, stessi bottoni, stesso effetto.
+//        STESSA cosa: stesse informazioni, stessi bottoni, stesso effetto;
+//     5. la scheda dice CHI ha chiesto la fusione: è la superficie che serve a
+//        separare chi chiede da chi approva.
 //
 //   In più: approvare non parte al primo click (è irreversibile), e "Scarta"
 //   toglie la richiesta senza fondere niente.
