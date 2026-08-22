@@ -212,14 +212,19 @@
       }
       if (it.type === 'inline') {
         const el = document.createElement('div');
-        el.className = 'sn-menu-inline';
-        if (it.content) el.textContent = it.content;
+        renderInline(el, it, { state: 'loading', text: it.content || '' });
         root.appendChild(el);
         if (typeof it.onMount === 'function') {
-          try {
-            const cleanup = it.onMount(el);
-            if (typeof cleanup === 'function') cleanups.push(cleanup);
-          } catch (e) { console.error(e); }
+          mounts.push(() => {
+            const update = (props) => {
+              if (!el.parentElement) return;
+              renderInline(el, it, props || {});
+            };
+            try {
+              const cleanup = it.onMount(el, update);
+              if (typeof cleanup === 'function') cleanups.push(cleanup);
+            } catch (e) { console.error(e); }
+          });
         }
         continue;
       }
