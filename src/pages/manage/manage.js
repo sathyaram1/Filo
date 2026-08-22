@@ -229,7 +229,10 @@
   // dello stesso tipo, poi per clientId così lo stesso mittente resta unito).
   // Le automazioni restano raggruppate fra loro (e fra owner/utente e Filo, come
   // prima); dentro il gruppo l'ordine va dal lavoro sul codice all'esplorazione.
-  const AUTHOR_RANK = { owner: 0, user: 1, worker: 2, verifier: 3, residuo: 4, prober: 5, claude: 6, filo: 7 };
+  // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
+  // Claude — la sessione locale in testa, perché è quella che lavora insieme
+  // all'owner — e in fondo Filo che scrive per conto di un utente.
+  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
