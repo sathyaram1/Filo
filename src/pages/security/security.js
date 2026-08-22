@@ -168,7 +168,6 @@
         // altre già aperte: prima qui si ricaricava la pagina intera dopo 1,2s,
         // che rileggeva sì le impostazioni ma portava via anche il messaggio
         // "Importazione completata" prima che si finisse di leggerlo.
-        setTimeout(() => location.reload(), 1200); // TEMP verifica rosso
       } else {
         showImportHint(I18n.t('security_import_fail'), true);
       }
