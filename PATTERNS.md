@@ -392,9 +392,9 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   suona. Regola: **ogni** famiglia ha il suo ripiego "sotto il punto cliccato"
   (`elementsFromPoint`), non solo il media; e due elementi impilati si tengono
   insieme quando occupano **lo stesso rettangolo** (`sameCardArea`: dentro il
-  link, oppure almeno metà del media dentro il riquadro del link). È quella
-  misura — non la parentela nel DOM — a distinguere la scheda vera dal video di
-  sfondo a tutta pagina che si trova per caso un link sotto il cursore.
+  link, oppure almeno metà del media dentro il riquadro del link). A distinguere
+  la scheda vera dal video di sfondo a tutta pagina che si trova per caso un link
+  sotto il cursore è quella misura, non la parentela nel DOM.
 - **`closest()` si ferma al confine di un componente web.** `realTarget` con
   `composedPath()[0]` ti dà l'elemento vero dentro lo shadow root, ma da lì la
   risalita non vede più gli antenati in chiaro: un `<video>` in un componente
