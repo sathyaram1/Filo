@@ -104,6 +104,10 @@ async function giro(rispostaLavoro) {
           FILO_ROUTINES_ENABLED: '1',
           // La chiave NON deve servire: se servisse, questo test lo direbbe.
           FILO_FEEDBACK_PRIVKEY: '',
+          // Col biglietto dispatch avvia il battito in sottofondo, che è
+          // staccato apposta per sopravvivergli: qui lascerebbe un processo per
+          // ogni caso di prova. Il battito ha un test suo (routineBeat).
+          FILO_NO_BEAT: '1',
         },
       });
       let so = ''; let se = '';
