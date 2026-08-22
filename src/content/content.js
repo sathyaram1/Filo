@@ -664,9 +664,11 @@
     const target = realTarget(mouseEvent);
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
-    const linkEl = target?.closest?.('a[href]');
-    const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
+    const linkEl = closestAcrossShadow(target, 'a[href]');
+    const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
     const { mediaEl, mediaUnder } = findMedia(target, mouseEvent.clientX, mouseEvent.clientY);
+    // Ripiego cercato solo se il collegamento non è già fra gli antenati.
+    const linkUnder = linkEl ? null : findLinkUnder(mouseEvent.clientX, mouseEvent.clientY);
     const editable = isEditable(target);
     // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
     // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
