@@ -4224,6 +4224,17 @@
     });
   } catch (_) {}
 
+  // #442 — un'importazione da backup ha rimesso dentro i documenti: stessa
+  // rilettura dell'aggiornamento live. `reloadFromArchive` fonde e rispetta il
+  // documento aperto con modifiche non salvate, quindi non porta via niente di
+  // ciò che si sta scrivendo.
+  try {
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { reloadFromArchive(); },
+      [COLLECTION_KEY, VERSIONS_KEY, TRASH_KEY],
+    );
+  } catch (_) {}
+
   // Hook di test/integrazione per lo storico versioni (usato dagli spec e da chi
   // costruirà la UI di storico sopra a questo). Espone la lista e il ripristino.
   window.__filoEditorVersions = {
