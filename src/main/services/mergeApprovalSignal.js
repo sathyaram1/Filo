@@ -26,9 +26,9 @@
 //   Il campanello può non suonare: Filo era chiuso quando è arrivata la
 //   richiesta, la cartella temporanea è stata ripulita, un domani un'altra
 //   strada apre richieste dal server. Per quei casi c'è il RIENTRO IN FINESTRA
-//   (`browser-window-focus`): quando l'owner torna su Filo si rilegge, al
-//   massimo una volta al minuto. È guidato dall'attenzione di una persona, non
-//   da un orologio: chi resta sulla home per ore non genera nemmeno una
+//   (`browser-window-focus`): quando l'owner torna su Filo si rilegge, non più
+//   di una volta ogni cinque minuti. È guidato dall'attenzione di una persona,
+//   non da un orologio: chi resta sulla home per ore non genera nemmeno una
 //   chiamata, e chi torna dal terminale trova l'avviso già lì.
 //
 // QUESTO CAMPANELLO NON DÀ POTERI A NESSUNO
