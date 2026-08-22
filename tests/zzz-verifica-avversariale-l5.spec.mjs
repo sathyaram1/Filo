@@ -171,6 +171,35 @@ test('niente richieste = niente avviso', async ({ openTab }) => {
   await expect(page.locator('#mgMergeApprovals')).toBeHidden();
 });
 
+test('anche sul tema scuro si legge', async ({ openTab }) => {
+  const page = await apri(openTab, { pending: [ROUTINE, LOCALE] });
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: 'tests/agent/.out/verifica-l5-scuro.png' });
+  await expect(page.locator('#mgMergeApprovals .sn-mac-origin').first()).toBeVisible();
+});
+
+test('la prima schermata mostra le stesse richieste', async ({ openTab }) => {
+  const page = await openTab('filo://dashboard/dashboard.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__filoDashActions && window.__filoDashActions.refreshMergeApprovals);
+  await page.evaluate(({ pending }) => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = (msg) => {
+      const t = msg && msg.type;
+      if (t === 'auth_status') return Promise.resolve({ ok: true, signedIn: true, isAdmin: true, email: 'o@x.it' });
+      if (t === 'merge_approvals_get') return Promise.resolve({ ok: true, pending, recent: [], ttlMs: 86400000 });
+      return orig(msg);
+    };
+  }, { pending: [ROUTINE, LOCALE] });
+  await page.evaluate(() => window.__filoDashActions.refreshAccountControl());
+  await page.evaluate(() => window.__filoDashActions.refreshMergeApprovals());
+  const cards = page.locator('#mergeApprovals .sn-mac-card');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0).locator('.sn-mac-origin')).toHaveText('automazione · feedback #512');
+  await page.screenshot({ path: 'tests/agent/.out/verifica-l5-home.png' });
+});
+
 test('le decisioni passate mostrano anche quelle delle automazioni', async ({ openTab }) => {
   const page = await apri(openTab, {
     pending: [],
