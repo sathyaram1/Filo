@@ -415,6 +415,7 @@
             : r.used ? 'approvata'
               : 'scaduta senza risposta';
       var li = el('li', 'sn-mac-recent-row');
+      li.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
       li.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
       li.appendChild(el('span', 'sn-mac-recent-what', esito));
       // La traccia serve a rispondere a "chi, cosa, quando": senza il chi
@@ -434,6 +435,10 @@
     expiresIn: expiresIn,
     headline: headline,
     requestedBy: requestedBy,
+    originOf: originOf,
+    originLabel: originLabel,
+    originHint: originHint,
+    howToRetry: howToRetry,
     blockLabel: blockLabel,
     blockItems: blockItems,
     outcomeMessage: outcomeMessage,
