@@ -272,9 +272,11 @@
               }
               renderCorrection(wrap, { ...it, ...newProps }, cleanups);
             };
-            const cleanup = it.onMount(wrap, update);
-            if (typeof cleanup === 'function') cleanups.push(cleanup);
-          } catch (e) { console.error(e); }
+            try {
+              const cleanup = it.onMount(wrap, update);
+              if (typeof cleanup === 'function') cleanups.push(cleanup);
+            } catch (e) { console.error(e); }
+          });
         }
 
         root.appendChild(wrap);
