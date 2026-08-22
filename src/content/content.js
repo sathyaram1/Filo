@@ -1198,9 +1198,11 @@
       // non è fra gli antenati e finisce in `mediaUnder`. Per chi guarda è lo
       // stesso identico filmato dentro lo stesso identico link: il menu deve
       // essere lo stesso del ramo qui sopra, overlay o non overlay. Solo se il
-      // filmato sta DENTRO il collegamento, però: un video di sfondo sotto a un
-      // link che non c'entra niente non deve intrufolarsi nel menu.
-      const mediaInLink = (mediaUnder && linkEl.contains?.(mediaUnder)) ? mediaUnder : null;
+      // filmato è DAVVERO quello della scheda, però: un video di sfondo sotto a
+      // un link che non c'entra niente non deve intrufolarsi nel menu — ed è
+      // esattamente ciò che distingue `sameCardArea` (dentro il link, oppure
+      // sotto e con lo stesso rettangolo) da "un filmato qualsiasi lì sotto".
+      const mediaInLink = (mediaUnder && sameCardArea(mediaUnder, linkEl)) ? mediaUnder : null;
       if (mediaInLink) {
         for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
         items.push({ type: 'separator' });
