@@ -1949,6 +1949,7 @@ const handlerCtx = {
   winOf,
   filoWin,
   broadcastToTabs,
+  broadcastToFiloPages,
   broadcastLiveUpdate,
   getEffectiveSettings,
   withDefaults,
