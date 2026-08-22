@@ -112,7 +112,16 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
   // sulla macchina di casa.
   if (String(process.env.FILO_NO_BEAT || '') === '1') return { started: false, why: 'disabled' };
 
-  if (beatIsLive(readBeat(root), t, { now, alive })) return { started: false, why: 'already_live' };
+  const vecchio = readBeat(root);
+  if (beatIsLive(vecchio, t, { now, alive })) return { started: false, why: 'already_live' };
+  // Un battito rimasto acceso su un ALTRO biglietto va spento ADESSO: fra una
+  // riga il marcatore viene sovrascritto, e da quel momento nessuno saprebbe
+  // più come raggiungerlo mentre lui continua a tenere vivo un semaforo che non
+  // serve a nessuno. (I lavoratori sono uno alla volta per costruzione: un
+  // biglietto nuovo in questa cartella vuol dire che il precedente ha finito.)
+  if (vecchio && String(vecchio.ticket || '') !== t && alive(vecchio.pid)) {
+    try { process.kill(Number(vecchio.pid)); } catch (_) { /* già morto */ }
+  }
 
   try {
     const script = resolve(HERE, '..', 'routine-channel.mjs');
