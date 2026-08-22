@@ -76,9 +76,11 @@ const FBS_ORIGINI = [
   { _id: 'W', seq: 51, subSeq: 0, priority: 0, name: 'Sviluppo',     clientId: 'routine:new-work', createdAt: '2026-08-05T11:00:00Z' },
   { _id: 'V', seq: 52, subSeq: 0, priority: 0, name: 'Verifica',     clientId: 'routine:verifier', createdAt: '2026-08-05T12:00:00Z' },
   { _id: 'F', seq: 53, subSeq: 0, priority: 0, name: 'Da Filo',      clientId: 'filo:chat',        createdAt: '2026-08-05T13:00:00Z' },
+  // La sessione locale: Claude che lavora sulla macchina dell'owner.
+  { _id: 'L', seq: 54, subSeq: 0, priority: 0, name: 'Sessione locale', clientId: 'local:claude',  createdAt: '2026-08-05T14:00:00Z' },
 ];
 
-test('le tre automazioni e Filo-per-conto-di-un-utente si distinguono in lista', async ({ openTab }) => {
+test('le tre automazioni, la sessione locale e Filo-per-conto-di-un-utente si distinguono in lista', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
@@ -86,21 +88,49 @@ test('le tre automazioni e Filo-per-conto-di-un-utente si distinguono in lista',
     window.__mgTest.setData(fbs);
     window.__mgTest.setTab('inbox');
   }, FBS_ORIGINI);
-  await expect(page.locator('.mg-item')).toHaveCount(4);
+  await expect(page.locator('.mg-item')).toHaveCount(5);
 
   const iconOf  = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`).textContent();
   const titleOf = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`).getAttribute('title');
 
-  // Quattro icone DIVERSE: è il punto: nessuna coppia deve collassare.
-  const icons = [await iconOf('P'), await iconOf('W'), await iconOf('V'), await iconOf('F')];
-  expect(new Set(icons).size).toBe(4);
-  expect(icons).toEqual(['🔍', '🔧', '🧪', '🧵']);
+  // Cinque icone DIVERSE: è il punto: nessuna coppia deve collassare.
+  const icons = [await iconOf('P'), await iconOf('W'), await iconOf('V'), await iconOf('F'), await iconOf('L')];
+  expect(new Set(icons).size).toBe(5);
+  expect(icons).toEqual(['🔍', '🔧', '🧪', '🧵', '💻']);
 
   // E l'etichetta dice quale mestiere, non solo "Claude".
   expect(await titleOf('P')).toContain('esplorazione');
   expect(await titleOf('W')).toContain('sviluppo');
   expect(await titleOf('V')).toContain('verifica');
   expect(await titleOf('F')).toContain('per conto di un utente');
+  expect(await titleOf('L')).toContain('sessione locale');
+});
+
+// La provenienza nuova: un feedback aperto da una sessione locale non deve
+// arrivare in dashboard come "un utente qualunque" (che è ciò che succedeva
+// depositandolo dalla strada dell'app) né confondersi con l'esploratore o con
+// le automazioni in cloud. Senza il ramo dedicato l'icona torna 👤 e l'etichetta
+// "Utente": entrambi gli assert diventano rossi.
+test('un feedback della sessione locale si legge come tale, non come utente né come automazione', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
+  await page.evaluate((fbs) => {
+    window.__mgTest.setData(fbs);
+    window.__mgTest.setTab('inbox');
+  }, FBS_ORIGINI);
+
+  const author = page.locator('.mg-item[data-id="L"] .mg-item-author');
+  await expect(author).toHaveText('💻');
+  await expect(author).toHaveAttribute('title', 'Scritto da: Claude (sessione locale)');
+
+  // Anche l'intestazione del dettaglio dichiara la provenienza (e non mostra
+  // un pezzo di identificativo grezzo, che è il trattamento riservato agli
+  // utenti esterni).
+  await page.locator('.mg-item[data-id="L"]').click();
+  const link = page.locator('#senderLink');
+  await expect(link).toHaveText('💻 Claude (sessione locale)');
+  await expect(link).toHaveAttribute('title', 'local:claude');
 });
 
 test('l’intestazione del dettaglio dice CHI ha scritto, non l’identificativo grezzo', async ({ openTab }) => {

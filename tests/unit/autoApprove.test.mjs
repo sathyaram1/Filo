@@ -42,6 +42,29 @@ test('le tre istanze di Claude sono un gruppo solo', () => {
   assert.equal(TH.autoApproveGroup('routine:secaudit'), g);
 });
 
+// ── La decisione sulla sessione locale, presa apposta ────────────────────────
+// Un feedback aperto da una sessione locale ENTRA IN CODA DA SOLO (quando
+// l'automatica è accesa e l'interruttore "Claude" è su). È accettabile perché
+// il giudizio dei giudici gira comunque — l'auto-approvazione salta
+// l'approvazione manuale dell'owner, non i controlli — e perché è una manopola
+// che l'owner spegne dalla dashboard quando vuole: un default comodo e
+// revocabile, non un privilegio.
+//
+// Se un giorno la decisione cambia, questo test deve cambiare INSIEME alla
+// scelta, non sparire in silenzio. Gemello del test in filo-security
+// (functions/test/autoApprove.test.js).
+test('sessione locale: entra in coda da sola — DECISIONE, non inerzia', () => {
+  assert.equal(TH.autoApproveGroup('local:claude'), 'claude');
+  const acceso = { enabled: true, autoApprove: { owner: true, filo: true, claude: true, user: false } };
+  assert.equal(TH.autoApproveAllowed('local:claude', acceso), true);
+  // …e la manopola che la revoca esiste: è l'interruttore "Claude".
+  const spento = { enabled: true, autoApprove: { owner: true, filo: true, claude: false, user: true } };
+  assert.equal(TH.autoApproveAllowed('local:claude', spento), false,
+    'spegnere il gruppo claude deve fermare anche la sessione locale');
+  // E il master spegne tutto, sessione locale compresa.
+  assert.equal(TH.autoApproveAllowed('local:claude', { enabled: false, autoApprove: { claude: true } }), false);
+});
+
 test('interruttore master spento: nessuno entra in coda da solo', () => {
   const cfg = { enabled: false, autoApprove: { owner: true, filo: true, claude: true, user: true } };
   for (const id of ['owner:x', 'filo:x', 'routine:prober', 'tester']) {

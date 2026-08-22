@@ -89,12 +89,21 @@
     return list.map(serializeAttachment).filter(Boolean).join('\n');
   }
 
-  // true se il feedback è stato inviato da un modello (issue d'agente o
-  // sub-feedback creato da una routine): in quel caso anche la segnalazione
-  // originale è "lato Filo", non "lato utente".
+  // I prefissi di `clientId` che dicono "questo testo l'ha scritto un'istanza di
+  // Claude, non una persona". Tre, e restano TRE cose diverse (vedi authorKind):
+  //   agent:   l'agente esploratore che gira sull'app in cerca di problemi;
+  //   routine: le automazioni in cloud, col loro ruolo dopo i due punti;
+  //   local:   la sessione locale — Claude che lavora sulla macchina dell'owner,
+  //            in chat con lui. È la provenienza di chi apre un feedback da lì.
+  const MODEL_PREFIXES = ['agent:', 'routine:', 'local:'];
+
+  // true se il feedback è stato inviato da un modello (issue d'agente,
+  // sub-feedback creato da una routine, ritrovamento di una sessione locale):
+  // in quel caso anche la segnalazione originale è "lato Filo", non
+  // "lato utente".
   function isFromModel(clientId) {
     const c = String(clientId || '');
-    return c.startsWith('agent:') || c.startsWith('routine:');
+    return MODEL_PREFIXES.some(function (p) { return c.indexOf(p) === 0; });
   }
 
   // true se il feedback è un invio MANUALE dell'owner (admin loggato). L'identità
@@ -109,12 +118,14 @@
   //   owner:<id>     → 'owner'    invio manuale dell'admin loggato (verde)
   //   agent:<model>  → 'agent'    agente esploratore LLM (accento)
   //   routine:<slug> → 'routine'  audit automatico delle routine cloud (blu)
+  //   local:<slug>   → 'local'    sessione locale di Claude (viola)
   //   <altro>        → 'user'     alpha tester esterno (arancione)
   function originOf(clientId) {
     const c = String(clientId || '');
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
     if (c.startsWith('routine:')) return 'routine';
+    if (c.startsWith('local:')) return 'local';
     return 'user';
   }
 
@@ -131,6 +142,19 @@
   //                                      è nato mentre scriveva il codice
   //   …:verifier / :secaudit→ 'verifier' un'istanza che VERIFICA il lavoro di
   //                                      un'altra: parla del lavoro appena fatto
+  //   local:<qualsiasi>     → 'local'    la SESSIONE LOCALE: Claude che lavora
+  //                                      sulla macchina dell'owner, in chat con
+  //                                      lui. Categoria PROPRIA, non 'prober' e
+  //                                      non 'claude': quello che nasce lì nasce
+  //                                      da un lavoro fatto insieme all'owner —
+  //                                      contesto diverso sia dall'esploratore
+  //                                      (che gira da solo sull'app) sia dalle
+  //                                      automazioni in cloud (che girano senza
+  //                                      nessuno davanti). Se collassasse su una
+  //                                      delle due, leggendo la coda non si
+  //                                      saprebbe più da dove viene un
+  //                                      ritrovamento — ed è l'unica cosa che il
+  //                                      mittente serve a dire
   //   routine:residuo       → 'residuo'  i rilievi RESIDUI di una verifica: un
   //                                      lavoro promosso dopo N giri «migliorabile»
   //                                      (SPEC-RIDISEGNO-MAX.md §13) lascia i
@@ -162,6 +186,9 @@
     var c = String(clientId || '');
     if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
     if (c.indexOf('owner:') === 0) return 'owner';
+    // La sessione locale prima del ramo agent/routine: non ha ruoli dopo i due
+    // punti da mappare, è una categoria sola.
+    if (c.indexOf('local:') === 0) return 'local';
     if (c.indexOf('agent:') === 0 || c.indexOf('routine:') === 0) {
       var role = c.slice(c.indexOf(':') + 1).trim().toLowerCase();
       return ROLE_KIND[role] || 'claude';
@@ -184,11 +211,27 @@
   function autoApproveGroup(clientId) {
     var k = authorKind(clientId);
     if (k === 'owner' || k === 'filo' || k === 'user') return k;
-    // prober | worker | verifier | residuo | claude. Il `residuo` cade in
-    // `claude` per DECISIONE, non per inerzia (SPEC-RIDISEGNO-MAX.md §13): è
-    // un'automazione dell'owner come le altre tre, quindi stesso trattamento
-    // (l'interruttore "claude" dell'auto-approvazione decide se entra in coda
-    // da solo). Un test la inchioda su entrambi i repo.
+    // prober | worker | verifier | residuo | local | claude.
+    //
+    // Il `residuo` cade in `claude` per DECISIONE, non per inerzia
+    // (SPEC-RIDISEGNO-MAX.md §13): è un'automazione dell'owner come le altre
+    // tre, quindi stesso trattamento.
+    //
+    // `local` (la sessione locale) cade in `claude` per DECISIONE PRESA
+    // APPOSTA dall'owner, non perché sia caduta qui da sola. COSA SUCCEDE: un
+    // feedback aperto da una sessione locale, se i giudici lo dichiarano
+    // sicuro, entra in coda da solo senza che l'owner lo approvi a mano.
+    // PERCHÉ VA BENE: (1) il giudizio gira comunque — l'auto-approvazione
+    // salta l'approvazione manuale, non i controlli di sicurezza; (2) è una
+    // manopola, non un privilegio: l'interruttore "Claude" della tab
+    // Automazioni la spegne quando l'owner vuole. Cioè un default comodo e
+    // revocabile, non una porta che resta aperta.
+    // Conseguenza da conoscere: quell'interruttore è lo STESSO delle
+    // automazioni in cloud — spegnerlo spegne entrambe. Distinguere la
+    // provenienza (authorKind, sopra) e distinguere la FIDUCIA sono due assi
+    // diversi: sul secondo la sessione locale e le automazioni in cloud sono
+    // la stessa cosa, i processi dell'owner.
+    // Un test la inchioda su entrambi i repo.
     return 'claude';
   }
 
@@ -524,6 +567,11 @@
     isFromOwner,
     originOf,
     authorKind,
+    // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
+    // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
+    // possano divergere su una stringa copiata a mano.
+    LOCAL_CLIENT_ID: 'local:claude',
+    MODEL_PREFIXES,
     // Auto-approvazione per mittente (#446). La LOGICA è specchiata nel backend
     // di sicurezza (filo-security: functions/src/autoApprove.js), che è l'unico
     // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.

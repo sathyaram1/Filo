@@ -81,8 +81,13 @@ DB3 esistente), poi "Risolti".
 da `unlabeled`. Solo le routine (via coda triage) muovono `todo→working→revision_*→done`
 e `revision_*→design(loop)`. Transizioni non elencate = illegali: il writer le rifiuta.
 
-**Mittenti fidati** (`owner:`/`routine:`/`agent:`): mai `attack`/`spam`; se un livello
-identità li flagga è un errore → `unlabeled` per ri-giudizio.
+**Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:`): mai `attack`/`spam`; se un
+livello identità li flagga è un errore → `unlabeled` per ri-giudizio. `local:` è la
+**sessione locale**: Claude che lavora sulla macchina dell'owner, in chat con lui (lo
+strumento che apre un feedback da lì è `npm run feedback:apri`). In dashboard è una
+categoria d'autore PROPRIA — né agente esploratore né automazione cloud: il contesto in
+cui nasce un ritrovamento è diverso da entrambi, ed è l'unica cosa che il mittente serve
+a dire.
 
 **Aggiornamento 2026-08-19 (smontaggio sotto-feedback, SPEC-RIDISEGNO-MAX.md §1).**
 L'estensione `todo→done` / `working→done` (attore routine), introdotta in F3 per il
@@ -112,6 +117,13 @@ dalla dashboard (azione bulk `aligned→todo`, da aggiungere alla UI).
 nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti, come prima che esistesse.
 La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackThread.js`
 (dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
+
+I gruppi sono QUATTRO e le categorie d'autore sono di più: `claude` raccoglie tutte le
+istanze di Claude (esplorazione, sviluppo, verifica, rilievo residuo **e la sessione
+locale**). Provenienza e fiducia sono due assi diversi: la dashboard distingue da dove
+nasce un ritrovamento, l'auto-approvazione decide di chi ci si fida — e su quel secondo
+asse le istanze dell'owner sono la stessa cosa. Conseguenza pratica: l'interruttore
+"Claude" spegne insieme le automazioni in cloud e la sessione locale.
 
 ## 5. Chat del feedback distingue i sotto-casi di `design`
 
