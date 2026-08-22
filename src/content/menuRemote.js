@@ -318,9 +318,12 @@
     // Le sezioni che chiedono qualcosa al modello partono SOLO quando la pagina
     // conferma di aver disegnato il menu: se non ce l'ha fatta ricadiamo sul
     // menu locale, e la spiegazione non deve essere chiesta (e pagata) due volte.
+    // Il tetto è basso di proposito: è il tempo massimo in cui l'utente resta
+    // senza menu se la pagina non risponde (di solito risponde in un paio di
+    // millisecondi). Scaduto, il menu si apre qui.
     state.timer = setTimeout(() => {
       if (owned === state && !state.ready && !state.done) giveUp(state);
-    }, 1500);
+    }, 1000);
 
     return true;
   }
