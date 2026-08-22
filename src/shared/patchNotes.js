@@ -18,7 +18,7 @@
     {
       version: '0.2.198', date: '2026-08-22',
       fixes: [
-        'Nelle home dei siti video e dei social, quando passando il mouse su una scheda parte l\'anteprima animata, il tasto destro continua a offrire le azioni sul collegamento — «Apri in nuova tab», «Copia URL», «Salva link per dopo», «Condividi link» — invece delle sole azioni sul filmato: non serve più spostare il mouse e aspettare che l\'anteprima finisca.',
+        'Quando passi il mouse su una scheda di un sito di video o di un social e parte l\'anteprima animata, il tasto destro ti dà anche le azioni sul collegamento («Apri in nuova tab», «Copia URL», «Salva link per dopo», «Condividi link»), non più le sole azioni sul filmato. Non devi più spostare il mouse e aspettare che l\'anteprima finisca per aprire la scheda in una nuova scheda.',
       ],
     },
     {
