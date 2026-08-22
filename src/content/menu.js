@@ -44,7 +44,9 @@
       window.removeEventListener('resize', activeMenu.onScroll, true);
       try { activeMenu.cleanupZoom?.(); } catch (_) {}
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
+      const notify = activeMenu.onClose;
       activeMenu = null;
+      if (typeof notify === 'function') { try { notify(); } catch (_) {} }
     }
     // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
     dropZones.length = 0;
