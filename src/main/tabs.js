@@ -1809,6 +1809,10 @@ class TabManager {
       try {
         const f = params.frame;
         if (f && !f.detached && f !== wc.mainFrame) {
+          // Timbro dell'ultimo click destro in questo riquadro: il ponte lo
+          // pretende prima di lasciar disegnare un menu sulla pagina. Un menu
+          // che compare senza che nessuno abbia cliccato non è un menu.
+          wc._filoLastContextMenu = { frame: f, t: Date.now() };
           const type = globalThis.SN_MSG?.MSG?.FRAME_VIEW_POS || 'frame_view_pos';
           // `params.x/y` sono in pixel della scheda NON ingrandita; i frame
           // ragionano in pixel CSS, che con lo zoom di pagina sono un'altra
