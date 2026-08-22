@@ -292,6 +292,7 @@ test('Ctrl +: il badge resta finché il puntatore ci sta sopra', async ({ openTa
 
   await page.waitForTimeout(3500); // oltre il doppio dell'attesa di sparizione
   await expect(badge).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/ctrl-zoom-badge.png' });
 
   // Spostato il puntatore, riparte e sparisce.
   await page.mouse.move(400, 400);
