@@ -111,6 +111,19 @@ async function apriHome(page, opts) {
   await page.evaluate(() => window.__filoDashActions.refreshAccountControl());
 }
 
+/**
+ * Gestione, SENZA passare dalla tab Automazioni: l'avviso vive sopra le schede,
+ * quindi si deve vedere da qualunque scheda si stia guardando.
+ */
+async function apriGestione(page, opts) {
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await stubApprovals(page, opts);
+  await page.evaluate((admin) => window.__mgTest.setAdmin(admin), opts?.admin !== false);
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+}
+
 async function apriAutomazioni(page, opts) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
@@ -457,4 +470,77 @@ test('Gestione elenca le decisioni già prese: un’eccezione deve lasciare trac
   const home = await openTab(NEWTAB);
   await apriHome(home, { pending: [], recent: [richiesta({ used: true, outcome: 'merged' })] });
   await expect(home.locator('#mergeApprovals')).toBeHidden();
+});
+
+
+// ── 6. Le due provenienze, nello stesso posto e in cima ─────────────────────
+//
+// Il blocco di sicurezza ferma sia il lavoro locale sia quello di
+// un'automazione. Prima solo il primo diventava una richiesta approvabile: il
+// secondo moriva in una nota dentro una segnalazione, e quel ramo restava fermo
+// per sempre. Adesso finiscono nello stesso elenco — che però deve stare DOVE
+// SI VEDE (sopra le schede, non dentro una di esse) e deve dire quale delle due
+// si sta guardando: approvare lavoro scritto da un'automazione a partire dal
+// testo di uno sconosciuto non è lo stesso gesto che approvare il proprio.
+
+test('Gestione: l’avviso sta sopra le schede e si vede senza cercarlo', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, { pending: [richiesta()] });
+
+  const avviso = page.locator('#mgMergeApprovals .sn-mac');
+  await expect(avviso).toBeVisible({ timeout: 8_000 });
+  // Si vede restando sulla scheda di partenza: non serve andare in Automazioni.
+  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveClass(/mg-tab--active/);
+
+  // E sta PRIMA della barra delle schede, non sotto.
+  const suo = await avviso.boundingBox();
+  const schede = await page.locator('#mgTabs').boundingBox();
+  expect(suo.y + suo.height).toBeLessThanOrEqual(schede.y + 1);
+});
+
+test('una fusione fermata a un’automazione si riconosce da quella locale', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, {
+    pending: [
+      richiesta({ id: 'aa11bb22cc33aa11bb22cc33', origin: 'routine', num: '412', who: 'secaudit · notturna', branch: 'claude/feedback-412' }),
+      richiesta({ id: 'bb22cc33dd44bb22cc33dd44', origin: 'locale', who: 'sathya@esempio.it' }),
+    ],
+  });
+
+  const automazione = page.locator('#mgMergeApprovals .sn-mac-card[data-origin="routine"]');
+  const locale = page.locator('#mgMergeApprovals .sn-mac-card[data-origin="locale"]');
+  await expect(automazione).toBeVisible({ timeout: 8_000 });
+  await expect(locale).toBeVisible();
+
+  // La provenienza si legge sulla scheda, e porta al numero della segnalazione.
+  await expect(automazione.locator('.sn-mac-origin')).toContainText(/automazione/i);
+  await expect(automazione.locator('.sn-mac-origin')).toContainText('412');
+  await expect(locale.locator('.sn-mac-origin')).not.toContainText(/automazione/i);
+
+  // …e si approva da lì, come quella locale: è il punto di tutta la modifica.
+  await automazione.locator('.sn-mac-btn-go').click();
+  await automazione.locator('.sn-mac-btn-go').click();
+  await expect
+    .poll(() => page.evaluate(() => window.__macCalls), { timeout: 8_000 })
+    .toEqual([{ op: 'approve', id: 'aa11bb22cc33aa11bb22cc33' }]);
+});
+
+test('una richiesta di un’automazione non manda l’owner a lanciare la pubblicazione locale', async ({ openTab }) => {
+  // Il consiglio sbagliato è peggio di nessun consiglio: quel comando pubblica
+  // il lavoro di QUESTO computer, e non c'entra niente con un ramo scritto da
+  // un'automazione.
+  const page = await openTab(MANAGE);
+  await apriGestione(page, {
+    pending: [richiesta({ origin: 'routine', num: '412' })],
+    approveReply: { ok: true, result: 'stale', headSha: 'f'.repeat(40) },
+  });
+
+  const card = page.locator('#mgMergeApprovals .sn-mac-card');
+  await expect(card).toBeVisible({ timeout: 8_000 });
+  await card.locator('.sn-mac-btn-go').click();
+  await card.locator('.sn-mac-btn-go').click();
+
+  const esito = card.locator('.sn-mac-status');
+  await expect(esito).toBeVisible({ timeout: 8_000 });
+  await expect(esito).not.toContainText('npm run finish');
 });

@@ -11,21 +11,29 @@
 //   è cascati subito.
 //
 // PERCHÉ UN FILE E NON UN CONTROLLO A INTERVALLI
-//   Le richieste nascono in UN solo posto, e quel posto è QUESTA macchina:
-//   `npm run finish` chiede la fusione, il server la blocca e apre la
-//   richiesta. Non c'è nessun altro produttore (il cancello delle routine
-//   respinge e basta, non accoda). Quindi non serve chiedere "c'è qualcosa?"
-//   a ripetizione: basta che chi apre la richiesta lo dica, e lo può dire
-//   scrivendo un file.
+//   La richiesta che nasce QUI la annuncia chi la fa nascere: `npm run finish`
+//   chiede la fusione, il server la blocca e apre la richiesta, e il campanello
+//   suona nello stesso istante. Non serve chiedere "c'è qualcosa?" a
+//   ripetizione per una cosa che questa macchina sa già.
 //
 //   Il risultato è quello che serviva: ZERO traffico quando non c'è niente da
 //   mostrare — e l'owner tiene la home aperta per ore — e l'avviso che compare
 //   entro un istante quando invece c'è.
 //
+// LE RICHIESTE CHE NASCONO IN CLOUD (dal 2026-08-22)
+//   Da quando anche una fusione bloccata a un'automazione apre una richiesta,
+//   esiste un secondo produttore — e quello NON passa da questa macchina: la
+//   apre il server, mentre qui magari non c'è nessuno. Il campanello non può
+//   suonare per lui, e non si finge il contrario: quelle richieste compaiono
+//   col RIENTRO IN FINESTRA qui sotto, cioè appena l'owner torna su Filo.
+//   Il ritardo non è nel decidere ma nell'accorgersene, e l'owner se ne
+//   accorge quando guarda — che è il momento in cui potrebbe decidere.
+//
 // LA RETE DI SICUREZZA (e perché non è un controllo periodico)
 //   Il campanello può non suonare: Filo era chiuso quando è arrivata la
-//   richiesta, la cartella temporanea è stata ripulita, un domani un'altra
-//   strada apre richieste dal server. Per quei casi c'è il RIENTRO IN FINESTRA
+//   richiesta, la cartella temporanea è stata ripulita, oppure la richiesta
+//   l'ha aperta il server per un'automazione. Per quei casi c'è il RIENTRO IN
+//   FINESTRA
 //   (`browser-window-focus`): quando l'owner torna su Filo si rilegge, non più
 //   di una volta ogni cinque minuti. È guidato dall'attenzione di una persona,
 //   non da un orologio: chi resta sulla home per ore non genera nemmeno una

@@ -104,11 +104,45 @@
    * email"), che è l'informazione vera: la richiesta è arrivata da una sessione
    * autenticata di cui non si conosce l'intestatario.
    */
-  function requestedBy(who) {
+  function requestedBy(who, req) {
     var s = String(who == null ? '' : who).trim().slice(0, 120);
     if (!s) return 'chi l’ha chiesta non risulta';
     if (s.indexOf('@') > 0) return 'chiesta da ' + s;
+    // Un'automazione un'email non ce l'ha e non l'avrà mai: quello che il
+    // server manda è il ruolo che stava lavorando, e quello SÌ dice qualcosa a
+    // chi decide. Dirgli "un accesso senza email" sarebbe vero e inutile.
+    if (originOf(req) === 'routine') return 'chiesta da ' + s;
     return 'chiesta da un accesso senza email';
+  }
+
+  /**
+   * Da dove arriva il lavoro fermato. PURA.
+   *
+   * Le due provenienze finiscono nello STESSO elenco — un blocco che non si
+   * vede è un lavoro fermo per sempre — ma non sono la stessa cosa da leggere:
+   * il lavoro locale l'owner l'ha fatto con le sue mani, quello di
+   * un'automazione l'ha scritto un modello partendo dal testo di uno
+   * sconosciuto. Chi approva deve saperlo prima di dire di sì.
+   *
+   * Origine assente = `locale`: è il caso storico (le richieste esistevano
+   * solo per il finish locale), e va letto così, non come "non si sa".
+   */
+  function originOf(req) {
+    return String((req && req.origin) || '') === 'routine' ? 'routine' : 'locale';
+  }
+
+  /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
+  function originLabel(req) {
+    if (originOf(req) !== 'routine') return 'lavoro tuo, da questo computer';
+    var num = String((req && req.num) || '').trim();
+    return num ? 'automazione · feedback #' + num : 'automazione';
+  }
+
+  /** Cosa spiegare all'owner sulla provenienza, sotto il puntatore. PURA. */
+  function originHint(req) {
+    return originOf(req) === 'routine'
+      ? 'Questo ramo l’ha scritto un’automazione partendo da una segnalazione: guarda cosa è stato bloccato prima di approvarlo.'
+      : 'Questo ramo l’hai scritto tu su questo computer.';
   }
 
   /** Un blocco, in una riga leggibile. PURA. Un blocco senza frase si NOMINA lo stesso. */
@@ -130,16 +164,37 @@
   }
 
   /**
+   * Come si riottiene una richiesta che è decaduta. PURA.
+   *
+   * Dipende da CHI aveva chiesto la fusione, e sbagliarlo manda l'owner a
+   * lanciare un comando che non c'entra niente: il lavoro locale si ripropone
+   * da questo computer, quello di un'automazione no — lì la segnalazione torna
+   * in attesa di una sua decisione.
+   */
+  /** La prima lettera minuscola, per incastrare una frase dentro un'altra. PURA. */
+  function lowerFirst(text) {
+    var s = String(text || '');
+    return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+  }
+
+  function howToRetry(req) {
+    return originOf(req) === 'routine'
+      ? 'Il lavoro resta fermo e la segnalazione torna a te.'
+      : 'Rilancia npm run finish.';
+  }
+
+  /**
    * L'esito di un'approvazione, detto all'owner. PURA.
    *
    * Vale la stessa regola delle bolle di chat: mai il motivo tecnico lasciato
    * lì da interpretare, sempre cosa è successo e cosa fare adesso.
    */
-  function outcomeMessage(reply) {
+  function outcomeMessage(reply, req) {
     var r = reply || {};
+    var retry = howToRetry(req);
     if (r.ok === false || r.error) {
       var err = String(r.error || r.detail || r.reason || '');
-      if (/scadut/i.test(err)) return { kind: 'warn', text: 'La richiesta è scaduta: rilancia npm run finish e riapprova.' };
+      if (/scadut/i.test(err)) return { kind: 'warn', text: 'La richiesta è scaduta. ' + retry };
       if (/già stata usata|already_used/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era già stata usata.' };
       if (/scartat|discarded/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era stata scartata.' };
       if (/non esiste|not_found/i.test(err)) return { kind: 'warn', text: 'Questa richiesta non c’è più.' };
@@ -148,8 +203,15 @@
       return { kind: 'err', text: err ? 'Non è riuscita: ' + err : 'Non è riuscita. Nessuna fusione è avvenuta.' };
     }
     if (r.result === 'merged') return { kind: 'ok', text: 'Fatto: il lavoro è su main' + (r.sha ? ' (' + shortSha(r.sha) + ')' : '') + '.' };
-    if (r.result === 'conflict') return { kind: 'warn', text: 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.' };
-    if (r.result === 'stale') return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. Rilancia npm run finish.' };
+    if (r.result === 'conflict') {
+      return {
+        kind: 'warn',
+        text: originOf(req) === 'routine'
+          ? 'Main è andato avanti e le modifiche non si incastrano da sole: serve un giro nuovo dell’automazione.'
+          : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.',
+      };
+    }
+    if (r.result === 'stale') return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. ' + retry };
     if (r.result === 'discarded') return { kind: 'ok', text: 'Scartata.' };
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }
@@ -183,20 +245,31 @@
     card.dataset.requestId = String(req.id || '');
     card.dataset.branch = String(req.branch || '');
 
+    card.dataset.origin = originOf(req);
+
     var head = el('div', 'sn-mac-head');
+    // Da dove viene il lavoro, PRIMA del resto: le due provenienze stanno nello
+    // stesso elenco, e chi approva deve sapere subito quale delle due sta
+    // guardando.
+    var origin = el('span', 'sn-mac-origin', originLabel(req));
+    origin.title = originHint(req);
+    head.appendChild(origin);
     head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
     sha.title = 'Il commit esaminato: ' + String(req.sha || '');
     head.appendChild(sha);
     // Chi ha chiesto: il dato arriva dal server e senza di lui la separazione
     // fra chi chiede e chi approva resta a metà.
-    var who = el('span', 'sn-mac-who', requestedBy(req.who));
+    var who = el('span', 'sn-mac-who', requestedBy(req.who, req));
     who.title = 'La richiesta è arrivata con questa identità; approvarla è un gesto tuo, qui.';
     head.appendChild(who);
     var when = el('span', 'sn-mac-when', timeAgo(req.createdAtMs, now));
     head.appendChild(when);
     var exp = el('span', 'sn-mac-expiry', expiresIn(req.expiresAtMs, now));
-    exp.title = 'Vale per il commit esaminato e per un giorno: passata la scadenza si rilancia npm run finish.';
+    // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro:
+    // mandare l'owner a lanciare la pubblicazione locale per un ramo scritto da
+    // un'automazione è un consiglio che non porta a niente.
+    exp.title = 'Vale per il commit esaminato e per un giorno. Passata la scadenza, ' + lowerFirst(howToRetry(req));
     head.appendChild(exp);
     card.appendChild(head);
 
@@ -221,7 +294,7 @@
     var actions = el('div', 'sn-mac-actions');
     var discardBtn = el('button', 'sn-mac-btn sn-mac-btn-quiet', 'Scarta');
     discardBtn.type = 'button';
-    discardBtn.title = 'Toglila dall’elenco senza fondere niente. Si rifà con npm run finish.';
+    discardBtn.title = 'Toglila dall’elenco senza fondere niente. ' + howToRetry(req);
     var approveBtn = el('button', 'sn-mac-btn sn-mac-btn-go', 'Approva e fondi');
     approveBtn.type = 'button';
     approveBtn.title = 'Fonde su main esattamente il commit esaminato.';
@@ -260,13 +333,13 @@
       say({ kind: 'wait', text: 'Chiedo al server di fondere…' });
       Promise.resolve(o.onApprove ? o.onApprove(req) : null)
         .then(function (reply) {
-          var msg = outcomeMessage(reply);
+          var msg = outcomeMessage(reply, req);
           say(msg);
           if (msg.kind === 'ok' && o.onDone) o.onDone();
           else setBusy(false);
         })
         .catch(function (e) {
-          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }));
+          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
     });
@@ -276,13 +349,13 @@
       setBusy(true);
       Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
         .then(function (reply) {
-          var msg = outcomeMessage(reply);
+          var msg = outcomeMessage(reply, req);
           if (msg.kind === 'ok' && o.onDone) { o.onDone(); return; }
           say(msg);
           setBusy(false);
         })
         .catch(function (e) {
-          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }));
+          say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
     });
@@ -355,11 +428,12 @@
             : r.used ? 'approvata'
               : 'scaduta senza risposta';
       var li = el('li', 'sn-mac-recent-row');
+      li.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
       li.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
       li.appendChild(el('span', 'sn-mac-recent-what', esito));
       // La traccia serve a rispondere a "chi, cosa, quando": senza il chi
       // risponde a due domande su tre.
-      li.appendChild(el('span', 'sn-mac-recent-who', requestedBy(r.who)));
+      li.appendChild(el('span', 'sn-mac-recent-who', requestedBy(r.who, r)));
       li.appendChild(el('span', 'sn-mac-recent-when', timeAgo(r.decidedAtMs || r.expiresAtMs, now)));
       li.dataset.outcome = esito;
       ul.appendChild(li);
@@ -374,6 +448,10 @@
     expiresIn: expiresIn,
     headline: headline,
     requestedBy: requestedBy,
+    originOf: originOf,
+    originLabel: originLabel,
+    originHint: originHint,
+    howToRetry: howToRetry,
     blockLabel: blockLabel,
     blockItems: blockItems,
     outcomeMessage: outcomeMessage,

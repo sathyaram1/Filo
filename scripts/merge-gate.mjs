@@ -32,7 +32,9 @@
 //   Exit code (contratto invariato):
 //     0  → fuso su main (dal server)
 //     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff): il feedback va
-//          messo in stato `design`, decide l'utente. Nessuna fusione.
+//          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
+//          ramo non è perduto: il server apre una richiesta di approvazione
+//          che l'owner trova in cima alla dashboard di gestione.
 //     20 → conflitto di merge: serve risoluzione manuale. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
 //          richiesta RIFIUTATA dal server (verdetti non registrati, ramo che
@@ -114,7 +116,13 @@ async function main() {
   const reply = await merge(ticket, source);
   const code = exitCodeFor(reply);
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
-  else if (code === 10) console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
+  else if (code === 10) {
+    console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
+    // Il blocco non è più un vicolo cieco: il server apre una richiesta che
+    // l'owner trova in cima alla dashboard di gestione. Dirlo qui evita che
+    // chi legge il registro creda che il ramo sia perduto.
+    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
+  }
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
   else console.error(`[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
   process.exit(code);

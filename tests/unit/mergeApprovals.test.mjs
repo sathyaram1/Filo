@@ -182,3 +182,65 @@ test('lo sha si accorcia a quanto basta per riconoscerlo', () => {
   assert.equal(UI.shortSha('abcdef1234567890'), 'abcdef12');
   assert.equal(UI.shortSha(null), '');
 });
+
+// ── Da dove viene il lavoro fermato ─────────────────────────────────────────
+//
+// Le fusioni bloccate arrivano da due strade — il lavoro locale dell'owner e
+// quello di un'automazione — e finiscono nello STESSO elenco: un blocco che non
+// si vede è un ramo fermo per sempre. Ma non sono la stessa cosa da approvare,
+// quindi la scheda deve dire quale delle due si sta guardando.
+describe('la provenienza della richiesta', () => {
+  test('automazione e lavoro locale non si leggono uguale', () => {
+    assert.equal(UI.originOf({ origin: 'routine' }), 'routine');
+    assert.notEqual(UI.originLabel({ origin: 'routine' }), UI.originLabel({ origin: 'locale' }));
+    assert.match(UI.originLabel({ origin: 'routine' }), /automazione/i);
+  });
+
+  test('col numero della segnalazione si risale a cosa era stato chiesto', () => {
+    assert.match(UI.originLabel({ origin: 'routine', num: '#412' }), /#412/);
+    // Senza numero non si inventa niente e non si stampa un cancelletto vuoto.
+    assert.doesNotMatch(UI.originLabel({ origin: 'routine' }), /#/);
+  });
+
+  test('origine assente = lavoro locale: è il caso storico, non un "non si sa"', () => {
+    for (const req of [{}, null, undefined, { origin: '' }, { origin: 'qualunque cosa' }]) {
+      assert.equal(UI.originOf(req), 'locale', JSON.stringify(req));
+    }
+  });
+
+  test('la spiegazione sotto il puntatore avverte di cosa si sta approvando', () => {
+    assert.match(UI.originHint({ origin: 'routine' }), /automazione/i);
+    assert.notEqual(UI.originHint({ origin: 'routine' }), UI.originHint({}));
+  });
+
+  test('una richiesta decaduta si rifà in due modi diversi, e non si confondono', () => {
+    // Mandare l'owner a lanciare il comando di pubblicazione locale per un
+    // lavoro che ha fatto un'automazione è un consiglio che non porta a niente.
+    const locale = UI.outcomeMessage({ ok: true, result: 'stale' }, { origin: 'locale' });
+    const routine = UI.outcomeMessage({ ok: true, result: 'stale' }, { origin: 'routine' });
+    assert.match(locale.text, /npm run finish/);
+    assert.doesNotMatch(routine.text, /npm run finish/);
+
+    const scadutaLocale = UI.outcomeMessage({ ok: false, error: 'la richiesta è scaduta' }, { origin: 'locale' });
+    const scadutaRoutine = UI.outcomeMessage({ ok: false, error: 'la richiesta è scaduta' }, { origin: 'routine' });
+    assert.match(scadutaLocale.text, /npm run finish/);
+    assert.doesNotMatch(scadutaRoutine.text, /npm run finish/);
+
+    const conflitto = UI.outcomeMessage({ ok: true, result: 'conflict' }, { origin: 'routine' });
+    assert.doesNotMatch(conflitto.text, /npm run finish/);
+  });
+
+  test('senza sapere la provenienza si parla come si è sempre parlato', () => {
+    // Il comportamento storico non deve cambiare da solo per chi chiama la
+    // funzione con la sola risposta del server.
+    assert.match(UI.outcomeMessage({ ok: true, result: 'stale' }).text, /npm run finish/);
+  });
+});
+
+test('di un’automazione si dice il ruolo che lavorava, non "un accesso senza email"', () => {
+  // Un'automazione un'email non ce l'ha: la frase pensata per una sessione
+  // umana senza indirizzo, qui, è vera e inutile.
+  assert.equal(UI.requestedBy('secaudit · notturna', { origin: 'routine' }), 'chiesta da secaudit · notturna');
+  assert.match(UI.requestedBy('K3nD9xQw1aZ7mB2pL0rT', { origin: 'locale' }), /senza email/);
+  assert.equal(UI.requestedBy('sathya@esempio.it', { origin: 'routine' }), 'chiesta da sathya@esempio.it');
+});
