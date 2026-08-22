@@ -1177,9 +1177,13 @@
       // prodotto, risultati di ricerca per immagini) è ANCHE un collegamento:
       // in un browser normale le due famiglie di voci compaiono insieme. Prima
       // il ramo immagine ritornava subito e le azioni sul link sparivano (#401).
-      if (linkEl) {
+      // Come per il filmato (#444), la copertina può anche essere STESA SOPRA il
+      // link della scheda invece che stargli dentro: se occupano lo stesso
+      // rettangolo è la stessa scheda, e le voci del collegamento restano.
+      const linkOfImg = linkEl || (sameCardArea(imgEl, linkUnder) ? linkUnder : null);
+      if (linkOfImg) {
         items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+        for (const it of buildLinkActionItems(linkOfImg)) items.push(it);
       }
       items.push({ type: 'separator' });
       // Una sola sezione "Spiega" (quella dell'immagine, l'elemento cliccato):
