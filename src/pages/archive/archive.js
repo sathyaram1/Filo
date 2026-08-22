@@ -368,6 +368,12 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // #442 — le schede archiviate del backup compaiono subito anche qui, senza
+    // chiudere e riaprire l'archivio.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { semanticResults = null; $('searchNote').hidden = true; load(); },
+      ['archivedTabs', 'settings'],
+    );
     $('list').addEventListener('wheel', onListWheel, { passive: false });
     // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
     $('search').addEventListener('input', () => {
