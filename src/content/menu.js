@@ -103,10 +103,78 @@
     });
   }
 
+  // Sezione inline (spiegazione AI, anteprima di un link, descrizione di
+  // un'immagine): il contenuto arriva dopo, e chi lo produce lo consegna come
+  // DATI — { state, text, markdown, warn, remove } — non come nodi del DOM.
+  // Il disegno sta tutto qui, in un posto solo, e per questo la stessa sezione
+  // può essere disegnata da un frame diverso da quello che la produce: fra i
+  // due passa testo, mai HTML (#445).
+  function renderInline(el, item, props) {
+    if (props.remove) {
+      const prev = el.previousElementSibling;
+      if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
+      el.remove();
+      return;
+    }
+    const variant = item.variant || 'plain';
+    el.className = 'sn-menu-inline';
+    if (variant === 'explain') el.classList.add('sn-menu-inline-explain');
+    if (props.state === 'loading') el.classList.add('sn-menu-inline-loading');
+    if (props.state === 'error') el.classList.add('sn-menu-inline-error');
+    el.textContent = '';
+
+    if (props.warn) {
+      const w = document.createElement('div');
+      w.className = 'sn-menu-link-warn';
+      w.textContent = props.warn;
+      el.appendChild(w);
+    }
+
+    const text = props.text == null ? '' : String(props.text);
+    if (variant === 'plain') {
+      // Nessun corpo separato: il testo sta direttamente nella sezione (è la
+      // forma che aveva la descrizione dell'immagine, e il CSS la assume).
+      el.appendChild(document.createTextNode(text));
+    } else {
+      const body = document.createElement('div');
+      body.className = variant === 'link' ? 'sn-menu-link-body' : 'sn-menu-inline-body';
+      if (props.markdown) {
+        const md = global.SN_POPUP?.renderMarkdown;
+        if (md) body.innerHTML = md(text);
+        else body.textContent = text;
+      } else {
+        body.textContent = text;
+      }
+      el.appendChild(body);
+    }
+
+    if (item.arrow) {
+      const arrow = document.createElement('button');
+      arrow.type = 'button';
+      arrow.className = 'sn-menu-inline-arrow';
+      arrow.title = item.arrowTitle || '';
+      arrow.textContent = '▸';
+      arrow.addEventListener('click', (e) => {
+        e.stopPropagation();
+        close();
+        try { item.onArrow && item.onArrow(); } catch (err) { console.error(err); }
+      });
+      el.appendChild(arrow);
+    }
+  }
+
   // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
-  // - 'inline': sezione che mostra contenuto dinamico (es. spiegazione AI). { content?: string, onMount?: (el) => cleanup }
+  // - 'inline': sezione con contenuto che arriva dopo (spiegazione AI).
+  //   { content?, variant?, arrow?, onArrow?, onMount?: (el, update) => cleanup }
   // - 'paste': come 'item' ma con freccetta a destra che apre il sotto-menu della cronologia
-  function open({ x, y, items, keepOnScroll }) {
+  //
+  // Opzioni #445 (menu disegnato per conto di un riquadro incorporato):
+  // - noProject: non delegare alla pagina, disegna qui comunque;
+  // - keepFocus: nessuna voce ruba il fuoco al campo su cui si sta scrivendo
+  //   (il campo è in un ALTRO frame: perderlo significherebbe perdere il punto
+  //   in cui incollare o la parola da correggere);
+  // - onClose: chiamata quando il menu si chiude.
+  function open({ x, y, items, keepOnScroll, noProject, keepFocus, onClose }) {
     close();
     const root = document.createElement('div');
     root.className = 'sn-menu';
@@ -114,6 +182,11 @@
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     const cleanups = [];
+    // Il montaggio delle sezioni dinamiche (che possono far partire una chiamata
+    // al modello) è rimandato a dopo la misura: se il menu non ci sta e va
+    // disegnato dalla pagina, qui non deve partire niente — altrimenti la
+    // spiegazione verrebbe chiesta due volte, e pagata due volte.
+    const mounts = [];
 
     for (const it of items) {
       if (it.type === 'separator') {
