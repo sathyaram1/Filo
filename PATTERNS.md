@@ -762,6 +762,26 @@ irraggiungibili.
   `.sn-toasts` in `src/content/popup.js` e `src/styles/popup.css` — ci passano
   toast, `.sn-dictate-pill` e `.sn-save-confirm`. Test `tests/toast-stack.spec.mjs`.
 
+## Gli overlay di Filo dentro la pagina non scalano con lo zoom
+
+Menu, popup, badge e pill che Filo disegna dentro una pagina sono **interfaccia
+di Filo**, non contenuto: quando l'utente zooma devono restare della stessa
+dimensione sullo schermo, come la barra delle schede.
+
+- **Perché:** a zoom alto un overlay scalato copre mezza pagina, e si zooma
+  proprio per leggere meglio quello che c'è sotto. Il contenuto cresce,
+  l'interfaccia no.
+- **Come:** `transform: scale(1 / fattore)` con `transform-origin` sull'angolo a
+  cui l'overlay è ancorato. Nel content script la funzione già pronta è
+  `attachZoomCompensation` (`src/content/popup.js`), che ricava il fattore da
+  `devicePixelRatio` e `visualViewport.scale` e riapplica a ogni resize. Nel
+  **preload** il fattore è più diretto: `webFrame.getZoomFactor()`, riapplicato
+  quando si cambia zoom (`syncBadgeScale` in `src/preload/wheel-zoom.js`).
+- **Come si asserisce:** la larghezza sullo schermo è
+  `getBoundingClientRect().width × fattore di zoom` (il rect è già in pixel CSS
+  scalati dalla trasformazione). Un test che guarda solo il rect non vede la
+  differenza fra compensato e non compensato.
+
 ## Riscontro effimero: sparisce da solo, ma non mentre ci stai interagendo
 
 Un indicatore che compare per un'azione e se ne va da solo (il badge della
