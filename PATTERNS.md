@@ -846,10 +846,12 @@ stata scritta.
 - **Rete di sicurezza guidata da una persona, non da un orologio.** Il
   campanello può mancare (app chiusa quando è arrivato l'evento, cartella
   ripulita, un domani un produttore remoto). Il ripiego è il **rientro nella
-  finestra** (`browser-window-focus`), non più di una volta al minuto: chi resta
-  sulla pagina per ore non genera nemmeno una chiamata, e chi torna dal
-  terminale trova l'avviso già lì. Un intervallo fisso invece paga sempre,
-  soprattutto quando non c'è niente da mostrare.
+  finestra** (`browser-window-focus`, e solo la finestra vera: il popup dei menu
+  è una BrowserWindow sua e ogni menu conterebbe come un rientro), con un
+  intervallo **largo** — cinque minuti: il caso vero lo copre già il campanello,
+  quindi la rete non deve costare. Chi resta sulla pagina per ore non genera
+  nemmeno una chiamata. Un intervallo fisso invece paga sempre, soprattutto
+  quando non c'è niente da mostrare.
 - **Se l'elenco non è cambiato, non si tocca la pagina**: un avviso che si
   ridisegna sotto le dita (magari con "Confermi?" già armato) è rumore.
 - **Dove:** `src/main/services/mergeApprovalSignal.js` (campanello + decisione
