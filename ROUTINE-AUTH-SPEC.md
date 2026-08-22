@@ -108,6 +108,17 @@ Punti non negoziabili del flusso:
 - **La durata sta nel semaforo, non nel biglietto.** Sessioni lunghe: il battito
   tiene vivo il semaforo. Sessione morta: il semaforo scade, il biglietto muore
   con lui. Nessun numero da indovinare sulla durata dei lavori.
+- **Il battito lo avvia lo strumento, non chi lavora** (dal 2026-08-22). Il
+  comando c'era dal primo giorno e non lo lanciava nessuno, perché non stava in
+  nessuna ricetta: il primo lavoro lungo davvero è morto alla consegna con
+  `dead_ticket`, venti commit spinti e nessun esito registrato. Lo avvia
+  `dispatch` in sottofondo quando riceve il biglietto (`lib/routine-beat.mjs`),
+  come già fa col marcatore del biglietto e per lo stesso motivo: quello che
+  deve succedere sempre non si chiede a chi lavora.
+- **Il battito prova che la sessione è viva, non che produce.** Un'istanza
+  bloccata in un giro a vuoto batte come una che lavora. Per quello il server
+  misura il lavoro sul RAMO (FEEDBACK-STATES.md §6a): la punta la chiede lui a
+  GitHub, e un ramo fermo da un'ora è un lavoro arenato che rientra in coda.
 
 ---
 
