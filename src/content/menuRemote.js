@@ -153,7 +153,7 @@
         // oggi il riquadro le rimanda a lei) e la pagina se la ricostruisce da
         // sé, col suo layout e il suo trascinamento. Passa solo lo stato di
         // navigazione, che decide il grigio di avanti/indietro.
-        out.push({ t: 'row', navState: it.navState || null });
+        out.push({ t: 'row', kind: str(it.kind), navState: it.navState || null });
         continue;
       }
       if (type === 'inline') {
