@@ -219,4 +219,5 @@
   color: var(--sn-muted);
 }
 .sn-mac-recent-branch { color: var(--sn-fg); overflow-wrap: anywhere; }
+.sn-mac-recent-who { overflow-wrap: anywhere; }
 .sn-mac-recent-row[data-outcome='approvata e fusa'] .sn-mac-recent-what { color: var(--sn-accent); }
