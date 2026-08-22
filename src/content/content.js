@@ -625,6 +625,25 @@
     return (w * h) >= (m.width * m.height) / 2;
   }
 
+  // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre
+  // da due strade (menu normale e menu di correzione): quando il riconoscimento
+  // era copiato in tutt'e due, lo stesso clic rischiava di dare due menu diversi
+  // a seconda che sotto ci fosse o no una parola da correggere.
+  function detectContext(target, x, y) {
+    const linkEl = closestAcrossShadow(target, 'a[href]');
+    const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
+    const { mediaEl, mediaUnder } = findMedia(target, x, y);
+    return {
+      linkEl,
+      imgEl,
+      mediaEl,
+      mediaUnder,
+      // Cercato solo se il collegamento non è già fra gli antenati.
+      linkUnder: linkEl ? null : findLinkUnder(x, y),
+      editable: isEditable(target),
+    };
+  }
+
   function isEditable(el) {
     if (!el) return false;
     if (el.matches?.('input, textarea')) {
