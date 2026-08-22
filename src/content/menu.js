@@ -501,7 +501,7 @@
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onScroll, true);
 
-    activeMenu = { root, onDocClick, onKey, onScroll, cleanupZoom, cleanups, subRoot: null };
+    activeMenu = { root, onDocClick, onKey, onScroll, cleanupZoom, cleanups, subRoot: null, onClose };
   }
 
   // Impedisce che l'elemento del menu prenda il fuoco quando lo si clicca.
