@@ -118,6 +118,13 @@ nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti, come prima che e
 La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackThread.js`
 (dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
 
+I gruppi sono QUATTRO e le categorie d'autore sono di più: `claude` raccoglie tutte le
+istanze di Claude (esplorazione, sviluppo, verifica, rilievo residuo **e la sessione
+locale**). Provenienza e fiducia sono due assi diversi: la dashboard distingue da dove
+nasce un ritrovamento, l'auto-approvazione decide di chi ci si fida — e su quel secondo
+asse le istanze dell'owner sono la stessa cosa. Conseguenza pratica: l'interruttore
+"Claude" spegne insieme le automazioni in cloud e la sessione locale.
+
 ## 5. Chat del feedback distingue i sotto-casi di `design`
 
 Un solo stato `design`, tre origini leggibili dalla chat/thread (`notes`): (1) verdetto
