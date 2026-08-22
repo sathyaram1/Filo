@@ -19,7 +19,7 @@
       version: '0.2.198', date: '2026-08-22',
       features: [],
       fixes: [
-        'Quando ingrandisci con Ctrl + / Ctrl - o tenendo Ctrl con la rotella, in alto compare per qualche secondo la percentuale di zoom: prima si vedeva solo entrando in modalità zoom col clic sulla rotella. Ci puoi anche scrivere dentro la percentuale che vuoi. Nell\'editor, la percentuale del foglio compare in basso a sinistra.',
+        'Ingrandendo con Ctrl + / Ctrl - o tenendo Ctrl con la rotella, in alto compare per qualche secondo la percentuale di zoom, e ci puoi scrivere dentro il valore che vuoi per tornare dove preferisci. Prima si vedeva solo entrando in modalità zoom col clic sulla rotella. Nell\'editor la percentuale del foglio compare in basso a sinistra.',
       ],
     },
     {
