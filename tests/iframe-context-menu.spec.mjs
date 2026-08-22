@@ -88,8 +88,8 @@ test('nel riquadro il menu sul collegamento porta le azioni del collegamento', a
 test('in un riquadro basso il menu resta tutto raggiungibile', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER), { width: 420, height: 180 }));
   await page.frameLocator('#embed').locator('#inner-text').click({ button: 'right' });
-  const menu = page.locator('.sn-menu, #embed >>> nothing').first();
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8000 });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 8000 });
   const fits = await menu.evaluate((el) => {
     const r = el.getBoundingClientRect();
     return r.top >= -1 && r.bottom <= window.innerHeight + 1;
