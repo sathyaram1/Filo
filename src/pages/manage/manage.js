@@ -1282,10 +1282,17 @@
         s.state === 'done' ? 'fatto' : s.state === 'current' ? 'in corso' : 'da fare'
       }">${marks[s.state]} ${esc(s.label)}</span>`
     ).join('<span class="mg-step-sep">·</span>');
+    // Quando nessuno sta lavorando, la riga deve dire una cosa VERA. Scriveva
+    // "in attesa di ripresa" per una ripresa che il sistema non sapeva fare: i
+    // feedback fermi in implementazione non li raccoglieva più nessuno, e due
+    // sono rimasti lì per giorni. Adesso il server li rimette in coda da solo
+    // dopo un'ora di ramo fermo, ed è quello che la riga racconta.
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
-      : `<span class="mg-work-idle">Nessuna istanza al lavoro: in attesa di ${
-          progress.current.key === 'impl' ? 'ripresa' : 'un verificatore'
+      : `<span class="mg-work-idle">${
+          progress.current.key === 'impl'
+            ? 'Nessun segnale da un’ora: se è fermo rientra in coda da solo'
+            : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;
     return `<div class="mg-item-state">${steps}${who}</div>`;
   }
