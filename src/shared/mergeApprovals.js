@@ -62,6 +62,10 @@
    * è il modo peggiore. Sotto il minuto non si finge precisione ("meno di un
    * minuto"): un conto alla rovescia al secondo su una cosa da decidere con
    * calma è solo ansia.
+   *
+   * La finestra è di un giorno (il perché sta nel server, dove il valore vive),
+   * quindi la scala normale sono le ORE: si arrotondano per DIFETTO, così
+   * l'avviso non promette mai più tempo di quanto ce n'è davvero.
    */
   function expiresIn(expiresAtMs, nowMs) {
     var exp = Number(expiresAtMs);
@@ -72,7 +76,7 @@
     if (m < 1) return 'scade fra meno di un minuto';
     if (m === 1) return 'scade fra 1 minuto';
     if (m < 60) return 'scade fra ' + m + ' minuti';
-    var h = Math.round(m / 60);
+    var h = Math.floor(m / 60);
     return h === 1 ? 'scade fra 1 ora' : 'scade fra ' + h + ' ore';
   }
 
