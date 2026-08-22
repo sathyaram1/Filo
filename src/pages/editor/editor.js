@@ -4231,7 +4231,7 @@
   try {
     window.SN_PAGE_BOOTSTRAP.onDataImported(
       () => { reloadFromArchive(); },
-      [COLLECTION_KEY, VERSIONS_KEY, TRASH_KEY],
+      [COLLECTION_KEY, VERSIONS_KEY], // il cestino vive solo su localStorage: non passa dall'export
     );
   } catch (_) {}
 
