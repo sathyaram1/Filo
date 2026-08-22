@@ -482,5 +482,9 @@
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
+    // #442 — le impostazioni di sicurezza ripristinate da un backup si vedono
+    // nei controlli senza ricaricare la pagina. Vale anche per una SECONDA
+    // scheda Sicurezza aperta altrove, che l'import non l'ha nemmeno lanciato.
+    Bootstrap.onDataImported(() => { load(); }, ['settings']);
   });
 })();
