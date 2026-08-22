@@ -786,7 +786,7 @@ cursore**, e farlo ripartire quando smette.
 - **Attenzione all'angolo:** un riscontro effimero non è un toast, ma occupa
   spazio come loro. Se vive in un contesto che non può agganciarsi alla pila
   (il badge dello zoom sta nel **preload**, la pila degli avvisi nel content
-  script), tienilo in un angolo diverso da quello della pila — vedi § "Stack di
+  script), tienilo in un angolo diverso da quello della pila. Vedi § "Stack di
   overlay impilati".
 - **Dove:** `src/preload/wheel-zoom.js` (badge dello zoom, condiviso fra
   modalità rotella e zoom con Ctrl), `.ed-zoom-pill` in
