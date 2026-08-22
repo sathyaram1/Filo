@@ -371,9 +371,15 @@
     return iconWhitelist.has(s) ? s : undefined;
   }
 
+  // Una voce scelta parte SEMPRE, anche se il menu si è gia' chiuso: menu.js
+  // chiude prima e agisce dopo, quindi quando l'azione parte il menu non c'e'
+  // piu'. Per questo l'avviso di chiusura viene rimandato di un microtask (vedi
+  // hostMenu): la scelta arriva al riquadro PRIMA che il ponte fra i due frame
+  // venga sciolto, altrimenti il clic si perderebbe e "Copia URL" non
+  // copierebbe niente.
   function deserialize(spec, ctx) {
     const fire = (id, arg) => {
-      if (!id || !hosted || hosted.token !== ctx.token) return;
+      if (!id) return;
       send({ phase: 'event', token: ctx.token, id: String(id), arg });
     };
     const subList = (list) => (Array.isArray(list) ? list : []).map((s) => {
@@ -472,7 +478,7 @@
   function deserializeProps(props, ctx) {
     const p = props || {};
     const fire = (id, arg) => {
-      if (!id || !hosted || hosted.token !== ctx.token) return;
+      if (!id) return;
       send({ phase: 'event', token: ctx.token, id: String(id), arg });
     };
     const out = {};
@@ -528,7 +534,12 @@
       onClose: () => {
         if (hosted !== ctx) return;
         hosted = null;
-        if (!ctx.closingFromRemote) send({ phase: 'close', token });
+        if (ctx.closingFromRemote) return;
+        // Rimandato di un microtask: la voce scelta parte SUBITO DOPO questa
+        // chiusura (menu.js chiude e poi agisce), e deve arrivare al riquadro
+        // prima che il ponte venga sciolto. Il microtask gira a fine task,
+        // quando l'azione è già partita.
+        Promise.resolve().then(() => send({ phase: 'close', token }));
       },
     });
     send({ phase: 'ready', token });
