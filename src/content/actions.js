@@ -660,14 +660,15 @@
   function buildInlineExplainLink(linkEl) {
     return {
       type: 'inline',
+      variant: 'link',
       content: I18n.t('menu_link_loading'),
-      onMount: (el) => {
-        el.classList.add('sn-menu-inline-loading');
+      onMount: (_el, update) => {
         let cancelled = false;
         (async () => {
           const url = linkEl.href;
           const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
           const flags = analyzeLinkSuspicious(url);
+          const warn = flags.length ? I18n.t('menu_link_suspicious') + ': ' + flags.join(', ') : '';
 
           // Fetch leggero dei metadati OG via background (CORS-safe). Saltato se url sospetto in modo grave.
           let ogTitle = '', ogDescription = '';
@@ -684,44 +685,23 @@
           try {
             port = chrome.runtime.connect({ name: global.SN_MSG.PORTS.AI_STREAM });
           } catch (_) {
-            el.classList.remove('sn-menu-inline-loading');
-            el.classList.add('sn-menu-inline-error');
-            el.textContent = I18n.t('err_provider_failed');
+            update({ state: 'error', text: I18n.t('err_provider_failed') });
             return;
           }
           let buf = '';
-          let firstDelta = true;
-          let warned = false;
           port.onMessage.addListener((m) => {
+            if (cancelled) return;
             if (m.type === 'delta') {
-              if (firstDelta) {
-                el.classList.remove('sn-menu-inline-loading');
-                el.textContent = '';
-                if (flags.length && !warned) {
-                  const w = document.createElement('div');
-                  w.className = 'sn-menu-link-warn';
-                  w.textContent = I18n.t('menu_link_suspicious') + ': ' + flags.join(', ');
-                  el.appendChild(w);
-                  warned = true;
-                }
-                firstDelta = false;
-              }
               buf += m.delta;
               // Sicurezza: niente HTML, è testo.
-              const txt = document.createElement('div');
-              txt.textContent = buf;
-              el.querySelector('.sn-menu-link-body')?.remove();
-              txt.className = 'sn-menu-link-body';
-              el.appendChild(txt);
+              update({ state: 'ready', text: buf, warn });
             } else if (m.type === 'reset') {
               // Provider caduto a metà risposta, si riparte col fallback:
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
-              el.querySelector('.sn-menu-link-body')?.remove();
+              update({ state: 'ready', text: '', warn });
             } else if (m.type === 'error') {
-              el.classList.remove('sn-menu-inline-loading');
-              el.classList.add('sn-menu-inline-error');
-              el.textContent = m.message || I18n.t('err_provider_failed');
+              update({ state: 'error', text: m.message || I18n.t('err_provider_failed') });
             }
           });
           port.postMessage({
