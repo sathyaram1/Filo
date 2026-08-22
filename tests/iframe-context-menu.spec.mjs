@@ -81,19 +81,21 @@ test('nel riquadro il menu sul collegamento porta le azioni del collegamento', a
   expect(txt.toLowerCase()).toContain('apri in nuova tab');
 });
 
-test('in un riquadro basso il menu resta tutto raggiungibile (scorre, non viene tagliato)', async ({ openTab, testServer }) => {
+// L'invariante di #405: in un riquadro basso NESSUNA voce va perduta. DOVE
+// venga disegnato il menu è cambiato con #445 (lo disegna la pagina, sopra al
+// riquadro, così ha tutta l'altezza della finestra — vedi
+// tests/iframe-menu-projection.spec.mjs); la promessa all'utente no.
+test('in un riquadro basso il menu resta tutto raggiungibile', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, outer(testServer.html(INNER), { width: 420, height: 180 }));
-  const frame = page.frameLocator('#embed');
-  await frame.locator('#inner-text').click({ button: 'right' });
-  const menu = frame.locator('.sn-menu');
-  await expect(menu).toBeVisible();
+  await page.frameLocator('#embed').locator('#inner-text').click({ button: 'right' });
+  const menu = page.locator('.sn-menu, #embed >>> nothing').first();
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8000 });
   const fits = await menu.evaluate((el) => {
     const r = el.getBoundingClientRect();
-    return r.top >= 0 && r.bottom <= window.innerHeight + 1;
+    return r.top >= -1 && r.bottom <= window.innerHeight + 1;
   });
   expect(fits).toBe(true);
-  // E l'ultima voce del menu è davvero raggiungibile scorrendo.
-  await expect(menu.getByText('Invia feedback', { exact: true })).toBeAttached();
+  await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
 });
 
 test('la pagina attorno al riquadro continua a funzionare come prima', async ({ openTab, testServer }) => {
