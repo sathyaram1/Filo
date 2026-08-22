@@ -304,6 +304,25 @@
     return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
   }
 
+  // `closest()` si ferma al confine del componente: da dentro uno shadow root
+  // NON vede gli antenati in chiaro. Sui siti moderni la copertina di una scheda
+  // è quasi sempre un componente web (`<video>` dentro lo shadow root) infilato
+  // dentro l'`<a>` della scheda: `realTarget` ci porta al filmato vero, ma poi
+  // `target.closest('a[href]')` risaliva fino alla radice del componente e
+  // tornava null — il collegamento spariva dal menu (#444). Questa versione,
+  // quando la risalita finisce dentro uno shadow root, riparte dal suo host, e
+  // così via per quanti componenti siano annidati.
+  function closestAcrossShadow(el, selector) {
+    let node = el;
+    while (node) {
+      const hit = node.closest?.(selector);
+      if (hit) return hit;
+      const root = node.getRootNode?.();
+      node = (root && root.host) ? root.host : null;
+    }
+    return null;
+  }
+
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
