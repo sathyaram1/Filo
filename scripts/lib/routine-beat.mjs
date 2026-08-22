@@ -144,11 +144,27 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
   }
 }
 
-/** Ferma il battito aperto da questa macchina, se c'è. Best-effort. */
-export function stopBeat(root, { alive = pidAlive } = {}) {
+/**
+ * Ferma il battito aperto da questa macchina. Best-effort.
+ *
+ * `ticket` dice QUALE battito si vuole fermare, e se il marcatore ne descrive
+ * un altro non si tocca niente. Senza quel confronto, rilasciare un biglietto
+ * spegneva il battito di un lavoro vivo che ne aveva un altro: `startBeat` il
+ * confronto lo faceva già, `stopBeat` no, e l'asimmetria fra due funzioni
+ * gemelle è dove si nascondono i guasti che nessuno cerca.
+ *
+ * Chi il biglietto non ce l'ha (un giro lanciato senza) passa null e dichiara
+ * di voler fermare quello che trova.
+ */
+export function stopBeat(root, { ticket = null, alive = pidAlive } = {}) {
   const m = readBeat(root);
-  if (m && alive(m.pid)) {
+  if (!m) return { stopped: false, why: 'absent' };
+  if (ticket && String(m.ticket || '') !== String(ticket)) {
+    return { stopped: false, why: 'other_ticket' };
+  }
+  if (alive(m.pid)) {
     try { process.kill(Number(m.pid)); } catch (_) { /* già morto */ }
   }
   clearBeat(root);
+  return { stopped: true, why: 'stopped' };
 }
