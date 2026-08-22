@@ -38,6 +38,8 @@
 //   4  non raggiungibile — rete assente, timeout, guasto del server
 
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura, come in owner-feedback.mjs:
