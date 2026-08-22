@@ -70,6 +70,7 @@
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
     if (c.startsWith('routine:')) return 'routine';
+    if (c.startsWith('local:')) return 'local';
     return 'user';
   }
   // Decodifica i metadati del ritrovamento per il badge. L'agente esploratore
