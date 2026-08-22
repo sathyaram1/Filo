@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.198', date: '2026-08-22',
+      features: [],
+      fixes: [
+        'Dopo aver importato un backup, le schede già aperte si aggiornano da sole. Pagine salvate, cronologia, archivio, editor e impostazioni mostrano subito i dati ripristinati, senza chiudere e riaprire.',
+      ],
+    },
+    {
       version: '0.2.196', date: '2026-08-08',
       features: [
         'Nuova pagina «Trasparenza»: quali modelli AI usa Filo e perché, con le fonti. La trovi anche senza connessione, e puoi chiederne conto a Filo in chat.',
