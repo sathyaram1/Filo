@@ -251,7 +251,7 @@
 
         // Espone un updater al chiamante (per quando la correzione arriva async).
         if (typeof it.onMount === 'function') {
-          try {
+          mounts.push(() => {
             const update = (newProps) => {
               if (!wrap.parentElement) return;
               if (newProps.remove) {
