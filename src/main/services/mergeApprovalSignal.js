@@ -56,11 +56,20 @@ const FILE_NAME = 'signal';
 // si aspetta un attimo e si legge una volta.
 const DEBOUNCE_MS = 300;
 
-// Rientro in finestra: al massimo una rilettura al minuto. È il valore più
-// corto che non trasforma un alt-tab nervoso in una raffica, e resta invisibile
-// a chi guarda (torni su Filo, l'avviso c'è). Non è un intervallo di polling:
-// senza qualcuno che torna sulla finestra, non scatta mai.
-const FOCUS_MIN_MS = 60 * 1000;
+// Rientro in finestra: al massimo una rilettura ogni cinque minuti.
+//
+// Perché così larga: il caso VERO — la richiesta appena aperta da
+// `npm run finish` — lo copre il campanello, che arriva in un istante e non
+// aspetta nessun intervallo. Questo è solo la rete di sicurezza, e una rete non
+// deve costare: cinque minuti bastano a raccogliere ciò che il campanello ha
+// mancato (Filo era chiuso, cartella ripulita) senza che una giornata di lavoro
+// dentro Filo — dove ogni rientro nella finestra è un'occasione di rilettura —
+// si trasformi in una fila di chiamate per dire ogni volta "non c'è niente".
+//
+// E resta comunque diverso da un controllo periodico: senza una persona che
+// torna sulla finestra non scatta MAI. Chi tiene la home aperta per ore non
+// genera una sola chiamata.
+const FOCUS_MIN_MS = 5 * 60 * 1000;
 
 /**
  * DOVE VIVE IL CAMPANELLO. PURA (a parte l'ambiente).
