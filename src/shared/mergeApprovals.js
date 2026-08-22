@@ -373,6 +373,7 @@
     timeAgo: timeAgo,
     expiresIn: expiresIn,
     headline: headline,
+    requestedBy: requestedBy,
     blockLabel: blockLabel,
     blockItems: blockItems,
     outcomeMessage: outcomeMessage,
