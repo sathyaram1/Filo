@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.198', date: '2026-08-22',
+      fixes: [
+        'Il tasto destro dentro un riquadro incorporato — un video, una mappa, una pubblicità — mostra tutto il menu anche quando il riquadro è alto pochi centimetri: prima si riduceva a una fessura da scorrere.',
+      ],
+    },
+    {
       version: '0.2.196', date: '2026-08-08',
       features: [
         'Nuova pagina «Trasparenza»: quali modelli AI usa Filo e perché, con le fonti. La trovi anche senza connessione, e puoi chiederne conto a Filo in chat.',
