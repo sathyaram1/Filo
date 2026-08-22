@@ -163,9 +163,11 @@
       });
       if (res && res.ok) {
         showImportHint(I18n.t('security_import_done'), false);
-        // I dati appena rimessi dentro devono comparire: la pagina si ricarica
-        // per mostrare le impostazioni importate invece di quelle vecchie.
-        setTimeout(() => location.reload(), 1200);
+        // I dati appena rimessi dentro devono comparire. Ci pensa il broadcast
+        // dell'importazione (#442), che riallinea QUESTA scheda e tutte le
+        // altre già aperte: prima qui si ricaricava la pagina intera dopo 1,2s,
+        // che rileggeva sì le impostazioni ma portava via anche il messaggio
+        // "Importazione completata" prima che si finisse di leggerlo.
       } else {
         showImportHint(I18n.t('security_import_fail'), true);
       }
