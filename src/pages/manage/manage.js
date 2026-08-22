@@ -178,6 +178,10 @@
     // (SPEC-RIDISEGNO-MAX.md §13): categoria propria, così leggendo la coda si
     // vede che nasce dal declassamento di una verifica, non da un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude — rilievo residuo' },
+    // Sessione locale: Claude in chat con l'owner, sulla sua macchina. Icona
+    // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
+    // altre girano da sole, questa nasce da una conversazione.
+    local:    { icon: '💻', label: 'Claude (sessione locale)' },
     claude:   { icon: '🤖', label: 'Claude' },
   };
   function authorKindOf(fb) {
