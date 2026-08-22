@@ -599,7 +599,9 @@
     // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.
     autoApproveGroup,
     autoApproveAllowed,
+    resolveAutoApprove,
     AUTO_APPROVE_GROUPS,
+    CLAUDE_GROUPS,
     ownerize,
     userTurnMarker,
     appendUserTurn,
