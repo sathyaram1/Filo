@@ -128,6 +128,14 @@ describe('cosa legge l’owner', () => {
     assert.match(msg, /in attesa/i);
     assert.match(msg, /prima schermata/i);
     assert.match(msg, /Gestione → Automazioni/);
+    // Quanto dura si dice QUI: è l'unico posto dove l'owner sta guardando nel
+    // momento in cui la richiesta nasce, e sapere se deve correre o no cambia
+    // cosa fa dopo. Un giorno, non mezz'ora: rifarla costa un giro intero.
+    assert.match(msg, /24 ore/);
+    assert.doesNotMatch(msg, /mezz'ora|mezz’ora/);
+    // E che una finestra già aperta se ne accorge da sola: senza questa riga
+    // l'owner chiude e riapre una scheda per far comparire l'avviso.
+    assert.match(msg, /già aperto/i);
   });
 
   test('bloccato SENZA richiesta: non promette un avviso che non comparirà mai', () => {
