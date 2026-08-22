@@ -49,6 +49,10 @@ test-results/
 # ricreato dal marcatore che serve a toglierlo.
 .claude/routine-ticket.json
 
+# Il battito aperto in sottofondo dal giro in corso (numero del processo e
+# biglietto a cui è appeso). Contiene un biglietto: vale la riga qui sopra.
+.claude/routine-beat.json
+
 # Stato locale del giro (ripiego: quello vero vive sul server). Effimero come
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
