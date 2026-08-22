@@ -91,6 +91,26 @@
     return n + ' fusioni aspettano il tuo via libera';
   }
 
+  /**
+   * Chi ha chiesto la fusione, in una frase. PURA.
+   *
+   * Questa superficie esiste per SEPARARE chi chiede da chi approva: tacere chi
+   * ha chiesto le toglie metà del senso. Il server manda l'identità con cui la
+   * richiesta è arrivata — di norma un'email, altrimenti l'identificativo
+   * tecnico dell'accesso.
+   *
+   * Un identificativo tecnico non si stampa: a chi legge non dice niente e
+   * somiglia a rumore. Si dice invece COSA significa ("un accesso senza
+   * email"), che è l'informazione vera: la richiesta è arrivata da una sessione
+   * autenticata di cui non si conosce l'intestatario.
+   */
+  function requestedBy(who) {
+    var s = String(who == null ? '' : who).trim().slice(0, 120);
+    if (!s) return 'chi l’ha chiesta non risulta';
+    if (s.indexOf('@') > 0) return 'chiesta da ' + s;
+    return 'chiesta da un accesso senza email';
+  }
+
   /** Un blocco, in una riga leggibile. PURA. Un blocco senza frase si NOMINA lo stesso. */
   function blockLabel(block) {
     var b = block || {};
