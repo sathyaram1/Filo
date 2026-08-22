@@ -317,6 +317,14 @@
       chrome.runtime.openOptionsPage();
     });
 
+    // #442 — dizionario personale e correzioni automatiche del backup si vedono
+    // subito: `storage.onChanged` non attraversa i WebContentsView, quindi la
+    // rilettura arriva dal broadcast dell'importazione.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { loadAll(); },
+      [STORAGE_KEYS.AUTOCORRECT, STORAGE_KEYS.PERSONAL_DICT, 'settings'],
+    );
+
     // Aggiornamento live se cambia da un altro tab.
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
