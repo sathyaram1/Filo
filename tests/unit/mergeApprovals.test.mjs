@@ -43,7 +43,22 @@ describe('il titolo', () => {
 });
 
 describe('la scadenza, detta prima', () => {
-  test('quanto resta si dice in minuti, che è la scala della finestra', () => {
+  test('la finestra è di un giorno: appena aperta lo dice in ore', () => {
+    // La difesa vera è lo sha registrato + l'uso singolo, non l'orologio: una
+    // finestra corta bruciava solo il quarto d'ora di controlli necessario a
+    // rifare la richiesta. Se il valore torna a mezz'ora questo diventa rosso.
+    assert.equal(UI.expiresIn(ORA + 24 * ORE, ORA), 'scade fra 24 ore');
+    assert.equal(UI.expiresIn(ORA + 2 * ORE, ORA), 'scade fra 2 ore');
+    assert.equal(UI.expiresIn(ORA + 61 * MIN, ORA), 'scade fra 1 ora');
+  });
+
+  test('le ore si arrotondano per DIFETTO: mai promettere più tempo di quanto ce n’è', () => {
+    // 2h59 → "2 ore" (vero), non "3 ore" (una promessa che non si mantiene).
+    assert.equal(UI.expiresIn(ORA + 2 * ORE + 59 * MIN, ORA), 'scade fra 2 ore');
+    assert.equal(UI.expiresIn(ORA + 24 * ORE - MIN, ORA), 'scade fra 23 ore');
+  });
+
+  test('sotto l’ora si passa ai minuti, sotto il minuto non si finge precisione', () => {
     assert.equal(UI.expiresIn(ORA + 28 * MIN, ORA), 'scade fra 28 minuti');
     assert.equal(UI.expiresIn(ORA + 1 * MIN, ORA), 'scade fra 1 minuto');
     assert.equal(UI.expiresIn(ORA + 20 * 1000, ORA), 'scade fra meno di un minuto');
@@ -59,15 +74,37 @@ describe('la scadenza, detta prima', () => {
 });
 
 describe('da quanto aspetta', () => {
-  test('la scala che conta sono i minuti: la richiesta vive mezz’ora', () => {
+  test('minuti e ore: una richiesta può aspettare tutto il giorno', () => {
     assert.equal(UI.timeAgo(ORA - 10 * 1000, ORA), 'adesso');
     assert.equal(UI.timeAgo(ORA - 2 * MIN, ORA), '2 minuti fa');
     assert.equal(UI.timeAgo(ORA - 60 * MIN, ORA), '1 ora fa');
+    assert.equal(UI.timeAgo(ORA - 5 * ORE, ORA), '5 ore fa');
   });
 
   test('un istante che non c’è non diventa una data inventata', () => {
     assert.equal(UI.timeAgo(0, ORA), '');
     assert.equal(UI.timeAgo(undefined, ORA), '');
+  });
+});
+
+describe('chi ha chiesto la fusione', () => {
+  test('l’email si legge: è il dato che separa chi chiede da chi approva', () => {
+    // Questa superficie esiste per tenere separate le due parti. Tacere chi ha
+    // chiesto le toglie metà del senso — e il server il dato lo manda già.
+    assert.equal(UI.requestedBy('owner@esempio.it'), 'chiesta da owner@esempio.it');
+  });
+
+  test('un identificativo tecnico non si stampa: si dice cosa significa', () => {
+    // Una stringa opaca a chi legge non dice niente e sembra rumore.
+    const t = UI.requestedBy('K3nD9xQw1aZ7mB2pL0rT');
+    assert.doesNotMatch(t, /K3nD9xQw1aZ7mB2pL0rT/);
+    assert.match(t, /senza email/i);
+  });
+
+  test('se non risulta nessuno lo si dice, non si finge un mittente', () => {
+    for (const v of ['', '   ', null, undefined]) {
+      assert.match(UI.requestedBy(v), /non risulta/i, `who=${String(v)}`);
+    }
   });
 });
 
