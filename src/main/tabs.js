@@ -1810,7 +1810,14 @@ class TabManager {
         const f = params.frame;
         if (f && !f.detached && f !== wc.mainFrame) {
           const type = globalThis.SN_MSG?.MSG?.FRAME_VIEW_POS || 'frame_view_pos';
-          f.send('filo:broadcast', { type, x: params.x, y: params.y });
+          // `params.x/y` sono in pixel della scheda NON ingrandita; i frame
+          // ragionano in pixel CSS, che con lo zoom di pagina sono un'altra
+          // cosa. Senza dividere per il fattore di zoom il menu comparirebbe
+          // spostato in proporzione allo zoom — a 1.5× finiva mezzo fuori dalla
+          // finestra.
+          let zf = 1;
+          try { zf = wc.getZoomFactor() || 1; } catch (_) { zf = 1; }
+          f.send('filo:broadcast', { type, x: params.x / zf, y: params.y / zf });
         }
       } catch (_) {}
     });
