@@ -1108,6 +1108,21 @@ if (isMainModule) {
       // provenienza dei feedback. Un giro senza biglietto cancella il
       // marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
+      // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
+      // cade dopo 30 minuti di silenzio e la suite completa in cloud ne dura 37,
+      // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
+      // biglietto morto (è già costato un giro intero: venti commit spinti e
+      // nessun esito registrato). Chiederlo al prompt del lavoratore è la
+      // scommessa già persa sulla firma dei feedback e sul biglietto delle
+      // consegne: quello che deve succedere sempre lo fa lo strumento.
+      if (ticket) {
+        const b = startBeat(ROOT, ticket);
+        if (!b.started && b.why !== 'already_live' && b.why !== 'disabled') {
+          process.stderr.write(`[dispatch] battito non avviato (${b.why}): la lavorazione lunga rischia il semaforo\n`);
+        }
+      } else {
+        stopBeat(ROOT);
+      }
       run().then((r) => {
         process.exit(r?.exit ?? 0);
       }).catch((e) => {
