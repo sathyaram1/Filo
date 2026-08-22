@@ -1999,3 +1999,33 @@ test('in "In coda" il feedback in lavorazione è pinnato in cima con lo stato de
   // Il todo normale non ha la riga di stato.
   await expect(items.nth(1).locator('.mg-item-state')).toHaveCount(0);
 });
+
+test('un lavoro senza nessuno al lavoro dice che rientra in coda, non che aspetta una ripresa', async ({ openTab }) => {
+  // La riga prometteva "in attesa di ripresa" per una ripresa che non esisteva:
+  // un feedback fermo in implementazione non lo raccoglieva più nessuno, perché
+  // quello stato non è né in coda né in revisione. Due sono rimasti lì per
+  // giorni. Adesso il server li rimette in coda da solo, e la riga lo dice.
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  await page.evaluate(() => {
+    window.__mgTest.setData([
+      { _id: 'q-fermo', text: 'lavoro fermo', name: 'Fermo', seq: 7, subSeq: 0,
+        status: 'working', priority: 0,
+        // Nessun claim vivo e ingresso in lavorazione di tre ore fa: per la
+        // dashboard qui non c'è nessuno.
+        workingSince: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        workingResets: 2,
+        createdAt: '2026-07-01T10:00:00Z' },
+    ]);
+    window.__mgTest.setTab('queue');
+  });
+
+  const card = page.locator('#mgList .mg-item').first();
+  const state = card.locator('.mg-item-state');
+  await expect(state).toContainText('rientra in coda da solo');
+  await expect(state).not.toContainText('in attesa di ripresa');
+  // E quante volte è già successo si legge senza aprire niente.
+  await expect(card).toHaveAttribute('title', /rientrato in coda 2 volte/);
+});
