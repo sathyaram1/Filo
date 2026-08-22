@@ -582,50 +582,34 @@
     return entry.promise;
   }
 
+  // Le sezioni inline consegnano il loro STATO (testo, caricamento, errore), non
+  // nodi del DOM: a disegnarle è menu.js. Così la stessa sezione può comparire
+  // in un menu che sta disegnando un ALTRO frame — la pagina che ospita il
+  // riquadro incorporato in cui si è cliccato (#445) — senza che fra i due passi
+  // mai dell'HTML.
   function buildInlineExplain(selInfo, opts = {}) {
     const withDeepArrow = !!opts.withDeepArrow;
     return {
       type: 'inline',
+      variant: 'explain',
       content: I18n.t('menu_explain_loading'),
-      onMount: (el) => {
-        el.classList.add('sn-menu-inline-loading', 'sn-menu-inline-explain');
-        const body = document.createElement('div');
-        body.className = 'sn-menu-inline-body';
-        body.textContent = I18n.t('menu_explain_loading');
-        el.textContent = '';
-        el.appendChild(body);
-
-        if (withDeepArrow) {
-          const arrow = document.createElement('button');
-          arrow.type = 'button';
-          arrow.className = 'sn-menu-inline-arrow';
-          arrow.title = I18n.t('menu_explain_deep') + ' (Alt+E)';
-          arrow.textContent = '▸';
-          arrow.addEventListener('click', (e) => {
-            e.stopPropagation();
-            try { global.SN_MENU?.close?.(); } catch (_) {}
-            triggerExplainDeep(selInfo, deps.getLastMouseEvent());
-          });
-          el.appendChild(arrow);
-        }
-
+      arrow: withDeepArrow,
+      arrowTitle: I18n.t('menu_explain_deep') + ' (Alt+E)',
+      onArrow: () => triggerExplainDeep(selInfo, deps.getLastMouseEvent()),
+      onMount: (_el, update) => {
         let cancelled = false;
         getExplainPromise(selInfo).then((res) => {
           if (cancelled) return;
-          el.classList.remove('sn-menu-inline-loading');
           if (!res || res.error || !res.text) {
-            el.classList.add('sn-menu-inline-error');
-            body.textContent = (res && res.error) || I18n.t('err_provider_failed');
+            update({ state: 'error', text: (res && res.error) || I18n.t('err_provider_failed') });
             return;
           }
           const resolved = Popup.resolveCalcMarkers(res.text);
           if (/NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
-            const prev = el.previousElementSibling;
-            if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
-            el.remove();
+            update({ remove: true });
             return;
           }
-          body.innerHTML = Popup.renderMarkdown(resolved);
+          update({ state: 'ready', text: resolved, markdown: true });
         });
         return () => { cancelled = true; };
       },
