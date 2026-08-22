@@ -418,7 +418,11 @@
   // farlo entrare in coda senza passare dall'owner. Spenta l'automatica non
   // contano: restano visibili ma inerti (e lo si vede).
   function reflectAutoApprove(map) {
-    const m = (map && typeof map === 'object') ? map : {};
+    // Il ripiego sul vecchio interruttore unico di Claude vive nel modulo
+    // condiviso: una mappa salvata prima che si sdoppiassero non deve mostrare
+    // acceso ciò che l'owner aveva spento.
+    const resolved = (TH && TH.resolveAutoApprove) ? TH.resolveAutoApprove(map) : null;
+    const m = resolved || ((map && typeof map === 'object') ? map : {});
     for (const [group, el] of Object.entries(mgAutoApprove)) {
       if (el) el.checked = m[group] !== false;
     }
