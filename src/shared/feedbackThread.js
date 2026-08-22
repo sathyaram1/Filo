@@ -186,6 +186,9 @@
     var c = String(clientId || '');
     if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
     if (c.indexOf('owner:') === 0) return 'owner';
+    // La sessione locale prima del ramo agent/routine: non ha ruoli dopo i due
+    // punti da mappare, è una categoria sola.
+    if (c.indexOf('local:') === 0) return 'local';
     if (c.indexOf('agent:') === 0 || c.indexOf('routine:') === 0) {
       var role = c.slice(c.indexOf(':') + 1).trim().toLowerCase();
       return ROLE_KIND[role] || 'claude';
