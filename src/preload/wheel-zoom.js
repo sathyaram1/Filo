@@ -130,21 +130,72 @@ module.exports = function setupWheelZoom(webFrame, opts) {
         input.blur();
       }
     });
-    input.addEventListener('blur', () => { applyPercentFromInput(); });
+    input.addEventListener('blur', () => {
+      applyPercentFromInput();
+      // Finito di scrivere fuori dalla modalità rotella: riparte il conto alla
+      // rovescia, altrimenti il badge di passaggio resterebbe lì per sempre.
+      if (!zoomMode) armHide();
+    });
     el.appendChild(input);
     percentInput = input;
 
-    el.appendChild(document.createTextNode('%, rotella per zoomare'));
+    el.appendChild(document.createTextNode('%'));
+    hintEl = document.createElement('span');
+    hintEl.textContent = ', rotella per zoomare';
+    el.appendChild(hintEl);
     return el;
+  }
+
+  // Attacca il badge al documento (creandolo la prima volta) e ne allinea la
+  // coda: l'istruzione "rotella per zoomare" vale solo in modalità rotella.
+  function mountBadge(withHint) {
+    try {
+      if (!badge) badge = makeBadge();
+      if (!badge.isConnected) (document.body || document.documentElement).appendChild(badge);
+      if (hintEl) hintEl.style.display = withHint ? '' : 'none';
+      refreshPercent();
+    } catch (_) {}
+    return badge;
+  }
+
+  function unmountBadge() {
+    try { if (badge && badge.parentNode) badge.parentNode.removeChild(badge); } catch (_) {}
+  }
+
+  // Il badge non sparisce mentre l'utente ci sta interagendo: col puntatore
+  // sopra (sta andando a scriverci) o col cursore dentro il campo.
+  function badgeHeld() {
+    try {
+      if (percentInput && document.activeElement === percentInput) return true;
+      return !!(badge && badge.isConnected && badge.matches(':hover'));
+    } catch (_) { return false; }
+  }
+
+  function cancelHide() { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } }
+
+  function armHide() {
+    cancelHide();
+    hideTimer = setTimeout(() => {
+      hideTimer = null;
+      if (zoomMode) return;      // in modalità rotella il badge è permanente
+      if (badgeHeld()) { armHide(); return; }
+      unmountBadge();
+    }, BADGE_LINGER_MS);
+  }
+
+  // Badge "di passaggio": lo zoom è cambiato con Ctrl (tasti, rotella, pinch).
+  function flashBadge() {
+    if (zoomMode) return;        // lì il badge c'è già, e ci resta
+    mountBadge(false);
+    armHide();
   }
 
   function enter() {
     if (zoomMode) return;
     zoomMode = true;
+    cancelHide();                // se era di passaggio, ora è dell'ospite
     try {
-      if (!badge) badge = makeBadge();
-      (document.body || document.documentElement).appendChild(badge);
-      refreshPercent();
+      mountBadge(true);
       document.documentElement.style.cursor = 'zoom-in';
     } catch (_) {}
     try { document.documentElement.dataset.filoZoomMode = '1'; } catch (_) {}
@@ -153,7 +204,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   function exit() {
     if (!zoomMode) return;
     zoomMode = false;
-    try { if (badge && badge.parentNode) badge.parentNode.removeChild(badge); } catch (_) {}
+    cancelHide();
+    unmountBadge();
     try { document.documentElement.style.cursor = ''; } catch (_) {}
     try { delete document.documentElement.dataset.filoZoomMode; } catch (_) {}
   }
