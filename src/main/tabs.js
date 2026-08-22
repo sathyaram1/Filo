@@ -1809,7 +1809,8 @@ class TabManager {
       try {
         const f = params.frame;
         if (f && !f.detached && f !== wc.mainFrame) {
-          f.send('filo:broadcast', { type: MSG.FRAME_VIEW_POS, x: params.x, y: params.y });
+          const type = globalThis.SN_MSG?.MSG?.FRAME_VIEW_POS || 'frame_view_pos';
+          f.send('filo:broadcast', { type, x: params.x, y: params.y });
         }
       } catch (_) {}
     });
