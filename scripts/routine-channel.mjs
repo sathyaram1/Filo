@@ -329,7 +329,9 @@ if (isMain) {
     process.exit(1);
   };
 
-  if (!cmd || !args[0]) usage();
+  // `heartbeat` è l'unico comando che può girare senza posizionali: il ciclo lo
+  // avvia dispatch e il biglietto viaggia nell'ambiente, mai fra gli argomenti.
+  if (!cmd || (!args[0] && cmd !== 'heartbeat')) usage();
 
   if (cmd === 'probe') {
     const r = await probe(args[0]);
