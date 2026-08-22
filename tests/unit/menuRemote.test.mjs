@@ -58,9 +58,10 @@ test('la funzione da eseguire resta nel riquadro: di là va solo il suo riferime
 test('la riga di icone non viaggia: la pagina se la ricostruisce da sé', () => {
   const reg = newReg();
   const spec = Remote._serialize([
-    { type: 'row', navState: { canBack: false, canFwd: true }, items: [{ id: 'share', onClick: () => {} }] },
+    { type: 'row', kind: 'globalIcons', navState: { canBack: false, canFwd: true }, items: [{ id: 'share', onClick: () => {} }] },
   ], reg);
   assert.equal(spec[0].t, 'row');
+  assert.equal(spec[0].kind, 'globalIcons');
   assert.equal(spec[0].items, undefined);
   assert.deepEqual(spec[0].navState, { canBack: false, canFwd: true });
 });
