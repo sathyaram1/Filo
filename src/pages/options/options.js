@@ -882,6 +882,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    // #442 — modelli, chiavi e costi ripristinati da un backup si vedono nei
+    // controlli senza chiudere e riaprire le Opzioni.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(() => { load(); }, ['settings', 'costs']);
     // Niente pulsante "Salva": ogni modifica viene applicata e persistita
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
