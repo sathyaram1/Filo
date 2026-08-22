@@ -87,7 +87,12 @@
   color: var(--sn-muted);
 }
 .sn-mac-when,
+.sn-mac-who,
 .sn-mac-expiry { color: var(--sn-muted); font-size: 11.5px; }
+/* Chi ha chiesto: è il motivo per cui questa superficie esiste (chi chiede non
+   è chi approva), quindi non deve sparire nel sottotono — resta accanto al
+   commit, un filo più marcato del resto dei metadati. */
+.sn-mac-who { color: color-mix(in srgb, var(--sn-fg) 72%, var(--sn-muted)); }
 /* La scadenza è l'unica cosa che scade: si distingue dal resto del sottotono. */
 .sn-mac-expiry { color: var(--sn-accent); }
 
