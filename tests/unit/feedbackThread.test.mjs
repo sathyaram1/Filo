@@ -128,13 +128,18 @@ test('authorKind: routine:residuo è una categoria propria, non prober né verif
   assert.notEqual(TH.authorKind('routine:residuo'), 'verifier');
 });
 
-// Decisione presa APPOSTA (SPEC §13, non subìta per inerzia): il residuo è
-// un'automazione dell'owner come le altre tre, quindi ai fini dell'ingresso
-// automatico in coda cade nel gruppo `claude` — lo stesso interruttore della
-// dashboard decide per tutte. Gemello del test in filo-security
+// Provenienza e fiducia sono lo STESSO asse: ogni categoria che la coda mostra
+// con un'icona ha il suo interruttore d'ingresso automatico, rilievi residui
+// compresi. Prima le istanze di Claude ne avevano uno solo per tutte, e per
+// fermarne una bisognava fermarle tutte. Gemello del test in filo-security
 // (functions/test/autoApprove.test.js), che è la copia che decide davvero.
-test('autoApproveGroup: routine:residuo cade nel gruppo claude (deciso, SPEC §13)', () => {
-  assert.equal(TH.autoApproveGroup('routine:residuo'), 'claude');
+test('autoApproveGroup: il gruppo è la categoria d’autore, una per una', () => {
+  assert.equal(TH.autoApproveGroup('routine:residuo'), 'residuo');
+  assert.equal(TH.autoApproveGroup('routine:prober'), 'prober');
+  assert.equal(TH.autoApproveGroup('local:claude'), 'local');
+  for (const id of ['routine:residuo', 'routine:prober', 'local:claude', 'owner:x', 'tester']) {
+    assert.equal(TH.autoApproveGroup(id), TH.authorKind(id), id);
+  }
 });
 
 test('isFromOwner: vero solo per il prefisso owner:', () => {
