@@ -155,6 +155,8 @@ function watchSignal(onRing, { base, debounceMs = DEBOUNCE_MS } = {}) {
         if (timer) clearTimeout(timer);
         timer = setTimeout(ring, debounceMs);
       });
+      // Un orecchio teso non deve tenere in vita il processo per conto suo.
+      if (typeof watcher.unref === 'function') watcher.unref();
       // Una cartella temporanea può sparire sotto i piedi (pulizia del sistema):
       // il watcher muore e da lì in poi non suonerebbe più niente, in silenzio.
       // Si riarma, con calma.
