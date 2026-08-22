@@ -31,6 +31,8 @@ const MANAGE = 'filo://manage/manage.html';
 
 const SHA = 'a1b2c3d4'.repeat(5);
 
+const GIORNO = 24 * 60 * 60 * 1000;
+
 function richiesta(over = {}) {
   return Object.assign({
     id: 'ab12cd34ef56ab12cd34ef56',
@@ -42,11 +44,25 @@ function richiesta(over = {}) {
       { gate: 'dependency_change', label: 'Cambia le dipendenze del progetto', items: ['package.json'], more: 0 },
     ],
     createdAtMs: Date.now() - 2 * 60 * 1000,
-    expiresAtMs: Date.now() + 28 * 60 * 1000,
+    expiresAtMs: Date.now() + GIORNO - 2 * 60 * 1000,
     expired: false,
     used: false,
     discarded: false,
   }, over);
+}
+
+/**
+ * Quello che fa il main quando `npm run finish` suona il campanello: rilegge e
+ * manda l'elenco alle pagine filo:// aperte. Si usa la funzione VERA di
+ * broadcast (globalThis.SN_BROADCAST_FILO), non una copia.
+ */
+async function avvisaDalMain(app, payload) {
+  await app.evaluate((_electron, msg) => globalThis.SN_BROADCAST_FILO(msg), {
+    type: 'merge_approvals_changed',
+    pending: payload.pending || [],
+    recent: payload.recent || [],
+    ttlMs: GIORNO,
+  });
 }
 
 /**
