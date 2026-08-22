@@ -2365,6 +2365,11 @@ globalThis.SN_HANDLE_FILO_CHAT = handleFiloChat;
 // canali privilegiati (storage/settings): permette di simulare un mittente con
 // origine web e asserire che le chiavi API non trapelano. Vedi handlers/storage.js.
 globalThis.SN_HANDLE_MESSAGE = handleMessage;
+// Broadcast alle sole pagine filo://. Gli spec devono poter usare la funzione
+// VERA: riscriverne una copia nel test verificherebbe il test, non il codice —
+// e qui la cosa da verificare è proprio CHI riceve (una scheda su un sito
+// qualunque non deve vedere passare i rami dell'owner).
+globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
 
 module.exports = {
   handleMessage,
