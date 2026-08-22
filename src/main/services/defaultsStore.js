@@ -348,7 +348,16 @@ function autoApproveGroups() {
   return (T && T.AUTO_APPROVE_GROUPS) || ['owner', 'filo', 'claude', 'user'];
 }
 
+// Un documento salvato prima che gli interruttori si sdoppiassero ha il solo
+// `claude` per tutte le istanze: il ripiego che fa ereditare quel valore vive
+// nel modulo condiviso (resolveAutoApprove), così la dashboard e il backend di
+// sicurezza leggono la stessa mappa dallo stesso documento.
 function normalizeAutoApprove(raw) {
+  const T = globalThis.SN_FEEDBACK_THREAD;
+  if (T && T.resolveAutoApprove) {
+    const resolved = T.resolveAutoApprove(raw);
+    if (resolved) return resolved;
+  }
   const out = {};
   for (const g of autoApproveGroups()) {
     out[g] = !(raw && typeof raw === 'object' && raw[g] === false);

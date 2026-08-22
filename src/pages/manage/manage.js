@@ -22,11 +22,18 @@
   const mgAutoApproveBlock = document.getElementById('mgAutoApproveBlock');
   // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
   // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
+  // Un interruttore per ogni categoria d'autore che la lista mostra come icona
+  // (AUTHOR_META più sotto): chi si vede separato si regola separato.
   const mgAutoApprove = {
-    owner:  document.getElementById('mgAutoApproveOwner'),
-    filo:   document.getElementById('mgAutoApproveFilo'),
-    claude: document.getElementById('mgAutoApproveClaude'),
-    user:   document.getElementById('mgAutoApproveUser'),
+    owner:    document.getElementById('mgAutoApproveOwner'),
+    user:     document.getElementById('mgAutoApproveUser'),
+    local:    document.getElementById('mgAutoApproveLocal'),
+    worker:   document.getElementById('mgAutoApproveWorker'),
+    verifier: document.getElementById('mgAutoApproveVerifier'),
+    residuo:  document.getElementById('mgAutoApproveResiduo'),
+    prober:   document.getElementById('mgAutoApproveProber'),
+    claude:   document.getElementById('mgAutoApproveClaude'),
+    filo:     document.getElementById('mgAutoApproveFilo'),
   };
   // Interruttore master delle routine autonome (config/routines).
   const mgRoutinesSwitch = document.getElementById('mgRoutinesSwitch');
@@ -177,12 +184,12 @@
     // Rilievi rimasti aperti quando un lavoro «migliorabile» viene promosso
     // (SPEC-RIDISEGNO-MAX.md §13): categoria propria, così leggendo la coda si
     // vede che nasce dal declassamento di una verifica, non da un'esplorazione.
-    residuo:  { icon: '🧹', label: 'Claude — rilievo residuo' },
+    residuo:  { icon: '🧹', label: 'Claude (rilievi residui)' },
     // Sessione locale: Claude in chat con l'owner, sulla sua macchina. Icona
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
-    claude:   { icon: '🤖', label: 'Claude' },
+    claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
   };
   function authorKindOf(fb) {
     return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
@@ -411,7 +418,11 @@
   // farlo entrare in coda senza passare dall'owner. Spenta l'automatica non
   // contano: restano visibili ma inerti (e lo si vede).
   function reflectAutoApprove(map) {
-    const m = (map && typeof map === 'object') ? map : {};
+    // Il ripiego sul vecchio interruttore unico di Claude vive nel modulo
+    // condiviso: una mappa salvata prima che si sdoppiassero non deve mostrare
+    // acceso ciò che l'owner aveva spento.
+    const resolved = (TH && TH.resolveAutoApprove) ? TH.resolveAutoApprove(map) : null;
+    const m = resolved || ((map && typeof map === 'object') ? map : {});
     for (const [group, el] of Object.entries(mgAutoApprove)) {
       if (el) el.checked = m[group] !== false;
     }

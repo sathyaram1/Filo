@@ -198,54 +198,76 @@
 
   // ── Chi può entrare in coda da solo ────────────────────────────────────────
   // La modalità automatica non è più un sì/no per tutti: l'owner sceglie QUALI
-  // mittenti si fida di far entrare in coda senza passare da lui. I gruppi sono
-  // quelli che la dashboard già mostra come icona d'autore, con le tre istanze
-  // di Claude (esplora / implementa / verifica) fuse in una: sono lo stesso
-  // grado di fiducia, sono i suoi processi.
+  // mittenti si fida di far entrare in coda senza passare da lui.
   //
-  // `filo` resta SEPARATO da `claude` apposta: un feedback che nasce da Filo è
-  // la voce di un utente vero filtrata da un modello, non un'automazione
+  // UN INTERRUTTORE PER OGNI AUTORE CHE LA DASHBOARD MOSTRA. Fino a oggi le
+  // cinque istanze di Claude (esplorazione, sviluppo, verifica, rilievi
+  // residui, sessione locale) stavano dietro un interruttore solo: la coda le
+  // distingueva con cinque icone diverse ma la fiducia era una sola, quindi
+  // per non far entrare da solo l'esploratore bisognava fermare anche la
+  // sessione locale. I due assi ora coincidono: chi si vede separato si regola
+  // separato.
+  //
+  // `filo` resta SEPARATO dalle automazioni: un feedback che nasce da Filo è
+  // la voce di un utente vero filtrata da un modello, non un processo
   // dell'owner. Metterli insieme farebbe entrare in coda del contenuto scritto
   // da un utente sotto l'etichetta "automazioni".
-  var AUTO_APPROVE_GROUPS = ['owner', 'filo', 'claude', 'user'];
+  //
+  // L'ordine è quello della dashboard (AUTHOR_RANK in manage.js): prima le
+  // persone, poi le istanze di Claude dalla più vicina all'owner, in fondo Filo.
+  var AUTO_APPROVE_GROUPS = [
+    'owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo',
+  ];
+
+  // Le istanze di Claude. Servono al ripiego sul vecchio interruttore unico
+  // (vedi resolveAutoApprove): un documento salvato prima di oggi ha solo
+  // `claude`, e quel "no" deve continuare a valere per tutte e cinque finché
+  // l'owner non sceglie diversamente. Senza questo, spezzare l'interruttore
+  // riaprirebbe da solo cinque porte che l'owner aveva chiuso.
+  var CLAUDE_GROUPS = ['local', 'worker', 'verifier', 'residuo', 'prober', 'claude'];
+
+  // Il gruppo di fiducia di un mittente = la sua categoria d'autore, quella che
+  // la dashboard mostra come icona. Una funzione sola per i due assi.
   function autoApproveGroup(clientId) {
-    var k = authorKind(clientId);
-    if (k === 'owner' || k === 'filo' || k === 'user') return k;
-    // prober | worker | verifier | residuo | local | claude.
-    //
-    // Il `residuo` cade in `claude` per DECISIONE, non per inerzia
-    // (SPEC-RIDISEGNO-MAX.md §13): è un'automazione dell'owner come le altre
-    // tre, quindi stesso trattamento.
-    //
-    // `local` (la sessione locale) cade in `claude` per DECISIONE PRESA
-    // APPOSTA dall'owner, non perché sia caduta qui da sola. COSA SUCCEDE: un
-    // feedback aperto da una sessione locale, se i giudici lo dichiarano
-    // sicuro, entra in coda da solo senza che l'owner lo approvi a mano.
-    // PERCHÉ VA BENE: (1) il giudizio gira comunque — l'auto-approvazione
-    // salta l'approvazione manuale, non i controlli di sicurezza; (2) è una
-    // manopola, non un privilegio: l'interruttore "Claude" della tab
-    // Automazioni la spegne quando l'owner vuole. Cioè un default comodo e
-    // revocabile, non una porta che resta aperta.
-    // Conseguenza da conoscere: quell'interruttore è lo STESSO delle
-    // automazioni in cloud — spegnerlo spegne entrambe. Distinguere la
-    // provenienza (authorKind, sopra) e distinguere la FIDUCIA sono due assi
-    // diversi: sul secondo la sessione locale e le automazioni in cloud sono
-    // la stessa cosa, i processi dell'owner.
-    // Un test la inchioda su entrambi i repo.
-    return 'claude';
+    return authorKind(clientId);
+  }
+
+  /**
+   * La mappa salvata → la mappa completa, un valore per ogni gruppo. PURA.
+   *
+   * Due ripieghi, in quest'ordine:
+   *   · gruppo assente e mappa con il vecchio `claude` → eredita quel valore
+   *     (solo per le istanze di Claude: è l'interruttore che le teneva tutte);
+   *   · tutto il resto assente → ammesso, che è la semantica che l'automatica
+   *     aveva prima che i sottointerruttori esistessero.
+   *
+   * Mappa assente del tutto ⇒ `null`: il chiamante sa che non c'è scelta
+   * registrata e ammette tutti.
+   */
+  function resolveAutoApprove(map) {
+    if (!map || typeof map !== 'object') return null;
+    var legacy = map.claude;
+    var out = {};
+    for (var i = 0; i < AUTO_APPROVE_GROUPS.length; i++) {
+      var g = AUTO_APPROVE_GROUPS[i];
+      if (typeof map[g] === 'boolean') out[g] = map[g];
+      else if (legacy === false && CLAUDE_GROUPS.indexOf(g) >= 0) out[g] = false;
+      else out[g] = true;
+    }
+    return out;
   }
 
   // Decide se un feedback SICURO (giudicato allineato) può entrare in coda da
   // solo. PURA: la config arriva già letta.
-  //   cfg = { enabled: bool, autoApprove?: { owner, filo, claude, user } }
+  //   cfg = { enabled: bool, autoApprove?: { <gruppo>: bool, … } }
   // Interruttore master spento ⇒ mai, qualunque cosa dicano i sottointerruttori
   // (è lo stato sicuro: uno solo da spegnere per fermare tutto).
   // Mappa assente ⇒ tutti ammessi: è la semantica che l'automatica aveva prima
   // che i sottointerruttori esistessero, e non deve cambiare da sola.
   function autoApproveAllowed(clientId, cfg) {
     if (!cfg || cfg.enabled !== true) return false;
-    var map = cfg.autoApprove;
-    if (!map || typeof map !== 'object') return true;
+    var map = resolveAutoApprove(cfg.autoApprove);
+    if (!map) return true;
     return map[autoApproveGroup(clientId)] !== false;
   }
 
@@ -577,7 +599,9 @@
     // a deciderla davvero: se cambi i gruppi qui, riallinea quel file e rideploya.
     autoApproveGroup,
     autoApproveAllowed,
+    resolveAutoApprove,
     AUTO_APPROVE_GROUPS,
+    CLAUDE_GROUPS,
     ownerize,
     userTurnMarker,
     appendUserTurn,
