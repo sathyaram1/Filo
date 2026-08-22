@@ -150,7 +150,37 @@ clarify`); (3) fix fallito 3× (dispatch appende l'ultima critica del verifier +
   resta come storia di come ci si è arrivati, non come istruzione.
 - Se un'istanza trova `working` fresco: NON aspetta, passa al prossimo `todo`; se non
   c'è altro, termina con "niente da fare".
-- L'Action apply-triage **riconcilia**: rilascia claim orfani e resetta i `working`
+
+### 6a. Il recupero degli arenati (dal 2026-08-22)
+
+Col ridisegno il reset `working`→`todo` era rimasto **scritto nella tabella ma
+senza nessuno che lo eseguisse**: lo faceva l'Action qui sotto, smontata, e il
+server non l'ha mai ripreso. Siccome `working` non è né fra i `todo` né fra gli
+stati di revisione da cui il server sceglie il lavoro, un feedback fermo lì non
+lo raccoglieva più nessuno — due sono rimasti fermi per giorni mentre la
+dashboard scriveva "in attesa di ripresa". Adesso:
+
+- lo fa il **pacemaker**, ogni 20 minuti, sui soli feedback in `working`
+  (`functions/src/routine/stall.js`), e gira anche mentre un altro giro sta
+  lavorando a qualcos'altro: dipende solo dall'interruttore;
+- **la misura è il ramo, non il battito**: il battito dice che la sessione
+  respira, e una sessione bloccata in un giro a vuoto respira come una che
+  lavora. La punta del ramo la chiede il server a GitHub — non la dichiara la
+  sessione — e se non è avanzata da **un'ora** il lavoro è arenato. Un'ora è
+  larga apposta: la suite completa gira 25 minuti senza toccare un file. Non
+  costa niente quando le cose vanno bene, perché chi finisce lo dichiara e
+  libera tutto subito;
+- feedback senza ramo (istanza morta prima di spingere) → si conta da
+  `workingSince`. GitHub irraggiungibile → **non si recupera niente**: "non lo
+  so" non è "è morto", e recuperare butta via il ramo di chi sta lavorando;
+- il recupero libera il semaforo, riporta a `todo` e incrementa `workingResets`.
+  Alla **3ª volta** il feedback esce dal giro automatico → `design`
+  (`statusReason: arenato`) con nota per l'owner, o un guasto che si ripete ogni
+  ora si mangia il tetto giornaliero di accensioni entro sera.
+
+### 6b. Storia: la riconciliazione dell'Action (smontata)
+
+- L'Action apply-triage **riconciliava**: rilasciava claim orfani e resettava i `working`
   scaduti. Estensioni 2026-07-14 (recupero istanze morte, es. crediti esauriti):
   - il claim **sopravvive** all'applicazione dell'entry `working` (è la presa in
     carico: l'istanza sta ancora lavorando) e viene rilasciato solo alle consegne;
