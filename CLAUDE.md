@@ -134,6 +134,11 @@ accorciato:
    qualunque può usare la cosa; una riga, orientata al beneficio. Superfici
    owner e parti interne NON entrano.
 
+Prima di consegnare QUALSIASI testo destinato a un umano (i tre testi qui
+sopra, ma anche testi UI e documentazione) applica
+**`.claude/skills/unslop/SKILL.md`**: toglie i tic da testo generato e rende
+la scrittura chiara.
+
 ## Fonti di verità singole (aggiornale nello stesso commit)
 
 - **`src/shared/patchNotes.js`** — changelog per l'utente comune (che non sa
