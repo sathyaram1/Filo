@@ -244,7 +244,7 @@
     const spec = serialize(items, reg);
     const state = {
       token, reg, cleanups: [], ready: false, done: false, onFallback,
-      remoteClosed: false,
+      remoteClosed: false, keepOnScroll: !!keepOnScroll,
     };
     owned = state;
 
