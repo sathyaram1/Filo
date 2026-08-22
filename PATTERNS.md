@@ -385,7 +385,7 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
 - **Le famiglie non sono annidate: sono IMPILATE (#444).** "Appartiene a più
   famiglie" non vuol dire "una sta dentro l'altra". Le schede delle home video e
   social sono strati sovrapposti: l'anteprima che parte al passaggio del mouse si
-  stende SOPRA la copertina, e il link della scheda le passa sotto — o sopra,
+  stende SOPRA la copertina, e il link della scheda le passa sotto, o sopra
   quando è un velo trasparente che copre tutto. Cercare il collegamento solo fra
   gli **antenati** (`closest('a[href]')`) lo perde in tutti questi casi, e la
   scheda diventa irraggiungibile col tasto destro proprio mentre l'anteprima
