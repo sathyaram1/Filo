@@ -160,16 +160,31 @@
   }
 
   /**
+   * Come si riottiene una richiesta che è decaduta. PURA.
+   *
+   * Dipende da CHI aveva chiesto la fusione, e sbagliarlo manda l'owner a
+   * lanciare un comando che non c'entra niente: il lavoro locale si ripropone
+   * da questo computer, quello di un'automazione no — lì la segnalazione torna
+   * in attesa di una sua decisione.
+   */
+  function howToRetry(req) {
+    return originOf(req) === 'routine'
+      ? 'Il lavoro resta fermo e la segnalazione torna a te.'
+      : 'Rilancia npm run finish.';
+  }
+
+  /**
    * L'esito di un'approvazione, detto all'owner. PURA.
    *
    * Vale la stessa regola delle bolle di chat: mai il motivo tecnico lasciato
    * lì da interpretare, sempre cosa è successo e cosa fare adesso.
    */
-  function outcomeMessage(reply) {
+  function outcomeMessage(reply, req) {
     var r = reply || {};
+    var retry = howToRetry(req);
     if (r.ok === false || r.error) {
       var err = String(r.error || r.detail || r.reason || '');
-      if (/scadut/i.test(err)) return { kind: 'warn', text: 'La richiesta è scaduta: rilancia npm run finish e riapprova.' };
+      if (/scadut/i.test(err)) return { kind: 'warn', text: 'La richiesta è scaduta. ' + retry };
       if (/già stata usata|already_used/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era già stata usata.' };
       if (/scartat|discarded/i.test(err)) return { kind: 'warn', text: 'Questa richiesta era stata scartata.' };
       if (/non esiste|not_found/i.test(err)) return { kind: 'warn', text: 'Questa richiesta non c’è più.' };
@@ -178,8 +193,15 @@
       return { kind: 'err', text: err ? 'Non è riuscita: ' + err : 'Non è riuscita. Nessuna fusione è avvenuta.' };
     }
     if (r.result === 'merged') return { kind: 'ok', text: 'Fatto: il lavoro è su main' + (r.sha ? ' (' + shortSha(r.sha) + ')' : '') + '.' };
-    if (r.result === 'conflict') return { kind: 'warn', text: 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.' };
-    if (r.result === 'stale') return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. Rilancia npm run finish.' };
+    if (r.result === 'conflict') {
+      return {
+        kind: 'warn',
+        text: originOf(req) === 'routine'
+          ? 'Main è andato avanti e le modifiche non si incastrano da sole: serve un giro nuovo dell’automazione.'
+          : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.',
+      };
+    }
+    if (r.result === 'stale') return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. ' + retry };
     if (r.result === 'discarded') return { kind: 'ok', text: 'Scartata.' };
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }
