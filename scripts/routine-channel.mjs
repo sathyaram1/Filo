@@ -340,18 +340,37 @@ if (isMain) {
     if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
     console.log(JSON.stringify(r.payload, null, 2));
   } else if (cmd === 'heartbeat') {
+    // Il ciclo lo avvia dispatch, che passa il biglietto nell'ambiente: la riga
+    // di comando di un processo la legge chiunque sulla macchina.
+    const biglietto = args[0] || readTicket(ROOT);
+    if (!biglietto) { console.error('guasto: nessun biglietto'); process.exit(3); }
     if (!flags.includes('--loop')) {
-      const r = await heartbeat(args[0]);
+      const r = await heartbeat(biglietto);
       if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
       console.log(`OK: semaforo vivo fino a ${r.expiresAt}`);
     } else {
-      // Sessioni lunghe: si batte finché il server risponde. Quando il
-      // biglietto muore (rilasciato o semaforo caduto) il ciclo finisce da solo
+      // Sessioni lunghe: si batte finché il biglietto vale. Quando il server
+      // dice che è morto (rilasciato o semaforo caduto) il ciclo finisce da solo
       // — nessun processo che resta appeso a battere il cuore di un morto.
+      //
+      // Su un intoppo passeggero si RIBATTE più fitto invece di arrendersi: il
+      // battito è l'unica cosa che tiene in piedi un lavoro lungo, e mollarlo
+      // per un buco di rete di due minuti butterebbe via un'ora di lavoro come
+      // è già successo. Si insiste finché il semaforo può ancora essere vivo:
+      // oltre quella soglia il biglietto è morto comunque e insistere è rumore.
+      let primoGuastoMs = 0;
       for (;;) {
-        const r = await heartbeat(args[0]);
-        if (!r.ok) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
-        await defaultSleep(BEAT_EVERY_MS);
+        const r = await heartbeat(biglietto);
+        if (r.ok) { primoGuastoMs = 0; await defaultSleep(BEAT_EVERY_MS); continue; }
+        if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
+        const ora = Date.now();
+        if (!primoGuastoMs) primoGuastoMs = ora;
+        if (ora - primoGuastoMs >= LEASE_TTL_MS) {
+          console.error(`battito finito: canale irraggiungibile da ${Math.round((ora - primoGuastoMs) / 60000)} minuti`);
+          process.exit(0);
+        }
+        console.error(`battito: intoppo (${r.reason}), riprovo`);
+        await defaultSleep(RETRY_EVERY_MS);
       }
     }
   } else if (cmd === 'release') {
