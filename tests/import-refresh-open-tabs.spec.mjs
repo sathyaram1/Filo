@@ -137,5 +137,3 @@ test('#442 — la conferma "importazione completata" resta leggibile (niente rel
     rmSync(backup.dir, { recursive: true, force: true });
   }
 });
-
-void MARK;
