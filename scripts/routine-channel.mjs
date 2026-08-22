@@ -261,7 +261,11 @@ export async function compare(t, mine, opts) {
  * Stessi ritentativi di call(): i guasti transienti (rete, 5xx) si ritentano,
  * un rifiuto no.
  *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha? }
+ * `approval` c'è solo sui blocchi: è la richiesta che il server ha aperto per
+ * l'owner. Va portata fin qui, o chi legge il registro crede che il ramo sia
+ * perduto proprio nel caso in cui invece basta un via libera.
+ *
+ * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha?, approval? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
@@ -272,6 +276,7 @@ export async function merge(t, branch, opts) {
       result: String(body.result),
       reason: String(body.reason || ''),
       sha: String(body.sha || ''),
+      approval: String(body.approval || ''),
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
