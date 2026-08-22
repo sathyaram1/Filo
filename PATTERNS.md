@@ -448,6 +448,12 @@ Le regole che tengono in piedi la cosa:
   AI, anteprima di un link) mandano il loro STATO `{ state, text, markdown }` e a
   disegnarlo è `menu.js` dall'altra parte. Il markdown si rende **di là**, dal
   testo. Un riquadro ostile non ha un canale per iniettare markup nella pagina.
+- **Serve un click destro vero.** Il ponte lascia disegnare un menu solo se il
+  main ha visto, poco prima, un `context-menu` in QUEL frame: un menu con la
+  faccia di Filo che compare quando lo decide il sito non è un menu.
+- **La riga di icone non viaggia**: porta un nome (`kind`) e la pagina
+  ricostruisce la sua, col suo layout e il suo trascinamento. Una riga senza
+  nome sparisce invece di diventare quella sbagliata.
 - **Chi produce una sezione inline non tocca il DOM.** È la ragione per cui
   `onMount(el, update)` consegna uno stato: la stessa sezione deve poter essere
   disegnata da un frame diverso da quello che la produce. Se aggiungi una sezione
