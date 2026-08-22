@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { beatIsLive, readBeat, startBeat, beatFile } from '../../scripts/lib/routine-beat.mjs';
+import { beatIsLive, readBeat, startBeat, stopBeat, beatFile } from '../../scripts/lib/routine-beat.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
