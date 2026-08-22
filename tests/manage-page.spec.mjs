@@ -288,6 +288,57 @@ test('#446 — gli interruttori per mittente scrivono nella config, uno alla vol
   await expect(page.locator('#mgAutoApproveOwner')).toBeChecked();
 });
 
+test('ogni istanza di Claude si spegne da sola, senza trascinare le altre', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+
+  await stubAutomation(page, { enabled: true });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+
+  // L'esploratore non entra più in coda da solo…
+  await page.evaluate(() => {
+    const el = document.getElementById('mgAutoApproveProber');
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.__automation.autoApprove.prober))
+    .toBe(false);
+
+  // …e la sessione locale, che è l'istanza che lavora insieme all'owner, resta
+  // ammessa: è il motivo per cui gli interruttori si sono sdoppiati.
+  expect(await page.evaluate(() => window.__automation.autoApprove.local)).not.toBe(false);
+  await expect(page.locator('#mgAutoApproveLocal')).toBeChecked();
+  await expect(page.locator('#mgAutoApproveWorker')).toBeChecked();
+  await expect(page.locator('#mgAutoApproveVerifier')).toBeChecked();
+  await expect(page.locator('#mgAutoApproveResiduo')).toBeChecked();
+});
+
+test('una config salvata prima dello sdoppiamento non riaccende le istanze spente', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+
+  // La mappa vecchia: un solo interruttore per tutte le istanze di Claude, spento.
+  await stubAutomation(page, {
+    enabled: true,
+    autoApprove: { owner: true, filo: true, claude: false, user: true },
+  });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+
+  for (const id of ['mgAutoApproveLocal', 'mgAutoApproveWorker', 'mgAutoApproveVerifier',
+    'mgAutoApproveResiduo', 'mgAutoApproveProber', 'mgAutoApproveClaude']) {
+    await expect(page.locator('#' + id)).not.toBeChecked();
+  }
+  await expect(page.locator('#mgAutoApproveOwner')).toBeChecked();
+  await expect(page.locator('#mgAutoApproveUser')).toBeChecked();
+});
+
 test('#446 — con l\'automatica spenta gli interruttori per mittente non decidono niente', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
