@@ -1999,6 +1999,13 @@
     wire();
     await loadLayout();
     await route();
+    // #442 — un'importazione da backup ha rimesso dentro i mazzi: la libreria
+    // (o il mazzo aperto) si rilegge da sola. `route()` e non `init()`: le
+    // iscrizioni agli eventi sono già montate e ri-montarle le duplicherebbe.
+    window.SN_PAGE_BOOTSTRAP.onDataImported(
+      () => { route().catch(() => {}); },
+      ['decks', 'decksUi', 'settings'],
+    );
   }
 
   init();
