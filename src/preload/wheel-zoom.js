@@ -63,10 +63,13 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   const ZOOM_STEP = 0.5;   // come un passo di Ctrl +/- (in "zoom level")
   const MIN_LEVEL = -5;
   const MAX_LEVEL = 5;
+  const BADGE_LINGER_MS = 2000; // quanto resta il badge dopo uno zoom con Ctrl
 
   let zoomMode = false;
   let badge = null;
   let percentInput = null;
+  let hintEl = null;       // la coda ", rotella per zoomare" (solo in modalità rotella)
+  let hideTimer = null;
   let suppressContextMenu = false;
 
   // Percentuale di zoom corrente (100 = nessuno zoom).
