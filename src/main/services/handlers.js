@@ -2371,6 +2371,7 @@ module.exports = {
   handleStream,
   broadcastLiveUpdate,
   broadcastToTabs,
+  broadcastToFiloPages,
   handleAIRequest,
   maybeCategorizeAsync,
   wireSafebrowse,
