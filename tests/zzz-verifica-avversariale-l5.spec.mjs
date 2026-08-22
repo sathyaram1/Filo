@@ -156,6 +156,17 @@ test('gli esiti negativi non consigliano una strada sbagliata', async ({ openTab
   await expect(card.locator('.sn-mac-status')).toContainText('già stata usata');
 });
 
+test('i suggerimenti sotto il puntatore sono giusti per la provenienza', async ({ openTab }) => {
+  const page = await apri(openTab, { pending: [ROUTINE, LOCALE] });
+  const cards = page.locator('#mgMergeApprovals .sn-mac-card');
+  const titoliRoutine = await cards.nth(0).evaluate((c) =>
+    [...c.querySelectorAll('[title]')].map((n) => n.getAttribute('title')));
+  console.log('SUGGERIMENTI SU LAVORO DI AUTOMAZIONE:\n' + titoliRoutine.join('\n'));
+  const sbagliati = titoliRoutine.filter((t) => /npm run finish/.test(t));
+  console.log('quelli che parlano di npm run finish: ' + sbagliati.length);
+  expect(sbagliati, 'su una richiesta di automazione nessun suggerimento deve parlare di npm run finish').toEqual([]);
+});
+
 test('chi non è owner non vede niente', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
