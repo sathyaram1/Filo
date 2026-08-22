@@ -311,6 +311,12 @@
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
     if (e.shiftKey) return;
 
+    // #445 — dentro un riquadro incorporato: metà della misura "dove sono nella
+    // finestra". L'altra metà (le coordinate dello stesso clic viste dalla
+    // scheda) la manda il main. Serve a far disegnare il menu alla pagina quando
+    // qui dentro non ci starebbe.
+    try { self.SN_MENU_REMOTE?.noteLocalPoint?.(e.clientX, e.clientY); } catch (_) {}
+
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
     // / page-preload bridge a document_start), quindi stopPropagation interrompe
