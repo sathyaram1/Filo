@@ -396,11 +396,17 @@ if (isMain) {
     // parole nel testo di ritorno (che nessuna macchina legge).
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
     const r = await release(args[0], guasto);
-    // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro
-    // dopo (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo
-    // adesso evita dieci minuti di processo che batte per un morto.
-    const { stopBeat } = await import('./lib/routine-beat.mjs');
-    stopBeat(resolve(fileURLToPath(new URL('..', import.meta.url))));
+    // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
+    // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
+    // evita dieci minuti di processo che batte per un morto.
+    //
+    // SOLO se il rilascio è andato a buon fine, e SOLO il battito di QUESTO
+    // biglietto: un rilascio rifiutato non ha liberato niente, e spegnere "il
+    // battito che c'è" ammazzava il lavoro di un altro giro ancora vivo.
+    if (r.ok) {
+      const { stopBeat } = await import('./lib/routine-beat.mjs');
+      stopBeat(resolve(fileURLToPath(new URL('..', import.meta.url))), { ticket: args[0] });
+    }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
   } else if (cmd === 'deliver') {
