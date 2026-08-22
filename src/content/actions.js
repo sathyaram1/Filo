@@ -620,14 +620,12 @@
   function buildInlineExplainImage(imgEl) {
     return {
       type: 'inline',
+      variant: 'plain',
       content: I18n.t('menu_explain_loading'),
-      onMount: (el) => {
-        el.classList.add('sn-menu-inline-loading');
+      onMount: (_el, update) => {
         const src = imgEl.currentSrc || imgEl.src;
         if (!src) {
-          el.textContent = I18n.t('err_provider_failed');
-          el.classList.remove('sn-menu-inline-loading');
-          el.classList.add('sn-menu-inline-error');
+          update({ state: 'error', text: I18n.t('err_provider_failed') });
           return () => {};
         }
         let cancelled = false;
@@ -643,18 +641,14 @@
               payload: { dataUrl },
             });
             if (cancelled) return;
-            el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
-              el.classList.add('sn-menu-inline-error');
-              el.textContent = res?.error || I18n.t('err_provider_failed');
+              update({ state: 'error', text: res?.error || I18n.t('err_provider_failed') });
               return;
             }
-            el.textContent = res.text;
+            update({ state: 'ready', text: res.text });
           } catch (e) {
             if (cancelled) return;
-            el.classList.remove('sn-menu-inline-loading');
-            el.classList.add('sn-menu-inline-error');
-            el.textContent = I18n.t('err_provider_failed');
+            update({ state: 'error', text: I18n.t('err_provider_failed') });
           }
         })();
         return () => { cancelled = true; };
