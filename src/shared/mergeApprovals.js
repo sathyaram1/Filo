@@ -357,6 +357,9 @@
       var li = el('li', 'sn-mac-recent-row');
       li.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
       li.appendChild(el('span', 'sn-mac-recent-what', esito));
+      // La traccia serve a rispondere a "chi, cosa, quando": senza il chi
+      // risponde a due domande su tre.
+      li.appendChild(el('span', 'sn-mac-recent-who', requestedBy(r.who)));
       li.appendChild(el('span', 'sn-mac-recent-when', timeAgo(r.decidedAtMs || r.expiresAtMs, now)));
       li.dataset.outcome = esito;
       ul.appendChild(li);
