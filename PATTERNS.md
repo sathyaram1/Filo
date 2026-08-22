@@ -382,9 +382,36 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   così il chiamante decide: **una sola** sezione "Spiega" inline (quella
   dell'elemento primario), perché ogni box `inline` fa una chiamata al modello a
   ogni apertura del menu — due box = doppio costo per un menu che si apre spesso.
-- **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`)
-  e `findMedia` in `src/content/content.js`, voci in `src/content/actions.js`.
-  Test: `tests/context-menu-media.spec.mjs`, `tests/context-menu-image-link.spec.mjs`.
+- **Le famiglie non sono annidate: sono IMPILATE (#444).** "Appartiene a più
+  famiglie" non vuol dire "una sta dentro l'altra". Le schede delle home video e
+  social sono strati sovrapposti: l'anteprima che parte al passaggio del mouse si
+  stende SOPRA la copertina, e il link della scheda le passa sotto — o sopra,
+  quando è un velo trasparente che copre tutto. Cercare il collegamento solo fra
+  gli **antenati** (`closest('a[href]')`) lo perde in tutti questi casi, e la
+  scheda diventa irraggiungibile col tasto destro proprio mentre l'anteprima
+  suona. Regola: **ogni** famiglia ha il suo ripiego "sotto il punto cliccato"
+  (`elementsFromPoint`), non solo il media; e due elementi impilati si tengono
+  insieme quando occupano **lo stesso rettangolo** (`sameCardArea`: dentro il
+  link, oppure almeno metà del media dentro il riquadro del link). È quella
+  misura — non la parentela nel DOM — a distinguere la scheda vera dal video di
+  sfondo a tutta pagina che si trova per caso un link sotto il cursore.
+- **`closest()` si ferma al confine di un componente web.** `realTarget` con
+  `composedPath()[0]` ti dà l'elemento vero dentro lo shadow root, ma da lì la
+  risalita non vede più gli antenati in chiaro: un `<video>` in un componente
+  dentro l'`<a>` della scheda sembrava senza collegamento. Chi cerca un antenato
+  a partire dal target usa `closestAcrossShadow` (risale, e quando la radice è
+  uno shadow root riparte dal suo host), mai `closest` nudo.
+- **Il riconoscimento del contesto sta in UN posto** (`detectContext`): il menu
+  si apre da due strade (menu normale e menu di correzione) e con la ricerca
+  copiata in tutt'e due lo stesso clic finiva col dare due menu diversi a seconda
+  che sotto ci fosse o no una parola da correggere.
+- **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`),
+  `detectContext`, `findMedia`, `findLinkUnder`, `sameCardArea` e
+  `closestAcrossShadow` in `src/content/content.js`, voci in
+  `src/content/actions.js`. Test: `tests/context-menu-media.spec.mjs`,
+  `tests/context-menu-image-link.spec.mjs`,
+  `tests/context-menu-media-link.spec.mjs`,
+  `tests/context-menu-video-preview-link.spec.mjs`.
 
 ## Riquadri incorporati (iframe): Filo gira anche lì, ma un riquadro non è la pagina
 
