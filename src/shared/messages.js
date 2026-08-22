@@ -546,6 +546,15 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // #445 — contropartita di PROJECT_MENU: il ponte consegna il messaggio al
+    // frame dall'altra parte (la pagina che ospita il riquadro, o il riquadro
+    // che ha aperto il menu). Stessi campi.
+    PROJECTED_MENU: 'projected_menu',
+    // #445 — il main dice a un riquadro dove si trova dentro la finestra, misurato
+    // sull'ultimo click destro (coordinate native del context-menu meno quelle
+    // locali dell'evento). Serve al riquadro per sapere DOVE far disegnare il menu
+    // alla pagina. Senza, il menu resta dentro il riquadro. { x, y }
+    FRAME_VIEW_POS: 'frame_view_pos',
     // Broadcast da background -> dashboard: lo stato live è cambiato
     // (nuovo timer, notifica, ecc.) e va re-renderizzato.
     FILO_LIVE_UPDATED: 'filo_live_updated',
