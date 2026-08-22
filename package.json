@@ -25,7 +25,8 @@
     "feedback:login": "node scripts/admin-login.mjs",
     "build": "electron-builder --win",
     "release": "electron-builder --win --publish always",
-    "feedback": "node scripts/owner-feedback.mjs"
+    "feedback": "node scripts/owner-feedback.mjs",
+    "feedback:apri": "node scripts/claude-feedback.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
