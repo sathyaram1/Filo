@@ -578,7 +578,10 @@
   // resterebbe fermo sopra un contenuto che si è già spostato.
   if (IS_SUBFRAME) {
     try {
-      const bail = () => { if (hasProjection()) { try { global.SN_MENU?.close?.(); } catch (_) {} } };
+      const bail = () => {
+        if (!hasProjection() || owned.keepOnScroll) return;
+        try { global.SN_MENU?.close?.(); } catch (_) {}
+      };
       window.addEventListener('scroll', bail, true);
       window.addEventListener('resize', bail, true);
     } catch (_) {}
