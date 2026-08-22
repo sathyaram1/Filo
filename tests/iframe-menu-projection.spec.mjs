@@ -183,3 +183,54 @@ test('«Incolla» dal menu disegnato dalla pagina scrive nel campo del riquadro'
   await expect.poll(async () => frame.locator('#campo').inputValue(), { timeout: 6000 })
     .toContain('mondo');
 });
+
+test('la correzione ortografica compare e corregge anche dal menu disegnato dalla pagina', async ({ app, openTab, testServer }) => {
+  // La riga di correzione arriva DOPO l'apertura del menu (il correttore
+  // risponde quando risponde) e nasce nel riquadro: deve poter comparire in un
+  // menu che sta disegnando un altro frame, e correggere davvero la parola.
+  const inner = `<!doctype html><html><body style="margin:0">
+    <div id="ce" contenteditable="true" spellcheck="true"
+         style="font:16px monospace;padding:8px;width:420px;height:60px">wrlod ciao</div>
+  </body></html>`;
+  const page = await testServer.openReady(openTab, outer(testServer.html(inner)));
+  const frame = page.frames().find((f) => f !== page.mainFrame() && f.url().includes('http'));
+
+  // Monta Filo nel riquadro (i content script partono alla prima interazione).
+  await page.frameLocator('#embed').locator('#ce').click();
+  await frame.waitForFunction(
+    () => document.documentElement.dataset.filoContentReady === '1',
+    null, { timeout: 8000 },
+  );
+
+  // I suggerimenti del correttore di sistema, come li manda Electron al frame
+  // che ha ricevuto il click destro.
+  await app.evaluate(({ webContents }, host) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let frames = [];
+      try { frames = wc.mainFrame ? wc.mainFrame.framesInSubtree : []; } catch (_) { frames = []; }
+      for (const f of frames) {
+        try {
+          if (new URL(f.url).host !== host) continue;
+          f.send('filo:broadcast', { type: '_spell:native', word: 'wrlod', suggestions: ['world', 'word'] });
+        } catch (_) {}
+      }
+    }
+  }, new URL(frame.url()).host);
+  await frame.waitForFunction(
+    () => document.documentElement.dataset.filoNativeWord === 'wrlod',
+    null, { timeout: 8000 },
+  );
+
+  const box = await page.locator('#embed').boundingBox();
+  await page.mouse.click(box.x + 18, box.y + 16, { button: 'right' });
+
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 8000 });
+  const correction = menu.locator('.sn-menu-correction');
+  await expect(correction).toBeVisible({ timeout: 8000 });
+  await expect(correction).toContainText('world');
+
+  await correction.locator('.sn-menu-correction-main').click();
+  await expect.poll(async () => frame.locator('#ce').textContent(), { timeout: 6000 })
+    .toContain('world');
+});
