@@ -222,6 +222,63 @@ module.exports = function register(on, ctx) {
     type: MSG.CLOSE_OTHER_MENUS,
   }));
 
+  // #445 — menu del tasto destro disegnato dalla PAGINA per conto di un riquadro
+  // incorporato troppo basso per contenerlo. Instrada in entrambe le direzioni
+  // fra due soli frame della stessa scheda: il riquadro che ha aperto il menu e
+  // il frame principale che lo disegna. Il legame nasce con 'open' e dura finché
+  // il menu resta aperto; ogni messaggio successivo deve portare lo stesso
+  // token, altrimenti non va da nessuna parte. Nessun altro frame è
+  // raggiungibile, e un frame non può parlare a se stesso.
+  on(MSG.PROJECT_MENU, async (msg, sender) => {
+    const wc = sender && sender.wc;
+    const from = sender && sender.frame;
+    if (!wc || !from) return { ok: false, error: 'no-sender' };
+    const phase = String(msg?.phase || '');
+    let main = null;
+    try { main = wc.mainFrame; } catch (_) { main = null; }
+    if (!main || main.detached) return { ok: false, error: 'no-main-frame' };
+
+    const send = (target, payload) => {
+      if (!target || target.detached) return { ok: false, error: 'frame-gone' };
+      try { target.send('filo:broadcast', { ...payload, type: MSG.PROJECTED_MENU }); } catch (e) {
+        return { ok: false, error: e.message || String(e) };
+      }
+      return { ok: true };
+    };
+
+    if (phase === 'open') {
+      // Solo un riquadro può CHIEDERE la proiezione: il frame principale ha già
+      // tutta la finestra e non ha niente da delegare.
+      if (from === main) return { ok: false, error: 'not-a-subframe' };
+      const token = String(msg?.token || '');
+      if (!token) return { ok: false, error: 'no-token' };
+      wc._filoProjectedMenu = { token, frame: from };
+      return send(main, {
+        phase: 'open',
+        token,
+        spec: msg?.spec,
+        x: Number(msg?.x) || 0,
+        y: Number(msg?.y) || 0,
+        keepOnScroll: !!msg?.keepOnScroll,
+      });
+    }
+
+    const link = wc._filoProjectedMenu;
+    if (!link || !msg?.token || link.token !== String(msg.token)) {
+      return { ok: false, error: 'no-projection' };
+    }
+    // La direzione la decide CHI parla: dal frame principale si torna al
+    // riquadro, dal riquadro si va al frame principale. Un terzo frame che
+    // conoscesse il token non otterrebbe comunque niente.
+    if (from === main) {
+      if (phase === 'close') wc._filoProjectedMenu = null;
+      return send(link.frame, { phase, token: link.token, id: msg?.id, arg: msg?.arg });
+    }
+    if (from !== link.frame) return { ok: false, error: 'not-the-owner' };
+    if (phase === 'close') wc._filoProjectedMenu = null;
+    return send(main, { phase, token: link.token, path: msg?.path, props: msg?.props });
+  });
+
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {
     // Usa l'API nativa di Electron per sostituire la parola sotto il cursore
     // del context-menu nativo (vedi `wc.on('context-menu', ...)` in tabs.js).
