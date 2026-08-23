@@ -1290,13 +1290,19 @@
     // Quando nessuno sta lavorando, la riga deve dire una cosa VERA. Scriveva
     // "in attesa di ripresa" per una ripresa che il sistema non sapeva fare: i
     // feedback fermi in implementazione non li raccoglieva più nessuno, e due
-    // sono rimasti lì per giorni. Adesso il server li rimette in coda da solo
-    // dopo un'ora di ramo fermo, ed è quello che la riga racconta.
+    // sono rimasti lì per giorni. Adesso il server li rimette in coda da solo, e
+    // "sta lavorando ora" si legge dal battito, non dall'ora trascorsa dalla
+    // presa in carico — con quella, ogni lavorazione più lunga di un'ora veniva
+    // dichiarata morta mentre era viva.
+    //
+    // Nessun tempo promesso: il momento del rientro dipende da quando il ramo si
+    // è fermato, e una riga che dice "fra un'ora" sarebbe di nuovo una cosa non
+    // vera.
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
       : `<span class="mg-work-idle">${
           progress.current.key === 'impl'
-            ? 'Nessun segnale da un’ora: se non ci lavora nessuno rientra in coda da solo'
+            ? 'Nessuna istanza al lavoro: rientra in coda da solo'
             : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;
     return `<div class="mg-item-state">${steps}${who}</div>`;

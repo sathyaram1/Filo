@@ -260,7 +260,7 @@
     tabFor,
     TRANSITIONS, ACTORS, canTransition, transitionsFrom, canReach,
     LEGACY_SIMPLE, LEGACY_STATUSES, isLegacy,
-    WORKING_TTL_MS, isWorkingExpired,
+    WORKING_TTL_MS, isWorkingExpired, BEAT_STALE_MS, isBeating,
     PUBLIC_MAP, isResolvedForUser, padForCipher, unpadFromCipher, CIPHER_PAD,
   };
 
