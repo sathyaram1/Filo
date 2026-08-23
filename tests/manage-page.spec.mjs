@@ -2000,6 +2000,32 @@ test('in "In coda" il feedback in lavorazione è pinnato in cima con lo stato de
   await expect(items.nth(1).locator('.mg-item-state')).toHaveCount(0);
 });
 
+test('un lavoro lungo ma VIVO non viene dichiarato morto dalla scheda', async ({ openTab }) => {
+  // Il caso normale, non l'eccezione: la sola suite completa dura mezz'ora, e
+  // prima bastava un'ora dalla presa in carico perché la scheda dicesse
+  // "nessuno ci sta lavorando" mentre un'istanza lavorava eccome. Adesso conta
+  // il battito, che arriva finché la sessione è viva.
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  await page.evaluate(() => {
+    window.__mgTest.setData([
+      { _id: 'q-vivo', text: 'lavoro lungo', name: 'Vivo', seq: 8, subSeq: 0,
+        status: 'working', priority: 0,
+        // Preso in carico tre ore fa, ma ha battuto due minuti fa.
+        workingSince: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        beatAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+        createdAt: '2026-07-01T10:00:00Z' },
+    ]);
+    window.__mgTest.setTab('queue');
+  });
+
+  const state = page.locator('#mgList .mg-item').first().locator('.mg-item-state');
+  await expect(state).toContainText("Un'istanza ci sta lavorando ora");
+  await expect(state).not.toContainText('rientra in coda');
+});
+
 test('un lavoro senza nessuno al lavoro dice che rientra in coda, non che aspetta una ripresa', async ({ openTab }) => {
   // La riga prometteva "in attesa di ripresa" per una ripresa che non esisteva:
   // un feedback fermo in implementazione non lo raccoglieva più nessuno, perché
