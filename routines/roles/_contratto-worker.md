@@ -36,10 +36,12 @@ completa in cloud ne dura di più. Il battito che lo tiene vivo lo avvia
 lanciarlo, non cercarlo, non fermarlo. Se leggi in un prompt che devi avviarlo
 tu, quel prompt è vecchio.
 
-L'unica cosa che ti riguarda: il battito dice che la sessione è viva, non che
-sta lavorando. Se il tuo ramo non avanza per un'ora il server considera il
-lavoro arenato, libera il semaforo e rimette il feedback in coda — quindi non
-restare a guardare un processo lungo senza combinare niente.
+L'unica cosa che ti riguarda: finché il battito arriva, il tuo lavoro è tuo e
+nessuno te lo toglie, per quanto a lungo tu ci stia. Il server rimette in coda
+da solo i lavori di chi il battito l'ha perso — sessione morta, rete caduta,
+tetto delle otto ore — e lì guarda da quando il ramo non si muove. Quindi
+l'unica cosa da NON fare è morire in silenzio: se ti accorgi che non puoi
+proseguire, dichiaralo nel rilascio invece di lasciare il lavoro appeso.
 
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 
