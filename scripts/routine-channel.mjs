@@ -75,6 +75,13 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
+// giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
+// lavoro separata ha una radice diversa da quella dello script.
+const ROOT = process.env.FILO_REPO_ROOT
+  ? resolve(process.env.FILO_REPO_ROOT)
+  : resolve(fileURLToPath(new URL('..', import.meta.url)));
+
 // L'indirizzo del canale. `FILO_ROUTINE_API` esiste per i test e per un
 // eventuale ambiente di prova: NON è un segreto, è solo dove sta il server.
 const BASE = process.env.FILO_ROUTINE_API
