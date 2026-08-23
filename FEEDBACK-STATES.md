@@ -170,12 +170,19 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   che mezz'ora. Una sessione viva ma davvero impantanata resta comunque limitata
   dal **tetto duro del semaforo (8 ore)**, scaduto il quale ricade nel caso qui
   sotto. Meglio aspettare quel tetto che ammazzare un lavoratore onesto;
-- **senza semaforo vivo**, il conto parte dall'ingresso in lavorazione
-  (`workingSince`, o `createdAt` per i documenti che non ce l'hanno) e la soglia
-  è **un'ora**. Prima di sfrattare si guarda il ramo: se è avanzato dall'ultima
-  occhiata, il cronometro riparte — sono i commit di qualcuno che stava ancora
-  combinando qualcosa, e non si buttano via. La punta del ramo la chiede il
-  server a GitHub, non la dichiara la sessione;
+- **senza semaforo vivo**, "da quando è fermo" è il più recente fra due limiti:
+  l'ingresso in lavorazione (`workingSince`, o `createdAt` per i documenti che
+  non ce l'hanno) e **la data dell'ultimo commit sul ramo**, che il server chiede
+  a GitHub e la sessione non dichiara. Soglia: **un'ora**. Un commit recente
+  salva chi stava ancora combinando qualcosa anche senza semaforo; l'ingresso in
+  lavorazione impedisce che un ramo nato da un commit vecchio condanni un lavoro
+  appena cominciato. Una data di commit nel futuro si BUTTA (orologio che mente)
+  invece di tagliarla ad adesso, o regalerebbe un'ora di vita a ogni giro;
+- ⚠️ la data è assoluta di proposito. Le prime due versioni la ricostruivano
+  ricordandosi fra un giro e l'altro dove stava il ramo, e **tutte e due le
+  volte quel ricordo non veniva mai scritto**: la misura sembrava esserci e non
+  entrava mai in funzione. Una domanda a cui GitHub risponde da sé non si tiene
+  a memoria;
 - GitHub irraggiungibile, o semafori illeggibili → **non si recupera niente**:
   "non lo so" non è "è morto", e recuperare alla cieca butta via giri interi;
 - il recupero libera il semaforo, riporta a `todo`, **azzera il cronometro**
