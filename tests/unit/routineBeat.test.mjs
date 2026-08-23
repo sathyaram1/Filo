@@ -102,6 +102,27 @@ test('biglietto nuovo: il battito si riaccende, e il vecchio non resta orfano', 
   }
 });
 
+test('un marcatore vecchio di giorni non fa ammazzare un estraneo', () => {
+  // Il sistema operativo riassegna i numeri di processo. Un marcatore di tre
+  // giorni fa nomina un numero che adesso è di qualcun altro, e spegnerlo
+  // vorrebbe dire terminare un programma che non c'entra niente: riprodotto dal
+  // vivo. Il controllo d'età serve a questo, e vale su ENTRAMBE le strade.
+  const casa = casaFinta();
+  const uccisi = [];
+  const killVero = process.kill.bind(process);
+  process.kill = (pid, sig) => { uccisi.push(pid); if (sig === 0) return killVero(pid, sig); };
+  try {
+    const treGiorniFa = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    scriviMarcatore(casa, { pid: 4242, ticket: 'b-vecchissimo', since: treGiorniFa });
+    const r = startBeat(casa, 'b-nuovo', { spawnImpl: () => ({ pid: 7, unref() {} }), alive: () => true });
+    assert.equal(r.started, true);
+    assert.deepEqual(uccisi, [], 'un numero di processo vecchio di giorni non dice più di chi è');
+  } finally {
+    process.kill = killVero;
+    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
 // ── Lo spegnimento: solo il proprio battito ────────────────────────────────
 
 test('rilasciare un biglietto NON spegne il battito di un altro lavoro', () => {
