@@ -46,7 +46,10 @@ DB3 esistente), poi "Risolti".
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `judges`,
 `clarify`, `loop`, `l1-identity`, `file-gate`, `legacy-ignored`…), `workingSince`
-(ISO, solo con `working`), `branch` (da `revision_*` in poi).
+(ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
+l'ultimo battito arrivato al server per quel lavoro, che lo specchia qui perché
+la dashboard i semafori non li vede — è l'unica cosa che le permette di dire il
+vero su "qualcuno ci sta lavorando ORA").
 
 **Stati legacy da RITIRARE:** `new`, `review`, `blocked`, `clarify`, `verified`,
 `ignored` (mappatura in §8).
