@@ -163,16 +163,21 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 - lo fa il **pacemaker**, ogni 20 minuti, sui soli feedback in `working`
   (`functions/src/routine/stall.js`), e gira anche mentre un altro giro sta
   lavorando a qualcos'altro: dipende solo dall'interruttore;
-- **la misura è il ramo, non il battito**: il battito dice che la sessione
-  respira, e una sessione bloccata in un giro a vuoto respira come una che
-  lavora. La punta del ramo la chiede il server a GitHub — non la dichiara la
-  sessione — e se non è avanzata da **un'ora** il lavoro è arenato. Un'ora è
-  larga apposta: la suite completa gira 25 minuti senza toccare un file. Non
-  costa niente quando le cose vanno bene, perché chi finisce lo dichiara e
-  libera tutto subito;
-- feedback senza ramo (istanza morta prima di spingere) → si conta da
-  `workingSince`. GitHub irraggiungibile → **non si recupera niente**: "non lo
-  so" non è "è morto", e recuperare butta via il ramo di chi sta lavorando;
+- **chi ha il semaforo VIVO non si sfratta, mai.** Un semaforo vivo vuol dire
+  che qualcuno sta battendo, cioè che la sessione è viva e collegata:
+  toglierglielo di sotto le fa rifiutare la consegna e le butta via il giro, che
+  è esattamente il guasto da cui nasce questo lavoro, rifatto un'ora dopo invece
+  che mezz'ora. Una sessione viva ma davvero impantanata resta comunque limitata
+  dal **tetto duro del semaforo (8 ore)**, scaduto il quale ricade nel caso qui
+  sotto. Meglio aspettare quel tetto che ammazzare un lavoratore onesto;
+- **senza semaforo vivo**, il conto parte dall'ingresso in lavorazione
+  (`workingSince`, o `createdAt` per i documenti che non ce l'hanno) e la soglia
+  è **un'ora**. Prima di sfrattare si guarda il ramo: se è avanzato dall'ultima
+  occhiata, il cronometro riparte — sono i commit di qualcuno che stava ancora
+  combinando qualcosa, e non si buttano via. La punta del ramo la chiede il
+  server a GitHub, non la dichiara la sessione;
+- GitHub irraggiungibile, o semafori illeggibili → **non si recupera niente**:
+  "non lo so" non è "è morto", e recuperare alla cieca butta via giri interi;
 - il recupero libera il semaforo, riporta a `todo` e incrementa `workingResets`.
   Alla **3ª volta** il feedback esce dal giro automatico → `design`
   (`statusReason: arenato`) con nota per l'owner, o un guasto che si ripete ogni
