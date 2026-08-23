@@ -1296,7 +1296,7 @@
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
       : `<span class="mg-work-idle">${
           progress.current.key === 'impl'
-            ? 'Nessun segnale da un’ora: se è fermo rientra in coda da solo'
+            ? 'Nessun segnale da un’ora: se non ci lavora nessuno rientra in coda da solo'
             : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;
     return `<div class="mg-item-state">${steps}${who}</div>`;
