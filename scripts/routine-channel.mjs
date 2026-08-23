@@ -363,7 +363,7 @@ if (isMain) {
     let biglietto = args[0];
     if (!biglietto) {
       const { readTicket } = await import('./lib/routine-ticket.mjs');
-      biglietto = readTicket(resolve(fileURLToPath(new URL('..', import.meta.url))));
+      biglietto = readTicket(ROOT);
     }
     if (!biglietto) {
       console.error('Nessun biglietto: non c’è nessun semaforo da tenere vivo.');
@@ -412,7 +412,7 @@ if (isMain) {
     // battito che c'è" ammazzava il lavoro di un altro giro ancora vivo.
     if (r.ok) {
       const { stopBeat } = await import('./lib/routine-beat.mjs');
-      stopBeat(resolve(fileURLToPath(new URL('..', import.meta.url))), { ticket: args[0] });
+      stopBeat(ROOT, { ticket: args[0] });
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
@@ -429,7 +429,7 @@ if (isMain) {
     if (INTENTI.includes(args[0])) {
       intento = args[0];
       const { readTicket } = await import('./lib/routine-ticket.mjs');
-      biglietto = readTicket(resolve(fileURLToPath(new URL('..', import.meta.url))));
+      biglietto = readTicket(ROOT);
       if (!biglietto) {
         console.error('Nessun biglietto: questa consegna non ha un lavoro a cui riferirsi.');
         process.exit(3);

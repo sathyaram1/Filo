@@ -196,7 +196,10 @@ test('un rilascio RIFIUTATO dal server lascia vivo il battito', async () => {
   const { srv, port } = await serverCheRifiuta({ ok: false, reason: 'not_holder' });
   const casa = casaFinta();
   try {
-    scriviMarcatore(casa, { pid: process.pid, ticket: 'b-mio', since: new Date().toISOString() });
+    // Un numero di processo che non esiste: qui si guarda il marcatore, e
+    // nominare un processo vivo vorrebbe dire rischiare di ammazzarlo se il
+    // controllo che stiamo provando non funzionasse.
+    scriviMarcatore(casa, { pid: 999999, ticket: 'b-mio', since: new Date().toISOString() });
     await new Promise((fine) => {
       const p = spawn(process.execPath,
         [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio'],
