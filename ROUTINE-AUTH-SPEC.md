@@ -116,9 +116,12 @@ Punti non negoziabili del flusso:
   come già fa col marcatore del biglietto e per lo stesso motivo: quello che
   deve succedere sempre non si chiede a chi lavora.
 - **Il battito prova che la sessione è viva, non che produce.** Un'istanza
-  bloccata in un giro a vuoto batte come una che lavora. Per quello il server
-  misura il lavoro sul RAMO (FEEDBACK-STATES.md §6a): la punta la chiede lui a
-  GitHub, e un ramo fermo da un'ora è un lavoro arenato che rientra in coda.
+  bloccata in un giro a vuoto batte come una che lavora. Per quello il recupero
+  degli arenati (FEEDBACK-STATES.md §6a) legge DUE segnali e non li confonde: il
+  semaforo dice chi è vivo, il ramo dice se il lavoro avanza. Chi ha il semaforo
+  vivo non si sfratta — costerebbe il giro a un lavoratore onesto, che è il
+  guasto che questa spec viene a togliere — e resta comunque limitato dal tetto
+  duro di otto ore del semaforo stesso.
 
 ---
 
