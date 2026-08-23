@@ -118,7 +118,8 @@ Punti non negoziabili del flusso:
 - **Il battito prova che la sessione è viva, non che produce.** Un'istanza
   bloccata in un giro a vuoto batte come una che lavora. Per quello il recupero
   degli arenati (FEEDBACK-STATES.md §6a) legge DUE segnali e non li confonde: il
-  semaforo dice chi è vivo, il ramo dice se il lavoro avanza. Chi ha il semaforo
+  semaforo dice chi è vivo, la data dell'ultimo commit dice se il lavoro avanza
+  (e la chiede il server a GitHub, non la dichiara la sessione). Chi ha il semaforo
   vivo non si sfratta — costerebbe il giro a un lavoratore onesto, che è il
   guasto che questa spec viene a togliere — e resta comunque limitato dal tetto
   duro di otto ore del semaforo stesso.
