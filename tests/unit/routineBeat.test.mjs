@@ -214,6 +214,30 @@ test('un rilascio RIFIUTATO dal server lascia vivo il battito', async () => {
   }
 });
 
+test('rilasciare il biglietto di un ALTRO giro non tocca il battito, dal comando vero', async () => {
+  // Il controllo gemello di quello qui sopra sta a un livello diverso: là si
+  // prova la funzione, qui il COMANDO. È la giuntura che si era rotta — la
+  // funzione sapeva confrontare i biglietti, ma chi la chiamava non le diceva
+  // quale. Provando solo la funzione, quel guasto resta invisibile.
+  const { srv, port } = await serverCheRifiuta({ ok: true });
+  const casa = casaFinta();
+  try {
+    scriviMarcatore(casa, { pid: 999999, ticket: 'b-di-un-altro', since: new Date().toISOString() });
+    await new Promise((fine) => {
+      const p = spawn(process.execPath,
+        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio'],
+        { cwd: casa, env: { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa }, stdio: 'ignore' });
+      p.on('close', fine);
+    });
+    const m = readBeat(casa);
+    assert.ok(m && m.ticket === 'b-di-un-altro',
+      'il battito di chi sta ancora lavorando deve sopravvivere al rilascio di un altro');
+  } finally {
+    srv.close();
+    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
 test('un rilascio ACCETTATO spegne il battito', async () => {
   const { srv, port } = await serverCheRifiuta({ ok: true });
   const casa = casaFinta();
