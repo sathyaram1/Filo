@@ -178,7 +178,9 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   server a GitHub, non la dichiara la sessione;
 - GitHub irraggiungibile, o semafori illeggibili → **non si recupera niente**:
   "non lo so" non è "è morto", e recuperare alla cieca butta via giri interi;
-- il recupero libera il semaforo, riporta a `todo` e incrementa `workingResets`.
+- il recupero libera il semaforo, riporta a `todo`, **azzera il cronometro**
+  (chi prende in carico dopo ha la sua ora piena, non gli avanzi di chi c'era
+  prima) e incrementa `workingResets`.
   Alla **3ª volta** il feedback esce dal giro automatico → `design`
   (`statusReason: arenato`) con nota per l'owner, o un guasto che si ripete ogni
   ora si mangia il tetto giornaliero di accensioni entro sera.
