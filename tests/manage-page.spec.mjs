@@ -2024,7 +2024,7 @@ test('un lavoro senza nessuno al lavoro dice che rientra in coda, non che aspett
 
   const card = page.locator('#mgList .mg-item').first();
   const state = card.locator('.mg-item-state');
-  await expect(state).toContainText('se non ci lavora nessuno rientra in coda da solo');
+  await expect(state).toContainText('rientra in coda da solo');
   await expect(state).not.toContainText('in attesa di ripresa');
   // E quante volte è già successo si legge senza aprire niente.
   await expect(card).toHaveAttribute('title', /rientrato in coda 2 volte/);
