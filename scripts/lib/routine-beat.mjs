@@ -119,7 +119,14 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
   // più come raggiungerlo mentre lui continua a tenere vivo un semaforo che non
   // serve a nessuno. (I lavoratori sono uno alla volta per costruzione: un
   // biglietto nuovo in questa cartella vuol dire che il precedente ha finito.)
-  if (vecchio && String(vecchio.ticket || '') !== t && alive(vecchio.pid)) {
+  //
+  // Ma solo se il marcatore è ancora CREDIBILE. Un marcatore vecchio di giorni
+  // nomina un numero di processo che il sistema ha già riassegnato a qualcun
+  // altro, e ammazzeremmo un estraneo: riprodotto dal vivo con un marcatore di
+  // tre giorni prima. Il controllo d'età è lo stesso di `beatIsLive`, che è il
+  // punto: due strade che decidono la stessa cosa non devono usare due criteri.
+  if (vecchio && String(vecchio.ticket || '') !== t
+      && beatIsLive(vecchio, vecchio.ticket, { now, alive })) {
     try { process.kill(Number(vecchio.pid)); } catch (_) { /* già morto */ }
   }
 
