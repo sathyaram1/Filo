@@ -172,6 +172,66 @@ test('un marcatore rimasto da una sessione morta non blocca il battito nuovo', (
   }
 });
 
+// ── Il rilascio rifiutato non deve spegnere niente ─────────────────────────
+
+/** Server finto che risponde come gli si dice al rilascio. */
+async function serverCheRifiuta(rispostaRilascio) {
+  const srv = createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.endsWith('/routineRelease')) res.end(JSON.stringify(rispostaRilascio));
+      else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  return { srv, port: srv.address().port };
+}
+
+test('un rilascio RIFIUTATO dal server lascia vivo il battito', async () => {
+  // Un rilascio rifiutato non ha liberato niente: il lavoro è ancora in piedi e
+  // ha ancora bisogno del suo battito. Spegnerlo lo lascerebbe col semaforo che
+  // cade mezz'ora dopo, cioè il guasto che tutto questo lavoro viene a togliere.
+  const { srv, port } = await serverCheRifiuta({ ok: false, reason: 'not_holder' });
+  const casa = casaFinta();
+  try {
+    scriviMarcatore(casa, { pid: process.pid, ticket: 'b-mio', since: new Date().toISOString() });
+    await new Promise((fine) => {
+      const p = spawn(process.execPath,
+        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio'],
+        { cwd: casa, env: { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa }, stdio: 'ignore' });
+      p.on('close', fine);
+    });
+    // Il marcatore è la prova: se fosse stato spento, sarebbe sparito.
+    assert.ok(readBeat(casa), 'il battito non va toccato quando il rilascio non è andato a buon fine');
+  } finally {
+    srv.close();
+    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test('un rilascio ACCETTATO spegne il battito', async () => {
+  const { srv, port } = await serverCheRifiuta({ ok: true });
+  const casa = casaFinta();
+  try {
+    // Un processo che esiste davvero ma che non è il battito: usiamo il nostro,
+    // e il segnale non arriva perché il marcatore viene tolto prima. Quello che
+    // conta è che il marcatore sparisca.
+    scriviMarcatore(casa, { pid: 999999, ticket: 'b-mio', since: new Date().toISOString() });
+    await new Promise((fine) => {
+      const p = spawn(process.execPath,
+        [resolve(REPO, 'scripts', 'routine-channel.mjs'), 'release', 'b-mio'],
+        { cwd: casa, env: { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa }, stdio: 'ignore' });
+      p.on('close', fine);
+    });
+    assert.equal(readBeat(casa), null, 'col biglietto muore anche il battito');
+  } finally {
+    srv.close();
+    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
 // ── Il controllo che conta: al server ARRIVA un battito ────────────────────
 
 test('il giro col biglietto fa arrivare un battito al server, senza che nessuno lo chieda', async () => {
