@@ -253,6 +253,13 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     assert.match(out.so, /RICETTA AGGIORNATA/,
       `al lavoratore è arrivata la ricetta del ramo:\n${out.so.slice(0, 400)}\n${out.se.slice(-200)}`);
     assert.ok(!out.so.includes('DI DUE GIORNI FA'), 'la ricetta del ramo non deve arrivare mai');
+    // E i comandi dentro la ricetta devono portare agli strumenti fissati: un
+    // percorso relativo, eseguito dalla cartella di lavoro, tornerebbe dritto
+    // agli strumenti del ramo vecchio.
+    assert.ok(!out.so.includes('node scripts/'),
+      `nella ricetta consegnata resta un percorso relativo: ${out.so.slice(0, 500)}`);
+    assert.ok(out.so.includes(`${resolve(dove).split('\\').join('/')}/scripts/routine-channel.mjs`),
+      'il comando deve nominare gli strumenti fissati');
   } finally {
     srv.close();
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
