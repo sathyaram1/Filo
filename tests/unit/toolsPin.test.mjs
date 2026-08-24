@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 const comeScritto = (p) => resolve(p).split('\\').join('/');
 
 import {
-  PINNED_PATHS, pinTools, pinnedRepoRoot, absolutizeRecipe,
+  PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe,
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
@@ -122,6 +122,48 @@ test('una copia vecchia non sopravvive alla nuova', () => {
     rmSync(dove, { recursive: true, force: true });
     rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
   }
+});
+
+// ── La regola, non l'elenco ────────────────────────────────────────────────
+
+test('nessuno strumento importa roba che la copia non contiene', async () => {
+  // L'elenco di cosa copiare si legge e sembra sempre giusto: è così che è
+  // passata la prima versione, senza la configurazione degli accessi. Questo
+  // controllo guarda gli IMPORT veri e chiede se ognuno cade dentro la copia.
+  // Chi domani aggiunge un import fuori dal recinto lo scopre qui, non in cloud
+  // con un giro che si ferma dicendo che è colpa della rete.
+  const { readdirSync, statSync } = await import('node:fs');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  const file = [];
+  const cammina = (dir) => {
+    for (const n of readdirSync(dir)) {
+      const p = resolve(dir, n);
+      if (statSync(p).isDirectory()) cammina(p);
+      else if (p.endsWith('.mjs') || p.endsWith('.js')) file.push(p);
+    }
+  };
+  cammina(resolve(REPO, 'scripts'));
+
+  const dentro = (p) => PINNED_PATHS.some((q) => {
+    const base = resolve(REPO, q);
+    return p === base || p.startsWith(base + '\\') || p.startsWith(base + '/');
+  });
+
+  const fuori = [];
+  for (const f of file) {
+    const testo = readFileSync(f, 'utf8');
+    // Import e require con percorso relativo che RISALE fuori da scripts/.
+    for (const m of testo.matchAll(/(?:from|import|require)\s*\(?\s*['"](\.\.[^'"]*)['"]/g)) {
+      const bersaglio = resolve(dirname(f), m[1]);
+      if (!dentro(bersaglio)) {
+        fuori.push(`${f.slice(REPO.length + 1)} → ${m[1]}`);
+      }
+    }
+  }
+
+  assert.deepEqual(fuori, [],
+    `questi strumenti importano roba fuori dalla copia: o si aggiunge il percorso a quelli fissati, o l'import va tolto:\n${fuori.join('\n')}`);
 });
 
 // ── Le ricette ─────────────────────────────────────────────────────────────
