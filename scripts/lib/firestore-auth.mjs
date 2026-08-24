@@ -24,7 +24,11 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// DUE radici, come in dispatch (lib/tools-pin.mjs): la configurazione si legge
+// accanto a QUESTO file — così una copia degli strumenti fuori dal progetto sa
+// girare da sola — mentre git deve parlare col PROGETTO, che è altrove.
 const ROOT = resolve(__dirname, '..', '..');
+const REPO_ROOT = pinnedRepoRoot(ROOT) || ROOT;
 const cfg = require(resolve(ROOT, 'src', 'main', 'auth', 'config.js'));
 
 export const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${cfg.firebaseProjectId}/databases/(default)/documents`;
