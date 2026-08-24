@@ -351,21 +351,26 @@ const WORKER_CONTRACT_FILE = '_contratto-worker.md';
  * essere dedotta da un comportamento strano ore dopo.
  */
 /**
- * Il checkout da cui si sta per fissare è quello giusto? Solo per le ROUTINE.
+ * Il checkout da cui si sta per fissare è quello giusto?
  *
  * La copia vale quanto il momento in cui viene presa: se il giro parte da un
  * checkout non aggiornato, fissa gli strumenti vecchi e il difetto torna con
- * un'altra causa — con l'aggravante che adesso sembra tutto a posto. Il giro in
- * cloud parte da un clone fresco sulla linea principale, quindi qui non c'è
- * niente da correggere: c'è da ACCORGERSENE se un giorno non fosse più vero.
+ * un'altra causa — con l'aggravante che stavolta sembra tutto a posto.
  *
- * In locale non si controlla niente: lì si lavora sui rami apposta, e il
- * preflight lo si lancia per provare.
+ * IL CONTROLLO NON SI APPENDE A `FILO_ROUTINE`, e non è un dettaglio: quella
+ * variabile la esporta l'orchestratore seguendo le istruzioni che riceve DAL
+ * PREFLIGHT, cioè dopo che questo controllo è già passato. Appesa lì, la
+ * guardia avrebbe avuto i test verdi e non sarebbe scattata mai in produzione:
+ * è la stessa forma di guasto che questo lavoro viene a chiudere.
+ *
+ * Il preflight è il portone d'ingresso di un giro di routine, quindi si guarda
+ * sempre. Chi lo lancia per provare in locale, dove si sta su un ramo apposta,
+ * lo dice: `FILO_PREFLIGHT_ANY_BRANCH=1`.
  *
  * @returns {string} '' se va bene, altrimenti il motivo per fermarsi
  */
 function checkoutNonAdatto() {
-  if (String(process.env.FILO_ROUTINE || '') !== '1') return '';
+  if (String(process.env.FILO_PREFLIGHT_ANY_BRANCH || '') === '1') return '';
   const g = (args) => execFileSync('git', args, {
     cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
