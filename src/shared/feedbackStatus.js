@@ -175,6 +175,30 @@
     return ((now == null ? Date.now() : now) - t) > WORKING_TTL_MS;
   }
 
+  // ── "Qualcuno ci sta lavorando ORA" (dashboard) ────────────────────────────
+  // Il battito arriva ogni dieci minuti finché una sessione è viva e collegata;
+  // il server lo specchia sul feedback (`beatAt`), perché i semafori vivono in
+  // una collezione che l'app non legge. Venticinque minuti tollerano due battiti
+  // persi di fila senza dichiarare morto chi è vivo.
+  const BEAT_STALE_MS = 25 * 60 * 1000;
+
+  /**
+   * Qualcuno sta lavorando a questo feedback in questo momento?
+   *
+   * Vale l'ULTIMO segno di vita: il battito, oppure la presa in carico per la
+   * manciata di minuti prima che arrivi il primo battito. Prima si guardava solo
+   * la presa in carico, con un'ora di tolleranza, e la scheda diventava bugiarda
+   * su ogni lavorazione lunga — cioè su tutte, visto che la sola suite completa
+   * dura mezz'ora: diceva "nessuno ci sta lavorando" mentre un'istanza lavorava.
+   */
+  function isBeating(fb, now) {
+    const t = (now == null ? Date.now() : now);
+    const beat = new Date((fb && fb.beatAt) || 0).getTime() || 0;
+    const preso = new Date((fb && fb.workingSince) || 0).getTime() || 0;
+    const ultimo = Math.max(beat, preso);
+    return !!ultimo && (t - ultimo) <= BEAT_STALE_MS;
+  }
+
   // ── statusPublic (S1.F2.1): enum grossolano in chiaro ──────────────────────
   // La mappa e il PERCHÉ (#476: i confermati collassano su 'open', mai un
   // valore nuovo) vivono nei DATI (feedbackTransitions.js).
@@ -236,7 +260,7 @@
     tabFor,
     TRANSITIONS, ACTORS, canTransition, transitionsFrom, canReach,
     LEGACY_SIMPLE, LEGACY_STATUSES, isLegacy,
-    WORKING_TTL_MS, isWorkingExpired,
+    WORKING_TTL_MS, isWorkingExpired, BEAT_STALE_MS, isBeating,
     PUBLIC_MAP, isResolvedForUser, padForCipher, unpadFromCipher, CIPHER_PAD,
   };
 

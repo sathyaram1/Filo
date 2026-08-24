@@ -387,15 +387,11 @@
       state: i < idx ? 'done' : (i === idx ? 'current' : 'pending'),
     }));
     const now = (opts && opts.now) != null ? opts.now : Date.now();
-    const claimExp = new Date((fb && fb.claimExpiresAt) || 0).getTime();
-    const claimLive = !!(claimExp && claimExp > now);
-    const workingFresh = status === 'working'
-      && !FS().isWorkingExpired({ status: 'working', workingSince: fb && fb.workingSince }, now);
     return {
       status,
       steps,
       current: steps[idx],
-      active: claimLive || workingFresh,
+      active: FS().isBeating(fb, now),
       by: String((fb && fb.claimedBy) || ''),
     };
   }

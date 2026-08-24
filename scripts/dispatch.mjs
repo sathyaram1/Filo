@@ -72,6 +72,7 @@ import {
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
+import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
@@ -957,15 +958,21 @@ async function finalizeBucket(bucket, fromServer) {
   // per un feedback solo. Il lucchetto su git non esiste più — era il modo che
   // avevano macchine senza credenziali di mettersi d'accordo fra loro.
   //
-  // La presa in carico (`working`) la si dichiara al server: è il riflesso che
-  // la dashboard mostra come "in lavorazione".
-  if (bucket.id && bucket.role === 'new-work') {
-    await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
-  }
-
   // A + D: la directory viene messa sul branch giusto PRIMA di consegnare, e il
   // lavoro di un'istanza interrotta viene riportato all'ultimo punto fermo.
   // FAIL CLOSED: se non riesce non si consegna niente.
+  //
+  // VIENE PRIMA della presa in carico, e non è un dettaglio d'ordine: il nome
+  // del ramo di un lavoro nuovo lo decide QUI, quindi dichiarare `working` prima
+  // vorrebbe dire dichiararlo senza ramo — ed è quello che succedeva. Il server
+  // non scrive un ramo vuoto, così NESSUN lavoro in corso aveva un ramo scritto
+  // sopra, e il recupero degli arenati — che guarda quando quel ramo si è mosso
+  // l'ultima volta — non aveva niente da guardare: sfrattava sull'ora trascorsa
+  // dalla presa in carico, cioè proprio la cosa che non doveva fare.
+  //
+  // Rovesciando l'ordine si guadagna anche un'altra cosa: se il posizionamento
+  // fallisce, il feedback resta in coda invece di restare marchiato "in
+  // lavorazione" da nessuno.
   if (bucket.id && bucket.role !== 'prober') {
     const pos = positionOnBranch(bucket);
     if (!pos.ok) {
@@ -986,6 +993,19 @@ async function finalizeBucket(bucket, fromServer) {
       }
       return emitHalt('transient', pos.message);
     }
+  }
+
+  // Il semaforo è del SERVER: l'ha preso lui rilasciando il biglietto, e vale
+  // per un feedback solo. Il lucchetto su git non esiste più — era il modo che
+  // avevano macchine senza credenziali di mettersi d'accordo fra loro.
+  //
+  // La presa in carico (`working`) la si dichiara al server COL RAMO: è il
+  // riflesso che la dashboard mostra come "in lavorazione", ed è anche l'unico
+  // momento in cui il server viene a sapere su quale ramo si sta lavorando —
+  // prima lo scopriva solo alla consegna, cioè ore dopo, e per tutto quel tempo
+  // il recupero degli arenati era cieco.
+  if (bucket.id && bucket.role === 'new-work') {
+    await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
@@ -1108,6 +1128,21 @@ if (isMainModule) {
       // provenienza dei feedback. Un giro senza biglietto cancella il
       // marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
+      // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
+      // cade dopo 30 minuti di silenzio e la suite completa in cloud ne dura 37,
+      // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
+      // biglietto morto (è già costato un giro intero: venti commit spinti e
+      // nessun esito registrato). Chiederlo al prompt del lavoratore è la
+      // scommessa già persa sulla firma dei feedback e sul biglietto delle
+      // consegne: quello che deve succedere sempre lo fa lo strumento.
+      if (ticket) {
+        const b = startBeat(ROOT, ticket);
+        if (!b.started && b.why !== 'already_live' && b.why !== 'disabled') {
+          process.stderr.write(`[dispatch] battito non avviato (${b.why}): la lavorazione lunga rischia il semaforo\n`);
+        }
+      } else {
+        stopBeat(ROOT);
+      }
       run().then((r) => {
         process.exit(r?.exit ?? 0);
       }).catch((e) => {

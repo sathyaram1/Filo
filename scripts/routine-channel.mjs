@@ -39,9 +39,12 @@
 //   node scripts/routine-channel.mjs work <biglietto>
 //       → stampa il JSON del proprio lavoro { role, ... }.
 //
-//   node scripts/routine-channel.mjs heartbeat <biglietto> [--loop]
-//       → tiene vivo il semaforo. Con --loop batte finché il biglietto vive
-//         (da lanciare in sottofondo per le sessioni lunghe).
+//   node scripts/routine-channel.mjs heartbeat [<biglietto>] [--loop]
+//       → tiene vivo il semaforo. Con --loop batte finché il biglietto vive.
+//         NON serve lanciarlo a mano: il ciclo lo avvia dispatch nel momento in
+//         cui riceve il biglietto (lib/routine-beat.mjs), perché una cosa che
+//         deve succedere sempre non si chiede a chi lavora. Senza biglietto fra
+//         gli argomenti lo ritrova da solo, come le consegne.
 //
 //   node scripts/routine-channel.mjs release <biglietto> [--guasto "motivo"]
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
@@ -72,6 +75,13 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
+// giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
+// lavoro separata ha una radice diversa da quella dello script.
+const ROOT = process.env.FILO_REPO_ROOT
+  ? resolve(process.env.FILO_REPO_ROOT)
+  : resolve(fileURLToPath(new URL('..', import.meta.url)));
+
 // L'indirizzo del canale. `FILO_ROUTINE_API` esiste per i test e per un
 // eventuale ambiente di prova: NON è un segreto, è solo dove sta il server.
 const BASE = process.env.FILO_ROUTINE_API
@@ -80,6 +90,12 @@ const BASE = process.env.FILO_ROUTINE_API
 // Il battito va più fitto della scadenza del semaforo (30 minuti lato server):
 // dieci minuti lasciano il margine per due battiti persi di fila.
 const BEAT_EVERY_MS = 10 * 60 * 1000;
+// Quanto dura il semaforo lato server senza battito. Serve come tetto
+// all'insistenza: oltre, il biglietto è morto comunque.
+const LEASE_TTL_MS = 30 * 60 * 1000;
+// Su un intoppo si ribatte più fitto: dentro mezz'ora ci stanno quindici
+// tentativi, abbastanza per attraversare un buco di rete senza perdere il lavoro.
+const RETRY_EVERY_MS = 2 * 60 * 1000;
 
 /**
  * Una chiamata al canale. Ritenta solo sui guasti che possono passare da soli
@@ -187,10 +203,17 @@ export async function work(t, opts) {
   return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
+// I motivi per cui il battito NON va ritentato: il server ha guardato il
+// biglietto e ha detto che non vale più. Qualunque altro motivo (rete giù, 5xx,
+// risposta illeggibile) è un intoppo che può passare da solo, e mollare lì
+// vorrebbe dire far cadere il semaforo di un lavoro ancora vivo.
+const BATTITO_FINITO = new Set(['bad_ticket', 'dead_ticket']);
+
 export async function heartbeat(t, opts) {
   const { status, body } = await call('routineHeartbeat', { ticket: t }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
-  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
+  const reason = String((body && body.reason) || `http_${status}`);
+  return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
 }
 
 /**
@@ -316,7 +339,9 @@ if (isMain) {
     process.exit(1);
   };
 
-  if (!cmd || !args[0]) usage();
+  // `heartbeat` è l'unico comando che può girare senza posizionali: il ciclo lo
+  // avvia dispatch e il biglietto viaggia nell'ambiente, mai fra gli argomenti.
+  if (!cmd || (!args[0] && cmd !== 'heartbeat')) usage();
 
   if (cmd === 'probe') {
     const r = await probe(args[0]);
@@ -333,18 +358,44 @@ if (isMain) {
     if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
     console.log(JSON.stringify(r.payload, null, 2));
   } else if (cmd === 'heartbeat') {
+    // Il ciclo lo avvia dispatch, che passa il biglietto nell'ambiente: la riga
+    // di comando di un processo la legge chiunque sulla macchina.
+    let biglietto = args[0];
+    if (!biglietto) {
+      const { readTicket } = await import('./lib/routine-ticket.mjs');
+      biglietto = readTicket(ROOT);
+    }
+    if (!biglietto) {
+      console.error('Nessun biglietto: non c’è nessun semaforo da tenere vivo.');
+      process.exit(3);
+    }
     if (!flags.includes('--loop')) {
-      const r = await heartbeat(args[0]);
+      const r = await heartbeat(biglietto);
       if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
       console.log(`OK: semaforo vivo fino a ${r.expiresAt}`);
     } else {
-      // Sessioni lunghe: si batte finché il server risponde. Quando il
-      // biglietto muore (rilasciato o semaforo caduto) il ciclo finisce da solo
+      // Sessioni lunghe: si batte finché il biglietto vale. Quando il server
+      // dice che è morto (rilasciato o semaforo caduto) il ciclo finisce da solo
       // — nessun processo che resta appeso a battere il cuore di un morto.
+      //
+      // Su un intoppo passeggero si RIBATTE più fitto invece di arrendersi: il
+      // battito è l'unica cosa che tiene in piedi un lavoro lungo, e mollarlo
+      // per un buco di rete di due minuti butterebbe via un'ora di lavoro come
+      // è già successo. Si insiste finché il semaforo può ancora essere vivo:
+      // oltre quella soglia il biglietto è morto comunque e insistere è rumore.
+      let primoGuastoMs = 0;
       for (;;) {
-        const r = await heartbeat(args[0]);
-        if (!r.ok) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
-        await defaultSleep(BEAT_EVERY_MS);
+        const r = await heartbeat(biglietto);
+        if (r.ok) { primoGuastoMs = 0; await defaultSleep(BEAT_EVERY_MS); continue; }
+        if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
+        const ora = Date.now();
+        if (!primoGuastoMs) primoGuastoMs = ora;
+        if (ora - primoGuastoMs >= LEASE_TTL_MS) {
+          console.error(`battito finito: canale irraggiungibile da ${Math.round((ora - primoGuastoMs) / 60000)} minuti`);
+          process.exit(0);
+        }
+        console.error(`battito: intoppo (${r.reason}), riprovo`);
+        await defaultSleep(RETRY_EVERY_MS);
       }
     }
   } else if (cmd === 'release') {
@@ -352,6 +403,17 @@ if (isMain) {
     // parole nel testo di ritorno (che nessuna macchina legge).
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
     const r = await release(args[0], guasto);
+    // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
+    // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso
+    // evita dieci minuti di processo che batte per un morto.
+    //
+    // SOLO se il rilascio è andato a buon fine, e SOLO il battito di QUESTO
+    // biglietto: un rilascio rifiutato non ha liberato niente, e spegnere "il
+    // battito che c'è" ammazzava il lavoro di un altro giro ancora vivo.
+    if (r.ok) {
+      const { stopBeat } = await import('./lib/routine-beat.mjs');
+      stopBeat(ROOT, { ticket: args[0] });
+    }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
   } else if (cmd === 'deliver') {
@@ -367,7 +429,7 @@ if (isMain) {
     if (INTENTI.includes(args[0])) {
       intento = args[0];
       const { readTicket } = await import('./lib/routine-ticket.mjs');
-      biglietto = readTicket(resolve(fileURLToPath(new URL('..', import.meta.url))));
+      biglietto = readTicket(ROOT);
       if (!biglietto) {
         console.error('Nessun biglietto: questa consegna non ha un lavoro a cui riferirsi.');
         process.exit(3);

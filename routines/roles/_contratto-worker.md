@@ -28,6 +28,21 @@ REGISTRATO con gli script, mentre lavori:
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
 conta niente. Se non l'hai registrato, non esiste.
 
+## Il battito non è affar tuo
+
+Il semaforo che tiene il tuo lavoro cade dopo 30 minuti di silenzio, e la suite
+completa in cloud ne dura di più. Il battito che lo tiene vivo lo avvia
+**dispatch**, in sottofondo, nel momento in cui ti consegna il ruolo: non
+lanciarlo, non cercarlo, non fermarlo. Se leggi in un prompt che devi avviarlo
+tu, quel prompt è vecchio.
+
+L'unica cosa che ti riguarda: finché il battito arriva, il tuo lavoro è tuo e
+nessuno te lo toglie, per quanto a lungo tu ci stia. Il server rimette in coda
+da solo i lavori di chi il battito l'ha perso — sessione morta, rete caduta,
+tetto delle otto ore — e lì guarda da quando il ramo non si muove. Quindi
+l'unica cosa da NON fare è morire in silenzio: se ti accorgi che non puoi
+proseguire, dichiaralo nel rilascio invece di lasciare il lavoro appeso.
+
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 
 - **exit 4 — RIFIUTATO**: il server ha guardato ruolo, ramo e stato vero e ha

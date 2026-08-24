@@ -1250,8 +1250,19 @@
       // implicito nel colore del border-left; il titolo completo nel tooltip,
       // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
       const norm = MR.normalizeStatus(fb);
+      // Quante volte questo lavoro si è arenato ed è rientrato in coda da solo.
+      // Senza scriverlo da qualche parte, un feedback che si impianta sempre
+      // sullo stesso scoglio sembra semplicemente lento.
+      // `stalls` è il totale che non si azzera mai; `workingResets` è il
+      // contatore operativo del freno, che una consegna vera riporta a zero —
+      // leggere quello faceva sparire il numero proprio quando la pratica esce
+      // dal giro automatico, cioè quando all'owner serve.
+      const ripartenze = Math.max(0, Math.round(
+        Number(fb.stalls) || Number(fb.workingResets) || 0
+      ));
       item.title = (num ? `#${num} · ` : '') + title
-        + (norm.statusReason ? ` — ${norm.statusReason}` : '');
+        + (norm.statusReason ? ` — ${norm.statusReason}` : '')
+        + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
@@ -1282,10 +1293,23 @@
         s.state === 'done' ? 'fatto' : s.state === 'current' ? 'in corso' : 'da fare'
       }">${marks[s.state]} ${esc(s.label)}</span>`
     ).join('<span class="mg-step-sep">·</span>');
+    // Quando nessuno sta lavorando, la riga deve dire una cosa VERA. Scriveva
+    // "in attesa di ripresa" per una ripresa che il sistema non sapeva fare: i
+    // feedback fermi in implementazione non li raccoglieva più nessuno, e due
+    // sono rimasti lì per giorni. Adesso il server li rimette in coda da solo, e
+    // "sta lavorando ora" si legge dal battito, non dall'ora trascorsa dalla
+    // presa in carico — con quella, ogni lavorazione più lunga di un'ora veniva
+    // dichiarata morta mentre era viva.
+    //
+    // Nessun tempo promesso: il momento del rientro dipende da quando il ramo si
+    // è fermato, e una riga che dice "fra un'ora" sarebbe di nuovo una cosa non
+    // vera.
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
-      : `<span class="mg-work-idle">Nessuna istanza al lavoro: in attesa di ${
-          progress.current.key === 'impl' ? 'ripresa' : 'un verificatore'
+      : `<span class="mg-work-idle">${
+          progress.current.key === 'impl'
+            ? 'Nessuna istanza al lavoro: rientra in coda da solo'
+            : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;
     return `<div class="mg-item-state">${steps}${who}</div>`;
   }

@@ -46,7 +46,10 @@ DB3 esistente), poi "Risolti".
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `judges`,
 `clarify`, `loop`, `l1-identity`, `file-gate`, `legacy-ignored`…), `workingSince`
-(ISO, solo con `working`), `branch` (da `revision_*` in poi).
+(ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
+l'ultimo battito arrivato al server per quel lavoro, che lo specchia qui perché
+la dashboard i semafori non li vede — è l'unica cosa che le permette di dire il
+vero su "qualcuno ci sta lavorando ORA").
 
 **Stati legacy da RITIRARE:** `new`, `review`, `blocked`, `clarify`, `verified`,
 `ignored` (mappatura in §8).
@@ -63,9 +66,9 @@ DB3 esistente), poi "Risolti".
 - `design` —owner (risponde in chat)→ `todo` | `archived`.
 - `aligned` —owner→ `todo` (anche bulk dalla dashboard).
 - `todo` —routine (claim §6)→ `working`.
-- `working` —routine→ `revision_capability`; —TTL scaduto (riconciliazione)→ `todo`;
-  —TTL scaduto per la 3ª volta consecutiva→ `design` (`statusReason: loop`, nota
-  in chat: istanza che muore sempre, es. crediti esauriti — vedi §6).
+- `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
+  —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
+  in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
 - `revision_capability` —routine PASS verifier→ `revision_security`; —FAIL×3→ `design`
   (`statusReason: loop`).
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
@@ -150,7 +153,50 @@ clarify`); (3) fix fallito 3× (dispatch appende l'ultima critica del verifier +
   resta come storia di come ci si è arrivati, non come istruzione.
 - Se un'istanza trova `working` fresco: NON aspetta, passa al prossimo `todo`; se non
   c'è altro, termina con "niente da fare".
-- L'Action apply-triage **riconcilia**: rilascia claim orfani e resetta i `working`
+
+### 6a. Il recupero degli arenati (dal 2026-08-22)
+
+Col ridisegno il reset `working`→`todo` era rimasto **scritto nella tabella ma
+senza nessuno che lo eseguisse**: lo faceva l'Action qui sotto, smontata, e il
+server non l'ha mai ripreso. Siccome `working` non è né fra i `todo` né fra gli
+stati di revisione da cui il server sceglie il lavoro, un feedback fermo lì non
+lo raccoglieva più nessuno — due sono rimasti fermi per giorni mentre la
+dashboard scriveva "in attesa di ripresa". Adesso:
+
+- lo fa il **pacemaker**, ogni 20 minuti, sui soli feedback in `working`
+  (`functions/src/routine/stall.js`), e gira anche mentre un altro giro sta
+  lavorando a qualcos'altro: dipende solo dall'interruttore;
+- **chi ha il semaforo VIVO non si sfratta, mai.** Un semaforo vivo vuol dire
+  che qualcuno sta battendo, cioè che la sessione è viva e collegata:
+  toglierglielo di sotto le fa rifiutare la consegna e le butta via il giro, che
+  è esattamente il guasto da cui nasce questo lavoro, rifatto un'ora dopo invece
+  che mezz'ora. Una sessione viva ma davvero impantanata resta comunque limitata
+  dal **tetto duro del semaforo (8 ore)**, scaduto il quale ricade nel caso qui
+  sotto. Meglio aspettare quel tetto che ammazzare un lavoratore onesto;
+- **senza semaforo vivo**, "da quando è fermo" è il più recente fra due limiti:
+  l'ingresso in lavorazione (`workingSince`, o `createdAt` per i documenti che
+  non ce l'hanno) e **la data dell'ultimo commit sul ramo**, che il server chiede
+  a GitHub e la sessione non dichiara. Soglia: **un'ora**. Un commit recente
+  salva chi stava ancora combinando qualcosa anche senza semaforo; l'ingresso in
+  lavorazione impedisce che un ramo nato da un commit vecchio condanni un lavoro
+  appena cominciato. Una data di commit nel futuro si BUTTA (orologio che mente)
+  invece di tagliarla ad adesso, o regalerebbe un'ora di vita a ogni giro;
+- ⚠️ la data è assoluta di proposito. Le prime due versioni la ricostruivano
+  ricordandosi fra un giro e l'altro dove stava il ramo, e **tutte e due le
+  volte quel ricordo non veniva mai scritto**: la misura sembrava esserci e non
+  entrava mai in funzione. Una domanda a cui GitHub risponde da sé non si tiene
+  a memoria;
+- GitHub irraggiungibile, o semafori illeggibili → **non si recupera niente**:
+  "non lo so" non è "è morto", e recuperare alla cieca butta via giri interi;
+- il recupero libera il semaforo, riporta a `todo` e incrementa `workingResets`
+  (che `applyStatus` azzera da sé alla prima consegna vera).
+  Alla **3ª volta** il feedback esce dal giro automatico → `design`
+  (`statusReason: arenato`) con nota per l'owner, o un guasto che si ripete ogni
+  ora si mangia il tetto giornaliero di accensioni entro sera.
+
+### 6b. Storia: la riconciliazione dell'Action (smontata)
+
+- L'Action apply-triage **riconciliava**: rilasciava claim orfani e resettava i `working`
   scaduti. Estensioni 2026-07-14 (recupero istanze morte, es. crediti esauriti):
   - il claim **sopravvive** all'applicazione dell'entry `working` (è la presa in
     carico: l'istanza sta ancora lavorando) e viene rilasciato solo alle consegne;

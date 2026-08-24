@@ -707,15 +707,15 @@ test('workProgress: revision_capability → impl fatta, controllo funzionalità 
   const p = MR.workProgress({ status: 'revision_capability' }, { now });
   assert.deepEqual(p.steps.map((s) => s.state), ['done', 'current', 'pending']);
   assert.equal(p.current.key, 'verify');
-  assert.equal(p.active, false); // nessun claim vivo → in attesa
+  assert.equal(p.active, false); // nessun battito → in attesa di un verificatore
 });
 
-test('workProgress: revision_security con claim vivo → sicurezza in corso, istanza attiva', () => {
+test('workProgress: revision_security che batte → sicurezza in corso, istanza attiva', () => {
   const now = Date.parse('2026-07-09T12:00:00Z');
   const p = MR.workProgress({
     status: 'revision_security',
     claimedBy: 'vm-123',
-    claimExpiresAt: '2026-07-09T12:30:00Z',
+    beatAt: '2026-07-09T11:57:00Z',
   }, { now });
   assert.deepEqual(p.steps.map((s) => s.state), ['done', 'done', 'current']);
   assert.equal(p.current.key, 'security');

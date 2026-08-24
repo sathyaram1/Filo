@@ -214,8 +214,12 @@ service cloud.firestore {
                     'priorityManual', // P6: flag manuale owner (il giudice auto non sovrascrive)
                     // Macchina a stati (FEEDBACK-STATES.md): statusReason = sottotesto
                     // dello status (loop/clarify/…), workingSince = timestamp del lock,
-                    // workingResets = interruzioni consecutive (riconciliazione §6).
-                    'statusReason', 'workingSince', 'workingResets',
+                    // workingResets = interruzioni consecutive (il freno del §6a),
+                    // stalls = quante volte in tutto (non si azzera: è il numero che
+                    // l'owner legge nella coda), beatAt = ultimo battito arrivato al
+                    // server per quel lavoro, che la dashboard usa per dire il vero su
+                    // "qualcuno ci sta lavorando ORA".
+                    'statusReason', 'workingSince', 'workingResets', 'stalls', 'beatAt',
                     'name', 'seq', 'subSeq', 'branch', 'blockReason', 'starred',
                     'claimedBy', 'claimedAt', 'claimExpiresAt', 'claimNum',
                     'reviewDecision', 'reviewComment', 'reviewedAt', 'resolvedInVersion',

@@ -35,11 +35,16 @@ const FEEDBACK = {
 };
 
 /** Server finto: risponde alle sole chiamate del canale che il giro fa. */
-function fintoServer(rispostaLavoro) {
+function fintoServer(rispostaLavoro, consegne = []) {
   const srv = createServer((req, res) => {
     let body = '';
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
+      // Le consegne si registrano: quello che il giro DICE al server è la cosa
+      // che i controlli sulle singole funzioni non vedono mai.
+      if (req.url.endsWith('/routineDeliver')) {
+        try { consegne.push(JSON.parse(body || '{}')); } catch (_) { /* non è una consegna leggibile */ }
+      }
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) res.end(JSON.stringify(rispostaLavoro));
       // L'interruttore delle routine: servito da qui, cosi' il giro non tocca la rete.
@@ -55,8 +60,8 @@ function fintoServer(rispostaLavoro) {
  * cartella git usa-e-getta (così claim e posizionamento non toccano niente di
  * reale). Ritorna il JSON che il giro consegna al lavoratore.
  */
-async function giro(rispostaLavoro) {
-  const { srv, port } = await fintoServer(rispostaLavoro);
+async function giro(rispostaLavoro, consegne = []) {
+  const { srv, port } = await fintoServer(rispostaLavoro, consegne);
   const casa = mkdtempSync(resolve(tmpdir(), 'filo-catena-'));
   try {
     mkdirSync(resolve(casa, '.claude'), { recursive: true });
@@ -73,6 +78,14 @@ async function giro(rispostaLavoro) {
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
     execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
     execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
+    // Le stesse righe di ignoranza del repo vero, per i marcatori del giro.
+    // NON è una comodità: preparare il ramo passa da `git clean`, che porta via
+    // i file non tracciati ma NON quelli ignorati. Senza queste righe il
+    // marcatore del biglietto sparisce a metà giro, le consegne successive non
+    // trovano più a quale lavoro riferirsi, e il banco di prova mostra un
+    // guasto che in produzione non esiste (o nasconde quello che esiste).
+    writeFileSync(resolve(casa, '.gitignore'),
+      '.claude/routine-ticket.json\n.claude/routine-beat.json\n.claude/routine-state/\n.claude/branch-expect.json\n.claude/routine-role.json\n', 'utf8');
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
     execFileSync('git', ['add', '-A'], { cwd: casa });
     execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
@@ -104,6 +117,10 @@ async function giro(rispostaLavoro) {
           FILO_ROUTINES_ENABLED: '1',
           // La chiave NON deve servire: se servisse, questo test lo direbbe.
           FILO_FEEDBACK_PRIVKEY: '',
+          // Col biglietto dispatch avvia il battito in sottofondo, che è
+          // staccato apposta per sopravvivergli: qui lascerebbe un processo per
+          // ogni caso di prova. Il battito ha un test suo (routineBeat).
+          FILO_NO_BEAT: '1',
         },
       });
       let so = ''; let se = '';
@@ -132,6 +149,24 @@ test('lavoro nuovo: al lavoratore arrivano ruolo, ricetta e il TESTO del feedbac
   assert.ok(json.payload && json.payload.feedback, 'il feedback deve esserci');
   assert.equal(json.payload.feedback.text, FEEDBACK.text,
     'è il testo del feedback che il lavoratore usa: senza, lavora alla cieca');
+});
+
+test('la presa in carico dice al server QUALE RAMO, non un ramo vuoto', async () => {
+  // Il ramo di un lavoro nuovo lo decide il giro, e per un po' lo ha deciso
+  // DOPO aver dichiarato la presa in carico: il server riceveva un ramo vuoto,
+  // non lo scriveva, e nessun lavoro in corso aveva un ramo scritto sopra.
+  // Conseguenza: il recupero dei lavori arenati — che guarda quando quel ramo
+  // si è mosso l'ultima volta — non aveva niente da guardare, e sfrattava
+  // contando le ore dalla presa in carico. Cioè la cosa che non deve fare.
+  const consegne = [];
+  await giro({
+    ok: true, role: 'new-work', id: 'fid-900', num: FEEDBACK.num, branch: '',
+    payload: { role: 'new-work', num: FEEDBACK.num, feedback: FEEDBACK },
+  }, consegne);
+
+  const presa = consegne.find((c) => c && c.intent === 'status' && c.data && c.data.status === 'working');
+  assert.ok(presa, 'la presa in carico deve arrivare al server');
+  assert.ok(presa.data.branch, `il ramo deve arrivare col resto (arrivato: ${JSON.stringify(presa.data.branch)})`);
 });
 
 test('correzione: arriva anche la critica di chi aveva bocciato', async () => {

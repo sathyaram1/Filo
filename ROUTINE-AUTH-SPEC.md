@@ -108,6 +108,21 @@ Punti non negoziabili del flusso:
 - **La durata sta nel semaforo, non nel biglietto.** Sessioni lunghe: il battito
   tiene vivo il semaforo. Sessione morta: il semaforo scade, il biglietto muore
   con lui. Nessun numero da indovinare sulla durata dei lavori.
+- **Il battito lo avvia lo strumento, non chi lavora** (dal 2026-08-22). Il
+  comando c'era dal primo giorno e non lo lanciava nessuno, perché non stava in
+  nessuna ricetta: il primo lavoro lungo davvero è morto alla consegna con
+  `dead_ticket`, venti commit spinti e nessun esito registrato. Lo avvia
+  `dispatch` in sottofondo quando riceve il biglietto (`lib/routine-beat.mjs`),
+  come già fa col marcatore del biglietto e per lo stesso motivo: quello che
+  deve succedere sempre non si chiede a chi lavora.
+- **Il battito prova che la sessione è viva, non che produce.** Un'istanza
+  bloccata in un giro a vuoto batte come una che lavora. Per quello il recupero
+  degli arenati (FEEDBACK-STATES.md §6a) legge DUE segnali e non li confonde: il
+  semaforo dice chi è vivo, la data dell'ultimo commit dice se il lavoro avanza
+  (e la chiede il server a GitHub, non la dichiara la sessione). Chi ha il semaforo
+  vivo non si sfratta — costerebbe il giro a un lavoratore onesto, che è il
+  guasto che questa spec viene a togliere — e resta comunque limitato dal tetto
+  duro di otto ore del semaforo stesso.
 
 ---
 
