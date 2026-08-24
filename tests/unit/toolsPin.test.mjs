@@ -112,7 +112,8 @@ test('le ricette puntano agli strumenti fissati, non a quelli del ramo', () => {
   // istruzioni anche con la copia in piedi.
   const testo = 'Rilascia con `node scripts/routine-channel.mjs release <biglietto>`.';
   const fuori = absolutizeRecipe(testo, '/tmp/strumenti', '/progetto');
-  assert.match(fuori, /node "\/tmp\/strumenti\/scripts\/routine-channel\.mjs"/);
+  assert.ok(fuori.includes(`node "${comeScritto('/tmp/strumenti')}/scripts/routine-channel.mjs"`),
+    `percorso non riscritto: ${fuori}`);
   assert.ok(!/node scripts\//.test(fuori), 'non deve restare nessun percorso relativo');
 });
 
