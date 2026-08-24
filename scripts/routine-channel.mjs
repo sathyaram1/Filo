@@ -339,7 +339,11 @@ if (isMain) {
   delete data.frase;
 
   const usage = () => {
-    console.error('Uso: node scripts/routine-channel.mjs <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]');
+    // Il percorso VERO di questo strumento, non la forma corta: se sta girando
+    // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
+    // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
+    const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
+    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]`);
     process.exit(1);
   };
 
