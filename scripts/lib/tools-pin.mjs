@@ -104,6 +104,10 @@ export function pinTools(repoRoot, { dest = pinnedDir(), origine = '' } = {}) {
       cpSync(resolve(src, p), resolve(dest, p), { recursive: true });
     }
     writeFileSync(resolve(dest, REPO_MARK), `${src}\n`, 'utf8');
+    // Da DOVE viene questa copia. Serve a chi legge i log: una copia presa da
+    // un checkout non aggiornato riporterebbe indietro gli strumenti con
+    // un'altra causa, e senza questa riga non si distinguerebbe.
+    if (origine) writeFileSync(resolve(dest, ORIGIN_MARK), `${origine}\n`, 'utf8');
     return { ok: true, dir: dest, why: 'copiati' };
   } catch (e) {
     return { ok: false, dir: '', why: String((e && e.message) || e) };
