@@ -23,7 +23,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Un percorso alla unix, su Windows, viene ancorato al disco corrente. L'atteso
 // si costruisce con la stessa normalizzazione dello strumento, o il controllo
@@ -188,6 +189,74 @@ test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', a
   } finally {
     srv.close();
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () => {
+  // Il caso di produzione: dispatch gira dalla copia, il progetto è aperto su un
+  // ramo vecchio, e le ricette del ramo dicono un'altra cosa. Sono le istruzioni
+  // che portano il lavoratore a usare gli strumenti giusti: se tornano indietro
+  // loro, torna indietro tutto il resto dietro di loro.
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const { cpSync } = await import('node:fs');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.endsWith('/routineWork')) {
+        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+      } else if (req.url.includes('config')) {
+        res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      } else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+
+  const casa = progettoFinto();
+  const dove = resolve(tmpdir(), `filo-strumenti-ricette-${process.pid}`);
+  try {
+    // Il progetto: strumenti veri (servono a farlo girare) e ricetta AGGIORNATA.
+    cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
+    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'RICETTA AGGIORNATA\n', 'utf8');
+
+    // Il giro fissa gli strumenti finché la cartella è ancora aggiornata.
+    const pin = pinTools(casa, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+
+    // Poi si apre il ramo vecchio: da qui il progetto dice un'altra cosa.
+    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
+
+    const out = await new Promise((fine) => {
+      const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova'], {
+        cwd: casa,
+        env: {
+          ...process.env,
+          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+          FILO_REPO_ROOT: casa,
+          FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
+          FILO_ROUTINES_ENABLED: '1',
+          FILO_NO_BEAT: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', () => fine({ so, se }));
+    });
+
+    assert.match(out.so, /RICETTA AGGIORNATA/,
+      `al lavoratore è arrivata la ricetta del ramo:\n${out.so.slice(0, 400)}\n${out.se.slice(-200)}`);
+    assert.ok(!out.so.includes('DI DUE GIORNI FA'), 'la ricetta del ramo non deve arrivare mai');
+  } finally {
+    srv.close();
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
