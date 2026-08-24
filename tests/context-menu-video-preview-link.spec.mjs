@@ -22,9 +22,10 @@
 // I test asseriscono il SUCCESSO dal punto di vista di chi guarda: le voci del
 // collegamento ci sono ED eseguono l'azione sul collegamento («Copia URL» mette
 // negli appunti l'href della scheda, non quello del filmato). Senza il fix le
-// voci non esistono → il click non trova nulla → rosso. L'ultimo test tiene il
-// confine: un filmato a tutta pagina con sotto un link che non c'entra niente
-// non deve regalare al menu le voci di quel link.
+// voci non esistono → il click non trova nulla → rosso. Gli ultimi due test
+// tengono il confine: un filmato a tutta pagina con sotto un link che non
+// c'entra niente, e un velo lontano dal collegamento, non devono regalare al
+// menu le voci di quel link.
 
 import { test, expect } from './fixtures/electron.mjs';
 
