@@ -323,6 +323,33 @@
     return null;
   }
 
+  // `document.elementsFromPoint()` si ferma al confine del componente esattamente
+  // come `closest()`, ma dall'altra parte: di un componente web restituisce
+  // l'HOST, mai quello che c'è dentro. Quindi la ricerca "cosa c'è sotto il
+  // cursore" era cieca a una scheda che tiene collegamento e anteprima IMPILATI
+  // dentro lo stesso componente — il caso resta quello della lamentela: solo le
+  // voci del filmato, nessuna voce del collegamento (#444). Qui, per ogni
+  // elemento che ha uno shadow root, ripetiamo il colpo dentro quel root: le
+  // parti del componente vengono PRIMA del loro host, che è l'ordine in cui si
+  // vedono (l'host lo disegna il suo contenuto). Il set `seen` chiude i cicli e
+  // toglie i doppioni fra un root e l'altro.
+  function deepElementsFromPoint(x, y) {
+    const out = [];
+    const seen = new Set();
+    const collect = (root) => {
+      let hits = [];
+      try { hits = root.elementsFromPoint?.(x, y) || []; } catch (_) { hits = []; }
+      for (const el of hits) {
+        if (!el || seen.has(el)) continue;
+        seen.add(el);
+        if (el.shadowRoot) collect(el.shadowRoot);
+        out.push(el);
+      }
+    };
+    try { collect(document); } catch (_) {}
+    return out;
+  }
+
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
