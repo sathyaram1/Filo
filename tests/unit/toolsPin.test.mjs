@@ -272,6 +272,7 @@ test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', a
           FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
           FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
           FILO_ROUTINES_ENABLED: '1',
+          FILO_PREFLIGHT_ANY_BRANCH: '1',
           FILO_TOOLS_DIR: dove,
           FILO_NO_BEAT: '1',
         },
@@ -418,6 +419,7 @@ test('la copia SA GIRARE da sola: il preflight lanciato da lì non si guasta', a
           FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
           FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
           FILO_ROUTINES_ENABLED: '1',
+          FILO_PREFLIGHT_ANY_BRANCH: '1',
           FILO_TOOLS_DIR: dove,
           FILO_REPO_ROOT: '',
           FILO_NO_BEAT: '1',
@@ -471,6 +473,7 @@ test('se la copia non riesce, il giro si FERMA invece di usare gli strumenti del
           FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
           FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
           FILO_ROUTINES_ENABLED: '1',
+          FILO_PREFLIGHT_ANY_BRANCH: '1',
           // Dentro una cartella che non esiste e non è creabile come tale.
           FILO_TOOLS_DIR: resolve(REPO, 'package.json', 'sotto'),
           FILO_NO_BEAT: '1',
@@ -580,7 +583,8 @@ test('una routine che parte dal ramo sbagliato si ferma invece di fissare strume
         env: {
           ...process.env,
           // Questo worktree NON è sulla linea principale, ed è il punto.
-          FILO_ROUTINE: '1',
+          // NIENTE via di fuga, e NIENTE `FILO_ROUTINE`: la guardia non deve
+          // dipendere da una variabile che viene esportata dopo di lei.
           FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
           FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
           FILO_ROUTINES_ENABLED: '1',
@@ -604,12 +608,70 @@ test('una routine che parte dal ramo sbagliato si ferma invece di fissare strume
   }
 });
 
-test('in locale il controllo sul ramo NON scatta', () => {
-  // Chi lavora in locale sta su un ramo suo apposta, e lancia il preflight per
-  // provare: fermarlo sarebbe rumore. Il controllo riguarda solo le routine,
-  // che si dichiarano tali.
-  assert.equal(String(process.env.FILO_ROUTINE || ''), '',
-    'questo controllo vale finché i test non si dichiarano routine');
+test('la guardia sul ramo NON dipende da come il giro si dichiara', () => {
+  // Appesa a una variabile che l'orchestratore esporta seguendo le istruzioni
+  // che riceve DAL preflight, la guardia avrebbe avuto i test verdi e non
+  // sarebbe scattata mai in produzione: la variabile arriva dopo di lei. È la
+  // stessa forma di guasto che questo lavoro viene a chiudere, e il controllo
+  // qui sopra la prova SENZA dichiararsi routine in nessun modo.
+  const testo = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'dispatch.mjs'), 'utf8');
+  const i = testo.indexOf('function checkoutNonAdatto');
+  assert.ok(i > 0);
+  const corpo = testo.slice(i, i + 600);
+  assert.ok(!corpo.includes('FILO_ROUTINE '), 'la guardia non deve leggere come il giro si dichiara');
+  assert.ok(!/process.env.FILO_ROUTINE/.test(corpo),
+    'la guardia non deve appendersi a una variabile che arriva dopo di lei');
+});
+
+test('anche i DATI che governano il giro vengono dalla copia', async () => {
+  // Non solo il codice: il numero di bocciature che si tollerano prima di
+  // chiamare l'owner è un dato, e preso dal ramo di lavoro sarebbe quello di
+  // giorni fa. Qui il ramo dice una cosa e la copia un'altra: vince la copia.
+  const { spawn } = await import('node:child_process');
+  const { cpSync } = await import('node:fs');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const casa = progettoFinto();
+  const dove = resolve(tmpdir(), `filo-strumenti-dati-${process.pid}`);
+
+  const tabella = (fail) => `(function (global) {
+  'use strict';
+  global.SN_FB_TRANSITIONS = { VERIFIER_CAPS: { improvableCap: 3, failCap: ${fail} } };
+})(typeof globalThis !== 'undefined' ? globalThis : self);
+`;
+
+  try {
+    cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
+    cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
+    // La copia si prende quando il progetto dice 7.
+    writeFileSync(resolve(casa, 'src', 'shared', 'feedbackTransitions.js'), tabella(7), 'utf8');
+    const pin = pinTools(casa, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+    // Poi si apre il ramo, che dice 2.
+    writeFileSync(resolve(casa, 'src', 'shared', 'feedbackTransitions.js'), tabella(2), 'utf8');
+
+    const out = await new Promise((fine) => {
+      const p = spawn(process.execPath, [
+        '--input-type=module', '-e',
+        `import { VERIFIER_CAPS } from ${JSON.stringify(`file:///${resolve(dove, 'scripts', 'dispatch.mjs').split('\\').join('/')}`)};
+         console.log('failCap=' + VERIFIER_CAPS.failCap);`,
+      ], {
+        cwd: casa,
+        env: { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', () => fine({ so, se }));
+    });
+
+    assert.match(out.so, /failCap=7/,
+      `ha letto il dato dal ramo invece che dalla copia: ${out.so.trim()} ${out.se.slice(-200)}`);
+  } finally {
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
 });
 
 test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () => {
