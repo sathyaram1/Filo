@@ -624,17 +624,29 @@
   // da due strade (menu normale e menu di correzione): quando il riconoscimento
   // era copiato in tutt'e due, lo stesso clic rischiava di dare due menu diversi
   // a seconda che sotto ci fosse o no una parola da correggere.
+  //
+  // Ogni famiglia (filmato, immagine, collegamento) ha DUE risposte: l'elemento
+  // fra gli antenati del punto cliccato, e il ripiego «sotto il punto cliccato»
+  // per quando gli strati sono impilati invece che annidati — le schede delle
+  // home video e social sono fatte così, e il clic destro arriva al velo di
+  // sopra (#400, #444). Gli strati si chiedono una volta sola: sono un hit-test,
+  // e il menu si apre spesso.
   function detectContext(target, x, y) {
+    let layers = null;
+    const under = () => (layers || (layers = elementsUnderPoint(x, y)));
     const linkEl = closestAcrossShadow(target, 'a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
-    const { mediaEl, mediaUnder } = findMedia(target, x, y);
+    const mediaEl = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
+      ? target
+      : closestAcrossShadow(target, 'video, audio');
     return {
       linkEl,
       imgEl,
       mediaEl,
-      mediaUnder,
-      // Cercato solo se il collegamento non è già fra gli antenati.
-      linkUnder: linkEl ? null : findLinkUnder(x, y),
+      // Cercati solo dove la famiglia non è già fra gli antenati.
+      mediaUnder: mediaEl ? null : firstUnder(under(), 'video, audio'),
+      linkUnder: linkEl ? null : firstUnder(under(), 'a[href]'),
+      imgUnder: imgEl ? null : firstUnder(under(), 'img'),
       editable: isEditable(target),
     };
   }
