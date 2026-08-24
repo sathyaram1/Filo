@@ -122,6 +122,9 @@ export function pinTools(repoRoot, { dest = pinnedDir(), origine = '' } = {}) {
     rmSync(dest, { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
     for (const p of PINNED_PATHS) {
+      // Anche i singoli file: la cartella che li conterrà va creata a mano,
+      // perché la copia non risale da sola.
+      mkdirSync(dirname(resolve(dest, p)), { recursive: true });
       cpSync(resolve(src, p), resolve(dest, p), { recursive: true });
     }
     writeFileSync(resolve(dest, REPO_MARK), `${src}\n`, 'utf8');
