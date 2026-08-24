@@ -1,6 +1,6 @@
 {
   "name": "filo",
-  "version": "0.2.201",
+  "version": "0.2.202",
   "private": true,
   "description": "Filo — browser AI-native cross-device. Layer di interazione, non solo finestra.",
   "main": "src/main/main.js",
