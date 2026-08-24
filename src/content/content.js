@@ -606,12 +606,15 @@
   // lo stesso rettangolo: la copertina/filmato e il collegamento che la avvolge.
   // Serve a tenere fuori il caso opposto — un video di sfondo a tutta pagina, o
   // un link che passa di sotto per caso — dove i due rettangoli non hanno
-  // niente a che vedere l'uno con l'altro. Misura quanta parte del MEDIA cade
-  // dentro il link: metà basta (le copertine hanno bordi, ritagli, sfumature).
-  function sameCardArea(mediaEl, linkEl) {
-    if (!mediaEl || !linkEl) return false;
-    if (linkEl.contains?.(mediaEl)) return true;
-    const m = mediaEl.getBoundingClientRect?.();
+  // niente a che vedere l'uno con l'altro. Misura quanta parte del CONTENUTO
+  // (filmato o copertina) cade dentro il link: metà basta, perché le copertine
+  // hanno bordi, ritagli e sfumature. La direzione conta: chiedere invece quanta
+  // parte del LINK cade dentro il contenuto farebbe passare anche il video a
+  // tutta pagina che si trova per caso un piccolo link sotto il cursore.
+  function sameCardArea(contentEl, linkEl) {
+    if (!contentEl || !linkEl) return false;
+    if (linkEl.contains?.(contentEl)) return true;
+    const m = contentEl.getBoundingClientRect?.();
     const l = linkEl.getBoundingClientRect?.();
     if (!m || !l || !(m.width > 0) || !(m.height > 0)) return false;
     const w = Math.min(m.right, l.right) - Math.max(m.left, l.left);
