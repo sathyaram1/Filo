@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.200', date: '2026-08-24',
+      features: [],
+      fixes: [
+        'Sulle pagine lunghissime «Traduci la pagina» non dichiara più di aver finito mentre il fondo è ancora in lingua originale: ti dice quanti blocchi ha tradotto e con un clic sul tasto destro completa il resto, senza rifare la parte già tradotta.',
+      ],
+    },
+    {
       version: '0.2.196', date: '2026-08-08',
       features: [
         'Nuova pagina «Trasparenza»: quali modelli AI usa Filo e perché, con le fonti. La trovi anche senza connessione, e puoi chiederne conto a Filo in chat.',
