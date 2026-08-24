@@ -127,8 +127,9 @@ test('a strumenti NON fissati la ricetta resta quella scritta', () => {
 test('più comandi nella stessa ricetta vengono riscritti tutti', () => {
   const testo = 'node scripts/a.mjs poi node scripts/lib/b.mjs infine node scripts/c.mjs --x';
   const fuori = absolutizeRecipe(testo, '/t', '/p');
-  assert.equal((fuori.match(/node "\/t\/scripts\//g) || []).length, 3);
-  assert.match(fuori, /node "\/t\/scripts\/lib\/b\.mjs"/);
+  const base = comeScritto('/t');
+  assert.equal(fuori.split(`node "${base}/scripts/`).length - 1, 3);
+  assert.ok(fuori.includes(`node "${base}/scripts/lib/b.mjs"`), fuori);
 });
 
 // ── Il controllo che conta ─────────────────────────────────────────────────
