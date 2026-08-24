@@ -74,6 +74,7 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -456,7 +457,7 @@ if (isMain) {
     if (intento === 'status' && data.status === 'done' && !data.resolvedInVersion) {
       try {
         const { readFileSync } = await import('node:fs');
-        const pkg = JSON.parse(readFileSync(resolve(fileURLToPath(new URL('..', import.meta.url)), 'package.json'), 'utf8'));
+        const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
         if (pkg.version) data.resolvedInVersion = pkg.version;
       } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
     }
