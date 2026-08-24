@@ -80,7 +80,15 @@
 
       if (!units.length) {
         progress.close();
-        if (already) {
+        if (truncated) {
+          // Niente di nuovo da mandare in questo giro, ma la coda della pagina
+          // esiste: non è finita, e va detto.
+          pageHasTranslation = already > 0;
+          pageComplete = false;
+          totalCount = already + truncated;
+          missingCount = truncated;
+          Popup.showToast(I18n.t('toast_page_translate_batch', already, totalCount), { duration: 7000 });
+        } else if (already) {
           // Ripresa su una pagina che nel frattempo è già tutta tradotta.
           pageHasTranslation = true;
           pageComplete = true;
