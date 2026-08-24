@@ -113,6 +113,6 @@ export function absolutizeRecipe(text, toolsRoot = TOOLS_ROOT, repoRoot = '') {
   const tools = resolve(toolsRoot);
   if (repoRoot && resolve(repoRoot) === tools) return t;
   // Le virgolette servono: in cloud la cartella temporanea può avere spazi.
-  return t.replace(/\bnode\s+scripts\//g, `node "${tools.replace(/\\/g, '/')}/scripts/`)
-    .replace(/node "([^"]+)\/scripts\/([^\s`'"]+)/g, 'node "$1/scripts/$2"');
+  const base = tools.replace(/\\/g, '/');
+  return t.replace(/\bnode\s+scripts\/([A-Za-z0-9._/-]+)/g, `node "${base}/scripts/$1"`);
 }
