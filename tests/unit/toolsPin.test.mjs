@@ -89,6 +89,21 @@ test('strumenti non fissati: nessun progetto da ricordare', () => {
   }
 });
 
+test('non si fissa sopra la copia che sta girando', () => {
+  // A metà giro il progetto è aperto sul ramo di lavoro: ricopiare da lì
+  // sovrascriverebbe gli strumenti buoni con quelli del ramo, cioè il guasto
+  // eseguito dalle nostre mani.
+  const casa = progettoFinto();
+  try {
+    const r = pinTools(casa, { dest: TOOLS_ROOT });
+    assert.equal(r.ok, true);
+    assert.equal(r.why, 'già fissati');
+    assert.equal(r.dir, TOOLS_ROOT);
+  } finally {
+    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
 test('una copia vecchia non sopravvive alla nuova', () => {
   // Una copia rimasta lì dal giro prima sarebbe lo stesso difetto con un'altra
   // faccia: strumenti vecchi eseguiti da un giro nuovo.
