@@ -568,42 +568,37 @@
     return false;
   }
 
-  // Video/audio sotto il cursore (#400).
-  // - `mediaEl`: il click è ARRIVATO sul media (o su un suo discendente) — è il
-  //   contesto principale, vince su immagine e link.
-  // - `mediaUnder`: nessun media nel cammino degli antenati, ma ce n'è uno sotto
-  //   al punto cliccato. Succede su quasi tutti i player veri, che coprono il
-  //   filmato con overlay di controllo: il tasto destro arriva all'overlay e il
-  //   <video> non compare fra gli antenati. Lo usiamo come ripiego SOLO quando
-  //   non c'è altro contesto (niente selezione, immagine, link, campo di testo),
-  //   così un video di sfondo non ruba il menu a ciò che sta sopra.
-  function findMedia(target, x, y) {
-    const direct = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
-      ? target
-      : closestAcrossShadow(target, 'video, audio');
-    if (direct) return { mediaEl: direct, mediaUnder: null };
-    let under = null;
-    try {
-      for (const el of document.elementsFromPoint(x, y) || []) {
-        if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') { under = el; break; }
+  // Gli strati sotto il punto cliccato, dal più in alto al più in basso,
+  // ENTRANDO nei componenti web. `document.elementsFromPoint` si ferma al bordo
+  // del componente: di una scheda fatta a componente restituisce l'host e basta,
+  // e il collegamento impilato lì dentro non lo vede nessuno (#444). Qui, per
+  // ogni strato che ha uno shadow root aperto, ripetiamo la domanda dentro il
+  // componente e infiliamo i suoi strati subito dopo l'host, così l'ordine
+  // sopra→sotto regge anche a cavallo del confine.
+  const SHADOW_DEPTH_MAX = 8;
+  function elementsUnderPoint(x, y) {
+    const out = [];
+    const seen = new Set();
+    const visit = (root, depth) => {
+      let layers;
+      try { layers = root.elementsFromPoint?.(x, y) || []; } catch (_) { return; }
+      for (const el of layers) {
+        if (!el || seen.has(el)) continue;
+        seen.add(el);
+        out.push(el);
+        if (el.shadowRoot && depth < SHADOW_DEPTH_MAX) visit(el.shadowRoot, depth + 1);
       }
-    } catch (_) {}
-    return { mediaEl: null, mediaUnder: under };
+    };
+    visit(document, 0);
+    return out;
   }
 
-  // Collegamento SOTTO il punto cliccato, quando non ce n'è uno fra gli antenati
-  // (#444). È il gemello di `mediaUnder`: le schede delle home video/social sono
-  // fatte di strati sovrapposti, e il link della scheda tanto spesso sta SOTTO
-  // l'anteprima (l'anteprima video parte al passaggio del mouse e si stende
-  // sopra la copertina) quanto sopra. Senza questo ripiego, appena il filmatino
-  // parte la scheda diventa irraggiungibile col tasto destro.
-  function findLinkUnder(x, y) {
-    try {
-      for (const el of document.elementsFromPoint(x, y) || []) {
-        const a = closestAcrossShadow(el, 'a[href]');
-        if (a) return a;
-      }
-    } catch (_) {}
+  // Il primo elemento di una famiglia fra gli strati sotto il cursore.
+  function firstUnder(layers, selector) {
+    for (const el of layers) {
+      const hit = closestAcrossShadow(el, selector);
+      if (hit) return hit;
+    }
     return null;
   }
 
