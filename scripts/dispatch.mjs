@@ -374,18 +374,42 @@ function checkoutNonAdatto() {
   const g = (args) => execFileSync('git', args, {
     cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
+  const viaDiFuga = "se lo stai lanciando per provare, FILO_PREFLIGHT_ANY_BRANCH=1";
   try {
+    g(['fetch', '--quiet', 'origin', MAIN_BRANCH]);
+    const qui = g(['rev-parse', 'HEAD']);
+    const la = g(['rev-parse', `origin/${MAIN_BRANCH}`]);
+    // Si confrontano i CONTENUTI, non i nomi: una testa staccata sulla punta
+    // della linea principale ha esattamente i file giusti, e rifiutarla col
+    // motivo "sei sul ramo sbagliato" sarebbe anche una bugia.
+    if (qui === la) return '';
+
     const ramo = g(['rev-parse', '--abbrev-ref', 'HEAD']);
     if (ramo !== MAIN_BRANCH) {
-      return `il giro parte da '${ramo}' invece che da '${MAIN_BRANCH}': gli strumenti fissati sarebbero quelli di quel ramo`;
+      return `il giro parte da '${ramo}', che non è '${MAIN_BRANCH}' aggiornato: gli strumenti fissati sarebbero quelli di quel ramo (${viaDiFuga})`;
     }
-    g(['fetch', '--quiet', 'origin', MAIN_BRANCH]);
-    const indietro = g(['rev-list', '--count', `HEAD..origin/${MAIN_BRANCH}`]);
-    if (Number(indietro) > 0) {
-      return `il checkout è indietro di ${indietro} commit su '${MAIN_BRANCH}': gli strumenti fissati sarebbero già vecchi`;
+
+    // Indietro sulla linea principale: NON è un motivo per morire. La ricetta
+    // dell'orchestratore prevede già di aggiornarsi, solo che lo fa due passi
+    // dopo — cioè dopo che la copia è stata presa. Lo si fa adesso, che è il
+    // momento giusto, e solo in avanti: se non basta un avanzamento pulito,
+    // qui c'è qualcosa che deve vedere l'owner.
+    const sporco = g(['status', '--porcelain']);
+    if (sporco) {
+      return `il checkout ha modifiche non salvate e non si può aggiornare prima di fissare gli strumenti (${viaDiFuga})`;
+    }
+    try {
+      g(['merge', '--ff-only', `origin/${MAIN_BRANCH}`]);
+    } catch (_) {
+      return `il checkout non si allinea a '${MAIN_BRANCH}' con un avanzamento pulito: gli strumenti fissati sarebbero già vecchi (${viaDiFuga})`;
+    }
+    if (g(['rev-parse', 'HEAD']) !== la) {
+      return `il checkout non si è allineato a '${MAIN_BRANCH}': gli strumenti fissati sarebbero già vecchi (${viaDiFuga})`;
     }
   } catch (_) {
-    // Niente git, o nessun remoto: non è questo il posto per fermare un giro.
+    // Niente git, nessun remoto, rete assente: qui si fallisce APERTI. Questo
+    // controllo esiste per accorgersi di una deriva, non per essere il punto in
+    // cui un giro muore perché il fetch non è passato.
     return '';
   }
   return '';
