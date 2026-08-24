@@ -25,6 +25,12 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
      nessuna macchina.
 3. **Setup** (una volta, i worker lo ereditano): install con skip del binario
    Electron + `ensure-electron.mjs`, `apt-get install -y scrot`.
+   - I comandi che ricevi da qui in poi nominano gli strumenti con un percorso
+     INTERO, fuori dal progetto: usali così come sono, non accorciarli in
+     `scripts/…`. Appena il giro apre il ramo di un feedback, la cartella del
+     progetto diventa quella del ramo, strumenti e ricette compresi — e un ramo
+     aperto giorni fa riporta indietro anche le correzioni già fatte. È già
+     costato un'ora di lavoro con la correzione in produzione da un giorno.
 4. `git pull --rebase origin main`. Se fallisce (conflitti, rete): chiudi il
    giro — NON risolvere niente a mano. Il clone è fresco: un conflitto qui è
    il sintomo di una sovrapposizione che deve vedere l'owner, non un intoppo
