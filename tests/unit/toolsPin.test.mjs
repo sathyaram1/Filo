@@ -40,7 +40,10 @@ function progettoFinto() {
   // Tutto quello che la copia deve contenere: se qui ne manca un pezzo, il
   // banco di prova diverge dalla produzione e nasconde proprio il guasto che
   // ha bocciato la prima versione (copia incompleta, giro che si ferma).
-  for (const p of PINNED_PATHS) mkdirSync(resolve(casa, p), { recursive: true });
+  for (const p of PINNED_PATHS) {
+    if (p.endsWith('.js')) { mkdirSync(dirname(resolve(casa, p)), { recursive: true }); writeFileSync(resolve(casa, p), '', 'utf8'); }
+    else mkdirSync(resolve(casa, p), { recursive: true });
+  }
   mkdirSync(resolve(casa, 'scripts', 'lib'), { recursive: true });
   mkdirSync(resolve(casa, 'routines', 'roles'), { recursive: true });
   return casa;
@@ -164,6 +167,50 @@ test('nessuno strumento importa roba che la copia non contiene', async () => {
 
   assert.deepEqual(fuori, [],
     `questi strumenti importano roba fuori dalla copia: o si aggiunge il percorso a quelli fissati, o l'import va tolto:\n${fuori.join('\n')}`);
+});
+
+test('dalla copia, git continua a parlare col PROGETTO', async () => {
+  // La copia non è un deposito git. Uno strumento che dalla copia interroga git
+  // per ritrovare le credenziali dell'owner non troverebbe niente, e direbbe
+  // "nessuna credenziale" invece di "sto guardando nel posto sbagliato".
+  const { spawn } = await import('node:child_process');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const finto = mkdtempSync(resolve(tmpdir(), 'filo-progetto-'));
+  const dove = resolve(tmpdir(), `filo-strumenti-git-${process.pid}`);
+
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: finto, stdio: 'ignore' });
+    mkdirSync(resolve(finto, 'tests', 'agent'), { recursive: true });
+    writeFileSync(resolve(finto, 'tests', 'agent', '.env'),
+      'FILO_ADMIN_REFRESH_TOKEN=segno-del-progetto\n', 'utf8');
+
+    const pin = pinTools(REPO, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+    // La copia punta al progetto finto, come farebbe in cloud.
+    writeFileSync(resolve(dove, '.filo-repo-root'), `${finto}\n`, 'utf8');
+
+    const out = await new Promise((fine) => {
+      const p = spawn(process.execPath, [
+        '--input-type=module', '-e',
+        `import { findAdminRefreshToken } from ${JSON.stringify(`file:///${resolve(dove, 'scripts', 'lib', 'firestore-auth.mjs').split('\\').join('/')}`)};
+         console.log(String(findAdminRefreshToken()));`,
+      ], {
+        cwd: dove,
+        env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: '', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', () => fine({ so, se }));
+    });
+
+    assert.match(out.so, /segno-del-progetto/,
+      `dalla copia non ha ritrovato il progetto: ${out.so.trim()} ${out.se.slice(-200)}`);
+  } finally {
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    rmSync(finto, { recursive: true, force: true, maxRetries: 5 });
+  }
 });
 
 // ── Le ricette ─────────────────────────────────────────────────────────────
