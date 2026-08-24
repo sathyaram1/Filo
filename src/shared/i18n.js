@@ -203,6 +203,10 @@
     // Traduzione interrotta a metà (#408): mai "Pagina tradotta" quando non lo
     // è. Dice quanto ne manca, perché si è fermata e come riprendere.
     toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
+    // Pagina più lunga di quanta ne entri in un giro solo: non è un guasto, è
+    // un lavoro a tratti. Dire "Pagina tradotta" con la coda ancora in inglese
+    // sarebbe la stessa bugia di una traduzione interrotta.
+    toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dal tasto destro per continuare.',
     toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
