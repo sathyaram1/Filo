@@ -103,6 +103,14 @@ export function pinnedDir() {
  */
 export function pinTools(repoRoot, { dest = pinnedDir(), origine = '' } = {}) {
   const src = resolve(repoRoot);
+  // NON si fissa sopra la copia che sta girando adesso. Non è prudenza: a
+  // metà giro il progetto è aperto sul ramo di lavoro, quindi ricopiare da lì
+  // sovrascriverebbe gli strumenti buoni con quelli del ramo — il guasto che
+  // questa copia esiste per togliere, eseguito dalle nostre mani. (E su Windows
+  // fallirebbe comunque, perché è la cartella da cui il processo sta girando.)
+  if (resolve(dest) === TOOLS_ROOT) {
+    return { ok: true, dir: TOOLS_ROOT, why: 'già fissati' };
+  }
   try {
     for (const p of PINNED_PATHS) {
       if (!existsSync(resolve(src, p))) return { ok: false, dir: '', why: `manca ${p}` };
