@@ -369,6 +369,11 @@ const WORKER_CONTRACT_FILE = '_contratto-worker.md';
  *
  * @returns {string} '' se va bene, altrimenti il motivo per fermarsi
  */
+// Riempita dalla guardia quando NON ha potuto guardare (niente remoto, rete
+// assente): finisce nei log, così un controllo saltato non somiglia a un
+// controllo passato.
+let nonVerificato = '';
+
 function checkoutNonAdatto() {
   if (String(process.env.FILO_PREFLIGHT_ANY_BRANCH || '') === '1') return '';
   const g = (args) => execFileSync('git', args, {
