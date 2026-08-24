@@ -258,8 +258,11 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     // agli strumenti del ramo vecchio.
     assert.ok(!out.so.includes('node scripts/'),
       `nella ricetta consegnata resta un percorso relativo: ${out.so.slice(0, 500)}`);
-    assert.ok(out.so.includes(`${resolve(dove).split('\\').join('/')}/scripts/routine-channel.mjs`),
-      'il comando deve nominare gli strumenti fissati');
+    // Sul nome della cartella e non sul percorso intero: fra forma breve e
+    // forma lunga dei percorsi di sistema il confronto fallirebbe per il
+    // sistema operativo invece che per il codice.
+    assert.ok(out.so.includes(`${basename(dove)}/scripts/routine-channel.mjs`),
+      `il comando deve nominare gli strumenti fissati: ${out.so.slice(0, 500)}`);
   } finally {
     srv.close();
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
