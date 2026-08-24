@@ -658,14 +658,19 @@
   function detectContext(target, x, y) {
     const linkEl = closestAcrossShadow(target, 'a[href]');
     const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
-    const { mediaEl, mediaUnder } = findMedia(target, x, y);
+    // Un solo colpo di hit-test per tutte e tre le famiglie: è la stessa pila di
+    // strati, e ripeterlo tre volte costerebbe tre risalite dell'albero a ogni
+    // apertura del menu.
+    const stack = deepElementsFromPoint(x, y);
+    const { mediaEl, mediaUnder } = findMedia(target, stack);
     return {
       linkEl,
       imgEl,
       mediaEl,
       mediaUnder,
-      // Cercato solo se il collegamento non è già fra gli antenati.
-      linkUnder: linkEl ? null : findLinkUnder(x, y),
+      // Cercati solo se non sono già fra gli antenati.
+      imgUnder: imgEl ? null : findUnder(stack, 'img'),
+      linkUnder: linkEl ? null : findUnder(stack, 'a[href]'),
       editable: isEditable(target),
     };
   }
