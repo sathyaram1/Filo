@@ -415,6 +415,61 @@ test('componente chiuso: dice che la pagina è tradotta solo in parte, non "Pagi
   await page.screenshot({ path: 'tests/.shots/translate-page-closed-component.png' }).catch(() => {});
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// Pagina PIÙ LUNGA del tetto di blocchi che un giro riesce a prendere.
+//
+// L'estrazione si ferma a un tetto (migliaia di blocchi): oltre quel punto il
+// testo resta in lingua originale. Finché il tetto era invisibile, il conto
+// finale considerava "tutto" solo ciò che era stato raccolto e l'avviso diceva
+// "Pagina tradotta" con la coda della pagina ancora in inglese — la stessa
+// bugia di #407, su un'altra causa.
+//
+// Comportamento giusto: dirlo, e finire il lavoro alla ripresa.
+// ───────────────────────────────────────────────────────────────────────────
+
+// 2100 blocchi: sopra il tetto (2000) ma abbastanza corti da tenere il test
+// veloce (il modello è stubbato: conta il numero di blocchi, non i caratteri).
+const HUGE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A gigantic English page</h1>
+  ${Array.from({ length: 2100 }, (_, i) => `<div id="b${i}">Block number ${i} of this page.</div>`).join('\n  ')}
+</body></html>`;
+
+test('pagina più lunga del tetto: lo dice e la ripresa la finisce', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, HUGE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  // Precondizione: il primo giro si ferma al tetto, la coda resta in inglese.
+  await expect.poll(() => translatedCount(page), { timeout: 120000 }).toBeGreaterThan(1000);
+  await expect(page.locator('#b2099')).toHaveText('Block number 2099 of this page.');
+
+  // La bugia: mai "Pagina tradotta" con la coda ancora in lingua originale.
+  const t1 = await toasts(page);
+  expect(t1).not.toContain('Pagina tradotta');
+  // …e l'avviso dice come arrivare in fondo.
+  expect(t1.join(' | ')).toContain('Riprendi dal tasto destro');
+
+  // Il menu offre di RIPRENDERE (non di buttare via i blocchi già tradotti).
+  await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toBeVisible();
+  await expect(icon).toHaveAttribute('aria-label', 'Riprendi traduzione');
+  await icon.click();
+
+  // SUCCESSO dal punto di vista dell'utente: la pagina finisce in italiano.
+  await expect(page.locator('#b2099')).toHaveText(/^IT /, { timeout: 120000 });
+  await expect(page.locator('#b0')).toHaveText(/^IT /);
+  await expect(page.locator('#head')).toHaveText(/^IT /);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 120000 }).toBe(true);
+
+  // Nessun blocco pagato due volte.
+  const doubled = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
+      .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
+  expect(doubled).toBe(0);
+});
+
 test('"Mostra originale" riporta indietro tutta la pagina, link compresi', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, ARTICLE);
