@@ -1253,7 +1253,13 @@
       // Quante volte questo lavoro si è arenato ed è rientrato in coda da solo.
       // Senza scriverlo da qualche parte, un feedback che si impianta sempre
       // sullo stesso scoglio sembra semplicemente lento.
-      const ripartenze = Math.max(0, Math.round(Number(fb.workingResets) || 0));
+      // `stalls` è il totale che non si azzera mai; `workingResets` è il
+      // contatore operativo del freno, che una consegna vera riporta a zero —
+      // leggere quello faceva sparire il numero proprio quando la pratica esce
+      // dal giro automatico, cioè quando all'owner serve.
+      const ripartenze = Math.max(0, Math.round(
+        Number(fb.stalls) || Number(fb.workingResets) || 0
+      ));
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${norm.statusReason}` : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
