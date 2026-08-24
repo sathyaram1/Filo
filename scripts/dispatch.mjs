@@ -1147,7 +1147,9 @@ if (isMainModule) {
           const tools = pin.dir;
           const f = resolve(tools, 'routines', 'roles', 'orchestrator.md');
           const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
-          console.log('[dispatch] prontezza OK. Le tue istruzioni:\n');
+          const da = pinnedOrigin(tools);
+          console.log(`[dispatch] prontezza OK. Strumenti fissati${da ? ` da ${da}` : ''}.`);
+          console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
             || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
           process.exit(0);
