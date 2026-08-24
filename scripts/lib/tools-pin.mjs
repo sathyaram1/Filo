@@ -67,6 +67,8 @@ export const PINNED_PATHS = [
   'src/shared',
   // La configurazione degli accessi, che il canale verso il database legge.
   'src/main/auth',
+  // Il campanello che avvisa l'owner quando una fusione resta in attesa.
+  'src/main/services/mergeApprovalSignal.js',
 ];
 
 const REPO_MARK = '.filo-repo-root';
