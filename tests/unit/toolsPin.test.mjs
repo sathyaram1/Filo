@@ -134,6 +134,63 @@ test('più comandi nella stessa ricetta vengono riscritti tutti', () => {
 
 // ── Il controllo che conta ─────────────────────────────────────────────────
 
+test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', async () => {
+  // La giuntura vera: non la funzione che copia, ma il momento del giro in cui
+  // viene chiamata. Il preflight è l'unico punto in cui la cartella è ancora
+  // sulla versione aggiornata; se la copia non parte da lì non serve a niente.
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.includes('config')) res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  const dove = resolve(tmpdir(), `filo-strumenti-preflight-${process.pid}`);
+
+  try {
+    const out = await new Promise((fine) => {
+      const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--preflight'], {
+        cwd: REPO,
+        env: {
+          ...process.env,
+          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+          FILO_ROUTINES_ENABLED: '1',
+          FILO_TOOLS_DIR: dove,
+          FILO_NO_BEAT: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', (code) => fine({ so, se, code }));
+    });
+
+    assert.equal(out.code, 0, `il preflight doveva dire che si lavora: ${out.se.slice(-300)}`);
+    assert.ok(existsSync(resolve(dove, 'scripts', 'dispatch.mjs')),
+      'gli strumenti non sono stati copiati fuori dal progetto');
+    assert.ok(existsSync(resolve(dove, 'routines', 'roles', 'orchestrator.md')),
+      'anche le ricette dei ruoli devono seguire gli strumenti');
+    assert.equal(pinnedRepoRoot(dove), resolve(REPO), 'la copia deve ricordare il progetto');
+    // E le istruzioni consegnate devono puntare alla copia, non al progetto.
+    assert.ok(!/node scripts\//.test(out.so),
+      `le istruzioni rimandano ancora agli strumenti del ramo:\n${out.so.slice(0, 400)}`);
+    assert.ok(out.so.includes(`${resolve(dove).split('\\').join('/')}/scripts/`),
+      'le istruzioni devono nominare la copia');
+  } finally {
+    srv.close();
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
 test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () => {
   // Il guasto del 24 agosto, riprodotto: un progetto con lo strumento nuovo, un
   // ramo che ne contiene uno vecchio, e il ramo che viene aperto a metà giro.
