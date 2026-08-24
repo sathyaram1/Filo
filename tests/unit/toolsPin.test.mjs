@@ -490,6 +490,128 @@ test('se la copia non riesce, il giro si FERMA invece di usare gli strumenti del
   }
 });
 
+test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
+  // Il collegamento copia→progetto letto da dispatch: in cloud nessuno gli dice
+  // dove sta il progetto, se lo ritrova col promemoria che la copia si è
+  // scritta. Senza, biglietto e battito finirebbero accanto alla copia, dove
+  // chi consegna non li cerca — e git parlerebbe con una cartella che non è un
+  // deposito.
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const { cpSync } = await import('node:fs');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.endsWith('/routineWork')) {
+        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+      } else if (req.url.includes('config')) {
+        res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      } else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+
+  const casa = progettoFinto();
+  const dove = resolve(tmpdir(), `filo-strumenti-marcatori-${process.pid}`);
+  try {
+    cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
+    cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
+    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'ricetta\n', 'utf8');
+    const pin = pinTools(casa, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+
+    await new Promise((fine) => {
+      // NIENTE `FILO_REPO_ROOT`: è la condizione vera in cloud.
+      const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova'], {
+        cwd: dove,
+        env: {
+          ...process.env,
+          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+          FILO_REPO_ROOT: '',
+          FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
+          FILO_ROUTINES_ENABLED: '1',
+          FILO_NO_BEAT: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      p.on('close', fine);
+    });
+
+    assert.ok(existsSync(resolve(casa, '.claude', 'routine-ticket.json')),
+      'il biglietto deve stare nel progetto: è lì che lo cerca chi consegna');
+    assert.ok(!existsSync(resolve(dove, '.claude', 'routine-ticket.json')),
+      'accanto alla copia non lo troverebbe nessuno');
+  } finally {
+    srv.close();
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
+test('una routine che parte dal ramo sbagliato si ferma invece di fissare strumenti vecchi', async () => {
+  // La copia vale quanto il momento in cui viene presa. Se il giro parte da un
+  // checkout non aggiornato fissa strumenti vecchi, e il difetto torna con
+  // un'altra causa — con l'aggravante che stavolta sembra tutto a posto.
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.includes('config')) res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  const dove = resolve(tmpdir(), `filo-strumenti-ramo-${process.pid}`);
+
+  try {
+    const out = await new Promise((fine) => {
+      const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--preflight'], {
+        cwd: REPO,
+        env: {
+          ...process.env,
+          // Questo worktree NON è sulla linea principale, ed è il punto.
+          FILO_ROUTINE: '1',
+          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+          FILO_ROUTINES_ENABLED: '1',
+          FILO_TOOLS_DIR: dove,
+          FILO_NO_BEAT: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', (code) => fine({ so, se, code }));
+    });
+
+    assert.equal(out.code, 3, `doveva fermarsi: ${out.code} ${out.so.slice(0, 200)}`);
+    assert.match(out.se, /invece che da/, 'e deve dire da dove è partito');
+    assert.ok(!existsSync(dove), 'e non deve aver fissato niente');
+  } finally {
+    srv.close();
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test('in locale il controllo sul ramo NON scatta', () => {
+  // Chi lavora in locale sta su un ramo suo apposta, e lancia il preflight per
+  // provare: fermarlo sarebbe rumore. Il controllo riguarda solo le routine,
+  // che si dichiarano tali.
+  assert.equal(String(process.env.FILO_ROUTINE || ''), '',
+    'questo controllo vale finché i test non si dichiarano routine');
+});
+
 test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () => {
   // Il guasto del 24 agosto, riprodotto: un progetto con lo strumento nuovo, un
   // ramo che ne contiene uno vecchio, e il ramo che viene aperto a metà giro.
