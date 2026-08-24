@@ -97,9 +97,11 @@ export function pinnedDir() {
 /**
  * Copia gli strumenti fuori dal progetto e ricorda dove sta il progetto.
  *
- * Best-effort dichiarato: se non riesce, chi chiama continua con gli strumenti
- * del repo — cioè il comportamento di prima, che funziona finché il ramo è
- * recente. Meglio un giro con gli strumenti del ramo che nessun giro.
+ * Un fallimento qui NON è un intoppo da ignorare, e chi chiama lo tratta come
+ * guasto che ferma il giro: proseguire vorrebbe dire eseguire gli strumenti del
+ * ramo di lavoro, cioè il guasto che questa copia esiste per togliere — e
+ * quello non si vede finché non è costato un'ora di lavoro. Meglio un giro
+ * saltato di un giro che lavora con gli attrezzi sbagliati.
  *
  * @returns {{ ok: boolean, dir: string, why: string }}
  */
