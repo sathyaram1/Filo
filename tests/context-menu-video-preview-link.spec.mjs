@@ -133,6 +133,95 @@ test('copertina stesa sopra il link (immagine, non filmato): stesse due famiglie
     .toBe(linkHref);
 });
 
+test('scheda tutta dentro un componente web (link e anteprima impilati lì dentro): le voci del link ci sono', async ({ app, openTab, testServer }) => {
+  // La forma che restava scoperta: il collegamento NON avvolge il componente, sta
+  // dentro insieme all'anteprima. `document.elementsFromPoint` si ferma al bordo
+  // del componente e restituisce solo l'host, quindi la ricerca «cosa c'è sotto
+  // il cursore» non vedeva più il collegamento e il menu tornava quello della
+  // lamentela: solo i comandi del filmato.
+  const linkHref = 'https://example.com/scheda-tutta-dentro';
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <card-tile></card-tile>
+    <script>
+      class CardTile extends HTMLElement {
+        constructor() {
+          super();
+          this.attachShadow({ mode: 'open' }).innerHTML =
+            '<div style="position:relative;width:320px;height:180px">'
+            + '<a href="${linkHref}" style="position:absolute;inset:0;display:block"></a>'
+            + '<video src="/clip.mp4" style="position:absolute;inset:0;width:100%;height:100%;background:#333"></video>'
+            + '</div>';
+        }
+      }
+      customElements.define('card-tile', CardTile);
+    </script>
+  </body></html>`);
+  const menu = await openMenuOn(page, 'card-tile');
+
+  for (const label of MEDIA_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+test('stesso pixel, anteprima ferma: il menu della scheda resta (copertina + collegamento)', async ({ app, openTab, testServer }) => {
+  // Prima: menu pieno mentre il filmatino suonava, menu VUOTO un istante dopo che
+  // si era fermato — stessa scheda, stesso gesto, due esiti opposti.
+  const linkHref = 'https://example.com/scheda-ferma';
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="card" style="position:relative;width:320px;height:180px">
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;display:block"></a>
+      <img id="cover" src="${PX}" style="position:absolute;inset:0;width:100%;height:100%;background:#e07b39">
+      <video id="clip" src="/clip.mp4" style="position:absolute;inset:0;width:100%;height:100%;background:#333"></video>
+      <span id="velo" style="position:absolute;inset:0;background:rgba(0,0,0,.001)"></span>
+    </div>
+  </body></html>`);
+
+  // Anteprima in funzione.
+  let menu = await openMenuOn(page, '#velo');
+  await expect(menu.getByText('Salva video come', { exact: false }).first()).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // L'anteprima smette e lascia il posto alla copertina: stesso pixel.
+  await page.evaluate(() => document.getElementById('clip').remove());
+  menu = await openMenuOn(page, '#velo');
+  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+test('velo trasparente su un collegamento qualsiasi (niente filmato, niente copertina): le voci del link ci sono', async ({ app, openTab, testServer }) => {
+  // Non è un problema delle sole schede video: qualunque elenco costruito a
+  // strati copre le sue righe con un velo, e il tasto destro non trovava niente.
+  const linkHref = 'https://example.com/riga-elenco';
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="riga" style="position:relative;width:320px;height:64px">
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;display:block">Una riga dell'elenco</a>
+      <span id="velo" style="position:absolute;inset:0;background:rgba(0,0,0,.001)"></span>
+    </div>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#velo');
+
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
 test('un filmato a tutta pagina non si porta dietro le voci di un link che gli passa sotto per caso', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
     <a id="estraneo" href="https://example.com/altro" style="position:fixed;left:40px;top:40px;z-index:1">Un collegamento qualsiasi</a>
