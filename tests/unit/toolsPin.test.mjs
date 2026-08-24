@@ -23,7 +23,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Un percorso alla unix, su Windows, viene ancorato al disco corrente. L'atteso
@@ -221,7 +221,8 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
   try {
     // Il progetto: strumenti veri (servono a farlo girare) e ricetta AGGIORNATA.
     cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'RICETTA AGGIORNATA\n', 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'),
+      'RICETTA AGGIORNATA\nRilascia con node scripts/routine-channel.mjs release <biglietto>\n', 'utf8');
 
     // Il giro fissa gli strumenti finché la cartella è ancora aggiornata.
     const pin = pinTools(casa, { dest: dove });
