@@ -275,6 +275,117 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
   }
 });
 
+test('la copia SA GIRARE da sola: il preflight lanciato da lì non si guasta', async () => {
+  // Il rilievo che ha bocciato la prima versione: la copia conteneva gli
+  // strumenti ma non i moduli che quegli strumenti importano. Il preflight
+  // lanciato dalla copia usciva con "guasto", accusando l'interruttore o la
+  // rete invece della copia incompleta — e "guasto" per l'orchestratore vuol
+  // dire chiudere il giro senza ritentare.
+  //
+  // Questo controllo esegue la copia. È l'unico modo di sapere se è completa:
+  // un elenco di cartelle si legge e sembra sempre giusto.
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.includes('config')) res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  const dove = resolve(tmpdir(), `filo-strumenti-autosuff-${process.pid}`);
+
+  try {
+    const pin = pinTools(REPO, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+
+    const out = await new Promise((fine) => {
+      // Lanciato DALLA COPIA, e senza dire dove sta il progetto: deve
+      // ritrovarselo da sé col promemoria che si è scritto.
+      const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--preflight'], {
+        cwd: dove,
+        env: {
+          ...process.env,
+          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+          FILO_ROUTINES_ENABLED: '1',
+          FILO_TOOLS_DIR: dove,
+          FILO_REPO_ROOT: '',
+          FILO_NO_BEAT: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', (code) => fine({ so, se, code }));
+    });
+
+    assert.equal(out.code, 0,
+      `il preflight dalla copia si è guastato: ${out.se.slice(-400) || out.so.slice(-400)}`);
+    assert.ok(!/Cannot find module/i.test(out.se), `alla copia manca un pezzo: ${out.se.slice(-300)}`);
+  } finally {
+    srv.close();
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test('se la copia non riesce, il giro si FERMA invece di usare gli strumenti del ramo', async () => {
+  // Proseguire vorrebbe dire eseguire gli strumenti del ramo, cioè il guasto
+  // che tutto questo viene a togliere — e quel guasto non si vede finché non
+  // costa un'ora di lavoro. Meglio un giro saltato.
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.includes('config')) res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  // Una destinazione che NON si può creare: un file al posto della cartella.
+  const dove = resolve(tmpdir(), `filo-strumenti-bloccata-${process.pid}`);
+  rmSync(dove, { recursive: true, force: true });
+  mkdirSync(dirname(dove), { recursive: true });
+
+  try {
+    const out = await new Promise((fine) => {
+      const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--preflight'], {
+        cwd: REPO,
+        env: {
+          ...process.env,
+          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+          FILO_ROUTINES_ENABLED: '1',
+          // Dentro una cartella che non esiste e non è creabile come tale.
+          FILO_TOOLS_DIR: resolve(REPO, 'package.json', 'sotto'),
+          FILO_NO_BEAT: '1',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', (code) => fine({ so, se, code }));
+    });
+
+    assert.equal(out.code, 3, `doveva fermarsi come guasto, invece: ${out.code} ${out.so.slice(0, 200)}`);
+    assert.match(out.se, /strumenti non fissati/, 'e il motivo deve dire QUALE cosa non è riuscita');
+  } finally {
+    srv.close();
+  }
+});
+
 test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () => {
   // Il guasto del 24 agosto, riprodotto: un progetto con lo strumento nuovo, un
   // ramo che ne contiene uno vecchio, e il ramo che viene aperto a metà giro.
