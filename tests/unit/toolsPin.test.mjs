@@ -600,7 +600,7 @@ test('una routine che parte dal ramo sbagliato si ferma invece di fissare strume
     });
 
     assert.equal(out.code, 3, `doveva fermarsi: ${out.code} ${out.so.slice(0, 200)}`);
-    assert.match(out.se, /invece che da/, 'e deve dire da dove è partito');
+    assert.ok(out.se.includes('claude/strumenti-fissi'), `deve dire da dove è partito: ${out.se.slice(-200)}`);
     assert.ok(!existsSync(dove), 'e non deve aver fissato niente');
   } finally {
     srv.close();
@@ -640,9 +640,14 @@ async function laboratorioGit() {
   g(['config', 'user.email', 't@t']);
   g(['config', 'user.name', 't']);
   // Gli strumenti veri: la guardia gira dentro dispatch, non da sola.
-  cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
-  cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
-  cpSync(resolve(REPO, 'src', 'shared'), resolve(casa, 'src', 'shared'), { recursive: true });
+  // Tutto quello che la copia pretende: enumerarlo a mano qui vorrebbe dire
+  // ricostruire lo stesso elenco in due posti, e vederli divergere.
+  for (const p of PINNED_PATHS) {
+    const da = resolve(REPO, p);
+    if (!existsSync(da)) continue;
+    mkdirSync(dirname(resolve(casa, p)), { recursive: true });
+    cpSync(da, resolve(casa, p), { recursive: true });
+  }
   mkdirSync(resolve(casa, 'routines', 'roles'), { recursive: true });
   writeFileSync(resolve(casa, 'routines', 'roles', 'orchestrator.md'), 'ricetta\n', 'utf8');
   g(['add', '-A']); g(['commit', '-qm', 'primo']);
