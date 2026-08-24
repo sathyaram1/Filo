@@ -604,33 +604,32 @@
   //   <video> non compare fra gli antenati. Lo usiamo come ripiego SOLO quando
   //   non c'è altro contesto (niente selezione, immagine, link, campo di testo),
   //   così un video di sfondo non ruba il menu a ciò che sta sopra.
-  function findMedia(target, x, y) {
+  function findMedia(target, stack) {
     const direct = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
       ? target
       : closestAcrossShadow(target, 'video, audio');
     if (direct) return { mediaEl: direct, mediaUnder: null };
     let under = null;
-    try {
-      for (const el of document.elementsFromPoint(x, y) || []) {
-        if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') { under = el; break; }
-      }
-    } catch (_) {}
+    for (const el of stack) {
+      if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') { under = el; break; }
+    }
     return { mediaEl: null, mediaUnder: under };
   }
 
-  // Collegamento SOTTO il punto cliccato, quando non ce n'è uno fra gli antenati
-  // (#444). È il gemello di `mediaUnder`: le schede delle home video/social sono
-  // fatte di strati sovrapposti, e il link della scheda tanto spesso sta SOTTO
-  // l'anteprima (l'anteprima video parte al passaggio del mouse e si stende
-  // sopra la copertina) quanto sopra. Senza questo ripiego, appena il filmatino
-  // parte la scheda diventa irraggiungibile col tasto destro.
-  function findLinkUnder(x, y) {
-    try {
-      for (const el of document.elementsFromPoint(x, y) || []) {
-        const a = closestAcrossShadow(el, 'a[href]');
-        if (a) return a;
-      }
-    } catch (_) {}
+  // Immagine e collegamento SOTTO il punto cliccato, quando non ce n'è uno fra
+  // gli antenati (#444). Sono i gemelli di `mediaUnder`, e devono esistere tutti
+  // e tre: le schede delle home video/social sono fatte di strati sovrapposti,
+  // non annidati. L'anteprima si stende SOPRA la copertina, il link della scheda
+  // passa sotto a entrambe, e sopra a tutto c'è spesso un velo trasparente che
+  // non è né link né immagine né filmato. Senza il ripiego per OGNI famiglia lo
+  // stesso identico pixel dà menu diversi a seconda di quale strato ha vinto in
+  // quell'istante — con l'anteprima in funzione il menu era completo, e con
+  // l'anteprima ferma restava vuoto.
+  function findUnder(stack, selector) {
+    for (const el of stack) {
+      const hit = closestAcrossShadow(el, selector);
+      if (hit) return hit;
+    }
     return null;
   }
 
