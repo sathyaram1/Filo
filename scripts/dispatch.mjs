@@ -341,6 +341,24 @@ const ROLE_FILE = {
 // divergevano.
 const WORKER_CONTRACT_FILE = '_contratto-worker.md';
 
+/**
+ * Da dove viene il contenuto che sto per fissare: ramo e commit del checkout.
+ * Non decide niente — si scrive accanto alla copia e finisce nelle istruzioni,
+ * così una copia presa da un checkout non aggiornato si vede invece di dover
+ * essere dedotta da un comportamento strano ore dopo.
+ */
+function origineDelCheckout() {
+  try {
+    const ramo = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return `${ramo} ${sha}`;
+  } catch (_) {
+    return '';
+  }
+}
+
 export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
