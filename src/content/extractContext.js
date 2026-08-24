@@ -327,8 +327,8 @@
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
-          out.push({ el, text: txt });
-          if (out.length >= maxBlocks) break;
+          if (out.length >= maxBlocks) truncated++;
+          else out.push({ el, text: txt });
         }
       }
       const kids = [];
