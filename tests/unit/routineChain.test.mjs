@@ -143,6 +143,24 @@ test('lavoro nuovo: al lavoratore arrivano ruolo, ricetta e il TESTO del feedbac
     'è il testo del feedback che il lavoratore usa: senza, lavora alla cieca');
 });
 
+test('la presa in carico dice al server QUALE RAMO, non un ramo vuoto', async () => {
+  // Il ramo di un lavoro nuovo lo decide il giro, e per un po' lo ha deciso
+  // DOPO aver dichiarato la presa in carico: il server riceveva un ramo vuoto,
+  // non lo scriveva, e nessun lavoro in corso aveva un ramo scritto sopra.
+  // Conseguenza: il recupero dei lavori arenati — che guarda quando quel ramo
+  // si è mosso l'ultima volta — non aveva niente da guardare, e sfrattava
+  // contando le ore dalla presa in carico. Cioè la cosa che non deve fare.
+  const consegne = [];
+  await giro({
+    ok: true, role: 'new-work', id: 'fid-900', num: FEEDBACK.num, branch: '',
+    payload: { role: 'new-work', num: FEEDBACK.num, feedback: FEEDBACK },
+  }, consegne);
+
+  const presa = consegne.find((c) => c && c.intent === 'status' && c.data && c.data.status === 'working');
+  assert.ok(presa, 'la presa in carico deve arrivare al server');
+  assert.ok(presa.data.branch, `il ramo deve arrivare col resto (arrivato: ${JSON.stringify(presa.data.branch)})`);
+});
+
 test('correzione: arriva anche la critica di chi aveva bocciato', async () => {
   const { json } = await giro({
     ok: true, role: 'fixer', id: 'fid-900', num: FEEDBACK.num, branch: 'worker/900',
