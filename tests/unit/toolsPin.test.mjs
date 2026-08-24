@@ -377,6 +377,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     srv.close();
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
 
@@ -553,6 +554,7 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
     srv.close();
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
 
@@ -634,7 +636,9 @@ async function laboratorioGit() {
   const { cpSync } = await import('node:fs');
   const g = (args, cwd = casa) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
-  const altrove = resolve(casa, 'altrove.git');
+  // L'altrove sta FUORI dalla cartella di lavoro: dentro, comparirebbe fra le
+  // modifiche non salvate e falserebbe ogni controllo sullo stato del checkout.
+  const altrove = resolve(dirname(casa), `${basename(casa)}-altrove.git`);
   execFileSync('git', ['init', '-q', '--bare', altrove], { stdio: 'ignore' });
   g(['init', '-q', '-b', 'main']);
   g(['config', 'user.email', 't@t']);
@@ -653,7 +657,7 @@ async function laboratorioGit() {
   g(['add', '-A']); g(['commit', '-qm', 'primo']);
   g(['remote', 'add', 'origin', altrove]);
   g(['push', '-q', '-u', 'origin', 'main']);
-  return { casa, g };
+  return { casa, altrove, g };
 }
 
 async function preflightIn(casa, extra = {}) {
@@ -702,13 +706,14 @@ test('testa staccata sulla PUNTA della linea principale: si passa', async () => 
   // Il contenuto è esattamente quello giusto. Rifiutarla guardando il nome del
   // ramo sarebbe anche una bugia: il messaggio direbbe "sei su un altro ramo"
   // mentre i file sono identici.
-  const { casa, g } = await laboratorioGit();
+  const { casa, altrove, g } = await laboratorioGit();
   try {
     g(['checkout', '-q', '--detach', 'HEAD']);
     const out = await preflightIn(casa);
     assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
   } finally {
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
 
@@ -716,7 +721,7 @@ test('checkout indietro: si allinea da solo invece di morire', async () => {
   // Morire qui vorrebbe dire fermare il giro PRIMA del passo in cui la sua
   // stessa ricetta gli dice di aggiornarsi, con un esito che significa "chiudi
   // e non ritentare". L'aggiornamento si fa adesso, che è il momento giusto.
-  const { casa, g } = await laboratorioGit();
+  const { casa, altrove, g } = await laboratorioGit();
   try {
     // Un commit nuovo sull'altrove, e il progetto resta indietro.
     writeFileSync(resolve(casa, 'nuovo.txt'), 'x', 'utf8');
@@ -730,11 +735,12 @@ test('checkout indietro: si allinea da solo invece di morire', async () => {
     assert.equal(g(['rev-parse', 'HEAD']), punta, 'e il checkout deve essere aggiornato davvero');
   } finally {
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
 
 test('ramo di lavoro: si ferma, e dice come si fa apposta', async () => {
-  const { casa, g } = await laboratorioGit();
+  const { casa, altrove, g } = await laboratorioGit();
   try {
     g(['checkout', '-q', '-b', 'claude/qualcosa']);
     writeFileSync(resolve(casa, 'suo.txt'), 'x', 'utf8');
@@ -747,19 +753,21 @@ test('ramo di lavoro: si ferma, e dice come si fa apposta', async () => {
       'e nominare la via di fuga: un rifiuto che non dice come si fa apposta è un muro');
   } finally {
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
 
 test('senza remoto la guardia lascia passare', async () => {
   // Fallire aperti: questo controllo esiste per accorgersi di una deriva, non
   // per essere il punto in cui un giro muore perché la rete non c'è.
-  const { casa, g } = await laboratorioGit();
+  const { casa, altrove, g } = await laboratorioGit();
   try {
     g(['remote', 'remove', 'origin']);
     const out = await preflightIn(casa);
     assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
   } finally {
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
 
@@ -810,6 +818,7 @@ test('anche i DATI che governano il giro vengono dalla copia', async () => {
   } finally {
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
 
@@ -849,5 +858,6 @@ test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () =>
   } finally {
     rmSync(dove, { recursive: true, force: true });
     rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
   }
 });
