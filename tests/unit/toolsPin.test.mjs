@@ -37,6 +37,10 @@ import {
 
 function progettoFinto() {
   const casa = mkdtempSync(resolve(tmpdir(), 'filo-strumenti-'));
+  // Tutto quello che la copia deve contenere: se qui ne manca un pezzo, il
+  // banco di prova diverge dalla produzione e nasconde proprio il guasto che
+  // ha bocciato la prima versione (copia incompleta, giro che si ferma).
+  for (const p of PINNED_PATHS) mkdirSync(resolve(casa, p), { recursive: true });
   mkdirSync(resolve(casa, 'scripts', 'lib'), { recursive: true });
   mkdirSync(resolve(casa, 'routines', 'roles'), { recursive: true });
   return casa;
