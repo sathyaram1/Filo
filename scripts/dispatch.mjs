@@ -346,10 +346,15 @@ export function readRoleInstructions(role) {
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
   const base = existsSync(f) ? readFileSync(f, 'utf8') : '';
-  if (!base || !RUOLI_LAVORABILI.includes(role)) return base;
+  if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
   const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
-  return contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
+  const testo = contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
+  // Le ricette dicono `node scripts/…`, che dalla cartella di lavoro porta agli
+  // strumenti DEL RAMO. Quando gli strumenti sono la copia fissata, il percorso
+  // va riscritto in assoluto qui, nel momento della consegna: è l'unico punto
+  // che sa dove stanno davvero, e chi lavora non deve saperlo.
+  return absolutizeRecipe(testo, TOOLS_ROOT, ROOT);
 }
 
 /**
