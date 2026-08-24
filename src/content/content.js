@@ -451,7 +451,7 @@
     // recuperiamola dal nodo stesso così Taglia/Copia compaiono nel menu.
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const {
-      linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable,
+      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable,
     } = detectContext(target, e.clientX, e.clientY);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
@@ -460,7 +460,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory, navState,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -714,7 +714,7 @@
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const {
-      linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable,
+      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable,
     } = detectContext(target, mouseEvent.clientX, mouseEvent.clientY);
     // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
     // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
@@ -727,7 +727,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory, navState,
     });
   }
 
@@ -1003,7 +1003,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory, navState,
   }) {
     const items = [];
 
@@ -1035,7 +1035,7 @@
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory,
     });
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
@@ -1137,7 +1137,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory,
   }) {
     const items = [];
 
@@ -1236,6 +1236,18 @@
       const mediaInLink = (mediaUnder && sameCardArea(mediaUnder, linkEl)) ? mediaUnder : null;
       if (mediaInLink) {
         for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
+        items.push({ type: 'separator' });
+      }
+      // Stessa storia per la copertina ferma: le schede la coprono quasi sempre
+      // con una sfumatura o un velo trasparente che regge il titolo, e il clic
+      // destro arriva lì invece che sull'`<img>`. Se non c'è un filmato in
+      // funzione, il contenuto della scheda è quell'immagine: le sue voci sono
+      // quelle che l'utente cerca (#444).
+      const imgInLink = (!mediaInLink && imgUnder && sameCardArea(imgUnder, linkEl))
+        ? imgUnder
+        : null;
+      if (imgInLink) {
+        for (const it of buildImageActionItems(imgInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
       for (const it of buildLinkActionItems(linkEl)) items.push(it);
