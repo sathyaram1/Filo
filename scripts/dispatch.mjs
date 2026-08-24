@@ -1117,11 +1117,16 @@ if (isMainModule) {
           // aggiornata, prima che qualunque ramo di lavoro venga aperto.
           // Da adesso in poi il giro esegue la copia, che nessun cambio di ramo
           // può riportare indietro (lib/tools-pin.mjs).
-          const pin = pinTools(ROOT);
+          const pin = pinTools(ROOT, { origine: origineDelCheckout() });
           if (!pin.ok) {
-            process.stderr.write(`[dispatch] strumenti non fissati (${pin.why}): il giro userà quelli del ramo di lavoro\n`);
+            // FERMA IL GIRO, non prosegue. Proseguire vorrebbe dire eseguire gli
+            // strumenti del ramo di lavoro, cioè esattamente il guasto che
+            // questa copia viene a togliere — e quel guasto non si vede: costa
+            // un'ora di lavoro e la si scopre alla consegna rifiutata.
+            console.error(`[dispatch] GUASTO (transient): strumenti non fissati (${pin.why})`);
+            process.exit(3);
           }
-          const tools = pin.ok ? pin.dir : TOOLS_ROOT;
+          const tools = pin.dir;
           const f = resolve(tools, 'routines', 'roles', 'orchestrator.md');
           const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
           console.log('[dispatch] prontezza OK. Le tue istruzioni:\n');
