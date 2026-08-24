@@ -195,6 +195,7 @@ test('velo trasparente, anteprima ferma: il menu è quello della scheda, non vuo
     </div>
   </body></html>`);
   const menu = await openMenuOn(page, '#velo');
+  await page.screenshot({ path: 'tests/.shots/context-menu-velo-anteprima-ferma.png' }).catch(() => {});
 
   await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
   for (const label of LINK_LABELS) {
