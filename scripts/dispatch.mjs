@@ -414,10 +414,17 @@ function checkoutNonAdatto() {
     if (g(['rev-parse', 'HEAD']) !== la) {
       return `il checkout non si è allineato a '${MAIN_BRANCH}': gli strumenti fissati sarebbero già vecchi (${viaDiFuga})`;
     }
-  } catch (_) {
-    // Niente git, nessun remoto, rete assente: qui si fallisce APERTI. Questo
-    // controllo esiste per accorgersi di una deriva, non per essere il punto in
-    // cui un giro muore perché il fetch non è passato.
+  } catch (e) {
+    // Niente git, nessun remoto, rete assente: qui si fallisce APERTI, perché
+    // questo controllo esiste per accorgersi di una deriva, non per essere il
+    // punto in cui un giro muore perché il fetch non è passato.
+    //
+    // Ma NON in silenzio: fallire aperti senza dirlo equivale a non avere la
+    // guardia. Con un remoto chiamato in un altro modo il controllo saltava e
+    // il giro fissava strumenti vecchi con un tranquillo "prontezza OK". Chi
+    // legge i log deve poter distinguere "verificato" da "non ho potuto
+    // guardare".
+    nonVerificato = String((e && e.message) || e).split('\n')[0].slice(0, 120);
     return '';
   }
   return '';
