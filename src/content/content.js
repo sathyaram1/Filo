@@ -424,7 +424,7 @@
     // recuperiamola dal nodo stesso così Taglia/Copia compaiono nel menu.
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const {
-      linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable,
+      linkEl, imgEl, mediaEl, mediaUnder, linkUnder, imgUnder, editable,
     } = detectContext(target, e.clientX, e.clientY);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
@@ -433,7 +433,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, imgUnder, editable, clipboardHistory, navState,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -690,7 +690,7 @@
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const {
-      linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable,
+      linkEl, imgEl, mediaEl, mediaUnder, linkUnder, imgUnder, editable,
     } = detectContext(target, mouseEvent.clientX, mouseEvent.clientY);
     // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
     // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
@@ -703,7 +703,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, imgUnder, editable, clipboardHistory, navState,
     });
   }
 
@@ -979,7 +979,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, imgUnder, editable, clipboardHistory, navState,
   }) {
     const items = [];
 
@@ -1011,7 +1011,7 @@
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, imgUnder, editable, clipboardHistory,
     });
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
@@ -1113,7 +1113,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, linkUnder, imgUnder, editable, clipboardHistory,
   }) {
     const items = [];
 
@@ -1227,19 +1227,49 @@
       return items;
     }
 
-    // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto
-    // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
+    // ---- Ripiego: niente fra gli antenati, ma qualcosa SOTTO il punto cliccato.
+    // I siti coprono le loro schede di veli trasparenti (aree cliccabili, strati
+    // per l'hover, ritagli): il clic destro arriva al velo e il cammino degli
+    // antenati non porta a niente. Le famiglie tengono lo stesso ordine di sopra
+    // — filmato, immagine, collegamento — e il collegamento si unisce alle altre
+    // due quando occupa lo stesso rettangolo, cioè quando è la stessa scheda.
+
+    // Filmato coperto dall'overlay del player, o anteprima sotto il velo della
+    // scheda: sono comunque le sue azioni che l'utente cerca.
     if (mediaUnder) {
       for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
-      // Scheda a strati: sopra un velo trasparente che non è né link né media,
-      // sotto il filmato e il link della scheda (#444). Se filmato e link
-      // occupano lo stesso rettangolo, il menu è quello della scheda intera.
       if (sameCardArea(mediaUnder, linkUnder)) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
         items.push({ type: 'separator' });
         items.push(Actions.buildInlineExplainLink(linkUnder));
       }
+      return items;
+    }
+
+    // Stessa scheda, anteprima ferma: sotto il velo resta la copertina. Senza
+    // questo ripiego lo stesso pixel dava un menu pieno mentre il filmatino
+    // suonava e un menu vuoto un istante dopo (#444).
+    if (imgUnder) {
+      for (const it of buildImageActionItems(imgUnder)) items.push(it);
+      if (sameCardArea(imgUnder, linkUnder)) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+      }
+      items.push({ type: 'separator' });
+      items.push(Actions.buildInlineExplainImage(imgUnder));
+      return items;
+    }
+
+    // Solo il collegamento, sotto un velo che non è né filmato né immagine: è il
+    // caso di qualunque elenco costruito a strati, non solo delle schede video.
+    // Nessuna misura da fare qui — non c'è una seconda famiglia con cui tenere
+    // il confine: il collegamento sotto il cursore È il contesto, esattamente
+    // come il filmato coperto dall'overlay qui sopra.
+    if (linkUnder) {
+      for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+      items.push({ type: 'separator' });
+      items.push(Actions.buildInlineExplainLink(linkUnder));
       return items;
     }
 
