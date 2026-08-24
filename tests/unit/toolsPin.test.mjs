@@ -558,57 +558,19 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
   }
 });
 
-test('una routine che parte dal ramo sbagliato si ferma invece di fissare strumenti vecchi', async () => {
-  // La copia vale quanto il momento in cui viene presa. Se il giro parte da un
-  // checkout non aggiornato fissa strumenti vecchi, e il difetto torna con
-  // un'altra causa — con l'aggravante che stavolta sembra tutto a posto.
-  const { createServer } = await import('node:http');
-  const { spawn } = await import('node:child_process');
-  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-
-  const srv = createServer((req, res) => {
-    let b = ''; req.on('data', (c) => { b += c; });
-    req.on('end', () => {
-      res.setHeader('Content-Type', 'application/json');
-      if (req.url.includes('config')) res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
-      else res.end(JSON.stringify({ ok: true }));
-    });
-  });
-  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  const port = srv.address().port;
-  const dove = resolve(tmpdir(), `filo-strumenti-ramo-${process.pid}`);
-
-  try {
-    const out = await new Promise((fine) => {
-      const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--preflight'], {
-        cwd: REPO,
-        env: {
-          ...process.env,
-          // Questo worktree NON è sulla linea principale, ed è il punto.
-          // NIENTE via di fuga, e NIENTE `FILO_ROUTINE`: la guardia non deve
-          // dipendere da una variabile che viene esportata dopo di lei.
-          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
-          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
-          FILO_ROUTINES_ENABLED: '1',
-          FILO_TOOLS_DIR: dove,
-          FILO_NO_BEAT: '1',
-        },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      let so = ''; let se = '';
-      p.stdout.on('data', (c) => { so += c; });
-      p.stderr.on('data', (c) => { se += c; });
-      p.on('close', (code) => fine({ so, se, code }));
-    });
-
-    assert.equal(out.code, 3, `doveva fermarsi: ${out.code} ${out.so.slice(0, 200)}`);
-    assert.ok(out.se.includes('claude/strumenti-fissi'), `deve dire da dove è partito: ${out.se.slice(-200)}`);
-    assert.ok(!existsSync(dove), 'e non deve aver fissato niente');
-  } finally {
-    srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-  }
-});
+// QUI VIVEVA un controllo che lanciava il preflight nella cartella del repo
+// stesso e pretendeva che si fermasse perché il ramo non era la linea
+// principale. Era verde su questo ramo e SAREBBE DIVENTATO ROSSO UNA VOLTA
+// FUSO: su main, pulito e aggiornato, il preflight passa — giustamente.
+//
+// Il costo non era teorico: la suite gira come cancello di pubblicazione ogni
+// sei ore, e sarebbe rimasta rossa per sempre, senza versioni agli utenti e
+// con un feedback aperto a ogni giro. Un test che dipende dal nome del ramo su
+// cui è stato scritto è la stessa forma di guasto che questo file sorveglia:
+// funziona qui, si rompe là.
+//
+// Il comportamento è coperto sotto, nel laboratorio git, dove il ramo di
+// lavoro viene COSTRUITO invece che ereditato dall'ambiente.
 
 test('la guardia sul ramo NON dipende da come il giro si dichiara', () => {
   // Appesa a una variabile che l'orchestratore esporta seguendo le istruzioni
