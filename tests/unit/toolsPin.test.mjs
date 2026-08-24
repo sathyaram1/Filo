@@ -757,6 +757,43 @@ test('ramo di lavoro: si ferma, e dice come si fa apposta', async () => {
   }
 });
 
+test('cartella sporca: ci si ferma ANCHE se il commit è quello giusto', async () => {
+  // Un progetto fermo a metà di un'operazione può stare esattamente sul commit
+  // giusto e avere i file rotti: un conflitto irrisolto lascia i suoi segni
+  // dentro le ricette, e la copia se li porterebbe dietro. Il controllo del
+  // pulito deve venire PRIMA del confronto dei contenuti, non dopo.
+  const { casa, altrove, g } = await laboratorioGit();
+  try {
+    writeFileSync(resolve(casa, 'routines', 'roles', 'orchestrator.md'),
+      '<<<<<<< HEAD\nricetta mia\n=======\nricetta loro\n>>>>>>> origin/main\n', 'utf8');
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 3, `doveva fermarsi: ${out.so.slice(0, 200)}`);
+    assert.match(out.se, /non salvata|non salvato/, 'e dire che la cartella non è pulita');
+  } finally {
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
+test('guardia che non ha potuto guardare: passa, ma lo DICE', async () => {
+  // Fallire aperti va bene: questo controllo non deve essere il punto in cui un
+  // giro muore per un intoppo di rete. Farlo in silenzio no: con un remoto
+  // chiamato in un altro modo il controllo saltava e il giro fissava strumenti
+  // vecchi con un tranquillo "prontezza OK". È il guasto che la guardia esiste
+  // per prevenire, riprodotto senza nemmeno un avviso.
+  const { casa, altrove, g } = await laboratorioGit();
+  try {
+    g(['remote', 'rename', 'origin', 'altrimenti']);
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 0, 'un remoto con un altro nome non è un motivo per morire');
+    assert.match(out.se, /ATTENZIONE/,
+      `un controllo saltato non deve somigliare a un controllo passato: ${out.se.slice(-200)}`);
+  } finally {
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
+
 test('senza remoto la guardia lascia passare', async () => {
   // Fallire aperti: questo controllo esiste per accorgersi di una deriva, non
   // per essere il punto in cui un giro muore perché la rete non c'è.
