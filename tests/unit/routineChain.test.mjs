@@ -60,8 +60,8 @@ function fintoServer(rispostaLavoro, consegne = []) {
  * cartella git usa-e-getta (così claim e posizionamento non toccano niente di
  * reale). Ritorna il JSON che il giro consegna al lavoratore.
  */
-async function giro(rispostaLavoro) {
-  const { srv, port } = await fintoServer(rispostaLavoro);
+async function giro(rispostaLavoro, consegne = []) {
+  const { srv, port } = await fintoServer(rispostaLavoro, consegne);
   const casa = mkdtempSync(resolve(tmpdir(), 'filo-catena-'));
   try {
     mkdirSync(resolve(casa, '.claude'), { recursive: true });
