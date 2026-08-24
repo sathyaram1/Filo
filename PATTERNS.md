@@ -390,17 +390,35 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   gli **antenati** (`closest('a[href]')`) lo perde in tutti questi casi, e la
   scheda diventa irraggiungibile col tasto destro proprio mentre l'anteprima
   suona. Regola: **ogni** famiglia ha il suo ripiego "sotto il punto cliccato"
-  (`elementsFromPoint`), non solo il media; e due elementi impilati si tengono
-  insieme quando occupano **lo stesso rettangolo** (`sameCardArea`: dentro il
-  link, oppure almeno metà del media dentro il riquadro del link). A distinguere
-  la scheda vera dal video di sfondo a tutta pagina che si trova per caso un link
-  sotto il cursore è quella misura, non la parentela nel DOM.
-- **`closest()` si ferma al confine di un componente web.** `realTarget` con
-  `composedPath()[0]` ti dà l'elemento vero dentro lo shadow root, ma da lì la
-  risalita non vede più gli antenati in chiaro: un `<video>` in un componente
-  dentro l'`<a>` della scheda sembrava senza collegamento. Chi cerca un antenato
-  a partire dal target usa `closestAcrossShadow` (risale, e quando la radice è
-  uno shadow root riparte dal suo host), mai `closest` nudo.
+  (`findUnder` sulla pila di `deepElementsFromPoint`) — media, immagine **e
+  collegamento**, anche da solo. Due elementi impilati si tengono insieme quando
+  occupano **lo stesso rettangolo** (`sameCardArea`: dentro il link, oppure
+  almeno metà del media dentro il riquadro del link). A distinguere la scheda
+  vera dal video di sfondo a tutta pagina che si trova per caso un link sotto il
+  cursore è quella misura, non la parentela nel DOM.
+- **Il ripiego vale per la famiglia da SOLA, non solo in coppia (#444).** Finché
+  il ripiego esisteva solo dentro i rami "media + link" e "immagine + link", lo
+  stesso identico pixel dava due esiti opposti a seconda dello strato che vinceva
+  in quell'istante: menu completo mentre l'anteprima suonava, menu **vuoto** un
+  istante dopo che si era fermata. E non serve un video: un velo trasparente
+  sopra una scheda-link — come è costruito quasi ogni elenco di schede — bastava
+  a far sparire tutte e quattro le voci del collegamento. Quando aggiungi un
+  ripiego a una famiglia, chiediti sempre come si comporta quando è l'unica cosa
+  lì sotto.
+- **`closest()` si ferma al confine di un componente web — e `elementsFromPoint`
+  pure, dall'altra parte.** `realTarget` con `composedPath()[0]` ti dà l'elemento
+  vero dentro lo shadow root, ma da lì la risalita non vede più gli antenati in
+  chiaro: un `<video>` in un componente dentro l'`<a>` della scheda sembrava
+  senza collegamento. Chi cerca un antenato a partire dal target usa
+  `closestAcrossShadow` (risale, e quando la radice è uno shadow root riparte dal
+  suo host), mai `closest` nudo. Specularmente
+  `document.elementsFromPoint()` di un componente restituisce **l'host**, mai
+  quello che c'è dentro: con collegamento e anteprima impilati dentro lo stesso
+  componente la ricerca si fermava al bordo e il link spariva. Chi guarda cosa
+  c'è sotto il cursore usa `deepElementsFromPoint`, che per ogni elemento con uno
+  shadow root ripete il colpo là dentro e mette le parti del componente PRIMA del
+  loro host (è l'ordine in cui si vedono). Limite noto: uno shadow root `closed`
+  resta opaco a entrambi.
 - **Il riconoscimento del contesto sta in UN posto** (`detectContext`): il menu
   si apre da due strade (menu normale e menu di correzione) e con la ricerca
   copiata in tutt'e due lo stesso clic finiva col dare due menu diversi a seconda
