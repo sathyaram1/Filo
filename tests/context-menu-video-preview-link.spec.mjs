@@ -133,6 +133,115 @@ test('copertina stesa sopra il link (immagine, non filmato): stesse due famiglie
     .toBe(linkHref);
 });
 
+// Scheda-componente: collegamento e anteprima IMPILATI dentro lo stesso
+// componente web, non annidati l'uno nell'altro. È la forma in cui la lamentela
+// sopravviveva parola per parola: solo Riproduci/Velocità/Salva video come.
+// `document.elementsFromPoint()` di un componente restituisce l'HOST, mai quello
+// che c'è dentro, quindi la ricerca "cosa c'è sotto il cursore" si fermava al
+// bordo del componente e il collegamento non lo vedeva più.
+function stackedInComponentHtml(linkHref) {
+  return `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <video-card></video-card>
+    <script>
+      class VideoCard extends HTMLElement {
+        constructor() {
+          super();
+          this.attachShadow({ mode: 'open' }).innerHTML =
+            '<div style="position:relative;width:320px;height:180px">'
+            + '<a id="lnk" href="${linkHref}" style="position:absolute;inset:0;display:block"></a>'
+            + '<video id="clip" src="/clip.mp4" style="position:absolute;inset:0;width:100%;height:100%;background:#333"></video>'
+            + '</div>';
+        }
+      }
+      customElements.define('video-card', VideoCard);
+    </script>
+  </body></html>`;
+}
+
+test('scheda-componente con link e anteprima impilati: le voci del collegamento ci sono', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, stackedInComponentHtml('https://example.com/scheda-impilata'));
+  const menu = await openMenuOn(page, 'video-card');
+
+  for (const label of MEDIA_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+});
+
+test('scheda-componente impilata: "Copia URL" copia l\'indirizzo della scheda', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/scheda-impilata-url';
+  const page = await testServer.openReady(openTab, stackedInComponentHtml(linkHref));
+  const menu = await openMenuOn(page, 'video-card');
+
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+// Stessa scheda, anteprima FERMA. Il velo trasparente c'è ancora, sotto c'è la
+// copertina e sotto ancora il collegamento: lo stesso identico pixel dava menu
+// completo mentre il filmatino suonava e menu vuoto un istante dopo.
+test('velo trasparente, anteprima ferma: il menu è quello della scheda, non vuoto', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/scheda-ferma';
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="card" style="position:relative;width:320px;height:180px">
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;display:block"></a>
+      <img id="cover" src="${PX}" style="position:absolute;inset:0;width:100%;height:100%;background:#e07b39">
+      <span id="velo" style="position:absolute;inset:0;background:rgba(0,0,0,.001)"></span>
+    </div>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#velo');
+
+  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+// Non serve nemmeno una scheda video: un velo trasparente sopra un collegamento
+// qualsiasi bastava a far sparire tutte e quattro le voci del link. È come sono
+// costruiti quasi tutti gli elenchi di schede.
+test('velo trasparente sopra un collegamento qualsiasi: le voci del link restano', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/scheda-di-testo';
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="card" style="position:relative;width:320px;height:120px">
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;display:block;background:#f0e6d8"></a>
+      <span id="velo" style="position:absolute;inset:0;background:rgba(0,0,0,.001)"></span>
+    </div>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#velo');
+
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+// Il confine regge anche per il ripiego nuovo: sotto il cursore ci deve essere
+// DAVVERO il collegamento, non uno che sta da un'altra parte nella pagina.
+test('un velo lontano dal collegamento non si porta dietro le voci del link', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <a id="altrove" href="https://example.com/altro" style="position:absolute;left:20px;top:20px">Un collegamento qualsiasi</a>
+    <span id="velo" style="position:absolute;left:20px;top:300px;width:320px;height:120px;background:rgba(0,0,0,.001)"></span>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#velo');
+
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: true })).toHaveCount(0);
+  }
+});
+
 test('un filmato a tutta pagina non si porta dietro le voci di un link che gli passa sotto per caso', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
     <a id="estraneo" href="https://example.com/altro" style="position:fixed;left:40px;top:40px;z-index:1">Un collegamento qualsiasi</a>
