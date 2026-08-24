@@ -74,13 +74,17 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
 // lavoro separata ha una radice diversa da quella dello script.
+// Se questi strumenti sono la copia fissata fuori dal progetto
+// (lib/tools-pin.mjs), il progetto vero lo dicono loro: senza, i marcatori del
+// giro finirebbero accanto alla copia invece che dove li cerca chi consegna.
 const ROOT = process.env.FILO_REPO_ROOT
   ? resolve(process.env.FILO_REPO_ROOT)
-  : resolve(fileURLToPath(new URL('..', import.meta.url)));
+  : (pinnedRepoRoot() || resolve(fileURLToPath(new URL('..', import.meta.url))));
 
 // L'indirizzo del canale. `FILO_ROUTINE_API` esiste per i test e per un
 // eventuale ambiente di prova: NON è un segreto, è solo dove sta il server.
@@ -335,7 +339,11 @@ if (isMain) {
   delete data.frase;
 
   const usage = () => {
-    console.error('Uso: node scripts/routine-channel.mjs <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]');
+    // Il percorso VERO di questo strumento, non la forma corta: se sta girando
+    // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
+    // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
+    const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
+    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]`);
     process.exit(1);
   };
 
@@ -453,7 +461,7 @@ if (isMain) {
     if (intento === 'status' && data.status === 'done' && !data.resolvedInVersion) {
       try {
         const { readFileSync } = await import('node:fs');
-        const pkg = JSON.parse(readFileSync(resolve(fileURLToPath(new URL('..', import.meta.url)), 'package.json'), 'utf8'));
+        const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
         if (pkg.version) data.resolvedInVersion = pkg.version;
       } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
     }

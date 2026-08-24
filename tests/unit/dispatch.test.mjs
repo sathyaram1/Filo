@@ -24,6 +24,11 @@ process.env.FILO_DISPATCH_STATE_DIR = TMP;
 // Anche la ROOT: emit() ci scrive il marcatore di ruolo (#443) e non deve
 // sporcare il checkout vero durante i test.
 process.env.FILO_REPO_ROOT = TMP;
+// E la radice degli STRUMENTI, che dal 2026-08-24 è una cosa diversa dalla
+// radice del progetto: le ricette dei ruoli seguono gli strumenti, perché
+// quelle del progetto sono quelle del ramo su cui si sta lavorando
+// (scripts/lib/tools-pin.mjs). Qui le due coincidono, come in locale.
+process.env.FILO_TOOLS_ROOT = TMP;
 
 const {
   applyVerifierVerdict,

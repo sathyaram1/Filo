@@ -115,6 +115,30 @@ Punti non negoziabili del flusso:
   `dispatch` in sottofondo quando riceve il biglietto (`lib/routine-beat.mjs`),
   come già fa col marcatore del biglietto e per lo stesso motivo: quello che
   deve succedere sempre non si chiede a chi lavora.
+- **Gli strumenti del giro non vengono dal ramo che il giro lavora**
+  (dal 2026-08-24, `scripts/lib/tools-pin.mjs`). Un giro apre il ramo del
+  feedback su cui deve lavorare, e da quel momento ogni file del progetto è
+  quello del ramo: strumenti e ricette dei ruoli compresi. Un ramo aperto giorni
+  prima riporta indietro anche le correzioni già in produzione, in silenzio —
+  quel codice semplicemente non fa la cosa nuova, e non c'è nessun errore da
+  leggere. È costato un'ora di lavoro il giorno dopo aver pubblicato il battito
+  automatico, che sul ramo del 22 non esisteva. Il preflight, che gira per primo
+  e sulla versione aggiornata, COPIA strumenti e ricette fuori dal progetto; da
+  lì in poi il giro esegue quella copia e i comandi nelle ricette vengono
+  riscritti col percorso intero. È lo stesso principio del biglietto e del
+  battito: **lo strumento che sorveglia il lavoro non può essere la stessa cosa
+  che il lavoro modifica.**
+  - RESIDUO NOTO: gli **hook** (`.claude/hooks/*.sh`: salvataggio automatico e
+    guardia sul ramo) restano quelli del ramo, perché li invoca l'ambiente che
+    ospita la sessione, non i nostri strumenti. Un ramo aperto giorni fa usa
+    ancora la versione vecchia del trasporto del lavoro. Non è richiudibile con
+    la copia: un rimedio scritto oggi non esisterebbe comunque sul ramo di
+    allora. Si chiude solo quando quei rami si esauriscono.
+  - RESIDUO NOTO: la copia va in una cartella temporanea con un nome fisso, che
+    viene rifatta a ogni giro. Due giri sulla STESSA macchina si
+    sovrascriverebbero; in cloud ogni giro ha il suo contenitore, quindi oggi
+    non capita, e se capitasse il guasto sarebbe rumoroso (file non trovato),
+    non silenzioso.
 - **Il battito prova che la sessione è viva, non che produce.** Un'istanza
   bloccata in un giro a vuoto batte come una che lavora. Per quello il recupero
   degli arenati (FEEDBACK-STATES.md §6a) legge DUE segnali e non li confonde: il

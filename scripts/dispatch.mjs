@@ -73,12 +73,24 @@ import {
 import { writeRole, clearRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
+import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
+// DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
+//   ROOT       il PROGETTO, dove si lavora e dove parla git;
+//   TOOLS_ROOT gli STRUMENTI che stanno girando, che in cloud sono una copia
+//              fuori dal progetto — perché il progetto, appena si apre il ramo
+//              di un feedback, si porta dietro gli strumenti di QUEL ramo.
+// Quando gli strumenti sono una copia fissata, il progetto lo dicono loro: non
+// si chiede a nessuno di ricordarsi di passarlo.
+const ROOT = process.env.FILO_REPO_ROOT
+  ? resolve(process.env.FILO_REPO_ROOT)
+  : (pinnedRepoRoot() || resolve(__dirname, '..'));
 // Lo stato locale e' solo un ripiego: quello vero vive sul server. Sta fra i
 const STATE_DIR = stateDir(ROOT);
-const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
+// Le ricette dei ruoli seguono gli STRUMENTI, non il progetto: su un ramo
+// vecchio anche le istruzioni sarebbero vecchie.
+const ROLES_DIR = resolve(TOOLS_ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 // Il documento che dice alle routine come devono comportarsi: acceso/spento,
@@ -104,7 +116,10 @@ const LOOP_CAP_MAX = 10;
 export const VERIFIER_CAPS = (() => {
   try {
     const req = createRequire(import.meta.url);
-    req(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
+    // Dagli STRUMENTI, non dal progetto: è un dato che governa il giro (quante
+    // bocciature si tollerano), e preso dal ramo di lavoro sarebbe di nuovo la
+    // versione di giorni fa.
+    req(resolve(TOOLS_ROOT, 'src', 'shared', 'feedbackTransitions.js'));
     const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
     if (caps && Number.isFinite(caps.failCap) && Number.isFinite(caps.improvableCap)) return caps;
   } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
@@ -329,15 +344,123 @@ const ROLE_FILE = {
 // divergevano.
 const WORKER_CONTRACT_FILE = '_contratto-worker.md';
 
+/**
+ * Da dove viene il contenuto che sto per fissare: ramo e commit del checkout.
+ * Non decide niente — si scrive accanto alla copia e finisce nelle istruzioni,
+ * così una copia presa da un checkout non aggiornato si vede invece di dover
+ * essere dedotta da un comportamento strano ore dopo.
+ */
+/**
+ * Il checkout da cui si sta per fissare è quello giusto?
+ *
+ * La copia vale quanto il momento in cui viene presa: se il giro parte da un
+ * checkout non aggiornato, fissa gli strumenti vecchi e il difetto torna con
+ * un'altra causa — con l'aggravante che stavolta sembra tutto a posto.
+ *
+ * IL CONTROLLO NON SI APPENDE A `FILO_ROUTINE`, e non è un dettaglio: quella
+ * variabile la esporta l'orchestratore seguendo le istruzioni che riceve DAL
+ * PREFLIGHT, cioè dopo che questo controllo è già passato. Appesa lì, la
+ * guardia avrebbe avuto i test verdi e non sarebbe scattata mai in produzione:
+ * è la stessa forma di guasto che questo lavoro viene a chiudere.
+ *
+ * Il preflight è il portone d'ingresso di un giro di routine, quindi si guarda
+ * sempre. Chi lo lancia per provare in locale, dove si sta su un ramo apposta,
+ * lo dice: `FILO_PREFLIGHT_ANY_BRANCH=1`.
+ *
+ * @returns {string} '' se va bene, altrimenti il motivo per fermarsi
+ */
+// Riempita dalla guardia quando NON ha potuto guardare (niente remoto, rete
+// assente): finisce nei log, così un controllo saltato non somiglia a un
+// controllo passato.
+let nonVerificato = '';
+
+function checkoutNonAdatto() {
+  if (String(process.env.FILO_PREFLIGHT_ANY_BRANCH || '') === '1') return '';
+  const g = (args) => execFileSync('git', args, {
+    cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+  const viaDiFuga = "se lo stai lanciando per provare, FILO_PREFLIGHT_ANY_BRANCH=1";
+  try {
+    // La CARTELLA PULITA si controlla per prima, prima ancora di guardare se il
+    // commit è quello giusto. Sembra un dettaglio d'ordine e non lo è: un
+    // progetto fermo a metà di un'operazione (un conflitto irrisolto, una
+    // modifica non salvata) può stare esattamente sul commit giusto e avere i
+    // file rotti. Controllandolo dopo, la copia si portava dentro i segni del
+    // conflitto e la ricetta consegnata al giro arrivava corrotta.
+    const sporco = g(['status', '--porcelain']);
+    if (sporco) {
+      const prima = sporco.split('\n')[0].trim();
+      return `il checkout ha roba non salvata ("${prima}"…): gli strumenti fissati sarebbero quelli mezzo modificati (${viaDiFuga})`;
+    }
+
+    g(['fetch', '--quiet', 'origin', MAIN_BRANCH]);
+    const qui = g(['rev-parse', 'HEAD']);
+    const la = g(['rev-parse', `origin/${MAIN_BRANCH}`]);
+    // Si confrontano i CONTENUTI, non i nomi: una testa staccata sulla punta
+    // della linea principale ha esattamente i file giusti, e rifiutarla col
+    // motivo "sei sul ramo sbagliato" sarebbe anche una bugia.
+    if (qui === la) return '';
+
+    const ramo = g(['rev-parse', '--abbrev-ref', 'HEAD']);
+    if (ramo !== MAIN_BRANCH) {
+      return `il giro parte da '${ramo}', che non è '${MAIN_BRANCH}' aggiornato: gli strumenti fissati sarebbero quelli di quel ramo (${viaDiFuga})`;
+    }
+
+    // Indietro sulla linea principale: NON è un motivo per morire. La ricetta
+    // dell'orchestratore prevede già di aggiornarsi, solo che lo fa due passi
+    // dopo — cioè dopo che la copia è stata presa. Lo si fa adesso, che è il
+    // momento giusto, e solo in avanti: se non basta un avanzamento pulito,
+    // qui c'è qualcosa che deve vedere l'owner.
+    try {
+      g(['merge', '--ff-only', `origin/${MAIN_BRANCH}`]);
+    } catch (_) {
+      return `il checkout non si allinea a '${MAIN_BRANCH}' con un avanzamento pulito: gli strumenti fissati sarebbero già vecchi (${viaDiFuga})`;
+    }
+    if (g(['rev-parse', 'HEAD']) !== la) {
+      return `il checkout non si è allineato a '${MAIN_BRANCH}': gli strumenti fissati sarebbero già vecchi (${viaDiFuga})`;
+    }
+  } catch (e) {
+    // Niente git, nessun remoto, rete assente: qui si fallisce APERTI, perché
+    // questo controllo esiste per accorgersi di una deriva, non per essere il
+    // punto in cui un giro muore perché il fetch non è passato.
+    //
+    // Ma NON in silenzio: fallire aperti senza dirlo equivale a non avere la
+    // guardia. Con un remoto chiamato in un altro modo il controllo saltava e
+    // il giro fissava strumenti vecchi con un tranquillo "prontezza OK". Chi
+    // legge i log deve poter distinguere "verificato" da "non ho potuto
+    // guardare".
+    nonVerificato = String((e && e.message) || e).split('\n')[0].slice(0, 120);
+    return '';
+  }
+  return '';
+}
+
+function origineDelCheckout() {
+  try {
+    const ramo = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return `${ramo} ${sha}`;
+  } catch (_) {
+    return '';
+  }
+}
+
 export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
   const base = existsSync(f) ? readFileSync(f, 'utf8') : '';
-  if (!base || !RUOLI_LAVORABILI.includes(role)) return base;
+  if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
   const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
-  return contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
+  const testo = contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
+  // Le ricette dicono `node scripts/…`, che dalla cartella di lavoro porta agli
+  // strumenti DEL RAMO. Quando gli strumenti sono la copia fissata, il percorso
+  // va riscritto in assoluto qui, nel momento della consegna: è l'unico punto
+  // che sa dove stanno davvero, e chi lavora non deve saperlo.
+  return absolutizeRecipe(testo, TOOLS_ROOT, ROOT);
 }
 
 /**
@@ -1095,10 +1218,38 @@ if (isMainModule) {
       // ritoccano i ruoli.
       preflight().then((r) => {
         if (r.ok) {
-          const f = resolve(ROLES_DIR, 'orchestrator.md');
+          // GLI STRUMENTI SI FISSANO QUI, e qui soltanto: questo è l'unico
+          // momento del giro in cui la cartella è ancora sulla versione
+          // aggiornata, prima che qualunque ramo di lavoro venga aperto.
+          // Da adesso in poi il giro esegue la copia, che nessun cambio di ramo
+          // può riportare indietro (lib/tools-pin.mjs).
+          const scomodo = checkoutNonAdatto();
+          if (scomodo) {
+            console.error(`[dispatch] GUASTO (transient): ${scomodo}`);
+            process.exit(3);
+          }
+          const pin = pinTools(ROOT, { origine: origineDelCheckout() });
+          if (!pin.ok) {
+            // FERMA IL GIRO, non prosegue. Proseguire vorrebbe dire eseguire gli
+            // strumenti del ramo di lavoro, cioè esattamente il guasto che
+            // questa copia viene a togliere — e quel guasto non si vede: costa
+            // un'ora di lavoro e la si scopre alla consegna rifiutata.
+            console.error(`[dispatch] GUASTO (transient): strumenti non fissati (${pin.why})`);
+            process.exit(3);
+          }
+          const tools = pin.dir;
+          const f = resolve(tools, 'routines', 'roles', 'orchestrator.md');
           const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
-          console.log('[dispatch] prontezza OK. Le tue istruzioni:\n');
-          console.log(brief || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
+          const da = pinnedOrigin(tools);
+          console.log(`[dispatch] prontezza OK. Strumenti fissati${da ? ` da ${da}` : ''}.`);
+          if (nonVerificato) {
+            process.stderr.write(
+              `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
+              + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
+          }
+          console.log('Le tue istruzioni:\n');
+          console.log(absolutizeRecipe(brief, tools, ROOT)
+            || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
           process.exit(0);
         }
         if (r.kind === 'off') console.log(`[dispatch] SPENTO: ${r.message}`);

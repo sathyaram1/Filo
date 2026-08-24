@@ -23,15 +23,21 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
+import { pinnedRepoRoot } from './tools-pin.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// DUE radici, come in dispatch (lib/tools-pin.mjs): la configurazione si legge
+// accanto a QUESTO file — così una copia degli strumenti fuori dal progetto sa
+// girare da sola — mentre git deve parlare col PROGETTO, che è altrove.
 const ROOT = resolve(__dirname, '..', '..');
+const REPO_ROOT = pinnedRepoRoot(ROOT) || ROOT;
 const cfg = require(resolve(ROOT, 'src', 'main', 'auth', 'config.js'));
 
 export const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${cfg.firebaseProjectId}/databases/(default)/documents`;
 export const FIREBASE_API_KEY = cfg.firebaseApiKey;
 
 function git(args) {
-  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
+  return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
 }
 
 // Trova FILO_ADMIN_REFRESH_TOKEN: prima da env, poi dal tests/agent/.env della
@@ -40,7 +46,7 @@ export function findAdminRefreshToken() {
   if (process.env.FILO_ADMIN_REFRESH_TOKEN) return process.env.FILO_ADMIN_REFRESH_TOKEN;
   try {
     let commonDir = git(['rev-parse', '--git-common-dir']);
-    if (!isAbsolute(commonDir)) commonDir = resolve(ROOT, commonDir);
+    if (!isAbsolute(commonDir)) commonDir = resolve(REPO_ROOT, commonDir);
     const mainRoot = dirname(commonDir); // .../Filo/.git → .../Filo
     const envPath = resolve(mainRoot, 'tests', 'agent', '.env');
     if (existsSync(envPath)) {
