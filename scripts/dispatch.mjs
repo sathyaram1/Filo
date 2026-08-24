@@ -958,15 +958,21 @@ async function finalizeBucket(bucket, fromServer) {
   // per un feedback solo. Il lucchetto su git non esiste più — era il modo che
   // avevano macchine senza credenziali di mettersi d'accordo fra loro.
   //
-  // La presa in carico (`working`) la si dichiara al server: è il riflesso che
-  // la dashboard mostra come "in lavorazione".
-  if (bucket.id && bucket.role === 'new-work') {
-    await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
-  }
-
   // A + D: la directory viene messa sul branch giusto PRIMA di consegnare, e il
   // lavoro di un'istanza interrotta viene riportato all'ultimo punto fermo.
   // FAIL CLOSED: se non riesce non si consegna niente.
+  //
+  // VIENE PRIMA della presa in carico, e non è un dettaglio d'ordine: il nome
+  // del ramo di un lavoro nuovo lo decide QUI, quindi dichiarare `working` prima
+  // vorrebbe dire dichiararlo senza ramo — ed è quello che succedeva. Il server
+  // non scrive un ramo vuoto, così NESSUN lavoro in corso aveva un ramo scritto
+  // sopra, e il recupero degli arenati — che guarda quando quel ramo si è mosso
+  // l'ultima volta — non aveva niente da guardare: sfrattava sull'ora trascorsa
+  // dalla presa in carico, cioè proprio la cosa che non doveva fare.
+  //
+  // Rovesciando l'ordine si guadagna anche un'altra cosa: se il posizionamento
+  // fallisce, il feedback resta in coda invece di restare marchiato "in
+  // lavorazione" da nessuno.
   if (bucket.id && bucket.role !== 'prober') {
     const pos = positionOnBranch(bucket);
     if (!pos.ok) {
