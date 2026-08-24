@@ -70,6 +70,17 @@ export const PINNED_PATHS = [
 ];
 
 const REPO_MARK = '.filo-repo-root';
+const ORIGIN_MARK = '.filo-origine';
+
+/** Da dove viene questa copia (ramo e commit), se lo ha registrato. */
+export function pinnedOrigin(toolsRoot = TOOLS_ROOT) {
+  try {
+    const f = resolve(toolsRoot, ORIGIN_MARK);
+    return existsSync(f) ? String(readFileSync(f, 'utf8') || '').trim() : '';
+  } catch (_) {
+    return '';
+  }
+}
 
 /**
  * Dove finisce la copia: fuori dal progetto, per costruzione.
