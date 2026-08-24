@@ -1174,6 +1174,11 @@ if (isMainModule) {
           // aggiornata, prima che qualunque ramo di lavoro venga aperto.
           // Da adesso in poi il giro esegue la copia, che nessun cambio di ramo
           // può riportare indietro (lib/tools-pin.mjs).
+          const scomodo = checkoutNonAdatto();
+          if (scomodo) {
+            console.error(`[dispatch] GUASTO (transient): ${scomodo}`);
+            process.exit(3);
+          }
           const pin = pinTools(ROOT, { origine: origineDelCheckout() });
           if (!pin.ok) {
             // FERMA IL GIRO, non prosegue. Proseguire vorrebbe dire eseguire gli
