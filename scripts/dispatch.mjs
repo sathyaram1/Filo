@@ -376,6 +376,18 @@ function checkoutNonAdatto() {
   }).trim();
   const viaDiFuga = "se lo stai lanciando per provare, FILO_PREFLIGHT_ANY_BRANCH=1";
   try {
+    // La CARTELLA PULITA si controlla per prima, prima ancora di guardare se il
+    // commit è quello giusto. Sembra un dettaglio d'ordine e non lo è: un
+    // progetto fermo a metà di un'operazione (un conflitto irrisolto, una
+    // modifica non salvata) può stare esattamente sul commit giusto e avere i
+    // file rotti. Controllandolo dopo, la copia si portava dentro i segni del
+    // conflitto e la ricetta consegnata al giro arrivava corrotta.
+    const sporco = g(['status', '--porcelain']);
+    if (sporco) {
+      const prima = sporco.split('\n')[0].trim();
+      return `il checkout ha roba non salvata ("${prima}"…): gli strumenti fissati sarebbero quelli mezzo modificati (${viaDiFuga})`;
+    }
+
     g(['fetch', '--quiet', 'origin', MAIN_BRANCH]);
     const qui = g(['rev-parse', 'HEAD']);
     const la = g(['rev-parse', `origin/${MAIN_BRANCH}`]);
