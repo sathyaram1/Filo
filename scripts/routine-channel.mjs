@@ -78,9 +78,12 @@ import { fileURLToPath } from 'node:url';
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
 // lavoro separata ha una radice diversa da quella dello script.
+// Se questi strumenti sono la copia fissata fuori dal progetto
+// (lib/tools-pin.mjs), il progetto vero lo dicono loro: senza, i marcatori del
+// giro finirebbero accanto alla copia invece che dove li cerca chi consegna.
 const ROOT = process.env.FILO_REPO_ROOT
   ? resolve(process.env.FILO_REPO_ROOT)
-  : resolve(fileURLToPath(new URL('..', import.meta.url)));
+  : (pinnedRepoRoot() || resolve(fileURLToPath(new URL('..', import.meta.url))));
 
 // L'indirizzo del canale. `FILO_ROUTINE_API` esiste per i test e per un
 // eventuale ambiente di prova: NON è un segreto, è solo dove sta il server.
