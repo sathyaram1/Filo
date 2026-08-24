@@ -128,6 +128,17 @@ Punti non negoziabili del flusso:
   riscritti col percorso intero. È lo stesso principio del biglietto e del
   battito: **lo strumento che sorveglia il lavoro non può essere la stessa cosa
   che il lavoro modifica.**
+  - RESIDUO NOTO: gli **hook** (`.claude/hooks/*.sh`: salvataggio automatico e
+    guardia sul ramo) restano quelli del ramo, perché li invoca l'ambiente che
+    ospita la sessione, non i nostri strumenti. Un ramo aperto giorni fa usa
+    ancora la versione vecchia del trasporto del lavoro. Non è richiudibile con
+    la copia: un rimedio scritto oggi non esisterebbe comunque sul ramo di
+    allora. Si chiude solo quando quei rami si esauriscono.
+  - RESIDUO NOTO: la copia va in una cartella temporanea con un nome fisso, che
+    viene rifatta a ogni giro. Due giri sulla STESSA macchina si
+    sovrascriverebbero; in cloud ogni giro ha il suo contenitore, quindi oggi
+    non capita, e se capitasse il guasto sarebbe rumoroso (file non trovato),
+    non silenzioso.
 - **Il battito prova che la sessione è viva, non che produce.** Un'istanza
   bloccata in un giro a vuoto batte come una che lavora. Per quello il recupero
   degli arenati (FEEDBACK-STATES.md §6a) legge DUE segnali e non li confonde: il
