@@ -11,7 +11,13 @@
 //   - l'anteprima è STESA SOPRA la scheda e il link le passa sotto (strati
 //     sovrapposti, non annidati);
 //   - il filmato vive dentro un componente web (shadow root) e `closest()` si
-//     ferma al confine del componente, quindi l'`<a>` in chiaro non si vedeva.
+//     ferma al confine del componente, quindi l'`<a>` in chiaro non si vedeva;
+//   - collegamento e anteprima stanno IMPILATI dentro lo stesso componente, e
+//     lì è `elementsFromPoint()` a fermarsi al bordo: di un componente
+//     restituisce l'host, mai quello che c'è dentro;
+//   - sopra tutto c'è un velo trasparente, e con l'anteprima FERMA lo stesso
+//     identico pixel non dava più niente: né le voci della copertina né quelle
+//     del collegamento. Bastava il velo, senza nemmeno un filmato.
 //
 // I test asseriscono il SUCCESSO dal punto di vista di chi guarda: le voci del
 // collegamento ci sono ED eseguono l'azione sul collegamento («Copia URL» mette
