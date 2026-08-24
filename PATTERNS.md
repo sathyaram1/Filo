@@ -418,7 +418,7 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   copiata in tutt'e due lo stesso clic finiva col dare due menu diversi a seconda
   che sotto ci fosse o no una parola da correggere.
 - **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`),
-  `detectContext`, `findMedia`, `findLinkUnder`, `sameCardArea` e
+  `detectContext`, `elementsUnderPoint`, `firstUnder`, `sameCardArea` e
   `closestAcrossShadow` in `src/content/content.js`, voci in
   `src/content/actions.js`. Test: `tests/context-menu-media.spec.mjs`,
   `tests/context-menu-image-link.spec.mjs`,
