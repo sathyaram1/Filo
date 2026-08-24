@@ -43,7 +43,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  * questa è il repo. Le due cose coincidono in locale e divergono in cloud, ed è
  * esattamente la distinzione che mancava.
  */
-export const TOOLS_ROOT = resolve(HERE, '..', '..');
+export const TOOLS_ROOT = process.env.FILO_TOOLS_ROOT
+  ? resolve(process.env.FILO_TOOLS_ROOT)
+  : resolve(HERE, '..', '..');
 
 /** Quello che si copia: gli strumenti e le ricette dei ruoli. */
 export const PINNED_PATHS = ['scripts', 'routines'];
