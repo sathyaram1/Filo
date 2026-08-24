@@ -406,10 +406,6 @@ function checkoutNonAdatto() {
     // dopo — cioè dopo che la copia è stata presa. Lo si fa adesso, che è il
     // momento giusto, e solo in avanti: se non basta un avanzamento pulito,
     // qui c'è qualcosa che deve vedere l'owner.
-    const sporco = g(['status', '--porcelain']);
-    if (sporco) {
-      return `il checkout ha modifiche non salvate e non si può aggiornare prima di fissare gli strumenti (${viaDiFuga})`;
-    }
     try {
       g(['merge', '--ff-only', `origin/${MAIN_BRANCH}`]);
     } catch (_) {
