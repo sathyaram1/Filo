@@ -35,6 +35,10 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
    giro — NON risolvere niente a mano. Il clone è fresco: un conflitto qui è
    il sintomo di una sovrapposizione che deve vedere l'owner, non un intoppo
    da rattoppare. (Vale anche per i worker: nessuno tocca `main`, mai.)
+   - Di solito qui non c'è più niente da fare: il preflight si è già allineato
+     da sé prima di fissare gli strumenti, perché una copia presa da un
+     checkout indietro sarebbe vecchia in partenza. Questo passo resta come
+     rete, e per il caso in cui `main` si sia mosso nel frattempo.
 5. **Biglietto**: `node scripts/routine-channel.mjs ticket "<parola-d-ordine>"`.
    La parola d'ordine arriva nel prompt della schedulazione e NON va mai
    esportata nell'ambiente. exit 2 → chiudi (niente da fare); exit 3 → chiudi
