@@ -1242,6 +1242,11 @@ if (isMainModule) {
           const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
           const da = pinnedOrigin(tools);
           console.log(`[dispatch] prontezza OK. Strumenti fissati${da ? ` da ${da}` : ''}.`);
+          if (nonVerificato) {
+            process.stderr.write(
+              `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
+              + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
+          }
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
             || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
