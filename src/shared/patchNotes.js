@@ -19,7 +19,7 @@
       version: '0.2.200', date: '2026-08-24',
       features: [],
       fixes: [
-        'Sulle pagine lunghissime «Traduci la pagina» non dichiara più di aver finito mentre il fondo è ancora in lingua originale: ti dice quanti blocchi ha tradotto e con un clic sul tasto destro completa il resto, senza rifare la parte già tradotta.',
+        'Sulle pagine lunghissime «Traduci la pagina» non dichiara più di aver finito mentre il fondo è ancora in lingua originale. Ti dice quanti blocchi ha tradotto, e dal tasto destro completi il resto senza rifare la parte già tradotta.',
       ],
     },
     {
