@@ -125,7 +125,7 @@
       // Avanzamento REALE mentre lavora: i blocchi hanno un totale noto, quindi
       // l'attesa può essere misurata invece che raccontata ("l'attesa è attrito":
       // se ci sono dati di progresso si mostrano).
-      const grandTotal = already + units.length;
+      const grandTotal = already + units.length + truncated;
       const tick = () => {
         const applied = already + units.filter((u) => u.applied).length;
         try { progress.el.textContent = I18n.t('toast_translating_page_progress', applied, grandTotal); } catch (_) {}
