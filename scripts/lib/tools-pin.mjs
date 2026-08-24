@@ -90,7 +90,7 @@ export function pinnedDir() {
  *
  * @returns {{ ok: boolean, dir: string, why: string }}
  */
-export function pinTools(repoRoot, { dest = pinnedDir() } = {}) {
+export function pinTools(repoRoot, { dest = pinnedDir(), origine = '' } = {}) {
   const src = resolve(repoRoot);
   try {
     for (const p of PINNED_PATHS) {
