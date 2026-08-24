@@ -47,8 +47,27 @@ export const TOOLS_ROOT = process.env.FILO_TOOLS_ROOT
   ? resolve(process.env.FILO_TOOLS_ROOT)
   : resolve(HERE, '..', '..');
 
-/** Quello che si copia: gli strumenti e le ricette dei ruoli. */
-export const PINNED_PATHS = ['scripts', 'routines'];
+/**
+ * Quello che si copia. Non solo gli strumenti e le ricette: anche i moduli che
+ * gli strumenti IMPORTANO, o la copia non sa girare.
+ *
+ * È il rilievo che ha bocciato la prima versione: mancava la configurazione
+ * degli accessi, e il preflight lanciato dalla copia usciva con "guasto",
+ * accusando la rete invece della copia incompleta — e "guasto" per
+ * l'orchestratore vuol dire chiudere il giro senza ritentare.
+ *
+ * La regola per chi aggiunge roba qui: se uno strumento del giro lo importa,
+ * ci va. Il controllo che lo inchioda esegue il preflight DALLA COPIA.
+ */
+export const PINNED_PATHS = [
+  'scripts',
+  'routines',
+  // I moduli condivisi che gli strumenti caricano (cifratura dei feedback,
+  // macchina a stati, thread).
+  'src/shared',
+  // La configurazione degli accessi, che il canale verso il database legge.
+  'src/main/auth',
+];
 
 const REPO_MARK = '.filo-repo-root';
 
