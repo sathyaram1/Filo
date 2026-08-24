@@ -25,6 +25,11 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
+// Un percorso alla unix, su Windows, viene ancorato al disco corrente. L'atteso
+// si costruisce con la stessa normalizzazione dello strumento, o il controllo
+// fallirebbe per il sistema operativo invece che per il codice.
+const comeScritto = (p) => resolve(p).split('\\').join('/');
+
 import {
   PINNED_PATHS, pinTools, pinnedRepoRoot, absolutizeRecipe,
 } from '../../scripts/lib/tools-pin.mjs';
