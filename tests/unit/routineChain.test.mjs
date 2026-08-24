@@ -35,11 +35,16 @@ const FEEDBACK = {
 };
 
 /** Server finto: risponde alle sole chiamate del canale che il giro fa. */
-function fintoServer(rispostaLavoro) {
+function fintoServer(rispostaLavoro, consegne = []) {
   const srv = createServer((req, res) => {
     let body = '';
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
+      // Le consegne si registrano: quello che il giro DICE al server è la cosa
+      // che i controlli sulle singole funzioni non vedono mai.
+      if (req.url.endsWith('/routineDeliver')) {
+        try { consegne.push(JSON.parse(body || '{}')); } catch (_) { /* non è una consegna leggibile */ }
+      }
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) res.end(JSON.stringify(rispostaLavoro));
       // L'interruttore delle routine: servito da qui, cosi' il giro non tocca la rete.
