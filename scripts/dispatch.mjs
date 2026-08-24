@@ -350,6 +350,42 @@ const WORKER_CONTRACT_FILE = '_contratto-worker.md';
  * così una copia presa da un checkout non aggiornato si vede invece di dover
  * essere dedotta da un comportamento strano ore dopo.
  */
+/**
+ * Il checkout da cui si sta per fissare è quello giusto? Solo per le ROUTINE.
+ *
+ * La copia vale quanto il momento in cui viene presa: se il giro parte da un
+ * checkout non aggiornato, fissa gli strumenti vecchi e il difetto torna con
+ * un'altra causa — con l'aggravante che adesso sembra tutto a posto. Il giro in
+ * cloud parte da un clone fresco sulla linea principale, quindi qui non c'è
+ * niente da correggere: c'è da ACCORGERSENE se un giorno non fosse più vero.
+ *
+ * In locale non si controlla niente: lì si lavora sui rami apposta, e il
+ * preflight lo si lancia per provare.
+ *
+ * @returns {string} '' se va bene, altrimenti il motivo per fermarsi
+ */
+function checkoutNonAdatto() {
+  if (String(process.env.FILO_ROUTINE || '') !== '1') return '';
+  const g = (args) => execFileSync('git', args, {
+    cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+  try {
+    const ramo = g(['rev-parse', '--abbrev-ref', 'HEAD']);
+    if (ramo !== MAIN_BRANCH) {
+      return `il giro parte da '${ramo}' invece che da '${MAIN_BRANCH}': gli strumenti fissati sarebbero quelli di quel ramo`;
+    }
+    g(['fetch', '--quiet', 'origin', MAIN_BRANCH]);
+    const indietro = g(['rev-list', '--count', `HEAD..origin/${MAIN_BRANCH}`]);
+    if (Number(indietro) > 0) {
+      return `il checkout è indietro di ${indietro} commit su '${MAIN_BRANCH}': gli strumenti fissati sarebbero già vecchi`;
+    }
+  } catch (_) {
+    // Niente git, o nessun remoto: non è questo il posto per fermare un giro.
+    return '';
+  }
+  return '';
+}
+
 function origineDelCheckout() {
   try {
     const ramo = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
