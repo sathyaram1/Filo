@@ -624,6 +624,140 @@ test('la guardia sul ramo NON dipende da come il giro si dichiara', () => {
     'la guardia non deve appendersi a una variabile che arriva dopo di lei');
 });
 
+// ── La guardia sul checkout di partenza ────────────────────────────────────
+//
+// Banco di prova: un progetto con un suo "altrove" da cui aggiornarsi, così i
+// casi si costruiscono davvero invece di simularli.
+async function laboratorioGit() {
+  const casa = mkdtempSync(resolve(tmpdir(), 'filo-guardia-'));
+  const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const { cpSync } = await import('node:fs');
+  const g = (args, cwd = casa) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+
+  const altrove = resolve(casa, 'altrove.git');
+  execFileSync('git', ['init', '-q', '--bare', altrove], { stdio: 'ignore' });
+  g(['init', '-q', '-b', 'main']);
+  g(['config', 'user.email', 't@t']);
+  g(['config', 'user.name', 't']);
+  // Gli strumenti veri: la guardia gira dentro dispatch, non da sola.
+  cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
+  cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
+  cpSync(resolve(REPO, 'src', 'shared'), resolve(casa, 'src', 'shared'), { recursive: true });
+  mkdirSync(resolve(casa, 'routines', 'roles'), { recursive: true });
+  writeFileSync(resolve(casa, 'routines', 'roles', 'orchestrator.md'), 'ricetta\n', 'utf8');
+  g(['add', '-A']); g(['commit', '-qm', 'primo']);
+  g(['remote', 'add', 'origin', altrove]);
+  g(['push', '-q', '-u', 'origin', 'main']);
+  return { casa, g };
+}
+
+async function preflightIn(casa, extra = {}) {
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.includes('config')) res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      else res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  const dove = resolve(tmpdir(), `filo-strumenti-lab-${process.pid}`);
+  try {
+    return await new Promise((fine) => {
+      const p = spawn(process.execPath, [resolve(casa, 'scripts', 'dispatch.mjs'), '--preflight'], {
+        cwd: casa,
+        env: {
+          ...process.env,
+          FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+          FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+          FILO_ROUTINES_ENABLED: '1',
+          FILO_REPO_ROOT: casa,
+          FILO_TOOLS_DIR: dove,
+          FILO_PREFLIGHT_ANY_BRANCH: '',
+          FILO_NO_BEAT: '1',
+          ...extra,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', (code) => fine({ so, se, code }));
+    });
+  } finally {
+    srv.close();
+    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+  }
+}
+
+test('testa staccata sulla PUNTA della linea principale: si passa', async () => {
+  // Il contenuto è esattamente quello giusto. Rifiutarla guardando il nome del
+  // ramo sarebbe anche una bugia: il messaggio direbbe "sei su un altro ramo"
+  // mentre i file sono identici.
+  const { casa, g } = await laboratorioGit();
+  try {
+    g(['checkout', '-q', '--detach', 'HEAD']);
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
+  } finally {
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
+test('checkout indietro: si allinea da solo invece di morire', async () => {
+  // Morire qui vorrebbe dire fermare il giro PRIMA del passo in cui la sua
+  // stessa ricetta gli dice di aggiornarsi, con un esito che significa "chiudi
+  // e non ritentare". L'aggiornamento si fa adesso, che è il momento giusto.
+  const { casa, g } = await laboratorioGit();
+  try {
+    // Un commit nuovo sull'altrove, e il progetto resta indietro.
+    writeFileSync(resolve(casa, 'nuovo.txt'), 'x', 'utf8');
+    g(['add', '-A']); g(['commit', '-qm', 'secondo']); g(['push', '-q', 'origin', 'main']);
+    const punta = g(['rev-parse', 'HEAD']);
+    g(['reset', '--hard', '-q', 'HEAD~1']);
+    assert.notEqual(g(['rev-parse', 'HEAD']), punta);
+
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 0, `doveva allinearsi e proseguire: ${out.se.slice(-300)}`);
+    assert.equal(g(['rev-parse', 'HEAD']), punta, 'e il checkout deve essere aggiornato davvero');
+  } finally {
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
+test('ramo di lavoro: si ferma, e dice come si fa apposta', async () => {
+  const { casa, g } = await laboratorioGit();
+  try {
+    g(['checkout', '-q', '-b', 'claude/qualcosa']);
+    writeFileSync(resolve(casa, 'suo.txt'), 'x', 'utf8');
+    g(['add', '-A']); g(['commit', '-qm', 'lavoro']);
+
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 3, `doveva fermarsi: ${out.so.slice(0, 200)}`);
+    assert.match(out.se, /claude\/qualcosa/, 'e dire da dove è partito');
+    assert.match(out.se, /FILO_PREFLIGHT_ANY_BRANCH/,
+      'e nominare la via di fuga: un rifiuto che non dice come si fa apposta è un muro');
+  } finally {
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
+test('senza remoto la guardia lascia passare', async () => {
+  // Fallire aperti: questo controllo esiste per accorgersi di una deriva, non
+  // per essere il punto in cui un giro muore perché la rete non c'è.
+  const { casa, g } = await laboratorioGit();
+  try {
+    g(['remote', 'remove', 'origin']);
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
+  } finally {
+    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
 test('anche i DATI che governano il giro vengono dalla copia', async () => {
   // Non solo il codice: il numero di bocciature che si tollerano prima di
   // chiamare l'owner è un dato, e preso dal ramo di lavoro sarebbe quello di
