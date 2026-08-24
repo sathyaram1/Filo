@@ -1112,10 +1112,21 @@ if (isMainModule) {
       // ritoccano i ruoli.
       preflight().then((r) => {
         if (r.ok) {
-          const f = resolve(ROLES_DIR, 'orchestrator.md');
+          // GLI STRUMENTI SI FISSANO QUI, e qui soltanto: questo è l'unico
+          // momento del giro in cui la cartella è ancora sulla versione
+          // aggiornata, prima che qualunque ramo di lavoro venga aperto.
+          // Da adesso in poi il giro esegue la copia, che nessun cambio di ramo
+          // può riportare indietro (lib/tools-pin.mjs).
+          const pin = pinTools(ROOT);
+          if (!pin.ok) {
+            process.stderr.write(`[dispatch] strumenti non fissati (${pin.why}): il giro userà quelli del ramo di lavoro\n`);
+          }
+          const tools = pin.ok ? pin.dir : TOOLS_ROOT;
+          const f = resolve(tools, 'routines', 'roles', 'orchestrator.md');
           const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
           console.log('[dispatch] prontezza OK. Le tue istruzioni:\n');
-          console.log(brief || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
+          console.log(absolutizeRecipe(brief, tools, ROOT)
+            || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
           process.exit(0);
         }
         if (r.kind === 'off') console.log(`[dispatch] SPENTO: ${r.message}`);
