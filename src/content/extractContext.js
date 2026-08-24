@@ -297,11 +297,19 @@
   // L'array ritornato porta anche `unreachable`: quanti componenti chiusi
   // (contenuto illeggibile per chiunque) sono stati incontrati. Serve a chi
   // scrive l'avviso finale, non alla traduzione.
+  //
+  // E porta `truncated`: quanti blocchi ci sono OLTRE il tetto di un giro. Il
+  // tetto tiene sotto controllo quanto lavoro parte in una volta, ma la
+  // scansione non si ferma lì — perché il conteggio serve a chi scrive
+  // l'avviso finale: senza, una pagina enorme veniva dichiarata "tradotta" con
+  // la coda ancora in lingua originale (la bugia di #407, altra causa). Contare
+  // costa una camminata nel DOM, niente richieste al modello.
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
-    if (!root) return Object.assign([], { unreachable: 0 });
+    if (!root) return Object.assign([], { unreachable: 0, truncated: 0 });
     const out = [];
     let unreachable = 0;
+    let truncated = 0;
     // Pila esplicita invece del TreeWalker: deve poter saltare da un albero
     // all'altro (pagina → componente) restando in ordine di lettura.
     const stack = [root];
