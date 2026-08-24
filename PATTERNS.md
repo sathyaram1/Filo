@@ -411,10 +411,10 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   chiaro: un `<video>` in un componente dentro l'`<a>` della scheda sembrava
   senza collegamento. Chi cerca un antenato a partire dal target usa
   `closestAcrossShadow` (risale, e quando la radice è uno shadow root riparte dal
-  suo host), mai `closest` nudo. Specularmente
-  `document.elementsFromPoint()` di un componente restituisce **l'host**, mai
-  quello che c'è dentro: con collegamento e anteprima impilati dentro lo stesso
-  componente la ricerca si fermava al bordo e il link spariva. Chi guarda cosa
+  suo host), mai `closest` nudo. Specularmente, `document.elementsFromPoint()`
+  di un componente restituisce **l'host**, mai quello che c'è dentro: con
+  collegamento e anteprima impilati dentro lo stesso componente la ricerca si
+  fermava al bordo e il link spariva. Chi guarda cosa
   c'è sotto il cursore usa `deepElementsFromPoint`, che per ogni elemento con uno
   shadow root ripete il colpo là dentro e mette le parti del componente PRIMA del
   loro host (è l'ordine in cui si vedono). Limite noto: uno shadow root `closed`
