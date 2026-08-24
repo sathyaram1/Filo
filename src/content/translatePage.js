@@ -57,6 +57,10 @@
       // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
       // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
       const unreachable = Number(blocks.unreachable || 0);
+      // Blocchi oltre il tetto di un giro solo: non sono persi, si prendono
+      // alla ripresa. Entrano nei totali perché è l'unico modo perché l'avviso
+      // finale non menta su una pagina enorme.
+      const truncated = Number(blocks.truncated || 0);
 
       // Per ogni unità: i figli (link, img, span, …) diventano segnaposto [[Lk]],
       // così il modello traduce solo il testo e la struttura resta intatta.
