@@ -78,6 +78,14 @@ async function giro(rispostaLavoro, consegne = []) {
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
     execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
     execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
+    // Le stesse righe di ignoranza del repo vero, per i marcatori del giro.
+    // NON è una comodità: preparare il ramo passa da `git clean`, che porta via
+    // i file non tracciati ma NON quelli ignorati. Senza queste righe il
+    // marcatore del biglietto sparisce a metà giro, le consegne successive non
+    // trovano più a quale lavoro riferirsi, e il banco di prova mostra un
+    // guasto che in produzione non esiste (o nasconde quello che esiste).
+    writeFileSync(resolve(casa, '.gitignore'),
+      '.claude/routine-ticket.json\n.claude/routine-beat.json\n.claude/routine-state/\n.claude/branch-expect.json\n.claude/routine-role.json\n', 'utf8');
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
     execFileSync('git', ['add', '-A'], { cwd: casa });
     execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
