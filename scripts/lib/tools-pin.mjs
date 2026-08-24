@@ -50,9 +50,14 @@ export const PINNED_PATHS = ['scripts', 'routines'];
 
 const REPO_MARK = '.filo-repo-root';
 
-/** Dove finisce la copia: fuori dal progetto, per costruzione. */
+/**
+ * Dove finisce la copia: fuori dal progetto, per costruzione.
+ * `FILO_TOOLS_DIR` esiste per i test, che non devono scrivere nella cartella
+ * che un giro vero potrebbe star usando.
+ */
 export function pinnedDir() {
-  return resolve(tmpdir(), 'filo-strumenti');
+  const scelta = String(process.env.FILO_TOOLS_DIR || '').trim();
+  return scelta ? resolve(scelta) : resolve(tmpdir(), 'filo-strumenti');
 }
 
 /**
