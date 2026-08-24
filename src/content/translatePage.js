@@ -170,6 +170,10 @@
       pageComplete = missingCount === 0;
       if (pageComplete) {
         Popup.showToast(...doneToast(unreachable));
+      } else if (!lastError && truncated) {
+        // Nessun guasto: la pagina è semplicemente più lunga di un giro solo.
+        // "Interrotta" suonerebbe come un errore che non c'è stato.
+        Popup.showToast(I18n.t('toast_page_translate_batch', applied, grandTotal), { duration: 7000 });
       } else {
         // MAI "Pagina tradotta" quando non lo è: si dice che si è interrotta,
         // quanto manca e come riprendere (il motivo tecnico grezzo resta fuori).
