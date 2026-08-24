@@ -995,6 +995,19 @@ async function finalizeBucket(bucket, fromServer) {
     }
   }
 
+  // Il semaforo è del SERVER: l'ha preso lui rilasciando il biglietto, e vale
+  // per un feedback solo. Il lucchetto su git non esiste più — era il modo che
+  // avevano macchine senza credenziali di mettersi d'accordo fra loro.
+  //
+  // La presa in carico (`working`) la si dichiara al server COL RAMO: è il
+  // riflesso che la dashboard mostra come "in lavorazione", ed è anche l'unico
+  // momento in cui il server viene a sapere su quale ramo si sta lavorando —
+  // prima lo scopriva solo alla consegna, cioè ore dopo, e per tutto quel tempo
+  // il recupero degli arenati era cieco.
+  if (bucket.id && bucket.role === 'new-work') {
+    await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
+  }
+
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
   const ctx = serverCtx(bucket, fromServer,
     bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
