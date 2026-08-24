@@ -75,10 +75,21 @@ import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, cle
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
+// DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
+//   ROOT       il PROGETTO, dove si lavora e dove parla git;
+//   TOOLS_ROOT gli STRUMENTI che stanno girando, che in cloud sono una copia
+//              fuori dal progetto — perché il progetto, appena si apre il ramo
+//              di un feedback, si porta dietro gli strumenti di QUEL ramo.
+// Quando gli strumenti sono una copia fissata, il progetto lo dicono loro: non
+// si chiede a nessuno di ricordarsi di passarlo.
+const ROOT = process.env.FILO_REPO_ROOT
+  ? resolve(process.env.FILO_REPO_ROOT)
+  : (pinnedRepoRoot() || resolve(__dirname, '..'));
 // Lo stato locale e' solo un ripiego: quello vero vive sul server. Sta fra i
 const STATE_DIR = stateDir(ROOT);
-const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
+// Le ricette dei ruoli seguono gli STRUMENTI, non il progetto: su un ramo
+// vecchio anche le istruzioni sarebbero vecchie.
+const ROLES_DIR = resolve(TOOLS_ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 // Il documento che dice alle routine come devono comportarsi: acceso/spento,
