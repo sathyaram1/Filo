@@ -116,7 +116,10 @@ const LOOP_CAP_MAX = 10;
 export const VERIFIER_CAPS = (() => {
   try {
     const req = createRequire(import.meta.url);
-    req(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
+    // Dagli STRUMENTI, non dal progetto: è un dato che governa il giro (quante
+    // bocciature si tollerano), e preso dal ramo di lavoro sarebbe di nuovo la
+    // versione di giorni fa.
+    req(resolve(TOOLS_ROOT, 'src', 'shared', 'feedbackTransitions.js'));
     const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
     if (caps && Number.isFinite(caps.failCap) && Number.isFinite(caps.improvableCap)) return caps;
   } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
