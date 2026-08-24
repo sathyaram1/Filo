@@ -1279,6 +1279,32 @@
       return items;
     }
 
+    // Stessa scheda, anteprima ferma. Il velo trasparente c'è ancora, ma sotto
+    // non c'è più un filmato: c'è la copertina, e sotto di lei il collegamento.
+    // Senza questo ramo lo stesso identico pixel dava due esiti opposti — menu
+    // completo mentre il filmatino suonava, menu vuoto un istante dopo (#444).
+    if (imgUnder) {
+      for (const it of buildImageActionItems(imgUnder)) items.push(it);
+      if (sameCardArea(imgUnder, linkUnder)) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+      }
+      items.push({ type: 'separator' });
+      items.push(Actions.buildInlineExplainImage(imgUnder));
+      return items;
+    }
+
+    // E il collegamento da solo: un velo trasparente sopra una scheda-link basta
+    // a far sparire «Apri in nuova tab», «Copia URL», «Salva link per dopo» e
+    // «Condividi link». Non è un caso di nicchia — è come sono costruiti quasi
+    // tutti gli elenchi di schede, con o senza filmato (#444).
+    if (linkUnder) {
+      for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+      items.push({ type: 'separator' });
+      items.push(Actions.buildInlineExplainLink(linkUnder));
+      return items;
+    }
+
     // Pagina generica senza contesto: nessuna zona contestuale.
     return items;
   }
