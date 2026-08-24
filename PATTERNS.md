@@ -390,17 +390,29 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   gli **antenati** (`closest('a[href]')`) lo perde in tutti questi casi, e la
   scheda diventa irraggiungibile col tasto destro proprio mentre l'anteprima
   suona. Regola: **ogni** famiglia ha il suo ripiego "sotto il punto cliccato"
-  (`elementsFromPoint`), non solo il media; e due elementi impilati si tengono
-  insieme quando occupano **lo stesso rettangolo** (`sameCardArea`: dentro il
-  link, oppure almeno metà del media dentro il riquadro del link). A distinguere
-  la scheda vera dal video di sfondo a tutta pagina che si trova per caso un link
-  sotto il cursore è quella misura, non la parentela nel DOM.
-- **`closest()` si ferma al confine di un componente web.** `realTarget` con
-  `composedPath()[0]` ti dà l'elemento vero dentro lo shadow root, ma da lì la
-  risalita non vede più gli antenati in chiaro: un `<video>` in un componente
-  dentro l'`<a>` della scheda sembrava senza collegamento. Chi cerca un antenato
-  a partire dal target usa `closestAcrossShadow` (risale, e quando la radice è
-  uno shadow root riparte dal suo host), mai `closest` nudo.
+  (`elementsUnderPoint`) — filmato, immagine E collegamento, nessuna esclusa:
+  se una ce l'ha e un'altra no, lo stesso pixel dà due menu diversi a seconda di
+  che cosa sta suonando in quel momento. Il ripiego di una famiglia **da sola**
+  non si misura (il collegamento sotto il velo È il contesto, come il filmato
+  sotto l'overlay del player); la misura serve solo a decidere se due famiglie
+  impilate vanno **unite**, e passa quando occupano **lo stesso rettangolo**
+  (`sameCardArea`: dentro il link, oppure almeno metà del media/copertina dentro
+  il riquadro del link). A distinguere la scheda vera dal video di sfondo a tutta
+  pagina che si trova per caso un link sotto il cursore è quella misura, non la
+  parentela nel DOM.
+- **I componenti web fermano tutt'e due le ricerche, in direzioni opposte.**
+  Chi risale: `realTarget` con `composedPath()[0]` ti dà l'elemento vero dentro
+  lo shadow root, ma da lì `closest()` non vede più gli antenati in chiaro — un
+  `<video>` in un componente dentro l'`<a>` della scheda sembrava senza
+  collegamento. Chi cerca un antenato a partire dal target usa
+  `closestAcrossShadow` (risale, e quando la radice è uno shadow root riparte dal
+  suo host), mai `closest` nudo. Chi scende: `document.elementsFromPoint`
+  ri-targetta al confine e di una scheda fatta a componente restituisce **solo
+  l'host**, quindi link e anteprima impilati lì dentro erano invisibili al
+  ripiego. `elementsUnderPoint` ripete la domanda dentro ogni shadow root aperto
+  e infila i suoi strati subito dopo l'host, così l'ordine sopra→sotto regge a
+  cavallo del confine. Gli strati si chiedono **una volta sola** per apertura di
+  menu e le tre famiglie li rileggono: è un hit-test, e il menu si apre spesso.
 - **Il riconoscimento del contesto sta in UN posto** (`detectContext`): il menu
   si apre da due strade (menu normale e menu di correzione) e con la ricerca
   copiata in tutt'e due lo stesso clic finiva col dare due menu diversi a seconda
