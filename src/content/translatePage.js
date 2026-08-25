@@ -65,9 +65,13 @@
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
     const progress = Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
+    // Alberi da sorvegliare a lavoro finito: il documento più i componenti
+    // aperti del sito, che una sentinella sul solo documento non vedrebbe.
+    let watchRoots = [];
 
     try {
       const blocks = Extract.extractTranslatableBlocks();
+      watchRoots = blocks.shadowRoots || [];
       // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
       // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
       const unreachable = Number(blocks.unreachable || 0);
