@@ -58,6 +58,9 @@ async function stubTranslationProvider(app) {
     });
     const P = globalThis.SN_PROVIDERS;
     globalThis.__filoTranslateCalls = 0;
+    // Blocchi effettivamente MANDATI al modello: è la misura di quanto l'utente
+    // paga. Serve a provare che una ripresa non rispedisce ciò che è già fatto.
+    globalThis.__filoTranslateBlocks = 0;
     const origComplete = P.completeWithFallback;
     P.completeWithFallback = async (args) => {
       const { messages } = args;
@@ -70,7 +73,9 @@ async function stubTranslationProvider(app) {
       const i = prompt.indexOf('Testo:\n\n');
       const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
       const SEP = '\n@@@SN_SEP@@@\n';
-      const out = chunk.split(/\n?@@@SN_SEP@@@\n?/).map((p) => `IT ${p}`).join(SEP);
+      const parts = chunk.split(/\n?@@@SN_SEP@@@\n?/);
+      globalThis.__filoTranslateBlocks += parts.length;
+      const out = parts.map((p) => `IT ${p}`).join(SEP);
       return { text: out, provider: 'test', model: 'test-translate', usage: {} };
     };
   });
