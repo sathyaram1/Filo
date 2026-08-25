@@ -1277,8 +1277,9 @@
       // destro arriva lì invece che sull'`<img>`. Se non c'è un filmato in
       // funzione, il contenuto della scheda è quell'immagine: le sue voci sono
       // quelle che l'utente cerca (#444).
-      if (!mediaUnder && imgUnder) {
-        for (const it of buildImageActionItems(imgUnder)) items.push(it);
+      const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl)) ? imgUnder : null;
+      if (imgInLink) {
+        for (const it of buildImageActionItems(imgInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
       for (const it of buildLinkActionItems(linkEl)) items.push(it);
