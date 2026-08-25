@@ -377,10 +377,22 @@
   // costa una camminata nel DOM, niente richieste al modello.
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
-    if (!root) return Object.assign([], { unreachable: 0, truncated: 0 });
+    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [] });
     const out = [];
+    // Etichette negli attributi (#407): stessa camminata, lista separata —
+    // si applicano scrivendo l'attributo, non sostituendo i figli.
+    const attrs = [];
     let unreachable = 0;
     let truncated = 0;
+    const room = () => out.length + attrs.length < maxBlocks;
+    const takeAttrs = (el) => {
+      const targets = attrTargetsOf(el);
+      if (!targets) return;
+      for (const t of targets) {
+        if (room()) attrs.push(t);
+        else truncated++;
+      }
+    };
     // Pila esplicita invece del TreeWalker: deve poter saltare da un albero
     // all'altro (pagina → componente) restando in ordine di lettura.
     const stack = [root];
@@ -389,7 +401,17 @@
       // La radice non passa dal filtro: un <body translate="no"> o nascosto in
       // partenza spegnerebbe la traduzione dell'intera pagina, che prima invece
       // partiva. Il filtro vale — come prima — da lì in giù.
-      if (el !== root && skipSubtreeForTranslation(el)) continue;
+      const skip = el !== root && skipSubtreeForTranslation(el);
+      if (skip) {
+        // Sottoalbero senza prosa: il contenuto resta intoccato, ma le sue
+        // etichette (placeholder di un campo, suggerimento di un bottone,
+        // voce di un menu a tendina) si leggono sullo schermo e si traducono —
+        // a meno che valga una barriera dura, che qui non è ancora stata
+        // controllata perché il tag l'ha preceduta.
+        if (skip === 'tag' && !hardSkipForTranslation(el)) takeAttrs(el);
+        continue;
+      }
+      takeAttrs(el);
       // Già tradotto: si salta QUESTO elemento ma si continua a scendere nei
       // figli (#408). Scartare tutto il sottoalbero renderebbe irraggiungibili
       // i blocchi annidati che una traduzione interrotta a metà non ha ancora
@@ -398,8 +420,8 @@
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
-          if (out.length >= maxBlocks) truncated++;
-          else out.push({ el, text: txt });
+          if (room()) out.push({ el, text: txt });
+          else truncated++;
         }
       }
       const kids = [];
@@ -412,7 +434,7 @@
       for (const c of el.children) kids.push(c);
       for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
     }
-    return Object.assign(out, { unreachable, truncated });
+    return Object.assign(out, { unreachable, truncated, attrs });
   }
 
   // Tutti gli elementi già tradotti, componenti isolati compresi: una
