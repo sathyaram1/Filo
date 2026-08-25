@@ -187,14 +187,74 @@
 
   // Sottoalberi che non si traducono mai: o non contengono prosa (script, media,
   // grafica) o il testo è codice/valore e tradurlo lo romperebbe.
+  // NB: SELECT e OPTGROUP NON sono qui: il loro testo proprio è vuoto (non
+  // rischiano di diventare blocchi) ma bisogna poterci scendere dentro per
+  // arrivare alle OPTION, le cui etichette si leggono sullo schermo. DATALIST
+  // invece resta fuori: le sue voci sono valori che finiscono dentro il campo,
+  // non etichette da leggere.
   const TRANSLATE_SKIP_TAGS = new Set([
     'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'MATH', 'CANVAS',
     'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'PRE', 'CODE', 'KBD',
-    'SAMP', 'VAR', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'OPTGROUP',
+    'SAMP', 'VAR', 'TEXTAREA', 'INPUT', 'OPTION',
     'DATALIST', 'HEAD', 'TITLE',
   ]);
 
   const HAS_LETTER = /\p{L}/u;
+
+  // ---------------------------------------------------------------------------
+  // Testo che si legge sullo schermo ma non sta nella pagina: sta negli
+  // ATTRIBUTI (#407). Il grigio dentro un campo di ricerca (`placeholder`), il
+  // suggerimento che compare fermando il mouse (`title`), la descrizione di
+  // un'immagine (`alt`), l'etichetta di una voce di menu a tendina. Lasciarli
+  // in inglese sotto un avviso "Pagina tradotta" è la stessa bugia da cui nasce
+  // la segnalazione: si vede a occhio che il lavoro non è finito.
+  //
+  // La riga di confine è netta: si traduce ciò che l'utente LEGGE, mai ciò che
+  // il sito RIMANDA INDIETRO. Perciò niente `value` (viene inviato col modulo),
+  // niente `href`/`src`/`name`/`id`, niente voci di `datalist` (finiscono
+  // dentro al campo come testo digitato).
+  const TRANSLATABLE_ATTRS_ANY = ['title', 'aria-label'];
+  const TRANSLATABLE_ATTRS_BY_TAG = {
+    INPUT: ['placeholder', 'alt'],
+    TEXTAREA: ['placeholder'],
+    IMG: ['alt'],
+    AREA: ['alt'],
+    // Una voce di menu a tendina si traduce SCRIVENDO l'etichetta, mai
+    // sostituendone il testo: il testo di una <option> senza `value` è proprio
+    // ciò che il modulo invia. Con `label` presente il browser mostra
+    // l'etichetta e continua a inviare il valore di prima.
+    OPTION: ['label'],
+    OPTGROUP: ['label'],
+  };
+
+  // Valore di partenza di un attributo traducibile. Per l'etichetta di una
+  // <option> che non ce l'ha, il testo che si legge è il suo contenuto.
+  function attrSourceValue(el, attr, tag) {
+    const v = el.getAttribute(attr);
+    if (v !== null) return v;
+    if (attr === 'label' && tag === 'OPTION') return el.textContent || '';
+    return null;
+  }
+
+  // Attributi da tradurre di QUESTO elemento, già ripuliti; null se non ce ne
+  // sono (il caso della stragrande maggioranza degli elementi: si esce subito).
+  function attrTargetsOf(el) {
+    if (!el.getAttribute) return null;
+    const tag = (el.tagName || '').toUpperCase();
+    const extra = TRANSLATABLE_ATTRS_BY_TAG[tag];
+    const names = extra ? TRANSLATABLE_ATTRS_ANY.concat(extra) : TRANSLATABLE_ATTRS_ANY;
+    const done = (el.dataset && el.dataset.snTranslatedAttrs) || '';
+    let out = null;
+    for (const attr of names) {
+      if (done && done.split(',').indexOf(attr) >= 0) continue;
+      const raw = attrSourceValue(el, attr, tag);
+      if (raw === null) continue;
+      const text = raw.replace(/\s+/g, ' ').trim();
+      if (text.length < 2 || !HAS_LETTER.test(text)) continue;
+      (out || (out = [])).push({ el, attr, text });
+    }
+    return out;
+  }
 
   // Namespace HTML: solo gli elementi qui dentro sono "testo di pagina". Tutto
   // ciò che sta in un altro namespace (SVG, MathML e qualsiasi foreign content)
