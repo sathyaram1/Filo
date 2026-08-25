@@ -412,10 +412,10 @@
         // voce di un menu a tendina) si leggono sullo schermo e si traducono —
         // a meno che valga una barriera dura, che qui non è ancora stata
         // controllata perché il tag l'ha preceduta.
-        if (skip === 'tag' && !hardSkipForTranslation(el)) takeAttrs(el);
+        if (skip === 'tag') takeAttrs(el, true);
         continue;
       }
-      takeAttrs(el);
+      takeAttrs(el, false);
       // Già tradotto: si salta QUESTO elemento ma si continua a scendere nei
       // figli (#408). Scartare tutto il sottoalbero renderebbe irraggiungibili
       // i blocchi annidati che una traduzione interrotta a metà non ha ancora
