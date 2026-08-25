@@ -667,6 +667,14 @@
       && outer.bottom > inner.bottom + SURFACE_SLACK_PX;
   }
 
+  // Un contenuto "appartiene" a un collegamento quando ci sta dentro (nel DOM) o
+  // quando ne occupa la superficie (i player veri coprono il filmato col proprio
+  // overlay, e le schede impilano copertina e link invece di annidarli).
+  function belongsTo(el, linkEl) {
+    if (!el || !linkEl) return false;
+    return linkEl.contains?.(el) || sameSurface(el, linkEl);
+  }
+
   function sameSurface(a, b) {
     if (!a || !b) return false;
     const ra = a.getBoundingClientRect?.();
