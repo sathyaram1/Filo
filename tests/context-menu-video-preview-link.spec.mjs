@@ -281,8 +281,8 @@ async function expectNessunaVoceDelLink(menu) {
   for (const label of LINK_LABELS) {
     await expect(menu.getByText(label, { exact: true })).toHaveCount(0);
   }
-  // Nemmeno l'analisi: è la parte silenziosa: compare «Analizzo il link…» e Filo
-  // va a scaricare l'indirizzo per conto suo.
+  // E nemmeno l'analisi, che è la parte silenziosa. Compare «Analizzo il link…»
+  // e Filo va a scaricare quell'indirizzo per conto suo.
   await expect(menu.getByText('Analizzo il link', { exact: false })).toHaveCount(0);
 }
 
