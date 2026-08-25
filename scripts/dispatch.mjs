@@ -1425,7 +1425,9 @@ if (isMainModule) {
       // un'ora di verifica (#444) non si è più potuto registrare.
       const ti = argv.indexOf('--ticket');
       const ticket = ti !== -1 ? String(argv[ti + 1] || '') : '';
-      if (ti !== -1 && !ticket) {
+      // Un "codice" che comincia con `--` è un flag finito nel posto sbagliato,
+      // non un biglietto: stessa regola di stripTicketArg sui --record-*.
+      if (ti !== -1 && (!ticket || ticket.startsWith('--'))) {
         console.error('Uso: node scripts/dispatch.mjs --ticket <biglietto> (vedi --help). Niente è stato toccato.');
         process.exit(1);
       }
