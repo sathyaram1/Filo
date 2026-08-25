@@ -611,7 +611,10 @@
     if (direct) return { mediaEl: direct, mediaUnder: null };
     let under = null;
     for (const el of stack) {
-      if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') { under = el; break; }
+      if (el.tagName !== 'VIDEO' && el.tagName !== 'AUDIO') continue;
+      if (!sameSurface(target, el)) continue;
+      under = el;
+      break;
     }
     return { mediaEl: null, mediaUnder: under };
   }
