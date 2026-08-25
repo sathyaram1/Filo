@@ -491,3 +491,194 @@ test('"Mostra originale" riporta indietro tutta la pagina, link compresi', async
   await expect(page.locator('#p2')).toHaveText('Second paragraph with a linked phrase inside it.');
   await expect(page.locator('#p2 a#inlink')).toHaveAttribute('href', '#x');
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #407 (secondo giro) — testo che si LEGGE ma non sta nel testo.
+//
+// Il grigio dentro un campo di ricerca, il suggerimento che compare fermando il
+// mouse, la descrizione di un'immagine, le voci di un menu a tendina: sono
+// etichette che l'utente vede sullo schermo. Restavano in inglese mentre
+// l'avviso diceva "Pagina tradotta" — la stessa bugia della segnalazione.
+//
+// La riga di confine: si traduce ciò che si LEGGE, mai ciò che il sito RIMANDA
+// INDIETRO (il valore di un campo, il valore inviato da una voce di menu).
+// ───────────────────────────────────────────────────────────────────────────
+
+const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+const LABELS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An English article with labels outside the body text</h1>
+  <input id="search" type="search" placeholder="Search the whole archive">
+  <button id="more" title="Open the full story">More</button>
+  <img id="pic" src="${PIXEL}" alt="A photo of the empty stadium">
+  <select id="pick">
+    <option id="o1" value="a">First option label</option>
+    <option id="o2" value="b">Second option label</option>
+  </select>
+  <a id="icon" href="#z" aria-label="Share this article"><span>·</span></a>
+  <form id="form" action="#">
+    <input id="q" name="q" type="text" value="do not touch this value" placeholder="Type your query here">
+  </form>
+</body></html>`;
+
+const labelState = (page) => page.evaluate(() => ({
+  placeholder: document.getElementById('search').getAttribute('placeholder'),
+  title: document.getElementById('more').getAttribute('title'),
+  alt: document.getElementById('pic').getAttribute('alt'),
+  ariaLabel: document.getElementById('icon').getAttribute('aria-label'),
+  // `label` è ciò che il menu a tendina MOSTRA; `value` e il testo sono ciò
+  // che il modulo invia.
+  optionLabels: Array.from(document.querySelectorAll('#pick option')).map((o) => o.label),
+  optionValues: Array.from(document.querySelectorAll('#pick option')).map((o) => o.value),
+  optionTexts: Array.from(document.querySelectorAll('#pick option')).map((o) => o.textContent),
+  fieldValue: document.getElementById('q').value,
+  fieldPlaceholder: document.getElementById('q').getAttribute('placeholder'),
+  hasLabelAttr: Array.from(document.querySelectorAll('#pick option')).map((o) => o.hasAttribute('label')),
+}));
+
+test('traduce anche le etichette che non stanno nel testo (campi, suggerimenti, immagini, menu a tendina)', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, LABELS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  await expect(page.locator('#head')).toHaveText(/^IT /);
+  await expect.poll(async () => (await labelState(page)).placeholder, { timeout: 30000 }).toMatch(/^IT /);
+
+  const after = await labelState(page);
+  expect(after.placeholder).toBe('IT Search the whole archive');
+  expect(after.title).toBe('IT Open the full story');
+  expect(after.alt).toBe('IT A photo of the empty stadium');
+  expect(after.ariaLabel).toBe('IT Share this article');
+  expect(after.fieldPlaceholder).toBe('IT Type your query here');
+  // Le voci del menu a tendina si LEGGONO in italiano…
+  expect(after.optionLabels).toEqual(['IT First option label', 'IT Second option label']);
+  // …e ciò che il modulo invia non è cambiato di una virgola.
+  expect(after.optionValues).toEqual(['a', 'b']);
+  expect(after.optionTexts).toEqual(['First option label', 'Second option label']);
+  expect(after.fieldValue).toBe('do not touch this value');
+
+  // L'avviso può dire "Pagina tradotta" perché adesso è vero.
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/translate-page-labels.png' }).catch(() => {});
+});
+
+test('"Mostra originale" rimette a posto anche le etichette', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, LABELS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+  await expect.poll(async () => (await labelState(page)).placeholder, { timeout: 30000 }).toMatch(/^IT /);
+
+  await clickTranslateIcon(page, '#head');
+  await expect(page.locator('#head')).toHaveText('An English article with labels outside the body text');
+
+  const back = await labelState(page);
+  expect(back.placeholder).toBe('Search the whole archive');
+  expect(back.title).toBe('Open the full story');
+  expect(back.alt).toBe('A photo of the empty stadium');
+  expect(back.ariaLabel).toBe('Share this article');
+  expect(back.fieldPlaceholder).toBe('Type your query here');
+  expect(back.optionLabels).toEqual(['First option label', 'Second option label']);
+  // L'etichetta l'avevamo aggiunta noi: tornando all'originale sparisce, non
+  // resta un attributo finto addosso alla pagina.
+  expect(back.hasLabelAttr).toEqual([false, false]);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// #407 (secondo giro) — testo che il sito aggiunge DOPO la traduzione.
+//
+// È la normalità sulle pagine che si allungano scorrendo e su quelle che
+// cambiano schermata senza ricaricare. Prima, a traduzione finita il menu
+// offriva solo "Mostra originale": per avere in italiano le righe arrivate dopo
+// bisognava tornare all'originale e RIPAGARE tutta la pagina.
+// ───────────────────────────────────────────────────────────────────────────
+
+const FEED = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A feed that keeps growing while you scroll it</h1>
+  <div id="feed">
+    <div class="row" id="r0">First row of the feed, written in English.</div>
+    <div class="row" id="r1">Second row of the feed, written in English.</div>
+    <div class="row" id="r2">Third row of the feed, written in English.</div>
+  </div>
+  <script>
+    window.__addRows = (n) => {
+      const feed = document.getElementById('feed');
+      for (let i = 0; i < n; i++) {
+        const d = document.createElement('div');
+        d.id = 'later' + i;
+        d.className = 'row';
+        d.textContent = 'Row number ' + i + ' arrived after the translation was done.';
+        feed.appendChild(d);
+      }
+    };
+  </script>
+</body></html>`;
+
+const blocksSent = (app) => app.evaluate(() => globalThis.__filoTranslateBlocks);
+
+test('il testo comparso dopo la traduzione si traduce dal menu, senza ripagare il resto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FEED);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  await expect(page.locator('#r2')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  const paidFirst = await blocksSent(app);
+
+  // Il sito allunga la pagina: sei righe nuove, in inglese.
+  await page.evaluate(() => window.__addRows(6));
+  await expect(page.locator('#later5')).toHaveText(/^Row number 5 /);
+
+  // Il menu se ne accorge e offre di tradurre SOLO quelle.
+  await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  // Anche in questo stato si deve poter rinunciare e tornare all'originale.
+  await expect(menu.getByText('Mostra originale', { exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/translate-page-new-content-menu.png' }).catch(() => {});
+  await icon.click();
+
+  // SUCCESSO per l'utente: le righe nuove sono in italiano…
+  for (const id of ['#later0', '#later3', '#later5']) {
+    await expect(page.locator(id)).toHaveText(/^IT /, { timeout: 60000 });
+  }
+  // …e quelle di prima non sono state tradotte due volte.
+  const doubled = await page.evaluate(() => Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
+    .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
+  expect(doubled).toBe(0);
+
+  // Il conto che l'utente paga: al modello sono andate SOLO le sei righe nuove.
+  expect(await blocksSent(app) - paidFirst).toBe(6);
+
+  // Finito il secondo giro l'avviso torna a dire il vero, e l'icona torna a
+  // offrire il ritorno all'originale.
+  await expect.poll(async () => (await toasts(page)).filter((t) => t === 'Pagina tradotta').length, { timeout: 60000 }).toBeGreaterThan(1);
+  await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
+  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
+});
+
+test('il testo comparso dopo torna in inglese con tutto il resto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FEED);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+  await expect(page.locator('#r2')).toHaveText(/^IT /, { timeout: 30000 });
+
+  await page.evaluate(() => window.__addRows(2));
+  await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  await icon.click();
+  await expect(page.locator('#later1')).toHaveText(/^IT /, { timeout: 60000 });
+
+  await clickTranslateIcon(page, '#head');
+  await expect(page.locator('#later1')).toHaveText('Row number 1 arrived after the translation was done.');
+  await expect(page.locator('#r0')).toHaveText('First row of the feed, written in English.');
+  await expect.poll(() => translatedCount(page)).toBe(0);
+});

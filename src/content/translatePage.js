@@ -82,8 +82,8 @@
       // tornano dall'estrazione (vengono saltati alla fonte) e non vanno
       // rimandati al modello — sarebbe testo pagato due volte. Qui servono solo
       // a dare i totali giusti a chi legge l'avviso (#408).
-      const done = Extract.findTranslatedElements();
-      const already = done.length + Number(done.attrCount || 0);
+      const doneBefore = Extract.findTranslatedElements();
+      const already = doneBefore.length + Number(doneBefore.attrCount || 0);
       const units = [];
       for (const b of blocks) {
         if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
