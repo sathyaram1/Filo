@@ -271,8 +271,8 @@ test('un filmato a tutta pagina non si porta dietro le voci di un link che gli p
 // sotto cui sono scivolati i titoli, il riquadro dei cookie, un manto steso
 // dalla pagina su tutta se stessa. In quest'ultimo caso il collegamento lo
 // sceglie la PAGINA: «Copia URL» le mette in mano gli appunti, «Apri in nuova
-// tab» e «Condividi link» decidono dove mandare l'utente, e l'analisi del link
-// parte da sola andando a scaricare quell'indirizzo a ogni clic destro.
+// tab» e «Condividi link» decidono dove mandare l'utente, e a ogni clic destro
+// parte l'analisi del link, che va a scaricare quell'indirizzo.
 // ---------------------------------------------------------------------------
 
 const IMG_LABELS = ['Copia immagine', 'Salva immagine come', 'Cerca immagine'];
