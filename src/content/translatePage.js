@@ -357,6 +357,7 @@
   // originali (nodi vivi) al posto dei segnaposto. Niente contenuto perso: i
   // figli che il modello non ha richiamato tornano comunque in fondo.
   function applyTranslation(unit, text) {
+    if (unit && unit.attr) return applyAttrTranslation(unit, text);
     const el = unit.el;
     if (!el || unit.applied || !text) return;
     if (el.dataset.snTranslated) return;
