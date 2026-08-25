@@ -505,6 +505,13 @@ test('stripTicketArg: flag senza codice (o seguito da un altro flag) è un error
   assert.equal(stripTicketArg(['--record-fixed', 'ID1', '--ticket', '--frase']).error, true);
 });
 
+test('serverDownText: dice che il canale è giù, senza travestirsi da rifiuto', () => {
+  const t = serverDownText('verdetto non registrato: il server non risponde (network)');
+  assert.ok(t.includes('NON RAGGIUNGIBILE'));
+  assert.ok(!t.includes('RIFIUTATO'), 'un guasto di rete non deve vestire il testo del rifiuto');
+  assert.ok(!t.includes('ha guardato'), 'niente "il server ha guardato": non ha visto niente');
+});
+
 test('ticketMissingText: indica il rimedio e NON accusa il server', () => {
   const t = ticketMissingText('verdetto non registrato: nessun biglietto trovato');
   assert.ok(t.includes('--ticket'), 'deve suggerire la scorta --ticket');
