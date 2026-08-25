@@ -1391,13 +1391,29 @@ if (isMainModule) {
       // consegne le fanno script diversi in momenti diversi, e pretendere che
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
       // provenienza dei feedback.
+      // Due sole forme legittime arrivano qui: NESSUN argomento (giro locale)
+      // o `--ticket <codice>` (giro col server). Tutto il resto — un flag
+      // storpiato, un `--ticket` senza codice — esce con un errore d'uso e NON
+      // tocca niente. Prima questa porta era anche quella degli argomenti
+      // sconosciuti: un `--help` battuto a metà lavoro veniva letto come "giro
+      // nuovo senza biglietto" e cancellava il promemoria — il verdetto di
+      // un'ora di verifica (#444) non si è più potuto registrare.
       const ti = argv.indexOf('--ticket');
-      const ticket = ti !== -1 ? argv[ti + 1] : '';
+      const ticket = ti !== -1 ? String(argv[ti + 1] || '') : '';
+      if (ti !== -1 && !ticket) {
+        console.error('Uso: node scripts/dispatch.mjs --ticket <biglietto> (vedi --help). Niente è stato toccato.');
+        process.exit(1);
+      }
+      const estranei = argv.filter((a, i) => ti === -1 || (i !== ti && i !== ti + 1));
+      if (estranei.length) {
+        console.error(`[dispatch] argomento non riconosciuto: ${estranei[0]} (vedi --help). Niente è stato toccato: promemoria e battito restano come sono.`);
+        process.exit(1);
+      }
       // Il biglietto viene messo dove chi consegna lo ritrova da solo: le
       // consegne le fanno script diversi, in momenti diversi, e pretendere che
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
-      // provenienza dei feedback. Un giro senza biglietto cancella il
-      // marcatore, o quello del giro prima sopravvivrebbe a questo.
+      // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
+      // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo 30 minuti di silenzio e la suite completa in cloud ne dura 37,
