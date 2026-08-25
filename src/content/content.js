@@ -924,11 +924,13 @@
       items.push(TTS.buildStopReadingItem());
     }
 
-    // 2c. Mostra originale — solo quando la traduzione di pagina si è interrotta
-    // a metà (#408): in quello stato l'icona serve a RIPRENDERE, quindi il
-    // ritorno all'originale deve restare raggiungibile da qualche parte.
-    // A traduzione completa la voce non compare: la offre già l'icona.
-    if (TranslatePage && typeof TranslatePage.isPartial === 'function' && TranslatePage.isPartial()) {
+    // 2c. Mostra originale — solo quando alla traduzione di pagina manca ancora
+    // qualcosa: si è interrotta a metà (#408), oppure è finita ma il sito ha
+    // aggiunto altro testo dopo (#407). In quegli stati l'icona serve a
+    // CONTINUARE, quindi il ritorno all'originale deve restare raggiungibile da
+    // qualche parte. A traduzione completa e ferma la voce non compare: la
+    // offre già l'icona.
+    if (TranslatePage && typeof TranslatePage.canContinue === 'function' && TranslatePage.canContinue()) {
       items.push(TranslatePage.buildRestoreOriginalItem());
     }
 
