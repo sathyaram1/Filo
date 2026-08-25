@@ -391,11 +391,24 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   scheda diventa irraggiungibile col tasto destro proprio mentre l'anteprima
   suona. Regola: **ogni** famiglia ha il suo ripiego "sotto il punto cliccato"
   (`findUnder` sulla pila di `deepElementsFromPoint`) — media, immagine **e
-  collegamento**, anche da solo. Due elementi impilati si tengono insieme quando
-  occupano **lo stesso rettangolo** (`sameCardArea`: dentro il link, oppure
-  almeno metà del media dentro il riquadro del link). A distinguere la scheda
-  vera dal video di sfondo a tutta pagina che si trova per caso un link sotto il
-  cursore è quella misura, non la parentela nel DOM.
+  collegamento**, anche da solo.
+- **Guardare sotto il cursore vuole un freno, e uno solo, per tutte le famiglie
+  (#444).** Adottare quello che sta sotto senza controllare che sia la stessa
+  cosa che l'utente sta GUARDANDO regala il menu a roba invisibile: la barra
+  fissa di un sito di notizie sotto cui sono scivolati i titoli, il riquadro dei
+  cookie, e soprattutto un manto che la pagina stende su tutta se stessa sotto al
+  testo — lì il collegamento lo sceglie lei, quindi «Copia URL» le mette in mano
+  gli appunti, «Apri in nuova tab» e «Condividi link» decidono dove mandare
+  l'utente, e l'analisi del link parte da sola andando a scaricare quell'indirizzo
+  a ogni clic destro. Il freno è `sameSurface`, misurato fra l'elemento **davvero
+  cliccato** e il candidato: si sovrappongono per almeno metà del più piccolo, e
+  nessuno dei due sfora l'altro **da tutte le parti**. Un velo che sta dentro
+  l'ingombro della scheda — la sfumatura sul titolo di una copertina — è
+  allineato con lei su almeno un lato e passa; una barra, un riquadro modale o un
+  manto inghiottono da ogni lato quello che coprono, e non passano. Sta in un
+  posto solo, `detectContext`: i tre `*Under` escono da lì già vagliati, così
+  nessun ramo a valle può dimenticarsene (era successo: il freno c'era per due
+  casi su tre).
 - **Il ripiego vale per la famiglia da SOLA, non solo in coppia (#444).** Finché
   il ripiego esisteva solo dentro i rami "media + link" e "immagine + link", lo
   stesso identico pixel dava due esiti opposti a seconda dello strato che vinceva
