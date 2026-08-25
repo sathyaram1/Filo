@@ -223,7 +223,7 @@
   // che c'è qualcosa di nuovo da guardare, così l'apertura del menu resta
   // istantanea. Il conto vero lo fa la traduzione, che rilegge la pagina e
   // salta ciò che è già tradotto (nessun blocco pagato due volte).
-  function startWatchingNewContent() {
+  function startWatchingNewContent(extraRoots) {
     if (contentObserver || typeof MutationObserver !== 'function') return;
     try {
       contentObserver = new MutationObserver((muts) => {
@@ -234,7 +234,13 @@
           }
         }
       });
-      contentObserver.observe(document.documentElement || document, { childList: true, subtree: true });
+      const opts = { childList: true, subtree: true };
+      contentObserver.observe(document.documentElement || document, opts);
+      // I componenti aperti del sito sono alberi a parte: vanno sorvegliati uno
+      // per uno, o il testo che cambia lì dentro resterebbe invisibile.
+      for (const r of (extraRoots || [])) {
+        try { contentObserver.observe(r, opts); } catch (_) {}
+      }
     } catch (_) { contentObserver = null; }
   }
 
