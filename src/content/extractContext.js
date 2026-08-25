@@ -443,6 +443,10 @@
   // #439 ha reso traducibili.
   function findTranslatedElements() {
     const out = [];
+    // Etichette già tradotte (attributi): non sono elementi da ripristinare
+    // come i blocchi, ma vanno CONTATE — altrimenti la ripresa dice "tradotti
+    // 10 su 12" su una pagina dove ne mancano davvero due.
+    let attrCount = 0;
     const roots = [document];
     while (roots.length) {
       const r = roots.pop();
@@ -450,10 +454,12 @@
       try { list = r.querySelectorAll('*'); } catch (_) { continue; }
       for (const el of list) {
         if (el.dataset && el.dataset.snTranslated) out.push(el);
+        const done = el.dataset && el.dataset.snTranslatedAttrs;
+        if (done) attrCount += done.split(',').filter(Boolean).length;
         if (el.shadowRoot) roots.push(el.shadowRoot);
       }
     }
-    return out;
+    return Object.assign(out, { attrCount });
   }
 
   function pageMeta() {
