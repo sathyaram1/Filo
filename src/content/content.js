@@ -698,10 +698,14 @@
       linkEl,
       imgEl,
       mediaEl,
+      // I tre `*Under` escono da qui GIÀ VAGLIATI: `sameSurface` li ha confrontati
+      // con l'elemento davvero cliccato, e chi legge questi campi più a valle non
+      // deve rifare il controllo (né può dimenticarselo — è così che la barra
+      // fissa e il manto invisibile erano finiti nel menu).
       mediaUnder,
       // Cercati solo se non sono già fra gli antenati.
-      imgUnder: imgEl ? null : findUnder(stack, 'img'),
-      linkUnder: linkEl ? null : findUnder(stack, 'a[href]'),
+      imgUnder: imgEl ? null : findUnder(stack, 'img', target),
+      linkUnder: linkEl ? null : findUnder(stack, 'a[href]', target),
       editable: isEditable(target),
     };
   }
