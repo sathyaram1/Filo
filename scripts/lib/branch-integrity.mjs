@@ -351,6 +351,10 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     return { ok: false, kind: 'permanent', message: `"${branch}" è la linea principale, non un ramo di lavoro` };
   }
   if (!g(['rev-parse', '--git-dir']).ok) return { ok: false, kind: 'transient', message: 'la directory non è un repo git' };
+  // PRIMA di checkout e pulizia: da qui in poi le esclusioni del ramo di arrivo
+  // non decidono più la sorte dei marcatori di sessione (vedi il commento su
+  // SESSION_MARKERS). Best-effort: un fallimento non ferma la preparazione.
+  ensureSessionExcludes(root);
 
   if (create) {
     const wanted = base || mainBranch;
