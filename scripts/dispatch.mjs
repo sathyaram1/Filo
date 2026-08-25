@@ -43,13 +43,19 @@
 //   stata interrotta. Ogni --record-* ricalcola l'identità della directory e
 //   RIFIUTA la transizione se non corrisponde al branch assegnato.
 //
-// USO
+// USO (la stessa lista, per chi la chiede dal terminale: `--help`)
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
-//   node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> ["critica"]
-//   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"]
-//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
+//   node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
+//
+//   Nei --record-* il biglietto si rilegge dal promemoria (.claude/routine-ticket.json);
+//   `--ticket` è la scorta per quando il promemoria è andato perso.
+//   Un argomento NON riconosciuto è un errore d'uso (exit 1) senza effetti
+//   collaterali: il promemoria si cancella solo all'avvio dichiarato di un giro
+//   locale senza biglietto, mai davanti a un argomento storpiato.
 //
 //   Exit 0 → JSON su stdout (c'è lavoro). Exit 2 → niente da fare. Exit 1 → errore.
 //   Exit 3 → GUASTO: non si può lavorare in sicurezza (vedi ROUTINE-BRANCH-INTEGRITY.md §E).
@@ -612,7 +618,13 @@ export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDe
  */
 async function deliverToChannel(intent, data) {
   const ticket = readRoutineTicket(ROOT);
-  if (!ticket) return { outcome: 'absent' };
+  // Senza biglietto il server non viene nemmeno chiamato: dirlo con le parole
+  // di un server giù ha già mandato un worker a diagnosticare per mezz'ora un
+  // guasto di rete che non esisteva (25 agosto, verifica di #444).
+  if (!ticket) {
+    process.stderr.write('[dispatch] nessun biglietto trovato (né promemoria né --ticket): il server NON è stato chiamato\n');
+    return { outcome: 'absent', reason: 'biglietto non trovato' };
+  }
   try {
     const ch = await import('./routine-channel.mjs');
     const r = await ch.deliver(ticket, intent, data);
@@ -702,12 +714,17 @@ async function recordVerifier(id, verdict, critique) {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    // Biglietto introvabile ≠ server giù: sono due frasi diverse perché sono
+    // due rimedi diversi (ripassare il biglietto vs fermarsi).
+    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+  }
 
   if (sent.outcome !== 'ok') {
     // Il server non risponde. Non c'è più una seconda strada su cui posare il
     // verdetto: dirlo è l'unica cosa onesta, perché un verdetto che nessuno ha
     // registrato ma che il ramo dà per dato è peggio di un verdetto mancante.
-    return { rejected: true, fromChannel: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
   }
   sealTransition(next, `verifier:${verdict}`);
   return next;
@@ -725,9 +742,12 @@ async function recordFixed(id, report = '', frase = '') {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    return { rejected: true, ticketMissing: true, message: 'consegna non registrata: nessun biglietto trovato' };
+  }
 
   if (sent.outcome !== 'ok') {
-    return { rejected: true, fromChannel: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
+    return { rejected: true, serverDown: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
   }
   sealTransition(next, 'fixer:consegna');
   return next;
@@ -743,10 +763,22 @@ async function recordSecaudit(id, verdict) {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+  }
+  if (sent.outcome !== 'ok') {
+    // Simmetria con recordVerifier/recordFixed, che qui mancava: sigillare lo
+    // stato locale con un verdetto che il server non ha mai ricevuto è la
+    // divergenza permissiva che questa spec toglie — e il cancello di fusione
+    // legge il verdetto REGISTRATO, quindi un secaudit "sigillato ma non
+    // consegnato" bloccherebbe comunque la fusione, solo più tardi e senza dire
+    // perché.
+    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+  }
 
   sealTransition(next, `secaudit:${verdict}`);
-  // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
-  // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
+  // Il passaggio a `done` (o a `design` su bocciatura) lo fa il ruolo dopo il
+  // cancello di fusione.
   return next;
 }
 
@@ -846,6 +878,110 @@ export function channelRejectionText(message) {
     'La decisione NON è stata registrata da nessuna parte, e non va aggirata',
     'depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato',
     "vero e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati.",
+  ].join('\n');
+}
+
+/**
+ * Il server non risponde: rete giù o 5xx, DOPO i ritentativi automatici del
+ * canale. Prima questo caso usciva incorniciato da channelRejectionText — "il
+ * server ha guardato e ha detto no" sopra un server che non aveva risposto
+ * affatto — e con exit 4, mentre il contratto dei worker documenta da sempre
+ * exit 3 per il canale non raggiungibile. Testo e codice ora dicono la stessa
+ * cosa del contratto. PURA (testata in tests/unit/dispatch.test.mjs).
+ */
+export function serverDownText(message) {
+  return [
+    `[dispatch] CANALE NON RAGGIUNGIBILE: ${message}`,
+    'La decisione NON è stata registrata da nessuna parte. Lo script ha già',
+    'ritentato da solo prima di arrendersi: non ritentare a mano in loop, fermati.',
+    'Il lavoro riprende quando il canale torna.',
+  ].join('\n');
+}
+
+/**
+ * Il biglietto non si trova: né nel promemoria né passato con `--ticket`. Terza
+ * voce accanto a rejectionText e channelRejectionText, perché è un terzo caso:
+ * non un rifiuto del server, non un server giù — il server non è stato proprio
+ * chiamato. Il 25 agosto questo caso usciva travestito da "il server non
+ * risponde" E da "RIFIUTATO dal server" nella stessa schermata, due diagnosi
+ * false in una: il worker ha inseguito un guasto di rete inesistente e un'ora
+ * di verifica è andata persa. PURA (testata in tests/unit/dispatch.test.mjs).
+ */
+export function ticketMissingText(message) {
+  return [
+    `[dispatch] NESSUN BIGLIETTO: ${message}`,
+    'Il server NON è stato chiamato: senza biglietto la consegna non si può nemmeno',
+    'chiedere. Il promemoria (.claude/routine-ticket.json) non c\'è: se hai ancora il',
+    'codice del biglietto (è nelle istruzioni con cui sei partito), ripeti questo',
+    'comando aggiungendo `--ticket <codice>`. Se non ce l\'hai, rilascia e fermati.',
+  ].join('\n');
+}
+
+/**
+ * Questo valore ha la FORMA di un biglietto? PURA.
+ *
+ * Un biglietto vero lo genera il server: 32 byte casuali in base64url, 43
+ * caratteri (filo-security, functions/src/secrets.js). L'alfabeto base64url
+ * comprende il trattino, quindi un biglietto legittimo PUÒ cominciare con un
+ * trattino singolo (~1 su 64): rifiutare "tutto ciò che comincia con -"
+ * butterebbe via giri validi. Si valida invece la forma: solo alfabeto
+ * base64url, lunghezza da biglietto (soglia larga, per lasciare al server il
+ * margine di cambiare taglia), mai doppio trattino. Ogni flag esistente cade
+ * fuori: i `--…` per il doppio trattino, `-h` per la lunghezza — ed è così che
+ * un flag finito al posto del codice non può più sovrascrivere il promemoria.
+ */
+export function looksLikeTicket(v) {
+  const s = String(v || '');
+  return /^[A-Za-z0-9_-]{16,}$/.test(s) && !s.startsWith('--');
+}
+
+/**
+ * Estrae la coppia `--ticket <codice>` da una lista di argomenti. PURA.
+ *
+ * Serve ai `--record-*`: il biglietto normalmente si rilegge dal promemoria,
+ * ma se il promemoria è andato perso il worker deve poterlo ripassare a mano —
+ * il rilascio lo permette da sempre, e l'asimmetria è costata il verdetto di
+ * #444 (il worker aveva il biglietto in mano e nessun posto dove metterlo).
+ *
+ * @returns {{ args: string[], ticket: string, error: boolean }} `error` = flag
+ *   presente ma codice mancante o che non ha la forma di un biglietto (il
+ *   chiamante esce con un errore d'uso).
+ */
+export function stripTicketArg(list) {
+  const args = Array.isArray(list) ? [...list] : [];
+  const i = args.indexOf('--ticket');
+  if (i === -1) return { args, ticket: '', error: false };
+  const v = String(args[i + 1] || '').trim();
+  args.splice(i, 2);
+  if (!looksLikeTicket(v)) return { args, ticket: '', error: true };
+  return { args, ticket: v, error: false };
+}
+
+/**
+ * La schermata di `--help`. Esiste perché un worker l'ha chiesta davvero — e la
+ * versione di allora, che non la conosceva, ha risposto trattandolo da giro
+ * nuovo senza biglietto e cancellandogli il promemoria. Chi chiede aiuto deve
+ * ricevere aiuto, senza effetti collaterali. PURA.
+ */
+export function usageText() {
+  return [
+    'Uso: node scripts/dispatch.mjs <comando>',
+    '',
+    '  --ticket <biglietto>   avvia il giro: ritira il lavoro dal server, scrive il',
+    '                         promemoria del biglietto e avvia il battito',
+    '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
+    '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
+    '  --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]',
+    '  --record-fixed    <id> ["report"] [--frase "…"] [--ticket <b>]',
+    '  --record-secaudit <id> <pass|fail> [--ticket <b>]',
+    '  --clear-state     <id> rimuove la copia locale dello stato',
+    '  --help                 questa schermata',
+    '',
+    'Nei --record-* il biglietto si rilegge da solo dal promemoria',
+    '(.claude/routine-ticket.json): `--ticket` serve solo se il promemoria è perso.',
+    '',
+    'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
+    '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
   ].join('\n');
 }
 
@@ -1179,16 +1315,38 @@ if (isMainModule) {
   const argv = process.argv.slice(2);
   const flag = argv[0];
 
+  // I `--record-*` accettano `--ticket <codice>` come scorta: il promemoria
+  // resta la via maestra, ma se è andato perso il worker — che il codice ce
+  // l'ha nelle istruzioni di partenza — deve poterlo ripassare, come già può
+  // nel rilascio. La coppia si toglie PRIMA di leggere i posizionali, e il
+  // codice viaggia nell'ambiente: readTicket lo trova lì per primo.
+  const conBiglietto = (args) => {
+    const t = stripTicketArg(args);
+    if (t.error) { console.error('Uso: --ticket richiede il codice del biglietto subito dopo'); process.exit(1); }
+    if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
+    return t.args;
+  };
+  // I quattro esiti di un --record-* respinto: biglietto introvabile (esci 1:
+  // si rimedia ripassando il codice), canale non raggiungibile (3, come da
+  // contratto dei worker), rifiuto del server (4), guardia d'identità (3).
+  // Quattro testi diversi perché quattro rimedi diversi.
+  const esciRespinto = (s) => {
+    if (s.ticketMissing) { console.error(ticketMissingText(s.message)); process.exit(1); }
+    if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
+    console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
+    process.exit(s.fromChannel ? 4 : 3);
+  };
+
   try {
     if (flag === '--record-verifier') {
-      const [, id, verdict, ...rest] = argv;
+      const [, id, verdict, ...rest] = conBiglietto(argv);
       if (!id || !VERIFIER_VERDICTS.includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|migliorabile|fail> ["critica"]'); process.exit(1); }
       const s = await recordVerifier(id, verdict, rest.join(' '));
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount} migliorabile=${Number(s.improvableCount) || 0}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const [, id, ...rest] = argv;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"]'); process.exit(1); }
       // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
       // resto è il report per l'owner, che il server cifra.
@@ -1196,15 +1354,21 @@ if (isMainModule) {
       const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
       const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
       const s = await recordFixed(id, report, frase);
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
-      const [, id, verdict] = argv;
+      const [, id, verdict] = conBiglietto(argv);
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
       const s = await recordSecaudit(id, verdict);
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
+      process.exit(0);
+    } else if (flag === '--help' || flag === '-h') {
+      // Chi chiede aiuto riceve aiuto. La versione che non conosceva `--help`
+      // lo trattava da giro nuovo senza biglietto e gli cancellava il
+      // promemoria: è il comando che ha perso il verdetto di #444.
+      console.log(usageText());
       process.exit(0);
     } else if (flag === '--preflight') {
       // Prontezza: gira PRIMA del setup dell'ambiente (npm install, binario
@@ -1271,13 +1435,32 @@ if (isMainModule) {
       // consegne le fanno script diversi in momenti diversi, e pretendere che
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
       // provenienza dei feedback.
+      // Due sole forme legittime arrivano qui: NESSUN argomento (giro locale)
+      // o `--ticket <codice>` (giro col server). Tutto il resto — un flag
+      // storpiato, un `--ticket` senza codice — esce con un errore d'uso e NON
+      // tocca niente. Prima questa porta era anche quella degli argomenti
+      // sconosciuti: un `--help` battuto a metà lavoro veniva letto come "giro
+      // nuovo senza biglietto" e cancellava il promemoria — il verdetto di
+      // un'ora di verifica (#444) non si è più potuto registrare.
       const ti = argv.indexOf('--ticket');
-      const ticket = ti !== -1 ? argv[ti + 1] : '';
+      const ticket = ti !== -1 ? String(argv[ti + 1] || '') : '';
+      // Il codice deve avere la FORMA di un biglietto (looksLikeTicket): un
+      // flag finito al posto del codice (`--foo`, `-h`) qui sovrascriveva il
+      // promemoria del giro in corso — stessa regola dei --record-*.
+      if (ti !== -1 && !looksLikeTicket(ticket)) {
+        console.error('Uso: node scripts/dispatch.mjs --ticket <biglietto> (vedi --help). Il valore ricevuto non ha la forma di un biglietto. Niente è stato toccato.');
+        process.exit(1);
+      }
+      const estranei = argv.filter((a, i) => ti === -1 || (i !== ti && i !== ti + 1));
+      if (estranei.length) {
+        console.error(`[dispatch] argomento non riconosciuto: ${estranei[0]} (vedi --help). Niente è stato toccato: promemoria e battito restano come sono.`);
+        process.exit(1);
+      }
       // Il biglietto viene messo dove chi consegna lo ritrova da solo: le
       // consegne le fanno script diversi, in momenti diversi, e pretendere che
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
-      // provenienza dei feedback. Un giro senza biglietto cancella il
-      // marcatore, o quello del giro prima sopravvivrebbe a questo.
+      // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
+      // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo 30 minuti di silenzio e la suite completa in cloud ne dura 37,

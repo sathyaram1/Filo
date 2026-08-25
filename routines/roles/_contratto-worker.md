@@ -61,3 +61,8 @@ proseguire, dichiaralo nel rilascio invece di lasciare il lavoro appeso.
   (pochi tentativi, attese brevi) prima di arrendersi: quando esce con 3 il
   canale è giù davvero. Non ritentare a mano in loop: fermati. Il lavoro
   riprende quando il canale torna.
+- **exit 1 con "NESSUN BIGLIETTO"**: il server non è stato nemmeno chiamato —
+  il promemoria del biglietto non si trova più. Non è un guasto del server e
+  non è un rifiuto: ripeti lo stesso comando aggiungendo `--ticket <codice>`
+  (il codice è nelle istruzioni con cui sei partito). Se non ce l'hai più,
+  rilascia e fermati.

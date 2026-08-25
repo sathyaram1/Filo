@@ -301,7 +301,7 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
 
   try {
     await new Promise((fine) => {
-      const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--ticket', 'biglietto-vivo'], {
+      const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--ticket', 'biglietto-vivo-con-la-forma-vera'], {
         cwd: casa,
         env: {
           ...process.env,
