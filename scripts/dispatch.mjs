@@ -724,7 +724,7 @@ async function recordVerifier(id, verdict, critique) {
     // Il server non risponde. Non c'è più una seconda strada su cui posare il
     // verdetto: dirlo è l'unica cosa onesta, perché un verdetto che nessuno ha
     // registrato ma che il ramo dà per dato è peggio di un verdetto mancante.
-    return { rejected: true, fromChannel: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
   }
   sealTransition(next, `verifier:${verdict}`);
   return next;
