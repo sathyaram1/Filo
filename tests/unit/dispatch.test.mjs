@@ -584,11 +584,15 @@ test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il 
     assert.ok(existsSync(ticketFile(sandbox)), 'un --ticket monco non deve cancellare il promemoria');
     assert.equal(readFileSync(ticketFile(sandbox), 'utf8').includes('biglietto-vivo'), true, 'il contenuto deve essere quello di prima');
 
-    // `--ticket --foo`: un flag non è un biglietto — errore d\'uso, promemoria intatto.
-    const flagComeCodice = lancia(['--ticket', '--foo']);
-    assert.equal(flagComeCodice.status, 1);
-    assert.equal(readFileSync(ticketFile(sandbox), 'utf8').includes('biglietto-vivo'), true,
-      'un flag scambiato per biglietto non deve sovrascrivere il promemoria');
+    // Un flag al posto del codice (`--foo`, e anche `-h` a trattino singolo,
+    // che è il caso trovato dalla verifica indipendente): errore d\'uso,
+    // promemoria intatto.
+    for (const finto of ['--foo', '-h']) {
+      const flagComeCodice = lancia(['--ticket', finto]);
+      assert.equal(flagComeCodice.status, 1, `--ticket ${finto} deve essere un errore d'uso`);
+      assert.equal(readFileSync(ticketFile(sandbox), 'utf8').includes('biglietto-vivo'), true,
+        `un flag (${finto}) scambiato per biglietto non deve sovrascrivere il promemoria`);
+    }
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
   }
