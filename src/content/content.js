@@ -1263,12 +1263,13 @@
       // col suo overlay: il clic destro arriva all'overlay, quindi il <video>
       // non è fra gli antenati e finisce in `mediaUnder`. Per chi guarda è lo
       // stesso identico filmato dentro lo stesso identico link: il menu deve
-      // essere lo stesso del ramo qui sopra, overlay o non overlay. Un video di
-      // sfondo sotto a un link che non c'entra niente resta fuori da solo: non
-      // occupa la superficie di quello che si è cliccato, quindi `mediaUnder`
-      // arriva qui già vuoto.
-      if (mediaUnder) {
-        for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
+      // essere lo stesso del ramo qui sopra, overlay o non overlay. Solo se il
+      // filmato è DAVVERO quello della scheda, però: dentro il collegamento
+      // oppure a occuparne la superficie. Un video di sfondo che si ritrova per
+      // caso un link sopra non deve intrufolarsi nel menu di quel link.
+      const mediaInLink = belongsTo(mediaUnder, linkEl) ? mediaUnder : null;
+      if (mediaInLink) {
+        for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
       // Stessa storia per la copertina ferma: le schede la coprono quasi sempre
