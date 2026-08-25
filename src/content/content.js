@@ -1221,9 +1221,9 @@
       // Il collegamento non è sempre un antenato: nelle home dei siti video e
       // dei social l'anteprima che parte al passaggio del mouse si STENDE SOPRA
       // la scheda, e il link della scheda resta sotto (#444). Per chi guarda è
-      // la stessa identica scheda: se occupano lo stesso rettangolo, le voci del
-      // collegamento vanno messe lo stesso.
-      const link = linkEl || (sameCardArea(mediaEl, linkUnder) ? linkUnder : null);
+      // la stessa identica scheda, ed è `linkUnder` — che arriva qui solo se
+      // occupa la stessa superficie del filmato cliccato.
+      const link = linkEl || linkUnder;
       if (link) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(link)) items.push(it);
