@@ -1307,11 +1307,13 @@ if (isMainModule) {
     if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
     return t.args;
   };
-  // I tre esiti di un --record-* respinto: biglietto introvabile (esci 1: si
-  // rimedia ripassando il codice), rifiuto del server (4), guardia d'identità
-  // (3). Tre testi diversi perché tre rimedi diversi.
+  // I quattro esiti di un --record-* respinto: biglietto introvabile (esci 1:
+  // si rimedia ripassando il codice), canale non raggiungibile (3, come da
+  // contratto dei worker), rifiuto del server (4), guardia d'identità (3).
+  // Quattro testi diversi perché quattro rimedi diversi.
   const esciRespinto = (s) => {
     if (s.ticketMissing) { console.error(ticketMissingText(s.message)); process.exit(1); }
+    if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
     console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
     process.exit(s.fromChannel ? 4 : 3);
   };
