@@ -628,30 +628,58 @@
   // stesso identico pixel dà menu diversi a seconda di quale strato ha vinto in
   // quell'istante — con l'anteprima in funzione il menu era completo, e con
   // l'anteprima ferma restava vuoto.
-  function findUnder(stack, selector) {
+  function findUnder(stack, selector, anchor) {
     for (const el of stack) {
       const hit = closestAcrossShadow(el, selector);
-      if (hit) return hit;
+      if (hit && sameSurface(anchor, hit)) return hit;
     }
     return null;
   }
 
-  // Due elementi impilati sono "la stessa scheda" per chi guarda quando occupano
-  // lo stesso rettangolo: la copertina/filmato e il collegamento che la avvolge.
-  // Serve a tenere fuori il caso opposto — un video di sfondo a tutta pagina, o
-  // un link che passa di sotto per caso — dove i due rettangoli non hanno
-  // niente a che vedere l'uno con l'altro. Misura quanta parte del MEDIA cade
-  // dentro il link: metà basta (le copertine hanno bordi, ritagli, sfumature).
-  function sameCardArea(mediaEl, linkEl) {
-    if (!mediaEl || !linkEl) return false;
-    if (linkEl.contains?.(mediaEl)) return true;
-    const m = mediaEl.getBoundingClientRect?.();
-    const l = linkEl.getBoundingClientRect?.();
-    if (!m || !l || !(m.width > 0) || !(m.height > 0)) return false;
-    const w = Math.min(m.right, l.right) - Math.max(m.left, l.left);
-    const h = Math.min(m.bottom, l.bottom) - Math.max(m.top, l.top);
+  // Il freno di TUTTO ciò che si adotta da sotto.
+  //
+  // Guardare sotto al punto cliccato serve (le schede sono fatte di strati:
+  // copertina, anteprima, velo col titolo, e il collegamento sotto a tutto), ma
+  // quello che sta sotto lo si adotta solo quando è la stessa cosa che l'utente
+  // sta GUARDANDO. Altrimenti basta un elemento opaco davanti perché il menu
+  // parli di un collegamento invisibile: la barra fissa di un sito di notizie
+  // sotto cui sono scivolati i titoli, il riquadro dei cookie, o un manto che la
+  // pagina stende su tutta se stessa sotto al testo — e lì il collegamento lo
+  // sceglie la pagina, quindi «Copia URL», «Apri in nuova tab» e «Condividi»
+  // finirebbero su un indirizzo deciso da lei, con in più l'analisi del link che
+  // parte da sola e va a scaricarlo.
+  //
+  // Due condizioni, entrambe misurate sui rettangoli:
+  // 1. si sovrappongono davvero — l'intersezione copre almeno metà del più
+  //    piccolo dei due (un incrocio d'angolo fra una barra laterale e una riga
+  //    di testo non è una sovrapposizione);
+  // 2. nessuno dei due sfora l'altro DA TUTTE LE PARTI. Un velo che sta dentro
+  //    l'ingombro della scheda — la sfumatura sul titolo di una copertina — è
+  //    allineato con lei su almeno un lato e passa; una barra fissa, un riquadro
+  //    modale o un manto steso sulla pagina inghiottono quello che coprono da
+  //    ogni lato, e non passano.
+  const SURFACE_SLACK_PX = 4;
+
+  function engulfs(outer, inner) {
+    return outer.left < inner.left - SURFACE_SLACK_PX
+      && outer.top < inner.top - SURFACE_SLACK_PX
+      && outer.right > inner.right + SURFACE_SLACK_PX
+      && outer.bottom > inner.bottom + SURFACE_SLACK_PX;
+  }
+
+  function sameSurface(a, b) {
+    if (!a || !b) return false;
+    const ra = a.getBoundingClientRect?.();
+    const rb = b.getBoundingClientRect?.();
+    if (!ra || !rb) return false;
+    const areaA = ra.width * ra.height;
+    const areaB = rb.width * rb.height;
+    if (!(areaA > 0) || !(areaB > 0)) return false;
+    const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+    const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
     if (w <= 0 || h <= 0) return false;
-    return (w * h) >= (m.width * m.height) / 2;
+    if ((w * h) * 2 < Math.min(areaA, areaB)) return false;
+    return !engulfs(ra, rb) && !engulfs(rb, ra);
   }
 
   // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre
