@@ -682,3 +682,50 @@ test('il testo comparso dopo torna in inglese con tutto il resto', async ({ app,
   await expect(page.locator('#r0')).toHaveText('First row of the feed, written in English.');
   await expect.poll(() => translatedCount(page)).toBe(0);
 });
+
+// Stesso caso, ma il contenuto nuovo arriva DENTRO un componente del sito
+// (#439 + #407): una sentinella che guarda solo il documento non vede oltre il
+// confine del componente, e sui siti a componenti è proprio lì che il contenuto
+// cambia.
+const SHADOW_FEED = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A page whose feed lives inside a component</h1>
+  <feed-card></feed-card>
+  <script>
+    customElements.define('feed-card', class extends HTMLElement {
+      connectedCallback() {
+        const r = this.attachShadow({ mode: 'open' });
+        r.innerHTML = '<div id="fTitle">Headline living inside a component</div><div id="fRows"></div>';
+        window.__addShadowRows = (n) => {
+          const rows = r.getElementById('fRows');
+          for (let i = 0; i < n; i++) {
+            const d = document.createElement('div');
+            d.id = 'srow' + i;
+            d.textContent = 'Component row ' + i + ' that arrived after the translation.';
+            rows.appendChild(d);
+          }
+        };
+      }
+    });
+  </script>
+</body></html>`;
+
+test('anche il testo che arriva dentro un componente del sito si può tradurre dopo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, SHADOW_FEED);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#fTitle')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+
+  await page.evaluate(() => window.__addShadowRows(3));
+  await expect(page.locator('#srow2')).toHaveText(/^Component row 2 /);
+
+  await page.locator('#plain').click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  await icon.click();
+
+  await expect(page.locator('#srow0')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect(page.locator('#srow2')).toHaveText(/^IT /, { timeout: 60000 });
+});

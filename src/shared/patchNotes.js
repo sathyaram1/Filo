@@ -21,7 +21,7 @@
       fixes: [
         'Sulle pagine lunghissime «Traduci la pagina» non dichiara più di aver finito mentre il fondo è ancora in lingua originale. Ti dice quanti blocchi ha tradotto, e dal tasto destro completi il resto senza rifare la parte già tradotta.',
         '«Traduci la pagina» ora traduce anche le scritte fuori dal testo: il grigio dentro i campi di ricerca, i suggerimenti che compaiono fermando il mouse, le descrizioni delle immagini e le voci dei menu a tendina. Prima restavano in inglese sotto la scritta «Pagina tradotta».',
-        'Sui siti che allungano la pagina mentre scorri, o che cambiano schermata senza ricaricare, il testo arrivato dopo la traduzione si traduce dal tasto destro con «Traduci il testo nuovo»: prima bisognava tornare all\'originale e rifare tutto da capo.',
+        'Se un sito allunga la pagina mentre scorri, o cambia schermata senza ricaricare, le righe arrivate dopo si traducono dal tasto destro con «Traduci il testo nuovo». Prima l\'unica strada era tornare all\'originale e rifare tutta la pagina da capo.',
       ],
     },
     {
