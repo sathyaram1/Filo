@@ -747,7 +747,7 @@ async function recordFixed(id, report = '', frase = '') {
   }
 
   if (sent.outcome !== 'ok') {
-    return { rejected: true, fromChannel: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
+    return { rejected: true, serverDown: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
   }
   sealTransition(next, 'fixer:consegna');
   return next;
