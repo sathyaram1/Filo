@@ -475,6 +475,91 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
   }
 });
 
+// ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
+//
+// Il 25 agosto un `--help` battuto a metà lavoro è finito nella porta "giro
+// nuovo senza biglietto", che ha cancellato il promemoria: il verdetto di
+// un'ora di verifica non si è più potuto registrare. Questi test inchiodano le
+// tre difese: argomenti sconosciuti inerti, `--help` vero, `--ticket` di
+// scorta sui --record-*, e un messaggio che non accusa più il server.
+
+test('stripTicketArg: estrae la coppia --ticket e lascia il resto', () => {
+  const r = stripTicketArg(['--record-verifier', 'ID1', 'pass', 'critica', '--ticket', 'abc123']);
+  assert.equal(r.ticket, 'abc123');
+  assert.equal(r.error, false);
+  assert.deepEqual(r.args, ['--record-verifier', 'ID1', 'pass', 'critica']);
+});
+
+test('stripTicketArg: senza flag non tocca niente', () => {
+  const r = stripTicketArg(['--record-fixed', 'ID1', 'report']);
+  assert.equal(r.ticket, '');
+  assert.equal(r.error, false);
+  assert.deepEqual(r.args, ['--record-fixed', 'ID1', 'report']);
+});
+
+test('stripTicketArg: flag senza codice (o seguito da un altro flag) è un errore', () => {
+  assert.equal(stripTicketArg(['--record-fixed', 'ID1', '--ticket']).error, true);
+  assert.equal(stripTicketArg(['--record-fixed', 'ID1', '--ticket', '--frase']).error, true);
+});
+
+test('ticketMissingText: indica il rimedio e NON accusa il server', () => {
+  const t = ticketMissingText('verdetto non registrato: nessun biglietto trovato');
+  assert.ok(t.includes('--ticket'), 'deve suggerire la scorta --ticket');
+  assert.ok(t.includes('NON è stato chiamato'), 'deve dire che il server non è stato interpellato');
+  assert.ok(!t.includes('non risponde'), 'niente diagnosi da server giù: era la frase che ha depistato il worker');
+  assert.ok(!t.includes('RIFIUTATO'), 'niente diagnosi da rifiuto: il server non ha visto niente');
+});
+
+test('usageText: elenca tutti i comandi, compresa la scorta --ticket', () => {
+  const u = usageText();
+  for (const c of ['--ticket', '--preflight', '--record-verifier', '--record-fixed', '--record-secaudit', '--clear-state', '--help']) {
+    assert.ok(u.includes(c), `la schermata di aiuto deve nominare ${c}`);
+  }
+});
+
+// I tre casi CLI che prima cancellavano il promemoria, eseguiti per davvero:
+// senza il fix questi assert sono rossi (il file sparisce).
+test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il promemoria', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { writeTicket, ticketFile } = await import('../../scripts/lib/routine-ticket.mjs');
+  const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
+  const sandbox = mkdtempSync(resolve(tmpdir(), 'filo-cli-'));
+  try {
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: sandbox,
+      FILO_TOOLS_ROOT: sandbox,
+      FILO_DISPATCH_STATE_DIR: resolve(sandbox, 'stato'),
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: '', // il promemoria su disco è l'oggetto del test
+    };
+    const lancia = (args) => spawnSync(process.execPath, [DISPATCH, ...args], { env, encoding: 'utf8' });
+
+    writeTicket(sandbox, 'biglietto-vivo');
+    assert.ok(existsSync(ticketFile(sandbox)));
+
+    // `--help`: risponde con la schermata, exit 0, promemoria intatto.
+    const aiuto = lancia(['--help']);
+    assert.equal(aiuto.status, 0);
+    assert.ok(String(aiuto.stdout).includes('--record-verifier'));
+    assert.ok(existsSync(ticketFile(sandbox)), '--help non deve cancellare il promemoria');
+
+    // Argomento sconosciuto: errore d\'uso, exit 1, promemoria intatto.
+    const storpio = lancia(['--hlep']);
+    assert.equal(storpio.status, 1);
+    assert.ok(String(storpio.stderr).includes('non riconosciuto'));
+    assert.ok(existsSync(ticketFile(sandbox)), 'un argomento storpiato non deve cancellare il promemoria');
+
+    // `--ticket` senza codice: errore d\'uso, exit 1, promemoria intatto.
+    const monco = lancia(['--ticket']);
+    assert.equal(monco.status, 1);
+    assert.ok(existsSync(ticketFile(sandbox)), 'un --ticket monco non deve cancellare il promemoria');
+    assert.equal(readFileSync(ticketFile(sandbox), 'utf8').includes('biglietto-vivo'), true, 'il contenuto deve essere quello di prima');
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
 test('cleanup STATE_DIR temporanea', () => {
   rmSync(TMP, { recursive: true, force: true });
   assert.ok(!existsSync(TMP));
