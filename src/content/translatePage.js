@@ -513,6 +513,6 @@
 
   global.SN_TRANSLATE_PAGE = {
     translatePage, restoreOriginal, hasTranslation,
-    isPartial, missing, total, buildRestoreOriginalItem,
+    isPartial, hasNewContent, canContinue, missing, total, buildRestoreOriginalItem,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
