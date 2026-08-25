@@ -265,6 +265,65 @@ function commitExists(g, sha) {
 }
 
 /**
+ * I marcatori di sessione: biglietto, battito, ruolo, identità attesa, stato
+ * locale. Vivono in `.claude/` DENTRO il progetto, quindi hanno due nemici che
+ * il `.gitignore` del ramo GIUSTO tiene a bada, ma quello di un ramo VECCHIO
+ * no: la pulizia della directory (che li spazza come file estranei) e il
+ * salvataggio automatico (che li committerebbe sul repo pubblico — e dentro il
+ * marcatore del biglietto c'è il biglietto).
+ *
+ * È già successo, il 25 agosto: il checkout di un ramo del 22 ha spazzato il
+ * marcatore del battito, nato il 23. La lista di esclusione che viaggia col
+ * ramo è vecchia quanto il ramo, per costruzione: ogni marcatore nuovo
+ * ripresenterebbe il problema.
+ */
+export const SESSION_MARKERS = Object.freeze([
+  '.claude/routine-ticket.json',
+  '.claude/routine-beat.json',
+  '.claude/routine-role.json',
+  '.claude/branch-expect.json',
+  '.claude/verify-local.json',
+  '.claude/routine-state/',
+]);
+
+/**
+ * Inchioda i marcatori di sessione in `info/exclude` del repo: la lista di
+ * esclusione LOCALE alla macchina, che vale su ogni ramo e ogni worktree e non
+ * viaggia mai in un commit. Con questa riga sia la pulizia sia il salvataggio
+ * automatico ignorano i marcatori QUALUNQUE sia l'età del ramo checkoutato —
+ * che è il punto: la protezione non deve dipendere da ciò che il ramo sa.
+ *
+ * Best-effort e idempotente: si chiama prima di ogni preparazione del branch,
+ * e se fallisce si prosegue (il comportamento torna quello di prima, non
+ * peggio).
+ */
+export function ensureSessionExcludes(root) {
+  const g = gitIn(root);
+  const common = g(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  if (!common.ok || !common.out) return false;
+  try {
+    const dir = resolve(common.out, 'info');
+    const file = resolve(dir, 'exclude');
+    const current = existsSync(file) ? readFileSync(file, 'utf8') : '';
+    const righe = current.split(/\r?\n/);
+    const mancanti = SESSION_MARKERS.filter((m) => !righe.includes(m));
+    if (!mancanti.length) return true;
+    mkdirSync(dir, { recursive: true });
+    const testa = current && !current.endsWith('\n') ? '\n' : '';
+    writeFileSync(file,
+      current + testa
+      + '# Marcatori di sessione Filo (scritti da scripts/lib/branch-integrity.mjs):\n'
+      + '# effimeri e locali alla macchina, non devono né finire in un commit né\n'
+      + '# essere spazzati dalla pulizia quando il ramo checkoutato è più vecchio di loro.\n'
+      + mancanti.join('\n') + '\n',
+      'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
  * Porta la directory `root` sul branch giusto, con il contenuto giusto.
  *
  * @param {object} o
