@@ -436,6 +436,7 @@
       const kids = [];
       const shadow = el.shadowRoot;
       if (shadow) {
+        if (shadowRoots.length < 500) shadowRoots.push(shadow);
         for (const c of shadow.children) kids.push(c);
       } else if (isClosedComponent(el)) {
         unreachable++;
