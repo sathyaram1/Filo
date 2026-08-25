@@ -17,6 +17,9 @@
     menu_translate_selection: 'Traduci',
     menu_show_original: 'Mostra originale',
     menu_resume_translation: 'Riprendi traduzione',
+    // Traduzione finita, ma il sito ha aggiunto altro testo dopo (scorrimento
+    // infinito, schermate che cambiano senza ricaricare).
+    menu_translate_new_content: 'Traduci il testo nuovo',
     menu_explain: 'Spiegazione',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
