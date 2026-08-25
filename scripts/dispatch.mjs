@@ -708,6 +708,11 @@ async function recordVerifier(id, verdict, critique) {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    // Biglietto introvabile ≠ server giù: sono due frasi diverse perché sono
+    // due rimedi diversi (ripassare il biglietto vs fermarsi).
+    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+  }
 
   if (sent.outcome !== 'ok') {
     // Il server non risponde. Non c'è più una seconda strada su cui posare il
