@@ -876,6 +876,74 @@ export function channelRejectionText(message) {
 }
 
 /**
+ * Il biglietto non si trova: né nel promemoria né passato con `--ticket`. Terza
+ * voce accanto a rejectionText e channelRejectionText, perché è un terzo caso:
+ * non un rifiuto del server, non un server giù — il server non è stato proprio
+ * chiamato. Il 25 agosto questo caso usciva travestito da "il server non
+ * risponde" E da "RIFIUTATO dal server" nella stessa schermata, due diagnosi
+ * false in una: il worker ha inseguito un guasto di rete inesistente e un'ora
+ * di verifica è andata persa. PURA (testata in tests/unit/dispatch.test.mjs).
+ */
+export function ticketMissingText(message) {
+  return [
+    `[dispatch] NESSUN BIGLIETTO: ${message}`,
+    'Il server NON è stato chiamato: senza biglietto la consegna non si può nemmeno',
+    'chiedere. Il promemoria (.claude/routine-ticket.json) non c\'è: se hai ancora il',
+    'codice del biglietto (è nelle istruzioni con cui sei partito), ripeti questo',
+    'comando aggiungendo `--ticket <codice>`. Se non ce l\'hai, rilascia e fermati.',
+  ].join('\n');
+}
+
+/**
+ * Estrae la coppia `--ticket <codice>` da una lista di argomenti. PURA.
+ *
+ * Serve ai `--record-*`: il biglietto normalmente si rilegge dal promemoria,
+ * ma se il promemoria è andato perso il worker deve poterlo ripassare a mano —
+ * il rilascio lo permette da sempre, e l'asimmetria è costata il verdetto di
+ * #444 (il worker aveva il biglietto in mano e nessun posto dove metterlo).
+ *
+ * @returns {{ args: string[], ticket: string, error: boolean }} `error` = flag
+ *   presente ma codice mancante (il chiamante esce con un errore d'uso).
+ */
+export function stripTicketArg(list) {
+  const args = Array.isArray(list) ? [...list] : [];
+  const i = args.indexOf('--ticket');
+  if (i === -1) return { args, ticket: '', error: false };
+  const v = String(args[i + 1] || '').trim();
+  args.splice(i, 2);
+  if (!v || v.startsWith('--')) return { args, ticket: '', error: true };
+  return { args, ticket: v, error: false };
+}
+
+/**
+ * La schermata di `--help`. Esiste perché un worker l'ha chiesta davvero — e la
+ * versione di allora, che non la conosceva, ha risposto trattandolo da giro
+ * nuovo senza biglietto e cancellandogli il promemoria. Chi chiede aiuto deve
+ * ricevere aiuto, senza effetti collaterali. PURA.
+ */
+export function usageText() {
+  return [
+    'Uso: node scripts/dispatch.mjs <comando>',
+    '',
+    '  --ticket <biglietto>   avvia il giro: ritira il lavoro dal server, scrive il',
+    '                         promemoria del biglietto e avvia il battito',
+    '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
+    '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
+    '  --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]',
+    '  --record-fixed    <id> ["report"] [--frase "…"] [--ticket <b>]',
+    '  --record-secaudit <id> <pass|fail> [--ticket <b>]',
+    '  --clear-state     <id> rimuove la copia locale dello stato',
+    '  --help                 questa schermata',
+    '',
+    'Nei --record-* il biglietto si rilegge da solo dal promemoria',
+    '(.claude/routine-ticket.json): `--ticket` serve solo se il promemoria è perso.',
+    '',
+    'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
+    '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
+  ].join('\n');
+}
+
+/**
  * Emette un GUASTO: nessun lavoro consegnato, e il worker lo dice
  * all'orchestratore con la terza parola del vocabolario (`guasto`), che ferma
  * il giro senza travestirlo da giornata tranquilla.
