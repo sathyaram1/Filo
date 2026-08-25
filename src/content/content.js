@@ -1263,14 +1263,12 @@
       // col suo overlay: il clic destro arriva all'overlay, quindi il <video>
       // non è fra gli antenati e finisce in `mediaUnder`. Per chi guarda è lo
       // stesso identico filmato dentro lo stesso identico link: il menu deve
-      // essere lo stesso del ramo qui sopra, overlay o non overlay. Solo se il
-      // filmato è DAVVERO quello della scheda, però: un video di sfondo sotto a
-      // un link che non c'entra niente non deve intrufolarsi nel menu — ed è
-      // esattamente ciò che distingue `sameCardArea` (dentro il link, oppure
-      // sotto e con lo stesso rettangolo) da "un filmato qualsiasi lì sotto".
-      const mediaInLink = (mediaUnder && sameCardArea(mediaUnder, linkEl)) ? mediaUnder : null;
-      if (mediaInLink) {
-        for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
+      // essere lo stesso del ramo qui sopra, overlay o non overlay. Un video di
+      // sfondo sotto a un link che non c'entra niente resta fuori da solo: non
+      // occupa la superficie di quello che si è cliccato, quindi `mediaUnder`
+      // arriva qui già vuoto.
+      if (mediaUnder) {
+        for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
         items.push({ type: 'separator' });
       }
       // Stessa storia per la copertina ferma: le schede la coprono quasi sempre
@@ -1278,11 +1276,8 @@
       // destro arriva lì invece che sull'`<img>`. Se non c'è un filmato in
       // funzione, il contenuto della scheda è quell'immagine: le sue voci sono
       // quelle che l'utente cerca (#444).
-      const imgInLink = (!mediaInLink && imgUnder && sameCardArea(imgUnder, linkEl))
-        ? imgUnder
-        : null;
-      if (imgInLink) {
-        for (const it of buildImageActionItems(imgInLink)) items.push(it);
+      if (!mediaUnder && imgUnder) {
+        for (const it of buildImageActionItems(imgUnder)) items.push(it);
         items.push({ type: 'separator' });
       }
       for (const it of buildLinkActionItems(linkEl)) items.push(it);
