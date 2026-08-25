@@ -82,7 +82,8 @@
       // tornano dall'estrazione (vengono saltati alla fonte) e non vanno
       // rimandati al modello — sarebbe testo pagato due volte. Qui servono solo
       // a dare i totali giusti a chi legge l'avviso (#408).
-      const already = Extract.findTranslatedElements().length;
+      const done = Extract.findTranslatedElements();
+      const already = done.length + Number(done.attrCount || 0);
       const units = [];
       for (const b of blocks) {
         if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
@@ -90,6 +91,13 @@
         // Se tolti i segnaposto non resta testo, non c'è nulla da tradurre.
         if (!hasTranslatableText(templated)) continue;
         units.push({ el: b.el, templated, refs });
+      }
+      // Etichette (placeholder, suggerimenti, descrizioni delle immagini, voci
+      // dei menu a tendina): stessa coda di lavoro, si applicano scrivendo
+      // l'attributo invece di sostituire i figli.
+      for (const a of (blocks.attrs || [])) {
+        if (!a.el || !hasTranslatableText(a.text)) continue;
+        units.push({ el: a.el, attr: a.attr, templated: a.text, refs: [] });
       }
 
       if (!units.length) {
