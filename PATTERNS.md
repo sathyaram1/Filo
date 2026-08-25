@@ -600,6 +600,17 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
 
 - **Tre stati, non due**: assente / **parziale** / completa. Il menu offre azioni
   diverse nei tre casi ("Traduci" / "Riprendi traduzione" / "Mostra originale").
+- **Su una pagina viva, "completa" scade.** I siti che si allungano scorrendo e
+  quelli che cambiano schermata senza ricaricare aggiungono testo DOPO che il
+  lavoro si è dichiarato finito: se il menu in quello stato offre solo il ritorno
+  all'originale, l'unico modo di tradurre tre righe nuove è buttare (e ripagare)
+  l'intera pagina. Serve un quarto stato — **completa ma con roba nuova** → "Traduci
+  il testo nuovo" — che riusa la stessa ripresa. Accorgersene costa una
+  `MutationObserver` che alza soltanto un flag (l'apertura del menu deve restare
+  istantanea: niente scansioni lì dentro); il conto vero lo rifà la traduzione,
+  che rilegge la pagina e salta ciò che è già marcato. L'osservatore si **stacca
+  mentre traduciamo**, o scambierebbe le nostre sostituzioni per contenuto del
+  sito, e ignora la UI di Filo iniettata nella pagina (prefisso `sn-`).
 - **La ripresa non ripaga ciò che è già fatto**: i pezzi conclusi si marcano nel
   DOM (`data-sn-translated`) e si escludono **prima** di costruire le richieste,
   non dopo aver ricevuto la risposta. Escluderli dopo significa pagare due volte
