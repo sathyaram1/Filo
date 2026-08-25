@@ -437,6 +437,19 @@
 
   // Ripristina il testo originale annullando la traduzione di pagina.
   function restoreOriginal() {
+    stopWatchingNewContent();
+    newContentSeen = false;
+    // Etichette: rimettere il valore di prima, o togliere l'attributo se prima
+    // non c'era (le voci dei menu a tendina tornano a mostrare il loro testo).
+    for (let i = translatedAttrs.length - 1; i >= 0; i--) {
+      const { el, attr, had, original } = translatedAttrs[i];
+      try {
+        if (had) el.setAttribute(attr, original);
+        else el.removeAttribute(attr);
+        delete el.dataset.snTranslatedAttrs;
+      } catch (_) {}
+    }
+    translatedAttrs = [];
     // A ritroso: le unità annidate (es. un link dentro un paragrafo) tornano
     // originali prima del contenitore che le ospita.
     for (let i = translatedUnits.length - 1; i >= 0; i--) {
