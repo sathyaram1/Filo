@@ -341,7 +341,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
 
     const out = await new Promise((fine) => {
-      const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova'], {
+      const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova-con-la-forma-vera-di-un-biglietto'], {
         cwd: casa,
         env: {
           ...process.env,
@@ -530,7 +530,7 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
 
     await new Promise((fine) => {
       // NIENTE `FILO_REPO_ROOT`: è la condizione vera in cloud.
-      const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova'], {
+      const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova-con-la-forma-vera-di-un-biglietto'], {
         cwd: dove,
         env: {
           ...process.env,
