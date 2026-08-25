@@ -50,6 +50,7 @@ const {
   resolveRoutinesEnabled,
   routineFault,
   stripTicketArg,
+  looksLikeTicket,
   ticketMissingText,
   serverDownText,
   usageText,
