@@ -277,16 +277,27 @@
     return false;
   }
 
+  // Due motivi diversi di saltare un sottoalbero, e la differenza conta:
+  //  - `'tag'` → "qui dentro non c'è prosa" (uno script, un video, un campo di
+  //    testo). Il CONTENUTO non si tocca, ma l'elemento può esporre etichette
+  //    da leggere (il grigio di un campo, il suggerimento di un bottone): quelle
+  //    si traducono lo stesso.
+  //  - `'hard'` → "qui non si tocca niente", nemmeno le etichette: testo scritto
+  //    dall'utente, roba nascosta, `translate="no"`, la UI di Filo.
   function skipSubtreeForTranslation(el) {
     // Barriera 1 — tag noti non-prosa. Confronto INSENSIBILE al maiuscolo/minuscolo:
     // gli elementi dentro un SVG/MathML inline espongono tagName in minuscolo
     // (es. 'svg', 'style', 'text'), quindi un confronto secco contro 'SVG'/'STYLE'
     // non farebbe mai presa e il loro contenuto finirebbe tradotto.
-    if (TRANSLATE_SKIP_TAGS.has((el.tagName || '').toUpperCase())) return true;
+    if (TRANSLATE_SKIP_TAGS.has((el.tagName || '').toUpperCase())) return 'tag';
     // Barriera 2 — qualsiasi elemento fuori dal namespace HTML (SVG, MathML,
     // foreign content futuro): non è testo di pagina. Ferma l'intero sottoalbero
     // anche se un domani comparisse un tag radice non previsto nella lista sopra.
-    if (el.namespaceURI && el.namespaceURI !== HTML_NS) return true;
+    if (el.namespaceURI && el.namespaceURI !== HTML_NS) return 'tag';
+    return hardSkipForTranslation(el) ? 'hard' : false;
+  }
+
+  function hardSkipForTranslation(el) {
     if (el.isContentEditable) return true;                  // testo dell'utente
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
