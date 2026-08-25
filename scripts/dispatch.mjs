@@ -612,7 +612,13 @@ export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDe
  */
 async function deliverToChannel(intent, data) {
   const ticket = readRoutineTicket(ROOT);
-  if (!ticket) return { outcome: 'absent' };
+  // Senza biglietto il server non viene nemmeno chiamato: dirlo con le parole
+  // di un server giù ha già mandato un worker a diagnosticare per mezz'ora un
+  // guasto di rete che non esisteva (25 agosto, verifica di #444).
+  if (!ticket) {
+    process.stderr.write('[dispatch] nessun biglietto trovato (né promemoria né --ticket): il server NON è stato chiamato\n');
+    return { outcome: 'absent', reason: 'biglietto non trovato' };
+  }
   try {
     const ch = await import('./routine-channel.mjs');
     const r = await ch.deliver(ticket, intent, data);
