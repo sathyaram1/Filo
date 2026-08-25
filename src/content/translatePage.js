@@ -207,7 +207,64 @@
     } finally {
       progress.close();
       pageTranslating = false;
+      // Da qui in poi ogni testo che compare sulla pagina è del sito, non
+      // nostro: se ne arriva, il menu deve poterlo offrire in traduzione.
+      newContentSeen = false;
+      if (pageHasTranslation) startWatchingNewContent();
     }
+  }
+
+  // Sentinella del testo che il sito aggiunge DOPO (scorrimento infinito,
+  // schermate che cambiano senza ricaricare). Non estrae niente: segna soltanto
+  // che c'è qualcosa di nuovo da guardare, così l'apertura del menu resta
+  // istantanea. Il conto vero lo fa la traduzione, che rilegge la pagina e
+  // salta ciò che è già tradotto (nessun blocco pagato due volte).
+  function startWatchingNewContent() {
+    if (contentObserver || typeof MutationObserver !== 'function') return;
+    try {
+      contentObserver = new MutationObserver((muts) => {
+        if (newContentSeen) return;
+        for (const m of muts) {
+          for (const n of m.addedNodes) {
+            if (looksLikeNewText(n)) { newContentSeen = true; return; }
+          }
+        }
+      });
+      contentObserver.observe(document.documentElement || document, { childList: true, subtree: true });
+    } catch (_) { contentObserver = null; }
+  }
+
+  function stopWatchingNewContent() {
+    if (!contentObserver) return;
+    try { contentObserver.disconnect(); } catch (_) {}
+    contentObserver = null;
+  }
+
+  // Nodo appena comparso che vale la pena offrire in traduzione: ha del testo
+  // con almeno una lettera, non è la UI di Filo (i nostri avvisi e menu vivono
+  // nella pagina) e non sta dentro un blocco che abbiamo già tradotto.
+  function looksLikeNewText(node) {
+    try {
+      if (!node) return false;
+      const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+      const text = node.nodeType === Node.TEXT_NODE ? (node.nodeValue || '') : (node.textContent || '');
+      if (text.trim().length < 2 || !HAS_LETTER.test(text)) return false;
+      if (isInsideFiloUi(el)) return false;
+      if (el.closest && el.closest('[data-sn-translated]')) return false;
+      return true;
+    } catch (_) { return false; }
+  }
+
+  function isInsideFiloUi(el) {
+    const own = Extract && typeof Extract.isFiloOwnUi === 'function' ? Extract.isFiloOwnUi : null;
+    if (!own) return false;
+    let cur = el;
+    for (let i = 0; cur && i < 8; i++) {
+      if (own(cur)) return true;
+      cur = cur.parentElement;
+    }
+    return false;
   }
 
   // Avviso di fine lavoro: "Pagina tradotta" solo se non è rimasto fuori niente.
