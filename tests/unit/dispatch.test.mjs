@@ -487,9 +487,25 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
 // tre difese: argomenti sconosciuti inerti, `--help` vero, `--ticket` di
 // scorta sui --record-*, e un messaggio che non accusa più il server.
 
+// Un biglietto dalla forma vera: 43 caratteri base64url, come li genera il
+// server (filo-security, functions/src/secrets.js).
+const BIGLIETTO_FINTO = '_LM6-W_KSOnJLA0Pj4aUpvd3fM3FWxU3SGolsBKLGAI';
+
+test('looksLikeTicket: accetta la forma vera (anche col trattino iniziale), rifiuta i flag', () => {
+  assert.equal(looksLikeTicket(BIGLIETTO_FINTO), true);
+  // base64url può cominciare con un trattino SINGOLO: un biglietto così è
+  // legittimo (~1 su 64) e rifiutarlo butterebbe via il giro.
+  assert.equal(looksLikeTicket('-' + BIGLIETTO_FINTO.slice(1)), true);
+  assert.equal(looksLikeTicket('-h'), false, 'un flag corto non è un biglietto');
+  assert.equal(looksLikeTicket('--foo'), false);
+  assert.equal(looksLikeTicket('--record-verifier'), false, 'doppio trattino = flag, anche se lungo');
+  assert.equal(looksLikeTicket(''), false);
+  assert.equal(looksLikeTicket('con spazi e roba'), false);
+});
+
 test('stripTicketArg: estrae la coppia --ticket e lascia il resto', () => {
-  const r = stripTicketArg(['--record-verifier', 'ID1', 'pass', 'critica', '--ticket', 'abc123']);
-  assert.equal(r.ticket, 'abc123');
+  const r = stripTicketArg(['--record-verifier', 'ID1', 'pass', 'critica', '--ticket', BIGLIETTO_FINTO]);
+  assert.equal(r.ticket, BIGLIETTO_FINTO);
   assert.equal(r.error, false);
   assert.deepEqual(r.args, ['--record-verifier', 'ID1', 'pass', 'critica']);
 });
@@ -501,9 +517,10 @@ test('stripTicketArg: senza flag non tocca niente', () => {
   assert.deepEqual(r.args, ['--record-fixed', 'ID1', 'report']);
 });
 
-test('stripTicketArg: flag senza codice (o seguito da un altro flag) è un errore', () => {
+test('stripTicketArg: flag senza codice, o con un flag al posto del codice, è un errore', () => {
   assert.equal(stripTicketArg(['--record-fixed', 'ID1', '--ticket']).error, true);
   assert.equal(stripTicketArg(['--record-fixed', 'ID1', '--ticket', '--frase']).error, true);
+  assert.equal(stripTicketArg(['--record-fixed', 'ID1', '--ticket', '-h']).error, true);
 });
 
 test('serverDownText: dice che il canale è giù, senza travestirsi da rifiuto', () => {
