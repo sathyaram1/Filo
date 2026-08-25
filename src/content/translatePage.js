@@ -390,6 +390,27 @@
     } catch (_) {}
   }
 
+  // Etichetta negli attributi: si scrive l'attributo e si tiene da parte com'era
+  // (e SE c'era: su una <option> senza etichetta esplicita l'attributo lo
+  // aggiungiamo noi, e il ritorno all'originale deve toglierlo, non lasciarne
+  // uno vuoto). Il testo del modello non viene mai interpretato come HTML:
+  // setAttribute scrive una stringa e basta.
+  function applyAttrTranslation(unit, text) {
+    const el = unit.el;
+    if (!el || unit.applied || !text) return;
+    try {
+      const attr = unit.attr;
+      const had = el.hasAttribute(attr);
+      const original = had ? el.getAttribute(attr) : null;
+      el.setAttribute(attr, text);
+      const marks = String(el.dataset.snTranslatedAttrs || '').split(',').filter(Boolean);
+      if (marks.indexOf(attr) < 0) marks.push(attr);
+      el.dataset.snTranslatedAttrs = marks.join(',');
+      unit.applied = true;
+      translatedAttrs.push({ el, attr, had, original });
+    } catch (_) {}
+  }
+
   // Trasforma i figli del blocco in segnaposto [[Lk]] preservandoli per il
   // rimontaggio. Restituisce { templated, refs } dove refs sono i NODI veri.
   function templateizeBlock(el) {
