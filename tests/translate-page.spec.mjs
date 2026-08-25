@@ -447,13 +447,16 @@ test('pagina più lunga del tetto: lo dice e la ripresa la finisce', async ({ ap
 
   // Precondizione: il primo giro si ferma al tetto, la coda resta in inglese.
   await expect.poll(() => translatedCount(page), { timeout: 120000 }).toBeGreaterThan(1000);
+  // Gli avvisi si leggono quando il primo giro ha FINITO. Leggerli al mille-esimo
+  // blocco vuol dire leggerli a lavoro in corso, e l'unico avviso sullo schermo
+  // è ancora quello di avanzamento.
+  await expect
+    .poll(async () => (await toasts(page)).join(' | ').includes('Riprendi dal tasto destro'), { timeout: 120000 })
+    .toBe(true);
   await expect(page.locator('#b2099')).toHaveText('Block number 2099 of this page.');
 
   // La bugia: mai "Pagina tradotta" con la coda ancora in lingua originale.
-  const t1 = await toasts(page);
-  expect(t1).not.toContain('Pagina tradotta');
-  // …e l'avviso dice come arrivare in fondo.
-  expect(t1.join(' | ')).toContain('Riprendi dal tasto destro');
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
 
   // Il menu offre di RIPRENDERE (non di buttare via i blocchi già tradotti).
   await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
