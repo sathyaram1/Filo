@@ -918,6 +918,24 @@ export function ticketMissingText(message) {
 }
 
 /**
+ * Questo valore ha la FORMA di un biglietto? PURA.
+ *
+ * Un biglietto vero lo genera il server: 32 byte casuali in base64url, 43
+ * caratteri (filo-security, functions/src/secrets.js). L'alfabeto base64url
+ * comprende il trattino, quindi un biglietto legittimo PUÒ cominciare con un
+ * trattino singolo (~1 su 64): rifiutare "tutto ciò che comincia con -"
+ * butterebbe via giri validi. Si valida invece la forma: solo alfabeto
+ * base64url, lunghezza da biglietto (soglia larga, per lasciare al server il
+ * margine di cambiare taglia), mai doppio trattino. Ogni flag esistente cade
+ * fuori: i `--…` per il doppio trattino, `-h` per la lunghezza — ed è così che
+ * un flag finito al posto del codice non può più sovrascrivere il promemoria.
+ */
+export function looksLikeTicket(v) {
+  const s = String(v || '');
+  return /^[A-Za-z0-9_-]{16,}$/.test(s) && !s.startsWith('--');
+}
+
+/**
  * Estrae la coppia `--ticket <codice>` da una lista di argomenti. PURA.
  *
  * Serve ai `--record-*`: il biglietto normalmente si rilegge dal promemoria,
@@ -926,7 +944,8 @@ export function ticketMissingText(message) {
  * #444 (il worker aveva il biglietto in mano e nessun posto dove metterlo).
  *
  * @returns {{ args: string[], ticket: string, error: boolean }} `error` = flag
- *   presente ma codice mancante (il chiamante esce con un errore d'uso).
+ *   presente ma codice mancante o che non ha la forma di un biglietto (il
+ *   chiamante esce con un errore d'uso).
  */
 export function stripTicketArg(list) {
   const args = Array.isArray(list) ? [...list] : [];
@@ -934,7 +953,7 @@ export function stripTicketArg(list) {
   if (i === -1) return { args, ticket: '', error: false };
   const v = String(args[i + 1] || '').trim();
   args.splice(i, 2);
-  if (!v || v.startsWith('--')) return { args, ticket: '', error: true };
+  if (!looksLikeTicket(v)) return { args, ticket: '', error: true };
   return { args, ticket: v, error: false };
 }
 
