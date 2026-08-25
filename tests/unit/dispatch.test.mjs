@@ -51,6 +51,7 @@ const {
   routineFault,
   stripTicketArg,
   ticketMissingText,
+  serverDownText,
   usageText,
 } = await import('../../scripts/dispatch.mjs');
 const { readRole } = await import('../../scripts/lib/routine-role.mjs');
