@@ -43,13 +43,19 @@
 //   stata interrotta. Ogni --record-* ricalcola l'identità della directory e
 //   RIFIUTA la transizione se non corrisponde al branch assegnato.
 //
-// USO
+// USO (la stessa lista, per chi la chiede dal terminale: `--help`)
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
-//   node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> ["critica"]
-//   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"]
-//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
+//   node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
+//
+//   Nei --record-* il biglietto si rilegge dal promemoria (.claude/routine-ticket.json);
+//   `--ticket` è la scorta per quando il promemoria è andato perso.
+//   Un argomento NON riconosciuto è un errore d'uso (exit 1) senza effetti
+//   collaterali: il promemoria si cancella solo all'avvio dichiarato di un giro
+//   locale senza biglietto, mai davanti a un argomento storpiato.
 //
 //   Exit 0 → JSON su stdout (c'è lavoro). Exit 2 → niente da fare. Exit 1 → errore.
 //   Exit 3 → GUASTO: non si può lavorare in sicurezza (vedi ROUTINE-BRANCH-INTEGRITY.md §E).
