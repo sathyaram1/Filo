@@ -757,10 +757,22 @@ async function recordSecaudit(id, verdict) {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+  }
+  if (sent.outcome !== 'ok') {
+    // Simmetria con recordVerifier/recordFixed, che qui mancava: sigillare lo
+    // stato locale con un verdetto che il server non ha mai ricevuto è la
+    // divergenza permissiva che questa spec toglie — e il cancello di fusione
+    // legge il verdetto REGISTRATO, quindi un secaudit "sigillato ma non
+    // consegnato" bloccherebbe comunque la fusione, solo più tardi e senza dire
+    // perché.
+    return { rejected: true, fromChannel: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+  }
 
   sealTransition(next, `secaudit:${verdict}`);
-  // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
-  // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
+  // Il passaggio a `done` (o a `design` su bocciatura) lo fa il ruolo dopo il
+  // cancello di fusione.
   return next;
 }
 
