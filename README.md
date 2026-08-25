@@ -1,5 +1,11 @@
 # Filo
 
+> **Non ancora pronto.** Questo repository è il dietro le quinte di un progetto
+> in costruzione, non un prodotto da usare. I documenti di trasparenza sono
+> incompleti e ci sono problemi di sicurezza noti in corso di risoluzione.
+> L'eseguibile è scaricabile perché lo sviluppo è pubblico, ma per ora provalo
+> solo per curiosità.
+
 Browser AI-native cross-device. Layer di interazione sopra il linguaggio
 naturale: la UI è un'accelerazione della conversazione, non l'opposto.
 
