@@ -377,8 +377,13 @@
   // costa una camminata nel DOM, niente richieste al modello.
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
-    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [] });
+    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], shadowRoots: [] });
     const out = [];
+    // Gli alberi separati dei componenti aperti incontrati per strada. Chi
+    // sorveglia il testo che arriva DOPO ne ha bisogno: una MutationObserver
+    // sul documento non vede dentro un componente, e sui siti a componenti è
+    // proprio lì che il contenuto cambia.
+    const shadowRoots = [];
     // Etichette negli attributi (#407): stessa camminata, lista separata —
     // si applicano scrivendo l'attributo, non sostituendo i figli.
     const attrs = [];
