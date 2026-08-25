@@ -29,6 +29,8 @@
   const SEP_RE = /\n?@@@\s*SN_SEP\s*@@@\n?/;
   const PLACEHOLDER_RE = /\[\[\s*L\s*(\d+)\s*\]\]/g;
 
+  const HAS_LETTER = /\p{L}/u;
+
   let pageTranslating = false;
   let pageHasTranslation = false;
   // Traduzione arrivata in fondo? Distinguere "completa" da "a metà" è ciò che
