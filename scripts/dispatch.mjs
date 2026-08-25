@@ -1444,10 +1444,11 @@ if (isMainModule) {
       // un'ora di verifica (#444) non si è più potuto registrare.
       const ti = argv.indexOf('--ticket');
       const ticket = ti !== -1 ? String(argv[ti + 1] || '') : '';
-      // Un "codice" che comincia con `--` è un flag finito nel posto sbagliato,
-      // non un biglietto: stessa regola di stripTicketArg sui --record-*.
-      if (ti !== -1 && (!ticket || ticket.startsWith('--'))) {
-        console.error('Uso: node scripts/dispatch.mjs --ticket <biglietto> (vedi --help). Niente è stato toccato.');
+      // Il codice deve avere la FORMA di un biglietto (looksLikeTicket): un
+      // flag finito al posto del codice (`--foo`, `-h`) qui sovrascriveva il
+      // promemoria del giro in corso — stessa regola dei --record-*.
+      if (ti !== -1 && !looksLikeTicket(ticket)) {
+        console.error('Uso: node scripts/dispatch.mjs --ticket <biglietto> (vedi --help). Il valore ricevuto non ha la forma di un biglietto. Niente è stato toccato.');
         process.exit(1);
       }
       const estranei = argv.filter((a, i) => ti === -1 || (i !== ti && i !== ti + 1));
