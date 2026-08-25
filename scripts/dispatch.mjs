@@ -1273,16 +1273,36 @@ if (isMainModule) {
   const argv = process.argv.slice(2);
   const flag = argv[0];
 
+  // I `--record-*` accettano `--ticket <codice>` come scorta: il promemoria
+  // resta la via maestra, ma se è andato perso il worker — che il codice ce
+  // l'ha nelle istruzioni di partenza — deve poterlo ripassare, come già può
+  // nel rilascio. La coppia si toglie PRIMA di leggere i posizionali, e il
+  // codice viaggia nell'ambiente: readTicket lo trova lì per primo.
+  const conBiglietto = (args) => {
+    const t = stripTicketArg(args);
+    if (t.error) { console.error('Uso: --ticket richiede il codice del biglietto subito dopo'); process.exit(1); }
+    if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
+    return t.args;
+  };
+  // I tre esiti di un --record-* respinto: biglietto introvabile (esci 1: si
+  // rimedia ripassando il codice), rifiuto del server (4), guardia d'identità
+  // (3). Tre testi diversi perché tre rimedi diversi.
+  const esciRespinto = (s) => {
+    if (s.ticketMissing) { console.error(ticketMissingText(s.message)); process.exit(1); }
+    console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
+    process.exit(s.fromChannel ? 4 : 3);
+  };
+
   try {
     if (flag === '--record-verifier') {
-      const [, id, verdict, ...rest] = argv;
+      const [, id, verdict, ...rest] = conBiglietto(argv);
       if (!id || !VERIFIER_VERDICTS.includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|migliorabile|fail> ["critica"]'); process.exit(1); }
       const s = await recordVerifier(id, verdict, rest.join(' '));
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount} migliorabile=${Number(s.improvableCount) || 0}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const [, id, ...rest] = argv;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"]'); process.exit(1); }
       // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
       // resto è il report per l'owner, che il server cifra.
@@ -1290,15 +1310,21 @@ if (isMainModule) {
       const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
       const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
       const s = await recordFixed(id, report, frase);
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
-      const [, id, verdict] = argv;
+      const [, id, verdict] = conBiglietto(argv);
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
       const s = await recordSecaudit(id, verdict);
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
+      process.exit(0);
+    } else if (flag === '--help' || flag === '-h') {
+      // Chi chiede aiuto riceve aiuto. La versione che non conosceva `--help`
+      // lo trattava da giro nuovo senza biglietto e gli cancellava il
+      // promemoria: è il comando che ha perso il verdetto di #444.
+      console.log(usageText());
       process.exit(0);
     } else if (flag === '--preflight') {
       // Prontezza: gira PRIMA del setup dell'ambiente (npm install, binario
