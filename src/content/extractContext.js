@@ -385,9 +385,13 @@
     let unreachable = 0;
     let truncated = 0;
     const room = () => out.length + attrs.length < maxBlocks;
-    const takeAttrs = (el) => {
+    const takeAttrs = (el, checkHard) => {
       const targets = attrTargetsOf(el);
       if (!targets) return;
+      // Solo se c'è davvero un'etichetta vale la pena pagare le barriere dure
+      // (fra cui getComputedStyle): la stragrande maggioranza degli elementi
+      // saltati è uno <script> o un pezzo di SVG, e esce alla riga sopra.
+      if (checkHard && hardSkipForTranslation(el)) return;
       for (const t of targets) {
         if (room()) attrs.push(t);
         else truncated++;
