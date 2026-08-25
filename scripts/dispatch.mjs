@@ -882,6 +882,23 @@ export function channelRejectionText(message) {
 }
 
 /**
+ * Il server non risponde: rete giù o 5xx, DOPO i ritentativi automatici del
+ * canale. Prima questo caso usciva incorniciato da channelRejectionText — "il
+ * server ha guardato e ha detto no" sopra un server che non aveva risposto
+ * affatto — e con exit 4, mentre il contratto dei worker documenta da sempre
+ * exit 3 per il canale non raggiungibile. Testo e codice ora dicono la stessa
+ * cosa del contratto. PURA (testata in tests/unit/dispatch.test.mjs).
+ */
+export function serverDownText(message) {
+  return [
+    `[dispatch] CANALE NON RAGGIUNGIBILE: ${message}`,
+    'La decisione NON è stata registrata da nessuna parte. Lo script ha già',
+    'ritentato da solo prima di arrendersi: non ritentare a mano in loop, fermati.',
+    'Il lavoro riprende quando il canale torna.',
+  ].join('\n');
+}
+
+/**
  * Il biglietto non si trova: né nel promemoria né passato con `--ticket`. Terza
  * voce accanto a rejectionText e channelRejectionText, perché è un terzo caso:
  * non un rifiuto del server, non un server giù — il server non è stato proprio
