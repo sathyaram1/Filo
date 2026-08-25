@@ -500,10 +500,11 @@
   function missing() { return missingCount; }
   function total() { return totalCount; }
 
-  // Voce etichettata "Mostra originale" da mostrare SOLO quando la traduzione è
-  // a metà: lì l'icona del menu serve per riprendere, ma chi vuole rinunciare
-  // deve comunque poter tornare indietro (se puoi aggiungere, devi poter
-  // togliere). A traduzione completa la voce non serve: la offre già l'icona.
+  // Voce etichettata "Mostra originale" da mostrare SOLO quando c'è ancora del
+  // lavoro da fare (traduzione a metà, o testo comparso dopo): lì l'icona del
+  // menu serve per continuare, ma chi vuole rinunciare deve comunque poter
+  // tornare indietro (se puoi aggiungere, devi poter togliere). A traduzione
+  // completa e ferma la voce non serve: la offre già l'icona.
   function buildRestoreOriginalItem() {
     const Icons = global.SN_ICONS;
     const icon = (Icons && typeof Icons.showOriginal === 'function') ? Icons.showOriginal(18) : undefined;
