@@ -489,6 +489,14 @@
   // "Mostra originale" (che butterebbe via anche la parte già tradotta e
   // pagata).
   function isPartial() { return pageHasTranslation && !pageComplete; }
+  // Traduzione completa, ma il sito ha aggiunto testo dopo: c'è ancora lavoro da
+  // fare e il menu deve offrirlo. Senza questo, l'unica strada era tornare
+  // all'originale e ripagare l'intera pagina per avere in italiano tre righe
+  // nuove.
+  function hasNewContent() { return pageHasTranslation && pageComplete && newContentSeen; }
+  // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
+  // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
+  function canContinue() { return isPartial() || hasNewContent(); }
   function missing() { return missingCount; }
   function total() { return totalCount; }
 
