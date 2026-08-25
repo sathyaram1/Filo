@@ -738,6 +738,7 @@
     extractMainTextNodes,
     extractTranslatableBlocks,
     findTranslatedElements,
+    isFiloOwnUi,
     pageMeta,
     pageExcerpt,
     extractInteractiveOutline,
