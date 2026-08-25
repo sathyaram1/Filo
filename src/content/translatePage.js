@@ -59,6 +59,9 @@
     // quanto il lavoro), un secondo riquadro identico sopra sarebbe solo rumore.
     if (pageTranslating) return;
     pageTranslating = true;
+    // Mentre lavoriamo la pagina la cambiamo noi: la sentinella del testo nuovo
+    // scambierebbe le nostre sostituzioni per contenuto del sito.
+    stopWatchingNewContent();
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
     const progress = Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
