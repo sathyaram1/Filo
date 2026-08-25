@@ -1244,9 +1244,9 @@
       // in un browser normale le due famiglie di voci compaiono insieme. Prima
       // il ramo immagine ritornava subito e le azioni sul link sparivano (#401).
       // Come per il filmato (#444), la copertina può anche essere STESA SOPRA il
-      // link della scheda invece che stargli dentro: se occupano lo stesso
-      // rettangolo è la stessa scheda, e le voci del collegamento restano.
-      const linkOfImg = linkEl || (sameCardArea(imgEl, linkUnder) ? linkUnder : null);
+      // link della scheda invece che stargli dentro: se occupa la stessa
+      // superficie è la stessa scheda, e le voci del collegamento restano.
+      const linkOfImg = linkEl || linkUnder;
       if (linkOfImg) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkOfImg)) items.push(it);
