@@ -63,16 +63,23 @@
     // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
     // Vedi src/shared/icons.js e src/styles/ICONS.md per la guida di stile.
     const I = (name) => Icons[name](18);
-    // Tre stati, non due (#408): senza traduzione → "Traduci"; con traduzione
-    // COMPLETA → "Mostra originale"; con traduzione interrotta a metà →
-    // "Riprendi traduzione", che completa solo i blocchi mancanti. Nello stato
-    // interrotto il ritorno all'originale resta raggiungibile come voce
-    // etichettata (vedi buildMenuItems in content.js).
+    // Quattro stati, non due: senza traduzione → "Traduci"; con traduzione
+    // COMPLETA e ferma → "Mostra originale"; con traduzione interrotta a metà
+    // (#408) → "Riprendi traduzione"; con traduzione completa ma testo comparso
+    // dopo (#407: scorrimento infinito, schermate che cambiano senza ricaricare)
+    // → "Traduci il testo nuovo". Negli ultimi due l'icona serve a CONTINUARE, e
+    // il ritorno all'originale resta raggiungibile come voce etichettata (vedi
+    // buildMenuItems in content.js). In tutti e due la traduzione completa solo
+    // ciò che manca: quel che è già tradotto non torna al modello.
     const partialTranslation = typeof Translate.isPartial === 'function' && Translate.isPartial();
-    const translateIcon = (Translate.hasTranslation() && !partialTranslation) ? I('showOriginal') : I('translate');
+    const newContent = typeof Translate.hasNewContent === 'function' && Translate.hasNewContent();
+    const continues = partialTranslation || newContent;
+    const translateIcon = (Translate.hasTranslation() && !continues) ? I('showOriginal') : I('translate');
     const translateLabel = partialTranslation
       ? I18n.t('menu_resume_translation')
-      : (Translate.hasTranslation() ? I18n.t('menu_show_original') : I18n.t('menu_global_translate'));
+      : newContent
+        ? I18n.t('menu_translate_new_content')
+        : (Translate.hasTranslation() ? I18n.t('menu_show_original') : I18n.t('menu_global_translate'));
     const isFs = !!(document.fullscreenElement || deps.isContentFullscreen());
     // Quando navState non è disponibile (es. menu aperto da flussi che non lo
     // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
