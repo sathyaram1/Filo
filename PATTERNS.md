@@ -562,6 +562,22 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   (mai perdere contenuto), e l'annullamento (`Mostra originale`) ripristina la
   **lista di nodi originali** tenuta in memoria, non una stringa HTML salvata in
   un attributo (che, con unità annidate, conterrebbe già la traduzione dei figli).
+- **Metà del testo che si legge non sta nel testo: sta negli ATTRIBUTI.** Il
+  grigio dentro un campo di ricerca (`placeholder`), il suggerimento che compare
+  fermando il mouse (`title`), la descrizione di un'immagine (`alt`),
+  l'etichetta di una voce di menu a tendina, `aria-label`. Lasciarli in lingua
+  originale sotto un avviso "Pagina tradotta" è la stessa bugia dei blocchi
+  saltati: si vede a occhio che il lavoro non è finito. La riga di confine è
+  **si legge / si rimanda indietro**: si traduce ciò che l'utente LEGGE, mai ciò
+  che il sito INVIA (`value` di un campo, voci di un `datalist`, `href`,
+  `name`). Corollario pratico: la voce di un menu a tendina si traduce
+  **scrivendo l'attributo `label`**, mai sostituendone il testo — il testo di una
+  `<option>` senza `value` è proprio ciò che il modulo invia, e il browser mostra
+  `label` quando c'è. Conseguenza sul filtro dei sottoalberi: "qui non c'è prosa"
+  (`script`, `video`, un campo di testo) e "qui non si tocca niente"
+  (`translate="no"`, nascosto, `contenteditable`, la UI di Filo) diventano **due
+  motivi diversi** di saltare: nel primo il contenuto resta intoccato ma le
+  etichette si traducono lo stesso.
 - **Il messaggio finale deve dire la verità**: "fatto" solo se tutte le unità sono
   state sostituite, "solo in parte" se qualcuna è rimasta indietro, e un avviso
   esplicito quando non c'è **niente** da tradurre — il silenzio fa ritentare
