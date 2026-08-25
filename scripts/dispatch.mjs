@@ -773,7 +773,7 @@ async function recordSecaudit(id, verdict) {
     // legge il verdetto REGISTRATO, quindi un secaudit "sigillato ma non
     // consegnato" bloccherebbe comunque la fusione, solo più tardi e senza dire
     // perché.
-    return { rejected: true, fromChannel: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
   }
 
   sealTransition(next, `secaudit:${verdict}`);
