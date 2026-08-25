@@ -214,7 +214,7 @@
       // Da qui in poi ogni testo che compare sulla pagina è del sito, non
       // nostro: se ne arriva, il menu deve poterlo offrire in traduzione.
       newContentSeen = false;
-      if (pageHasTranslation) startWatchingNewContent();
+      if (pageHasTranslation) startWatchingNewContent(watchRoots);
     }
   }
 
