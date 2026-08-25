@@ -1328,7 +1328,9 @@
     // E il collegamento da solo: un velo trasparente sopra una scheda-link basta
     // a far sparire «Apri in nuova tab», «Copia URL», «Salva link per dopo» e
     // «Condividi link». Non è un caso di nicchia — è come sono costruiti quasi
-    // tutti gli elenchi di schede, con o senza filmato (#444).
+    // tutti gli elenchi di schede, con o senza filmato (#444). Un velo, appunto:
+    // se davanti c'è una barra fissa, un riquadro modale o un manto steso sulla
+    // pagina, `linkUnder` è già stato scartato e qui non arriva niente.
     if (linkUnder) {
       for (const it of buildLinkActionItems(linkUnder)) items.push(it);
       items.push({ type: 'separator' });
