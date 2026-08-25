@@ -1298,9 +1298,10 @@
     if (mediaUnder) {
       for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
       // Scheda a strati: sopra un velo trasparente che non è né link né media,
-      // sotto il filmato e il link della scheda (#444). Se filmato e link
-      // occupano lo stesso rettangolo, il menu è quello della scheda intera.
-      if (sameCardArea(mediaUnder, linkUnder)) {
+      // sotto il filmato e il link della scheda (#444). Qui sono due cose prese
+      // entrambe da sotto: oltre al velo devono essere la stessa superficie
+      // anche fra loro, altrimenti il menu unirebbe due schede diverse.
+      if (sameSurface(mediaUnder, linkUnder)) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
         items.push({ type: 'separator' });
