@@ -44,6 +44,15 @@
   // Unità tradotte in questa sessione, con i NODI originali (non l'HTML): è ciò
   // che "Mostra originale" rimette al suo posto.
   let translatedUnits = [];
+  // Etichette tradotte (attributi), con il valore di prima — e se l'attributo
+  // prima non c'era affatto, per poterlo togliere invece di lasciarne uno finto.
+  let translatedAttrs = [];
+  // Testo arrivato DOPO che la traduzione si era dichiarata finita (#407): sui
+  // siti che allungano la pagina mentre si scorre, o che cambiano schermata
+  // senza ricaricare, è la normalità. Senza accorgersene, l'unico modo di
+  // averlo in italiano era tornare all'originale e ripagare tutta la pagina.
+  let newContentSeen = false;
+  let contentObserver = null;
 
   async function translatePage() {
     // Riclic mentre traduce: l'avviso "in corso" è già sullo schermo (dura
