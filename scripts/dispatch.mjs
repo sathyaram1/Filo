@@ -736,6 +736,9 @@ async function recordFixed(id, report = '', frase = '') {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    return { rejected: true, ticketMissing: true, message: 'consegna non registrata: nessun biglietto trovato' };
+  }
 
   if (sent.outcome !== 'ok') {
     return { rejected: true, fromChannel: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
