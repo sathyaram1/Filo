@@ -716,7 +716,7 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   l'opposta: **prendi ogni elemento che ha un text node come figlio DIRETTO** e
   scarta solo ciò che non è prosa (script/media/`pre`/`code`, campi di testo,
   `[translate="no"]`, `.notranslate`, `contenteditable`, elementi nascosti e la
-  UI di Filo stessa, riconoscibile dal prefisso di classe `sn-`). Così ogni
+  UI di Filo stessa, riconoscibile dal **marchio** che si mette da sé). Così ogni
   pezzo di testo appartiene a **una sola** unità (niente doppie sostituzioni) e
   anche il testo dentro i link diventa una unità sua invece di restare un
   segnaposto intoccato.
