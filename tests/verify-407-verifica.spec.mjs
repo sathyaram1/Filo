@@ -45,6 +45,9 @@ async function stubModel(app) {
       if (globalThis.__vDelay) await new Promise((r) => setTimeout(r, globalThis.__vDelay));
       const segs = chunk.split(/\n?@@@\s*SN_SEP\s*@@@\n?/);
       const S = '\n@@@SN_SEP@@@\n';
+      if (globalThis.__vMode === 'zulu-empty' && chunk.indexOf('ZULU') >= 0) {
+        return { text: '', model: 'm', provider: 'gemini', usage: {} };
+      }
       if (globalThis.__vMode === 'attr-injection') {
         // Modello ostile: prova a chiudere l'attributo e ad aprirne un altro.
         return {
