@@ -95,6 +95,18 @@
   background: color-mix(in srgb, var(--sn-accent) 12%, transparent);
   color: color-mix(in srgb, var(--sn-fg) 80%, var(--sn-accent));
 }
+/* Quando la pastiglia sa aprire la segnalazione diventa un bottone: stessa
+   forma, ma risponde al puntatore — l'utente deve capire che si clicca. */
+button.sn-mac-origin-link {
+  font-family: var(--sn-font);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+button.sn-mac-origin-link:hover {
+  background: color-mix(in srgb, var(--sn-accent) 22%, transparent);
+  border-color: var(--sn-accent);
+}
+button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
 .sn-mac-sha {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11.5px;
