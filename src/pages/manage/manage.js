@@ -931,6 +931,9 @@
       mgManage.hidden = true;
       closeSidebar();
       renderList();
+      // L'avviso delle fusioni appartiene ai soli Ricevuti: il pannello è lo
+      // stesso per le quattro schede-lista, quindi si ricontrolla qui.
+      applyMergeApprovalsVisibility();
     }
   }
 
