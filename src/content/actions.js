@@ -586,6 +586,7 @@
     const withDeepArrow = !!opts.withDeepArrow;
     return {
       type: 'inline',
+      subject: 'text',
       content: I18n.t('menu_explain_loading'),
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading', 'sn-menu-inline-explain');
@@ -636,6 +637,7 @@
   function buildInlineExplainImage(imgEl) {
     return {
       type: 'inline',
+      subject: 'image',
       content: I18n.t('menu_explain_loading'),
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
@@ -682,6 +684,7 @@
   function buildInlineExplainLink(linkEl) {
     return {
       type: 'inline',
+      subject: 'link',
       content: I18n.t('menu_link_loading'),
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');

@@ -549,3 +549,183 @@ test('un riquadro molto più grande sopra una scheda-link non si porta dietro le
 
   await expectNessunaVoceDelLink(menu);
 });
+
+// ---------------------------------------------------------------------------
+// La riga di un elenco di risultati: miniatura piccola a sinistra, titolo e tre
+// righe di descrizione a destra, il collegamento della riga steso sopra a
+// tutto. È la forma di mezzo web — pagine di risultati, feed, elenchi di
+// articoli — e per il freno geometrico era indistinguibile da una barra fissa
+// sopra un titolo sepolto: un rettangolo largo quanto la pagina che ne
+// circonda uno piccolo. Risultato: sulla miniatura partiva l'anteprima, ma il
+// tasto destro dava solo le quattro voci del collegamento e NIENTE comandi del
+// filmato — mentre la stessa identica riga con la miniatura dentro un
+// collegamento suo dava il menu completo. Misure del rilievo: riga larga 760,
+// miniatura alta 160 (sotto la soglia dove i comandi sparivano).
+// ---------------------------------------------------------------------------
+
+function rigaRisultatoHtml(linkHref, copertina) {
+  return `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+    <div id="riga" style="position:relative;width:760px;margin:24px;padding:12px;box-sizing:border-box;display:flex;gap:16px;align-items:flex-start">
+      ${copertina}
+      <div>
+        <h3 style="margin:0 0 8px">Il titolo del risultato</h3>
+        <p style="margin:0">Prima riga della descrizione del risultato.</p>
+        <p style="margin:0">Seconda riga della descrizione del risultato.</p>
+        <p style="margin:0">Terza riga della descrizione del risultato.</p>
+      </div>
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;display:block"></a>
+    </div>
+  </body></html>`;
+}
+
+const MINIATURA = 'width:284px;height:160px;flex:none';
+
+// Il centro della miniatura. Il clic non può passare dal locator: sopra c'è il
+// collegamento della riga, ed è proprio quello il punto della prova.
+async function centroDi(page, selector) {
+  return page.evaluate((sel) => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  }, selector);
+}
+
+test('riga di risultati con miniatura piccola: sull\'anteprima ci sono ANCHE i comandi del filmato', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, rigaRisultatoHtml(
+    'https://example.com/risultato',
+    `<video id="clip" src="/clip.mp4" style="${MINIATURA};background:#333"></video>`,
+  ));
+  const p = await centroDi(page, '#clip');
+  const menu = await rightClickAt(page, p.x, p.y);
+  await page.screenshot({ path: 'tests/.shots/context-menu-riga-risultato.png' }).catch(() => {});
+
+  for (const label of MEDIA_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+});
+
+test('riga di risultati: i comandi del filmato agiscono sul filmato, «Copia URL» sulla riga', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/risultato-url';
+  const page = await testServer.openReady(openTab, rigaRisultatoHtml(
+    linkHref,
+    `<video id="clip" src="/clip.mp4" style="${MINIATURA};background:#333"></video>`,
+  ));
+  const p = await centroDi(page, '#clip');
+  const menu = await rightClickAt(page, p.x, p.y);
+
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+test('riga di risultati, anteprima ferma: la miniatura dà le voci dell\'immagine e quelle della riga', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, rigaRisultatoHtml(
+    'https://example.com/risultato-fermo',
+    `<img id="cover" src="${PX}" style="${MINIATURA};background:#e07b39">`,
+  ));
+  const p = await centroDi(page, '#cover');
+  const menu = await rightClickAt(page, p.x, p.y);
+
+  for (const label of IMG_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+});
+
+// Il confine dall'altra parte, con la stessa identica forma: se sopra la
+// miniatura non c'è un velo ma un pannello OPACO, il filmato non si vede più e
+// il menu non deve parlarne.
+test('pannello opaco a forma di riga sopra una miniatura: niente comandi del filmato', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+    <div id="riga" style="position:relative;width:760px;margin:24px;padding:12px;box-sizing:border-box">
+      <video id="clip" src="/clip.mp4" style="${MINIATURA};background:#333"></video>
+      <div id="pannello" style="position:absolute;inset:0;background:#fffdf8">Iscriviti alla newsletter</div>
+    </div>
+  </body></html>`);
+  const p = await centroDi(page, '#clip');
+  const menu = await rightClickAt(page, p.x, p.y);
+
+  for (const label of MEDIA_LABELS) {
+    await expect(menu.getByText(label, { exact: false })).toHaveCount(0);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Il riquadro di spiegazione: sulla STESSA scheda deve parlare sempre della
+// stessa cosa. Prima cambiava argomento a seconda del punto cliccato — la parte
+// scoperta della copertina descriveva l'immagine, la fascia del titolo
+// centoventi pixel più in basso analizzava il collegamento, con le stesse
+// identiche voci-azione in tutti e due i punti. L'argomento è l'elemento
+// primario, cioè quello le cui voci aprono il menu.
+// ---------------------------------------------------------------------------
+
+// Scheda con la fascia del titolo DENTRO il collegamento, stesa sopra il fondo
+// della copertina.
+function schedaConFasciaHtml(linkHref, copertina) {
+  return `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="card" style="position:relative;width:344px;height:264px">
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;padding:12px;display:block;box-sizing:border-box">
+        ${copertina}
+        <span id="fascia" style="position:absolute;left:12px;right:12px;bottom:12px;height:56px;background:rgba(0,0,0,.75);color:#fff">Il titolo della scheda</span>
+      </a>
+    </div>
+  </body></html>`;
+}
+
+async function argomentoDelRiquadro(menu) {
+  const box = menu.locator('.sn-menu-inline');
+  await expect(box).toHaveCount(1);
+  return box.getAttribute('data-subject');
+}
+
+test('scheda con copertina ferma: il riquadro parla dell\'immagine da qualunque punto la si clicchi', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, schedaConFasciaHtml(
+    'https://example.com/scheda-argomento',
+    `<img id="cover" src="${PX}" style="width:100%;height:100%;background:#e07b39">`,
+  ));
+
+  // 1. La parte scoperta della copertina.
+  const menuCopertina = await openMenuOn(page, '#cover', { x: 160, y: 60 });
+  expect(await argomentoDelRiquadro(menuCopertina)).toBe('image');
+  await page.keyboard.press('Escape');
+
+  // 2. La fascia del titolo, centoventi pixel più in basso sulla STESSA
+  //    copertina: stesse voci-azione, quindi stesso argomento.
+  const p = await centroDi(page, '#fascia');
+  const menuFascia = await rightClickAt(page, p.x, p.y);
+  for (const label of IMG_LABELS) {
+    await expect(menuFascia.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  expect(await argomentoDelRiquadro(menuFascia)).toBe('image');
+});
+
+test('scheda a strati, velo fuori dal collegamento: il riquadro parla ancora dell\'immagine', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, copertinaNelLinkConStrisciaHtml(
+    'https://example.com/scheda-argomento-strati',
+    `<img id="cover" src="${PX}" style="width:100%;height:100%;background:#e07b39">`,
+  ));
+  const menu = await openMenuOn(page, '#striscia');
+  expect(await argomentoDelRiquadro(menu)).toBe('image');
+});
+
+// Sul filmato l'argomento è il collegamento (una spiegazione del filmato non
+// esiste) — e lo è in tutti e tre i modi di cliccare la scheda.
+test('scheda con anteprima: il riquadro parla del collegamento da qualunque punto', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, schedaConFasciaHtml(
+    'https://example.com/scheda-argomento-video',
+    '<video id="clip" src="/clip.mp4" style="width:100%;height:100%;background:#333"></video>',
+  ));
+
+  const menuClip = await openMenuOn(page, '#clip', { x: 160, y: 60 });
+  expect(await argomentoDelRiquadro(menuClip)).toBe('link');
+  await page.keyboard.press('Escape');
+
+  const p = await centroDi(page, '#fascia');
+  const menuFascia = await rightClickAt(page, p.x, p.y);
+  expect(await argomentoDelRiquadro(menuFascia)).toBe('link');
+});
