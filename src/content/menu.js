@@ -1200,7 +1200,8 @@
   global.SN_MENU = {
     open,
     close,
-    computePlacement,
+    computeCap,
+    computeOffset,
     openGenericSubmenu,
     openIconGridSubmenu,
     refreshIconRow,
