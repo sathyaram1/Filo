@@ -391,6 +391,10 @@ function loadScripts() {
   // caricano affatto (#405).
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
+  // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
+  // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
+  // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
+  try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
