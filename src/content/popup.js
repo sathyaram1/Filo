@@ -511,11 +511,12 @@
     document.documentElement.appendChild(root);
 
     const cleanupZoom = attachZoomCompensation(root);
-    position(root, anchor);
+    const pose = attachPose(root, anchor);
 
     const popup = {
       root,
       cleanupZoom,
+      pose,
       activePort: null,
       conversation: [],     // [{role, content}]
       action: null,         // ACTIONS.*
