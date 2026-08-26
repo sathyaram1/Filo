@@ -168,3 +168,143 @@ test('#500 se la spiegazione poi si accorcia il menu torna intero, senza barra',
   expect(g.menuTop).toBeGreaterThanOrEqual(0);
   await expect(menu).toBeVisible();
 });
+
+// --- lo scorrimento del menu si ferma dentro al menu -----------------------
+
+// Rende la spiegazione più alta della finestra: nessuna posa può farci stare il
+// menu, quindi diventa scorrevole.
+async function rendiScorrevole(page) {
+  await page.evaluate(() => {
+    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    box.style.minHeight = `${window.innerHeight + 600}px`;
+  });
+  await expect.poll(async () => (await geometria(page)).scorrevole, { timeout: 5000 }).toBe(true);
+}
+
+// Porta il puntatore sul menu e gira la rotella `giri` volte.
+async function rotellaSulMenu(page, giri, passo = 200) {
+  const c = await page.evaluate(() => {
+    const m = document.querySelector('.sn-menu').getBoundingClientRect();
+    return { x: Math.round(m.left + m.width / 2), y: Math.round(m.top + m.height / 2) };
+  });
+  await page.mouse.move(c.x, c.y);
+  for (let i = 0; i < giri; i++) await page.mouse.wheel(0, passo);
+}
+
+async function statoScorrimento(page) {
+  return page.evaluate(() => {
+    const m = document.querySelector('.sn-menu');
+    return {
+      menuAperto: !!m,
+      menuScrollTop: m ? Math.round(m.scrollTop) : -1,
+      inFondo: m ? (m.scrollTop + m.clientHeight >= m.scrollHeight - 2) : false,
+      paginaY: Math.round(window.scrollY),
+    };
+  });
+}
+
+test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non porta via il menu', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLunga());
+  const menu = await apriMenuSu(page, '#link');
+  await rendiScorrevole(page);
+
+  // Fino in fondo alla spiegazione.
+  await rotellaSulMenu(page, 20, 300);
+  await expect.poll(async () => (await statoScorrimento(page)).inFondo, { timeout: 5000 }).toBe(true);
+
+  const prima = await statoScorrimento(page);
+  expect(prima.menuScrollTop).toBeGreaterThan(0);
+
+  // Il colpo di troppo: col trackpad l'inerzia lo dà da sola. Il menu deve
+  // restare, e la pagina sotto non deve muoversi di un pixel.
+  await rotellaSulMenu(page, 4, 300);
+  await page.waitForTimeout(400);
+
+  const dopo = await statoScorrimento(page);
+  expect(dopo.menuAperto).toBe(true);
+  expect(dopo.paginaY).toBe(prima.paginaY);
+  await expect(menu).toBeVisible();
+
+  // E l'ultima voce si raggiunge davvero, scorrendo.
+  const ultima = menu.locator('.sn-menu-item').last();
+  await ultima.hover({ timeout: 3000 });
+  await ultima.click({ timeout: 3000 });
+  await expect(menu).toHaveCount(0);
+});
+
+// --- il pannello delle altre icone segue il menu ---------------------------
+
+// Apre la griglia "Altro…" dalla freccetta in cima al menu.
+async function apriPannelloIcone(page, menu) {
+  const freccetta = menu.locator('.sn-menu-row-overflow');
+  await expect(freccetta).toBeVisible();
+  await freccetta.click();
+  await expect(page.locator('.sn-menu-icon-grid')).toBeVisible();
+}
+
+// Dove sta la freccetta e dove sta il pannello che le è appeso.
+async function ancoraEPannello(page) {
+  return page.evaluate(() => {
+    const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
+    const freccetta = menu && menu.querySelector('.sn-menu-row-overflow');
+    const grid = document.querySelector('.sn-menu-icon-grid');
+    return {
+      menuTop: menu ? Math.round(menu.getBoundingClientRect().top) : null,
+      ancoraTop: freccetta ? Math.round(freccetta.getBoundingClientRect().top) : null,
+      pannelloTop: grid ? Math.round(grid.getBoundingClientRect().top) : null,
+      pannelloAperto: !!grid,
+    };
+  });
+}
+
+// Il pannello è rimasto appeso alla sua freccetta: la distanza fra i due è la
+// stessa di prima. Tolleranza di 2px, che è il subpixel dell'arrotondamento —
+// il difetto che stiamo escludendo vale decine di pixel (nella verifica: 180).
+function restaAttaccato(prima, dopo) {
+  const deriva = (dopo.pannelloTop - dopo.ancoraTop) - (prima.pannelloTop - prima.ancoraTop);
+  expect(dopo.pannelloAperto).toBe(true);
+  expect(Math.abs(deriva)).toBeLessThanOrEqual(2);
+}
+
+test('#500 la spiegazione fa scivolare il menu: il pannello delle altre icone scivola con lui', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLink());
+  const menu = await apriMenuSu(page, '#link');
+  await apriPannelloIcone(page, menu);
+
+  const prima = await ancoraEPannello(page);
+  expect(prima.pannelloAperto).toBe(true);
+
+  const cresciuto = await cresciOltreIlBordo(page, 40);
+  expect(cresciuto.error).toBeFalsy();
+  await attendiRientro(page);
+
+  const dopo = await ancoraEPannello(page);
+  // Il menu si è mosso davvero (senza, il resto non proverebbe niente)…
+  expect(dopo.menuTop).toBeLessThan(prima.menuTop);
+  // …e il pannello si è mosso con lui: stessa distanza dalla freccetta di prima.
+  expect(dopo.pannelloAperto).toBe(true);
+  expect(dopo.pannelloTop - dopo.ancoraTop).toBe(prima.pannelloTop - prima.ancoraTop);
+});
+
+test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e sparisce con lei', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLunga());
+  const menu = await apriMenuSu(page, '#link');
+  await rendiScorrevole(page);
+  await apriPannelloIcone(page, menu);
+
+  const prima = await ancoraEPannello(page);
+
+  // Uno scorrimento breve: la freccetta è ancora lì, il pannello la segue.
+  await page.evaluate(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 20; });
+  await expect.poll(async () => (await ancoraEPannello(page)).ancoraTop, { timeout: 3000 })
+    .toBeLessThan(prima.ancoraTop);
+  const durante = await ancoraEPannello(page);
+  expect(durante.pannelloAperto).toBe(true);
+  expect(durante.pannelloTop - durante.ancoraTop).toBe(prima.pannelloTop - prima.ancoraTop);
+
+  // Scorrimento lungo: la freccetta esce oltre il bordo alto. Il pannello non ha
+  // più niente a cui stare appeso e si chiude, invece di galleggiare da solo.
+  await page.evaluate(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)'); m.scrollTop = m.scrollHeight; });
+  await expect(page.locator('.sn-menu-icon-grid')).toHaveCount(0, { timeout: 3000 });
+  await expect(menu).toBeVisible();
+});
