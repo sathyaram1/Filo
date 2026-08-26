@@ -1,11 +1,16 @@
-// Feedback #500, superficie gemella del menu: il RIQUADRO DELLA RISPOSTA di
-// Filo — quello che si apre chiedendo di spiegare o tradurre — non ha
-// un'altezza definitiva quando viene posato. Filo lo posa mentre è ancora
-// vuoto, alto un paio di centinaia di pixel; poi la risposta arriva, il
-// riquadro cresce fino al suo tetto e nessuno lo rimisura. Aprendolo intorno a
-// metà schermo il fondo finisce sotto il bordo della finestra: la riga col
-// modello e il costo resta tagliata a metà e il campo dove si scrive la domanda
-// successiva finisce tutto fuori — la conversazione si interrompe lì.
+// Feedback #502 — il RIQUADRO DELLA RISPOSTA di Filo, quello che si apre
+// chiedendo di spiegare (Alt+E) o tradurre, non ha un'altezza definitiva quando
+// viene posato. Filo lo posa mentre è ancora vuoto, alto un paio di centinaia di
+// pixel; poi la risposta arriva, il riquadro cresce fino al suo tetto e nessuno
+// lo rimisura. Aprendolo nella metà bassa della finestra il fondo finisce sotto
+// il bordo: la riga col modello e il costo resta tagliata a metà e il campo dove
+// si scrive la domanda successiva finisce tutto fuori — la conversazione si
+// interrompe lì, e per rimediare bisogna chiudere tutto e rifare la selezione
+// più in alto nella pagina.
+//
+// Stesso difetto, stessa cura del menu del tasto destro (#500): la posa non è un
+// fatto solo, si ripete a ogni cambio d'altezza. Vedi PATTERNS.md § "Un riquadro
+// che si riempie dopo va rimisurato dopo".
 //
 // Questi spec asseriscono il SUCCESSO dal punto di vista di chi usa Filo: dopo
 // che la risposta è arrivata si riesce ancora a leggere la riga del modello e a
@@ -110,7 +115,7 @@ async function attendiRientro(page) {
 test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestra', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
-  await apriRiquadro(page, 0.5);
+  await apriRiquadro(page, SPAZIO_STRETTO);
   const prima = await geometria(page);
   expect(prima.error).toBeFalsy();
 
@@ -138,7 +143,7 @@ test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestr
 test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al cursore', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
-  const y = await apriRiquadro(page, 0.5);
+  const y = await apriRiquadro(page, SPAZIO_STRETTO);
   const prima = await geometria(page);
   await rispostaArriva(page);
   await attendiRientro(page);
@@ -156,7 +161,7 @@ test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al 
 test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
-  await apriRiquadro(page, 0.05);
+  await apriRiquadro(page, SPAZIO_LARGO);
   const prima = await geometria(page);
   await rispostaArriva(page);
   // Cresciuto per davvero, e senza essersi mosso di un pixel.
@@ -170,7 +175,7 @@ test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce',
 test('#500 la risposta si accorcia: il riquadro non si tiene addosso una barra che non serve', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
-  await apriRiquadro(page, 0.5);
+  await apriRiquadro(page, SPAZIO_STRETTO);
   await rispostaArriva(page, 40);
   await attendiRientro(page);
 
@@ -203,8 +208,10 @@ async function trascinaA(page, y) {
 test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più da solo', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
-  await apriRiquadro(page, 0.1);
-  const bersaglio = await page.evaluate(() => Math.round(window.innerHeight * 0.55));
+  await apriRiquadro(page, SPAZIO_LARGO);
+  // Lo si trascina dove il riquadro pieno NON ci starebbe: è lì che si vede se
+  // resta dove l'utente l'ha messo invece di scappare in su.
+  const bersaglio = await page.evaluate((s) => Math.max(8, Math.round(window.innerHeight - s)), SPAZIO_STRETTO);
   await trascinaA(page, bersaglio);
   const messo = await geometria(page);
   expect(Math.abs(messo.top - bersaglio)).toBeLessThanOrEqual(4);
@@ -255,7 +262,7 @@ test('#500 la finestra si accorcia sotto al riquadro: rientra e resta scrivibile
   const page = await paginaFresca(openTab);
   await portaInPrimoPiano(shell, page);
 
-  await apriRiquadro(page, 0.45);
+  await apriRiquadro(page, SPAZIO_LARGO);
   await rispostaArriva(page, 14);
   await attendiRientro(page);
   const prima = await geometria(page);
