@@ -595,7 +595,12 @@
   // Avviso di fine lavoro: "Pagina tradotta" solo se non è rimasto fuori niente.
   // Con dei componenti chiusi (#439) la stessa frase sarebbe una bugia, e la
   // versione onesta resta in vista più a lungo perché dice qualcosa di nuovo.
-  function doneToast(unreachable) {
+  // `framesLeft` viene prima: un riquadro incorporato rimasto in inglese è un
+  // rettangolo intero sullo schermo, mentre un componente chiuso è di solito un
+  // pezzetto. Quando ci sono tutti e due, la frase che conta è quella che
+  // manda l'utente a guardare la cosa più grande.
+  function doneToast(unreachable, framesLeft) {
+    if (framesLeft) return [I18n.t('toast_page_translated_partial_frame'), { duration: 7000 }];
     return unreachable
       ? [I18n.t('toast_page_translated_partial'), { duration: 7000 }]
       : [I18n.t('toast_page_translated')];
