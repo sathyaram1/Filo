@@ -543,6 +543,12 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // Contropartita di TRANSLATE_FRAMES: arriva a ogni riquadro della scheda e
+    // gli fa tradurre (o riportare all'originale) se stesso. { mode, runId }
+    FRAME_TRANSLATE: 'frame_translate',
+    // Contropartita di FRAME_TRANSLATE_DONE: arriva al SOLO frame principale e
+    // gli porta il resoconto di un riquadro. { runId, phase, frames, applied, left }
+    FRAME_TRANSLATE_REPORT: 'frame_translate_report',
     // Broadcast da background -> dashboard: lo stato live è cambiato
     // (nuovo timer, notifica, ecc.) e va re-renderizzato.
     FILO_LIVE_UPDATED: 'filo_live_updated',
