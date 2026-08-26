@@ -375,8 +375,6 @@
   // ribaltarlo sopra al punto cliccato.
   function placePopup(popup, opts) {
     const root = popup.root;
-    // Mentre l'utente lo trascina non gli si tocca niente.
-    if (popup.dragging) return;
     const vw = window.innerWidth, vh = window.innerHeight;
 
     // Trascinato a mano: la posa è sua e non si muove più. L'unico modo di
