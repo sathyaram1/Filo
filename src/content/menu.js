@@ -105,90 +105,22 @@
     });
   }
 
-  // Margine minimo fra il menu e i bordi della finestra.
-  const GAP = 8;
-
-  // Tetto d'altezza del menu, in px di LAYOUT (quelli che finiscono nello
-  // stile). `null` = ci sta tutto, nessun tetto e nessuna barra di scorrimento.
+  // Geometria condivisa col riquadro della risposta di Filo — l'altra
+  // superficie che cresce dopo essere stata posata. Vedi
+  // `src/shared/overlayPlacement.js`.
   //
-  // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
-  // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
-  // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
-  // aiuto — sarebbero irraggiungibili. Sopra una finestra normale la condizione
-  // è falsa e non cambia nulla.
-  //
-  // `scale` è il fattore della compensazione zoom: il menu è DISEGNATO scalato,
-  // quindi sullo schermo occupa `h * scale` — è quella l'altezza da confrontare
-  // col bordo, e il tetto va riportato in px di layout dividendo.
-  function computeCap({ h, vh, scale }) {
-    const s = (Number.isFinite(scale) && scale > 0) ? scale : 1;
-    if (h * s + 2 * GAP <= vh) return null;
-    return Math.max(96, vh - 2 * GAP) / s;
-  }
-
-  // Dove posare il menu. Pura — solo numeri, nessun DOM — così i casi limite
-  // (ribaltamento, ricrescita, bordi) si provano in unit test.
-  //
-  // - `visW`/`visH`: quanto il menu occupa DAVVERO sullo schermo (tetto e zoom
-  //   già applicati);
-  // - `from`: la posa attuale, passata solo quando il menu è GIÀ sullo schermo
-  //   e ha cambiato altezza. In quel caso non si ribalta — salterebbe via da
-  //   sotto il cursore mentre l'utente sta per cliccare — si scivola in su
-  //   quel tanto che basta a rientrare.
-  function computeOffset({ x, y, visW, visH, vw, vh, from }) {
-    let left = from ? from.left : x;
-    let top = from ? from.top : y;
-    if (left + visW + GAP > vw) left = vw - visW - GAP;
-    // Prima posa: se sotto il cursore non ci sta, il menu si apre verso l'alto.
-    if (!from && top + visH + GAP > vh) top = Math.max(GAP, y - visH);
-    // Ricrescita (e ultima rete della prima posa): scivola in su quanto basta.
-    if (top + visH + GAP > vh) top = vh - visH - GAP;
-    if (left < 4) left = 4;
-    if (top < 4) top = 4;
-    return { left, top };
-  }
-
-  // Fattore della compensazione zoom applicato a questo menu (1 se assente).
-  function readScale(el) {
-    const m = /scale\(\s*([0-9.]+)\s*\)/.exec((el.style && el.style.transform) || '');
-    const v = m ? parseFloat(m[1]) : 1;
-    return (Number.isFinite(v) && v > 0) ? v : 1;
-  }
+  // #405 — il tetto d'altezza serve anche dentro un riquadro incorporato, dove
+  // lo spazio verticale può essere meno dell'altezza del menu (un player alto
+  // 200px, un blocco commenti stretto): senza, il menu verrebbe tagliato e le
+  // voci in fondo — feedback, aiuto — sarebbero irraggiungibili.
+  const Place = global.SN_PLACE;
 
   // Posa il menu misurandolo ADESSO. `keep: true` = il menu è già sullo schermo
   // e ha cambiato altezza: si parte dalla posa corrente invece che dal cursore.
   function place(root, x, y, opts) {
     const keep = !!(opts && opts.keep);
-    // Il tetto messo da un giro precedente falserebbe la misura, e resterebbe
-    // addosso anche a un menu che nel frattempo si è ACCORCIATO (la spiegazione
-    // che sparisce quando non c'è niente da spiegare): si toglie, si misura
-    // l'altezza naturale, si rimette solo se serve ancora. Tutto nello stesso
-    // giro sincrono, quindi non si vede nessuno sfarfallio.
-    root.style.maxHeight = '';
-    root.style.overflowY = '';
-    root.style.overscrollBehavior = '';
-    const scale = readScale(root);
+    const { scale } = Place.applyCap(root);
     const vw = window.innerWidth, vh = window.innerHeight;
-
-    const cap = computeCap({ h: root.offsetHeight, vh, scale });
-    if (cap != null) {
-      root.style.maxHeight = `${cap}px`;
-      root.style.overflowY = 'auto';
-      // Lo scorrimento si ferma DENTRO il menu. Senza, arrivati in fondo alla
-      // spiegazione il giro di rotella successivo passa alla pagina: la pagina
-      // scorre, e uno scroll di pagina chiude il menu. Chi legge una
-      // spiegazione lunga fino in fondo perderebbe il menu proprio lì — col
-      // trackpad quasi sempre, perché l'inerzia continua da sola dopo che hai
-      // staccato le dita.
-      root.style.overscrollBehavior = 'contain';
-      // `max-height` morde il box scelto dal CSS: con `content-box` — il valore
-      // di partenza, e quello che si prende un menu dentro una pagina che non
-      // impone `box-sizing` — bordo e imbottitura restano FUORI dal conto, e il
-      // menu resta più alto del tetto quel tanto che basta a sforare comunque.
-      // La differenza si misura e si toglie.
-      const extra = root.offsetHeight - cap;
-      if (extra > 0) root.style.maxHeight = `${Math.max(48, cap - extra)}px`;
-    }
 
     let from = null;
     if (keep) {
