@@ -575,6 +575,16 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   si sono fatti vivi è ciò che fa dire "una parte è rimasta fuori" invece di
   "fatto". E se si può tradurre lì dentro si deve poter tornare indietro lì
   dentro: il ritorno all'originale passa parola con lo stesso giro.
+  **In un riquadro SENZA indirizzo il preload non entra affatto**, e questo si
+  scopre solo provandolo: un `iframe` vuoto riempito dalla pagina stessa
+  (`about:blank`, `srcdoc`) resta senza Filo dentro, e quasi tutti i riquadri
+  pubblicitari nascono così. Lì non c'è nessuno a cui passare parola e nessuno
+  che risponda, quindi due cose insieme: il documento lo legge chi ospita (è
+  della stessa origine e `contentDocument` si apre), e quel riquadro esce dal
+  conto di chi deve rispondere, o ogni pagina che ne ha uno si prenderebbe a
+  torto l'avviso "una parte è rimasta fuori". Entrare così vale SOLO per i
+  riquadri senza indirizzo: in quelli con un indirizzo vero il content script
+  c'è e traduce da sé, e leggerli anche da fuori è pagare due volte.
 
 Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
 diventa scorrevole invece di essere tagliato.
