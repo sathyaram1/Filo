@@ -751,8 +751,9 @@
       // deve rifare il controllo (né può dimenticarselo — è così che la barra
       // fissa e il manto invisibile erano finiti nel menu).
       mediaUnder,
-      // Cercati solo se non sono già fra gli antenati.
       imgUnder,
+      // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
+      // <a>) prima ancora della pila di strati.
       linkUnder: linkEl ? null : findLinkUnder(stack, target, mediaUnder || imgUnder),
       editable: isEditable(target),
     };
