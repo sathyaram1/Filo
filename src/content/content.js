@@ -631,7 +631,7 @@
   function findUnder(stack, selector, anchor) {
     for (const el of stack) {
       const hit = closestAcrossShadow(el, selector);
-      if (hit && sameSurface(anchor, hit)) return hit;
+      if (hit && sameSurface(anchor, hit, stack)) return hit;
     }
     return null;
   }
