@@ -103,6 +103,89 @@
     });
   }
 
+  // Geometria della posa del menu. Pura — solo numeri, nessun DOM — così i casi
+  // limite (ribaltamento, tetto d'altezza, ricrescita) si provano in unit test.
+  //
+  // - `w`/`h`: misure di layout del menu, prese SENZA il tetto di un giro
+  //   precedente (altrimenti si rimisura il tetto, non il contenuto);
+  // - `scale`: fattore della compensazione zoom. Il menu è disegnato scalato,
+  //   quindi sullo schermo occupa `h * scale`: è quella l'altezza da confrontare
+  //   col bordo della finestra;
+  // - `from`: la posa attuale, passata solo quando il menu è GIÀ sullo schermo e
+  //   sta cambiando altezza. In quel caso non si ribalta — il menu salterebbe
+  //   via da sotto il cursore mentre l'utente sta per cliccare — si scivola in
+  //   su quel tanto che basta a rientrare.
+  //
+  // Ritorna `maxHeight` in px di layout (quello che finisce nello stile), non in
+  // px di schermo.
+  function computePlacement({ x, y, w, h, vw, vh, scale, from }) {
+    const s = (Number.isFinite(scale) && scale > 0) ? scale : 1;
+    let maxHeight = null;
+    let visH = h * s;
+    // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
+    // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
+    // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
+    // aiuto — sarebbero irraggiungibili. Sopra una finestra normale non cambia
+    // nulla: la condizione è falsa.
+    if (visH + 16 > vh) {
+      const cap = Math.max(96, vh - 16);
+      maxHeight = cap / s;
+      visH = cap;
+    }
+    const visW = w * s;
+    let left = from ? from.left : x;
+    let top = from ? from.top : y;
+    if (left + visW + 8 > vw) left = vw - visW - 8;
+    // Prima posa: se sotto il cursore non ci sta, il menu si apre verso l'alto.
+    if (!from && top + visH + 8 > vh) top = Math.max(8, y - visH);
+    // Ricrescita (e ultima rete della prima posa): scivola in su quanto basta.
+    if (top + visH + 8 > vh) top = vh - visH - 8;
+    if (left < 4) left = 4;
+    if (top < 4) top = 4;
+    return { left, top, maxHeight };
+  }
+
+  // Fattore della compensazione zoom applicato a questo menu (1 se assente).
+  function readScale(el) {
+    const m = /scale\(\s*([0-9.]+)\s*\)/.exec((el.style && el.style.transform) || '');
+    const v = m ? parseFloat(m[1]) : 1;
+    return (Number.isFinite(v) && v > 0) ? v : 1;
+  }
+
+  // Posa il menu misurandolo ADESSO. `keep: true` = il menu è già sullo schermo
+  // e ha cambiato altezza: si parte dalla posa corrente invece che dal cursore.
+  function place(root, x, y, opts) {
+    const keep = !!(opts && opts.keep);
+    // Il tetto messo da un giro precedente falserebbe la misura, e resterebbe
+    // addosso anche a un menu che nel frattempo si è ACCORCIATO (la spiegazione
+    // che sparisce quando non c'è niente da spiegare): si toglie, si misura
+    // l'altezza naturale, si rimette solo se serve ancora. Tutto nello stesso
+    // giro sincrono, quindi non si vede nessuno sfarfallio.
+    root.style.maxHeight = '';
+    root.style.overflowY = '';
+    const h = root.offsetHeight;
+    const w = root.offsetWidth;
+    let from = null;
+    if (keep) {
+      const l = parseFloat(root.style.left);
+      const t = parseFloat(root.style.top);
+      if (Number.isFinite(l) && Number.isFinite(t)) from = { left: l, top: t };
+    }
+    const p = computePlacement({
+      x, y, w, h,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      scale: readScale(root),
+      from,
+    });
+    if (p.maxHeight != null) {
+      root.style.maxHeight = `${p.maxHeight}px`;
+      root.style.overflowY = 'auto';
+    }
+    root.style.left = `${p.left}px`;
+    root.style.top = `${p.top}px`;
+  }
+
   // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
   // - 'inline': sezione che mostra contenuto dinamico (es. spiegazione AI). { content?: string, onMount?: (el) => cleanup }
   // - 'paste': come 'item' ma con freccetta a destra che apre il sotto-menu della cronologia
