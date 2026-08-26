@@ -818,8 +818,8 @@ chiede, ma **spostare la decisione su una superficie diversa da quella da cui
 ## "Vai a guardare in quell'altro posto": quel posto deve accorgersene DA APERTO
 
 Quando una superficie manda l'utente su un'altra (il terminale che dice
-"approvala dalla prima schermata di Filo"), la seconda è quasi sempre **già
-aperta** — è la home del browser, la pagina di gestione lasciata lì. Se carica
+"approvala dalla dashboard di gestione"), la seconda è quasi sempre **già
+aperta** — la pagina di gestione lasciata lì in una scheda. Se carica
 il suo elenco solo all'apertura, l'avviso compare soltanto a chi pensa di
 riaprirla: cioè a nessuno. È successo il giorno stesso in cui l'indicazione è
 stata scritta.
@@ -859,23 +859,30 @@ stata scritta.
   `src/main/services/handlers.js`, `MSG.MERGE_APPROVALS_CHANGED`. Test:
   `tests/unit/mergeApprovalSignal.test.mjs`, `tests/merge-approvals.spec.mjs`.
 
-## Superficie owner in evidenza sulla home: una riga in più, accesa da una classe
+## Le cose che aspettano una decisione dell'owner stanno in UN posto: i Ricevuti
 
-Un avviso che deve stare **in cima alla prima schermata** ma esistere solo per
-una persona e solo ogni tanto non può costare niente a chi non ce l'ha. Il
-modo sbagliato è dichiarare la griglia a tre righe e lasciare l'elemento
-`hidden`: la traccia vuota è alta 0, ma **il `gap` fra le righe resta** e tutta
-la home scende di 24px per tutti.
+Le fusioni bloccate in attesa del via libera vivevano su DUE superfici — la
+prima schermata del browser e la pagina di gestione — con l'idea che "così
+l'owner le trova senza cercarle". La scelta dell'owner (2026-08-26) è stata
+l'opposta: la home di tutti i giorni non è il posto delle sue pratiche, e le
+cose che aspettano una sua decisione hanno GIÀ una casa — la scheda Ricevuti
+della dashboard di gestione, dove stanno i feedback da decidere.
 
-- **Regola:** la griglia di default non cambia; una classe sul contenitore
-  (`.dash--notice`) aggiunge la traccia e sposta le righe delle colonne, e la
-  mette il JS solo quando ha disegnato qualcosa. Per tutti gli altri il layout
-  è identico al byte precedente.
-- **Come si testa:** misura la posizione della colonna centrale *prima* e
-  *dopo* il caricamento a vuoto e pretendi che non si muova. Un assert
-  "l'elemento è nascosto" non vede lo slittamento.
-- **Dove:** `.dash-notice` / `.dash--notice` in `src/pages/dashboard/dashboard.css`,
-  `refreshMergeApprovals()` in `dashboard.js`.
+- **Regola:** una cosa da decidere si mette dove l'owner decide le altre, in
+  cima se è più urgente — non su una superficie in più "per visibilità". Due
+  posti per la stessa decisione sono rumore per uno dei due, e prima o poi i
+  due imparano cose diverse.
+- Il pannello dei Ricevuti è condiviso dalle quattro schede-lista: la
+  visibilità dell'avviso dipende da "c'è qualcosa" E "sei sulla scheda giusta",
+  e il cambio scheda riapplica la regola senza rileggere dal server.
+- L'avviso nomina la segnalazione da cui nasce il lavoro (`automazione ·
+  feedback #N`) e — vivendo già dentro la dashboard dei feedback — quel numero
+  è un bottone che la apre: "guarda cosa era stato chiesto" è il gesto che
+  serve prima di approvare.
+- **Dove:** `#mgMergeApprovals` dentro `panel-list` in
+  `src/pages/manage/manage.html`, `applyMergeApprovalsVisibility()` /
+  `openFeedbackByNum()` in `manage.js`, modulo `src/shared/mergeApprovals.js`.
+  Test: `tests/merge-approvals.spec.mjs`.
 
 ## Azione distruttiva: l'"Annulla" effimero non può essere l'UNICA rete
 

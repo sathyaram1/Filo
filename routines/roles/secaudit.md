@@ -66,7 +66,7 @@ server un verdetto raccontato non lo legge).
    - `10` → BLOCCATO (L5 sul diff) → `deliver status --status design
      --notes "<spiegazione>" --branch <branch> --reason secaudit`.
      Il ramo NON è perduto: il server apre una richiesta in attesa che l'owner
-     trova in cima alla dashboard di gestione, e da lì può dare il via libera
+     trova in cima ai Ricevuti della dashboard di gestione, e da lì può dare il via libera
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
    - `20` → conflitto → risolvi o accoda `design` (come sopra)

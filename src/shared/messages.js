@@ -398,8 +398,8 @@
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
-    // rientra nella finestra. Serve perché una prima schermata GIÀ APERTA se ne
-    // accorga: prima l'elenco si leggeva solo all'apertura, e l'avviso di cui
+    // rientra nella finestra. Serve perché una pagina di gestione GIÀ APERTA se
+    // ne accorga: prima l'elenco si leggeva solo all'apertura, e l'avviso di cui
     // parla il terminale non compariva mai sotto gli occhi di chi lo stava
     // aspettando. Porta il dato con sé (una lettura sola per tutte le pagine
     // aperte, invece di una per pagina) e va SOLO alle pagine filo://: dentro

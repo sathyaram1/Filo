@@ -104,9 +104,9 @@ export function messageForOwnerMerge(reply, branch = 'il ramo') {
         + '  Sono controlli automatici sul contenuto delle modifiche (aree protette,\n'
         + '  dipendenze nuove, segreti), e da qui non si aggirano.\n'
         + (r.requestId
-          ? '\n  L\'ho messa IN ATTESA: approvala da Filo, prima schermata (l\'avviso in\n'
-            + '  cima alla home), oppure Gestione → Automazioni. Da lì puoi anche scartarla.\n'
-            + '  Se Filo è già aperto l\'avviso compare da solo, non serve riaprire niente.\n'
+          ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
+            + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
+            + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
             + '  Vale per il commit appena controllato e per 24 ore: se scade, o se il\n'
             + '  ramo si muove, rilancia npm run finish.'
           : '\n  Non sono riuscito a metterla in attesa: nell\'app non comparirà niente da\n'
