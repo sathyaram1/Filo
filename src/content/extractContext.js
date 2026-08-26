@@ -300,7 +300,10 @@
   //    da leggere (il grigio di un campo, il suggerimento di un bottone): quelle
   //    si traducono lo stesso.
   //  - `'hard'` → "qui non si tocca niente", nemmeno le etichette: testo scritto
-  //    dall'utente, roba nascosta, `translate="no"`, la UI di Filo.
+  //    dall'utente, `translate="no"`, la UI di Filo.
+  //  - `'hidden'` → nascosto ADESSO, ma non per sempre. Non si traduce (l'utente
+  //    non lo vede, e potrebbe non aprirlo mai), però si segna: vedi
+  //    isVisibilityHidden.
   function skipSubtreeForTranslation(el) {
     // Barriera 1 — tag noti non-prosa. Confronto INSENSIBILE al maiuscolo/minuscolo:
     // gli elementi dentro un SVG/MathML inline espongono tagName in minuscolo
