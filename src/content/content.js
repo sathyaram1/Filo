@@ -750,10 +750,24 @@
       // fissa e il manto invisibile erano finiti nel menu).
       mediaUnder,
       // Cercati solo se non sono già fra gli antenati.
-      imgUnder: imgEl ? null : findUnder(stack, 'img', target),
-      linkUnder: linkEl ? null : findUnder(stack, 'a[href]', target),
+      imgUnder,
+      linkUnder: linkEl ? null : findLinkUnder(stack, target, mediaUnder || imgUnder),
       editable: isEditable(target),
     };
+  }
+
+  // Il collegamento della scheda, quando non è fra gli antenati del punto
+  // cliccato. Due strade, e la prima è il DOM (#444): se abbiamo già adottato la
+  // copertina — il filmato o l'immagine che l'utente sta guardando — e quella
+  // copertina sta DENTRO un <a>, la pagina ha già detto che sono la stessa
+  // scheda. Rifare il conto sui rettangoli lì non aggiunge niente e toglie: fra
+  // il collegamento e la copertina ci sono il bordo, l'imbottitura, e spesso il
+  // titolo, quindi la geometria da sola diceva di no proprio dove la struttura
+  // diceva di sì. Solo quando il DOM non lega niente si guarda la pila di strati
+  // sotto il cursore, e lì il freno geometrico è l'unica cosa che regge.
+  function findLinkUnder(stack, target, contentUnder) {
+    const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
+    return owner || findUnder(stack, 'a[href]', target);
   }
 
   function isEditable(el) {
