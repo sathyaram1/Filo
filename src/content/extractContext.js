@@ -258,7 +258,8 @@
     if (!el.getAttribute) return null;
     const tag = (el.tagName || '').toUpperCase();
     const extra = TRANSLATABLE_ATTRS_BY_TAG[tag];
-    const names = extra ? TRANSLATABLE_ATTRS_ANY.concat(extra) : TRANSLATABLE_ATTRS_ANY;
+    let names = extra ? TRANSLATABLE_ATTRS_ANY.concat(extra) : TRANSLATABLE_ATTRS_ANY;
+    if (tag === 'INPUT' && inputValueIsLabel(el)) names = names.concat('value');
     const done = (el.dataset && el.dataset.snTranslatedAttrs) || '';
     let out = null;
     for (const attr of names) {
