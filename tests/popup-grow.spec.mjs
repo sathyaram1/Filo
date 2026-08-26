@@ -18,13 +18,21 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+// Una pagina nuova per ogni test: le pagine interne di Filo vengono riusate fra
+// una scheda e l'altra, e un riquadro rimasto aperto da un test precedente
+// sarebbe quello che troviamo cercando `.sn-popup`.
+async function paginaFresca(openTab, testServer) {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body
+    style="margin:0;font:16px sans-serif"><p style="padding:16px">Una pagina qualunque.</p></body></html>`);
+  await page.waitForFunction(
+    () => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
+  return page;
+}
+
 // Apre il riquadro come fa "Spiega" dal menu del tasto destro. `fraz` è dove
 // sta il punto cliccato, in frazione dell'altezza della finestra.
 async function apriRiquadro(page, fraz = 0.5) {
   const y = await page.evaluate((f) => {
-    // Le pagine interne vengono riusate fra un test e l'altro: un riquadro
-    // rimasto aperto prima sarebbe quello che troviamo cercando `.sn-popup`.
-    for (let i = 0; i < 10 && document.querySelector('.sn-popup'); i++) window.SN_POPUP.closeTopmost();
     const yy = Math.round(window.innerHeight * f);
     window.SN_POPUP.openStreaming({
       action: window.SN_CONST.ACTIONS.EXPLAIN,
@@ -79,9 +87,8 @@ async function attendiRientro(page) {
   }, { timeout: 5000 }).toBeLessThanOrEqual(0);
 }
 
-test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestra', async ({ openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
+test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestra', async ({ openTab, testServer }) => {
+  const page = await paginaFresca(openTab, testServer);
 
   await apriRiquadro(page, 0.5);
   const prima = await geometria(page);
@@ -108,9 +115,8 @@ test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestr
   await expect(campo).toHaveValue('e questo cosa vuol dire?');
 });
 
-test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al cursore', async ({ openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming, null, { timeout: 8000 });
+test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al cursore', async ({ openTab, testServer }) => {
+  const page = await paginaFresca(openTab, testServer);
 
   const y = await apriRiquadro(page, 0.5);
   const prima = await geometria(page);
@@ -127,9 +133,8 @@ test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al 
   expect(dopo.bottom).toBeGreaterThanOrEqual(dopo.vh - 12);
 });
 
-test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce', async ({ openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming, null, { timeout: 8000 });
+test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce', async ({ openTab, testServer }) => {
+  const page = await paginaFresca(openTab, testServer);
 
   await apriRiquadro(page, 0.05);
   const prima = await geometria(page);
@@ -140,9 +145,8 @@ test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce',
   expect(dopo.bottom).toBeLessThanOrEqual(dopo.vh);
 });
 
-test('#500 la risposta si accorcia: il riquadro non si tiene addosso una barra che non serve', async ({ openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming, null, { timeout: 8000 });
+test('#500 la risposta si accorcia: il riquadro non si tiene addosso una barra che non serve', async ({ openTab, testServer }) => {
+  const page = await paginaFresca(openTab, testServer);
 
   await apriRiquadro(page, 0.5);
   await rispostaArriva(page, 40);
@@ -174,9 +178,8 @@ async function trascinaA(page, y) {
   await page.mouse.up();
 }
 
-test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più da solo', async ({ openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming, null, { timeout: 8000 });
+test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più da solo', async ({ openTab, testServer }) => {
+  const page = await paginaFresca(openTab, testServer);
 
   await apriRiquadro(page, 0.1);
   const bersaglio = await page.evaluate(() => Math.round(window.innerHeight * 0.55));
