@@ -900,6 +900,47 @@ irraggiungibili.
   `.sn-toasts` in `src/content/popup.js` e `src/styles/popup.css` — ci passano
   toast, `.sn-dictate-pill` e `.sn-save-confirm`. Test `tests/toast-stack.spec.mjs`.
 
+## Un riquadro che si riempie dopo va rimisurato dopo
+
+Un riquadro ancorato a un punto della pagina — la spiegazione su una selezione,
+un menu con una sezione che arriva da un modello, un'anteprima che carica
+un'immagine — **nasce vuoto e si riempie dopo**. La posa calcolata subito dopo
+l'apertura è calcolata sull'altezza sbagliata: quando il contenuto arriva il
+riquadro si allunga e il **fondo esce dallo schermo**. Il fondo è quasi sempre
+la parte che serve (la riga per scrivere la domanda dopo, i bottoni di
+conferma), quindi il difetto non è estetico: la funzione diventa
+irraggiungibile e l'unico rimedio resta chiudere e riprovare più in alto
+(#500, #502).
+
+Non basta rimisurare: rimisurare da solo produce un **salto** a metà risposta e
+una posa che cambia a ogni apertura, perché dipende da quanto ci mette il
+modello. Servono due mosse.
+
+- **Il LATO si sceglie una volta e non cambia più**, e si sceglie sull'altezza
+  che il riquadro **potrà** raggiungere (il suo tetto, letto dal foglio di
+  stile — non ricopiato in JS), non su quella che ha adesso. Se ci sta sotto il
+  punto ancorato va sotto; se no e ci sta sopra va sopra; se non basta nessuno
+  dei due, il lato più capiente.
+- **Il tetto d'altezza si stringe allo spazio di quel lato.** Da lì in poi il
+  riquadro non *può* diventare più alto di quanto ci sta: il corpo si accorcia
+  e scorre, e il fondo resta raggiungibile. Tieni un'altezza minima sotto la
+  quale il riquadro non è più usabile e lascia che sia l'ultimo aggancio ai
+  bordi a occuparsi delle finestre minuscole.
+- **Poi rimisura davvero**, con un `ResizeObserver` sulla radice: a ogni cambio
+  d'altezza riappoggia il riquadro al punto ancorato — sotto cresce verso il
+  basso, sopra resta agganciato e cresce verso l'alto. Non toccare la
+  dimensione dentro la callback o l'osservatore si rincorre.
+- **Misura l'ingombro VISIBILE** (`getBoundingClientRect`), non quello di
+  layout (`offsetHeight`): con la compensazione zoom addosso il riquadro porta
+  una scala e i due numeri divergono proprio quando lo schermo è più stretto.
+- **Se l'utente lo ha trascinato, la posa è sua.** Smetti di riportarlo sul
+  punto ancorato: resta dove l'ha messo e ti limiti a non farlo uscire dallo
+  schermo, senza nemmeno il margine dai bordi (l'ha appoggiato lì apposta).
+- **Ricalcola anche su `resize` della finestra e del visual viewport**: lo
+  spazio disponibile è cambiato, il tetto va ristretto di nuovo.
+- **Dove:** `attachPose()` in `src/content/popup.js` (riquadro `.sn-popup`),
+  test `tests/popup-pose-streaming.spec.mjs`.
+
 ## Un cancello automatico che blocca deve avere una via d'uscita, e la via d'uscita è una PERSONA
 
 Un controllo deterministico che dice di no a un caso legittimo — e lo dice
