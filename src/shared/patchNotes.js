@@ -21,6 +21,7 @@
       fixes: [
         'Quando la spiegazione dentro al menu del tasto destro finisce di caricare e si allunga, il menu si sposta da solo invece di uscire dal fondo della finestra. L\'ultima voce resta intera e si può cliccare.',
         'Se la spiegazione è così lunga da non starci, il menu si scorre fino in fondo e ci resta: prima un giro di rotella in più faceva scorrere la pagina e il menu spariva.',
+        'Anche il riquadro con la risposta di Filo resta dentro la finestra mentre la risposta arriva e lo allunga: la riga del modello e il campo per la domanda successiva restano dove puoi usarli. Se lo sposti a mano, ci resta.',
       ],
     },
     {
