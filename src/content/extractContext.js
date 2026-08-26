@@ -227,6 +227,22 @@
     OPTGROUP: ['label'],
   };
 
+  // Le scritte sui BOTTONI dei moduli: su <input type="button|reset|submit"> la
+  // scritta che si legge è `value`, non il contenuto. La riga di confine resta
+  // la stessa — si traduce ciò che l'utente LEGGE, mai ciò che il sito RIMANDA
+  // INDIETRO — e fra gli input passa esattamente qui: il valore di un bottone
+  // entra nei dati del modulo solo se il bottone ha un `name` (e solo per i
+  // bottoni che inviano). Uno che azzera il modulo o che apre qualcosa nella
+  // pagina non rimanda niente: la sua etichetta si traduce come quella di una
+  // voce di menu a tendina. `type="image"` resta fuori: lì la scritta visibile
+  // è `alt`, già tradotto, e `value` non si legge da nessuna parte.
+  function inputValueIsLabel(el) {
+    const type = String(el.getAttribute('type') || '').toLowerCase();
+    if (type === 'button' || type === 'reset') return true;
+    if (type !== 'submit') return false;
+    return !el.hasAttribute('name');
+  }
+
   // Valore di partenza di un attributo traducibile. Per l'etichetta di una
   // <option> che non ce l'ha, il testo che si legge è il suo contenuto.
   function attrSourceValue(el, attr, tag) {
