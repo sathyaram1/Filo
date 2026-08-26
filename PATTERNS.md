@@ -740,6 +740,19 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   "Interrompi lettura", che appare solo mentre la sintesi è in corso).
 - **Avanzamento reale mentre lavora**: il totale dei pezzi è noto, quindi
   l'avviso "in corso" mostra `fatti/totale` invece di una frase fissa.
+- **Un avviso che manda a guardare parla solo di ciò che si VEDE**: "è rimasto
+  fuori quel pezzo lì" è un invito a cercarlo con gli occhi, quindi il conto che
+  lo fa scattare misura la visibilità, mai l'ingombro. Un rettangolo grande può
+  essere fuori schermo, trasparente, spento con `content-visibility` o dentro una
+  sezione ancora chiusa: sono le forme normali di spazi pubblicitari e banner, e
+  contarli fa uscire l'avviso quasi sempre a vuoto — che brucia anche le volte in
+  cui dice il vero. Il metro è uno solo (`isSeenByUser` in `extractContext.js`:
+  `checkVisibility()` + opacità/`content-visibility`/ritaglio + antenato
+  ripiegato + rettangolo portato fuori dalla pagina) e **"più in basso della
+  prima schermata" non è nascosto**: ci si arriva scorrendo, è contenuto vero.
+  Attenzione alla simmetria opposta: questo metro vale per il CONTO, non per
+  cosa si traduce — il testo trasparente per un'animazione d'ingresso va tradotto
+  lo stesso, o comparirà in lingua originale un secondo dopo.
 - **Dove:** `src/content/translatePage.js` (stato + ripresa),
   `src/content/extractContext.js` (`extractTranslatableBlocks`),
   `src/content/menuIcons.js` + `src/content/content.js` (menu). Test:
