@@ -471,6 +471,9 @@
     if (!result) return 0;
     if (result.kind === 'none' || result.kind === 'aborted') return 0;
     if (result.kind === 'done') return Number(result.unreachable || 0) > 0 ? 1 : 0;
+    // Riquadro fatto di soli componenti chiusi: il testo c'è e resta in lingua
+    // originale, ma non è "un blocco mancante" di cui contare il numero.
+    if (result.kind === 'onlyClosed') return 1;
     return Math.max(1, missingCount);
   }
 
