@@ -688,6 +688,82 @@
     return areaInner < areaOuter * CONTAINER_MIN_RATIO;
   }
 
+  // ------------------------------------------------------------
+  // La seconda prova: quello che sta sotto lo si VEDE.
+  //
+  // Il conto sui rettangoli sa dire "stessa scala, stessa scheda", ma sulla
+  // FORMA non sa dire niente, e ci sono due cose opposte con la stessa forma.
+  // La riga di un elenco di risultati — miniatura piccola a sinistra, titolo e
+  // tre righe di testo a destra, il collegamento della riga steso sopra a
+  // tutto — ha lo stesso ingombro di una barra fissa sopra un titolo scivolato
+  // sotto: un rettangolo largo quanto la pagina che ne circonda uno piccolo.
+  // Nessuna soglia di area separa i due casi, e infatti il freno geometrico
+  // buttava via i comandi del filmato proprio sulle miniature vere (#444):
+  // sotto a circa un terzo di riga sparivano tutti, e la stessa riga costruita
+  // con la miniatura dentro un collegamento suo dava invece il menu completo.
+  //
+  // Quello che separa i due casi è se l'utente li vede: sopra la miniatura c'è
+  // un collegamento invisibile, sopra il titolo sepolto c'è una barra opaca.
+  // Quindi: se fra il punto cliccato e il candidato non c'è niente di DIPINTO,
+  // il candidato è esattamente quello che l'utente sta guardando, e a quel
+  // punto la geometria non ha più niente da aggiungere.
+  // ------------------------------------------------------------
+
+  // Elementi che si disegnano da soli, senza bisogno di sfondo o di testo.
+  const SELF_PAINTING_TAGS = new Set([
+    'IMG', 'VIDEO', 'AUDIO', 'CANVAS', 'SVG', 'IFRAME', 'EMBED', 'OBJECT',
+    'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'HR', 'PROGRESS', 'METER',
+  ]);
+  // Sotto questa opacità uno sfondo non copre niente: serve solo a intercettare
+  // il mouse (è così che sono fatti i veli delle schede), e chi guarda vede
+  // quello che c'è dietro.
+  const VEIL_ALPHA = 0.05;
+
+  function colorAlpha(css) {
+    const v = (css || '').trim();
+    if (!v || v === 'transparent' || v === 'none') return 0;
+    const m = /^rgba?\(([^)]+)\)$/.exec(v);
+    if (!m) return 1;
+    const parts = m[1].split(/[,/\s]+/).filter(Boolean);
+    if (parts.length < 4) return 1;
+    const a = parseFloat(parts[3]);
+    return Number.isFinite(a) ? a : 1;
+  }
+
+  // Testo che si vede per davvero. Il testo per i lettori di schermo sta nel
+  // DOM ma è ritagliato a un pixel: non deve far passare per opaco un velo
+  // vuoto (le righe dei risultati ci infilano spesso il titolo ripetuto).
+  function hasVisibleText(el) {
+    const t = el.textContent;
+    if (!t || !t.trim()) return false;
+    try {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const box = r.getBoundingClientRect();
+      return box.width > 2 && box.height > 2;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function paintsSomething(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (SELF_PAINTING_TAGS.has(el.tagName)) return true;
+    let cs = null;
+    try { cs = getComputedStyle(el); } catch (_) { return true; }
+    if (!cs) return true;
+    if (cs.visibility === 'hidden' || cs.opacity === '0') return false;
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
+    if (colorAlpha(cs.backgroundColor) > VEIL_ALPHA) return true;
+    if (cs.boxShadow && cs.boxShadow !== 'none') return true;
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+      if (cs[`border${side}Style`] !== 'none'
+        && parseFloat(cs[`border${side}Width`]) > 0
+        && colorAlpha(cs[`border${side}Color`]) > VEIL_ALPHA) return true;
+    }
+    return hasVisibleText(el);
+  }
+
   // Risalita che attraversa i confini dei componenti web: `contains()` di un
   // elemento in chiaro non vede quello che sta dentro uno shadow root, quindi
   // "la copertina sta dentro il collegamento" risultava falso proprio sulle
