@@ -466,6 +466,7 @@
     }
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub';
+    global.SN_FILO_UI?.mark(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     if (!items || items.length === 0) {
@@ -541,6 +542,7 @@
     }
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub';
+    global.SN_FILO_UI?.mark(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     if (!entries || entries.length === 0) {
@@ -769,6 +771,7 @@
     const cols = opts.cols || 4;
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
+    global.SN_FILO_UI?.mark(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     sub.style.setProperty('--sn-icon-cols', String(cols));
     if (opts.dropTarget) sub.dataset.snDropTarget = opts.dropTarget;
@@ -804,6 +807,7 @@
     if (tooltipEl && document.documentElement.contains(tooltipEl)) return tooltipEl;
     tooltipEl = document.createElement('div');
     tooltipEl.className = 'sn-tooltip';
+    global.SN_FILO_UI?.mark(tooltipEl);
     tooltipEl.style.display = 'none';
     menuHost().appendChild(tooltipEl);
     return tooltipEl;

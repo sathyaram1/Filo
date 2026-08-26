@@ -70,6 +70,7 @@
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-rt-overlay';
+    global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     // Box trascinabile, due campi separati + bottone d'invio col costo.
     root.innerHTML = `

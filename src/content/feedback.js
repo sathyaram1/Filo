@@ -131,6 +131,7 @@
 
       const layer = document.createElement('div');
       layer.className = 'sn-fb-credit-fly';
+      global.SN_FILO_UI?.mark(layer);
       layer.setAttribute('aria-hidden', 'true');
       Object.assign(layer.style, {
         position: 'fixed', inset: '0', zIndex: '2147483647',
@@ -208,6 +209,7 @@
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
+    global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     // Layout richiesto dall'utente: solo il box per scrivere + 4 bottoni
     // (Allega, Chiudi, Invia, e "Cancella disegno" che compare solo quando c'è

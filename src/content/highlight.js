@@ -61,6 +61,7 @@
     if (document.getElementById('sn-force-hover-sheet')) return;
     const s = document.createElement('style');
     s.id = 'sn-force-hover-sheet';
+    global.SN_FILO_UI?.mark(s);
     // Regola "best effort": copre i pattern dropdown più comuni. Non
     // garantita su markup esotici, ma il dispatch di mouseenter copre
     // il 90% dei casi reali; questo è il fallback per :hover puro CSS.
@@ -210,6 +211,7 @@
 
     const overlay = document.createElement('div');
     overlay.className = 'sn-highlight';
+    global.SN_FILO_UI?.mark(overlay);
     if (action === 'fill') overlay.classList.add('sn-highlight-fill');
     const frame = document.createElement('div');
     frame.className = 'sn-highlight-frame';

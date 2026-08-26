@@ -160,6 +160,9 @@
     // posizionamento a tutto viewport (inline, così non serve CSS nel documento).
     const host = doc.createElement('div');
     host.className = 'sn-confirm-host';
+    // Su una pagina web l'host finisce dentro il <body> del sito: marcarlo
+    // tiene fuori il riquadro da chi cammina sulla pagina (la traduzione).
+    global.SN_FILO_UI?.mark(host);
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;';
 
     const root = host.attachShadow({ mode: 'closed' });
