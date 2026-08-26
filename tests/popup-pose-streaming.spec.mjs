@@ -155,7 +155,7 @@ test('spiegazione approfondita su selezione in basso: la riga per scrivere resta
   await ripristinaProvider(app);
 });
 
-test('selezione in alto: il riquadro resta agganciato sotto al punto e non si sposta più', async ({ app, openTab }) => {
+test('selezione a metà finestra: il riquadro si accorcia invece di sbordare, e non salta', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   const page = await openTab('filo://newtab/');
   await page.waitForFunction(
@@ -165,14 +165,16 @@ test('selezione in alto: il riquadro resta agganciato sotto al punto e non si sp
 
   await preparaProvider(app);
 
-  // In alto c'è spazio per l'altezza massima: il lato è "sotto" e non deve
-  // cambiare mai — niente salto a metà risposta, che è l'altra metà del difetto
-  // (la posa cambiava a seconda di quanto ci metteva il modello a rispondere).
+  // A metà finestra il riquadro VUOTO ci sta comodo sotto la selezione: il
+  // vecchio codice lo posava lì e non ci tornava più, poi la risposta lo
+  // allungava e il fondo scendeva sotto il bordo. È l'altra metà del difetto —
+  // dove non basta "girarlo di sopra", perché sopra lo spazio non è di più:
+  // l'altezza va stretta a quella disponibile e il corpo deve scorrere.
   await page.evaluate(() => {
     window.SN_POPUP.openStreaming({
       action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
       payload: { selection: 'parola', sentence: 'una frase con parola dentro' },
-      anchor: { x: 120, y: 60 },
+      anchor: { x: 120, y: Math.round(window.innerHeight * 0.5) },
       title: 'Approfondisci',
     });
   });
@@ -186,7 +188,8 @@ test('selezione in alto: il riquadro resta agganciato sotto al punto e non si sp
     const m = await page.evaluate(misura);
     if (!m) break;
     cime.add(Math.round(m.top));
-    if (m.bottom > m.vh + 1) throw new Error(`riquadro fuori dal fondo: bottom=${m.bottom} vh=${m.vh}`);
+    // Nemmeno per un fotogramma: se sborda, qui il test è già rosso.
+    expect(m.bottom, `riquadro fuori dal fondo a metà risposta (vh=${m.vh})`).toBeLessThanOrEqual(m.vh + 1);
     const fatto = await page.locator('.sn-popup .sn-popup-meta').textContent().catch(() => '');
     if (fatto && fatto.includes('€')) break;
     await page.waitForTimeout(60);
@@ -195,10 +198,23 @@ test('selezione in alto: il riquadro resta agganciato sotto al punto e non si sp
   await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 15_000 });
 
   const finale = await page.evaluate(misura);
-  // Cresce verso il basso restando agganciato: la cima non si è mai mossa.
+  // Il lato scelto è "sotto" e non cambia: la cima non si è mai mossa, niente
+  // salto a metà risposta.
   expect([...cime]).toEqual([Math.round(daVuoto.top)]);
   expect(Math.round(finale.top)).toBe(Math.round(daVuoto.top));
+  // E la riga per scrivere è dentro lo schermo, cliccabile.
   expect(finale.inputBottom).toBeLessThanOrEqual(finale.vh);
+  const cliccabile = await page.evaluate(() => {
+    const input = document.querySelector('.sn-popup .sn-popup-input');
+    const r = input.getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !!el && (el === input || input.contains(el));
+  });
+  expect(cliccabile).toBe(true);
+
+  // Il testo non è andato perduto con l'altezza: il corpo scorre.
+  await expect(page.locator('.sn-popup .sn-msg-assistant .sn-msg-text').last())
+    .toContainText('Paragrafo 12', { timeout: 5000 });
 
   await ripristinaProvider(app);
 });
