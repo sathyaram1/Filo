@@ -314,18 +314,47 @@
     // foreign content futuro): non è testo di pagina. Ferma l'intero sottoalbero
     // anche se un domani comparisse un tag radice non previsto nella lista sopra.
     if (el.namespaceURI && el.namespaceURI !== HTML_NS) return 'tag';
-    return hardSkipForTranslation(el) ? 'hard' : false;
+    const hard = hardSkipForTranslation(el);
+    if (hard === 'hidden') return 'hidden';
+    return hard ? 'hard' : false;
   }
 
   function hardSkipForTranslation(el) {
     if (el.isContentEditable) return true;                  // testo dell'utente
-    if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
-    if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
     if (el.classList && el.classList.contains('notranslate')) return true;
     if (isFiloOwnUi(el)) return true;
+    return isVisibilityHidden(el) ? 'hidden' : false;
+  }
+
+  // Nascosto in questo momento: una fisarmonica chiusa, la scheda che non è in
+  // primo piano, un "leggi tutto" ripiegato. Il testo è già nella pagina e
+  // l'utente lo SCOPRE con un clic — per chi guarda lo schermo è la stessa cosa
+  // del testo che il sito AGGIUNGE dopo, e va trattato uguale (#407): non si
+  // traduce adesso, ma appena si vede il menu deve offrire di tradurlo, invece
+  // di lasciare come unica strada tornare all'originale e ripagare la pagina.
+  function isVisibilityHidden(el) {
+    if (el.hasAttribute && el.hasAttribute('hidden')) return true;
+    if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
     const cs = window.getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse') return true;
+    return cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse';
+  }
+
+  // Un pezzo di pagina segnato come nascosto che ADESSO si vede, con del testo
+  // ancora da tradurre dentro. È la domanda che si fa il menu del tasto destro,
+  // quindi deve costare poco: la lista è corta per costruzione (MAX_HIDDEN) e
+  // la maggior parte degli elementi esce alla prima riga.
+  function hasRevealedText(list) {
+    for (const el of (list || [])) {
+      try {
+        if (!el || !el.isConnected) continue;
+        if (isVisibilityHidden(el)) continue;
+        const txt = (el.textContent || '');
+        if (!HAS_LETTER.test(txt)) continue;
+        if (el.dataset && el.dataset.snTranslated) continue;
+        return true;
+      } catch (_) {}
+    }
     return false;
   }
 
