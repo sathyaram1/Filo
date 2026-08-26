@@ -345,24 +345,128 @@
   }
 
   // ----------------------------------------------------------------
-  // Posizionamento iniziale (smart, con flip ai bordi)
+  // Posa del riquadro — vedi PATTERNS.md § "Un riquadro che si riempie dopo va
+  // rimisurato dopo"
   // ----------------------------------------------------------------
-  function position(root, anchor) {
-    const w = 380;
-    const margin = 8;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    let left = anchor.x;
-    let top = anchor.y + 8;
-    if (left + w + margin > vw) left = vw - w - margin;
-    if (left < margin) left = margin;
-    requestAnimationFrame(() => {
-      const h = root.offsetHeight;
-      if (top + h + margin > vh) top = Math.max(margin, anchor.y - h - 8);
-      root.style.left = `${left}px`;
-      root.style.top = `${top}px`;
-    });
-    root.style.left = `${left}px`;
-    root.style.top = `${top}px`;
+  // Il riquadro nasce VUOTO (poco più di 200px) e si riempie dopo, mentre la
+  // risposta arriva, fino al tetto d'altezza del foglio di stile. Una posa
+  // calcolata una volta sola alla nascita è calcolata sull'altezza sbagliata:
+  // il fondo — cioè la riga dove si scrive la domanda successiva — finisce
+  // fuori dallo schermo e non si può più chiedere niente (#502).
+  //
+  // Due mosse, non una:
+  //
+  //   1. Il LATO (sopra o sotto il punto ancorato) si sceglie SUBITO, sulla
+  //      massima altezza che il riquadro potrà raggiungere e non su quella che
+  //      ha adesso, e da lì non cambia più. Sceglierlo sull'altezza corrente
+  //      significa farlo dipendere da quanto ci mette il modello a rispondere:
+  //      stessa selezione, posa diversa a ogni apertura, e un salto a metà
+  //      risposta quando il riquadro cresce oltre lo spazio che aveva.
+  //   2. Il tetto d'altezza viene STRETTO allo spazio di quel lato, così il
+  //      riquadro non può più diventare più alto di quanto ci sta, e a ogni
+  //      cambio d'altezza viene riposato: sotto resta agganciato al punto e
+  //      cresce verso il basso, sopra resta agganciato al punto e cresce verso
+  //      l'alto. Quando lo spazio non basta il corpo si accorcia e scorre —
+  //      la riga per scrivere resta comunque raggiungibile.
+  //
+  // Dopo che l'utente lo ha trascinato la posa è sua: non lo riportiamo sul
+  // punto ancorato, ci limitiamo a non farlo uscire dallo schermo.
+  const POSE_MARGIN = 8;   // aria fra riquadro e bordi della finestra
+  const POSE_GAP = 8;      // stacco fra riquadro e punto ancorato
+  const POSE_MIN_H = 200;  // sotto quest'altezza il riquadro non è più usabile
+  const POSE_MAX_H_FALLBACK = 480;
+
+  // Il tetto lo tiene il foglio di stile: lo leggiamo invece di ricopiarlo, così
+  // se cambia lì la posa lo segue da sola.
+  function styleMaxHeight(root) {
+    let v = NaN;
+    try { v = parseFloat(getComputedStyle(root).maxHeight); } catch (_) {}
+    return Number.isFinite(v) && v > 0 ? v : POSE_MAX_H_FALLBACK;
+  }
+
+  function attachPose(root, anchor) {
+    const ax = Number.isFinite(anchor?.x) ? anchor.x : POSE_MARGIN;
+    const ay = Number.isFinite(anchor?.y) ? anchor.y : POSE_MARGIN;
+    // Letto PRIMA di scrivere il tetto inline: dopo rileggeremmo il nostro
+    // stesso valore e lo stringeremmo a ogni giro.
+    const maxH = styleMaxHeight(root);
+    let side = null;
+    let dragged = false;
+    let ro = null;
+
+    const roomBelow = () => window.innerHeight - (ay + POSE_GAP) - POSE_MARGIN;
+    const roomAbove = () => ay - POSE_GAP - POSE_MARGIN;
+
+    function chooseSide() {
+      const below = roomBelow(), above = roomAbove();
+      if (below >= maxH) return 'below';   // ci sta tutto sotto: preferenza naturale
+      if (above >= maxH) return 'above';
+      return above > below ? 'above' : 'below'; // nessuno dei due basta: il più capiente
+    }
+
+    function capHeight() {
+      const room = side === 'above' ? roomAbove() : roomBelow();
+      const cap = Math.min(maxH, Math.max(POSE_MIN_H, room));
+      root.style.maxHeight = `${Math.round(cap)}px`;
+    }
+
+    function apply() {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      // getBoundingClientRect e non offsetHeight: con la compensazione zoom
+      // attiva il riquadro porta una scala, e quello che deve stare dentro lo
+      // schermo è l'ingombro VISIBILE, non quello di layout.
+      const rect = root.getBoundingClientRect();
+      const h = rect.height || root.offsetHeight;
+      const w = rect.width || root.offsetWidth;
+      // Chi l'ha trascinato l'ha messo dove voleva, bordo compreso: rispettiamo
+      // la sua posa e non gli spostiamo il riquadro di 8px al primo delta.
+      const m = dragged ? 0 : POSE_MARGIN;
+
+      let left, top;
+      if (dragged) {
+        left = parseFloat(root.style.left) || 0;
+        top = parseFloat(root.style.top) || 0;
+      } else {
+        left = ax;
+        top = side === 'above' ? ay - POSE_GAP - h : ay + POSE_GAP;
+      }
+      if (left + w + m > vw) left = vw - w - m;
+      if (left < m) left = m;
+      if (top + h + m > vh) top = vh - h - m;
+      if (top < m) top = m;
+      root.style.left = `${Math.round(left)}px`;
+      root.style.top = `${Math.round(top)}px`;
+    }
+
+    side = chooseSide();
+    capHeight();
+    apply();
+    // La prima misura utile arriva dopo il layout del contenuto iniziale.
+    requestAnimationFrame(apply);
+
+    // Il rimisuratore: ogni volta che il riquadro cambia altezza — delta in
+    // arrivo, bolla di follow-up, casella di testo che si allarga — la posa si
+    // rifà. Non tocchiamo mai la dimensione qui dentro, quindi non si innesca.
+    try {
+      ro = new ResizeObserver(() => apply());
+      ro.observe(root);
+    } catch (_) {}
+
+    // Finestra ridimensionata o zoom cambiato: lo spazio disponibile è un altro,
+    // il tetto va ristretto di nuovo e la posa rifatta.
+    const vv = window.visualViewport;
+    const onViewport = () => { if (!dragged) capHeight(); apply(); };
+    window.addEventListener('resize', onViewport);
+    vv?.addEventListener('resize', onViewport);
+
+    return {
+      markDragged() { dragged = true; },
+      dispose() {
+        try { ro?.disconnect(); } catch (_) {}
+        window.removeEventListener('resize', onViewport);
+        try { vv?.removeEventListener('resize', onViewport); } catch (_) {}
+      },
+    };
   }
 
   // ----------------------------------------------------------------
