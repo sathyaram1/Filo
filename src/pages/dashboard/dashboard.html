@@ -27,11 +27,9 @@
        icona aziona il comando reale della shell via MSG.SHELL_ACTION. -->
   <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
   <main class="dash" id="dash">
-    <!-- Fusioni in attesa del via libera dell'owner (SPEC-RIDISEGNO-MAX.md §10).
-         SOLO owner, e solo se ce n'è almeno una: quando è vuoto resta `hidden`
-         e la griglia torna esattamente com'era per tutti gli altri (la riga in
-         più la accende la classe `dash--notice`, che si mette solo qui). -->
-    <div class="dash-notice" id="mergeApprovals" hidden></div>
+    <!-- Le fusioni in attesa del via libera dell'owner NON vivono più qui:
+         stanno in cima ai Ricevuti della dashboard di gestione, insieme alle
+         altre cose che aspettano una sua decisione (scelta owner 2026-08-26). -->
 
     <!-- Left column: suggested actions -->
     <aside class="dash-left" id="left">
