@@ -41,12 +41,7 @@ test('cattura: avviso in cima ai Ricevuti', async ({ openTab }) => {
     _id: 'fb-471', text: 'Un altro feedback in attesa.', name: 'Altro feedback',
     seq: 471, subSeq: 0, clientId: 'tester@esempio.it', createdAt: '2026-08-24T10:00:00Z', images: [],
   }]));
-  const diag = await page.evaluate(async () => {
-    const r = await window.filo.message({ type: 'merge_approvals_get' });
-    const n = await window.__mgTest.loadMergeApprovals();
-    return { n, get: JSON.stringify(r).slice(0, 300), host: document.getElementById('mgMergeApprovals')?.outerHTML?.slice(0, 200) };
-  });
-  console.log('DIAG', JSON.stringify(diag));
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
   await expect(page.locator('#mgMergeApprovals .sn-mac')).toBeVisible({ timeout: 8000 });
   mkdirSync('tests/agent/.out', { recursive: true });
   await page.screenshot({ path: 'tests/agent/.out/avviso-ricevuti.png', fullPage: false });
