@@ -608,9 +608,35 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   il testo nuovo" — che riusa la stessa ripresa. Accorgersene costa una
   `MutationObserver` che alza soltanto un flag (l'apertura del menu deve restare
   istantanea: niente scansioni lì dentro); il conto vero lo rifà la traduzione,
-  che rilegge la pagina e salta ciò che è già marcato. L'osservatore si **stacca
-  mentre traduciamo**, o scambierebbe le nostre sostituzioni per contenuto del
-  sito, e ignora la UI di Filo iniettata nella pagina (prefisso `sn-`).
+  che rilegge la pagina e salta ciò che è già marcato. L'osservatore ignora la UI
+  di Filo iniettata nella pagina (prefisso `sn-`) e non ha bisogno di staccarsi
+  mentre traduciamo: le nostre sostituzioni nascono **già marcate**
+  (`data-sn-translated` scritto nella stessa esecuzione in cui si sostituiscono i
+  figli), quindi il filtro le scarta da sé.
+- **Il testo arrivato DURANTE il lavoro conta come quello arrivato dopo.**
+  Scorrere mentre si aspetta è il comportamento normale: se la sorveglianza parte
+  solo a lavoro finito, quelle righe non le vede nessuno e l'avviso finale
+  dichiara tradotta una pagina che sotto gli occhi è mezza in lingua originale.
+  Sorvegliare **da prima di cominciare** e rifare un giro (con un tetto: su un
+  sito che carica all'infinito rincorrerlo non finirebbe mai) costa solo il testo
+  nuovo, perché la rilettura salta ciò che è già marcato. Se dopo il tetto ne è
+  arrivato dell'altro, lo dice e lascia la voce di menu.
+- **"Nascosto adesso" non è "da non tradurre mai".** Una fisarmonica chiusa, una
+  scheda in secondo piano, un "leggi tutto" ripiegato: quel testo non si traduce
+  (l'utente potrebbe non aprirlo mai, e lo pagherebbe), ma i sottoalberi saltati
+  **per motivi di visibilità** si segnano a parte — sono un motivo di salto
+  diverso da `translate="no"`/UI di Filo. Quando uno di quelli torna visibile, per
+  chi guarda lo schermo è identico al testo che il sito ha appena aggiunto, e il
+  menu deve offrire la stessa cosa: "Traduci il testo nuovo", non "butta via
+  tutto e ricomincia".
+- **Un lavoro lungo si deve poter fermare, e fermarlo deve durare.** Mentre la
+  traduzione lavora l'icona del menu è il **ritorno all'originale** (prima lì
+  c'era "Traduci la pagina", che a lavoro in corso non faceva niente: un vicolo
+  cieco). E il ritorno indietro deve reggere contro le richieste già spedite: un
+  **numero d'ordine del giro** sulle unità di lavoro fa buttare via le risposte in
+  volo, invece di lasciarle ricadere sulla pagina qualche secondo dopo e
+  ritradurla a metà. Vale per qualsiasi lavoro asincrono annullabile, non solo
+  qui.
 - **La ripresa non ripaga ciò che è già fatto**: i pezzi conclusi si marcano nel
   DOM (`data-sn-translated`) e si escludono **prima** di costruire le richieste,
   non dopo aver ricevuto la risposta. Escluderli dopo significa pagare due volte
