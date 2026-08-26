@@ -16,7 +16,7 @@ test('cattura: avviso in cima ai Ricevuti', async ({ openTab }) => {
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
-      if (t === 'merge_approvals_get') return { ok: true, pending: cfg.pending, recent: [], ttlMs: GIORNO };
+      if (t === 'merge_approvals_get') return { ok: true, pending: cfg.pending, recent: [], ttlMs: 24 * 60 * 60 * 1000 };
       return orig(msg);
     };
   }, {
