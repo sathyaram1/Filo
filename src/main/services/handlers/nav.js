@@ -196,7 +196,7 @@ module.exports = function register(on, ctx) {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };
     try {
-      if (payload.type === MSG.TOP_FRAME_COMMAND) {
+      if (payload.type === MSG.TOP_FRAME_COMMAND || payload.type === MSG.FRAME_TRANSLATE_REPORT) {
         const main = wc.mainFrame;
         if (main && !main.detached) main.send('filo:broadcast', payload);
       } else {
