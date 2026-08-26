@@ -615,6 +615,13 @@
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
   function canContinue() { return isPartial() || hasNewContent(); }
+  // L'icona del menu è il ritorno all'originale? Sì a traduzione completa e
+  // ferma, e sì anche MENTRE traduce: una cosa che parte si deve poter fermare,
+  // e a metà lavoro fermarsi vuol dire tornare indietro. Prima, aprendo il menu
+  // durante il lavoro, l'unica voce era "Traduci la pagina" — che non faceva
+  // niente. Fonte unica: la usano sia l'icona sia la voce etichettata, che
+  // compare solo quando l'icona serve ad altro.
+  function showsRestore() { return pageTranslating || (pageHasTranslation && !canContinue()); }
   function missing() { return missingCount; }
   function total() { return totalCount; }
 
