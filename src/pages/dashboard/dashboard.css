@@ -74,24 +74,6 @@ html, body {
   .dash-left, .dash-right { display: none; }
 }
 
-/* ===== Avviso "fusioni in attesa" (owner, e solo se ce n'è) =====
-   Una riga in più IN CIMA, a tutta larghezza: è la posizione che si vede senza
-   cercarla, e non ruba spazio a nessuna delle tre colonne.
-
-   La riga si accende con la classe `dash--notice`, che il JS mette solo quando
-   c'è davvero qualcosa da mostrare. Non basta lasciare l'elemento `hidden` in
-   una griglia a tre righe: la traccia vuota sarebbe alta 0 ma il `gap` fra le
-   righe resterebbe, e tutta la home scenderebbe di 24px anche per chi non ha
-   niente in sospeso. Con l'interruttore, per tutti gli altri il layout è
-   identico al byte precedente. */
-.dash-notice { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
-.dash--notice { grid-template-rows: auto 1fr auto; }
-.dash--notice .dash-left,
-.dash--notice .dash-center,
-.dash--notice .dash-right { grid-row: 2; }
-.dash--notice .dash-input-wrap { grid-row: 3; }
-
-
 /* ===== Colonna sinistra: suggerimenti ===== */
 .dash-left {
   grid-column: 1;
