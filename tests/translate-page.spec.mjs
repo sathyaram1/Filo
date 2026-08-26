@@ -938,6 +938,11 @@ test('chiedere l’originale mentre traduce: la pagina torna indietro e ci RESTA
   await expect(icon).toHaveAttribute('aria-label', 'Mostra originale');
   await icon.click();
 
+  // L'avviso "sto traducendo" sparisce nell'istante in cui si ferma: lasciarlo
+  // in vista finché le richieste già spedite si decidono a tornare fa sembrare
+  // vivo un lavoro che l'utente ha appena fermato.
+  expect(await liveToastTexts(page)).not.toContain('Traduzione pagina');
+
   // Torna in inglese subito…
   await expect.poll(() => translatedCount(page), { timeout: 15000 }).toBe(0);
   // …e ci resta: il lavoro rimasto in volo non si scarica addosso alla pagina.
