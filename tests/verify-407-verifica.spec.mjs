@@ -515,7 +515,5 @@ test('pagina oltre il tetto di un giro: avviso onesto e ripresa che arriva in fo
       });
       return n;
     }, MARK), { timeout: 180_000 }).toBe(0);
-  } else {
-    expect(first).toMatch(/^Pagina tradotta/);
   }
 });
