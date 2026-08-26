@@ -570,7 +570,13 @@
     wrap.appendChild(text);
     popup.bodyEl.appendChild(wrap);
     popup.bodyEl.scrollTop = popup.bodyEl.scrollHeight;
+    reflow(popup);
     return { wrap, text };
+  }
+
+  // Il riquadro è appena diventato più alto: rimettilo in posa.
+  function reflow(popup) {
+    try { popup?.pose?.reflow(); } catch (_) {}
   }
 
   // ----------------------------------------------------------------
