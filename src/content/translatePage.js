@@ -538,6 +538,11 @@
   function restoreOriginal() {
     stopWatchingNewContent();
     newContentSeen = false;
+    hiddenSkipped = [];
+    // Il lavoro ancora in volo smette di essere quello buono: quando le
+    // risposte arriveranno si butteranno via da sole, invece di ritradurre a
+    // metà una pagina che l'utente ha appena riportato indietro.
+    runSeq++;
     // Etichette: rimettere il valore di prima, o togliere l'attributo se prima
     // non c'era (le voci dei menu a tendina tornano a mostrare il loro testo).
     for (let i = translatedAttrs.length - 1; i >= 0; i--) {
