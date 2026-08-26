@@ -585,7 +585,11 @@
     pageComplete = false;
     missingCount = 0;
     totalCount = 0;
-    Popup.showToast(I18n.t('toast_original_restored'));
+    // Fermare una traduzione appena partita non è "ripristinare": sullo schermo
+    // non era ancora cambiato niente, e dire il contrario è già una piccola
+    // bugia. Ferma restando che la richiesta è stata ascoltata, e va detto.
+    if (!restoredAny && wasWorking) Popup.showToast(I18n.t('toast_translation_cancelled'));
+    else Popup.showToast(I18n.t('toast_original_restored'));
   }
 
   function hasTranslation() { return pageHasTranslation; }
