@@ -175,10 +175,27 @@ let streamCounter = 0;
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
 const broadcastListeners = new Set();
+// #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
+// riquadro i content script si montano solo quando l'utente lo tocca; ma
+// «Traduci la pagina» arriva dalla pagina che lo ospita, non da un clic lì
+// dentro, e un riquadro addormentato lascerebbe il suo testo in lingua
+// originale sotto un avviso che dichiara finito. La costante di SN_MSG qui non
+// c'è ancora (i moduli condivisi si caricano dopo): il valore letterale è
+// l'unico modo, ed è lo stesso trucco della consegna delle scorciatoie.
+const WAKE_BROADCASTS = new Set(['frame_translate']);
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
-  for (const fn of broadcastListeners) {
-    try { fn(msg, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo CS] listener err', e); }
+  const deliver = () => {
+    for (const fn of broadcastListeners) {
+      try { fn(msg, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo CS] listener err', e); }
+    }
+  };
+  const type = msg && msg.type;
+  if (IS_SUBFRAME && !contentScriptsStarted && WAKE_BROADCASTS.has(type)) {
+    ensureContentScripts();
+    waitForContentScripts(deliver);
+    return;
   }
+  deliver();
 });
 
 const chromeShim = {
