@@ -439,6 +439,16 @@ non si riescono a cliccare (#500).
 - **Regola.** Ogni overlay posizionato con una misura presa dal DOM tiene un
   `ResizeObserver` sul proprio contenitore e ripete la posa a ogni cambio
   d'altezza, finché resta aperto. Se l'altezza non cambia non costa niente.
+- **L'osservatore non basta da solo.** La consegna del `ResizeObserver` è legata
+  al ciclo di disegno: se la finestra non sta dipingendo può arrivare molto
+  tardi (in cloud, sotto Xvfb, anche secondi). Dove si SA già cosa fa crescere
+  il riquadro — l'arrivo di un pezzo di risposta — chiedi la rimisura anche lì,
+  fusa per fotogramma. L'osservatore resta la rete per tutto il resto.
+- **Le superfici che crescono sono due.** Il menu del tasto destro e il riquadro
+  della risposta di Filo hanno lo STESSO difetto e la stessa cura: chi ne
+  sistema uno sistemi anche l'altro, o chi ha segnalato il primo incontra il
+  secondo il giorno dopo (#500). La geometria sta in un posto solo,
+  `src/shared/overlayPlacement.js`; menu e riquadro la usano, non la ricopiano.
 - **Ricrescita ≠ prima posa.** Alla prima apertura il menu si **ribalta** sopra
   al cursore se sotto non ci sta. Ripetere quel ribaltamento a ogni ricrescita
   farebbe schizzare via il menu da sotto la mano proprio mentre l'utente sta per
