@@ -970,3 +970,164 @@ test('chiedere l’originale mentre traduce: la pagina torna indietro e ci RESTA
   await page.locator('#q0').click({ button: 'right', position: { x: 5, y: 5 } });
   await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Traduci');
 });
+
+// ---------------------------------------------------------------------------
+// Il nome della scheda in alto (#407, secondo giro). È l'ultimo pezzo di lingua
+// originale che resta sotto gli occhi quando la pagina è tutta in italiano.
+// ---------------------------------------------------------------------------
+
+const TITLED = `<!doctype html><html lang="en">
+<head><title>The end of an era in European football</title></head>
+<body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">The end of an era in European football</h1>
+  <p id="p1">First paragraph of the body text, long enough to be picked up.</p>
+</body></html>`;
+
+test('anche il nome della scheda cambia lingua, e torna indietro con la pagina', async ({ app, shell, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, TITLED);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.locator('#head')).toHaveText(/^IT /, { timeout: 30000 });
+  // Il titolo del documento è quello che la scheda mostra in alto.
+  await expect.poll(() => page.evaluate(() => document.title), { timeout: 30000 }).toMatch(/^IT /);
+  // …e la scheda lo mostra davvero: è lì che l'utente lo legge.
+  await expect.poll(
+    () => shell.evaluate(() => (document.body.innerText || '')),
+    { timeout: 15000 },
+  ).toMatch(/IT The end of an era/);
+  expect(await toasts(page)).toContain('Pagina tradotta');
+
+  // Se si può cambiare, si deve poter tornare indietro.
+  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.locator('[data-sn-icon-id="translate"]').click();
+  await expect.poll(() => page.evaluate(() => document.title), { timeout: 15000 })
+    .toBe('The end of an era in European football');
+});
+
+// ---------------------------------------------------------------------------
+// Riquadri incorporati (#407, secondo giro): post incorporati, blocchi
+// commenti, moduli di iscrizione. Sono pagine dentro la pagina, e prima
+// restavano in inglese sotto la scritta "Pagina tradotta".
+// ---------------------------------------------------------------------------
+
+const EMBED_INNER = `<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+  <div id="fhead">A comment thread from the readers of this article</div>
+  <p id="fbody">The first comment left by a reader, written in english and long enough to count.</p>
+</body></html>`;
+
+const embedPage = (src, attrs = '') => `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An article with an embedded box inside it</h1>
+  <p id="p1">First paragraph of the body text, long enough to be picked up by the translation.</p>
+  <iframe id="emb" src="${src}" ${attrs} style="width:520px;height:220px;border:1px solid #ccc"></iframe>
+</body></html>`;
+
+const inFrame = (page, sel) => page.frameLocator('#emb').locator(sel);
+
+test('il testo dentro un riquadro incorporato viene tradotto insieme alla pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, embedPage(testServer.html(EMBED_INNER)));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  // Il pezzo della segnalazione: quello che sta nel riquadro.
+  await expect(inFrame(page, '#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect(inFrame(page, '#fhead')).toHaveText(/^IT /);
+  // Tradotta tutta: l'avviso non deve confessare niente.
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 })
+    .toContain('Pagina tradotta');
+  expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+
+  // "Mostra originale" riporta indietro anche il riquadro.
+  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.locator('[data-sn-icon-id="translate"]').click();
+  await expect(inFrame(page, '#fbody')).toHaveText(/^The first comment/, { timeout: 30000 });
+  await expect(page.locator('#p1')).toHaveText(/^First paragraph/);
+});
+
+test('riquadro incorporato di un altro sito: tradotto lo stesso', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  // "blocked.test" è un'ALTRA origine (la fixture la fa risolvere sul
+  // loopback): è il caso vero dei post incorporati e dei blocchi commenti, che
+  // arrivano sempre da un altro sito.
+  const cross = testServer.html(EMBED_INNER).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, embedPage(cross));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(inFrame(page, '#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 })
+    .toContain('Pagina tradotta');
+});
+
+test('tasto destro DENTRO il riquadro: cambia lingua anche quello sotto il cursore', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const cross = testServer.html(EMBED_INNER).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, embedPage(cross));
+  await watchToasts(page);
+
+  // Il menu si apre dentro il riquadro, e la voce Traduci vale per la pagina
+  // intera: prima traduceva tutto TRANNE il rettangolo sotto il cursore.
+  const frame = page.frameLocator('#emb');
+  await frame.locator('#fbody').click({ button: 'right', position: { x: 5, y: 5 } });
+  await frame.locator('[data-sn-icon-id="translate"]').click();
+
+  await expect(frame.locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+});
+
+test('riquadro che il sito chiude a chiave: lo dice, invece di dichiarare tradotta la pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  // `sandbox` senza allow-scripts: lì dentro non gira nessuno script, nemmeno
+  // il nostro. Il testo resta in inglese e l'utente lo vede: va detto.
+  const page = await testServer.openReady(openTab, embedPage(testServer.html(EMBED_INNER), 'sandbox'));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 })
+    .toContain('riquadro incorporato');
+  // Il rettangolo è ancora in inglese: "Pagina tradotta" sarebbe una bugia.
+  await expect(inFrame(page, '#fbody')).toHaveText(/^The first comment/);
+  const t = await toasts(page);
+  expect(t).not.toContain('Pagina tradotta');
+});
+
+// ---------------------------------------------------------------------------
+// Modello che risponde a vuoto (#407, secondo giro): non è un guasto, e
+// l'avviso non deve raccontarne uno.
+// ---------------------------------------------------------------------------
+
+// Paragrafi lunghi apposta: così le richieste sono più d'una e il blocco che
+// torna vuoto NON si porta dietro tutta la pagina — è il caso vero, dove una
+// parte è tradotta e una no.
+const LONG_FILLER = 'This is a long english sentence written to fill up a request. ';
+const EMPTY_ANSWER_PAGE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  ${Array.from({ length: 6 }, (_, i) => `<p id="g${i}">${LONG_FILLER.repeat(9)} Marker number ${i}.</p>`).join('\n  ')}
+  <p id="bad">${LONG_FILLER.repeat(9)} ZULU is the word that makes this block come back empty from the model.</p>
+</body></html>`;
+
+test('blocchi tornati vuoti dal modello: l’avviso lo dice, invece di "qualcosa è andato storto"', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, EMPTY_ANSWER_PAGE);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#g0');
+
+  const stopped = async () => (await toasts(page)).find((t) => t.startsWith('Traduzione interrotta')) || '';
+  await expect.poll(stopped, { timeout: 90000 }).toMatch(/^Traduzione interrotta/);
+  const msg = await stopped();
+  // La frase giusta esiste già e dice cosa è successo davvero.
+  expect(msg).toContain('Alcuni blocchi sono tornati vuoti dal modello');
+  // Quella sbagliata non dice niente e contraddice la riga dopo, che invita a
+  // riprendere: "riprova" e "puoi riprenderla" non possono stare insieme.
+  expect(msg).not.toContain('Qualcosa è andato storto');
+  expect(msg).toContain('Puoi riprenderla dal tasto destro');
+});
