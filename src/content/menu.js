@@ -164,6 +164,7 @@
     // giro sincrono, quindi non si vede nessuno sfarfallio.
     root.style.maxHeight = '';
     root.style.overflowY = '';
+    root.style.overscrollBehavior = '';
     const scale = readScale(root);
     const vw = window.innerWidth, vh = window.innerHeight;
 
@@ -171,6 +172,13 @@
     if (cap != null) {
       root.style.maxHeight = `${cap}px`;
       root.style.overflowY = 'auto';
+      // Lo scorrimento si ferma DENTRO il menu. Senza, arrivati in fondo alla
+      // spiegazione il giro di rotella successivo passa alla pagina: la pagina
+      // scorre, e uno scroll di pagina chiude il menu. Chi legge una
+      // spiegazione lunga fino in fondo perderebbe il menu proprio lì — col
+      // trackpad quasi sempre, perché l'inerzia continua da sola dopo che hai
+      // staccato le dita.
+      root.style.overscrollBehavior = 'contain';
       // `max-height` morde il box scelto dal CSS: con `content-box` — il valore
       // di partenza, e quello che si prende un menu dentro una pagina che non
       // impone `box-sizing` — bordo e imbottitura restano FUORI dal conto, e il
