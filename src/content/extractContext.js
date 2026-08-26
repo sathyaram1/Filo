@@ -532,7 +532,7 @@
       for (const c of el.children) kids.push(c);
       for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
     }
-    return Object.assign(out, { unreachable, truncated, attrs, shadowRoots });
+    return Object.assign(out, { unreachable, truncated, attrs, shadowRoots, hidden });
   }
 
   // Tutti gli elementi già tradotti, componenti isolati compresi: una
