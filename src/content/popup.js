@@ -269,13 +269,14 @@
   // ----------------------------------------------------------------
   // Drag dell'header
   // ----------------------------------------------------------------
-  function attachDrag(root, handle) {
+  function attachDrag(popup, handle) {
+    const root = popup.root;
     let dx = 0, dy = 0;
     let dragging = false;
     handle.addEventListener('mousedown', (e) => {
       if (e.target.closest('.sn-popup-close')) return;
       // Porta in primo piano il popup trascinato
-      bringToFront(rootToPopup(root));
+      bringToFront(popup);
       const rect = root.getBoundingClientRect();
       dx = e.clientX - rect.left;
       dy = e.clientY - rect.top;
@@ -287,6 +288,12 @@
     });
     function onMove(e) {
       if (!dragging) return;
+      // Da qui in poi la posa è una scelta dell'utente: Filo non lo sposta più
+      // da solo, o glielo muoverebbe sotto le dita mentre legge. Quello che
+      // continua a fare è tenerlo dentro la finestra facendolo scorrere (vedi
+      // `placePopup`).
+      popup.pinned = true;
+      popup.dragging = true;
       let left = e.clientX - dx;
       let top = e.clientY - dy;
       const w = root.offsetWidth, h = root.offsetHeight;
@@ -300,9 +307,13 @@
     }
     function onUp() {
       dragging = false;
+      popup.dragging = false;
       handle.classList.remove('sn-popup-dragging');
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('mouseup', onUp, true);
+      // Adesso che l'utente ha scelto il punto, il tetto si ricalcola su
+      // quello: il riquadro resta dov'è e il corpo scorre.
+      if (popup.pinned) placePopup(popup);
     }
   }
 
