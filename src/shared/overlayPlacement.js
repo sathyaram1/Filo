@@ -135,5 +135,7 @@
     return () => { try { ro.disconnect(); } catch (_) {} };
   }
 
-  global.SN_PLACE = { GAP, computeCap, computeOffset, readScale, applyCap, observeGrowth };
+  global.SN_PLACE = {
+    GAP, computeCap, computeOffset, computePinnedLimit, readScale, applyCap, observeGrowth,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
