@@ -40,6 +40,16 @@ async function cresciOltreIlBordo(page, sfora) {
   }, sfora);
 }
 
+// Pagina lunga: serve a vedere se lo scorrimento del menu si trasferisce alla
+// pagina sotto (deve fermarsi dentro al menu).
+function paginaLunga() {
+  return `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+    <div style="height:40vh;padding:16px">Testo in cima alla pagina.</div>
+    <a id="link" href="${LINK}" style="display:inline-block;padding:8px">un collegamento</a>
+    <div style="height:300vh;padding:16px">Tanta pagina sotto, tutta scorrevole.</div>
+  </body></html>`;
+}
+
 // Geometria del menu e della sua ultima voce.
 async function geometria(page) {
   return page.evaluate(() => {
