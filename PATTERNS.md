@@ -570,7 +570,11 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   saltati: si vede a occhio che il lavoro non è finito. La riga di confine è
   **si legge / si rimanda indietro**: si traduce ciò che l'utente LEGGE, mai ciò
   che il sito INVIA (`value` di un campo, voci di un `datalist`, `href`,
-  `name`). Corollario pratico: la voce di un menu a tendina si traduce
+  `name`). La riga passa **in mezzo agli `<input>`**: la scritta su un bottone è
+  il suo `value`, e quel valore entra nei dati del modulo solo se il bottone ha
+  un `name` — quindi un bottone che azzera il modulo, o che apre qualcosa nella
+  pagina, o un invio senza `name` si traduce, un invio con `name` no. Corollario
+  pratico: la voce di un menu a tendina si traduce
   **scrivendo l'attributo `label`**, mai sostituendone il testo — il testo di una
   `<option>` senza `value` è proprio ciò che il modulo invia, e il browser mostra
   `label` quando c'è. Conseguenza sul filtro dei sottoalberi: "qui non c'è prosa"
