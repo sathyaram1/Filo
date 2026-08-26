@@ -534,6 +534,7 @@
     wrap.appendChild(text);
     popup.bodyEl.appendChild(wrap);
     popup.bodyEl.scrollTop = popup.bodyEl.scrollHeight;
+    richiediPosa(popup);
     return { wrap, text };
   }
 
