@@ -616,6 +616,10 @@
         const done = el.dataset && el.dataset.snTranslatedAttrs;
         if (done) attrCount += done.split(',').filter(Boolean).length;
         if (el.shadowRoot) roots.push(el.shadowRoot);
+        // Riquadri senza indirizzo: la traduzione ci entra, quindi anche il
+        // conto dei pezzi già fatti e il ritorno all'originale devono entrarci.
+        const inner = inlineFrameBody(el);
+        if (inner && inner.ownerDocument) roots.push(inner.ownerDocument);
       }
     }
     return Object.assign(out, { attrCount });
