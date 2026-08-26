@@ -2821,12 +2821,13 @@
     loadWorkerLog();
   });
 
-  // Tab "Automazioni": le fusioni in attesa si rileggono a OGNI apertura —
-  // una richiesta già decisa o appena arrivata renderebbe la sezione una
+  // Tab "Ricevuti" (l'avviso da decidere) e "Automazioni" (la traccia delle
+  // decisioni passate): le fusioni si rileggono a OGNI apertura — una
+  // richiesta già decisa o appena arrivata renderebbe la sezione una
   // fotografia vecchia.
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'automation') return;
+    if (!btn || (btn.dataset.tab !== 'automation' && btn.dataset.tab !== 'inbox')) return;
     loadMergeApprovals();
   });
 
