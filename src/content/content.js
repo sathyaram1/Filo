@@ -746,10 +746,11 @@
       linkEl,
       imgEl,
       mediaEl,
-      // I tre `*Under` escono da qui GIÀ VAGLIATI: `sameSurface` li ha confrontati
-      // con l'elemento davvero cliccato, e chi legge questi campi più a valle non
-      // deve rifare il controllo (né può dimenticarselo — è così che la barra
-      // fissa e il manto invisibile erano finiti nel menu).
+      // I tre `*Under` escono da qui GIÀ VAGLIATI: o `sameSurface` li ha
+      // confrontati con l'elemento davvero cliccato, o è il DOM a legarli alla
+      // copertina adottata. Chi legge questi campi più a valle non deve rifare
+      // il controllo (né può dimenticarselo — è così che la barra fissa e il
+      // manto invisibile erano finiti nel menu).
       mediaUnder,
       imgUnder,
       // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
