@@ -5,7 +5,13 @@
 //
 // Le unità da tradurre arrivano da Extract.extractTranslatableBlocks(): TUTTO
 // il testo visibile della pagina (titoli, sommari, didascalie, riquadri
-// laterali, voci di menu, link), non solo i paragrafi dell'articolo.
+// laterali, voci di menu, link), non solo i paragrafi dell'articolo. Più due
+// pezzi che non stanno nel corpo del documento: il NOME DELLA SCHEDA in alto
+// (document.title) e il testo dentro i RIQUADRI INCORPORATI — post
+// incorporati, blocchi commenti, moduli di iscrizione: pagine dentro la pagina,
+// che il frame principale non può toccare ma dove il content script di Filo
+// gira lo stesso, e a cui la traduzione passa parola (vedi "Riquadri
+// incorporati" più sotto).
 //
 // Ricostruzione: i figli di un'unità diventano segnaposto [[Lk]] nel testo
 // mandato al modello e vengono rimessi al loro posto come NODI VIVI (non come
