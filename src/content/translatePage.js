@@ -612,15 +612,13 @@
     } catch (_) { return false; }
   }
 
+  // Il marchio sta sulla RADICE del pezzo di UI: un nodo che compare in fondo a
+  // un nostro popup va cercato fra gli antenati. `closest` risale tutto l'albero
+  // (prima si guardavano otto livelli e bastava un popup più profondo per
+  // scambiare il nostro stesso disegno per testo appena arrivato dal sito).
   function isInsideFiloUi(el) {
-    const own = Extract && typeof Extract.isFiloOwnUi === 'function' ? Extract.isFiloOwnUi : null;
-    if (!own) return false;
-    let cur = el;
-    for (let i = 0; cur && i < 8; i++) {
-      if (own(cur)) return true;
-      cur = cur.parentElement;
-    }
-    return false;
+    const UI = global.SN_FILO_UI;
+    return !!(UI && UI.inside(el));
   }
 
   // Avviso di fine lavoro: "Pagina tradotta" solo se non è rimasto fuori niente.
