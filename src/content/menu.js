@@ -1193,8 +1193,8 @@
   global.SN_MENU = {
     open,
     close,
-    computeCap,
-    computeOffset,
+    computeCap: Place.computeCap,
+    computeOffset: Place.computeOffset,
     computeSubOffset,
     openGenericSubmenu,
     openIconGridSubmenu,
