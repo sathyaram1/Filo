@@ -423,8 +423,18 @@
   //     il punto d'inserimento del cursore: sopra un elemento davvero vuoto
   //     cade sull'elemento stesso, sopra un componente chiuso viene rimbalzato
   //     fuori, perché il testo su cui cadrebbe sta in un albero che non ci
-  //     appartiene. Se il punto è coperto da altro (o fuori dallo schermo) la
-  //     prova non si può fare: lì si torna alla prudenza di prima.
+  //     appartiene.
+  //
+  // La prova del punto si può fare solo dove il cursore arriva: dentro lo
+  // schermo, e su un elemento che i clic non attraversano. Fuori di lì la
+  // risposta è "non lo so" — e "non lo so" NON è "è un componente chiuso".
+  // Trattarlo come tale rovesciava la bugia della segnalazione: su qualsiasi
+  // pagina più lunga di una schermata basta uno spaziatore col trattino nel
+  // nome sotto il bordo dello schermo, o una decorazione trasparente ai clic
+  // (è così che i siti disegnano quasi tutte le icone), e una pagina tradotta
+  // per intero si chiudeva con "restano nella lingua originale". L'utente va a
+  // cercare dell'inglese che non c'è, e la volta che l'avviso dice il vero non
+  // ci crede più. Dove non si può guardare non si accusa: si tace.
   const CLOSED_MIN_W = 40;
   const CLOSED_MIN_H = 16;
 
