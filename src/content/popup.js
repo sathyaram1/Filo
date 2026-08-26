@@ -423,6 +423,7 @@
     if (!popup) return;
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
+    (popup.cleanups || []).forEach((fn) => { try { fn(); } catch (_) {} });
     popup.root.remove();
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
