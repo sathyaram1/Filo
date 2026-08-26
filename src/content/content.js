@@ -1383,7 +1383,7 @@
     // completo mentre il filmatino suonava, menu vuoto un istante dopo (#444).
     if (imgUnder) {
       for (const it of buildImageActionItems(imgUnder)) items.push(it);
-      if (sameSurface(imgUnder, linkUnder)) {
+      if (belongsTo(imgUnder, linkUnder)) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
       }
