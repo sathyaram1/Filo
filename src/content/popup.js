@@ -476,6 +476,7 @@
     if (!popup) return;
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
+    try { popup.pose?.dispose(); } catch (_) {}
     popup.root.remove();
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
