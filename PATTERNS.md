@@ -589,6 +589,19 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   con `showToast(testo, { duration: 0 })` e si **chiude** con l'handle restituito
   quando arriva l'esito: i toast delle pagine non si impilano, si sovrapporrebbero
   nello stesso angolo diventando illeggibili.
+- **Anche l'avviso onesto deve essere vero: "solo in parte" vuole una PROVA, non
+  prudenza.** Un "è rimasto fuori qualcosa" che scatta a vuoto manda l'utente a
+  cercare del testo in lingua originale che non esiste, e brucia la credibilità
+  dell'avviso per le volte in cui è vero: sbagliare "dalla parte della prudenza"
+  non è gratis. Concretamente, per dire che il contenuto di un componente del
+  sito è illeggibile non basta che l'elemento sia vuoto e abbia il trattino nel
+  nome (un separatore o uno spaziatore disegnato in CSS è fatto così): servono
+  segnali positivi — che il sito l'abbia davvero **registrato** (`:defined`,
+  interrogabile sul DOM anche da un altro mondo JS, al contrario del registro dei
+  componenti) e che lì dentro qualcosa sia **disegnato e irraggiungibile** (sopra
+  un elemento vuoto il punto d'inserimento del cursore cade sull'elemento stesso,
+  sopra un componente chiuso viene rimbalzato fuori). Dove la prova non si può
+  fare — punto fuori dallo schermo o coperto — si torna alla prudenza.
 - **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
   (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
