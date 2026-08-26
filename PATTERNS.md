@@ -791,11 +791,11 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   **numero d'ordine del giro** sulle unità di lavoro fa buttare via le risposte in
   volo, invece di lasciarle ricadere sulla pagina qualche secondo dopo e
   ritradurla a metà. E l'avviso "sto lavorando" si chiude **nell'istante** in cui
-  si ferma, non quando le richieste già spedite si decidono a tornare: un
-  riquadro "in corso" accanto a "annullata" dice che la richiesta non è stata
-  ascoltata. Chi mostra un avviso di avanzamento ne tiene quindi l'handle dove
-  arriva anche l'annullamento, non solo nella funzione che lavora. Vale per
-  qualsiasi lavoro asincrono annullabile, non solo qui.
+  l'utente ferma, non quando le richieste già spedite si decidono a tornare. Un
+  riquadro "in corso" accanto a "annullata" gli dice che nessuno l'ha ascoltato.
+  Quindi l'handle dell'avviso di avanzamento vive dove arriva anche
+  l'annullamento, non solo dentro la funzione che lavora. Vale per qualsiasi
+  lavoro asincrono annullabile, non solo qui.
 - **La ripresa non ripaga ciò che è già fatto**: i pezzi conclusi si marcano nel
   DOM (`data-sn-translated`) e si escludono **prima** di costruire le richieste,
   non dopo aver ricevuto la risposta. Escluderli dopo significa pagare due volte
