@@ -801,6 +801,15 @@
     <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
          il dettaglio al centro e il pannello laterale a destra sono comuni. -->
     <section class="mg-panel mg-panel--active" id="panel-list" data-panel="list">
+      <!-- Fusioni fermate dai controlli di sicurezza, in attesa del tuo via
+           libera (SPEC-RIDISEGNO-MAX.md §10). IN CIMA AI RICEVUTI, perché i
+           Ricevuti sono le cose che aspettano una decisione dell'owner e
+           questa è la più urgente: un ramo fermo finché lui non dice sì o no
+           (scelta owner 2026-08-26). Il pannello è condiviso dalle quattro
+           schede-lista, quindi il JS la mostra SOLO sui Ricevuti. Vuoto =
+           invisibile. La traccia delle decisioni passate resta in Automazioni. -->
+      <div class="mg-merge-approvals" id="mgMergeApprovals" hidden></div>
+
       <!-- Le larghezze delle colonne si trascinano dai due divisori e vengono
            ricordate; doppio clic su un divisore ripristina la misura iniziale. -->
       <div class="mg-review" id="mgReviewGrid">
