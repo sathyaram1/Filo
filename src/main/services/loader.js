@@ -12,6 +12,9 @@ const SVC = __dirname;
 
 // Ordine identico al vecchio background.js importScripts(...).
 require(path.join(SHARED, 'constants.js'));
+// Il marchio della UI di Filo dentro le pagine web: serve ai content script,
+// ma sta fra i moduli condivisi e segue l'ordine di tutti gli altri.
+require(path.join(SHARED, 'filoUi.js'));
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
 require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
