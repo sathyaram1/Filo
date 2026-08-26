@@ -739,6 +739,35 @@
     } catch (_) {}
   }
 
+  // Il nome della scheda. È testo della pagina come gli altri e va nella stessa
+  // coda di lavoro: un'unità sola, che si applica scrivendo `document.title`.
+  // Solo dal frame principale — il titolo di un riquadro incorporato non
+  // compare da nessuna parte, e tradurlo sarebbe una richiesta al modello
+  // pagata per niente.
+  function titleUnit(myRun) {
+    if (!isTopFrame() || translatedTitle) return null;
+    let text = '';
+    try { text = String(document.title || '').replace(/\s+/g, ' ').trim(); } catch (_) { return null; }
+    if (!hasTranslatableText(text)) return null;
+    return { title: true, templated: text, refs: [], run: myRun };
+  }
+
+  function applyTitleTranslation(unit, text) {
+    if (unit.applied || !text) return;
+    try {
+      const original = document.title;
+      document.title = text;
+      // Il segno sul <title> serve a due cose: la ripresa lo conta fra i pezzi
+      // già fatti, e la sentinella del testo nuovo non scambia la nostra stessa
+      // scrittura per testo appena arrivato dal sito (dichiarerebbe "il sito ne
+      // ha aggiunta dell'altra" su una pagina dove non è arrivato niente).
+      const el = document.querySelector('title');
+      if (el && el.dataset) el.dataset.snTranslated = '1';
+      translatedTitle = { original };
+      unit.applied = true;
+    } catch (_) {}
+  }
+
   // Etichetta negli attributi: si scrive l'attributo e si tiene da parte com'era
   // (e SE c'era: su una <option> senza etichetta esplicita l'attributo lo
   // aggiungiamo noi, e il ritorno all'originale deve toglierlo, non lasciarne
