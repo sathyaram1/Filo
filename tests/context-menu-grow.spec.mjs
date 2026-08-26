@@ -295,11 +295,14 @@ test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e spari
   const prima = await ancoraEPannello(page);
 
   // Uno scorrimento breve: la freccetta è ancora lì, il pannello la segue.
+  // (Lo scorrimento arriva come evento, quindi si aspetta invece di misurare
+  // subito: senza il fix il pannello non si muove MAI e l'attesa scade.)
   await page.evaluate(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 20; });
-  await expect.poll(async () => (await ancoraEPannello(page)).ancoraTop, { timeout: 3000 })
-    .toBeLessThan(prima.ancoraTop);
-  const durante = await ancoraEPannello(page);
-  restaAttaccato(prima, durante);
+  await expect.poll(async () => {
+    const s = await ancoraEPannello(page);
+    const deriva = (s.pannelloTop - s.ancoraTop) - (prima.pannelloTop - prima.ancoraTop);
+    return { scorso: s.ancoraTop < prima.ancoraTop, attaccato: Math.abs(deriva) <= 2 };
+  }, { timeout: 3000 }).toEqual({ scorso: true, attaccato: true });
 
   // Scorrimento lungo: la freccetta esce oltre il bordo alto. Il pannello non ha
   // più niente a cui stare appeso e si chiude, invece di galleggiare da solo.
