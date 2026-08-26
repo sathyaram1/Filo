@@ -128,7 +128,7 @@
       const t = parseFloat(root.style.top);
       if (Number.isFinite(l) && Number.isFinite(t)) from = { left: l, top: t };
     }
-    const p = computeOffset({
+    const p = Place.computeOffset({
       x, y,
       visW: root.offsetWidth * scale,
       visH: root.offsetHeight * scale,
