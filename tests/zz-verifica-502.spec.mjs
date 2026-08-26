@@ -35,6 +35,9 @@ test('#502 — a risposta finita la riga per scrivere resta dentro lo schermo', 
     globalThis.SN_PROVIDER_GEMINI = {
       ...orig,
       streamComplete: async ({ onDelta }) => {
+        // Il modello ci mette un attimo a rispondere: il riquadro resta vuoto
+        // per un po', ed è lì che si posa. Poi il testo arriva e lo allunga.
+        await new Promise((r) => setTimeout(r, 4000));
         const par = 'Questa è una spiegazione approfondita abbastanza lunga da riempire il riquadro fino al suo tetto di altezza, come succede con una risposta vera. ';
         let full = '';
         for (let i = 0; i < 12; i++) {
