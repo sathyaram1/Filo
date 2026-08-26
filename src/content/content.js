@@ -1447,14 +1447,24 @@
       // destro arriva lì invece che sull'`<img>`. Se non c'è un filmato in
       // funzione, il contenuto della scheda è quell'immagine: le sue voci sono
       // quelle che l'utente cerca (#444).
-      const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl)) ? imgUnder : null;
+      const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl, layers)) ? imgUnder : null;
       if (imgInLink) {
         for (const it of buildImageActionItems(imgInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
       for (const it of buildLinkActionItems(linkEl)) items.push(it);
       items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplainLink(linkEl));
+      // Il riquadro parla dell'elemento primario, cioè di quello le cui voci
+      // aprono il menu: se abbiamo adottato la copertina, il primario è lei.
+      // Senza questa riga la stessa scheda cambiava argomento a seconda del
+      // punto cliccato — la parte scoperta della copertina descriveva
+      // l'immagine, la fascia del titolo centoventi pixel più in basso
+      // analizzava il collegamento, con le stesse identiche voci-azione (#444).
+      // Sul filmato resta il collegamento: una spiegazione del filmato non
+      // esiste, ed è già la stessa in tutti e tre i modi di cliccare la scheda.
+      items.push(imgInLink
+        ? Actions.buildInlineExplainImage(imgInLink)
+        : Actions.buildInlineExplainLink(linkEl));
       return items;
     }
 
