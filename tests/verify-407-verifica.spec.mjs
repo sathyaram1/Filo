@@ -496,7 +496,11 @@ test('pagina oltre il tetto di un giro: avviso onesto e ripresa che arriva in fo
     return n;
   }, MARK);
 
-  if (leftover > 0) {
+  // 2400 righe superano il tetto di un giro solo: la coda DEVE restare fuori,
+  // altrimenti questo caso non lo sta provando nessuno.
+  expect(leftover, 'il tetto di un giro non è stato superato: il caso non è coperto')
+    .toBeGreaterThan(0);
+  {
     expect(first, `avviso disonesto: "${first}" con ${leftover} righe ancora in inglese`)
       .not.toBe('Pagina tradotta');
     expect(first).toMatch(/Riprendi|riprender/);
