@@ -998,6 +998,8 @@ test('anche il nome della scheda cambia lingua, e torna indietro con la pagina',
     { timeout: 15000 },
   ).toMatch(/IT The end of an era/);
   expect(await toasts(page)).toContain('Pagina tradotta');
+  // Traccia ispezionabile della scheda in alto (gitignorata).
+  await shell.screenshot({ path: 'tests/.shots/translate-page-tab-title.png' }).catch(() => {});
 
   // Se si può cambiare, si deve poter tornare indietro.
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
