@@ -928,18 +928,25 @@
     if (!tooltipEl) return;
     tooltipEl.style.display = 'none';
   }
+  // Toglie l'etichetta E l'attesa che sta per farla comparire. Serve quando a
+  // muoversi non è il puntatore ma il menu (scivola, scorre, viene trascinato):
+  // l'attesa lasciata correre farebbe comparire fra un attimo l'etichetta di un
+  // bottone che nel frattempo si è spostato altrove.
+  function dismissTooltip() {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = null;
+    hideTooltip();
+  }
   function attachTooltip(el, text) {
     el.addEventListener('mouseenter', () => {
       clearTimeout(tooltipHideTimer);
       tooltipHideTimer = setTimeout(() => showTooltip(el, text), 250);
     });
     el.addEventListener('mouseleave', () => {
-      clearTimeout(tooltipHideTimer);
-      hideTooltip();
+      dismissTooltip();
     });
     el.addEventListener('mousedown', () => {
-      clearTimeout(tooltipHideTimer);
-      hideTooltip();
+      dismissTooltip();
     });
   }
 
