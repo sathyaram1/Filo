@@ -38,6 +38,28 @@
 
   const HAS_LETTER = /\p{L}/u;
 
+  // Riquadri incorporati (#407). Sotto queste misure non c'è un post
+  // incorporato né un blocco commenti: c'è un pixel di tracciamento o uno
+  // spaziatore. Non si traducono e non entrano nel conto di ciò che è rimasto
+  // fuori — un avviso "una parte è rimasta in lingua originale" che scatta per
+  // un iframe da 1×1 manda l'utente a cercare del testo che non esiste.
+  const FRAME_MIN_W = 120;
+  const FRAME_MIN_H = 40;
+  // Tempo dato a un riquadro per farsi vivo. Chi non risponde entro questo
+  // momento non ha script (sandbox chiuso): è esattamente il caso in cui
+  // l'avviso deve dire che una parte è rimasta fuori.
+  const FRAME_ACK_GRACE = 2500;
+  // Tetto all'attesa di chi si è fatto vivo e sta lavorando. Non è un timer da
+  // consumare: si esce appena tutti hanno finito.
+  const FRAME_WORK_CAP = 60000;
+
+  // Errore "vuoto": il modello ha risposto, ma senza testo. Non è un guasto —
+  // la richiesta è partita e la risposta è tornata — e non va raccontato come
+  // tale: "Qualcosa è andato storto. Riprova" non dice niente e contraddice la
+  // riga che segue, che invita a riprendere. La frase giusta esiste già e parla
+  // di blocchi tornati vuoti dal modello.
+  const EMPTY_ANSWER = { emptyAnswer: true };
+
   let pageTranslating = false;
   let pageHasTranslation = false;
   // Traduzione arrivata in fondo? Distinguere "completa" da "a metà" è ciò che
