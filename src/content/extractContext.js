@@ -375,21 +375,45 @@
   // fare è ACCORGERSENE, così l'avviso finale resta onesto ("tradotta solo in
   // parte") invece di dichiarare finito un lavoro monco.
   //
-  // Riconoscerlo senza falsi allarmi: un elemento personalizzato del sito (nome
-  // col trattino) che non espone un contenitore aperto, non ha NIENTE dentro di
-  // sé nella pagina, e ciò nonostante occupa un rettangolo grande abbastanza da
-  // starci del testo — sta disegnando qualcosa che noi non vediamo.
+  // Riconoscerlo senza falsi allarmi. Un avviso "tradotta solo in parte" che
+  // scatta a vuoto manda l'utente a cercare del testo in lingua originale che
+  // non esiste, e brucia la credibilità dell'avviso quando è vero: qui servono
+  // PROVE, non prudenza. Tre, tutte necessarie:
   //
-  // NB: "è un componente registrato dal sito?" non è una domanda che si possa
-  // fare da qui — il registro dei componenti della pagina non è lo stesso che
-  // vede il codice di Filo, e da qui risulterebbe sempre vuoto. Restano la
-  // forma del nome e il rettangolo. La soglia tiene fuori le icone disegnate
-  // via CSS (quadratini di 20-30px senza testo), che sono il falso allarme
-  // plausibile; nel dubbio si sbaglia dalla parte della prudenza, perché
-  // "tradotta solo in parte" di troppo costa molto meno di un "Pagina tradotta"
-  // falso.
+  //  1. il sito ha davvero REGISTRATO quel componente (`:defined`). Il registro
+  //     dei componenti della pagina non si può interrogare da qui (è un altro
+  //     mondo JS), ma `:defined` è uno stato dell'elemento nel DOM, e il DOM è
+  //     lo stesso: risponde per la pagina, non per noi. È ciò che scarta i
+  //     separatori e gli spaziatori col trattino nel nome disegnati solo in CSS
+  //     — che nessuno ha mai registrato;
+  //  2. il rettangolo è grande abbastanza da starci del testo;
+  //  3. qualcosa è DISEGNATO lì dentro e noi non lo raggiungiamo. Il segnale è
+  //     il punto d'inserimento del cursore: sopra un elemento davvero vuoto
+  //     cade sull'elemento stesso, sopra un componente chiuso viene rimbalzato
+  //     fuori, perché il testo su cui cadrebbe sta in un albero che non ci
+  //     appartiene. Se il punto è coperto da altro (o fuori dallo schermo) la
+  //     prova non si può fare: lì si torna alla prudenza di prima.
   const CLOSED_MIN_W = 40;
   const CLOSED_MIN_H = 16;
+
+  // 'self' = lì dentro non c'è niente · 'other' = c'è qualcosa che non
+  // raggiungiamo · 'unknown' = non si può dire (fuori schermo, o coperto).
+  function paintedContentProbe(el, rect) {
+    try {
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return 'unknown';
+      // Il punto deve colpire proprio lui: sotto un menu fisso o un riquadro
+      // sovrapposto misureremmo l'elemento sbagliato.
+      const hit = document.elementFromPoint(x, y);
+      if (hit !== el) return 'unknown';
+      const node = document.caretPositionFromPoint
+        ? (document.caretPositionFromPoint(x, y) || {}).offsetNode
+        : (document.caretRangeFromPoint ? (document.caretRangeFromPoint(x, y) || {}).startContainer : null);
+      if (!node) return 'unknown';
+      return node === el ? 'self' : 'other';
+    } catch (_) { return 'unknown'; }
+  }
 
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
@@ -398,8 +422,10 @@
     if (el.children.length) return false;            // ha contenuto raggiungibile
     if ((el.textContent || '').trim()) return false;
     try {
+      if (el.matches && !el.matches(':defined')) return false;
       const r = el.getBoundingClientRect();
-      return r.width >= CLOSED_MIN_W && r.height >= CLOSED_MIN_H;
+      if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
+      return paintedContentProbe(el, r) !== 'self';
     } catch (_) { return false; }
   }
 
