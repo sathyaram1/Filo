@@ -1,8 +1,8 @@
 /* Avviso delle fusioni in attesa di approvazione (src/shared/mergeApprovals.js).
  *
- * UN foglio per DUE superfici: la prima schermata (dashboard) e Gestione →
- * Automazioni. Cammini equivalenti devono anche SEMBRARE la stessa cosa; con
- * due fogli, prima o poi uno dei due prende una tinta che l'altro non ha.
+ * Vive nella dashboard di gestione: l'avviso da decidere in cima ai Ricevuti,
+ * la traccia delle decisioni passate in Automazioni. Un foglio solo per
+ * entrambe le rese, così non possono divergere.
  *
  * Tutto passa dai token del tema (`--sn-*`): niente colori sparsi, così gli
  * override estetici dell'utente valgono anche qui e il blocco resta leggibile
