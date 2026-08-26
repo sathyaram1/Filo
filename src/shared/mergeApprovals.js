@@ -475,6 +475,7 @@
     headline: headline,
     requestedBy: requestedBy,
     originOf: originOf,
+    feedbackNum: feedbackNum,
     originLabel: originLabel,
     originHint: originHint,
     howToRetry: howToRetry,
