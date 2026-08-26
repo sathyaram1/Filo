@@ -520,3 +520,58 @@ test('pagina oltre il tetto di un giro: avviso onesto e ripresa che arriva in fo
     }, MARK), { timeout: 180_000 }).toBe(0);
   }
 });
+
+// ---------------------------------------------------------------------------
+// 10. Come si vedono gli avvisi nuovi (che sono lunghi) e il menu quando
+//     l'icona cambia mestiere — tema chiaro e tema scuro.
+// ---------------------------------------------------------------------------
+
+async function setTheme(app, theme) {
+  await app.evaluate(async (_e, t) => {
+    await globalThis.SN_STORAGE.updateSettings({ theme: t });
+  }, theme);
+}
+
+for (const theme of ['light', 'dark']) {
+  test(`aspetto degli avvisi lunghi e del menu — tema ${theme}`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(150_000);
+    await stubModel(app);
+    await setTheme(app, theme);
+    await setMode(app, 'zulu-empty');
+    const filler = 'This is a long english sentence used to fill up the request. ';
+    const good = Array.from({ length: 5 }, (_, i) =>
+      `<p id="g${i}">${filler.repeat(9)} Marker ${i}.</p>`).join('');
+    const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="padding:20px">
+      ${good}<p id="bad">${filler.repeat(9)} ZULU sentence the model refuses.</p>
+    </body></html>`);
+
+    await clickTranslate(page);
+    await expect.poll(() => settled(page), { timeout: 90_000 }).toMatch(/^Traduzione interrotta/);
+    mkdirSync('tests/.shots', { recursive: true });
+    await page.screenshot({ path: `tests/.shots/407v-avviso-interrotta-${theme}.png` });
+
+    // L'avviso lungo non deve uscire dallo schermo né coprirlo tutto.
+    const box = await page.evaluate(() => {
+      const all = document.querySelectorAll('.sn-toast:not([data-sn-closing])');
+      const t = all[all.length - 1];
+      const r = t.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, h: r.height,
+               vw: window.innerWidth, vh: window.innerHeight };
+    });
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(box.vw + 1);
+    expect(box.bottom).toBeLessThanOrEqual(box.vh + 1);
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    expect(box.h).toBeLessThan(box.vh / 2);
+
+    // Il menu con l'icona che cambia mestiere: "Riprendi traduzione" e la voce
+    // "Mostra originale" che resta raggiungibile.
+    await openMenu(page);
+    expect(await page.locator('.sn-menu [data-sn-icon-id="translate"]').getAttribute('aria-label'))
+      .toBe('Riprendi traduzione');
+    expect(await page.evaluate(() => document.querySelector('.sn-menu').textContent))
+      .toContain('Mostra originale');
+    await page.screenshot({ path: `tests/.shots/407v-menu-riprendi-${theme}.png` });
+    await closeMenu(page);
+  });
+}
