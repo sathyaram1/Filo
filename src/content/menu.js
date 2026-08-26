@@ -347,26 +347,25 @@
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(root);
 
     // Posizionamento: misura, flip se necessario.
-    let h = root.offsetHeight;
-    const w = root.offsetWidth;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
-    // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
-    // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
-    // aiuto — sarebbero irraggiungibili. Sopra una finestra normale non cambia
-    // nulla: la condizione è falsa.
-    if (h + 16 > vh) {
-      root.style.maxHeight = `${Math.max(96, vh - 16)}px`;
-      root.style.overflowY = 'auto';
-      h = root.offsetHeight;
+    place(root, x, y);
+
+    // #500 — il menu non ha un'altezza definitiva quando lo si posa: le sezioni
+    // dinamiche (la spiegazione AI di una selezione, di un collegamento, di
+    // un'immagine) nascono a una riga e diventano tre quando la risposta arriva.
+    // Misurando una volta sola il menu cresceva OLTRE il bordo basso della
+    // finestra e l'ultima voce restava tagliata a metà, non cliccabile.
+    // Rimisurare a ogni cambio d'altezza lo tiene dentro; la posa "keep" scivola
+    // del minimo indispensabile invece di ribaltare il menu sotto il cursore.
+    if (typeof ResizeObserver === 'function') {
+      let placedH = root.offsetHeight;
+      const ro = new ResizeObserver(() => {
+        if (root.offsetHeight === placedH) return;
+        place(root, x, y, { keep: true });
+        placedH = root.offsetHeight;
+      });
+      ro.observe(root);
+      cleanups.push(() => { try { ro.disconnect(); } catch (_) {} });
     }
-    let left = x, top = y;
-    if (left + w + 8 > vw) left = vw - w - 8;
-    if (top + h + 8 > vh) top = Math.max(8, y - h);
-    if (left < 4) left = 4;
-    if (top < 4) top = 4;
-    root.style.left = `${left}px`;
-    root.style.top = `${top}px`;
 
     const onDocClick = (e) => {
       if (root.contains(e.target)) return;
