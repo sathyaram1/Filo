@@ -631,6 +631,7 @@
         retry.className = 'sn-msg-loading';
         retry.textContent = I18n.t('popup_loading');
         bubble.text.appendChild(retry);
+        reflow(popup);
       } else if (m.type === 'done') {
         if (firstDelta) {
           // nessun delta arrivato (es. cache vuota errore)
