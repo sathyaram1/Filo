@@ -127,23 +127,38 @@
     progressToast = null;
   }
 
-  async function translatePage() {
+  async function translatePage(opts) {
+    // Dentro un riquadro incorporato: stesso lavoro, ma senza avvisi (li mostra
+    // la pagina che lo ospita) e con un resoconto da mandarle indietro.
+    const quiet = !!(opts && opts.quiet);
+    const frameRunId = (opts && opts.runId) || '';
     // Riclic mentre traduce: l'avviso "in corso" è già sullo schermo (dura
     // quanto il lavoro), un secondo riquadro identico sopra sarebbe solo rumore.
-    if (pageTranslating) return;
+    if (pageTranslating) {
+      // Un riquadro già al lavoro non deve restare "mai finito" nel conto di
+      // chi lo ospita, o l'avviso finale direbbe che è rimasto fuori del testo
+      // che sta invece arrivando.
+      if (quiet) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
+      return;
+    }
     pageTranslating = true;
     const myRun = ++runSeq;
     const aborted = () => myRun !== runSeq;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
-    const progress = Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
-    progressToast = progress;
+    const progress = quiet
+      ? silentToast()
+      : Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
+    if (!quiet) progressToast = progress;
     // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è il
     // comportamento normale, e il testo che il sito carica in quei secondi è
     // testo che l'utente vede restare in lingua originale. Le nostre
     // sostituzioni non la ingannano: nascono già marcate come tradotte.
     newContentSeen = false;
     startWatchingNewContent();
+    // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
+    // parallelo alla pagina, non dopo di lei (l'attesa è attrito).
+    const framesRunId = quiet ? null : await beginFrames(myRun);
 
     let result = null;
     try {
@@ -161,10 +176,20 @@
         if (!newContentSeen || (result.kind !== 'done' && result.kind !== 'none')) break;
       }
       if (aborted()) return;
+      if (quiet) { reportToHost(frameRunId, { phase: 'end', applied: appliedOf(result), left: leftOf(result) }); return; }
+      // I riquadri lavorano in parallelo: l'avviso finale li aspetta, perché è
+      // lui a dover dire la verità su tutta la pagina. Fino ad allora resta in
+      // vista "sto traducendo": una cosa che lavora deve sembrare che lavori.
+      const frames = await waitForFrames(framesRunId, aborted);
+      if (aborted()) return;
       progress.close();
-      showResultToast(result, newContentSeen);
+      showResultToast(result, newContentSeen, frames);
     } finally {
       progress.close();
+      if (framesRunId) frameRuns.delete(framesRunId);
+      // Un riquadro che si ferma per strada (l'utente ha chiesto l'originale,
+      // un'eccezione) non deve lasciare la pagina ad aspettarlo fino al tetto.
+      if (quiet && (result === null || myRun !== runSeq)) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
       if (progressToast === progress) progressToast = null;
       // Se nel frattempo l'utente ha annullato (o ha già fatto ripartire un
       // altro giro), lo stato non è più nostro: toccarlo vorrebbe dire spegnere
