@@ -411,6 +411,7 @@
     });
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
+    try { root.dataset.dbg = `${(+root.dataset.dbgN||0)+1}|pin=${!!popup.pinned}|lim=${limit}|oh=${root.offsetHeight}`; root.dataset.dbgN = String((+root.dataset.dbgN||0)+1); } catch(_){}
   }
 
   // ----------------------------------------------------------------

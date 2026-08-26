@@ -73,6 +73,7 @@ async function geometria(page) {
     const input = r.querySelector('.sn-popup-input');
     const b = r.getBoundingClientRect();
     return {
+      dbg: r.dataset.dbg, dbgN: r.dataset.dbgN, styleMaxH: r.style.maxHeight,
       vh: window.innerHeight,
       top: Math.round(b.top),
       bottom: Math.round(b.bottom),
@@ -94,8 +95,8 @@ async function attendiRientro(page) {
   }, { timeout: 5000 }).toBeLessThanOrEqual(0);
 }
 
-test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestra', async ({ openTab, testServer }) => {
-  const page = await paginaFresca(openTab, testServer);
+test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestra', async ({ openTab }) => {
+  const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, 0.5);
   const prima = await geometria(page);
@@ -122,8 +123,8 @@ test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestr
   await expect(campo).toHaveValue('e questo cosa vuol dire?');
 });
 
-test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al cursore', async ({ openTab, testServer }) => {
-  const page = await paginaFresca(openTab, testServer);
+test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al cursore', async ({ openTab }) => {
+  const page = await paginaFresca(openTab);
 
   const y = await apriRiquadro(page, 0.5);
   const prima = await geometria(page);
@@ -140,8 +141,8 @@ test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al 
   expect(dopo.bottom).toBeGreaterThanOrEqual(dopo.vh - 12);
 });
 
-test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce', async ({ openTab, testServer }) => {
-  const page = await paginaFresca(openTab, testServer);
+test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce', async ({ openTab }) => {
+  const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, 0.05);
   const prima = await geometria(page);
@@ -152,8 +153,8 @@ test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce',
   expect(dopo.bottom).toBeLessThanOrEqual(dopo.vh);
 });
 
-test('#500 la risposta si accorcia: il riquadro non si tiene addosso una barra che non serve', async ({ openTab, testServer }) => {
-  const page = await paginaFresca(openTab, testServer);
+test('#500 la risposta si accorcia: il riquadro non si tiene addosso una barra che non serve', async ({ openTab }) => {
+  const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, 0.5);
   await rispostaArriva(page, 40);
@@ -185,8 +186,8 @@ async function trascinaA(page, y) {
   await page.mouse.up();
 }
 
-test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più da solo', async ({ openTab, testServer }) => {
-  const page = await paginaFresca(openTab, testServer);
+test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più da solo', async ({ openTab }) => {
+  const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, 0.1);
   const bersaglio = await page.evaluate(() => Math.round(window.innerHeight * 0.55));
@@ -195,7 +196,7 @@ test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più d
   expect(Math.abs(messo.top - bersaglio)).toBeLessThanOrEqual(4);
 
   await rispostaArriva(page, 40);
-  await page.waitForTimeout(500);
+  await attendiRientro(page);
 
   const dopo = await geometria(page);
   // Non gli si muove sotto le dita: sta dove l'utente l'ha messo…
