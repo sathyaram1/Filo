@@ -362,6 +362,11 @@
         Popup.showToast(I18n.t('toast_only_closed_components'), { duration: 7000 });
         return;
       case 'none':
+        // La pagina che ospita non aveva testo proprio, ma i riquadri
+        // incorporati sì: "Non ho trovato testo da tradurre" davanti a uno
+        // schermo che è appena cambiato lingua sarebbe falso.
+        if (framesApplied) { Popup.showToast(...doneToast(0, framesLeft)); return; }
+        if (framesLeft) { Popup.showToast(I18n.t('toast_page_translated_partial_frame'), { duration: 7000 }); return; }
         Popup.showToast(I18n.t('toast_nothing_to_translate'));
         return;
       case 'failed':
