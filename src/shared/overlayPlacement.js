@@ -6,7 +6,9 @@
 // sola all'apertura vuol dire posarle su un numero che scade un secondo dopo:
 // il fondo esce dalla finestra, e quello che resta tagliato è proprio la roba
 // in coda (le ultime voci del menu, la riga del modello e il campo della
-// domanda successiva). Vedi #500.
+// domanda successiva). Il menu è #500, il riquadro della risposta #502: stesso
+// difetto, stessa cura — ed è per questo che i numeri stanno qui e non in due
+// copie che prima o poi divergono.
 //
 // Qui stanno solo i numeri, senza DOM, così i casi limite si provano in unit
 // test; l'unica funzione che tocca il DOM (`applyCap`) fa una cosa sola e la

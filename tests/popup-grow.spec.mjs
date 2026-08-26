@@ -112,7 +112,7 @@ async function attendiRientro(page) {
   }, { timeout: 5000 }).toBeLessThanOrEqual(0);
 }
 
-test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestra', async ({ openTab }) => {
+test('#502 la risposta arriva e fa crescere il riquadro: resta dentro la finestra', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, SPAZIO_STRETTO);
@@ -140,7 +140,7 @@ test('#500 la risposta arriva e fa crescere il riquadro: resta dentro la finestr
   await expect(campo).toHaveValue('e questo cosa vuol dire?');
 });
 
-test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al cursore', async ({ openTab }) => {
+test('#502 crescendo, il riquadro scivola del minimo invece di saltare sopra al cursore', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
   const y = await apriRiquadro(page, SPAZIO_STRETTO);
@@ -158,7 +158,7 @@ test('#500 crescendo, il riquadro scivola del minimo invece di saltare sopra al 
   expect(dopo.bottom).toBeGreaterThanOrEqual(dopo.vh - 12);
 });
 
-test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce', async ({ openTab }) => {
+test('#502 un riquadro che ci sta già non si sposta di un pixel quando cresce', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, SPAZIO_LARGO);
@@ -172,7 +172,7 @@ test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce',
   expect(dopo.bottom).toBeLessThanOrEqual(dopo.vh);
 });
 
-test('#500 la risposta si accorcia: il riquadro non si tiene addosso una barra che non serve', async ({ openTab }) => {
+test('#502 la risposta si accorcia: il riquadro non si tiene addosso una barra che non serve', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, SPAZIO_STRETTO);
@@ -205,7 +205,7 @@ async function trascinaA(page, y) {
   await page.mouse.up();
 }
 
-test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più da solo', async ({ openTab }) => {
+test('#502 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più da solo', async ({ openTab }) => {
   const page = await paginaFresca(openTab);
 
   await apriRiquadro(page, SPAZIO_LARGO);
@@ -258,7 +258,7 @@ async function portaInPrimoPiano(shell, page) {
   }, marchio), { timeout: 5000 }).toBe('in primo piano');
 }
 
-test('#500 la finestra si accorcia sotto al riquadro: rientra e resta scrivibile', async ({ app, shell, openTab }) => {
+test('#502 la finestra si accorcia sotto al riquadro: rientra e resta scrivibile', async ({ app, shell, openTab }) => {
   const page = await paginaFresca(openTab);
   await portaInPrimoPiano(shell, page);
 

@@ -372,7 +372,7 @@
   // permettono di continuare la conversazione.
   const MIN_H = 180;
 
-  // #500 — quando il riquadro si apre è VUOTO: sta caricando, è alto un paio di
+  // #502 — quando il riquadro si apre è VUOTO: sta caricando, è alto un paio di
   // centinaia di pixel. Poi la risposta arriva e lo fa crescere fino al suo
   // tetto. Misurandolo una volta sola, il fondo finiva sotto il bordo della
   // finestra: la riga col modello e il costo tagliata a metà, il campo della
@@ -496,7 +496,7 @@
 
     placePopup(popup);
 
-    // #500 — il riquadro non ha un'altezza definitiva quando lo si posa: la
+    // #502 — il riquadro non ha un'altezza definitiva quando lo si posa: la
     // risposta arriva a pezzi e lo fa crescere. Lo si rimisura a ogni cambio,
     // finché resta aperto.
     popup.cleanups.push(Place.observeGrowth(root, () => placePopup(popup, { keep: true })));
@@ -617,7 +617,7 @@
         bubble.wrap.classList.add('sn-msg-error');
         popup.activePort = null;
       }
-      // #500 — ogni pezzo di risposta che arriva cambia l'altezza del riquadro:
+      // #502 — ogni pezzo di risposta che arriva cambia l'altezza del riquadro:
       // rimisurarlo qui è la via più corta, senza aspettare che il
       // `ResizeObserver` se ne accorga (la sua consegna è legata al ciclo di
       // disegno e può tardare). Le richieste dello stesso fotogramma si fondono

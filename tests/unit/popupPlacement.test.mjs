@@ -1,6 +1,6 @@
 // Unit test per la geometria del riquadro della risposta di Filo — quello che
 // si apre chiedendo di spiegare o tradurre e si riempie mentre la risposta
-// arriva (#500).
+// arriva (#502; stesso difetto del menu del tasto destro, #500).
 //
 // Il riquadro viene posato quando è ancora VUOTO (~200px: sta caricando). Poi
 // la risposta arriva e lo porta al suo tetto (480px). Se nessuno lo rimisura il
@@ -79,9 +79,9 @@ test('vicino al bordo destro il riquadro rientra', () => {
   assert.equal(p.left, VW - W - 8);
 });
 
-// --- #500: la risposta arriva e il riquadro cresce -------------------------
+// --- #502: la risposta arriva e il riquadro cresce -------------------------
 
-test('#500 la risposta arriva, il riquadro cresce: rientra invece di farsi tagliare', () => {
+test('#502 la risposta arriva, il riquadro cresce: rientra invece di farsi tagliare', () => {
   // Posa iniziale, riquadro ancora vuoto: metà schermo, ci stava.
   const primo = posa({ x: 300, y: 400, h: H_VUOTO });
   assert.equal(primo.top, 408);
@@ -93,33 +93,33 @@ test('#500 la risposta arriva, il riquadro cresce: rientra invece di farsi tagli
   assertDentro(dopo);
 });
 
-test('#500 crescendo il riquadro scivola del minimo, non salta sopra al cursore', () => {
+test('#502 crescendo il riquadro scivola del minimo, non salta sopra al cursore', () => {
   const dopo = posa({ x: 300, y: 400, h: H_PIENO, from: { left: 300, top: 408 } });
   // Scivolata di 96px: ribaltandosi finirebbe a -88, cioè fuori in cima.
   assert.equal(408 - dopo.top, 96);
 });
 
-test('#500 un riquadro che non ha bisogno di muoversi non si muove di un pixel', () => {
+test('#502 un riquadro che non ha bisogno di muoversi non si muove di un pixel', () => {
   const dopo = posa({ x: 300, y: 100, h: H_PIENO, from: { left: 300, top: 108 } });
   assert.deepEqual({ left: dopo.left, top: dopo.top }, { left: 300, top: 108 });
 });
 
-test('#500 in una finestra più bassa del riquadro compare la barra di scorrimento', () => {
+test('#502 in una finestra più bassa del riquadro compare la barra di scorrimento', () => {
   const p = posa({ x: 100, y: 100, h: H_PIENO, vw: 900, vh: 420, from: { left: 100, top: 108 } });
   assert.equal(p.cap, 420 - 16);
   assertDentro(p, 420);
 });
 
-test('#500 se la risposta poi si accorcia il tetto sparisce', () => {
+test('#502 se la risposta poi si accorcia il tetto sparisce', () => {
   // L\'altezza di partenza è sempre quella naturale: rientrato nella finestra,
   // il riquadro non si tiene addosso una barra che non gli serve più.
   const p = posa({ x: 300, y: 100, h: 240, from: { left: 300, top: 108 } });
   assert.equal(p.cap, null);
 });
 
-// --- #500: trascinato a mano, non si sposta più ----------------------------
+// --- #502: trascinato a mano, non si sposta più ----------------------------
 
-test('#500 trascinato a mano, il riquadro che cresce resta dov\'è e scorre', () => {
+test('#502 trascinato a mano, il riquadro che cresce resta dov\'è e scorre', () => {
   const from = { left: 500, top: 500 };
   const p = posa({ x: 300, y: 400, h: H_PIENO, from, pinned: true });
   assert.deepEqual({ left: p.left, top: p.top }, from, 'si è mosso sotto le dita dell\'utente');
@@ -128,14 +128,14 @@ test('#500 trascinato a mano, il riquadro che cresce resta dov\'è e scorre', ()
   assertDentro(p);
 });
 
-test('#500 trascinato in alto, il riquadro cresce per intero senza barra', () => {
+test('#502 trascinato in alto, il riquadro cresce per intero senza barra', () => {
   const from = { left: 500, top: 60 };
   const p = posa({ x: 300, y: 400, h: H_PIENO, from, pinned: true });
   assert.equal(p.cap, null);
   assert.equal(p.top, 60);
 });
 
-test('#500 trascinato a filo del bordo basso, scivolare è il male minore', () => {
+test('#502 trascinato a filo del bordo basso, scivolare è il male minore', () => {
   // Meno di `MIN_H` di spazio sotto: tagliandolo lì sparirebbero la riga del
   // modello e il campo della domanda, cioè tutto il motivo per cui esiste.
   const from = { left: 500, top: VH - 60 };
