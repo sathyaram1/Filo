@@ -366,6 +366,40 @@ function paginaCorta() {
   return `<!doctype html><html lang="en"><body style="font:16px sans-serif">${voci.join('')}</body></html>`;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// 10. STRESS — pagina pesante come un sito vero: migliaia di elementi e
+//     centinaia di componenti registrati e vuoti (il caso in cui la ricerca
+//     dei "componenti chiusi" fa una prova col cursore su ognuno). Il menu del
+//     tasto destro deve restare istantaneo e la traduzione deve partire.
+// ───────────────────────────────────────────────────────────────────────────
+
+function paginaPesante() {
+  const pezzi = [];
+  for (let i = 0; i < 400; i++) {
+    pezzi.push(`<section><div><span><b>Row ${i}</b></span> <em>English text of the row number ${i}</em></div>`
+      + `<x-icona></x-icona><a href="#z" title="Tooltip ${i}">link ${i}</a></section>`);
+  }
+  return `<!doctype html><html lang="en"><head><style>x-icona{display:inline-block;width:60px;height:20px}</style></head>
+  <body style="font:16px sans-serif">${pezzi.join('')}
+  <script>customElements.define('x-icona', class extends HTMLElement {});<\/script></body></html>`;
+}
+
+test('pagina pesante a componenti: il menu resta istantaneo e la traduzione parte', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180000);
+  await stubProvider(app);
+  const page = await testServer.openReady(openTab, paginaPesante());
+  await watchToasts(page);
+
+  const t0 = Date.now();
+  await openMenu(page, 'section');
+  const apertura = Date.now() - t0;
+  await page.locator('[data-sn-icon-id="translate"]').click();
+  await expect(page.locator('#nonEsiste')).toHaveCount(0);
+  await expect.poll(async () => (await page.evaluate(() => document.querySelectorAll('[data-sn-translated]').length)) > 100, { timeout: 90000 }).toBe(true);
+  // Nessun blocco è finito nel posto sbagliato e il menu non si è impantanato.
+  expect(apertura, `apertura del menu: ${apertura}ms`).toBeLessThan(4000);
+});
+
 test('modello che perde un separatore: niente testi nel blocco sbagliato', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubProvider(app, { mode: 'dropSep' });
