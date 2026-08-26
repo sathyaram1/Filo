@@ -269,13 +269,16 @@
   // ----------------------------------------------------------------
   // Drag dell'header
   // ----------------------------------------------------------------
-  function attachDrag(root, handle) {
+  function attachDrag(root, handle, onDragStart) {
     let dx = 0, dy = 0;
     let dragging = false;
     handle.addEventListener('mousedown', (e) => {
       if (e.target.closest('.sn-popup-close')) return;
       // Porta in primo piano il popup trascinato
       bringToFront(rootToPopup(root));
+      // Da qui in poi la posa è dell'utente: chi rimisura smette di riportare
+      // il riquadro sul punto ancorato e si limita a tenerlo dentro lo schermo.
+      try { onDragStart && onDragStart(); } catch (_) {}
       const rect = root.getBoundingClientRect();
       dx = e.clientX - rect.left;
       dy = e.clientY - rect.top;
