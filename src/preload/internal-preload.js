@@ -273,6 +273,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'chatErrors.js')); // #360 — errori tecnici → frasi per l'utente
   safe(path.join(SHARED, 'icons.js'));
   safe(path.join(SHARED, 'qr.js'));
+  safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'menu.js'));
