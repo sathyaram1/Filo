@@ -202,6 +202,62 @@
     });
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
+    repositionSub();
+  }
+
+  // Dove posare un pannello ancorato (la griglia "Altro…", la cronologia
+  // incolla, i sotto-menu a lista). Pura, come computeOffset.
+  //
+  // `mode`:
+  // - `'anchor'` (predefinito): a fianco della voce che l'ha aperto, con un
+  //   filo di stacco; se a destra non ci sta passa a sinistra;
+  // - `'edge'`: attaccato al bordo del MENU con un pelo di sovrapposizione, così
+  //   le due superfici si toccano e si leggono come un pezzo solo.
+  function computeSubOffset({ aTop, aLeft, aRight, mLeft, mRight, w, h, vw, vh, mode }) {
+    const edge = mode === 'edge';
+    let left = edge ? mRight - 2 : aRight + 4;
+    if (left + w + 8 > vw) left = edge ? Math.max(4, mLeft - w + 2) : Math.max(4, aLeft - w - 4);
+    let top = aTop;
+    if (top + h + 8 > vh) top = Math.max(8, vh - h - 8);
+    return { left, top };
+  }
+
+  // Posa il pannello aperto da `anchorEl` misurando ADESSO dove si trova
+  // l'ancora: chiamabile quante volte serve, anche mentre il menu si muove.
+  function placeSub(sub, anchorEl, mode) {
+    const a = anchorEl.getBoundingClientRect();
+    const m = ((activeMenu && activeMenu.root) || anchorEl).getBoundingClientRect();
+    const p = computeSubOffset({
+      aTop: a.top, aLeft: a.left, aRight: a.right,
+      mLeft: m.left, mRight: m.right,
+      w: sub.offsetWidth, h: sub.offsetHeight,
+      vw: window.innerWidth, vh: window.innerHeight,
+      mode,
+    });
+    sub.style.left = `${p.left}px`;
+    sub.style.top = `${p.top}px`;
+  }
+
+  // #500 — un pannello ancorato viene posato una volta e poi il menu si muove
+  // sotto di lui: scivola in su perché la spiegazione è arrivata, oppure scorre
+  // perché è più alto della finestra. Se il pannello resta fermo si stacca dalla
+  // freccetta che l'ha aperto e galleggia a mezz'aria sopra alle voci. Quindi:
+  // il pannello SEGUE la sua ancora; se l'ancora è scorsa via oltre il bordo del
+  // menu non c'è più niente a cui stare attaccati e il pannello si chiude.
+  function repositionSub() {
+    if (!activeMenu || !activeMenu.subRoot || !activeMenu.subAnchor) return;
+    const sub = activeMenu.subRoot;
+    const anchor = activeMenu.subAnchor;
+    const root = activeMenu.root;
+    if (root && root.contains(anchor)) {
+      const a = anchor.getBoundingClientRect();
+      const r = root.getBoundingClientRect();
+      // Metà ancora fuori = ancora persa: meglio chiudere che appendersi a una
+      // scheggia di bottone mezza tagliata dal bordo.
+      const centro = a.top + a.height / 2;
+      if (centro < r.top || centro > r.bottom) { closeSubmenu(); return; }
+    }
+    placeSub(sub, anchor, activeMenu.subMode);
   }
 
   // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
