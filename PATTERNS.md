@@ -534,7 +534,7 @@ preload privilegiato). Senza, dentro il riquadro Filo semplicemente non esiste �
 il tasto destro non produce nulla, e per l'utente è un buco nero senza spiegazione
 (#405).
 
-Tre regole quando si tocca qualcosa che vive nel content script:
+Quattro regole quando si tocca qualcosa che vive nel content script:
 
 - **Costo pigro.** Una pagina può avere decine di riquadri che l'utente non tocca
   mai. Nel sottoframe `page-preload.js` non carica NIENTE finché non arriva la
