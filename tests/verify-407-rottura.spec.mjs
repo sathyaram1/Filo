@@ -322,9 +322,11 @@ test('D4 — il modello dimentica i segnaposto: il link non si perde', async ({ 
   const page = await testServer.openReady(openTab, SIMPLE);
   await clickTranslate(page, '#a');
   await expect(page.locator('#b')).toHaveText(/^IT /);
-  // Contenuto mai perso: il link torna comunque nella pagina, ancora un link.
+  // Contenuto mai perso: il link torna comunque nella pagina, ancora un link
+  // (il suo testo è un'unità sua, quindi cambia lingua anche lui).
   await expect(page.locator('#b a#lk')).toHaveAttribute('href', '#z');
-  await expect(page.locator('#b a#lk')).toHaveText('link');
+  await expect(page.locator('#b a#lk')).toContainText('link');
+  expect(await page.evaluate(() => document.querySelectorAll('#content a').length)).toBe(1);
 });
 
 // ───────────────────────────────────────────────────────────────────────────
