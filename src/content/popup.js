@@ -654,6 +654,7 @@
       } else if (m.type === 'error') {
         bubble.text.textContent = m.message || I18n.t('err_provider_failed');
         bubble.wrap.classList.add('sn-msg-error');
+        reflow(popup);
         popup.activePort = null;
       }
     });
