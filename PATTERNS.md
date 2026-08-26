@@ -789,7 +789,11 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   tutti.** Vale per qualunque diagnosi appoggiata alla geometria della finestra
   (`elementFromPoint`, `caretPositionFromPoint`, il rettangolo visibile): il
   risultato "indeterminato" va tenuto separato dal risultato negativo, e trattato
-  come tale fino in fondo.
+  come tale fino in fondo. Corollario: se tacere costa, **conviene insistere solo
+  dove la risposta manca**. La sonda riprova su altre righe dell'elemento quando
+  la prima non ha risposto (una barra fissa che lo taglia a metà), e si ferma
+  appena una risposta arriva: righe in più non devono poter ribaltare un esito
+  già certo, o la sonda diventa una votazione.
 - **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
   (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
