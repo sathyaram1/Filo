@@ -841,7 +841,16 @@
     // Il giro in corso è finito qui: l'utente deve poter far ripartire una
     // traduzione subito, senza aspettare che le richieste già spedite tornino.
     pageTranslating = false;
-    const restoredAny = translatedUnits.length > 0 || translatedAttrs.length > 0;
+    const restoredAny = translatedUnits.length > 0 || translatedAttrs.length > 0 || !!translatedTitle;
+    // Il nome della scheda torna quello del sito.
+    if (translatedTitle) {
+      try {
+        document.title = translatedTitle.original;
+        const el = document.querySelector('title');
+        if (el && el.dataset) delete el.dataset.snTranslated;
+      } catch (_) {}
+      translatedTitle = null;
+    }
     // Etichette: rimettere il valore di prima, o togliere l'attributo se prima
     // non c'era (le voci dei menu a tendina tornano a mostrare il loro testo).
     for (let i = translatedAttrs.length - 1; i >= 0; i--) {
