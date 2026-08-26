@@ -426,6 +426,41 @@ diventa scorrevole invece di essere tagliato.
 `IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
 `src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`.
 
+## Un riquadro che si riempie dopo va rimisurato dopo: la posa non è un fatto solo
+
+Menu, popup e tooltip di Filo contengono roba che arriva **più tardi** — la
+spiegazione AI di una selezione o di un link, il suggerimento del correttore, i
+metadati di una pagina. Misurare l'altezza al momento dell'apertura e non
+tornarci più significa posare il riquadro su un numero che scade un secondo
+dopo: il contenuto cresce verso il basso, il fondo esce dalla finestra e le voci
+in coda — che in Filo sono sempre Invia feedback e Aiuto — restano tagliate e
+non cliccabili (#500).
+
+- **Regola:** ogni overlay posizionato con una misura presa dal DOM tiene un
+  `ResizeObserver` sul proprio contenitore e ripete la posa a ogni cambio
+  d'altezza, finché resta aperto. Il costo è nullo quando l'altezza non cambia.
+- **Ricrescita ≠ prima posa:** alla prima apertura il menu si **ribalta** sopra
+  al cursore se sotto non ci sta. Ripetere quel ribaltamento a ogni ricrescita
+  farebbe schizzare via il menu da sotto la mano mentre l'utente sta per
+  cliccare: da posato in poi ci si muove del **minimo** (si scivola in su quanto
+  basta a rientrare), mai si salta.
+- **Rimisura pulita:** prima di misurare togli il tetto (`max-height`) messo dal
+  giro precedente, altrimenti misuri il tetto e non il contenuto — e un riquadro
+  che si è ACCORCIATO si tiene addosso per sempre una barra di scorrimento che
+  non gli serve più. Toglilo e rimettilo dentro lo stesso giro sincrono: non si
+  vede nessuno sfarfallio.
+- **`max-height` non è l'altezza finale:** morde il box scelto dal CSS, e in
+  `content-box` (il valore di partenza, quello che si prende un overlay dentro
+  una pagina qualunque) bordo e imbottitura restano fuori dal conto — il
+  riquadro resta più alto del tetto quel tanto che basta a sforare comunque.
+  Dopo aver messo il tetto **rimisura** e togli l'eccedenza.
+- **Zoom:** il menu è disegnato scalato per non crescere con Ctrl+/- , quindi
+  quello che occupa davvero è `offsetHeight * scala`: è quel numero a dover
+  stare dentro `innerHeight`, non l'altezza di layout.
+- **Dove:** `computeCap` / `computeOffset` / `place` in `src/content/menu.js`.
+  Test: `tests/unit/menuPlacement.test.mjs` (geometria pura),
+  `tests/context-menu-grow.spec.mjs` (il menu vero che cresce).
+
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
 Il popup menu custom (`src/main/popup-menu.js`, una BrowserWindow frameless)
