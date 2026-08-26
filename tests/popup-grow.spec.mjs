@@ -22,6 +22,9 @@ import { test, expect } from './fixtures/electron.mjs';
 // sta il punto cliccato, in frazione dell'altezza della finestra.
 async function apriRiquadro(page, fraz = 0.5) {
   const y = await page.evaluate((f) => {
+    // Le pagine interne vengono riusate fra un test e l'altro: un riquadro
+    // rimasto aperto prima sarebbe quello che troviamo cercando `.sn-popup`.
+    for (let i = 0; i < 10 && document.querySelector('.sn-popup'); i++) window.SN_POPUP.closeTopmost();
     const yy = Math.round(window.innerHeight * f);
     window.SN_POPUP.openStreaming({
       action: window.SN_CONST.ACTIONS.EXPLAIN,
