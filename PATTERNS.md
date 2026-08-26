@@ -837,6 +837,14 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   la frase di `SN_CHAT_ERRORS` (la regola "mai il messaggio grezzo" vale per i
   toast di pagina esattamente come per le bolle di chat) + come riprendere. Mai
   un messaggio di successo su un lavoro monco.
+- **"Il modello ha risposto a vuoto" non è un errore, ed è un motivo a sé.** La
+  richiesta è partita, la risposta è tornata, semplicemente non conteneva testo:
+  fabbricare un `Error` per farla passare da `SN_CHAT_ERRORS` produce "Qualcosa è
+  andato storto. Riprova", che non dice niente e contraddice la riga successiva,
+  dove si spiega come riprendere. Il ripiego per l'errore mancante esisteva già
+  ("alcuni blocchi sono tornati vuoti dal modello"): la risposta vuota deve
+  arrivarci, non scavalcarlo. In generale: prima di tradurre un guasto in una
+  frase, chiedersi se un guasto c'è stato davvero.
 - **Se l'icona cambia mestiere, l'azione che ha lasciato scoperta torna come
   voce**: nello stato parziale l'icona serve a riprendere, quindi "Mostra
   originale" compare come voce etichettata del menu (stesso schema di
