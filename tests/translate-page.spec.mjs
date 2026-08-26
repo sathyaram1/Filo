@@ -87,6 +87,7 @@ async function stubTranslationProvider(app, delayMs = 0) {
       const SEP = '\n@@@SN_SEP@@@\n';
       const parts = chunk.split(/\n?@@@SN_SEP@@@\n?/);
       globalThis.__filoTranslateBlocks += parts.length;
+      globalThis.__filoTranslatePrompts.push(chunk);
       const out = parts.map((p) => `IT ${p}`).join(SEP);
       return { text: out, provider: 'test', model: 'test-translate', usage: {} };
     };
