@@ -60,6 +60,13 @@ test('#502 — a risposta finita la riga per scrivere resta dentro lo schermo', 
   });
   console.log('[#502] viewport', geom);
 
+  // In una finestra che non dipinge (xvfb) i requestAnimationFrame restano
+  // sospesi: la posa iniziale non verrebbe mai calcolata e il test misurerebbe
+  // uno stato che l'utente non vede mai. Forziamo un frame subito, mentre il
+  // corpo è ancora vuoto — è esattamente quello che succede in una finestra
+  // vera, dove la posa si calcola ~16ms dopo l'apertura.
+  try { await page.screenshot({ path: 'tests/.shots/verifica-502-apertura.png' }); } catch (_) {}
+
   // Misura subito dopo l'apertura, con il corpo ancora vuoto.
   const vuoto = await page.evaluate(() => {
     const r = document.querySelector('.sn-popup')?.getBoundingClientRect();
