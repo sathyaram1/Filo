@@ -64,7 +64,7 @@ test.describe('avviso fusioni in attesa', () => {
         _id: 'fb444',
         seq: 444,
         status: 'new',
-        message: 'Segnalazione che ha generato il lavoro',
+        text: 'Segnalazione che ha generato il lavoro',
         clientId: 'client-1',
         createdAt: Date.now() - 3600e3,
       }]);
