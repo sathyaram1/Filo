@@ -902,6 +902,7 @@
     extractTranslatableBlocks,
     findTranslatedElements,
     hasRevealedText,
+    inlineFrameBody,
     isFiloOwnUi,
     pageMeta,
     pageExcerpt,
