@@ -317,9 +317,6 @@
     }
   }
 
-  function rootToPopup(root) {
-    return popups.find((p) => p.root === root);
-  }
   function bringToFront(popup) {
     if (!popup) return;
     const idx = popups.indexOf(popup);
