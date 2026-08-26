@@ -1484,7 +1484,7 @@
       // entrambe da sotto: oltre al velo devono stare insieme anche fra loro —
       // il filmato dentro il collegamento, o sulla sua stessa superficie —
       // altrimenti il menu unirebbe due schede diverse.
-      if (belongsTo(mediaUnder, linkUnder)) {
+      if (belongsTo(mediaUnder, linkUnder, layers)) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
         items.push({ type: 'separator' });
@@ -1499,7 +1499,7 @@
     // completo mentre il filmatino suonava, menu vuoto un istante dopo (#444).
     if (imgUnder) {
       for (const it of buildImageActionItems(imgUnder)) items.push(it);
-      if (belongsTo(imgUnder, linkUnder)) {
+      if (belongsTo(imgUnder, linkUnder, layers)) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
       }
