@@ -516,14 +516,16 @@ conversazione (#500).
   scivolare è il male minore.
 - **Dove:** `computeCap` / `computeOffset` / `computePinnedLimit` / `applyCap` /
   `observeGrowth` in `src/shared/overlayPlacement.js`; `place` /
-  `computeSubOffset` / `repositionSub` in `src/content/menu.js`; `placePopup` /
-  `richiediPosa` in `src/content/popup.js`. Va caricato PRIMA di `popup.js` e
+  `computeSubOffset` / `repositionSub` / `dismissTooltip` e il gestore `resize`
+  in `src/content/menu.js`; `placePopup` / `richiediPosa` e il suo `resize` in
+  `src/content/popup.js`. Va caricato PRIMA di `popup.js` e
   `menu.js` in `src/preload/page-preload.js` e `src/preload/internal-preload.js`.
   Test: `tests/unit/menuPlacement.test.mjs` e
   `tests/unit/popupPlacement.test.mjs` (geometria pura),
-  `tests/context-menu-grow.spec.mjs` (il menu vero che cresce, scorre e si
-  porta dietro il pannello), `tests/popup-grow.spec.mjs` (il riquadro vero che
-  cresce, resta scrivibile e non si muove se l'hai trascinato).
+  `tests/context-menu-grow.spec.mjs` (il menu vero che cresce, scorre, si porta
+  dietro il pannello, rientra quando la finestra si accorcia e non lascia
+  etichette appese), `tests/popup-grow.spec.mjs` (il riquadro vero che cresce,
+  resta scrivibile e non si muove se l'hai trascinato).
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
