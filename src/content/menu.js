@@ -545,7 +545,15 @@
       // appunti più vecchi (feedback alpha).
       const t = e && e.target;
       if (t && t.nodeType === 1) {
-        if (root.contains(t)) return;
+        if (root.contains(t)) {
+          // #500 — il menu ha scorso sotto al pannello ancorato: la freccetta
+          // che l'ha aperto si è spostata, e il pannello va con lei (o si
+          // chiude, se la freccetta è uscita dal bordo). Anche il tooltip, che
+          // parlava di un bottone che ora non è più sotto al cursore.
+          try { hideTooltip?.(); } catch (_) {}
+          repositionSub();
+          return;
+        }
         if (activeMenu?.subRoot && activeMenu.subRoot.contains(t)) return;
       }
       close();
