@@ -21,11 +21,18 @@ import { test, expect } from './fixtures/electron.mjs';
 // Una pagina nuova per ogni test: le pagine interne di Filo vengono riusate fra
 // una scheda e l'altra, e un riquadro rimasto aperto da un test precedente
 // sarebbe quello che troviamo cercando `.sn-popup`.
-async function paginaFresca(openTab, testServer) {
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body
-    style="margin:0;font:16px sans-serif"><p style="padding:16px">Una pagina qualunque.</p></body></html>`);
+async function paginaFresca(openTab) {
+  const page = await openTab('filo://newtab/');
   await page.waitForFunction(
     () => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
+  // La scheda di una pagina interna viene RIUSATA: i riquadri lasciati aperti
+  // da un test precedente sono ancora nel documento, e sarebbero loro i primi a
+  // farsi trovare cercando `.sn-popup`.
+  await page.evaluate(() => {
+    for (let i = 0; i < 20 && document.querySelector('.sn-popup'); i++) window.SN_POPUP.closeTopmost();
+    document.querySelectorAll('.sn-popup').forEach((n) => n.remove());
+  });
+  await expect(page.locator('.sn-popup')).toHaveCount(0);
   return page;
 }
 
