@@ -456,7 +456,23 @@
     // finestra e l'ultima voce restava tagliata a metà, non cliccabile.
     // Rimisurare a ogni cambio d'altezza lo tiene dentro; la posa "keep" scivola
     // del minimo indispensabile invece di ribaltare il menu sotto il cursore.
-    cleanups.push(Place.observeGrowth(root, () => place(root, x, y, { keep: true })));
+    const riposa = () => place(root, x, y, { keep: true });
+    cleanups.push(Place.observeGrowth(root, riposa));
+    // …e le sezioni che si riempiono dopo si guardano anche da vicino: una
+    // mutazione del contenuto arriva subito, senza passare dal ciclo di disegno.
+    // Le richieste dello stesso fotogramma diventano una misura sola.
+    if (crescite.length && typeof MutationObserver === 'function') {
+      let inAttesa = false;
+      const mo = new MutationObserver(() => {
+        if (inAttesa) return;
+        inAttesa = true;
+        const giro = () => { inAttesa = false; if (root.isConnected) riposa(); };
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(giro);
+        else setTimeout(giro, 16);
+      });
+      for (const el of crescite) mo.observe(el, { childList: true, subtree: true, characterData: true });
+      cleanups.push(() => { try { mo.disconnect(); } catch (_) {} });
+    }
 
     const onDocClick = (e) => {
       if (root.contains(e.target)) return;
