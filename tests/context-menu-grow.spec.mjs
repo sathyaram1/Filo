@@ -1,137 +1,160 @@
 // Feedback #500: il menu del tasto destro NON ha un'altezza definitiva quando
 // viene posato. Il riquadro della spiegazione (la sezione AI su un collegamento,
 // su un'immagine, su una selezione) nasce a una riga e diventa di tre quando la
-// risposta arriva: il menu cresce verso il basso DOPO essere stato piazzato, e
-// l'ultima voce finisce oltre il bordo della finestra, tagliata a metà e non
-// cliccabile. Il menu non si risposta e non si può scorrere.
+// risposta arriva: il menu cresce verso il basso DOPO essere stato piazzato,
+// l'ultima voce finisce oltre il bordo della finestra — tagliata a metà e non
+// cliccabile — e il menu non si risposta né si può scorrere.
 //
 // Questi spec asseriscono il SUCCESSO dal punto di vista di chi usa Filo:
-// l'ULTIMA voce del menu è dentro la finestra e si può cliccare davvero (il
-// click esegue l'azione). Senza il fix — misura unica all'apertura — il menu
-// resta dov'è, l'ultima voce sfora e il click sulle sue coordinate non la
-// raggiunge: rosso.
+// l'ULTIMA voce del menu (Invia feedback / Invia attacco, in fondo a QUALSIASI
+// menu) resta dentro la finestra e si può puntare e cliccare davvero. Senza il
+// fix — misura unica all'apertura — il menu resta dov'è, l'ultima voce sfora e
+// Playwright non riesce nemmeno a portarci sopra il puntatore: rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const LINK = 'https://example.com/articolo-lungo';
 
-// Pagina alta, col bersaglio nella metà bassa della finestra: è lo scenario
-// descritto (menu aperto in basso, spiegazione che arriva dopo).
-function pagina(extra = '') {
+// Pagina col bersaglio nella metà bassa della finestra: lo scenario descritto.
+function paginaLink() {
   return `<!doctype html><html><body style="margin:0;font:16px sans-serif">
-    <div style="height:70vh;padding:16px">Testo in cima alla pagina.</div>
+    <div style="height:65vh;padding:16px">Testo in cima alla pagina.</div>
     <a id="link" href="${LINK}" style="display:inline-block;padding:8px">un collegamento in fondo</a>
-    ${extra}
   </body></html>`;
 }
 
 // Fa crescere il riquadro della spiegazione come fa la risposta AI quando
-// arriva: `delta` px in più di contenuto dentro la sezione inline del menu.
-// Ritorna la geometria prima/dopo.
-async function cresci(page, delta) {
-  return page.evaluate((d) => {
+// arriva. `sfora` = di quanti px il menu finirebbe sotto il bordo se restasse
+// dov'è: la crescita si calcola sulla posa vera, così lo scenario è lo stesso
+// qualunque sia l'altezza del menu e della finestra.
+async function cresciOltreIlBordo(page, sfora) {
+  return page.evaluate((s) => {
     const menu = document.querySelector('.sn-menu');
-    const box = menu.querySelector('.sn-menu-inline');
+    const box = menu && menu.querySelector('.sn-menu-inline');
     if (!box) return { error: 'nessun riquadro di spiegazione nel menu' };
-    const prima = menu.getBoundingClientRect().bottom;
-    const target = (box.getBoundingClientRect().height || 0) + d;
-    box.style.minHeight = `${target}px`;
-    return { prima, vh: window.innerHeight };
-  }, delta);
+    const bottom = menu.getBoundingClientRect().bottom;
+    const vh = window.innerHeight;
+    const delta = Math.max(24, Math.round(vh - bottom + s));
+    box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) + delta}px`;
+    return { bottom, vh, delta };
+  }, sfora);
 }
 
-// Geometria dell'ultima voce cliccabile del menu.
-async function ultimaVoce(page) {
+// Geometria del menu e della sua ultima voce.
+async function geometria(page) {
   return page.evaluate(() => {
     const menu = document.querySelector('.sn-menu');
-    const voci = menu.querySelectorAll('.sn-menu-item, .sn-menu-paste, .sn-menu-correction');
-    const el = voci[voci.length - 1];
-    const r = el.getBoundingClientRect();
+    if (!menu) return { error: 'menu chiuso' };
+    const voci = menu.querySelectorAll('.sn-menu-item');
+    const ultima = voci[voci.length - 1];
+    const m = menu.getBoundingClientRect();
+    const u = ultima ? ultima.getBoundingClientRect() : null;
     return {
-      testo: (el.textContent || '').trim(),
-      bottom: r.bottom,
-      cx: r.left + r.width / 2,
-      cy: r.top + r.height / 2,
       vh: window.innerHeight,
-      menuBottom: menu.getBoundingClientRect().bottom,
+      menuTop: m.top,
+      menuBottom: m.bottom,
+      ultimaTesto: ultima ? (ultima.textContent || '').trim() : '',
+      ultimaBottom: u ? u.bottom : null,
+      scorrevole: menu.scrollHeight > menu.clientHeight + 1,
     };
   });
 }
 
-test('#500 il riquadro della spiegazione cresce: il menu del collegamento resta dentro la finestra', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, pagina());
-  await page.locator('#link').click({ button: 'right' });
+// Aspetta che il menu sia rientrato dopo la crescita.
+async function attendiRientro(page) {
+  await expect.poll(async () => {
+    const g = await geometria(page);
+    return g.error ? -1 : Math.round(g.menuBottom - g.vh);
+  }, { timeout: 5000 }).toBeLessThanOrEqual(0);
+}
+
+async function apriMenuSu(page, selector, opts = {}) {
+  await page.locator(selector).click({ button: 'right', ...opts });
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible();
+  // Il riquadro della spiegazione: è lui che cresce quando la risposta arriva.
   await expect(menu.locator('.sn-menu-inline')).toBeVisible();
+  return menu;
+}
 
-  const stato = await cresci(page, 60);
-  expect(stato.error).toBeFalsy();
-  // Il menu era posato vicino al bordo: la crescita lo porterebbe fuori.
-  expect(stato.prima + 60).toBeGreaterThan(stato.vh);
+test('#500 la spiegazione cresce: il menu del collegamento rientra invece di farsi tagliare', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLink());
+  const menu = await apriMenuSu(page, '#link');
 
-  await expect.poll(async () => (await ultimaVoce(page)).menuBottom)
-    .toBeLessThanOrEqual(stato.vh);
+  const cresciuto = await cresciOltreIlBordo(page, 40);
+  expect(cresciuto.error).toBeFalsy();
+  expect(cresciuto.bottom + cresciuto.delta).toBeGreaterThan(cresciuto.vh);
 
-  const voce = await ultimaVoce(page);
-  expect(voce.bottom).toBeLessThanOrEqual(voce.vh);
-});
+  await attendiRientro(page);
+  const g = await geometria(page);
+  expect(g.menuTop).toBeGreaterThanOrEqual(0);
+  expect(g.scorrevole).toBe(false);          // ci sta: basta spostarlo, non tagliarlo
+  expect(g.ultimaBottom).toBeLessThanOrEqual(g.vh);
+  expect(g.ultimaTesto.length).toBeGreaterThan(0);
 
-test('#500 dopo la crescita l\'ultima voce si clicca davvero', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, pagina());
-  await page.locator('#link').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
-  await expect(menu).toBeVisible();
-  await expect(menu.locator('.sn-menu-inline')).toBeVisible();
-
-  const stato = await cresci(page, 60);
-  expect(stato.error).toBeFalsy();
-  await expect.poll(async () => (await ultimaVoce(page)).menuBottom)
-    .toBeLessThanOrEqual(stato.vh);
-
-  // Click alle coordinate vere dell'ultima voce: se fosse ancora oltre il bordo
-  // il puntatore non la incontrerebbe e il menu resterebbe aperto.
-  const voce = await ultimaVoce(page);
-  await page.mouse.click(voce.cx, voce.cy);
+  // E si può davvero puntare e cliccare l'ultima voce: Playwright rifiuta di
+  // agire su un elemento fuori dalla finestra, quindi questo è il test vero.
+  const ultima = menu.locator('.sn-menu-item').last();
+  await ultima.hover({ timeout: 3000 });
+  await ultima.click({ timeout: 3000 });
   await expect(menu).toHaveCount(0);
 });
 
-test('#500 il menu di una scheda filmato dentro un collegamento resta dentro la finestra', async ({ openTab, testServer }) => {
+test('#500 il menu di una scheda filmato dentro un collegamento rientra a sua volta', async ({ openTab, testServer }) => {
   // Il menu più alto: azioni del filmato + azioni del link + spiegazione.
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
-    <div style="height:60vh;padding:16px">Testo in cima alla pagina.</div>
+    <div style="height:55vh;padding:16px">Testo in cima alla pagina.</div>
     <a id="card" href="${LINK}"><video id="clip" src="/clip.mp4" width="320" height="120" style="background:#333"></video></a>
   </body></html>`);
-  await page.locator('#clip').click({ button: 'right', position: { x: 20, y: 20 } });
-  const menu = page.locator('.sn-menu');
-  await expect(menu).toBeVisible();
-  await expect(menu.locator('.sn-menu-inline')).toBeVisible();
+  const menu = await apriMenuSu(page, '#clip', { position: { x: 20, y: 20 } });
 
-  const stato = await cresci(page, 80);
-  expect(stato.error).toBeFalsy();
+  const cresciuto = await cresciOltreIlBordo(page, 40);
+  expect(cresciuto.error).toBeFalsy();
 
-  await expect.poll(async () => (await ultimaVoce(page)).menuBottom)
-    .toBeLessThanOrEqual(stato.vh);
-  const voce = await ultimaVoce(page);
-  expect(voce.bottom).toBeLessThanOrEqual(voce.vh);
+  await attendiRientro(page);
+  const g = await geometria(page);
+  expect(g.menuTop).toBeGreaterThanOrEqual(0);
+  if (!g.scorrevole) expect(g.ultimaBottom).toBeLessThanOrEqual(g.vh);
+  await menu.locator('.sn-menu-item').last().hover({ timeout: 3000 });
 });
 
-test('#500 un menu più alto della finestra diventa scorrevole invece di essere tagliato', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, pagina());
-  await page.locator('#link').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
-  await expect(menu).toBeVisible();
-  await expect(menu.locator('.sn-menu-inline')).toBeVisible();
+test('#500 se la spiegazione supera la finestra intera il menu diventa scorrevole', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLink());
+  const menu = await apriMenuSu(page, '#link');
 
-  // Una spiegazione enorme: non c'è posa che la faccia stare: deve scorrere.
+  // Nessuna posa può farlo stare: l'unica via d'uscita è lo scorrimento (#405).
   await page.evaluate(() => {
     const box = document.querySelector('.sn-menu .sn-menu-inline');
     box.style.minHeight = `${window.innerHeight + 400}px`;
   });
 
-  await expect.poll(async () => page.evaluate(() => {
-    const m = document.querySelector('.sn-menu');
-    const r = m.getBoundingClientRect();
-    return { scorre: m.scrollHeight > m.clientHeight + 1, dentro: r.bottom <= window.innerHeight && r.top >= 0 };
-  })).toEqual({ scorre: true, dentro: true });
+  await expect.poll(async () => {
+    const g = await geometria(page);
+    if (g.error) return null;
+    return { scorrevole: g.scorrevole, dentro: g.menuBottom <= g.vh && g.menuTop >= 0 };
+  }, { timeout: 5000 }).toEqual({ scorrevole: true, dentro: true });
+  await expect(menu).toBeVisible();
+});
+
+test('#500 se la spiegazione poi si accorcia il menu torna intero, senza barra', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLink());
+  const menu = await apriMenuSu(page, '#link');
+
+  await page.evaluate(() => {
+    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    box.style.minHeight = `${window.innerHeight + 400}px`;
+  });
+  await expect.poll(async () => (await geometria(page)).scorrevole, { timeout: 5000 }).toBe(true);
+
+  // La spiegazione sparisce (succede davvero: "NESSUNA SPIEGAZIONE" toglie il
+  // riquadro). Il tetto messo prima non deve restare addosso a un menu corto.
+  await page.evaluate(() => {
+    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    box.style.minHeight = '';
+  });
+  await expect.poll(async () => (await geometria(page)).scorrevole, { timeout: 5000 }).toBe(false);
+  const g = await geometria(page);
+  expect(g.menuBottom).toBeLessThanOrEqual(g.vh);
+  expect(g.menuTop).toBeGreaterThanOrEqual(0);
+  await expect(menu).toBeVisible();
 });
