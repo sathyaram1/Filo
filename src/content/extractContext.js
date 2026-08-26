@@ -460,16 +460,26 @@
       const y0 = Math.max(rect.top, 0);
       const y1 = Math.min(rect.bottom, window.innerHeight);
       if (x1 - x0 < 2 || y1 - y0 < 2) return 'unknown';
-      const y = (y0 + y1) / 2;
       const w = x1 - x0;
+      const h = y1 - y0;
       let seen = 'unknown';
       // Tre punti invece di uno: basta che UNO cada nel vuoto perché lì dentro
       // non ci sia niente di nascosto, mentre un pezzo di UI sovrapposto o un
       // bordo arrotondato rovinerebbero il punto singolo.
-      for (const x of [x0 + w / 2, x0 + w * 0.25, x0 + w * 0.75]) {
-        const r = probePoint(el, x, y);
-        if (r === 'self') return 'self';
-        if (r === 'other') seen = 'other';
+      //
+      // E tre righe invece di una, ma solo se la prima non ha risposto: una
+      // barra fissa che taglia l'elemento a metà lasciava "non lo so", e "non
+      // lo so" adesso vuol dire nessun avviso. Le righe in più si pagano
+      // soltanto lì — dove la prima riga decide (quasi sempre) restano tre
+      // interrogazioni come prima — e non possono ribaltare una risposta
+      // certa: si fermano appena ne arriva una.
+      for (const y of [y0 + h / 2, y0 + h * 0.25, y0 + h * 0.75]) {
+        for (const x of [x0 + w / 2, x0 + w * 0.25, x0 + w * 0.75]) {
+          const r = probePoint(el, x, y);
+          if (r === 'self') return 'self';
+          if (r === 'other') seen = 'other';
+        }
+        if (seen !== 'unknown') break;
       }
       return seen;
     } catch (_) { return 'unknown'; }
