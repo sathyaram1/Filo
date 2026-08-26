@@ -301,7 +301,8 @@
   // istantanea. Il conto vero lo fa la traduzione, che rilegge la pagina e
   // salta ciò che è già tradotto (nessun blocco pagato due volte).
   function startWatchingNewContent(extraRoots) {
-    if (contentObserver || typeof MutationObserver !== 'function') return;
+    if (contentObserver) { addWatchRoots(extraRoots); return; }
+    if (typeof MutationObserver !== 'function') return;
     try {
       contentObserver = new MutationObserver((muts) => {
         if (newContentSeen) return;
@@ -311,14 +312,18 @@
           }
         }
       });
-      const opts = { childList: true, subtree: true };
-      contentObserver.observe(document.documentElement || document, opts);
-      // I componenti aperti del sito sono alberi a parte: vanno sorvegliati uno
-      // per uno, o il testo che cambia lì dentro resterebbe invisibile.
-      for (const r of (extraRoots || [])) {
-        try { contentObserver.observe(r, opts); } catch (_) {}
-      }
+      contentObserver.observe(document.documentElement || document, { childList: true, subtree: true });
+      addWatchRoots(extraRoots);
     } catch (_) { contentObserver = null; }
+  }
+
+  // I componenti aperti del sito sono alberi a parte: vanno sorvegliati uno per
+  // uno, o il testo che cambia lì dentro resterebbe invisibile.
+  function addWatchRoots(roots) {
+    if (!contentObserver) return;
+    for (const r of (roots || [])) {
+      try { contentObserver.observe(r, { childList: true, subtree: true }); } catch (_) {}
+    }
   }
 
   function stopWatchingNewContent() {
