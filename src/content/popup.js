@@ -553,6 +553,8 @@
     popup.inputEl.addEventListener('input', () => {
       popup.inputEl.style.height = 'auto';
       popup.inputEl.style.height = Math.min(popup.inputEl.scrollHeight, 120) + 'px';
+      // Anche la casella che si allarga alza il riquadro: stessa regola.
+      reflow(popup);
     });
 
     popups.push(popup);
