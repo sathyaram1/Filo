@@ -562,8 +562,8 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   lingua originale sotto un avviso "Pagina tradotta" è la bugia della
   segnalazione, in un caso più stretto. Il frame principale non può toccarlo (è
   un'altra origine), ma il content script gira già lì dentro: gli si passa
-  parola, e ogni riquadro lavora su se stesso. Tre conseguenze che si pagano se
-  si saltano. **Il giro passa dal main**, non da `postMessage`: una postMessage
+  parola, e ogni riquadro lavora su se stesso. Quattro conseguenze che si pagano
+  se si saltano. **Il giro passa dal main**, non da `postMessage`: una postMessage
   la sa scrivere anche il sito, e si ritroverebbe a comandare un riquadro che non
   è suo; il main invece conosce l'albero dei frame e sa chi è il frame
   principale. **Il riquadro va svegliato**: per il costo pigro lì dentro non c'è
