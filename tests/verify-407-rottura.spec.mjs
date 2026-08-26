@@ -394,10 +394,11 @@ test('D5 — se il modello non risponde MAI, non dice "Pagina tradotta"', async 
   expect(t).not.toContain('fetch failed');
   // La pagina è rimasta esattamente com'era.
   expect(await page.locator('#content').innerHTML()).toBe(before);
-  // E il menu offre ancora di riprovare.
+  // E il menu offre ancora di riprovare, non il ritorno all'originale: dopo un
+  // buco nell'acqua non è rimasto in piedi nessuno stato di traduzione.
   await openMenu(page, '#a');
   await expect(page.locator('[data-sn-icon-id="translate"]'))
-    .toHaveAttribute('aria-label', 'Traduci la pagina');
+    .toHaveAttribute('aria-label', 'Traduci');
 });
 
 // ───────────────────────────────────────────────────────────────────────────
