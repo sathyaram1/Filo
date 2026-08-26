@@ -18,7 +18,7 @@
     {
       version: '0.2.205', date: '2026-08-26',
       fixes: [
-        'Il riquadro con la risposta di Filo resta dentro la finestra mentre la risposta arriva e lo allunga, anche se hai selezionato una parola in fondo alla pagina: la riga per scrivere la domanda successiva non finisce più fuori schermo. Se lo sposti a mano ci resta, e il testo scorre al suo interno.',
+        'Il riquadro con la risposta di Filo resta dentro la finestra mentre la risposta arriva e lo allunga: anche selezionando una parola in fondo alla pagina, la riga per scrivere la domanda successiva non finisce più fuori schermo. Se lo sposti a mano resta dove l\'hai messo e il testo gli scorre dentro.',
       ],
     },
     {
