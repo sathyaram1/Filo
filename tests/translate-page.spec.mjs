@@ -415,6 +415,112 @@ test('componente chiuso: dice che la pagina è tradotta solo in parte, non "Pagi
   await page.screenshot({ path: 'tests/.shots/translate-page-closed-component.png' }).catch(() => {});
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// #503 — l'avviso "tradotta solo in parte" che scattava a vuoto.
+//
+// Spazi pubblicitari, banner dei cookie e riquadri di statistica sono
+// componenti chiusi TENUTI FUORI DALLA VISTA: spostati fuori schermo, resi
+// trasparenti, col contenuto spento ma l'ingombro intatto. Filo li contava
+// (guardava quanto era grande il rettangolo, mai se si vedeva), così su una
+// pagina tradotta per intero l'avviso mandava a cercare un riquadro in lingua
+// originale che sullo schermo non c'era.
+//
+// Le due metà del comportamento giusto:
+//  1) i riquadri che l'utente NON vede non entrano nel conto → "Pagina tradotta";
+//  2) quelli che si vedono — anche solo scorrendo — restano contati: l'avviso
+//     serve proprio lì.
+// ───────────────────────────────────────────────────────────────────────────
+
+const CLOSED_CARD_DEF = `<script>
+    customElements.define('closed-card', class extends HTMLElement {
+      connectedCallback() {
+        const r = this.attachShadow({ mode: 'closed' });
+        r.innerHTML = '<h2>Locked headline</h2><p>Body nobody outside can read.</p>';
+      }
+    });
+  </script>`;
+
+// Tutti i modi di nascondere un riquadro senza toglierlo dal documento.
+const CLOSED_HIDDEN = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A plain heading outside any component</h1>
+  <p id="body">Body text of the article, plainly visible on the page.</p>
+  <closed-card id="cOff" style="display:block;position:absolute;left:-9999px;top:0;width:300px;height:60px"></closed-card>
+  <closed-card id="cTransparent" style="display:block;opacity:0;width:300px;height:60px"></closed-card>
+  <closed-card id="cContentHidden" style="display:block;content-visibility:hidden;width:300px;height:60px"></closed-card>
+  <closed-card id="cVisHidden" style="display:block;visibility:hidden;width:300px;height:60px"></closed-card>
+  <div style="opacity:0"><closed-card id="cInTransparent" style="display:block;width:300px;height:60px"></closed-card></div>
+  <closed-card id="cClipped" style="display:block;position:absolute;clip-path:inset(100%);width:300px;height:60px"></closed-card>
+  ${CLOSED_CARD_DEF}
+</body></html>`;
+
+// Lo stesso riquadro, semplicemente più in basso della prima schermata: è
+// contenuto vero, ci si arriva scorrendo, e l'avviso deve uscire.
+const CLOSED_BELOW_FOLD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A plain heading outside any component</h1>
+  <div style="height:2500px"></div>
+  <closed-card id="cBelow" style="display:block;width:300px;height:60px"></closed-card>
+  ${CLOSED_CARD_DEF}
+</body></html>`;
+
+// Riquadro dentro una sezione ripiegata: finché la sezione è chiusa non è
+// "rimasto in lingua originale sotto gli occhi dell'utente".
+const CLOSED_IN_DETAILS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A plain heading outside any component</h1>
+  <details id="det">
+    <summary id="sum">More about this story</summary>
+    <closed-card id="cInDetails" style="display:block;width:300px;height:60px"></closed-card>
+  </details>
+  ${CLOSED_CARD_DEF}
+</body></html>`;
+
+test('componenti chiusi che non si vedono: dice "Pagina tradotta", senza mandare a cercare un riquadro che non c’è', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, CLOSED_HIDDEN);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect(page.locator('#body')).toHaveText(/^IT /);
+
+  // Quello che l'utente vede è tradotto per intero: l'avviso onesto è questo.
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).join(' | ')).not.toContain('tradotta solo in parte');
+  await page.screenshot({ path: 'tests/.shots/translate-page-hidden-closed.png' }).catch(() => {});
+});
+
+test('componente chiuso più in basso della prima schermata: resta contato, l’avviso esce', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, CLOSED_BELOW_FOLD);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  const partial = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
+});
+
+test('componente chiuso dentro una sezione ripiegata: contato solo dopo che l’utente la apre', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, CLOSED_IN_DETAILS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).join(' | ')).not.toContain('tradotta solo in parte');
+
+  // Torna all'originale, apri la sezione e ritraduci: adesso il riquadro è
+  // davvero sotto gli occhi, e l'avviso deve dirlo.
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText('A plain heading outside any component');
+  await page.locator('#sum').click();
+  await expect(page.locator('#det')).toHaveAttribute('open', '');
+  await clickTranslateIcon(page, '#plain');
+
+  const partial = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
+});
+
 test('"Mostra originale" riporta indietro tutta la pagina, link compresi', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, ARTICLE);
