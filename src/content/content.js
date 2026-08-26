@@ -653,12 +653,26 @@
   // 1. si sovrappongono davvero — l'intersezione copre almeno metà del più
   //    piccolo dei due (un incrocio d'angolo fra una barra laterale e una riga
   //    di testo non è una sovrapposizione);
-  // 2. nessuno dei due sfora l'altro DA TUTTE LE PARTI. Un velo che sta dentro
-  //    l'ingombro della scheda — la sfumatura sul titolo di una copertina — è
-  //    allineato con lei su almeno un lato e passa; una barra fissa, un riquadro
-  //    modale o un manto steso sulla pagina inghiottono quello che coprono da
-  //    ogni lato, e non passano.
+  // 2. nessuno dei due INGHIOTTE l'altro: non basta circondarlo da tutte le
+  //    parti, deve anche stare su un'altra scala. La differenza è quella fra un
+  //    contenitore e una copertura. La scheda con un bordo, o con l'imbottitura
+  //    fra il bordo e la copertina, circonda la copertina da tutti e quattro i
+  //    lati — ed è la forma più comune degli elenchi di schede: fermarsi al
+  //    "circonda" faceva sparire di nuovo le voci del collegamento su mezzo web
+  //    (#444). Un contenitore però ABBRACCIA quello che tiene: la copertina
+  //    riempie quasi tutta la scheda. Una barra fissa, un riquadro dei cookie o
+  //    un manto steso sulla pagina sono grandi come la finestra e coprono un
+  //    titolo di poche parole: quello che nascondono è una frazione minima di
+  //    loro, ed è il segno che non lo stanno contenendo, se lo stanno solo
+  //    trovando sotto.
   const SURFACE_SLACK_PX = 4;
+  // Quanta parte del più grande deve occupare il più piccolo perché il primo
+  // sia il suo contenitore e non una copertura. Le misure vere stanno lontane
+  // dalla soglia da tutte e due le parti: la copertina rientrata di dodici
+  // pixel in una scheda ne occupa l'85%, e una scheda che tiene dentro anche il
+  // titolo resta sopra alla metà; una barra fissa a tutta larghezza sopra una
+  // riga di titoli sta sotto al 5%, il manto invisibile sopra un paragrafo al 3%.
+  const CONTAINER_MIN_RATIO = 0.35;
 
   function engulfs(outer, inner) {
     return outer.left < inner.left - SURFACE_SLACK_PX
@@ -667,12 +681,36 @@
       && outer.bottom > inner.bottom + SURFACE_SLACK_PX;
   }
 
+  function swallows(outer, inner) {
+    if (!engulfs(outer, inner)) return false;
+    const areaOuter = outer.width * outer.height;
+    const areaInner = inner.width * inner.height;
+    return areaInner < areaOuter * CONTAINER_MIN_RATIO;
+  }
+
+  // Risalita che attraversa i confini dei componenti web: `contains()` di un
+  // elemento in chiaro non vede quello che sta dentro uno shadow root, quindi
+  // "la copertina sta dentro il collegamento" risultava falso proprio sulle
+  // schede fatte a componenti.
+  function containsAcrossShadow(ancestor, el) {
+    if (!ancestor || !el) return false;
+    let node = el;
+    while (node) {
+      if (node === ancestor) return true;
+      node = node.parentNode || node.host || null;
+    }
+    return false;
+  }
+
   // Un contenuto "appartiene" a un collegamento quando ci sta dentro (nel DOM) o
   // quando ne occupa la superficie (i player veri coprono il filmato col proprio
-  // overlay, e le schede impilano copertina e link invece di annidarli).
+  // overlay, e le schede impilano copertina e link invece di annidarli). Il DOM
+  // viene prima: se la pagina dice già che copertina e collegamento sono la
+  // stessa scheda, rifare il conto sui rettangoli può solo buttare via
+  // un'informazione certa (#444).
   function belongsTo(el, linkEl) {
     if (!el || !linkEl) return false;
-    return linkEl.contains?.(el) || sameSurface(el, linkEl);
+    return containsAcrossShadow(linkEl, el) || sameSurface(el, linkEl);
   }
 
   function sameSurface(a, b) {
@@ -687,7 +725,7 @@
     const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
     if (w <= 0 || h <= 0) return false;
     if ((w * h) * 2 < Math.min(areaA, areaB)) return false;
-    return !engulfs(ra, rb) && !engulfs(rb, ra);
+    return !swallows(ra, rb) && !swallows(rb, ra);
   }
 
   // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre
