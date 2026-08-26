@@ -24,7 +24,7 @@
         'Se un sito allunga la pagina mentre scorri, o cambia schermata senza ricaricare, le righe arrivate dopo si traducono dal tasto destro con «Traduci il testo nuovo». Prima l\'unica strada era tornare all\'originale e rifare tutta la pagina da capo.',
         'Il testo che il sito carica mentre la traduzione sta ancora lavorando viene tradotto insieme al resto, senza doverci tornare sopra: scorrere mentre si aspetta non lascia più righe in lingua originale.',
         'Le sezioni ripiegate («Mostra di più», le schede, i «leggi tutto») che apri dopo aver tradotto la pagina si traducono dal tasto destro con «Traduci il testo nuovo», invece di costringerti a rifare tutta la pagina.',
-        'Mentre traduce, il tasto destro offre «Mostra originale» per fermarla: l\'avviso di lavoro in corso sparisce subito e la pagina torna in lingua originale e ci resta, invece di ritradursi da sola qualche secondo dopo.',
+        'Mentre traduce, il tasto destro offre «Mostra originale» per fermarla. L\'avviso di lavoro in corso sparisce subito e la pagina torna in lingua originale e ci resta, invece di ritradursi da sola qualche secondo dopo.',
         'Filo non dice più che una pagina è tradotta «solo in parte» quando l\'ha tradotta tutta: bastava un separatore o uno spazio decorativo per far comparire l\'avviso, e ti mandava a cercare del testo in lingua originale che non c\'era.',
       ],
     },
