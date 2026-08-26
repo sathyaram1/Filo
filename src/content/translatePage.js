@@ -755,7 +755,7 @@
         }
         last = PLACEHOLDER_RE.lastIndex;
       }
-      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      if (last < text.length) frag.appendChild(doc.createTextNode(text.slice(last)));
       for (let k = 0; k < refs.length; k++) {
         if (!used.has(k) && refs[k]) frag.appendChild(refs[k]);
       }
