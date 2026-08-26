@@ -341,6 +341,10 @@
     );
     if (myRun !== runSeq) return { kind: 'aborted' };
 
+    // Le etichette gemelle: si copiano adesso dal testo che l'elemento mostra,
+    // appena tradotto. Non è passata nessuna richiesta al modello per loro.
+    applyMirroredAttrs(blocks.mirrors, myRun);
+
     const done = units.filter((u) => u.applied).length;
     const applied = already + done;
     totalCount = grandTotal;

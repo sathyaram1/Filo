@@ -557,7 +557,7 @@
 
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
-    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], shadowRoots: [], frameDocs: [], hidden: [] });
+    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], mirrors: [], shadowRoots: [], frameDocs: [], hidden: [] });
     const out = [];
     // Gli alberi separati dei componenti aperti incontrati per strada. Chi
     // sorveglia il testo che arriva DOPO ne ha bisogno: una MutationObserver
@@ -570,6 +570,9 @@
     // Etichette negli attributi (#407): stessa camminata, lista separata —
     // si applicano scrivendo l'attributo, non sostituendo i figli.
     const attrs = [];
+    // Etichette GEMELLE del testo che l'elemento mostra già: si copiano dalla
+    // traduzione di quel testo invece di ripagarle al modello.
+    const mirrors = [];
     // Sottoalberi nascosti ADESSO (#407): non entrano nel lavoro, ma se
     // l'utente li scopre il menu deve offrire di tradurli.
     const hidden = [];
@@ -656,7 +659,7 @@
       for (const c of el.children) kids.push(c);
       for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
     }
-    return Object.assign(out, { unreachable, truncated, attrs, shadowRoots, frameDocs, hidden });
+    return Object.assign(out, { unreachable, truncated, attrs, mirrors, shadowRoots, frameDocs, hidden });
   }
 
   // Tutti gli elementi già tradotti, componenti isolati compresi: una
