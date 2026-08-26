@@ -1263,6 +1263,7 @@
     close,
     computeCap,
     computeOffset,
+    computeSubOffset,
     openGenericSubmenu,
     openIconGridSubmenu,
     refreshIconRow,
