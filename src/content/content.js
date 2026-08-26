@@ -855,6 +855,13 @@
       // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
       // <a>) prima ancora della pila di strati.
       linkUnder: linkEl ? null : findLinkUnder(stack, target, mediaUnder || imgUnder),
+      // Gli strati sotto il cursore, così come li ha visti il freno. Servono
+      // più a valle per l'unica domanda che resta lì: la copertina adottata e
+      // il collegamento sono la STESSA scheda? Anche quella risposta può
+      // passare dal "si vede o no", e senza gli strati tornerebbe a dipendere
+      // dai soli rettangoli — che sulle righe con la miniatura piccola
+      // sbagliano (#444).
+      layers: stack,
       editable: isEditable(target),
     };
   }
