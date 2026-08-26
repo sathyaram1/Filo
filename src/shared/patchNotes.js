@@ -16,7 +16,7 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
-      version: '0.2.200', date: '2026-08-24',
+      version: '0.2.204', date: '2026-08-26',
       features: [],
       fixes: [
         'Sulle pagine lunghissime «Traduci la pagina» non dichiara più di aver finito mentre il fondo è ancora in lingua originale. Ti dice quanti blocchi ha tradotto, e dal tasto destro completi il resto senza rifare la parte già tradotta.',
@@ -26,6 +26,12 @@
         'Le sezioni ripiegate («Mostra di più», le schede, i «leggi tutto») che apri dopo aver tradotto la pagina si traducono dal tasto destro con «Traduci il testo nuovo», invece di costringerti a rifare tutta la pagina.',
         'Mentre traduce, il tasto destro offre «Mostra originale» per fermarla: l\'avviso di lavoro in corso sparisce subito e la pagina torna in lingua originale e ci resta, invece di ritradursi da sola qualche secondo dopo.',
         'Filo non dice più che una pagina è tradotta «solo in parte» quando l\'ha tradotta tutta: bastava un separatore o uno spazio decorativo per far comparire l\'avviso, e ti mandava a cercare del testo in lingua originale che non c\'era.',
+      ],
+    },
+    {
+      version: '0.2.198', date: '2026-08-22',
+      fixes: [
+        'Nelle home dei siti di video, nei social e nelle pagine di risultati il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» insieme ai comandi della copertina, anche mentre parte l\'anteprima animata. Prima il menu cambiava a seconda di come il sito aveva costruito la scheda, e quasi sempre metà delle voci non c\'era.',
       ],
     },
     {

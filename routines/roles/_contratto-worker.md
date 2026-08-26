@@ -28,6 +28,14 @@ REGISTRATO con gli script, mentre lavori:
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
 conta niente. Se non l'hai registrato, non esiste.
 
+## Gli strumenti che ti vengono nominati
+
+I comandi in queste istruzioni hanno un percorso INTERO, che punta fuori dal
+progetto. Usali così: sono la versione aggiornata, messa da parte prima che il
+giro aprisse il ramo su cui stai lavorando. Dentro il progetto ci sono gli
+strumenti di QUEL ramo, che possono essere vecchi di giorni e non fare cose che
+credi facciano — senza dirtelo. Se scrivi `scripts/…` a mano, stai tornando lì.
+
 ## Il battito non è affar tuo
 
 Il semaforo che tiene il tuo lavoro cade dopo 30 minuti di silenzio, e la suite
@@ -53,3 +61,8 @@ proseguire, dichiaralo nel rilascio invece di lasciare il lavoro appeso.
   (pochi tentativi, attese brevi) prima di arrendersi: quando esce con 3 il
   canale è giù davvero. Non ritentare a mano in loop: fermati. Il lavoro
   riprende quando il canale torna.
+- **exit 1 con "NESSUN BIGLIETTO"**: il server non è stato nemmeno chiamato —
+  il promemoria del biglietto non si trova più. Non è un guasto del server e
+  non è un rifiuto: ripeti lo stesso comando aggiungendo `--ticket <codice>`
+  (il codice è nelle istruzioni con cui sei partito). Se non ce l'hai più,
+  rilascia e fermati.

@@ -140,6 +140,11 @@
       if (it.type === 'inline') {
         const el = document.createElement('div');
         el.className = 'sn-menu-inline';
+        // Di cosa parla il riquadro (immagine / collegamento / testo). Sulla
+        // stessa scheda deve restare lo STESSO da qualunque punto la si clicchi
+        // (#444): scritto qui, l'argomento è leggibile anche prima che la
+        // risposta arrivi e sostituisca il testo di attesa.
+        if (it.subject) el.dataset.subject = it.subject;
         if (it.content) el.textContent = it.content;
         root.appendChild(el);
         if (typeof it.onMount === 'function') {

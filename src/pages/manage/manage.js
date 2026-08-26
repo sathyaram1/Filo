@@ -814,27 +814,53 @@
 
   // ── Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) ─────────
   //
-  // Lo STESSO comando che vive nella prima schermata di Filo. Non una copia:
-  // il disegno e i bottoni li costruisce il modulo condiviso
-  // (src/shared/mergeApprovals.js), qui c'è solo il posto dove appenderlo e la
-  // lettura via IPC. Cammini equivalenti fanno la stessa cosa — e con due
-  // implementazioni, prima o poi non sarebbe più vero.
+  // L'UNICA superficie dove si approvano (scelta owner 2026-08-26: prima
+  // l'avviso stava anche sulla prima schermata del browser). Vive in cima ai
+  // Ricevuti perché i Ricevuti sono le cose che aspettano una decisione
+  // dell'owner, e questa è la più urgente: un ramo fermo finché lui non dice
+  // sì o no. Il disegno e i bottoni li costruisce il modulo condiviso
+  // (src/shared/mergeApprovals.js); qui c'è il posto dove appenderlo, la
+  // lettura via IPC e il legame con la lista dei feedback.
   //
   // Quando non c'è niente in attesa il blocco resta invisibile: una sezione
   // vuota in una pagina di gestione è rumore, non informazione. Le decisioni
-  // già prese restano invece elencate qui (e solo qui): un'eccezione ai
+  // già prese restano invece elencate in Automazioni: un'eccezione ai
   // controlli di sicurezza deve lasciare una traccia che si può guardare.
   const mgMergeApprovals = document.getElementById('mgMergeApprovals');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
 
+  // Il pannello-lista è condiviso dalle quattro schede (Ricevuti / In coda /
+  // Risolti / Archiviati): l'avviso appartiene SOLO ai Ricevuti, quindi la
+  // visibilità dipende da due cose — c'è qualcosa da approvare, e si sta
+  // guardando la scheda giusta. Il conteggio resta qui e il cambio scheda
+  // riapplica la regola senza rileggere niente dal server.
+  let mergeApprovalsCount = 0;
+  function applyMergeApprovalsVisibility() {
+    if (!mgMergeApprovals) return;
+    mgMergeApprovals.hidden = mergeApprovalsCount === 0 || currentTab !== 'inbox';
+  }
+
+  // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
+  // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
+  // feedback, quindi "guarda cosa era stato chiesto" deve essere un click, non
+  // una ricerca a mano. Se il feedback non è (più) nella lista non si fa nulla.
+  function openFeedbackByNum(num) {
+    const cerca = String(num || '').trim();
+    if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
+    const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
+    if (!fb) return;
+    selectTab(MR.manageTabFor(fb, { releasedVersion }));
+    openDetail(fb._id);
+  }
+
   // `already` è l'elenco già pronto, quando ad avvisare è stato il main
-  // (MERGE_APPROVALS_CHANGED). Vale la stessa cosa detta nella prima
-  // schermata: una pagina già aperta deve accorgersi di una richiesta nuova,
-  // altrimenti l'avviso lo vede solo chi riapre la pagina.
+  // (MERGE_APPROVALS_CHANGED): una pagina già aperta deve accorgersi di una
+  // richiesta nuova, altrimenti l'avviso lo vede solo chi riapre la pagina.
   async function loadMergeApprovals(already) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!mgMergeApprovals || !UI) return 0;
     const spegni = () => {
+      mergeApprovalsCount = 0;
       mgMergeApprovals.replaceChildren();
       mgMergeApprovals.hidden = true;
       if (mgMergeApprovalsRecent) {
@@ -857,7 +883,10 @@
       onDone: () => { setTimeout(loadMergeApprovals, 1200); },
       onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
       onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
+      onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
     });
+    mergeApprovalsCount = n;
+    applyMergeApprovalsVisibility();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
     return n;
   }
@@ -902,6 +931,9 @@
       mgManage.hidden = true;
       closeSidebar();
       renderList();
+      // L'avviso delle fusioni appartiene ai soli Ricevuti: il pannello è lo
+      // stesso per le quattro schede-lista, quindi si ricontrolla qui.
+      applyMergeApprovalsVisibility();
     }
   }
 
@@ -2789,12 +2821,13 @@
     loadWorkerLog();
   });
 
-  // Tab "Automazioni": le fusioni in attesa si rileggono a OGNI apertura —
-  // una richiesta già decisa o appena arrivata renderebbe la sezione una
+  // Tab "Ricevuti" (l'avviso da decidere) e "Automazioni" (la traccia delle
+  // decisioni passate): le fusioni si rileggono a OGNI apertura — una
+  // richiesta già decisa o appena arrivata renderebbe la sezione una
   // fotografia vecchia.
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'automation') return;
+    if (!btn || (btn.dataset.tab !== 'automation' && btn.dataset.tab !== 'inbox')) return;
     loadMergeApprovals();
   });
 

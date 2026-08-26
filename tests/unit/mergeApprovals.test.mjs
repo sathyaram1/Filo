@@ -4,7 +4,7 @@
 // Qui sta la parte PURA: cosa legge l'owner. È il pezzo delicato, perché una
 // frase sbagliata su questa superficie fa approvare (o buttare) una fusione
 // senza sapere cosa contiene. Il disegno vero lo verificano gli spec Playwright
-// (tests/merge-approvals.spec.mjs), che aprono le due pagine.
+// (tests/merge-approvals.spec.mjs), sulla dashboard di gestione.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -200,6 +200,18 @@ describe('la provenienza della richiesta', () => {
     assert.match(UI.originLabel({ origin: 'routine', num: '#412' }), /#412/);
     // Senza numero non si inventa niente e non si stampa un cancelletto vuoto.
     assert.doesNotMatch(UI.originLabel({ origin: 'routine' }), /#/);
+  });
+
+  test('il cancelletto è uno solo, comunque il server mandi il numero', () => {
+    // Il server manda il numero a volte nudo ("444") e a volte già col
+    // cancelletto ("#444"): la richiesta vera del 2026-08-26 stampava
+    // "feedback ##444". La normalizzazione sta in un punto solo (feedbackNum),
+    // così anche chi confronta col numero della lista confronta la stessa cosa.
+    assert.equal(UI.feedbackNum({ num: '#444' }), '444');
+    assert.equal(UI.feedbackNum({ num: '444' }), '444');
+    assert.equal(UI.feedbackNum({}), '');
+    assert.doesNotMatch(UI.originLabel({ origin: 'routine', num: '#444' }), /##/);
+    assert.match(UI.originLabel({ origin: 'routine', num: '444' }), /feedback #444/);
   });
 
   test('origine assente = lavoro locale: è il caso storico, non un "non si sa"', () => {

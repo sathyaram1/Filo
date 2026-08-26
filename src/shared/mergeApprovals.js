@@ -13,20 +13,23 @@
 //   rende l'eccezione accettabile: una sessione catturata ha le credenziali
 //   della macchina, non le mani dell'owner sulla finestra di Filo.
 //
-// PERCHÉ UN MODULO CONDIVISO
-//   L'avviso vive in DUE posti — la prima schermata (dove l'owner lo trova
-//   senza cercarlo) e Gestione → Automazioni (dove lo va a cercare). Cammini
-//   equivalenti devono fare la stessa cosa: se il disegno e il comportamento
-//   stessero in due file, prima o poi uno dei due imparerebbe qualcosa che
-//   l'altro non sa. Qui c'è UNA costruzione, e le due pagine passano solo
-//   `onApprove`/`onDiscard`.
+// DOVE VIVE (scelta dell'owner, 2026-08-26)
+//   SOLO nella dashboard di gestione, in cima ai Ricevuti: i Ricevuti sono le
+//   cose che aspettano una decisione dell'owner, e questa È una decisione —
+//   sta lì, prima dei feedback, non su una superficie a parte. Prima l'avviso
+//   viveva anche sulla prima schermata del browser: due posti per la stessa
+//   decisione erano rumore per la home di tutti i giorni.
+//
+//   Il modulo resta separato dalla pagina perché tiene insieme le due rese —
+//   l'avviso da decidere (Ricevuti) e la traccia delle decisioni passate
+//   (Automazioni) — e la parte PURA che gli unit test coprono.
 //
 //   Le frasi che spiegano COSA è stato bloccato NON stanno qui: le manda il
 //   server, che è l'unico posto dove la tabella dei controlli vive. Questo file
 //   le mostra e basta — e se una voce arrivasse senza frase, mostra il nome
 //   grezzo invece di nascondere il blocco.
 //
-// Stile: src/styles/mergeApprovals.css (caricato da entrambe le pagine).
+// Stile: src/styles/mergeApprovals.css.
 
 (function (global) {
   'use strict';
@@ -131,10 +134,20 @@
     return String((req && req.origin) || '') === 'routine' ? 'routine' : 'locale';
   }
 
+  /**
+   * Il numero del feedback da cui nasce il lavoro, senza cancelletto. PURA.
+   * Il server a volte lo manda già con il `#` davanti: qui si normalizza,
+   * così chi lo stampa ne mette uno solo e chi lo confronta con i numeri
+   * della lista feedback confronta la stessa cosa.
+   */
+  function feedbackNum(req) {
+    return String((req && req.num) || '').trim().replace(/^#+/, '');
+  }
+
   /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
   function originLabel(req) {
     if (originOf(req) !== 'routine') return 'lavoro tuo, da questo computer';
-    var num = String((req && req.num) || '').trim();
+    var num = feedbackNum(req);
     return num ? 'automazione · feedback #' + num : 'automazione';
   }
 
@@ -251,8 +264,21 @@
     // Da dove viene il lavoro, PRIMA del resto: le due provenienze stanno nello
     // stesso elenco, e chi approva deve sapere subito quale delle due sta
     // guardando.
-    var origin = el('span', 'sn-mac-origin', originLabel(req));
-    origin.title = originHint(req);
+    //
+    // Se il lavoro nasce da una segnalazione e la pagina sa aprirla
+    // (`onFeedback`), l'etichetta diventa un bottone: "guarda cosa era stato
+    // chiesto" è esattamente il gesto che serve prima di approvare, e deve
+    // stare a un click, non a una ricerca.
+    var origin;
+    if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
+      origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
+      origin.type = 'button';
+      origin.title = 'Apri la segnalazione #' + feedbackNum(req) + ' da cui nasce questo lavoro.';
+      origin.addEventListener('click', function () { o.onFeedback(req); });
+    } else {
+      origin = el('span', 'sn-mac-origin', originLabel(req));
+      origin.title = originHint(req);
+    }
     head.appendChild(origin);
     head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
@@ -371,8 +397,8 @@
    * Disegna l'avviso dentro `host`.
    *
    * NIENTE RICHIESTE = NIENTE AVVISO: `host` resta vuoto e nascosto. È la
-   * condizione che tiene la prima schermata pulita per chi non ha nulla in
-   * sospeso — cioè quasi sempre, e per chiunque non sia il proprietario.
+   * condizione che tiene i Ricevuti puliti per chi non ha nulla in sospeso —
+   * cioè quasi sempre, e per chiunque non sia il proprietario.
    *
    * @returns {number} quante richieste sono state disegnate
    */
@@ -408,7 +434,7 @@
   /**
    * Le decisioni passate, in righe minute. Traccia dell'eccezione: un'apertura
    * di questo tipo che non lascia segno non è verificabile.
-   * Vive SOLO nella pagina di gestione — sulla prima schermata sarebbe rumore.
+   * Vive in Gestione → Automazioni — fra le cose da decidere sarebbe rumore.
    */
   function renderRecent(host, opts) {
     if (!host) return 0;
@@ -449,6 +475,7 @@
     headline: headline,
     requestedBy: requestedBy,
     originOf: originOf,
+    feedbackNum: feedbackNum,
     originLabel: originLabel,
     originHint: originHint,
     howToRetry: howToRetry,

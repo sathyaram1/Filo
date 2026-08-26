@@ -42,6 +42,7 @@
 
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { merge } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
 
@@ -49,7 +50,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // FILO_REPO_ROOT: override della root (dove si cerca il biglietto). Esiste SOLO
 // per i test, che simulano il giro in cartelle usa-e-getta senza toccare il
 // repo reale (stesso pattern degli altri script delle routine).
-const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
+const ROOT = process.env.FILO_REPO_ROOT
+  ? resolve(process.env.FILO_REPO_ROOT)
+  : (pinnedRepoRoot() || resolve(__dirname, '..'));
 
 // ─── logica pura (testabile) ────────────────────────────────────────────────
 

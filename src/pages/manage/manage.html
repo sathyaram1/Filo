@@ -680,8 +680,8 @@
     }
     .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css (lo stesso
-       che usa la prima schermata). Qui solo la spaziatura nella pagina. */
+    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css. Qui solo
+       la spaziatura nella pagina. */
     .mg-merge-approvals { margin: 0 0 20px; }
     .mg-merge-approvals-recent { margin: 0 0 20px; }
 
@@ -770,15 +770,6 @@
       <button type="button" class="sn-btn" id="mgSignIn">Accedi</button>
     </div>
 
-    <!-- Fusioni fermate dai controlli di sicurezza, in attesa del tuo via libera
-         (SPEC-RIDISEGNO-MAX.md §10). SOPRA LE SCHEDE, e non dentro una di esse:
-         qui finiscono sia il lavoro locale sia quello delle automazioni, ed è
-         l'unica cosa in questa pagina che aspetta una decisione per non restare
-         ferma per sempre. Dentro Automazioni la si vedeva solo andandola a
-         cercare. È lo STESSO comando della prima schermata — stesso modulo,
-         stesso foglio di stile. Vuoto = invisibile. -->
-    <div class="mg-merge-approvals" id="mgMergeApprovals" hidden></div>
-
     <!-- Tab bar (dashboard unificata DB1, owner-only) -->
     <nav class="mg-tabs" id="mgTabs" role="tablist">
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
@@ -810,6 +801,15 @@
     <!-- Layout condiviso a 3 colonne: la lista a sinistra è filtrata per tab,
          il dettaglio al centro e il pannello laterale a destra sono comuni. -->
     <section class="mg-panel mg-panel--active" id="panel-list" data-panel="list">
+      <!-- Fusioni fermate dai controlli di sicurezza, in attesa del tuo via
+           libera (SPEC-RIDISEGNO-MAX.md §10). IN CIMA AI RICEVUTI, perché i
+           Ricevuti sono le cose che aspettano una decisione dell'owner e
+           questa è la più urgente: un ramo fermo finché lui non dice sì o no
+           (scelta owner 2026-08-26). Il pannello è condiviso dalle quattro
+           schede-lista, quindi il JS la mostra SOLO sui Ricevuti. Vuoto =
+           invisibile. La traccia delle decisioni passate resta in Automazioni. -->
+      <div class="mg-merge-approvals" id="mgMergeApprovals" hidden></div>
+
       <!-- Le larghezze delle colonne si trascinano dai due divisori e vengono
            ricordate; doppio clic su un divisore ripristina la misura iniziale. -->
       <div class="mg-review" id="mgReviewGrid">

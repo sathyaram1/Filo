@@ -3,12 +3,11 @@
 //
 // IL GUASTO CHE CHIUDE
 //   Quando i controlli del server fermano una fusione, il terminale dice
-//   "approvala dalla prima schermata di Filo". Ma la prima schermata leggeva
-//   l'elenco solo all'apertura, al cambio di account e dopo una decisione: se
-//   era GIÀ APERTA — cioè quasi sempre, visto che è la home del browser — non
-//   mostrava niente finché non se ne apriva una nuova. Un avviso che si vede
-//   solo aprendo una finestra in più è un avviso che l'owner si perde, e ci si
-//   è cascati subito.
+//   "approvala da Filo" (oggi: la dashboard di gestione, in cima ai Ricevuti).
+//   Ma quella pagina leggeva l'elenco solo all'apertura, al cambio di account
+//   e dopo una decisione: se era GIÀ APERTA non mostrava niente finché non se
+//   ne apriva una nuova. Un avviso che si vede solo aprendo una finestra in
+//   più è un avviso che l'owner si perde, e ci si è cascati subito.
 //
 // PERCHÉ UN FILE E NON UN CONTROLLO A INTERVALLI
 //   La richiesta che nasce QUI la annuncia chi la fa nascere: `npm run finish`

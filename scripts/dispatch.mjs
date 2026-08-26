@@ -43,13 +43,19 @@
 //   stata interrotta. Ogni --record-* ricalcola l'identità della directory e
 //   RIFIUTA la transizione se non corrisponde al branch assegnato.
 //
-// USO
+// USO (la stessa lista, per chi la chiede dal terminale: `--help`)
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
-//   node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> ["critica"]
-//   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"]
-//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail>
+//   node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
+//
+//   Nei --record-* il biglietto si rilegge dal promemoria (.claude/routine-ticket.json);
+//   `--ticket` è la scorta per quando il promemoria è andato perso.
+//   Un argomento NON riconosciuto è un errore d'uso (exit 1) senza effetti
+//   collaterali: il promemoria si cancella solo all'avvio dichiarato di un giro
+//   locale senza biglietto, mai davanti a un argomento storpiato.
 //
 //   Exit 0 → JSON su stdout (c'è lavoro). Exit 2 → niente da fare. Exit 1 → errore.
 //   Exit 3 → GUASTO: non si può lavorare in sicurezza (vedi ROUTINE-BRANCH-INTEGRITY.md §E).
@@ -73,12 +79,24 @@ import {
 import { writeRole, clearRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
+import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
+// DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
+//   ROOT       il PROGETTO, dove si lavora e dove parla git;
+//   TOOLS_ROOT gli STRUMENTI che stanno girando, che in cloud sono una copia
+//              fuori dal progetto — perché il progetto, appena si apre il ramo
+//              di un feedback, si porta dietro gli strumenti di QUEL ramo.
+// Quando gli strumenti sono una copia fissata, il progetto lo dicono loro: non
+// si chiede a nessuno di ricordarsi di passarlo.
+const ROOT = process.env.FILO_REPO_ROOT
+  ? resolve(process.env.FILO_REPO_ROOT)
+  : (pinnedRepoRoot() || resolve(__dirname, '..'));
 // Lo stato locale e' solo un ripiego: quello vero vive sul server. Sta fra i
 const STATE_DIR = stateDir(ROOT);
-const ROLES_DIR = resolve(ROOT, 'routines', 'roles');
+// Le ricette dei ruoli seguono gli STRUMENTI, non il progetto: su un ramo
+// vecchio anche le istruzioni sarebbero vecchie.
+const ROLES_DIR = resolve(TOOLS_ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 // Il documento che dice alle routine come devono comportarsi: acceso/spento,
@@ -104,7 +122,10 @@ const LOOP_CAP_MAX = 10;
 export const VERIFIER_CAPS = (() => {
   try {
     const req = createRequire(import.meta.url);
-    req(resolve(ROOT, 'src', 'shared', 'feedbackTransitions.js'));
+    // Dagli STRUMENTI, non dal progetto: è un dato che governa il giro (quante
+    // bocciature si tollerano), e preso dal ramo di lavoro sarebbe di nuovo la
+    // versione di giorni fa.
+    req(resolve(TOOLS_ROOT, 'src', 'shared', 'feedbackTransitions.js'));
     const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
     if (caps && Number.isFinite(caps.failCap) && Number.isFinite(caps.improvableCap)) return caps;
   } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
@@ -329,15 +350,123 @@ const ROLE_FILE = {
 // divergevano.
 const WORKER_CONTRACT_FILE = '_contratto-worker.md';
 
+/**
+ * Da dove viene il contenuto che sto per fissare: ramo e commit del checkout.
+ * Non decide niente — si scrive accanto alla copia e finisce nelle istruzioni,
+ * così una copia presa da un checkout non aggiornato si vede invece di dover
+ * essere dedotta da un comportamento strano ore dopo.
+ */
+/**
+ * Il checkout da cui si sta per fissare è quello giusto?
+ *
+ * La copia vale quanto il momento in cui viene presa: se il giro parte da un
+ * checkout non aggiornato, fissa gli strumenti vecchi e il difetto torna con
+ * un'altra causa — con l'aggravante che stavolta sembra tutto a posto.
+ *
+ * IL CONTROLLO NON SI APPENDE A `FILO_ROUTINE`, e non è un dettaglio: quella
+ * variabile la esporta l'orchestratore seguendo le istruzioni che riceve DAL
+ * PREFLIGHT, cioè dopo che questo controllo è già passato. Appesa lì, la
+ * guardia avrebbe avuto i test verdi e non sarebbe scattata mai in produzione:
+ * è la stessa forma di guasto che questo lavoro viene a chiudere.
+ *
+ * Il preflight è il portone d'ingresso di un giro di routine, quindi si guarda
+ * sempre. Chi lo lancia per provare in locale, dove si sta su un ramo apposta,
+ * lo dice: `FILO_PREFLIGHT_ANY_BRANCH=1`.
+ *
+ * @returns {string} '' se va bene, altrimenti il motivo per fermarsi
+ */
+// Riempita dalla guardia quando NON ha potuto guardare (niente remoto, rete
+// assente): finisce nei log, così un controllo saltato non somiglia a un
+// controllo passato.
+let nonVerificato = '';
+
+function checkoutNonAdatto() {
+  if (String(process.env.FILO_PREFLIGHT_ANY_BRANCH || '') === '1') return '';
+  const g = (args) => execFileSync('git', args, {
+    cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+  const viaDiFuga = "se lo stai lanciando per provare, FILO_PREFLIGHT_ANY_BRANCH=1";
+  try {
+    // La CARTELLA PULITA si controlla per prima, prima ancora di guardare se il
+    // commit è quello giusto. Sembra un dettaglio d'ordine e non lo è: un
+    // progetto fermo a metà di un'operazione (un conflitto irrisolto, una
+    // modifica non salvata) può stare esattamente sul commit giusto e avere i
+    // file rotti. Controllandolo dopo, la copia si portava dentro i segni del
+    // conflitto e la ricetta consegnata al giro arrivava corrotta.
+    const sporco = g(['status', '--porcelain']);
+    if (sporco) {
+      const prima = sporco.split('\n')[0].trim();
+      return `il checkout ha roba non salvata ("${prima}"…): gli strumenti fissati sarebbero quelli mezzo modificati (${viaDiFuga})`;
+    }
+
+    g(['fetch', '--quiet', 'origin', MAIN_BRANCH]);
+    const qui = g(['rev-parse', 'HEAD']);
+    const la = g(['rev-parse', `origin/${MAIN_BRANCH}`]);
+    // Si confrontano i CONTENUTI, non i nomi: una testa staccata sulla punta
+    // della linea principale ha esattamente i file giusti, e rifiutarla col
+    // motivo "sei sul ramo sbagliato" sarebbe anche una bugia.
+    if (qui === la) return '';
+
+    const ramo = g(['rev-parse', '--abbrev-ref', 'HEAD']);
+    if (ramo !== MAIN_BRANCH) {
+      return `il giro parte da '${ramo}', che non è '${MAIN_BRANCH}' aggiornato: gli strumenti fissati sarebbero quelli di quel ramo (${viaDiFuga})`;
+    }
+
+    // Indietro sulla linea principale: NON è un motivo per morire. La ricetta
+    // dell'orchestratore prevede già di aggiornarsi, solo che lo fa due passi
+    // dopo — cioè dopo che la copia è stata presa. Lo si fa adesso, che è il
+    // momento giusto, e solo in avanti: se non basta un avanzamento pulito,
+    // qui c'è qualcosa che deve vedere l'owner.
+    try {
+      g(['merge', '--ff-only', `origin/${MAIN_BRANCH}`]);
+    } catch (_) {
+      return `il checkout non si allinea a '${MAIN_BRANCH}' con un avanzamento pulito: gli strumenti fissati sarebbero già vecchi (${viaDiFuga})`;
+    }
+    if (g(['rev-parse', 'HEAD']) !== la) {
+      return `il checkout non si è allineato a '${MAIN_BRANCH}': gli strumenti fissati sarebbero già vecchi (${viaDiFuga})`;
+    }
+  } catch (e) {
+    // Niente git, nessun remoto, rete assente: qui si fallisce APERTI, perché
+    // questo controllo esiste per accorgersi di una deriva, non per essere il
+    // punto in cui un giro muore perché il fetch non è passato.
+    //
+    // Ma NON in silenzio: fallire aperti senza dirlo equivale a non avere la
+    // guardia. Con un remoto chiamato in un altro modo il controllo saltava e
+    // il giro fissava strumenti vecchi con un tranquillo "prontezza OK". Chi
+    // legge i log deve poter distinguere "verificato" da "non ho potuto
+    // guardare".
+    nonVerificato = String((e && e.message) || e).split('\n')[0].slice(0, 120);
+    return '';
+  }
+  return '';
+}
+
+function origineDelCheckout() {
+  try {
+    const ramo = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return `${ramo} ${sha}`;
+  } catch (_) {
+    return '';
+  }
+}
+
 export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
   const f = resolve(ROLES_DIR, name);
   const base = existsSync(f) ? readFileSync(f, 'utf8') : '';
-  if (!base || !RUOLI_LAVORABILI.includes(role)) return base;
+  if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
   const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
-  return contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
+  const testo = contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
+  // Le ricette dicono `node scripts/…`, che dalla cartella di lavoro porta agli
+  // strumenti DEL RAMO. Quando gli strumenti sono la copia fissata, il percorso
+  // va riscritto in assoluto qui, nel momento della consegna: è l'unico punto
+  // che sa dove stanno davvero, e chi lavora non deve saperlo.
+  return absolutizeRecipe(testo, TOOLS_ROOT, ROOT);
 }
 
 /**
@@ -489,7 +618,13 @@ export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDe
  */
 async function deliverToChannel(intent, data) {
   const ticket = readRoutineTicket(ROOT);
-  if (!ticket) return { outcome: 'absent' };
+  // Senza biglietto il server non viene nemmeno chiamato: dirlo con le parole
+  // di un server giù ha già mandato un worker a diagnosticare per mezz'ora un
+  // guasto di rete che non esisteva (25 agosto, verifica di #444).
+  if (!ticket) {
+    process.stderr.write('[dispatch] nessun biglietto trovato (né promemoria né --ticket): il server NON è stato chiamato\n');
+    return { outcome: 'absent', reason: 'biglietto non trovato' };
+  }
   try {
     const ch = await import('./routine-channel.mjs');
     const r = await ch.deliver(ticket, intent, data);
@@ -579,12 +714,17 @@ async function recordVerifier(id, verdict, critique) {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    // Biglietto introvabile ≠ server giù: sono due frasi diverse perché sono
+    // due rimedi diversi (ripassare il biglietto vs fermarsi).
+    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+  }
 
   if (sent.outcome !== 'ok') {
     // Il server non risponde. Non c'è più una seconda strada su cui posare il
     // verdetto: dirlo è l'unica cosa onesta, perché un verdetto che nessuno ha
     // registrato ma che il ramo dà per dato è peggio di un verdetto mancante.
-    return { rejected: true, fromChannel: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
   }
   sealTransition(next, `verifier:${verdict}`);
   return next;
@@ -602,9 +742,12 @@ async function recordFixed(id, report = '', frase = '') {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    return { rejected: true, ticketMissing: true, message: 'consegna non registrata: nessun biglietto trovato' };
+  }
 
   if (sent.outcome !== 'ok') {
-    return { rejected: true, fromChannel: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
+    return { rejected: true, serverDown: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
   }
   sealTransition(next, 'fixer:consegna');
   return next;
@@ -620,10 +763,22 @@ async function recordSecaudit(id, verdict) {
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
   }
+  if (sent.outcome === 'absent') {
+    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+  }
+  if (sent.outcome !== 'ok') {
+    // Simmetria con recordVerifier/recordFixed, che qui mancava: sigillare lo
+    // stato locale con un verdetto che il server non ha mai ricevuto è la
+    // divergenza permissiva che questa spec toglie — e il cancello di fusione
+    // legge il verdetto REGISTRATO, quindi un secaudit "sigillato ma non
+    // consegnato" bloccherebbe comunque la fusione, solo più tardi e senza dire
+    // perché.
+    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+  }
 
   sealTransition(next, `secaudit:${verdict}`);
-  // Senza canale non si accodava niente nemmeno prima: il passaggio a `done`
-  // (o a `design` su bocciatura) lo fa il ruolo dopo il cancello di fusione.
+  // Il passaggio a `done` (o a `design` su bocciatura) lo fa il ruolo dopo il
+  // cancello di fusione.
   return next;
 }
 
@@ -723,6 +878,110 @@ export function channelRejectionText(message) {
     'La decisione NON è stata registrata da nessuna parte, e non va aggirata',
     'depositandola sulla coda su git: il server ha guardato ruolo, ramo e stato',
     "vero e ha detto no. Leggi il motivo, correggi se puoi, altrimenti fermati.",
+  ].join('\n');
+}
+
+/**
+ * Il server non risponde: rete giù o 5xx, DOPO i ritentativi automatici del
+ * canale. Prima questo caso usciva incorniciato da channelRejectionText — "il
+ * server ha guardato e ha detto no" sopra un server che non aveva risposto
+ * affatto — e con exit 4, mentre il contratto dei worker documenta da sempre
+ * exit 3 per il canale non raggiungibile. Testo e codice ora dicono la stessa
+ * cosa del contratto. PURA (testata in tests/unit/dispatch.test.mjs).
+ */
+export function serverDownText(message) {
+  return [
+    `[dispatch] CANALE NON RAGGIUNGIBILE: ${message}`,
+    'La decisione NON è stata registrata da nessuna parte. Lo script ha già',
+    'ritentato da solo prima di arrendersi: non ritentare a mano in loop, fermati.',
+    'Il lavoro riprende quando il canale torna.',
+  ].join('\n');
+}
+
+/**
+ * Il biglietto non si trova: né nel promemoria né passato con `--ticket`. Terza
+ * voce accanto a rejectionText e channelRejectionText, perché è un terzo caso:
+ * non un rifiuto del server, non un server giù — il server non è stato proprio
+ * chiamato. Il 25 agosto questo caso usciva travestito da "il server non
+ * risponde" E da "RIFIUTATO dal server" nella stessa schermata, due diagnosi
+ * false in una: il worker ha inseguito un guasto di rete inesistente e un'ora
+ * di verifica è andata persa. PURA (testata in tests/unit/dispatch.test.mjs).
+ */
+export function ticketMissingText(message) {
+  return [
+    `[dispatch] NESSUN BIGLIETTO: ${message}`,
+    'Il server NON è stato chiamato: senza biglietto la consegna non si può nemmeno',
+    'chiedere. Il promemoria (.claude/routine-ticket.json) non c\'è: se hai ancora il',
+    'codice del biglietto (è nelle istruzioni con cui sei partito), ripeti questo',
+    'comando aggiungendo `--ticket <codice>`. Se non ce l\'hai, rilascia e fermati.',
+  ].join('\n');
+}
+
+/**
+ * Questo valore ha la FORMA di un biglietto? PURA.
+ *
+ * Un biglietto vero lo genera il server: 32 byte casuali in base64url, 43
+ * caratteri (filo-security, functions/src/secrets.js). L'alfabeto base64url
+ * comprende il trattino, quindi un biglietto legittimo PUÒ cominciare con un
+ * trattino singolo (~1 su 64): rifiutare "tutto ciò che comincia con -"
+ * butterebbe via giri validi. Si valida invece la forma: solo alfabeto
+ * base64url, lunghezza da biglietto (soglia larga, per lasciare al server il
+ * margine di cambiare taglia), mai doppio trattino. Ogni flag esistente cade
+ * fuori: i `--…` per il doppio trattino, `-h` per la lunghezza — ed è così che
+ * un flag finito al posto del codice non può più sovrascrivere il promemoria.
+ */
+export function looksLikeTicket(v) {
+  const s = String(v || '');
+  return /^[A-Za-z0-9_-]{16,}$/.test(s) && !s.startsWith('--');
+}
+
+/**
+ * Estrae la coppia `--ticket <codice>` da una lista di argomenti. PURA.
+ *
+ * Serve ai `--record-*`: il biglietto normalmente si rilegge dal promemoria,
+ * ma se il promemoria è andato perso il worker deve poterlo ripassare a mano —
+ * il rilascio lo permette da sempre, e l'asimmetria è costata il verdetto di
+ * #444 (il worker aveva il biglietto in mano e nessun posto dove metterlo).
+ *
+ * @returns {{ args: string[], ticket: string, error: boolean }} `error` = flag
+ *   presente ma codice mancante o che non ha la forma di un biglietto (il
+ *   chiamante esce con un errore d'uso).
+ */
+export function stripTicketArg(list) {
+  const args = Array.isArray(list) ? [...list] : [];
+  const i = args.indexOf('--ticket');
+  if (i === -1) return { args, ticket: '', error: false };
+  const v = String(args[i + 1] || '').trim();
+  args.splice(i, 2);
+  if (!looksLikeTicket(v)) return { args, ticket: '', error: true };
+  return { args, ticket: v, error: false };
+}
+
+/**
+ * La schermata di `--help`. Esiste perché un worker l'ha chiesta davvero — e la
+ * versione di allora, che non la conosceva, ha risposto trattandolo da giro
+ * nuovo senza biglietto e cancellandogli il promemoria. Chi chiede aiuto deve
+ * ricevere aiuto, senza effetti collaterali. PURA.
+ */
+export function usageText() {
+  return [
+    'Uso: node scripts/dispatch.mjs <comando>',
+    '',
+    '  --ticket <biglietto>   avvia il giro: ritira il lavoro dal server, scrive il',
+    '                         promemoria del biglietto e avvia il battito',
+    '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
+    '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
+    '  --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]',
+    '  --record-fixed    <id> ["report"] [--frase "…"] [--ticket <b>]',
+    '  --record-secaudit <id> <pass|fail> [--ticket <b>]',
+    '  --clear-state     <id> rimuove la copia locale dello stato',
+    '  --help                 questa schermata',
+    '',
+    'Nei --record-* il biglietto si rilegge da solo dal promemoria',
+    '(.claude/routine-ticket.json): `--ticket` serve solo se il promemoria è perso.',
+    '',
+    'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
+    '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
   ].join('\n');
 }
 
@@ -1056,16 +1315,38 @@ if (isMainModule) {
   const argv = process.argv.slice(2);
   const flag = argv[0];
 
+  // I `--record-*` accettano `--ticket <codice>` come scorta: il promemoria
+  // resta la via maestra, ma se è andato perso il worker — che il codice ce
+  // l'ha nelle istruzioni di partenza — deve poterlo ripassare, come già può
+  // nel rilascio. La coppia si toglie PRIMA di leggere i posizionali, e il
+  // codice viaggia nell'ambiente: readTicket lo trova lì per primo.
+  const conBiglietto = (args) => {
+    const t = stripTicketArg(args);
+    if (t.error) { console.error('Uso: --ticket richiede il codice del biglietto subito dopo'); process.exit(1); }
+    if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
+    return t.args;
+  };
+  // I quattro esiti di un --record-* respinto: biglietto introvabile (esci 1:
+  // si rimedia ripassando il codice), canale non raggiungibile (3, come da
+  // contratto dei worker), rifiuto del server (4), guardia d'identità (3).
+  // Quattro testi diversi perché quattro rimedi diversi.
+  const esciRespinto = (s) => {
+    if (s.ticketMissing) { console.error(ticketMissingText(s.message)); process.exit(1); }
+    if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
+    console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
+    process.exit(s.fromChannel ? 4 : 3);
+  };
+
   try {
     if (flag === '--record-verifier') {
-      const [, id, verdict, ...rest] = argv;
+      const [, id, verdict, ...rest] = conBiglietto(argv);
       if (!id || !VERIFIER_VERDICTS.includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|migliorabile|fail> ["critica"]'); process.exit(1); }
       const s = await recordVerifier(id, verdict, rest.join(' '));
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount} migliorabile=${Number(s.improvableCount) || 0}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const [, id, ...rest] = argv;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"]'); process.exit(1); }
       // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
       // resto è il report per l'owner, che il server cifra.
@@ -1073,15 +1354,21 @@ if (isMainModule) {
       const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
       const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
       const s = await recordFixed(id, report, frase);
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
       process.exit(0);
     } else if (flag === '--record-secaudit') {
-      const [, id, verdict] = argv;
+      const [, id, verdict] = conBiglietto(argv);
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
       const s = await recordSecaudit(id, verdict);
-      if (s.rejected) { console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message)); process.exit(s.fromChannel ? 4 : 3); }
+      if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
+      process.exit(0);
+    } else if (flag === '--help' || flag === '-h') {
+      // Chi chiede aiuto riceve aiuto. La versione che non conosceva `--help`
+      // lo trattava da giro nuovo senza biglietto e gli cancellava il
+      // promemoria: è il comando che ha perso il verdetto di #444.
+      console.log(usageText());
       process.exit(0);
     } else if (flag === '--preflight') {
       // Prontezza: gira PRIMA del setup dell'ambiente (npm install, binario
@@ -1095,10 +1382,38 @@ if (isMainModule) {
       // ritoccano i ruoli.
       preflight().then((r) => {
         if (r.ok) {
-          const f = resolve(ROLES_DIR, 'orchestrator.md');
+          // GLI STRUMENTI SI FISSANO QUI, e qui soltanto: questo è l'unico
+          // momento del giro in cui la cartella è ancora sulla versione
+          // aggiornata, prima che qualunque ramo di lavoro venga aperto.
+          // Da adesso in poi il giro esegue la copia, che nessun cambio di ramo
+          // può riportare indietro (lib/tools-pin.mjs).
+          const scomodo = checkoutNonAdatto();
+          if (scomodo) {
+            console.error(`[dispatch] GUASTO (transient): ${scomodo}`);
+            process.exit(3);
+          }
+          const pin = pinTools(ROOT, { origine: origineDelCheckout() });
+          if (!pin.ok) {
+            // FERMA IL GIRO, non prosegue. Proseguire vorrebbe dire eseguire gli
+            // strumenti del ramo di lavoro, cioè esattamente il guasto che
+            // questa copia viene a togliere — e quel guasto non si vede: costa
+            // un'ora di lavoro e la si scopre alla consegna rifiutata.
+            console.error(`[dispatch] GUASTO (transient): strumenti non fissati (${pin.why})`);
+            process.exit(3);
+          }
+          const tools = pin.dir;
+          const f = resolve(tools, 'routines', 'roles', 'orchestrator.md');
           const brief = existsSync(f) ? readFileSync(f, 'utf8') : '';
-          console.log('[dispatch] prontezza OK. Le tue istruzioni:\n');
-          console.log(brief || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
+          const da = pinnedOrigin(tools);
+          console.log(`[dispatch] prontezza OK. Strumenti fissati${da ? ` da ${da}` : ''}.`);
+          if (nonVerificato) {
+            process.stderr.write(
+              `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
+              + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
+          }
+          console.log('Le tue istruzioni:\n');
+          console.log(absolutizeRecipe(brief, tools, ROOT)
+            || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
           process.exit(0);
         }
         if (r.kind === 'off') console.log(`[dispatch] SPENTO: ${r.message}`);
@@ -1120,13 +1435,32 @@ if (isMainModule) {
       // consegne le fanno script diversi in momenti diversi, e pretendere che
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
       // provenienza dei feedback.
+      // Due sole forme legittime arrivano qui: NESSUN argomento (giro locale)
+      // o `--ticket <codice>` (giro col server). Tutto il resto — un flag
+      // storpiato, un `--ticket` senza codice — esce con un errore d'uso e NON
+      // tocca niente. Prima questa porta era anche quella degli argomenti
+      // sconosciuti: un `--help` battuto a metà lavoro veniva letto come "giro
+      // nuovo senza biglietto" e cancellava il promemoria — il verdetto di
+      // un'ora di verifica (#444) non si è più potuto registrare.
       const ti = argv.indexOf('--ticket');
-      const ticket = ti !== -1 ? argv[ti + 1] : '';
+      const ticket = ti !== -1 ? String(argv[ti + 1] || '') : '';
+      // Il codice deve avere la FORMA di un biglietto (looksLikeTicket): un
+      // flag finito al posto del codice (`--foo`, `-h`) qui sovrascriveva il
+      // promemoria del giro in corso — stessa regola dei --record-*.
+      if (ti !== -1 && !looksLikeTicket(ticket)) {
+        console.error('Uso: node scripts/dispatch.mjs --ticket <biglietto> (vedi --help). Il valore ricevuto non ha la forma di un biglietto. Niente è stato toccato.');
+        process.exit(1);
+      }
+      const estranei = argv.filter((a, i) => ti === -1 || (i !== ti && i !== ti + 1));
+      if (estranei.length) {
+        console.error(`[dispatch] argomento non riconosciuto: ${estranei[0]} (vedi --help). Niente è stato toccato: promemoria e battito restano come sono.`);
+        process.exit(1);
+      }
       // Il biglietto viene messo dove chi consegna lo ritrova da solo: le
       // consegne le fanno script diversi, in momenti diversi, e pretendere che
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
-      // provenienza dei feedback. Un giro senza biglietto cancella il
-      // marcatore, o quello del giro prima sopravvivrebbe a questo.
+      // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
+      // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo 30 minuti di silenzio e la suite completa in cloud ne dura 37,

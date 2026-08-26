@@ -25,6 +25,7 @@ import {
   escalationNote, currentBranch, headSha,
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
+  ensureSessionExcludes, SESSION_MARKERS,
 } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -404,5 +405,58 @@ describe('E — un guasto non si traveste da giornata tranquilla', () => {
     assert.match(src, /nessun biglietto/, 'senza biglietto non si lavora: nessun cammino alternativo');
     assert.ok(!src.includes('next-feedback'),
       'la scelta locale del lavoro è smontata: se riappare, la chiave della coda torna su questa macchina');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('F — i marcatori di sessione sopravvivono ai rami vecchi (incidente #444)', () => {
+  // Il 25 agosto il checkout di un ramo del 22 ha spazzato il marcatore del
+  // battito, nato il 23: la lista di esclusione che viaggia col ramo è vecchia
+  // quanto il ramo. La cura è `info/exclude`, che vale su ogni ramo e non
+  // viaggia mai in un commit — così né la pulizia né il salvataggio automatico
+  // vedono i marcatori, qualunque sia l'età del ramo checkoutato.
+
+  test('ensureSessionExcludes: scrive le esclusioni una volta sola (idempotente)', () => {
+    const { work } = makeRepo();
+    assert.equal(ensureSessionExcludes(work), true);
+    const f = resolve(work, '.git', 'info', 'exclude');
+    const primo = readFileSync(f, 'utf8');
+    for (const m of SESSION_MARKERS) {
+      assert.ok(primo.includes(m), `info/exclude deve elencare ${m}`);
+    }
+    assert.equal(ensureSessionExcludes(work), true);
+    assert.equal(readFileSync(f, 'utf8'), primo, 'una seconda chiamata non deve duplicare niente');
+  });
+
+  test('prepareBranch verso un ramo più vecchio dei marcatori NON li spazza e NON li consegna a git', () => {
+    const { work } = makeRepo();
+    // Il ramo "vecchio": la sua lista di esclusione conosce il promemoria del
+    // biglietto ma NON il marcatore del battito (nato dopo) — è la scena del
+    // 25 agosto, ricostruita.
+    git(work, ['checkout', '-q', '-b', 'worker/vecchio']);
+    writeFileSync(resolve(work, '.gitignore'), '.claude/routine-ticket.json\n', 'utf8');
+    git(work, ['add', '-A']);
+    git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'ramo vecchio']);
+    git(work, ['push', '-q', 'origin', 'worker/vecchio']);
+    git(work, ['checkout', '-q', 'main']);
+
+    // I marcatori del giro in corso, scritti prima del cambio di ramo.
+    mkdirSync(resolve(work, '.claude'), { recursive: true });
+    writeFileSync(resolve(work, '.claude', 'routine-ticket.json'), '{"ticket":"vivo"}\n', 'utf8');
+    writeFileSync(resolve(work, '.claude', 'routine-beat.json'), '{"pid":1,"ticket":"vivo"}\n', 'utf8');
+
+    const r = prepareBranch({ root: work, branch: 'worker/vecchio' });
+    assert.equal(r.ok, true, r.message);
+    // Senza il fix qui il marcatore del battito è sparito (la pulizia lo vedeva
+    // come file estraneo): questo assert era rosso.
+    assert.ok(existsSync(resolve(work, '.claude', 'routine-beat.json')),
+      'il marcatore del battito deve sopravvivere anche su un ramo che non lo conosce');
+    assert.ok(existsSync(resolve(work, '.claude', 'routine-ticket.json')),
+      'il promemoria del biglietto deve sopravvivere');
+    // E il salvataggio automatico non deve vederli: un marcatore committato è
+    // un biglietto pubblicato sul repo.
+    const status = git(work, ['status', '--porcelain']);
+    assert.ok(!status.includes('routine-beat.json') && !status.includes('routine-ticket.json'),
+      `i marcatori non devono comparire a git status (visti: ${status || 'niente'})`);
   });
 });

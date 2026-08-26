@@ -31,9 +31,18 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
+import { pinnedRepoRoot } from './tools-pin.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
+// DUE radici (lib/tools-pin.mjs): i moduli condivisi si leggono accanto a
+// QUESTO file, così una copia degli strumenti fuori dal progetto sa girare da
+// sola; i ripieghi locali per la chiave (file dell'owner, git) devono invece
+// guardare nel PROGETTO, che è altrove. Senza la seconda, da una copia si
+// perdono entrambi i ripieghi e la coda torna illeggibile — è la "coda
+// fantasma" dell'ondata #310, con un'altra causa.
 const ROOT = resolve(__dirname, '..', '..');
+const REPO_ROOT = pinnedRepoRoot(ROOT) || ROOT;
 
 // Campi di testo da decifrare. S1.F2.1: aggiunto 'status' (cifrato quando gate on).
 // S1.F2.2: aggiunto 'clientId' (cifrato quando gate on; clientIdHash resta in chiaro).
@@ -82,7 +91,7 @@ function readPrivKey() {
   if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
 
   // 2. File .env locale (solo in locale, il file è gitignorato).
-  const local = privKeyFromEnvFile(join(ROOT, 'tests', 'agent', '.env'));
+  const local = privKeyFromEnvFile(join(REPO_ROOT, 'tests', 'agent', '.env'));
   if (local) return local;
 
   // 3. In un WORKTREE git il file .env (gitignorato) esiste solo nel checkout
@@ -91,7 +100,7 @@ function readPrivKey() {
   //    vuota" → il giro delle routine finiva in audit (i feedback #310+).
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
-      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (common) {
       const fromMain = privKeyFromEnvFile(join(resolve(common, '..'), 'tests', 'agent', '.env'));
       if (fromMain) return fromMain;

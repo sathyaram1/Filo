@@ -1,8 +1,8 @@
 /* Avviso delle fusioni in attesa di approvazione (src/shared/mergeApprovals.js).
  *
- * UN foglio per DUE superfici: la prima schermata (dashboard) e Gestione →
- * Automazioni. Cammini equivalenti devono anche SEMBRARE la stessa cosa; con
- * due fogli, prima o poi uno dei due prende una tinta che l'altro non ha.
+ * Vive nella dashboard di gestione: l'avviso da decidere in cima ai Ricevuti,
+ * la traccia delle decisioni passate in Automazioni. Un foglio solo per
+ * entrambe le rese, così non possono divergere.
  *
  * Tutto passa dai token del tema (`--sn-*`): niente colori sparsi, così gli
  * override estetici dell'utente valgono anche qui e il blocco resta leggibile
@@ -95,6 +95,18 @@
   background: color-mix(in srgb, var(--sn-accent) 12%, transparent);
   color: color-mix(in srgb, var(--sn-fg) 80%, var(--sn-accent));
 }
+/* Quando la pastiglia sa aprire la segnalazione diventa un bottone: stessa
+   forma, ma risponde al puntatore — l'utente deve capire che si clicca. */
+button.sn-mac-origin-link {
+  font-family: var(--sn-font);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+button.sn-mac-origin-link:hover {
+  background: color-mix(in srgb, var(--sn-accent) 22%, transparent);
+  border-color: var(--sn-accent);
+}
+button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
 .sn-mac-sha {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11.5px;

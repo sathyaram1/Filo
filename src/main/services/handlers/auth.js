@@ -537,9 +537,9 @@ module.exports = function register(on, ctx) {
 
   on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
 
-  // Una prima schermata GIÀ APERTA deve accorgersi di una richiesta nuova.
+  // Una pagina di gestione GIÀ APERTA deve accorgersi di una richiesta nuova.
   // Prima l'elenco si leggeva solo all'apertura di una pagina: il terminale
-  // diceva "approvala dalla home" e sulla home aperta non compariva niente.
+  // diceva "approvala da Filo" e sulla pagina aperta non compariva niente.
   //
   // Chi avvisa è il main, non la pagina, e per due motivi: la lettura è UNA
   // sola anche con dieci schede aperte, e il cancello del proprietario resta in

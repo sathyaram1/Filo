@@ -1,5 +1,11 @@
 # Filo
 
+> **Non ancora pronto.** Questo repository è il dietro le quinte di un progetto
+> in costruzione, non un prodotto da usare. I documenti di trasparenza sono
+> incompleti e ci sono problemi di sicurezza noti in corso di risoluzione.
+> L'eseguibile è scaricabile perché lo sviluppo è pubblico, ma per ora provalo
+> solo per curiosità.
+
 Browser AI-native cross-device. Layer di interazione sopra il linguaggio
 naturale: la UI è un'accelerazione della conversazione, non l'opposto.
 
@@ -137,3 +143,12 @@ Quando aggiungi un nuovo messaggio IPC, ricordati di:
    registrandolo con `on(MSG.X, fn)` (il registro vive in `handlers.js`).
 3. Se è broadcast main→renderer, usa `broadcastToTabs` o
    `broadcastLiveUpdate` (vedi handlers.js).
+
+## Licenza
+
+Il codice di Filo è distribuito sotto [licenza Apache 2.0](LICENSE): puoi
+usarlo, modificarlo e ridistribuirlo, anche a scopo commerciale.
+
+Il nome «Filo» e il logo NON sono coperti dalla licenza (è la sezione 6,
+"Trademarks"): un fork deve presentarsi con un altro nome. È la stessa
+distinzione di Firefox o VS Code: il codice è libero, l'identità no.
