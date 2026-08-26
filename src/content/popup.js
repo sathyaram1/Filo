@@ -397,17 +397,32 @@
     const roomBelow = () => window.innerHeight - (ay + POSE_GAP) - POSE_MARGIN;
     const roomAbove = () => ay - POSE_GAP - POSE_MARGIN;
 
+    // `max-height` misura il CONTENUTO: bordi e imbottitura del riquadro stanno
+    // fuori da quel numero, mentre lo spazio sullo schermo li comprende. Senza
+    // questa differenza il tetto sfora di un paio di pixel, l'aggancio ai bordi
+    // scatta e il riquadro scivola in su di quei due pixel a metà risposta —
+    // proprio il tremolio che stiamo togliendo.
+    function boxExtra() {
+      try {
+        const cs = getComputedStyle(root);
+        if (cs.boxSizing === 'border-box') return 0;
+        return (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0)
+          + (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      } catch (_) { return 0; }
+    }
+
     function chooseSide() {
+      const want = maxH + boxExtra();  // ingombro pieno che il riquadro può raggiungere
       const below = roomBelow(), above = roomAbove();
-      if (below >= maxH) return 'below';   // ci sta tutto sotto: preferenza naturale
-      if (above >= maxH) return 'above';
+      if (below >= want) return 'below';   // ci sta tutto sotto: preferenza naturale
+      if (above >= want) return 'above';
       return above > below ? 'above' : 'below'; // nessuno dei due basta: il più capiente
     }
 
     function capHeight() {
-      const room = side === 'above' ? roomAbove() : roomBelow();
+      const room = (side === 'above' ? roomAbove() : roomBelow()) - boxExtra();
       const cap = Math.min(maxH, Math.max(POSE_MIN_H, room));
-      root.style.maxHeight = `${Math.round(cap)}px`;
+      root.style.maxHeight = `${Math.floor(cap)}px`;
     }
 
     function apply() {
