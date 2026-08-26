@@ -63,6 +63,10 @@ async function stubTranslationProvider(app, delayMs = 0) {
     // Blocchi effettivamente MANDATI al modello: è la misura di quanto l'utente
     // paga. Serve a provare che una ripresa non rispedisce ciò che è già fatto.
     globalThis.__filoTranslateBlocks = 0;
+    // Il TESTO davvero spedito, richiesta per richiesta: è l'unico modo di
+    // provare che una frase non parte due volte (una dal testo e una
+    // dall'etichetta che lo ripete).
+    globalThis.__filoTranslatePrompts = [];
     const origComplete = P.completeWithFallback;
     P.completeWithFallback = async (args) => {
       const { messages } = args;
@@ -1245,4 +1249,136 @@ test('riquadro riempito dalla pagina stessa: tradotto, e nessun falso allarme', 
   await page.locator('[data-sn-icon-id="translate"]').click();
   await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^A comment left/, { timeout: 30000 });
   await expect(page.frameLocator('#doc').locator('#sbody')).toHaveText(/^A short english note/);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// #407 (terzo giro) — chi ha disegnato questo pezzo di pagina?
+//
+// La UI che Filo aggiunge alla pagina (menu, avvisi, popup) non si traduce: è
+// già nella lingua dell'utente. Riconoscerla dal NOME — una classe che comincia
+// per "sn-", un id che comincia per "filo-" — sbaglia su siti veri: i portali
+// costruiti con ServiceNow chiamano `sn-qualcosa` ogni loro pezzo, e "filo" è
+// una parola italiana normale in un nome. Su quei siti interi riquadri
+// restavano in lingua originale sotto un avviso che dichiarava la pagina
+// tradotta: la stessa bugia della segnalazione.
+// ───────────────────────────────────────────────────────────────────────────
+
+const SITE_NAMED_LIKE_FILO = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An English page whose blocks are named like Filo's own boxes</h1>
+  <div class="sn-card">
+    <h2 id="cardTitle">A headline living inside a block the site calls sn-card</h2>
+    <p id="cardBody">The body of that block, written in English by the site and not by Filo.</p>
+  </div>
+  <div id="sn-panel">
+    <div id="panelText">A second English block, inside an element whose id starts with sn.</div>
+  </div>
+  <div id="filo-widget">
+    <div id="widgetText">A third English block, inside an element whose id starts with filo.</div>
+  </div>
+</body></html>`;
+
+test('i riquadri del sito che si chiamano come la UI di Filo cambiano lingua come il resto', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, SITE_NAMED_LIKE_FILO);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  await expect(page.locator('#head')).toHaveText(/^IT /, { timeout: 30000 });
+  // Prima restava intero in inglese, e l'avviso diceva lo stesso "Pagina tradotta".
+  await expect(page.locator('#cardTitle')).toHaveText(/^IT /);
+  await expect(page.locator('#cardBody')).toHaveText(/^IT /);
+  await expect(page.locator('#panelText')).toHaveText(/^IT /);
+  await expect(page.locator('#widgetText')).toHaveText(/^IT /);
+
+  // …e adesso "Pagina tradotta" è vero.
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 })
+    .toContain('Pagina tradotta');
+});
+
+test('gli avvisi di Filo restano nella lingua di Filo, e non passano per testo del sito', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app, 300);
+  const page = await testServer.openReady(openTab, SITE_NAMED_LIKE_FILO);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  await expect(page.locator('#cardBody')).toHaveText(/^IT /, { timeout: 30000 });
+  const seen = await toasts(page);
+  // L'avviso "sto traducendo" è nella pagina MENTRE si traduce: se finisse nel
+  // lavoro, o passasse per testo appena arrivato dal sito, si vedrebbe qui.
+  expect(seen.join(' | ')).not.toContain('IT ');
+  expect(seen).toContain('Pagina tradotta');
+  expect(seen.join(' | ')).not.toContain('ne ha aggiunta dell\'altra');
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// #407 (terzo giro) — l'etichetta gemella si copia, non si ricompra.
+//
+// Un link col suggerimento del mouse uguale al proprio testo, un bottone con
+// l'etichetta di accessibilità uguale alla scritta: sono dappertutto. Mandare
+// al modello due volte la stessa frase costa il doppio e sullo schermo non
+// cambia niente.
+// ───────────────────────────────────────────────────────────────────────────
+
+const TWIN_LABELS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An English page where labels repeat the text you can already read</h1>
+  <p id="p1"><a id="twin" href="#x" title="Read the full story about the season">Read the full story about the season</a></p>
+  <p id="p2"><button id="btn" aria-label="Subscribe to the newsletter">Subscribe to the newsletter</button></p>
+  <p id="p3"><a id="wrapped" href="#y" title="Open the gallery"><span id="inner">Open the gallery</span></a></p>
+  <p id="p4"><a id="different" href="#z" title="Opens in a new window">See the pictures</a></p>
+</body></html>`;
+
+const twinState = (page) => page.evaluate(() => ({
+  twinText: document.getElementById('twin').textContent,
+  twinTitle: document.getElementById('twin').getAttribute('title'),
+  btnText: document.getElementById('btn').textContent,
+  btnLabel: document.getElementById('btn').getAttribute('aria-label'),
+  wrappedText: document.getElementById('wrapped').textContent,
+  wrappedTitle: document.getElementById('wrapped').getAttribute('title'),
+  differentText: document.getElementById('different').textContent,
+  differentTitle: document.getElementById('different').getAttribute('title'),
+}));
+
+test('l’etichetta uguale al testo che si legge non si paga due volte', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, TWIN_LABELS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  await expect(page.locator('#twin')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await twinState(page)).twinTitle, { timeout: 30000 }).toMatch(/^IT /);
+
+  const after = await twinState(page);
+  // Sullo schermo (e sotto al mouse) non cambia niente: l'etichetta segue il
+  // testo, come prima.
+  expect(after.twinTitle).toBe(after.twinText);
+  expect(after.btnLabel).toBe(after.btnText);
+  expect(after.wrappedTitle).toBe(after.wrappedText);
+  // L'etichetta DIVERSA dal testo resta un lavoro suo, e si traduce.
+  expect(after.differentTitle).toBe('IT Opens in a new window');
+  expect(after.differentText).toMatch(/^IT /);
+
+  // …e al modello quelle frasi sono partite UNA volta sola.
+  const sent = await app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'));
+  const times = (hay, needle) => hay.split(needle).length - 1;
+  expect(times(sent, 'Read the full story about the season')).toBe(1);
+  expect(times(sent, 'Subscribe to the newsletter')).toBe(1);
+  expect(times(sent, 'Open the gallery')).toBe(1);
+  expect(times(sent, 'Opens in a new window')).toBe(1);
+});
+
+test('"Mostra originale" rimette a posto anche le etichette copiate dal testo', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, TWIN_LABELS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+  await expect.poll(async () => (await twinState(page)).twinTitle, { timeout: 30000 }).toMatch(/^IT /);
+
+  await clickTranslateIcon(page, '#head');
+  await expect(page.locator('#twin')).toHaveText('Read the full story about the season', { timeout: 30000 });
+
+  const back = await twinState(page);
+  expect(back.twinTitle).toBe('Read the full story about the season');
+  expect(back.btnLabel).toBe('Subscribe to the newsletter');
+  expect(back.wrappedTitle).toBe('Open the gallery');
+  expect(back.differentTitle).toBe('Opens in a new window');
 });
