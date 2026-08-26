@@ -556,6 +556,25 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   scorciatoie di selezione verso l'ultimo frame usato). `webContents.send`
   raggiunge **solo** il frame principale: per parlare a tutti serve
   `mainFrame.framesInSubtree`.
+- **Un'azione di pagina che tocca il TESTO deve entrare nei riquadri** (#407).
+  "Frame vs pagina" dice dove l'azione si esegue, non fin dove arriva: un post
+  incorporato o un blocco commenti è testo che l'utente legge, e lasciarlo in
+  lingua originale sotto un avviso "Pagina tradotta" è la bugia della
+  segnalazione, in un caso più stretto. Il frame principale non può toccarlo (è
+  un'altra origine), ma il content script gira già lì dentro: gli si passa
+  parola, e ogni riquadro lavora su se stesso. Tre conseguenze che si pagano se
+  si saltano. **Il giro passa dal main**, non da `postMessage`: una postMessage
+  la sa scrivere anche il sito, e si ritroverebbe a comandare un riquadro che non
+  è suo; il main invece conosce l'albero dei frame e sa chi è il frame
+  principale. **Il riquadro va svegliato**: per il costo pigro lì dentro non c'è
+  ancora niente di montato, quindi il messaggio che lo comanda deve far partire
+  `ensureContentScripts()` e farsi consegnare dopo (stesso cammino delle
+  scorciatoie). **Chi non risponde entra nell'avviso**: un riquadro chiuso a
+  chiave dal `sandbox` non ha script e non risponderà mai, e il conto dei
+  riquadri che si VEDONO (grandi abbastanza da starci del testo) meno quelli che
+  si sono fatti vivi è ciò che fa dire "una parte è rimasta fuori" invece di
+  "fatto". E se si può tradurre lì dentro si deve poter tornare indietro lì
+  dentro: il ritorno all'originale passa parola con lo stesso giro.
 
 Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
 diventa scorrevole invece di essere tagliato.
