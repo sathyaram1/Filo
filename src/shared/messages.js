@@ -517,6 +517,22 @@
     // solo un id del registro icone o il nome di un pannello.
     RUN_IN_TOP_FRAME: 'run_in_top_frame',
 
+    // #407 — la traduzione della pagina passa parola ai riquadri incorporati.
+    // Un post incorporato, un blocco commenti, un modulo di iscrizione sono
+    // pagine dentro la pagina: il frame principale non può toccarne il testo
+    // (quasi sempre è di un'altra origine), ma il content script di Filo gira
+    // anche lì dentro. Il giro passa da qui perché il main è l'unico a conoscere
+    // l'albero dei frame: una postMessage la saprebbe scrivere anche il sito, e
+    // si ritroverebbe a comandare la traduzione dentro un riquadro altrui.
+    // { mode: 'translate'|'restore', runId } — lo manda il SOLO frame principale.
+    TRANSLATE_FRAMES: 'translate_frames',
+    // Il riquadro riferisce alla pagina che lo ospita: prima che si è fatto
+    // vivo (`ack`, con quanti riquadri ospita a sua volta), poi com'è finita
+    // (`end`, con quanto è rimasto in lingua originale). Senza, l'avviso finale
+    // non saprebbe se dire "Pagina tradotta" o "una parte è rimasta fuori".
+    // { runId, phase, frames, applied, left }
+    FRAME_TRANSLATE_DONE: 'frame_translate_done',
+
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
