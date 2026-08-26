@@ -134,10 +134,20 @@
     return String((req && req.origin) || '') === 'routine' ? 'routine' : 'locale';
   }
 
+  /**
+   * Il numero del feedback da cui nasce il lavoro, senza cancelletto. PURA.
+   * Il server a volte lo manda già con il `#` davanti: qui si normalizza,
+   * così chi lo stampa ne mette uno solo e chi lo confronta con i numeri
+   * della lista feedback confronta la stessa cosa.
+   */
+  function feedbackNum(req) {
+    return String((req && req.num) || '').trim().replace(/^#+/, '');
+  }
+
   /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
   function originLabel(req) {
     if (originOf(req) !== 'routine') return 'lavoro tuo, da questo computer';
-    var num = String((req && req.num) || '').trim();
+    var num = feedbackNum(req);
     return num ? 'automazione · feedback #' + num : 'automazione';
   }
 
