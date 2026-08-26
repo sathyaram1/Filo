@@ -778,18 +778,33 @@
     return false;
   }
 
+  // C'è qualcosa di DIPINTO davanti a `el`, nel punto cliccato? `stack` arriva
+  // da `deepElementsFromPoint`, cioè nell'ordine in cui si vedono: chi sta
+  // prima sta sopra. Antenati e discendenti di `el` non contano — un antenato
+  // disegna dietro al figlio, e un figlio per chi guarda È `el`.
+  function coveredAt(el, stack) {
+    if (!el || !Array.isArray(stack)) return false;
+    for (const other of stack) {
+      if (other === el) return false;
+      if (containsAcrossShadow(el, other) || containsAcrossShadow(other, el)) continue;
+      if (paintsSomething(other)) return true;
+    }
+    // `el` non è nella pila sotto il cursore: non possiamo dire che si veda.
+    return true;
+  }
+
   // Un contenuto "appartiene" a un collegamento quando ci sta dentro (nel DOM) o
   // quando ne occupa la superficie (i player veri coprono il filmato col proprio
   // overlay, e le schede impilano copertina e link invece di annidarli). Il DOM
   // viene prima: se la pagina dice già che copertina e collegamento sono la
   // stessa scheda, rifare il conto sui rettangoli può solo buttare via
   // un'informazione certa (#444).
-  function belongsTo(el, linkEl) {
+  function belongsTo(el, linkEl, stack) {
     if (!el || !linkEl) return false;
-    return containsAcrossShadow(linkEl, el) || sameSurface(el, linkEl);
+    return containsAcrossShadow(linkEl, el) || sameSurface(el, linkEl, stack);
   }
 
-  function sameSurface(a, b) {
+  function sameSurface(a, b, stack) {
     if (!a || !b) return false;
     const ra = a.getBoundingClientRect?.();
     const rb = b.getBoundingClientRect?.();
@@ -801,7 +816,13 @@
     const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
     if (w <= 0 || h <= 0) return false;
     if ((w * h) * 2 < Math.min(areaA, areaB)) return false;
-    return !swallows(ra, rb) && !swallows(rb, ra);
+    if (!swallows(ra, rb) && !swallows(rb, ra)) return true;
+    // Il conto sui rettangoli dice di no. Resta la prova diretta, e vale da
+    // sola: se né l'uno né l'altro hanno qualcosa di dipinto davanti, in questo
+    // punto sono tutti e due sotto gli occhi dell'utente — che è l'unica cosa
+    // che il freno voleva sapere (#444). È il caso della riga di risultati con
+    // la miniatura piccola, dove la geometria da sola sbagliava.
+    return !coveredAt(a, stack) && !coveredAt(b, stack);
   }
 
   // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre
