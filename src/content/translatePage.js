@@ -800,6 +800,31 @@
     } catch (_) {}
   }
 
+  // Etichette GEMELLE del testo che l'elemento mostra già: il suggerimento del
+  // mouse uguale al testo del link, l'etichetta di accessibilità uguale alla
+  // scritta sul bottone. Sono dappertutto — sulla home di un giornale sono
+  // decine di frasi — e mandarle al modello vorrebbe dire pagare due volte la
+  // stessa riga per ottenere lo stesso schermo. Si copiano invece dal testo
+  // appena tradotto: sullo schermo non cambia niente, cambia il conto.
+  //
+  // Si legge il testo dell'elemento ADESSO, non la traduzione di una singola
+  // unità: l'etichetta può stare su un contenitore (`<a title="…"><span>…`),
+  // dove la frase tradotta è quella del figlio.
+  function applyMirroredAttrs(mirrors, myRun) {
+    for (const m of (mirrors || [])) {
+      if (myRun !== runSeq) return;
+      const el = m && m.el;
+      if (!el || !el.isConnected) continue;
+      let now = '';
+      try { now = String(el.textContent || '').replace(/\s+/g, ' ').trim(); } catch (_) { continue; }
+      // Il testo non è cambiato: la sua traduzione non è arrivata (blocco
+      // saltato, richiesta fallita). L'etichetta resta com'è e senza marchio,
+      // così la ripresa ci riprova invece di darla per fatta.
+      if (!now || now === m.text) continue;
+      applyTranslation({ el, attr: m.attr, run: myRun }, now);
+    }
+  }
+
   // Etichetta negli attributi: si scrive l'attributo e si tiene da parte com'era
   // (e SE c'era: su una <option> senza etichetta esplicita l'attributo lo
   // aggiungiamo noi, e il ritorno all'originale deve toglierlo, non lasciarne
