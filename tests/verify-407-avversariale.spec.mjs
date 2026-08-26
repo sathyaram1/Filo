@@ -247,24 +247,31 @@ const LONGISH = `<!doctype html><html lang="en"><body style="font:16px sans-seri
   ${Array.from({ length: 25 }, (_, i) => `<div id="d${i}">Block number ${i} of the page body, written long enough to take a real share of the request budget so the work lasts more than one request.</div>`).join('\n  ')}
 </body></html>`;
 
-test('doppio clic, annullo a metà e ripartenza: nessuna traduzione fantasma e la pagina finisce tradotta', async ({ app, openTab, testServer }) => {
+test('mentre lavora si può fermare, e dopo l’annullo niente si traduce alle spalle dell’utente', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app, 700);
   const page = await testServer.openReady(openTab, LONGISH);
   await watchToasts(page);
 
-  // Doppio clic rapido sull'icona: il secondo non deve far partire un secondo giro.
   const btn = await openMenu(page, '#d0');
+  expect(await iconLabel(btn)).toBe('Traduci');
   await btn.click();
-  await clickTranslateIcon(page, '#d0').catch(() => {});
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(300);
 
-  // Annullo a metà: la pagina torna indietro e ci RESTA (le richieste già
-  // spedite tornano dopo e non devono ritradurre niente).
-  await restoreFromMenu(page, '#d0').catch(async () => { await clickTranslateIcon(page, '#d0'); });
-  await page.waitForTimeout(2500);
+  // Riaprire il menu MENTRE lavora deve offrire di fermarla: trovarci solo
+  // "Traduci la pagina" sarebbe un vicolo cieco.
+  const btn2 = await openMenu(page, '#d0');
+  expect(await iconLabel(btn2), 'a lavoro in corso il menu non offre di fermare').toBe('Mostra originale');
+  await btn2.click();
+
+  // Le richieste già spedite tornano dopo: non devono ritradurre niente.
+  await page.waitForTimeout(3000);
   const afterCancel = await page.evaluate(() =>
     Array.from(document.querySelectorAll('[id^="d"]')).filter((e) => /^IT /.test(e.textContent)).length);
   expect(afterCancel, 'dopo l’annullo è rimasto del testo tradotto').toBe(0);
+  // E l'avviso "sto traducendo" non è rimasto sullo schermo.
+  const live = await page.evaluate(() => Array.from(document.querySelectorAll('.sn-toast'))
+    .filter((t) => !t.dataset.snClosing).map((t) => t.textContent).join(' | '));
+  expect(live).not.toContain('Traduzione pagina in corso');
 
   // Si riparte da zero e questa volta si arriva in fondo.
   await stubTranslationProvider(app, 0);
