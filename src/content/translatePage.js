@@ -739,12 +739,15 @@
       const original = Array.from(el.childNodes);
       const refs = unit.refs || [];
       const used = new Set();
-      const frag = document.createDocumentFragment();
+      // Il documento dell'elemento, non il nostro: dentro un riquadro riempito
+      // dalla pagina stessa (#407) i nodi nuovi appartengono a quel documento.
+      const doc = el.ownerDocument || document;
+      const frag = doc.createDocumentFragment();
       let last = 0;
       let m;
       PLACEHOLDER_RE.lastIndex = 0;
       while ((m = PLACEHOLDER_RE.exec(text))) {
-        if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        if (m.index > last) frag.appendChild(doc.createTextNode(text.slice(last, m.index)));
         const k = Number(m[1]);
         if (refs[k] && !used.has(k)) {
           frag.appendChild(refs[k]);
