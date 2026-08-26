@@ -1,7 +1,6 @@
-// Sonda: pagina con un riquadro incorporato (iframe) pieno di testo inglese.
+// Sonda: tasto destro DENTRO un riquadro incorporato, su una pagina non ancora
+// tradotta. Cosa cambia e cosa dice Filo?
 import { test, expect } from './fixtures/electron.mjs';
-
-const MARK = '‹IT›';
 
 async function stubModel(app) {
   await app.evaluate(async () => {
@@ -28,19 +27,7 @@ async function stubModel(app) {
   });
 }
 
-async function toastText(page) {
-  return page.evaluate(() => {
-    const all = document.querySelectorAll('.sn-toast:not([data-sn-closing])');
-    const t = all[all.length - 1];
-    return t ? t.textContent : null;
-  });
-}
-const settled = async (page) => {
-  const t = await toastText(page);
-  return t && !/^Traduzione pagina/.test(t) ? t : null;
-};
-
-test('riquadro incorporato: cosa succede al suo testo', async ({ app, openTab, testServer }) => {
+test('tasto destro dentro il riquadro, pagina non tradotta', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await stubModel(app);
   const inner = testServer.html(`<!doctype html><html lang="en"><body style="padding:8px">
@@ -49,38 +36,32 @@ test('riquadro incorporato: cosa succede al suo testo', async ({ app, openTab, t
   </body></html>`);
   const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="padding:20px">
     <h1 id="h">The outer heading in english</h1>
-    <p id="p">The outer paragraph in english with enough words.</p>
     <iframe id="fr" src="${inner}" width="500" height="200"></iframe>
   </body></html>`);
   await page.waitForTimeout(1500);
-
-  await page.locator('body').first().click({ button: 'right', position: { x: 5, y: 5 } });
-  await page.locator('.sn-menu [data-sn-icon-id="translate"]').click();
-  await expect.poll(() => settled(page), { timeout: 45_000 }).not.toBeNull();
-  const toast = await settled(page);
-  const outer = await page.evaluate(() => document.getElementById('h').innerText);
   const frame = page.frames().find((f) => f !== page.mainFrame());
-  const insideH = frame ? await frame.evaluate(() => document.getElementById('ih').innerText) : '(nessun frame)';
-  const insideP = frame ? await frame.evaluate(() => document.getElementById('ip').innerText) : '(nessun frame)';
-  console.log('TOAST:', JSON.stringify(toast));
-  console.log('FUORI:', JSON.stringify(outer));
-  console.log('DENTRO h:', JSON.stringify(insideH));
-  console.log('DENTRO p:', JSON.stringify(insideP));
-  await page.screenshot({ path: 'tests/.shots/tmp-iframe.png' });
 
-  // Ora: tasto destro DENTRO il riquadro e clic su Traduci.
   const box = await page.locator('#fr').boundingBox();
-  await page.mouse.click(box.x + 30, box.y + 30, { button: 'right' });
+  await page.mouse.click(box.x + 40, box.y + 20, { button: 'right' });
   await page.waitForTimeout(800);
-  const menus = await page.evaluate(() => document.querySelectorAll('.sn-menu').length);
-  console.log('MENU nel top dopo destro dentro il riquadro:', menus);
-  const inFrameMenu = frame ? await frame.evaluate(() => document.querySelectorAll('.sn-menu').length) : -1;
-  console.log('MENU dentro il riquadro:', inFrameMenu);
-  if (inFrameMenu > 0) {
-    await frame.locator('.sn-menu [data-sn-icon-id="translate"]').click();
-    await page.waitForTimeout(3000);
-    console.log('DOPO clic dentro — DENTRO h:', JSON.stringify(await frame.evaluate(() => document.getElementById('ih').innerText)));
-    console.log('DOPO clic dentro — TOAST:', JSON.stringify(await toastText(page)));
+  const label = await frame.locator('.sn-menu [data-sn-icon-id="translate"]').getAttribute('aria-label');
+  console.log('ETICHETTA icona nel riquadro:', JSON.stringify(label));
+  await frame.locator('.sn-menu [data-sn-icon-id="translate"]').click();
+
+  const seen = [];
+  for (let i = 0; i < 20; i++) {
+    const t = await page.evaluate(() => Array.from(
+      document.querySelectorAll('.sn-toast')).map((x) => x.textContent));
+    const ft = await frame.evaluate(() => Array.from(
+      document.querySelectorAll('.sn-toast')).map((x) => x.textContent));
+    for (const x of t) if (!seen.includes('top:' + x)) seen.push('top:' + x);
+    for (const x of ft) if (!seen.includes('frame:' + x)) seen.push('frame:' + x);
+    await page.waitForTimeout(300);
   }
+  console.log('AVVISI VISTI:', JSON.stringify(seen));
+  console.log('FUORI:', JSON.stringify(await page.evaluate(() => document.getElementById('h').innerText)));
+  console.log('DENTRO:', JSON.stringify(await frame.evaluate(() => document.getElementById('ih').innerText)));
+  console.log('CHIAMATE:', await app.evaluate(() => globalThis.__vChunks.length));
+  await page.screenshot({ path: 'tests/.shots/tmp-iframe2.png' });
   expect(1).toBe(1);
 });
