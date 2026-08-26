@@ -10,30 +10,28 @@ async function probe(page, anchor) {
   return page.evaluate(() => ({
     menus: document.querySelectorAll('.sn-menu, [class*="sn-menu"]').length,
     icons: document.querySelectorAll('[data-sn-icon-id]').length,
-    err: window.__snErr || null,
+    scrollY: Math.round(window.scrollY),
   }));
 }
 
-test('probe: menu su pagina con blocco enorme', async ({ openTab, testServer }) => {
+test('probe A: click su #huge (in cima, nessuno scroll)', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, mk(`<div id="huge">${HUGE}</div><div id="emoji">Breaking news tonight</div>`));
-  await page.evaluate(() => { window.__snErr = null; window.addEventListener('error', (e) => { window.__snErr = String(e.message); }); });
-  console.log('HUGE+emoji su #emoji:', JSON.stringify(await probe(page, '#emoji')));
+  console.log('A:', JSON.stringify(await probe(page, '#huge')));
 });
 
-test('probe: menu su pagina con emoji/zw/rtl', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
-  <div id="emoji">Breaking 🚨 news 👩‍👩‍👧‍👦 from the stadium 🏟️ tonight</div>
-  <div id="zw">Invisible​​characters﻿inside this line of text</div>
-  <div id="rtl">مرحبا بالعالم من هذه الصفحة</div>
-  <div id="spaces">     </div>
-  <div id="entity">Text with &lt;script&gt;alert(1)&lt;/script&gt; written as characters</div>
-</body></html>`);
-  await page.evaluate(() => { window.__snErr = null; window.addEventListener('error', (e) => { window.__snErr = String(e.message); }); });
-  console.log('extremes senza huge su #emoji:', JSON.stringify(await probe(page, '#emoji')));
+test('probe B: spaziatore alto + testo sotto, click sul testo sotto', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, mk('<div style="height:3000px;background:#eee"></div><div id="low">Some English text far below the fold here</div>'));
+  console.log('B:', JSON.stringify(await probe(page, '#low')));
 });
 
-test('probe: menu su pagina solo huge', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, mk(`<div id="huge">${HUGE}</div>`));
-  await page.evaluate(() => { window.__snErr = null; window.addEventListener('error', (e) => { window.__snErr = String(e.message); }); });
-  console.log('solo huge su #huge:', JSON.stringify(await probe(page, '#huge')));
+test('probe C: come B ma scroll esplicito prima del click', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, mk('<div style="height:3000px;background:#eee"></div><div id="low">Some English text far below the fold here</div>'));
+  await page.evaluate(() => document.querySelector('#low').scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(300);
+  console.log('C:', JSON.stringify(await probe(page, '#low')));
+});
+
+test('probe D: pagina corta, click su un div normale', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, mk('<div id="low">Some English text right at the top of the page</div>'));
+  console.log('D:', JSON.stringify(await probe(page, '#low')));
 });
