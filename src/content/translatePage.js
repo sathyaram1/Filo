@@ -543,6 +543,8 @@
     // risposte arriveranno si butteranno via da sole, invece di ritradurre a
     // metà una pagina che l'utente ha appena riportato indietro.
     runSeq++;
+    const wasWorking = pageTranslating;
+    const restoredAny = translatedUnits.length > 0 || translatedAttrs.length > 0;
     // Etichette: rimettere il valore di prima, o togliere l'attributo se prima
     // non c'era (le voci dei menu a tendina tornano a mostrare il loro testo).
     for (let i = translatedAttrs.length - 1; i >= 0; i--) {
