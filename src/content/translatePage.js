@@ -611,7 +611,7 @@
   function reasonFor(err) {
     // Nessun guasto: qualche blocco è semplicemente tornato vuoto dal modello.
     // Dirlo così è più onesto che inventare un errore che non c'è stato.
-    if (!err) return I18n.t('reason_translate_incomplete');
+    if (!err || err.emptyAnswer) return I18n.t('reason_translate_incomplete');
     const CE = global.SN_CHAT_ERRORS;
     if (CE && typeof CE.sentence === 'function') return CE.sentence(err);
     return I18n.t('err_provider_failed');
