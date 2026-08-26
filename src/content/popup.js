@@ -477,8 +477,20 @@
       sendEl: root.querySelector('.sn-popup-send'),
     };
 
+    placePopup(popup);
+
+    // #500 — il riquadro non ha un'altezza definitiva quando lo si posa: la
+    // risposta arriva a pezzi e lo fa crescere. Lo si rimisura a ogni cambio,
+    // finché resta aperto.
+    popup.cleanups.push(Place.observeGrowth(root, () => placePopup(popup, { keep: true })));
+    // Anche rimpicciolire la finestra può lasciarlo mezzo fuori: lì rientrare
+    // non è "muoverglielo sotto le dita", è l'unico modo di restare usabile.
+    const onWinResize = () => placePopup(popup, { keep: true });
+    window.addEventListener('resize', onWinResize);
+    popup.cleanups.push(() => window.removeEventListener('resize', onWinResize));
+
     root.querySelector('.sn-popup-close').addEventListener('click', () => closePopup(popup));
-    attachDrag(root, root.querySelector('.sn-popup-header'));
+    attachDrag(popup, root.querySelector('.sn-popup-header'));
 
     // Quando l'utente clicca dentro il popup, portalo in primo piano
     root.addEventListener('mousedown', () => bringToFront(popup), true);
