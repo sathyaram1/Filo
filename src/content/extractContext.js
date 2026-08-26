@@ -465,6 +465,11 @@
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
+    // La prova del punto d'inserimento si fa sul documento della pagina: su un
+    // elemento che vive dentro un riquadro incorporato misurerebbe le
+    // coordinate sbagliate, e un avviso "una parte è rimasta fuori" che scatta
+    // a vuoto è peggio di nessun avviso.
+    if (el.ownerDocument !== document) return false;
     if (el.shadowRoot) return false;                 // aperto: lo attraversiamo
     if (el.children.length) return false;            // ha contenuto raggiungibile
     if ((el.textContent || '').trim()) return false;
