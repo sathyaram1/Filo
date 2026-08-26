@@ -706,6 +706,7 @@
     // una pagina che si ritraduce da sola qualche secondo dopo non l'ha chiesta
     // nessuno (#407).
     if (!unit || unit.run !== runSeq) return;
+    if (unit.title) return applyTitleTranslation(unit, text);
     if (unit.attr) return applyAttrTranslation(unit, text);
     const el = unit.el;
     if (!el || unit.applied || !text) return;
