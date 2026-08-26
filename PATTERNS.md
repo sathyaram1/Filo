@@ -818,8 +818,8 @@ chiede, ma **spostare la decisione su una superficie diversa da quella da cui
 ## "Vai a guardare in quell'altro posto": quel posto deve accorgersene DA APERTO
 
 Quando una superficie manda l'utente su un'altra (il terminale che dice
-"approvala dalla prima schermata di Filo"), la seconda è quasi sempre **già
-aperta** — è la home del browser, la pagina di gestione lasciata lì. Se carica
+"approvala dalla dashboard di gestione"), la seconda è quasi sempre **già
+aperta** — la pagina di gestione lasciata lì in una scheda. Se carica
 il suo elenco solo all'apertura, l'avviso compare soltanto a chi pensa di
 riaprirla: cioè a nessuno. È successo il giorno stesso in cui l'indicazione è
 stata scritta.
