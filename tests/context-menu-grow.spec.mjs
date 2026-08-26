@@ -10,6 +10,13 @@
 // menu) resta dentro la finestra e si può puntare e cliccare davvero. Senza il
 // fix — misura unica all'apertura — il menu resta dov'è, l'ultima voce sfora e
 // Playwright non riesce nemmeno a portarci sopra il puntatore: rosso.
+//
+// Un menu che si muove porta con sé due conseguenze, provate in fondo al file:
+// quando è così alto da doversi scorrere, lo scorrimento deve fermarsi dentro
+// al menu (se passa alla pagina, la pagina scorre e il menu sparisce proprio a
+// chi stava leggendo fino in fondo); e il pannello ancorato a una sua voce
+// (la griglia "Altro…") deve muoversi insieme a lui, o chiudersi quando la
+// voce a cui è appeso scorre via.
 
 import { test, expect } from './fixtures/electron.mjs';
 
