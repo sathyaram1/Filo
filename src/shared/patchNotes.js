@@ -19,7 +19,7 @@
       version: '0.2.203', date: '2026-08-26',
       features: [],
       fixes: [
-        'Il menu del tasto destro non esce più dal fondo della finestra quando la spiegazione dentro al menu finisce di caricare e si allunga: il menu si sposta da solo e l\'ultima voce resta intera e cliccabile.',
+        'Quando la spiegazione dentro al menu del tasto destro finisce di caricare e si allunga, il menu si sposta da solo invece di uscire dal fondo della finestra. L\'ultima voce resta intera e si può cliccare.',
       ],
     },
     {
