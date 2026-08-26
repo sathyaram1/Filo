@@ -103,46 +103,47 @@
     });
   }
 
-  // Geometria della posa del menu. Pura — solo numeri, nessun DOM — così i casi
-  // limite (ribaltamento, tetto d'altezza, ricrescita) si provano in unit test.
+  // Margine minimo fra il menu e i bordi della finestra.
+  const GAP = 8;
+
+  // Tetto d'altezza del menu, in px di LAYOUT (quelli che finiscono nello
+  // stile). `null` = ci sta tutto, nessun tetto e nessuna barra di scorrimento.
   //
-  // - `w`/`h`: misure di layout del menu, prese SENZA il tetto di un giro
-  //   precedente (altrimenti si rimisura il tetto, non il contenuto);
-  // - `scale`: fattore della compensazione zoom. Il menu è disegnato scalato,
-  //   quindi sullo schermo occupa `h * scale`: è quella l'altezza da confrontare
-  //   col bordo della finestra;
-  // - `from`: la posa attuale, passata solo quando il menu è GIÀ sullo schermo e
-  //   sta cambiando altezza. In quel caso non si ribalta — il menu salterebbe
-  //   via da sotto il cursore mentre l'utente sta per cliccare — si scivola in
-  //   su quel tanto che basta a rientrare.
+  // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
+  // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
+  // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
+  // aiuto — sarebbero irraggiungibili. Sopra una finestra normale la condizione
+  // è falsa e non cambia nulla.
   //
-  // Ritorna `maxHeight` in px di layout (quello che finisce nello stile), non in
-  // px di schermo.
-  function computePlacement({ x, y, w, h, vw, vh, scale, from }) {
+  // `scale` è il fattore della compensazione zoom: il menu è DISEGNATO scalato,
+  // quindi sullo schermo occupa `h * scale` — è quella l'altezza da confrontare
+  // col bordo, e il tetto va riportato in px di layout dividendo.
+  function computeCap({ h, vh, scale }) {
     const s = (Number.isFinite(scale) && scale > 0) ? scale : 1;
-    let maxHeight = null;
-    let visH = h * s;
-    // #405 — dentro un riquadro incorporato lo spazio verticale può essere meno
-    // dell'altezza del menu (un player alto 200px, un blocco commenti stretto):
-    // senza questo il menu verrebbe tagliato e le voci in fondo — feedback,
-    // aiuto — sarebbero irraggiungibili. Sopra una finestra normale non cambia
-    // nulla: la condizione è falsa.
-    if (visH + 16 > vh) {
-      const cap = Math.max(96, vh - 16);
-      maxHeight = cap / s;
-      visH = cap;
-    }
-    const visW = w * s;
+    if (h * s + 2 * GAP <= vh) return null;
+    return Math.max(96, vh - 2 * GAP) / s;
+  }
+
+  // Dove posare il menu. Pura — solo numeri, nessun DOM — così i casi limite
+  // (ribaltamento, ricrescita, bordi) si provano in unit test.
+  //
+  // - `visW`/`visH`: quanto il menu occupa DAVVERO sullo schermo (tetto e zoom
+  //   già applicati);
+  // - `from`: la posa attuale, passata solo quando il menu è GIÀ sullo schermo
+  //   e ha cambiato altezza. In quel caso non si ribalta — salterebbe via da
+  //   sotto il cursore mentre l'utente sta per cliccare — si scivola in su
+  //   quel tanto che basta a rientrare.
+  function computeOffset({ x, y, visW, visH, vw, vh, from }) {
     let left = from ? from.left : x;
     let top = from ? from.top : y;
-    if (left + visW + 8 > vw) left = vw - visW - 8;
+    if (left + visW + GAP > vw) left = vw - visW - GAP;
     // Prima posa: se sotto il cursore non ci sta, il menu si apre verso l'alto.
-    if (!from && top + visH + 8 > vh) top = Math.max(8, y - visH);
+    if (!from && top + visH + GAP > vh) top = Math.max(GAP, y - visH);
     // Ricrescita (e ultima rete della prima posa): scivola in su quanto basta.
-    if (top + visH + 8 > vh) top = vh - visH - 8;
+    if (top + visH + GAP > vh) top = vh - visH - GAP;
     if (left < 4) left = 4;
     if (top < 4) top = 4;
-    return { left, top, maxHeight };
+    return { left, top };
   }
 
   // Fattore della compensazione zoom applicato a questo menu (1 se assente).
@@ -163,25 +164,34 @@
     // giro sincrono, quindi non si vede nessuno sfarfallio.
     root.style.maxHeight = '';
     root.style.overflowY = '';
-    const h = root.offsetHeight;
-    const w = root.offsetWidth;
+    const scale = readScale(root);
+    const vw = window.innerWidth, vh = window.innerHeight;
+
+    const cap = computeCap({ h: root.offsetHeight, vh, scale });
+    if (cap != null) {
+      root.style.maxHeight = `${cap}px`;
+      root.style.overflowY = 'auto';
+      // `max-height` morde il box scelto dal CSS: con `content-box` — il valore
+      // di partenza, e quello che si prende un menu dentro una pagina che non
+      // impone `box-sizing` — bordo e imbottitura restano FUORI dal conto, e il
+      // menu resta più alto del tetto quel tanto che basta a sforare comunque.
+      // La differenza si misura e si toglie.
+      const extra = root.offsetHeight - cap;
+      if (extra > 0) root.style.maxHeight = `${Math.max(48, cap - extra)}px`;
+    }
+
     let from = null;
     if (keep) {
       const l = parseFloat(root.style.left);
       const t = parseFloat(root.style.top);
       if (Number.isFinite(l) && Number.isFinite(t)) from = { left: l, top: t };
     }
-    const p = computePlacement({
-      x, y, w, h,
-      vw: window.innerWidth,
-      vh: window.innerHeight,
-      scale: readScale(root),
-      from,
+    const p = computeOffset({
+      x, y,
+      visW: root.offsetWidth * scale,
+      visH: root.offsetHeight * scale,
+      vw, vh, from,
     });
-    if (p.maxHeight != null) {
-      root.style.maxHeight = `${p.maxHeight}px`;
-      root.style.overflowY = 'auto';
-    }
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
   }
