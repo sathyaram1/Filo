@@ -918,16 +918,10 @@
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
+    activeMenu.subAnchor = anchorEl;
+    activeMenu.subMode = 'anchor';
 
-    const aRect = anchorEl.getBoundingClientRect();
-    const w = sub.offsetWidth, h = sub.offsetHeight;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    let left = aRect.right + 4;
-    let top = aRect.top;
-    if (left + w + 8 > vw) left = Math.max(4, aRect.left - w - 4);
-    if (top + h + 8 > vh) top = Math.max(8, vh - h - 8);
-    sub.style.left = `${left}px`;
-    sub.style.top = `${top}px`;
+    placeSub(sub, anchorEl, 'anchor');
     // Senza questo, il timer di mouseleave sull'ancora (overflow) chiude il
     // sub-menu appena il cursore entra nella griglia (feedback alpha).
     attachSubmenuHover(sub);
