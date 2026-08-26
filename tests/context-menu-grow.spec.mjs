@@ -299,8 +299,7 @@ test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e spari
   await expect.poll(async () => (await ancoraEPannello(page)).ancoraTop, { timeout: 3000 })
     .toBeLessThan(prima.ancoraTop);
   const durante = await ancoraEPannello(page);
-  expect(durante.pannelloAperto).toBe(true);
-  expect(durante.pannelloTop - durante.ancoraTop).toBe(prima.pannelloTop - prima.ancoraTop);
+  restaAttaccato(prima, durante);
 
   // Scorrimento lungo: la freccetta esce oltre il bordo alto. Il pannello non ha
   // più niente a cui stare appeso e si chiude, invece di galleggiare da solo.
