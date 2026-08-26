@@ -265,11 +265,87 @@
   // vede il codice di Filo, e da qui risulterebbe sempre vuoto. Restano la
   // forma del nome e il rettangolo. La soglia tiene fuori le icone disegnate
   // via CSS (quadratini di 20-30px senza testo), che sono il falso allarme
-  // plausibile; nel dubbio si sbaglia dalla parte della prudenza, perché
-  // "tradotta solo in parte" di troppo costa molto meno di un "Pagina tradotta"
-  // falso.
+  // plausibile.
+  //
+  // #503 — il rettangolo da solo non basta: contava QUANTO È GRANDE il riquadro
+  // e mai SE si vede. Spazi pubblicitari, banner dei cookie e riquadri di
+  // statistica sono componenti chiusi tenuti fuori dalla vista (spostati fuori
+  // schermo, resi trasparenti, col contenuto spento ma l'ingombro intatto),
+  // quindi su un sito di giornale l'avviso "tradotta solo in parte" usciva quasi
+  // sempre — e quasi sempre a vuoto, mandando a cercare un riquadro in lingua
+  // originale che sullo schermo non c'era. L'avviso parla di qualcosa che
+  // l'utente dovrebbe poter GUARDARE: se non lo vede, non entra nel conto.
+  //
+  // Resta contato ciò che sta solo più in basso della prima schermata: quello è
+  // contenuto vero, ci si arriva scorrendo.
   const CLOSED_MIN_W = 40;
   const CLOSED_MIN_H = 16;
+
+  // Il rettangolo è stato portato FUORI dalla pagina (il vecchio trucco
+  // `left: -9999px`, o spinto oltre il fondo del documento)? Attenzione a non
+  // confondere "fuori dalla pagina" con "fuori dalla prima schermata": il
+  // secondo si raggiunge scorrendo ed è contenuto a tutti gli effetti, quindi il
+  // confronto è con l'AREA SCORRIBILE del documento, non con la finestra.
+  function isPushedOutOfPage(r) {
+    const doc = document.documentElement;
+    const left = r.left + (window.scrollX || 0);
+    const top = r.top + (window.scrollY || 0);
+    const pageW = Math.max(doc ? doc.scrollWidth : 0, window.innerWidth || 0);
+    const pageH = Math.max(doc ? doc.scrollHeight : 0, window.innerHeight || 0);
+    if (left + r.width <= 0 || top + r.height <= 0) return true;
+    if (left >= pageW || top >= pageH) return true;
+    return false;
+  }
+
+  // Ritagliato a zero: il modo moderno di nascondere lasciando l'ingombro
+  // (`clip-path: inset(100%)`, e il vecchio `clip: rect(0 0 0 0)` degli
+  // sr-only). Il rettangolo resta grande, ma non se ne disegna niente.
+  function isClippedAway(cs) {
+    const cp = String(cs.clipPath || '');
+    if (cp.indexOf('inset(100%') === 0 || cp.indexOf('inset(50%') === 0) return true;
+    const clip = String(cs.clip || '');
+    if (/^rect\(\s*[01]px[\s,]/.test(clip) && /[01]px\s*\)$/.test(clip)) return true;
+    return false;
+  }
+
+  // L'utente lo vede? Un solo metro, quello che vale per il resto della pagina:
+  // display, visibilità, opacità (anche ereditata dagli antenati), sezioni
+  // ripiegate (dentro un <details> chiuso il contenuto ha ancora un rettangolo
+  // ma non si vede), contenuto spento con `content-visibility`, ritaglio a zero
+  // e rettangolo portato fuori dalla pagina.
+  function isSeenByUser(el) {
+    try {
+      // checkVisibility() è il metro del browser: copre display, visibility,
+      // opacità ereditata e i sottoalberi spenti (compreso il contenuto di un
+      // <details> chiuso, che sta su uno pseudo-elemento e dagli antenati non si
+      // raggiunge). Quello che NON copre è `content-visibility: hidden` messo
+      // sull'elemento stesso — lì il suo riquadro c'è, ma dentro non si disegna
+      // niente — e i due casi qui sotto.
+      if (typeof el.checkVisibility === 'function'
+        && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) {
+        return false;
+      }
+    } catch (_) { /* metro non disponibile: restano i controlli a mano */ }
+    let cur = el;
+    while (cur && cur.nodeType === 1) {
+      const cs = window.getComputedStyle(cur);
+      if (cs.display === 'none') return false;
+      if (cs.visibility === 'hidden' || cs.visibility === 'collapse') return false;
+      if (parseFloat(cs.opacity || '1') === 0) return false;
+      if (cs.contentVisibility === 'hidden') return false;
+      if (isClippedAway(cs)) return false;
+      const root = cur.getRootNode ? cur.getRootNode() : null;
+      cur = cur.parentElement || (root && root.host) || null;
+    }
+    // Sezione ripiegata (<details> chiuso, pannello [hidden] o
+    // aria-expanded="false"): quel pezzo di pagina è ancora chiuso, e ciò che
+    // l'utente non ha ancora aperto non è "rimasto in lingua originale sotto i
+    // suoi occhi". Stesso metro dell'outline della pagina.
+    if (getCollapsedAncestor(el)) return false;
+    try {
+      return !isPushedOutOfPage(el.getBoundingClientRect());
+    } catch (_) { return true; }
+  }
 
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
@@ -279,7 +355,8 @@
     if ((el.textContent || '').trim()) return false;
     try {
       const r = el.getBoundingClientRect();
-      return r.width >= CLOSED_MIN_W && r.height >= CLOSED_MIN_H;
+      if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
+      return isSeenByUser(el);
     } catch (_) { return false; }
   }
 
