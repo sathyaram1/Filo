@@ -387,6 +387,8 @@
   // per scegliere la frase giusta da mostrare all'utente).
   async function translateGroup(units, depth) {
     if (!units.length) return null;
+    // Lavoro di un giro che l'utente ha già annullato: non si spedisce.
+    if (units[0].run !== runSeq) return null;
     const joined = units.map((u) => u.templated).join(SEPARATOR);
     const res = await requestTranslation(joined);
     if (!res.ok) return res.error;
