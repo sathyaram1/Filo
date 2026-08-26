@@ -450,9 +450,14 @@
   // l'avviso finale: senza, una pagina enorme veniva dichiarata "tradotta" con
   // la coda ancora in lingua originale (la bugia di #407, altra causa). Contare
   // costa una camminata nel DOM, niente richieste al modello.
+  // Quanti sottoalberi nascosti tenere d'occhio: la lista serve al menu del
+  // tasto destro, che deve aprirsi subito. Una pagina con centinaia di sezioni
+  // ripiegate ne segna le prime: basta una per offrire "traduci quello nuovo".
+  const MAX_HIDDEN = 200;
+
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
-    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], shadowRoots: [] });
+    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], shadowRoots: [], hidden: [] });
     const out = [];
     // Gli alberi separati dei componenti aperti incontrati per strada. Chi
     // sorveglia il testo che arriva DOPO ne ha bisogno: una MutationObserver
