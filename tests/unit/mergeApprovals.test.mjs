@@ -4,7 +4,7 @@
 // Qui sta la parte PURA: cosa legge l'owner. È il pezzo delicato, perché una
 // frase sbagliata su questa superficie fa approvare (o buttare) una fusione
 // senza sapere cosa contiene. Il disegno vero lo verificano gli spec Playwright
-// (tests/merge-approvals.spec.mjs), che aprono le due pagine.
+// (tests/merge-approvals.spec.mjs), sulla dashboard di gestione.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
