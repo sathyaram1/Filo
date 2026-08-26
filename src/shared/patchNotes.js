@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.205', date: '2026-08-26',
+      fixes: [
+        'Quando traduci una pagina, l\'avviso «tradotta solo in parte» compare solo se un riquadro in lingua originale ti è rimasto davanti agli occhi. Sui siti di giornale usciva quasi sempre, e mandava a cercare un riquadro che non c\'era: a farlo scattare bastavano gli spazi pubblicitari e i banner nascosti.',
+      ],
+    },
+    {
       version: '0.2.198', date: '2026-08-22',
       fixes: [
         'Nelle home dei siti di video, nei social e nelle pagine di risultati il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» insieme ai comandi della copertina, anche mentre parte l\'anteprima animata. Prima il menu cambiava a seconda di come il sito aveva costruito la scheda, e quasi sempre metà delle voci non c\'era.',
