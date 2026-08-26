@@ -68,6 +68,16 @@ async function apriRiquadro(page, spazioSotto = SPAZIO_STRETTO) {
     return yy;
   }, spazioSotto);
   await expect(page.locator('.sn-popup')).toBeVisible();
+  // La PRIMA posa passa da un `requestAnimationFrame`, e quel fotogramma è
+  // legato al ciclo di disegno: sotto Xvfb può tardare più di un secondo. Se la
+  // risposta arriva prima, quella misura unica capita a riquadro GIÀ cresciuto e
+  // il riquadro si ribalta da solo, cioè il difetto non si vede e la prova
+  // diventa verde anche senza la cura (visto succedere). Qui aspettiamo che il
+  // riquadro sia posato da VUOTO, come succede a chi usa Filo davanti a una
+  // finestra che dipinge normalmente.
+  await page.evaluate(() => new Promise((ok) => {
+    requestAnimationFrame(() => requestAnimationFrame(ok));
+  }));
   return y;
 }
 
