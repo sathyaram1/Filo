@@ -287,6 +287,11 @@
     });
     function onMove(e) {
       if (!dragging) return;
+      // Il riquadro si è MOSSO davvero (un clic sull'intestazione per portarlo
+      // davanti non conta): da qui in poi la posa è dell'utente, chi rimisura
+      // smette di riportarlo sul punto ancorato e si limita a tenerlo dentro
+      // lo schermo.
+      try { onDragStart && onDragStart(); } catch (_) {}
       let left = e.clientX - dx;
       let top = e.clientY - dy;
       const w = root.offsetWidth, h = root.offsetHeight;
