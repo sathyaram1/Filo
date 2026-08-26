@@ -486,8 +486,19 @@ conversazione (#500).
   posa del pannello è una funzione richiamabile, non un calcolo fatto una volta
   all'apertura, e la si richiama a ogni riposizionamento e a ogni scorrimento
   del menu. Se l'ancora è scorsa fuori dal bordo del menu non c'è più niente a
-  cui stare attaccati: il pannello si chiude. Stessa regola per il tooltip, che
-  dopo uno scorrimento parla di un bottone che non è più sotto al cursore.
+  cui stare attaccati: il pannello si chiude.
+- **L'etichetta di un'icona vale finché l'icona sta ferma.** Il tooltip nasce da
+  un hover e muore con l'hover — ma solo se a muoversi è il puntatore. Quando è
+  il MENU a muoversi (scorre, scivola perché la spiegazione è arrivata, rientra
+  perché la finestra si è accorciata) l'etichetta resta ferma dov'era, staccata
+  dall'icona di cui parla e sovrapposta alle voci. Non contare sul browser: il
+  `mouseleave` sintetico che segue un cambio di layout arriva solo se sotto al
+  puntatore finisce un altro elemento — se il menu scivola di pochi pixel non
+  arriva affatto, e l'etichetta resta lì appesa. Quindi la si toglie a mano,
+  insieme all'attesa che sta per farla comparire (`dismissTooltip`), ogni volta
+  che il menu si è MOSSO davvero. Se invece è solo cresciuto restando fermo,
+  l'etichetta non si tocca: farla sparire sotto il naso di chi la sta leggendo
+  sarebbe un dispetto, non una correzione.
 - **Un riquadro che scorre deve trattenere lo scorrimento.** Senza
   `overscroll-behavior: contain` il giro di rotella che arriva dopo l'ultima riga
   passa alla pagina, la pagina scorre e uno scroll di pagina chiude il menu: chi
