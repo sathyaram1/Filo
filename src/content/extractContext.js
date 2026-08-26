@@ -577,13 +577,20 @@
     let truncated = 0;
     const room = () => out.length + attrs.length < maxBlocks;
     const takeAttrs = (el, checkHard) => {
-      const targets = attrTargetsOf(el);
+      // `checkHard` distingue anche i due mondi per l'etichetta gemella: qui
+      // arrivano gli elementi in cui NON si scende (un campo, un'immagine, una
+      // voce di menu a tendina), il cui testo non verrà tradotto — da lì non
+      // c'è niente da copiare.
+      const targets = attrTargetsOf(el, !checkHard);
       if (!targets) return;
       // Solo se c'è davvero un'etichetta vale la pena pagare le barriere dure
       // (fra cui getComputedStyle): la stragrande maggioranza degli elementi
       // saltati è uno <script> o un pezzo di SVG, e esce alla riga sopra.
       if (checkHard && hardSkipForTranslation(el)) return;
       for (const t of targets) {
+        // Le gemelle non consumano il tetto del giro e non contano come
+        // "rimasto fuori": non sono lavoro da spedire, sono una copia.
+        if (t.mirror) { if (mirrors.length < maxBlocks) mirrors.push(t); continue; }
         if (room()) attrs.push(t);
         else truncated++;
       }
