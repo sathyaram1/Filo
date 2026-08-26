@@ -110,6 +110,10 @@
     close();
     const root = document.createElement('div');
     root.className = 'sn-menu';
+    // UI nostra dentro la pagina del sito: marcata alla nascita, così chi
+    // cammina sulla pagina (la traduzione) la salta senza doverla indovinare
+    // dal nome. In pieno schermo il menu finisce DENTRO l'elemento del sito.
+    global.SN_FILO_UI?.mark(root);
     root.setAttribute('role', 'menu');
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
