@@ -188,6 +188,14 @@
       // vista "sto traducendo": una cosa che lavora deve sembrare che lavori.
       const frames = await waitForFrames(framesRunId, aborted);
       if (aborted()) return;
+      // Il testo cambiato sta tutto dentro i riquadri (una pagina che è poco
+      // più di una cornice attorno a un modulo incorporato): senza questo, il
+      // menu offrirebbe di nuovo "Traduci la pagina" e non ci sarebbe più modo
+      // di tornare indietro da ciò che è appena cambiato lingua.
+      if (frames.applied > 0 && !pageHasTranslation) {
+        pageHasTranslation = true;
+        pageComplete = true;
+      }
       progress.close();
       showResultToast(result, newContentSeen, frames);
     } finally {
