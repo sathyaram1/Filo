@@ -581,7 +581,8 @@ diventa scorrevole invece di essere tagliato.
 
 **Dove:** `_makeView` in `src/main/tabs.js`, `src/preload/page-preload.js`,
 `IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
-`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`.
+`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`,
+`tests/translate-page.spec.mjs`.
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
