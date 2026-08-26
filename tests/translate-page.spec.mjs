@@ -104,6 +104,14 @@ async function watchToasts(page) {
 
 const toasts = (page) => page.evaluate(() => window.__toasts || []);
 
+// I toast ANCORA in vista in questo istante (quelli in chiusura sono marcati
+// `data-sn-closing` e stanno già sfumando). Serve dove conta che un avviso
+// sparisca subito, non che sia comparso.
+const liveToastTexts = (page) => page.evaluate(() => Array.from(document.querySelectorAll('.sn-toast'))
+  .filter((t) => !t.dataset.snClosing)
+  .map((t) => t.textContent || '')
+  .join(' | '));
+
 async function clickTranslateIcon(page, anchor = 'body') {
   await page.locator(anchor).first().click({ button: 'right', position: { x: 5, y: 5 } });
   const btn = page.locator('[data-sn-icon-id="translate"]');
