@@ -484,11 +484,24 @@ non si riescono a cliccare (#500).
   trackpad succede quasi sempre, perché l'inerzia continua da sola dopo che hai
   staccato le dita. Vale per ogni contenitore scorrevole dentro un overlay
   (`.sn-menu-history-list` e chiunque altro).
-- **Dove:** `computeCap` / `computeOffset` / `computeSubOffset` / `place` /
-  `repositionSub` in `src/content/menu.js`. Test:
-  `tests/unit/menuPlacement.test.mjs` (geometria pura),
+- **Un riquadro trascinato a mano non si sposta più da solo.** La posa è
+  diventata una scelta dell'utente: muoverglielo sotto le dita mentre legge è
+  peggio del difetto. Quello che si può ancora fare senza spostarlo è
+  impedirgli di crescere oltre il bordo — cresce verso il basso finché tocca la
+  fine della finestra, poi scorre — così la riga del modello e il campo della
+  domanda restano dove l'utente li ha messi. L'unica eccezione è il riquadro
+  trascinato così in basso che nemmeno il minimo utile ci starebbe: lì
+  scivolare è il male minore.
+- **Dove:** `computeCap` / `computeOffset` / `computePinnedLimit` / `applyCap` /
+  `observeGrowth` in `src/shared/overlayPlacement.js`; `place` /
+  `computeSubOffset` / `repositionSub` in `src/content/menu.js`; `placePopup` /
+  `richiediPosa` in `src/content/popup.js`. Va caricato PRIMA di `popup.js` e
+  `menu.js` in `src/preload/page-preload.js` e `src/preload/internal-preload.js`.
+  Test: `tests/unit/menuPlacement.test.mjs` e
+  `tests/unit/popupPlacement.test.mjs` (geometria pura),
   `tests/context-menu-grow.spec.mjs` (il menu vero che cresce, scorre e si
-  porta dietro il pannello).
+  porta dietro il pannello), `tests/popup-grow.spec.mjs` (il riquadro vero che
+  cresce, resta scrivibile e non si muove se l'hai trascinato).
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
