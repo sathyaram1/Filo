@@ -509,13 +509,16 @@
 
   function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
     const root = document.body || document.documentElement;
-    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], shadowRoots: [], hidden: [] });
+    if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], shadowRoots: [], frameDocs: [], hidden: [] });
     const out = [];
     // Gli alberi separati dei componenti aperti incontrati per strada. Chi
     // sorveglia il testo che arriva DOPO ne ha bisogno: una MutationObserver
     // sul documento non vede dentro un componente, e sui siti a componenti è
     // proprio lì che il contenuto cambia.
     const shadowRoots = [];
+    // Documenti dei riquadri senza indirizzo in cui siamo entrati (#407): come
+    // gli alberi dei componenti aperti, vanno sorvegliati a parte.
+    const frameDocs = [];
     // Etichette negli attributi (#407): stessa camminata, lista separata —
     // si applicano scrivendo l'attributo, non sostituendo i figli.
     const attrs = [];
@@ -598,7 +601,7 @@
       for (const c of el.children) kids.push(c);
       for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
     }
-    return Object.assign(out, { unreachable, truncated, attrs, shadowRoots, hidden });
+    return Object.assign(out, { unreachable, truncated, attrs, shadowRoots, frameDocs, hidden });
   }
 
   // Tutti gli elementi già tradotti, componenti isolati compresi: una

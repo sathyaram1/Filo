@@ -229,6 +229,8 @@
     // I componenti aperti del sito sono alberi a parte: una sentinella sul solo
     // documento non vede il contenuto che cambia lì dentro.
     addWatchRoots(blocks.shadowRoots);
+    // Anche i riquadri riempiti dalla pagina stessa sono alberi a parte (#407).
+    addWatchRoots(blocks.frameDocs);
     hiddenSkipped = blocks.hidden || [];
     // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
     // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
