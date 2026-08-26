@@ -377,6 +377,12 @@ test('sezione ripiegata aperta dopo: il menu offre di tradurla', async ({ app, o
   await expect.poll(() => page.evaluate(() => document.getElementById('hiddenp').innerText),
     { timeout: 45_000 }).toContain(MARK);
   expect((await page.evaluate(() => document.getElementById('h').innerText)).match(/‹IT›/g).length).toBe(1);
+
+  // Tradotta la parte scoperta, l'icona torna a "Mostra originale": se restasse
+  // a offrire testo nuovo, ogni clic ripeterebbe un lavoro che non c'è.
+  await page.waitForTimeout(300);
+  expect(await translateIconLabel(page)).toBe('Mostra originale');
+  await closeMenu(page);
 });
 
 // ---------------------------------------------------------------------------
