@@ -17,13 +17,13 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-// Risposta lunga a sufficienza da portare il riquadro al suo tetto d'altezza.
-const PEZZI = Array.from({ length: 12 }, (_, i) =>
-  `Paragrafo ${i + 1}: una spiegazione distesa della parola selezionata, con abbastanza testo da far crescere il riquadro fino al suo tetto di altezza. `);
-const RISPOSTA = PEZZI.join('');
-
+// Provider finto: manda una risposta lunga a pezzi, con una pausa fra uno e
+// l'altro. La lunghezza serve a portare il riquadro al suo tetto d'altezza; le
+// pause servono a poterlo guardare MENTRE cresce, che è il momento del difetto.
+// Il corpo della funzione gira nel processo main, dove le variabili del file di
+// test non arrivano: i pezzi si costruiscono lì dentro.
 async function preparaProvider(app) {
-  await app.evaluate(async (pezzi) => {
+  await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -31,6 +31,8 @@ async function preparaProvider(app) {
       models: { [C.ACTIONS.EXPLAIN_DEEP]: 'flash-lite-3' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
+    const pezzi = Array.from({ length: 12 }, (_, i) =>
+      `Paragrafo ${i + 1}: una spiegazione distesa della parola selezionata, con abbastanza testo da far crescere il riquadro fino al suo tetto di altezza. `);
     globalThis.__origGemPose = globalThis.SN_PROVIDER_GEMINI;
     globalThis.SN_PROVIDER_GEMINI = {
       ...globalThis.__origGemPose,
@@ -42,7 +44,7 @@ async function preparaProvider(app) {
         return { text: pezzi.join(''), usage: {} };
       },
     };
-  }, PEZZI);
+  });
 }
 
 async function ripristinaProvider(app) {

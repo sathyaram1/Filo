@@ -1,5 +1,8 @@
 import { test, expect } from './fixtures/electron.mjs';
 
+const PEZZI = Array.from({ length: 12 }, (_, i) =>
+  `Paragrafo ${i + 1}: una spiegazione distesa della parola selezionata, con abbastanza testo da far crescere il riquadro fino al suo tetto di altezza. `);
+
 test('probe', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab('filo://newtab/');
@@ -8,7 +11,7 @@ test('probe', async ({ app, openTab }) => {
   const errs = [];
   page.on('console', (m) => errs.push(`[page:${m.type()}] ${m.text()}`));
 
-  await app.evaluate(async () => {
+  await app.evaluate(async (pezzi) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -22,12 +25,13 @@ test('probe', async ({ app, openTab }) => {
       ...globalThis.__o,
       streamComplete: async ({ onDelta }) => {
         globalThis.__called++;
-        onDelta('CIAO ');
-        onDelta('MONDO');
-        return { text: 'CIAO MONDO', usage: {} };
+        try {
+          for (const p of pezzi) { onDelta(p); await new Promise((r) => setTimeout(r, 40)); }
+        } catch (e) { globalThis.__err = String(e && e.message || e); throw e; }
+        return { text: pezzi.join(''), usage: {} };
       },
     };
-  });
+  }, PEZZI);
 
   await page.evaluate(() => {
     window.SN_POPUP.openStreaming({
@@ -43,7 +47,7 @@ test('probe', async ({ app, openTab }) => {
     const r = document.querySelector('.sn-popup');
     return r ? r.innerText : 'NO POPUP';
   });
-  const called = await app.evaluate(() => globalThis.__called);
+  const called = await app.evaluate(() => globalThis.__called + ' err=' + globalThis.__err);
   console.log('=== CALLED:', called);
   console.log('=== DUMP:', JSON.stringify(dump));
   console.log('=== CONSOLE:', errs.slice(0, 20).join('\n'));
