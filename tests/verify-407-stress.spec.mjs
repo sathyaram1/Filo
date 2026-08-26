@@ -370,14 +370,29 @@ test('doppio clic rapido: nessuna doppia traduzione, un solo avviso', async ({ a
     <p id="b">A paragraph in english about something else entirely.</p>
   </body></html>`);
 
-  await clickTranslate(page);
-  const toasts1 = await page.evaluate(() => document.querySelectorAll('.sn-toast').length);
-  await clickTranslate(page);
-  await page.waitForTimeout(300);
-  const toasts2 = await page.evaluate(() => document.querySelectorAll('.sn-toast').length);
-  expect(toasts1).toBe(1);
-  expect(toasts2).toBe(1);
+  const liveToasts = () => page.evaluate(() => document
+    .querySelectorAll('.sn-toast:not([data-sn-closing])').length);
 
+  await clickTranslate(page);
+  expect(await liveToasts()).toBe(1);
+
+  // Secondo giro sull'icona, a lavoro ancora in corso. Da #407 quell'icona non
+  // ripropone più "Traduci la pagina" (che a lavoro in corso non faceva niente,
+  // e lasciava l'utente senza modo di fermare): è il ritorno all'originale.
+  // Quel che conta qui resta uguale: nessun secondo avviso impilato.
+  await page.locator('body').first().click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('.sn-menu [data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Mostra originale');
+  await icon.click();
+  await page.waitForTimeout(600);
+  expect(await liveToasts()).toBe(1);
+
+  // Fermata a metà, la pagina è tornata in inglese: la traduzione che riparte
+  // da lì non deve tradurre due volte lo stesso blocco.
+  await expect.poll(() => page.evaluate(() => document.getElementById('a').innerText),
+    { timeout: 30_000 }).not.toContain(MARK);
+
+  await clickTranslate(page);
   await expect.poll(() => toastText(page), { timeout: 60_000 }).toMatch(/^Pagina tradotta/);
   const a = await page.evaluate(() => document.getElementById('a').innerText);
   // Un solo marcatore: il blocco non è stato tradotto due volte.
