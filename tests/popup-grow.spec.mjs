@@ -73,7 +73,6 @@ async function geometria(page) {
     const input = r.querySelector('.sn-popup-input');
     const b = r.getBoundingClientRect();
     return {
-      dbg: r.dataset.dbg, dbgN: r.dataset.dbgN, styleMaxH: r.style.maxHeight,
       vh: window.innerHeight,
       top: Math.round(b.top),
       bottom: Math.round(b.bottom),

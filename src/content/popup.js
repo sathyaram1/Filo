@@ -411,7 +411,19 @@
     });
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
-    try { root.dataset.dbg = `${(+root.dataset.dbgN||0)+1}|pin=${!!popup.pinned}|lim=${limit}|oh=${root.offsetHeight}`; root.dataset.dbgN = String((+root.dataset.dbgN||0)+1); } catch(_){}
+  }
+
+  // Rimisura al prossimo fotogramma, una volta sola per quanti inviti arrivino.
+  // Il `ResizeObserver` da solo basterebbe, ma la sua consegna è legata al ciclo
+  // di disegno e può arrivare tardi; i delta della risposta invece si sa già che
+  // fanno crescere il riquadro, quindi tanto vale dirlo. Chiamarla a ogni delta
+  // non costa: le richieste dello stesso fotogramma diventano una sola misura.
+  function richiediPosa(popup) {
+    if (popup.posaInAttesa) return;
+    popup.posaInAttesa = true;
+    const giro = () => { popup.posaInAttesa = false; if (popup.root.isConnected) placePopup(popup, { keep: true }); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(giro);
+    else setTimeout(giro, 16);
   }
 
   // ----------------------------------------------------------------
