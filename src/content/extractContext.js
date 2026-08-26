@@ -254,7 +254,16 @@
 
   // Attributi da tradurre di QUESTO elemento, già ripuliti; null se non ce ne
   // sono (il caso della stragrande maggioranza degli elementi: si esce subito).
-  function attrTargetsOf(el) {
+  //
+  // `canMirror` — l'elemento è uno di quelli in cui SCENDIAMO, quindi il suo
+  // testo verrà tradotto. Serve a riconoscere l'ETICHETTA GEMELLA: il
+  // suggerimento del mouse uguale al testo del link, l'etichetta di
+  // accessibilità uguale alla scritta sul bottone. È la norma, non un caso
+  // raro — sulla home di un giornale sono decine di frasi — e mandare al
+  // modello due volte la stessa frase la fa pagare due volte senza cambiare
+  // niente sullo schermo. Quelle si segnano `mirror`: non si spediscono, si
+  // copiano dalla traduzione del testo che l'elemento mostra già.
+  function attrTargetsOf(el, canMirror) {
     if (!el.getAttribute) return null;
     const tag = (el.tagName || '').toUpperCase();
     const extra = TRANSLATABLE_ATTRS_BY_TAG[tag];
@@ -262,15 +271,26 @@
     if (tag === 'INPUT' && inputValueIsLabel(el)) names = names.concat('value');
     const done = (el.dataset && el.dataset.snTranslatedAttrs) || '';
     let out = null;
+    let visible;
     for (const attr of names) {
       if (done && done.split(',').indexOf(attr) >= 0) continue;
       const raw = attrSourceValue(el, attr, tag);
       if (raw === null) continue;
       const text = raw.replace(/\s+/g, ' ').trim();
       if (text.length < 2 || !HAS_LETTER.test(text)) continue;
-      (out || (out = [])).push({ el, attr, text });
+      // `textContent` si paga solo quando un'etichetta c'è davvero: sulla
+      // stragrande maggioranza degli elementi non si arriva fin qui.
+      if (canMirror && visible === undefined) visible = visibleTextOf(el);
+      const t = { el, attr, text };
+      if (canMirror && text === visible) t.mirror = true;
+      (out || (out = [])).push(t);
     }
     return out;
+  }
+
+  // Il testo che l'elemento MOSTRA, normalizzato come le etichette.
+  function visibleTextOf(el) {
+    try { return String(el.textContent || '').replace(/\s+/g, ' ').trim(); } catch (_) { return ''; }
   }
 
   // Namespace HTML: solo gli elementi qui dentro sono "testo di pagina". Tutto
