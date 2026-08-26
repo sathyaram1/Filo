@@ -14,6 +14,9 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
+// La geometria vive in `src/shared/overlayPlacement.js` (condivisa col riquadro
+// della risposta di Filo); il menu la ri-espone. Va caricata prima.
+require(join(ROOT, 'src', 'shared', 'overlayPlacement.js'));
 require(join(ROOT, 'src', 'content', 'menu.js'));
 const Menu = globalThis.SN_MENU;
 
