@@ -515,14 +515,27 @@
       if (keepOnScroll) return;
       close();
     };
+    // #500 — la finestra che si accorcia è lo STESSO difetto preso dall'altro
+    // verso: prima si allungava il menu sotto una finestra ferma, qui si
+    // accorcia la finestra sotto un menu fermo, e in tutti e due i casi il fondo
+    // del menu finisce oltre il bordo con le ultime voci irraggiungibili. Quindi
+    // il conto di dove sta il menu si rifà anche qui, invece di chiuderlo (o di
+    // non fare niente, che è quello che succedeva col menu di una selezione).
+    // Capita a chi ridimensiona la finestra mentre legge, e ogni volta che
+    // l'area della pagina si accorcia da sola — un riquadro incorporato che
+    // cambia misura, una barra che compare.
+    const onResize = () => {
+      if (!root.isConnected) return;
+      riposa();
+    };
 
     document.addEventListener('mousedown', onDocClick, true);
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onScroll, true);
+    window.addEventListener('resize', onResize, true);
 
     activeMenu = {
-      root, onDocClick, onKey, onScroll, cleanupZoom, cleanups,
+      root, onDocClick, onKey, onScroll, onResize, cleanupZoom, cleanups,
       subRoot: null, subAnchor: null, subMode: null,
     };
   }
