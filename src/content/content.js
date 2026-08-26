@@ -612,7 +612,7 @@
     let under = null;
     for (const el of stack) {
       if (el.tagName !== 'VIDEO' && el.tagName !== 'AUDIO') continue;
-      if (!sameSurface(target, el)) continue;
+      if (!sameSurface(target, el, stack)) continue;
       under = el;
       break;
     }
