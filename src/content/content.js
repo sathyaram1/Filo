@@ -930,7 +930,10 @@
     // CONTINUARE, quindi il ritorno all'originale deve restare raggiungibile da
     // qualche parte. A traduzione completa e ferma la voce non compare: la
     // offre già l'icona.
-    if (TranslatePage && typeof TranslatePage.canContinue === 'function' && TranslatePage.canContinue()) {
+    const iconIsRestore = TranslatePage && typeof TranslatePage.showsRestore === 'function'
+      && TranslatePage.showsRestore();
+    if (TranslatePage && typeof TranslatePage.canContinue === 'function'
+        && TranslatePage.canContinue() && !iconIsRestore) {
       items.push(TranslatePage.buildRestoreOriginalItem());
     }
 
