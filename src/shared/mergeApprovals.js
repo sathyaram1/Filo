@@ -264,8 +264,21 @@
     // Da dove viene il lavoro, PRIMA del resto: le due provenienze stanno nello
     // stesso elenco, e chi approva deve sapere subito quale delle due sta
     // guardando.
-    var origin = el('span', 'sn-mac-origin', originLabel(req));
-    origin.title = originHint(req);
+    //
+    // Se il lavoro nasce da una segnalazione e la pagina sa aprirla
+    // (`onFeedback`), l'etichetta diventa un bottone: "guarda cosa era stato
+    // chiesto" è esattamente il gesto che serve prima di approvare, e deve
+    // stare a un click, non a una ricerca.
+    var origin;
+    if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
+      origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
+      origin.type = 'button';
+      origin.title = 'Apri la segnalazione #' + feedbackNum(req) + ' da cui nasce questo lavoro.';
+      origin.addEventListener('click', function () { o.onFeedback(req); });
+    } else {
+      origin = el('span', 'sn-mac-origin', originLabel(req));
+      origin.title = originHint(req);
+    }
     head.appendChild(origin);
     head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
