@@ -314,7 +314,6 @@
   // ma non si vede), contenuto spento con `content-visibility`, ritaglio a zero
   // e rettangolo portato fuori dalla pagina.
   function isSeenByUser(el) {
-    if (el) return true; // PROVA TEMPORANEA — comportamento vecchio
     try {
       // checkVisibility() è il metro del browser: copre display, visibility,
       // opacità ereditata e i sottoalberi spenti (compreso il contenuto di un
