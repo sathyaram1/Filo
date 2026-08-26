@@ -397,8 +397,8 @@
    * Disegna l'avviso dentro `host`.
    *
    * NIENTE RICHIESTE = NIENTE AVVISO: `host` resta vuoto e nascosto. È la
-   * condizione che tiene la prima schermata pulita per chi non ha nulla in
-   * sospeso — cioè quasi sempre, e per chiunque non sia il proprietario.
+   * condizione che tiene i Ricevuti puliti per chi non ha nulla in sospeso —
+   * cioè quasi sempre, e per chiunque non sia il proprietario.
    *
    * @returns {number} quante richieste sono state disegnate
    */
