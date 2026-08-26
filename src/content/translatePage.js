@@ -385,11 +385,153 @@
           Popup.showToast(I18n.t('toast_page_translated_new_arrived'), { duration: 7000 });
           return;
         }
-        Popup.showToast(...doneToast(result.unreachable));
+        Popup.showToast(...doneToast(result.unreachable, framesLeft));
         return;
       default:
     }
   }
+
+  // ── Riquadri incorporati ────────────────────────────────────────────────
+  //
+  // Un post incorporato, un blocco commenti, un modulo di iscrizione, una guida:
+  // sono pagine dentro la pagina. Il loro testo il frame principale non lo tocca
+  // — quasi sempre è di un'altra origine — ma il content script di Filo gira
+  // anche lì dentro, e la traduzione gli passa parola: ogni riquadro traduce se
+  // stesso e riferisce com'è andata. Dove nemmeno questo si può (un riquadro
+  // senza script, chiuso a chiave dal `sandbox`), l'avviso finale lo dice,
+  // invece di dichiarare tradotta una pagina con dentro un rettangolo in
+  // inglese (#407).
+
+  // Quanti riquadri incorporati vale la pena guardare qui dentro. Serve alla
+  // pagina per sapere quante risposte aspettarsi: chi non risponde è un
+  // riquadro che nessuno script può toccare, e va detto.
+  function visibleEmbeddedFrames() {
+    let n = 0;
+    try {
+      for (const f of document.querySelectorAll('iframe, frame')) {
+        const r = f.getBoundingClientRect();
+        if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) continue;
+        if (isInsideFiloUi(f)) continue;
+        n++;
+      }
+    } catch (_) {}
+    return n;
+  }
+
+  // Vale la pena tradurre QUESTO riquadro? Un rettangolo grande come un
+  // francobollo è un pixel di tracciamento o uno spaziatore: non ha testo che
+  // qualcuno legga, e una richiesta al modello per lui è denaro buttato.
+  function worthTranslatingHere() {
+    try {
+      return window.innerWidth >= FRAME_MIN_W && window.innerHeight >= FRAME_MIN_H;
+    } catch (_) { return true; }
+  }
+
+  function reportToHost(runId, data) {
+    if (!runId) return;
+    try {
+      chrome.runtime.sendMessage(Object.assign(
+        { type: MSG.FRAME_TRANSLATE_DONE, runId: String(runId) }, data,
+      ));
+    } catch (_) {}
+  }
+
+  // Blocchi tradotti in questo giro, come li conta chi ospita.
+  function appliedOf(result) {
+    if (!result) return 0;
+    if (result.kind === 'none' || result.kind === 'aborted') return 0;
+    return Math.max(0, totalCount - missingCount);
+  }
+
+  // Quanto è rimasto in lingua originale qui dentro. Non serve il numero esatto:
+  // serve sapere SE è rimasto fuori qualcosa, perché è l'unica cosa che cambia
+  // l'avviso finale.
+  function leftOf(result) {
+    if (!result) return 0;
+    if (result.kind === 'none' || result.kind === 'aborted') return 0;
+    if (result.kind === 'done') return Number(result.unreachable || 0) > 0 ? 1 : 0;
+    return Math.max(1, missingCount);
+  }
+
+  // Indice il giro: conta i riquadri da guardare e passa parola. Se non ce n'è
+  // nessuno di visibile, non si spende nemmeno un messaggio.
+  async function beginFrames(myRun) {
+    if (!isTopFrame()) return null;
+    const expected = visibleEmbeddedFrames();
+    if (!expected) return null;
+    const runId = 'r' + myRun;
+    frameRuns.set(runId, { expected, acked: 0, ended: 0, applied: 0, left: 0 });
+    let sent = 0;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
+      sent = Number(res && res.frames) || 0;
+    } catch (_) { sent = 0; }
+    if (!sent) {
+      // Nessun riquadro raggiungibile, eppure sullo schermo ce n'è: il testo lì
+      // dentro resta in lingua originale e l'avviso deve dirlo.
+      const st = frameRuns.get(runId);
+      if (st) { st.acked = 0; st.ended = 0; st.silent = true; }
+    }
+    return runId;
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Aspetta i riquadri. Due finestre, non un timer unico: chi c'è si fa vivo
+  // subito (chi non lo fa non ha script e non lo farà mai), poi si aspetta che
+  // chi si è fatto vivo finisca — e si esce appena hanno finito tutti.
+  async function waitForFrames(runId, aborted) {
+    if (!runId) return { left: 0, applied: 0 };
+    const st = frameRuns.get(runId);
+    if (!st) return { left: 0, applied: 0 };
+    const t0 = Date.now();
+    while (st.acked < st.expected && Date.now() - t0 < FRAME_ACK_GRACE) {
+      if (aborted && aborted()) break;
+      await sleep(80);
+    }
+    const silent = Math.max(0, st.expected - st.acked);
+    while (st.ended < st.acked && Date.now() - t0 < FRAME_WORK_CAP) {
+      if (aborted && aborted()) break;
+      await sleep(120);
+    }
+    const unfinished = Math.max(0, st.acked - st.ended);
+    frameRuns.delete(runId);
+    return { left: silent + unfinished + st.left, applied: st.applied };
+  }
+
+  // Resoconto di un riquadro, arrivato al frame principale.
+  function onFrameReport(msg) {
+    const st = frameRuns.get(String((msg && msg.runId) || ''));
+    if (!st) return;
+    if (msg.phase === 'ack') {
+      st.acked++;
+      // Un riquadro può ospitarne altri: la pagina aspetta anche quelli.
+      st.expected += Number(msg.frames) || 0;
+      return;
+    }
+    st.ended++;
+    st.applied += Number(msg.applied) || 0;
+    st.left += Number(msg.left) || 0;
+  }
+
+  // Parola arrivata dalla pagina che ci ospita: traduci te stesso, o torna
+  // all'originale insieme a lei.
+  function onFrameCommand(msg) {
+    if (isTopFrame()) return;
+    const runId = String((msg && msg.runId) || '');
+    if (String(msg && msg.mode) === 'restore') { restoreOriginal({ quiet: true }); return; }
+    reportToHost(runId, { phase: 'ack', frames: visibleEmbeddedFrames() });
+    if (!worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
+    translatePage({ quiet: true, runId });
+  }
+
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg) return;
+      if (msg.type === MSG.FRAME_TRANSLATE) onFrameCommand(msg);
+      else if (msg.type === MSG.FRAME_TRANSLATE_REPORT) onFrameReport(msg);
+    });
+  } catch (_) {}
 
   // Sentinella del testo che il sito aggiunge DOPO (scorrimento infinito,
   // schermate che cambiano senza ricaricare). Non estrae niente: segna soltanto
