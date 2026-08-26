@@ -1136,3 +1136,42 @@ test('blocchi tornati vuoti dal modello: l’avviso lo dice, invece di "qualcosa
   expect(msg).not.toContain('Qualcosa è andato storto');
   expect(msg).toContain('Puoi riprenderla dal tasto destro');
 });
+
+// Riquadro SENZA indirizzo, riempito dalla pagina stessa (about:blank, srcdoc):
+// è come nascono i riquadri pubblicitari e parecchi widget. Lì dentro Filo non
+// gira, quindi non c'è nessuno a cui passare parola: il testo lo prende chi
+// ospita, che è della stessa origine. Se non lo facesse, ogni pagina con un
+// riquadro così si prenderebbe l'avviso "una parte è rimasta fuori" a torto.
+const INLINE_FRAME = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An article with a box the page fills by itself</h1>
+  <p id="p1">First paragraph of the body text, long enough to be picked up by the translation.</p>
+  <iframe id="emb" style="width:520px;height:220px;border:1px solid #ccc"></iframe>
+  <iframe id="doc" srcdoc="<p id='sbody'>A short english note written inline by the page.</p>" style="width:520px;height:120px;border:1px solid #ccc"></iframe>
+  <script>
+    const d = document.getElementById('emb').contentDocument;
+    d.body.innerHTML = '<p id="fbody">A comment left by a reader of this article, written in english.</p>';
+  </script>
+</body></html>`;
+
+test('riquadro riempito dalla pagina stessa: tradotto, e nessun falso allarme', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, INLINE_FRAME);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.frameLocator('#doc').locator('#sbody')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 })
+    .toContain('Pagina tradotta');
+  // Niente è rimasto fuori: dirlo manderebbe l'utente a cercare del testo in
+  // lingua originale che non c'è.
+  expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+
+  // E si torna indietro anche lì dentro.
+  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.locator('[data-sn-icon-id="translate"]').click();
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^A comment left/, { timeout: 30000 });
+  await expect(page.frameLocator('#doc').locator('#sbody')).toHaveText(/^A short english note/);
+});
