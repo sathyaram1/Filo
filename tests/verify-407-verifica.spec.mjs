@@ -92,9 +92,12 @@ async function closeMenu(page) {
   await expect(page.locator('.sn-menu')).toHaveCount(0);
 }
 
+// L'avviso più recente ancora sullo schermo: quello di prima può essere ancora
+// lì mentre svanisce, e leggerlo al posto dell'ultimo dà un esito vecchio.
 async function toastText(page) {
   return page.evaluate(() => {
-    const t = document.querySelector('.sn-toast:not([data-sn-closing])');
+    const all = document.querySelectorAll('.sn-toast:not([data-sn-closing])');
+    const t = all[all.length - 1];
     return t ? t.textContent : null;
   });
 }
