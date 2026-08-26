@@ -39,6 +39,7 @@ test('si registra su globalThis con la geometria esposta', () => {
   assert.ok(Menu, 'SN_MENU assente');
   assert.equal(typeof Menu.computeCap, 'function');
   assert.equal(typeof Menu.computeOffset, 'function');
+  assert.equal(typeof Menu.computeSubOffset, 'function');
 });
 
 test('con spazio abbondante il menu nasce esattamente sotto al cursore', () => {
