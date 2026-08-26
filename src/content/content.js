@@ -814,12 +814,12 @@
   // viene prima: se la pagina dice già che copertina e collegamento sono la
   // stessa scheda, rifare il conto sui rettangoli può solo buttare via
   // un'informazione certa (#444).
-  function belongsTo(el, linkEl, stack) {
+  function belongsTo(el, linkEl, view) {
     if (!el || !linkEl) return false;
-    return containsAcrossShadow(linkEl, el) || sameSurface(el, linkEl, stack);
+    return containsAcrossShadow(linkEl, el) || sameSurface(el, linkEl, view);
   }
 
-  function sameSurface(a, b, stack) {
+  function sameSurface(a, b, view) {
     if (!a || !b) return false;
     const ra = a.getBoundingClientRect?.();
     const rb = b.getBoundingClientRect?.();
@@ -827,17 +827,22 @@
     const areaA = ra.width * ra.height;
     const areaB = rb.width * rb.height;
     if (!(areaA > 0) || !(areaB > 0)) return false;
-    const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
-    const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
-    if (w <= 0 || h <= 0) return false;
-    if ((w * h) * 2 < Math.min(areaA, areaB)) return false;
-    if (!swallows(ra, rb) && !swallows(rb, ra)) return true;
-    // Il conto sui rettangoli dice di no. Resta la prova diretta, e vale da
+    // I rettangoli si misurano solo se sono davvero quelli del punto cliccato.
+    // Quando uno dei due è nella pila per uno pseudo-elemento, il suo
+    // rettangolo sta da un'altra parte e ogni conto su di lui è rumore.
+    if (coversPoint(ra, view) && coversPoint(rb, view)) {
+      const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+      const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+      if (w <= 0 || h <= 0) return false;
+      if ((w * h) * 2 < Math.min(areaA, areaB)) return false;
+      if (!swallows(ra, rb) && !swallows(rb, ra)) return true;
+    }
+    // Il conto sui rettangoli non decide. Resta la prova diretta, e vale da
     // sola: se né l'uno né l'altro hanno qualcosa di dipinto davanti, in questo
     // punto sono tutti e due sotto gli occhi dell'utente — che è l'unica cosa
     // che il freno voleva sapere (#444). È il caso della riga di risultati con
     // la miniatura piccola, dove la geometria da sola sbagliava.
-    return !coveredAt(a, stack) && !coveredAt(b, stack);
+    return !coveredAt(a, view) && !coveredAt(b, view);
   }
 
   // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre
