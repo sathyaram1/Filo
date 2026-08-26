@@ -1098,6 +1098,9 @@ test('riquadro che il sito chiude a chiave: lo dice, invece di dichiarare tradot
     .toContain('riquadro incorporato');
   // Il rettangolo è ancora in inglese: "Pagina tradotta" sarebbe una bugia.
   await expect(inFrame(page, '#fbody')).toHaveText(/^The first comment/);
+  // Traccia ispezionabile dell'avviso nuovo accanto al riquadro rimasto in
+  // inglese (gitignorata).
+  await page.screenshot({ path: 'tests/.shots/translate-page-frame-locked.png' }).catch(() => {});
   const t = await toasts(page);
   expect(t).not.toContain('Pagina tradotta');
 });
