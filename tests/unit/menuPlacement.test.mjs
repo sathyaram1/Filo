@@ -99,6 +99,55 @@ test('#500 un menu che si ACCORCIA perde il tetto e torna intero', () => {
   assert.equal(p.cap, null);
 });
 
+// --- #500: il pannello ancorato si muove col menu --------------------------
+
+// Come `placeSub()` nel browser, ma coi numeri in chiaro: un menu alto `mH`
+// posato a `mTop`, e dentro di lui la freccetta a `aTop` (misurata dall'alto
+// del menu).
+function posaPannello({ mTop, mLeft = 300, mW = 240, aTop, aH = 28, w = 200, h = 120, mode = 'anchor', vw = VW, vh = VH }) {
+  return Menu.computeSubOffset({
+    aTop: mTop + aTop, aLeft: mLeft, aRight: mLeft + mW,
+    mLeft, mRight: mLeft + mW,
+    w, h, vw, vh, mode,
+  });
+}
+
+test('#500 il pannello nasce allineato alla freccetta che l\'ha aperto', () => {
+  const p = posaPannello({ mTop: 100, aTop: 8 });
+  assert.equal(p.top, 108);
+  assert.equal(p.left, 300 + 240 + 4);
+});
+
+test('#500 il menu scivola in su e il pannello scivola con lui, dello stesso tanto', () => {
+  const prima = posaPannello({ mTop: 400, aTop: 8 });
+  const dopo = posaPannello({ mTop: 380, aTop: 8 });
+  assert.equal(prima.top - dopo.top, 20);
+});
+
+test('#500 il menu scorre di 180px sotto al pannello: il pannello lo segue', () => {
+  // La freccetta sta in cima al menu: scorrendo il contenuto risale, e il
+  // pannello deve risalire con lei invece di restare a mezz\'aria.
+  const prima = posaPannello({ mTop: 8, aTop: 200 });
+  const dopo = posaPannello({ mTop: 8, aTop: 20 });
+  assert.equal(prima.top - dopo.top, 180);
+});
+
+test('#500 un pannello alto ricade verso l\'alto invece di sforare in basso', () => {
+  const p = posaPannello({ mTop: 600, aTop: 100, h: 300 });
+  assert.equal(p.top, VH - 300 - 8);
+});
+
+test('#500 se a destra non ci sta il pannello passa a sinistra del menu', () => {
+  const p = posaPannello({ mTop: 100, mLeft: VW - 260, aTop: 8, w: 200 });
+  assert.equal(p.left, VW - 260 - 200 - 4);
+});
+
+test('#500 la cronologia incolla resta attaccata al bordo del menu', () => {
+  const p = posaPannello({ mTop: 100, aTop: 40, mode: 'edge' });
+  assert.equal(p.left, 300 + 240 - 2);
+  assert.equal(p.top, 140);
+});
+
 // --- #405: dentro un riquadro incorporato lo spazio è poco -----------------
 
 test('#405 in un riquadro più basso del menu, il menu diventa scorrevole', () => {
