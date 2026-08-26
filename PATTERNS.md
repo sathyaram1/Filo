@@ -421,6 +421,19 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   (0.35, con margine largo da tutt'e due le parti). Quando allarghi un freno,
   cerca la grandezza che distingue davvero i due casi: alzare i pixel di
   tolleranza avrebbe solo spostato il confine di qualche scheda.
+- **Se lo dice il DOM, la geometria non ha voce in capitolo (#444).** Il freno
+  serve a indovinare quando la pagina non dice niente: strati sovrapposti che
+  nessuna parentela lega. Quando invece la copertina adottata sta **dentro** un
+  `<a>`, la pagina ha già dichiarato che copertina e collegamento sono la stessa
+  scheda, e rifare il conto sui rettangoli può solo buttare via un'informazione
+  certa — è quello che succedeva con la striscia del titolo stesa sopra una
+  copertina racchiusa nel collegamento: la struttura diceva di sì, la geometria
+  (bordo, imbottitura, titolo in mezzo) diceva di no, e vinceva il no. Quindi:
+  `findLinkUnder` cerca prima l'`<a>` che **contiene** il media o l'immagine
+  adottati, e solo se non ne trova guarda la pila sotto il cursore; `belongsTo`
+  mette la parentela prima di `sameSurface`, e la cerca con
+  `containsAcrossShadow` (`contains()` di un elemento in chiaro non vede dentro
+  uno shadow root, e le schede a componenti sono proprio quelle che rompeva).
 - **Il ripiego vale per la famiglia da SOLA, non solo in coppia (#444).** Finché
   il ripiego esisteva solo dentro i rami "media + link" e "immagine + link", lo
   stesso identico pixel dava due esiti opposti a seconda dello strato che vinceva
