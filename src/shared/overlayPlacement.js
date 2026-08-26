@@ -106,6 +106,18 @@
     return { scale, cap };
   }
 
+  // Quanto può essere alto un overlay che NON si può spostare perché l'utente
+  // l'ha messo lì con le sue mani: cresce verso il basso finché tocca il bordo,
+  // poi scorre. In px di layout, come `computeCap`.
+  //
+  // Il minimo è la rete: sotto quello il riquadro non serve più a niente, e
+  // scivolare diventa il male minore — ci pensa `computeOffset`, che l'ultima
+  // rientrata la fa comunque.
+  function computePinnedLimit({ top, vh, scale, gap = GAP, min = 96 }) {
+    const s = (Number.isFinite(scale) && scale > 0) ? scale : 1;
+    return Math.max(min, (vh - top - gap) / s);
+  }
+
   // Segue l'altezza di un overlay finché resta aperto: a ogni cambio ripete la
   // posa. Ritorna la funzione per staccarsi (no-op dove `ResizeObserver` non
   // esiste). Il confronto è con la misura dell'ULTIMA posa: senza, l'overlay si
