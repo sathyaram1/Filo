@@ -219,7 +219,7 @@ test('risposta ostile del modello: nessun HTML e nessuno script entrano nella pa
 
 function paginaEnorme() {
   const blocchi = [];
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90; i++) {
     blocchi.push(`<div id="b${i}">Paragraph number ${i} with a fairly long English sentence inside it so that the page is well past ten thousand characters in total. 🚀 &amp; "quotes" &lt;tags&gt; — أهلا</div>`);
   }
   return `<!doctype html><html lang="en"><body style="font:16px sans-serif">${blocchi.join('')}</body></html>`;
