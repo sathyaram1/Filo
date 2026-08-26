@@ -336,6 +336,12 @@ test('testo aggiunto dopo la fine: il menu offre di prenderlo e non ritraduce il
   const lastChunk = await app.evaluate(() => globalThis.__vChunks[globalThis.__vChunks.length - 1]);
   expect(lastChunk).toContain('brand new paragraph');
   expect(lastChunk).not.toContain('A heading that is translated first');
+
+  // Preso il testo nuovo, l'icona torna a fare il suo mestiere di prima:
+  // altrimenti resterebbe a offrire un lavoro che non c'è più.
+  await page.waitForTimeout(300);
+  expect(await translateIconLabel(page)).toBe('Mostra originale');
+  await closeMenu(page);
 });
 
 // ---------------------------------------------------------------------------
