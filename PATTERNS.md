@@ -740,6 +740,15 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   (`translate="no"`, nascosto, `contenteditable`, la UI di Filo) diventano **due
   motivi diversi** di saltare: nel primo il contenuto resta intoccato ma le
   etichette si traducono lo stesso.
+- **Il testo della pagina non finisce col `<body>`.** Il nome della scheda in
+  alto (`document.title`) resta sotto gli occhi per tutto il tempo, e su una
+  pagina per il resto tutta tradotta era l'ultima riga in lingua originale.
+  Entra nella stessa coda di lavoro come un'unità sola, si applica scrivendo
+  `document.title` (Electron rilancia `page-title-updated` e la scheda si
+  aggiorna da sé) e va **marcato** come tutto il resto: senza
+  `data-sn-translated` sul `<title>`, la sentinella del testo nuovo scambia la
+  nostra stessa scrittura per testo appena arrivato dal sito e l'avviso finale
+  annuncia roba nuova che non c'è.
 - **Il messaggio finale deve dire la verità**: "fatto" solo se tutte le unità sono
   state sostituite, "solo in parte" se qualcuna è rimasta indietro, e un avviso
   esplicito quando non c'è **niente** da tradurre — il silenzio fa ritentare
