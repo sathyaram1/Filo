@@ -96,6 +96,17 @@ test('#502 — a risposta finita la riga per scrivere resta dentro lo schermo', 
 
   try { await page.screenshot({ path: 'tests/.shots/verifica-502-popup.png' }); } catch (_) {}
 
+  const dopoShot = await page.evaluate(() => {
+    const pop = document.querySelector('.sn-popup');
+    const r = pop.getBoundingClientRect();
+    return {
+      top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(r.height),
+      styleTop: pop.style.top, pos: getComputedStyle(pop).position,
+      vh: window.innerHeight, scrollY: window.scrollY,
+    };
+  });
+  console.log('[#502] dopo lo screenshot', dopoShot);
+
   // SUCCESSO: il riquadro sta dentro lo schermo…
   expect(dopo.fuoriSchermo, `il riquadro esce dal fondo di ${dopo.fuoriSchermo}px`).toBe(0);
   // …e la riga per scrivere la domanda successiva è visibile e cliccabile.
