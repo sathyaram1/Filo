@@ -458,7 +458,9 @@
   // Blocchi tradotti in questo giro, come li conta chi ospita.
   function appliedOf(result) {
     if (!result) return 0;
-    if (result.kind === 'none' || result.kind === 'aborted') return 0;
+    // Questi tre non passano dal conteggio di un giro di lavoro: i totali
+    // sarebbero quelli, vecchi, di una traduzione precedente.
+    if (result.kind === 'none' || result.kind === 'aborted' || result.kind === 'onlyClosed') return 0;
     return Math.max(0, totalCount - missingCount);
   }
 
