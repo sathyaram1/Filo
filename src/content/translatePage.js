@@ -460,18 +460,13 @@
     const expected = visibleEmbeddedFrames();
     if (!expected) return null;
     const runId = 'r' + myRun;
+    // Chi non si farà vivo resta nel conto: `expected` sono i riquadri che si
+    // VEDONO, e un rettangolo visibile che nessuno script raggiunge è
+    // esattamente ciò che l'avviso finale deve confessare.
     frameRuns.set(runId, { expected, acked: 0, ended: 0, applied: 0, left: 0 });
-    let sent = 0;
     try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
-      sent = Number(res && res.frames) || 0;
-    } catch (_) { sent = 0; }
-    if (!sent) {
-      // Nessun riquadro raggiungibile, eppure sullo schermo ce n'è: il testo lì
-      // dentro resta in lingua originale e l'avviso deve dirlo.
-      const st = frameRuns.get(runId);
-      if (st) { st.acked = 0; st.ended = 0; st.silent = true; }
-    }
+      await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
+    } catch (_) {}
     return runId;
   }
 
