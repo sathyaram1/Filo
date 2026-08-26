@@ -98,6 +98,28 @@
   // riquadro "Traduzione pagina in corso…" resterebbe sullo schermo accanto a
   // "Traduzione annullata". Una cosa che si ferma deve sembrare ferma subito.
   let progressToast = null;
+  // Il nome della scheda in alto: è l'ultimo pezzo di lingua originale che
+  // resta sotto gli occhi quando la pagina è tutta tradotta, e sta nello stesso
+  // giro di lavoro. Vale solo per il frame principale — il titolo di un
+  // riquadro incorporato non compare da nessuna parte.
+  let translatedTitle = null;
+  // Giri di traduzione in corso, con il conto dei riquadri incorporati: quanti
+  // ne aspettiamo, quanti si sono fatti vivi, quanti hanno finito e quanto è
+  // rimasto in lingua originale. Ne esiste uno alla volta, ma la chiave del
+  // giro tiene fuori i resoconti in ritardo di un giro già chiuso.
+  const frameRuns = new Map();
+
+  // Un riquadro incorporato non è "la pagina": lì gli avvisi non si mostrano
+  // (li mostra chi lo ospita) e il giro non si indice.
+  function isTopFrame() {
+    try { return window.top === window.self; } catch (_) { return false; }
+  }
+
+  // Avviso finto per il lavoro dentro un riquadro: stessa forma, non disegna
+  // niente. Evita di infilare "se non sono un riquadro" in mezzo al lavoro.
+  function silentToast() {
+    return { el: {}, close() {} };
+  }
 
   function closeProgressToast() {
     if (!progressToast) return;
