@@ -300,12 +300,19 @@
       let top = e.clientY - dy;
       const w = root.offsetWidth, h = root.offsetHeight;
       const vw = window.innerWidth, vh = window.innerHeight;
-      if (left < 0) left = 0;
-      if (top < 0) top = 0;
-      if (left + w > vw) left = vw - w;
-      if (top + h > vh) top = vh - h;
+      // Lo stesso margine dai bordi che tiene la posa automatica: se qui fosse
+      // zero, la rimisura successiva scosterebbe il riquadro di 8px dal punto
+      // in cui l'utente l'ha appena lasciato.
+      const g = Place.GAP;
+      if (left < g) left = g;
+      if (top < g) top = g;
+      if (left + w + g > vw) left = vw - w - g;
+      if (top + h + g > vh) top = vh - h - g;
       root.style.left = left + 'px';
       root.style.top = top + 'px';
+      // Trascinandolo in alto guadagna spazio, in basso ne perde: il tetto lo
+      // segue mentre si muove, invece di aggiustarsi con uno scatto al rilascio.
+      richiediPosa(popup);
     }
     function onUp() {
       dragging = false;
