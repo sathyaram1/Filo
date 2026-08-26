@@ -456,20 +456,43 @@ async function mostraEtichetta(page, menu) {
   return { icona, etichetta };
 }
 
+// Fa crescere la spiegazione quel tanto che serve a far scivolare il menu di
+// POCHI pixel: l'icona resta sotto al puntatore, quindi il browser non manda
+// nessun mouseleave e la sparizione dell'etichetta deve deciderla Filo. È
+// esattamente il caso raccontato — l'etichetta ferma dov'era mentre l'icona di
+// cui parla se n'è andata — misurato in piccolo perché sia riproducibile.
+async function scivolaDiPoco(page, px) {
+  return page.evaluate((slide) => {
+    const menu = document.querySelector('.sn-menu');
+    const box = menu.querySelector('.sn-menu-inline');
+    const cs = getComputedStyle(box);
+    // `min-height` morde il box del CSS: in content-box bordo e imbottitura
+    // restano fuori dal conto e la crescita vera sarebbe più alta di quella
+    // chiesta.
+    const extra = cs.boxSizing === 'border-box' ? 0
+      : parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+        + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    const bottom = menu.getBoundingClientRect().bottom;
+    const cresci = Math.round(window.innerHeight - bottom) + slide;
+    box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) - extra + cresci}px`;
+  }, px);
+}
+
 test('#500 il menu scivola sotto al puntatore: l\'etichetta dell\'icona sparisce invece di restare appesa', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, paginaLink());
   const menu = await apriMenuSu(page, '#link');
-  const { etichetta } = await mostraEtichetta(page, menu);
+  const { icona, etichetta } = await mostraEtichetta(page, menu);
 
   const menuPrima = (await geometria(page)).menuTop;
+  const iconaPrima = (await icona.boundingBox()).y;
 
-  // Arriva la spiegazione: il menu scivola in su, l'icona di cui parla
-  // l'etichetta se ne va da sotto il puntatore.
-  const cresciuto = await cresciOltreIlBordo(page, 40);
-  expect(cresciuto.error).toBeFalsy();
+  // Arriva la spiegazione: il menu scivola in su e si porta dietro l'icona.
+  await scivolaDiPoco(page, 6);
   await attendiRientro(page);
-  expect((await geometria(page)).menuTop, 'il menu non si è mosso: il test non prova niente')
-    .toBeLessThan(menuPrima);
+
+  const menuDopo = (await geometria(page)).menuTop;
+  expect(menuDopo, 'il menu non si è mosso: il test non prova niente').toBeLessThan(menuPrima);
+  expect((await icona.boundingBox()).y, 'l\'icona non si è mossa col menu').toBeLessThan(iconaPrima);
 
   await expect(etichetta).toBeHidden({ timeout: 3000 });
 });

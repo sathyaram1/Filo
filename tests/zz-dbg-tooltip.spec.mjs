@@ -38,13 +38,26 @@ test('dbg tooltip', async ({ openTab, testServer }) => {
 
   console.log('PRIMA', JSON.stringify(await stato()));
 
-  await page.evaluate(() => {
+  console.log('ICONA', JSON.stringify(await page.evaluate(() => {
+    const b = document.querySelector('.sn-menu .sn-menu-row-btn');
+    const r = b.getBoundingClientRect();
+    const m = document.querySelector('.sn-menu').getBoundingClientRect();
+    return { iconaH: Math.round(r.height), iconaTop: Math.round(r.top), menuBottom: Math.round(m.bottom), vh: window.innerHeight };
+  })));
+
+  console.log('SLIDE', JSON.stringify(await page.evaluate((slide) => {
     const menu = document.querySelector('.sn-menu');
-    const b = menu.querySelector('.sn-menu-inline');
+    const box = menu.querySelector('.sn-menu-inline');
+    const cs = getComputedStyle(box);
+    const extra = cs.boxSizing === 'border-box' ? 0
+      : parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+        + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
     const bottom = menu.getBoundingClientRect().bottom;
-    const delta = Math.max(24, Math.round(window.innerHeight - bottom + 40));
-    b.style.minHeight = `${Math.round(b.getBoundingClientRect().height) + delta}px`;
-  });
+    const delta = Math.round(window.innerHeight - bottom) + slide;
+    const target = Math.round(box.getBoundingClientRect().height) - extra + delta;
+    box.style.minHeight = `${target}px`;
+    return { extra, delta, target, boxSizing: cs.boxSizing };
+  }, 6)));
 
   for (const ms of [50, 150, 400, 1000]) {
     await page.waitForTimeout(ms === 50 ? 50 : ms - 0);
