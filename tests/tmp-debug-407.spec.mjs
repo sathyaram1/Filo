@@ -51,14 +51,11 @@ test('debug stato dopo traduzione', async ({ app, openTab, testServer }) => {
   await page.locator('body').first().click({ button: 'right', position: { x: 5, y: 5 } });
   await page.locator('.sn-menu [data-sn-icon-id="translate"]').click();
   await page.waitForTimeout(4000);
-  const st = await page.evaluate(() => {
-    const T = globalThis.SN_TRANSLATE_PAGE;
-    return {
-      has: T.hasTranslation(), partial: T.isPartial(), newC: T.hasNewContent(),
-      restore: T.showsRestore(), missing: T.missing(), total: T.total(),
-      toasts: Array.from(document.querySelectorAll('.sn-toast')).map((t) => t.textContent),
-    };
-  });
+  const st = await page.evaluate(() => ({
+    toasts: Array.from(document.querySelectorAll('.sn-toast')).map((t) => t.textContent),
+    marked: document.querySelectorAll('[data-sn-translated]').length,
+    attrs: document.querySelectorAll('[data-sn-translated-attrs]').length,
+  }));
   console.log('STATO:', JSON.stringify(st, null, 1));
   await page.locator('body').first().click({ button: 'right', position: { x: 5, y: 5 } });
   const lab = await page.locator('.sn-menu [data-sn-icon-id="translate"]').getAttribute('aria-label');
