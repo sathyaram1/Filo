@@ -147,7 +147,9 @@ test('#500 un riquadro che ci sta già non si sposta di un pixel quando cresce',
   await apriRiquadro(page, 0.05);
   const prima = await geometria(page);
   await rispostaArriva(page);
-  await page.waitForTimeout(400);
+  // Cresciuto per davvero, e senza essersi mosso di un pixel.
+  await expect.poll(async () => (await geometria(page)).altezza, { timeout: 5000 })
+    .toBeGreaterThan(prima.altezza);
   const dopo = await geometria(page);
   expect(dopo.top).toBe(prima.top);
   expect(dopo.bottom).toBeLessThanOrEqual(dopo.vh);
