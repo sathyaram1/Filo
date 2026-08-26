@@ -815,7 +815,17 @@
   }
 
   // Ripristina il testo originale annullando la traduzione di pagina.
-  function restoreOriginal() {
+  function restoreOriginal(opts) {
+    // Dentro un riquadro incorporato: torna all'originale insieme alla pagina
+    // che lo ospita, ma senza avvisi propri (l'avviso è uno, ed è il suo).
+    const quiet = !!(opts && opts.quiet);
+    // Se si può tradurre un riquadro incorporato, si deve poter tornare
+    // indietro anche lì: senza questa parola, "Mostra originale" lascerebbe in
+    // italiano proprio il rettangolo che l'utente vede meglio.
+    if (!quiet && isTopFrame()) {
+      frameRuns.clear();
+      try { chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'restore', runId: '' }); } catch (_) {}
+    }
     // Prima di tutto il resto: l'avviso "sto traducendo" sparisce nell'istante
     // in cui l'utente ferma il lavoro, non quando le richieste già spedite si
     // decidono a tornare.
