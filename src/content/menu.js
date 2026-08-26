@@ -447,18 +447,7 @@
     // finestra e l'ultima voce restava tagliata a metà, non cliccabile.
     // Rimisurare a ogni cambio d'altezza lo tiene dentro; la posa "keep" scivola
     // del minimo indispensabile invece di ribaltare il menu sotto il cursore.
-    if (typeof ResizeObserver === 'function') {
-      // La misura di confronto è quella dell'ULTIMA posa: senza, il menu si
-      // riposerebbe all'infinito rispondendo al proprio stesso tetto.
-      let posato = `${root.offsetWidth}x${root.offsetHeight}`;
-      const ro = new ResizeObserver(() => {
-        if (`${root.offsetWidth}x${root.offsetHeight}` === posato) return;
-        place(root, x, y, { keep: true });
-        posato = `${root.offsetWidth}x${root.offsetHeight}`;
-      });
-      ro.observe(root);
-      cleanups.push(() => { try { ro.disconnect(); } catch (_) {} });
-    }
+    cleanups.push(Place.observeGrowth(root, () => place(root, x, y, { keep: true })));
 
     const onDocClick = (e) => {
       if (root.contains(e.target)) return;
