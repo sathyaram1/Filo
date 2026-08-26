@@ -73,6 +73,11 @@ async function stubTranslationProvider(app, delayMs = 0) {
       if (prompt.indexOf('@@@SN_SEP@@@') < 0) return origComplete(args);
       globalThis.__filoTranslateCalls++;
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+      // Modello che risponde A VUOTO: nessun errore, nessun testo. Serve a
+      // provare che l'avviso non inventa un guasto che non c'è stato.
+      if (prompt.indexOf('ZULU') >= 0) {
+        return { text: '', provider: 'test', model: 'test-translate', usage: {} };
+      }
       const i = prompt.indexOf('Testo:\n\n');
       const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
       const SEP = '\n@@@SN_SEP@@@\n';
