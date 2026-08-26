@@ -556,6 +556,10 @@
 
   // Ripristina il testo originale annullando la traduzione di pagina.
   function restoreOriginal() {
+    // Prima di tutto il resto: l'avviso "sto traducendo" sparisce nell'istante
+    // in cui l'utente ferma il lavoro, non quando le richieste già spedite si
+    // decidono a tornare.
+    closeProgressToast();
     stopWatchingNewContent();
     newContentSeen = false;
     hiddenSkipped = [];
