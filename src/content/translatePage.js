@@ -60,168 +60,238 @@
   // averlo in italiano era tornare all'originale e ripagare tutta la pagina.
   let newContentSeen = false;
   let contentObserver = null;
+  // Sottoalberi che al momento della traduzione erano nascosti (fisarmoniche
+  // chiuse, schede in secondo piano, "leggi tutto" ripiegati). Non sono stati
+  // tradotti — l'utente non li vede — ma se li apre il menu deve offrire di
+  // tradurli: scoprire del testo e riceverlo dal sito, per chi guarda lo
+  // schermo, sono la stessa cosa (#407).
+  let hiddenSkipped = [];
+  // Numero d'ordine del lavoro in corso. Chi chiede l'originale lo fa avanzare:
+  // le richieste rimaste in volo si accorgono di non essere più quelle buone e
+  // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
+  // appena riportato indietro (#407).
+  let runSeq = 0;
 
   async function translatePage() {
     // Riclic mentre traduce: l'avviso "in corso" è già sullo schermo (dura
     // quanto il lavoro), un secondo riquadro identico sopra sarebbe solo rumore.
     if (pageTranslating) return;
     pageTranslating = true;
-    // Mentre lavoriamo la pagina la cambiamo noi: la sentinella del testo nuovo
-    // scambierebbe le nostre sostituzioni per contenuto del sito.
-    stopWatchingNewContent();
+    const myRun = ++runSeq;
+    const aborted = () => myRun !== runSeq;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
     const progress = Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
-    // Alberi da sorvegliare a lavoro finito: il documento più i componenti
-    // aperti del sito, che una sentinella sul solo documento non vedrebbe.
-    let watchRoots = [];
+    // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è il
+    // comportamento normale, e il testo che il sito carica in quei secondi è
+    // testo che l'utente vede restare in lingua originale. Le nostre
+    // sostituzioni non la ingannano: nascono già marcate come tradotte.
+    newContentSeen = false;
+    startWatchingNewContent();
 
+    let result = null;
     try {
-      const blocks = Extract.extractTranslatableBlocks();
-      watchRoots = blocks.shadowRoots || [];
-      // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
-      // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
-      const unreachable = Number(blocks.unreachable || 0);
-      // Blocchi oltre il tetto di un giro solo: non sono persi, si prendono
-      // alla ripresa. Entrano nei totali perché è l'unico modo perché l'avviso
-      // finale non menta su una pagina enorme.
-      const truncated = Number(blocks.truncated || 0);
-
-      // Per ogni unità: i figli (link, img, span, …) diventano segnaposto [[Lk]],
-      // così il modello traduce solo il testo e la struttura resta intatta.
-      // Blocchi già tradotti da un giro precedente interrotto a metà: NON
-      // tornano dall'estrazione (vengono saltati alla fonte) e non vanno
-      // rimandati al modello — sarebbe testo pagato due volte. Qui servono solo
-      // a dare i totali giusti a chi legge l'avviso (#408).
-      const doneBefore = Extract.findTranslatedElements();
-      const already = doneBefore.length + Number(doneBefore.attrCount || 0);
-      const units = [];
-      for (const b of blocks) {
-        if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
-        const { templated, refs } = templateizeBlock(b.el);
-        // Se tolti i segnaposto non resta testo, non c'è nulla da tradurre.
-        if (!hasTranslatableText(templated)) continue;
-        units.push({ el: b.el, templated, refs });
+      for (let pass = 0; pass < MAX_PASSES; pass++) {
+        // Da qui in poi, quel che compare è arrivato DOPO l'inizio del giro.
+        newContentSeen = false;
+        result = await runPass(progress, myRun);
+        if (aborted()) return;
+        // Il sito ha allungato la pagina mentre lavoravamo: la finiamo adesso,
+        // senza far ricliccare e senza rimandare al modello ciò che è già
+        // fatto. Se invece il giro si è interrotto, l'avviso lo dice già e sarà
+        // la ripresa a prendere tutto il resto.
+        if (!newContentSeen || result.kind !== 'done') break;
       }
-      // Etichette (placeholder, suggerimenti, descrizioni delle immagini, voci
-      // dei menu a tendina): stessa coda di lavoro, si applicano scrivendo
-      // l'attributo invece di sostituire i figli.
-      for (const a of (blocks.attrs || [])) {
-        if (!a.el || !hasTranslatableText(a.text)) continue;
-        units.push({ el: a.el, attr: a.attr, templated: a.text, refs: [] });
-      }
-
-      if (!units.length) {
-        progress.close();
-        if (truncated) {
-          // Niente di nuovo da mandare in questo giro, ma la coda della pagina
-          // esiste: non è finita, e va detto.
-          pageHasTranslation = already > 0;
-          pageComplete = false;
-          totalCount = already + truncated;
-          missingCount = truncated;
-          Popup.showToast(I18n.t('toast_page_translate_batch', already, totalCount), { duration: 7000 });
-        } else if (already) {
-          // Ripresa su una pagina che nel frattempo è già tutta tradotta.
-          pageHasTranslation = true;
-          pageComplete = true;
-          missingCount = 0;
-          totalCount = already;
-          Popup.showToast(...doneToast(unreachable));
-        } else if (unreachable) {
-          // Pagina fatta solo di componenti chiusi: non è "niente da tradurre",
-          // è testo che non riusciamo a leggere. Dire l'una per l'altra
-          // manderebbe l'utente a riprovare all'infinito.
-          Popup.showToast(I18n.t('toast_only_closed_components'), { duration: 7000 });
-        } else {
-          Popup.showToast(I18n.t('toast_nothing_to_translate'));
-        }
-        return;
-      }
-
-      // Chunking: aggrega unità fino a ~3000 caratteri per richiesta.
-      const chunks = [];
-      let cur = [];
-      let curLen = 0;
-      for (const u of units) {
-        const len = u.templated.length + SEPARATOR.length;
-        if (curLen + len > CHUNK_SIZE && cur.length) {
-          chunks.push(cur);
-          cur = [];
-          curLen = 0;
-        }
-        cur.push(u);
-        curLen += len;
-      }
-      if (cur.length) chunks.push(cur);
-
-      // Avanzamento REALE mentre lavora: i blocchi hanno un totale noto, quindi
-      // l'attesa può essere misurata invece che raccontata ("l'attesa è attrito":
-      // se ci sono dati di progresso si mostrano).
-      const grandTotal = already + units.length + truncated;
-      const tick = () => {
-        const applied = already + units.filter((u) => u.applied).length;
-        try { progress.el.textContent = I18n.t('toast_translating_page_progress', applied, grandTotal); } catch (_) {}
-      };
-      tick();
-
-      // Le richieste partono a gruppi e i risultati vengono applicati appena
-      // arrivano: la pagina si traduce progressivamente sotto gli occhi.
-      let lastError = null;
-      let next = 0;
-      const worker = async () => {
-        while (next < chunks.length) {
-          const chunk = chunks[next++];
-          const err = await translateGroup(chunk, 0);
-          if (err) lastError = err;
-          tick();
-        }
-      };
-      await Promise.all(
-        Array.from({ length: Math.min(CONCURRENCY, chunks.length) }, worker),
-      );
-
-      const done = units.filter((u) => u.applied).length;
-      const applied = already + done;
+      if (aborted()) return;
       progress.close();
-      totalCount = grandTotal;
-      missingCount = grandTotal - applied;
-
-      if (!applied) {
-        // Niente tradotto: né prima né adesso. Nessuno stato da conservare.
-        pageHasTranslation = false;
-        pageComplete = false;
-        Popup.showToast(I18n.t('toast_page_translate_failed', reasonFor(lastError)), { duration: 7000 });
-        return;
-      }
-
-      pageHasTranslation = true;
-      // NB: i componenti chiusi non rendono la traduzione "riprendibile" —
-      // riprovare non li aprirà mai. Lo stato resta quindi completo (il menu
-      // offre "Mostra originale", non "Riprendi": riprendere non farebbe
-      // nulla), ed è l'AVVISO a dire che una parte è rimasta fuori.
-      pageComplete = missingCount === 0;
-      if (pageComplete) {
-        Popup.showToast(...doneToast(unreachable));
-      } else if (!lastError && truncated) {
-        // Nessun guasto: la pagina è semplicemente più lunga di un giro solo.
-        // "Interrotta" suonerebbe come un errore che non c'è stato.
-        Popup.showToast(I18n.t('toast_page_translate_batch', applied, grandTotal), { duration: 7000 });
-      } else {
-        // MAI "Pagina tradotta" quando non lo è: si dice che si è interrotta,
-        // quanto manca e come riprendere (il motivo tecnico grezzo resta fuori).
-        Popup.showToast(
-          I18n.t('toast_page_translate_stopped', applied, grandTotal, reasonFor(lastError)),
-          { duration: 7000 },
-        );
-      }
+      showResultToast(result, newContentSeen);
     } finally {
       progress.close();
       pageTranslating = false;
-      // Da qui in poi ogni testo che compare sulla pagina è del sito, non
-      // nostro: se ne arriva, il menu deve poterlo offrire in traduzione.
-      newContentSeen = false;
-      if (pageHasTranslation) startWatchingNewContent(watchRoots);
+      // Nessuna traduzione in piedi: niente da continuare, e nessun motivo di
+      // tenere una sentinella addosso alla pagina.
+      if (!pageHasTranslation) {
+        stopWatchingNewContent();
+        newContentSeen = false;
+        hiddenSkipped = [];
+      }
+    }
+  }
+
+  // Un giro di lavoro: rilegge la pagina, manda al modello solo ciò che non è
+  // già tradotto, applica. Ritorna com'è andata; l'avviso lo scrive chi chiama,
+  // che è l'unico a sapere se nel frattempo è arrivato dell'altro.
+  async function runPass(progress, myRun) {
+    const blocks = Extract.extractTranslatableBlocks();
+    // I componenti aperti del sito sono alberi a parte: una sentinella sul solo
+    // documento non vede il contenuto che cambia lì dentro.
+    addWatchRoots(blocks.shadowRoots);
+    hiddenSkipped = blocks.hidden || [];
+    // Pezzi di pagina che nessuno script può leggere (#439): non entrano nel
+    // lavoro, ma cambiano l'avviso finale — "Pagina tradotta" sarebbe falso.
+    const unreachable = Number(blocks.unreachable || 0);
+    // Blocchi oltre il tetto di un giro solo: non sono persi, si prendono
+    // alla ripresa. Entrano nei totali perché è l'unico modo perché l'avviso
+    // finale non menta su una pagina enorme.
+    const truncated = Number(blocks.truncated || 0);
+
+    // Per ogni unità: i figli (link, img, span, …) diventano segnaposto [[Lk]],
+    // così il modello traduce solo il testo e la struttura resta intatta.
+    // Blocchi già tradotti da un giro precedente interrotto a metà: NON
+    // tornano dall'estrazione (vengono saltati alla fonte) e non vanno
+    // rimandati al modello — sarebbe testo pagato due volte. Qui servono solo
+    // a dare i totali giusti a chi legge l'avviso (#408).
+    const doneBefore = Extract.findTranslatedElements();
+    const already = doneBefore.length + Number(doneBefore.attrCount || 0);
+    const units = [];
+    for (const b of blocks) {
+      if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
+      const { templated, refs } = templateizeBlock(b.el);
+      // Se tolti i segnaposto non resta testo, non c'è nulla da tradurre.
+      if (!hasTranslatableText(templated)) continue;
+      units.push({ el: b.el, templated, refs, run: myRun });
+    }
+    // Etichette (placeholder, suggerimenti, descrizioni delle immagini, voci
+    // dei menu a tendina, scritte sui bottoni): stessa coda di lavoro, si
+    // applicano scrivendo l'attributo invece di sostituire i figli.
+    for (const a of (blocks.attrs || [])) {
+      if (!a.el || !hasTranslatableText(a.text)) continue;
+      units.push({ el: a.el, attr: a.attr, templated: a.text, refs: [], run: myRun });
+    }
+
+    if (!units.length) {
+      if (truncated) {
+        // Niente di nuovo da mandare in questo giro, ma la coda della pagina
+        // esiste: non è finita, e va detto.
+        pageHasTranslation = already > 0;
+        pageComplete = false;
+        totalCount = already + truncated;
+        missingCount = truncated;
+        return { kind: 'batch', applied: already, total: totalCount };
+      }
+      if (already) {
+        // Ripresa su una pagina che nel frattempo è già tutta tradotta.
+        pageHasTranslation = true;
+        pageComplete = true;
+        missingCount = 0;
+        totalCount = already;
+        return { kind: 'done', unreachable };
+      }
+      if (unreachable) {
+        // Pagina fatta solo di componenti chiusi: non è "niente da tradurre",
+        // è testo che non riusciamo a leggere. Dire l'una per l'altra
+        // manderebbe l'utente a riprovare all'infinito.
+        return { kind: 'onlyClosed' };
+      }
+      return { kind: 'none' };
+    }
+
+    // Chunking: aggrega unità fino a ~3000 caratteri per richiesta.
+    const chunks = [];
+    let cur = [];
+    let curLen = 0;
+    for (const u of units) {
+      const len = u.templated.length + SEPARATOR.length;
+      if (curLen + len > CHUNK_SIZE && cur.length) {
+        chunks.push(cur);
+        cur = [];
+        curLen = 0;
+      }
+      cur.push(u);
+      curLen += len;
+    }
+    if (cur.length) chunks.push(cur);
+
+    // Avanzamento REALE mentre lavora: i blocchi hanno un totale noto, quindi
+    // l'attesa può essere misurata invece che raccontata ("l'attesa è attrito":
+    // se ci sono dati di progresso si mostrano).
+    const grandTotal = already + units.length + truncated;
+    const tick = () => {
+      const applied = already + units.filter((u) => u.applied).length;
+      try { progress.el.textContent = I18n.t('toast_translating_page_progress', applied, grandTotal); } catch (_) {}
+    };
+    tick();
+
+    // Le richieste partono a gruppi e i risultati vengono applicati appena
+    // arrivano: la pagina si traduce progressivamente sotto gli occhi.
+    let lastError = null;
+    let next = 0;
+    const worker = async () => {
+      // Se l'utente ha chiesto l'originale, quel che resta non parte nemmeno:
+      // non si continua a lavorare (e a far pagare) contro la sua ultima parola.
+      while (next < chunks.length && myRun === runSeq) {
+        const chunk = chunks[next++];
+        const err = await translateGroup(chunk, 0);
+        if (err) lastError = err;
+        tick();
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, chunks.length) }, worker),
+    );
+    if (myRun !== runSeq) return { kind: 'aborted' };
+
+    const done = units.filter((u) => u.applied).length;
+    const applied = already + done;
+    totalCount = grandTotal;
+    missingCount = grandTotal - applied;
+
+    if (!applied) {
+      // Niente tradotto: né prima né adesso. Nessuno stato da conservare.
+      pageHasTranslation = false;
+      pageComplete = false;
+      return { kind: 'failed', reason: reasonFor(lastError) };
+    }
+
+    pageHasTranslation = true;
+    // NB: i componenti chiusi non rendono la traduzione "riprendibile" —
+    // riprovare non li aprirà mai. Lo stato resta quindi completo (il menu
+    // offre "Mostra originale", non "Riprendi": riprendere non farebbe
+    // nulla), ed è l'AVVISO a dire che una parte è rimasta fuori.
+    pageComplete = missingCount === 0;
+    if (pageComplete) return { kind: 'done', unreachable };
+    // Nessun guasto: la pagina è semplicemente più lunga di un giro solo.
+    // "Interrotta" suonerebbe come un errore che non c'è stato.
+    if (!lastError && truncated) return { kind: 'batch', applied, total: grandTotal };
+    // MAI "Pagina tradotta" quando non lo è: si dice che si è interrotta,
+    // quanto manca e come riprendere (il motivo tecnico grezzo resta fuori).
+    return { kind: 'stopped', applied, total: grandTotal, reason: reasonFor(lastError) };
+  }
+
+  // L'esito, detto all'utente. `moreArrived` è l'unica cosa che chi ha fatto il
+  // lavoro non può sapere: il sito ha continuato ad aggiungere testo anche
+  // durante l'ultimo giro, e noi abbiamo smesso di rincorrerlo.
+  function showResultToast(result, moreArrived) {
+    if (!result) return;
+    switch (result.kind) {
+      case 'batch':
+        Popup.showToast(I18n.t('toast_page_translate_batch', result.applied, result.total), { duration: 7000 });
+        return;
+      case 'onlyClosed':
+        Popup.showToast(I18n.t('toast_only_closed_components'), { duration: 7000 });
+        return;
+      case 'none':
+        Popup.showToast(I18n.t('toast_nothing_to_translate'));
+        return;
+      case 'failed':
+        Popup.showToast(I18n.t('toast_page_translate_failed', result.reason), { duration: 7000 });
+        return;
+      case 'stopped':
+        Popup.showToast(
+          I18n.t('toast_page_translate_stopped', result.applied, result.total, result.reason),
+          { duration: 7000 },
+        );
+        return;
+      case 'done':
+        if (moreArrived) {
+          // "Pagina tradotta" sarebbe di nuovo la bugia della segnalazione: il
+          // testo arrivato per ultimo è lì, in lingua originale, sotto gli occhi.
+          Popup.showToast(I18n.t('toast_page_translated_new_arrived'), { duration: 7000 });
+          return;
+        }
+        Popup.showToast(...doneToast(result.unreachable));
+        return;
+      default:
     }
   }
 
