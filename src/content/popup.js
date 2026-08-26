@@ -309,7 +309,6 @@
     }
     function onUp() {
       dragging = false;
-      popup.dragging = false;
       handle.classList.remove('sn-popup-dragging');
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('mouseup', onUp, true);
