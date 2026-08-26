@@ -489,11 +489,27 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   si apre da due strade (menu normale e menu di correzione) e con la ricerca
   copiata in tutt'e due lo stesso clic finiva col dare due menu diversi a seconda
   che sotto ci fosse o no una parola da correggere.
+- **Una scheda, un argomento: il riquadro «Spiega» non cambia discorso a seconda
+  del punto cliccato (#444).** Sulla stessa scheda — copertina dentro il
+  collegamento, fascia del titolo stesa sopra il fondo — il riquadro descriveva
+  l'immagine se il clic cadeva sulla copertina scoperta e analizzava il
+  collegamento centoventi pixel più in basso, con le stesse identiche
+  voci-azione: tre modi di cliccare la stessa cosa, due risposte diverse, e
+  nessun modo per chi guarda di sapere quale gli toccherà. L'argomento è
+  **l'elemento primario**, cioè quello le cui voci aprono il menu: se abbiamo
+  adottato la copertina, il riquadro parla di lei, anche quando il clic è
+  arrivato al collegamento. Sul filmato resta il collegamento — una spiegazione
+  del filmato non esiste — ed è già così in tutti e tre i modi. L'argomento è
+  scritto nell'item (`subject`) e finisce su `data-subject` del riquadro: è
+  leggibile prima che la risposta sostituisca il testo d'attesa, e i test lo
+  controllano di lì invece di fare la corsa con la rete.
 - **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`),
   `detectContext`, `findMedia`, `findUnder`, `findLinkUnder`, `sameSurface`
-  (+ `swallows`), `belongsTo` (+ `containsAcrossShadow`),
+  (+ `swallows`, `coveredAt`, `paintsSomething`, `hasVisibleText`), `belongsTo`
+  (+ `containsAcrossShadow`),
   `closestAcrossShadow` e `deepElementsFromPoint` in `src/content/content.js`, voci in
-  `src/content/actions.js`. Test: `tests/context-menu-media.spec.mjs`,
+  `src/content/actions.js` (`subject` sugli item `inline`), reso da
+  `src/content/menu.js`. Test: `tests/context-menu-media.spec.mjs`,
   `tests/context-menu-image-link.spec.mjs`,
   `tests/context-menu-media-link.spec.mjs`,
   `tests/context-menu-video-preview-link.spec.mjs`.
