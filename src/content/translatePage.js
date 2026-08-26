@@ -98,9 +98,11 @@
         if (aborted()) return;
         // Il sito ha allungato la pagina mentre lavoravamo: la finiamo adesso,
         // senza far ricliccare e senza rimandare al modello ciò che è già
-        // fatto. Se invece il giro si è interrotto, l'avviso lo dice già e sarà
-        // la ripresa a prendere tutto il resto.
-        if (!newContentSeen || result.kind !== 'done') break;
+        // fatto. Vale anche quando il primo giro non aveva trovato niente: su
+        // una schermata che si disegna in ritardo, "non ho trovato testo" mentre
+        // il testo sta comparendo è la stessa bugia. Se invece il giro si è
+        // interrotto, l'avviso lo dice già e sarà la ripresa a prendere il resto.
+        if (!newContentSeen || (result.kind !== 'done' && result.kind !== 'none')) break;
       }
       if (aborted()) return;
       progress.close();
