@@ -559,7 +559,12 @@
           // Nascosto o vietato dalle barriere dure resta fuori come gli altri.
           if (!hardSkipForTranslation(el)) {
             const inner = inlineFrameBody(el);
-            if (inner) stack.push(inner);
+            if (inner) {
+              stack.push(inner);
+              // Anche qui il sito può aggiungere testo dopo: chi sorveglia la
+              // pagina deve tenere d'occhio pure questo documento.
+              if (frameDocs.length < 100) frameDocs.push(inner.ownerDocument);
+            }
           }
         }
         // Ripiegato, in secondo piano, chiuso: si segna e si va avanti. Il
