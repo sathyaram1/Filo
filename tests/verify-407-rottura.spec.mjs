@@ -362,6 +362,58 @@ const ONLY_FIELDS = `<!doctype html><html lang="en"><head><title>1234</title></h
 <input id="q" placeholder="Search the archive">
 </div></body></html>`;
 
+// ───────────────────────────────────────────────────────────────────────────
+// F. La UI di Filo non deve inquinare il conto del "testo nuovo".
+// ───────────────────────────────────────────────────────────────────────────
+
+test('F — dopo una pagina tradotta il menu offre l’originale, non "testo nuovo"', async ({ app, openTab, testServer }) => {
+  await stubProvider(app);
+  const page = await testServer.openReady(openTab, NO_PROSE_ARTICLE);
+  await watchToasts(page);
+  await clickTranslate(page, '#body1');
+  await expect(page.locator('#title')).toHaveText(/^IT /);
+  await expect.poll(async () => (await toasts(page)).join(' | ')).toContain('Pagina tradotta');
+
+  // I nostri avvisi e i nostri menu sono comparsi nella pagina: se passassero
+  // per testo appena arrivato dal sito, il menu proporrebbe di tradurre roba
+  // che non esiste e l'utente pagherebbe un giro a vuoto.
+  await page.waitForTimeout(1200);
+  await openMenu(page, '#body1');
+  await expect(page.locator('[data-sn-icon-id="translate"]'))
+    .toHaveAttribute('aria-label', 'Mostra originale');
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// G. Resa visiva degli avvisi, tema chiaro e tema scuro.
+// ───────────────────────────────────────────────────────────────────────────
+
+for (const theme of ['light', 'dark']) {
+  test(`G — l’avviso di fine lavoro si legge sul tema ${theme}`, async ({ app, openTab, testServer }) => {
+    await stubProvider(app, { delay: 400 });
+    await app.evaluate(async (_e, t) => globalThis.SN_STORAGE.updateSettings({ theme: t }), theme);
+    const page = await testServer.openReady(openTab, SIMPLE);
+    await clickTranslate(page, '#a');
+    // Colto MENTRE lavora: è l'avviso che l'utente guarda più a lungo.
+    await expect(page.locator('.sn-toast').first()).toBeVisible();
+    await page.screenshot({ path: `tests/.shots/v407-rottura-toast-${theme}.png` }).catch(() => {});
+    const box = await page.locator('.sn-toast').first().boundingBox();
+    // Non tagliato, non fuori dallo schermo.
+    const vp = page.viewportSize() || { width: 1280, height: 800 };
+    expect(box.width).toBeGreaterThan(80);
+    expect(box.height).toBeGreaterThan(16);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(vp.width + 1);
+    // Un solo avviso alla volta: due sovrapposti nello stesso angolo sarebbero
+    // illeggibili.
+    await expect(page.locator('#a')).toHaveText(/^IT /);
+    await page.waitForTimeout(300);
+    const live = await page.evaluate(() => Array.from(document.querySelectorAll('.sn-toast'))
+      .filter((t) => !t.dataset.snClosing).length);
+    expect(live).toBeLessThanOrEqual(1);
+  });
+}
+
 test('E2 — pagina fatta di soli campi e immagini: le scritte cambiano lingua lo stesso', async ({ app, openTab, testServer }) => {
   await stubProvider(app);
   const page = await testServer.openReady(openTab, ONLY_FIELDS);
