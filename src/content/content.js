@@ -740,6 +740,8 @@
     // apertura del menu.
     const stack = deepElementsFromPoint(x, y);
     const { mediaEl, mediaUnder } = findMedia(target, stack);
+    // Cercati solo se non sono già fra gli antenati.
+    const imgUnder = imgEl ? null : findUnder(stack, 'img', target);
     return {
       linkEl,
       imgEl,
