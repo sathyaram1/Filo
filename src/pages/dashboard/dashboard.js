@@ -39,8 +39,6 @@
   const inputEl = $('input');
   const sendBtn = $('sendBtn');
   const dashDir = $('dashDir');
-  const dashEl = $('dash');
-  const mergeApprovalsEl = $('mergeApprovals');
 
   // ===== Stato locale =====
   let suggestions = [];
