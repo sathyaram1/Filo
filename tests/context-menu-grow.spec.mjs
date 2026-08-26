@@ -323,3 +323,175 @@ test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e spari
   await expect(page.locator('.sn-menu-icon-grid')).toHaveCount(0, { timeout: 3000 });
   await expect(menu).toBeVisible();
 });
+
+// --- la FINESTRA si accorcia sotto al menu ---------------------------------
+// L'altro verso dello stesso difetto: il menu sta fermo ed è la finestra a
+// perdere altezza. Prima non succedeva niente — col menu di una selezione,
+// che sopravvive apposta agli eventi di scorrimento, il menu restava esatto
+// dov'era con le ultime voci fuori dal bordo.
+
+// Cambia l'altezza della finestra e aspetta che la pagina se ne accorga.
+// Ritorna la funzione che rimette le misure di prima.
+async function accorciaFinestra(app, page, quanto) {
+  const vhPrima = await page.evaluate(() => window.innerHeight);
+  const bounds = await app.evaluate(async ({ BrowserWindow }, d) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    const b = w.getBounds();
+    w.setBounds({ ...b, height: Math.max(240, b.height - d) });
+    return b;
+  }, quanto);
+  await expect
+    .poll(async () => page.evaluate(() => window.innerHeight), { timeout: 5000 })
+    .toBeLessThan(vhPrima);
+  return async () => {
+    await app.evaluate(async ({ BrowserWindow }, b) => {
+      BrowserWindow.getAllWindows()[0].setBounds(b);
+    }, bounds);
+  };
+}
+
+// Seleziona un paragrafo: il menu che ne esce è quello che il difetto colpiva
+// per intero, perché è marcato per NON chiudersi sugli eventi di scorrimento.
+async function selezionaParagrafo(page, selettore) {
+  await page.evaluate((s) => {
+    const p = document.querySelector(s);
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }, selettore);
+}
+
+test('#500 la finestra si accorcia sotto al menu di una selezione: il menu rientra e l\'ultima voce resta cliccabile', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+    <div style="height:60vh;padding:16px">Testo in cima alla pagina.</div>
+    <p id="frase" style="padding:8px">Una frase selezionata nella metà bassa della finestra.</p>
+  </body></html>`);
+  await selezionaParagrafo(page, '#frase');
+  const menu = await apriMenuSu(page, '#frase');
+
+  const prima = await geometria(page);
+  expect(prima.menuBottom).toBeLessThanOrEqual(prima.vh);
+
+  const ripristina = await accorciaFinestra(app, page, 340);
+  try {
+    await attendiRientro(page);
+    const dopo = await geometria(page);
+    expect(dopo.error).toBeFalsy();
+    expect(dopo.menuTop).toBeGreaterThanOrEqual(0);
+    expect(dopo.menuBottom).toBeLessThanOrEqual(dopo.vh);
+    expect(dopo.ultimaBottom).toBeLessThanOrEqual(dopo.vh);
+    expect(dopo.ultimaTesto.length).toBeGreaterThan(0);
+
+    // La prova vera: Playwright rifiuta di puntare e cliccare un elemento
+    // fuori dalla finestra.
+    const ultima = menu.locator('.sn-menu-item').last();
+    await ultima.hover({ timeout: 3000 });
+    await ultima.click({ timeout: 3000 });
+    await expect(menu).toHaveCount(0);
+  } finally {
+    await ripristina();
+  }
+});
+
+test('#500 la finestra si accorcia sotto al menu di un collegamento: resta aperto e rientra', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLink());
+  const menu = await apriMenuSu(page, '#link');
+
+  const ripristina = await accorciaFinestra(app, page, 340);
+  try {
+    // Non si chiude: chi rimpicciolisce la finestra non sta chiedendo di
+    // annullare quello che stava per fare.
+    await expect(menu).toBeVisible();
+    await attendiRientro(page);
+    const dopo = await geometria(page);
+    expect(dopo.menuTop).toBeGreaterThanOrEqual(0);
+    expect(dopo.menuBottom).toBeLessThanOrEqual(dopo.vh);
+    await menu.locator('.sn-menu-item').last().hover({ timeout: 3000 });
+  } finally {
+    await ripristina();
+  }
+});
+
+test('#500 la finestra scende sotto l\'altezza del menu: il menu diventa scorrevole invece di uscire', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLink());
+  await apriMenuSu(page, '#link');
+
+  // Una spiegazione lunga: il menu arriva a riempire quasi tutta la finestra,
+  // ma ci sta ancora — niente tetto, niente barra.
+  await page.evaluate(() => {
+    const menu = document.querySelector('.sn-menu');
+    const box = menu.querySelector('.sn-menu-inline');
+    const cresci = window.innerHeight - 60 - Math.round(menu.getBoundingClientRect().height);
+    if (cresci > 0) box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) + cresci}px`;
+  });
+  await attendiRientro(page);
+  expect((await geometria(page)).scorrevole, 'il menu è già scorrevole: lo scenario non prova niente').toBe(false);
+
+  // Adesso la finestra si accorcia: quel menu non ci sta più in nessuna posa.
+  const ripristina = await accorciaFinestra(app, page, 340);
+  try {
+    await expect.poll(async () => {
+      const g = await geometria(page);
+      if (g.error) return null;
+      return { scorrevole: g.scorrevole, dentro: g.menuBottom <= g.vh && g.menuTop >= 0 };
+    }, { timeout: 5000 }).toEqual({ scorrevole: true, dentro: true });
+  } finally {
+    await ripristina();
+  }
+});
+
+// --- l'etichetta di un'icona non resta appesa a mezz'aria ------------------
+
+// Porta il puntatore su un'icona della fila in cima e aspetta l'etichetta.
+// Ritorna dove sta l'etichetta e dove sta l'icona di cui parla.
+async function mostraEtichetta(page, menu) {
+  const icona = menu.locator('.sn-menu-row-btn:not(.sn-menu-row-overflow):not(.sn-menu-row-empty)').first();
+  await expect(icona).toBeVisible();
+  const box = await icona.boundingBox();
+  await page.mouse.move(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2));
+  const etichetta = page.locator('.sn-tooltip');
+  await expect(etichetta).toBeVisible({ timeout: 3000 });
+  return { icona, etichetta };
+}
+
+test('#500 il menu scivola sotto al puntatore: l\'etichetta dell\'icona sparisce invece di restare appesa', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, paginaLink());
+  const menu = await apriMenuSu(page, '#link');
+  const { etichetta } = await mostraEtichetta(page, menu);
+
+  const menuPrima = (await geometria(page)).menuTop;
+
+  // Arriva la spiegazione: il menu scivola in su, l'icona di cui parla
+  // l'etichetta se ne va da sotto il puntatore.
+  const cresciuto = await cresciOltreIlBordo(page, 40);
+  expect(cresciuto.error).toBeFalsy();
+  await attendiRientro(page);
+  expect((await geometria(page)).menuTop, 'il menu non si è mosso: il test non prova niente')
+    .toBeLessThan(menuPrima);
+
+  await expect(etichetta).toBeHidden({ timeout: 3000 });
+});
+
+test('#500 il menu cresce senza muoversi: l\'etichetta resta, non sparisce sotto il naso', async ({ openTab, testServer }) => {
+  // Bersaglio in ALTO: il menu ha spazio sotto, cresce e resta dov'è. Qui
+  // togliere l'etichetta sarebbe un dispetto, non una correzione.
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+    <a id="link" href="${LINK}" style="display:inline-block;padding:8px">un collegamento in cima</a>
+    <div style="height:80vh"></div>
+  </body></html>`);
+  const menu = await apriMenuSu(page, '#link');
+  const { etichetta } = await mostraEtichetta(page, menu);
+
+  const prima = await geometria(page);
+  await page.evaluate(() => {
+    const box = document.querySelector('.sn-menu .sn-menu-inline');
+    box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) + 40}px`;
+  });
+  await page.waitForTimeout(400);
+
+  const dopo = await geometria(page);
+  expect(Math.abs(dopo.menuTop - prima.menuTop), 'il menu si è mosso: scenario sbagliato').toBeLessThanOrEqual(2);
+  await expect(etichetta).toBeVisible();
+});
