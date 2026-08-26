@@ -362,6 +362,44 @@ const ONLY_FIELDS = `<!doctype html><html lang="en"><head><title>1234</title></h
 <input id="q" placeholder="Search the archive">
 </div></body></html>`;
 
+test('D5 — se il modello non risponde MAI, non dice "Pagina tradotta"', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
+    const P = globalThis.SN_PROVIDERS;
+    const orig = P.completeWithFallback;
+    P.completeWithFallback = async (args) => {
+      const last = [...args.messages].reverse().find((m) => typeof m.content === 'string');
+      if (String((last && last.content) || '').indexOf('@@@SN_SEP@@@') < 0) return orig(args);
+      const e = new Error('fetch failed');
+      e.code = 'NETWORK';
+      throw e;
+    };
+  });
+  const page = await testServer.openReady(openTab, SIMPLE);
+  await watchToasts(page);
+  const before = await page.locator('#content').innerHTML();
+  await clickTranslate(page, '#a');
+
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 20000 })
+    .toContain('Non sono riuscito a tradurre la pagina');
+  const t = (await toasts(page)).join(' | ');
+  expect(t).not.toContain('Pagina tradotta');
+  // Mai il messaggio grezzo del provider.
+  expect(t).not.toContain('fetch failed');
+  // La pagina è rimasta esattamente com'era.
+  expect(await page.locator('#content').innerHTML()).toBe(before);
+  // E il menu offre ancora di riprovare.
+  await openMenu(page, '#a');
+  await expect(page.locator('[data-sn-icon-id="translate"]'))
+    .toHaveAttribute('aria-label', 'Traduci la pagina');
+});
+
 // ───────────────────────────────────────────────────────────────────────────
 // F. La UI di Filo non deve inquinare il conto del "testo nuovo".
 // ───────────────────────────────────────────────────────────────────────────
