@@ -69,8 +69,10 @@ test('#500 crescendo il menu scivola del minimo, non salta sopra al cursore', ()
 });
 
 test('#500 il menu di una scheda filmato più collegamento (655px) resta dentro', () => {
-  const primo = place({ x: 300, y: 120, w: 240, h: 600 });
-  const dopo = place({ x: 300, y: 120, w: 240, h: 655, from: { left: primo.left, top: primo.top } });
+  const primo = place({ x: 300, y: 157, w: 240, h: 600 });
+  assert.equal(primo.top, 157);
+  const dopo = place({ x: 300, y: 157, w: 240, h: 655, from: { left: primo.left, top: primo.top } });
+  assert.equal(dopo.top, VH - 655 - 8);
   assertDentro(dopo, 655);
 });
 
