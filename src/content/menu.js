@@ -506,7 +506,7 @@
           // che l'ha aperto si è spostata, e il pannello va con lei (o si
           // chiude, se la freccetta è uscita dal bordo). Anche il tooltip, che
           // parlava di un bottone che ora non è più sotto al cursore.
-          try { hideTooltip?.(); } catch (_) {}
+          try { dismissTooltip?.(); } catch (_) {}
           repositionSub();
           return;
         }
