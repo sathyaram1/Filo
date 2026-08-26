@@ -121,6 +121,7 @@
       showResultToast(result, newContentSeen);
     } finally {
       progress.close();
+      if (progressToast === progress) progressToast = null;
       // Se nel frattempo l'utente ha annullato (o ha già fatto ripartire un
       // altro giro), lo stato non è più nostro: toccarlo vorrebbe dire spegnere
       // il lavoro di qualcun altro.
