@@ -524,6 +524,85 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   `tests/context-menu-media-link.spec.mjs`,
   `tests/context-menu-video-preview-link.spec.mjs`.
 
+## Un riquadro che si riempie dopo va rimisurato dopo
+
+Menu, riquadri e tooltip di Filo contengono roba che arriva più tardi: la
+spiegazione AI di una selezione o di un link, il suggerimento del correttore, i
+metadati di una pagina. Misurare l'altezza all'apertura e non tornarci più vuol
+dire posare il riquadro su un numero che scade un secondo dopo. Il contenuto
+cresce verso il basso, il fondo esce dalla finestra, e quel che sta in coda
+resta tagliato: nel menu le ultime voci (in Filo sempre Invia feedback e Aiuto),
+nel riquadro della risposta la riga del modello e il campo dove si scrive la
+domanda successiva, cioè la fine della conversazione (#500, #502).
+
+- **Regola.** Ogni overlay posato con una misura presa dal DOM tiene un
+  `ResizeObserver` sul proprio contenitore e ripete la posa a ogni cambio
+  d'altezza, finché resta aperto. Se l'altezza non cambia non costa niente.
+- **L'osservatore non basta da solo.** La consegna del `ResizeObserver` è legata
+  al ciclo di disegno: se la finestra non sta dipingendo può arrivare molto
+  tardi (in cloud, sotto Xvfb, anche secondi). Dove si sa già cosa fa crescere il
+  riquadro, cioè l'arrivo di un pezzo di risposta, chiedi la rimisura anche lì,
+  fusa per fotogramma. L'osservatore resta la rete per tutto il resto.
+- **A muoversi sono in due, il riquadro e la finestra.** Quello che conta non è
+  che il riquadro sia cresciuto, è che il posto per stargli non basti più. Ci si
+  arriva anche dall'altro verso, con la finestra che si accorcia sotto a un
+  riquadro fermo. Il sintomo è identico, quindi il conto va rifatto uguale:
+  `ResizeObserver` sul contenitore e `resize` sulla finestra, tutti e due che
+  chiamano la stessa riposa. E il `resize` non è un buon motivo per CHIUDERE
+  l'overlay: chi rimpicciolisce la finestra non sta chiedendo di annullare
+  quello che stava per fare.
+- **Ricrescita non è prima posa.** Alla prima apertura il riquadro si ribalta
+  sopra al punto cliccato se sotto non ci sta. Ripetere quel ribaltamento a ogni
+  ricrescita lo farebbe schizzare via da sotto la mano di chi sta per cliccare.
+  Da posato in poi ci si muove del minimo: si scivola in su quanto basta a
+  rientrare, mai si salta.
+- **Rimisura pulita.** Prima di misurare togli il tetto (`max-height`) messo dal
+  giro precedente, altrimenti misuri il tetto e non il contenuto, e un riquadro
+  che si è ACCORCIATO si tiene addosso per sempre una barra di scorrimento che
+  non gli serve più. Toglilo e rimettilo nello stesso giro sincrono, così non si
+  vede nessuno sfarfallio.
+- **`max-height` non è l'altezza finale.** Morde il box scelto dal CSS, e in
+  `content-box` (il valore di partenza, quello che si prende un overlay dentro
+  una pagina qualunque) bordo e imbottitura restano fuori dal conto: il riquadro
+  resta più alto del tetto quel tanto che basta a sforare comunque. Dopo aver
+  messo il tetto rimisura e togli l'eccedenza.
+- **Zoom.** Gli overlay sono disegnati scalati per non crescere con Ctrl+/-,
+  quindi quello che occupano davvero è `offsetHeight * scala`. È quel numero a
+  dover stare dentro `innerHeight`, non l'altezza di layout.
+- **Un riquadro trascinato a mano non si sposta più da solo.** La posa è
+  diventata una scelta dell'utente, e muoverglielo sotto le dita mentre legge è
+  peggio del difetto. Quello che si può ancora fare senza spostarlo è impedirgli
+  di crescere oltre il bordo: cresce verso il basso finché tocca la fine della
+  finestra, poi scorre, e la riga del modello e il campo della domanda restano
+  dove l'utente li ha messi. L'unica eccezione è il riquadro trascinato così in
+  basso che nemmeno il minimo utile ci starebbe; lì scivolare è il male minore.
+- **Un riquadro che scorre deve trattenere lo scorrimento.** Senza
+  `overscroll-behavior: contain` il giro di rotella che arriva dopo l'ultima riga
+  passa alla pagina. La pagina scorre, e uno scroll di pagina chiude gli overlay:
+  chi legge una risposta lunga fino in fondo la perde proprio lì. Col trackpad
+  succede quasi sempre, perché l'inerzia continua da sola dopo che hai staccato
+  le dita.
+- **La prova deve essere rossa su qualunque finestra.** Uno spec che apre il
+  riquadro a metà altezza mostra il difetto solo se la finestra è abbastanza
+  bassa: su una finestra alta mille pixel il riquadro pieno ci sta comunque e il
+  test passa anche senza la cura (visto succedere, due volte su tre). Scegli il
+  punto d'ancoraggio a partire dal bordo basso, cioè da quanto spazio resta
+  sotto, mai come frazione dell'altezza.
+- **Le superfici che crescono sono due.** Il menu del tasto destro (#500) e il
+  riquadro della risposta (#502) hanno lo stesso difetto e la stessa cura: chi
+  ne sistema uno sistemi anche l'altro, o chi ha segnalato il primo incontra il
+  secondo il giorno dopo. La geometria sta in un posto solo,
+  `src/shared/overlayPlacement.js`, e si usa, non si ricopia.
+- **Dove:** `computeCap` / `computeOffset` / `computePinnedLimit` / `applyCap` /
+  `observeGrowth` in `src/shared/overlayPlacement.js`, caricato PRIMA di
+  `popup.js` e `menu.js` in `src/preload/page-preload.js` e
+  `src/preload/internal-preload.js`. Il riquadro della risposta lo usa in
+  `placePopup` / `richiediPosa` (`src/content/popup.js`); la posa del menu
+  (`src/content/menu.js`) ha ancora la sua copia, la converte il lavoro su #500.
+  Test: `tests/unit/popupPlacement.test.mjs` (geometria pura) e
+  `tests/popup-grow.spec.mjs` (il riquadro vero che cresce, resta scrivibile,
+  rientra quando la finestra si accorcia e non si muove se l'hai trascinato).
+
 ## Riquadri incorporati (iframe): Filo gira anche lì, ma un riquadro non è la pagina
 
 Le pagine vere sono piene di riquadri di altri siti: un video dentro un articolo,
