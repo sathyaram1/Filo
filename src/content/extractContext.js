@@ -467,6 +467,9 @@
     // Etichette negli attributi (#407): stessa camminata, lista separata —
     // si applicano scrivendo l'attributo, non sostituendo i figli.
     const attrs = [];
+    // Sottoalberi nascosti ADESSO (#407): non entrano nel lavoro, ma se
+    // l'utente li scopre il menu deve offrire di tradurli.
+    const hidden = [];
     let unreachable = 0;
     let truncated = 0;
     const room = () => out.length + attrs.length < maxBlocks;
