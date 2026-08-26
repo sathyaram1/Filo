@@ -610,6 +610,12 @@
         bubble.wrap.classList.add('sn-msg-error');
         popup.activePort = null;
       }
+      // #500 — ogni pezzo di risposta che arriva cambia l'altezza del riquadro:
+      // rimisurarlo qui è la via più corta, senza aspettare che il
+      // `ResizeObserver` se ne accorga (la sua consegna è legata al ciclo di
+      // disegno e può tardare). Le richieste dello stesso fotogramma si fondono
+      // in una misura sola, quindi chiamarla a ogni delta non costa.
+      richiediPosa(popup);
     });
 
     port.postMessage({
