@@ -61,18 +61,17 @@
 //
 //   La via d'uscita non è un permesso in più per questo script: il server APRE
 //   UNA RICHIESTA IN ATTESA, e l'owner la approva DENTRO FILO (l'avviso in
-//   cima alla prima schermata, o Gestione → Automazioni). Serve una persona
-//   davanti allo schermo, su una superficie diversa da questo terminale: è
-//   l'unica cosa che una sessione catturata non può procurarsi da sola.
+//   cima ai Ricevuti della dashboard di gestione). Serve una persona davanti
+//   allo schermo, su una superficie diversa da questo terminale: è l'unica
+//   cosa che una sessione catturata non può procurarsi da sola.
 //
 //   Qui i compiti sono due. DIRLO bene (messageForOwnerMerge in
 //   scripts/lib/owner-merge.mjs): l'esito porta il nome della richiesta aperta,
 //   e il messaggio nomina dove approvarla invece di fermarsi al blocco. E
-//   SUONARE IL CAMPANELLO: se Filo è già aperto — cioè quasi sempre, è il
-//   browser — la sua prima schermata non si accorgerebbe di niente, perché
-//   l'elenco lo legge solo quando la si apre. Una riga qui e l'avviso compare
-//   sotto gli occhi di chi lo sta aspettando (src/main/services/
-//   mergeApprovalSignal.js).
+//   SUONARE IL CAMPANELLO: se quella pagina è già aperta non si accorgerebbe
+//   di niente, perché l'elenco lo legge solo quando la si apre. Una riga qui e
+//   l'avviso compare sotto gli occhi di chi lo sta aspettando
+//   (src/main/services/mergeApprovalSignal.js).
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
