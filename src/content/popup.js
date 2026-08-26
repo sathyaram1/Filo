@@ -529,7 +529,7 @@
     };
 
     root.querySelector('.sn-popup-close').addEventListener('click', () => closePopup(popup));
-    attachDrag(root, root.querySelector('.sn-popup-header'));
+    attachDrag(root, root.querySelector('.sn-popup-header'), () => popup.pose?.markDragged());
 
     // Quando l'utente clicca dentro il popup, portalo in primo piano
     root.addEventListener('mousedown', () => bringToFront(popup), true);
