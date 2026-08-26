@@ -46,9 +46,11 @@ const NOTHING = `<!doctype html><html lang="en"><body style="font:16px sans-seri
 </body></html>`;
 
 // Finta traduzione nel main: "IT " davanti a ogni blocco, separatori e
-// segnaposto [[Lk]] intatti.
-async function stubTranslationProvider(app) {
-  await app.evaluate(async () => {
+// segnaposto [[Lk]] intatti. `delayMs` fa durare ogni richiesta: serve agli
+// scenari in cui conta cosa succede MENTRE la traduzione lavora (il sito che
+// allunga la pagina, l'utente che chiede l'originale a metà).
+async function stubTranslationProvider(app, delayMs = 0) {
+  await app.evaluate(async (_electron, delay) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
