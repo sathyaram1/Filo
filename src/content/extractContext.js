@@ -308,12 +308,8 @@
   // riquadro del sito restasse in lingua originale sotto un avviso che
   // dichiarava la pagina tradotta (#407).
   function isFiloOwnUi(el) {
-    const id = el.id || '';
-    if (id.indexOf('sn-') === 0 || id.indexOf('filo-') === 0) return true;
-    const cl = el.classList;
-    if (!cl || !cl.length) return false;
-    for (const c of cl) if (c.indexOf('sn-') === 0) return true;
-    return false;
+    const UI = global.SN_FILO_UI;
+    return !!(UI && UI.is(el));
   }
 
   // Due motivi diversi di saltare un sottoalbero, e la differenza conta:
