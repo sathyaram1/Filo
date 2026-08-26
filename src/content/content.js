@@ -778,17 +778,30 @@
     return false;
   }
 
-  // C'è qualcosa di DIPINTO davanti a `el`, nel punto cliccato? `stack` arriva
+  // Il rettangolo dell'elemento copre il punto cliccato? Se no, l'elemento sta
+  // nella pila per via di uno PSEUDO-ELEMENTO: il collegamento steso su tutta
+  // la scheda lo fanno quasi tutti con un `::after` a `inset:0`, e allora nella
+  // pila c'è l'`<a>` del titolo mentre il suo rettangolo sta nella colonna del
+  // testo, lontano dalla miniatura. Il rettangolo, lì, non misura la superficie
+  // di niente, e quello che l'elemento disegna lo disegna altrove.
+  function coversPoint(rect, view) {
+    if (!rect || !view) return false;
+    return view.x >= rect.left && view.x <= rect.right
+      && view.y >= rect.top && view.y <= rect.bottom;
+  }
+
+  // C'è qualcosa di DIPINTO davanti a `el`, nel punto cliccato? La pila arriva
   // da `deepElementsFromPoint`, cioè nell'ordine in cui si vedono: chi sta
   // prima sta sopra. Antenati e discendenti di `el` non contano — un antenato
   // disegna dietro al figlio, e un figlio per chi guarda È `el`.
-  function coveredAt(el, stack) {
+  function coveredAt(el, view) {
     // Senza la pila non possiamo dimostrare niente: in dubbio resta il freno
     // geometrico, cioè il comportamento di prima.
-    if (!el || !Array.isArray(stack)) return true;
-    for (const other of stack) {
+    if (!el || !Array.isArray(view?.stack)) return true;
+    for (const other of view.stack) {
       if (other === el) return false;
       if (containsAcrossShadow(el, other) || containsAcrossShadow(other, el)) continue;
+      if (!coversPoint(other.getBoundingClientRect?.(), view)) continue;
       if (paintsSomething(other)) return true;
     }
     // `el` non è nella pila sotto il cursore: non possiamo dire che si veda.
