@@ -102,6 +102,38 @@ test('#500 un menu che si ACCORCIA perde il tetto e torna intero', () => {
   assert.equal(p.cap, null);
 });
 
+// --- #500: la FINESTRA si accorcia sotto un menu fermo ---------------------
+// Lo stesso difetto preso dall'altro verso: là si allungava il menu sotto una
+// finestra ferma, qui si accorcia la finestra sotto un menu fermo. In tutti e
+// due i casi il fondo esce dal bordo e le ultime voci diventano irraggiungibili,
+// quindi il conto va rifatto uguale.
+
+test('#500 la finestra si accorcia: il menu rientra invece di restare mezzo fuori', () => {
+  const primo = posa({ x: 300, y: 400, w: 240, h: 300 });
+  assert.equal(primo.top, 400);
+  // Da 800 a 460px di altezza: dov'è, il menu sforerebbe di 248px.
+  const dopo = posa({ x: 300, y: 400, w: 240, h: 300, vh: 460, from: { left: primo.left, top: primo.top } });
+  assert.equal(dopo.top, 460 - 300 - 8);
+  assertDentro(dopo, 460);
+});
+
+test('#500 la finestra scende sotto l\'altezza del menu: tetto e scorrimento', () => {
+  const dopo = posa({ x: 300, y: 400, w: 240, h: 600, vh: 300, from: { left: 300, top: 400 } });
+  assert.equal(dopo.cap, 300 - 16);
+  assertDentro(dopo, 300);
+});
+
+test('#500 la finestra si stringe: il menu rientra anche di lato', () => {
+  const dopo = posa({ x: 900, y: 100, w: 240, h: 200, vw: 700, from: { left: 900, top: 100 } });
+  assert.equal(dopo.left, 700 - 240 - 8);
+});
+
+test('#500 rimpicciolendo la finestra il menu scivola, non si ribalta sopra al cursore', () => {
+  // Ribaltare vorrebbe dire top = 400 - 300 = 100. Scivolare è il minimo: 152.
+  const dopo = posa({ x: 300, y: 400, w: 240, h: 300, vh: 460, from: { left: 300, top: 400 } });
+  assert.equal(dopo.top, 152);
+});
+
 // --- #500: il pannello ancorato si muove col menu --------------------------
 
 // Come `placeSub()` nel browser, ma coi numeri in chiaro: un menu alto `mH`
