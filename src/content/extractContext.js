@@ -552,7 +552,16 @@
         // voce di un menu a tendina) si leggono sullo schermo e si traducono —
         // a meno che valga una barriera dura, che qui non è ancora stata
         // controllata perché il tag l'ha preceduta.
-        if (skip === 'tag') takeAttrs(el, true);
+        if (skip === 'tag') {
+          takeAttrs(el, true);
+          // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun
+          // Filo a cui passare parola, e il testo si legge da qui (#407).
+          // Nascosto o vietato dalle barriere dure resta fuori come gli altri.
+          if (!hardSkipForTranslation(el)) {
+            const inner = inlineFrameBody(el);
+            if (inner) stack.push(inner);
+          }
+        }
         // Ripiegato, in secondo piano, chiuso: si segna e si va avanti. Il
         // testo c'è già, l'utente non lo vede — tradurlo adesso vorrebbe dire
         // pagarlo per una sezione che magari non aprirà mai.
