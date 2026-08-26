@@ -432,9 +432,11 @@ Menu, popup e tooltip di Filo contengono roba che arriva **più tardi**: la
 spiegazione AI di una selezione o di un link, il suggerimento del correttore, i
 metadati di una pagina. Misurare l'altezza al momento dell'apertura e non
 tornarci più vuol dire posare il riquadro su un numero che scade un secondo
-dopo. Il contenuto cresce verso il basso, il fondo esce dalla finestra, e le
-voci in coda (in Filo sempre Invia feedback e Aiuto) restano tagliate a metà e
-non si riescono a cliccare (#500).
+dopo. Il contenuto cresce verso il basso, il fondo esce dalla finestra, e quel
+che sta in coda resta tagliato a metà: nel menu le ultime voci (in Filo sempre
+Invia feedback e Aiuto), nel riquadro della risposta la riga del modello e il
+campo dove si scrive la domanda successiva — cioè, lì, la fine della
+conversazione (#500).
 
 - **Regola.** Ogni overlay posizionato con una misura presa dal DOM tiene un
   `ResizeObserver` sul proprio contenitore e ripete la posa a ogni cambio
