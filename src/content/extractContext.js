@@ -501,6 +501,11 @@
         // a meno che valga una barriera dura, che qui non è ancora stata
         // controllata perché il tag l'ha preceduta.
         if (skip === 'tag') takeAttrs(el, true);
+        // Ripiegato, in secondo piano, chiuso: si segna e si va avanti. Il
+        // testo c'è già, l'utente non lo vede — tradurlo adesso vorrebbe dire
+        // pagarlo per una sezione che magari non aprirà mai.
+        else if (skip === 'hidden' && hidden.length < MAX_HIDDEN
+                 && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
         continue;
       }
       takeAttrs(el, false);
