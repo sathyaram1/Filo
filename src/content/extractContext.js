@@ -490,7 +490,14 @@
       if (el.matches && !el.matches(':defined')) return false;
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
-      return paintedContentProbe(el, r) !== 'self';
+      // Serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
+      // no. Il prezzo è un componente chiuso che resta fuori dal conto quando
+      // sta sotto il bordo dello schermo — l'avviso dirà "Pagina tradotta"
+      // invece di "solo in parte". Tacere su un pezzo che forse non esiste
+      // costa meno che mandare a cercare in tutta la pagina del testo che non
+      // c'è: il primo è un avviso in meno, il secondo rende inutili tutti gli
+      // altri.
+      return paintedContentProbe(el, r) === 'other';
     } catch (_) { return false; }
   }
 
