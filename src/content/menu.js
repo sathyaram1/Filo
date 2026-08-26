@@ -134,8 +134,18 @@
       visH: root.offsetHeight * scale,
       vw, vh, from,
     });
+    const primaLeft = parseFloat(root.style.left);
+    const primaTop = parseFloat(root.style.top);
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
+    // #500 — se il menu è SCIVOLATO, l'etichetta che spiegava un'icona è
+    // rimasta ferma dov'era: adesso parla di un bottone che non è più sotto al
+    // puntatore e copre le voci. Stesso trattamento che riceve quando il menu
+    // scorre. Solo se si è mosso davvero: un menu che cresce restando fermo non
+    // deve far sparire l'etichetta sotto il naso di chi la sta leggendo.
+    const mosso = (Number.isFinite(primaTop) && Math.abs(p.top - primaTop) > 0.5)
+      || (Number.isFinite(primaLeft) && Math.abs(p.left - primaLeft) > 0.5);
+    if (mosso) dismissTooltip();
     repositionSub();
   }
 
