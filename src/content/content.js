@@ -451,7 +451,7 @@
     // recuperiamola dal nodo stesso così Taglia/Copia compaiono nel menu.
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const {
-      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable,
+      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, e.clientX, e.clientY);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
@@ -460,7 +460,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -919,7 +919,7 @@
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const {
-      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable,
+      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, mouseEvent.clientX, mouseEvent.clientY);
     // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
     // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
@@ -932,7 +932,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
     });
   }
 
@@ -1240,7 +1240,7 @@
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
     });
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
@@ -1342,7 +1342,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
   }) {
     const items = [];
 
@@ -1437,7 +1437,7 @@
       // filmato è DAVVERO quello della scheda, però: dentro il collegamento
       // oppure a occuparne la superficie. Un video di sfondo che si ritrova per
       // caso un link sopra non deve intrufolarsi nel menu di quel link.
-      const mediaInLink = belongsTo(mediaUnder, linkEl) ? mediaUnder : null;
+      const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
       if (mediaInLink) {
         for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
         items.push({ type: 'separator' });
