@@ -269,13 +269,14 @@
   // ----------------------------------------------------------------
   // Drag dell'header
   // ----------------------------------------------------------------
-  function attachDrag(root, handle) {
+  function attachDrag(popup, handle) {
+    const root = popup.root;
     let dx = 0, dy = 0;
     let dragging = false;
     handle.addEventListener('mousedown', (e) => {
       if (e.target.closest('.sn-popup-close')) return;
       // Porta in primo piano il popup trascinato
-      bringToFront(rootToPopup(root));
+      bringToFront(popup);
       const rect = root.getBoundingClientRect();
       dx = e.clientX - rect.left;
       dy = e.clientY - rect.top;
@@ -287,28 +288,43 @@
     });
     function onMove(e) {
       if (!dragging) return;
+      // Da qui in poi la posa è una scelta dell'utente: Filo non lo sposta più
+      // da solo, o glielo muoverebbe sotto le dita mentre legge. Quello che
+      // continua a fare è tenerlo dentro la finestra facendolo scorrere (vedi
+      // `placePopup`). Basta questo flag anche mentre il trascinamento è in
+      // corso: da "trascinato" in poi la posa non la decide più nessun altro,
+      // quindi non serve — e sarebbe fragile — una seconda guardia legata al
+      // mouseup, che se andasse persa lascerebbe il riquadro senza tetto.
+      popup.pinned = true;
       let left = e.clientX - dx;
       let top = e.clientY - dy;
       const w = root.offsetWidth, h = root.offsetHeight;
       const vw = window.innerWidth, vh = window.innerHeight;
-      if (left < 0) left = 0;
-      if (top < 0) top = 0;
-      if (left + w > vw) left = vw - w;
-      if (top + h > vh) top = vh - h;
+      // Lo stesso margine dai bordi che tiene la posa automatica: se qui fosse
+      // zero, la rimisura successiva scosterebbe il riquadro di 8px dal punto
+      // in cui l'utente l'ha appena lasciato.
+      const g = Place.GAP;
+      if (left < g) left = g;
+      if (top < g) top = g;
+      if (left + w + g > vw) left = vw - w - g;
+      if (top + h + g > vh) top = vh - h - g;
       root.style.left = left + 'px';
       root.style.top = top + 'px';
+      // Trascinandolo in alto guadagna spazio, in basso ne perde: il tetto lo
+      // segue mentre si muove, invece di aggiustarsi con uno scatto al rilascio.
+      richiediPosa(popup);
     }
     function onUp() {
       dragging = false;
       handle.classList.remove('sn-popup-dragging');
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('mouseup', onUp, true);
+      // Adesso che l'utente ha scelto il punto, il tetto si ricalcola su
+      // quello: il riquadro resta dov'è e il corpo scorre.
+      if (popup.pinned) placePopup(popup);
     }
   }
 
-  function rootToPopup(root) {
-    return popups.find((p) => p.root === root);
-  }
   function bringToFront(popup) {
     if (!popup) return;
     const idx = popups.indexOf(popup);
@@ -342,24 +358,79 @@
   }
 
   // ----------------------------------------------------------------
-  // Posizionamento iniziale (smart, con flip ai bordi)
+  // Posizionamento (smart, con flip ai bordi) — e RIposizionamento
   // ----------------------------------------------------------------
-  function position(root, anchor) {
-    const w = 380;
-    const margin = 8;
+  // Geometria condivisa col menu del tasto destro, l'altra superficie di Filo
+  // che cresce dopo essere stata posata (`src/shared/overlayPlacement.js`).
+  const Place = global.SN_PLACE;
+
+  // Stacco fra il punto cliccato e il riquadro.
+  const BIAS = 8;
+
+  // Sotto quest'altezza il riquadro non è più un riquadro: sparirebbero la riga
+  // del modello e il campo della domanda successiva, cioè le due cose che
+  // permettono di continuare la conversazione.
+  const MIN_H = 180;
+
+  // #500 — quando il riquadro si apre è VUOTO: sta caricando, è alto un paio di
+  // centinaia di pixel. Poi la risposta arriva e lo fa crescere fino al suo
+  // tetto. Misurandolo una volta sola, il fondo finiva sotto il bordo della
+  // finestra: la riga col modello e il costo tagliata a metà, il campo della
+  // domanda successiva del tutto fuori — la conversazione si interrompeva lì.
+  //
+  // `keep: true` = il riquadro è già sullo schermo e ha cambiato altezza: si
+  // parte dalla posa corrente e si scivola in su del minimo, invece di
+  // ribaltarlo sopra al punto cliccato.
+  function placePopup(popup, opts) {
+    const root = popup.root;
     const vw = window.innerWidth, vh = window.innerHeight;
-    let left = anchor.x;
-    let top = anchor.y + 8;
-    if (left + w + margin > vw) left = vw - w - margin;
-    if (left < margin) left = margin;
-    requestAnimationFrame(() => {
-      const h = root.offsetHeight;
-      if (top + h + margin > vh) top = Math.max(margin, anchor.y - h - 8);
-      root.style.left = `${left}px`;
-      root.style.top = `${top}px`;
+
+    // Trascinato a mano: la posa è sua e non si muove più. L'unico modo di
+    // tenerlo dentro senza spostarlo è impedirgli di crescere oltre il bordo —
+    // il tetto lo ferma lì e il corpo scorre, così la riga del modello e il
+    // campo della domanda restano in vista. Se però l'utente l'ha portato così
+    // in basso che nemmeno il minimo ci starebbe, scivolare è l'unica uscita.
+    let limit;
+    const keep = !!(opts && opts.keep) || !!popup.pinned;
+    if (popup.pinned) {
+      const topOra = parseFloat(root.style.top);
+      if (Number.isFinite(topOra)) {
+        limit = Place.computePinnedLimit({
+          top: topOra, vh, scale: Place.readScale(root), min: MIN_H,
+        });
+      }
+    }
+
+    const { scale } = Place.applyCap(root, { min: MIN_H, limit });
+
+    let from = null;
+    if (keep) {
+      const l = parseFloat(root.style.left);
+      const t = parseFloat(root.style.top);
+      if (Number.isFinite(l) && Number.isFinite(t)) from = { left: l, top: t };
+    }
+    const anchor = popup.anchor || { x: Place.GAP, y: Place.GAP };
+    const p = Place.computeOffset({
+      x: anchor.x, y: anchor.y,
+      visW: root.offsetWidth * scale,
+      visH: root.offsetHeight * scale,
+      vw, vh, from, bias: BIAS,
     });
-    root.style.left = `${left}px`;
-    root.style.top = `${top}px`;
+    root.style.left = `${p.left}px`;
+    root.style.top = `${p.top}px`;
+  }
+
+  // Rimisura al prossimo fotogramma, una volta sola per quanti inviti arrivino.
+  // Il `ResizeObserver` da solo basterebbe, ma la sua consegna è legata al ciclo
+  // di disegno e può arrivare tardi; i delta della risposta invece si sa già che
+  // fanno crescere il riquadro, quindi tanto vale dirlo. Chiamarla a ogni delta
+  // non costa: le richieste dello stesso fotogramma diventano una sola misura.
+  function richiediPosa(popup) {
+    if (popup.posaInAttesa) return;
+    popup.posaInAttesa = true;
+    const giro = () => { popup.posaInAttesa = false; if (popup.root.isConnected) placePopup(popup, { keep: true }); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(giro);
+    else setTimeout(giro, 16);
   }
 
   // ----------------------------------------------------------------
@@ -369,6 +440,7 @@
     if (!popup) return;
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
+    (popup.cleanups || []).forEach((fn) => { try { fn(); } catch (_) {} });
     popup.root.remove();
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
@@ -404,10 +476,12 @@
     document.documentElement.appendChild(root);
 
     const cleanupZoom = attachZoomCompensation(root);
-    position(root, anchor);
 
     const popup = {
       root,
+      anchor: anchor || null,
+      cleanups: [],
+      pinned: false,       // l'utente l'ha trascinato: da lì in poi non si muove
       cleanupZoom,
       activePort: null,
       conversation: [],     // [{role, content}]
@@ -420,8 +494,20 @@
       sendEl: root.querySelector('.sn-popup-send'),
     };
 
+    placePopup(popup);
+
+    // #500 — il riquadro non ha un'altezza definitiva quando lo si posa: la
+    // risposta arriva a pezzi e lo fa crescere. Lo si rimisura a ogni cambio,
+    // finché resta aperto.
+    popup.cleanups.push(Place.observeGrowth(root, () => placePopup(popup, { keep: true })));
+    // Anche rimpicciolire la finestra può lasciarlo mezzo fuori: lì rientrare
+    // non è "muoverglielo sotto le dita", è l'unico modo di restare usabile.
+    const onWinResize = () => placePopup(popup, { keep: true });
+    window.addEventListener('resize', onWinResize);
+    popup.cleanups.push(() => window.removeEventListener('resize', onWinResize));
+
     root.querySelector('.sn-popup-close').addEventListener('click', () => closePopup(popup));
-    attachDrag(root, root.querySelector('.sn-popup-header'));
+    attachDrag(popup, root.querySelector('.sn-popup-header'));
 
     // Quando l'utente clicca dentro il popup, portalo in primo piano
     root.addEventListener('mousedown', () => bringToFront(popup), true);
@@ -455,6 +541,7 @@
     wrap.appendChild(text);
     popup.bodyEl.appendChild(wrap);
     popup.bodyEl.scrollTop = popup.bodyEl.scrollHeight;
+    richiediPosa(popup);
     return { wrap, text };
   }
 
@@ -530,6 +617,12 @@
         bubble.wrap.classList.add('sn-msg-error');
         popup.activePort = null;
       }
+      // #500 — ogni pezzo di risposta che arriva cambia l'altezza del riquadro:
+      // rimisurarlo qui è la via più corta, senza aspettare che il
+      // `ResizeObserver` se ne accorga (la sua consegna è legata al ciclo di
+      // disegno e può tardare). Le richieste dello stesso fotogramma si fondono
+      // in una misura sola, quindi chiamarla a ogni delta non costa.
+      richiediPosa(popup);
     });
 
     port.postMessage({
