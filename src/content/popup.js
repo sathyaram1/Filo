@@ -353,24 +353,67 @@
   }
 
   // ----------------------------------------------------------------
-  // Posizionamento iniziale (smart, con flip ai bordi)
+  // Posizionamento (smart, con flip ai bordi) — e RIposizionamento
   // ----------------------------------------------------------------
-  function position(root, anchor) {
-    const w = 380;
-    const margin = 8;
+  // Geometria condivisa col menu del tasto destro, l'altra superficie di Filo
+  // che cresce dopo essere stata posata (`src/shared/overlayPlacement.js`).
+  const Place = global.SN_PLACE;
+
+  // Stacco fra il punto cliccato e il riquadro.
+  const BIAS = 8;
+
+  // Sotto quest'altezza il riquadro non è più un riquadro: sparirebbero la riga
+  // del modello e il campo della domanda successiva, cioè le due cose che
+  // permettono di continuare la conversazione.
+  const MIN_H = 180;
+
+  // #500 — quando il riquadro si apre è VUOTO: sta caricando, è alto un paio di
+  // centinaia di pixel. Poi la risposta arriva e lo fa crescere fino al suo
+  // tetto. Misurandolo una volta sola, il fondo finiva sotto il bordo della
+  // finestra: la riga col modello e il costo tagliata a metà, il campo della
+  // domanda successiva del tutto fuori — la conversazione si interrompeva lì.
+  //
+  // `keep: true` = il riquadro è già sullo schermo e ha cambiato altezza: si
+  // parte dalla posa corrente e si scivola in su del minimo, invece di
+  // ribaltarlo sopra al punto cliccato.
+  function placePopup(popup, opts) {
+    const root = popup.root;
+    // Mentre l'utente lo trascina non gli si tocca niente.
+    if (popup.dragging) return;
     const vw = window.innerWidth, vh = window.innerHeight;
-    let left = anchor.x;
-    let top = anchor.y + 8;
-    if (left + w + margin > vw) left = vw - w - margin;
-    if (left < margin) left = margin;
-    requestAnimationFrame(() => {
-      const h = root.offsetHeight;
-      if (top + h + margin > vh) top = Math.max(margin, anchor.y - h - 8);
-      root.style.left = `${left}px`;
-      root.style.top = `${top}px`;
+
+    // Trascinato a mano: la posa è sua e non si muove più. L'unico modo di
+    // tenerlo dentro senza spostarlo è impedirgli di crescere oltre il bordo —
+    // il tetto lo ferma lì e il corpo scorre, così la riga del modello e il
+    // campo della domanda restano in vista. Se però l'utente l'ha portato così
+    // in basso che nemmeno il minimo ci starebbe, scivolare è l'unica uscita.
+    let limit;
+    const keep = !!(opts && opts.keep) || !!popup.pinned;
+    if (popup.pinned) {
+      const topOra = parseFloat(root.style.top);
+      if (Number.isFinite(topOra)) {
+        const s = Place.readScale(root);
+        limit = Math.max(MIN_H, (vh - topOra - Place.GAP) / s);
+      }
+    }
+
+    const { scale } = Place.applyCap(root, { min: MIN_H, limit });
+
+    let from = null;
+    if (keep) {
+      const l = parseFloat(root.style.left);
+      const t = parseFloat(root.style.top);
+      if (Number.isFinite(l) && Number.isFinite(t)) from = { left: l, top: t };
+    }
+    const anchor = popup.anchor || { x: Place.GAP, y: Place.GAP };
+    const p = Place.computeOffset({
+      x: anchor.x, y: anchor.y,
+      visW: root.offsetWidth * scale,
+      visH: root.offsetHeight * scale,
+      vw, vh, from, bias: BIAS,
     });
-    root.style.left = `${left}px`;
-    root.style.top = `${top}px`;
+    root.style.left = `${p.left}px`;
+    root.style.top = `${p.top}px`;
   }
 
   // ----------------------------------------------------------------
