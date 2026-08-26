@@ -57,9 +57,20 @@ test('debug stato dopo traduzione', async ({ app, openTab, testServer }) => {
     attrs: document.querySelectorAll('[data-sn-translated-attrs]').length,
   }));
   console.log('STATO:', JSON.stringify(st, null, 1));
+  await page.screenshot({ path: 'tests/.shots/tmp-debug.png' });
   await page.locator('body').first().click({ button: 'right', position: { x: 5, y: 5 } });
   const lab = await page.locator('.sn-menu [data-sn-icon-id="translate"]').getAttribute('aria-label');
   console.log('ICONA:', lab);
-  await page.keyboard.press('Escape');
+  await page.locator('.sn-menu [data-sn-icon-id="translate"]').click();
+  for (let i = 0; i < 12; i++) {
+    const t = await page.evaluate(() => Array.from(document.querySelectorAll('.sn-toast'))
+      .map((x) => x.textContent + (x.hasAttribute('data-sn-closing') ? ' [closing]' : '')));
+    console.log('t+' + (i * 300) + 'ms', JSON.stringify(t));
+    await page.waitForTimeout(300);
+  }
+  console.log('DOPO:', JSON.stringify(await page.evaluate(() => ({
+    h: document.getElementById('h').innerText,
+    ph: document.getElementById('q').getAttribute('placeholder'),
+  }))));
   expect(1).toBe(1);
 });
