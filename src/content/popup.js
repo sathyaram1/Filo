@@ -646,6 +646,7 @@
         }
         const eur = m.costEur || 0;
         popup.metaEl.textContent = `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`;
+        reflow(popup);
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
         // non i marker, così l'LLM non si confonde nei turni successivi.
         try { onAssistantDone && onAssistantDone(resolved); } catch (_) {}
