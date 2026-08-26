@@ -198,6 +198,10 @@
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_translating_page_progress: 'Traduzione pagina… %s/%s',
     toast_page_translated: 'Pagina tradotta',
+    // Il sito ha continuato ad aggiungere testo anche mentre traducevamo, e a
+    // un certo punto smettiamo di rincorrerlo: "Pagina tradotta" sarebbe di
+    // nuovo falso, con le righe nuove in inglese sotto gli occhi.
+    toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: dal tasto destro trovi «Traduci il testo nuovo».',
     // #439 — parti della pagina che NESSUNO script può leggere (i siti moderni
     // possono chiudere a chiave i propri componenti). Non si traducono, e dirlo
     // è l'unica cosa onesta: "Pagina tradotta" sarebbe falso.
