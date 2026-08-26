@@ -72,6 +72,7 @@ async function stubTranslationProvider(app, delayMs = 0) {
       // qui ci interessano SOLO quelle di traduzione pagina.
       if (prompt.indexOf('@@@SN_SEP@@@') < 0) return origComplete(args);
       globalThis.__filoTranslateCalls++;
+      if (delay > 0) await new Promise((r) => setTimeout(r, delay));
       const i = prompt.indexOf('Testo:\n\n');
       const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
       const SEP = '\n@@@SN_SEP@@@\n';
@@ -80,7 +81,7 @@ async function stubTranslationProvider(app, delayMs = 0) {
       const out = parts.map((p) => `IT ${p}`).join(SEP);
       return { text: out, provider: 'test', model: 'test-translate', usage: {} };
     };
-  });
+  }, delayMs);
 }
 
 // Raccoglie i toast man mano che compaiono (durano pochi secondi: un assert
