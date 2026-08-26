@@ -50,7 +50,11 @@ test('debug stato dopo traduzione', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, LABELS);
   await page.locator('body').first().click({ button: 'right', position: { x: 5, y: 5 } });
   await page.locator('.sn-menu [data-sn-icon-id="translate"]').click();
-  await page.waitForTimeout(4000);
+  await expect.poll(() => page.evaluate(() => {
+    const t = document.querySelector('.sn-toast:not([data-sn-closing])');
+    const x = t ? t.textContent : null;
+    return x && !/^Traduzione pagina/.test(x) ? x : null;
+  }), { timeout: 45_000 }).toMatch(/^Pagina tradotta/);
   const st = await page.evaluate(() => ({
     toasts: Array.from(document.querySelectorAll('.sn-toast')).map((t) => t.textContent),
     marked: document.querySelectorAll('[data-sn-translated]').length,
