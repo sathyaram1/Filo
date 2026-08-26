@@ -389,8 +389,9 @@
     if (popup.pinned) {
       const topOra = parseFloat(root.style.top);
       if (Number.isFinite(topOra)) {
-        const s = Place.readScale(root);
-        limit = Math.max(MIN_H, (vh - topOra - Place.GAP) / s);
+        limit = Place.computePinnedLimit({
+          top: topOra, vh, scale: Place.readScale(root), min: MIN_H,
+        });
       }
     }
 
