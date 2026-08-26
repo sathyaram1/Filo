@@ -265,6 +265,9 @@ function loadContentScripts() {
   // stessi oggetti su globalThis).
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
   safe(path.join(SHARED, 'constants.js'));
+  // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
+  // la disegnano, lo legge chi cammina sulla pagina.
+  safe(path.join(SHARED, 'filoUi.js'));
   safe(path.join(SHARED, 'i18n.js'));
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
