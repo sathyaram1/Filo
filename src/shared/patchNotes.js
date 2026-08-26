@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.203', date: '2026-08-26',
+      features: [],
+      fixes: [
+        'Il menu del tasto destro non esce più dal fondo della finestra quando la spiegazione dentro al menu finisce di caricare e si allunga: il menu si sposta da solo e l\'ultima voce resta intera e cliccabile.',
+      ],
+    },
+    {
       version: '0.2.196', date: '2026-08-08',
       features: [
         'Nuova pagina «Trasparenza»: quali modelli AI usa Filo e perché, con le fonti. La trovi anche senza connessione, e puoi chiederne conto a Filo in chat.',
