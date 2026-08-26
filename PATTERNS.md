@@ -794,6 +794,35 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   la prima non ha risposto (una barra fissa che lo taglia a metà), e si ferma
   appena una risposta arriva: righe in più non devono poter ribaltare un esito
   già certo, o la sonda diventa una votazione.
+- **"È roba mia" si MARCA alla nascita, non si indovina dal nome.** Chi cammina
+  su una pagina che non è sua deve saltare la UI che Filo ci ha disegnato dentro
+  (menu, avvisi, popup, riquadri di conferma): è già nella lingua dell'utente, e
+  tradurla vuol dire pagare il modello per riscrivere il proprio menu.
+  Riconoscerla dal nome — una classe che comincia per `sn-`, un id che comincia
+  per `filo-` — **sbaglia su siti veri**: i portali costruiti con ServiceNow
+  chiamano `sn-qualcosa` ogni loro pezzo, e "filo" è una parola italiana normale
+  in un nome. Il prezzo dell'errore non è simmetrico: un riquadro del sito
+  scambiato per nostro resta intero in lingua originale **sotto un avviso che
+  dichiara la pagina tradotta**, e nessun conteggio se ne accorge (il pezzo
+  saltato non è "rimasto fuori": è come se non esistesse). La regola è
+  `SN_FILO_UI.mark(el)` sulla **radice** di ogni pezzo di UI che attacchiamo al
+  documento, nella stessa funzione che la crea, e `SN_FILO_UI.is/inside` come
+  unica risposta alla domanda "chi l'ha disegnato". Un attributo (`data-sn-ui`),
+  non una classe: le classi le riscrive anche il sito. Vale per chiunque
+  cammini sulla pagina, non solo per la traduzione — la sentinella del testo
+  nuovo usa lo stesso marchio, o scambia i nostri avvisi per roba appena
+  arrivata dal sito.
+- **L'etichetta gemella si copia, non si ricompra.** Un link col suggerimento
+  del mouse uguale al proprio testo, un bottone a sola icona con l'etichetta di
+  accessibilità ripetuta: sono dappertutto (sulla home di un giornale sono
+  decine di frasi). Mandare al modello due volte la stessa frase costa il doppio
+  e sullo schermo non cambia niente. Quando il valore dell'attributo è identico
+  al testo che l'elemento MOSTRA, l'unità non si spedisce: si applica dopo,
+  copiando il `textContent` appena tradotto (che può venire da un figlio —
+  `<a title="…"><span>…`). Due dettagli che tengono onesto il conto: se il
+  testo non è cambiato (richiesta fallita) l'etichetta **non** si marca come
+  fatta, così la ripresa ci riprova; e la copia non entra fra le unità del giro,
+  perché non è lavoro rimasto fuori.
 - **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
   (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
