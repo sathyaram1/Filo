@@ -291,9 +291,11 @@
       // Da qui in poi la posa è una scelta dell'utente: Filo non lo sposta più
       // da solo, o glielo muoverebbe sotto le dita mentre legge. Quello che
       // continua a fare è tenerlo dentro la finestra facendolo scorrere (vedi
-      // `placePopup`).
+      // `placePopup`). Basta questo flag anche mentre il trascinamento è in
+      // corso: da "trascinato" in poi la posa non la decide più nessun altro,
+      // quindi non serve — e sarebbe fragile — una seconda guardia legata al
+      // mouseup, che se andasse persa lascerebbe il riquadro senza tetto.
       popup.pinned = true;
-      popup.dragging = true;
       let left = e.clientX - dx;
       let top = e.clientY - dy;
       const w = root.offsetWidth, h = root.offsetHeight;
