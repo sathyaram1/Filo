@@ -205,6 +205,9 @@
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     const cleanups = [];
+    // Le sezioni che si riempiono più tardi: guardate da vicino, così la
+    // rimisura parte appena il testo cambia (vedi sotto).
+    const crescite = [];
 
     for (const it of items) {
       if (it.type === 'separator') {
