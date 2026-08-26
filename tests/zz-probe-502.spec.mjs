@@ -25,10 +25,9 @@ test('probe', async ({ app, openTab }) => {
       ...globalThis.__o,
       streamComplete: async ({ onDelta }) => {
         globalThis.__called++;
-        try {
-          for (const p of pezzi) { onDelta(p); await new Promise((r) => setTimeout(r, 40)); }
-        } catch (e) { globalThis.__err = String(e && e.message || e); throw e; }
-        return { text: pezzi.join(''), usage: {} };
+        const pz = Array.from({ length: 12 }, (_, i) => 'Paragrafo ' + (i+1) + ': testo lungo di riempimento per far crescere il riquadro fino al tetto. ');
+        for (const p of pz) { onDelta(p); await new Promise((r) => setTimeout(r, 40)); }
+        return { text: pz.join(''), usage: {} };
       },
     };
   }, PEZZI);
@@ -45,7 +44,14 @@ test('probe', async ({ app, openTab }) => {
   await page.waitForTimeout(8000);
   const dump = await page.evaluate(() => {
     const r = document.querySelector('.sn-popup');
-    return r ? r.innerText : 'NO POPUP';
+    if (!r) return 'NO POPUP';
+    return {
+      inlineMaxH: r.style.maxHeight,
+      top: r.style.top,
+      hasRO: typeof ResizeObserver,
+      rect: JSON.stringify(r.getBoundingClientRect()),
+      hasAttachPose: String(window.SN_POPUP.openStreaming).slice(0, 40),
+    };
   });
   const called = await app.evaluate(() => globalThis.__called + ' err=' + globalThis.__err);
   console.log('=== CALLED:', called);

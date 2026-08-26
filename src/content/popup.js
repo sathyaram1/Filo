@@ -460,6 +460,12 @@
     vv?.addEventListener('resize', onViewport);
 
     return {
+      // Riposa SUBITO, in modo sincrono. Il ResizeObserver è la rete che prende
+      // le crescite di cui nessuno ci avvisa, ma consegna solo al passo di
+      // rendering: in una scheda in secondo piano o in una finestra nascosta
+      // quel passo è strozzato, e il riquadro resterebbe sbordato finché la
+      // pagina non torna a disegnare. Chi allunga il contenuto chiama questa.
+      reflow: apply,
       markDragged() { dragged = true; },
       dispose() {
         try { ro?.disconnect(); } catch (_) {}
