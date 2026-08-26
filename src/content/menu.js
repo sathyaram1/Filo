@@ -537,12 +537,12 @@
       if (e.key === 'Escape') close();
     };
     const onScroll = (e) => {
-      if (keepOnScroll) return;
       // Lo scroll DENTRO il menu (es. la lista scorrevole della cronologia
-      // incolla) NON deve chiudere il menu: il listener è in capture su window,
-      // quindi intercetta anche gli scroll dei discendenti. Senza questa guardia
-      // girare la rotella sulla lista chiude il box invece di scorrere gli
-      // appunti più vecchi (feedback alpha).
+      // incolla, o il menu stesso quando la spiegazione lo fa diventare più alto
+      // della finestra) NON deve chiudere il menu: il listener è in capture su
+      // window, quindi intercetta anche gli scroll dei discendenti. Senza questa
+      // guardia girare la rotella sulla lista chiude il box invece di scorrere
+      // gli appunti più vecchi (feedback alpha).
       const t = e && e.target;
       if (t && t.nodeType === 1) {
         if (root.contains(t)) {
@@ -556,6 +556,7 @@
         }
         if (activeMenu?.subRoot && activeMenu.subRoot.contains(t)) return;
       }
+      if (keepOnScroll) return;
       close();
     };
 
