@@ -729,3 +729,39 @@ test('scheda con anteprima: il riquadro parla del collegamento da qualunque punt
   const menuFascia = await rightClickAt(page, p.x, p.y);
   expect(await argomentoDelRiquadro(menuFascia)).toBe('link');
 });
+
+// Lo stesso elenco di risultati, ma il collegamento steso sulla riga è uno
+// PSEUDO-ELEMENTO (`.stretched-link::after`, come lo fa Bootstrap e con lui
+// mezzo web). Nella pila sotto il cursore finisce l'`<a>` del titolo, che però
+// ha il suo rettangolo nella colonna del testo, lontano dalla miniatura: ogni
+// conto sui rettangoli lì dice "non c'entrano niente", e la miniatura spariva
+// dal menu tale e quale.
+test('collegamento steso con uno pseudo-elemento: la miniatura resta nel menu', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/risultato-pseudo';
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><style>
+    .stretched::after { content:""; position:absolute; inset:0; z-index:1 }
+  </style></head><body style="margin:0;font:16px sans-serif">
+    <div id="riga" style="position:relative;width:760px;margin:24px;padding:12px;box-sizing:border-box;display:flex;gap:16px;align-items:flex-start">
+      <video id="clip" src="/clip.mp4" style="${MINIATURA};background:#333"></video>
+      <div>
+        <h3 style="margin:0 0 8px"><a id="lnk" class="stretched" href="${linkHref}">Il titolo del risultato</a></h3>
+        <p style="margin:0">Prima riga della descrizione del risultato.</p>
+        <p style="margin:0">Seconda riga della descrizione del risultato.</p>
+        <p style="margin:0">Terza riga della descrizione del risultato.</p>
+      </div>
+    </div>
+  </body></html>`);
+  const p = await centroDi(page, '#clip');
+  const menu = await rightClickAt(page, p.x, p.y);
+
+  for (const label of MEDIA_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});

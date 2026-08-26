@@ -449,6 +449,16 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
     misura l'ingombro del testo con un `Range` e sotto i 2 px lo considera
     assente, se no una riga di risultati con il titolo ripetuto dentro il
     collegamento-velo si comporterebbe da elemento opaco.
+  - **Un rettangolo vale come misura solo se copre il punto cliccato**
+    (`coversPoint`). Il collegamento steso sulla scheda lo fa mezzo web con uno
+    pseudo-elemento (`.stretched-link::after { inset: 0 }`): l'hit-test
+    restituisce l'`<a>` del titolo, il cui rettangolo sta nella colonna del
+    testo, lontano dalla miniatura. Ogni conto sui rettangoli lì dice "non
+    c'entrano niente" e la miniatura spariva dal menu; e nel senso opposto, quel
+    titolo contava come cosa dipinta davanti alla miniatura, che invece copre
+    solo dov'è. Quindi `sameSurface` salta la geometria quando uno dei due
+    rettangoli non copre il punto, e `coveredAt` ignora chi non è lì. Il punto
+    viaggia insieme alla pila (`view = { stack, x, y }`): sono un dato solo.
 - **Se lo dice il DOM, la geometria non ha voce in capitolo (#444).** Il freno
   serve a indovinare quando la pagina non dice niente: strati sovrapposti che
   nessuna parentela lega. Quando invece la copertina adottata sta **dentro** un

@@ -604,15 +604,15 @@
   //   <video> non compare fra gli antenati. Lo usiamo come ripiego SOLO quando
   //   non c'è altro contesto (niente selezione, immagine, link, campo di testo),
   //   così un video di sfondo non ruba il menu a ciò che sta sopra.
-  function findMedia(target, stack) {
+  function findMedia(target, view) {
     const direct = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
       ? target
       : closestAcrossShadow(target, 'video, audio');
     if (direct) return { mediaEl: direct, mediaUnder: null };
     let under = null;
-    for (const el of stack) {
+    for (const el of view.stack) {
       if (el.tagName !== 'VIDEO' && el.tagName !== 'AUDIO') continue;
-      if (!sameSurface(target, el, stack)) continue;
+      if (!sameSurface(target, el, view)) continue;
       under = el;
       break;
     }
@@ -628,10 +628,10 @@
   // stesso identico pixel dà menu diversi a seconda di quale strato ha vinto in
   // quell'istante — con l'anteprima in funzione il menu era completo, e con
   // l'anteprima ferma restava vuoto.
-  function findUnder(stack, selector, anchor) {
-    for (const el of stack) {
+  function findUnder(view, selector, anchor) {
+    for (const el of view.stack) {
       const hit = closestAcrossShadow(el, selector);
-      if (hit && sameSurface(anchor, hit, stack)) return hit;
+      if (hit && sameSurface(anchor, hit, view)) return hit;
     }
     return null;
   }
@@ -855,10 +855,12 @@
     // Un solo colpo di hit-test per tutte e tre le famiglie: è la stessa pila di
     // strati, e ripeterlo tre volte costerebbe tre risalite dell'albero a ogni
     // apertura del menu.
-    const stack = deepElementsFromPoint(x, y);
-    const { mediaEl, mediaUnder } = findMedia(target, stack);
+    // `view` = la pila PIÙ il punto: i due dati vanno sempre insieme, perché
+    // il rettangolo di un elemento vale come misura solo se copre quel punto.
+    const view = { stack: deepElementsFromPoint(x, y), x, y };
+    const { mediaEl, mediaUnder } = findMedia(target, view);
     // Cercati solo se non sono già fra gli antenati.
-    const imgUnder = imgEl ? null : findUnder(stack, 'img', target);
+    const imgUnder = imgEl ? null : findUnder(view, 'img', target);
     return {
       linkEl,
       imgEl,
@@ -872,14 +874,14 @@
       imgUnder,
       // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
       // <a>) prima ancora della pila di strati.
-      linkUnder: linkEl ? null : findLinkUnder(stack, target, mediaUnder || imgUnder),
+      linkUnder: linkEl ? null : findLinkUnder(view, target, mediaUnder || imgUnder),
       // Gli strati sotto il cursore, così come li ha visti il freno. Servono
       // più a valle per l'unica domanda che resta lì: la copertina adottata e
       // il collegamento sono la STESSA scheda? Anche quella risposta può
       // passare dal "si vede o no", e senza gli strati tornerebbe a dipendere
       // dai soli rettangoli — che sulle righe con la miniatura piccola
       // sbagliano (#444).
-      layers: stack,
+      layers: view,
       editable: isEditable(target),
     };
   }
@@ -893,9 +895,9 @@
   // titolo, quindi la geometria da sola diceva di no proprio dove la struttura
   // diceva di sì. Solo quando il DOM non lega niente si guarda la pila di strati
   // sotto il cursore, e lì il freno geometrico è l'unica cosa che regge.
-  function findLinkUnder(stack, target, contentUnder) {
+  function findLinkUnder(view, target, contentUnder) {
     const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
-    return owner || findUnder(stack, 'a[href]', target);
+    return owner || findUnder(view, 'a[href]', target);
   }
 
   function isEditable(el) {
