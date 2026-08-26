@@ -16,8 +16,12 @@ const PAGE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;p
     <summary>Open me</summary>
     <div id="detText">Ordinary text inside the collapsed section</div>
     <closed-card id="cInDetails" style="display:block;width:300px;height:50px"></closed-card>
-    <open-card id="oInDetails"></open-card>
   </details>
+
+  <div id="panel" hidden>
+    <div id="panelText">Ordinary text inside the hidden panel</div>
+    <closed-card id="cInPanel" style="display:block;width:300px;height:50px"></closed-card>
+  </div>
 
   <div style="margin-top:2000px">
     <closed-card id="cBelow" style="display:block;width:300px;height:50px"></closed-card>
@@ -31,31 +35,26 @@ const PAGE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;p
         r.innerHTML = '<h2>Locked headline</h2><p>Body nobody can read.</p>';
       }
     });
-    customElements.define('open-card', class extends HTMLElement {
-      connectedCallback() {
-        const r = this.attachShadow({ mode: 'open' });
-        r.innerHTML = '<h2 id="openTitle">Open component headline</h2>';
-      }
-    });
   </script>
 </body></html>`;
 
 test('sonda estrazione', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGE);
   const out = await page.evaluate(() => {
-    const blocks = globalThis.SN_EXTRACT.extractTranslatableBlocks();
-    const ids = [];
-    for (const b of blocks) {
-      const el = b.el;
-      ids.push((el.id || el.tagName.toLowerCase()) + ' :: ' + b.text.slice(0, 30));
-    }
-    const rects = {};
-    for (const id of ['cInDetails', 'detText', 'cCv', 'cOff', 'cBelow']) {
+    const ids = ['cVisible', 'cOff', 'cTransp', 'cVis', 'cCv', 'cNone', 'cParentTransp', 'cInDetails', 'detText', 'panelText', 'cInPanel', 'cBelow', 'belowText'];
+    const res = {};
+    for (const id of ids) {
       const el = document.getElementById(id);
+      const cs = getComputedStyle(el);
       const r = el.getBoundingClientRect();
-      rects[id] = [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height), el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })];
+      res[id] = {
+        css: [cs.display, cs.visibility, cs.opacity, cs.contentVisibility].join('/'),
+        rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+        vis: el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true }),
+      };
     }
-    return { unreachable: blocks.unreachable, count: blocks.length, ids, rects };
+    res.__doc = { scrollW: document.documentElement.scrollWidth, scrollH: document.documentElement.scrollHeight, innerW: innerWidth, innerH: innerHeight, sx: scrollX, sy: scrollY };
+    return res;
   });
-  console.log('PROBE2 ' + JSON.stringify(out, null, 1));
+  console.log('PROBE2 ' + JSON.stringify(out));
 });
