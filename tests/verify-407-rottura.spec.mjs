@@ -82,6 +82,12 @@ async function watchToasts(page) {
 const toasts = (page) => page.evaluate(() => window.__toasts || []);
 
 async function openMenu(page, anchor) {
+  // Lo scorrimento automatico di Playwright e il clic destro possono
+  // sovrapporsi su una pagina alta: le coordinate del clic restano quelle di
+  // prima dello scorrimento e l'evento cade fuori dalla pagina. Si porta
+  // l'elemento in vista, si lascia posare, poi si clicca.
+  await page.locator(anchor).first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
   await page.locator(anchor).first().click({ button: 'right', position: { x: 3, y: 3 } });
 }
 async function clickTranslate(page, anchor = 'body') {
