@@ -251,24 +251,26 @@ test('traduci → mostra originale → traduci → mostra originale: la pagina t
   await stubProvider(app);
   const page = await testServer.openReady(openTab, ARTICOLO);
   await watchToasts(page);
-  const htmlPrima = await page.evaluate(() => document.body.innerHTML);
+  // Solo i pezzi che il SITO ha scritto: la UI di Filo (menu, avvisi) vive
+  // anch'essa nel body e non c'entra col confronto.
+  const impronta = () => page.evaluate(() => ['#hd', 'nav', 'main', 'aside', 'footer']
+    .map((s) => document.querySelector(s).outerHTML).join('\n'));
+  const htmlPrima = await impronta();
   const titoloPrima = await page.title();
 
   for (let giro = 0; giro < 2; giro++) {
     await clickTranslate(page, '#p1');
     await expect(page.locator('#p1')).toHaveText(/^IT /);
-    await expect.poll(async () => (await toasts(page)).length > giro * 2, { timeout: 20000 }).toBe(true);
+    await expect.poll(async () => (await toasts(page)).some((t) => /Pagina tradotta/.test(t)), { timeout: 20000 }).toBe(true);
+    await page.evaluate(() => { window.__toasts.length = 0; });
 
     await openMenu(page, '#p1');
     expect(await translateIconLabel(page)).toBe('Mostra originale');
     await page.locator('[data-sn-icon-id="translate"]').click();
     await expect(page.locator('#p1')).not.toHaveText(/^IT /);
+    await page.waitForTimeout(300);
 
-    const htmlDopo = await page.evaluate(() => document.body.innerHTML
-      .replace(/<div[^>]*class="sn-[^"]*"[\s\S]*$/, '')
-      .replace(/ data-sn-[a-z-]+="[^"]*"/g, ''));
-    const atteso = htmlPrima.replace(/<div[^>]*class="sn-[^"]*"[\s\S]*$/, '');
-    expect(htmlDopo.trim(), `giro ${giro + 1}`).toBe(atteso.trim());
+    expect(await impronta(), `giro ${giro + 1}`).toBe(htmlPrima);
     expect(await page.title()).toBe(titoloPrima);
   }
 });
