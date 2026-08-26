@@ -582,12 +582,18 @@ domanda successiva, cioè la fine della conversazione (#500, #502).
   chi legge una risposta lunga fino in fondo la perde proprio lì. Col trackpad
   succede quasi sempre, perché l'inerzia continua da sola dopo che hai staccato
   le dita.
-- **La prova deve essere rossa su qualunque finestra.** Uno spec che apre il
-  riquadro a metà altezza mostra il difetto solo se la finestra è abbastanza
-  bassa: su una finestra alta mille pixel il riquadro pieno ci sta comunque e il
-  test passa anche senza la cura (visto succedere, due volte su tre). Scegli il
-  punto d'ancoraggio a partire dal bordo basso, cioè da quanto spazio resta
-  sotto, mai come frazione dell'altezza.
+- **La prova deve essere rossa su qualunque finestra, e va aspettata la prima
+  posa.** Due trappole, tutte e due viste dal vivo su questo difetto. La prima:
+  uno spec che apre il riquadro a metà altezza mostra il difetto solo se la
+  finestra è abbastanza bassa, perché su una finestra alta mille pixel il
+  riquadro pieno ci sta comunque. Scegli il punto d'ancoraggio a partire dal
+  bordo basso, cioè da quanto spazio resta sotto, mai come frazione
+  dell'altezza. La seconda è peggio: se la prima posa passa da un
+  `requestAnimationFrame`, sotto Xvfb quel fotogramma tarda anche più di un
+  secondo, quindi la misura unica capita a riquadro GIÀ cresciuto e il codice
+  rotto si posa giusto per caso. Prima di far arrivare la risposta aspetta due
+  `requestAnimationFrame` dentro la pagina, così il riquadro è posato da vuoto
+  come succede a chi guarda una finestra che dipinge.
 - **Le superfici che crescono sono due.** Il menu del tasto destro (#500) e il
   riquadro della risposta (#502) hanno lo stesso difetto e la stessa cura: chi
   ne sistema uno sistemi anche l'altro, o chi ha segnalato il primo incontra il
