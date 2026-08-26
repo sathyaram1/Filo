@@ -190,7 +190,11 @@ ipcRenderer.on('filo:broadcast', (_event, msg) => {
     }
   };
   const type = msg && msg.type;
-  if (IS_SUBFRAME && !contentScriptsStarted && WAKE_BROADCASTS.has(type)) {
+  // Il ritorno all'originale non sveglia nessuno: un riquadro che dorme non ha
+  // mai tradotto niente, e montarci Filo dentro per non fare nulla sarebbe
+  // lavoro pagato per niente.
+  const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore';
+  if (IS_SUBFRAME && !contentScriptsStarted && wakes) {
     ensureContentScripts();
     waitForContentScripts(deliver);
     return;
