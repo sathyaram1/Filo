@@ -13,20 +13,23 @@
 //   rende l'eccezione accettabile: una sessione catturata ha le credenziali
 //   della macchina, non le mani dell'owner sulla finestra di Filo.
 //
-// PERCHÉ UN MODULO CONDIVISO
-//   L'avviso vive in DUE posti — la prima schermata (dove l'owner lo trova
-//   senza cercarlo) e Gestione → Automazioni (dove lo va a cercare). Cammini
-//   equivalenti devono fare la stessa cosa: se il disegno e il comportamento
-//   stessero in due file, prima o poi uno dei due imparerebbe qualcosa che
-//   l'altro non sa. Qui c'è UNA costruzione, e le due pagine passano solo
-//   `onApprove`/`onDiscard`.
+// DOVE VIVE (scelta dell'owner, 2026-08-26)
+//   SOLO nella dashboard di gestione, in cima ai Ricevuti: i Ricevuti sono le
+//   cose che aspettano una decisione dell'owner, e questa È una decisione —
+//   sta lì, prima dei feedback, non su una superficie a parte. Prima l'avviso
+//   viveva anche sulla prima schermata del browser: due posti per la stessa
+//   decisione erano rumore per la home di tutti i giorni.
+//
+//   Il modulo resta separato dalla pagina perché tiene insieme le due rese —
+//   l'avviso da decidere (Ricevuti) e la traccia delle decisioni passate
+//   (Automazioni) — e la parte PURA che gli unit test coprono.
 //
 //   Le frasi che spiegano COSA è stato bloccato NON stanno qui: le manda il
 //   server, che è l'unico posto dove la tabella dei controlli vive. Questo file
 //   le mostra e basta — e se una voce arrivasse senza frase, mostra il nome
 //   grezzo invece di nascondere il blocco.
 //
-// Stile: src/styles/mergeApprovals.css (caricato da entrambe le pagine).
+// Stile: src/styles/mergeApprovals.css.
 
 (function (global) {
   'use strict';
