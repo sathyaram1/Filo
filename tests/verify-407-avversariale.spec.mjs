@@ -208,7 +208,7 @@ const snapshot = (page) => page.evaluate(() => document.body.innerHTML);
 
 async function restoreFromMenu(page, anchor) {
   const btn = await openMenu(page, anchor);
-  await expect(btn).toHaveAttribute('data-sn-icon-id', 'translate');
+  expect(await iconLabel(btn), 'l’icona non offre il ritorno all’originale').toBe('Mostra originale');
   await btn.click();
 }
 
