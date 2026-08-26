@@ -735,3 +735,220 @@ test('anche il testo che arriva dentro un componente del sito si può tradurre d
   await expect(page.locator('#srow0')).toHaveText(/^IT /, { timeout: 60000 });
   await expect(page.locator('#srow2')).toHaveText(/^IT /, { timeout: 60000 });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #407 (terzo giro) — quello che resta in lingua originale sotto un avviso che
+// dice "Pagina tradotta". Cinque strade diverse per la stessa bugia:
+//
+//  1) il testo che il sito carica MENTRE la traduzione lavora (scorrere
+//     aspettando è il comportamento normale, non il caso limite);
+//  2) il testo già nella pagina ma ripiegato quando la traduzione parte: chi
+//     lo apre dopo se lo trova in inglese, e il sito non ha aggiunto niente;
+//  3) le scritte sui bottoni dei moduli, che si leggono a occhio come il
+//     titolo della segnalazione;
+//  4) l'avviso onesto che scatta a vuoto: "tradotta solo in parte" su una
+//     pagina tradotta tutta manda l'utente a cercare inglese che non c'è;
+//  5) chiedere l'originale mentre lavora: se l'utente dice di tornare indietro,
+//     ci deve tornare e restarci.
+// ───────────────────────────────────────────────────────────────────────────
+
+// Il sito allunga la pagina NEL MOMENTO in cui la traduzione comincia a
+// sostituire testo: è quello che si vede scorrendo mentre si aspetta.
+const DURING = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A feed that keeps loading while you wait</h1>
+  <div id="feed">
+    <div class="row" id="r0">First row of the feed, written in English.</div>
+    <div class="row" id="r1">Second row of the feed, written in English.</div>
+    <div class="row" id="r2">Third row of the feed, written in English.</div>
+  </div>
+  <script>
+    const obs = new MutationObserver(() => {
+      if (!document.querySelector('[data-sn-translated]')) return;
+      obs.disconnect();
+      const feed = document.getElementById('feed');
+      for (let i = 0; i < 4; i++) {
+        const d = document.createElement('div');
+        d.id = 'dur' + i;
+        d.className = 'row';
+        d.textContent = 'Row number ' + i + ' loaded while the translation was still running.';
+        feed.appendChild(d);
+      }
+    });
+    obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+  </script>
+</body></html>`;
+
+test('il testo che arriva MENTRE traduce non resta in inglese', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app, 300);
+  const page = await testServer.openReady(openTab, DURING);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  // SUCCESSO per chi guarda lo schermo: anche le righe caricate durante
+  // l'attesa sono in italiano, senza dover ricliccare niente.
+  for (const id of ['#dur0', '#dur2', '#dur3']) {
+    await expect(page.locator(id)).toHaveText(/^IT /, { timeout: 60000 });
+  }
+  await expect(page.locator('#r0')).toHaveText(/^IT /);
+
+  // Nessun blocco pagato due volte dal giro in più.
+  const doubled = await page.evaluate(() => Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
+    .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
+  expect(doubled).toBe(0);
+
+  // E l'avviso può dire "Pagina tradotta" perché adesso è vero.
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 60000 }).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/translate-page-during.png' }).catch(() => {});
+});
+
+// Testo già presente ma RIPIEGATO quando la traduzione parte. Il sito non
+// aggiunge niente: è l'utente che lo scopre — e per lui è la stessa cosa.
+const COLLAPSED = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An article with a section folded away</h1>
+  <p id="p1">The visible paragraph of the article, long enough to be picked up.</p>
+  <button id="toggle" onclick="document.getElementById('more').hidden = false">Show more</button>
+  <div id="more" hidden>
+    <h2 id="mtitle">The headline hidden inside the folded section</h2>
+    <p id="mbody">The body of the folded section, written in English like the rest.</p>
+  </div>
+</body></html>`;
+
+test('la sezione ripiegata che si apre DOPO si traduce dal menu, senza rifare il resto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, COLLAPSED);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  const paidFirst = await blocksSent(app);
+
+  // L'utente apre la fisarmonica: dentro è tutto in lingua originale.
+  await page.locator('#toggle').click();
+  await expect(page.locator('#mtitle')).toHaveText('The headline hidden inside the folded section');
+
+  // Il menu se ne accorge e offre di tradurre quello, non di buttare via tutto.
+  await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  await page.screenshot({ path: 'tests/.shots/translate-page-revealed-menu.png' }).catch(() => {});
+  await icon.click();
+
+  await expect(page.locator('#mtitle')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect(page.locator('#mbody')).toHaveText(/^IT /, { timeout: 60000 });
+  // Al modello sono andati SOLO i due blocchi scoperti adesso.
+  expect(await blocksSent(app) - paidFirst).toBe(2);
+  const doubled = await page.evaluate(() => Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
+    .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
+  expect(doubled).toBe(0);
+});
+
+// Le scritte sui bottoni dei moduli: su <input> la scritta è `value`. La riga
+// di confine passa in mezzo agli input — si traduce ciò che si legge, mai ciò
+// che il modulo rimanda indietro (e il valore di un bottone parte solo se il
+// bottone ha un `name`).
+const FORM_BUTTONS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A page with the usual three form buttons</h1>
+  <form id="f" action="#">
+    <input id="b1" type="button" value="Show all comments">
+    <input id="b2" type="reset" value="Clear the form">
+    <input id="b3" type="submit" value="Send the message">
+    <input id="b4" type="submit" name="action" value="Save the draft">
+  </form>
+</body></html>`;
+
+const buttonValues = (page) => page.evaluate(() => ['b1', 'b2', 'b3', 'b4']
+  .map((id) => document.getElementById(id).getAttribute('value')));
+
+test('traduce anche le scritte sui bottoni dei moduli, senza toccare quel che il modulo invia', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FORM_BUTTONS);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#head');
+
+  await expect(page.locator('#head')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await buttonValues(page))[0], { timeout: 30000 }).toMatch(/^IT /);
+
+  const after = await buttonValues(page);
+  expect(after[0]).toBe('IT Show all comments');   // apre qualcosa nella pagina
+  expect(after[1]).toBe('IT Clear the form');      // azzera il modulo
+  expect(after[2]).toBe('IT Send the message');    // invia, ma senza `name`: non parte niente
+  // Con un `name`, quel valore è un dato che il sito riceve: non si tocca.
+  expect(after[3]).toBe('Save the draft');
+  await page.screenshot({ path: 'tests/.shots/translate-page-buttons.png' }).catch(() => {});
+
+  // E "Mostra originale" le rimette com'erano.
+  await clickTranslateIcon(page, '#head');
+  await expect(page.locator('#head')).toHaveText('A page with the usual three form buttons');
+  expect(await buttonValues(page)).toEqual(['Show all comments', 'Clear the form', 'Send the message', 'Save the draft']);
+});
+
+// Elementi col trattino nel nome che non nascondono NIENTE: un separatore
+// disegnato in CSS e uno spaziatore registrato ma vuoto. Su una pagina così
+// "tradotta solo in parte" manda l'utente a cercare inglese che non esiste.
+const DECOR = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A page with a decorative divider between the paragraphs</h1>
+  <p id="p1">First paragraph of the page, long enough to be picked up by the translation.</p>
+  <x-divider></x-divider>
+  <fancy-spacer></fancy-spacer>
+  <p id="p2">Second paragraph of the page, also long enough to be picked up.</p>
+  <style>
+    x-divider { display:block; width:600px; height:40px; background:#ccc; }
+    fancy-spacer { display:block; width:600px; height:60px; }
+  </style>
+  <script>customElements.define('fancy-spacer', class extends HTMLElement {});</script>
+</body></html>`;
+
+test('un separatore decorativo non fa dire "tradotta solo in parte" a una pagina tradotta tutta', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, DECOR);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#p2')).toHaveText(/^IT /);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  // Il falso allarme al contrario: non c'è niente di chiuso, e non va detto.
+  expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
+});
+
+// Pagina abbastanza grande da tenere occupate più richieste: serve a chiedere
+// l'originale MENTRE il lavoro è ancora in volo.
+const SLOW = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A long English article used to stop a translation halfway</h1>
+  ${Array.from({ length: 60 }, (_, i) => `<p id="q${i}">Paragraph number ${i} of an article written to be long: it exists so that the translation needs many separate requests, one after the other, and stays busy long enough for someone to change their mind while it is still working on the rest of the page.</p>`).join('\n  ')}
+</body></html>`;
+
+test('chiedere l’originale mentre traduce: la pagina torna indietro e ci RESTA', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app, 1200);
+  const page = await testServer.openReady(openTab, SLOW);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#q0');
+
+  // Il lavoro è cominciato: qualcosa è già in italiano, il resto è per strada.
+  await expect.poll(() => translatedCount(page), { timeout: 60000 }).toBeGreaterThan(0);
+
+  // A lavoro in corso l'icona serve a fermare: aprire il menu e trovare solo
+  // "Traduci la pagina" (che non fa niente) sarebbe un vicolo cieco.
+  await page.locator('#q0').click({ button: 'right', position: { x: 5, y: 5 } });
+  const icon = page.locator('[data-sn-icon-id="translate"]');
+  await expect(icon).toHaveAttribute('aria-label', 'Mostra originale');
+  await icon.click();
+
+  // Torna in inglese subito…
+  await expect.poll(() => translatedCount(page), { timeout: 15000 }).toBe(0);
+  // …e ci resta: il lavoro rimasto in volo non si scarica addosso alla pagina.
+  await page.waitForTimeout(8000);
+  expect(await translatedCount(page)).toBe(0);
+  await expect(page.locator('#q0')).toHaveText(/^Paragraph number 0 /);
+  await expect(page.locator('#head')).toHaveText('A long English article used to stop a translation halfway');
+  // E nessuno dichiara finito un lavoro che l'utente ha fermato.
+  expect((await toasts(page)).join(' | ')).not.toContain('Pagina tradotta');
+
+  // Tornati all'originale, l'icona ripropone "Traduci".
+  await page.locator('#q0').click({ button: 'right', position: { x: 5, y: 5 } });
+  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Traduci');
+});

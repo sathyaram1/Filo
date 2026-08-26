@@ -107,13 +107,18 @@
       showResultToast(result, newContentSeen);
     } finally {
       progress.close();
-      pageTranslating = false;
-      // Nessuna traduzione in piedi: niente da continuare, e nessun motivo di
-      // tenere una sentinella addosso alla pagina.
-      if (!pageHasTranslation) {
-        stopWatchingNewContent();
-        newContentSeen = false;
-        hiddenSkipped = [];
+      // Se nel frattempo l'utente ha annullato (o ha già fatto ripartire un
+      // altro giro), lo stato non è più nostro: toccarlo vorrebbe dire spegnere
+      // il lavoro di qualcun altro.
+      if (myRun === runSeq) {
+        pageTranslating = false;
+        // Nessuna traduzione in piedi: niente da continuare, e nessun motivo di
+        // tenere una sentinella addosso alla pagina.
+        if (!pageHasTranslation) {
+          stopWatchingNewContent();
+          newContentSeen = false;
+          hiddenSkipped = [];
+        }
       }
     }
   }
