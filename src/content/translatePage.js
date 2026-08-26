@@ -350,8 +350,10 @@
   // L'esito, detto all'utente. `moreArrived` è l'unica cosa che chi ha fatto il
   // lavoro non può sapere: il sito ha continuato ad aggiungere testo anche
   // durante l'ultimo giro, e noi abbiamo smesso di rincorrerlo.
-  function showResultToast(result, moreArrived) {
+  function showResultToast(result, moreArrived, frames) {
     if (!result) return;
+    const framesLeft = (frames && frames.left) || 0;
+    const framesApplied = (frames && frames.applied) || 0;
     switch (result.kind) {
       case 'batch':
         Popup.showToast(I18n.t('toast_page_translate_batch', result.applied, result.total), { duration: 7000 });
