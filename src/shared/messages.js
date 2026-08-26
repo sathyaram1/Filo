@@ -525,6 +525,12 @@
     // l'albero dei frame: una postMessage la saprebbe scrivere anche il sito, e
     // si ritroverebbe a comandare la traduzione dentro un riquadro altrui.
     // { mode: 'translate'|'restore', runId } — lo manda il SOLO frame principale.
+    //
+    // ORIGINE: chiamabile anche da una pagina web (è il content script a
+    // mandarlo) — di proposito, e senza gate, come RUN_IN_TOP_FRAME. Non legge
+    // dati, non tocca il disco e non aziona il sistema: inoltra un messaggio ai
+    // frame DELLA STESSA SCHEDA, e non porta dati arbitrari (una parola fra due,
+    // e un numero di giro che il mittente stesso ha scelto).
     TRANSLATE_FRAMES: 'translate_frames',
     // Il riquadro riferisce alla pagina che lo ospita: prima che si è fatto
     // vivo (`ack`, con quanti riquadri ospita a sua volta), poi com'è finita
