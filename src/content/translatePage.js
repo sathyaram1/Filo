@@ -93,6 +93,7 @@
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
     const progress = Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
+    progressToast = progress;
     // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è il
     // comportamento normale, e il testo che il sito carica in quei secondi è
     // testo che l'utente vede restare in lingua originale. Le nostre
