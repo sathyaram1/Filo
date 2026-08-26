@@ -218,6 +218,9 @@
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
+    // Fermata prima che cambiasse qualcosa sullo schermo: "Originale
+    // ripristinato" parlerebbe di un ritorno che non c'è stato.
+    toast_translation_cancelled: 'Traduzione annullata',
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_open_weights_violated:
       'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',
