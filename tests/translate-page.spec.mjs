@@ -963,6 +963,41 @@ test('decorazioni fuori dallo schermo o trasparenti ai clic: la pagina è tradot
   expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
 });
 
+// L'altra metà della stessa regola: dove il cursore ARRIVA, la prova si fa e
+// l'avviso onesto deve uscire lo stesso. Qui un componente chiuso ha la fascia
+// centrale coperta da una barra del sito — è il punto dove la sonda guardava, e
+// guardando solo lì si sarebbe arresa proprio su un pezzo che è davvero rimasto
+// in lingua originale.
+const COMPONENTE_COPERTO = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A plain heading outside any component</h1>
+  <div class="wrap"><closed-card></closed-card><div class="bar"></div></div>
+  <style>
+    .wrap { position:relative; width:600px; }
+    .bar { position:absolute; left:0; top:40%; width:100%; height:20%; background:#333; }
+  </style>
+  <script>
+    customElements.define('closed-card', class extends HTMLElement {
+      connectedCallback() {
+        const r = this.attachShadow({ mode: 'closed' });
+        r.innerHTML = '<h2>Headline locked inside a closed component</h2>'
+          + '<p>Body text nobody outside the component can read.</p>';
+      }
+    });
+  </script>
+</body></html>`;
+
+test('componente chiuso con la fascia centrale coperta: l’avviso onesto esce lo stesso', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, COMPONENTE_COPERTO);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /, { timeout: 30000 });
+  const partial = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
+
 // Pagina abbastanza grande da tenere occupate più richieste: serve a chiedere
 // l'originale MENTRE il lavoro è ancora in volo.
 const SLOW = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
