@@ -593,11 +593,19 @@
   // "Mostra originale" (che butterebbe via anche la parte già tradotta e
   // pagata).
   function isPartial() { return pageHasTranslation && !pageComplete; }
-  // Traduzione completa, ma il sito ha aggiunto testo dopo: c'è ancora lavoro da
-  // fare e il menu deve offrirlo. Senza questo, l'unica strada era tornare
-  // all'originale e ripagare l'intera pagina per avere in italiano tre righe
-  // nuove.
-  function hasNewContent() { return pageHasTranslation && pageComplete && newContentSeen; }
+  // Traduzione completa, ma sullo schermo c'è del testo in lingua originale che
+  // il lavoro non ha toccato. Due strade diverse, per l'utente identiche: il
+  // sito l'ha AGGIUNTO (scorrimento infinito, schermate che cambiano senza
+  // ricaricare), oppure era già lì e lui l'ha SCOPERTO aprendo una fisarmonica,
+  // una scheda, un "leggi tutto". In entrambi i casi il menu deve offrire di
+  // tradurlo: senza, l'unica strada era tornare all'originale e ripagare
+  // l'intera pagina per avere in italiano tre righe.
+  function hasNewContent() {
+    if (!pageHasTranslation || !pageComplete) return false;
+    if (newContentSeen) return true;
+    return !!(Extract && typeof Extract.hasRevealedText === 'function'
+      && Extract.hasRevealedText(hiddenSkipped));
+  }
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
   function canContinue() { return isPartial() || hasNewContent(); }
