@@ -927,6 +927,42 @@ test('un separatore decorativo non fa dire "tradotta solo in parte" a una pagina
   expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
 });
 
+// Gli stessi elementi vuoti, nei due posti dove il cursore non arriva: sotto il
+// bordo dello schermo (qualsiasi pagina più lunga di una schermata) e trasparenti
+// ai clic (come sono disegnate quasi tutte le icone e le decorazioni). Lì la
+// prova non si può fare, e "non lo so" non è "è un componente chiuso": la pagina
+// è tutta in italiano, e l'avviso deve dirlo.
+const DECOR_FUORI_PORTATA = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A page with decorative components out of the cursor reach</h1>
+  <p id="p1">First paragraph of the page, long enough to be picked up by the translation.</p>
+  <fancy-spacer id="ghost"></fancy-spacer>
+  <div style="height:4000px"></div>
+  <p id="p2">Second paragraph of the page, also long enough to be picked up.</p>
+  <fancy-spacer id="below"></fancy-spacer>
+  <style>
+    fancy-spacer { display:block; width:120px; height:40px; background:#ccc; }
+    #ghost { pointer-events:none; }
+  </style>
+  <script>customElements.define('fancy-spacer', class extends HTMLElement {});</script>
+</body></html>`;
+
+test('decorazioni fuori dallo schermo o trasparenti ai clic: la pagina è tradotta e l’avviso lo dice', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, DECOR_FUORI_PORTATA);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  // Non è rimasto fuori niente: tutto il testo della pagina è in italiano.
+  await expect(page.locator('#head')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#p1')).toHaveText(/^IT /);
+  await expect(page.locator('#p2')).toHaveText(/^IT /);
+
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  // La bugia rovesciata: mandare a cercare in tutta la pagina dell'inglese che
+  // non esiste brucia l'avviso anche per la volta che dirà il vero.
+  expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
+});
+
 // Pagina abbastanza grande da tenere occupate più richieste: serve a chiedere
 // l'originale MENTRE il lavoro è ancora in volo.
 const SLOW = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
