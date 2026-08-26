@@ -202,6 +202,18 @@ describe('la provenienza della richiesta', () => {
     assert.doesNotMatch(UI.originLabel({ origin: 'routine' }), /#/);
   });
 
+  test('il cancelletto è uno solo, comunque il server mandi il numero', () => {
+    // Il server manda il numero a volte nudo ("444") e a volte già col
+    // cancelletto ("#444"): la richiesta vera del 2026-08-26 stampava
+    // "feedback ##444". La normalizzazione sta in un punto solo (feedbackNum),
+    // così anche chi confronta col numero della lista confronta la stessa cosa.
+    assert.equal(UI.feedbackNum({ num: '#444' }), '444');
+    assert.equal(UI.feedbackNum({ num: '444' }), '444');
+    assert.equal(UI.feedbackNum({}), '');
+    assert.doesNotMatch(UI.originLabel({ origin: 'routine', num: '#444' }), /##/);
+    assert.match(UI.originLabel({ origin: 'routine', num: '444' }), /feedback #444/);
+  });
+
   test('origine assente = lavoro locale: è il caso storico, non un "non si sa"', () => {
     for (const req of [{}, null, undefined, { origin: '' }, { origin: 'qualunque cosa' }]) {
       assert.equal(UI.originOf(req), 'locale', JSON.stringify(req));
