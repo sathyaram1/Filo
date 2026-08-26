@@ -656,6 +656,12 @@
   // Una richiesta al modello, con un ritentativo dopo un attimo: un errore
   // singolo (rete, rate limit) non deve lasciare mezza pagina non tradotta.
   async function requestTranslation(chunk) {
+    // Il modello ha risposto, ma senza testo: la richiesta è partita e la
+    // risposta è tornata, quindi non c'è nessun guasto da raccontare. Chi legge
+    // l'avviso deve trovarci "alcuni blocchi sono tornati vuoti dal modello",
+    // non un "qualcosa è andato storto, riprova" che non dice niente e
+    // contraddice la riga dopo, dove si spiega come riprendere.
+    let answeredEmpty = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt) await new Promise((r) => setTimeout(r, 1200));
       let res = null;
@@ -669,7 +675,8 @@
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };
       }
       if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text };
-      if (attempt) return { ok: false, error: errFrom(res) };
+      answeredEmpty = !!(res && res.ok);
+      if (attempt) return { ok: false, error: answeredEmpty ? null : errFrom(res) };
     }
     return { ok: false, error: errFrom(null) };
   }
