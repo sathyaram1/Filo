@@ -783,7 +783,9 @@
   // prima sta sopra. Antenati e discendenti di `el` non contano — un antenato
   // disegna dietro al figlio, e un figlio per chi guarda È `el`.
   function coveredAt(el, stack) {
-    if (!el || !Array.isArray(stack)) return false;
+    // Senza la pila non possiamo dimostrare niente: in dubbio resta il freno
+    // geometrico, cioè il comportamento di prima.
+    if (!el || !Array.isArray(stack)) return true;
     for (const other of stack) {
       if (other === el) return false;
       if (containsAcrossShadow(el, other) || containsAcrossShadow(other, el)) continue;
