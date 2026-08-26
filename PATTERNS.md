@@ -421,6 +421,34 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   (0.35, con margine largo da tutt'e due le parti). Quando allarghi un freno,
   cerca la grandezza che distingue davvero i due casi: alzare i pixel di
   tolleranza avrebbe solo spostato il confine di qualche scheda.
+- **Ci sono due cose opposte con la stessa forma: lì la geometria non può
+  decidere, e la domanda vera è se si VEDE (#444).** La riga di un elenco di
+  risultati — miniatura piccola a sinistra, titolo e tre righe di descrizione a
+  destra, il collegamento della riga steso sopra a tutto — ha lo stesso ingombro
+  di una barra fissa sopra un titolo scivolato sotto: un rettangolo largo quanto
+  la pagina che ne circonda uno piccolo. Nessuna soglia di area li separa, e
+  infatti `CONTAINER_MIN_RATIO` cadeva esattamente in mezzo: su una riga larga
+  760 i comandi del filmato sparivano con miniature alte 101 e 160, tornavano da
+  220 in su — cioè quasi mai, perché le miniature vere dei risultati e dei feed
+  stanno tutte sotto. Quello che distingue i due casi non è una misura: sopra la
+  miniatura c'è un collegamento invisibile, sopra il titolo sepolto c'è una barra
+  opaca. Quindi il freno ha una **seconda prova, che vale da sola**: se fra il
+  punto cliccato e il candidato non c'è niente di **dipinto**, il candidato è
+  esattamente quello che l'utente sta guardando (`coveredAt` scorre la pila di
+  `deepElementsFromPoint` fino al candidato — chi sta prima sta sopra — e chiede
+  a `paintsSomething` se qualcuno disegna: sfondo, immagine di sfondo, bordo,
+  ombra, tag che si disegna da sé, o testo che si vede davvero). Le due prove
+  stanno in OR dentro `sameSurface`: la geometria dice "stessa scala, stessa
+  scheda", la visibilità dice "è lì sotto gli occhi". Nessuna delle due copre
+  l'altra — un velo con la sfumatura del titolo dipinge eccome, e passa per
+  geometria.
+  - `paintsSomething` guarda l'elemento intero, non il pixel: il paragrafo
+    cliccato di fianco all'ultima parola dipinge lo stesso, altrimenti il manto
+    invisibile steso sulla pagina tornava nel menu.
+  - Il testo dei lettori di schermo è ritagliato a un pixel: `hasVisibleText`
+    misura l'ingombro del testo con un `Range` e sotto i 2 px lo considera
+    assente, se no una riga di risultati con il titolo ripetuto dentro il
+    collegamento-velo si comporterebbe da elemento opaco.
 - **Se lo dice il DOM, la geometria non ha voce in capitolo (#444).** Il freno
   serve a indovinare quando la pagina non dice niente: strati sovrapposti che
   nessuna parentela lega. Quando invece la copertina adottata sta **dentro** un
