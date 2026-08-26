@@ -457,9 +457,28 @@ non si riescono a cliccare (#500).
 - **Zoom.** Il menu è disegnato scalato per non crescere con Ctrl+/-, quindi
   quello che occupa davvero è `offsetHeight * scala`. È quel numero a dover
   stare dentro `innerHeight`, non l'altezza di layout.
-- **Dove:** `computeCap` / `computeOffset` / `place` in `src/content/menu.js`.
-  Test: `tests/unit/menuPlacement.test.mjs` (geometria pura),
-  `tests/context-menu-grow.spec.mjs` (il menu vero che cresce).
+- **Chi è appeso al riquadro si muove col riquadro.** Un pannello ancorato (la
+  griglia "Altro…", la cronologia incolla, un sotto-menu) viene posato una volta
+  e poi il menu gli si muove sotto: scivola perché la spiegazione è arrivata,
+  oppure scorre perché è più alto della finestra. Se il pannello resta fermo si
+  stacca dalla freccetta che l'ha aperto e galleggia sopra alle voci. Quindi la
+  posa del pannello è una funzione richiamabile, non un calcolo fatto una volta
+  all'apertura, e la si richiama a ogni riposizionamento e a ogni scorrimento
+  del menu. Se l'ancora è scorsa fuori dal bordo del menu non c'è più niente a
+  cui stare attaccati: il pannello si chiude. Stessa regola per il tooltip, che
+  dopo uno scorrimento parla di un bottone che non è più sotto al cursore.
+- **Un riquadro che scorre deve trattenere lo scorrimento.** Senza
+  `overscroll-behavior: contain` il giro di rotella che arriva dopo l'ultima riga
+  passa alla pagina, la pagina scorre e uno scroll di pagina chiude il menu: chi
+  legge fino in fondo una spiegazione lunga perde il menu proprio lì. Col
+  trackpad succede quasi sempre, perché l'inerzia continua da sola dopo che hai
+  staccato le dita. Vale per ogni contenitore scorrevole dentro un overlay
+  (`.sn-menu-history-list` e chiunque altro).
+- **Dove:** `computeCap` / `computeOffset` / `computeSubOffset` / `place` /
+  `repositionSub` in `src/content/menu.js`. Test:
+  `tests/unit/menuPlacement.test.mjs` (geometria pura),
+  `tests/context-menu-grow.spec.mjs` (il menu vero che cresce, scorre e si
+  porta dietro il pannello).
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
