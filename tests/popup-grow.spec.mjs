@@ -214,3 +214,65 @@ test('#500 dopo che l\'utente l\'ha trascinato, il riquadro non si sposta più d
   await campo.fill('e adesso?');
   await expect(campo).toHaveValue('e adesso?');
 });
+
+// --- la FINESTRA si accorcia sotto al riquadro -----------------------------
+// L'altro verso dello stesso difetto: il riquadro sta fermo ed è la finestra a
+// perdere altezza. Il fondo esce dal bordo esattamente come quando è il
+// riquadro a crescere, quindi il conto va rifatto uguale.
+
+// Il ridimensionamento della finestra arriva solo alla scheda ATTIVA: una in
+// secondo piano ha i bounds azzerati e continua a raccontare la misura vecchia.
+// Di `filo://newtab/` ne esiste già una all'avvio, quindi la scheda che stiamo
+// pilotando non è per forza quella in primo piano: la marchiamo col titolo e
+// chiediamo alla shell di portarla davanti.
+async function portaInPrimoPiano(shell, page) {
+  const marchio = `filo-test-${Date.now()}`;
+  await page.evaluate((t) => { document.title = t; }, marchio);
+  await expect.poll(async () => shell.evaluate(async (t) => {
+    const s = await window.filoShell.tabs.snapshot();
+    const tab = s.tabs.find((x) => x.title === t);
+    if (!tab) return 'scheda non trovata';
+    if (s.activeId === tab.id) return 'in primo piano';
+    await window.filoShell.tabs.activate(tab.id);
+    return 'la sto attivando';
+  }, marchio), { timeout: 5000 }).toBe('in primo piano');
+}
+
+test('#500 la finestra si accorcia sotto al riquadro: rientra e resta scrivibile', async ({ app, shell, openTab }) => {
+  const page = await paginaFresca(openTab);
+  await portaInPrimoPiano(shell, page);
+
+  await apriRiquadro(page, 0.45);
+  await rispostaArriva(page, 14);
+  await attendiRientro(page);
+  const prima = await geometria(page);
+  expect(prima.bottom).toBeLessThanOrEqual(prima.vh);
+
+  const bounds = await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    const b = w.getBounds();
+    w.setBounds({ ...b, height: Math.max(240, b.height - 340) });
+    return b;
+  });
+  try {
+    await expect
+      .poll(async () => page.evaluate(() => window.innerHeight), { timeout: 5000 })
+      .toBeLessThan(prima.vh);
+    await attendiRientro(page);
+
+    const dopo = await geometria(page);
+    expect(dopo.top).toBeGreaterThanOrEqual(0);
+    expect(dopo.bottom).toBeLessThanOrEqual(dopo.vh);
+    expect(dopo.metaBottom).toBeLessThanOrEqual(dopo.vh);
+
+    // La prova vera: la conversazione continua.
+    const campo = page.locator('.sn-popup-input');
+    await campo.click({ timeout: 3000 });
+    await campo.fill('e in una finestra piccola?');
+    await expect(campo).toHaveValue('e in una finestra piccola?');
+  } finally {
+    await app.evaluate(async ({ BrowserWindow }, b) => {
+      BrowserWindow.getAllWindows()[0].setBounds(b);
+    }, bounds);
+  }
+});
