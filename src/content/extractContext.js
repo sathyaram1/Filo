@@ -398,20 +398,38 @@
 
   // 'self' = lì dentro non c'è niente · 'other' = c'è qualcosa che non
   // raggiungiamo · 'unknown' = non si può dire (fuori schermo, o coperto).
+  function probePoint(el, x, y) {
+    // Il punto deve colpire proprio lui: sotto un menu fisso o un riquadro
+    // sovrapposto misureremmo l'elemento sbagliato.
+    if (document.elementFromPoint(x, y) !== el) return 'unknown';
+    const node = document.caretPositionFromPoint
+      ? (document.caretPositionFromPoint(x, y) || {}).offsetNode
+      : (document.caretRangeFromPoint ? (document.caretRangeFromPoint(x, y) || {}).startContainer : null);
+    if (!node) return 'unknown';
+    return node === el ? 'self' : 'other';
+  }
+
   function paintedContentProbe(el, rect) {
     try {
-      const x = rect.left + rect.width / 2;
-      const y = rect.top + rect.height / 2;
-      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return 'unknown';
-      // Il punto deve colpire proprio lui: sotto un menu fisso o un riquadro
-      // sovrapposto misureremmo l'elemento sbagliato.
-      const hit = document.elementFromPoint(x, y);
-      if (hit !== el) return 'unknown';
-      const node = document.caretPositionFromPoint
-        ? (document.caretPositionFromPoint(x, y) || {}).offsetNode
-        : (document.caretRangeFromPoint ? (document.caretRangeFromPoint(x, y) || {}).startContainer : null);
-      if (!node) return 'unknown';
-      return node === el ? 'self' : 'other';
+      // Solo la parte che sta davvero sullo schermo: fuori dal riquadro visibile
+      // non si può colpire niente, e la prova non si può fare.
+      const x0 = Math.max(rect.left, 0);
+      const x1 = Math.min(rect.right, window.innerWidth);
+      const y0 = Math.max(rect.top, 0);
+      const y1 = Math.min(rect.bottom, window.innerHeight);
+      if (x1 - x0 < 2 || y1 - y0 < 2) return 'unknown';
+      const y = (y0 + y1) / 2;
+      const w = x1 - x0;
+      let seen = 'unknown';
+      // Tre punti invece di uno: basta che UNO cada nel vuoto perché lì dentro
+      // non ci sia niente di nascosto, mentre un pezzo di UI sovrapposto o un
+      // bordo arrotondato rovinerebbero il punto singolo.
+      for (const x of [x0 + w / 2, x0 + w * 0.25, x0 + w * 0.75]) {
+        const r = probePoint(el, x, y);
+        if (r === 'self') return 'self';
+        if (r === 'other') seen = 'other';
+      }
+      return seen;
     } catch (_) { return 'unknown'; }
   }
 
