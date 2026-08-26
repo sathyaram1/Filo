@@ -17,6 +17,12 @@
 // chi stava leggendo fino in fondo); e il pannello ancorato a una sua voce
 // (la griglia "Altro…") deve muoversi insieme a lui, o chiudersi quando la
 // voce a cui è appeso scorre via.
+//
+// Lo stesso difetto ha un secondo verso, in fondo al file: non è il menu ad
+// allungarsi ma la FINESTRA ad accorciarsi sotto di lui. Il fondo esce dal
+// bordo esattamente allo stesso modo, e il conto va rifatto uguale. Con lui
+// viaggia l'etichetta che spiega un'icona: se il menu le scivola via da sotto,
+// l'etichetta parla di un bottone che non è più lì e va tolta.
 
 import { test, expect } from './fixtures/electron.mjs';
 
