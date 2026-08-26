@@ -2294,61 +2294,11 @@
       isOwner = false;
       applyAccountProfile(null);
     }
-    refreshMergeApprovals();
   }
 
-  // ===== Fusioni in attesa del via libera (SPEC-RIDISEGNO-MAX.md §10) =====
-  //
-  // I controlli di sicurezza del server fermano le fusioni che toccano le parti
-  // protette. Il lavoro locale dell'owner ci finisce quasi sempre, e senza
-  // questa superficie non avrebbe nessuna strada per arrivare agli utenti: sul
-  // ramo principale scrive solo il server, e il server vuole un via libera dato
-  // da una persona — non dal terminale da cui è partita la richiesta.
-  //
-  // DUE CONDIZIONI PER VEDERLO, entrambe necessarie: essere il proprietario, e
-  // avere davvero qualcosa in attesa. Per tutti gli altri (e per l'owner nei
-  // giorni normali) questa parte della home non esiste: nessun riquadro vuoto,
-  // nessuna riga che scende.
-  //
-  // Il disegno e i comandi vengono dal modulo condiviso con Gestione →
-  // Automazioni: i due cammini devono fare la stessa identica cosa.
-  //
-  // `already` è l'elenco già pronto, quando ad avvisare è stato il main
-  // (MERGE_APPROVALS_CHANGED): una richiesta nuova arriva mentre la schermata è
-  // già aperta, e il dato viaggia col messaggio. Senza, se lo va a prendere lei
-  // — è il cammino di quando la pagina si apre o cambia l'account.
-  async function refreshMergeApprovals(already) {
-    const host = mergeApprovalsEl;
-    const UI = self.SN_MERGE_APPROVALS;
-    if (!host || !UI) return 0;
-    const spegni = () => {
-      host.replaceChildren();
-      host.hidden = true;
-      if (dashEl) dashEl.classList.remove('dash--notice');
-      return 0;
-    };
-    if (!isOwner) return spegni();
-    let r = already || null;
-    try {
-      if (!r) r = await send({ type: MSG.MERGE_APPROVALS_GET });
-    } catch (_) {
-      // Il server non risponde: non è il posto per dirlo. Chi ha una fusione in
-      // sospeso lo scopre dal terminale, e riempire la home di un errore che
-      // non si può risolvere da qui sarebbe rumore.
-      return spegni();
-    }
-    if (!r || r.ok === false) return spegni();
-    const n = UI.render(host, {
-      requests: r.pending || [],
-      // Dopo un esito buono la lista si rilegge: la richiesta appena decisa non
-      // deve restare lì a farsi ricliccare.
-      onDone: () => { setTimeout(refreshMergeApprovals, 1200); },
-      onApprove: (req) => send({ type: MSG.MERGE_APPROVAL_APPROVE, id: req.id }),
-      onDiscard: (req) => send({ type: MSG.MERGE_APPROVAL_DISCARD, id: req.id }),
-    });
-    if (dashEl) dashEl.classList.toggle('dash--notice', n > 0);
-    return n;
-  }
+  // Le fusioni in attesa del via libera dell'owner NON compaiono più qui: la
+  // decisione vive in cima ai Ricevuti della dashboard di gestione, insieme
+  // alle altre cose che aspettano lui (scelta owner 2026-08-26).
 
   // ===== Recap aggiornamento (C4) =====
   // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
