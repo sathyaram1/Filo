@@ -38,7 +38,7 @@
       document.removeEventListener('mousedown', activeMenu.onDocClick, true);
       document.removeEventListener('keydown', activeMenu.onKey, true);
       window.removeEventListener('scroll', activeMenu.onScroll, true);
-      window.removeEventListener('resize', activeMenu.onScroll, true);
+      window.removeEventListener('resize', activeMenu.onResize, true);
       try { activeMenu.cleanupZoom?.(); } catch (_) {}
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
       activeMenu = null;
