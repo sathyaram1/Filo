@@ -71,6 +71,17 @@
   // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
   // appena riportato indietro (#407).
   let runSeq = 0;
+  // L'avviso "sto traducendo" del giro in corso. Serve a chi lo FERMA: le
+  // richieste già spedite tornano quando vogliono, e finché non tornano il
+  // riquadro "Traduzione pagina in corso…" resterebbe sullo schermo accanto a
+  // "Traduzione annullata". Una cosa che si ferma deve sembrare ferma subito.
+  let progressToast = null;
+
+  function closeProgressToast() {
+    if (!progressToast) return;
+    try { progressToast.close(); } catch (_) {}
+    progressToast = null;
+  }
 
   async function translatePage() {
     // Riclic mentre traduce: l'avviso "in corso" è già sullo schermo (dura
