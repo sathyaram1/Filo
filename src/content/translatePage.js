@@ -233,6 +233,11 @@
     const doneBefore = Extract.findTranslatedElements();
     const already = doneBefore.length + Number(doneBefore.attrCount || 0);
     const units = [];
+    // Il nome della scheda in alto, per primo: è la prima riga di lingua
+    // originale che l'utente incontra ed è l'ultima che restava in inglese su
+    // una pagina per il resto tutta tradotta.
+    const title = titleUnit(myRun);
+    if (title) units.push(title);
     for (const b of blocks) {
       if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
       const { templated, refs } = templateizeBlock(b.el);
