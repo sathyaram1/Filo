@@ -18,7 +18,7 @@
     {
       version: '0.2.198', date: '2026-08-22',
       fixes: [
-        'Nelle home dei siti di video, nei social e negli elenchi di articoli il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link». Prima su molte schede quelle voci mancavano, e mentre sulla copertina partiva l\'anteprima animata sparivano del tutto: per aprire la scheda in una nuova tab dovevi spostare il mouse e aspettare.',
+        'Nelle home dei siti di video, nei social e nelle pagine di risultati il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» insieme ai comandi della copertina, anche mentre parte l\'anteprima animata. Prima il menu cambiava a seconda di come il sito aveva costruito la scheda, e quasi sempre metà delle voci non c\'era.',
       ],
     },
     {
