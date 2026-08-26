@@ -1,11 +1,32 @@
-// Il caso "non fa nulla" più comune per un utente vero: il modello non è
-// raggiungibile (nessuna chiave, chiave rifiutata, rete giù). Filo deve DIRLO.
+// Sonde finali: quali pezzi di una pagina VERA restano in lingua originale
+// mentre l'avviso dice "Pagina tradotta", e quanto testo viene spedito due volte.
 import { test, expect } from './fixtures/electron.mjs';
 
-const PAGE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:24px">
-  <h1 id="t">An English headline</h1>
-  <p id="p">A paragraph of English body text, long enough to be worth translating.</p>
-</body></html>`;
+async function stub(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { gemini: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
+      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+    });
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__sent = [];
+    const orig = P.completeWithFallback;
+    P.completeWithFallback = async (args) => {
+      const last = [...args.messages].reverse().find((m) => typeof m.content === 'string');
+      const prompt = (last && last.content) || '';
+      if (prompt.indexOf('@@@SN_SEP@@@') < 0) return orig(args);
+      const i = prompt.indexOf('Testo:\n\n');
+      const chunk = i >= 0 ? prompt.slice(i + 'Testo:\n\n'.length) : '';
+      const SEP = '\n@@@SN_SEP@@@\n';
+      const parts = chunk.split(/\n?@@@SN_SEP@@@\n?/);
+      for (const p of parts) globalThis.__sent.push(p);
+      return { text: parts.map((p) => `IT ${p}`).join(SEP), provider: 'test', model: 'test-translate', usage: {} };
+    };
+  });
+}
 
 async function watchToasts(page) {
   await page.evaluate(() => {
@@ -18,59 +39,58 @@ async function watchToasts(page) {
   });
 }
 
-async function openMenu(page, anchor) {
+async function translate(page, anchor) {
   const el = page.locator(anchor).first();
   await el.evaluate((n) => n.scrollIntoView({ block: 'center' }));
   await page.waitForTimeout(150);
   await el.click({ button: 'right', position: { x: 5, y: 5 } });
   const btn = page.locator('[data-sn-icon-id="translate"]');
   await expect(btn).toBeVisible();
-  return btn;
+  await btn.click();
 }
 
-test('nessuna chiave configurata: cosa vede l’utente', async ({ app, openTab, testServer }) => {
-  await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: {} });
-  });
-  const page = await testServer.openReady(openTab, PAGE);
+// Un portale aziendale che usa il prefisso di classe "sn-" per i propri
+// componenti (ServiceNow lo fa davvero) e un id che comincia per "filo-".
+const PREFIXES = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:24px">
+  <h1 id="ok">A headline that should change language</h1>
+  <div class="sn-card"><h2 id="snTitle">Incident summary for this request</h2>
+    <p id="snBody">The description of the incident, written in English by the portal.</p></div>
+  <div id="filo-thread"><p id="filoBody">A discussion thread rendered by the portal.</p></div>
+  <div class="notranslate" id="nt">Brand name kept as is by the site</div>
+</body></html>`;
+
+test('sonda: prefissi di classe/id che Filo scambia per la propria UI', async ({ app, openTab, testServer }) => {
+  await stub(app);
+  const page = await testServer.openReady(openTab, PREFIXES);
   await watchToasts(page);
-  const btn = await openMenu(page, '#p');
-  await btn.click();
-  await page.waitForTimeout(9000);
-  console.log('SENZA CHIAVE toast:', JSON.stringify(await page.evaluate(() => window.__toasts)));
-  console.log('SENZA CHIAVE testo:', await page.locator('#t').textContent());
-  const btn2 = await openMenu(page, '#p');
-  console.log('SENZA CHIAVE etichetta dopo:', await btn2.getAttribute('aria-label'));
-  await page.screenshot({ path: 'tests/.shots/407-senza-chiave.png' });
+  await translate(page, '#ok');
+  await expect(page.locator('#ok')).toHaveText(/^IT /);
+  await page.waitForTimeout(1200);
+  console.log('PREFIXES:', JSON.stringify({
+    ok: await page.locator('#ok').textContent(),
+    snTitle: await page.locator('#snTitle').textContent(),
+    snBody: await page.locator('#snBody').textContent(),
+    filoBody: await page.locator('#filoBody').textContent(),
+    nt: await page.locator('#nt').textContent(),
+    toasts: await page.evaluate(() => window.__toasts),
+  }, null, 1));
+  await page.screenshot({ path: 'tests/.shots/407-prefissi.png' });
 });
 
-test('chiave rifiutata dal provider: cosa vede l’utente', async ({ app, openTab, testServer }) => {
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
-    });
-    const P = globalThis.SN_PROVIDERS;
-    const orig = P.completeWithFallback;
-    P.completeWithFallback = async (args) => {
-      const last = [...args.messages].reverse().find((m) => typeof m.content === 'string');
-      if (String(last?.content || '').indexOf('@@@SN_SEP@@@') < 0) return orig(args);
-      const e = new Error('API key not valid');
-      e.code = 'AUTH';
-      e.status = 401;
-      throw e;
-    };
-  });
-  const page = await testServer.openReady(openTab, PAGE);
+// Attributi che ripetono il testo già visibile: si pagano due volte?
+const DUP = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:24px">
+  <a id="a1" href="#x" title="Read more about the final match">Read more about the final match</a>
+  <button id="b1" aria-label="Close the newsletter box">Close the newsletter box</button>
+  <p id="p1">A paragraph of ordinary body text to keep the page realistic.</p>
+</body></html>`;
+
+test('sonda: testo mandato due volte (attributo uguale al testo visibile)', async ({ app, openTab, testServer }) => {
+  await stub(app);
+  const page = await testServer.openReady(openTab, DUP);
   await watchToasts(page);
-  const btn = await openMenu(page, '#p');
-  await btn.click();
-  await page.waitForTimeout(9000);
-  console.log('CHIAVE KO toast:', JSON.stringify(await page.evaluate(() => window.__toasts)));
-  const btn2 = await openMenu(page, '#p');
-  console.log('CHIAVE KO etichetta dopo:', await btn2.getAttribute('aria-label'));
-  await page.screenshot({ path: 'tests/.shots/407-chiave-ko.png' });
+  await translate(page, '#p1');
+  await expect(page.locator('#p1')).toHaveText(/^IT /);
+  await page.waitForTimeout(1000);
+  const sent = await app.evaluate(() => globalThis.__sent);
+  console.log('DUP blocchi spediti:', JSON.stringify(sent, null, 1));
 });
