@@ -336,8 +336,37 @@
   function isVisibilityHidden(el) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
     if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
-    const cs = window.getComputedStyle(el);
+    // La finestra dell'elemento, non la nostra: da quando la traduzione entra
+    // nei riquadri senza indirizzo (#407) qui arrivano elementi di un ALTRO
+    // documento, e chiederne lo stile alla finestra sbagliata non risponde di
+    // loro.
+    const cs = viewOf(el).getComputedStyle(el);
     return cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse';
+  }
+
+  function viewOf(el) {
+    try {
+      const doc = el.ownerDocument;
+      return (doc && doc.defaultView) || window;
+    } catch (_) { return window; }
+  }
+
+  // Un riquadro incorporato SENZA indirizzo proprio: `about:blank` o `srcdoc`,
+  // riempito dalla pagina che lo ospita (i riquadri pubblicitari e parecchi
+  // widget nascono così). Dentro questi documenti il preload non entra, quindi
+  // non c'è nessun Filo a cui passare parola: il testo lo prende chi ospita,
+  // che è della stessa origine e ci arriva. Un riquadro con un indirizzo vero
+  // NON si apre da qui — ha il suo content script e traduce da sé, e leggerlo
+  // anche da fuori vorrebbe dire pagare due volte lo stesso testo.
+  function inlineFrameBody(el) {
+    try {
+      const tag = (el.tagName || '').toUpperCase();
+      if (tag !== 'IFRAME' && tag !== 'FRAME') return null;
+      const win = el.contentWindow;
+      if (!win || win.location.protocol !== 'about:') return null;
+      const doc = el.contentDocument;
+      return (doc && doc.body) || null;
+    } catch (_) { return null; }   // altra origine: da qui non si legge
   }
 
   // Un pezzo di pagina segnato come nascosto che ADESSO si vede, con del testo
