@@ -98,11 +98,13 @@ test.describe('avviso fusioni in attesa', () => {
     await page.evaluate(() => window.__mgTest.setTab('inbox'));
     await expect(avviso).toBeVisible();
 
-    // Il numero apre la segnalazione: si arriva al dettaglio del #444.
+    // Il numero apre la segnalazione: si apre il dettaglio proprio del #444
+    // (selezione in lista sul feedback giusto + il suo testo nel dettaglio).
     await origine.click();
     const dettaglio = page.locator('#mgDetail');
     await expect(dettaglio).toBeVisible();
-    await expect(page.locator('#mgDetailHead')).toContainText('#444');
+    await expect(page.locator('.mg-item--selected')).toHaveAttribute('data-id', 'fb444');
+    await expect(page.locator('#mgThread')).toContainText('Segnalazione che ha generato il lavoro');
     await page.screenshot({ path: join(OUT, 'verifica-fusioni-dettaglio.png') });
   });
 
