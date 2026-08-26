@@ -451,6 +451,15 @@ conversazione (#500).
   sistema uno sistemi anche l'altro, o chi ha segnalato il primo incontra il
   secondo il giorno dopo (#500). La geometria sta in un posto solo,
   `src/shared/overlayPlacement.js`; menu e riquadro la usano, non la ricopiano.
+- **A muoversi sono in due: il riquadro e la finestra.** Quello che conta non è
+  che il riquadro sia cresciuto, è che il posto per stargli non basti più — e ci
+  si arriva anche dall'altro verso, con la finestra che si accorcia sotto a un
+  riquadro fermo (o l'area della pagina che si accorcia da sola: un riquadro
+  incorporato che cambia misura, una barra che compare). Il sintomo è identico,
+  quindi il conto va rifatto uguale: `ResizeObserver` sul contenitore **e**
+  `resize` sulla finestra, tutti e due che chiamano la stessa riposa. E il
+  `resize` non è un buon motivo per CHIUDERE l'overlay: chi rimpicciolisce la
+  finestra non sta chiedendo di annullare quello che stava per fare.
 - **Ricrescita ≠ prima posa.** Alla prima apertura il menu si **ribalta** sopra
   al cursore se sotto non ci sta. Ripetere quel ribaltamento a ogni ricrescita
   farebbe schizzare via il menu da sotto la mano proprio mentre l'utente sta per
