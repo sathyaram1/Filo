@@ -67,12 +67,23 @@ async function watchToasts(page) {
 
 const toasts = (page) => page.evaluate(() => window.__toasts || []);
 
+// NB: Playwright, se deve PRIMA scorrere e POI cliccare nella stessa azione,
+// manda il contextmenu a coordinate ormai vecchie e il menu non si apre (è un
+// limite del pilota, non dell'app: scorrendo prima a parte il menu esce). Da
+// qui lo scorrimento esplicito prima di ogni tasto destro.
 async function openMenu(page, anchor = 'body') {
-  await page.locator(anchor).first().click({ button: 'right', position: { x: 5, y: 5 } });
+  const el = page.locator(anchor).first();
+  await el.evaluate((n) => n.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(150);
+  await el.click({ button: 'right', position: { x: 5, y: 5 } });
   const btn = page.locator('[data-sn-icon-id="translate"]');
   await expect(btn).toBeVisible();
   return btn;
 }
+
+// L'etichetta dell'icona dice a che stato è la traduzione: "Traduci",
+// "Mostra originale", "Riprendi traduzione", "Traduci il testo nuovo".
+const iconLabel = (btn) => btn.getAttribute('aria-label');
 
 async function clickTranslateIcon(page, anchor = 'body') {
   const btn = await openMenu(page, anchor);
