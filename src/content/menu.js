@@ -30,7 +30,7 @@
   let activeMenu = null;
 
   function close() {
-    try { hideTooltip?.(); } catch (_) {}
+    try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
     if (activeMenu) {
       activeMenu.root.remove();
