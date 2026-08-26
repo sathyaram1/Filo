@@ -407,3 +407,145 @@ test('sfumatura sul titolo (solo il fondo della copertina): il menu resta quello
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
     .toBe(linkHref);
 });
+
+// ---------------------------------------------------------------------------
+// La scheda con un bordo, o con l'imbottitura fra il bordo e la copertina. È la
+// forma più comune degli elenchi di schede, e per il freno geometrico era
+// indistinguibile da una barra fissa: il collegamento circonda la copertina da
+// tutti e quattro i lati, quindi «la inghiotte», quindi via le quattro voci del
+// collegamento. Su quei siti chi ha segnalato ritrovava il problema tale e
+// quale — la scheda irraggiungibile col tasto destro, con l'anteprima in
+// funzione e con l'anteprima ferma.
+// ---------------------------------------------------------------------------
+
+// Misure del rilievo: scheda 344×264, collegamento steso su tutta la scheda,
+// copertina rientrata di dodici pixel.
+function schedaConImbottituraHtml(linkHref, copertina) {
+  return `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="card" style="position:relative;width:344px;height:264px;background:#fff;border:1px solid #ddd;box-sizing:border-box">
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;display:block"></a>
+      ${copertina}
+    </div>
+  </body></html>`;
+}
+
+const COPERTINA_INSET = 'position:absolute;left:12px;top:12px;width:320px;height:240px';
+
+test('scheda con imbottitura attorno alla copertina: l\'anteprima porta anche le voci del collegamento', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, schedaConImbottituraHtml(
+    'https://example.com/scheda-con-bordo',
+    `<video id="clip" src="/clip.mp4" style="${COPERTINA_INSET};background:#333"></video>`,
+  ));
+  const menu = await openMenuOn(page, '#clip');
+  await page.screenshot({ path: 'tests/.shots/context-menu-scheda-con-imbottitura.png' }).catch(() => {});
+
+  for (const label of MEDIA_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+});
+
+test('scheda con imbottitura: "Copia URL" copia l\'indirizzo della scheda', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/scheda-con-bordo-url';
+  const page = await testServer.openReady(openTab, schedaConImbottituraHtml(
+    linkHref,
+    `<video id="clip" src="/clip.mp4" style="${COPERTINA_INSET};background:#333"></video>`,
+  ));
+  const menu = await openMenuOn(page, '#clip');
+
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+test('scheda con imbottitura, anteprima ferma: la copertina dà lo stesso menu', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/scheda-con-bordo-ferma';
+  const page = await testServer.openReady(openTab, schedaConImbottituraHtml(
+    linkHref,
+    `<img id="cover" src="${PX}" style="${COPERTINA_INSET};background:#e07b39">`,
+  ));
+  const menu = await openMenuOn(page, '#cover');
+
+  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+// ---------------------------------------------------------------------------
+// Il caso in cui non c'è niente da indovinare: la copertina sta DENTRO il
+// collegamento nella struttura della pagina — la pagina ha già detto che sono
+// la stessa scheda — e sopra c'è la striscia del titolo, che nel collegamento
+// non ci sta. Il menu buttava via quell'informazione per rifare il conto sui
+// rettangoli, e con l'imbottitura in mezzo il conto diceva di no.
+// ---------------------------------------------------------------------------
+
+function copertinaNelLinkConStrisciaHtml(linkHref, copertina) {
+  return `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="card" style="position:relative;width:344px;height:264px">
+      <a id="lnk" href="${linkHref}" style="position:absolute;inset:0;padding:12px;display:block;box-sizing:border-box">
+        ${copertina}
+      </a>
+      <span id="striscia" style="${COPERTINA_INSET};display:flex;align-items:flex-end;color:#fff;background:rgba(0,0,0,.001)">Il titolo della scheda</span>
+    </div>
+  </body></html>`;
+}
+
+test('copertina dentro il collegamento, striscia del titolo sopra: le voci del collegamento restano', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/scheda-striscia';
+  const page = await testServer.openReady(openTab, copertinaNelLinkConStrisciaHtml(
+    linkHref,
+    '<video id="clip" src="/clip.mp4" style="width:100%;height:100%;background:#333"></video>',
+  ));
+  const menu = await openMenuOn(page, '#striscia');
+  await page.screenshot({ path: 'tests/.shots/context-menu-striscia-titolo.png' }).catch(() => {});
+
+  for (const label of MEDIA_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'video' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+test('copertina ferma dentro il collegamento, striscia del titolo sopra: idem', async ({ app, openTab, testServer }) => {
+  const linkHref = 'https://example.com/scheda-striscia-ferma';
+  const page = await testServer.openReady(openTab, copertinaNelLinkConStrisciaHtml(
+    linkHref,
+    `<img id="cover" src="${PX}" style="width:100%;height:100%;background:#e07b39">`,
+  ));
+  const menu = await openMenuOn(page, '#striscia');
+
+  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+  await menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' }).first().click();
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 8000 })
+    .toBe(linkHref);
+});
+
+// Il contenitore che abbraccia passa, la copertura che si trova sotto una
+// scheda intera no: un riquadro grande come mezza pagina sopra una scheda-link
+// non è il suo bordo, anche se la circonda da tutte le parti.
+test('un riquadro molto più grande sopra una scheda-link non si porta dietro le voci del link', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+    <a id="scheda" href="https://example.com/scheda-sepolta" style="position:absolute;left:200px;top:200px;width:200px;height:120px;background:#f0e6d8;display:block"></a>
+    <div id="pannello" style="position:fixed;left:0;top:0;width:100%;height:520px;background:#fffdf8;border:1px solid #333;z-index:9">Iscriviti</div>
+  </body></html>`);
+  const menu = await rightClickAt(page, 300, 260);
+
+  await expectNessunaVoceDelLink(menu);
+});

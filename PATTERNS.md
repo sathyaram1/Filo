@@ -402,13 +402,25 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   l'utente, e a ogni clic destro parte l'analisi del link, che va a scaricare
   quell'indirizzo. Il freno è `sameSurface` e misura l'elemento **davvero
   cliccato** contro il candidato, con due condizioni: si sovrappongono per almeno
-  metà del più piccolo, e nessuno dei due sfora l'altro **da tutte le parti**. Un
-  velo che sta dentro l'ingombro della scheda passa, per esempio la sfumatura sul
-  titolo di una copertina: è allineato con lei su almeno un lato. Una barra, un
-  riquadro modale o un manto inghiottono da ogni lato quello che coprono, e non
-  passano. Il freno sta in un posto solo, `detectContext`: i tre `*Under` escono
-  da lì già vagliati, così nessun ramo a valle può dimenticarsene. Era già
-  successo: il controllo c'era per due casi su tre.
+  metà del più piccolo, e nessuno dei due **inghiotte** l'altro. Il freno sta in
+  un posto solo, `detectContext`: i tre `*Under` escono da lì già vagliati, così
+  nessun ramo a valle può dimenticarsene. Era già successo: il controllo c'era
+  per due casi su tre.
+- **Inghiottire non è contenere: circondare da tutte le parti non basta a dire
+  di no (#444).** La prima versione del freno scartava il candidato appena
+  sforava l'elemento cliccato su tutti e quattro i lati. Ma è esattamente la
+  forma della scheda con un bordo, o con l'imbottitura fra il bordo e la
+  copertina — mezzo web — e su quelle schede le quattro voci del collegamento
+  sparivano di nuovo, col filmatino in funzione e da fermo. La differenza fra un
+  contenitore e una copertura è la **scala**, non il numero di lati: un
+  contenitore abbraccia quello che tiene (la copertina rientrata di dodici pixel
+  riempie l'85% della scheda; anche la scheda che si tiene dentro il titolo resta
+  sopra alla metà), mentre una barra fissa, un riquadro dei cookie o un manto
+  sono grandi come la finestra e nascondono una riga di poche parole — sotto al
+  5% di sé. `swallows` = circonda **e** l'altro sta sotto a `CONTAINER_MIN_RATIO`
+  (0.35, con margine largo da tutt'e due le parti). Quando allarghi un freno,
+  cerca la grandezza che distingue davvero i due casi: alzare i pixel di
+  tolleranza avrebbe solo spostato il confine di qualche scheda.
 - **Il ripiego vale per la famiglia da SOLA, non solo in coppia (#444).** Finché
   il ripiego esisteva solo dentro i rami "media + link" e "immagine + link", lo
   stesso identico pixel dava due esiti opposti a seconda dello strato che vinceva
