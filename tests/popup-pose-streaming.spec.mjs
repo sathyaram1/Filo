@@ -37,6 +37,9 @@ async function preparaProvider(app) {
     globalThis.SN_PROVIDER_GEMINI = {
       ...globalThis.__origGemPose,
       streamComplete: async ({ onDelta }) => {
+        // Attesa iniziale come quella vera di un modello: è la finestra in cui
+        // il riquadro sta aperto e vuoto, e in cui l'utente può spostarlo.
+        await new Promise((r) => setTimeout(r, 1200));
         for (const p of pezzi) {
           onDelta(p);
           await new Promise((r) => setTimeout(r, 40));
