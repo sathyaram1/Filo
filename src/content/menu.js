@@ -51,6 +51,8 @@
     if (!activeMenu?.subRoot) return;
     activeMenu.subRoot.remove();
     activeMenu.subRoot = null;
+    activeMenu.subAnchor = null;
+    activeMenu.subMode = null;
     activeMenu.subLocked = false;
     activeMenu.subOwner = null;
   }
