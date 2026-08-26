@@ -24,6 +24,13 @@
 
   const CHUNK_SIZE = 3000;      // caratteri per richiesta
   const CONCURRENCY = 3;        // richieste in parallelo (l'attesa è attrito)
+  // Giri di lavoro in un colpo solo. Sulle pagine che si allungano mentre le
+  // scorri il testo nuovo arriva PROPRIO mentre traduciamo: fermarsi al primo
+  // giro vuol dire lasciarlo in lingua originale sotto un avviso che dichiara
+  // finito (#407). Il tetto esiste perché su un sito che carica all'infinito
+  // rincorrerlo non finirebbe mai: dopo, se ne è arrivato dell'altro, lo dice e
+  // il menu offre di prenderlo.
+  const MAX_PASSES = 3;
   const MAX_SPLIT_DEPTH = 4;    // bisezione massima quando il modello sballa i separatori
   const SEPARATOR = '\n@@@SN_SEP@@@\n';
   const SEP_RE = /\n?@@@\s*SN_SEP\s*@@@\n?/;
