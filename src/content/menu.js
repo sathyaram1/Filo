@@ -233,6 +233,12 @@
         el.className = 'sn-menu-inline';
         if (it.content) el.textContent = it.content;
         root.appendChild(el);
+        // #500 — è questa sezione che cresce quando la spiegazione arriva. Il
+        // `ResizeObserver` sul menu se ne accorge comunque, ma la sua consegna
+        // è legata al ciclo di disegno e può tardare; guardare direttamente il
+        // contenuto è la via più corta, e non serve che chi lo riempie sappia
+        // di doverlo dire.
+        crescite.push(el);
         if (typeof it.onMount === 'function') {
           try {
             const cleanup = it.onMount(el);
