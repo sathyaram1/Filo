@@ -282,8 +282,8 @@ test('#500 la spiegazione fa scivolare il menu: il pannello delle altre icone sc
   // Il menu si è mosso davvero (senza, il resto non proverebbe niente)…
   expect(dopo.menuTop).toBeLessThan(prima.menuTop);
   // …e il pannello si è mosso con lui: stessa distanza dalla freccetta di prima.
-  expect(dopo.pannelloAperto).toBe(true);
-  expect(dopo.pannelloTop - dopo.ancoraTop).toBe(prima.pannelloTop - prima.ancoraTop);
+  restaAttaccato(prima, dopo);
+  expect(dopo.pannelloTop).toBeLessThan(prima.pannelloTop);
 });
 
 test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e sparisce con lei', async ({ openTab, testServer }) => {
