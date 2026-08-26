@@ -304,6 +304,52 @@
     return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
   }
 
+  // `closest()` si ferma al confine del componente: da dentro uno shadow root
+  // NON vede gli antenati in chiaro. Sui siti moderni la copertina di una scheda
+  // è quasi sempre un componente web (`<video>` dentro lo shadow root) infilato
+  // dentro l'`<a>` della scheda: `realTarget` ci porta al filmato vero, ma poi
+  // `target.closest('a[href]')` risaliva fino alla radice del componente e
+  // tornava null — il collegamento spariva dal menu (#444). Questa versione,
+  // quando la risalita finisce dentro uno shadow root, riparte dal suo host, e
+  // così via per quanti componenti siano annidati.
+  function closestAcrossShadow(el, selector) {
+    let node = el;
+    while (node) {
+      const hit = node.closest?.(selector);
+      if (hit) return hit;
+      const root = node.getRootNode?.();
+      node = (root && root.host) ? root.host : null;
+    }
+    return null;
+  }
+
+  // `document.elementsFromPoint()` si ferma al confine del componente esattamente
+  // come `closest()`, ma dall'altra parte: di un componente web restituisce
+  // l'HOST, mai quello che c'è dentro. Quindi la ricerca "cosa c'è sotto il
+  // cursore" era cieca a una scheda che tiene collegamento e anteprima IMPILATI
+  // dentro lo stesso componente — il caso resta quello della lamentela: solo le
+  // voci del filmato, nessuna voce del collegamento (#444). Qui, per ogni
+  // elemento che ha uno shadow root, ripetiamo il colpo dentro quel root: le
+  // parti del componente vengono PRIMA del loro host, che è l'ordine in cui si
+  // vedono (l'host lo disegna il suo contenuto). Il set `seen` chiude i cicli e
+  // toglie i doppioni fra un root e l'altro.
+  function deepElementsFromPoint(x, y) {
+    const out = [];
+    const seen = new Set();
+    const collect = (root) => {
+      let hits = [];
+      try { hits = root.elementsFromPoint?.(x, y) || []; } catch (_) { hits = []; }
+      for (const el of hits) {
+        if (!el || seen.has(el)) continue;
+        seen.add(el);
+        if (el.shadowRoot) collect(el.shadowRoot);
+        out.push(el);
+      }
+    };
+    try { collect(document); } catch (_) {}
+    return out;
+  }
+
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
@@ -404,10 +450,9 @@
     // window.getSelection() non vede la selezione dentro <input>/<textarea>:
     // recuperiamola dal nodo stesso così Taglia/Copia compaiono nel menu.
     if (!selInfo) selInfo = getInputSelectionInfo(target);
-    const linkEl = target?.closest?.('a[href]');
-    const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
-    const { mediaEl, mediaUnder } = findMedia(target, e.clientX, e.clientY);
-    const editable = isEditable(target);
+    const {
+      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
+    } = detectContext(target, e.clientX, e.clientY);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
     const [clipboardHistory, navState] = await Promise.all([
@@ -415,7 +460,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -559,18 +604,300 @@
   //   <video> non compare fra gli antenati. Lo usiamo come ripiego SOLO quando
   //   non c'è altro contesto (niente selezione, immagine, link, campo di testo),
   //   così un video di sfondo non ruba il menu a ciò che sta sopra.
-  function findMedia(target, x, y) {
+  function findMedia(target, view) {
     const direct = (target?.tagName === 'VIDEO' || target?.tagName === 'AUDIO')
       ? target
-      : target?.closest?.('video, audio');
+      : closestAcrossShadow(target, 'video, audio');
     if (direct) return { mediaEl: direct, mediaUnder: null };
     let under = null;
-    try {
-      for (const el of document.elementsFromPoint(x, y) || []) {
-        if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') { under = el; break; }
-      }
-    } catch (_) {}
+    for (const el of view.stack) {
+      if (el.tagName !== 'VIDEO' && el.tagName !== 'AUDIO') continue;
+      if (!sameSurface(target, el, view)) continue;
+      under = el;
+      break;
+    }
     return { mediaEl: null, mediaUnder: under };
+  }
+
+  // Immagine e collegamento SOTTO il punto cliccato, quando non ce n'è uno fra
+  // gli antenati (#444). Sono i gemelli di `mediaUnder`, e devono esistere tutti
+  // e tre: le schede delle home video/social sono fatte di strati sovrapposti,
+  // non annidati. L'anteprima si stende SOPRA la copertina, il link della scheda
+  // passa sotto a entrambe, e sopra a tutto c'è spesso un velo trasparente che
+  // non è né link né immagine né filmato. Senza il ripiego per OGNI famiglia lo
+  // stesso identico pixel dà menu diversi a seconda di quale strato ha vinto in
+  // quell'istante — con l'anteprima in funzione il menu era completo, e con
+  // l'anteprima ferma restava vuoto.
+  function findUnder(view, selector, anchor) {
+    for (const el of view.stack) {
+      const hit = closestAcrossShadow(el, selector);
+      if (hit && sameSurface(anchor, hit, view)) return hit;
+    }
+    return null;
+  }
+
+  // Il freno di TUTTO ciò che si adotta da sotto.
+  //
+  // Guardare sotto al punto cliccato serve (le schede sono fatte di strati:
+  // copertina, anteprima, velo col titolo, e il collegamento sotto a tutto), ma
+  // quello che sta sotto lo si adotta solo quando è la stessa cosa che l'utente
+  // sta GUARDANDO. Altrimenti basta un elemento opaco davanti perché il menu
+  // parli di un collegamento invisibile: la barra fissa di un sito di notizie
+  // sotto cui sono scivolati i titoli, il riquadro dei cookie, o un manto che la
+  // pagina stende su tutta se stessa sotto al testo — e lì il collegamento lo
+  // sceglie la pagina, quindi «Copia URL», «Apri in nuova tab» e «Condividi»
+  // finirebbero su un indirizzo deciso da lei, con in più l'analisi del link che
+  // parte da sola e va a scaricarlo.
+  //
+  // Due condizioni, entrambe misurate sui rettangoli:
+  // 1. si sovrappongono davvero — l'intersezione copre almeno metà del più
+  //    piccolo dei due (un incrocio d'angolo fra una barra laterale e una riga
+  //    di testo non è una sovrapposizione);
+  // 2. nessuno dei due INGHIOTTE l'altro: non basta circondarlo da tutte le
+  //    parti, deve anche stare su un'altra scala. La differenza è quella fra un
+  //    contenitore e una copertura. La scheda con un bordo, o con l'imbottitura
+  //    fra il bordo e la copertina, circonda la copertina da tutti e quattro i
+  //    lati — ed è la forma più comune degli elenchi di schede: fermarsi al
+  //    "circonda" faceva sparire di nuovo le voci del collegamento su mezzo web
+  //    (#444). Un contenitore però ABBRACCIA quello che tiene: la copertina
+  //    riempie quasi tutta la scheda. Una barra fissa, un riquadro dei cookie o
+  //    un manto steso sulla pagina sono grandi come la finestra e coprono un
+  //    titolo di poche parole: quello che nascondono è una frazione minima di
+  //    loro, ed è il segno che non lo stanno contenendo, se lo stanno solo
+  //    trovando sotto.
+  const SURFACE_SLACK_PX = 4;
+  // Quanta parte del più grande deve occupare il più piccolo perché il primo
+  // sia il suo contenitore e non una copertura. Le misure vere stanno lontane
+  // dalla soglia da tutte e due le parti: la copertina rientrata di dodici
+  // pixel in una scheda ne occupa l'85%, e una scheda che tiene dentro anche il
+  // titolo resta sopra alla metà; una barra fissa a tutta larghezza sopra una
+  // riga di titoli sta sotto al 5%, il manto invisibile sopra un paragrafo al 3%.
+  const CONTAINER_MIN_RATIO = 0.35;
+
+  function engulfs(outer, inner) {
+    return outer.left < inner.left - SURFACE_SLACK_PX
+      && outer.top < inner.top - SURFACE_SLACK_PX
+      && outer.right > inner.right + SURFACE_SLACK_PX
+      && outer.bottom > inner.bottom + SURFACE_SLACK_PX;
+  }
+
+  function swallows(outer, inner) {
+    if (!engulfs(outer, inner)) return false;
+    const areaOuter = outer.width * outer.height;
+    const areaInner = inner.width * inner.height;
+    return areaInner < areaOuter * CONTAINER_MIN_RATIO;
+  }
+
+  // ------------------------------------------------------------
+  // La seconda prova: quello che sta sotto lo si VEDE.
+  //
+  // Il conto sui rettangoli sa dire "stessa scala, stessa scheda", ma sulla
+  // FORMA non sa dire niente, e ci sono due cose opposte con la stessa forma.
+  // La riga di un elenco di risultati — miniatura piccola a sinistra, titolo e
+  // tre righe di testo a destra, il collegamento della riga steso sopra a
+  // tutto — ha lo stesso ingombro di una barra fissa sopra un titolo scivolato
+  // sotto: un rettangolo largo quanto la pagina che ne circonda uno piccolo.
+  // Nessuna soglia di area separa i due casi, e infatti il freno geometrico
+  // buttava via i comandi del filmato proprio sulle miniature vere (#444):
+  // sotto a circa un terzo di riga sparivano tutti, e la stessa riga costruita
+  // con la miniatura dentro un collegamento suo dava invece il menu completo.
+  //
+  // Quello che separa i due casi è se l'utente li vede: sopra la miniatura c'è
+  // un collegamento invisibile, sopra il titolo sepolto c'è una barra opaca.
+  // Quindi: se fra il punto cliccato e il candidato non c'è niente di DIPINTO,
+  // il candidato è esattamente quello che l'utente sta guardando, e a quel
+  // punto la geometria non ha più niente da aggiungere.
+  // ------------------------------------------------------------
+
+  // Elementi che si disegnano da soli, senza bisogno di sfondo o di testo.
+  const SELF_PAINTING_TAGS = new Set([
+    'IMG', 'VIDEO', 'AUDIO', 'CANVAS', 'SVG', 'IFRAME', 'EMBED', 'OBJECT',
+    'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'HR', 'PROGRESS', 'METER',
+  ]);
+  // Sotto questa opacità uno sfondo non copre niente: serve solo a intercettare
+  // il mouse (è così che sono fatti i veli delle schede), e chi guarda vede
+  // quello che c'è dietro.
+  const VEIL_ALPHA = 0.05;
+
+  function colorAlpha(css) {
+    const v = (css || '').trim();
+    if (!v || v === 'transparent' || v === 'none') return 0;
+    const m = /^rgba?\(([^)]+)\)$/.exec(v);
+    if (!m) return 1;
+    const parts = m[1].split(/[,/\s]+/).filter(Boolean);
+    if (parts.length < 4) return 1;
+    const a = parseFloat(parts[3]);
+    return Number.isFinite(a) ? a : 1;
+  }
+
+  // Testo che si vede per davvero. Il testo per i lettori di schermo sta nel
+  // DOM ma è ritagliato a un pixel: non deve far passare per opaco un velo
+  // vuoto (le righe dei risultati ci infilano spesso il titolo ripetuto).
+  function hasVisibleText(el) {
+    const t = el.textContent;
+    if (!t || !t.trim()) return false;
+    try {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const box = r.getBoundingClientRect();
+      return box.width > 2 && box.height > 2;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function paintsSomething(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (SELF_PAINTING_TAGS.has(el.tagName)) return true;
+    let cs = null;
+    try { cs = getComputedStyle(el); } catch (_) { return true; }
+    if (!cs) return true;
+    if (cs.visibility === 'hidden' || cs.opacity === '0') return false;
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
+    if (colorAlpha(cs.backgroundColor) > VEIL_ALPHA) return true;
+    if (cs.boxShadow && cs.boxShadow !== 'none') return true;
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+      if (cs[`border${side}Style`] !== 'none'
+        && parseFloat(cs[`border${side}Width`]) > 0
+        && colorAlpha(cs[`border${side}Color`]) > VEIL_ALPHA) return true;
+    }
+    return hasVisibleText(el);
+  }
+
+  // Risalita che attraversa i confini dei componenti web: `contains()` di un
+  // elemento in chiaro non vede quello che sta dentro uno shadow root, quindi
+  // "la copertina sta dentro il collegamento" risultava falso proprio sulle
+  // schede fatte a componenti.
+  function containsAcrossShadow(ancestor, el) {
+    if (!ancestor || !el) return false;
+    let node = el;
+    while (node) {
+      if (node === ancestor) return true;
+      node = node.parentNode || node.host || null;
+    }
+    return false;
+  }
+
+  // Il rettangolo dell'elemento copre il punto cliccato? Se no, l'elemento sta
+  // nella pila per via di uno PSEUDO-ELEMENTO: il collegamento steso su tutta
+  // la scheda lo fanno quasi tutti con un `::after` a `inset:0`, e allora nella
+  // pila c'è l'`<a>` del titolo mentre il suo rettangolo sta nella colonna del
+  // testo, lontano dalla miniatura. Il rettangolo, lì, non misura la superficie
+  // di niente, e quello che l'elemento disegna lo disegna altrove.
+  function coversPoint(rect, view) {
+    if (!rect || !view) return false;
+    return view.x >= rect.left && view.x <= rect.right
+      && view.y >= rect.top && view.y <= rect.bottom;
+  }
+
+  // C'è qualcosa di DIPINTO davanti a `el`, nel punto cliccato? La pila arriva
+  // da `deepElementsFromPoint`, cioè nell'ordine in cui si vedono: chi sta
+  // prima sta sopra. Antenati e discendenti di `el` non contano — un antenato
+  // disegna dietro al figlio, e un figlio per chi guarda È `el`.
+  function coveredAt(el, view) {
+    // Senza la pila non possiamo dimostrare niente: in dubbio resta il freno
+    // geometrico, cioè il comportamento di prima.
+    if (!el || !Array.isArray(view?.stack)) return true;
+    for (const other of view.stack) {
+      if (other === el) return false;
+      if (containsAcrossShadow(el, other) || containsAcrossShadow(other, el)) continue;
+      if (!coversPoint(other.getBoundingClientRect?.(), view)) continue;
+      if (paintsSomething(other)) return true;
+    }
+    // `el` non è nella pila sotto il cursore: non possiamo dire che si veda.
+    return true;
+  }
+
+  // Un contenuto "appartiene" a un collegamento quando ci sta dentro (nel DOM) o
+  // quando ne occupa la superficie (i player veri coprono il filmato col proprio
+  // overlay, e le schede impilano copertina e link invece di annidarli). Il DOM
+  // viene prima: se la pagina dice già che copertina e collegamento sono la
+  // stessa scheda, rifare il conto sui rettangoli può solo buttare via
+  // un'informazione certa (#444).
+  function belongsTo(el, linkEl, view) {
+    if (!el || !linkEl) return false;
+    return containsAcrossShadow(linkEl, el) || sameSurface(el, linkEl, view);
+  }
+
+  function sameSurface(a, b, view) {
+    if (!a || !b) return false;
+    const ra = a.getBoundingClientRect?.();
+    const rb = b.getBoundingClientRect?.();
+    if (!ra || !rb) return false;
+    const areaA = ra.width * ra.height;
+    const areaB = rb.width * rb.height;
+    if (!(areaA > 0) || !(areaB > 0)) return false;
+    // I rettangoli si misurano solo se sono davvero quelli del punto cliccato.
+    // Quando uno dei due è nella pila per uno pseudo-elemento, il suo
+    // rettangolo sta da un'altra parte e ogni conto su di lui è rumore.
+    if (coversPoint(ra, view) && coversPoint(rb, view)) {
+      const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+      const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+      if (w <= 0 || h <= 0) return false;
+      if ((w * h) * 2 < Math.min(areaA, areaB)) return false;
+      if (!swallows(ra, rb) && !swallows(rb, ra)) return true;
+    }
+    // Il conto sui rettangoli non decide. Resta la prova diretta, e vale da
+    // sola: se né l'uno né l'altro hanno qualcosa di dipinto davanti, in questo
+    // punto sono tutti e due sotto gli occhi dell'utente — che è l'unica cosa
+    // che il freno voleva sapere (#444). È il caso della riga di risultati con
+    // la miniatura piccola, dove la geometria da sola sbagliava.
+    return !coveredAt(a, view) && !coveredAt(b, view);
+  }
+
+  // Cosa c'è sotto il tasto destro. Sta in un posto solo perché il menu si apre
+  // da due strade (menu normale e menu di correzione): quando il riconoscimento
+  // era copiato in tutt'e due, lo stesso clic rischiava di dare due menu diversi
+  // a seconda che sotto ci fosse o no una parola da correggere.
+  function detectContext(target, x, y) {
+    const linkEl = closestAcrossShadow(target, 'a[href]');
+    const imgEl = target?.tagName === 'IMG' ? target : closestAcrossShadow(target, 'img');
+    // Un solo colpo di hit-test per tutte e tre le famiglie: è la stessa pila di
+    // strati, e ripeterlo tre volte costerebbe tre risalite dell'albero a ogni
+    // apertura del menu.
+    // `view` = la pila PIÙ il punto: i due dati vanno sempre insieme, perché
+    // il rettangolo di un elemento vale come misura solo se copre quel punto.
+    const view = { stack: deepElementsFromPoint(x, y), x, y };
+    const { mediaEl, mediaUnder } = findMedia(target, view);
+    // Cercati solo se non sono già fra gli antenati.
+    const imgUnder = imgEl ? null : findUnder(view, 'img', target);
+    return {
+      linkEl,
+      imgEl,
+      mediaEl,
+      // I tre `*Under` escono da qui GIÀ VAGLIATI: o `sameSurface` li ha
+      // confrontati con l'elemento davvero cliccato, o è il DOM a legarli alla
+      // copertina adottata. Chi legge questi campi più a valle non deve rifare
+      // il controllo (né può dimenticarselo — è così che la barra fissa e il
+      // manto invisibile erano finiti nel menu).
+      mediaUnder,
+      imgUnder,
+      // Il collegamento lo può dire il DOM (la copertina adottata sta dentro un
+      // <a>) prima ancora della pila di strati.
+      linkUnder: linkEl ? null : findLinkUnder(view, target, mediaUnder || imgUnder),
+      // Gli strati sotto il cursore, così come li ha visti il freno. Servono
+      // più a valle per l'unica domanda che resta lì: la copertina adottata e
+      // il collegamento sono la STESSA scheda? Anche quella risposta può
+      // passare dal "si vede o no", e senza gli strati tornerebbe a dipendere
+      // dai soli rettangoli — che sulle righe con la miniatura piccola
+      // sbagliano (#444).
+      layers: view,
+      editable: isEditable(target),
+    };
+  }
+
+  // Il collegamento della scheda, quando non è fra gli antenati del punto
+  // cliccato. Due strade, e la prima è il DOM (#444): se abbiamo già adottato la
+  // copertina — il filmato o l'immagine che l'utente sta guardando — e quella
+  // copertina sta DENTRO un <a>, la pagina ha già detto che sono la stessa
+  // scheda. Rifare il conto sui rettangoli lì non aggiunge niente e toglie: fra
+  // il collegamento e la copertina ci sono il bordo, l'imbottitura, e spesso il
+  // titolo, quindi la geometria da sola diceva di no proprio dove la struttura
+  // diceva di sì. Solo quando il DOM non lega niente si guarda la pila di strati
+  // sotto il cursore, e lì il freno geometrico è l'unica cosa che regge.
+  function findLinkUnder(view, target, contentUnder) {
+    const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
+    return owner || findUnder(view, 'a[href]', target);
   }
 
   function isEditable(el) {
@@ -611,10 +938,9 @@
     const target = realTarget(mouseEvent);
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
-    const linkEl = target?.closest?.('a[href]');
-    const imgEl = target?.tagName === 'IMG' ? target : target?.closest?.('img');
-    const { mediaEl, mediaUnder } = findMedia(target, mouseEvent.clientX, mouseEvent.clientY);
-    const editable = isEditable(target);
+    const {
+      linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
+    } = detectContext(target, mouseEvent.clientX, mouseEvent.clientY);
     // Cattura il contesto di incolla (elemento + caret/selezione) anche per i
     // menu di correzione: senza questo, l'item "Incolla" del menu spellcheck
     // usava un pasteContext stale e incollava all'inizio del campo / falliva
@@ -626,7 +952,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
     });
   }
 
@@ -902,7 +1228,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
   }) {
     const items = [];
 
@@ -934,7 +1260,7 @@
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
     });
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
@@ -1036,7 +1362,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
   }) {
     const items = [];
 
@@ -1081,14 +1407,21 @@
       // queste voci non avrebbe nessun modo di aprirlo, copiarlo o salvarlo
       // (#434). Stessa forma del ramo immagine: contenuto in cima, separatore,
       // collegamento sotto.
-      if (linkEl) {
+      //
+      // Il collegamento non è sempre un antenato: nelle home dei siti video e
+      // dei social l'anteprima che parte al passaggio del mouse si STENDE SOPRA
+      // la scheda, e il link della scheda resta sotto (#444). Per chi guarda è
+      // la stessa identica scheda, ed è `linkUnder` — che arriva qui solo se
+      // occupa la stessa superficie del filmato cliccato.
+      const link = linkEl || linkUnder;
+      if (link) {
         items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+        for (const it of buildLinkActionItems(link)) items.push(it);
         items.push({ type: 'separator' });
         // Il media non ha una sua sezione "Spiega": quella del collegamento è
         // l'unica, quindi resta (nessuna seconda chiamata AI, e il menu del
         // link è completo come quando lo si clicca da solo).
-        items.push(Actions.buildInlineExplainLink(linkEl));
+        items.push(Actions.buildInlineExplainLink(link));
       }
       return items;
     }
@@ -1100,9 +1433,13 @@
       // prodotto, risultati di ricerca per immagini) è ANCHE un collegamento:
       // in un browser normale le due famiglie di voci compaiono insieme. Prima
       // il ramo immagine ritornava subito e le azioni sul link sparivano (#401).
-      if (linkEl) {
+      // Come per il filmato (#444), la copertina può anche essere STESA SOPRA il
+      // link della scheda invece che stargli dentro: se occupa la stessa
+      // superficie è la stessa scheda, e le voci del collegamento restano.
+      const linkOfImg = linkEl || linkUnder;
+      if (linkOfImg) {
         items.push({ type: 'separator' });
-        for (const it of buildLinkActionItems(linkEl)) items.push(it);
+        for (const it of buildLinkActionItems(linkOfImg)) items.push(it);
       }
       items.push({ type: 'separator' });
       // Una sola sezione "Spiega" (quella dell'immagine, l'elemento cliccato):
@@ -1117,16 +1454,37 @@
       // non è fra gli antenati e finisce in `mediaUnder`. Per chi guarda è lo
       // stesso identico filmato dentro lo stesso identico link: il menu deve
       // essere lo stesso del ramo qui sopra, overlay o non overlay. Solo se il
-      // filmato sta DENTRO il collegamento, però: un video di sfondo sotto a un
-      // link che non c'entra niente non deve intrufolarsi nel menu.
-      const mediaInLink = (mediaUnder && linkEl.contains?.(mediaUnder)) ? mediaUnder : null;
+      // filmato è DAVVERO quello della scheda, però: dentro il collegamento
+      // oppure a occuparne la superficie. Un video di sfondo che si ritrova per
+      // caso un link sopra non deve intrufolarsi nel menu di quel link.
+      const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
       if (mediaInLink) {
         for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
+      // Stessa storia per la copertina ferma: le schede la coprono quasi sempre
+      // con una sfumatura o un velo trasparente che regge il titolo, e il clic
+      // destro arriva lì invece che sull'`<img>`. Se non c'è un filmato in
+      // funzione, il contenuto della scheda è quell'immagine: le sue voci sono
+      // quelle che l'utente cerca (#444).
+      const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl, layers)) ? imgUnder : null;
+      if (imgInLink) {
+        for (const it of buildImageActionItems(imgInLink)) items.push(it);
+        items.push({ type: 'separator' });
+      }
       for (const it of buildLinkActionItems(linkEl)) items.push(it);
       items.push({ type: 'separator' });
-      items.push(Actions.buildInlineExplainLink(linkEl));
+      // Il riquadro parla dell'elemento primario, cioè di quello le cui voci
+      // aprono il menu: se abbiamo adottato la copertina, il primario è lei.
+      // Senza questa riga la stessa scheda cambiava argomento a seconda del
+      // punto cliccato — la parte scoperta della copertina descriveva
+      // l'immagine, la fascia del titolo centoventi pixel più in basso
+      // analizzava il collegamento, con le stesse identiche voci-azione (#444).
+      // Sul filmato resta il collegamento: una spiegazione del filmato non
+      // esiste, ed è già la stessa in tutti e tre i modi di cliccare la scheda.
+      items.push(imgInLink
+        ? Actions.buildInlineExplainImage(imgInLink)
+        : Actions.buildInlineExplainLink(linkEl));
       return items;
     }
 
@@ -1141,6 +1499,45 @@
     // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
     if (mediaUnder) {
       for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
+      // Scheda a strati: sopra un velo trasparente che non è né link né media,
+      // sotto il filmato e il link della scheda (#444). Qui sono due cose prese
+      // entrambe da sotto: oltre al velo devono stare insieme anche fra loro —
+      // il filmato dentro il collegamento, o sulla sua stessa superficie —
+      // altrimenti il menu unirebbe due schede diverse.
+      if (belongsTo(mediaUnder, linkUnder, layers)) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+        items.push({ type: 'separator' });
+        items.push(Actions.buildInlineExplainLink(linkUnder));
+      }
+      return items;
+    }
+
+    // Stessa scheda, anteprima ferma. Il velo trasparente c'è ancora, ma sotto
+    // non c'è più un filmato: c'è la copertina, e sotto di lei il collegamento.
+    // Senza questo ramo lo stesso identico pixel dava due esiti opposti — menu
+    // completo mentre il filmatino suonava, menu vuoto un istante dopo (#444).
+    if (imgUnder) {
+      for (const it of buildImageActionItems(imgUnder)) items.push(it);
+      if (belongsTo(imgUnder, linkUnder, layers)) {
+        items.push({ type: 'separator' });
+        for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+      }
+      items.push({ type: 'separator' });
+      items.push(Actions.buildInlineExplainImage(imgUnder));
+      return items;
+    }
+
+    // E il collegamento da solo: un velo trasparente sopra una scheda-link basta
+    // a far sparire «Apri in nuova tab», «Copia URL», «Salva link per dopo» e
+    // «Condividi link». Non è un caso di nicchia — è come sono costruiti quasi
+    // tutti gli elenchi di schede, con o senza filmato (#444). Un velo, appunto:
+    // se davanti c'è una barra fissa, un riquadro modale o un manto steso sulla
+    // pagina, `linkUnder` è già stato scartato e qui non arriva niente.
+    if (linkUnder) {
+      for (const it of buildLinkActionItems(linkUnder)) items.push(it);
+      items.push({ type: 'separator' });
+      items.push(Actions.buildInlineExplainLink(linkUnder));
       return items;
     }
 
