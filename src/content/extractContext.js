@@ -279,19 +279,17 @@
   // istruzioni interne romperebbero l'illustrazione/formula se rimpiazzate.
   const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
-  // La UI che Filo inietta nella pagina (menu, toast, popup, sidebar) usa il
-  // prefisso di classe "sn-": non è contenuto del sito e non va tradotta.
-  // Alcuni riquadri di Filo (avviso sito pericoloso, proposta cambio paese)
-  // vivono invece dentro un componente isolato agganciato a un host con id
-  // "filo-…": da quando la traduzione entra nei componenti, anche quelli
-  // finirebbero tradotti — e sono già scritti nella lingua dell'utente.
+  // La UI che Filo inietta nella pagina (menu, avvisi, popup, barra laterale):
+  // non è contenuto del sito e non va tradotta — è già nella lingua dell'utente.
+  // La riconosce dal MARCHIO che i moduli le mettono addosso quando la creano
+  // (SN_FILO_UI.mark), mai dal nome. Il nome lo sceglie anche il sito: prima
+  // bastava una classe che cominciasse per "sn-" — come le chiama ogni portale
+  // costruito con ServiceNow — o un id che cominciasse per "filo-" perché un
+  // riquadro del sito restasse in lingua originale sotto un avviso che
+  // dichiarava la pagina tradotta (#407).
   function isFiloOwnUi(el) {
-    const id = el.id || '';
-    if (id.indexOf('sn-') === 0 || id.indexOf('filo-') === 0) return true;
-    const cl = el.classList;
-    if (!cl || !cl.length) return false;
-    for (const c of cl) if (c.indexOf('sn-') === 0) return true;
-    return false;
+    const UI = global.SN_FILO_UI;
+    return !!(UI && UI.is(el));
   }
 
   // Due motivi diversi di saltare un sottoalbero, e la differenza conta:
