@@ -73,13 +73,20 @@
     // ciò che manca: quel che è già tradotto non torna al modello.
     const partialTranslation = typeof Translate.isPartial === 'function' && Translate.isPartial();
     const newContent = typeof Translate.hasNewContent === 'function' && Translate.hasNewContent();
-    const continues = partialTranslation || newContent;
-    const translateIcon = (Translate.hasTranslation() && !continues) ? I('showOriginal') : I('translate');
-    const translateLabel = partialTranslation
-      ? I18n.t('menu_resume_translation')
-      : newContent
-        ? I18n.t('menu_translate_new_content')
-        : (Translate.hasTranslation() ? I18n.t('menu_show_original') : I18n.t('menu_global_translate'));
+    // Mentre traduce, l'icona è il modo di FERMARE: aprire il menu a lavoro in
+    // corso e trovare solo "Traduci la pagina" (che non fa niente) non è una
+    // scelta, è un vicolo cieco.
+    const restore = typeof Translate.showsRestore === 'function'
+      ? Translate.showsRestore()
+      : (Translate.hasTranslation() && !(partialTranslation || newContent));
+    const translateIcon = restore ? I('showOriginal') : I('translate');
+    const translateLabel = restore
+      ? I18n.t('menu_show_original')
+      : partialTranslation
+        ? I18n.t('menu_resume_translation')
+        : newContent
+          ? I18n.t('menu_translate_new_content')
+          : I18n.t('menu_global_translate');
     const isFs = !!(document.fullscreenElement || deps.isContentFullscreen());
     // Quando navState non è disponibile (es. menu aperto da flussi che non lo
     // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
