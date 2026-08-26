@@ -359,9 +359,12 @@
   // NON si apre da qui — ha il suo content script e traduce da sé, e leggerlo
   // anche da fuori vorrebbe dire pagare due volte lo stesso testo.
   function inlineFrameBody(el) {
+    // Prima riga senza allocazioni: questa funzione la chiede anche chi cammina
+    // su tutti gli elementi della pagina, e lì un `toUpperCase()` a testa si
+    // sente.
+    const tag = el && el.tagName;
+    if (tag !== 'IFRAME' && tag !== 'FRAME' && tag !== 'iframe' && tag !== 'frame') return null;
     try {
-      const tag = (el.tagName || '').toUpperCase();
-      if (tag !== 'IFRAME' && tag !== 'FRAME') return null;
       const win = el.contentWindow;
       if (!win || win.location.protocol !== 'about:') return null;
       const doc = el.contentDocument;
