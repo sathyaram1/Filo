@@ -434,7 +434,7 @@
   /**
    * Le decisioni passate, in righe minute. Traccia dell'eccezione: un'apertura
    * di questo tipo che non lascia segno non è verificabile.
-   * Vive SOLO nella pagina di gestione — sulla prima schermata sarebbe rumore.
+   * Vive in Gestione → Automazioni — fra le cose da decidere sarebbe rumore.
    */
   function renderRecent(host, opts) {
     if (!host) return 0;
