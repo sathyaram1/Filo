@@ -836,6 +836,7 @@
     extractMainTextNodes,
     extractTranslatableBlocks,
     findTranslatedElements,
+    hasRevealedText,
     isFiloOwnUi,
     pageMeta,
     pageExcerpt,
