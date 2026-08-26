@@ -188,6 +188,8 @@ module.exports = function register(on, ctx) {
   //   - RUN_IN_TOP_FRAME: azione di pagina (traduci, condividi, salva, QR,
   //     screenshot…) scelta dal menu aperto dentro il riquadro → va eseguita
   //     dal frame principale, che è l'unico a conoscere la pagina intera;
+  //   - FRAME_TRANSLATE_DONE (#407): il riquadro riferisce com'è andata la sua
+  //     traduzione → va al solo frame principale, che tiene il conto del giro;
   //   - CLOSE_OTHER_MENUS: il riquadro ha appena aperto il suo menu → gli
   //     altri frami della stessa scheda chiudono il loro.
   // Il messaggio non porta dati arbitrari: solo l'id di un'icona del registro
