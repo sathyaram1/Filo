@@ -826,7 +826,8 @@ pagina") valgono due regole imparate a caro prezzo con #407.
 - **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
   (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
-  in `src/content/translatePage.js`. Test `tests/translate-page.spec.mjs`.
+  in `src/content/translatePage.js`; il marchio della UI di Filo in
+  `src/shared/filoUi.js`. Test `tests/translate-page.spec.mjs`.
 
 ## Operazione a chunk che può fallire a metà: tre stati, ripresa, avviso onesto
 
