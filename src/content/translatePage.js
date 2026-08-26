@@ -451,7 +451,12 @@
   // originali (nodi vivi) al posto dei segnaposto. Niente contenuto perso: i
   // figli che il modello non ha richiamato tornano comunque in fondo.
   function applyTranslation(unit, text) {
-    if (unit && unit.attr) return applyAttrTranslation(unit, text);
+    // Traduzione che arriva quando l'utente ha già chiesto l'originale: si
+    // butta via. Se ha detto di tornare indietro, ci deve tornare e restarci —
+    // una pagina che si ritraduce da sola qualche secondo dopo non l'ha chiesta
+    // nessuno (#407).
+    if (!unit || unit.run !== runSeq) return;
+    if (unit.attr) return applyAttrTranslation(unit, text);
     const el = unit.el;
     if (!el || unit.applied || !text) return;
     if (el.dataset.snTranslated) return;
