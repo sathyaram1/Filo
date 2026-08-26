@@ -431,6 +431,11 @@
         const r = f.getBoundingClientRect();
         if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) continue;
         if (isInsideFiloUi(f)) continue;
+        // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo
+        // che possa rispondere, ma il testo lo prende l'estrazione da qui.
+        // Aspettarne una risposta vorrebbe dire dire "una parte è rimasta
+        // fuori" su un rettangolo che invece è stato tradotto.
+        if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) continue;
         n++;
       }
     } catch (_) {}
