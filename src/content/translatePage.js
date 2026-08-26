@@ -629,7 +629,7 @@
     if (units[0].run !== runSeq) return null;
     const joined = units.map((u) => u.templated).join(SEPARATOR);
     const res = await requestTranslation(joined);
-    if (!res.ok) return res.error;
+    if (!res.ok) return res.error || EMPTY_ANSWER;
 
     const parts = String(res.text || '').split(SEP_RE);
     if (units.length === 1) {
