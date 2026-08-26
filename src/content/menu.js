@@ -1117,7 +1117,7 @@
 
       const startDrag = (x, y) => {
         dragging = true;
-        try { hideTooltip?.(); } catch (_) {}
+        try { dismissTooltip?.(); } catch (_) {}
         el.classList.add('sn-dragging');
         preview = el.cloneNode(true);
         preview.classList.add('sn-drag-preview');
