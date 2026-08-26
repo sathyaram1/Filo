@@ -458,10 +458,13 @@
     document.documentElement.appendChild(root);
 
     const cleanupZoom = attachZoomCompensation(root);
-    position(root, anchor);
 
     const popup = {
       root,
+      anchor: anchor || null,
+      cleanups: [],
+      pinned: false,       // l'utente l'ha trascinato: da lì in poi non si muove
+      dragging: false,
       cleanupZoom,
       activePort: null,
       conversation: [],     // [{role, content}]
