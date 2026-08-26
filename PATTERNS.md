@@ -777,8 +777,19 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   interrogabile sul DOM anche da un altro mondo JS, al contrario del registro dei
   componenti) e che lì dentro qualcosa sia **disegnato e irraggiungibile** (sopra
   un elemento vuoto il punto d'inserimento del cursore cade sull'elemento stesso,
-  sopra un componente chiuso viene rimbalzato fuori). Dove la prova non si può
-  fare — punto fuori dallo schermo o coperto — si torna alla prudenza.
+  sopra un componente chiuso viene rimbalzato fuori).
+- **"Non lo so" non è "sì": dove la prova non si può fare, si tace.** Una prova
+  che si appoggia al cursore vale solo dentro lo schermo e solo su ciò che i clic
+  non attraversano — cioè quasi mai: qualsiasi pagina più lunga di una schermata
+  ha roba sotto il bordo, e le decorazioni sono quasi tutte `pointer-events:none`.
+  Contare quel "non lo so" come prova rovescia la bugia invece di toglierla: la
+  pagina è tutta tradotta e l'avviso manda comunque a cercare dell'inglese che non
+  c'è. Il prezzo giusto è l'altro: un avviso in meno quando il pezzo illeggibile
+  sta fuori portata. **Un avviso mancato costa uno; un avviso falso li svaluta
+  tutti.** Vale per qualunque diagnosi appoggiata alla geometria della finestra
+  (`elementFromPoint`, `caretPositionFromPoint`, il rettangolo visibile): il
+  risultato "indeterminato" va tenuto separato dal risultato negativo, e trattato
+  come tale fino in fondo.
 - **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
   (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
