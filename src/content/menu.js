@@ -30,7 +30,7 @@
   let activeMenu = null;
 
   function close() {
-    try { hideTooltip?.(); } catch (_) {}
+    try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
     if (activeMenu) {
       activeMenu.root.remove();
@@ -38,7 +38,7 @@
       document.removeEventListener('mousedown', activeMenu.onDocClick, true);
       document.removeEventListener('keydown', activeMenu.onKey, true);
       window.removeEventListener('scroll', activeMenu.onScroll, true);
-      window.removeEventListener('resize', activeMenu.onScroll, true);
+      window.removeEventListener('resize', activeMenu.onResize, true);
       try { activeMenu.cleanupZoom?.(); } catch (_) {}
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
       activeMenu = null;
@@ -134,8 +134,18 @@
       visH: root.offsetHeight * scale,
       vw, vh, from,
     });
+    const primaLeft = parseFloat(root.style.left);
+    const primaTop = parseFloat(root.style.top);
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
+    // #500 — se il menu è SCIVOLATO, l'etichetta che spiegava un'icona è
+    // rimasta ferma dov'era: adesso parla di un bottone che non è più sotto al
+    // puntatore e copre le voci. Stesso trattamento che riceve quando il menu
+    // scorre. Solo se si è mosso davvero: un menu che cresce restando fermo non
+    // deve far sparire l'etichetta sotto il naso di chi la sta leggendo.
+    const mosso = (Number.isFinite(primaTop) && Math.abs(p.top - primaTop) > 0.5)
+      || (Number.isFinite(primaLeft) && Math.abs(p.left - primaLeft) > 0.5);
+    if (mosso) dismissTooltip();
     repositionSub();
   }
 
@@ -496,7 +506,7 @@
           // che l'ha aperto si è spostata, e il pannello va con lei (o si
           // chiude, se la freccetta è uscita dal bordo). Anche il tooltip, che
           // parlava di un bottone che ora non è più sotto al cursore.
-          try { hideTooltip?.(); } catch (_) {}
+          try { dismissTooltip?.(); } catch (_) {}
           repositionSub();
           return;
         }
@@ -505,14 +515,27 @@
       if (keepOnScroll) return;
       close();
     };
+    // #500 — la finestra che si accorcia è lo STESSO difetto preso dall'altro
+    // verso: prima si allungava il menu sotto una finestra ferma, qui si
+    // accorcia la finestra sotto un menu fermo, e in tutti e due i casi il fondo
+    // del menu finisce oltre il bordo con le ultime voci irraggiungibili. Quindi
+    // il conto di dove sta il menu si rifà anche qui, invece di chiuderlo (o di
+    // non fare niente, che è quello che succedeva col menu di una selezione).
+    // Capita a chi ridimensiona la finestra mentre legge, e ogni volta che
+    // l'area della pagina si accorcia da sola — un riquadro incorporato che
+    // cambia misura, una barra che compare.
+    const onResize = () => {
+      if (!root.isConnected) return;
+      riposa();
+    };
 
     document.addEventListener('mousedown', onDocClick, true);
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onScroll, true);
+    window.addEventListener('resize', onResize, true);
 
     activeMenu = {
-      root, onDocClick, onKey, onScroll, cleanupZoom, cleanups,
+      root, onDocClick, onKey, onScroll, onResize, cleanupZoom, cleanups,
       subRoot: null, subAnchor: null, subMode: null,
     };
   }
@@ -918,18 +941,25 @@
     if (!tooltipEl) return;
     tooltipEl.style.display = 'none';
   }
+  // Toglie l'etichetta E l'attesa che sta per farla comparire. Serve quando a
+  // muoversi non è il puntatore ma il menu (scivola, scorre, viene trascinato):
+  // l'attesa lasciata correre farebbe comparire fra un attimo l'etichetta di un
+  // bottone che nel frattempo si è spostato altrove.
+  function dismissTooltip() {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = null;
+    hideTooltip();
+  }
   function attachTooltip(el, text) {
     el.addEventListener('mouseenter', () => {
       clearTimeout(tooltipHideTimer);
       tooltipHideTimer = setTimeout(() => showTooltip(el, text), 250);
     });
     el.addEventListener('mouseleave', () => {
-      clearTimeout(tooltipHideTimer);
-      hideTooltip();
+      dismissTooltip();
     });
     el.addEventListener('mousedown', () => {
-      clearTimeout(tooltipHideTimer);
-      hideTooltip();
+      dismissTooltip();
     });
   }
 
@@ -1100,7 +1130,7 @@
 
       const startDrag = (x, y) => {
         dragging = true;
-        try { hideTooltip?.(); } catch (_) {}
+        try { dismissTooltip?.(); } catch (_) {}
         el.classList.add('sn-dragging');
         preview = el.cloneNode(true);
         preview.classList.add('sn-drag-preview');
