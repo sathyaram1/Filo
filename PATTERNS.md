@@ -996,11 +996,32 @@ una conseguenza; va fatto il contrario.
   zoom: il tetto è in px di layout, lo spazio sullo schermo in px visibili. Con
   l'ancoraggio dal fondo la `transform-origin` va spostata a `bottom left`, o al
   primo cambio di zoom il riquadro si stacca dal punto.
-- **Se l'utente lo ha trascinato, la posa è sua.** Smetti di riportarlo sul
-  punto ancorato: resta dove l'ha messo e ti limiti a non farlo uscire dallo
-  schermo, senza nemmeno il margine dai bordi (l'ha appoggiato lì apposta).
-  Passando al trascinamento azzera `bottom`: con `top` e `bottom` insieme e
-  altezza automatica il riquadro si stira fra i due bordi.
+- **Se l'utente lo ha trascinato, la POSIZIONE è sua — l'INGOMBRO no.** Smetti
+  di riportarlo sul punto ancorato: resta dove l'ha messo e ti limiti a non
+  farlo uscire dallo schermo, senza nemmeno il margine dai bordi (l'ha
+  appoggiato lì apposta). Passando al trascinamento azzera `bottom`: con `top` e
+  `bottom` insieme e altezza automatica il riquadro si stira fra i due bordi.
+  Ma la dimensione non l'ha scelta lui, e va rifatta **su tutti e due gli assi e
+  in tutte e due le direzioni** a ogni cambio di spazio, esattamente come se
+  fosse ancorato — solo che lo spazio, da spostato, è la finestra intera invece
+  del lato scelto (e cambia già nell'istante in cui lo prende in mano: rifai il
+  tetto anche lì, o si tiene l'altezza del lato a cui era appeso). Saltarne una
+  sola metà si vede: il riquadro spostato si stringeva di larghezza e non di
+  altezza, così bastava abbassare la finestra perché smettesse di accorciarsi,
+  si appoggiasse in cima e il fondo — la riga per scrivere — restasse fuori. E
+  con un tetto che sa solo stringere c'è la faccia opposta: spostato mentre lo
+  spazio era poco, restava schiacciato per sempre, con la risposta in una
+  striscia da scorrere e lo spazio tutto lì (#502). **Cerca l'asimmetria dentro
+  il rimedio**: un rimedio che vale su un asse e non sull'altro, o in un verso e
+  non nell'altro, è quasi sempre incompleto piuttosto che sbagliato.
+- **Un riquadro che si apre da tastiera lascia il fuoco dove si continua a
+  scrivere.** Chi chiede la spiegazione con Alt+E vuole fare la domanda dopo con
+  la tastiera: se il cursore non è già nella riga per scrivere deve tornare al
+  mouse (o scoprire Tab). Vale per tutte le strade che aprono lo stesso riquadro
+  — scorciatoia e menu del tasto destro fanno la stessa cosa. `focus()` va
+  chiamato con `{ preventScroll: true }`: dentro un riquadro incorporato,
+  altrimenti, la pagina che lo contiene scorre e il riquadro appena aperto
+  scappa di vista.
 - **Il guardiano guarda TUTTI E DUE i bordi, non solo quello previsto.** Finché
   la finestra non cambia sborda solo il lato libero, e lì si stringe il tetto.
   Ma quando lo spazio si accorcia dopo la posa, a uscire è il lato ANCORATO — un
