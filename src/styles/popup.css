@@ -164,6 +164,8 @@
   border-top: 1px solid var(--sn-border);
   font-size: 11px;
   color: var(--sn-muted);
+  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
+  min-height: 13px; /* nasce vuota: l'altezza che avrà è già questa */
 }
 
 .sn-popup-meta {
