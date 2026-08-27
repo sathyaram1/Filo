@@ -18,7 +18,7 @@
     {
       version: '0.2.205', date: '2026-08-27',
       fixes: [
-        'La finestra della spiegazione approfondita resta dentro lo schermo mentre la risposta la fa crescere, e ci resta anche se cambi zoom o rimpicciolisci la finestra mentre è aperta. Se selezioni una parola in basso nella pagina, la riga per scrivere la domanda successiva resta dove puoi cliccarla, invece di finire fuori dal bordo e costringerti a chiudere tutto e ricominciare.',
+        'La finestra della spiegazione approfondita resta dentro lo schermo mentre la risposta la fa crescere, e ci resta anche se cambi zoom o rimpicciolisci la finestra mentre è aperta. Se selezioni una parola in basso nella pagina, la riga per scrivere la domanda successiva resta dove puoi cliccarla, invece di finire fuori dal bordo e costringerti a chiudere tutto e ricominciare. Vale anche per le parole dentro ai riquadri incorporati — box dei commenti, lettori video, anteprime di articoli — dove la finestrella si restringe per starci: il testo scorre e la riga per scrivere resta al suo posto.',
       ],
     },
     {
