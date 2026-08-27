@@ -318,7 +318,10 @@ test('trascinato mentre la risposta arriva: si sposta, non si stira e non torna 
     null, { timeout: 8000 },
   );
 
-  await preparaProvider(app);
+  // Attesa lunga di proposito: il trascinamento deve avvenire mentre il
+  // riquadro è ancora VUOTO, altrimenti non si distingue la crescita del
+  // contenuto da uno stiramento.
+  await preparaProvider(app, 9000);
 
   // In basso: il riquadro va sopra la selezione, quindi agganciato col fondo.
   await page.evaluate(() => {
