@@ -45,6 +45,11 @@
   text-transform: uppercase;
   color: var(--sn-muted);
   pointer-events: none; /* il drag funziona ovunque sull'header */
+  /* In un riquadro stretto il titolo si accorcia invece di spingere fuori la
+     × di chiusura. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sn-popup-close {
