@@ -1186,15 +1186,19 @@
           bubble.text.textContent = '';
         }
         const resolved = resolveCalcMarkers(buf);
-        if (popup.action === ACTIONS.EXPLAIN && /NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
-          bubble.text.textContent = I18n.t('popup_no_explanation');
-          bubble.wrap.classList.add('sn-msg-muted');
-        } else {
-          bubble.text.innerHTML = renderMarkdown(resolved);
-        }
         const eur = m.costEur || 0;
-        setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
-        reflow(popup);
+        // L'ultima riscrittura è quella che può ACCORCIARE il testo (markdown
+        // completo al posto del parziale): senza rimettere la posizione, chi
+        // stava rileggendo a metà si ritrova sbalzato dal clamp del browser.
+        scrollaConservando(popup, () => {
+          if (popup.action === ACTIONS.EXPLAIN && /NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
+            bubble.text.textContent = I18n.t('popup_no_explanation');
+            bubble.wrap.classList.add('sn-msg-muted');
+          } else {
+            bubble.text.innerHTML = renderMarkdown(resolved);
+          }
+          setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
+        });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
         // non i marker, così l'LLM non si confonde nei turni successivi.
         try { onAssistantDone && onAssistantDone(resolved); } catch (_) {}
