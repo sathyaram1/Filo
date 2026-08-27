@@ -620,12 +620,13 @@
       if (left < POSE_MARGIN) left = POSE_MARGIN;
       root.style.left = `${Math.round(left)}px`;
       if (side === 'above') {
-        // Il fondo resta incollato sopra la selezione e la crescita va in su.
+        // Il fondo resta incollato sopra la CIMA della selezione (non sopra il
+        // suo fondo, o il riquadro coprirebbe la parola) e la crescita va in su.
         root.style.top = 'auto';
-        root.style.bottom = `${Math.round(vh - (ay() - POSE_GAP))}px`;
+        root.style.bottom = `${Math.round(vh - (ayCima() - POSE_GAP))}px`;
       } else {
         root.style.bottom = 'auto';
-        root.style.top = `${Math.round(ay() + POSE_GAP)}px`;
+        root.style.top = `${Math.round(ayFondo() + POSE_GAP)}px`;
       }
     }
 
