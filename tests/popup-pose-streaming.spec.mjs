@@ -535,9 +535,7 @@ test('zoom della pagina col riquadro aperto: resta dentro lo schermo, e tornando
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
   ).toBe(Math.round(prima.height));
 
-  const tornato = await page.evaluate(misura);
-  expect(tornato.bottom).toBeLessThanOrEqual(tornato.vh + 1);
-  expect(tornato.inputBottom).toBeLessThanOrEqual(tornato.vh);
+  expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
   expect(await page.evaluate(casellaCliccabile)).toBe(true);
 
   await zoomScheda(app, 1);
