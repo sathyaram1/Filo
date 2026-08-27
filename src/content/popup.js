@@ -569,8 +569,26 @@
       root.style.maxWidth = `${Math.max(0, Math.floor(Math.min(baseW, room)))}px`;
     }
 
+    // Lo spazio in altezza su cui si stringe il tetto. Finché il riquadro è
+    // ancorato è quello del lato scelto. Dopo che l'utente lo ha TRASCINATO è
+    // tutta la finestra: la posizione è sua, l'ingombro no — quello non l'ha
+    // scelto nessuno, e un riquadro più alto della finestra sborda comunque.
+    // (È la stessa regola che la larghezza applicava già: `capWidth()` si rifà
+    // anche da trascinato. L'altezza no, e quell'asimmetria ERA il difetto —
+    // finestra rimpicciolita e riquadro spostato: smetteva di accorciarsi, si
+    // appoggiava in cima e il fondo usciva, con la riga per scrivere fuori.)
+    function roomForCap() {
+      if (dragged) return window.innerHeight - POSE_MARGIN * 2;
+      return side === 'above' ? roomAbove() : roomBelow();
+    }
+
+    // Si rifà da capo a ogni misura, in tutte e due le direzioni: stringe
+    // quando lo spazio manca e RIALLARGA quando torna. Un tetto che sa solo
+    // stringere lascia il riquadro schiacciato per sempre — la seconda faccia
+    // dello stesso difetto: spostato mentre lo spazio era poco, restava alto
+    // 194px anche con la finestra tornata a 900.
     function capHeight() {
-      const room = (side === 'above' ? roomAbove() : roomBelow()) / scale() - boxExtra();
+      const room = roomForCap() / scale() - boxExtra();
       const cap = Math.min(maxH, Math.max(pavimento(), room));
       comprimi(cap);
       root.style.maxHeight = `${Math.floor(cap)}px`;
