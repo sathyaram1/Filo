@@ -842,3 +842,126 @@ test('finestra ristretta col riquadro aperto: si stringe per starci, e riallarga
 
   await ripristinaProvider(app);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Il riquadro SPOSTATO dall'utente. La posizione in cui l'ha messo è sua e non
+// si tocca; l'ingombro no — quello non l'ha scelto lui. Il tetto d'altezza si
+// rifaceva solo finché il riquadro era ancorato al punto della selezione: da
+// spostato smetteva di accorciarsi, e appena la finestra scendeva sotto la sua
+// altezza si appoggiava in cima col fondo — la riga per scrivere — fuori dallo
+// schermo. Stesso danno della segnalazione, stesso unico rimedio: chiudere e
+// ricominciare.
+//
+// E la faccia opposta dello stesso difetto: spostato mentre lo spazio era poco,
+// restava schiacciato per sempre, con la risposta compressa in una striscia da
+// scorrere anche dopo che lo spazio era tornato tutto.
+//
+// Il segnale che porta alla causa era un'asimmetria dentro il rimedio stesso:
+// di LARGHEZZA il riquadro spostato si stringeva eccome, di ALTEZZA no.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Trascina il riquadro per la sua intestazione, come fa un utente.
+async function trascina(page, dx, dy) {
+  const hb = await page.locator('.sn-popup-header').boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 + dx, hb.y + hb.height / 2 + dy, { steps: 10 });
+  await page.mouse.up();
+}
+
+test('riquadro spostato dall\'utente e finestra abbassata: si accorcia per starci, e riportata alta torna alto com\'era', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://newtab/');
+  const prima = await riquadroPosato(app, page);
+  const alta = prima.vh;
+  expect(fuoriDaiBordi(prima)).toEqual([]);
+
+  // L'utente lo sposta dove gli fa comodo, a risposta arrivata.
+  await trascina(page, -80, -140);
+  const spostato = await page.evaluate(misura);
+  expect(Math.round(spostato.top), 'il trascinamento non ha spostato niente')
+    .toBeLessThan(Math.round(prima.top));
+  expect(fuoriDaiBordi(spostato)).toEqual([]);
+
+  // Poi abbassa la finestra di Filo (affiancarla a metà schermo basta). Sotto
+  // i 480px utili il riquadro non ci sta più: deve accorciarsi.
+  for (const h of [450, 380]) {
+    await altezzaFinestra(page, h);
+    await expect.poll(
+      () => page.evaluate(() => window.innerHeight),
+      { timeout: 5000, message: `la finestra non è scesa a ${h}px: lo scenario non è quello vero` },
+    ).toBeLessThanOrEqual(h);
+
+    // SUCCESSO — tutto dentro lo schermo, riga per scrivere compresa.
+    await expect.poll(
+      async () => fuoriDaiBordi(await page.evaluate(misura)),
+      { timeout: 5000, message: `con la finestra a ${h}px il riquadro spostato è rimasto fuori dallo schermo` },
+    ).toEqual([]);
+    // E non "dentro le coordinate" e basta: cliccabile davvero.
+    expect(await page.evaluate(casellaCliccabile), `con la finestra a ${h}px la riga per scrivere non si clicca`).toBe(true);
+    await page.locator('.sn-popup .sn-popup-input').click();
+    await page.locator('.sn-popup .sn-popup-input').fill(`e adesso a ${h}?`);
+    await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue(`e adesso a ${h}?`);
+    await page.locator('.sn-popup .sn-popup-input').fill('');
+  }
+
+  // Il posto che torna: riportata alta la finestra, il riquadro spostato torna
+  // alto com'era. Un tetto che sa solo stringere lo lascerebbe schiacciato per
+  // sempre, con la risposta in una striscia da scorrere e lo spazio tutto lì.
+  await altezzaFinestra(page, alta);
+  await expect.poll(
+    () => page.evaluate(() => window.innerHeight),
+    { timeout: 5000 },
+  ).toBeGreaterThan(700);
+  await expect.poll(
+    async () => (await page.evaluate(misura)).height,
+    { timeout: 5000, message: 'tornato lo spazio, il riquadro spostato è rimasto schiacciato' },
+  ).toBeGreaterThan(prima.height - 3);
+
+  expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
+  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+
+  await ripristinaProvider(app);
+});
+
+// Nota su un caso che NON serve provare qui: zoom della pagina col riquadro
+// spostato. La compensazione zoom contro-scala il riquadro, quindi zoomando il
+// suo ingombro sullo schermo non cresce mai rispetto alla finestra e il
+// guardiano gli basta. Un test lì sarebbe verde anche senza il rimedio: non
+// proverebbe niente e costerebbe un avvio in più.
+
+// Chi ha chiesto la spiegazione con la tastiera continua con la tastiera: il
+// cursore deve essere GIÀ nella riga per scrivere. Prima ci si arrivava solo
+// premendo Tab o tornando al mouse.
+test('aperta con la scorciatoia: si può scrivere la domanda dopo senza toccare il mouse', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await preparaProvider(app, 300);
+
+  await page.locator('#bersaglio').dblclick();
+  await expect
+    .poll(() => page.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+    .toContain('supercalifragilistico');
+
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+
+  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
+
+  // Il cursore è nella riga per scrivere, senza aver toccato niente.
+  await expect.poll(
+    () => page.evaluate(() => {
+      const input = document.querySelector('.sn-popup .sn-popup-input');
+      return !!input && document.activeElement === input;
+    }),
+    { timeout: 5000, message: 'dopo la scorciatoia il cursore non è nella riga per scrivere' },
+  ).toBe(true);
+
+  // E si scrive davvero: tastiera e basta, niente clic e niente Tab.
+  await page.keyboard.type('e questo cosa vuol dire?');
+  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e questo cosa vuol dire?');
+
+  await ripristinaProvider(app);
+});
