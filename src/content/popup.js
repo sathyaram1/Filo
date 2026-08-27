@@ -931,6 +931,29 @@
     if (popups.length) closePopup(popups[popups.length - 1]);
   }
 
+  // La casella della domanda si allunga con quello che ci si scrive dentro.
+  // Due cose che sembrano dettagli e non lo sono:
+  //  • il TETTO non si ricopia qui. Lo tiene il foglio di stile, e la posa lo
+  //    stringe allo spazio che c'è quando la finestra è bassa — un numero
+  //    ricopiato terrebbe il tetto pieno anche dove non ci sta, ed è così che
+  //    la riga per scrivere finiva fuori dal riquadro (#502);
+  //  • `scrollHeight` comprende l'IMBOTTITURA, `height` (se il box è
+  //    content-box) no. Scriverlo tal quale lasciava la casella più alta del
+  //    suo testo di quei pixel, e non li restituiva più: cancellata la domanda
+  //    la casella restava gonfia e la risposta non si riprendeva lo spazio.
+  function autoGrow(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    let pad = 0;
+    try {
+      const cs = getComputedStyle(el);
+      if (cs.boxSizing !== 'border-box') {
+        pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      }
+    } catch (_) {}
+    el.style.height = `${Math.max(0, el.scrollHeight - pad)}px`;
+  }
+
   // ----------------------------------------------------------------
   // Crea un popup vuoto (header + body conversazione + input follow-up)
   // ----------------------------------------------------------------
