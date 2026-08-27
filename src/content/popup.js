@@ -555,12 +555,24 @@
       ro.observe(root);
     } catch (_) {}
 
-    // Finestra ridimensionata o zoom cambiato: lo spazio disponibile è un altro,
-    // il tetto va ricalcolato da capo (anche verso l'alto) e la posa riscritta.
+    // Finestra ridimensionata o zoom cambiato: lo spazio disponibile è un altro.
+    // Il tetto va rifatto DA CAPO — anche verso l'alto: quando lo spazio torna
+    // (zoom rimesso a 100%, finestra riallargata) il riquadro deve poter tornare
+    // alto com'era, non restare stretto per sempre — e la posa riscritta sul
+    // punto ancorato ritagliato sulla finestra di adesso.
     const vv = window.visualViewport;
     const onViewport = () => { if (!dragged) capHeight(); refresh(); };
     window.addEventListener('resize', onViewport);
     vv?.addEventListener('resize', onViewport);
+    // Lo zoom della pagina (Ctrl +/-, pinch, rotella) cambia la risoluzione:
+    // stessa rete della compensazione zoom, per i casi in cui `resize` da solo
+    // non arriva. Registrata DOPO quella della compensazione, così quando
+    // rimisuriamo la `scale()` del riquadro è già quella nuova.
+    let mql = null;
+    try {
+      mql = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      mql.addEventListener?.('change', onViewport);
+    } catch (_) {}
 
     return {
       // Ripassa SUBITO, in modo sincrono. Il ResizeObserver consegna solo al
