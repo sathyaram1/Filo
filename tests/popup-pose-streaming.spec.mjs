@@ -1381,3 +1381,33 @@ test('cancellata la domanda lunga, la risposta si riprende lo spazio', async ({ 
   expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
   await ripristinaProvider(app);
 });
+
+// La stessa cosa da SPOSTATO. Se l'utente lo ha trascinato la posizione è sua,
+// ma l'ingombro no: la domanda lunga deve trovare spazio anche lì, senza che il
+// riquadro esca dal bordo. È l'angolo in cui un rimedio scritto per il solo
+// riquadro ancorato si vedrebbe subito.
+test('domanda lunga col riquadro spostato a mano in una finestra bassa: resta tutto dentro', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://newtab/');
+  await riquadroPosato(app, page, 0.6);
+
+  // L'utente lo prende per l'intestazione e lo appoggia più in basso.
+  await trascina(page, 40, 180);
+  await altezzaFinestra(page, 460);
+  await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
+    .toBeLessThanOrEqual(460);
+  await expect.poll(
+    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    { timeout: 5000, message: 'il riquadro spostato è già fuori prima della domanda' },
+  ).toEqual([]);
+
+  await domandaLunga(page);
+  await expect.poll(
+    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    { timeout: 5000, message: 'scritta la domanda, il riquadro spostato è finito fuori' },
+  ).toEqual([]);
+  expect(await page.evaluate(casellaCliccabile), 'la casella non si clicca più').toBe(true);
+  expect(await page.evaluate(invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
+
+  await ripristinaProvider(app);
+});
