@@ -1212,3 +1212,163 @@ test('zoom al massimo con la parola in basso: la riga per scrivere sta dentro il
   await zoomScheda(app, 1);
   await ripristinaProvider(app);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #502, la porta rimasta aperta: a crescere non è solo la RISPOSTA.
+//
+// Il riquadro sa già accorciare il corpo e farlo scorrere quando lo spazio
+// manca — ma rifà quel conto solo quando cambia la finestra o lo zoom. Quando a
+// crescere è la RIGA PER SCRIVERE (la domanda successiva che passa le due
+// righe: la casella si allunga fino a 120px) il conto resta quello di prima: il
+// corpo è già al suo minimo comodo e non cede un pixel, così a uscire dal bordo
+// del riquadro è proprio la riga in basso — con il tasto di invio, che sotto il
+// cursore non c'è più.
+//
+// È la stessa asimmetria di sempre, un tasto più in là: un rimedio che vale per
+// una causa di crescita (la risposta) e non per l'altra (la domanda).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Il tasto di invio non basta che sia "dentro le coordinate": ci si deve poter
+// cliccare sopra davvero.
+const invioCliccabile = () => {
+  const root = document.querySelector('.sn-popup');
+  if (!root) return false;
+  const b = root.querySelector('.sn-popup-send');
+  const r = b.getBoundingClientRect();
+  const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return !!el && (el === b || b.contains(el));
+};
+
+// Scrive una domanda lunga come farebbe l'utente: tante righe, così la casella
+// si allunga fino al suo tetto. `pressSequentially` batte `fill` perché fa
+// scattare l'auto-grow a ogni carattere, come una vera digitazione.
+async function domandaLunga(page, radice = '.sn-popup') {
+  const input = page.locator(`${radice} .sn-popup-input`);
+  await input.click();
+  await input.fill('');
+  await input.pressSequentially(
+    'e questo invece cosa vorrebbe dire nel contesto della frase che avevo selezionato prima, ',
+    { delay: 1 },
+  );
+  // Ancora, così la casella arriva al suo tetto anche in un riquadro largo.
+  await input.pressSequentially('e in che modo cambia se la frase parlasse di altro?', { delay: 1 });
+}
+
+for (const altezza of [540, 480, 420]) {
+  test(`domanda lunga scritta dopo la risposta, finestra alta ${altezza}px: la riga per scrivere resta dentro`, async ({ app, openTab }) => {
+    test.setTimeout(90_000);
+    const page = await openTab('filo://newtab/');
+    await altezzaFinestra(page, altezza);
+    await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
+      .toBeLessThanOrEqual(altezza);
+
+    // Parola dalla metà in giù e risposta arrivata: fin qui è tutto dentro.
+    const posato = await riquadroPosato(app, page, 0.6);
+    expect(fuoriDaiBordi(posato), 'il riquadro sborda già prima della domanda').toEqual([]);
+
+    // Adesso la domanda successiva, lunga.
+    await domandaLunga(page);
+    // La casella si è allungata davvero: senza, il test non prova niente.
+    const cresciuta = await page.evaluate(() => {
+      const i = document.querySelector('.sn-popup .sn-popup-input');
+      return i.getBoundingClientRect().height;
+    });
+    expect(cresciuta, 'la casella non si è allungata: lo scenario non è quello vero').toBeGreaterThan(45);
+
+    const m = await page.evaluate(misura);
+    // SUCCESSO — niente sporge: né dal bordo arrotondato del riquadro né dalla
+    // finestra. È la riga per scrivere a essere in gioco, quindi si guarda lei.
+    expect(fuoriDaiBordi(m), 'scritta la domanda, qualcosa sporge').toEqual([]);
+    expect(await page.evaluate(casellaCliccabile), 'la casella non si clicca più').toBe(true);
+    expect(await page.evaluate(invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
+
+    // E la domanda si può mandare col tasto, non solo indovinando l'Invio.
+    await page.locator('.sn-popup .sn-popup-send').click();
+    await expect(page.locator('.sn-popup .sn-msg-user .sn-msg-text').last())
+      .toContainText('cosa vorrebbe dire', { timeout: 5000 });
+
+    await ripristinaProvider(app);
+  });
+}
+
+// Dentro un riquadro incorporato lo "schermo" È il riquadro e quello che esce
+// dal suo bordo il browser lo TAGLIA: non lo recuperi né scorrendo né
+// spostando il popup altrove. I box dei commenti stanno spesso fra i 230 e i
+// 420px, quindi è lì che la domanda lunga fa più danno.
+for (const alto of [420, 320, 240]) {
+  test(`domanda lunga dentro un riquadro incorporato alto ${alto}px: la riga per scrivere resta dentro`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const src = testServer.html(RIQUADRO_INTERNO);
+    const page = await testServer.openReady(openTab, PAGINA_CON_RIQUADRO(src, alto));
+    await preparaProvider(app, 300);
+
+    const frame = await frameDelRiquadro(page, src);
+    await frame.locator('#bersaglio').dblclick();
+    await expect
+      .poll(() => frame.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+      .toContain('supercalifragilistico');
+
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      globalThis.__filoShortcuts.dispatch('explain-selection', win);
+    });
+    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
+    await expect(frame.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+    await frame.evaluate(async () => {
+      const root = document.querySelector('.sn-popup');
+      if (!root?.getAnimations) return;
+      await Promise.all(root.getAnimations().map((a) => a.finished.catch(() => {})));
+    });
+
+    expect(fuoriDaiBordi(await frame.evaluate(misura)), 'sborda già prima della domanda').toEqual([]);
+
+    await domandaLunga(frame);
+    const cresciuta = await frame.evaluate(() => {
+      const i = document.querySelector('.sn-popup .sn-popup-input');
+      return i.getBoundingClientRect().height;
+    });
+    expect(cresciuta, 'la casella non si è allungata: lo scenario non è quello vero').toBeGreaterThan(45);
+
+    const m = await frame.evaluate(misura);
+    expect(fuoriDaiBordi(m), 'scritta la domanda, qualcosa sporge dal riquadro incorporato').toEqual([]);
+    expect(await frame.evaluate(casellaCliccabile), 'la casella non si clicca più').toBe(true);
+    expect(await frame.evaluate(invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
+
+    await ripristinaProvider(app);
+  });
+}
+
+// La faccia opposta, che un rimedio "che sa solo stringere" lascerebbe fuori:
+// cancellata la domanda lunga la casella torna bassa, e lo spazio che aveva
+// preso deve tornare alla RISPOSTA. Senza, il riquadro resta schiacciato per
+// sempre solo perché per un momento c'era una domanda lunga.
+test('cancellata la domanda lunga, la risposta si riprende lo spazio', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  await altezzaFinestra(page, 480);
+  await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
+    .toBeLessThanOrEqual(480);
+
+  await riquadroPosato(app, page, 0.6);
+  const corpoPrima = await page.evaluate(() => (
+    document.querySelector('.sn-popup .sn-popup-body').getBoundingClientRect().height
+  ));
+
+  await domandaLunga(page);
+  const corpoStretto = await page.evaluate(() => (
+    document.querySelector('.sn-popup .sn-popup-body').getBoundingClientRect().height
+  ));
+  expect(corpoStretto, 'il corpo non ha ceduto spazio alla domanda').toBeLessThan(corpoPrima - 5);
+
+  await page.locator('.sn-popup .sn-popup-input').fill('');
+  await page.locator('.sn-popup .sn-popup-input').press('Backspace');
+  await expect.poll(
+    async () => page.evaluate(() => (
+      document.querySelector('.sn-popup .sn-popup-body').getBoundingClientRect().height
+    )),
+    { timeout: 5000, message: 'cancellata la domanda, il corpo è rimasto schiacciato' },
+  ).toBeGreaterThan(corpoPrima - 5);
+
+  expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
+  await ripristinaProvider(app);
+});
