@@ -431,3 +431,94 @@ test('"Mostra originale" riporta indietro tutta la pagina, link compresi', async
   await expect(page.locator('#p2')).toHaveText('Second paragraph with a linked phrase inside it.');
   await expect(page.locator('#p2 a#inlink')).toHaveAttribute('href', '#x');
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #503 — l'avviso "tradotta solo in parte" non deve scattare a vuoto.
+//
+// Gli spazi pubblicitari, i banner dei cookie già chiusi e i riquadri di
+// statistica sono componenti chiusi NASCOSTI: su un sito di giornale ce n'è
+// sempre almeno uno, e l'avviso usciva praticamente sempre mandando l'utente a
+// cercare sullo schermo un rettangolo in lingua originale che non c'è.
+//
+// Il metro è "l'utente lo vede?", non "quanto è grande il rettangolo":
+//  1) portato fuori dallo schermo, reso trasparente, nascosto lasciandogli
+//     l'ingombro o tolto dal flusso → NON conta: l'avviso dice "Pagina tradotta";
+//  2) semplicemente più in basso della prima schermata → CONTA: è contenuto
+//     vero, ci si arriva scorrendo.
+// ───────────────────────────────────────────────────────────────────────────
+
+const AD_SLOT_SCRIPT = `<script>
+    customElements.define('ad-slot', class extends HTMLElement {
+      connectedCallback() {
+        this.style.display = 'block';
+        this.style.width = '300px';
+        this.style.height = '250px';
+        const r = this.attachShadow({ mode: 'closed' });
+        r.innerHTML = '<div>Sponsored message nobody outside can read</div>';
+      }
+    });
+  </script>`;
+
+// Pagina di giornale tradotta per intero, con quattro spazi pubblicitari chiusi
+// nascosti nei quattro modi soliti. Nessuno di loro è sullo schermo.
+const HIDDEN_ADS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="position:absolute;left:-9999px;top:0"><ad-slot id="adOffscreen"></ad-slot></div>
+  <div style="transform:translateX(-200vw)"><ad-slot id="adPushed"></ad-slot></div>
+  <div style="opacity:0"><ad-slot id="adTransparent"></ad-slot></div>
+  <div style="visibility:hidden"><ad-slot id="adInvisible"></ad-slot></div>
+  <div style="display:none"><ad-slot id="adRemoved"></ad-slot></div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+// Stessa pagina, ma lo spazio chiuso è visibilissimo: sta solo più in basso
+// della prima schermata. Scorrendo lo si trova, in lingua originale.
+const BELOW_FOLD_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="height:3000px"></div>
+  <ad-slot id="adBelow"></ad-slot>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('spazi chiusi ma invisibili: la pagina è tradotta e l’avviso non manda a cercare niente', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, HIDDEN_ADS);
+  await watchToasts(page);
+
+  // Il presupposto della prova: gli spazi ci sono davvero, sono componenti
+  // chiusi (nessuno script può leggerci dentro) e nessuno di loro si vede.
+  expect(await page.evaluate(() => document.querySelectorAll('ad-slot').length)).toBe(5);
+  expect(await page.evaluate(() => [...document.querySelectorAll('ad-slot')].every((el) => !el.shadowRoot))).toBe(true);
+
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect(page.locator('#body')).toHaveText(/^IT /);
+
+  // Quello che conta: l'avviso di fine lavoro dice che la pagina è tradotta,
+  // punto. Senza il fix qui usciva "tradotta solo in parte".
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/translate-page-hidden-ads.png' }).catch(() => {});
+});
+
+test('spazio chiuso sotto la prima schermata: continua a contare, l’avviso resta onesto', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, BELOW_FOLD_AD);
+  await watchToasts(page);
+
+  // Fuori dalla prima schermata, ma dentro la pagina: ci si arriva scorrendo.
+  expect(await page.evaluate(() => {
+    const r = document.querySelector('#adBelow').getBoundingClientRect();
+    return r.top + window.scrollY > window.innerHeight;
+  })).toBe(true);
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partial = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
