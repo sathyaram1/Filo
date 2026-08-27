@@ -579,6 +579,20 @@
     // allarga quando la domanda è lunga.
     const incomprimibile = () => altezza(headerEl) + altezza(composeEl);
 
+    // La casella della domanda: il suo minimo e il suo tetto naturale, letti dal
+    // foglio di stile UNA VOLTA e prima di scriverci sopra il tetto ristretto —
+    // dopo rileggeremmo il nostro stesso valore e lo stringeremmo a ogni giro.
+    // (Stessa storia del tetto del riquadro: il numero sta nel foglio di stile,
+    // non ricopiato qui.)
+    const inputEl = root.querySelector('.sn-popup-input');
+    const misuraStile = (el, prop, ripiego) => {
+      let v = NaN;
+      try { v = parseFloat(getComputedStyle(el)[prop]); } catch (_) {}
+      return Number.isFinite(v) && v > 0 ? v : ripiego;
+    };
+    const inputMin = inputEl ? misuraStile(inputEl, 'minHeight', 30) : 30;
+    const inputMax = inputEl ? misuraStile(inputEl, 'maxHeight', 120) : 120;
+
     // I tre gradini, dal più comodo al più stretto: quanto misura il riquadro
     // AL MINIMO in ciascuno. Sotto quel numero, in quello stato, non si accorcia
     // più — i pezzi escono dal bordo invece di comprimersi, e dentro un riquadro
