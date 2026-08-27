@@ -286,7 +286,8 @@ test('#502 tema scuro: traccia visiva', async ({ app, openTab }) => {
   await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
   await provider(app, { attesa: 200 });
-  await page.waitForTimeout(500);
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.snTheme), { timeout: 8000 })
+    .toBe('dark');
   await page.evaluate(() => window.SN_POPUP.openStreaming({
     action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
     payload: { selection: 'x', sentence: 'y' },
