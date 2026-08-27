@@ -655,6 +655,7 @@
 
     function refresh() { place(); guard(); }
 
+    capWidth();
     side = chooseSide();
     capHeight();
     place();
