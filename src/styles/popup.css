@@ -197,6 +197,10 @@
 }
 .sn-popup-input {
   flex: 1;
+  /* Senza questo la casella non scende sotto la sua larghezza naturale (un
+     textarea ne ha una tutta sua) e in un riquadro stretto spinge fuori il
+     tasto di invio, che è proprio quello che deve restare. */
+  min-width: 0;
   resize: none;
   border: 1px solid var(--sn-border);
   border-radius: 6px;
