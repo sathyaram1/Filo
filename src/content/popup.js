@@ -569,7 +569,7 @@
     })();
     // Da stretto (il corpo scorre) e da nudo (il corpo è sparito del tutto).
     const bodyStretto = residuoCorpo([POSE_TIGHT]);
-    const bodyNudo = residuoCorpo([POSE_TIGHT, POSE_BARE]);
+    const bodyNudo = 0; // RED-CHECK TEMP
     // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe
     // più. (Nasce vuota ma il foglio di stile le dà già l'altezza che avrà
     // piena, così questa misura vale anche dopo.)
