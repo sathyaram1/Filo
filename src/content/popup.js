@@ -1204,9 +1204,11 @@
         try { onAssistantDone && onAssistantDone(resolved); } catch (_) {}
         popup.activePort = null;
       } else if (m.type === 'error') {
-        bubble.text.textContent = m.message || I18n.t('err_provider_failed');
-        bubble.wrap.classList.add('sn-msg-error');
-        reflow(popup);
+        // L'errore va LETTO: è l'unica cosa rimasta da leggere, la vista ci va.
+        scrollaConservando(popup, () => {
+          bubble.text.textContent = m.message || I18n.t('err_provider_failed');
+          bubble.wrap.classList.add('sn-msg-error');
+        }, true);
         popup.activePort = null;
       }
     });
