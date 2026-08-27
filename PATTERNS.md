@@ -900,7 +900,7 @@ irraggiungibili.
   `.sn-toasts` in `src/content/popup.js` e `src/styles/popup.css` — ci passano
   toast, `.sn-dictate-pill` e `.sn-save-confirm`. Test `tests/toast-stack.spec.mjs`.
 
-## Un riquadro che si riempie dopo va rimisurato dopo
+## Un riquadro che si riempie dopo si ancora dal lato che non si muove
 
 Un riquadro ancorato a un punto della pagina — la spiegazione su una selezione,
 un menu con una sezione che arriva da un modello, un'anteprima che carica
@@ -912,9 +912,12 @@ conferma), quindi il difetto non è estetico: la funzione diventa
 irraggiungibile e l'unico rimedio resta chiudere e riprovare più in alto
 (#500, #502).
 
-Non basta rimisurare: rimisurare da solo produce un **salto** a metà risposta e
-una posa che cambia a ogni apertura, perché dipende da quanto ci mette il
-modello. Servono due mosse.
+La tentazione è inseguire: rimisurare a ogni pezzo di risposta e rispostare il
+riquadro. Non funziona bene. La posa finisce per dipendere da **quando** si
+guarda, cioè da quanto ci mette il modello: stessa selezione, riquadro sopra o
+sotto a seconda della volta, e un salto a metà risposta quando cresce oltre lo
+spazio che aveva. Chi insegue tratta l'altezza come un dato e la posizione come
+una conseguenza; va fatto il contrario.
 
 - **Il LATO si sceglie una volta e non cambia più**, e si sceglie sull'altezza
   che il riquadro **potrà** raggiungere (il suo tetto, letto dal foglio di
@@ -923,21 +926,38 @@ modello. Servono due mosse.
   dei due, il lato più capiente.
 - **Il tetto d'altezza si stringe allo spazio di quel lato.** Da lì in poi il
   riquadro non *può* diventare più alto di quanto ci sta: il corpo si accorcia
-  e scorre, e il fondo resta raggiungibile. Tieni un'altezza minima sotto la
-  quale il riquadro non è più usabile e lascia che sia l'ultimo aggancio ai
-  bordi a occuparsi delle finestre minuscole.
-- **Poi rimisura davvero**, con un `ResizeObserver` sulla radice: a ogni cambio
-  d'altezza riappoggia il riquadro al punto ancorato — sotto cresce verso il
-  basso, sopra resta agganciato e cresce verso l'alto. Non toccare la
-  dimensione dentro la callback o l'osservatore si rincorre.
+  e scorre, e il fondo resta raggiungibile.
+- **Il bordo ancorato lo tiene il foglio di stile, non JavaScript.** Sotto il
+  punto si fissa `top` e il riquadro cresce verso il basso; sopra il punto si
+  fissa `bottom` — non `top` ricalcolato dall'altezza — e cresce verso l'alto da
+  solo. Le coordinate scritte diventano così **costanti per tutta la vita del
+  riquadro**: riscriverle mille volte non lo sposta di un pixel, e l'unica
+  coordinata che cambia col contenuto la calcola il browser. È qui che muore il
+  tremolio, non nel rimisurare meglio.
+- **Il `ResizeObserver` resta, ma come rete, non come motore.** Serve per i casi
+  che la matematica non copre — le altezze minime dei pezzi interni non stanno
+  nel tetto, finestra bassissima — e in quei casi **stringe ancora il tetto,
+  non sposta il riquadro**: una sola direzione, quindi non può oscillare. Non
+  toccare la dimensione fuori da questo schema o l'osservatore si rincorre.
+- **Il `ResizeObserver` consegna al passo di rendering**, che in una scheda in
+  secondo piano è strozzato: esponi anche una richiamata sincrona e chiamala
+  da chi allunga il contenuto.
 - **Misura l'ingombro VISIBILE** (`getBoundingClientRect`), non quello di
-  layout (`offsetHeight`): con la compensazione zoom addosso il riquadro porta
-  una scala e i due numeri divergono proprio quando lo schermo è più stretto.
+  layout (`offsetHeight`), e tieni conto della `scale()` della compensazione
+  zoom: il tetto è in px di layout, lo spazio sullo schermo in px visibili. Con
+  l'ancoraggio dal fondo la `transform-origin` va spostata a `bottom left`, o al
+  primo cambio di zoom il riquadro si stacca dal punto.
 - **Se l'utente lo ha trascinato, la posa è sua.** Smetti di riportarlo sul
   punto ancorato: resta dove l'ha messo e ti limiti a non farlo uscire dallo
   schermo, senza nemmeno il margine dai bordi (l'ha appoggiato lì apposta).
-- **Ricalcola anche su `resize` della finestra e del visual viewport**: lo
-  spazio disponibile è cambiato, il tetto va ristretto di nuovo.
+  Passando al trascinamento azzera `bottom`: con `top` e `bottom` insieme e
+  altezza automatica il riquadro si stira fra i due bordi.
+- **Ricalcola su `resize` della finestra e del visual viewport**: lo spazio
+  disponibile è cambiato, il tetto va rifatto da capo (anche verso l'alto).
+- **Attento a misurare dopo l'animazione d'ingresso.** `.sn-popup` entra con una
+  dissolvenza che porta 2px di scivolata: un test che legge la posizione mentre
+  scorre legge un fotogramma, non una posa, e accusa di tremolio del codice che
+  sta fermo. Aspetta `element.getAnimations()` prima di prendere le misure.
 - **Dove:** `attachPose()` in `src/content/popup.js` (riquadro `.sn-popup`),
   test `tests/popup-pose-streaming.spec.mjs`.
 
