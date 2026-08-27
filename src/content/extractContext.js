@@ -271,6 +271,72 @@
   const CLOSED_MIN_W = 40;
   const CLOSED_MIN_H = 16;
 
+  // #503 — il rettangolo da solo non basta: dice quanto è grande il componente,
+  // mai se quel rettangolo si vede. Un componente chiuso che l'utente NON vede
+  // non va contato, perché il conto serve a una cosa sola — scrivere l'avviso
+  // finale — e "tradotta solo in parte" ha senso solo se sullo schermo è
+  // rimasto davvero un riquadro in lingua originale da andare a cercare. Spazi
+  // pubblicitari, banner dei cookie già chiusi e riquadri di statistica sono
+  // esattamente questo: componenti chiusi e nascosti, e su un sito di giornale
+  // ce n'è sempre almeno uno. Senza questo filtro l'avviso esce quasi sempre, e
+  // quasi sempre a vuoto: che è la bugia di #439 girata al contrario (prima
+  // dichiarava monco un lavoro finito... no: dichiarava finito un lavoro monco;
+  // qui dichiarerebbe monco un lavoro finito) e brucia le uniche volte che
+  // serve davvero.
+  //
+  // "Non lo vede" = display:none, visibility:hidden, opacità zero (anche presa
+  // da un antenato: sullo schermo il risultato è lo stesso) o rettangolo
+  // portato fuori dalla pagina (left:-9999px, top negativo, transform).
+  // NON vuol dire "sotto la prima schermata": quello è contenuto vero, ci si
+  // arriva scorrendo, e deve continuare a contare come prima. Per questo il
+  // confronto è con l'area SCORRIBILE del documento, non con la finestra.
+
+  // Trasparente per l'utente. checkVisibility (Chromium) guarda display,
+  // visibility e opacità lungo tutta la catena degli antenati in un colpo solo;
+  // il ripiego rifà lo stesso giro a mano con lo stesso metro già usato dal
+  // resto della pagina (isHiddenByCss).
+  function isInvisibleToUser(el) {
+    try {
+      if (typeof el.checkVisibility === 'function') {
+        return !el.checkVisibility({
+          // I nomi nuovi e quelli vecchi della stessa opzione: passarli
+          // entrambi evita che su una versione di Chromium l'opacità venga
+          // semplicemente ignorata (il default è "non guardarla").
+          opacityProperty: true, checkOpacity: true,
+          visibilityProperty: true, checkVisibilityCSS: true,
+        });
+      }
+    } catch (_) {}
+    let cur = el;
+    for (let hops = 0; cur && cur.nodeType === 1 && hops < 64; hops++) {
+      if (isHiddenByCss(cur)) return true;
+      cur = cur.parentElement;
+    }
+    return false;
+  }
+
+  // Rettangolo portato fuori dalla pagina: non ci si arriva scorrendo, quindi
+  // l'utente non lo vedrà mai. Le coordinate sono quelle del DOCUMENTO (rect +
+  // scroll corrente), non della finestra: ciò che sta solo più in basso della
+  // prima schermata resta dentro e continua a contare.
+  function isOutsideScrollablePage(rect) {
+    const doc = document.documentElement;
+    const left = rect.left + (window.scrollX || 0);
+    const top = rect.top + (window.scrollY || 0);
+    const pageW = Math.max((doc && doc.scrollWidth) || 0, window.innerWidth || 0);
+    const pageH = Math.max((doc && doc.scrollHeight) || 0, window.innerHeight || 0);
+    // Margine a sinistra: una pagina da destra a sinistra può avere area
+    // scorribile con coordinate negative, e lì lo zero non è il bordo. Il
+    // margine costa solo qualche pixel di prudenza — chi si nasconde lo fa a
+    // migliaia di pixel di distanza.
+    const leftEdge = -Math.max(0, ((doc && doc.scrollWidth) || 0) - ((doc && doc.clientWidth) || 0));
+    if (left + rect.width <= leftEdge) return true;   // tutto oltre il bordo sinistro
+    if (top + rect.height <= 0) return true;          // tutto sopra la pagina
+    if (left >= pageW) return true;                   // oltre il bordo destro
+    if (top >= pageH) return true;                    // oltre il fondo scorribile
+    return false;
+  }
+
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
@@ -279,7 +345,10 @@
     if ((el.textContent || '').trim()) return false;
     try {
       const r = el.getBoundingClientRect();
-      return r.width >= CLOSED_MIN_W && r.height >= CLOSED_MIN_H;
+      if (!(r.width >= CLOSED_MIN_W && r.height >= CLOSED_MIN_H)) return false;
+      if (isOutsideScrollablePage(r)) return false;
+      if (isInvisibleToUser(el)) return false;
+      return true;
     } catch (_) { return false; }
   }
 
