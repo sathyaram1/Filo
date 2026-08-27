@@ -396,8 +396,15 @@
   }
 
   function attachPose(root, anchor) {
-    const ax = Number.isFinite(anchor?.x) ? anchor.x : POSE_MARGIN;
-    const ay = Number.isFinite(anchor?.y) ? anchor.y : POSE_MARGIN;
+    // Il punto ancorato va riportato DENTRO la finestra prima di ragionarci
+    // sopra. Non è teoria: la scorciatoia ancora al fondo del rettangolo della
+    // selezione, e una selezione che continua sotto la piega ha il fondo fuori
+    // dallo schermo. Con un punto fuori, "sopra il punto" è a sua volta fuori e
+    // il riquadro nasce già sbordato.
+    const vw0 = window.innerWidth, vh0 = window.innerHeight;
+    const dentro = (v, max) => Math.max(POSE_MARGIN, Math.min(max - POSE_MARGIN, v));
+    const ax = dentro(Number.isFinite(anchor?.x) ? anchor.x : POSE_MARGIN, vw0);
+    const ay = dentro(Number.isFinite(anchor?.y) ? anchor.y : POSE_MARGIN, vh0);
     // Letto PRIMA di scrivere il tetto inline: dopo rileggeremmo il nostro
     // stesso valore e lo stringeremmo a ogni giro.
     const maxH = styleMaxHeight(root);
