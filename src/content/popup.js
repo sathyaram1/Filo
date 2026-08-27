@@ -494,14 +494,23 @@
         return;
       }
       const vh = window.innerHeight;
-      const r = root.getBoundingClientRect();
+      let r = root.getBoundingClientRect();
       const over = side === 'above'
         ? POSE_MARGIN - r.top
         : r.bottom - (vh - POSE_MARGIN);
       if (!(over > 0.5)) return;
       const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
-      const next = Math.max(60, Math.floor(cur - over / scale()));
-      if (next < cur) root.style.maxHeight = `${next}px`;
+      const next = Math.max(POSE_FLOOR_H, Math.floor(cur - over / scale()));
+      if (next < cur) { root.style.maxHeight = `${next}px`; return; }
+      // Tetto già al minimo e sborda lo stesso: la finestra è più bassa del
+      // riquadro. Meglio coprire il punto ancorato che restare fuori dal bordo,
+      // dove non si clicca. Passa all'aggancio dall'alto per non litigare con
+      // `bottom`; `place()` lo riscriverà e questo lo ricorreggerà, sempre allo
+      // stesso valore.
+      r = root.getBoundingClientRect();
+      const top = Math.max(0, Math.min(vh - r.height, r.top));
+      root.style.bottom = 'auto';
+      root.style.top = `${Math.round(top)}px`;
     }
 
     function refresh() { place(); guard(); }
