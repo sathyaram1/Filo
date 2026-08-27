@@ -510,13 +510,16 @@ test('zoom della pagina col riquadro aperto: resta dentro lo schermo, e tornando
     { timeout: 5000, message: 'lo zoom non ha accorciato la finestra: lo scenario non è quello vero' },
   ).toBeLessThan(prima.vh - 50);
 
+  // Il browser aggiorna `innerHeight` prima di consegnare `resize` a JS: per un
+  // fotogramma il riquadro è ancora posato sulla finestra di prima. Quello che
+  // conta è dove si ferma — senza il rimedio ci resta e basta.
+  await expect.poll(
+    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    { timeout: 5000, message: 'dopo lo zoom il riquadro è rimasto fuori dallo schermo' },
+  ).toEqual([]);
+
   const zoomato = await page.evaluate(misura);
-  expect(zoomato.bottom, `riquadro fuori dal fondo dopo lo zoom (vh=${zoomato.vh})`)
-    .toBeLessThanOrEqual(zoomato.vh + 1);
-  expect(zoomato.top).toBeGreaterThanOrEqual(-1);
   // È questo che l'utente non riusciva più a fare.
-  expect(zoomato.inputBottom).toBeLessThanOrEqual(zoomato.vh);
-  expect(zoomato.inputTop).toBeGreaterThanOrEqual(0);
   expect(await page.evaluate(casellaCliccabile)).toBe(true);
   await page.locator('.sn-popup .sn-popup-input').click();
   await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
