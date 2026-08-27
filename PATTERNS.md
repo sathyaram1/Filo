@@ -1032,6 +1032,33 @@ una conseguenza; va fatto il contrario.
   riquadro**: riscriverle mille volte non lo sposta di un pixel, e l'unica
   coordinata che cambia col contenuto la calcola il browser. È qui che muore il
   tremolio, non nel rimisurare meglio.
+- **Il bilancio va rifatto anche quando a crescere è chi NON cede.** Tetto e
+  gradino di compressione si sceglievano alla posa e a ogni cambio di finestra:
+  le due cause di cambiamento che arrivano da FUORI. Ma dentro il riquadro c'è
+  un pezzo che cresce da solo e non cede mai — la riga per scrivere, che si
+  allunga con la domanda (la casella arriva a 120px). Cresciuta lei il conto è
+  vecchio: il corpo resta al minimo comodo che aveva, non cede un pixel, e a
+  uscire dal bordo del riquadro è proprio la riga in basso, col tasto di invio
+  che sotto il cursore non c'è più — 50px oltre il bordo e 42 fuori dallo
+  schermo su una finestra di 480, con la seconda faccia (la riga appoggiata sul
+  vuoto sotto l'angolo arrotondato) visibile anche a riquadro comodo dentro lo
+  schermo (#502). Rifai il bilancio quando cambia l'altezza INCOMPRIMIBILE, e
+  **solo** allora: rifarlo a ogni misura lo metterebbe a rincorrere lo
+  stringimento in più che il guardiano applica di suo.
+- **E anche il pezzo che non cede ha un tetto, che va stretto allo spazio.**
+  Altrimenti nella finestra bassa — o nel riquadro incorporato — è lui a
+  spingere fuori il tasto di invio dopo che tutto il resto ha già ceduto. Il suo
+  tetto è quanto resta quando ha ceduto ANCHE il corpo, ridotto all'osso: da lì
+  in giù la casella smette di allungarsi e scorre al suo interno, e il cursore
+  resta in vista perché il browser segue chi scrive. Si rifà in tutte e due le
+  direzioni, come ogni altro tetto.
+- **Una casella che si auto-allunga: il tetto non si ricopia, e
+  `scrollHeight` non è `height`.** Il tetto lo tiene il foglio di stile (la posa
+  lo stringe da lì), quindi `Math.min(scrollHeight, 120)` in JS terrebbe il
+  tetto pieno anche dove non ci sta. E `scrollHeight` comprende l'imbottitura
+  mentre `height` (box content-box) no: scriverlo tal quale lascia la casella
+  più alta del suo testo di quei pixel e non li restituisce più — cancellata la
+  domanda resta gonfia e la risposta non si riprende lo spazio.
 - **Il `ResizeObserver` resta, ma come rete, non come motore.** Serve per i casi
   che la matematica non copre — le altezze minime dei pezzi interni non stanno
   nel tetto, finestra bassissima — e in quei casi **stringe ancora il tetto,
