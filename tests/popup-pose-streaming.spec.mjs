@@ -440,3 +440,141 @@ test('selezione che prosegue sotto la piega: il riquadro nasce dentro lo schermo
 
   await ripristinaProvider(app);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lo spazio a disposizione può cambiare DOPO che il riquadro si è posato: in
+// Filo lo zoom della pagina si usa di continuo (Ctrl +/-, pinch, rotella) e la
+// finestra dell'app si ridimensiona. Il punto a cui il riquadro si aggancia
+// veniva riportato dentro lo schermo una volta sola, all'apertura: se poi la
+// finestra si accorciava, quel punto restava dov'era — ormai oltre il bordo —
+// e il riquadro veniva riposato rispetto a un posto che non esiste più. Stesso
+// sintomo del difetto segnalato (la riga per scrivere fuori dallo schermo), da
+// un'altra porta, e senza nemmeno bisogno che arrivi una risposta.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Cambia lo zoom della SCHEDA: è la strada in cui finiscono tutte le vie di
+// zoom di Filo (Ctrl +/-, pinch, rotella passano da webFrame.setZoomLevel, che
+// è la stessa manopola di webContents).
+async function zoomScheda(app, fattore) {
+  await app.evaluate(({ BrowserWindow }, f) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    for (const t of (win?._filoTabs?.tabs || [])) {
+      try { t.view.webContents.setZoomFactor(f); } catch (_) {}
+    }
+  }, fattore);
+}
+
+async function altezzaFinestra(app, px) {
+  return app.evaluate(({ BrowserWindow }, h) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const b = win.getBounds();
+    win.setBounds({ x: b.x, y: b.y, width: b.width, height: h });
+    return win.getBounds().height;
+  }, px);
+}
+
+// Apre il riquadro su una selezione in basso e aspetta che la risposta sia
+// finita: da qui in poi il riquadro è alto quanto può, ed è posato.
+async function riquadroPosato(app, page, frazione = 0.75) {
+  await page.waitForFunction(
+    () => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST,
+    null, { timeout: 8000 },
+  );
+  await preparaProvider(app, 300);
+  await page.evaluate((f) => {
+    window.SN_POPUP.openStreaming({
+      action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+      payload: { selection: 'parola', sentence: 'una frase con parola dentro' },
+      anchor: { x: 120, y: Math.round(window.innerHeight * f) },
+      title: 'Approfondisci',
+    });
+  }, frazione);
+  await page.waitForSelector('.sn-popup', { timeout: 8000 });
+  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+  await attendiIngresso(page);
+  return page.evaluate(misura);
+}
+
+test('zoom della pagina col riquadro aperto: resta dentro lo schermo, e tornando allo zoom di prima torna alto com\'era', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  const prima = await riquadroPosato(app, page);
+  expect(prima.bottom).toBeLessThanOrEqual(prima.vh + 1);
+
+  // Zoom al 150% mentre il riquadro sta lì. Lo spazio si accorcia sotto il
+  // punto ancorato: senza il rimedio il riquadro non si sposta e il suo fondo
+  // resta dov'era, decine di pixel sotto il bordo.
+  await zoomScheda(app, 1.5);
+  await expect.poll(
+    () => page.evaluate(() => window.innerHeight),
+    { timeout: 5000, message: 'lo zoom non ha accorciato la finestra: lo scenario non è quello vero' },
+  ).toBeLessThan(prima.vh - 50);
+
+  const zoomato = await page.evaluate(misura);
+  expect(zoomato.bottom, `riquadro fuori dal fondo dopo lo zoom (vh=${zoomato.vh})`)
+    .toBeLessThanOrEqual(zoomato.vh + 1);
+  expect(zoomato.top).toBeGreaterThanOrEqual(-1);
+  // È questo che l'utente non riusciva più a fare.
+  expect(zoomato.inputBottom).toBeLessThanOrEqual(zoomato.vh);
+  expect(zoomato.inputTop).toBeGreaterThanOrEqual(0);
+  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+  await page.locator('.sn-popup .sn-popup-input').click();
+  await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
+  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+
+  // Quando lo spazio torna, il riquadro deve poter tornare alto com'era: non
+  // resta stretto per sempre solo perché per un momento c'era meno posto.
+  await zoomScheda(app, 1);
+  await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
+    .toBeGreaterThan(zoomato.vh + 50);
+  await expect.poll(
+    async () => Math.round((await page.evaluate(misura)).height),
+    { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
+  ).toBe(Math.round(prima.height));
+
+  const tornato = await page.evaluate(misura);
+  expect(tornato.bottom).toBeLessThanOrEqual(tornato.vh + 1);
+  expect(tornato.inputBottom).toBeLessThanOrEqual(tornato.vh);
+  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+
+  await zoomScheda(app, 1);
+  await ripristinaProvider(app);
+});
+
+test('finestra rimpicciolita col riquadro aperto: resta dentro lo schermo e la riga per scrivere si clicca', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  const prima = await riquadroPosato(app, page);
+
+  // Meno di un terzo in meno di altezza: abbastanza da portare fuori un punto
+  // ancorato a tre quarti.
+  const alta = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    return win.getBounds().height;
+  });
+  await altezzaFinestra(app, Math.max(420, Math.round(alta * 0.62)));
+  await expect.poll(
+    () => page.evaluate(() => window.innerHeight),
+    { timeout: 5000, message: 'la finestra non si è rimpicciolita: lo scenario non è quello vero' },
+  ).toBeLessThan(prima.vh - 50);
+
+  const stretta = await page.evaluate(misura);
+  expect(stretta.bottom, `riquadro fuori dal fondo dopo il ridimensionamento (vh=${stretta.vh})`)
+    .toBeLessThanOrEqual(stretta.vh + 1);
+  expect(stretta.top).toBeGreaterThanOrEqual(-1);
+  expect(stretta.inputBottom).toBeLessThanOrEqual(stretta.vh);
+  expect(stretta.inputTop).toBeGreaterThanOrEqual(0);
+  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+  await page.locator('.sn-popup .sn-popup-input').click();
+  await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
+  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+
+  // Riallargata, il riquadro torna alto com'era.
+  await altezzaFinestra(app, alta);
+  await expect.poll(
+    async () => Math.round((await page.evaluate(misura)).height),
+    { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
+  ).toBe(Math.round(prima.height));
+
+  await ripristinaProvider(app);
+});
