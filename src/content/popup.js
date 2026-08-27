@@ -1181,10 +1181,7 @@
           bubble.text.appendChild(retry);
         }, true);
       } else if (m.type === 'done') {
-        if (firstDelta) {
-          // nessun delta arrivato (es. cache vuota errore)
-          bubble.text.textContent = '';
-        }
+        const vuota = firstDelta;   // nessun delta arrivato (es. cache vuota errore)
         const resolved = resolveCalcMarkers(buf);
         const eur = m.costEur || 0;
         // L'ultima riscrittura è quella che può ACCORCIARE il testo (markdown
