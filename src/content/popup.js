@@ -1071,10 +1071,42 @@
     const text = document.createElement('div');
     text.className = 'sn-msg-text';
     wrap.appendChild(text);
-    popup.bodyEl.appendChild(wrap);
-    popup.bodyEl.scrollTop = popup.bodyEl.scrollHeight;
-    reflow(popup);
+    // Bolla nuova = turno nuovo, e il turno lo apre sempre l'utente (ha aperto
+    // il riquadro o ha appena inviato una domanda): questa è l'eccezione
+    // esplicita "vai comunque in fondo", vuole vedere quello che ha chiesto.
+    scrollaConservando(popup, () => popup.bodyEl.appendChild(wrap), true);
     return { wrap, text };
+  }
+
+  // Aggiorna il corpo della risposta senza STRAPPARE la lettura —
+  // vedi PATTERNS.md § "Liste/chat che si ricostruiscono in streaming".
+  //
+  // Il corpo del riquadro è una finestrella che scorre, e quando lo spazio è
+  // poco si accorcia parecchio: leggere scorrendo mentre la risposta arriva è
+  // il modo normale di usarla. Portare la vista in fondo a ogni pezzo che
+  // arriva vuol dire che chi torna su a rileggere viene sbalzato giù di nuovo,
+  // e a ogni pezzo — cioè non può rileggere finché il modello non ha finito.
+  //
+  // Quindi: si segue il fondo solo se l'utente ci era rimasto, altrimenti la
+  // lettura si lascia dov'è. La posizione si RIMETTE, non basta non toccarla:
+  // se il contenuto si accorcia (il riquadro si comprime, la risposta finale
+  // rirenderizzata è più corta del parziale) il browser clampa `scrollTop` e la
+  // vista salta da sola.
+  //
+  // Il ritaglio va fatto DOPO la posa: `reflow` può accorciare il corpo, e con
+  // esso lo scorrimento massimo.
+  const POPUP_FOLLOW_PX = 48;
+  function scrollaConservando(popup, muta, vaiInFondo) {
+    const el = popup?.bodyEl;
+    if (!el) { muta(); reflow(popup); return; }
+    const prevTop = el.scrollTop;
+    // La tolleranza si adatta all'altezza: da compresso il corpo è alto pochi
+    // pixel, e una soglia fissa di 48px direbbe "sei in fondo" sempre.
+    const tolleranza = Math.min(POPUP_FOLLOW_PX, Math.max(8, el.clientHeight / 3));
+    const segui = vaiInFondo || (el.scrollHeight - prevTop - el.clientHeight < tolleranza);
+    muta();
+    reflow(popup);
+    el.scrollTop = segui ? el.scrollHeight : prevTop;
   }
 
   // Il riquadro è appena diventato più alto: rimettilo in posa.
