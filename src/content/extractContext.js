@@ -315,11 +315,32 @@
     return false;
   }
 
+  // Un elemento agganciato alla finestra (position:fixed, suo o di un antenato)
+  // non si muove quando la pagina scorre: per lui "raggiungibile" vuol dire
+  // "dentro la finestra ADESSO", e le coordinate del documento non dicono
+  // niente. È la forma delle strisce pubblicitarie e dei banner appiccicati in
+  // fondo allo schermo, che una volta chiusi restano nella pagina spinti fuori.
+  function isViewportAnchored(el) {
+    let cur = el;
+    for (let hops = 0; cur && cur.nodeType === 1 && hops < 64; hops++) {
+      let pos = '';
+      try { pos = window.getComputedStyle(cur).position; } catch (_) { return false; }
+      if (pos === 'fixed') return true;
+      cur = cur.parentElement;
+    }
+    return false;
+  }
+
   // Rettangolo portato fuori dalla pagina: non ci si arriva scorrendo, quindi
   // l'utente non lo vedrà mai. Le coordinate sono quelle del DOCUMENTO (rect +
   // scroll corrente), non della finestra: ciò che sta solo più in basso della
   // prima schermata resta dentro e continua a contare.
-  function isOutsideScrollablePage(rect) {
+  function isOutsideScrollablePage(el, rect) {
+    if (isViewportAnchored(el)) {
+      return rect.right <= 0 || rect.bottom <= 0
+          || rect.left >= (window.innerWidth || 0)
+          || rect.top >= (window.innerHeight || 0);
+    }
     const doc = document.documentElement;
     const left = rect.left + (window.scrollX || 0);
     const top = rect.top + (window.scrollY || 0);
