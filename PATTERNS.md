@@ -1131,7 +1131,7 @@ una conseguenza; va fatto il contrario.
   aspetta la posa che si ferma (`expect.poll`), non la prima misura utile —
   senza il rimedio ci resta e basta, quindi il test è rosso lo stesso.
 - **Dove:** `attachPose()` in `src/content/popup.js` (riquadro `.sn-popup`),
-  test `tests/popup-pose-streaming.spec.mjs`.
+  test `tests/popup-pose-streaming.spec.mjs` e `tests/popup-pose-casi-limite.spec.mjs`.
 
 ## Un cancello automatico che blocca deve avere una via d'uscita, e la via d'uscita è una PERSONA
 
