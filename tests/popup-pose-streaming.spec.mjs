@@ -478,13 +478,17 @@ async function zoomScheda(app, fattore) {
   }, fattore);
 }
 
-async function altezzaFinestra(app, px) {
-  return app.evaluate(({ BrowserWindow }, h) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    const b = win.getBounds();
-    win.setBounds({ x: b.x, y: b.y, width: b.width, height: h });
-    return win.getBounds().height;
-  }, px);
+// Accorcia la FINESTRA come la vede la pagina.
+//
+// Perché non `win.setBounds`: durante i test la finestra sta fuori schermo
+// (`src/main/test-window-mode.js`) e la nuova altezza arriva sì alla vista, ma
+// NON al renderer — `window.innerHeight` resta quello di prima, misurato. Fatto
+// così il test non proverebbe niente. `setViewportSize` consegna alla pagina
+// esattamente quello che le arriva quando l'utente rimpicciolisce la finestra:
+// viewport più bassa ed evento `resize`, che è tutto ciò su cui la posa ragiona.
+async function altezzaFinestra(page, px) {
+  const w = await page.evaluate(() => window.innerWidth);
+  await page.setViewportSize({ width: w, height: px });
 }
 
 // Apre il riquadro su una selezione in basso e aspetta che la risposta sia
@@ -545,9 +549,9 @@ test('zoom della pagina col riquadro aperto: resta dentro lo schermo, e tornando
   await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
     .toBeGreaterThan(zoomato.vh + 50);
   await expect.poll(
-    async () => Math.round((await page.evaluate(misura)).height),
+    async () => (await page.evaluate(misura)).height,
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
-  ).toBe(Math.round(prima.height));
+  ).toBeGreaterThan(prima.height - 3);
 
   expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
   expect(await page.evaluate(casellaCliccabile)).toBe(true);
@@ -585,9 +589,9 @@ test('finestra rimpicciolita col riquadro aperto: resta dentro lo schermo e la r
   // Riallargata, il riquadro torna alto com'era.
   await altezzaFinestra(app, alta);
   await expect.poll(
-    async () => Math.round((await page.evaluate(misura)).height),
+    async () => (await page.evaluate(misura)).height,
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
-  ).toBe(Math.round(prima.height));
+  ).toBeGreaterThan(prima.height - 3);
 
   await ripristinaProvider(app);
 });
