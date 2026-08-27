@@ -740,20 +740,33 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   "Interrompi lettura", che appare solo mentre la sintesi è in corso).
 - **Avanzamento reale mentre lavora**: il totale dei pezzi è noto, quindi
   l'avviso "in corso" mostra `fatti/totale` invece di una frase fissa.
-- **"È rimasto fuori un pezzo" si misura su ciò che l'utente VEDE** (#503).
-  Mandare a cercare sullo schermo qualcosa che sullo schermo non c'è è la bugia
-  opposta e costa uguale. Peggio: un avviso che sbaglia spesso brucia anche le
-  volte in cui dice il vero, che sono le uniche che servono. Prima di contare un
-  pezzo come "rimasto indietro" chiedi se si vede. Nascosto (`display:none`,
-  `visibility:hidden`, opacità zero anche presa da un antenato) o portato fuori
-  dalla pagina non conta, e sulle pagine vere questo è il caso normale, non
-  l'eccezione: spazi pubblicitari, banner dei cookie già chiusi e riquadri di
-  statistica sono quasi sempre lì e quasi sempre invisibili.
-- **"Fuori dalla pagina" non è "fuori dalla finestra"**. Quel che sta solo sotto
-  la prima schermata è contenuto vero, ci si arriva scorrendo, e continua a
-  contare. Il confronto va fatto con l'area scorribile del documento
-  (`rect` + `scrollX/scrollY` contro `scrollWidth/scrollHeight`), mai con il
-  viewport.
+- **"È rimasto fuori un pezzo" si misura su ciò che l'utente PUÒ RAGGIUNGERE**
+  (#503). Mandare a cercare nella pagina qualcosa che nella pagina non c'è è la
+  bugia opposta e costa uguale; e un avviso che sbaglia spesso brucia anche le
+  volte in cui dice il vero, che sono le uniche che servono. Ma la domanda è
+  "ci si arriva?", non "si vede in questo istante": chi risponde alla seconda
+  smette di contare metà del contenuto vero.
+  - **Dentro**: quel che sta sotto la prima schermata, e quel che sta più in
+    basso dentro un pannello con una barra di scorrimento sua — scorrere un
+    pannello è lo stesso gesto dello scorrere la pagina.
+  - **Fuori**: nascosto dal CSS (`display:none`, `visibility:hidden`, opacità
+    zero, anche ereditate); portato oltre i bordi dell'area scorribile
+    (`left:-9999px`, `transform`), o fuori dalla finestra se è agganciato a lei
+    (`position:fixed`, che non scorre con la pagina); **ritagliato** da un
+    antenato che non scorre — la fisarmonica ripiegata e il banner dei cookie
+    chiuso sono un contenitore schiacciato a zero con `overflow:hidden`, e sulle
+    pagine vere questo è il caso normale, non l'eccezione.
+- **Il ritaglio si calcola risalendo, non guardando il singolo elemento.** Un
+  antenato con `overflow` diverso da `visible` limita ciò che si raggiunge: se
+  scorre, il limite è la sua estensione scorribile e il rettangolo che prosegue
+  verso l'alto diventa quello della finestrella (una volta scorso, il contenuto
+  sta lì dentro); se ritaglia e basta, il limite è la finestrella e quel che
+  sborda è perduto. Due trappole: un elemento in posizione assoluta NON è
+  ritagliato dagli antenati che non lo contengono (saltarli evita di dichiarare
+  irraggiungibile un riquadro visibilissimo), e l'`overflow` di `<body>`/`<html>`
+  "sale" al viewport — il `body { overflow-x: hidden }` che sta ovunque non
+  ritaglia niente, e va giudicato con l'area scorribile del documento.
+  Implementazione: `isReachableByUser` in `src/content/extractContext.js`.
 - **Dove:** `src/content/translatePage.js` (stato + ripresa),
   `src/content/extractContext.js` (`extractTranslatableBlocks`),
   `src/content/menuIcons.js` + `src/content/content.js` (menu). Test:
