@@ -759,6 +759,114 @@ for (const alto of [130, 180, 240]) {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// La spiegazione si deve LEGGERE, non solo starci dentro. Nei riquadri
+// incorporati la parola sta spesso a metà del box: sopra e sotto restano due
+// fette da un centinaio di pixel, e il riquadro che si aggrappa alla parola si
+// schiaccia in una fessura — la risposta appena chiesta si scorre sei pixel per
+// volta con la rotella — mentre metà del box resta vuota. Peggio: più spazio,
+// meno spiegazione. In un box alto 220 il riquadro si staccava già e della
+// risposta se ne leggevano 82px; a 240, venti pixel IN PIÙ, si agganciava alla
+// parola e ne restavano 8.
+//
+// Qui il riquadro deve staccarsi e appoggiarsi al bordo del box, dove lo spazio
+// c'è tutto. La soglia dello stacco non è "ci sta il riquadro ridotto all'osso"
+// (all'osso della risposta non si vede niente) ma "il corpo tiene il minimo che
+// gli dà il foglio di stile".
+//
+// Senza il rimedio: 8px di risposta a 240, 40 a 300, 32 a 340, 74 a 420 — tutti
+// sotto il minimo comodo del corpo, e l'assert diventa rosso a ogni misura.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// La parola a metà del riquadro incorporato: è la posizione che stringe TUTTI E
+// DUE i lati, quella dei box dei commenti veri.
+const RIQUADRO_INTERNO_A_META = (y) => `<!doctype html><meta charset="utf-8">
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; }
+  #bersaglio { position: absolute; left: 10px; top: ${y}px; margin: 0; }
+</style>
+<p id="bersaglio">supercalifragilistico</p>`;
+
+// Il minimo comodo del corpo si LEGGE dal foglio di stile (min-height più la
+// sua imbottitura), come fa la posa: un numero ricopiato qui ricomincerebbe a
+// mentire al primo ritocco del CSS.
+const minimoComodoDelCorpo = () => {
+  const d = document.createElement('div');
+  d.className = 'sn-popup-body';
+  d.style.cssText = 'position:fixed;left:-9999px;top:0;visibility:hidden';
+  document.body.appendChild(d);
+  let v = 0;
+  try {
+    const cs = getComputedStyle(d);
+    const mh = parseFloat(cs.minHeight) || 0;
+    const bordo = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    v = cs.boxSizing === 'border-box' ? Math.max(mh, bordo) : mh + bordo;
+  } catch (_) { v = 0; }
+  d.remove();
+  return v;
+};
+
+for (const alto of [240, 300, 340, 420]) {
+  test(`Alt+E su una parola a metà di un riquadro incorporato alto ${alto}px: la spiegazione si legge`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const src = testServer.html(RIQUADRO_INTERNO_A_META(Math.round(alto * 0.5)));
+    const page = await testServer.openReady(openTab, PAGINA_CON_RIQUADRO(src, alto));
+    await preparaProvider(app, 300);
+
+    const frame = await frameDelRiquadro(page, src);
+    await frame.locator('#bersaglio').dblclick();
+    await expect
+      .poll(() => frame.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+      .toContain('supercalifragilistico');
+
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      globalThis.__filoShortcuts.dispatch('explain-selection', win);
+    });
+
+    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
+    await attendiIngresso(frame);
+    await expect
+      .poll(() => frame.evaluate(() => document.querySelector('.sn-popup-meta')?.textContent || ''), { timeout: 20_000 })
+      .toContain('€');
+
+    // Lo scenario è quello vero: il box è più basso del tetto del riquadro, e
+    // la parola sta a metà — nessuno dei due lati basta.
+    const m = await frame.evaluate(misura);
+    expect(m.vh, 'il popup non sta nel frame del riquadro').toBeLessThanOrEqual(alto);
+
+    // SUCCESSO 1 — della spiegazione se ne legge almeno il minimo comodo: non
+    // una fessura da scorrere con la rotella.
+    const comodo = await frame.evaluate(minimoComodoDelCorpo);
+    expect(comodo, 'il minimo comodo del corpo non si legge dal foglio di stile').toBeGreaterThan(0);
+    const corpo = await frame.evaluate(() => {
+      const b = document.querySelector('.sn-popup .sn-popup-body');
+      return b ? b.getBoundingClientRect().height : 0;
+    });
+    expect(
+      Math.round(corpo),
+      `della spiegazione si leggono ${Math.round(corpo)}px in un riquadro alto ${alto}px, con ${Math.round(m.vh - m.height)}px di riquadro vuoto`,
+    ).toBeGreaterThanOrEqual(Math.floor(comodo));
+
+    // SUCCESSO 2 — e niente esce dal bordo del box né dal bordo del riquadro:
+    // lo spazio guadagnato non si paga con la riga per scrivere tagliata.
+    expect(fuoriDaiBordi(m), 'il popup è uscito dal riquadro incorporato').toEqual([]);
+    expect(await frame.evaluate(casellaCliccabile)).toBe(true);
+
+    // SUCCESSO 3 — la conversazione continua: la domanda dopo si scrive.
+    const casella = page.frameLocator('#riquadro').locator('.sn-popup .sn-popup-input');
+    await casella.click();
+    await casella.fill('e questo cosa vuol dire?');
+    await expect(casella).toHaveValue('e questo cosa vuol dire?');
+
+    // SUCCESSO 4 — la risposta è tutta lì: il corpo scorre.
+    const testo = await frame.evaluate(() => document.querySelector('.sn-popup .sn-msg-assistant .sn-msg-text')?.textContent || '');
+    expect(testo).toContain('Paragrafo 12');
+
+    await ripristinaProvider(app);
+  });
+}
+
 // Stesso danno, altra direzione: un riquadro incorporato STRETTO. Il popup ha
 // una larghezza sua (380px) e i box dei commenti spesso sono più stretti di
 // così: senza rimedio sborda a destra e il tasto di invio finisce oltre il
