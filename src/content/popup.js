@@ -1171,12 +1171,15 @@
         // così il messaggio finale è SOLO la risposta del provider che riesce.
         buf = '';
         firstDelta = true;
-        bubble.text.innerHTML = '';
-        const retry = document.createElement('span');
-        retry.className = 'sn-msg-loading';
-        retry.textContent = I18n.t('popup_loading');
-        bubble.text.appendChild(retry);
-        reflow(popup);
+        // Si riparte da zero su un altro provider: il testo parziale sparisce e
+        // non c'è più niente da rileggere lì, quindi la vista torna in fondo.
+        scrollaConservando(popup, () => {
+          bubble.text.innerHTML = '';
+          const retry = document.createElement('span');
+          retry.className = 'sn-msg-loading';
+          retry.textContent = I18n.t('popup_loading');
+          bubble.text.appendChild(retry);
+        }, true);
       } else if (m.type === 'done') {
         if (firstDelta) {
           // nessun delta arrivato (es. cache vuota errore)
