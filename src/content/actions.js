@@ -495,6 +495,28 @@
   // ------------------------------------------------------------
   // Spiega / Traduci (popup streaming)
   // ------------------------------------------------------------
+  // Il riquadro si stacca dalla PAROLA, non da un punto. Una parola ha
+  // un'altezza, e il riquadro posato sopra deve appoggiarsi sopra la sua cima:
+  // ancorato al solo punto di partenza copriva la metà bassa delle lettere, e
+  // la parola diventava illeggibile proprio mentre l'utente leggeva cosa vuol
+  // dire. Il rettangolo lo prendiamo dalla selezione — è la stessa parola per
+  // tutte e due le strade, la scorciatoia e la freccetta del tasto destro, che
+  // così si comportano uguale. Senza selezione misurabile restano il punto del
+  // puntatore e il vecchio comportamento.
+  function ancoraSelezione(anchorEvent) {
+    const x = Number.isFinite(anchorEvent?.clientX) ? anchorEvent.clientX : 0;
+    const y = Number.isFinite(anchorEvent?.clientY) ? anchorEvent.clientY : 0;
+    const ancora = { x, y, top: y, bottom: y };
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) {
+        const r = sel.getRangeAt(0).getBoundingClientRect();
+        if (r.width || r.height) { ancora.top = r.top; ancora.bottom = r.bottom; }
+      }
+    } catch (_) {}
+    return ancora;
+  }
+
   function triggerExplainOrTranslate(action, selInfo, anchorEvent) {
     if (!selInfo) {
       Popup.showToast(I18n.t('err_no_selection'));
