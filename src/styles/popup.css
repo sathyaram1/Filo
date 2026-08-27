@@ -186,6 +186,7 @@
   align-items: flex-end;
   padding: 6px 8px 8px 8px;
   border-top: 1px solid var(--sn-border);
+  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
 }
 .sn-popup-input {
   flex: 1;
