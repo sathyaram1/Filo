@@ -18,7 +18,7 @@
     {
       version: '0.2.205', date: '2026-08-27',
       fixes: [
-        'Chiedi la spiegazione approfondita su una parola in basso nella pagina e la riga per scrivere la domanda dopo resta dove puoi cliccarla, anche quando la domanda che stai scrivendo prende più righe.',
+        'Chiedi la spiegazione approfondita su una parola in basso nella pagina e la riga per scrivere la domanda dopo resta dove puoi cliccarla, anche se la domanda prende più righe.',
         'La finestrella della spiegazione non copre più la parola su cui l\'hai chiesta.',
         'Dopo Alt+E il cursore è già nella riga per scrivere, quindi la domanda successiva la fai senza passare dal mouse.',
         'Se chiedi la spiegazione dentro un box dei commenti o un\'anteprima incorporata nella pagina, della risposta vedi diverse righe invece di una fessura da scorrere.',
