@@ -963,5 +963,17 @@ test('aperta con la scorciatoia: si può scrivere la domanda dopo senza toccare 
   await page.keyboard.type('e questo cosa vuol dire?');
   await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e questo cosa vuol dire?');
 
+  // Il fuoco nella casella spegne la selezione della pagina, che è una sola.
+  // Chiuso il riquadro la parola deve tornare selezionata: da lì l'utente ci
+  // fa la cosa dopo (tradurre, copiare, cercare) senza rifare la selezione.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sn-popup')).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => String(window.getSelection())), {
+      timeout: 3000,
+      message: 'chiuso il riquadro la parola non è più selezionata: va rifatta a mano',
+    })
+    .toContain('supercalifragilistico');
+
   await ripristinaProvider(app);
 });
