@@ -22,8 +22,11 @@ import { test, expect } from './fixtures/electron.mjs';
 // pause servono a poterlo guardare MENTRE cresce, che è il momento del difetto.
 // Il corpo della funzione gira nel processo main, dove le variabili del file di
 // test non arrivano: i pezzi si costruiscono lì dentro.
-async function preparaProvider(app, attesaMs = 1200) {
-  await app.evaluate(async (attesa) => {
+async function preparaProvider(app, attesaMs = 4000) {
+  // NB: il primo argomento che arriva qui è il modulo Electron; il nostro
+  // parametro è il SECONDO. Scambiarli fa diventare l'attesa uno zero, e il
+  // test non guarda più il riquadro da vuoto.
+  await app.evaluate(async (_electron, attesa) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -109,6 +112,9 @@ test('spiegazione approfondita su selezione in basso: la riga per scrivere resta
   await attendiIngresso(page);
   const daVuoto = await page.evaluate(misura);
   expect(daVuoto).not.toBeNull();
+  // La misura è presa DAVVERO da vuoto: se la risposta fosse già arrivata il
+  // test non guarderebbe più la crescita, e passerebbe senza provare niente.
+  expect(daVuoto.height, 'la risposta è arrivata prima della misura da vuoto').toBeLessThan(350);
 
   // Mentre la risposta arriva, campiona la posa: nessun istante in cui il
   // riquadro sborda dal fondo (né dagli altri bordi).
@@ -197,6 +203,7 @@ test('selezione a metà finestra: il riquadro si accorcia invece di sbordare, e 
   await page.waitForSelector('.sn-popup', { timeout: 8000 });
   await attendiIngresso(page);
   const daVuoto = await page.evaluate(misura);
+  expect(daVuoto.height, 'la risposta è arrivata prima della misura da vuoto').toBeLessThan(350);
 
   const cime = new Set();
   const finoA = Date.now() + 12_000;
@@ -270,6 +277,9 @@ test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere rest
   await attendiIngresso(page);
   const daVuoto = await page.evaluate(misura);
   expect(daVuoto).not.toBeNull();
+  // La misura è presa DAVVERO da vuoto: se la risposta fosse già arrivata il
+  // test non guarderebbe più la crescita, e passerebbe senza provare niente.
+  expect(daVuoto.height, 'la risposta è arrivata prima della misura da vuoto').toBeLessThan(350);
 
   // Guarda la posa MENTRE la risposta arriva: non deve sbordare mai.
   const sconfinamenti = [];

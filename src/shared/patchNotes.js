@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.206', date: '2026-08-27',
+      fixes: [
+        'La finestra della spiegazione approfondita resta dentro lo schermo anche mentre la risposta la fa crescere. Se selezioni una parola in basso nella pagina, la riga per scrivere la domanda successiva resta dove puoi cliccarla, invece di finire fuori dal bordo e costringerti a chiudere tutto e rifare la selezione più in alto.',
+      ],
+    },
+    {
       version: '0.2.198', date: '2026-08-22',
       fixes: [
         'Nelle home dei siti di video, nei social e nelle pagine di risultati il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» insieme ai comandi della copertina, anche mentre parte l\'anteprima animata. Prima il menu cambiava a seconda di come il sito aveva costruito la scheda, e quasi sempre metà delle voci non c\'era.',
