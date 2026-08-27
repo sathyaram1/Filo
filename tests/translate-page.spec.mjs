@@ -658,3 +658,76 @@ test('riquadro più in basso dentro un pannello che scorre: si raggiunge scorren
   await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
   expect(await toasts(page)).not.toContain('Pagina tradotta');
 });
+
+// Chi ritaglia non ritaglia tutti: un riquadro in posizione assoluta NON è
+// ritagliato dagli antenati che non lo contengono, e sta lì bello visibile.
+// Scambiarli per ritagliatori sarebbe l'errore opposto — l'avviso muto proprio
+// quando serve — e i contenitori con `overflow:hidden` messi lì per ragioni di
+// impaginazione sono ovunque.
+const ESCAPING_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div id="clipper" style="height:30px;overflow:hidden">
+    <ad-slot id="adEscapes" style="position:absolute;top:200px;left:20px"></ad-slot>
+  </div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('riquadro in posizione assoluta dentro un contenitore che ritaglia: si vede, quindi conta', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, ESCAPING_AD);
+  await watchToasts(page);
+
+  // Il presupposto: il contenitore ritaglia, ma non questo — il riquadro è
+  // davvero disegnato sullo schermo.
+  expect(await page.evaluate(() => {
+    const el = document.querySelector('#adEscapes');
+    const r = el.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    return document.elementsFromPoint(x, y).includes(el);
+  })).toBe(true);
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partialEsc = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partialEsc, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
+
+// Pagina da destra a sinistra: lì l'area scorribile cresce VERSO SINISTRA e le
+// coordinate del documento vanno in negativo. Un conto che desse per scontato
+// che il bordo è lo zero butterebbe via il riquadro visibile.
+const RTL_AD = `<!doctype html><html lang="ar" dir="rtl"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="width:4000px;height:8px"></div>
+  <ad-slot id="adRtl"></ad-slot>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('pagina da destra a sinistra: il riquadro visibile conta anche con le coordinate in negativo', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RTL_AD);
+  await watchToasts(page);
+
+  // Il presupposto: la pagina scorre in orizzontale verso sinistra (corsa della
+  // barra in negativo) e il riquadro è sullo schermo.
+  expect(await page.evaluate(() => {
+    const de = document.documentElement;
+    const r = document.querySelector('#adRtl').getBoundingClientRect();
+    return {
+      overflowsSideways: de.scrollWidth > de.clientWidth,
+      rtl: getComputedStyle(de).direction === 'rtl',
+      onScreen: r.right > 0 && r.left < de.clientWidth && r.bottom > 0,
+    };
+  })).toEqual({ overflowsSideways: true, rtl: true, onScreen: true });
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partialRtl = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partialRtl, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
