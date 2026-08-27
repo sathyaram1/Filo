@@ -526,30 +526,50 @@
     // In px di LAYOUT: sullo schermo la compensazione zoom li scala.
     const altezza = (el) => (el ? el.getBoundingClientRect().height / (scale() || 1) : 0);
 
-    // Il corpo si legge ORA, che è ancora quello naturale: da compresso
-    // rileggeremmo zero, e la decisione dipenderebbe dal suo stesso esito — cioè
-    // oscillerebbe. Due numeri, non uno:
-    //   - il MINIMO comodo (`min-height` + il suo contorno), sotto cui il corpo
-    //     comincia a scorrere;
-    //   - il RESIDUO, cioè quello che resta del corpo quando il suo minimo è
-    //     già andato a zero: l'imbottitura e i bordi, che il `min-height: 0`
-    //     NON toglie. Vale una ventina di pixel, e non metterlo in bilancio era
-    //     il difetto: il conto prometteva un riquadro più basso di quello che il
-    //     browser sa disegnare, il tetto restava largo di quei pixel e a uscire
-    //     dal bordo era la riga per scrivere.
-    const bodyBox = (() => {
-      if (!bodyEl) return { min: 0, residuo: 0 };
+    // Quanto occupa il corpo al minimo, in ciascuno dei gradini di
+    // compressione. Si legge ORA, una volta, prima che il riquadro sia posato:
+    // a decidere in corsa sul proprio esito la posa oscillerebbe.
+    //
+    // Il numero che mancava è il RESIDUO: quello che resta del corpo quando il
+    // suo contenuto è già a zero. `min-height: 0` azzera il contenuto, non
+    // l'ingombro — imbottitura e bordi restano, e sono una ventina di pixel che
+    // il riquadro continua a occupare quando ormai non mostra più niente. Non
+    // metterli in bilancio ERA il difetto all'estremo della scala: il conto
+    // prometteva un riquadro più basso di quello che il browser sa disegnare,
+    // il tetto restava largo di quei pixel e a uscire dal bordo era la riga per
+    // scrivere.
+    //
+    // Si LEGGONO dal foglio di stile accendendo per un attimo le classi, invece
+    // di ricopiarli qui: è il foglio di stile a decidere quanto cede il corpo, e
+    // un numero ricopiato in JS ricomincerebbe a mentire al primo ritocco — che
+    // è la forma esatta di questo difetto. Nessun fotogramma viene disegnato in
+    // mezzo, quindi non si vede niente.
+    const residuoCorpo = (classi) => {
+      if (!bodyEl) return 0;
+      const messe = classi.filter((c) => !root.classList.contains(c));
+      messe.forEach((c) => root.classList.add(c));
+      let v = 0;
       try {
         const cs = getComputedStyle(bodyEl);
-        const mh = parseFloat(cs.minHeight) || 0;
-        const bordo = cs.boxSizing === 'border-box' ? 0
-          : (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
-            + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-        return { min: mh, residuo: bordo };
-      } catch (_) { return { min: 0, residuo: 0 }; }
+        v = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+          + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+      } catch (_) { v = 0; }
+      messe.forEach((c) => root.classList.remove(c));
+      return v;
+    };
+    // Da comodo: il minimo dichiarato più il suo contorno.
+    const bodyComfort = (() => {
+      if (!bodyEl) return 0;
+      let mh = 0, bordo = residuoCorpo([]);
+      try {
+        const cs = getComputedStyle(bodyEl);
+        mh = parseFloat(cs.minHeight) || 0;
+        return cs.boxSizing === 'border-box' ? Math.max(mh, bordo) : mh + bordo;
+      } catch (_) { return bordo; }
     })();
-    const bodyComfort = bodyBox.min + bodyBox.residuo;
-    const bodyResiduo = bodyBox.residuo;
+    // Da stretto (il corpo scorre) e da nudo (il corpo è sparito del tutto).
+    const bodyStretto = residuoCorpo([POSE_TIGHT]);
+    const bodyNudo = residuoCorpo([POSE_TIGHT, POSE_BARE]);
     // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe
     // più. (Nasce vuota ma il foglio di stile le dà già l'altezza che avrà
     // piena, così questa misura vale anche dopo.)
