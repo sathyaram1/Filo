@@ -4,13 +4,19 @@
   position: fixed;
   /* z-index gestito inline da popup.js per stacking deterministico */
   z-index: 2147483600;
-  width: 380px;
+  /* Larghezza naturale in una variabile: la posa la legge da qui (invece di
+     ricopiarla in JS) e `width` sotto resta clampata da `max-width` senza che
+     la lettura ne risenta. */
+  --sn-popup-w: 380px;
+  width: var(--sn-popup-w);
   /* Stessa storia del tetto d'altezza, sull'altro asse (#502): dentro un
      riquadro incorporato lo "schermo" è il riquadro, e i box dei commenti sono
      spesso STRETTI. Con una larghezza fissa il riquadro sborda a destra e il
      tasto di invio finisce tagliato via — non lo si raggiunge né scorrendo né
      trascinando. Qui non serve far cedere nessuno: basta che la larghezza si
-     stringa allo spazio che c'è, come già fa lo stack dei toast. */
+     stringa allo spazio che c'è, come già fa lo stack dei toast. Rete di
+     sicurezza in px di layout; la posa la rifinisce inline tenendo conto della
+     scala della compensazione zoom. */
   max-width: calc(100vw - 16px);
   max-height: 480px;
   display: flex;
