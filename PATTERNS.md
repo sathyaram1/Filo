@@ -977,6 +977,21 @@ una conseguenza; va fatto il contrario.
   corpo finiva a zero e la spiegazione appena chiesta non si leggeva per
   niente. La coordinata resta costante anche lì, quindi la regola d'oro non si
   rompe.
+- **La soglia per staccarsi non è «ci sta il minimo», è «il contenuto si
+  legge».** Sono due numeri diversi e la differenza è tutta la fascia in mezzo:
+  con la soglia al minimo assoluto ci si stacca solo quando del contenuto non
+  si vedrebbe comunque niente, e appena sopra quella soglia il riquadro si
+  aggrappa al punto ancorato pagando tutto lo spazio che quel lato non ha —
+  metà del riquadro incorporato resta vuota e della risposta appena chiesta
+  restano pochi pixel da scorrere con la rotella. Si vede da fuori come «più
+  spazio, meno contenuto»: un box alto 240px ne mostrava 8, uno alto 220 — che
+  si staccava già — ne mostrava 82, e la fascia storta arrivava fino a 420px,
+  cioè la misura tipica di un box commenti (#502). Metti la soglia dove il
+  contenuto smette di leggersi: il minimo COMODO, quello in cui nessun pezzo
+  interno ha ancora ceduto il minimo che gli dà il foglio di stile. Staccarsi
+  però costa (il riquadro copre la parola), quindi fallo solo quando frutta
+  davvero: se il posto guadagnato è qualche pixel — una finestra appena troppo
+  bassa — resta ancorato.
 - **Un riquadro si stacca da una PAROLA, non da un punto, e una parola ha
   un'altezza.** Sopra la parola ci si appoggia sopra la sua CIMA, sotto sotto il
   suo FONDO. L'ancora che arriva dalla scorciatoia è il fondo del rettangolo:
