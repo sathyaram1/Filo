@@ -674,7 +674,13 @@
       if (left + w + POSE_MARGIN > vw) left = vw - w - POSE_MARGIN;
       if (left < POSE_MARGIN) left = POSE_MARGIN;
       root.style.left = `${Math.round(left)}px`;
-      if (side === 'above') {
+      if (side === 'dentro') {
+        // Il punto ancorato non era onorabile: il riquadro si appoggia in cima
+        // alla finestra e il tetto lo tiene dentro. Anche questa coordinata non
+        // dipende dall'altezza corrente, quindi resta costante come le altre.
+        root.style.bottom = 'auto';
+        root.style.top = `${POSE_MARGIN}px`;
+      } else if (side === 'above') {
         // Il fondo resta incollato sopra la CIMA della selezione (non sopra il
         // suo fondo, o il riquadro coprirebbe la parola) e la crescita va in su.
         root.style.top = 'auto';
