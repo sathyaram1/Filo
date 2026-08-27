@@ -584,7 +584,7 @@ test('finestra rimpicciolita col riquadro aperto: resta dentro lo schermo e la r
   await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
 
   // Riallargata, il riquadro torna alto com'era.
-  await altezzaFinestra(app, alta);
+  await altezzaFinestra(page, alta);
   await expect.poll(
     async () => (await page.evaluate(misura)).height,
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
