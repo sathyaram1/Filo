@@ -965,8 +965,19 @@ una conseguenza; va fatto il contrario.
   schermo, senza nemmeno il margine dai bordi (l'ha appoggiato lì apposta).
   Passando al trascinamento azzera `bottom`: con `top` e `bottom` insieme e
   altezza automatica il riquadro si stira fra i due bordi.
+- **Il guardiano guarda TUTTI E DUE i bordi, non solo quello previsto.** Finché
+  la finestra non cambia sborda solo il lato libero, e lì si stringe il tetto.
+  Ma quando lo spazio si accorcia dopo la posa, a uscire è il lato ANCORATO — un
+  riquadro agganciato in alto che finisce sotto il fondo — e un controllo puntato
+  sul solo lato atteso non lo vede. Sul lato ancorato stringere non serve a
+  niente (quel bordo sta fermo): va riportato dentro di peso. E dopo aver stretto
+  **rimisura e ricontrolla** invece di uscire: un solo giro deve bastare.
 - **Ricalcola su `resize` della finestra e del visual viewport**: lo spazio
-  disponibile è cambiato, il tetto va rifatto da capo (anche verso l'alto).
+  disponibile è cambiato, il tetto va rifatto da capo — **anche verso l'alto**,
+  o il riquadro resta stretto per sempre solo perché per un momento c'era meno
+  posto. Lo zoom cambia anche la risoluzione: aggiungi la stessa rete
+  `matchMedia('(resolution: Xdppx)')` della compensazione zoom, e registrala
+  DOPO, così quando rimisuri la `scale()` è già quella nuova.
 - **Attento a misurare dopo l'animazione d'ingresso.** `.sn-popup` entra con una
   dissolvenza che porta 2px di scivolata: un test che legge la posizione mentre
   scorre legge un fotogramma, non una posa, e accusa di tremolio del codice che
