@@ -5,6 +5,13 @@
   /* z-index gestito inline da popup.js per stacking deterministico */
   z-index: 2147483600;
   width: 380px;
+  /* Stessa storia del tetto d'altezza, sull'altro asse (#502): dentro un
+     riquadro incorporato lo "schermo" è il riquadro, e i box dei commenti sono
+     spesso STRETTI. Con una larghezza fissa il riquadro sborda a destra e il
+     tasto di invio finisce tagliato via — non lo si raggiunge né scorrendo né
+     trascinando. Qui non serve far cedere nessuno: basta che la larghezza si
+     stringa allo spazio che c'è, come già fa lo stack dei toast. */
+  max-width: calc(100vw - 16px);
   max-height: 480px;
   display: flex;
   flex-direction: column;
