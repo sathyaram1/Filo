@@ -764,6 +764,13 @@
     // minime dei pezzi interni non stanno nel tetto, finestra bassissima — si
     // stringe ANCORA il tetto. Solo in una direzione: non può oscillare.
     function guard() {
+      // Prima di guardare i bordi: se a cambiare è stato ciò che NON cede — la
+      // riga per scrivere che si allunga o si riaccorcia con la domanda — il
+      // bilancio è vecchio e va rifatto da capo, esattamente come quando cambia
+      // la finestra. Rifarlo solo quando quel numero è cambiato è ciò che
+      // impedisce di rincorrere lo stringimento in più che questo stesso
+      // guardiano applica qui sotto.
+      if (bilancioVecchio()) capHeight();
       if (dragged) {
         // Trascinato: lì la posa è dell'utente, si sposta solo se esce.
         const vw = window.innerWidth, vh = window.innerHeight;
