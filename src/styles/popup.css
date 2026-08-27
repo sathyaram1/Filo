@@ -27,6 +27,7 @@
   border-bottom: 1px solid var(--sn-border);
   cursor: move;
   user-select: none;
+  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
 }
 .sn-popup-header.sn-popup-dragging { cursor: grabbing; }
 
