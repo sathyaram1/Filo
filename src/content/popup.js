@@ -990,13 +990,7 @@
     popup.sendEl.addEventListener('click', () => submitFollowup(popup));
     // Auto-grow textarea
     popup.inputEl.addEventListener('input', () => {
-      popup.inputEl.style.height = 'auto';
-      // Il tetto della casella lo tiene il foglio di stile, e la posa lo
-      // stringe allo spazio che c'è quando la finestra è bassa: qui si chiede
-      // solo l'altezza del testo e si lascia decidere a loro. Ricopiare qui il
-      // numero del foglio di stile vorrebbe dire tenersi il tetto pieno anche
-      // dove non ci sta — ed è così che la riga per scrivere finiva fuori.
-      popup.inputEl.style.height = `${popup.inputEl.scrollHeight}px`;
+      autoGrow(popup.inputEl);
       // Anche la casella che si allarga alza il riquadro: stessa regola.
       reflow(popup);
     });
