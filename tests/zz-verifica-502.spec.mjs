@@ -498,3 +498,48 @@ test('#502 risposta vuota: il riquadro resta posato e la casella si clicca', asy
   const m = (await page.evaluate(misuraTutti))[0];
   expect(fuori(m), `con risposta vuota: ${JSON.stringify(m)}`).toEqual([]);
 });
+
+// ── 15. CONTROLLO NEGATIVO ───────────────────────────────────────────────────
+// Riproduco il comportamento VECCHIO senza toccare il codice: appena il
+// riquadro è nato (vuoto) congelo le coordinate e il tetto che la posa ha
+// scritto, e li rimetto a forza ogni volta che qualcuno prova a cambiarli.
+// È esattamente "la posa si calcola una volta sola, poi nessuno rimisura".
+// Se le mie asserzioni non diventassero rosse qui, non proverebbero niente.
+test('#502 controllo negativo: con la posa congelata da vuoto le asserzioni diventano rosse', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  const w = await page.evaluate(() => window.innerWidth);
+  await page.setViewportSize({ width: w, height: 800 });
+  await provider(app, { attesa: 1500 });
+  await apri(page, 0.75);
+  await attendiIngresso(page);
+
+  // Il codice vecchio agganciava il riquadro con `top`, calcolato una volta
+  // sola sull'altezza da vuoto, e lasciava il tetto del foglio di stile: da lì
+  // il riquadro cresceva VERSO IL BASSO fino a 480px. Lo rimetto in scena
+  // prendendo la cima di adesso (da vuoto) e inchiodandocelo.
+  await page.evaluate(() => {
+    const root = document.querySelector('.sn-popup');
+    const cima = `${Math.round(root.getBoundingClientRect().top)}px`;
+    const fissa = () => {
+      if (root.style.top !== cima) root.style.top = cima;
+      if (root.style.bottom !== 'auto') root.style.bottom = 'auto';
+      if (root.style.maxHeight) root.style.maxHeight = '';
+      root.classList.remove('sn-popup-tight', 'sn-popup-bare');
+    };
+    fissa();
+    const mo = new MutationObserver(fissa);
+    mo.observe(root, { attributes: true, attributeFilter: ['style', 'class'] });
+    window.__congelaMO = mo;
+  });
+
+  await finito(page);
+  await page.waitForTimeout(500);
+  const m = (await page.evaluate(misuraTutti))[0];
+  const problemi = fuori(m);
+  // Con la posa congelata il fondo DEVE uscire dallo schermo: è la prova che
+  // gli assert degli altri test guardano davvero la cosa giusta.
+  expect(problemi.length, `con la posa congelata non si è rotto niente: ${JSON.stringify(m)}`).toBeGreaterThan(0);
+  console.log('CONTROLLO NEGATIVO →', JSON.stringify(problemi), JSON.stringify(m));
+  await page.evaluate(() => window.__congelaMO?.disconnect());
+});
