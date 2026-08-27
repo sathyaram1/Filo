@@ -35,6 +35,7 @@
     if (!host) {
       host = document.createElement('div');
       host.id = HOST_ID;
+      global.SN_FILO_UI?.mark(host);
       css(host, { all: 'initial' });
       shadow = host.attachShadow({ mode: 'open' });
       (document.documentElement || document.body).appendChild(host);

@@ -17,6 +17,9 @@
     menu_translate_selection: 'Traduci',
     menu_show_original: 'Mostra originale',
     menu_resume_translation: 'Riprendi traduzione',
+    // Traduzione finita, ma il sito ha aggiunto altro testo dopo (scorrimento
+    // infinito, schermate che cambiano senza ricaricare).
+    menu_translate_new_content: 'Traduci il testo nuovo',
     menu_explain: 'Spiegazione',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
@@ -195,18 +198,34 @@
     toast_translating_page: 'Traduzione pagina in corso…',
     toast_translating_page_progress: 'Traduzione pagina… %s/%s',
     toast_page_translated: 'Pagina tradotta',
+    // Il sito ha continuato ad aggiungere testo anche mentre traducevamo, e a
+    // un certo punto smettiamo di rincorrerlo: "Pagina tradotta" sarebbe di
+    // nuovo falso, con le righe nuove in inglese sotto gli occhi.
+    toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: dal tasto destro trovi «Traduci il testo nuovo».',
     // #439 — parti della pagina che NESSUNO script può leggere (i siti moderni
     // possono chiudere a chiave i propri componenti). Non si traducono, e dirlo
     // è l'unica cosa onesta: "Pagina tradotta" sarebbe falso.
     toast_page_translated_partial: 'Pagina tradotta solo in parte: alcuni componenti di questo sito sono chiusi e restano nella lingua originale.',
     toast_only_closed_components: 'Il testo di questa pagina vive dentro componenti chiusi del sito: non riesco a leggerlo, e resta nella lingua originale.',
+    // #407 — un riquadro incorporato (post incorporato, blocco commenti, modulo
+    // di iscrizione) che nessuno script può toccare: il sito lo chiude a chiave
+    // con l'attributo `sandbox`. È un rettangolo intero che resta in inglese in
+    // mezzo a una pagina italiana: dirlo è l'unica cosa onesta.
+    toast_page_translated_partial_frame: 'Pagina tradotta, tranne un riquadro incorporato. Il sito non lascia leggere il testo lì dentro, e resta nella lingua originale.',
     // Traduzione interrotta a metà (#408): mai "Pagina tradotta" quando non lo
     // è. Dice quanto ne manca, perché si è fermata e come riprendere.
     toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
+    // Pagina più lunga di quanta ne entri in un giro solo: non è un guasto, è
+    // un lavoro a tratti. Dire "Pagina tradotta" con la coda ancora in inglese
+    // sarebbe la stessa bugia di una traduzione interrotta.
+    toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dal tasto destro per continuare.',
     toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
     toast_original_restored: 'Originale ripristinato',
+    // Fermata prima che cambiasse qualcosa sullo schermo: "Originale
+    // ripristinato" parlerebbe di un ritorno che non c'è stato.
+    toast_translation_cancelled: 'Traduzione annullata',
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_open_weights_violated:
       'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',

@@ -188,6 +188,8 @@ module.exports = function register(on, ctx) {
   //   - RUN_IN_TOP_FRAME: azione di pagina (traduci, condividi, salva, QR,
   //     screenshot…) scelta dal menu aperto dentro il riquadro → va eseguita
   //     dal frame principale, che è l'unico a conoscere la pagina intera;
+  //   - FRAME_TRANSLATE_DONE (#407): il riquadro riferisce com'è andata la sua
+  //     traduzione → va al solo frame principale, che tiene il conto del giro;
   //   - CLOSE_OTHER_MENUS: il riquadro ha appena aperto il suo menu → gli
   //     altri frami della stessa scheda chiudono il loro.
   // Il messaggio non porta dati arbitrari: solo l'id di un'icona del registro
@@ -196,7 +198,7 @@ module.exports = function register(on, ctx) {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };
     try {
-      if (payload.type === MSG.TOP_FRAME_COMMAND) {
+      if (payload.type === MSG.TOP_FRAME_COMMAND || payload.type === MSG.FRAME_TRANSLATE_REPORT) {
         const main = wc.mainFrame;
         if (main && !main.detached) main.send('filo:broadcast', payload);
       } else {
@@ -220,6 +222,52 @@ module.exports = function register(on, ctx) {
 
   on(MSG.CLOSE_OTHER_MENUS, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.CLOSE_OTHER_MENUS,
+  }));
+
+  // #407 — «Traduci la pagina» deve arrivare anche dentro i riquadri
+  // incorporati (post incorporati, blocchi commenti, moduli di iscrizione).
+  // Il frame principale non può toccarne il testo — sono altre origini — ma il
+  // content script di Filo gira anche lì: qui gli si passa parola.
+  //
+  // Solo il frame PRINCIPALE può indire il giro. Un riquadro che comandasse i
+  // suoi fratelli non risolverebbe niente e aprirebbe una strada perché un sito
+  // incorporato muova la traduzione dentro riquadri che non sono suoi.
+  //
+  // La risposta dice a quanti riquadri è stata passata parola: è la base del
+  // conto con cui la pagina decide se l'avviso finale può dire "Pagina
+  // tradotta" o deve dire che una parte è rimasta fuori.
+  on(MSG.TRANSLATE_FRAMES, async (msg, sender) => {
+    const wc = sender && sender.wc;
+    if (!wc) return { ok: false, error: 'no-sender' };
+    const mainFrame = wc.mainFrame;
+    if (!mainFrame) return { ok: false, error: 'no-main-frame' };
+    if (sender.frame && sender.frame !== mainFrame) return { ok: false, error: 'not-top-frame' };
+    const payload = {
+      type: MSG.FRAME_TRANSLATE,
+      mode: String(msg?.mode || 'translate'),
+      runId: String(msg?.runId || ''),
+    };
+    let frames = 0;
+    try {
+      for (const f of mainFrame.framesInSubtree || []) {
+        if (f === mainFrame || f.detached) continue;
+        try { f.send('filo:broadcast', payload); frames++; } catch (_) {}
+      }
+    } catch (e) {
+      return { ok: false, error: e.message || String(e) };
+    }
+    return { ok: true, frames };
+  });
+
+  // Il resoconto di un riquadro torna al frame principale, che è l'unico a
+  // tenere il conto del giro e a scrivere l'avviso.
+  on(MSG.FRAME_TRANSLATE_DONE, async (msg, sender) => frameBridge(msg, sender, {
+    type: MSG.FRAME_TRANSLATE_REPORT,
+    runId: String(msg?.runId || ''),
+    phase: String(msg?.phase || 'end'),
+    frames: Number(msg?.frames) || 0,
+    applied: Number(msg?.applied) || 0,
+    left: Number(msg?.left) || 0,
   }));
 
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {

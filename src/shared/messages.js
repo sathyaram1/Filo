@@ -517,6 +517,28 @@
     // solo un id del registro icone o il nome di un pannello.
     RUN_IN_TOP_FRAME: 'run_in_top_frame',
 
+    // #407 — la traduzione della pagina passa parola ai riquadri incorporati.
+    // Un post incorporato, un blocco commenti, un modulo di iscrizione sono
+    // pagine dentro la pagina: il frame principale non può toccarne il testo
+    // (quasi sempre è di un'altra origine), ma il content script di Filo gira
+    // anche lì dentro. Il giro passa da qui perché il main è l'unico a conoscere
+    // l'albero dei frame: una postMessage la saprebbe scrivere anche il sito, e
+    // si ritroverebbe a comandare la traduzione dentro un riquadro altrui.
+    // { mode: 'translate'|'restore', runId } — lo manda il SOLO frame principale.
+    //
+    // ORIGINE: chiamabile anche da una pagina web (è il content script a
+    // mandarlo) — di proposito, e senza gate, come RUN_IN_TOP_FRAME. Non legge
+    // dati, non tocca il disco e non aziona il sistema: inoltra un messaggio ai
+    // frame DELLA STESSA SCHEDA, e non porta dati arbitrari (una parola fra due,
+    // e un numero di giro che il mittente stesso ha scelto).
+    TRANSLATE_FRAMES: 'translate_frames',
+    // Il riquadro riferisce alla pagina che lo ospita: prima che si è fatto
+    // vivo (`ack`, con quanti riquadri ospita a sua volta), poi com'è finita
+    // (`end`, con quanto è rimasto in lingua originale). Senza, l'avviso finale
+    // non saprebbe se dire "Pagina tradotta" o "una parte è rimasta fuori".
+    // { runId, phase, frames, applied, left }
+    FRAME_TRANSLATE_DONE: 'frame_translate_done',
+
     // Da background -> content (broadcast)
     SETTINGS_UPDATED: 'settings_updated',
     SHORTCUT_TRIGGERED: 'shortcut_triggered',     // { command }
@@ -527,6 +549,12 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // Contropartita di TRANSLATE_FRAMES: arriva a ogni riquadro della scheda e
+    // gli fa tradurre (o riportare all'originale) se stesso. { mode, runId }
+    FRAME_TRANSLATE: 'frame_translate',
+    // Contropartita di FRAME_TRANSLATE_DONE: arriva al SOLO frame principale e
+    // gli porta il resoconto di un riquadro. { runId, phase, frames, applied, left }
+    FRAME_TRANSLATE_REPORT: 'frame_translate_report',
     // Broadcast da background -> dashboard: lo stato live è cambiato
     // (nuovo timer, notifica, ecc.) e va re-renderizzato.
     FILO_LIVE_UPDATED: 'filo_live_updated',

@@ -16,6 +16,21 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.204', date: '2026-08-26',
+      features: [],
+      fixes: [
+        'Sulle pagine lunghissime «Traduci la pagina» non dichiara più di aver finito mentre il fondo è ancora in lingua originale. Ti dice quanti blocchi ha tradotto, e dal tasto destro completi il resto senza rifare la parte già tradotta.',
+        '«Traduci la pagina» ora traduce anche le scritte fuori dal testo: il grigio dentro i campi di ricerca, i suggerimenti che compaiono fermando il mouse, le descrizioni delle immagini, le voci dei menu a tendina e le scritte sui bottoni dei moduli. Prima restavano in inglese sotto la scritta «Pagina tradotta».',
+        'Se un sito allunga la pagina mentre scorri, o cambia schermata senza ricaricare, le righe arrivate dopo si traducono dal tasto destro con «Traduci il testo nuovo». Prima l\'unica strada era tornare all\'originale e rifare tutta la pagina da capo.',
+        'Il testo che il sito carica mentre la traduzione sta ancora lavorando viene tradotto insieme al resto, senza doverci tornare sopra: scorrere mentre si aspetta non lascia più righe in lingua originale.',
+        'Le sezioni ripiegate («Mostra di più», le schede, i «leggi tutto») che apri dopo aver tradotto la pagina si traducono dal tasto destro con «Traduci il testo nuovo», invece di costringerti a rifare tutta la pagina.',
+        'Mentre traduce, il tasto destro offre «Mostra originale» per fermarla. L\'avviso di lavoro in corso sparisce subito e la pagina torna in lingua originale e ci resta, invece di ritradursi da sola qualche secondo dopo.',
+        'Filo non dice più che una pagina è tradotta «solo in parte» quando l\'ha tradotta tutta: bastava un separatore o uno spazio decorativo per far comparire l\'avviso, e ti mandava a cercare del testo in lingua originale che non c\'era.',
+        '«Traduci la pagina» entra anche nei riquadri incorporati, cioè i post di altri siti, i blocchi commenti e i moduli di iscrizione. Prima restavano in inglese in mezzo a una pagina italiana, e cliccare Traduci proprio lì dentro non li toccava. Dove il sito non lascia leggere il testo del riquadro, l\'avviso lo dice invece di dichiarare finito.',
+        'Quando traduci una pagina cambia lingua anche il nome della scheda in alto. Era l\'ultimo pezzo di inglese che restava sotto gli occhi.',
+      ],
+    },
+    {
       version: '0.2.198', date: '2026-08-22',
       fixes: [
         'Nelle home dei siti di video, nei social e nelle pagine di risultati il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» insieme ai comandi della copertina, anche mentre parte l\'anteprima animata. Prima il menu cambiava a seconda di come il sito aveva costruito la scheda, e quasi sempre metà delle voci non c\'era.',

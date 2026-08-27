@@ -534,7 +534,7 @@ preload privilegiato). Senza, dentro il riquadro Filo semplicemente non esiste �
 il tasto destro non produce nulla, e per l'utente è un buco nero senza spiegazione
 (#405).
 
-Tre regole quando si tocca qualcosa che vive nel content script:
+Quattro regole quando si tocca qualcosa che vive nel content script:
 
 - **Costo pigro.** Una pagina può avere decine di riquadri che l'utente non tocca
   mai. Nel sottoframe `page-preload.js` non carica NIENTE finché non arriva la
@@ -556,13 +556,43 @@ Tre regole quando si tocca qualcosa che vive nel content script:
   scorciatoie di selezione verso l'ultimo frame usato). `webContents.send`
   raggiunge **solo** il frame principale: per parlare a tutti serve
   `mainFrame.framesInSubtree`.
+- **Un'azione di pagina che tocca il TESTO deve entrare nei riquadri** (#407).
+  "Frame vs pagina" dice dove l'azione si esegue, non fin dove arriva: un post
+  incorporato o un blocco commenti è testo che l'utente legge, e lasciarlo in
+  lingua originale sotto un avviso "Pagina tradotta" è la bugia della
+  segnalazione, in un caso più stretto. Il frame principale non può toccarlo (è
+  un'altra origine), ma il content script gira già lì dentro: gli si passa
+  parola, e ogni riquadro lavora su se stesso. Quattro conseguenze che si pagano
+  se si saltano. **Il giro passa dal main**, non da `postMessage`: una postMessage
+  la sa scrivere anche il sito, e si ritroverebbe a comandare un riquadro che non
+  è suo; il main invece conosce l'albero dei frame e sa chi è il frame
+  principale. **Il riquadro va svegliato**: per il costo pigro lì dentro non c'è
+  ancora niente di montato, quindi il messaggio che lo comanda deve far partire
+  `ensureContentScripts()` e farsi consegnare dopo (stesso cammino delle
+  scorciatoie). **Chi non risponde entra nell'avviso**: un riquadro chiuso a
+  chiave dal `sandbox` non ha script e non risponderà mai, e il conto dei
+  riquadri che si VEDONO (grandi abbastanza da starci del testo) meno quelli che
+  si sono fatti vivi è ciò che fa dire "una parte è rimasta fuori" invece di
+  "fatto". E se si può tradurre lì dentro si deve poter tornare indietro lì
+  dentro: il ritorno all'originale passa parola con lo stesso giro.
+  **In un riquadro SENZA indirizzo il preload non entra affatto**, e questo si
+  scopre solo provandolo: un `iframe` vuoto riempito dalla pagina stessa
+  (`about:blank`, `srcdoc`) resta senza Filo dentro, e quasi tutti i riquadri
+  pubblicitari nascono così. Lì non c'è nessuno a cui passare parola e nessuno
+  che risponda, quindi due cose insieme: il documento lo legge chi ospita (è
+  della stessa origine e `contentDocument` si apre), e quel riquadro esce dal
+  conto di chi deve rispondere, o ogni pagina che ne ha uno si prenderebbe a
+  torto l'avviso "una parte è rimasta fuori". Entrare così vale SOLO per i
+  riquadri senza indirizzo: in quelli con un indirizzo vero il content script
+  c'è e traduce da sé, e leggerli anche da fuori è pagare due volte.
 
 Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
 diventa scorrevole invece di essere tagliato.
 
 **Dove:** `_makeView` in `src/main/tabs.js`, `src/preload/page-preload.js`,
 `IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
-`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`.
+`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`,
+`tests/translate-page.spec.mjs`.
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
@@ -686,7 +716,7 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   l'opposta: **prendi ogni elemento che ha un text node come figlio DIRETTO** e
   scarta solo ciò che non è prosa (script/media/`pre`/`code`, campi di testo,
   `[translate="no"]`, `.notranslate`, `contenteditable`, elementi nascosti e la
-  UI di Filo stessa, riconoscibile dal prefisso di classe `sn-`). Così ogni
+  UI di Filo stessa, riconoscibile dal **marchio** che si mette da sé). Così ogni
   pezzo di testo appartiene a **una sola** unità (niente doppie sostituzioni) e
   anche il testo dentro i link diventa una unità sua invece di restare un
   segnaposto intoccato.
@@ -700,6 +730,35 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   (mai perdere contenuto), e l'annullamento (`Mostra originale`) ripristina la
   **lista di nodi originali** tenuta in memoria, non una stringa HTML salvata in
   un attributo (che, con unità annidate, conterrebbe già la traduzione dei figli).
+- **Metà del testo che si legge non sta nel testo: sta negli ATTRIBUTI.** Il
+  grigio dentro un campo di ricerca (`placeholder`), il suggerimento che compare
+  fermando il mouse (`title`), la descrizione di un'immagine (`alt`),
+  l'etichetta di una voce di menu a tendina, `aria-label`. Lasciarli in lingua
+  originale sotto un avviso "Pagina tradotta" è la stessa bugia dei blocchi
+  saltati: si vede a occhio che il lavoro non è finito. La riga di confine è
+  **si legge / si rimanda indietro**: si traduce ciò che l'utente LEGGE, mai ciò
+  che il sito INVIA (`value` di un campo, voci di un `datalist`, `href`,
+  `name`). La riga passa **in mezzo agli `<input>`**: la scritta su un bottone è
+  il suo `value`, e quel valore entra nei dati del modulo solo se il bottone ha
+  un `name` — quindi un bottone che azzera il modulo, o che apre qualcosa nella
+  pagina, o un invio senza `name` si traduce, un invio con `name` no. Corollario
+  pratico: la voce di un menu a tendina si traduce
+  **scrivendo l'attributo `label`**, mai sostituendone il testo — il testo di una
+  `<option>` senza `value` è proprio ciò che il modulo invia, e il browser mostra
+  `label` quando c'è. Conseguenza sul filtro dei sottoalberi: "qui non c'è prosa"
+  (`script`, `video`, un campo di testo) e "qui non si tocca niente"
+  (`translate="no"`, nascosto, `contenteditable`, la UI di Filo) diventano **due
+  motivi diversi** di saltare: nel primo il contenuto resta intoccato ma le
+  etichette si traducono lo stesso.
+- **Il testo della pagina non finisce col `<body>`.** Il nome della scheda in
+  alto (`document.title`) resta sotto gli occhi per tutto il tempo, e su una
+  pagina per il resto tutta tradotta era l'ultima riga in lingua originale.
+  Entra nella stessa coda di lavoro come un'unità sola, si applica scrivendo
+  `document.title` (Electron rilancia `page-title-updated` e la scheda si
+  aggiorna da sé) e va **marcato** come tutto il resto: senza
+  `data-sn-translated` sul `<title>`, la sentinella del testo nuovo scambia la
+  nostra stessa scrittura per testo appena arrivato dal sito e l'avviso finale
+  annuncia roba nuova che non c'è.
 - **Il messaggio finale deve dire la verità**: "fatto" solo se tutte le unità sono
   state sostituite, "solo in parte" se qualcuna è rimasta indietro, e un avviso
   esplicito quando non c'è **niente** da tradurre — il silenzio fa ritentare
@@ -707,10 +766,68 @@ pagina") valgono due regole imparate a caro prezzo con #407.
   con `showToast(testo, { duration: 0 })` e si **chiude** con l'handle restituito
   quando arriva l'esito: i toast delle pagine non si impilano, si sovrapporrebbero
   nello stesso angolo diventando illeggibili.
+- **Anche l'avviso onesto deve essere vero: "solo in parte" vuole una PROVA, non
+  prudenza.** Un "è rimasto fuori qualcosa" che scatta a vuoto manda l'utente a
+  cercare del testo in lingua originale che non esiste, e brucia la credibilità
+  dell'avviso per le volte in cui è vero: sbagliare "dalla parte della prudenza"
+  non è gratis. Concretamente, per dire che il contenuto di un componente del
+  sito è illeggibile non basta che l'elemento sia vuoto e abbia il trattino nel
+  nome (un separatore o uno spaziatore disegnato in CSS è fatto così): servono
+  segnali positivi — che il sito l'abbia davvero **registrato** (`:defined`,
+  interrogabile sul DOM anche da un altro mondo JS, al contrario del registro dei
+  componenti) e che lì dentro qualcosa sia **disegnato e irraggiungibile** (sopra
+  un elemento vuoto il punto d'inserimento del cursore cade sull'elemento stesso,
+  sopra un componente chiuso viene rimbalzato fuori).
+- **"Non lo so" non è "sì": dove la prova non si può fare, si tace.** Una prova
+  che si appoggia al cursore vale solo dentro lo schermo e solo su ciò che i clic
+  non attraversano — cioè quasi mai: qualsiasi pagina più lunga di una schermata
+  ha roba sotto il bordo, e le decorazioni sono quasi tutte `pointer-events:none`.
+  Contare quel "non lo so" come prova rovescia la bugia invece di toglierla: la
+  pagina è tutta tradotta e l'avviso manda comunque a cercare dell'inglese che non
+  c'è. Il prezzo giusto è l'altro: un avviso in meno quando il pezzo illeggibile
+  sta fuori portata. **Un avviso mancato costa uno; un avviso falso li svaluta
+  tutti.** Vale per qualunque diagnosi appoggiata alla geometria della finestra
+  (`elementFromPoint`, `caretPositionFromPoint`, il rettangolo visibile): il
+  risultato "indeterminato" va tenuto separato dal risultato negativo, e trattato
+  come tale fino in fondo. Corollario: se tacere costa, **conviene insistere solo
+  dove la risposta manca**. La sonda riprova su altre righe dell'elemento quando
+  la prima non ha risposto (una barra fissa che lo taglia a metà), e si ferma
+  appena una risposta arriva: righe in più non devono poter ribaltare un esito
+  già certo, o la sonda diventa una votazione.
+- **"È roba mia" si MARCA alla nascita, non si indovina dal nome.** Chi cammina
+  su una pagina che non è sua deve saltare la UI che Filo ci ha disegnato dentro
+  (menu, avvisi, popup, riquadri di conferma): è già nella lingua dell'utente, e
+  tradurla vuol dire pagare il modello per riscrivere il proprio menu.
+  Riconoscerla dal nome — una classe che comincia per `sn-`, un id che comincia
+  per `filo-` — **sbaglia su siti veri**: i portali costruiti con ServiceNow
+  chiamano `sn-qualcosa` ogni loro pezzo, e "filo" è una parola italiana normale
+  in un nome. Il prezzo dell'errore non è simmetrico: un riquadro del sito
+  scambiato per nostro resta intero in lingua originale **sotto un avviso che
+  dichiara la pagina tradotta**, e nessun conteggio se ne accorge (il pezzo
+  saltato non è "rimasto fuori": è come se non esistesse). La regola è
+  `SN_FILO_UI.mark(el)` sulla **radice** di ogni pezzo di UI che attacchiamo al
+  documento, nella stessa funzione che la crea, e `SN_FILO_UI.is/inside` come
+  unica risposta alla domanda "chi l'ha disegnato". Un attributo (`data-sn-ui`),
+  non una classe: le classi le riscrive anche il sito. Vale per chiunque
+  cammini sulla pagina, non solo per la traduzione — la sentinella del testo
+  nuovo usa lo stesso marchio, o scambia i nostri avvisi per roba appena
+  arrivata dal sito.
+- **L'etichetta gemella si copia, non si ricompra.** Un link col suggerimento
+  del mouse uguale al proprio testo, un bottone a sola icona con l'etichetta di
+  accessibilità ripetuta: sono dappertutto (sulla home di un giornale sono
+  decine di frasi). Mandare al modello due volte la stessa frase costa il doppio
+  e sullo schermo non cambia niente. Quando il valore dell'attributo è identico
+  al testo che l'elemento MOSTRA, l'unità non si spedisce: si applica dopo,
+  copiando il `textContent` appena tradotto (che può venire da un figlio —
+  `<a title="…"><span>…`). Due dettagli che tengono onesto il conto: se il
+  testo non è cambiato (richiesta fallita) l'etichetta **non** si marca come
+  fatta, così la ripresa ci riprova; e la copia non entra fra le unità del giro,
+  perché non è lavoro rimasto fuori.
 - **Dove:** `extractTranslatableBlocks` in `src/content/extractContext.js`
   (`extractMainTextNodes`, accanto, resta la versione "solo l'articolo" per
   l'excerpt del categorizer: sono due domande diverse); applicazione e ripristino
-  in `src/content/translatePage.js`. Test `tests/translate-page.spec.mjs`.
+  in `src/content/translatePage.js`; il marchio della UI di Filo in
+  `src/shared/filoUi.js`. Test `tests/translate-page.spec.mjs`.
 
 ## Operazione a chunk che può fallire a metà: tre stati, ripresa, avviso onesto
 
@@ -722,6 +839,47 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
 
 - **Tre stati, non due**: assente / **parziale** / completa. Il menu offre azioni
   diverse nei tre casi ("Traduci" / "Riprendi traduzione" / "Mostra originale").
+- **Su una pagina viva, "completa" scade.** I siti che si allungano scorrendo e
+  quelli che cambiano schermata senza ricaricare aggiungono testo DOPO che il
+  lavoro si è dichiarato finito: se il menu in quello stato offre solo il ritorno
+  all'originale, l'unico modo di tradurre tre righe nuove è buttare (e ripagare)
+  l'intera pagina. Serve un quarto stato — **completa ma con roba nuova** → "Traduci
+  il testo nuovo" — che riusa la stessa ripresa. Accorgersene costa una
+  `MutationObserver` che alza soltanto un flag (l'apertura del menu deve restare
+  istantanea: niente scansioni lì dentro); il conto vero lo rifà la traduzione,
+  che rilegge la pagina e salta ciò che è già marcato. L'osservatore ignora la UI
+  di Filo iniettata nella pagina (prefisso `sn-`) e non ha bisogno di staccarsi
+  mentre traduciamo: le nostre sostituzioni nascono **già marcate**
+  (`data-sn-translated` scritto nella stessa esecuzione in cui si sostituiscono i
+  figli), quindi il filtro le scarta da sé.
+- **Il testo arrivato DURANTE il lavoro conta come quello arrivato dopo.**
+  Scorrere mentre si aspetta è il comportamento normale: se la sorveglianza parte
+  solo a lavoro finito, quelle righe non le vede nessuno e l'avviso finale
+  dichiara tradotta una pagina che sotto gli occhi è mezza in lingua originale.
+  Sorvegliare **da prima di cominciare** e rifare un giro (con un tetto: su un
+  sito che carica all'infinito rincorrerlo non finirebbe mai) costa solo il testo
+  nuovo, perché la rilettura salta ciò che è già marcato. Se dopo il tetto ne è
+  arrivato dell'altro, lo dice e lascia la voce di menu.
+- **"Nascosto adesso" non è "da non tradurre mai".** Una fisarmonica chiusa, una
+  scheda in secondo piano, un "leggi tutto" ripiegato: quel testo non si traduce
+  (l'utente potrebbe non aprirlo mai, e lo pagherebbe), ma i sottoalberi saltati
+  **per motivi di visibilità** si segnano a parte — sono un motivo di salto
+  diverso da `translate="no"`/UI di Filo. Quando uno di quelli torna visibile, per
+  chi guarda lo schermo è identico al testo che il sito ha appena aggiunto, e il
+  menu deve offrire la stessa cosa: "Traduci il testo nuovo", non "butta via
+  tutto e ricomincia".
+- **Un lavoro lungo si deve poter fermare, e fermarlo deve durare.** Mentre la
+  traduzione lavora l'icona del menu è il **ritorno all'originale** (prima lì
+  c'era "Traduci la pagina", che a lavoro in corso non faceva niente: un vicolo
+  cieco). E il ritorno indietro deve reggere contro le richieste già spedite: un
+  **numero d'ordine del giro** sulle unità di lavoro fa buttare via le risposte in
+  volo, invece di lasciarle ricadere sulla pagina qualche secondo dopo e
+  ritradurla a metà. E l'avviso "sto lavorando" si chiude **nell'istante** in cui
+  l'utente ferma, non quando le richieste già spedite si decidono a tornare. Un
+  riquadro "in corso" accanto a "annullata" gli dice che nessuno l'ha ascoltato.
+  Quindi l'handle dell'avviso di avanzamento vive dove arriva anche
+  l'annullamento, non solo dentro la funzione che lavora. Vale per qualsiasi
+  lavoro asincrono annullabile, non solo qui.
 - **La ripresa non ripaga ciò che è già fatto**: i pezzi conclusi si marcano nel
   DOM (`data-sn-translated`) e si escludono **prima** di costruire le richieste,
   non dopo aver ricevuto la risposta. Escluderli dopo significa pagare due volte
@@ -734,6 +892,14 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   la frase di `SN_CHAT_ERRORS` (la regola "mai il messaggio grezzo" vale per i
   toast di pagina esattamente come per le bolle di chat) + come riprendere. Mai
   un messaggio di successo su un lavoro monco.
+- **"Il modello ha risposto a vuoto" non è un errore, ed è un motivo a sé.** La
+  richiesta è partita, la risposta è tornata, semplicemente non conteneva testo:
+  fabbricare un `Error` per farla passare da `SN_CHAT_ERRORS` produce "Qualcosa è
+  andato storto. Riprova", che non dice niente e contraddice la riga successiva,
+  dove si spiega come riprendere. Il ripiego per l'errore mancante esisteva già
+  ("alcuni blocchi sono tornati vuoti dal modello"): la risposta vuota deve
+  arrivarci, non scavalcarlo. In generale: prima di tradurre un guasto in una
+  frase, chiedersi se un guasto c'è stato davvero.
 - **Se l'icona cambia mestiere, l'azione che ha lasciato scoperta torna come
   voce**: nello stato parziale l'icona serve a riprendere, quindi "Mostra
   originale" compare come voce etichettata del menu (stesso schema di
