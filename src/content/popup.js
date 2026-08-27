@@ -645,6 +645,9 @@
     // appoggiava in cima e il fondo usciva, con la riga per scrivere fuori.)
     function roomForCap() {
       if (dragged) return window.innerHeight - POSE_MARGIN * 2;
+      // 'dentro': il punto ancorato non era onorabile, il riquadro sta dove ci
+      // sta e lo spazio è tutta la finestra — come da trascinato.
+      if (side === 'dentro') return window.innerHeight - POSE_MARGIN * 2;
       return side === 'above' ? roomAbove() : roomBelow();
     }
 
