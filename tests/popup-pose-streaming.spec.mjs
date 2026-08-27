@@ -685,7 +685,12 @@ async function frameDelRiquadro(page, src) {
   return f;
 }
 
-for (const alto of [180, 240]) {
+// 130px è il gradino che serve davvero: sotto quella soglia non basta più
+// stringere il tetto e togliere la riga del costo — anche l'IMBOTTITURA del
+// corpo deve cedere, perché `min-height: 0` azzera il contenuto e non
+// l'ingombro. Quei venti pixel non contati facevano sporgere la riga per
+// scrivere oltre il bordo del riquadro, dove il frame la taglia a metà.
+for (const alto of [130, 180, 240]) {
   test(`Alt+E dentro un riquadro incorporato alto ${alto}px: il riquadro nasce intero e la riga per scrivere si clicca`, async ({ app, openTab, testServer }) => {
     test.setTimeout(90_000);
     const src = testServer.html(RIQUADRO_INTERNO);
