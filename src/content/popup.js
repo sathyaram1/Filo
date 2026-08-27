@@ -835,6 +835,15 @@
       reflow(popup);
     });
 
+    // Il cursore va SUBITO nella riga per scrivere. Chi ha chiesto la
+    // spiegazione con la tastiera (Alt+E) doveva passare al mouse — o scoprire
+    // Tab — per fare la domanda dopo: attrito puro su una strada che è tutta di
+    // tastiera. Le due strade fanno la stessa cosa, quindi vale anche per la
+    // freccetta del menu del tasto destro. `preventScroll` perché dare il fuoco
+    // a un elemento dentro un riquadro incorporato farebbe scorrere la pagina
+    // che lo contiene, e il riquadro appena aperto scapperebbe di vista.
+    try { popup.inputEl.focus({ preventScroll: true }); } catch (_) {}
+
     popups.push(popup);
     return popup;
   }
