@@ -581,13 +581,12 @@
 
     // I tre gradini, dal più comodo al più stretto: quanto misura il riquadro
     // AL MINIMO in ciascuno. Sotto quel numero, in quello stato, non si accorcia
-    // più — i pezzi escono dal bordo invece di comprimersi, e il browser li
-    // taglia. Nell'ultimo il corpo cede anche l'imbottitura (il foglio di stile
-    // gliela azzera), quindi sparisce per intero e il pavimento è davvero il
-    // solo incomprimibile.
+    // più — i pezzi escono dal bordo invece di comprimersi, e dentro un riquadro
+    // incorporato il browser li taglia. Nell'ultimo il corpo ha ceduto anche
+    // l'imbottitura, quindi sparisce per intero.
     const minComodo = () => incomprimibile() + footerH + bodyComfort;
-    const minStretto = () => incomprimibile() + footerH + bodyResiduo;
-    const minNudo = () => incomprimibile();
+    const minStretto = () => incomprimibile() + footerH + bodyStretto;
+    const minNudo = () => incomprimibile() + bodyNudo;
 
     // Il livello di compressione è funzione SOLO del tetto e di misure prese
     // una volta sola: a parità di spazio dà sempre la stessa risposta, quindi
