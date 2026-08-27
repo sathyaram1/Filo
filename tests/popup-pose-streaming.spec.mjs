@@ -85,6 +85,17 @@ const misura = () => {
   };
 };
 
+// La riga per scrivere non è solo "dentro le coordinate": sotto il cursore, al
+// centro della casella, ci deve essere davvero la casella.
+const casellaCliccabile = () => {
+  const root = document.querySelector('.sn-popup');
+  if (!root) return false;
+  const input = root.querySelector('.sn-popup-input');
+  const r = input.getBoundingClientRect();
+  const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return !!el && (el === input || input.contains(el));
+};
+
 test('spiegazione approfondita su selezione in basso: la riga per scrivere resta dentro lo schermo mentre la risposta arriva', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   const page = await openTab('filo://newtab/');
