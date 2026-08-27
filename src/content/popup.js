@@ -450,6 +450,7 @@
     // Letto PRIMA di scrivere il tetto inline: dopo rileggeremmo il nostro
     // stesso valore e lo stringeremmo a ogni giro.
     const maxH = styleMaxHeight(root);
+    const baseW = styleWidth(root);
     let side = null;
     let dragged = false;
     let ro = null;
