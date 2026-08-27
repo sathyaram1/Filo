@@ -77,6 +77,7 @@ test('probe: riquadro incorporato 420px + domanda successiva lunga', async ({ ap
   await provider(app);
   let frame = null;
   await expect.poll(() => { frame = page.frames().find((f) => f.url() === src) || null; return !!frame; }, { timeout: 8000 }).toBe(true);
+  await expect.poll(() => frame.evaluate(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST).catch(() => false), { timeout: 15_000 }).toBe(true);
   await frame.evaluate(() => {
     window.SN_POPUP.openStreaming({
       action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
