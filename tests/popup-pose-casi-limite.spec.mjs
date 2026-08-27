@@ -1,6 +1,10 @@
-// VERIFICA #502 (avversariale) — non fa parte della consegna: prova a rompere
-// la posa del riquadro della spiegazione approfondita da angoli che la suite
-// del rimedio non tocca.
+// #502 — casi limite della posa del riquadro della spiegazione approfondita.
+// Nato come banco di prova avversariale (prova a ROMPERE la posa invece di
+// confermarla) e tenuto qui perché quegli angoli sono esattamente quelli in cui
+// il difetto è tornato fuori tre volte: la strada del tasto destro, il secondo
+// turno, il contenuto ostile, la raffica. Lo scenario centrale — la domanda
+// successiva che allunga la riga per scrivere — sta in
+// `popup-pose-streaming.spec.mjs` insieme al resto della posa.
 //
 //  1. la domanda lunga nella riga per scrivere (la casella cresce fino a 120px)
 //     e poi cancellata: il riquadro deve tornare alto com'era, non restare
