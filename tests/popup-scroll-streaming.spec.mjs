@@ -115,6 +115,8 @@ test('scrollando su per rileggere mentre la risposta arriva, la vista NON torna 
   expect(s.height - s.client, 'il corpo non è più scorrevole: il test non prova niente').toBeGreaterThan(80);
   // SUCCESSO — la lettura è rimasta dove l'aveva lasciata l'utente.
   expect(s.top, 'la risposta che arriva ha strappato la lettura in fondo').toBeLessThan(20);
+
+  await ripristinaProvider(app);
 });
 
 test('restando in fondo, la vista continua a seguire la risposta che arriva', async ({ app, openTab }) => {
