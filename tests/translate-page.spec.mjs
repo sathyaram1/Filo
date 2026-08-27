@@ -555,3 +555,106 @@ test('striscia agganciata alla finestra e spinta fuori: non la si raggiunge scor
   await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
   expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #503 (secondo giro) — nascondere non è solo questione di CSS sull'elemento:
+// il modo più comune è RITAGLIARLO da un antenato.
+//
+//  1) fisarmonica ripiegata / banner dei cookie chiuso: il contenitore è
+//     schiacciato a zero e taglia via quello che sborda → NON conta;
+//  2) contenitore di dimensioni normali che ritaglia il riquadro spinto più in
+//     basso del suo bordo → NON conta;
+//  3) pannello con una barra di scorrimento SUA (colonne laterali, finestre col
+//     corpo che scorre): il riquadro sta più in basso di quanto il pannello
+//     mostri, ma basta scorrere il pannello per averlo sotto gli occhi in
+//     lingua originale → CONTA, esattamente come il contenuto sotto la prima
+//     schermata.
+// ───────────────────────────────────────────────────────────────────────────
+
+const CLIPPED_ADS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <!-- Fisarmonica ripiegata: contenitore a zero che taglia via quel che sborda. -->
+  <section id="accordion" style="height:0;overflow:hidden">
+    <ad-slot id="adFolded"></ad-slot>
+  </section>
+  <!-- Banner dei cookie chiuso: contenitore di dimensioni normali, riquadro
+       spinto fuori dal suo bordo e ritagliato via. -->
+  <div id="cookiebar" style="height:30px;overflow:hidden">
+    <div style="height:400px"></div>
+    <ad-slot id="adClipped"></ad-slot>
+  </div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('riquadro ritagliato via da un antenato: la pagina è tradotta e l’avviso non manda a cercare niente', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, CLIPPED_ADS);
+  await watchToasts(page);
+
+  // Il presupposto della prova: i due riquadri hanno un rettangolo grande —
+  // quindi il conteggio "a rettangolo" li prenderebbe — ma sullo schermo non
+  // c'è un solo pixel loro, perché l'antenato li ritaglia.
+  expect(await page.evaluate(() => {
+    const big = (id) => {
+      const r = document.querySelector(id).getBoundingClientRect();
+      return r.width >= 40 && r.height >= 16;
+    };
+    const painted = (id) => {
+      const el = document.querySelector(id);
+      const r = el.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2);
+      const y = Math.round(r.top + r.height / 2);
+      return document.elementsFromPoint(x, y).includes(el);
+    };
+    return {
+      folded: { big: big('#adFolded'), painted: painted('#adFolded') },
+      clipped: { big: big('#adClipped'), painted: painted('#adClipped') },
+    };
+  })).toEqual({
+    folded: { big: true, painted: false },
+    clipped: { big: true, painted: false },
+  });
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect(page.locator('#body')).toHaveText(/^IT /);
+
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/translate-page-clipped-ads.png' }).catch(() => {});
+});
+
+const PANEL_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <aside id="panel" style="height:200px;width:340px;overflow-y:auto;border:1px solid #ccc">
+    <div style="height:1000px"></div>
+    <ad-slot id="adInPanel"></ad-slot>
+  </aside>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('riquadro più in basso dentro un pannello che scorre: si raggiunge scorrendo, quindi l’avviso esce', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, PANEL_AD);
+  await watchToasts(page);
+
+  // Il presupposto: adesso il riquadro non si vede (sta oltre il fondo del
+  // pannello), ma il pannello ha una barra di scorrimento sua e ce lo porta.
+  expect(await page.evaluate(() => {
+    const p = document.querySelector('#panel');
+    const r = document.querySelector('#adInPanel').getBoundingClientRect();
+    return {
+      belowPanel: r.top > p.getBoundingClientRect().bottom,
+      panelScrolls: p.scrollHeight > p.clientHeight,
+    };
+  })).toEqual({ belowPanel: true, panelScrolls: true });
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partial = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
