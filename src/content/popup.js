@@ -608,7 +608,18 @@
       const below = roomBelow(), above = roomAbove();
       if (below >= want) return 'below';   // ci sta tutto sotto: preferenza naturale
       if (above >= want) return 'above';
-      return above > below ? 'above' : 'below'; // nessuno dei due basta: il più capiente
+      // Nessuno dei due basta al riquadro pieno: si prende il più capiente e il
+      // tetto si stringe a quello. Ma se in quel lato non ci sta nemmeno il
+      // MINIMO, il punto ancorato non è onorabile: il riquadro finirebbe fuori
+      // dal bordo e andrebbe staccato comunque (meglio coprire la parola che
+      // restare dove non si clicca). Tanto vale saperlo subito e dire che lo
+      // spazio è la finestra INTERA: stringendo il tetto al solo lato si
+      // butterebbe via posto che c'è, e nei riquadri incorporati più bassi il
+      // corpo della risposta finiva a zero — la spiegazione richiesta non si
+      // leggeva per niente.
+      const migliore = above > below ? 'above' : 'below';
+      const minimo = (pavimento() + boxExtra()) * scale();
+      return Math.max(above, below) >= minimo ? migliore : 'dentro';
     }
 
     // Larghezza: stesso ragionamento del tetto d'altezza, sull'altro asse.
