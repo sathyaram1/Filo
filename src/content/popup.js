@@ -835,6 +835,17 @@
       reflow(popup);
     });
 
+    // Dare il fuoco alla casella spegne la selezione della pagina: un documento
+    // ha una selezione sola, e prenderla dentro il riquadro vuol dire lasciarla
+    // fuori. La parola su cui l'utente ha chiesto la spiegazione però gli serve
+    // ancora quando il riquadro si chiude (tradurla, copiarla, cercarla), e
+    // rifarla a mano è lo stesso attrito da cui stiamo scappando: ce la teniamo
+    // da parte e gliela rimettiamo alla chiusura.
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount && !sel.isCollapsed) popup.savedRange = sel.getRangeAt(0).cloneRange();
+    } catch (_) {}
+
     // Il cursore va SUBITO nella riga per scrivere. Chi ha chiesto la
     // spiegazione con la tastiera (Alt+E) doveva passare al mouse — o scoprire
     // Tab — per fare la domanda dopo: attrito puro su una strada che è tutta di
