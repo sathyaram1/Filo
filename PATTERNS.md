@@ -1021,7 +1021,11 @@ una conseguenza; va fatto il contrario.
   — scorciatoia e menu del tasto destro fanno la stessa cosa. `focus()` va
   chiamato con `{ preventScroll: true }`: dentro un riquadro incorporato,
   altrimenti, la pagina che lo contiene scorre e il riquadro appena aperto
-  scappa di vista.
+  scappa di vista. **E il fuoco dentro il riquadro spegne la selezione della
+  pagina**, perché un documento ne ha una sola: la parola su cui l'utente ha
+  chiesto la spiegazione sparisce, e alla chiusura deve rifarla a mano per
+  tradurla o copiarla. Tieni da parte il `Range` all'apertura e rimettilo alla
+  chiusura, ma solo se nel frattempo l'utente non ne ha fatta una sua.
 - **Il guardiano guarda TUTTI E DUE i bordi, non solo quello previsto.** Finché
   la finestra non cambia sborda solo il lato libero, e lì si stringe il tetto.
   Ma quando lo spazio si accorcia dopo la posa, a uscire è il lato ANCORATO — un
