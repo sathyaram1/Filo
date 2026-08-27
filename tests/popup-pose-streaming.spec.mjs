@@ -1136,6 +1136,52 @@ for (const { zoom, sintomo } of CASI_ZOOM_TRASCINATO) {
   });
 }
 
+// Lo stesso gesto su un riquadro posato SOPRA la parola. Lì il bordo ancorato è
+// il fondo, e la compensazione zoom scala da lì (`transform-origin: bottom
+// left`): prendendolo in mano il bordo ancorato diventa la cima, e finché il
+// punto da cui scala resta quello di prima il riquadro si disegna dove
+// `style.top` non dice — con la pagina al 50% saltava di un'altezza intera al
+// primo pixel di trascinamento, e ogni conto fatto sulle sue coordinate
+// parlava di un posto dove non era.
+test('riquadro posato sopra la parola, pagina al 50% e trascinamento: non salta e resta dentro lo schermo', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://newtab/');
+  // Parola in fondo: sotto non ci sta, il riquadro si posa sopra.
+  const prima = await riquadroPosato(app, page, 0.85);
+  expect(fuoriDaiBordi(prima)).toEqual([]);
+  const ancoratoSopra = await page.evaluate(() => {
+    const s = document.querySelector('.sn-popup').style;
+    return !!s.bottom && s.bottom !== 'auto';
+  });
+  expect(ancoratoSopra, 'il riquadro non si è posato sopra la parola: lo scenario non è quello vero').toBe(true);
+
+  await zoomScheda(app, 0.5);
+  await expect.poll(
+    () => page.evaluate(() => window.innerHeight),
+    { timeout: 5000, message: 'lo zoom non ha allargato la finestra: lo scenario non è quello vero' },
+  ).toBeGreaterThan(prima.vh + 50);
+  const primaDelPresa = await page.evaluate(misura);
+
+  // Una presa e uno spostamento piccolo: quello che deve succedere è che il
+  // riquadro segua il mouse, non che salti da un'altra parte.
+  await trascina(page, 0, 60);
+  const dopo = await page.evaluate(misura);
+  expect(Math.abs(dopo.top - (primaDelPresa.top + 60)), 'il riquadro è saltato invece di seguire il mouse')
+    .toBeLessThan(24);
+  expect(fuoriDaiBordi(dopo)).toEqual([]);
+
+  // E poi fino in fondo, come nell'altro caso.
+  await trascinaInFondo(page);
+  await expect.poll(
+    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    { timeout: 5000, message: 'trascinato in fondo il riquadro posato sopra è rimasto fuori dallo schermo' },
+  ).toEqual([]);
+  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+
+  await zoomScheda(app, 1);
+  await ripristinaProvider(app);
+});
+
 // La faccia opposta: con la pagina INGRANDITA il limite si fermava troppo
 // presto e il riquadro non arrivava al bordo, lasciando fuori una fascia di
 // schermo utile. Stesso errore di misura, verso opposto.
