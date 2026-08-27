@@ -85,6 +85,20 @@ const misura = () => {
   };
 };
 
+// Elenco dei bordi da cui il riquadro (o la riga per scrivere) sta uscendo.
+// Vuoto = è tutto dentro lo schermo. Gira nel processo di test, su una misura
+// già presa: torna un elenco e non un booleano così il messaggio d'errore dice
+// da che parte è uscito e di quanto.
+const fuoriDaiBordi = (m) => {
+  if (!m) return ['riquadro sparito'];
+  const fuori = [];
+  if (m.bottom > m.vh + 1) fuori.push(`fondo oltre il bordo di ${Math.round(m.bottom - m.vh)}px (vh=${m.vh})`);
+  if (m.top < -1) fuori.push(`cima oltre il bordo di ${Math.round(-m.top)}px`);
+  if (m.inputBottom > m.vh) fuori.push(`riga per scrivere sotto il bordo di ${Math.round(m.inputBottom - m.vh)}px`);
+  if (m.inputTop < 0) fuori.push(`riga per scrivere sopra il bordo di ${Math.round(-m.inputTop)}px`);
+  return fuori;
+};
+
 // La riga per scrivere non è solo "dentro le coordinate": sotto il cursore, al
 // centro della casella, ci deve essere davvero la casella.
 const casellaCliccabile = () => {
