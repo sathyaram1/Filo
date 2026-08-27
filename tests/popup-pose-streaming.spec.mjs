@@ -565,13 +565,10 @@ test('finestra rimpicciolita col riquadro aperto: resta dentro lo schermo e la r
   const page = await openTab('filo://newtab/');
   const prima = await riquadroPosato(app, page);
 
-  // Meno di un terzo in meno di altezza: abbastanza da portare fuori un punto
-  // ancorato a tre quarti.
-  const alta = await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    return win.getBounds().height;
-  });
-  await altezzaFinestra(app, Math.max(420, Math.round(alta * 0.62)));
+  // Un terzo di altezza in meno, come nella critica (da 910 a 660): abbastanza
+  // da portare fuori un punto ancorato a tre quarti.
+  const alta = prima.vh;
+  await altezzaFinestra(page, Math.max(420, Math.round(alta * 0.62)));
   await expect.poll(
     () => page.evaluate(() => window.innerHeight),
     { timeout: 5000, message: 'la finestra non si è rimpicciolita: lo scenario non è quello vero' },
