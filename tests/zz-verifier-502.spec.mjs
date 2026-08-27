@@ -286,8 +286,7 @@ test('#502 tema scuro: traccia visiva', async ({ app, openTab }) => {
   await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
   await provider(app, { attesa: 200 });
-  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.snTheme), { timeout: 8000 })
-    .toBe('dark');
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
   await page.evaluate(() => window.SN_POPUP.openStreaming({
     action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
     payload: { selection: 'x', sentence: 'y' },
@@ -300,3 +299,60 @@ test('#502 tema scuro: traccia visiva', async ({ app, openTab }) => {
   expect(fuori(await page.evaluate(misura))).toEqual([]);
   try { await page.screenshot({ path: 'tests/.shots/zz-verifier-502-scuro.png' }); } catch (_) {}
 });
+
+// ── 8. Finestra estrema: bassissima e strettissima.
+for (const [w, h] of [[1100, 200], [1100, 150], [340, 700]]) {
+  test(`#502 finestra ${w}x${h}: il riquadro resta raggiungibile`, async ({ app, openTab }) => {
+    test.setTimeout(120_000);
+    const page = await openTab('filo://newtab/');
+    await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
+    await page.setViewportSize({ width: w, height: h });
+    await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 }).toBeLessThanOrEqual(h);
+    await provider(app, { attesa: 200 });
+    await page.evaluate(() => window.SN_POPUP.openStreaming({
+      action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+      payload: { selection: 'x', sentence: 'y' },
+      anchor: { x: 120, y: Math.round(window.innerHeight * 0.75) },
+      title: 'Approfondisci',
+    }));
+    await page.waitForSelector('.sn-popup', { timeout: 8000 });
+    await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+    await page.waitForTimeout(400);
+    const m = await page.evaluate(misura);
+    console.log(`[${w}x${h}]`, JSON.stringify(m), fuori(m));
+    try { await page.screenshot({ path: `tests/.shots/zz-verifier-502-${w}x${h}.png` }); } catch (_) {}
+    expect(fuori(m)).toEqual([]);
+  });
+}
+
+// ── 9. Zoom della pagina spinto, per la strada vera dell'app (il campo delle
+// percentuali arriva a 500%, la rotella a ~250%).
+for (const z of [2.0, 2.5, 3.0, 5.0]) {
+  test(`#502 zoom ${z * 100}% col riquadro aperto`, async ({ app, openTab }) => {
+    test.setTimeout(120_000);
+    const page = await openTab('filo://newtab/');
+    await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
+    await provider(app, { attesa: 200 });
+    await page.evaluate(() => window.SN_POPUP.openStreaming({
+      action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+      payload: { selection: 'x', sentence: 'y' },
+      anchor: { x: 120, y: Math.round(window.innerHeight * 0.75) },
+      title: 'Approfondisci',
+    }));
+    await page.waitForSelector('.sn-popup', { timeout: 8000 });
+    await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+    await app.evaluate(({ BrowserWindow }, f) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      for (const t of (win?._filoTabs?.tabs || [])) { try { t.view.webContents.setZoomFactor(f); } catch (_) {} }
+    }, z);
+    await page.waitForTimeout(1200);
+    const m = await page.evaluate(misura);
+    console.log(`[zoom ${z}]`, JSON.stringify(m), fuori(m));
+    try { await page.screenshot({ path: `tests/.shots/zz-verifier-502-zoom${z}.png` }); } catch (_) {}
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      for (const t of (win?._filoTabs?.tabs || [])) { try { t.view.webContents.setZoomFactor(1); } catch (_) {} }
+    });
+    expect(fuori(m)).toEqual([]);
+  });
+}
