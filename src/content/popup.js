@@ -683,16 +683,52 @@
       return side === 'above' ? roomAbove() : roomBelow();
     }
 
+    // Anche la CASELLA della domanda ha un tetto, e va stretto allo spazio come
+    // quello del riquadro. Cresce mentre l'utente scrive (fino a 120px di
+    // foglio di stile) e non cede mai — quindi in una finestra bassa, o dentro
+    // un riquadro incorporato, sarebbe lei a spingere fuori il tasto di invio
+    // anche dopo che tutto il resto ha ceduto. Il suo tetto è quanto resta
+    // quando ha ceduto ANCHE il corpo, ridotto all'osso: da lì in giù la
+    // casella smette di allungarsi e scorre al suo interno — il cursore resta
+    // in vista perché il browser segue chi scrive, e nessun pezzo esce dal
+    // bordo. Si rifà a ogni misura, in tutte e due le direzioni: quando lo
+    // spazio torna, la casella torna a potersi allungare.
+    function capInput() {
+      if (!inputEl) return;
+      // Imbottitura e bordo della riga: quello che la riga occupa OLTRE la
+      // casella. È una differenza, quindi non risente del tetto che stiamo per
+      // scrivere.
+      const contorno = Math.max(0, altezza(composeEl) - altezza(inputEl));
+      const room = roomForCap() / scale() - boxExtra();
+      const disponibile = room - altezza(headerEl) - contorno - bodyNudo;
+      const tetto = Math.max(inputMin, Math.min(inputMax, disponibile));
+      inputEl.style.maxHeight = `${Math.floor(tetto)}px`;
+    }
+
+    // Su quale altezza incomprimibile è stato fatto il bilancio dell'altezza.
+    // La riga per scrivere CRESCE con la domanda, e quando cresce il bilancio è
+    // vecchio: il corpo resta al minimo comodo che aveva, non cede un pixel, e
+    // a uscire dal bordo del riquadro è proprio la riga in basso — col tasto di
+    // invio, che sotto il cursore non c'è più. Era la stessa asimmetria di
+    // sempre, un tasto più in là: il conto si rifaceva quando cambiava la
+    // finestra, mai quando a crescere era la domanda (#502).
+    let bilancioSu = -1;
+    const bilancioVecchio = () => Math.abs(incomprimibile() - bilancioSu) > 0.5;
+
     // Si rifà da capo a ogni misura, in tutte e due le direzioni: stringe
     // quando lo spazio manca e RIALLARGA quando torna. Un tetto che sa solo
     // stringere lascia il riquadro schiacciato per sempre — la seconda faccia
     // dello stesso difetto: spostato mentre lo spazio era poco, restava alto
     // 194px anche con la finestra tornata a 900.
     function capHeight() {
+      capInput();
       const room = roomForCap() / scale() - boxExtra();
       const cap = Math.min(maxH, Math.max(pavimento(), room));
       comprimi(cap);
       root.style.maxHeight = `${Math.floor(cap)}px`;
+      // Preso DOPO aver stretto la casella: è l'altezza su cui questo bilancio
+      // vale, e finché non cambia non c'è niente da rifare.
+      bilancioSu = incomprimibile();
     }
 
     // Scrive le coordinate. Non dipendono dall'altezza corrente — solo dal punto
