@@ -469,24 +469,24 @@
       root.style.maxHeight = `${Math.floor(cap)}px`;
     }
 
-    // Scrive le coordinate. Sono COSTANTI per tutta la vita del riquadro (non
-    // dipendono dall'altezza corrente), quindi riscriverle mille volte non lo
-    // muove di un pixel.
+    // Scrive le coordinate. Non dipendono dall'altezza corrente — solo dal punto
+    // ancorato e dalla finestra — quindi finché la finestra non cambia sono
+    // COSTANTI: riscriverle mille volte non muove il riquadro di un pixel.
     function place() {
       const vw = window.innerWidth, vh = window.innerHeight;
       if (dragged) return;
       const w = root.getBoundingClientRect().width || root.offsetWidth;
-      let left = ax;
+      let left = ax();
       if (left + w + POSE_MARGIN > vw) left = vw - w - POSE_MARGIN;
       if (left < POSE_MARGIN) left = POSE_MARGIN;
       root.style.left = `${Math.round(left)}px`;
       if (side === 'above') {
         // Il fondo resta incollato sopra la selezione e la crescita va in su.
         root.style.top = 'auto';
-        root.style.bottom = `${Math.round(vh - (ay - POSE_GAP))}px`;
+        root.style.bottom = `${Math.round(vh - (ay() - POSE_GAP))}px`;
       } else {
         root.style.bottom = 'auto';
-        root.style.top = `${Math.round(ay + POSE_GAP)}px`;
+        root.style.top = `${Math.round(ay() + POSE_GAP)}px`;
       }
     }
 
