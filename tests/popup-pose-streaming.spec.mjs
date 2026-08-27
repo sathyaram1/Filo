@@ -1371,7 +1371,6 @@ test('cancellata la domanda lunga, la risposta si riprende lo spazio', async ({ 
   expect(corpoStretto, 'il corpo non ha ceduto spazio alla domanda').toBeLessThan(corpoPrima - 5);
 
   await page.locator('.sn-popup .sn-popup-input').fill('');
-  await page.locator('.sn-popup .sn-popup-input').press('Backspace');
   await expect.poll(
     async () => page.evaluate(() => (
       document.querySelector('.sn-popup .sn-popup-body').getBoundingClientRect().height
