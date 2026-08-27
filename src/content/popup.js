@@ -737,6 +737,12 @@
         const r = root.getBoundingClientRect();
         root.style.bottom = 'auto';
         root.style.top = `${Math.round(r.top)}px`;
+        // Lo spazio disponibile è cambiato nell'istante stesso in cui è stato
+        // preso in mano: non è più quello del lato ancorato, è la finestra
+        // intera. Rifare il tetto qui è ciò che gli ridà l'altezza che lo
+        // spazio consente, invece di tenersi quella di quando era appeso al
+        // punto della selezione.
+        capHeight();
       },
       dispose() {
         try { ro?.disconnect(); } catch (_) {}
