@@ -940,6 +940,30 @@ una conseguenza; va fatto il contrario.
 - **Il tetto d'altezza si stringe allo spazio di quel lato.** Da lì in poi il
   riquadro non *può* diventare più alto di quanto ci sta: il corpo si accorcia
   e scorre, e il fondo resta raggiungibile.
+- **Ma un tetto stringe solo finché sta sopra i minimi interni: sotto quella
+  soglia qualcuno deve cedere DAVVERO.** Intestazione, corpo, riga di stato e
+  riga per scrivere hanno ciascuno un'altezza minima; quando la loro somma
+  supera il tetto, il riquadro smette di accorciarsi e i pezzi ESCONO dal suo
+  bordo. Decidi in anticipo chi cede e in che ordine — nel popup: prima il
+  minimo del corpo (che scorre), poi la riga del costo (che riappare come
+  hover sull'intestazione), mai intestazione e riga per scrivere — e mettilo
+  in due classi che la posa accende in funzione del **tetto**, non dell'altezza
+  misurata: una decisione presa sul proprio esito oscilla. Le misure che
+  servono a decidere (il minimo del corpo, l'altezza della riga che si può
+  nascondere) vanno lette **una volta, da non compresso**: da compresso
+  varrebbero zero e non tornerebbero più.
+- **La "finestra" non è sempre quella dell'app: dentro un iframe è l'iframe.**
+  Filo gira anche nei riquadri incorporati (#405), e lì `position: fixed` e
+  `window.innerHeight` parlano del riquadro. Un box alto 180px è quindi uno
+  scenario reale, non un caso di laboratorio — e ciò che esce dal suo bordo il
+  browser lo **taglia**: non si raggiunge né scorrendo né trascinando il
+  riquadro altrove, che in pagina invece salverebbe la situazione. Le prove di
+  una posa vanno fatte anche dentro un iframe basso, non solo su una finestra
+  bassa.
+- **Un pezzo che nasce vuoto e si riempie di una riga sola dagli il suo minimo
+  nel CSS** (`min-height: 1.2em` sulla riga del costo): così la posa lo misura
+  già dell'altezza che avrà, e non si ritrova a metà risposta un pezzo che è
+  cresciuto sotto i piedi.
 - **Il bordo ancorato lo tiene il foglio di stile, non JavaScript.** Sotto il
   punto si fissa `top` e il riquadro cresce verso il basso; sopra il punto si
   fissa `bottom` — non `top` ricalcolato dall'altezza — e cresce verso l'alto da
