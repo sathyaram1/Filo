@@ -62,6 +62,22 @@
   user-select: text;
 }
 
+/* ── Chi cede quando lo spazio si stringe (#502) ───────────────────────────
+   Stringere il tetto d'altezza del riquadro funziona finché il tetto resta
+   sopra la somma dei minimi dei pezzi interni. Sotto quella soglia il riquadro
+   non si accorcia più: i pezzi ESCONO dal suo bordo. In pagina si vedono
+   comunque; dentro un riquadro incorporato — un box commenti, un lettore
+   video, l'anteprima di un articolo, dove per un elemento `position: fixed`
+   lo "schermo" È il riquadro — il browser li taglia via, e non si raggiungono
+   né scorrendo né trascinando il popup altrove.
+   L'unico pezzo che può cedere è il CORPO della risposta: si accorcia e scorre,
+   fino a sparire. Poi, se ancora non basta, va la riga del costo (che resta
+   leggibile passando sopra l'intestazione). Intestazione e riga per scrivere
+   restano sempre: sono ciò che tiene viva la conversazione.
+   I due stati li mette `attachPose()` in src/content/popup.js. */
+.sn-popup-tight .sn-popup-body { min-height: 0; }
+.sn-popup-bare .sn-popup-footer { display: none; }
+
 /* Bolle conversazione */
 .sn-msg {
   margin: 0 0 10px 0;
