@@ -465,6 +465,63 @@
       } catch (_) { return 0; }
     }
 
+    // ── Chi cede quando lo spazio si stringe (#502, seconda porta) ─────────
+    //
+    // Stringere il tetto funziona finché il tetto resta sopra la somma dei
+    // minimi dei pezzi interni. Sotto quella soglia il riquadro NON si accorcia
+    // più: i pezzi escono dal suo bordo. In pagina si vedono lo stesso; dentro
+    // un riquadro incorporato — dove per un elemento `position: fixed` lo
+    // "schermo" È il riquadro (#405: lì dentro tasto destro e Alt+E funzionano
+    // apposta) — il browser li taglia via, e la riga per scrivere non si
+    // raggiunge né scorrendo né spostando il riquadro altrove.
+    //
+    // Quindi il tetto da solo non basta: qualcuno deve cedere DAVVERO. A cedere
+    // è il corpo della risposta, che si accorcia e scorre fino a sparire; poi,
+    // se ancora non basta, la riga del costo (che resta leggibile passando
+    // sopra l'intestazione). Intestazione e riga per scrivere restano sempre.
+    const headerEl = root.querySelector('.sn-popup-header');
+    const bodyEl = root.querySelector('.sn-popup-body');
+    const footerEl = root.querySelector('.sn-popup-footer');
+    const composeEl = root.querySelector('.sn-popup-compose');
+    // In px di LAYOUT: sullo schermo la compensazione zoom li scala.
+    const altezza = (el) => (el ? el.getBoundingClientRect().height / (scale() || 1) : 0);
+
+    // Il minimo del corpo si legge ORA, che è ancora quello naturale: da
+    // compresso rileggeremmo zero, e la decisione dipenderebbe dal suo stesso
+    // esito — cioè oscillerebbe.
+    const bodyComfort = (() => {
+      if (!bodyEl) return 0;
+      try {
+        const cs = getComputedStyle(bodyEl);
+        const mh = parseFloat(cs.minHeight) || 0;
+        if (!mh) return 0;
+        if (cs.boxSizing === 'border-box') return mh;
+        return mh + (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+          + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+      } catch (_) { return 0; }
+    })();
+    // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe
+    // più. (Nasce vuota ma il foglio di stile le dà già l'altezza che avrà
+    // piena, così questa misura vale anche dopo.)
+    const footerH = altezza(footerEl);
+
+    // Quello che non cede mai. Misurato ogni volta: la riga per scrivere si
+    // allarga quando la domanda è lunga.
+    const incomprimibile = () => altezza(headerEl) + altezza(composeEl);
+
+    // Il livello di compressione è funzione SOLO del tetto e di misure prese
+    // una volta sola: a parità di spazio dà sempre la stessa risposta, quindi
+    // non può rincorrersi.
+    function comprimi(cap) {
+      const fisso = incomprimibile();
+      root.classList.toggle(POSE_TIGHT, cap < fisso + footerH + bodyComfort - 0.5);
+      root.classList.toggle(POSE_BARE, cap < fisso + footerH - 0.5);
+    }
+
+    // Il pavimento del tetto non è una costante: è quanto misurano i pezzi che
+    // non cedono. Più in basso il tetto non stringe più niente.
+    const pavimento = () => incomprimibile();
+
     function chooseSide() {
       const want = (maxH + boxExtra()) * scale();  // ingombro pieno raggiungibile
       const below = roomBelow(), above = roomAbove();
