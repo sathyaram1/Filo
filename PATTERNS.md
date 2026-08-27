@@ -982,6 +982,17 @@ una conseguenza; va fatto il contrario.
   dissolvenza che porta 2px di scivolata: un test che legge la posizione mentre
   scorre legge un fotogramma, non una posa, e accusa di tremolio del codice che
   sta fermo. Aspetta `element.getAnimations()` prima di prendere le misure.
+- **Per provarlo: `page.setViewportSize`, non `win.setBounds`.** Nei test la
+  finestra sta fuori schermo (`src/main/test-window-mode.js`) e la nuova altezza
+  arriva alla vista ma NON al renderer: `window.innerHeight` resta quello di
+  prima, e un test che rimpicciolisce la finestra così non prova niente pur
+  passando. `setViewportSize` consegna alla pagina quello che vede davvero
+  quando l'utente ridimensiona: viewport più bassa ed evento `resize`. Lo zoom
+  invece passa: `webContents.setZoomFactor` dal main.
+- **Il `resize` arriva a JS DOPO che `innerHeight` è cambiato**: per un
+  fotogramma il riquadro è ancora posato sulla finestra di prima. Nei test
+  aspetta la posa che si ferma (`expect.poll`), non la prima misura utile —
+  senza il rimedio ci resta e basta, quindi il test è rosso lo stesso.
 - **Dove:** `attachPose()` in `src/content/popup.js` (riquadro `.sn-popup`),
   test `tests/popup-pose-streaming.spec.mjs`.
 
