@@ -103,7 +103,7 @@
    che il browser sa disegnare e a uscire dal bordo è la riga per scrivere. */
 .sn-popup-tight .sn-popup-body { min-height: 0; }
 .sn-popup-bare .sn-popup-footer { display: none; }
-/* RED-CHECK TEMP */
+.sn-popup-bare .sn-popup-body { padding-top: 0; padding-bottom: 0; }
 
 /* Bolle conversazione */
 .sn-msg {
