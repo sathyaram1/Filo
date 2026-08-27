@@ -522,3 +522,36 @@ test('spazio chiuso sotto la prima schermata: continua a contare, l’avviso res
   await expect.poll(partial, { timeout: 30000 }).toBeTruthy();
   expect(await toasts(page)).not.toContain('Pagina tradotta');
 });
+
+// Striscia pubblicitaria agganciata alla finestra e spinta fuori dallo schermo:
+// non scorre con la pagina, quindi non la si raggiunge nemmeno arrivando in
+// fondo. Le coordinate del documento qui mentono, ed è per questo che la prova
+// scorre prima di tradurre.
+const FIXED_HIDDEN_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="height:3000px"></div>
+  <p id="tail">Closing paragraph at the very bottom of a long page.</p>
+  <div style="position:fixed;top:-400px;left:0"><ad-slot id="adSticky"></ad-slot></div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('striscia agganciata alla finestra e spinta fuori: non la si raggiunge scorrendo, e non fa uscire l’avviso', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FIXED_HIDDEN_AD);
+  await watchToasts(page);
+
+  await page.evaluate(() => window.scrollTo(0, 3000));
+  // Con la pagina scorsa, le coordinate del documento direbbero che la striscia
+  // sta a metà pagina; sullo schermo invece non c'è.
+  expect(await page.evaluate(() => {
+    const r = document.querySelector('#adSticky').getBoundingClientRect();
+    return { onScreen: r.bottom > 0, docWouldSay: r.top + window.scrollY > 0 };
+  })).toEqual({ onScreen: false, docWouldSay: true });
+
+  await clickTranslateIcon(page, '#tail');
+  await expect(page.locator('#tail')).toHaveText(/^IT /);
+
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+});
