@@ -511,19 +511,30 @@
       }
       const vh = window.innerHeight;
       let r = root.getBoundingClientRect();
-      const over = side === 'above'
+      // Guarda TUTTI E DUE i bordi, non solo quello da cui ci si aspetta lo
+      // sbordo. Sul lato LIBERO — quello verso cui il riquadro cresce — sborda
+      // il contenuto: lì la cura è stringere ancora il tetto. Sul lato ANCORATO
+      // stringere non serve a niente, perché quel bordo sta fermo: va riportato
+      // dentro di peso. Guardare il solo lato previsto lasciava passare proprio
+      // il caso in cui lo spazio si accorcia DOPO l'apertura: un riquadro
+      // agganciato in alto che finisce sotto il fondo non lo vedeva nessuno.
+      const libero = side === 'above'
         ? POSE_MARGIN - r.top
         : r.bottom - (vh - POSE_MARGIN);
-      if (!(over > 0.5)) return;
-      const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
-      const next = Math.max(POSE_FLOOR_H, Math.floor(cur - over / scale()));
-      if (next < cur) { root.style.maxHeight = `${next}px`; return; }
-      // Tetto già al minimo e sborda lo stesso: la finestra è più bassa del
-      // riquadro. Meglio coprire il punto ancorato che restare fuori dal bordo,
-      // dove non si clicca. Passa all'aggancio dall'alto per non litigare con
-      // `bottom`; `place()` lo riscriverà e questo lo ricorreggerà, sempre allo
-      // stesso valore.
-      r = root.getBoundingClientRect();
+      if (libero > 0.5) {
+        const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
+        const next = Math.max(POSE_FLOOR_H, Math.floor(cur - libero / scale()));
+        // Rileggere subito costa un layout, ma senza non sapremmo se lo
+        // stringimento è bastato.
+        if (next < cur) { root.style.maxHeight = `${next}px`; r = root.getBoundingClientRect(); }
+      }
+      // Dentro tutti e due i bordi: finito.
+      if (POSE_MARGIN - r.top <= 1 && r.bottom - (vh - POSE_MARGIN) <= 1) return;
+      // Sborda ancora: o il tetto è già al minimo (finestra più bassa del
+      // riquadro), o a sbordare è il bordo ancorato. Meglio coprire il punto
+      // ancorato che restare fuori dal bordo, dove non si clicca. Passa
+      // all'aggancio dall'alto per non litigare con `bottom`; `place()` lo
+      // riscriverà e questo lo ricorreggerà, sempre allo stesso valore.
       const top = Math.max(0, Math.min(vh - r.height, r.top));
       root.style.bottom = 'auto';
       root.style.top = `${Math.round(top)}px`;
