@@ -56,6 +56,17 @@ async function ripristinaProvider(app) {
   });
 }
 
+// L'apertura ha una sua animazione (dissolvenza con 2px di scivolata): non è la
+// posa, è l'ingresso. Chi misura prima che finisca legge una posizione che
+// nessuno ha deciso. Aspettiamo che sia finita e poi guardiamo.
+const attendiIngresso = async (page) => {
+  await page.evaluate(async () => {
+    const root = document.querySelector('.sn-popup');
+    if (!root?.getAnimations) return;
+    await Promise.all(root.getAnimations().map((a) => a.finished.catch(() => {})));
+  });
+};
+
 // Legge la posa corrente: ingombro del riquadro e della riga per scrivere.
 const misura = () => {
   const root = document.querySelector('.sn-popup');
