@@ -272,24 +272,50 @@
   const CLOSED_MIN_H = 16;
 
   // #503 — il rettangolo da solo non basta: dice quanto è grande il componente,
-  // mai se quel rettangolo si vede. Un componente chiuso che l'utente NON vede
-  // non va contato, perché il conto serve a una cosa sola — scrivere l'avviso
-  // finale — e "tradotta solo in parte" ha senso solo se sullo schermo è
-  // rimasto davvero un riquadro in lingua originale da andare a cercare. Spazi
-  // pubblicitari, banner dei cookie già chiusi e riquadri di statistica sono
-  // esattamente questo: componenti chiusi e nascosti, e su un sito di giornale
-  // ce n'è sempre almeno uno. Senza questo filtro l'avviso esce quasi sempre, e
-  // quasi sempre a vuoto: è la bugia di #439 girata al contrario — lì dichiarava
-  // finito un lavoro monco, qui dichiarerebbe monco un lavoro finito — e un
-  // avviso che sbaglia spesso brucia anche le volte in cui dice il vero, che
-  // sono le uniche che servono.
+  // mai se l'utente ci può arrivare. Un componente chiuso che l'utente non
+  // raggiunge non va contato, perché il conto serve a una cosa sola — scrivere
+  // l'avviso finale — e "tradotta solo in parte" ha senso solo se nella pagina
+  // è rimasto davvero un riquadro in lingua originale da andare a leggere.
+  // Spazi pubblicitari, banner dei cookie già chiusi e riquadri di statistica
+  // sono esattamente questo: componenti chiusi che il sito tiene fuori dalla
+  // vista, e su un sito di giornale ce n'è sempre almeno uno. Senza il filtro
+  // l'avviso esce quasi sempre, e quasi sempre a vuoto: è la bugia di #439
+  // girata al contrario — lì dichiarava finito un lavoro monco, qui
+  // dichiarerebbe monco un lavoro finito — e un avviso che sbaglia spesso
+  // brucia anche le volte in cui dice il vero, che sono le uniche che servono.
   //
-  // "Non lo vede" = display:none, visibility:hidden, opacità zero (anche presa
-  // da un antenato: sullo schermo il risultato è lo stesso) o rettangolo
-  // portato fuori dalla pagina (left:-9999px, top negativo, transform).
-  // NON vuol dire "sotto la prima schermata": quello è contenuto vero, ci si
-  // arriva scorrendo, e deve continuare a contare come prima. Per questo il
-  // confronto è con l'area SCORRIBILE del documento, non con la finestra.
+  // Il metro è "ci si arriva?", NON "si vede in questo istante". Continuano a
+  // contare, perché è contenuto vero che basta scorrere per avere sotto gli
+  // occhi:
+  //   - quel che sta sotto la prima schermata;
+  //   - quel che sta più in basso dentro un pannello con una barra di
+  //     scorrimento sua (colonne laterali, finestre col corpo che scorre):
+  //     scorrere un pannello è lo stesso gesto dello scorrere la pagina.
+  // Restano fuori solo i componenti che nessuno scorrimento porta sotto gli
+  // occhi:
+  //   - nascosti dal CSS (display:none, visibility:hidden, opacità zero, anche
+  //     ereditate da un antenato);
+  //   - portati oltre i bordi dell'area scorribile (left:-9999px, transform),
+  //     o fuori dalla finestra se sono agganciati a lei (position:fixed);
+  //   - RITAGLIATI da un antenato che non scorre: la fisarmonica ripiegata e il
+  //     banner dei cookie chiuso sono un contenitore schiacciato a zero con
+  //     overflow:hidden, e quel che sborda non lo vedrà mai nessuno.
+
+  const REACH_MAX_HOPS = 128;
+
+  function styleOf(el) {
+    try { return window.getComputedStyle(el); } catch (_) { return null; }
+  }
+
+  // Sale di un livello restando dentro i componenti aperti: al confine di uno
+  // shadow tree `parentElement` è null, e fermarsi lì vorrebbe dire perdere di
+  // vista chi sta ritagliando dall'alto.
+  function parentOrHost(el) {
+    if (el.parentElement) return el.parentElement;
+    const p = el.parentNode;
+    if (p && p.nodeType === 11 && p.host && p.host.nodeType === 1) return p.host;
+    return null;
+  }
 
   // Trasparente per l'utente. checkVisibility (Chromium) guarda display,
   // visibility e opacità lungo tutta la catena degli antenati in un colpo solo;
@@ -308,54 +334,141 @@
       }
     } catch (_) {}
     let cur = el;
-    for (let hops = 0; cur && cur.nodeType === 1 && hops < 64; hops++) {
+    for (let hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; hops++) {
       if (isHiddenByCss(cur)) return true;
-      cur = cur.parentElement;
+      cur = parentOrHost(cur);
     }
     return false;
   }
 
-  // Un elemento agganciato alla finestra (position:fixed, suo o di un antenato)
-  // non si muove quando la pagina scorre: per lui "raggiungibile" vuol dire
-  // "dentro la finestra ADESSO", e le coordinate del documento non dicono
-  // niente. È la forma delle strisce pubblicitarie e dei banner appiccicati in
-  // fondo allo schermo, che una volta chiusi restano nella pagina spinti fuori.
-  function isViewportAnchored(el) {
-    let cur = el;
-    for (let hops = 0; cur && cur.nodeType === 1 && hops < 64; hops++) {
-      let pos = '';
-      try { pos = window.getComputedStyle(cur).position; } catch (_) { return false; }
-      if (pos === 'fixed') return true;
-      cur = cur.parentElement;
-    }
+  // Un antenato crea un blocco contenitore anche per chi è posizionato in
+  // assoluto (transform, filter, contain…). Serve a sapere CHI ritaglia chi:
+  // un elemento in posizione assoluta non viene ritagliato dagli antenati che
+  // non lo contengono, e scambiarli per ritagliatori dichiarerebbe
+  // irraggiungibile un riquadro che invece si vede benissimo — l'errore
+  // opposto, che costa uguale.
+  function makesFixedContainingBlock(cs) {
+    if (cs.transform && cs.transform !== 'none') return true;
+    if (cs.perspective && cs.perspective !== 'none') return true;
+    if (cs.filter && cs.filter !== 'none') return true;
+    if (cs.backdropFilter && cs.backdropFilter !== 'none') return true;
+    if (cs.contain && /paint|layout|strict|content/.test(cs.contain)) return true;
+    if (cs.containerType && cs.containerType !== 'normal') return true;
+    if (cs.willChange && /transform|perspective|filter|contain/.test(cs.willChange)) return true;
     return false;
   }
 
-  // Rettangolo portato fuori dalla pagina: non ci si arriva scorrendo, quindi
-  // l'utente non lo vedrà mai. Le coordinate sono quelle del DOCUMENTO (rect +
-  // scroll corrente), non della finestra: ciò che sta solo più in basso della
-  // prima schermata resta dentro e continua a contare.
-  function isOutsideScrollablePage(el, rect) {
-    if (isViewportAnchored(el)) {
-      return rect.right <= 0 || rect.bottom <= 0
-          || rect.left >= (window.innerWidth || 0)
-          || rect.top >= (window.innerHeight || 0);
+  const SCROLLS = (o) => o === 'auto' || o === 'scroll' || o === 'overlay';
+
+  // Restringe il rettangolo raggiungibile passando per un antenato che ritaglia.
+  // Su ciascun asse:
+  //   - overflow:visible → l'antenato non c'entra;
+  //   - barra di scorrimento (auto/scroll) → prima o poi TUTTO il contenuto
+  //     passa dentro la finestrella: il limite è l'estensione scorribile, e una
+  //     volta scorso il riquadro si trova NELLA finestrella (ecco perché il
+  //     rettangolo che prosegue verso l'alto diventa quello della finestrella:
+  //     altrimenti un pannello che scorre dentro una pagina corta risulterebbe
+  //     fuori pagina);
+  //   - ritaglia e basta (hidden/clip) → il limite è la finestrella e quel che
+  //     sborda è perduto.
+  // Ritorna null quando non resta niente: irraggiungibile.
+  function narrowByClipper(box, anc, cs) {
+    const ox = cs.overflowX || 'visible';
+    const oy = cs.overflowY || 'visible';
+    if (ox === 'visible' && oy === 'visible') return box;
+    // Su una scatola in linea (o senza scatola) l'overflow non ha effetto, e
+    // clientWidth/clientHeight varrebbero zero: sarebbe un ritaglio inventato.
+    const disp = cs.display || '';
+    if (disp === 'inline' || disp === 'contents' || disp === 'none') return box;
+    let rect;
+    try { rect = anc.getBoundingClientRect(); } catch (_) { return box; }
+    const padL = rect.left + (parseFloat(cs.borderLeftWidth) || 0);
+    const padT = rect.top + (parseFloat(cs.borderTopWidth) || 0);
+    const cw = anc.clientWidth || 0;
+    const ch = anc.clientHeight || 0;
+    const out = { l: box.l, t: box.t, r: box.r, b: box.b };
+
+    if (ox !== 'visible') {
+      if (SCROLLS(ox)) {
+        const range = Math.max(0, (anc.scrollWidth || 0) - cw);
+        // Da destra a sinistra la corsa della barra va in negativo: lì lo zero
+        // non è il bordo di partenza.
+        const rtl = cs.direction === 'rtl';
+        const sL = anc.scrollLeft || 0;
+        const lo = padL + ((rtl ? -range : 0) - sL);
+        const hi = padL + ((rtl ? 0 : range) - sL) + cw;
+        if (out.r <= lo || out.l >= hi) return null;
+        out.l = padL; out.r = padL + cw;
+      } else {
+        out.l = Math.max(out.l, padL);
+        out.r = Math.min(out.r, padL + cw);
+        if (out.r <= out.l) return null;
+      }
     }
-    const doc = document.documentElement;
-    const left = rect.left + (window.scrollX || 0);
-    const top = rect.top + (window.scrollY || 0);
-    const pageW = Math.max((doc && doc.scrollWidth) || 0, window.innerWidth || 0);
-    const pageH = Math.max((doc && doc.scrollHeight) || 0, window.innerHeight || 0);
-    // Margine a sinistra: una pagina da destra a sinistra può avere area
-    // scorribile con coordinate negative, e lì lo zero non è il bordo. Il
-    // margine costa solo qualche pixel di prudenza — chi si nasconde lo fa a
-    // migliaia di pixel di distanza.
-    const leftEdge = -Math.max(0, ((doc && doc.scrollWidth) || 0) - ((doc && doc.clientWidth) || 0));
-    if (left + rect.width <= leftEdge) return true;   // tutto oltre il bordo sinistro
-    if (top + rect.height <= 0) return true;          // tutto sopra la pagina
-    if (left >= pageW) return true;                   // oltre il bordo destro
-    if (top >= pageH) return true;                    // oltre il fondo scorribile
-    return false;
+    if (oy !== 'visible') {
+      if (SCROLLS(oy)) {
+        const range = Math.max(0, (anc.scrollHeight || 0) - ch);
+        const sT = anc.scrollTop || 0;
+        const lo = padT - sT;
+        const hi = padT + range - sT + ch;
+        if (out.b <= lo || out.t >= hi) return null;
+        out.t = padT; out.b = padT + ch;
+      } else {
+        out.t = Math.max(out.t, padT);
+        out.b = Math.min(out.b, padT + ch);
+        if (out.b <= out.t) return null;
+      }
+    }
+    return out;
+  }
+
+  // Ultimo passo: la pagina stessa. Se il riquadro è agganciato alla finestra
+  // (position:fixed) non scorre con la pagina, quindi "raggiungibile" vuol dire
+  // "dentro la finestra adesso" — è la forma delle strisce e dei banner
+  // appiccicati, che una volta chiusi restano nella pagina spinti fuori.
+  // Altrimenti il confronto è con l'AREA SCORRIBILE del documento: quel che sta
+  // sotto la prima schermata è dentro, quel che sta a -9999px è fuori.
+  function withinPage(box, anchored) {
+    const de = document.documentElement;
+    const vw = (de && de.clientWidth) || window.innerWidth || 0;
+    const vh = (de && de.clientHeight) || window.innerHeight || 0;
+    if (anchored) {
+      return box.r > 0 && box.b > 0 && box.l < vw && box.t < vh;
+    }
+    const sX = window.scrollX || 0;
+    const sY = window.scrollY || 0;
+    const rangeX = Math.max(0, ((de && de.scrollWidth) || 0) - vw);
+    const rangeY = Math.max(0, ((de && de.scrollHeight) || 0) - vh);
+    const dirEl = styleOf(de) || (document.body && styleOf(document.body));
+    const rtl = !!(dirEl && dirEl.direction === 'rtl');
+    const loX = (rtl ? -rangeX : 0) - sX;
+    const hiX = (rtl ? 0 : rangeX) - sX + vw;
+    return box.r > loX && box.l < hiX && box.b > -sY && box.t < rangeY - sY + vh;
+  }
+
+  // "L'utente ci arriva?" — con lo stesso metro usato per il resto della pagina.
+  function isReachableByUser(el, rect) {
+    let box = { l: rect.left, t: rect.top, r: rect.right, b: rect.bottom };
+    const own = styleOf(el);
+    let pos = (own && own.position) || 'static';
+    const de = document.documentElement;
+    const body = document.body;
+    let cur = parentOrHost(el);
+    for (let hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; hops++, cur = parentOrHost(cur)) {
+      // <body> e <html> non si giudicano qui: il loro overflow "sale" al
+      // viewport (un `body { overflow-x: hidden }`, che è ovunque, non ritaglia
+      // un bel niente), e la pagina la giudica withinPage.
+      if (cur === body || cur === de) continue;
+      const cs = styleOf(cur);
+      if (!cs) break;
+      const escapes = (pos === 'absolute' && cs.position === 'static' && !makesFixedContainingBlock(cs))
+                   || (pos === 'fixed' && !makesFixedContainingBlock(cs));
+      if (escapes) continue;
+      box = narrowByClipper(box, cur, cs);
+      if (!box) return false;
+      pos = cs.position || 'static';
+    }
+    return withinPage(box, pos === 'fixed');
   }
 
   function isClosedComponent(el) {
@@ -367,8 +480,8 @@
     try {
       const r = el.getBoundingClientRect();
       if (!(r.width >= CLOSED_MIN_W && r.height >= CLOSED_MIN_H)) return false;
-      if (isOutsideScrollablePage(el, r)) return false;
       if (isInvisibleToUser(el)) return false;
+      if (!isReachableByUser(el, r)) return false;
       return true;
     } catch (_) { return false; }
   }
