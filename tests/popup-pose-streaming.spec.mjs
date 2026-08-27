@@ -620,3 +620,114 @@ for (const altezza of [380, 260]) {
     await ripristinaProvider(app);
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La finestra del riquadro non è sempre quella dell'app. Dentro un riquadro
+// incorporato — i box dei commenti, i lettori video, le anteprime di articoli —
+// il content script di Filo gira nel frame del riquadro (#405: lì dentro tasto
+// destro e Alt+E funzionano apposta), e per un elemento `position: fixed` lo
+// "schermo" È il riquadro. Se il riquadro è basso, il popup nasce già mozzato:
+// il browser taglia via quello che esce dal bordo del frame, e non si raggiunge
+// né scorrendo né trascinando il popup altrove.
+//
+// Qui il tetto d'altezza da solo non basta: intestazione, corpo, riga del costo
+// e riga per scrivere hanno ognuno un'altezza minima, e sotto la loro somma
+// stringere il tetto non stringe più niente — i pezzi escono dal bordo del
+// popup invece di comprimersi. A cedere deve essere il CORPO della risposta,
+// che può accorciarsi e scorrere fino a sparire.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RIQUADRO_INTERNO = `<!doctype html><meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 10px; font: 16px/1.5 system-ui, sans-serif; }
+</style>
+<p id="bersaglio">supercalifragilistico</p>`;
+
+const PAGINA_CON_RIQUADRO = (src, h) => `<!doctype html><meta charset="utf-8">
+<style>
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+  h1 { margin: 24px; font-size: 20px; }
+  iframe { display: block; width: 560px; height: ${h}px; border: 1px solid #ccc; margin: 0 24px; }
+</style>
+<h1>Pagina con un riquadro incorporato</h1>
+<iframe id="riquadro" src="${src}"></iframe>`;
+
+// Il frame del riquadro, come oggetto Playwright: da lì misuriamo con le sue
+// coordinate, che sono quelle su cui il popup ragiona.
+async function frameDelRiquadro(page, src) {
+  let f = null;
+  await expect.poll(() => {
+    f = page.frames().find((fr) => fr.url() === src) || null;
+    return !!f;
+  }, { timeout: 8000, message: 'il riquadro incorporato non si è caricato' }).toBe(true);
+  return f;
+}
+
+for (const alto of [180, 240]) {
+  test(`Alt+E dentro un riquadro incorporato alto ${alto}px: il riquadro nasce intero e la riga per scrivere si clicca`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const src = testServer.html(RIQUADRO_INTERNO);
+    const page = await testServer.openReady(openTab, PAGINA_CON_RIQUADRO(src, alto));
+    await preparaProvider(app, 300);
+
+    const frame = await frameDelRiquadro(page, src);
+
+    // Doppio clic sulla parola DENTRO il riquadro: seleziona, e insieme dice al
+    // main che è questo il frame con cui l'utente sta interagendo (#405).
+    await frame.locator('#bersaglio').dblclick();
+    await expect
+      .poll(() => frame.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+      .toContain('supercalifragilistico');
+
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      globalThis.__filoShortcuts.dispatch('explain-selection', win);
+    });
+
+    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
+    await attendiIngresso(frame);
+
+    // Lo scenario è quello vero: il popup vive dentro il riquadro, e il riquadro
+    // è più basso del tetto d'altezza del popup.
+    const daVuoto = await frame.evaluate(misura);
+    expect(daVuoto.vh, 'il popup non sta nel frame del riquadro').toBeLessThanOrEqual(alto);
+
+    // SUCCESSO 1 — già da vuoto è tutto dentro il riquadro: intestazione e riga
+    // per scrivere comprese. Senza il rimedio nasce mozzato, prima ancora che
+    // la risposta arrivi.
+    expect(fuoriDaiBordi(daVuoto), 'il popup nasce fuori dal bordo del riquadro incorporato').toEqual([]);
+
+    // …e ci resta quando la risposta lo fa crescere.
+    await expect
+      .poll(() => frame.evaluate(() => document.querySelector('.sn-popup-meta')?.textContent || ''), { timeout: 20_000 })
+      .toContain('€');
+    const finale = await frame.evaluate(misura);
+    expect(fuoriDaiBordi(finale), 'il popup è uscito dal riquadro incorporato quando la risposta è arrivata').toEqual([]);
+
+    // SUCCESSO 2 — la riga per scrivere si clicca davvero, e accetta testo: è
+    // questo che dentro un riquadro basso non si riusciva più a fare.
+    expect(await frame.evaluate(casellaCliccabile)).toBe(true);
+    const casella = page.frameLocator('#riquadro').locator('.sn-popup .sn-popup-input');
+    await casella.click();
+    await casella.fill('e questo cosa vuol dire?');
+    await expect(casella).toHaveValue('e questo cosa vuol dire?');
+
+    // SUCCESSO 3 — il tasto di invio c'è ed è cliccabile.
+    const inviaDentro = await frame.evaluate(() => {
+      const b = document.querySelector('.sn-popup .sn-popup-send');
+      if (!b) return false;
+      const r = b.getBoundingClientRect();
+      if (r.bottom > window.innerHeight || r.top < 0 || r.width === 0) return false;
+      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!el && (el === b || b.contains(el));
+    });
+    expect(inviaDentro, 'il tasto di invio è fuori dal riquadro incorporato').toBe(true);
+
+    // SUCCESSO 4 — la risposta non è andata perduta con l'altezza: il corpo
+    // scorre, e il testo completo è lì dentro.
+    const testo = await frame.evaluate(() => document.querySelector('.sn-popup .sn-msg-assistant .sn-msg-text')?.textContent || '');
+    expect(testo).toContain('Paragrafo 12');
+
+    await ripristinaProvider(app);
+  });
+}
