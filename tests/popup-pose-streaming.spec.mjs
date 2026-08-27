@@ -304,3 +304,59 @@ test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere rest
 
   await ripristinaProvider(app);
 });
+
+// Il riquadro posato SOPRA la selezione è agganciato col fondo, non con la
+// cima. Chi lo trascina passa all'aggancio dall'alto: se il passaggio non fosse
+// pulito il riquadro resterebbe legato a tutti e due i bordi e si stirerebbe da
+// cima a fondo dello schermo. E una volta spostato deve restare dove l'utente
+// l'ha messo, anche mentre la risposta continua ad arrivare.
+test('trascinato mentre la risposta arriva: si sposta, non si stira e non torna indietro', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(
+    () => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST,
+    null, { timeout: 8000 },
+  );
+
+  await preparaProvider(app);
+
+  // In basso: il riquadro va sopra la selezione, quindi agganciato col fondo.
+  await page.evaluate(() => {
+    window.SN_POPUP.openStreaming({
+      action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+      payload: { selection: 'parola', sentence: 'una frase con parola dentro' },
+      anchor: { x: 120, y: Math.round(window.innerHeight * 0.75) },
+      title: 'Approfondisci',
+    });
+  });
+  await page.waitForSelector('.sn-popup', { timeout: 8000 });
+  await attendiIngresso(page);
+  const prima = await page.evaluate(misura);
+
+  // Trascina l'intestazione verso l'alto a sinistra, come farebbe un utente.
+  const header = page.locator('.sn-popup-header');
+  const hb = await header.boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 - 60, hb.y + hb.height / 2 - 120, { steps: 10 });
+  await page.mouse.up();
+
+  const dopo = await page.evaluate(misura);
+  // Si è spostato davvero…
+  expect(Math.round(dopo.top)).toBeLessThan(Math.round(prima.top));
+  expect(Math.round(dopo.left)).toBeLessThan(Math.round(prima.left));
+  // …e NON si è stirato: l'altezza è quella di prima, non tutto lo schermo.
+  expect(Math.abs(dopo.height - prima.height)).toBeLessThanOrEqual(2);
+  expect(dopo.height).toBeLessThan(dopo.vh - 50);
+
+  // La risposta finisce di arrivare: il riquadro resta dove l'utente l'ha messo.
+  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+  const finale = await page.evaluate(misura);
+  expect(Math.round(finale.left)).toBe(Math.round(dopo.left));
+  expect(finale.bottom).toBeLessThanOrEqual(finale.vh + 1);
+  expect(finale.top).toBeGreaterThanOrEqual(-1);
+  // E la riga per scrivere è comunque raggiungibile.
+  expect(finale.inputBottom).toBeLessThanOrEqual(finale.vh);
+
+  await ripristinaProvider(app);
+});
