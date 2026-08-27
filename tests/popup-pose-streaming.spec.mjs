@@ -79,12 +79,15 @@ const misura = () => {
   const r = root.getBoundingClientRect();
   const i = input.getBoundingClientRect();
   const s = send ? send.getBoundingClientRect() : null;
+  const compose = root.querySelector('.sn-popup-compose');
+  const c = compose ? compose.getBoundingClientRect() : null;
   return {
     vh: window.innerHeight,
     vw: window.innerWidth,
     top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height,
     inputTop: i.top, inputBottom: i.bottom, inputLeft: i.left, inputRight: i.right,
     sendRight: s ? s.right : 0,
+    composeBottom: c ? c.bottom : 0,
   };
 };
 
