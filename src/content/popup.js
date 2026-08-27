@@ -428,8 +428,8 @@
     let dragged = false;
     let ro = null;
 
-    const roomBelow = () => window.innerHeight - (ay + POSE_GAP) - POSE_MARGIN;
-    const roomAbove = () => ay - POSE_GAP - POSE_MARGIN;
+    const roomBelow = () => window.innerHeight - (ay() + POSE_GAP) - POSE_MARGIN;
+    const roomAbove = () => ay() - POSE_GAP - POSE_MARGIN;
 
     // La compensazione zoom mette una `scale()` sul riquadro: il tetto è in px
     // di layout, lo spazio sullo schermo è in px visibili. Senza la scala il
