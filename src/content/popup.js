@@ -404,10 +404,23 @@
     // selezione, e una selezione che continua sotto la piega ha il fondo fuori
     // dallo schermo. Con un punto fuori, "sopra il punto" è a sua volta fuori e
     // il riquadro nasce già sbordato.
-    const vw0 = window.innerWidth, vh0 = window.innerHeight;
+    //
+    // E non basta farlo all'APERTURA: lo spazio cambia anche dopo — zoom della
+    // pagina (in Filo si usa di continuo: Ctrl +/-, pinch, rotella) e finestra
+    // ridimensionata accorciano la finestra sotto un punto che era dentro. Se il
+    // punto resta quello di prima, ormai oltre il bordo, il riquadro viene
+    // riposato rispetto a un posto che non esiste più e torna fuori dallo
+    // schermo, con la riga per scrivere di nuovo irraggiungibile — lo stesso
+    // sintomo del difetto, da un'altra porta. Quindi il punto grezzo si tiene e
+    // si riporta dentro a OGNI misura: `ax()`/`ay()` sono funzioni, non costanti.
+    // (Lo zoom della pagina non muove il contenuto nelle coordinate CSS: cambia
+    // quanto viewport ci sta. Il punto grezzo resta quello giusto, va solo
+    // ritagliato sulla finestra di adesso.)
+    const rawX = Number.isFinite(anchor?.x) ? anchor.x : POSE_MARGIN;
+    const rawY = Number.isFinite(anchor?.y) ? anchor.y : POSE_MARGIN;
     const dentro = (v, max) => Math.max(POSE_MARGIN, Math.min(max - POSE_MARGIN, v));
-    const ax = dentro(Number.isFinite(anchor?.x) ? anchor.x : POSE_MARGIN, vw0);
-    const ay = dentro(Number.isFinite(anchor?.y) ? anchor.y : POSE_MARGIN, vh0);
+    const ax = () => dentro(rawX, window.innerWidth);
+    const ay = () => dentro(rawY, window.innerHeight);
     // Letto PRIMA di scrivere il tetto inline: dopo rileggeremmo il nostro
     // stesso valore e lo stringeremmo a ogni giro.
     const maxH = styleMaxHeight(root);
