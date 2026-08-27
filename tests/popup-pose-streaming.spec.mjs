@@ -996,3 +996,108 @@ test('aperta con la scorciatoia: si può scrivere la domanda dopo senza toccare 
 
   await ripristinaProvider(app);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La parola resta LEGGIBILE. Il riquadro si stacca dalla parola su cui si è
+// chiesta la spiegazione, e una parola ha un'altezza: staccarsi dal suo punto
+// di partenza — il fondo del rettangolo, che è quello che passa la scorciatoia
+// — vuol dire appoggiarsi otto pixel sopra il FONDO delle lettere, cioè dentro
+// le lettere. Su una riga alta 19px ne restavano coperti gli ultimi 11: la
+// metà bassa della parola spariva proprio mentre l'utente leggeva cosa vuol
+// dire, ed è la prima cosa che si nota.
+// ─────────────────────────────────────────────────────────────────────────────
+test('la parola su cui hai chiesto la spiegazione resta scoperta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await preparaProvider(app, 300);
+
+  await page.locator('#bersaglio').dblclick();
+  await expect
+    .poll(() => page.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+    .toContain('supercalifragilistico');
+
+  // Il rettangolo della parola va letto PRIMA: il fuoco nella riga per scrivere
+  // spegne la selezione della pagina, che è una sola.
+  const parola = await page.evaluate(() => {
+    const r = window.getSelection().getRangeAt(0).getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, height: r.height };
+  });
+  expect(parola.height, 'la parola non ha altezza: lo scenario non è quello vero').toBeGreaterThan(8);
+
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
+  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+  await attendiIngresso(page);
+
+  const m = await page.evaluate(misura);
+  // Lo scenario è quello vero: il riquadro si è posato SOPRA la parola (in
+  // basso nella pagina non ci sta sotto). È lì che il difetto si vedeva.
+  expect(m.bottom, 'il riquadro non si è posato sopra la parola').toBeLessThan(parola.bottom);
+
+  // SUCCESSO — nessuna sovrapposizione: la parola si legge tutta.
+  const coperto = Math.min(m.bottom, parola.bottom) - Math.max(m.top, parola.top);
+  expect(
+    Math.max(0, Math.round(coperto)),
+    `il riquadro copre ${Math.round(coperto)}px dei ${Math.round(parola.height)} della parola`,
+  ).toBe(0);
+  // E non si è allontanato: resta agganciato lì sopra.
+  expect(parola.top - m.bottom).toBeLessThanOrEqual(12);
+
+  expect(fuoriDaiBordi(m)).toEqual([]);
+  await ripristinaProvider(app);
+});
+
+// Lo zoom massimo del browser (500%) è una porta vera per lo stesso difetto
+// delle finestre bassissime: su una finestra normale lascia poco più di 150px
+// di altezza utile, e lì il tetto d'altezza scende sotto la somma dei minimi
+// dei pezzi interni. Senza contare l'imbottitura del corpo, la riga per
+// scrivere sporgeva dal bordo arrotondato del riquadro — visibile anche quando
+// il riquadro nel suo insieme sta dentro lo schermo.
+test('zoom al massimo con la parola in basso: la riga per scrivere sta dentro il riquadro e si scrive', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await preparaProvider(app, 300);
+
+  await zoomScheda(app, 5);
+  await expect.poll(
+    () => page.evaluate(() => window.innerHeight),
+    { timeout: 5000, message: 'lo zoom non ha accorciato la finestra: lo scenario non è quello vero' },
+  ).toBeLessThan(220);
+
+  await page.locator('#bersaglio').dblclick();
+  await expect
+    .poll(() => page.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+    .toContain('supercalifragilistico');
+
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
+  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+  await attendiIngresso(page);
+
+  const m = await page.evaluate(misura);
+  // SUCCESSO 1 — niente sporge: né dal bordo del riquadro né dalla finestra.
+  expect(fuoriDaiBordi(m), 'a zoom massimo qualcosa sporge').toEqual([]);
+  // SUCCESSO 2 — e la riga per scrivere si clicca e accetta la domanda dopo.
+  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+  await page.locator('.sn-popup .sn-popup-input').click();
+  await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
+  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+  // SUCCESSO 3 — il tasto di invio si vede intero, non a metà.
+  const inviaIntero = await page.evaluate(() => {
+    const root = document.querySelector('.sn-popup');
+    const b = root.querySelector('.sn-popup-send');
+    const r = b.getBoundingClientRect();
+    const rr = root.getBoundingClientRect();
+    return r.bottom <= rr.bottom + 1 && r.bottom <= window.innerHeight + 1;
+  });
+  expect(inviaIntero, 'il tasto di invio è tagliato').toBe(true);
+
+  await zoomScheda(app, 1);
+  await ripristinaProvider(app);
+});
