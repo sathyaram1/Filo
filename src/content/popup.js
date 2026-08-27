@@ -414,6 +414,16 @@
     return Number.isFinite(v) && v > 0 ? v : POSE_MAX_H_FALLBACK;
   }
 
+  // La larghezza naturale sta in una variabile del foglio di stile e non in
+  // `width`: quella, dentro un riquadro stretto, è già stata clampata dal
+  // `max-width` di rete, e rileggerla vorrebbe dire tenersi la misura di quando
+  // c'era meno posto anche dopo che il posto è tornato.
+  function styleWidth(root) {
+    let v = NaN;
+    try { v = parseFloat(getComputedStyle(root).getPropertyValue('--sn-popup-w')); } catch (_) {}
+    return Number.isFinite(v) && v > 0 ? v : POSE_W_FALLBACK;
+  }
+
   function attachPose(root, anchor) {
     // Il punto ancorato va riportato DENTRO la finestra prima di ragionarci
     // sopra. Non è teoria: la scorciatoia ancora al fondo del rettangolo della
