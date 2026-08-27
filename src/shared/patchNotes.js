@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.205', date: '2026-08-27',
+      fixes: [
+        'Dopo «Traduci la pagina», l\'avviso che una parte è rimasta in lingua originale esce solo se sullo schermo c\'è davvero un riquadro non tradotto da andare a leggere. Sui siti di giornale usciva quasi sempre a vuoto, per via degli spazi pubblicitari e dei banner nascosti nella pagina.',
+      ],
+    },
+    {
       version: '0.2.198', date: '2026-08-22',
       fixes: [
         'Nelle home dei siti di video, nei social e nelle pagine di risultati il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» insieme ai comandi della copertina, anche mentre parte l\'anteprima animata. Prima il menu cambiava a seconda di come il sito aveva costruito la scheda, e quasi sempre metà delle voci non c\'era.',
