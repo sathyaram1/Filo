@@ -16,7 +16,7 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
-      version: '0.2.206', date: '2026-08-27',
+      version: '0.2.205', date: '2026-08-27',
       fixes: [
         'La finestra della spiegazione approfondita resta dentro lo schermo anche mentre la risposta la fa crescere. Se selezioni una parola in basso nella pagina, la riga per scrivere la domanda successiva resta dove puoi cliccarla, invece di finire fuori dal bordo e costringerti a chiudere tutto e rifare la selezione più in alto.',
       ],
