@@ -815,7 +815,7 @@
     port.onMessage.addListener((m) => {
       if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
-        popup.metaEl.textContent = `${I18n.t('popup_model')}: ${popup.model}`;
+        setMeta(popup, `${I18n.t('popup_model')}: ${popup.model}`);
       } else if (m.type === 'delta') {
         if (firstDelta) {
           bubble.text.innerHTML = '';
