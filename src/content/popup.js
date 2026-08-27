@@ -228,7 +228,11 @@
       const zoomRatio = (curDpr / baselineDpr) * (curVv / baselineVv);
       const scale = 1 / zoomRatio;
       root.style.transform = scale === 1 ? '' : `scale(${scale})`;
-      root.style.transformOrigin = 'top left';
+      // Scala dal bordo ANCORATO alla selezione, non sempre dall'alto: un
+      // riquadro agganciato col fondo (posato sopra la selezione) altrimenti si
+      // staccherebbe dal punto appena l'utente cambia zoom.
+      const bottomAnchored = root.style.bottom && root.style.bottom !== 'auto';
+      root.style.transformOrigin = bottomAnchored ? 'bottom left' : 'top left';
     };
     apply();
     const onResize = () => apply();
