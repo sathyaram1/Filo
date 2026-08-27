@@ -289,8 +289,153 @@ test('#502 apri/chiudi ripetuto e due riquadri insieme: tutti dentro lo schermo'
   await page.waitForTimeout(800);
   await attendiIngresso(page);
   const ms = await page.evaluate(misuraTutti);
-  ms.forEach((m, i) => expect(fuori(m), `riquadro ${i}: ${JSON.stringify(m)}`).toEqual([]));
+  // Il riquadro sotto è coperto da quello sopra: lì la cliccabilità non si può
+  // pretendere (è normale sovrapposizione). Di lui guardo solo la geometria.
+  ms.forEach((m, i) => {
+    const e = fuori(m).filter((s) => i === ms.length - 1 || !s.includes('si clicca'));
+    expect(e, `riquadro ${i}: ${JSON.stringify(m)}`).toEqual([]);
+  });
   try { await page.screenshot({ path: 'tests/.shots/v502-due.png' }); } catch (_) {}
+});
+
+// ── 11. ZOOM E FINESTRA CHE CAMBIANO **MENTRE** LA RISPOSTA ARRIVA ───────────
+async function zoomScheda(app, f) {
+  await app.evaluate(({ BrowserWindow }, z) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    for (const t of (win?._filoTabs?.tabs || [])) {
+      try { t.view.webContents.setZoomFactor(z); } catch (_) {}
+    }
+  }, f);
+}
+
+test('#502 zoom al 175% mentre la risposta sta arrivando', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://newtab/');
+  const w = await page.evaluate(() => window.innerWidth);
+  await page.setViewportSize({ width: w, height: 800 });
+  await provider(app, { attesa: 1200 });
+  await apri(page, 0.8);
+  await attendiIngresso(page);
+  await page.waitForTimeout(1400);          // i delta hanno cominciato ad arrivare
+  await zoomScheda(app, 1.75);
+  await finito(page);
+  await page.waitForTimeout(600);
+  await attendiIngresso(page);
+  let m = (await page.evaluate(misuraTutti))[0];
+  expect(fuori(m), `zoom 175% a risposta finita: ${JSON.stringify(m)}`).toEqual([]);
+  await zoomScheda(app, 1);
+  await page.waitForTimeout(600);
+  m = (await page.evaluate(misuraTutti))[0];
+  expect(fuori(m), `zoom tornato a 100%: ${JSON.stringify(m)}`).toEqual([]);
+});
+
+test('#502 finestra accorciata a 300px mentre la risposta sta arrivando', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://newtab/');
+  const w = await page.evaluate(() => window.innerWidth);
+  await page.setViewportSize({ width: w, height: 900 });
+  await provider(app, { attesa: 1200 });
+  await apri(page, 0.85);
+  await attendiIngresso(page);
+  await page.waitForTimeout(1400);
+  await page.setViewportSize({ width: w, height: 300 });
+  await finito(page);
+  await page.waitForTimeout(800);
+  await attendiIngresso(page);
+  const m = (await page.evaluate(misuraTutti))[0];
+  expect(fuori(m), `finestra a 300px: ${JSON.stringify(m)}`).toEqual([]);
+  try { await page.screenshot({ path: 'tests/.shots/v502-300.png' }); } catch (_) {}
+});
+
+// ── 12. TRASCINATO SUL BORDO DI SOTTO DA VUOTO, POI LA RISPOSTA ARRIVA ───────
+test('#502 trascinato sul bordo di sotto da vuoto: la casella resta raggiungibile', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://newtab/');
+  const w = await page.evaluate(() => window.innerWidth);
+  await page.setViewportSize({ width: w, height: 750 });
+  await provider(app, { attesa: 3000 });
+  await apri(page, 0.35);
+  await attendiIngresso(page);
+
+  // Lo trascino per l'intestazione fin sul fondo, mentre è ancora vuoto.
+  const h = await page.locator('.sn-popup .sn-popup-header').boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, 730, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+
+  await finito(page);
+  await page.waitForTimeout(600);
+  await attendiIngresso(page);
+  const m = (await page.evaluate(misuraTutti))[0];
+  expect(fuori(m), `dopo il trascinamento sul fondo: ${JSON.stringify(m)}`).toEqual([]);
+  await page.locator('.sn-popup .sn-popup-input').click();
+  await page.locator('.sn-popup .sn-popup-input').fill('ancora una domanda');
+  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('ancora una domanda');
+  try { await page.screenshot({ path: 'tests/.shots/v502-trascinato.png' }); } catch (_) {}
+});
+
+// ── 13. ANCORE AI BORDI (0, oltre il fondo, oltre destra) ────────────────────
+for (const caso of [
+  { nome: 'sul bordo di sopra', x: 0, y: 0 },
+  { nome: 'esattamente sul fondo', x: 300, y: 'vh' },
+  { nome: 'oltre il fondo di 5000px', x: 300, y: 'vh+5000' },
+  { nome: 'oltre il bordo destro', x: 'vw+2000', y: 'vh-40' },
+  { nome: 'coordinate negative', x: -900, y: -900 },
+]) {
+  test(`#502 ancora ${caso.nome}: il riquadro nasce e resta dentro`, async ({ app, openTab }) => {
+    test.setTimeout(90_000);
+    const page = await openTab('filo://newtab/');
+    const w = await page.evaluate(() => window.innerWidth);
+    await page.setViewportSize({ width: w, height: 700 });
+    await provider(app, { attesa: 400 });
+    await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming, null, { timeout: 8000 });
+    await page.evaluate((c) => {
+      const val = (v) => {
+        if (typeof v === 'number') return v;
+        if (v === 'vh') return window.innerHeight;
+        if (v === 'vh+5000') return window.innerHeight + 5000;
+        if (v === 'vh-40') return window.innerHeight - 40;
+        if (v === 'vw+2000') return window.innerWidth + 2000;
+        return 0;
+      };
+      window.SN_POPUP.openStreaming({
+        action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+        payload: { selection: 'parola', sentence: 'frase' },
+        anchor: { x: val(c.x), y: val(c.y) },
+        title: 'Approfondisci',
+      });
+    }, caso);
+    await page.waitForSelector('.sn-popup', { timeout: 8000 });
+    await attendiIngresso(page);
+    expect(fuori((await page.evaluate(misuraTutti))[0]), 'da vuoto').toEqual([]);
+    await finito(page);
+    await attendiIngresso(page);
+    const m = (await page.evaluate(misuraTutti))[0];
+    expect(fuori(m), `a risposta finita: ${JSON.stringify(m)}`).toEqual([]);
+  });
+}
+
+// ── 14. ANCORA NaN / mancante (il chiamante non ha un punto) ─────────────────
+test('#502 nessuna ancora valida: il riquadro nasce comunque dentro', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  await provider(app, { attesa: 300 });
+  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming, null, { timeout: 8000 });
+  await page.evaluate(() => {
+    window.SN_POPUP.openStreaming({
+      action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+      payload: { selection: 'parola', sentence: 'frase' },
+      anchor: { x: NaN, y: undefined },
+      title: 'Approfondisci',
+    });
+  });
+  await page.waitForSelector('.sn-popup', { timeout: 8000 });
+  await finito(page);
+  await attendiIngresso(page);
+  const m = (await page.evaluate(misuraTutti))[0];
+  expect(fuori(m), `senza ancora: ${JSON.stringify(m)}`).toEqual([]);
 });
 
 // ── 8. TEMA CHIARO E TEMA SCURO (traccia visiva) ─────────────────────────────
