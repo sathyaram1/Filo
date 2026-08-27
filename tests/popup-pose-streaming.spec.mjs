@@ -739,3 +739,106 @@ for (const alto of [180, 240]) {
     await ripristinaProvider(app);
   });
 }
+
+// Stesso danno, altra direzione: un riquadro incorporato STRETTO. Il popup ha
+// una larghezza sua (380px) e i box dei commenti spesso sono più stretti di
+// così: senza rimedio sborda a destra e il tasto di invio finisce oltre il
+// bordo del riquadro, dove il browser lo taglia — di nuovo "non posso più
+// chiedere niente", senza poterci arrivare né scorrendo né trascinando.
+for (const largo of [320, 280]) {
+  test(`Alt+E dentro un riquadro incorporato largo ${largo}px: il riquadro ci sta dentro e il tasto di invio si clicca`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const src = testServer.html(RIQUADRO_INTERNO);
+    const page = await testServer.openReady(openTab, PAGINA_CON_RIQUADRO(src, 400, largo));
+    await preparaProvider(app, 300);
+
+    const frame = await frameDelRiquadro(page, src);
+    await frame.locator('#bersaglio').dblclick();
+    await expect
+      .poll(() => frame.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+      .toContain('supercalifragilistico');
+
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      globalThis.__filoShortcuts.dispatch('explain-selection', win);
+    });
+
+    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
+    await attendiIngresso(frame);
+
+    // Lo scenario è quello vero: il riquadro incorporato è più STRETTO della
+    // larghezza naturale del popup.
+    const daVuoto = await frame.evaluate(misura);
+    expect(daVuoto.vw, 'il riquadro incorporato non è più stretto del popup').toBeLessThan(380);
+
+    // SUCCESSO 1 — già da vuoto è tutto dentro, tasto di invio compreso.
+    expect(fuoriDaiBordi(daVuoto), 'il popup nasce fuori dal bordo del riquadro stretto').toEqual([]);
+
+    await expect
+      .poll(() => frame.evaluate(() => document.querySelector('.sn-popup-meta')?.textContent || ''), { timeout: 20_000 })
+      .toContain('€');
+    expect(fuoriDaiBordi(await frame.evaluate(misura)), 'il popup è uscito dal riquadro stretto quando la risposta è arrivata').toEqual([]);
+
+    // SUCCESSO 2 — la riga per scrivere accetta testo…
+    expect(await frame.evaluate(casellaCliccabile)).toBe(true);
+    const casella = page.frameLocator('#riquadro').locator('.sn-popup .sn-popup-input');
+    await casella.click();
+    await casella.fill('e questo cosa vuol dire?');
+    await expect(casella).toHaveValue('e questo cosa vuol dire?');
+
+    // SUCCESSO 3 — …e il tasto di invio si clicca davvero: è lui che in un
+    // riquadro stretto finiva tagliato via.
+    const inviaCliccabile = await frame.evaluate(() => {
+      const b = document.querySelector('.sn-popup .sn-popup-send');
+      if (!b) return false;
+      const r = b.getBoundingClientRect();
+      if (r.right > window.innerWidth || r.left < 0 || r.bottom > window.innerHeight || r.width === 0) return false;
+      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!el && (el === b || b.contains(el));
+    });
+    expect(inviaCliccabile, 'il tasto di invio è fuori dal bordo del riquadro stretto').toBe(true);
+
+    // SUCCESSO 4 — la risposta è tutta lì: il testo va a capo, non viene tagliato.
+    const testo = await frame.evaluate(() => document.querySelector('.sn-popup .sn-msg-assistant .sn-msg-text')?.textContent || '');
+    expect(testo).toContain('Paragrafo 12');
+
+    await ripristinaProvider(app);
+  });
+}
+
+// Il posto che torna: se il riquadro si è stretto perché ce n'era poco, quando
+// lo spazio torna deve tornare largo com'era. Un rimedio che stringe e basta
+// lascerebbe il popup mingherlino per sempre dopo un ridimensionamento.
+test('finestra ristretta col riquadro aperto: si stringe per starci, e riallargata torna largo com\'era', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://newtab/');
+  const prima = await riquadroPosato(app, page);
+  const largo = prima.right - prima.left;
+  expect(largo, 'in una finestra larga il riquadro deve avere la sua larghezza piena').toBeGreaterThan(300);
+
+  const alta = prima.vh;
+  await page.setViewportSize({ width: 300, height: alta });
+  await expect.poll(
+    () => page.evaluate(() => window.innerWidth),
+    { timeout: 5000, message: 'la finestra non si è ristretta: lo scenario non è quello vero' },
+  ).toBeLessThan(380);
+
+  await expect.poll(
+    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    { timeout: 5000, message: 'ristretta la finestra, il riquadro è rimasto fuori dal bordo' },
+  ).toEqual([]);
+  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+
+  // Tornato lo spazio, torna anche la larghezza: un rimedio che stringe e basta
+  // lascerebbe il riquadro mingherlino per sempre.
+  await page.setViewportSize({ width: Math.round(prima.vw), height: alta });
+  await expect.poll(
+    async () => {
+      const m = await page.evaluate(misura);
+      return Math.round(m.right - m.left);
+    },
+    { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
+  ).toBe(Math.round(largo));
+
+  await ripristinaProvider(app);
+});
