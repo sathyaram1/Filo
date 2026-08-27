@@ -234,3 +234,73 @@ test('selezione a metà finestra: il riquadro si accorcia invece di sbordare, e 
 
   await ripristinaProvider(app);
 });
+
+// I due test sopra aprono il riquadro chiamando l'app dall'interno. Questo fa
+// esattamente quello che fa chi ha segnalato: pagina web vera, parola
+// selezionata col mouse a tre quarti dell'altezza, Alt+E, e si aspetta la
+// risposta. È la strada che passa per la scorciatoia globale e per l'ancora
+// ricavata dalla selezione — se il rimedio non arrivasse fin qui, qui si vede.
+const PAGINA = `<!doctype html><meta charset="utf-8">
+<style>
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+  #riempitivo { height: 300vh; padding: 20px; }
+  #bersaglio { position: fixed; left: 40px; top: 75vh; font-size: 20px; }
+</style>
+<div id="riempitivo">Testo di contorno, serve solo a dare corpo alla pagina.</div>
+<p id="bersaglio">supercalifragilistico</p>`;
+
+test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere resta usabile', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await preparaProvider(app);
+
+  // Selezione col mouse, come la fa un utente: doppio clic sulla parola.
+  await page.locator('#bersaglio').dblclick();
+  await expect
+    .poll(() => page.evaluate(() => String(window.getSelection())), { timeout: 5000 })
+    .toContain('supercalifragilistico');
+
+  // La scorciatoia globale, la stessa strada di Alt+E.
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+
+  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
+  await attendiIngresso(page);
+  const daVuoto = await page.evaluate(misura);
+  expect(daVuoto).not.toBeNull();
+
+  // Guarda la posa MENTRE la risposta arriva: non deve sbordare mai.
+  const sconfinamenti = [];
+  let cresciuto = daVuoto.height;
+  const finoA = Date.now() + 20_000;
+  while (Date.now() < finoA) {
+    const m = await page.evaluate(misura);
+    if (!m) break;
+    cresciuto = Math.max(cresciuto, m.height);
+    if (m.bottom > m.vh + 1 || m.top < -1) sconfinamenti.push(m);
+    const fatto = await page.locator('.sn-popup .sn-popup-meta').textContent().catch(() => '');
+    if (fatto && fatto.includes('€')) break;
+    await page.waitForTimeout(60);
+  }
+
+  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+  // Lo scenario è quello vero: il riquadro è cresciuto parecchio dopo l'apertura.
+  expect(cresciuto).toBeGreaterThan(daVuoto.height + 100);
+
+  const finale = await page.evaluate(misura);
+  expect(finale.bottom).toBeLessThanOrEqual(finale.vh + 1);
+  expect(finale.top).toBeGreaterThanOrEqual(-1);
+  expect(finale.inputBottom).toBeLessThanOrEqual(finale.vh);
+  expect(finale.inputTop).toBeGreaterThanOrEqual(0);
+  expect(sconfinamenti, `posa fuori dallo schermo durante lo streaming: ${JSON.stringify(sconfinamenti.slice(0, 3))}`).toEqual([]);
+
+  // E la domanda successiva si può davvero fare: la casella si clicca e accetta
+  // testo. È questo che l'utente non riusciva più a fare.
+  await page.locator('.sn-popup .sn-popup-input').click();
+  await page.locator('.sn-popup .sn-popup-input').fill('e questo cosa vuol dire?');
+  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e questo cosa vuol dire?');
+
+  await ripristinaProvider(app);
+});
