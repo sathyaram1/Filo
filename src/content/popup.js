@@ -618,8 +618,26 @@
       // corpo della risposta finiva a zero — la spiegazione richiesta non si
       // leggeva per niente.
       const migliore = above > below ? 'above' : 'below';
+      const spazio = Math.max(above, below);
       const minimo = (pavimento() + boxExtra()) * scale();
-      return Math.max(above, below) >= minimo ? migliore : 'dentro';
+      if (spazio < minimo) return 'dentro';
+      // …ma "ci sta il riquadro ridotto all'osso" è la soglia sbagliata, perché
+      // all'osso della risposta non si vede NIENTE. Il punto ancorato si onora
+      // finché lascia LEGGERE la risposta, cioè finché il corpo tiene il minimo
+      // che gli dà il foglio di stile: sotto, il riquadro si aggrappa alla
+      // parola e paga tutto lo spazio che quel lato non ha, mentre metà del
+      // riquadro incorporato resta vuota — in un box commenti (230-420px, la
+      // misura tipica) della spiegazione appena chiesta restavano pochi pixel
+      // da scorrere con la rotella. Sotto quella soglia conviene staccarsi e
+      // appoggiarsi al bordo, dove lo spazio c'è tutto.
+      const comodo = (minComodo() + boxExtra()) * scale();
+      if (spazio >= comodo) return migliore;
+      // Staccarsi però costa: il riquadro copre la parola. Lo si fa solo quando
+      // frutta davvero — almeno un corpo comodo di spazio in più. Senza questa
+      // condizione una finestra appena troppo bassa faceva coprire la parola per
+      // guadagnare gli otto pixel dello stacco.
+      const guadagno = (window.innerHeight - POSE_MARGIN * 2) - spazio;
+      return guadagno >= bodyComfort * scale() ? 'dentro' : migliore;
     }
 
     // Larghezza: stesso ragionamento del tetto d'altezza, sull'altro asse.
