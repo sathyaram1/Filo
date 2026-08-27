@@ -863,6 +863,9 @@ for (const alto of [240, 300, 340, 420]) {
     const testo = await frame.evaluate(() => document.querySelector('.sn-popup .sn-msg-assistant .sn-msg-text')?.textContent || '');
     expect(testo).toContain('Paragrafo 12');
 
+    // Traccia visiva della run (gitignorata).
+    try { await page.screenshot({ path: `tests/.shots/popup-pose-riquadro-${alto}.png` }); } catch (_) {}
+
     await ripristinaProvider(app);
   });
 }
