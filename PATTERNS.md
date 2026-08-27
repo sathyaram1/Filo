@@ -960,17 +960,18 @@ una conseguenza; va fatto il contrario.
   riquadro altrove, che in pagina invece salverebbe la situazione. Le prove di
   una posa vanno fatte anche dentro un iframe basso, non solo su una finestra
   bassa.
-- **Lo stesso vale di LARGHEZZA, e lì nessuno deve cedere.** Un riquadro con
-  una larghezza sua dentro un riquadro incorporato stretto — i box dei commenti
-  lo sono quasi sempre — sborda a destra, e quello che il browser taglia via è
-  il tasto di invio: stesso danno del difetto, altra direzione. Basta stringere
-  la larghezza allo spazio che c'è. Due dettagli che la fanno funzionare: la
-  larghezza naturale va letta da una **variabile** del foglio di stile e non da
-  `width`, che dentro lo spazio stretto è già stata clampata (rileggerla vuol
-  dire tenersi la misura di quando c'era meno posto anche dopo che il posto è
-  tornato); e i pezzi che non devono sparire vanno marcati `flex: 0 0 auto`,
-  perché un `<textarea>` con `flex: 1` ha una larghezza naturale tutta sua e
-  senza `min-width: 0` spinge fuori il bottone accanto invece di accorciarsi.
+- **Lo stesso vale di LARGHEZZA, e lì nessuno deve cedere.** I riquadri
+  incorporati sono stretti quasi quanto sono bassi (un box commenti sta spesso
+  sotto i 320px), e un riquadro con una larghezza sua ci sborda a destra. Quello
+  che il browser taglia via è il tasto di invio: stesso danno, altra direzione.
+  Qui basta stringere la larghezza allo spazio che c'è. Due dettagli la fanno
+  funzionare. La larghezza naturale si legge da una **variabile** del foglio di
+  stile, non da `width`, che nello spazio stretto è già stata clampata: chi
+  rilegge `width` si tiene la misura di quando c'era meno posto anche dopo che
+  il posto è tornato. E i pezzi che non devono sparire vanno marcati
+  `flex: 0 0 auto`: un `<textarea>` con `flex: 1` ha una larghezza naturale
+  tutta sua e senza `min-width: 0` spinge fuori il bottone accanto invece di
+  accorciarsi.
 - **A un pezzo che nasce vuoto e si riempie di una riga sola, dagli il suo
   minimo nel foglio di stile** (`min-height: 1.2em` sulla riga del costo): la
   posa lo misura già dell'altezza che avrà, invece di ritrovarselo cresciuto
