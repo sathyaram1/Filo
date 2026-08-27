@@ -482,6 +482,15 @@
       } catch (_) { return 0; }
     }
 
+    function boxExtraX() {
+      try {
+        const cs = getComputedStyle(root);
+        if (cs.boxSizing === 'border-box') return 0;
+        return (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0)
+          + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      } catch (_) { return 0; }
+    }
+
     // ── Chi cede quando lo spazio si stringe (#502, seconda porta) ─────────
     //
     // Stringere il tetto funziona finché il tetto resta sopra la somma dei
