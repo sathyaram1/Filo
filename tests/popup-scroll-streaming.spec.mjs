@@ -134,6 +134,6 @@ test('restando in fondo, la vista continua a seguire la risposta che arriva', as
   // riga senza dover scorrere.
   expect(s.height - s.top - s.client, 'restando in fondo la vista non ha seguito la risposta')
     .toBeLessThan(8);
-});
 
-test.afterEach(async ({ app }) => { await ripristinaProvider(app); });
+  await ripristinaProvider(app);
+});
