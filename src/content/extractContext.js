@@ -279,10 +279,10 @@
   // pubblicitari, banner dei cookie già chiusi e riquadri di statistica sono
   // esattamente questo: componenti chiusi e nascosti, e su un sito di giornale
   // ce n'è sempre almeno uno. Senza questo filtro l'avviso esce quasi sempre, e
-  // quasi sempre a vuoto: che è la bugia di #439 girata al contrario (prima
-  // dichiarava monco un lavoro finito... no: dichiarava finito un lavoro monco;
-  // qui dichiarerebbe monco un lavoro finito) e brucia le uniche volte che
-  // serve davvero.
+  // quasi sempre a vuoto: è la bugia di #439 girata al contrario — lì dichiarava
+  // finito un lavoro monco, qui dichiarerebbe monco un lavoro finito — e un
+  // avviso che sbaglia spesso brucia anche le volte in cui dice il vero, che
+  // sono le uniche che servono.
   //
   // "Non lo vede" = display:none, visibility:hidden, opacità zero (anche presa
   // da un antenato: sullo schermo il risultato è lo stesso) o rettangolo
