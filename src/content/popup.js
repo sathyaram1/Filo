@@ -379,8 +379,15 @@
   // Resta un guardiano per i casi che la matematica non copre (finestra troppo
   // bassa perché il riquadro ci stia nemmeno al minimo): stringe ancora il
   // tetto invece di spostare il riquadro, quindi va in una sola direzione e non
-  // può oscillare. Solo quando il tetto è già al minimo e il riquadro sborda lo
-  // stesso lo riporta dentro a forza.
+  // può oscillare. Guarda tutti e due i bordi, non solo quello verso cui il
+  // riquadro cresce: quando lo spazio si accorcia dopo la posa a uscire può
+  // essere il bordo ANCORATO, e lì stringere non serve a niente perché quel
+  // bordo sta fermo. In quel caso, e quando il tetto è già al minimo, lo riporta
+  // dentro a forza.
+  //
+  // Il punto ancorato, infine, si ritaglia sulla finestra a ogni misura e non
+  // una volta sola: lo zoom e il ridimensionamento lo lasciano fuori dal bordo,
+  // e un riquadro posato rispetto a un punto che non c'è più esce con lui.
   //
   // Dopo che l'utente lo ha trascinato la posa è sua: non lo riportiamo sul
   // punto ancorato, ci limitiamo a non farlo uscire dallo schermo.
