@@ -176,6 +176,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.2; /* pari al minimo della riga: riempiendosi non la fa crescere */
 }
 
 /* Composer per follow-up */
