@@ -96,6 +96,11 @@ const fuoriDaiBordi = (m) => {
   if (m.top < -1) fuori.push(`cima oltre il bordo di ${Math.round(-m.top)}px`);
   if (m.inputBottom > m.vh) fuori.push(`riga per scrivere sotto il bordo di ${Math.round(m.inputBottom - m.vh)}px`);
   if (m.inputTop < 0) fuori.push(`riga per scrivere sopra il bordo di ${Math.round(-m.inputTop)}px`);
+  // Anche di lato: dentro un riquadro incorporato stretto è da destra che esce
+  // il tasto di invio, e lì il browser lo taglia via esattamente come sotto.
+  if (m.right > m.vw + 1) fuori.push(`destra oltre il bordo di ${Math.round(m.right - m.vw)}px (vw=${m.vw})`);
+  if (m.left < -1) fuori.push(`sinistra oltre il bordo di ${Math.round(-m.left)}px`);
+  if (m.sendRight > m.vw + 1) fuori.push(`tasto di invio oltre il bordo destro di ${Math.round(m.sendRight - m.vw)}px`);
   return fuori;
 };
 
