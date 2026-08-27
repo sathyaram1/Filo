@@ -764,6 +764,16 @@
     popup.root.remove();
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
+    // Rimette la selezione che il fuoco della riga per scrivere aveva spento:
+    // la parola torna selezionata com'era, pronta per la cosa dopo. Solo se
+    // nel frattempo l'utente non ne ha fatta una sua, che comanda lei.
+    try {
+      const sel = window.getSelection();
+      if (popup.savedRange && sel && (sel.rangeCount === 0 || sel.isCollapsed)) {
+        sel.removeAllRanges();
+        sel.addRange(popup.savedRange);
+      }
+    } catch (_) {}
   }
 
   function closeTopmost() {
