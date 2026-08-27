@@ -960,10 +960,10 @@ una conseguenza; va fatto il contrario.
   riquadro altrove, che in pagina invece salverebbe la situazione. Le prove di
   una posa vanno fatte anche dentro un iframe basso, non solo su una finestra
   bassa.
-- **Un pezzo che nasce vuoto e si riempie di una riga sola dagli il suo minimo
-  nel CSS** (`min-height: 1.2em` sulla riga del costo): così la posa lo misura
-  già dell'altezza che avrà, e non si ritrova a metà risposta un pezzo che è
-  cresciuto sotto i piedi.
+- **A un pezzo che nasce vuoto e si riempie di una riga sola, dagli il suo
+  minimo nel foglio di stile** (`min-height: 1.2em` sulla riga del costo): la
+  posa lo misura già dell'altezza che avrà, invece di ritrovarselo cresciuto
+  sotto i piedi a metà risposta.
 - **Il bordo ancorato lo tiene il foglio di stile, non JavaScript.** Sotto il
   punto si fissa `top` e il riquadro cresce verso il basso; sopra il punto si
   fissa `bottom` — non `top` ricalcolato dall'altezza — e cresce verso l'alto da
