@@ -533,7 +533,7 @@
         selection: selInfo.selection,
         sentence: selInfo.sentence,
       },
-      anchor: { x: anchorEvent.clientX, y: anchorEvent.clientY },
+      anchor: ancoraSelezione(anchorEvent),
       title,
     });
   }
