@@ -18,7 +18,8 @@
     {
       version: '0.2.205', date: '2026-08-27',
       fixes: [
-        'Chiedi la spiegazione approfondita su una parola in basso nella pagina e la riga per scrivere la domanda dopo resta dove puoi cliccarla, anche mentre la risposta fa crescere la finestrella e anche se nel frattempo cambi zoom o rimpicciolisci la finestra. Vale pure per le parole dentro ai box dei commenti e alle anteprime incorporate, per quanto piccoli siano: lì la finestrella si stringe per starci, il testo scorre e la riga per scrivere resta al suo posto.',
+        'Chiedi la spiegazione approfondita su una parola in basso nella pagina e la riga per scrivere la domanda dopo resta dove puoi cliccarla: mentre la risposta fa crescere la finestrella, se cambi zoom, se rimpicciolisci la finestra e anche se la finestrella l\'hai spostata tu. Vale pure per le parole dentro ai box dei commenti e alle anteprime incorporate, per quanto piccoli siano: lì la finestrella si stringe per starci e il testo scorre.',
+        'Dopo Alt+E scrivi subito la domanda successiva: il cursore è già nella riga per scrivere.',
       ],
     },
     {
