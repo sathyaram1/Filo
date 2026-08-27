@@ -1239,23 +1239,33 @@ const invioCliccabile = () => {
   return !!el && (el === b || b.contains(el));
 };
 
-// Scrive una domanda lunga come farebbe l'utente: tante righe, così la casella
-// si allunga fino al suo tetto. `pressSequentially` batte `fill` perché fa
-// scattare l'auto-grow a ogni carattere, come una vera digitazione.
-async function domandaLunga(page, radice = '.sn-popup') {
-  const input = page.locator(`${radice} .sn-popup-input`);
+// Scrive una domanda lunga come farebbe l'utente: quattro righe di testo, così
+// la casella si allunga fino al suo tetto. `pressSequentially` batte `fill`
+// perché fa scattare l'auto-grow a ogni carattere, come una vera digitazione.
+const TESTO_DOMANDA = 'e questo invece cosa vorrebbe dire nel contesto della frase che avevo selezionato prima, e in che modo cambia se la frase parlasse di altro? aggiungi anche un esempio pratico che si capisca subito';
+async function domandaLunga(page) {
+  const input = page.locator('.sn-popup .sn-popup-input');
   await input.click();
   await input.fill('');
-  await input.pressSequentially(
-    'e questo invece cosa vorrebbe dire nel contesto della frase che avevo selezionato prima, ',
-    { delay: 1 },
-  );
-  // Ancora, così la casella arriva al suo tetto anche in un riquadro largo.
-  await input.pressSequentially('e in che modo cambia se la frase parlasse di altro?', { delay: 1 });
+  await input.pressSequentially(TESTO_DOMANDA, { delay: 0 });
 }
 
-for (const altezza of [540, 480, 420]) {
-  test(`domanda lunga scritta dopo la risposta, finestra alta ${altezza}px: la riga per scrivere resta dentro`, async ({ app, openTab }) => {
+// Le coppie (altezza della finestra, dov'è la parola) in cui la domanda lunga
+// spingeva fuori la riga per scrivere. Non sono casi di laboratorio: è
+// "finestra fino a 540px, parola dalla metà in giù", cioè la finestra di un
+// portatile con qualche pannello aperto e una parola a metà pagina. Sotto ogni
+// coppia c'è di quanto sporgeva prima del rimedio.
+const CASI_DOMANDA = [
+  { altezza: 540, frazione: 0.5, sporgeva: 20 },
+  { altezza: 480, frazione: 0.5, sporgeva: 50 },   // e 42px fuori dallo SCHERMO
+  { altezza: 480, frazione: 0.55, sporgeva: 28 },
+  { altezza: 420, frazione: 0.55, sporgeva: 61 },
+  { altezza: 420, frazione: 0.65, sporgeva: 19 },
+  { altezza: 380, frazione: 0.65, sporgeva: 45 },
+];
+
+for (const { altezza, frazione, sporgeva } of CASI_DOMANDA) {
+  test(`domanda lunga dopo la risposta, finestra alta ${altezza}px e parola a ${frazione}: la riga per scrivere resta dentro (sporgeva di ${sporgeva}px)`, async ({ app, openTab }) => {
     test.setTimeout(90_000);
     const page = await openTab('filo://newtab/');
     await altezzaFinestra(page, altezza);
@@ -1263,7 +1273,7 @@ for (const altezza of [540, 480, 420]) {
       .toBeLessThanOrEqual(altezza);
 
     // Parola dalla metà in giù e risposta arrivata: fin qui è tutto dentro.
-    const posato = await riquadroPosato(app, page, 0.6);
+    const posato = await riquadroPosato(app, page, frazione);
     expect(fuoriDaiBordi(posato), 'il riquadro sborda già prima della domanda').toEqual([]);
 
     // Adesso la domanda successiva, lunga.
