@@ -367,7 +367,7 @@
     try {
       const r = el.getBoundingClientRect();
       if (!(r.width >= CLOSED_MIN_W && r.height >= CLOSED_MIN_H)) return false;
-      if (isOutsideScrollablePage(r)) return false;
+      if (isOutsideScrollablePage(el, r)) return false;
       if (isInvisibleToUser(el)) return false;
       return true;
     } catch (_) { return false; }
