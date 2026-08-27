@@ -532,7 +532,8 @@
 
     function capHeight() {
       const room = (side === 'above' ? roomAbove() : roomBelow()) / scale() - boxExtra();
-      const cap = Math.min(maxH, Math.max(POSE_MIN_H, room));
+      const cap = Math.min(maxH, Math.max(pavimento(), room));
+      comprimi(cap);
       root.style.maxHeight = `${Math.floor(cap)}px`;
     }
 
