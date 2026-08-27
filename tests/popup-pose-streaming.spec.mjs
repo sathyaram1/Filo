@@ -106,6 +106,7 @@ test('spiegazione approfondita su selezione in basso: la riga per scrivere resta
 
   // Il riquadro nasce vuoto: è questa l'altezza su cui il vecchio codice posava.
   await page.waitForSelector('.sn-popup', { timeout: 8000 });
+  await attendiIngresso(page);
   const daVuoto = await page.evaluate(misura);
   expect(daVuoto).not.toBeNull();
 
