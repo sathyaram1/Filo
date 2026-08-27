@@ -1054,11 +1054,117 @@ test('riquadro spostato dall\'utente e finestra abbassata: si accorcia per starc
   await ripristinaProvider(app);
 });
 
-// Nota su un caso che NON serve provare qui: zoom della pagina col riquadro
-// spostato. La compensazione zoom contro-scala il riquadro, quindi zoomando il
-// suo ingombro sullo schermo non cresce mai rispetto alla finestra e il
-// guardiano gli basta. Un test lì sarebbe verde anche senza il rimedio: non
-// proverebbe niente e costerebbe un avvio in più.
+// ─────────────────────────────────────────────────────────────────────────────
+// #502, la porta del TRASCINAMENTO: il limite che ferma il riquadro al bordo
+// misurava l'ingombro di LAYOUT (`offsetHeight`), non quello visibile.
+//
+// La compensazione zoom mette una `scale()` sul riquadro, e le due misure
+// coincidono solo al 100%. Con la pagina rimpicciolita (Ctrl+meno, due gesti
+// comunissimi) la scala è maggiore di 1: il riquadro occupa PIÙ di quanto dice
+// `offsetHeight`, il limite lascia passare la differenza e la riga per scrivere
+// finisce sotto il fondo dello schermo — 148px al 75%, 464px al 50%. Da lì non
+// rientra più da sola: senza cambi di dimensione il guardiano non gira.
+//
+// Con la pagina INGRANDITA la scala è minore di 1 e vale la faccia opposta: il
+// riquadro si ferma prima del bordo, lasciando fuori una fascia di schermo che
+// c'è. Le due facce sono lo stesso errore, ed è per questo che si provano
+// insieme: un rimedio che tiene in un verso e non nell'altro è la firma di
+// questo difetto.
+//
+// (La nota che stava qui diceva che lo zoom col riquadro spostato non serviva
+// provarlo, perché la contro-scala tiene l'ingombro costante sullo schermo. È
+// vero per il guardiano, che misura visibile; non lo era per il limite del
+// trascinamento, che misurava di layout.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Prende il riquadro per l'intestazione e lo porta più in basso che può, come
+// l'utente che se lo mette in fondo allo schermo.
+async function trascinaInFondo(page) {
+  const hb = await page.locator('.sn-popup-header').boundingBox();
+  const vh = await page.evaluate(() => window.innerHeight);
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2, vh - 4, { steps: 12 });
+  await page.mouse.up();
+}
+
+// Sotto ogni zoom, di quanto la riga per scrivere finiva fuori prima del rimedio.
+const CASI_ZOOM_TRASCINATO = [
+  { zoom: 0.75, sintomo: 'la riga per scrivere finiva 148px sotto il bordo' },
+  { zoom: 0.5, sintomo: 'la riga per scrivere finiva 464px sotto il bordo' },
+];
+
+for (const { zoom, sintomo } of CASI_ZOOM_TRASCINATO) {
+  test(`pagina rimpicciolita al ${Math.round(zoom * 100)}% e riquadro trascinato in fondo: resta dentro lo schermo (${sintomo})`, async ({ app, openTab }) => {
+    test.setTimeout(120_000);
+    const page = await openTab('filo://newtab/');
+    const prima = await riquadroPosato(app, page, 0.4);
+    expect(fuoriDaiBordi(prima)).toEqual([]);
+
+    // Ctrl+meno: la finestra, in px di pagina, diventa più grande.
+    await zoomScheda(app, zoom);
+    await expect.poll(
+      () => page.evaluate(() => window.innerHeight),
+      { timeout: 5000, message: 'lo zoom non ha allargato la finestra: lo scenario non è quello vero' },
+    ).toBeGreaterThan(prima.vh + 50);
+    await expect.poll(
+      async () => fuoriDaiBordi(await page.evaluate(misura)),
+      { timeout: 5000 },
+    ).toEqual([]);
+
+    // L'utente lo prende per la barra del titolo e lo porta in fondo.
+    await trascinaInFondo(page);
+    const spostato = await page.evaluate(misura);
+    expect(Math.round(spostato.top), 'il trascinamento non lo ha portato in basso: lo scenario non è quello vero')
+      .toBeGreaterThan(Math.round(prima.top) + 50);
+
+    // SUCCESSO — niente è finito fuori, e non "dopo qualche secondo": subito e
+    // per sempre. (`expect.poll` per non leggere un fotogramma a metà.)
+    await expect.poll(
+      async () => fuoriDaiBordi(await page.evaluate(misura)),
+      { timeout: 5000, message: `trascinato in fondo al ${Math.round(zoom * 100)}% il riquadro è rimasto fuori dallo schermo` },
+    ).toEqual([]);
+    // E la riga per scrivere si clicca e accetta la domanda dopo: è questo che
+    // l'utente non riusciva più a fare.
+    expect(await page.evaluate(casellaCliccabile)).toBe(true);
+    await page.locator('.sn-popup .sn-popup-input').click();
+    await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
+    await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+
+    await zoomScheda(app, 1);
+    await ripristinaProvider(app);
+  });
+}
+
+// La faccia opposta: con la pagina INGRANDITA il limite si fermava troppo
+// presto e il riquadro non arrivava al bordo, lasciando fuori una fascia di
+// schermo utile. Stesso errore di misura, verso opposto.
+test('pagina ingrandita al 150% e riquadro trascinato in fondo: arriva davvero al bordo', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const page = await openTab('filo://newtab/');
+  await riquadroPosato(app, page, 0.3);
+
+  await zoomScheda(app, 1.5);
+  await expect.poll(
+    () => page.evaluate(() => window.innerHeight),
+    { timeout: 5000, message: 'lo zoom non ha accorciato la finestra: lo scenario non è quello vero' },
+  ).toBeLessThan(700);
+  await expect.poll(
+    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    { timeout: 5000 },
+  ).toEqual([]);
+
+  await trascinaInFondo(page);
+  const m = await page.evaluate(misura);
+  expect(fuoriDaiBordi(m)).toEqual([]);
+  // SUCCESSO — il fondo del riquadro è appoggiato al bordo, non decine di pixel
+  // più su: lo spazio che l'utente vede è lo spazio che può usare.
+  expect(Math.round(m.vh - m.bottom), 'il riquadro si ferma prima del bordo: resta fuori una fascia di schermo che c\'è')
+    .toBeLessThanOrEqual(8);
+
+  await zoomScheda(app, 1);
+  await ripristinaProvider(app);
+});
 
 // Chi ha chiesto la spiegazione con la tastiera continua con la tastiera: il
 // cursore deve essere GIÀ nella riga per scrivere. Prima ci si arrivava solo
