@@ -591,10 +591,16 @@
         : r.bottom - (vh - POSE_MARGIN);
       if (libero > 0.5) {
         const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
-        const next = Math.max(POSE_FLOOR_H, Math.floor(cur - libero / scale()));
+        const next = Math.max(pavimento(), Math.floor(cur - libero / scale()));
+        // Stringere il tetto senza far cedere nessuno non stringe niente:
+        // il livello di compressione va rifatto sul tetto nuovo, anche quando
+        // il tetto era già al pavimento (è il caso in cui a sbordare sono
+        // proprio i minimi interni).
+        comprimi(next);
         // Rileggere subito costa un layout, ma senza non sapremmo se lo
         // stringimento è bastato.
-        if (next < cur) { root.style.maxHeight = `${next}px`; r = root.getBoundingClientRect(); }
+        if (next < cur) { root.style.maxHeight = `${Math.floor(next)}px`; }
+        r = root.getBoundingClientRect();
       }
       // Dentro tutti e due i bordi: finito.
       if (POSE_MARGIN - r.top <= 1 && r.bottom - (vh - POSE_MARGIN) <= 1) return;
