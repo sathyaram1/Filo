@@ -556,6 +556,19 @@
       return above > below ? 'above' : 'below'; // nessuno dei due basta: il più capiente
     }
 
+    // Larghezza: stesso ragionamento del tetto d'altezza, sull'altro asse.
+    // Dentro un riquadro incorporato lo "schermo" è il riquadro (#405), e i box
+    // dei commenti sono spesso stretti: con la larghezza fissa il tasto di
+    // invio finisce oltre il bordo destro, dove il browser lo taglia — stesso
+    // danno del difetto, altra direzione. Qui non deve cedere nessuno: basta
+    // stringere la larghezza allo spazio che c'è. Si rifà da capo a ogni
+    // misura, anche verso l'alto, così quando il posto torna torna anche la
+    // larghezza piena.
+    function capWidth() {
+      const room = (window.innerWidth - POSE_MARGIN * 2) / scale() - boxExtraX();
+      root.style.maxWidth = `${Math.max(0, Math.floor(Math.min(baseW, room)))}px`;
+    }
+
     function capHeight() {
       const room = (side === 'above' ? roomAbove() : roomBelow()) / scale() - boxExtra();
       const cap = Math.min(maxH, Math.max(pavimento(), room));
