@@ -385,6 +385,7 @@
   const POSE_MARGIN = 8;   // aria fra riquadro e bordi della finestra
   const POSE_GAP = 8;      // stacco fra riquadro e punto ancorato
   const POSE_MIN_H = 160;  // sotto quest'altezza il riquadro non è più usabile
+  const POSE_FLOOR_H = 60; // fondo assoluto a cui può scendere il guardiano
   const POSE_MAX_H_FALLBACK = 480;
 
   // Il tetto lo tiene il foglio di stile: lo leggiamo invece di ricopiarlo, così
