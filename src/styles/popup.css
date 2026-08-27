@@ -234,6 +234,7 @@
   cursor: pointer;
   height: 30px;
   width: 30px;
+  flex: 0 0 auto; /* non si stringe: è l'altra metà della riga per scrivere */
   display: flex;
   align-items: center;
   justify-content: center;
