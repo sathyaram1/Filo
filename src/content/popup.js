@@ -399,6 +399,7 @@
   const POSE_MARGIN = 8;   // aria fra riquadro e bordi della finestra
   const POSE_GAP = 8;      // stacco fra riquadro e punto ancorato
   const POSE_MAX_H_FALLBACK = 480;
+  const POSE_W_FALLBACK = 380;
   // Stati di compressione, definiti nel foglio di stile (§ "chi cede quando lo
   // spazio si stringe"): il corpo perde il suo minimo e scorre; poi va via
   // anche la riga del costo.
