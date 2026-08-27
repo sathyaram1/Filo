@@ -442,11 +442,25 @@
     // (Lo zoom della pagina non muove il contenuto nelle coordinate CSS: cambia
     // quanto viewport ci sta. Il punto grezzo resta quello giusto, va solo
     // ritagliato sulla finestra di adesso.)
+    //
+    // E il punto ancorato non è UN punto: è la parola. Una parola ha un'altezza,
+    // e il riquadro va staccato dal bordo che gli sta di fronte — sopra la
+    // parola si misura dalla sua CIMA, sotto dal suo FONDO. Ancorando tutti e
+    // due i lati al solo fondo, il riquadro posato sopra si appoggiava otto
+    // pixel sopra il fondo della parola, cioè DENTRO la parola: su una riga alta
+    // 19px ne copriva gli ultimi 11, e la parola diventava illeggibile proprio
+    // mentre l'utente leggeva cosa vuol dire. Chi passa un punto solo (il tasto
+    // destro, dove l'ancora è il puntatore) lo usa per tutti e due i lati, che
+    // per un punto è la stessa cosa.
     const rawX = Number.isFinite(anchor?.x) ? anchor.x : POSE_MARGIN;
     const rawY = Number.isFinite(anchor?.y) ? anchor.y : POSE_MARGIN;
+    const rawYSopra = Number.isFinite(anchor?.top) ? anchor.top : rawY;
+    const rawYSotto = Number.isFinite(anchor?.bottom) ? anchor.bottom : rawY;
     const dentro = (v, max) => Math.max(POSE_MARGIN, Math.min(max - POSE_MARGIN, v));
     const ax = () => dentro(rawX, window.innerWidth);
-    const ay = () => dentro(rawY, window.innerHeight);
+    // Il bordo della parola da cui si stacca il riquadro, a seconda del lato.
+    const ayCima = () => dentro(rawYSopra, window.innerHeight);
+    const ayFondo = () => dentro(rawYSotto, window.innerHeight);
     // Letto PRIMA di scrivere il tetto inline: dopo rileggeremmo il nostro
     // stesso valore e lo stringeremmo a ogni giro.
     const maxH = styleMaxHeight(root);
