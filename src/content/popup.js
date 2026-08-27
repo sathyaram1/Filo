@@ -351,12 +351,12 @@
   }
 
   // ----------------------------------------------------------------
-  // Posa del riquadro — vedi PATTERNS.md § "Un riquadro che si riempie dopo va
-  // rimisurato dopo"
+  // Posa del riquadro — vedi PATTERNS.md § "Un riquadro che si riempie dopo si
+  // ancora dal lato che non si muove"
   // ----------------------------------------------------------------
-  // Il riquadro nasce VUOTO (poco più di 200px) e si riempie dopo, mentre la
-  // risposta arriva, fino al tetto d'altezza del foglio di stile. Una posa
-  // calcolata una volta sola alla nascita è calcolata sull'altezza sbagliata:
+  // Il riquadro nasce VUOTO (circa 300px) e si riempie dopo, mentre la risposta
+  // arriva, fino al tetto d'altezza del foglio di stile. Una posa calcolata una
+  // volta sola alla nascita è calcolata sull'altezza sbagliata:
   // il fondo — cioè la riga dove si scrive la domanda successiva — finisce
   // fuori dallo schermo e non si può più chiedere niente (#502).
   //
