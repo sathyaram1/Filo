@@ -777,6 +777,15 @@
     try { popup?.pose?.reflow(); } catch (_) {}
   }
 
+  // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
+  // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
+  // posa), l'informazione resta comunque: passando sopra l'intestazione.
+  function setMeta(popup, testo) {
+    if (!popup?.metaEl) return;
+    popup.metaEl.textContent = testo;
+    try { popup.root.querySelector('.sn-popup-header').title = testo; } catch (_) {}
+  }
+
   // ----------------------------------------------------------------
   // Avvia un turno di streaming. messages è la cronologia COMPLETA
   // (incluso il nuovo messaggio user finale).
