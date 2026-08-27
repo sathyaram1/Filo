@@ -592,3 +592,31 @@ test('finestra rimpicciolita col riquadro aperto: resta dentro lo schermo e la r
 
   await ripristinaProvider(app);
 });
+
+// Il caso che restava scoperto: finestra bassissima GIÀ PRIMA che il riquadro si
+// apra. Qui non c'è nessuna posa da correggere — c'è da nascere giusti, in uno
+// spazio che non basta al tetto d'altezza né sopra né sotto il punto ancorato.
+// La risposta deve restare leggibile (il corpo scorre) e la riga per scrivere
+// raggiungibile: è l'unica cosa che tiene viva la conversazione.
+for (const altezza of [380, 260]) {
+  test(`finestra alta ${altezza}px fin dall'apertura: il riquadro nasce dentro e la riga per scrivere si clicca`, async ({ app, openTab }) => {
+    test.setTimeout(90_000);
+    const page = await openTab('filo://newtab/');
+    await altezzaFinestra(page, altezza);
+    await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
+      .toBeLessThanOrEqual(altezza);
+
+    const posato = await riquadroPosato(app, page);
+    expect(fuoriDaiBordi(posato), 'il riquadro nasce fuori da una finestra bassa').toEqual([]);
+    expect(await page.evaluate(casellaCliccabile)).toBe(true);
+    await page.locator('.sn-popup .sn-popup-input').click();
+    await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
+    await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+
+    // Il testo non è andato perduto con l'altezza: il corpo scorre.
+    await expect(page.locator('.sn-popup .sn-msg-assistant .sn-msg-text').last())
+      .toContainText('Paragrafo 12', { timeout: 5000 });
+
+    await ripristinaProvider(app);
+  });
+}

@@ -924,6 +924,14 @@ una conseguenza; va fatto il contrario.
   che prosegue sotto la piega ha il fondo fuori dallo schermo. Con un punto
   fuori, «sopra il punto» è fuori a sua volta e il riquadro nasce già sbordato,
   senza nemmeno aspettare la risposta: misurato a 620px oltre il bordo.
+- **E ritaglialo a OGNI misura, non solo all'apertura.** La finestra si accorcia
+  anche dopo: zoom della pagina (in Filo si usa di continuo) e ridimensionamento
+  la portano sotto un punto che era dentro. Se il ritaglio è una costante
+  calcolata alla nascita, il riquadro viene riposato rispetto a un posto che non
+  esiste più e torna fuori dal bordo — stesso sintomo, altra porta: misurato a
+  59px sotto il fondo al 150% di zoom, con la riga per scrivere di nuovo
+  irraggiungibile. Tieni il punto GREZZO e ritaglialo sulla finestra di adesso:
+  il punto ancorato è una funzione, non un numero.
 - **Il LATO si sceglie una volta e non cambia più**, e si sceglie sull'altezza
   che il riquadro **potrà** raggiungere (il suo tetto, letto dal foglio di
   stile — non ricopiato in JS), non su quella che ha adesso. Se ci sta sotto il
