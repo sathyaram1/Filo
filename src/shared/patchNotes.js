@@ -18,7 +18,7 @@
     {
       version: '0.2.205', date: '2026-08-27',
       fixes: [
-        'Dopo «Traduci la pagina», l\'avviso che una parte è rimasta in lingua originale esce solo se sullo schermo c\'è davvero un riquadro non tradotto da andare a leggere. Sui siti di giornale usciva quasi sempre a vuoto, per via degli spazi pubblicitari e dei banner nascosti nella pagina.',
+        'Dopo «Traduci la pagina», l\'avviso «tradotta solo in parte» compare solo quando sullo schermo c\'è davvero un riquadro rimasto in lingua originale. Sui siti di giornale usciva quasi sempre a vuoto, per colpa degli spazi pubblicitari e dei banner nascosti nella pagina.',
       ],
     },
     {
