@@ -1159,11 +1159,12 @@
           firstDelta = false;
         }
         buf += m.delta;
-        bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf));
-        popup.bodyEl.scrollTop = popup.bodyEl.scrollHeight;
         // Ogni delta allunga il riquadro: la posa va rifatta ADESSO, non al
-        // prossimo disegno (#502).
-        reflow(popup);
+        // prossimo disegno (#502). E la lettura resta dov'è se l'utente era
+        // tornato su a rileggere.
+        scrollaConservando(popup, () => {
+          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf));
+        });
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e il sistema riparte da zero su
         // un fallback: butta il testo parziale e torna allo stato "in attesa",
