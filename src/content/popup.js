@@ -900,6 +900,14 @@
         const r = root.getBoundingClientRect();
         root.style.bottom = 'auto';
         root.style.top = `${Math.round(r.top)}px`;
+        // Cambiato il bordo ancorato cambia anche il punto da cui scala la
+        // compensazione zoom: restando `bottom left` il riquadro si disegnerebbe
+        // alto quanto la scala lo allunga sopra il suo `top`, e ogni conto fatto
+        // su `style.top` (il limite del trascinamento, il guardiano) parlerebbe
+        // di un posto dove il riquadro non è. La compensazione ricava la stessa
+        // cosa da `bottom: auto` al prossimo cambio di zoom: qui la anticipiamo
+        // nello stesso istante, così non passa nemmeno un fotogramma storto.
+        root.style.transformOrigin = 'top left';
         // Lo spazio disponibile è cambiato nell'istante stesso in cui è stato
         // preso in mano: non è più quello del lato ancorato, è la finestra
         // intera. Rifare il tetto qui è ciò che gli ridà l'altezza che lo
