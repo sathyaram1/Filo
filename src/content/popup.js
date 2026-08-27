@@ -526,20 +526,30 @@
     // In px di LAYOUT: sullo schermo la compensazione zoom li scala.
     const altezza = (el) => (el ? el.getBoundingClientRect().height / (scale() || 1) : 0);
 
-    // Il minimo del corpo si legge ORA, che è ancora quello naturale: da
-    // compresso rileggeremmo zero, e la decisione dipenderebbe dal suo stesso
-    // esito — cioè oscillerebbe.
-    const bodyComfort = (() => {
-      if (!bodyEl) return 0;
+    // Il corpo si legge ORA, che è ancora quello naturale: da compresso
+    // rileggeremmo zero, e la decisione dipenderebbe dal suo stesso esito — cioè
+    // oscillerebbe. Due numeri, non uno:
+    //   - il MINIMO comodo (`min-height` + il suo contorno), sotto cui il corpo
+    //     comincia a scorrere;
+    //   - il RESIDUO, cioè quello che resta del corpo quando il suo minimo è
+    //     già andato a zero: l'imbottitura e i bordi, che il `min-height: 0`
+    //     NON toglie. Vale una ventina di pixel, e non metterlo in bilancio era
+    //     il difetto: il conto prometteva un riquadro più basso di quello che il
+    //     browser sa disegnare, il tetto restava largo di quei pixel e a uscire
+    //     dal bordo era la riga per scrivere.
+    const bodyBox = (() => {
+      if (!bodyEl) return { min: 0, residuo: 0 };
       try {
         const cs = getComputedStyle(bodyEl);
         const mh = parseFloat(cs.minHeight) || 0;
-        if (!mh) return 0;
-        if (cs.boxSizing === 'border-box') return mh;
-        return mh + (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
-          + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-      } catch (_) { return 0; }
+        const bordo = cs.boxSizing === 'border-box' ? 0
+          : (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+            + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+        return { min: mh, residuo: bordo };
+      } catch (_) { return { min: 0, residuo: 0 }; }
     })();
+    const bodyComfort = bodyBox.min + bodyBox.residuo;
+    const bodyResiduo = bodyBox.residuo;
     // Idem per la riga del costo: da nascosta misurerebbe zero e non tornerebbe
     // più. (Nasce vuota ma il foglio di stile le dà già l'altezza che avrà
     // piena, così questa misura vale anche dopo.)
@@ -549,18 +559,30 @@
     // allarga quando la domanda è lunga.
     const incomprimibile = () => altezza(headerEl) + altezza(composeEl);
 
+    // I tre gradini, dal più comodo al più stretto: quanto misura il riquadro
+    // AL MINIMO in ciascuno. Sotto quel numero, in quello stato, non si accorcia
+    // più — i pezzi escono dal bordo invece di comprimersi, e il browser li
+    // taglia. Nell'ultimo il corpo cede anche l'imbottitura (il foglio di stile
+    // gliela azzera), quindi sparisce per intero e il pavimento è davvero il
+    // solo incomprimibile.
+    const minComodo = () => incomprimibile() + footerH + bodyComfort;
+    const minStretto = () => incomprimibile() + footerH + bodyResiduo;
+    const minNudo = () => incomprimibile();
+
     // Il livello di compressione è funzione SOLO del tetto e di misure prese
     // una volta sola: a parità di spazio dà sempre la stessa risposta, quindi
-    // non può rincorrersi.
+    // non può rincorrersi. Ogni soglia è il minimo VERO dello stato di sopra:
+    // si passa al gradino dopo appena il tetto scende sotto quello che il
+    // gradino di adesso sa disegnare.
     function comprimi(cap) {
-      const fisso = incomprimibile();
-      root.classList.toggle(POSE_TIGHT, cap < fisso + footerH + bodyComfort - 0.5);
-      root.classList.toggle(POSE_BARE, cap < fisso + footerH - 0.5);
+      root.classList.toggle(POSE_TIGHT, cap < minComodo() - 0.5);
+      root.classList.toggle(POSE_BARE, cap < minStretto() - 0.5);
     }
 
-    // Il pavimento del tetto non è una costante: è quanto misurano i pezzi che
-    // non cedono. Più in basso il tetto non stringe più niente.
-    const pavimento = () => incomprimibile();
+    // Il pavimento del tetto non è una costante: è il minimo del gradino più
+    // stretto, cioè quanto misurano i pezzi che non cedono mai. Più in basso il
+    // tetto non stringe più niente.
+    const pavimento = () => minNudo();
 
     function chooseSide() {
       const want = (maxH + boxExtra()) * scale();  // ingombro pieno raggiungibile
