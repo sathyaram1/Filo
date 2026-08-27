@@ -43,7 +43,7 @@ test('probe visivo: finestra 480px, parola a metà, domanda successiva lunga', a
   await page.screenshot({ path: 'tests/.shots/zz502-A-prima.png' });
   const input = page.locator('.sn-popup .sn-popup-input');
   await input.click();
-  await input.type('perché questa cosa funziona così e non in un altro modo, e cosa cambierebbe se invece fosse fatta nell\'altro modo? mi serve capire bene il motivo', { delay: 0 });
+  await input.fill('perché questa cosa funziona così e non in un altro modo? '.repeat(12));
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'tests/.shots/zz502-A-dopo.png' });
   const m = await page.evaluate(() => {
