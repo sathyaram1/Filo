@@ -1283,7 +1283,7 @@ for (const { altezza, frazione, sporgeva } of CASI_DOMANDA) {
       const i = document.querySelector('.sn-popup .sn-popup-input');
       return i.getBoundingClientRect().height;
     });
-    expect(cresciuta, 'la casella non si è allungata: lo scenario non è quello vero').toBeGreaterThan(45);
+    expect(cresciuta, 'la casella non si è allungata: lo scenario non è quello vero').toBeGreaterThan(80);
 
     const m = await page.evaluate(misura);
     // SUCCESSO — niente sporge: né dal bordo arrotondato del riquadro né dalla
