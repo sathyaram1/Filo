@@ -378,7 +378,9 @@
   //
   // Resta un guardiano per i casi che la matematica non copre (finestra troppo
   // bassa perché il riquadro ci stia nemmeno al minimo): stringe ancora il
-  // tetto, non sposta il riquadro — così non può oscillare.
+  // tetto invece di spostare il riquadro, quindi va in una sola direzione e non
+  // può oscillare. Solo quando il tetto è già al minimo e il riquadro sborda lo
+  // stesso lo riporta dentro a forza.
   //
   // Dopo che l'utente lo ha trascinato la posa è sua: non lo riportiamo sul
   // punto ancorato, ci limitiamo a non farlo uscire dallo schermo.
