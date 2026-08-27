@@ -18,7 +18,7 @@
     {
       version: '0.2.205', date: '2026-08-27',
       fixes: [
-        'Dopo «Traduci la pagina», l\'avviso «tradotta solo in parte» compare solo quando sullo schermo c\'è davvero un riquadro rimasto in lingua originale. Sui siti di giornale usciva quasi sempre a vuoto, per colpa degli spazi pubblicitari e dei banner nascosti nella pagina.',
+        'Dopo «Traduci la pagina», l\'avviso «tradotta solo in parte» compare solo quando nella pagina è rimasto davvero un riquadro in lingua originale da leggere, anche se per arrivarci devi scorrere. Sui siti di giornale usciva quasi sempre a vuoto, per colpa degli spazi pubblicitari e dei banner che il sito tiene nascosti nella pagina.',
       ],
     },
     {
