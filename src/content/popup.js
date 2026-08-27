@@ -370,6 +370,11 @@
   //   2. Il tetto d'altezza viene STRETTO allo spazio di quel lato: più alto di
   //      così il riquadro non può diventare. Il corpo si accorcia e scorre, la
   //      riga per scrivere resta raggiungibile.
+  //   2b. Ma un tetto stringe solo finché sta sopra la somma dei minimi dei
+  //      pezzi interni: sotto, i pezzi escono dal bordo del riquadro invece di
+  //      comprimersi. Quindi quando lo spazio si stringe qualcuno deve cedere
+  //      DAVVERO: prima il minimo del corpo, poi la riga del costo.
+  //      Intestazione e riga per scrivere non cedono mai.
   //   3. Il bordo ancorato lo tiene il FOGLIO DI STILE, non JavaScript: sotto
   //      la selezione si fissa `top` e il riquadro cresce verso il basso; sopra
   //      la selezione si fissa `bottom` e cresce verso l'alto da solo. Nessuno
