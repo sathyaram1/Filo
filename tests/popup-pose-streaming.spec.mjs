@@ -22,8 +22,8 @@ import { test, expect } from './fixtures/electron.mjs';
 // pause servono a poterlo guardare MENTRE cresce, che è il momento del difetto.
 // Il corpo della funzione gira nel processo main, dove le variabili del file di
 // test non arrivano: i pezzi si costruiscono lì dentro.
-async function preparaProvider(app) {
-  await app.evaluate(async () => {
+async function preparaProvider(app, attesaMs = 1200) {
+  await app.evaluate(async (attesa) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
