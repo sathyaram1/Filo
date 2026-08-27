@@ -740,18 +740,20 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   "Interrompi lettura", che appare solo mentre la sintesi è in corso).
 - **Avanzamento reale mentre lavora**: il totale dei pezzi è noto, quindi
   l'avviso "in corso" mostra `fatti/totale` invece di una frase fissa.
-- **"È rimasto fuori un pezzo" si misura su ciò che l'utente VEDE** (#503): un
-  avviso che manda a cercare sullo schermo qualcosa che sullo schermo non c'è è
-  la bugia opposta e costa uguale — e sbagliando spesso brucia le volte in cui
-  dice il vero. Prima di contare un pezzo come "rimasto indietro" chiedi se si
-  vede: nascosto (`display:none`, `visibility:hidden`, opacità zero anche presa
-  da un antenato) o portato fuori dalla pagina non conta. Sulle pagine vere il
-  caso normale è questo, non l'eccezione: spazi pubblicitari, banner dei cookie
-  già chiusi e riquadri di statistica sono quasi sempre lì e quasi sempre
-  invisibili. **"Fuori dalla pagina" non è "fuori dalla finestra"**: quel che
-  sta solo sotto la prima schermata è contenuto vero, ci si arriva scorrendo, e
-  conta — il confronto va fatto con l'area scorribile del documento
-  (`rect` + scroll), mai con il viewport.
+- **"È rimasto fuori un pezzo" si misura su ciò che l'utente VEDE** (#503).
+  Mandare a cercare sullo schermo qualcosa che sullo schermo non c'è è la bugia
+  opposta e costa uguale. Peggio: un avviso che sbaglia spesso brucia anche le
+  volte in cui dice il vero, che sono le uniche che servono. Prima di contare un
+  pezzo come "rimasto indietro" chiedi se si vede. Nascosto (`display:none`,
+  `visibility:hidden`, opacità zero anche presa da un antenato) o portato fuori
+  dalla pagina non conta, e sulle pagine vere questo è il caso normale, non
+  l'eccezione: spazi pubblicitari, banner dei cookie già chiusi e riquadri di
+  statistica sono quasi sempre lì e quasi sempre invisibili.
+- **"Fuori dalla pagina" non è "fuori dalla finestra"**. Quel che sta solo sotto
+  la prima schermata è contenuto vero, ci si arriva scorrendo, e continua a
+  contare. Il confronto va fatto con l'area scorribile del documento
+  (`rect` + `scrollX/scrollY` contro `scrollWidth/scrollHeight`), mai con il
+  viewport.
 - **Dove:** `src/content/translatePage.js` (stato + ripresa),
   `src/content/extractContext.js` (`extractTranslatableBlocks`),
   `src/content/menuIcons.js` + `src/content/content.js` (menu). Test:
