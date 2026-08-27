@@ -21,6 +21,7 @@
         'Chiedi la spiegazione approfondita su una parola in basso nella pagina e la riga per scrivere la domanda dopo resta dove puoi cliccarla.',
         'La finestrella della spiegazione non copre più la parola su cui l\'hai chiesta.',
         'Dopo Alt+E il cursore è già nella riga per scrivere, quindi la domanda successiva la fai senza passare dal mouse.',
+        'Se chiedi la spiegazione dentro un box dei commenti o un\'anteprima incorporata nella pagina, della risposta vedi diverse righe invece di una fessura da scorrere.',
       ],
     },
     {
