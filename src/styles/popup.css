@@ -93,9 +93,17 @@
    fino a sparire. Poi, se ancora non basta, va la riga del costo (che resta
    leggibile passando sopra l'intestazione). Intestazione e riga per scrivere
    restano sempre: sono ciò che tiene viva la conversazione.
-   I due stati li mette `attachPose()` in src/content/popup.js. */
+   I due stati li mette `attachPose()` in src/content/popup.js.
+
+   Attenzione al residuo: `min-height: 0` porta a zero il CONTENUTO del corpo,
+   non il suo ingombro — l'imbottitura resta, e sono una ventina di pixel che
+   il riquadro continua a occupare quando ormai non mostra più niente. Nello
+   stato più stretto, dove del corpo non si vede comunque nulla, cede anche
+   quella: senza, il conto della posa promette un riquadro più basso di quello
+   che il browser sa disegnare e a uscire dal bordo è la riga per scrivere. */
 .sn-popup-tight .sn-popup-body { min-height: 0; }
 .sn-popup-bare .sn-popup-footer { display: none; }
+.sn-popup-bare .sn-popup-body { padding-top: 0; padding-bottom: 0; }
 
 /* Bolle conversazione */
 .sn-msg {
