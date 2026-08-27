@@ -298,7 +298,19 @@
       try { onDragStart && onDragStart(); } catch (_) {}
       let left = e.clientX - dx;
       let top = e.clientY - dy;
-      const w = root.offsetWidth, h = root.offsetHeight;
+      // L'ingombro si misura VISIBILE (`getBoundingClientRect`), non di layout
+      // (`offsetWidth/Height`): la compensazione zoom mette una `scale()` sul
+      // riquadro, e le due misure coincidono solo al 100%. Con la pagina
+      // rimpicciolita (Ctrl+meno) la scala è maggiore di 1 e il riquadro occupa
+      // PIÙ di quanto dice `offsetHeight`: il limite lasciava passare la
+      // differenza e la riga per scrivere finiva sotto il fondo dello schermo —
+      // 148px al 75%, 464px al 50% — dove nessuno la riportava dentro, perché
+      // senza cambi di dimensione il guardiano non gira. Con la pagina
+      // ingrandita valeva la faccia opposta: il riquadro si fermava prima del
+      // bordo, in una fascia di schermo che c'era. Stessa asimmetria del
+      // difetto (#502): un rimedio che tiene in un verso e non nell'altro.
+      const r = root.getBoundingClientRect();
+      const w = r.width, h = r.height;
       const vw = window.innerWidth, vh = window.innerHeight;
       if (left < 0) left = 0;
       if (top < 0) top = 0;
