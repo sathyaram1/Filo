@@ -952,6 +952,40 @@ una conseguenza; va fatto il contrario.
   servono a decidere (il minimo del corpo, l'altezza della riga che si può
   nascondere) vanno lette **una volta, da non compresso**: da compresso
   varrebbero zero e non tornerebbero più.
+- **Il pezzo che "sparisce" continua a occupare la sua imbottitura, e il conto
+  se ne dimentica.** `min-height: 0` porta a zero il CONTENUTO, non l'ingombro:
+  bordi e imbottitura restano. Nel popup sono venti pixel, e il pavimento del
+  tetto li ignorava. Il risultato è un conto che promette un riquadro più basso
+  di quello che il browser sa disegnare: il tetto resta largo di quei pixel, i
+  pezzi escono dal bordo e la riga per scrivere sporge oltre l'angolo
+  arrotondato — visibile anche quando il riquadro nel suo insieme sta dentro lo
+  schermo, e tagliata a metà dentro un riquadro incorporato basso (#502). Due
+  conseguenze. Ogni gradino di compressione ha il **suo** minimo vero, e la
+  soglia per passare al gradino dopo è il minimo del gradino di ADESSO, non una
+  somma qualsiasi. E nell'ultimo gradino ceda anche l'imbottitura, così il
+  pavimento è davvero il solo incomprimibile. Quei minimi **leggili dal foglio
+  di stile accendendo per un attimo le classi**, invece di ricopiare i numeri in
+  JS: è il foglio di stile a decidere quanto cede ogni pezzo, e un numero
+  ricopiato ricomincia a mentire al primo ritocco — che è la forma esatta di
+  questo difetto. Nessun fotogramma viene disegnato in mezzo.
+- **Quando nel lato scelto non ci sta nemmeno il MINIMO, il punto ancorato non
+  è onorabile: dillo subito.** Il riquadro verrà staccato comunque (meglio
+  coprire la parola che restare dove non si clicca), e stringere il tetto allo
+  spazio di quel lato butta via posto che c'è. Vale la pena di un terzo lato —
+  «dentro»: si appoggia al bordo della finestra e il tetto è la finestra
+  intera, come da trascinato. Senza, nei riquadri incorporati più bassi il
+  corpo finiva a zero e la spiegazione appena chiesta non si leggeva per
+  niente. La coordinata resta costante anche lì, quindi la regola d'oro non si
+  rompe.
+- **Un riquadro si stacca da una PAROLA, non da un punto, e una parola ha
+  un'altezza.** Sopra la parola ci si appoggia sopra la sua CIMA, sotto sotto il
+  suo FONDO. L'ancora che arriva dalla scorciatoia è il fondo del rettangolo:
+  usarla anche per il lato di sopra vuol dire appoggiarsi otto pixel sopra il
+  fondo delle lettere, cioè dentro le lettere. Su una riga alta 19px ne restano
+  coperti gli ultimi 11, e la parola sparisce proprio mentre l'utente legge cosa
+  vuol dire. Passa il rettangolo, non il punto, e prendilo dalla SELEZIONE su
+  tutte le strade: così la scorciatoia e il menu del tasto destro si comportano
+  uguale invece di dipendere da dove stava il puntatore.
 - **La "finestra" non è sempre quella dell'app: dentro un iframe è l'iframe.**
   Filo gira anche nei riquadri incorporati (#405), e lì `position: fixed` e
   `window.innerHeight` parlano del riquadro. Un box alto 180px è quindi uno
