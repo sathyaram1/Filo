@@ -55,9 +55,13 @@ const fuori = (m) => {
 };
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
-<style>body{margin:0;font:16px/1.6 system-ui,sans-serif}#riempi{height:78vh;padding:20px}#bersaglio{padding:0 20px}</style>
-<div id="riempi">Testa della pagina.</div>
-<p id="bersaglio">La parola supercalifragilistico sta in fondo alla finestra.</p>`;
+<style>
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+  #riempi { height: 300vh; padding: 20px; }
+  #bersaglio { position: fixed; left: 40px; top: 78vh; font-size: 20px; }
+</style>
+<div id="riempi">Testo di contorno.</div>
+<p id="bersaglio">supercalifragilistico</p>`;
 
 // ── 1. La SECONDA strada della segnalazione: la freccetta dentro il riquadro
 // del tasto destro. Deve comportarsi come Alt+E.
