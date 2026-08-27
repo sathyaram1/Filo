@@ -1188,6 +1188,7 @@
         // completo al posto del parziale): senza rimettere la posizione, chi
         // stava rileggendo a metà si ritrova sbalzato dal clamp del browser.
         scrollaConservando(popup, () => {
+          if (vuota) bubble.text.textContent = '';
           if (popup.action === ACTIONS.EXPLAIN && /NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
             bubble.text.textContent = I18n.t('popup_no_explanation');
             bubble.wrap.classList.add('sn-msg-muted');
