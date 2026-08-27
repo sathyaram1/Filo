@@ -707,9 +707,11 @@
     // alto com'era, non restare stretto per sempre — e la posa riscritta sul
     // punto ancorato ritagliato sulla finestra di adesso.
     const vv = window.visualViewport;
-    // La larghezza si rifà sempre, anche se l'utente lo ha trascinato: la posa
-    // è sua, ma un riquadro più largo della finestra non lo ha scelto nessuno.
-    const onViewport = () => { capWidth(); if (!dragged) capHeight(); refresh(); };
+    // Larghezza E altezza si rifanno sempre, anche se l'utente lo ha
+    // trascinato: la posa è sua, l'ingombro non lo ha scelto nessuno. Rifarne
+    // una sola delle due era il difetto — di larghezza il riquadro spostato si
+    // stringeva, di altezza no.
+    const onViewport = () => { capWidth(); capHeight(); refresh(); };
     window.addEventListener('resize', onViewport);
     vv?.addEventListener('resize', onViewport);
     // Lo zoom della pagina (Ctrl +/-, pinch, rotella) cambia la risoluzione:
