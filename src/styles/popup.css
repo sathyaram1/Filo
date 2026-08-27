@@ -55,6 +55,7 @@
 .sn-popup-close {
   all: unset;
   cursor: pointer;
+  flex: 0 0 auto; /* la chiusura resta raggiungibile anche in un riquadro stretto */
   padding: 0 6px;
   color: var(--sn-muted);
   font-size: 18px;
