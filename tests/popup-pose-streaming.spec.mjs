@@ -195,6 +195,7 @@ test('selezione a metà finestra: il riquadro si accorcia invece di sbordare, e 
   });
 
   await page.waitForSelector('.sn-popup', { timeout: 8000 });
+  await attendiIngresso(page);
   const daVuoto = await page.evaluate(misura);
 
   const cime = new Set();
