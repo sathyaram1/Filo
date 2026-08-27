@@ -98,6 +98,17 @@ const misura = () => {
 const fuoriDaiBordi = (m) => {
   if (!m) return ['riquadro sparito'];
   const fuori = [];
+  // Prima di tutto: sta dentro il RIQUADRO STESSO. Quando il tetto d'altezza
+  // scende sotto la somma dei minimi dei pezzi interni, il riquadro smette di
+  // accorciarsi e i pezzi escono dal suo bordo — e il conto del minimo si
+  // dimenticava dell'imbottitura del corpo, che `min-height: 0` non toglie.
+  // Il risultato: la riga per scrivere sporgeva oltre il bordo arrotondato, e
+  // dentro un riquadro incorporato basso il browser la tagliava a metà. Si vede
+  // anche quando il riquadro nel suo insieme è dentro lo schermo, quindi va
+  // guardato per primo e in ogni scenario.
+  if (m.composeBottom > m.bottom + 1) {
+    fuori.push(`riga per scrivere oltre il bordo del riquadro di ${Math.round(m.composeBottom - m.bottom)}px`);
+  }
   if (m.bottom > m.vh + 1) fuori.push(`fondo oltre il bordo di ${Math.round(m.bottom - m.vh)}px (vh=${m.vh})`);
   if (m.top < -1) fuori.push(`cima oltre il bordo di ${Math.round(-m.top)}px`);
   if (m.inputBottom > m.vh) fuori.push(`riga per scrivere sotto il bordo di ${Math.round(m.inputBottom - m.vh)}px`);
