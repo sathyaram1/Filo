@@ -559,12 +559,10 @@ test('finestra rimpicciolita col riquadro aperto: resta dentro lo schermo e la r
     { timeout: 5000, message: 'la finestra non si è rimpicciolita: lo scenario non è quello vero' },
   ).toBeLessThan(prima.vh - 50);
 
-  const stretta = await page.evaluate(misura);
-  expect(stretta.bottom, `riquadro fuori dal fondo dopo il ridimensionamento (vh=${stretta.vh})`)
-    .toBeLessThanOrEqual(stretta.vh + 1);
-  expect(stretta.top).toBeGreaterThanOrEqual(-1);
-  expect(stretta.inputBottom).toBeLessThanOrEqual(stretta.vh);
-  expect(stretta.inputTop).toBeGreaterThanOrEqual(0);
+  await expect.poll(
+    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    { timeout: 5000, message: 'dopo il ridimensionamento il riquadro è rimasto fuori dallo schermo' },
+  ).toEqual([]);
   expect(await page.evaluate(casellaCliccabile)).toBe(true);
   await page.locator('.sn-popup .sn-popup-input').click();
   await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
