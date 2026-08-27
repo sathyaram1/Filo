@@ -623,7 +623,21 @@
       if (dragged) {
         // Trascinato: lì la posa è dell'utente, si sposta solo se esce.
         const vw = window.innerWidth, vh = window.innerHeight;
-        const r = root.getBoundingClientRect();
+        let r = root.getBoundingClientRect();
+        // Ma prima di spostarlo va fatto STARE: da trascinato non c'è un bordo
+        // ancorato, quindi il riquadro è libero di scorrere su e giù — se non
+        // ci sta è perché è più ALTO della finestra, e allora si stringe il
+        // tetto, come sul lato libero di un riquadro ancorato. Senza questo
+        // passo il riquadro più alto della finestra si appoggia in cima e il
+        // fondo (la riga per scrivere) resta fuori: spostarlo non basta.
+        const fuori = r.height - vh;
+        if (fuori > 0.5) {
+          const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
+          const next = Math.max(pavimento(), Math.floor(cur - fuori / scale()));
+          comprimi(next);
+          if (next < cur) { root.style.maxHeight = `${Math.floor(next)}px`; }
+          r = root.getBoundingClientRect();
+        }
         let left = parseFloat(root.style.left) || 0;
         let top = parseFloat(root.style.top) || 0;
         if (top + r.height > vh) top = vh - r.height;
