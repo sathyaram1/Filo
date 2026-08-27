@@ -651,11 +651,11 @@ const RIQUADRO_INTERNO = `<!doctype html><meta charset="utf-8">
 </style>
 <p id="bersaglio">supercalifragilistico</p>`;
 
-const PAGINA_CON_RIQUADRO = (src, h) => `<!doctype html><meta charset="utf-8">
+const PAGINA_CON_RIQUADRO = (src, h, w = 560) => `<!doctype html><meta charset="utf-8">
 <style>
   body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
   h1 { margin: 24px; font-size: 20px; }
-  iframe { display: block; width: 560px; height: ${h}px; border: 1px solid #ccc; margin: 0 24px; }
+  iframe { display: block; width: ${w}px; height: ${h}px; border: 1px solid #ccc; margin: 0 24px; }
 </style>
 <h1>Pagina con un riquadro incorporato</h1>
 <iframe id="riquadro" src="${src}"></iframe>`;
