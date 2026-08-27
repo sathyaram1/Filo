@@ -919,6 +919,11 @@ sotto a seconda della volta, e un salto a metà risposta quando cresce oltre lo
 spazio che aveva. Chi insegue tratta l'altezza come un dato e la posizione come
 una conseguenza; va fatto il contrario.
 
+- **Prima di tutto, riporta il punto ancorato DENTRO la finestra.** Le
+  scorciatoie ancorano al fondo del rettangolo della selezione, e una selezione
+  che prosegue sotto la piega ha il fondo fuori dallo schermo. Con un punto
+  fuori, «sopra il punto» è fuori a sua volta e il riquadro nasce già sbordato,
+  senza nemmeno aspettare la risposta: misurato a 620px oltre il bordo.
 - **Il LATO si sceglie una volta e non cambia più**, e si sceglie sull'altezza
   che il riquadro **potrà** raggiungere (il suo tetto, letto dal foglio di
   stile — non ricopiato in JS), non su quella che ha adesso. Se ci sta sotto il

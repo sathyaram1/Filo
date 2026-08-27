@@ -373,3 +373,59 @@ test('trascinato mentre la risposta arriva: si sposta, non si stira e non torna 
 
   await ripristinaProvider(app);
 });
+
+// La scorciatoia ancora il riquadro al FONDO del rettangolo della selezione. Se
+// la selezione continua sotto la piega quel fondo è fuori dallo schermo, e
+// "sopra il punto" è fuori a sua volta: il riquadro nascerebbe già sbordato,
+// senza nemmeno aspettare la risposta.
+const PAGINA_LUNGA = `<!doctype html><meta charset="utf-8">
+<style>
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+  #testa { height: 60vh; padding: 20px; }
+  #lungo { padding: 0 20px; }
+</style>
+<div id="testa">Intestazione della pagina.</div>
+<p id="lungo">${'Un paragrafo che comincia in fondo alla finestra e prosegue ben oltre la piega, tanto da avere il proprio fondo fuori dallo schermo. '.repeat(40)}</p>`;
+
+test('selezione che prosegue sotto la piega: il riquadro nasce dentro lo schermo, non fuori', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA_LUNGA);
+  await preparaProvider(app);
+
+  // Seleziona tutto il paragrafo: comincia visibile, finisce sotto la piega.
+  const fuori = await page.evaluate(() => {
+    const p = document.querySelector('#lungo');
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const r = range.getBoundingClientRect();
+    return { fondo: r.bottom, vh: window.innerHeight };
+  });
+  // Lo scenario è quello vero: il fondo della selezione è fuori dallo schermo.
+  expect(fuori.fondo).toBeGreaterThan(fuori.vh);
+
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+
+  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
+  await attendiIngresso(page);
+
+  // Già da vuoto è dentro lo schermo.
+  const daVuoto = await page.evaluate(misura);
+  expect(daVuoto.bottom, 'il riquadro nasce già fuori dal fondo').toBeLessThanOrEqual(daVuoto.vh + 1);
+  expect(daVuoto.top).toBeGreaterThanOrEqual(-1);
+
+  // E ci resta quando la risposta lo fa crescere.
+  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+  const finale = await page.evaluate(misura);
+  expect(finale.bottom).toBeLessThanOrEqual(finale.vh + 1);
+  expect(finale.top).toBeGreaterThanOrEqual(-1);
+  expect(finale.inputBottom).toBeLessThanOrEqual(finale.vh);
+  expect(finale.inputTop).toBeGreaterThanOrEqual(0);
+
+  await ripristinaProvider(app);
+});
