@@ -592,6 +592,7 @@
         try { ro?.disconnect(); } catch (_) {}
         window.removeEventListener('resize', onViewport);
         try { vv?.removeEventListener('resize', onViewport); } catch (_) {}
+        try { mql?.removeEventListener?.('change', onViewport); } catch (_) {}
       },
     };
   }
