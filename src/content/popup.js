@@ -356,26 +356,31 @@
   // il fondo — cioè la riga dove si scrive la domanda successiva — finisce
   // fuori dallo schermo e non si può più chiedere niente (#502).
   //
-  // Due mosse, non una:
+  // La cura NON è inseguire l'altezza spostando il riquadro a ogni delta: così
+  // la posa dipende da quanto ci mette il modello a rispondere e il riquadro
+  // balla. È tenere fermo il bordo ANCORATO alla selezione e lasciare che sia
+  // la crescita a essere limitata:
   //
-  //   1. Il LATO (sopra o sotto il punto ancorato) si sceglie SUBITO, sulla
-  //      massima altezza che il riquadro potrà raggiungere e non su quella che
-  //      ha adesso, e da lì non cambia più. Sceglierlo sull'altezza corrente
-  //      significa farlo dipendere da quanto ci mette il modello a rispondere:
-  //      stessa selezione, posa diversa a ogni apertura, e un salto a metà
-  //      risposta quando il riquadro cresce oltre lo spazio che aveva.
-  //   2. Il tetto d'altezza viene STRETTO allo spazio di quel lato, così il
-  //      riquadro non può più diventare più alto di quanto ci sta, e a ogni
-  //      cambio d'altezza viene riposato: sotto resta agganciato al punto e
-  //      cresce verso il basso, sopra resta agganciato al punto e cresce verso
-  //      l'alto. Quando lo spazio non basta il corpo si accorcia e scorre —
-  //      la riga per scrivere resta comunque raggiungibile.
+  //   1. Il LATO si sceglie SUBITO, sulla massima altezza che il riquadro potrà
+  //      raggiungere e non su quella che ha adesso, e da lì non cambia più.
+  //   2. Il tetto d'altezza viene STRETTO allo spazio di quel lato: più alto di
+  //      così il riquadro non può diventare. Il corpo si accorcia e scorre, la
+  //      riga per scrivere resta raggiungibile.
+  //   3. Il bordo ancorato lo tiene il FOGLIO DI STILE, non JavaScript: sotto
+  //      la selezione si fissa `top` e il riquadro cresce verso il basso; sopra
+  //      la selezione si fissa `bottom` e cresce verso l'alto da solo. Nessuno
+  //      deve rimisurare niente perché niente si sposta: l'unica coordinata che
+  //      cambia col contenuto è quella libera, e ci pensa il browser.
+  //
+  // Resta un guardiano per i casi che la matematica non copre (finestra troppo
+  // bassa perché il riquadro ci stia nemmeno al minimo): stringe ancora il
+  // tetto, non sposta il riquadro — così non può oscillare.
   //
   // Dopo che l'utente lo ha trascinato la posa è sua: non lo riportiamo sul
   // punto ancorato, ci limitiamo a non farlo uscire dallo schermo.
   const POSE_MARGIN = 8;   // aria fra riquadro e bordi della finestra
   const POSE_GAP = 8;      // stacco fra riquadro e punto ancorato
-  const POSE_MIN_H = 200;  // sotto quest'altezza il riquadro non è più usabile
+  const POSE_MIN_H = 160;  // sotto quest'altezza il riquadro non è più usabile
   const POSE_MAX_H_FALLBACK = 480;
 
   // Il tetto lo tiene il foglio di stile: lo leggiamo invece di ricopiarlo, così
@@ -399,11 +404,21 @@
     const roomBelow = () => window.innerHeight - (ay + POSE_GAP) - POSE_MARGIN;
     const roomAbove = () => ay - POSE_GAP - POSE_MARGIN;
 
-    // `max-height` misura il CONTENUTO: bordi e imbottitura del riquadro stanno
-    // fuori da quel numero, mentre lo spazio sullo schermo li comprende. Senza
-    // questa differenza il tetto sfora di un paio di pixel, l'aggancio ai bordi
-    // scatta e il riquadro scivola in su di quei due pixel a metà risposta —
-    // proprio il tremolio che stiamo togliendo.
+    // La compensazione zoom mette una `scale()` sul riquadro: il tetto è in px
+    // di layout, lo spazio sullo schermo è in px visibili. Senza la scala il
+    // tetto sarebbe stretto (o largo) del fattore di zoom.
+    function scale() {
+      try {
+        const t = getComputedStyle(root).transform;
+        if (!t || t === 'none') return 1;
+        const m = new DOMMatrixReadOnly(t);
+        return m.a > 0 ? m.a : 1;
+      } catch (_) { return 1; }
+    }
+
+    // `max-height` misura il CONTENUTO quando il box è content-box: bordi e
+    // imbottitura stanno fuori da quel numero, mentre lo spazio sullo schermo
+    // li comprende.
     function boxExtra() {
       try {
         const cs = getComputedStyle(root);
@@ -414,7 +429,7 @@
     }
 
     function chooseSide() {
-      const want = maxH + boxExtra();  // ingombro pieno che il riquadro può raggiungere
+      const want = (maxH + boxExtra()) * scale();  // ingombro pieno raggiungibile
       const below = roomBelow(), above = roomAbove();
       if (below >= want) return 'below';   // ci sta tutto sotto: preferenza naturale
       if (above >= want) return 'above';
@@ -422,68 +437,98 @@
     }
 
     function capHeight() {
-      const room = (side === 'above' ? roomAbove() : roomBelow()) - boxExtra();
+      const room = (side === 'above' ? roomAbove() : roomBelow()) / scale() - boxExtra();
       const cap = Math.min(maxH, Math.max(POSE_MIN_H, room));
       root.style.maxHeight = `${Math.floor(cap)}px`;
     }
 
-    function apply() {
+    // Scrive le coordinate. Sono COSTANTI per tutta la vita del riquadro (non
+    // dipendono dall'altezza corrente), quindi riscriverle mille volte non lo
+    // muove di un pixel.
+    function place() {
       const vw = window.innerWidth, vh = window.innerHeight;
-      // getBoundingClientRect e non offsetHeight: con la compensazione zoom
-      // attiva il riquadro porta una scala, e quello che deve stare dentro lo
-      // schermo è l'ingombro VISIBILE, non quello di layout.
-      const rect = root.getBoundingClientRect();
-      const h = rect.height || root.offsetHeight;
-      const w = rect.width || root.offsetWidth;
-      // Chi l'ha trascinato l'ha messo dove voleva, bordo compreso: rispettiamo
-      // la sua posa e non gli spostiamo il riquadro di 8px al primo delta.
-      const m = dragged ? 0 : POSE_MARGIN;
-
-      let left, top;
-      if (dragged) {
-        left = parseFloat(root.style.left) || 0;
-        top = parseFloat(root.style.top) || 0;
-      } else {
-        left = ax;
-        top = side === 'above' ? ay - POSE_GAP - h : ay + POSE_GAP;
-      }
-      if (left + w + m > vw) left = vw - w - m;
-      if (left < m) left = m;
-      if (top + h + m > vh) top = vh - h - m;
-      if (top < m) top = m;
+      if (dragged) return;
+      const w = root.getBoundingClientRect().width || root.offsetWidth;
+      let left = ax;
+      if (left + w + POSE_MARGIN > vw) left = vw - w - POSE_MARGIN;
+      if (left < POSE_MARGIN) left = POSE_MARGIN;
       root.style.left = `${Math.round(left)}px`;
-      root.style.top = `${Math.round(top)}px`;
+      if (side === 'above') {
+        // Il fondo resta incollato sopra la selezione e la crescita va in su.
+        root.style.top = 'auto';
+        root.style.bottom = `${Math.round(vh - (ay - POSE_GAP))}px`;
+      } else {
+        root.style.bottom = 'auto';
+        root.style.top = `${Math.round(ay + POSE_GAP)}px`;
+      }
     }
+
+    // Rete di sicurezza. Con il tetto stretto allo spazio disponibile il
+    // riquadro non dovrebbe mai sbordare; se succede lo stesso — le altezze
+    // minime dei pezzi interni non stanno nel tetto, finestra bassissima — si
+    // stringe ANCORA il tetto. Solo in una direzione: non può oscillare.
+    function guard() {
+      if (dragged) {
+        // Trascinato: lì la posa è dell'utente, si sposta solo se esce.
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const r = root.getBoundingClientRect();
+        let left = parseFloat(root.style.left) || 0;
+        let top = parseFloat(root.style.top) || 0;
+        if (top + r.height > vh) top = vh - r.height;
+        if (left + r.width > vw) left = vw - r.width;
+        if (top < 0) top = 0;
+        if (left < 0) left = 0;
+        root.style.left = `${Math.round(left)}px`;
+        root.style.top = `${Math.round(top)}px`;
+        return;
+      }
+      const vh = window.innerHeight;
+      const r = root.getBoundingClientRect();
+      const over = side === 'above'
+        ? POSE_MARGIN - r.top
+        : r.bottom - (vh - POSE_MARGIN);
+      if (!(over > 0.5)) return;
+      const cur = parseFloat(root.style.maxHeight) || root.offsetHeight;
+      const next = Math.max(60, Math.floor(cur - over / scale()));
+      if (next < cur) root.style.maxHeight = `${next}px`;
+    }
+
+    function refresh() { place(); guard(); }
 
     side = chooseSide();
     capHeight();
-    apply();
+    place();
     // La prima misura utile arriva dopo il layout del contenuto iniziale.
-    requestAnimationFrame(apply);
+    requestAnimationFrame(refresh);
 
-    // Il rimisuratore: ogni volta che il riquadro cambia altezza — delta in
-    // arrivo, bolla di follow-up, casella di testo che si allarga — la posa si
-    // rifà. Non tocchiamo mai la dimensione qui dentro, quindi non si innesca.
+    // Rete: ogni cambio d'altezza — delta in arrivo, bolla di follow-up,
+    // casella di testo che si allarga — ripassa dal guardiano.
     try {
-      ro = new ResizeObserver(() => apply());
+      ro = new ResizeObserver(() => guard());
       ro.observe(root);
     } catch (_) {}
 
     // Finestra ridimensionata o zoom cambiato: lo spazio disponibile è un altro,
-    // il tetto va ristretto di nuovo e la posa rifatta.
+    // il tetto va ricalcolato da capo (anche verso l'alto) e la posa riscritta.
     const vv = window.visualViewport;
-    const onViewport = () => { if (!dragged) capHeight(); apply(); };
+    const onViewport = () => { if (!dragged) capHeight(); refresh(); };
     window.addEventListener('resize', onViewport);
     vv?.addEventListener('resize', onViewport);
 
     return {
-      // Riposa SUBITO, in modo sincrono. Il ResizeObserver è la rete che prende
-      // le crescite di cui nessuno ci avvisa, ma consegna solo al passo di
-      // rendering: in una scheda in secondo piano o in una finestra nascosta
-      // quel passo è strozzato, e il riquadro resterebbe sbordato finché la
-      // pagina non torna a disegnare. Chi allunga il contenuto chiama questa.
-      reflow: apply,
-      markDragged() { dragged = true; },
+      // Ripassa SUBITO, in modo sincrono. Il ResizeObserver consegna solo al
+      // passo di rendering: in una scheda in secondo piano quel passo è
+      // strozzato. Chi allunga il contenuto chiama questa.
+      reflow: refresh,
+      markDragged() {
+        if (dragged) return;
+        dragged = true;
+        // Da qui in poi comanda `top`: con `top` e `bottom` insieme e altezza
+        // automatica il riquadro verrebbe stirato fra i due bordi.
+        const r = root.getBoundingClientRect();
+        root.style.bottom = 'auto';
+        root.style.top = `${Math.round(r.top)}px`;
+      },
       dispose() {
         try { ro?.disconnect(); } catch (_) {}
         window.removeEventListener('resize', onViewport);
