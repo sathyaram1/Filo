@@ -89,6 +89,30 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 <style>body { margin: 0; font: 16px/1.6 system-ui, sans-serif; } #b { position: fixed; left: 40px; top: 70vh; font-size: 20px; }</style>
 <p id="b">supercalifragilistico</p>`;
 
+test('PROBE copertura parola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await preparaProvider(app);
+  await page.locator('#b').dblclick();
+  await expect.poll(() => page.evaluate(() => String(window.getSelection())), { timeout: 5000 }).toContain('super');
+  const selr = await page.evaluate(() => {
+    const r = window.getSelection().getRangeAt(0).getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, h: r.height };
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
+  await expect.poll(() => page.evaluate(() => document.querySelector('.sn-popup-meta')?.textContent || ''), { timeout: 20_000 }).toContain('€');
+  const d = await page.evaluate(dettaglio);
+  console.log('selezione:', JSON.stringify(selr));
+  console.log('popup:', JSON.stringify(d.root), 'vh', d.vh);
+  console.log('copertura:', d.root.bottom > selr.top && d.root.top < selr.bottom
+    ? `COPRE ${Math.min(d.root.bottom, selr.bottom) - Math.max(d.root.top, selr.top)}px su ${selr.h}`
+    : 'non copre');
+});
+
 for (const zoom of [0, 4.7] ) {
   test(`PROBE zoom ${zoom}`, async ({ app, openTab, testServer }) => {
     test.setTimeout(90_000);
