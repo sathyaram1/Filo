@@ -670,6 +670,7 @@
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
+    panelComplete, judgesNote, reasonText,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
   };
 
