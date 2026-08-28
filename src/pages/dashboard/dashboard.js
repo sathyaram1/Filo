@@ -340,7 +340,7 @@
         // rimuove, come per i timer.
         liveEl.appendChild(renderLiveCard({
           kind: 'process',
-          text: `⏰ Sveglia ${fmtAlarmTime(t.endsAt)}${t.label ? `\n${t.label}` : ''}`,
+          text: `⏰ Sveglia ${fmtAlarmWhen(t)}${t.label ? `\n${t.label}` : ''}`,
           onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
         }));
       } else {
