@@ -1241,11 +1241,10 @@
     // Sottoinsieme della tab corrente, ordinato (logica pura condivisa).
     if (isArchived) {
       // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
-      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly });
-      // Filtro "Bloccati confermati": solo gli attacchi/spam confermati.
-      if (confirmedOnly) {
-        currentList = currentList.filter((f) => String(MR.normalizeStatus(f).status).endsWith('_confirmed'));
-      }
+      // Il filtro "Bloccati confermati" (attacchi/spam confermati) vive nella
+      // stessa funzione pura: così il contatore sulla scheda e la lista che
+      // vedi qui sotto non possono divergere.
+      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
       mgListEmpty.textContent = confirmedOnly
         ? 'Nessun attacco o spam confermato.'
         : starredOnly
