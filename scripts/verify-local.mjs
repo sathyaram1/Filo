@@ -319,8 +319,15 @@ if (isMain) {
       console.error('deve poter concludere "non è quello che era stato chiesto".');
       process.exit(1);
     }
-    writeState(withRequest(readState(), branch, { request, sha }));
-    console.log(buildVerifierBrief({ request, branch, recipe: readRecipe() }));
+    // Prima di consegnare il compito il ramo si riallinea alla linea
+    // principale (caso #500): la verifica deve giudicare il contenuto che
+    // verrà pubblicato. Sul conflitto ci si ferma qui, col ramo intatto.
+    if (!realignBeforeStart()) process.exit(1);
+    // Ramo e sha si rileggono: il riallineamento può averli riscritti, e il
+    // verdetto deve legarsi al contenuto vero.
+    const b = currentBranch();
+    writeState(withRequest(readState(), b, { request, sha: headSha() }));
+    console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe() }));
     process.exit(0);
   }
 
