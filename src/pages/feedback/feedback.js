@@ -1244,6 +1244,9 @@
     setData(fbs) {
       loadGen++; // il caricamento reale in volo, se c'è, viene scartato
       all = (Array.isArray(fbs) ? fbs : []).map(sanitizeReportForReader);
+      // Dati iniettati = dati arrivati: da qui i numeri delle sezioni si scrivono.
+      dataLoaded = true;
+      loadError = null;
       applyFilter();
     },
     setTab(tab) { selectTab(tab); },
