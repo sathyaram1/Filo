@@ -1294,7 +1294,7 @@
         Number(fb.stalls) || Number(fb.workingResets) || 0
       ));
       item.title = (num ? `#${num} · ` : '') + title
-        + (norm.statusReason ? ` — ${norm.statusReason}` : '')
+        + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
