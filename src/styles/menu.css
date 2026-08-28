@@ -357,6 +357,9 @@
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
+  /* Arrivati in fondo alla cronologia il giro di rotella successivo non deve
+     passare alla pagina: la pagina scorrerebbe e il menu si chiuderebbe. */
+  overscroll-behavior: contain;
 }
 .sn-menu-history-search {
   flex: 0 0 auto;

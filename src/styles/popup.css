@@ -72,6 +72,9 @@
 .sn-popup-body {
   padding: 10px 12px;
   overflow-y: auto;
+  /* Arrivati in fondo alla risposta il giro di rotella successivo non deve
+     passare alla pagina sotto: si sta leggendo qui. */
+  overscroll-behavior: contain;
   flex: 1;
   min-height: 60px;
   max-height: 340px;

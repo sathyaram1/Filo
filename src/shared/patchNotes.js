@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.207', date: '2026-08-28',
+      fixes: [
+        'Quando la spiegazione dentro al menu del tasto destro finisce di caricare e si allunga, il menu si sposta da solo invece di uscire dal fondo della finestra. L\'ultima voce resta intera e si può cliccare.',
+        'Se la spiegazione è così lunga da non starci, il menu si scorre fino in fondo e ci resta: prima un giro di rotella in più faceva scorrere la pagina e il menu spariva.',
+        'Se rimpicciolisci la finestra mentre il menu del tasto destro è aperto, il menu si sposta da solo e resta tutto visibile.',
+      ],
+    },
+    {
       version: '0.2.205', date: '2026-08-27',
       fixes: [
         'Chiedi la spiegazione approfondita su una parola in basso nella pagina e la riga per scrivere la domanda dopo resta dove puoi cliccarla, anche se la domanda prende più righe.',
