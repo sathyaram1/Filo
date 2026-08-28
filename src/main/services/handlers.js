@@ -1536,6 +1536,10 @@ function fileReadsForPrompt(actions) {
 // da LEGGERE, non da OBBEDIRE.
 function documentReadsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
+  // Il tetto lo dichiara il modulo che tronca: una seconda copia del numero qui
+  // sarebbe la solita costante che si sfasa dalla realtà al primo cambio.
+  let cap = 0;
+  try { cap = require('./documentRead').MAX_TEXT_CHARS; } catch (_) {}
   const blocks = [];
   for (const a of actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_DOCUMENTO') continue;
