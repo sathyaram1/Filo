@@ -183,7 +183,11 @@
     'format-table', 'ft', 'format-list', 'fl', 'format-wide', 'fw',
     'out-string', 'out-host', 'out-null', 'write-output', 'write-host',
     'convertto-json', 'convertfrom-json', 'convertto-csv', 'convertfrom-csv',
-    'convertfrom-stringdata',
+    'convertfrom-stringdata', 'get-filehash',
+    // Navigazione pura: cambiano solo la cartella di lavoro, come `cd` (che è
+    // già livello 1). `Set-Location`/`sl`, `pushd`/`popd` sono le forme
+    // PowerShell dello stesso gesto benigno e reversibile.
+    'set-location', 'sl', 'pushd', 'popd',
   ]);
   // Alias VOLUTAMENTE esclusi perché su un'altra shell sono un programma che
   // SCRIVE, e il classificatore non sa quale shell eseguirà il comando: `sort`
