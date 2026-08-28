@@ -455,6 +455,35 @@
     return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed };
   }
 
+  // ── Il tetto del caricamento, e come si dice ──────────────────────────────
+  // Le pagine che ELENCANO i feedback (dashboard di gestione, pagina feedback,
+  // bacheca) ne chiedono al massimo questi, dal più recente al più vecchio.
+  // È un TETTO, non un totale: appena la raccolta lo supera, i più vecchi
+  // restano fuori e nessun conteggio calcolato in pagina può vederli.
+  const LIST_PAGE_SIZE = 500;
+
+  // Il caricamento ha toccato il tetto? Allora ogni numero che ne deriva è un
+  // "almeno N", non un totale.
+  function listHitCap(loaded, pageSize) {
+    const cap = Number(pageSize) > 0 ? Number(pageSize) : LIST_PAGE_SIZE;
+    return Array.isArray(loaded) && loaded.length >= cap;
+  }
+
+  // Come si scrive un conteggio accanto al nome di una sezione: "(24)" quando
+  // il numero è il totale, "(24+)" quando il caricamento ha toccato il tetto e
+  // quindi è solo un minimo. Un numero che afferma un totale che non conosce
+  // sembra una risposta ed è peggio di nessun numero; il "+" costa un carattere
+  // e dice la verità (caricare TUTTO costerebbe letture, ed è una scelta
+  // dell'owner, non di questa riga).
+  function countLabel(n, truncated) {
+    const v = Math.max(0, Math.trunc(Number(n) || 0));
+    return truncated ? `(${v}+)` : `(${v})`;
+  }
+
+  // Perché c'è il "+": lo spiega l'hover, così il segno non resta un enigma.
+  const COUNT_CAP_HINT =
+    `Caricati i ${LIST_PAGE_SIZE} feedback più recenti: più vecchi di questi potrebbero essercene altri, non contati.`;
+
   // Lista tutti i feedback (più recenti prima). Usata dalla dashboard e dalla
   // bacheca. `timeoutMs` (opzionale): se > 0, la fetch si arrende dopo quel tempo
   // invece di restare muta finché il sistema operativo non decide di mollare
