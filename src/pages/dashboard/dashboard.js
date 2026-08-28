@@ -985,6 +985,13 @@
       const title = (a._output && a._output.title) || '';
       return stepTrace(title ? `📄 Leggo: ${title}` : '📄 Leggo un file');
     }
+    if (type === 'LEGGI_DOCUMENTO') {
+      // Traccia del passo intermedio: Filo apre un documento dal disco (un PDF,
+      // un file di testo). Il contenuto rientra nel turno successivo
+      // (auto-continue), dove compare la risposta.
+      const nome = (a._output && a._output.name) || '';
+      return stepTrace(nome ? `📄 Leggo il documento: ${nome}` : '📄 Leggo il documento');
+    }
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
       // per iscritto prima di rispondere sul perché di un modello o di un dato.
