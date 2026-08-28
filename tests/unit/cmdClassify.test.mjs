@@ -122,7 +122,7 @@ test('mescolare sequenza e pipe NON è sicuro → resta 3', () => {
     'cd x && ls > out',  // redirezione
     'cd x && echo $(pwd)',
     'ls | cat > out.txt',// pipe che finisce in una redirezione
-    'ls || cat',         // || non è una pipe
+    'ls || rm x',        // `||` è una sequenza, non una pipe: vale il massimo
     'ls |',              // pipe monca
     '| ls',
   ]) {
