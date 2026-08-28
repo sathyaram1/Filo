@@ -293,10 +293,16 @@ test('sotto-comando git sconosciuto → livello 3 (non assumere sicurezza)', () 
   assert.equal(lvl('git filter-branch x'), 3);
 });
 
-test('il path del programma è normalizzato (basename + estensione)', () => {
-  assert.equal(lvl('/usr/bin/ls'), 1);
-  assert.equal(lvl('C:\\Windows\\System32\\where.exe foo'), 1);
-  assert.equal(lvl('/bin/rm file'), 3);
+test('un percorso o un\'estensione eseguibile NON eredita il livello del comando fidato', () => {
+  // Sicurezza: `programOf` normalizza il basename SOLO per il backstop dei
+  // distruttivi (così `/bin/rm` resta 3 anche col percorso). Ma un comando di
+  // sola lettura è fidato SOLO se invocato come nome nudo: un file su disco che
+  // si chiama come un comando fidato è un PROGRAMMA, non il comando → livello 3.
+  assert.equal(lvl('/bin/rm file'), 3);   // distruttivo: 3 per nome E per percorso
+  assert.equal(lvl('/usr/bin/ls'), 3);    // prima era 1: un `ls` in un percorso non è fidato
+  assert.equal(lvl('C:\\Windows\\System32\\where.exe foo'), 3);
+  assert.equal(lvl('ls'), 1);             // nudo: resta 1
+  assert.equal(lvl('where node'), 1);
 });
 
 test('livello 1 — interrogazioni di versione/help dei tool comuni (sola lettura)', () => {
