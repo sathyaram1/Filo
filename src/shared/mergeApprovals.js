@@ -402,33 +402,126 @@
    *
    * @returns {number} quante richieste sono state disegnate
    */
+  /**
+   * La scheda di una fusione APPROVATA e mai avvenuta (conflitto). Non chiede
+   * un'altra approvazione — non c'è più niente da approvare — ma non può
+   * nemmeno sparire fra le decisioni passate: è successo (#500, 27/08) e
+   * l'owner si è ritrovato con "niente da accettare" e un ramo mai fuso.
+   * Resta in vista finché il lavoro rifatto non viene fuso (allora si toglie
+   * da sola) o finché l'owner non la segna sistemata.
+   */
+  function buildFailedCard(req, opts) {
+    var o = opts || {};
+    var now = Number(o.nowMs) || Date.now();
+    var card = el('div', 'sn-mac-card sn-mac-card-failed');
+    card.dataset.requestId = String(req.id || '');
+    card.dataset.branch = String(req.branch || '');
+    card.dataset.origin = originOf(req);
+
+    var head = el('div', 'sn-mac-head');
+    var origin;
+    if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
+      origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
+      origin.type = 'button';
+      origin.title = 'Apri la segnalazione #' + feedbackNum(req) + ' da cui nasce questo lavoro.';
+      origin.addEventListener('click', function () { o.onFeedback(req); });
+    } else {
+      origin = el('span', 'sn-mac-origin', originLabel(req));
+      origin.title = originHint(req);
+    }
+    head.appendChild(origin);
+    head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
+    var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
+    sha.title = 'Il commit che avevi approvato: ' + String(req.sha || '');
+    head.appendChild(sha);
+    head.appendChild(el('span', 'sn-mac-who', requestedBy(req.who, req)));
+    head.appendChild(el('span', 'sn-mac-when', 'approvata ' + timeAgo(req.decidedAtMs || req.usedAtMs, now)));
+    card.appendChild(head);
+
+    card.appendChild(el('p', 'sn-mac-why',
+      'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
+      + 'non si incastrano da sole. ' + howToRetry(req) + ' Quando il lavoro rifatto verrà fuso, '
+      + 'questa scheda si toglie da sola.'));
+
+    var status = el('p', 'sn-mac-status');
+    status.setAttribute('role', 'status');
+    status.hidden = true;
+
+    var actions = el('div', 'sn-mac-actions');
+    var okBtn = el('button', 'sn-mac-btn sn-mac-btn-quiet', 'Segna come sistemata');
+    okBtn.type = 'button';
+    okBtn.title = 'Toglila da qui. Non fonde e non cancella niente: dice solo che te ne sei occupato.';
+    okBtn.addEventListener('click', function () {
+      okBtn.disabled = true;
+      Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
+        .then(function (reply) {
+          var msg = outcomeMessage(reply, req);
+          if (msg.kind === 'ok' && o.onDone) { o.onDone(); return; }
+          status.hidden = false; status.textContent = msg.text; status.dataset.kind = msg.kind;
+          okBtn.disabled = false;
+        })
+        .catch(function (e) {
+          var msg = outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req);
+          status.hidden = false; status.textContent = msg.text; status.dataset.kind = msg.kind;
+          okBtn.disabled = false;
+        });
+    });
+    actions.appendChild(okBtn);
+    card.appendChild(status);
+    card.appendChild(actions);
+    return card;
+  }
+
   function render(host, opts) {
     if (!host) return 0;
     var o = opts || {};
     var list = Array.isArray(o.requests) ? o.requests : [];
+    var failed = Array.isArray(o.failed) ? o.failed : [];
     host.replaceChildren();
-    host.hidden = list.length === 0;
-    if (!list.length) return 0;
+    host.hidden = list.length === 0 && failed.length === 0;
+    if (!list.length && !failed.length) return 0;
 
-    var box = el('section', 'sn-mac');
-    box.setAttribute('aria-label', 'Fusioni in attesa di approvazione');
+    // Le fusioni approvate e mai avvenute vengono PRIMA delle richieste in
+    // attesa: sono un sì già dato che non ha prodotto niente, e più invecchia
+    // più costa accorgersene.
+    if (failed.length) {
+      var fbox = el('section', 'sn-mac sn-mac-failed');
+      fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');
+      var ftitle = el('div', 'sn-mac-title');
+      var fico = el('span', 'sn-mac-ico');
+      var ficons = global.SN_ICONS;
+      fico.innerHTML = (ficons && typeof ficons.lock === 'function') ? ficons.lock(18) : '';
+      ftitle.appendChild(fico);
+      ftitle.appendChild(el('span', 'sn-mac-title-text',
+        failed.length === 1
+          ? 'Una fusione approvata non è avvenuta'
+          : failed.length + ' fusioni approvate non sono avvenute'));
+      fbox.appendChild(ftitle);
+      for (var k = 0; k < failed.length; k++) fbox.appendChild(buildFailedCard(failed[k], o));
+      host.appendChild(fbox);
+    }
 
-    var title = el('div', 'sn-mac-title');
-    var ico = el('span', 'sn-mac-ico');
-    var icons = global.SN_ICONS;
-    ico.innerHTML = (icons && typeof icons.lock === 'function') ? icons.lock(18) : '';
-    title.appendChild(ico);
-    title.appendChild(el('span', 'sn-mac-title-text', headline(list.length)));
-    box.appendChild(title);
+    if (list.length) {
+      var box = el('section', 'sn-mac');
+      box.setAttribute('aria-label', 'Fusioni in attesa di approvazione');
 
-    var intro = el('p', 'sn-mac-intro',
-      'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. '
-      + 'Approvarle da qui è l’unica strada: il terminale, da solo, non può.');
-    box.appendChild(intro);
+      var title = el('div', 'sn-mac-title');
+      var ico = el('span', 'sn-mac-ico');
+      var icons = global.SN_ICONS;
+      ico.innerHTML = (icons && typeof icons.lock === 'function') ? icons.lock(18) : '';
+      title.appendChild(ico);
+      title.appendChild(el('span', 'sn-mac-title-text', headline(list.length)));
+      box.appendChild(title);
 
-    for (var i = 0; i < list.length; i++) box.appendChild(buildCard(list[i], o));
-    host.appendChild(box);
-    return list.length;
+      var intro = el('p', 'sn-mac-intro',
+        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. '
+        + 'Approvarle da qui è l’unica strada: il terminale, da solo, non può.');
+      box.appendChild(intro);
+
+      for (var i = 0; i < list.length; i++) box.appendChild(buildCard(list[i], o));
+      host.appendChild(box);
+    }
+    return list.length + failed.length;
   }
 
   /**
