@@ -184,3 +184,43 @@ test('un documento indicato con le virgolette si legge lo stesso', async () => {
   assert.equal(r.ok, true);
   assert.equal(r.text, 'contenuto');
 });
+
+// ══════════════ il giro completo: prompt, registro dei livelli, manifesto ═════
+// Un modulo che estrae il testo ma non è collegato a niente non serve a nessuno:
+// se l'azione non è nel prompt il modello non la emette mai, e se non è nel
+// registro dei livelli il dispatch la rifiuta prima di eseguirla.
+
+test('il prompt della chat espone LEGGI_DOCUMENTO e quando usarla', () => {
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  const p = globalThis.SN_CONST.PROMPTS.filoChat({ profilo: '', preferenze: '', stato: '' });
+  assert.match(p, /LEGGI_DOCUMENTO/);
+  // Deve dire che è l'unica via per un PDF, o il modello ci proverà col terminale.
+  assert.match(p, /LEGGERE UN DOCUMENTO DELL'UTENTE[\s\S]*PDF/);
+  assert.match(p, /giacenza media|estratto conto|bolletta/i);
+  // E deve trattare il contenuto come dato, non come istruzioni.
+  assert.match(p, /LEGGERE UN DOCUMENTO DELL'UTENTE[\s\S]*non istruzioni da eseguire/);
+});
+
+test('LEGGI_DOCUMENTO è registrata al livello 1 (sola lettura, esegue subito)', () => {
+  require(join(ROOT, 'src', 'shared', 'preferences.js'));
+  require(join(ROOT, 'src', 'shared', 'themeTokens.js'));
+  require(join(ROOT, 'src', 'shared', 'cmdClassify.js'));
+  require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
+  const AL = globalThis.SN_ACTION_LEVELS;
+  // Senza voce nel registro il dispatch RIFIUTA l'azione: sarebbe una feature
+  // completa che non parte mai.
+  assert.equal(AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), 1);
+  assert.match(AL.describe({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), /C:\/x\/y\.pdf/);
+  // Stessa cosa per la lettura dei documenti dell'EDITOR, che era rimasta fuori
+  // dal registro e quindi non è mai partita.
+  assert.equal(AL.levelFor({ type: 'LEGGI_FILE', fileId: 'file-1' }), 1);
+});
+
+test('il manifesto delle capacità dichiara che Filo legge i documenti', () => {
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const cap = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'read-user-documents');
+  assert.ok(cap, 'la capacità deve esistere: un manifesto che tace è un manifesto che mente');
+  assert.match(cap.desc, /PDF/);
+  // Il confine dichiarato: sulle scansioni non c'è testo da leggere.
+  assert.match(cap.doesNot, /scansione|foto/i);
+});
