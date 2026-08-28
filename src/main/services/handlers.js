@@ -1063,9 +1063,40 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const entry = await FiloMem.addAlarm({
           label: String(action.label ?? action.etichetta ?? '').trim(),
           time: action.time ?? action.orario ?? action.at ?? '',
+          repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
         });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: false };
+      }
+      case 'CANCELLA_SVEGLIA': {
+        // Prima non esisteva: dalla chat si potevano solo CREARE sveglie e
+        // timer, e i modelli o dichiaravano di averli tolti o si arrendevano.
+        // Se non abbiamo capito a cosa si riferisce non cancelliamo niente:
+        // `removed` vuoto torna al modello, che chiede quale.
+        const ids = Array.isArray(action._targetIds) ? action._targetIds : null;
+        const r = await FiloMem.removeTimersByRef(ids ? { ids } : timerRefOf(action));
+        const removed = r.removed || [];
+        if (removed.length) broadcastLiveUpdate();
+        return {
+          executed: removed.length > 0,
+          kept: false,
+          output: { removed: removed.map(describeTimerEntry) },
+        };
+      }
+      case 'MODIFICA_SVEGLIA': {
+        const ids = Array.isArray(action._targetIds) ? action._targetIds : null;
+        const r = await FiloMem.updateTimersByRef(ids ? { ids } : timerRefOf(action), {
+          time: action.orario ?? action.time ?? action.at ?? action.nuovoOrario,
+          repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
+          seconds: action.secondi ?? action.seconds,
+        });
+        const updated = r.updated || [];
+        if (updated.length) broadcastLiveUpdate();
+        return {
+          executed: updated.length > 0,
+          kept: false,
+          output: { updated: updated.map(describeTimerEntry) },
+        };
       }
       case 'SALVA_APPUNTO': {
         // Filo scrive l'appunto DIRETTAMENTE in un file dell'editor (fine
