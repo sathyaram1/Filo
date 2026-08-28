@@ -43,6 +43,13 @@
   // I 'ignored' restano nascosti (raggiungibili solo riaprendoli via DB).
   let all = [];
   let currentTab = 'inbox';
+  // I feedback sono arrivati davvero (vs. caricamento in corso o fallito).
+  // Finché è false la pagina non conosce nessun numero: le sezioni restano col
+  // solo nome — stessa cautela della dashboard di gestione (#495).
+  let dataLoaded = false;
+  // Ultimo caricamento fallito: la frase d'errore + "Riprova" da rimettere in
+  // pagina se un re-render (un click su una sezione) svuota il riquadro.
+  let loadError = null;
   // Numero di generazione dei caricamenti: ogni load() ne prende uno nuovo, e
   // butta il proprio risultato se nel frattempo ne è partito un altro (o un
   // test ha iniettato dati con __fbTest.setData). Senza questo, il caricamento
