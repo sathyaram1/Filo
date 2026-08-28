@@ -52,6 +52,66 @@ describe('quali spec lanciare', () => {
   });
 });
 
+describe('la base del confronto è la linea principale REMOTA (feedback #508)', () => {
+  // Il difetto: `git diff main...HEAD` col ref LOCALE di main. Su una macchina
+  // col main locale indietro (455 commit, caso vissuto) il diff include il
+  // lavoro degli altri già pubblicato e il finish lancia 158 spec invece di 1,
+  // inciampando nei rossi altrui.
+
+  test('con la copia remota disponibile la base è origin/main, senza avvisi', () => {
+    assert.deepEqual(resolveDiffBase({ fetchOk: true, remoteRefOk: true }), { base: 'origin/main', note: '' });
+  });
+
+  test('fetch fallito ma copia remota presente: si usa quella, DICENDOLO', () => {
+    const r = resolveDiffBase({ fetchOk: false, remoteRefOk: true });
+    assert.equal(r.base, 'origin/main');
+    assert.ok(r.note.length > 0, 'un ripiego silenzioso è indistinguibile dal difetto');
+  });
+
+  test('senza copia remota: ripiego sul ref locale, mai in silenzio', () => {
+    const r = resolveDiffBase({ fetchOk: false, remoteRefOk: false });
+    assert.equal(r.base, 'main');
+    assert.ok(r.note.length > 0);
+  });
+
+  test('il diff degli spec usa la base scelta, non il ref locale di main', () => {
+    // Senza il fix questa sentinella è rossa: la funzione può essere giusta e
+    // il diff continuare a partire dal ref locale.
+    assert.ok(!SORGENTE.includes('${MAIN}...HEAD'),
+      'il confronto non deve partire dal ref locale di main');
+    assert.match(SORGENTE, /\$\{base\}\.\.\.HEAD/,
+      'il confronto parte dalla base scelta (origin/main quando c\'è)');
+  });
+});
+
+describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
+  test('ramo indietro → fermi subito, col rimedio scritto', () => {
+    const msg = behindMainStop(3);
+    assert.match(msg, /3 commit/);
+    assert.match(msg, /verify-local\.mjs start/, 'il messaggio deve dire cosa fare adesso');
+  });
+
+  test('ramo pari (o solo avanti) → via libera', () => {
+    assert.equal(behindMainStop(0), '');
+    assert.equal(behindMainStop(-2), '');
+  });
+
+  test('conteggio illeggibile → via libera (la guardia non inventa conflitti)', () => {
+    assert.equal(behindMainStop(NaN), '');
+    assert.equal(behindMainStop('fatal: qualcosa'), '');
+    assert.equal(behindMainStop(undefined), '');
+  });
+
+  test('la guardia sta PRIMA dei controlli, non dopo', () => {
+    // Meglio 5 secondi di errore chiaro che 15 minuti di controlli seguiti da
+    // un conflitto. lastIndexOf: si guarda la CHIAMATA, non la definizione.
+    const guardia = SORGENTE.lastIndexOf('behindMainStop(');
+    const controlli = SORGENTE.indexOf("'test:unit'");
+    assert.ok(guardia > 0 && controlli > 0);
+    assert.ok(guardia < controlli, 'il conflitto di fusione va scoperto prima di pagare i controlli');
+  });
+});
+
 describe('da qui sul ramo principale non si scrive', () => {
   // Le righe di commento raccontano la storia (e nominano main di continuo):
   // la sentinella deve guardare il CODICE. Vanno via anche i blocchi `/* */`,
