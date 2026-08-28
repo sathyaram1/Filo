@@ -379,3 +379,58 @@ test('pannello ancorato e tooltip: quando la spiegazione sposta il menu, il pann
 
   await ripristinaProvider(app);
 });
+
+// ── 6. Menu su LINK: la spiegazione arriva in streaming, un pezzo alla volta ──
+// Crescita a tanti passi piccoli: se anche uno solo lasciasse il menu fuori dal
+// bordo e nessuno lo riportasse dentro, il difetto resterebbe lì. Una sbordata
+// transitoria di un fotogramma è ammessa (la rimisura passa dal ciclo di
+// disegno): fuori è un difetto solo se CI RESTA.
+test('menu su link, spiegazione in streaming: il menu non resta mai fuori dal bordo e l\'ultima voce si clicca', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const destinazione = testServer.html('<!doctype html><title>Destinazione</title><p>arrivo</p>');
+  const PAGINA_LINK = `<!doctype html><meta charset="utf-8">
+  <style>
+    body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+    #riempitivo { height: 260vh; padding: 20px; }
+    #collegamento { position: fixed; left: 40px; top: 78vh; font-size: 18px; }
+  </style>
+  <div id="riempitivo">Testo di contorno per dare corpo alla pagina.</div>
+  <a id="collegamento" href="${destinazione}">un articolo interessante</a>`;
+  const page = await testServer.openReady(openTab, PAGINA_LINK);
+  await preparaProvider(app, { attesaMs: 1500, ripetizioni: 25, aPezzi: true });
+
+  await page.locator('#collegamento').click({ button: 'right' });
+  const menu = page.locator('.sn-menu:not(.sn-menu-sub)');
+  await expect(menu).toBeVisible();
+  const daVuoto = await page.evaluate(misuraMenu);
+
+  // Mentre lo streaming allunga il menu: se una misura lo trova fuori, si
+  // riguarda subito dopo — fuori STABILE è rosso, un fotogramma no.
+  const violazioni = [];
+  const finoA = Date.now() + 20_000;
+  let arrivato = false;
+  while (Date.now() < finoA) {
+    const m = await page.evaluate(misuraMenu);
+    if (!m) break;
+    if (m.bottom > m.vh + 1 || m.top < -1) {
+      await page.waitForTimeout(120);
+      const m2 = await page.evaluate(misuraMenu);
+      if (m2 && (m2.bottom > m2.vh + 1 || m2.top < -1)) violazioni.push(m2);
+    }
+    const testo = await menu.locator('.sn-menu-inline').textContent().catch(() => '');
+    if (testo && testo.includes('SPIEGONE FINE')) { arrivato = true; break; }
+    await page.waitForTimeout(50);
+  }
+  expect(arrivato, 'la spiegazione del link non è mai arrivata').toBe(true);
+  expect(violazioni, `il menu è rimasto fuori dal bordo durante lo streaming: ${JSON.stringify(violazioni.slice(0, 3))}`).toEqual([]);
+
+  // A spiegazione finita: cresciuto davvero, dentro lo schermo, ultima voce ok.
+  const finale = await page.evaluate(misuraMenu);
+  expect(finale.scrollHeight).toBeGreaterThan(daVuoto.height + 80);
+  expect(finale.bottom).toBeLessThanOrEqual(finale.vh + 1);
+  expect(finale.top).toBeGreaterThanOrEqual(-1);
+  const esito = await page.evaluate(ultimaVoceCliccabile);
+  expect(esito, `ultima voce non usabile: ${JSON.stringify(esito)}`).toMatchObject({ ok: true });
+
+  await ripristinaProvider(app);
+});
