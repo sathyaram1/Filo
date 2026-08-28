@@ -47,7 +47,8 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('.mg-tab')).toHaveCount(8);
   // Con i feedback caricati (qui: nessuno) le quattro schede-lista dicono
   // quante ne contengono, le altre quattro no (#495).
-  await page.waitForFunction(() => window.__mgTest);
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setData([]));
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
