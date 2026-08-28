@@ -1336,7 +1336,9 @@ all'utente. Il pattern anti-attrito:
   all'apertura (mostra l'ultimo scambio). Passala come flag, non come default.
 - **Dove:** `renderChat`/`renderBuilder` in `src/pages/decks/decks.js` (flag
   `stickBottom`/`stickChat`). Test `tests/decks-chat-scroll.spec.mjs` (scroll su
-  mentre genera → posizione conservata; resti in fondo → segue).
+  mentre genera → posizione conservata; resti in fondo → segue). Stessa regola
+  nel riquadro della spiegazione: `scrollaConservando()` in
+  `src/content/popup.js`, test `tests/popup-scroll-streaming.spec.mjs`.
 
 ## Errori in chat: mai il messaggio grezzo, sempre una frase + un modo di riprovare
 
