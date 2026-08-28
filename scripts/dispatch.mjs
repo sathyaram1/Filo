@@ -1209,8 +1209,13 @@ export function serverCtx(bucket, fromServer, diff = '') {
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
-    // che da qui è stato tolto.
-    return { feedback: (payload && payload.feedback) || null };
+    // che da qui è stato tolto. Lo storico delle critiche viaggia accanto al
+    // feedback, per chi lo riceve (verifier e fixer); un server vecchio non lo
+    // manda e qui arriva semplicemente vuoto.
+    return {
+      feedback: (payload && payload.feedback) || null,
+      history: Array.isArray(payload && payload.history) ? payload.history : [],
+    };
   }
   return {};
 }
