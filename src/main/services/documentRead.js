@@ -213,13 +213,15 @@ async function readDocument(input) {
       return { ...base, kind: 'pdf', error: 'pdf_failed', detail: 'il PDF è danneggiato o protetto da password' };
     }
     base.pages = out.pages;
-    const clean = String(out.text || '').replace(/ /g, '').trim();
-    if (!clean) {
+    const text = String(out.text || '').trim();
+    // Un PDF di sole immagini può restituire comunque spazi e a capo: se tolti
+    // quelli non resta nulla, allora testo estraibile non ce n'è.
+    if (!text.replace(/[s ]/g, '')) {
       // PDF senza testo estraibile: è una scansione o una foto. Risposta onesta,
       // niente OCR (per ora) e soprattutto niente contenuto inventato.
       return { ...base, ok: true, kind: 'pdf', empty: true, text: '' };
     }
-    const capped = capText(clean);
+    const capped = capText(text);
     return { ...base, ok: true, kind: 'pdf', text: capped.text, truncated: capped.truncated };
   }
 
