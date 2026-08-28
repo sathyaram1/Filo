@@ -625,8 +625,25 @@
   }
 
   // Silenzia un timer in stato ringing rimuovendolo dalla lista.
+  // ECCEZIONE: una sveglia RICORRENTE non si cancella premendo "Ferma" — fermare
+  // la sveglia di stamattina non vuol dire disdire quella di mercoledì. Resta in
+  // lista, muta, già puntata sull'occorrenza successiva. Per toglierla davvero
+  // c'è la × (deleteTimer), come per tutte le altre.
   async function stopTimerAlarm(id) {
     const list = await listTimers();
+    const idx = list.findIndex((t) => t.id === id);
+    if (idx >= 0 && isRecurring(list[idx])) {
+      const t = list[idx];
+      const now = Date.now();
+      const next = new Date(t.endsAt).getTime() > now ? new Date(t.endsAt).getTime() : nextAlarmOccurrence(t, now);
+      if (next) {
+        const kept = list.slice();
+        kept[idx] = { ...t, ringing: false, endsAt: new Date(next).toISOString() };
+        await setRaw(KEYS.FILO_TIMERS, kept);
+        await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
+        return kept;
+      }
+    }
     const filtered = list.filter((t) => t.id !== id);
     await setRaw(KEYS.FILO_TIMERS, filtered);
     await setRaw(KEYS.FILO_DASHBOARD_CACHE, null);
