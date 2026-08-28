@@ -1203,7 +1203,7 @@
     reflectSortBtn();
   }
 
-  // ── Quanti feedback c'è in ogni scheda (#495) ─────────────────────────────
+  // ── Quanti feedback ci sono in ogni scheda (#495) ─────────────────────────
   // Le quattro schede che ELENCANO feedback (Ricevuti, In coda, Risolti,
   // Archiviati) portano il loro numero accanto al nome, come la pagina gemella
   // dei feedback. Le altre quattro (Statistiche, Modelli, Automazioni, Log) non
