@@ -8,9 +8,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const {
   checkVerdict, withRequest, withVerdict, buildVerifierBrief,
+  realignPlan, afterRebase,
 } = await import('../../scripts/verify-local.mjs');
 
 const SHA = 'a'.repeat(40);
