@@ -393,7 +393,10 @@
   const GIT_DESTROY = new Set(['reset', 'clean', 'rm', 'gc', 'filter-branch', 'update-ref', 'prune']);
 
   // npm/pip: il livello dipende dal sotto-comando.
-  const NPM_READ = new Set(['list', 'ls', 'view', 'show', 'outdated', 'root', 'bin', 'prefix', 'ping', 'doctor', 'whoami', 'help', 'search', 'config']);
+  // NB: 'config' NON sta qui: `npm/pip config` è duale (get/list leggono, set/
+  // delete/edit CAMBIANO tra l'altro il registry dei pacchetti) → lo classifica
+  // classifyNpm guardando il verbo.
+  const NPM_READ = new Set(['list', 'ls', 'view', 'show', 'outdated', 'root', 'bin', 'prefix', 'ping', 'doctor', 'whoami', 'help', 'search']);
   const NPM_WRITE = new Set(['install', 'i', 'ci', 'add', 'update', 'upgrade', 'uninstall', 'remove', 'rm', 'dedupe', 'prune', 'link', 'rebuild']);
   // npm run / exec / start / test / publish → eseguono script arbitrari o
   // pubblicano (irreversibile) → restano fuori → 3.
