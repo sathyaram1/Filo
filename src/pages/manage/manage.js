@@ -1294,7 +1294,7 @@
         Number(fb.stalls) || Number(fb.workingResets) || 0
       ));
       item.title = (num ? `#${num} · ` : '') + title
-        + (norm.statusReason ? ` — ${norm.statusReason}` : '')
+        + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
@@ -2184,6 +2184,7 @@
         dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
         mgJudgesRow.appendChild(dot);
       }
+      appendJudgesNote(fb);
       return;
     }
     mgJudgesRow.hidden = false;
@@ -2210,6 +2211,21 @@
       }
       mgJudgesRow.appendChild(dot);
     }
+    appendJudgesNote(fb);
+  }
+
+  // La frase accanto ai pallini: perché il feedback è in questo stato. I
+  // pallini da soli raccontavano solo il voto dei giudici, e uno stato deciso
+  // DOPO (sicurezza che boccia il fix, domande della routine) sembrava in
+  // contraddizione con quattro pallini blu (#462).
+  function appendJudgesNote(fb) {
+    const note = MR.judgesNote ? MR.judgesNote(fb) : null;
+    if (!note || !note.text) return;
+    const span = document.createElement('span');
+    span.className = 'mg-judge-note';
+    span.textContent = note.text;
+    if (note.color) span.style.color = note.color;
+    mgJudgesRow.appendChild(span);
   }
 
   // Verdetto di un dato giudice (per nome) su un feedback, o null se mancante.

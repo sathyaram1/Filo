@@ -22,6 +22,12 @@
     // ai fini dell'instradamento (mai in coda: resta nei Ricevuti finché l'owner
     // non lo risolve o ri-valuta i giudici mancanti).
     unfiltered: { label: 'Non filtrato', color: '#ffffff', severity: 4 },
+    // Bocciatura di SICUREZZA sul fix (statusReason `secaudit`): il feedback era
+    // approvato e lavorato, ma l'audit di sicurezza (o il cancello di fusione)
+    // ha detto no e la pratica è tornata all'owner. ROSSO come l'attacco: il
+    // verde di `design` faceva sembrare "questione di gusto" un allarme di
+    // sicurezza — scelta dell'owner, 2026-08-29.
+    secaudit:   { label: 'Bloccato dalla sicurezza', color: '#c0392b', severity: 3 },
     attack:     { label: 'Attacco',      color: '#c0392b', severity: 3 },
     spam:       { label: 'Spam',         color: '#e08e0b', severity: 2 },
     design:     { label: 'Design',       color: '#2e9e5b', severity: 1 },
@@ -313,10 +319,103 @@
     if (status === 'aligned') return worstVerdictBlock(fb);
     const info = fs.STATUSES[status];
     if (!info || info.tab !== 'inbox') return null;
+    // Bocciatura di sicurezza sul fix: lo stato è `design` (torna all'owner),
+    // ma NON è una questione di design — è un blocco di sicurezza. Rosso.
+    if (status === 'design' && statusReason === 'secaudit') {
+      return { reason: 'secaudit', ...REASONS.secaudit };
+    }
+    // Panel COMPLETO su un feedback rimasto `unlabeled`: succede ai mittenti
+    // fidati che i giudici hanno segnalato (la pipeline non li marchia mai
+    // attack/spam, li lascia "da ri-giudicare"). Ma un panel completo non ha
+    // niente da ri-giudicare: mostrarlo bianco ("non filtrato") era falso, e il
+    // bottone "Ri-valuta" lo ritentava per sempre rispondendo "nessun giudice
+    // recuperato". La card prende la categoria più alta segnalata; decide l'owner.
+    if (status === 'unlabeled' && panelComplete(fb)) {
+      const worst = worstVerdictBlock(fb);
+      if (worst) return worst;
+    }
     const base = { reason: reasonOf(status, statusReason), color: info.color, severity: info.severity, label: info.label };
     const worst = worstVerdictBlock(fb);
     if (worst && worst.severity > base.severity) return worst;
     return base;
+  }
+
+  // Panel dei giudici COMPLETO: tutti i verdetti attesi ci sono e la pipeline
+  // non lo dichiara parziale/degradato. È il discrimine fra "non filtrato" vero
+  // (manca un giudice: ha senso ri-valutare) e "giudicato per intero".
+  function panelComplete(fb) {
+    const p = fb && fb.pipeline;
+    if (!p || typeof p !== 'object') return false;
+    if (p.l2Unfiltered === true || p.l2Degraded === true) return false;
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts.filter((v) => v && v.class) : [];
+    return verdicts.length > 0 && verdicts.length >= panelSize(p);
+  }
+
+  // ── Frase accanto ai pallini dei giudici (dettaglio dashboard) ────────────
+  // I pallini dicono COSA hanno votato i giudici; la frase dice PERCHÉ il
+  // feedback è nello stato in cui è — che non sempre coincide (#462: giudici
+  // tutti allineati, ma il fix è stato poi bocciato dalla sicurezza). Ritorna
+  // { text, color } (color null = colore neutro), o null se non c'è niente da
+  // spiegare (feedback in coda/chiusi: i pallini sono solo storia).
+  function judgesNote(fb) {
+    const fs = FS();
+    const S = fs.STATUSES;
+    const { status, statusReason } = normalizeStatus(fb);
+    if (status === 'design') {
+      if (statusReason === 'secaudit') {
+        return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
+      }
+      if (statusReason === 'clarify') {
+        return { text: 'La routine ha domande: rispondi qui sotto.', color: S.design.color };
+      }
+      if (statusReason === 'loop') {
+        return { text: 'La verifica ha bocciato il fix troppe volte: decidi tu.', color: S.design.color };
+      }
+      if (statusReason === 'arenato') {
+        return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
+      }
+      return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
+    }
+    if (status === 'aligned') {
+      const worst = worstVerdictBlock(fb);
+      if (worst) {
+        return { text: `Un giudice ha segnalato: ${worst.label.toLowerCase()}. Da esaminare prima di approvare.`, color: worst.color };
+      }
+      return { text: 'Tutti d’accordo: aspetta la tua approvazione.', color: S.aligned.color };
+    }
+    if (status === 'attack') return { text: 'Segnalato come attacco.', color: S.attack.color };
+    if (status === 'spam') return { text: 'Segnalato come spam.', color: S.spam.color };
+    if (status === 'unlabeled') {
+      if (panelComplete(fb)) {
+        const worst = worstVerdictBlock(fb);
+        if (worst) {
+          return { text: `Mittente fidato segnalato come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
+        }
+        return null;
+      }
+      const p = fb && fb.pipeline;
+      const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
+      if (!verdicts.length) return { text: 'In attesa del giudizio.', color: null };
+      const missing = Math.max(0, panelSize(p) - verdicts.length);
+      return { text: `Panel incompleto: ${missing} giudic${missing === 1 ? 'e' : 'i'} senza verdetto.`, color: null };
+    }
+    return null;
+  }
+
+  // Motivo dello stato (statusReason) in parole: per tooltip e sottotesti. I
+  // codici grezzi ('secaudit', 'clarify'…) non dicono niente a chi legge la
+  // lista; un motivo sconosciuto passa invariato (meglio grezzo che muto).
+  const REASON_TEXTS = {
+    secaudit: 'bloccato dalla sicurezza',
+    clarify: 'domande per te',
+    loop: 'fix bocciato troppe volte',
+    arenato: 'lavorazione arenata',
+    judges: 'verdetto dei giudici',
+    duplicate: 'duplicato',
+  };
+  function reasonText(statusReason) {
+    const k = String(statusReason || '');
+    return REASON_TEXTS[k] || k;
   }
 
   // "Allineato" = status normalizzato `aligned` (badge blu, aspetta approvazione).
@@ -571,6 +670,7 @@
     isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
+    panelComplete, judgesNote, reasonText,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
   };
 

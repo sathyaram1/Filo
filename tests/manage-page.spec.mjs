@@ -1023,6 +1023,101 @@ test('feedback di routine bloccato a L1 → bianco (non rosso) e panel atteso tr
   await expect(page.locator('#mgJudgesRow .mg-dot--empty')).toHaveCount(4);
 });
 
+// #462: giudici tutti allineati (4 pallini blu) ma fix poi BOCCIATO dalla
+// sicurezza (status design/secaudit). La card deve essere ROSSA (non il verde
+// "questione di design") e accanto ai pallini deve esserci la frase che spiega
+// il perché — senza, quattro pallini blu su una card colorata sembrano una
+// contraddizione.
+const FAKE_FB_SECAUDIT = {
+  _id: 'test-fb-secaudit', text: 'Lavoro consegnato, audit di sicurezza fallito.',
+  name: 'Fix bocciato dalla sicurezza', seq: 462, subSeq: 0,
+  status: 'design', statusReason: 'secaudit',
+  clientId: 'routine:verifier', createdAt: '2026-08-13T10:00:00Z', images: [],
+  pipeline: {
+    action: 'candidate_change', l2Class: 'aligned',
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+    verdicts: [
+      { judge: 'fixed_1', class: 'aligned', reasoning: 'Ok.' },
+      { judge: 'fixed_2', class: 'aligned', reasoning: 'Ok.' },
+      { judge: 'fixed_3', class: 'aligned', reasoning: 'Ok.' },
+      { judge: 'dynamic', class: 'aligned', reasoning: 'Ok.' },
+    ],
+    stage: 'L2',
+  },
+};
+
+test('fix bocciato dalla sicurezza (design/secaudit) → card ROSSA + frase accanto ai giudici', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_SECAUDIT);
+
+  // Card rossa: il canale R domina (niente più verde design).
+  const border = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  const rgb = border.match(/\d+/g).map(Number);
+  expect(rgb[0]).toBeGreaterThan(rgb[1]); // rosso > verde
+  expect(rgb[0]).toBeGreaterThan(rgb[2]); // rosso > blu
+
+  // Tooltip in parole, non il codice grezzo "secaudit".
+  const title = await page.locator('.mg-item').getAttribute('title');
+  expect(title).toContain('bloccato dalla sicurezza');
+  expect(title).not.toContain('secaudit');
+
+  // Dettaglio: i 4 pallini blu restano (è la storia del giudizio)…
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_SECAUDIT._id);
+  await expect(page.locator('#mgJudgesRow .mg-dot--aligned')).toHaveCount(4);
+  // …e accanto c'è la frase che spiega lo stato, rossa come la card.
+  const note = page.locator('#mgJudgesRow .mg-judge-note');
+  await expect(note).toContainText(/sicurezza/i);
+  const noteColor = await note.evaluate((el) => getComputedStyle(el).color);
+  expect(noteColor).toBe(border);
+});
+
+// #238: mittente fidato (routine) con panel COMPLETO che ha segnalato un
+// attacco. La pipeline lo lascia `unlabeled`, ma mostrarlo "non filtrato"
+// (bianco) era falso: i verdetti ci sono tutti. Deve apparire come attacco
+// (rosso), con la frase che lo spiega, e NON finire nel bottone "Ri-valuta".
+const FAKE_FB_TRUSTED_FLAGGED = {
+  _id: 'test-fb-trusted-flagged', text: 'Feedback di routine segnalato dal panel.',
+  name: 'Fidato ma segnalato', seq: 238, subSeq: 0, status: 'unlabeled',
+  clientId: 'routine:routine', createdAt: '2026-06-27T10:00:00Z', images: [],
+  pipeline: {
+    action: 'block_attack', l2Class: 'attack',
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+    verdicts: [
+      { judge: 'fixed_1', class: 'design', reasoning: 'Vago.' },
+      { judge: 'fixed_2', class: 'aligned', reasoning: 'Ok.' },
+      { judge: 'fixed_3', class: 'design', reasoning: 'Vago.' },
+      { judge: 'dynamic', class: 'attack', reasoning: 'Sospetto.' },
+    ],
+    stage: 'L2',
+  },
+};
+
+test('fidato con panel completo che segnala attacco → rosso (non bianco), frase "decidi tu", fuori dal Ri-valuta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
+
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_TRUSTED_FLAGGED);
+
+  // Niente card bianca "non filtrato", e il bottone "Ri-valuta" non lo conta.
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('.mg-item--unfiltered')).toHaveCount(0);
+  await expect(page.locator('#mgReevalBar')).toBeHidden();
+
+  // Card rossa (attacco segnalato).
+  const border = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
+  const rgb = border.match(/\d+/g).map(Number);
+  expect(rgb[0]).toBeGreaterThan(rgb[1]);
+
+  // Dettaglio: verdetti visibili + frase che spiega la decisione da prendere.
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FAKE_FB_TRUSTED_FLAGGED._id);
+  await expect(page.locator('#mgJudgesRow .mg-dot--attack')).toHaveCount(1);
+  await expect(page.locator('#mgJudgesRow .mg-judge-note')).toContainText(/decidi tu/i);
+});
+
 test('il pannello centrale si apre al click e mostra bolle + giudici', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');

@@ -751,3 +751,99 @@ test('listForManageTab queue: gli in-lavorazione sono PINNATI in cima, attivi pr
   // poi i todo per priorità (a=3 prima di d=1).
   assert.deepEqual(ids, ['c', 'b', 'a', 'd']);
 });
+
+// ── Bocciatura di sicurezza sul fix (statusReason `secaudit`) ────────────────
+
+test('classifyBlock: design/secaudit → ROSSO (blocco di sicurezza), non verde design', () => {
+  const r = MR.classifyBlock({ status: 'design', statusReason: 'secaudit' });
+  assert.equal(r.reason, 'secaudit');
+  assert.equal(r.color, '#c0392b');
+  assert.equal(r.severity, 3);
+});
+
+test('classifyBlock: design con altri motivi (clarify/judges) resta verde design', () => {
+  assert.equal(MR.classifyBlock({ status: 'design', statusReason: 'clarify' }).reason, 'design');
+  assert.equal(MR.classifyBlock({ status: 'design' }).reason, 'design');
+  assert.equal(MR.classifyBlock({ status: 'design' }).color, '#2e9e5b');
+});
+
+// ── Panel completo su `unlabeled` (mittente fidato segnalato) ────────────────
+
+const PANEL4 = (classes) => ({
+  expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+  verdicts: classes.map((c, i) => ({ judge: `j${i}`, class: c })),
+});
+
+test('classifyBlock: unlabeled con panel COMPLETO che segnala attacco → attacco, non bianco', () => {
+  const fb = { status: 'unlabeled', clientId: 'routine:routine', pipeline: PANEL4(['design', 'aligned', 'design', 'attack']) };
+  const r = MR.classifyBlock(fb);
+  assert.equal(r.reason, 'attack');
+  assert.equal(r.color, '#c0392b');
+});
+
+test('classifyBlock: unlabeled con panel PARZIALE resta bianco (da ri-valutare)', () => {
+  const p = PANEL4(['attack']);
+  p.verdicts = p.verdicts.slice(0, 1);
+  const r = MR.classifyBlock({ status: 'unlabeled', clientId: 'routine:routine', pipeline: p });
+  assert.equal(r.reason, 'unfiltered');
+});
+
+test('panelComplete: vero solo con tutti i verdetti attesi e senza flag di degrado', () => {
+  assert.equal(MR.panelComplete({ pipeline: PANEL4(['aligned', 'aligned', 'aligned', 'aligned']) }), true);
+  const parziale = PANEL4(['aligned']);
+  parziale.verdicts = parziale.verdicts.slice(0, 1);
+  assert.equal(MR.panelComplete({ pipeline: parziale }), false);
+  const degradato = PANEL4(['aligned', 'aligned', 'aligned', 'aligned']);
+  degradato.l2Degraded = true;
+  assert.equal(MR.panelComplete({ pipeline: degradato }), false);
+  assert.equal(MR.panelComplete({}), false);
+});
+
+// ── judgesNote: la frase accanto ai pallini ──────────────────────────────────
+
+test('judgesNote: design/secaudit → frase rossa sulla bocciatura di sicurezza', () => {
+  const n = MR.judgesNote({ status: 'design', statusReason: 'secaudit', pipeline: PANEL4(['aligned', 'aligned', 'aligned', 'aligned']) });
+  assert.match(n.text, /sicurezza/i);
+  assert.equal(n.color, '#c0392b');
+});
+
+test('judgesNote: design/clarify → frase verde sulle domande', () => {
+  const n = MR.judgesNote({ status: 'design', statusReason: 'clarify' });
+  assert.match(n.text, /domande/i);
+  assert.equal(n.color, '#2e9e5b');
+});
+
+test('judgesNote: aligned pulito → frase blu di attesa approvazione', () => {
+  const n = MR.judgesNote({ status: 'aligned', pipeline: PANEL4(['aligned', 'aligned', 'aligned', 'aligned']) });
+  assert.match(n.text, /approvazione/i);
+  assert.equal(n.color, '#5b6ee0');
+});
+
+test('judgesNote: unlabeled fidato con panel completo segnalato → frase rossa "decidi tu"', () => {
+  const n = MR.judgesNote({ status: 'unlabeled', clientId: 'routine:routine', pipeline: PANEL4(['design', 'aligned', 'design', 'attack']) });
+  assert.match(n.text, /attacco/i);
+  assert.match(n.text, /decidi tu/i);
+  assert.equal(n.color, '#c0392b');
+});
+
+test('judgesNote: unlabeled parziale → conta i giudici mancanti, colore neutro', () => {
+  const p = PANEL4(['aligned', 'aligned', 'aligned']);
+  p.verdicts = p.verdicts.slice(0, 3);
+  const n = MR.judgesNote({ status: 'unlabeled', pipeline: p });
+  assert.match(n.text, /1 giudice senza verdetto/i);
+  assert.equal(n.color, null);
+});
+
+test('judgesNote: feedback in coda/chiusi → nessuna frase (i pallini sono storia)', () => {
+  assert.equal(MR.judgesNote({ status: 'todo', pipeline: PANEL4(['aligned', 'aligned', 'aligned', 'aligned']) }), null);
+  assert.equal(MR.judgesNote({ status: 'done' }), null);
+});
+
+// ── reasonText: motivi in parole per i tooltip ───────────────────────────────
+
+test('reasonText: traduce i codici noti e lascia passare gli ignoti', () => {
+  assert.equal(MR.reasonText('secaudit'), 'bloccato dalla sicurezza');
+  assert.equal(MR.reasonText('clarify'), 'domande per te');
+  assert.equal(MR.reasonText('boh-nuovo'), 'boh-nuovo');
+  assert.equal(MR.reasonText(null), '');
+});
