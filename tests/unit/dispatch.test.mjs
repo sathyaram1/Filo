@@ -169,6 +169,38 @@ test('buildPayload prober: payload vuoto', () => {
   assert.deepEqual(buildPayload({ role: 'prober' }), {});
 });
 
+// ─── Lo storico delle critiche (caso #502: sei giri per un difetto da due) ────
+
+test('buildPayload verifier e fixer: lo storico delle critiche arriva nel payload', () => {
+  const history = [
+    { verdict: 'fail', critique: 'esce con lo zoom' },
+    { verdict: 'fail', critique: 'esce col ridimensionamento' },
+  ];
+  const v = buildPayload({ role: 'verifier', id: 'A', num: '#1', branch: 'worker/A', loopCount: 2 }, { feedback: { text: 's' }, history });
+  assert.deepEqual(v.history, history, 'il verifier vede le porte già trovate dai giri passati');
+  assert.equal(v.loopCount, 2, 'e sa a che giro è');
+  const f = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A', serverCritique: 'ultima' }, { feedback: { text: 's' }, history });
+  assert.deepEqual(f.history, history, 'chi corregge vede la SERIE, non solo l\'ultima critica');
+  assert.equal(f.verifierCritique, 'ultima');
+});
+
+test('buildPayload: senza storico dal server (o malformato) arriva un elenco vuoto', () => {
+  const v = buildPayload({ role: 'verifier', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' } });
+  assert.deepEqual(v.history, [], 'un server vecchio non manda lo storico: elenco vuoto, non un buco');
+  const f = buildPayload({ role: 'fixer', id: 'A', branch: 'worker/A' }, { feedback: { text: 's' }, history: 'non-un-array' });
+  assert.deepEqual(f.history, []);
+});
+
+test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e chi verifica', () => {
+  const due = [{ critique: 'a' }, { critique: 'b' }];
+  assert.equal(serialAwarenessNote('fixer', []), '', 'primo passaggio: niente avvertenza');
+  assert.equal(serialAwarenessNote('fixer', [{ critique: 'a' }]), '', 'una sola bocciatura non è una serie');
+  assert.match(serialAwarenessNote('fixer', due), /inventario/, 'dalla seconda: inventario delle strade, non l\'ultima porta');
+  assert.match(serialAwarenessNote('verifier', due), /stessa critica/i, 'il verifier deve elencare le porte tutte insieme');
+  assert.equal(serialAwarenessNote('secaudit', due), '', 'il controllo di sicurezza non c\'entra con la serie');
+  assert.equal(serialAwarenessNote('fixer', null), '', 'storico assente ≠ guasto');
+});
+
 // ─── Stato su disco ───────────────────────────────────────────────────────────
 
 test('writeState/readState/clearState: round-trip su STATE_DIR temporanea', () => {
