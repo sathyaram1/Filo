@@ -49,6 +49,15 @@ test("l'API sopra i dati funziona come prima (nessun cambiamento per i chiamanti
   assert.equal(S.padForCipher('todo').length, DATA.CIPHER_PAD);
 });
 
+test('riallineamento: dopo un conflitto di fusione la routine può riportare il lavoro in revisione', () => {
+  // Caso #500 (27/08/2026): verifica e sicurezza passate, ma main è avanzato e
+  // il merge non passa più. Il ramo va ribasato e ricontrollato — e senza
+  // questa transizione il giro di riallineamento moriva alla consegna.
+  assert.equal(S.canTransition('revision_security', 'revision_capability', 'routine'), true);
+  assert.equal(S.canTransition('revision_security', 'revision_capability', 'owner'), false,
+    'il rientro è un passo dell\'iter: appartiene alle routine, non alla dashboard');
+});
+
 test('VERIFIER_CAPS: i default di N (improvableCap) e M (failCap) — SPEC §13', () => {
   // N = 3: quanti «migliorabile» tornano in correzione prima della promozione.
   // M = 10: scelta di misura dell'owner per la prima settimana sul piano Max

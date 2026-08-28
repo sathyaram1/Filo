@@ -72,7 +72,10 @@ vero su "qualcuno ci sta lavorando ORA").
 - `revision_capability` —routine PASS verifier→ `revision_security`; —FAIL×3→ `design`
   (`statusReason: loop`).
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
-  (`statusReason: loop`).
+  (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
+  (riallineamento: main è avanzato e il merge non passa più da solo — non è una
+  bocciatura di qualità, il contatore M non si muove; il ramo viene ribasato e
+  ripassa verifica e sicurezza sul contenuto nuovo).
 - `done` —owner verifica→ `archived`; —owner "manca qualcosa"→ `todo` (riapertura).
 - `archived` —owner ripristina→ `todo`.
 - `attack_confirmed`/`spam_confirmed` —owner "era legittimo"→ `todo`.

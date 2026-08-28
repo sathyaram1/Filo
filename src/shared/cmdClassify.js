@@ -22,8 +22,13 @@
 //     di salire a 3 solo perché concatenato; `ls && rm -rf x` resta 3 (per via
 //     dell'rm). È sicuro perché il livello non scende mai sotto quello del pezzo
 //     più pericoloso.
-//   • pipe (|), background (&), redirezioni (>, >>, <), sostituzioni ($(...),
-//     ${...}, backtick) e newline NON sono semplici sequenze: il comando non è
+//   • una PIPELINE pura (solo `|`) scende a livello 1 SOLO se OGNI segmento è
+//     una lettura riconosciuta, scriptblock inclusi (vedi segmentIsRead): la
+//     shell di default su Windows è PowerShell, e lì leggere significa scrivere
+//     pipeline. Un solo segmento non riconosciuto, o uno scriptblock che
+//     potrebbe invocare qualcosa, e la pipeline resta 3.
+//   • background (&), redirezioni (>, >>, <), sostituzioni ($(...), ${...},
+//     backtick) e newline NON sono semplici sequenze: il comando non è
 //     "interamente riconoscibile" → 3, sempre. Non proviamo a fare il parsing
 //     del quoting: un falso positivo qui costa solo più attrito (digitare
 //     "conferma"), mai un'esecuzione silenziosa indebita.
@@ -34,6 +39,14 @@
 //     solo far riconoscere PIÙ bersagli/flag pericolosi, mai di meno.
 //   • un backstop di programmi distruttivi (rm/del/format/…) resta 3 anche se
 //     per errore comparisse in una whitelist.
+//   • la whitelist FIDA di un nome solo se invocato NUDO (nessun separatore di
+//     percorso, nessuna estensione eseguibile, nessun prefisso `.\`/`.`/`&`).
+//     Un file su disco chiamato come un comando fidato — `.\Get-ChildItem.exe`,
+//     `C:\tmp\ls.exe`, `Get-ChildItem.exe` dal PATH — NON è quel comando: è un
+//     eseguibile arbitrario e resta al livello 3 di default. Il backstop dei
+//     distruttivi invece guarda il basename (così `/bin/rm` resta 3 col
+//     percorso): catturare un nome pericoloso travestito è sempre giusto,
+//     fidarsi di uno fidato travestito no.
 //   • flag pericolosi (--force, --hard, -rf…) alzano un livello ≤2 a 3.
 //   • curl/wget con un flag di output-su-file (-o/-O/--output/--remote-name…),
 //     wget con un flag di cartella di destinazione (-P/--directory-prefix) o curl
@@ -144,6 +157,141 @@
     'ln',
   ]);
 
+  // ── PowerShell: cmdlet di sola lettura e pipeline di sole letture ─────────
+  //
+  // Su Windows la shell di Filo È PowerShell (src/main/services/terminal.js), e
+  // un LLM che scrive PowerShell naturale usa `Get-ChildItem` e le pipeline, non
+  // `ls`. Prima di questo blocco OGNI cmdlet e OGNI pipeline cadevano nel ramo
+  // "non riconosciuto" → livello 3: elencare una cartella costava all'utente la
+  // stessa frizione di un `rm -rf` (misurato su un banco con modelli reali: 26
+  // comandi bloccati su 33, quasi tutti letture innocue).
+  //
+  // Il rimedio resta il principio del file — WHITELIST, l'ignoto è 3 — applicato
+  // ai cmdlet. Criterio di ammissione: entra solo il cmdlet che NON ha una forma
+  // capace di scrivere. In PowerShell è la norma, perché il gemello che scrive è
+  // sempre un ALTRO verbo (Get-Item legge, Set-Item scrive; Get-Content legge,
+  // Set-Content/Out-File/Tee-Object scrivono; Get-Process legge, Stop-Process
+  // uccide; Get-Date legge l'orologio, Set-Date lo imposta): il cmdlet in lista
+  // non ha quindi flag distruttivi da intercettare come in LEVEL1_MUTATES —
+  // basta che il gemello che scrive resti FUORI, dove il default lo tiene a 3.
+  // Restano fuori di proposito anche i cmdlet di sola lettura ma con una
+  // superficie troppo larga o ambigua (Get-CimInstance/Get-WmiObject, che
+  // arrivano ovunque nel sistema; Get-Credential, che apre una richiesta di
+  // password; Measure-Command, che ESEGUE lo scriptblock che riceve).
+  const PS_READ = new Set([
+    'get-childitem', 'gci', 'get-content', 'gc', 'get-item', 'gi',
+    'get-itemproperty', 'gp', 'get-itempropertyvalue', 'get-location', 'gl',
+    'get-date', 'get-process', 'gps', 'get-service', 'get-help', 'get-member',
+    'get-alias', 'get-variable', 'get-module', 'get-psdrive', 'get-host',
+    'get-command', 'get-history', 'get-computerinfo', 'get-culture',
+    'get-timezone', 'get-random', 'get-unique',
+    'select-string', 'sls', 'select-object', 'select', 'sort-object',
+    'measure-object', 'measure', 'group-object', 'group', 'compare-object',
+    'test-path', 'resolve-path', 'split-path', 'join-path', 'convert-path',
+    'format-table', 'ft', 'format-list', 'fl', 'format-wide', 'fw',
+    'out-string', 'out-host', 'out-null', 'write-output', 'write-host',
+    'convertto-json', 'convertfrom-json', 'convertto-csv', 'convertfrom-csv',
+    'convertfrom-stringdata', 'get-filehash',
+    // Navigazione pura: cambiano solo la cartella di lavoro, come `cd` (che è
+    // già livello 1). `Set-Location`/`sl`, `pushd`/`popd` sono le forme
+    // PowerShell dello stesso gesto benigno e reversibile.
+    'set-location', 'sl', 'pushd', 'popd',
+  ]);
+  // Alias VOLUTAMENTE esclusi perché su un'altra shell sono un programma che
+  // SCRIVE, e il classificatore non sa quale shell eseguirà il comando: `sort`
+  // (Sort-Object in PowerShell, ma `sort -o file` su Unix scrive un file), `gm`
+  // (Get-Member, ma anche GraphicsMagick, che converte e sovrascrive immagini),
+  // `gcm` (Get-Command, ma anche git-credential-manager, che cancella
+  // credenziali), `compare` (Compare-Object, ma anche ImageMagick, che scrive
+  // l'immagine di confronto). I nomi lunghi corrispondenti restano ammessi.
+
+  // Where-Object/ForEach-Object (e gli alias `?`, `%`, `where`, `foreach`) hanno
+  // senso solo DENTRO una pipeline: da soli non ricevono niente da filtrare.
+  const PS_PIPE_ONLY = new Set(['where-object', 'where', '?', 'foreach-object', 'foreach', '%']);
+  // ForEach-Object senza scriptblock usa la forma "nome di membro", che INVOCA
+  // il metodo su ogni oggetto: `Get-ChildItem | % Delete` CANCELLA i file. Quindi
+  // per questi lo scriptblock (validato) è obbligatorio.
+  const PS_FOREACH = new Set(['foreach-object', 'foreach', '%']);
+
+  // Uno SCRIPTBLOCK `{ … }` è il buco naturale della pipeline: `gci | % {
+  // Remove-Item $_ }` è una cancellazione travestita da lettura. Non proviamo a
+  // classificare cosa c'è dentro (sarebbe interpretare PowerShell): pretendiamo
+  // che il blocco sia INERTE, cioè che non contenga NESSUN token in posizione di
+  // comando. Passano proprietà, confronti, operatori e numeri (`{ $_.Length -gt
+  // 1000 }`); non passa niente che possa invocare qualcosa — parole nude
+  // (`Remove-Item`, `ri`, `foobar`), percorsi di eseguibili (`.\x.exe`),
+  // dot-sourcing, chiamate di metodo `(`, assegnazioni `=`, membri statici `::`.
+  // I LETTERALI FRA VIRGOLETTE sono già stati neutralizzati a `0` da chi chiama
+  // (segmentIsRead): un confronto `-eq "readme.md"` è inerte, la stringa non è
+  // un comando. È volutamente più severo del necessario: un blocco di lettura
+  // respinto costa una conferma in più, uno ostile accettato costa i file.
+  function scriptBlockIsInert(inner) {
+    const s = String(inner);
+    if (/[=(){}`;&|<>@]|::/.test(s)) return false;
+    for (const t of s.trim().split(/\s+/).filter(Boolean)) {
+      if (/^[A-Za-z_]/.test(t)) return false;              // parola nuda = comando
+      if (/^\.{1,2}$/.test(t)) return false;               // dot-sourcing
+      if (/[\\/]/.test(t) && !/^-/.test(t)) return false;  // percorso di un eseguibile
+    }
+    return true;
+  }
+
+  // Un SEGMENTO (comando singolo, o un pezzo di pipeline) è di sola lettura?
+  // Serve sia per il cmdlet isolato sia per ogni pezzo di una pipeline, così i
+  // due cammini non possono divergere. Riceve il segmento GREZZO (con le
+  // virgolette): i letterali quotati vanno riconosciuti come inerti PRIMA di
+  // togliere le virgolette, altrimenti una parola quotata resta nuda e sembra un
+  // comando.
+  function segmentIsRead(seg, inPipeline) {
+    // `%{...}` e `?{...}` (senza spazio) sono scrittura PowerShell normalissima:
+    // isoliamo le graffe come token a sé prima di guardare programma e blocco.
+    const norm = String(seg).replace(/\{/g, ' { ').replace(/\}/g, ' } ');
+    // Il primo token deve essere il comando NUDO, non un file omonimo su disco
+    // (`.\Get-ChildItem.exe`): senza questo, `programOf` (che fa basename e
+    // toglie l'estensione) lo scambierebbe per il cmdlet fidato.
+    if (!isBareName(tokens(norm)[0])) return false;
+    // I letterali fra virgolette sono inerti: li rimpiazziamo con `0` (un numero,
+    // che scriptBlockIsInert accetta). Così un confronto `-eq "readme.md"` passa,
+    // e un metacarattere DENTRO le virgolette non fa salire il livello. Ciò che
+    // invoca davvero (parole nude, `&`, `(`, `.`) sta FUORI dalle virgolette e
+    // viene comunque intercettato.
+    const noStr = norm.replace(/'[^']*'/g, ' 0 ').replace(/"[^"]*"/g, ' 0 ');
+    // Sottoespressioni, chiamate, hashtable/array, redirezioni, operatore di
+    // chiamata, membri statici: dentro può nascondersi qualunque cosa.
+    if (/[`()<>;&|@]|\$\(|\$\{|::/.test(noStr)) return false;
+    const open = (noStr.match(/\{/g) || []).length;
+    const close = (noStr.match(/\}/g) || []).length;
+    if (open !== close || open > 1) return false; // graffe sbilanciate o annidate
+    if (open === 1) {
+      const i = noStr.indexOf('{');
+      const j = noStr.lastIndexOf('}');
+      if (j < i || !scriptBlockIsInert(noStr.slice(i + 1, j))) return false;
+    }
+    const prog = programOf(norm);
+    if (!prog) return false;
+    if (ALWAYS_3.has(prog) || ARBITRARY_CODE.has(prog)) return false;
+    if (PS_PIPE_ONLY.has(prog)) {
+      if (!inPipeline) return false;
+      return PS_FOREACH.has(prog) ? open === 1 : true;
+    }
+    if (PS_READ.has(prog)) return true;
+    // Dentro una pipeline vale come lettura anche tutto ciò che il
+    // classificatore riconosce già come livello 1 (`ls`, `cat`, `grep`, `head`,
+    // `git log`…): `cat file | grep errore` non compie nulla di più di `cat file`.
+    return inPipeline && classifyOne(seg) === 1;
+  }
+
+  // Il comando è una pura PIPELINE (solo `|`), senza sequenziamento, background,
+  // redirezioni o sostituzioni? Ritorna i segmenti, altrimenti null. Nota: `||`
+  // produce un segmento vuoto e fa fallire il controllo, quindi non passa di qui.
+  function splitSafePipeline(cmd) {
+    if (/[`<>;&]|\$\(|\$\{|\r|\n/.test(cmd)) return null;
+    if (cmd.indexOf('|') === -1) return null;
+    const parts = cmd.split('|').map((p) => p.trim());
+    if (parts.length < 2 || parts.some((p) => !p)) return null;
+    return parts;
+  }
+
   // Flag che alzano a 3 un comando altrimenti ≤2.
   const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
 
@@ -253,7 +401,10 @@
   const GIT_DESTROY = new Set(['reset', 'clean', 'rm', 'gc', 'filter-branch', 'update-ref', 'prune']);
 
   // npm/pip: il livello dipende dal sotto-comando.
-  const NPM_READ = new Set(['list', 'ls', 'view', 'show', 'outdated', 'root', 'bin', 'prefix', 'ping', 'doctor', 'whoami', 'help', 'search', 'config']);
+  // NB: 'config' NON sta qui: `npm/pip config` è duale (get/list leggono, set/
+  // delete/edit CAMBIANO tra l'altro il registry dei pacchetti) → lo classifica
+  // classifyNpm guardando il verbo.
+  const NPM_READ = new Set(['list', 'ls', 'view', 'show', 'outdated', 'root', 'bin', 'prefix', 'ping', 'doctor', 'whoami', 'help', 'search']);
   const NPM_WRITE = new Set(['install', 'i', 'ci', 'add', 'update', 'upgrade', 'uninstall', 'remove', 'rm', 'dedupe', 'prune', 'link', 'rebuild']);
   // npm run / exec / start / test / publish → eseguono script arbitrari o
   // pubblicano (irreversibile) → restano fuori → 3.
@@ -296,6 +447,29 @@
     // togli quoting, prendi il basename, normalizza, togli estensioni eseguibili
     const bare = unquote(first);
     return bare.split(/[\\/]/).pop().toLowerCase().replace(/\.(exe|cmd|bat|ps1|com|msi)$/i, '');
+  }
+
+  // Estensioni di file ESEGUIBILI: se il primo token ne ha una, quel token è un
+  // FILE su disco, non il comando di sistema che ne condivide il nome.
+  const EXE_EXT_RE = /\.(exe|cmd|bat|ps1|psm1|com|msi|vbs|vbe|wsf|wsh|scr|pif|cpl|msc|jar|js|jse|ps1xml)$/i;
+
+  // `programOf` fa il BASENAME del percorso e toglie l'estensione: serve al
+  // backstop dei distruttivi (`/bin/rm` deve restare 3 anche col percorso). Ma
+  // per FIDARSI di un comando (livello 1 o 2) quella normalizzazione è un buco:
+  // un eseguibile piantato in una cartella e chiamato come un cmdlet di lettura
+  // (`.\Get-ChildItem.exe`, `C:\tmp\ls.exe`, o `Get-ChildItem.exe` dal PATH)
+  // verrebbe scambiato per il cmdlet ed eseguito SENZA conferma. Un comando è
+  // "nudo" — cioè davvero quel comando di sistema, non un file omonimo — solo se
+  // il primo token non ha separatori di percorso, né un'estensione eseguibile,
+  // né un prefisso di chiamata (`.\`, `./`, `.`, `&`). Altrimenti è un programma
+  // arbitrario e la whitelist non lo copre → resta al livello 3 di default.
+  function isBareName(tok) {
+    const t = unquote(String(tok || ''));
+    if (!t) return false;
+    if (/[\\/]/.test(t)) return false;   // qualunque separatore di percorso
+    if (/^[.&]/.test(t)) return false;   // .\  ./  .  &  (chiamata / dot-source)
+    if (EXE_EXT_RE.test(t)) return false; // estensione eseguibile = file, non cmdlet
+    return true;
   }
 
   // sotto-comando = primo token che non è una flag (dopo il programma)
@@ -443,6 +617,16 @@
   function classifyNpm(cmd) {
     const sub = subcommandOf(cmd);
     if (!sub) return 1; // `npm` da solo → help
+    // `config`: leggere la configurazione è lettura (get/list/ls/debug/nudo),
+    // ma `set`/`delete`/`rm`/`unset`/`edit`/`add` la CAMBIANO — e tra le chiavi
+    // c'è il REGISTRY, cioè da dove npm/pip scaricano ed eseguono codice.
+    // Reindirizzarlo non è lettura → conferma (2). `edit` apre pure un editor.
+    if (sub === 'config') {
+      const rest = tokens(cmd).slice(1).map(unquote).filter((t) => !t.startsWith('-'));
+      const verb = (rest[1] || '').toLowerCase(); // rest[0] === 'config'
+      if (!verb || verb === 'get' || verb === 'list' || verb === 'ls' || verb === 'debug') return 1;
+      return 2;
+    }
     if (NPM_READ.has(sub)) return 1;
     if (NPM_WRITE.has(sub)) return 2;
     return 3; // run/exec/start/test/publish/sconosciuti → 3
@@ -476,7 +660,13 @@
     const trimmed = dequote(raw);
     const prog = programOf(trimmed);
     if (!prog) return 3;
-    if (ALWAYS_3.has(prog)) return 3;
+    if (ALWAYS_3.has(prog)) return 3; // backstop: vale anche col percorso (`/bin/rm`)
+
+    // Superato il backstop dei distruttivi, la whitelist FIDA di un nome solo se
+    // è invocato nudo. Un file su disco che si chiama come un comando fidato
+    // (`.\Get-ChildItem.exe`, `C:\tmp\ls.exe`, `git.exe` dal PATH) NON è quel
+    // comando: è un eseguibile arbitrario → livello 3 di default.
+    if (!isBareName(tokens(trimmed)[0])) return 3;
 
     if (prog === 'git') return classifyGit(trimmed);
     if (prog === 'npm' || prog === 'pip' || prog === 'pip3') return classifyNpm(trimmed);
@@ -515,6 +705,14 @@
       return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
     }
 
+    // Cmdlet PowerShell di sola lettura (`Get-ChildItem`, `Select-String`…): 1
+    // solo se supera anche i controlli strutturali (niente sottoespressioni,
+    // niente scriptblock che invoca). Where-Object/ForEach-Object NON passano di
+    // qui: da soli non filtrano niente, valgono solo dentro una pipeline.
+    // Passiamo `raw` (con le virgolette): segmentIsRead deve poter riconoscere i
+    // letterali quotati come inerti.
+    if (PS_READ.has(prog) && segmentIsRead(raw, false)) return 1;
+
     return 3; // comando non riconosciuto → livello 3 di default
   }
 
@@ -532,6 +730,14 @@
     if (seq && seq.length) {
       return seq.reduce((max, part) => Math.max(max, classifyOne(part)), 1);
     }
+    // Pipeline di sole letture (`Get-ChildItem | Sort-Object | Select-Object
+    // -First 5`, `cat file | grep errore`) → livello 1: incanalare una lettura
+    // dentro un'altra lettura non produce niente che la prima non facesse già.
+    // Basta UN segmento non riconosciuto — o uno scriptblock che potrebbe
+    // invocare qualcosa — e si torna al 3 di prima.
+    const pipe = splitSafePipeline(trimmed);
+    if (pipe) return pipe.every((p) => segmentIsRead(p, true)) ? 1 : 3;
+
     // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
     if (!seq && CHAIN_RE.test(trimmed)) return 3;
 

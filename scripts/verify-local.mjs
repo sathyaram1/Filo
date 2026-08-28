@@ -107,6 +107,69 @@ export function withVerdict(state, branch, { verdict, critique, sha, at }) {
   return s;
 }
 
+// ─── Riallineamento alla linea principale (caso #500) ───────────────────────
+//
+// Un ramo che resta indietro mentre aspetta verifica e approvazione finisce in
+// conflitto di fusione, e quel conflitto salterebbe fuori solo DOPO i controlli
+// o dopo l'approvazione dell'owner. Il riallineamento si fa QUI, all'inizio
+// della verifica: così verifica e chiusura girano già sul contenuto allineato,
+// e lo sha approvato è quello che si pubblica.
+
+/**
+ * Cosa fare col ramo prima di avviare la verifica. PURA.
+ *
+ * `ahead` non conta: i commit propri il rebase li riporta sopra da solo, e un
+ * ramo solo avanti (behind = 0) non ha niente da riallineare. Ogni astensione
+ * che nasconde un ramo indietro va DETTA: un salto silenzioso è
+ * indistinguibile dal non avere il riallineamento.
+ */
+export function realignPlan({ fetchOk, dirty, behind, workBranch = true }) {
+  // I rami protetti non li tocca nessun automatismo (regola del repo), e lì
+  // non c'è niente da dire: su quei rami non si chiude nessun lavoro.
+  if (!workBranch) return { action: 'skip', message: '' };
+  if (!fetchOk) {
+    return {
+      action: 'skip',
+      message: 'Non raggiungo origin, quindi non so se il ramo è rimasto indietro: se la chiusura poi si ferma per questo, riprova con la rete.',
+    };
+  }
+  const n = Number(behind);
+  if (!Number.isFinite(n) || n <= 0) return { action: 'skip', message: '' };
+  if (dirty) {
+    return {
+      action: 'skip',
+      message: `Il ramo è indietro di ${n} commit rispetto alla linea principale, ma ci sono modifiche non salvate: non lo tocco. Falle salvare e rilancia, così la verifica parte dal contenuto riallineato.`,
+    };
+  }
+  return { action: 'rebase', message: '' };
+}
+
+/**
+ * L'esito del rebase → cosa fare. PURA.
+ *
+ * `abort` significa: il repo torna ESATTAMENTE com'era. Un rebase lasciato a
+ * metà blocca ogni comando git successivo, compreso il salvataggio automatico:
+ * peggio del conflitto stesso.
+ */
+export function afterRebase({ ok, behind = 0, conflictFiles = [] }) {
+  if (ok) {
+    return {
+      action: 'push',
+      message: `Il ramo era indietro di ${behind} commit rispetto alla linea principale: l'ho riallineato e lo rispedisco. La verifica parte dal contenuto aggiornato.`,
+    };
+  }
+  const files = (Array.isArray(conflictFiles) ? conflictFiles : []).filter(Boolean);
+  return {
+    action: 'abort',
+    message: [
+      'Il riallineamento alla linea principale va in conflitto. Ho annullato tutto: il ramo è rimasto com\'era.',
+      'File in conflitto:',
+      files.length ? files.map((f) => `  ${f}`).join('\n') : '  (non identificati)',
+      'Risolvili a mano (git rebase origin/main, sistema i file, git rebase --continue) e poi rilancia questo comando.',
+    ].join('\n'),
+  };
+}
+
 // ─── Stato su disco ─────────────────────────────────────────────────────────
 
 export function readState(root = ROOT) {
@@ -130,6 +193,54 @@ export function writeState(state, root = ROOT) {
 function git(args, root = ROOT) {
   try { return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim(); }
   catch (_) { return ''; }
+}
+
+// Come `git`, ma distingue il successo dal fallimento e non lascia che il
+// `fatal:` di un tentativo gestito finisca a schermo come se fosse un guasto.
+function tryGit(args, root = ROOT) {
+  try { return { ok: true, out: execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() }; }
+  catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
+}
+
+// Inchiodato, non letto dall'ambiente: stessa regola della guardia di
+// finish-local — un nome che si sposta con una variabile non protegge niente.
+const MAIN = 'main';
+
+/**
+ * Riallinea il ramo corrente a origin/main. Ritorna false solo sul conflitto:
+ * lì la verifica non deve nemmeno partire, verificherebbe un contenuto che non
+ * si può fondere. Le decisioni sono nelle funzioni pure qui sopra; qui si
+ * eseguono e basta.
+ */
+function realignBeforeStart(root = ROOT) {
+  const branch = currentBranch(root);
+  const workBranch = !!branch && branch !== 'HEAD' && !['main', 'master'].includes(branch.toLowerCase());
+  const fetchOk = tryGit(['fetch', 'origin', MAIN], root).ok;
+  const behind = fetchOk ? Number(tryGit(['rev-list', '--count', `HEAD..origin/${MAIN}`], root).out) : 0;
+  const plan = realignPlan({ fetchOk, dirty: isDirty(root), behind, workBranch });
+  if (plan.message) console.log(`${plan.message}\n`);
+  if (plan.action !== 'rebase') return true;
+
+  const reb = tryGit(['rebase', `origin/${MAIN}`], root);
+  if (!reb.ok) {
+    // I file in conflitto si leggono PRIMA dell'abort: dopo non esistono più.
+    const files = tryGit(['diff', '--name-only', '--diff-filter=U'], root).out.split('\n').filter(Boolean);
+    tryGit(['rebase', '--abort'], root);
+    console.error(afterRebase({ ok: false, conflictFiles: files }).message);
+    return false;
+  }
+  console.log(`${afterRebase({ ok: true, behind }).message}\n`);
+  // Il rebase riscrive i commit: senza forza il push verrebbe rifiutato; la
+  // "lease" evita di sovrascrivere lavoro che qualcun altro avesse spedito nel
+  // frattempo sullo stesso ramo. La destinazione è nel refspec, per intero:
+  // non la sceglie la configurazione locale di git (stessa forma di ogni altra
+  // spedizione del repo).
+  const push = tryGit(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], root);
+  if (!push.ok) {
+    console.error(`Ramo riallineato qui, ma non riesco a rispedirlo su origin:\n${push.out.slice(0, 300)}`);
+    console.error('La verifica può proseguire; prima di chiudere serve che il ramo arrivi su origin (di solito basta riprovare con la rete).');
+  }
+  return true;
 }
 
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
@@ -208,8 +319,15 @@ if (isMain) {
       console.error('deve poter concludere "non è quello che era stato chiesto".');
       process.exit(1);
     }
-    writeState(withRequest(readState(), branch, { request, sha }));
-    console.log(buildVerifierBrief({ request, branch, recipe: readRecipe() }));
+    // Prima di consegnare il compito il ramo si riallinea alla linea
+    // principale (caso #500): la verifica deve giudicare il contenuto che
+    // verrà pubblicato. Sul conflitto ci si ferma qui, col ramo intatto.
+    if (!realignBeforeStart()) process.exit(1);
+    // Ramo e sha si rileggono: il riallineamento può averli riscritti, e il
+    // verdetto deve legarsi al contenuto vero.
+    const b = currentBranch();
+    writeState(withRequest(readState(), b, { request, sha: headSha() }));
+    console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe() }));
     process.exit(0);
   }
 

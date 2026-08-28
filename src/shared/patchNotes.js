@@ -19,8 +19,11 @@
       version: '0.2.207', date: '2026-08-28',
       features: [
         'Filo legge i tuoi documenti, PDF compresi. Indicagli la bolletta o l\'estratto conto che hai sul computer e chiedigli quello che ti serve: quant\'è la giacenza media, quanto hai pagato di luce a marzo, cosa dice quella clausola. Se il PDF è una scansione senza testo te lo dice, invece di inventarsi il contenuto.',
+        'Le sveglie e i timer che hai messo ora li gestisci a parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8". Prima si potevano solo creare.',
+        'Una sveglia può ripetersi nei giorni che dici tu: "il lunedì e il mercoledì", "nei giorni feriali", "tutte le mattine". Suona a ogni giorno indicato senza che tu la rimetta, e i giorni si leggono sulla sua scheda in alto nella nuova scheda.',
       ],
       fixes: [
+        'Quando chiedi a Filo di guardare qualcosa sul tuo computer, i comandi che si limitano a leggere partono subito: elencare una cartella, aprire un file di testo, cercare una parola dentro i file. Prima quasi tutti si fermavano a chiederti di digitare «conferma», come se dovessero cancellare qualcosa.',
         'Quando la spiegazione dentro al menu del tasto destro finisce di caricare e si allunga, il menu si sposta da solo invece di uscire dal fondo della finestra. L\'ultima voce resta intera e si può cliccare.',
         'Se la spiegazione è così lunga da non starci, il menu si scorre fino in fondo e ci resta: prima un giro di rotella in più faceva scorrere la pagina e il menu spariva.',
         'Se rimpicciolisci la finestra mentre il menu del tasto destro è aperto, il menu si sposta da solo e resta tutto visibile.',
