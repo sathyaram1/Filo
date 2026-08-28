@@ -133,6 +133,7 @@
   // ── Stato ─────────────────────────────────────────────────────────────────
   let isAdmin       = false;
   let allFeedbacks  = [];       // tutti i feedback caricati
+  let dataLoaded    = false;    // i feedback sono arrivati davvero (vs. in corso/fallito)
   let currentTab    = 'inbox';  // tab lista attiva (inbox/queue/resolved/archived)
   let currentList   = [];       // feedback della tab corrente, ordinati
   let selectedId    = null;     // ID del feedback selezionato nel pannello centrale
