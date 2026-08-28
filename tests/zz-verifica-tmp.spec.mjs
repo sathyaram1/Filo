@@ -210,6 +210,7 @@ test(`finestra bassa (${altezza}px): il menu diventa scorrevole e l'ultima voce 
 
   await ripristinaProvider(app);
 });
+}
 
 // ── 3. Rotella in più a fine spiegazione: il menu non se ne va ──
 // Menu su IMMAGINE: senza selezione keepOnScroll è falso, quindi se la rotella
