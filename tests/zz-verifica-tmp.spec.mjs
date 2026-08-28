@@ -31,7 +31,14 @@ async function preparaProvider(app, { attesaMs = 2000, ripetizioni = 12, aPezzi 
     globalThis.__origGemVerifica = globalThis.SN_PROVIDER_GEMINI;
     const risposta = async ({ onDelta }) => {
       await new Promise((r) => setTimeout(r, opts.attesaMs));
-      if (onDelta) onDelta(testo);
+      if (onDelta && opts.aPezzi) {
+        // Arriva un pezzo alla volta, come da un modello vero in streaming.
+        const passo = Math.max(40, Math.ceil(testo.length / opts.ripetizioni));
+        for (let i = 0; i < testo.length; i += passo) {
+          onDelta(testo.slice(i, i + passo));
+          await new Promise((r) => setTimeout(r, 40));
+        }
+      } else if (onDelta) onDelta(testo);
       return { text: testo, usage: {} };
     };
     globalThis.SN_PROVIDER_GEMINI = {
