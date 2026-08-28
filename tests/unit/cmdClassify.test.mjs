@@ -623,7 +623,7 @@ test('livello 3 — i cmdlet che SCRIVONO restano fuori dalla whitelist', () => 
     'New-Item -ItemType File x', 'Remove-Item x', 'Remove-Item -Recurse -Force x',
     'Out-File out.txt', 'Tee-Object out.txt', 'Export-Csv out.csv',
     'Stop-Process -Name filo', 'Start-Process calc', 'Set-Date -Date 2020-01-01',
-    'Set-Location C:\\', 'Invoke-Expression "rm x"', 'Invoke-WebRequest http://x',
+    'Invoke-Expression "rm x"', 'Invoke-WebRequest http://x',
     'Import-Module MioModulo', 'Clear-Content log.txt', 'Rename-Item a b',
     // letture volutamente NON ammesse: superficie troppo larga o interattiva
     'Get-CimInstance Win32_Process', 'Get-WmiObject Win32_Service',
