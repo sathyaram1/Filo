@@ -1847,6 +1847,10 @@
       const r = await sendToMain({ type: 'feedback_update', id, starred: next });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.starred = next;
+      // Col filtro ⭐ acceso gli Archiviati elencano i preferiti: cambiarne uno
+      // cambia quel numero anche da un'altra scheda, dove la lista non si
+      // ridisegna. Il conteggio si aggiorna comunque.
+      updateTabCounts();
       // Nell'attesa il pannello può essere passato a un altro feedback:
       // ridipingerlo con lo stato di questo direbbe il falso su quello aperto.
       if (selectedId !== id) { if (currentTab === 'archived' && starredOnly) renderList(); return; }
