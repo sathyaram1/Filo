@@ -2184,6 +2184,7 @@
         dot.title = `Giudice ${judgeLetters[i] || i + 1}: nessun verdetto`;
         mgJudgesRow.appendChild(dot);
       }
+      appendJudgesNote(fb);
       return;
     }
     mgJudgesRow.hidden = false;
