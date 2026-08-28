@@ -4,7 +4,20 @@
   position: fixed;
   /* z-index gestito inline da popup.js per stacking deterministico */
   z-index: 2147483600;
-  width: 380px;
+  /* Larghezza naturale in una variabile: la posa la legge da qui (invece di
+     ricopiarla in JS) e `width` sotto resta clampata da `max-width` senza che
+     la lettura ne risenta. */
+  --sn-popup-w: 380px;
+  width: var(--sn-popup-w);
+  /* Stessa storia del tetto d'altezza, sull'altro asse (#502): dentro un
+     riquadro incorporato lo "schermo" è il riquadro, e i box dei commenti sono
+     spesso STRETTI. Con una larghezza fissa il riquadro sborda a destra e il
+     tasto di invio finisce tagliato via — non lo si raggiunge né scorrendo né
+     trascinando. Qui non serve far cedere nessuno: basta che la larghezza si
+     stringa allo spazio che c'è, come già fa lo stack dei toast. Rete di
+     sicurezza in px di layout; la posa la rifinisce inline tenendo conto della
+     scala della compensazione zoom. */
+  max-width: calc(100vw - 16px);
   max-height: 480px;
   display: flex;
   flex-direction: column;
@@ -27,6 +40,7 @@
   border-bottom: 1px solid var(--sn-border);
   cursor: move;
   user-select: none;
+  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
 }
 .sn-popup-header.sn-popup-dragging { cursor: grabbing; }
 
@@ -37,11 +51,17 @@
   text-transform: uppercase;
   color: var(--sn-muted);
   pointer-events: none; /* il drag funziona ovunque sull'header */
+  /* In un riquadro stretto il titolo si accorcia invece di spingere fuori la
+     × di chiusura. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sn-popup-close {
   all: unset;
   cursor: pointer;
+  flex: 0 0 auto; /* la chiusura resta raggiungibile anche in un riquadro stretto */
   padding: 0 6px;
   color: var(--sn-muted);
   font-size: 18px;
@@ -60,6 +80,30 @@
   /* la selezione del testo è permessa esplicitamente (header e composer no) */
   user-select: text;
 }
+
+/* ── Chi cede quando lo spazio si stringe (#502) ───────────────────────────
+   Stringere il tetto d'altezza del riquadro funziona finché il tetto resta
+   sopra la somma dei minimi dei pezzi interni. Sotto quella soglia il riquadro
+   non si accorcia più: i pezzi ESCONO dal suo bordo. In pagina si vedono
+   comunque; dentro un riquadro incorporato — un box commenti, un lettore
+   video, l'anteprima di un articolo, dove per un elemento `position: fixed`
+   lo "schermo" È il riquadro — il browser li taglia via, e non si raggiungono
+   né scorrendo né trascinando il popup altrove.
+   L'unico pezzo che può cedere è il CORPO della risposta: si accorcia e scorre,
+   fino a sparire. Poi, se ancora non basta, va la riga del costo (che resta
+   leggibile passando sopra l'intestazione). Intestazione e riga per scrivere
+   restano sempre: sono ciò che tiene viva la conversazione.
+   I due stati li mette `attachPose()` in src/content/popup.js.
+
+   Attenzione al residuo: `min-height: 0` porta a zero il CONTENUTO del corpo,
+   non il suo ingombro — l'imbottitura resta, e sono una ventina di pixel che
+   il riquadro continua a occupare quando ormai non mostra più niente. Nello
+   stato più stretto, dove del corpo non si vede comunque nulla, cede anche
+   quella: senza, il conto della posa promette un riquadro più basso di quello
+   che il browser sa disegnare e a uscire dal bordo è la riga per scrivere. */
+.sn-popup-tight .sn-popup-body { min-height: 0; }
+.sn-popup-bare .sn-popup-footer { display: none; }
+.sn-popup-bare .sn-popup-body { padding-top: 0; padding-bottom: 0; }
 
 /* Bolle conversazione */
 .sn-msg {
@@ -147,6 +191,11 @@
   border-top: 1px solid var(--sn-border);
   font-size: 11px;
   color: var(--sn-muted);
+  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
+  /* La riga nasce VUOTA e si riempie quando il modello risponde: senza un
+     minimo passerebbe da 12px a 25px a metà risposta, e la posa l'avrebbe
+     misurata bassa. Con questo, l'altezza che avrà è già quella di adesso. */
+  min-height: 1.2em;
 }
 
 .sn-popup-meta {
@@ -154,6 +203,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.2; /* pari al minimo della riga: riempiendosi non la fa crescere */
 }
 
 /* Composer per follow-up */
@@ -163,9 +213,14 @@
   align-items: flex-end;
   padding: 6px 8px 8px 8px;
   border-top: 1px solid var(--sn-border);
+  flex: 0 0 auto; /* non cede: vedi § "chi cede quando lo spazio si stringe" */
 }
 .sn-popup-input {
   flex: 1;
+  /* Senza questo la casella non scende sotto la sua larghezza naturale (un
+     textarea ne ha una tutta sua) e in un riquadro stretto spinge fuori il
+     tasto di invio, che è proprio quello che deve restare. */
+  min-width: 0;
   resize: none;
   border: 1px solid var(--sn-border);
   border-radius: 6px;
@@ -194,6 +249,7 @@
   cursor: pointer;
   height: 30px;
   width: 30px;
+  flex: 0 0 auto; /* non si stringe: è l'altra metà della riga per scrivere */
   display: flex;
   align-items: center;
   justify-content: center;
