@@ -312,10 +312,15 @@
       const r = root.getBoundingClientRect();
       const w = r.width, h = r.height;
       const vw = window.innerWidth, vh = window.innerHeight;
-      if (left < 0) left = 0;
-      if (top < 0) top = 0;
+      // Stesso ORDINE del guardiano: il bordo di sopra vince su quello di sotto.
+      // Se il riquadro è più alto della finestra i due limiti non possono valere
+      // insieme, e a cedere dev'essere il fondo: con l'ordine invertito è
+      // l'intestazione a uscire dalla cima, cioè l'unica presa che l'utente ha
+      // per rimetterlo a posto.
       if (left + w > vw) left = vw - w;
       if (top + h > vh) top = vh - h;
+      if (left < 0) left = 0;
+      if (top < 0) top = 0;
       root.style.left = left + 'px';
       root.style.top = top + 'px';
     }
@@ -324,6 +329,10 @@
       handle.classList.remove('sn-popup-dragging');
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('mouseup', onUp, true);
+      // Lasciato il riquadro, l'ultima parola è del guardiano: se è più alto
+      // della finestra il limite del mouse può solo spostarlo, mentre lui sa
+      // anche stringergli il tetto.
+      try { onDragEnd && onDragEnd(); } catch (_) {}
     }
   }
 
