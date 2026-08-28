@@ -1202,6 +1202,28 @@
     reflectSortBtn();
   }
 
+  // ── Quanti feedback c'è in ogni scheda (#495) ─────────────────────────────
+  // Le quattro schede che ELENCANO feedback (Ricevuti, In coda, Risolti,
+  // Archiviati) portano il loro numero accanto al nome, come la pagina gemella
+  // dei feedback. Le altre quattro (Statistiche, Modelli, Automazioni, Log) non
+  // elencano niente: lì un numero non vorrebbe dire nulla e non si scrive.
+  // Il conteggio degli Archiviati segue i filtri della colonna (⭐ e "Bloccati
+  // confermati"), altrimenti direbbe un numero diverso da quello che si vede.
+  function updateTabCounts() {
+    const counts = MR.manageTabCounts(allFeedbacks, {
+      releasedVersion, starredOnly, confirmedOnly,
+    });
+    for (const tab of LIST_TABS) {
+      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
+      if (!btn) continue;
+      btn.textContent = TAB_LABELS[tab] || tab;
+      const badge = document.createElement('span');
+      badge.className = 'mg-tab-count';
+      badge.textContent = `(${counts[tab]})`;
+      btn.appendChild(badge);
+    }
+  }
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
