@@ -1790,9 +1790,11 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   sua resa onesta (`LIST_PAGE_SIZE`, `listHitCap`, `countLabel`,
   `COUNT_CAP_HINT`) in `src/shared/feedback.js`; `updateTabCounts()` /
   `setListHead()` in `src/pages/manage/manage.js` (`.mg-tab-count`),
-  `updateTabCounts()` in `src/pages/feedback/feedback.js`. Test:
-  `tests/manage-tab-counts.spec.mjs`, `tests/unit/manageReview.test.mjs`,
-  `tests/unit/feedbackCountCap.test.mjs`.
+  `updateTabCounts()` in `src/pages/feedback/feedback.js`. I flag di onestà:
+  `dataLoaded`/`loadFailed` in `manage.js`, `dataLoaded`/`loadError` +
+  `showLoadError()` in `feedback.js`. Test:
+  `tests/manage-tab-counts.spec.mjs`, `tests/feedback-tab-counts-cap.spec.mjs`,
+  `tests/unit/manageReview.test.mjs`, `tests/unit/feedbackCountCap.test.mjs`.
 
 ## Se un dato ESCE da Filo, deve poter RIENTRARE (e l'import mostra prima cosa scrive)
 
