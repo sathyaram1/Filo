@@ -488,6 +488,12 @@
   // 'timer' (countdown); assente = entrambi.
   function resolveTimerRefs(list, ref = {}) {
     const all = Array.isArray(list) ? list : [];
+    // Riferimento già risolto altrove (il main lo risolve prima del popup di
+    // conferma e poi agisce su QUESTI, non su una nuova ricerca).
+    if (Array.isArray(ref.ids)) {
+      const set = new Set(ref.ids);
+      return all.filter((t) => set.has(t.id));
+    }
     if (ref.id) return all.filter((t) => t.id === ref.id);
     const kind = ref.kind === 'alarm' || ref.kind === 'timer' ? ref.kind : null;
     const pool = kind
