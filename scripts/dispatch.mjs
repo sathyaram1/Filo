@@ -453,6 +453,50 @@ function origineDelCheckout() {
   }
 }
 
+/**
+ * L'avvertenza di serie: quando lo stesso lavoro ha già collezionato più
+ * bocciature, chi riparte deve saperlo PRIMA di mettersi al lavoro. PURA.
+ *
+ * Non basta l'istruzione generica "causa non sintomo" nel file di ruolo: a
+ * ogni giro il lavorante riparte con un contesto fresco in cui "il problema"
+ * è l'ultima critica, e rispetto a quella la causa la trova davvero. Quello
+ * che non può vedere da solo è la SERIE — tre bocciature con lo stesso danno
+ * da porte diverse — perché nessuno gliela mette davanti. Questa nota
+ * gliela mette davanti (caso #502: sei giri per un difetto da due).
+ *
+ * @param {string} role     ruolo del lavorante
+ * @param {Array}  history  critiche dei giri passati (dal server)
+ * @returns {string} '' se non c'è niente da dire
+ */
+export function serialAwarenessNote(role, history) {
+  const n = Array.isArray(history) ? history.length : 0;
+  if (n < 2) return '';
+  if (role === 'fixer' || role === 'resolver') {
+    return [
+      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n} volte`,
+      '',
+      'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
+      'Leggile TUTTE prima di toccare codice. Se raccontano lo stesso danno che',
+      'rientra da porte diverse, il rimedio giusto non è chiudere l\'ultima porta',
+      'segnalata: è fare l\'inventario di TUTTE le strade che possono riprodurre',
+      'il sintomo (cosa può cambiare lo stato da cui il difetto nasce, in ogni',
+      'direzione) e scrivere una regola sola che le copra. Prima di consegnare,',
+      'ripercorri l\'inventario e verifica ogni voce.',
+    ].join('\n');
+  }
+  if (role === 'verifier') {
+    return [
+      `## ⚠️ Avvertenza di serie: sei al giro ${n + 1} di verifica su questo lavoro`,
+      '',
+      'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
+      'Se raccontano lo stesso danno da porte diverse, non limitarti a cercare la',
+      'porta successiva: elenca nella STESSA critica tutte quelle che trovi, così',
+      'la prossima correzione le chiude insieme invece che una per giro.',
+    ].join('\n');
+  }
+  return '';
+}
+
 export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
