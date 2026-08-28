@@ -123,6 +123,33 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    LEGGI_FILE: {
+      // Filo apre per intero un file dell'EDITOR di cui vede solo il riassunto
+      // (#379.5). Sola lettura di dati che sono già in parte nel contesto (i
+      // riassunti ci stanno sempre), nessuna scrittura e nessuna uscita → 1.
+      // Mancava dal registro: senza una voce qui il dispatch rifiuta l'azione,
+      // quindi la lettura on-demand dei documenti dell'editor non partiva mai.
+      level: 1,
+      describe: (a) => {
+        const id = a && (a.fileId ?? a.id ?? a.file);
+        return `Leggere per intero un documento dell'editor${id ? ` (${id})` : ''}`;
+      },
+    },
+    LEGGI_DOCUMENTO: {
+      // Filo legge un documento dal DISCO dell'utente — un PDF (bolletta,
+      // estratto conto, contratto) o un file di testo — perché l'utente gli ha
+      // chiesto di leggerlo. Livello 1, per le stesse ragioni per cui un comando
+      // di sola lettura nel terminale è livello 1: non modifica niente, non
+      // esegue niente, non manda niente fuori dal computer — il testo entra solo
+      // nel contesto del modello. Una conferma a ogni documento sarebbe attrito
+      // su una cosa che l'utente ha appena chiesto, e una conferma che si accetta
+      // sempre smette di essere un controllo.
+      level: 1,
+      describe: (a) => {
+        const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
+        return `Leggere il documento ${p || ''}`.trim();
+      },
+    },
     LEGGI_TRASPARENZA: {
       // Filo rilegge i propri documenti di trasparenza per rispondere a "perché
       // usi questo modello?", "che fine fanno i miei dati?". Sola lettura di
