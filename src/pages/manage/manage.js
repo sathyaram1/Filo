@@ -1212,18 +1212,32 @@
   // confermati"), altrimenti direbbe un numero diverso da quello che si vede.
   // Finché i feedback non sono arrivati (caricamento in corso, o fallito) non
   // si scrive nessun numero: uno "(0)" là dove il dato manca è un numero falso.
+  // Il caricamento si ferma ai 500 più recenti: quando li tocca tutti, i numeri
+  // diventano "(24+)" — sono minimi, non totali — e l'hover dice perché.
+  function loadHitCap() {
+    return FB.listHitCap(allFeedbacks, FB.LIST_PAGE_SIZE);
+  }
+  // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
+  // l'intestazione della colonna e per la ricerca.
+  function countText(n) {
+    return FB.countLabel(n, loadHitCap());
+  }
+
   function updateTabCounts() {
     const counts = dataLoaded
       ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
       : null;
+    const capped = counts ? loadHitCap() : false;
     for (const tab of LIST_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
       btn.textContent = counts ? `${TAB_LABELS[tab] || tab} ` : (TAB_LABELS[tab] || tab);
+      btn.title = capped ? FB.COUNT_CAP_HINT : '';
+      if (!capped) btn.removeAttribute('title');
       if (!counts) continue;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
-      badge.textContent = `(${counts[tab]})`;
+      badge.textContent = countText(counts[tab]);
       btn.appendChild(badge);
     }
   }
