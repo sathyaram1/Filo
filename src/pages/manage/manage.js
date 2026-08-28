@@ -1673,11 +1673,7 @@
     // Il numero è quello delle card DAVVERO disegnate: un risultato il cui
     // feedback non è più fra i caricati non viene mostrato, e non va contato.
     setListHead('Ricerca', shown);
-    if (!shown) {
-      mgList.hidden = true;
-      mgListEmpty.hidden = false;
-      mgListEmpty.textContent = 'Nessun feedback pertinente.';
-    }
+    if (!shown) nessuno();
   }
 
   async function runSearch(rawQuery) {
