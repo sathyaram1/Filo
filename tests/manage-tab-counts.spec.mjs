@@ -201,12 +201,14 @@ test('#495 — a finestra stretta il nome e il suo numero restano sulla stessa r
   expect(geo.lenteRight).toBeLessThanOrEqual(geo.clientWidth + 1);
   expect(geo.scrollWidth).toBeLessThanOrEqual(geo.clientWidth);
 
+  // La lente, in fondo alla barra, resta raggiungibile anche dopo il capo.
+  await page.locator('#mgSearchToggle').click();
+  await expect(page.locator('#mgSearchInput')).toBeVisible();
+  await page.locator('#mgSearchClose').click();
+
   // E le schede andate a capo restano cliccabili: l'ultima si apre davvero.
   await tab(page, 'log').click();
   await expect(tab(page, 'log')).toHaveClass(/mg-tab--active/);
-  // La ricerca, in fondo alla barra, resta raggiungibile anche lì.
-  await page.locator('#mgSearchToggle').click();
-  await expect(page.locator('#mgSearchInput')).toBeVisible();
 });
 
 // ── La ricerca è una lista come le altre: dice quanti ne ha trovati ────────
