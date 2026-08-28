@@ -82,7 +82,7 @@ async function avvisaDalMain(app, payload) {
  * può asserire che il gesto è arrivato davvero al main — non solo che la UI ha
  * cambiato colore.
  */
-async function stubApprovals(page, { admin = true, pending = [], recent = [], approveReply = null } = {}) {
+async function stubApprovals(page, { admin = true, pending = [], failed = [], recent = [], approveReply = null } = {}) {
   await page.evaluate((cfg) => {
     window.__macCalls = [];
     const orig = window.filo.message.bind(window.filo);
@@ -91,7 +91,11 @@ async function stubApprovals(page, { admin = true, pending = [], recent = [], ap
       if (t === 'auth_status') return { ok: true, signedIn: cfg.admin, isAdmin: cfg.admin, profile: null };
       if (t === 'merge_approvals_get') {
         if (!cfg.admin) return { ok: false, error: 'Operazione riservata agli amministratori.' };
-        return { ok: true, pending: cfg.pending, recent: cfg.recent, ttlMs: 24 * 60 * 60 * 1000 };
+        // Al primo scarto la scheda "approvata ma non avvenuta" esce
+        // dall'elenco, come farebbe il server: serve per asserire che dopo
+        // "Segna come sistemata" la scheda sparisce davvero.
+        const failedNow = cfg.failed.filter((f) => !window.__macCalls.some((c) => c.op === 'discard' && c.id === f.id));
+        return { ok: true, pending: cfg.pending, failed: failedNow, recent: cfg.recent, ttlMs: 7 * 24 * 60 * 60 * 1000 };
       }
       if (t === 'merge_approval_approve') {
         window.__macCalls.push({ op: 'approve', id: msg.id });
@@ -103,7 +107,7 @@ async function stubApprovals(page, { admin = true, pending = [], recent = [], ap
       }
       return orig(msg);
     };
-  }, { admin, pending, recent, approveReply });
+  }, { admin, pending, failed, recent, approveReply });
 }
 
 /** Gestione, sulla scheda di partenza: i Ricevuti. */
