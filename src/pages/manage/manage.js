@@ -1205,7 +1205,6 @@
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
-    if (mgListHead) mgListHead.textContent = TAB_LABELS[currentTab] || '';
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
 
     // Il filtro ⭐ esiste solo nella tab Archiviati (DB2).
@@ -1215,11 +1214,10 @@
     // Sottoinsieme della tab corrente, ordinato (logica pura condivisa).
     if (isArchived) {
       // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
-      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly });
-      // Filtro "Bloccati confermati": solo gli attacchi/spam confermati.
-      if (confirmedOnly) {
-        currentList = currentList.filter((f) => String(MR.normalizeStatus(f).status).endsWith('_confirmed'));
-      }
+      // Il filtro "Bloccati confermati" (solo attacchi/spam confermati) è dentro
+      // listArchiveTab: la stessa funzione conta la scheda, così il numero non
+      // può discostarsi dalla lista.
+      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
       mgListEmpty.textContent = confirmedOnly
         ? 'Nessun attacco o spam confermato.'
         : starredOnly
