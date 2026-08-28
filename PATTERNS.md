@@ -1819,3 +1819,32 @@ tecnica letta male — dopo di che tutti i feedback di quel mittente saltano i g
 (icona, etichetta, ordinamento) e `manage.html` (interruttori). Test:
 `tests/unit/feedbackThread.test.mjs`, `tests/unit/autoApprove.test.mjs`,
 `tests/manage-author-sort.spec.mjs`, e i gemelli in `filo-security/functions/test/`.
+
+## Una barra di schede che divide una lista porta il conteggio di ogni scheda
+
+Quando delle schede spartiscono uno stesso insieme (i feedback fra Ricevuti / In coda /
+Risolti / Archiviati), ogni scheda scrive **quanti elementi contiene**, in forma
+`Etichetta (N)`. Senza il numero l'unico modo di sapere dov'è finito il lavoro è
+aprirle una per una: quattro clic per una domanda che si risponde con uno sguardo.
+
+- **Il numero è la LUNGHEZZA della lista che si apre cliccando**, non un conteggio
+  calcolato per conto suo. Vale anche coi filtri della scheda attivi (⭐ preferiti,
+  bloccati confermati): un badge che dice 12 su una lista di 3 è peggio di nessun badge.
+  In pratica: il conteggio esce dalla **stessa funzione pura** che costruisce la lista.
+- **Si mostra anche lo zero.** `Risolti (0)` è informazione ("è vuota"); il vuoto è
+  ambiguo ("è vuota" o "non ho ancora caricato").
+- **Finché i dati non sono arrivati il posto resta vuoto**, non `(0)`: un contatore che
+  parte da zero e poi salta a 24 racconta una bugia per mezzo secondo.
+- **Si aggiorna dove si aggiorna la lista.** Ogni azione che sposta un elemento di
+  scheda (archiviare, sbloccare, approvare) ridisegna già la lista: il conteggio va
+  ricalcolato lì, non a un ricaricamento della pagina.
+- Le schede che non sono liste (segnaposto, pannelli di impostazioni) restano senza
+  numero: non c'è niente da contare.
+- Resa: etichetta piena + numero più piccolo e smorzato accanto, con lo **spazio nel
+  testo** e non solo nel margine (letto ad alta voce è "Ricevuti (24)", non
+  "Ricevuti(24)"), più un `title` che dice di cosa è il conto.
+
+**Dove:** `countsByManageTab` in `src/shared/manageReview.js` + `renderTabCounts` in
+`src/pages/manage/manage.js` (`.mg-tab-count`); `updateTabCounts` in
+`src/pages/feedback/feedback.js`. Test: `tests/unit/manageReview.test.mjs`,
+`tests/manage-tab-counts.spec.mjs`.

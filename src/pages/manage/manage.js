@@ -1209,7 +1209,10 @@
   // logica pura che la costruisce. Finché i dati non sono arrivati gli spazi
   // restano vuoti: meglio niente che uno zero falso.
   const TAB_COUNT_NOUN = {
-    inbox: 'ricevuti', queue: 'in coda', resolved: 'risolti', archived: 'archiviati',
+    inbox:    ['feedback ricevuto', 'feedback ricevuti'],
+    queue:    ['feedback in coda', 'feedback in coda'],
+    resolved: ['feedback risolto', 'feedback risolti'],
+    archived: ['feedback archiviato', 'feedback archiviati'],
   };
   function renderTabCounts() {
     const counts = MR.countsByManageTab(allFeedbacks, {
