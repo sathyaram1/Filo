@@ -125,6 +125,18 @@
       border-bottom-color: var(--sn-accent);
     }
     .mg-tab[hidden] { display: none; }
+    /* Quanti feedback ci sono in quella scheda. Sta accanto all'etichetta,
+       più piccolo e smorzato: si legge di sfuggita e non ruba la scena al
+       nome della scheda. Vuoto finché i dati non sono arrivati (un "(0)"
+       durante il caricamento sarebbe una bugia). */
+    .mg-tab-count {
+      margin-left: 5px;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0.65;
+    }
+    .mg-tab-count:empty { display: none; }
+    .mg-tab--active .mg-tab-count { opacity: 0.8; }
     .mg-panel { display: none; }
     .mg-panel--active { display: block; }
 
