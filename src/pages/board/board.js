@@ -103,6 +103,12 @@
 
   // ── Render ──────────────────────────────────────────────────────────────
   function renderList() {
+    // Caricamento fallito e mai riuscito: la lista è vuota perché non l'abbiamo,
+    // non perché non ci sia niente. Resta l'errore, con la via d'uscita.
+    if (!dataLoaded && lastLoadError) {
+      showLoadError(lastLoadError);
+      return;
+    }
     const items = MR.listBoardTab(allFeedbacks, { releasedVersion });
     bdLoading.hidden = true;
     if (bdError) bdError.hidden = true;
