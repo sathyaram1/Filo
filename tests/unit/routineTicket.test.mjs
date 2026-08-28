@@ -121,6 +121,17 @@ test('chi esplora non riceve niente', () => {
   assert.deepEqual(serverCtx({ role: 'prober' }, BUSTA), {});
 });
 
+test('lo storico delle critiche passa dalla busta al pacchetto (e manca senza rompere)', () => {
+  const history = [{ verdict: 'fail', critique: 'esce con lo zoom' }];
+  const conStorico = Object.assign({}, BUSTA, {
+    role: 'verifier',
+    payload: Object.assign({}, BUSTA.payload, { role: 'verifier', history }),
+  });
+  assert.deepEqual(serverCtx({ role: 'verifier' }, conStorico).history, history);
+  // Un server vecchio non manda `history`: elenco vuoto, non un buco nel payload.
+  assert.deepEqual(serverCtx({ role: 'fixer' }, Object.assign({}, BUSTA, { role: 'fixer' })).history, []);
+});
+
 test('una busta con un ruolo sconosciuto NON si consegna', () => {
   assert.match(checkEnvelope({ role: 'capo', id: 'x' }), /non sa eseguire/);
   assert.match(checkEnvelope({ role: '', id: 'x' }), /non sa eseguire/);

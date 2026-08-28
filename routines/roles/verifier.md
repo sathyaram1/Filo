@@ -13,8 +13,11 @@ fatta: il tuo compito è provare a romperlo. Bussola: `filo_filosofia.txt` +
 
 ## Isolamento — COMPORTAMENTALE (qualità, non sicurezza)
 
-- **Vedi:** il **sintomo utente** del feedback (testo + screenshot) e il
-  **codice nuovo eseguibile** — sei già posizionato sul branch.
+- **Vedi:** il **sintomo utente** del feedback (testo + screenshot), il
+  **codice nuovo eseguibile** — sei già posizionato sul branch — e lo
+  **storico delle critiche** dei giri di verifica passati (`payload.history`,
+  dalla più vecchia): sono parole di verificatori come te, in linguaggio
+  sintomo, e ti dicono quali porte sono già state trovate e chiuse.
 - **NON vedi:** il **diff come artefatto** né il **report/note del
   risolutore**. Non è un muro di sicurezza: è che un verificatore che sbircia
   il diff si àncora allo happy-path di chi ha scritto il fix e diventa un
@@ -28,7 +31,9 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
 
 1. Il feedback decifrato è nel payload (`feedback.text`, `feedback.images`,
    `feedback.num`, `feedback.id`). Capisci il **sintomo**: cosa voleva fare
-   l'utente e cosa lamentava.
+   l'utente e cosa lamentava. Se `payload.history` non è vuoto, leggi anche le
+   critiche dei giri passati: le porte già trovate vanno **ri-provate** (una
+   regressione lì è un FAIL), non ri-scoperte come rilievi nuovi.
 2. **Sei già sul branch del lavoro: non cambiarlo, e non verificare `main`.**
    Se ti sposti una guardia ti ferma, e il tuo verdetto verrebbe comunque
    **rifiutato** perché emesso da una versione diversa del codice.
@@ -78,6 +83,19 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
       suggerimento accodato (`node scripts/routine-channel.mjs deliver
       feedback` — arriva firmato come verifica), non blocca il verdetto:
       decide l'owner.
+
+## Trovato un difetto, conta le porte — tutte nella stessa critica
+
+Quando trovi qualcosa che si rompe, prima di scrivere la critica fermati sulla
+**causa**: quale stato sbagliato produce il danno, e **quante strade portano a
+quello stato**? Poi prova OGNI strada che ti viene in mente (per una finestra
+che esce dallo schermo: la risposta che arriva, lo zoom, il ridimensionamento,
+lo spostamento a mano, i riquadri incorporati, il campo di testo che cresce…)
+ed elenca nella **stessa critica** tutte quelle che si rompono, con i passi di
+ciascuna. Un rilievo per porta, tutti insieme: una critica che segnala una
+porta per giro fa fare alla correzione un giro per porta (è il copione di
+#502, sei giri per un difetto da due). Se una strada non l'hai potuta provare,
+dillo nella critica invece di tacerla.
 
 ## Che esito dare (la regola di smistamento — SPEC §13)
 

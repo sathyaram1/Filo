@@ -453,6 +453,50 @@ function origineDelCheckout() {
   }
 }
 
+/**
+ * L'avvertenza di serie: quando lo stesso lavoro ha già collezionato più
+ * bocciature, chi riparte deve saperlo PRIMA di mettersi al lavoro. PURA.
+ *
+ * Non basta l'istruzione generica "causa non sintomo" nel file di ruolo: a
+ * ogni giro il lavorante riparte con un contesto fresco in cui "il problema"
+ * è l'ultima critica, e rispetto a quella la causa la trova davvero. Quello
+ * che non può vedere da solo è la SERIE — tre bocciature con lo stesso danno
+ * da porte diverse — perché nessuno gliela mette davanti. Questa nota
+ * gliela mette davanti (caso #502: sei giri per un difetto da due).
+ *
+ * @param {string} role     ruolo del lavorante
+ * @param {Array}  history  critiche dei giri passati (dal server)
+ * @returns {string} '' se non c'è niente da dire
+ */
+export function serialAwarenessNote(role, history) {
+  const n = Array.isArray(history) ? history.length : 0;
+  if (n < 2) return '';
+  if (role === 'fixer' || role === 'resolver') {
+    return [
+      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n} volte`,
+      '',
+      'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
+      'Leggile TUTTE prima di toccare codice. Se raccontano lo stesso danno che',
+      'rientra da porte diverse, il rimedio giusto non è chiudere l\'ultima porta',
+      'segnalata: è fare l\'inventario di TUTTE le strade che possono riprodurre',
+      'il sintomo (cosa può cambiare lo stato da cui il difetto nasce, in ogni',
+      'direzione) e scrivere una regola sola che le copra. Prima di consegnare,',
+      'ripercorri l\'inventario e verifica ogni voce.',
+    ].join('\n');
+  }
+  if (role === 'verifier') {
+    return [
+      `## ⚠️ Avvertenza di serie: sei al giro ${n + 1} di verifica su questo lavoro`,
+      '',
+      'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
+      'Se raccontano lo stesso danno da porte diverse, non limitarti a cercare la',
+      'porta successiva: elenca nella STESSA critica tutte quelle che trovi, così',
+      'la prossima correzione le chiude insieme invece che una per giro.',
+    ].join('\n');
+  }
+  return '';
+}
+
 export function readRoleInstructions(role) {
   const name = ROLE_FILE[role];
   if (!name) return '';
@@ -487,7 +531,15 @@ export function buildPayload(bucket, ctx = {}) {
       return { branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
-      return { branch: bucket.branch, id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      // Lo STORICO delle critiche dei giri passati invece sì (è linguaggio
+      // sintomo, scritto dai verificatori precedenti, non il racconto di chi
+      // ha risolto): senza, ogni giro trova UNA porta e la serie non converge.
+      return {
+        branch: bucket.branch, id: bucket.id, num: bucket.num,
+        feedback: ctx.feedback || null,
+        history: Array.isArray(ctx.history) ? ctx.history : [],
+        loopCount: bucket.loopCount || 0,
+      };
     case 'fixer':
       return {
         // È il resolver nel caso `correzione`: stesse istruzioni del primo
@@ -503,6 +555,10 @@ export function buildPayload(bucket, ctx = {}) {
         // riscritto quando ci si posiziona sul ramo — ed è così che la critica
         // spariva senza che nessuno se ne accorgesse.
         verifierCritique: bucket.serverCritique || bucket.state?.verifierCritique || '',
+        // TUTTE le critiche dei giri passati, dalla più vecchia: la singola
+        // critica dice cosa correggere, la serie dice se stai tappando porte
+        // una alla volta invece di chiudere la causa.
+        history: Array.isArray(ctx.history) ? ctx.history : [],
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
@@ -1197,8 +1253,13 @@ export function serverCtx(bucket, fromServer, diff = '') {
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
     // se lo vada a rileggere: il ripiego sarebbe la chiave, ed è proprio ciò
-    // che da qui è stato tolto.
-    return { feedback: (payload && payload.feedback) || null };
+    // che da qui è stato tolto. Lo storico delle critiche viaggia accanto al
+    // feedback, per chi lo riceve (verifier e fixer); un server vecchio non lo
+    // manda e qui arriva semplicemente vuoto.
+    return {
+      feedback: (payload && payload.feedback) || null,
+      history: Array.isArray(payload && payload.history) ? payload.history : [],
+    };
   }
   return {};
 }
@@ -1297,12 +1358,16 @@ export function emit(bucket, ctx) {
   if (bucket.role === 'halt') clearRole(ROOT);
   else writeRole(ROOT, bucket.role);
   const payload = buildPayload(bucket, ctx);
+  // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
+  // payload: un dato in più si può non guardare, un'istruzione no.
+  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history);
+  const base = readRoleInstructions(bucket.role);
   const out = {
     role: bucket.role,
     payload,
     claim: bucket.id || null,
     loopCount: bucket.loopCount || 0,
-    instructions: readRoleInstructions(bucket.role),
+    instructions: serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base,
   };
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
