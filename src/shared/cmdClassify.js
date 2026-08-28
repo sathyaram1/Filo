@@ -609,6 +609,16 @@
   function classifyNpm(cmd) {
     const sub = subcommandOf(cmd);
     if (!sub) return 1; // `npm` da solo → help
+    // `config`: leggere la configurazione è lettura (get/list/ls/debug/nudo),
+    // ma `set`/`delete`/`rm`/`unset`/`edit`/`add` la CAMBIANO — e tra le chiavi
+    // c'è il REGISTRY, cioè da dove npm/pip scaricano ed eseguono codice.
+    // Reindirizzarlo non è lettura → conferma (2). `edit` apre pure un editor.
+    if (sub === 'config') {
+      const rest = tokens(cmd).slice(1).map(unquote).filter((t) => !t.startsWith('-'));
+      const verb = (rest[1] || '').toLowerCase(); // rest[0] === 'config'
+      if (!verb || verb === 'get' || verb === 'list' || verb === 'ls' || verb === 'debug') return 1;
+      return 2;
+    }
     if (NPM_READ.has(sub)) return 1;
     if (NPM_WRITE.has(sub)) return 2;
     return 3; // run/exec/start/test/publish/sconosciuti → 3
