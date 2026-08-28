@@ -1227,9 +1227,8 @@
       // feedback (`updateTabCounts` in feedback.js).
       el.textContent = ` (${n})`;
       // Hover: il numero da solo non dice di cosa sia il conto.
-      el.title = n === 1
-        ? `1 feedback ${TAB_COUNT_NOUN[tab]}`
-        : `${n} feedback ${TAB_COUNT_NOUN[tab]}`;
+      const noun = TAB_COUNT_NOUN[tab];
+      el.title = `${n} ${noun[n === 1 ? 0 : 1]}`;
     }
   }
 
