@@ -1264,7 +1264,8 @@
     // non cambia il numero, quindi si può contare qui.
     updateTabCounts();
     if (mgListHead) {
-      mgListHead.textContent = `${TAB_LABELS[currentTab] || ''} (${currentList.length})`;
+      const label = TAB_LABELS[currentTab] || '';
+      mgListHead.textContent = dataLoaded ? `${label} (${currentList.length})` : label;
     }
 
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
