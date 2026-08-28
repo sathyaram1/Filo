@@ -44,11 +44,12 @@ describe('il titolo', () => {
 });
 
 describe('la scadenza, detta prima', () => {
-  test('la finestra è di un giorno: appena aperta lo dice in ore', () => {
+  test('la finestra è di una settimana: appena aperta lo dice in giorni, sotto il giorno in ore', () => {
     // La difesa vera è lo sha registrato + l'uso singolo, non l'orologio: una
-    // finestra corta bruciava solo il quarto d'ora di controlli necessario a
-    // rifare la richiesta. Se il valore torna a mezz'ora questo diventa rosso.
-    assert.equal(UI.expiresIn(ORA + 24 * ORE, ORA), 'scade fra 24 ore');
+    // finestra corta obbligava l'owner a passare da Filo ogni giorno (decisione
+    // owner 2026-08-28). Se il valore torna corto questo diventa rosso.
+    assert.equal(UI.expiresIn(ORA + 7 * 24 * ORE, ORA), 'scade fra 7 giorni');
+    assert.equal(UI.expiresIn(ORA + 24 * ORE, ORA), 'scade fra 1 giorno');
     assert.equal(UI.expiresIn(ORA + 2 * ORE, ORA), 'scade fra 2 ore');
     assert.equal(UI.expiresIn(ORA + 61 * MIN, ORA), 'scade fra 1 ora');
   });

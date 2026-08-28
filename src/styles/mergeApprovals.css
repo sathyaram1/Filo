@@ -251,3 +251,15 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-recent-who { overflow-wrap: anywhere; }
 .sn-mac-recent-origin { color: var(--sn-muted); white-space: nowrap; }
 .sn-mac-recent-row[data-outcome='approvata e fusa'] .sn-mac-recent-what { color: var(--sn-accent); }
+
+/* ── Approvata ma mai avvenuta (conflitto) ─────────────────────────────── */
+
+/* Stessa grammatica dell'avviso, ma in tinta d'errore: qui un sì già dato non
+   ha prodotto niente, e deve saltare all'occhio più di una richiesta nuova. */
+.sn-mac.sn-mac-failed {
+  background: color-mix(in srgb, var(--sn-error) 8%, var(--sn-bg));
+  border: 1px solid color-mix(in srgb, var(--sn-error) 34%, var(--sn-border));
+  border-left: 3px solid var(--sn-error);
+}
+.sn-mac.sn-mac-failed .sn-mac-title-text { color: var(--sn-error); }
+.sn-mac-card-failed .sn-mac-why { color: var(--sn-fg); }
