@@ -273,7 +273,7 @@
   // ----------------------------------------------------------------
   // Drag dell'header
   // ----------------------------------------------------------------
-  function attachDrag(root, handle, onDragStart) {
+  function attachDrag(root, handle, onDragStart, onDragEnd) {
     let dx = 0, dy = 0;
     let dragging = false;
     handle.addEventListener('mousedown', (e) => {
