@@ -153,7 +153,9 @@ test('una sveglia ricorrente suona e resta: "Ferma" non la disdice', async ({ ap
   // "Ferma" la zittisce, ma domani suona ancora: resta in colonna con la sua
   // ricorrenza e con la prossima occorrenza nel futuro. Prima una sveglia
   // fermata spariva, e questo è il passo che senza la ricorrenza è rosso.
-  await page.locator('.dash-live-stop').click();
+  // La colonna si ridisegna ogni secondo (i timer scorrono): senza `force` il
+  // click aspetta una stabilità che non arriva mai.
+  await page.locator('.dash-live-stop').click({ force: true });
   await expect(page.locator('#live')).toHaveAttribute('data-ringing', '0', { timeout: 10_000 });
   await expect(page.locator('.dash-live-card', { hasText: 'pillola' })).toContainText('ogni giorno');
 
@@ -163,6 +165,6 @@ test('una sveglia ricorrente suona e resta: "Ferma" non la disdice', async ({ ap
   expect(new Date(left[0].endsAt).getTime()).toBeGreaterThan(Date.now());
 
   // La × invece la toglie davvero, anche se si ripete.
-  await page.locator('.dash-live-card', { hasText: 'pillola' }).locator('.dash-live-dismiss').click();
+  await page.locator('.dash-live-card', { hasText: 'pillola' }).locator('.dash-live-dismiss').click({ force: true });
   await expect(page.locator('.dash-live-card', { hasText: 'pillola' })).toHaveCount(0, { timeout: 10_000 });
 });
