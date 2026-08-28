@@ -784,10 +784,13 @@
 
     <!-- Tab bar (dashboard unificata DB1, owner-only) -->
     <nav class="mg-tabs" id="mgTabs" role="tablist">
-      <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
-      <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
-      <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
-      <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
+      <!-- Le quattro schede-lista portano il conteggio dei feedback che
+           contengono (riempito dal JS a dati caricati): si vede dove si è
+           accumulato il lavoro senza aprirle una per una. -->
+      <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab"><span class="mg-tab-label">Ricevuti</span><span class="mg-tab-count" data-count="inbox"></span></button>
+      <button type="button" class="mg-tab" data-tab="queue" role="tab"><span class="mg-tab-label">In coda</span><span class="mg-tab-count" data-count="queue"></span></button>
+      <button type="button" class="mg-tab" data-tab="resolved" role="tab"><span class="mg-tab-label">Risolti</span><span class="mg-tab-count" data-count="resolved"></span></button>
+      <button type="button" class="mg-tab" data-tab="archived" role="tab"><span class="mg-tab-label">Archiviati</span><span class="mg-tab-count" data-count="archived"></span></button>
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Statistiche Red Team</button>
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
