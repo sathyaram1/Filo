@@ -393,6 +393,19 @@
     }
   }
 
+  // Quando suona una sveglia. Se si RIPETE, il giorno della prossima occorrenza
+  // non è l'informazione utile ("07:55 di domani" per una sveglia del lunedì e
+  // del mercoledì dice meno del vero): si mostrano l'orario e i giorni, con la
+  // stessa dicitura che legge l'assistente ("feriali", "lun+mer").
+  function fmtAlarmWhen(t) {
+    const M = self.SN_FILO_MEMORY;
+    const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
+    if (!rep) return fmtAlarmTime(t.endsAt);
+    const d = new Date(t.endsAt);
+    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `${hhmm} · ${rep}`;
+  }
+
   // Orario "umano" di una sveglia: HH:MM, con l'indicazione del giorno solo se
   // non è oggi (#322).
   function fmtAlarmTime(iso) {
