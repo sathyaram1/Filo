@@ -1752,13 +1752,29 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   caricamento fallito, la scheda resta col solo nome: uno "(0)" là dove non si
   sa è peggio del silenzio. `(0)` si scrive solo quando la sezione è davvero
   vuota — ed è lì che serve, perché dice "vuota" invece di lasciarlo intuire.
+- **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
+  anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
+  a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
+  Il numero è quello delle righe DISEGNATE, non quello che ha risposto il
+  modello: un risultato che punta a un elemento non più caricato non si vede e
+  non si conta.
+- **Un numero non può affermare più di quanto la pagina sa.** Se la pagina
+  carica al massimo N elementi (qui 500, i più recenti), oltre quella soglia
+  ogni conteggio è un MINIMO: si scrive `(312+)`, non `(312)`, e un hover dice
+  quanti se ne sono caricati. Vale anche per lo zero — `(0+)` — e il testo di
+  "sezione vuota" lo ripete, perché al tetto una sezione vuota può non esserlo.
+  Caricare davvero tutto costa letture: è una scelta dell'owner, non una
+  scorciatoia per far tornare i numeri.
 - **Superfici gemelle si allineano.** La pagina dei feedback e la dashboard di
   gestione sono la stessa barra vista da due ruoli: la seconda era rimasta
   senza numeri per anni proprio perché nessuno le guardava affiancate.
-- **Dove:** `manageTabCounts` in `src/shared/manageReview.js`,
-  `updateTabCounts()` in `src/pages/manage/manage.js` (`.mg-tab-count`),
+- **Dove:** `manageTabCounts` in `src/shared/manageReview.js`; il tetto e la
+  sua resa onesta (`LIST_PAGE_SIZE`, `listHitCap`, `countLabel`,
+  `COUNT_CAP_HINT`) in `src/shared/feedback.js`; `updateTabCounts()` /
+  `setListHead()` in `src/pages/manage/manage.js` (`.mg-tab-count`),
   `updateTabCounts()` in `src/pages/feedback/feedback.js`. Test:
-  `tests/manage-tab-counts.spec.mjs`, `tests/unit/manageReview.test.mjs`.
+  `tests/manage-tab-counts.spec.mjs`, `tests/unit/manageReview.test.mjs`,
+  `tests/unit/feedbackCountCap.test.mjs`.
 
 ## Se un dato ESCE da Filo, deve poter RIENTRARE (e l'import mostra prima cosa scrive)
 
