@@ -818,6 +818,11 @@
   global.SN_FEEDBACK = {
     submit,
     list,
+    // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
+    LIST_PAGE_SIZE,
+    listHitCap,
+    countLabel,
+    COUNT_CAP_HINT,
     updateStatus,
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
     // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.
