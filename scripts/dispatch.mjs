@@ -1358,12 +1358,16 @@ export function emit(bucket, ctx) {
   if (bucket.role === 'halt') clearRole(ROOT);
   else writeRole(ROOT, bucket.role);
   const payload = buildPayload(bucket, ctx);
+  // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
+  // payload: un dato in più si può non guardare, un'istruzione no.
+  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history);
+  const base = readRoleInstructions(bucket.role);
   const out = {
     role: bucket.role,
     payload,
     claim: bucket.id || null,
     loopCount: bucket.loopCount || 0,
-    instructions: readRoleInstructions(bucket.role),
+    instructions: serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base,
   };
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
