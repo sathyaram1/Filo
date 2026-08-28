@@ -1235,6 +1235,13 @@
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
     currentList = applySortMode(currentList);
 
+    // #495: quante ne contiene ogni scheda, senza doverle aprire. L'ordinamento
+    // non cambia il numero, quindi si può contare qui.
+    updateTabCounts();
+    if (mgListHead) {
+      mgListHead.textContent = `${TAB_LABELS[currentTab] || ''} (${currentList.length})`;
+    }
+
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
     // almeno un feedback bianco (panel parziale) da ri-valutare.
     updateReevalBar();
