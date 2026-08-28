@@ -31,7 +31,9 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
 
 1. Il feedback decifrato è nel payload (`feedback.text`, `feedback.images`,
    `feedback.num`, `feedback.id`). Capisci il **sintomo**: cosa voleva fare
-   l'utente e cosa lamentava.
+   l'utente e cosa lamentava. Se `payload.history` non è vuoto, leggi anche le
+   critiche dei giri passati: le porte già trovate vanno **ri-provate** (una
+   regressione lì è un FAIL), non ri-scoperte come rilievi nuovi.
 2. **Sei già sul branch del lavoro: non cambiarlo, e non verificare `main`.**
    Se ti sposti una guardia ti ferma, e il tuo verdetto verrebbe comunque
    **rifiutato** perché emesso da una versione diversa del codice.
