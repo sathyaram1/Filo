@@ -487,7 +487,15 @@ export function buildPayload(bucket, ctx = {}) {
       return { branch: bucket.branch, diff: ctx.diff || '', id: bucket.id, num: bucket.num };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
-      return { branch: bucket.branch, id: bucket.id, num: bucket.num, feedback: ctx.feedback || null };
+      // Lo STORICO delle critiche dei giri passati invece sì (è linguaggio
+      // sintomo, scritto dai verificatori precedenti, non il racconto di chi
+      // ha risolto): senza, ogni giro trova UNA porta e la serie non converge.
+      return {
+        branch: bucket.branch, id: bucket.id, num: bucket.num,
+        feedback: ctx.feedback || null,
+        history: Array.isArray(ctx.history) ? ctx.history : [],
+        loopCount: bucket.loopCount || 0,
+      };
     case 'fixer':
       return {
         // È il resolver nel caso `correzione`: stesse istruzioni del primo
