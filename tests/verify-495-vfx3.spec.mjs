@@ -27,17 +27,10 @@ test('#495/vfx3 — feedback: caricamento fallito → le sezioni non devono dire
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
 
-  // Il caricamento fallisce: è lo stato in cui la pagina si trova offline.
-  await page.evaluate(() => {
-    if (window.__fbTest && window.__fbTest.load) {
-      window.SN_FEEDBACK.list = async () => { throw new Error('offline'); };
-    }
-  });
-  await page.evaluate(async () => {
-    window.SN_FEEDBACK.list = async () => { throw new Error('offline'); };
-    if (window.__fbTest.load) { try { await window.__fbTest.load(); } catch (_) {} }
-  });
-  await page.waitForTimeout(400);
+  // Caricamento fallito: è lo stato in cui la pagina si trova offline. In
+  // questo ambiente non c'è rete, quindi ci arriva da sola — la si aspetta
+  // dal tasto "Riprova" che compare solo su quel ramo.
+  await expect(page.locator('.fb-load-retry')).toBeVisible({ timeout: 30000 });
 
   const primaDelClick = await page.locator('[data-tab]').allInnerTexts();
   console.log('DOPO IL FALLIMENTO:', JSON.stringify(primaDelClick));
