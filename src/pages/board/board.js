@@ -488,7 +488,7 @@
     }
 
     try {
-      allFeedbacks = await FB.list({ pageSize: 500, timeoutMs: LOAD_TIMEOUT_MS });
+      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
     } catch (err) {
       // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
       // il tasto Riprova e fermati qui (renderList mostrerebbe #bdEmpty).
