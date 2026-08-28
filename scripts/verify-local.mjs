@@ -107,6 +107,69 @@ export function withVerdict(state, branch, { verdict, critique, sha, at }) {
   return s;
 }
 
+// ─── Riallineamento alla linea principale (caso #500) ───────────────────────
+//
+// Un ramo che resta indietro mentre aspetta verifica e approvazione finisce in
+// conflitto di fusione, e quel conflitto salterebbe fuori solo DOPO i controlli
+// o dopo l'approvazione dell'owner. Il riallineamento si fa QUI, all'inizio
+// della verifica: così verifica e chiusura girano già sul contenuto allineato,
+// e lo sha approvato è quello che si pubblica.
+
+/**
+ * Cosa fare col ramo prima di avviare la verifica. PURA.
+ *
+ * `ahead` non conta: i commit propri il rebase li riporta sopra da solo, e un
+ * ramo solo avanti (behind = 0) non ha niente da riallineare. Ogni astensione
+ * che nasconde un ramo indietro va DETTA: un salto silenzioso è
+ * indistinguibile dal non avere il riallineamento.
+ */
+export function realignPlan({ fetchOk, dirty, behind, workBranch = true }) {
+  // I rami protetti non li tocca nessun automatismo (regola del repo), e lì
+  // non c'è niente da dire: su quei rami non si chiude nessun lavoro.
+  if (!workBranch) return { action: 'skip', message: '' };
+  if (!fetchOk) {
+    return {
+      action: 'skip',
+      message: 'Non raggiungo origin, quindi non so se il ramo è rimasto indietro: se la chiusura poi si ferma per questo, riprova con la rete.',
+    };
+  }
+  const n = Number(behind);
+  if (!Number.isFinite(n) || n <= 0) return { action: 'skip', message: '' };
+  if (dirty) {
+    return {
+      action: 'skip',
+      message: `Il ramo è indietro di ${n} commit rispetto alla linea principale, ma ci sono modifiche non salvate: non lo tocco. Falle salvare e rilancia, così la verifica parte dal contenuto riallineato.`,
+    };
+  }
+  return { action: 'rebase', message: '' };
+}
+
+/**
+ * L'esito del rebase → cosa fare. PURA.
+ *
+ * `abort` significa: il repo torna ESATTAMENTE com'era. Un rebase lasciato a
+ * metà blocca ogni comando git successivo, compreso il salvataggio automatico:
+ * peggio del conflitto stesso.
+ */
+export function afterRebase({ ok, behind = 0, conflictFiles = [] }) {
+  if (ok) {
+    return {
+      action: 'push',
+      message: `Il ramo era indietro di ${behind} commit rispetto alla linea principale: l'ho riallineato e lo rispedisco. La verifica parte dal contenuto aggiornato.`,
+    };
+  }
+  const files = (Array.isArray(conflictFiles) ? conflictFiles : []).filter(Boolean);
+  return {
+    action: 'abort',
+    message: [
+      'Il riallineamento alla linea principale va in conflitto. Ho annullato tutto: il ramo è rimasto com\'era.',
+      'File in conflitto:',
+      files.length ? files.map((f) => `  ${f}`).join('\n') : '  (non identificati)',
+      'Risolvili a mano (git rebase origin/main, sistema i file, git rebase --continue) e poi rilancia questo comando.',
+    ].join('\n'),
+  };
+}
+
 // ─── Stato su disco ─────────────────────────────────────────────────────────
 
 export function readState(root = ROOT) {
