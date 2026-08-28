@@ -1161,8 +1161,14 @@ una conseguenza; va fatto il contrario.
   fotogramma il riquadro è ancora posato sulla finestra di prima. Nei test
   aspetta la posa che si ferma (`expect.poll`), non la prima misura utile —
   senza il rimedio ci resta e basta, quindi il test è rosso lo stesso.
-- **Dove:** `attachPose()` in `src/content/popup.js` (riquadro `.sn-popup`),
-  test `tests/popup-pose-streaming.spec.mjs` e `tests/popup-pose-casi-limite.spec.mjs`.
+- **Nei test il mouse va simulato dopo che la posa si è fermata.** Un
+  trascinamento che parte mentre il riquadro sta ancora tornando al suo posto
+  dopo un cambio di zoom misura la posizione di prima, e il test accusa un salto
+  che nel prodotto non c'è. Aspetta due letture uguali di fila
+  (`attendiPosaFerma`) prima di premere il pulsante.
+- **Dove:** `attachPose()` e `attachDrag()` in `src/content/popup.js` (riquadro
+  `.sn-popup`), test `tests/popup-pose-streaming.spec.mjs`,
+  `tests/popup-pose-casi-limite.spec.mjs` e `tests/popup-scroll-streaming.spec.mjs`.
 
 ## Un cancello automatico che blocca deve avere una via d'uscita, e la via d'uscita è una PERSONA
 
