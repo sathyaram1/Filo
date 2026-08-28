@@ -192,7 +192,11 @@
           // countdown (che per una sveglia a ore di distanza confonderebbe).
           const d = new Date(t.endsAt);
           const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}: suona alle ${hhmm}`);
+          // Ricorrenza: dicitura unica con la colonna destra (SN_FILO_MEMORY),
+          // così l'agente e l'utente leggono la stessa cosa.
+          const M = global.SN_FILO_MEMORY;
+          const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
+          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`);
         } else {
           const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
           lines.push(`- Timer "${t.label}": ${rem}`);
