@@ -105,6 +105,11 @@
     /* ── Tab bar (pattern fb-tabs di feedback.html) ───────────────────── */
     .mg-tabs {
       display: flex;
+      /* Finestra stretta: vanno a capo le schede INTERE, come nella pagina dei
+         feedback (.fb-tabs). Senza, i bottoni si stringono e spezzano le parole:
+         "In" / "coda" / "(0)" su tre righe, e il numero smette di leggersi come
+         parte del nome. */
+      flex-wrap: wrap;
       gap: 2px;
       border-bottom: 1px solid var(--sn-border);
       margin: 8px 0 20px;
@@ -117,6 +122,8 @@
       color: var(--sn-muted);
       border-bottom: 2px solid transparent;
       margin-bottom: -1px;
+      /* Nome e numero sono una cosa sola: non si separano mai. */
+      white-space: nowrap;
     }
     .mg-tab:hover { color: var(--sn-fg); }
     /* Quante ne contiene la scheda (#495): accanto al nome, più tenue del nome
