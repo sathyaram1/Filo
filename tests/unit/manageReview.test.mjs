@@ -553,6 +553,94 @@ test('listArchiveTab: filtro ⭐ mostra TUTTI i preferiti di qualunque status', 
   );
 });
 
+test('listArchiveTab: filtro "bloccati confermati" tiene solo attack/spam confermati', () => {
+  const items = [
+    { _id: 'a1', status: 'archived', createdAt: '2026-01-01' },
+    { _id: 'k1', status: 'attack_confirmed', createdAt: '2026-06-01' },
+    { _id: 'p1', status: 'spam_confirmed', createdAt: '2026-05-01' },
+    { _id: 't1', status: 'todo', createdAt: '2026-07-01' },
+  ];
+  assert.deepEqual(
+    MR.listArchiveTab(items, { confirmedOnly: true }).map((f) => f._id),
+    ['k1', 'p1']
+  );
+  // Si combina col filtro ⭐: solo i confermati che sono anche preferiti.
+  const starred = items.map((f) => (f._id === 'p1' ? { ...f, starred: true } : f));
+  assert.deepEqual(
+    MR.listArchiveTab(starred, { starredOnly: true, confirmedOnly: true }).map((f) => f._id),
+    ['p1']
+  );
+});
+
+// ── Conteggi per scheda (badge della tab bar) ───────────────────────────────
+
+test('countsByManageTab: conta i feedback di ogni scheda-lista', () => {
+  const items = [
+    { _id: 'u1', status: 'unlabeled' },
+    { _id: 'u2', status: 'attack' },
+    { _id: 'u3', status: 'aligned' },
+    { _id: 'q1', status: 'todo' },
+    { _id: 'q2', status: 'working' },
+    { _id: 'a1', status: 'archived' },
+    { _id: 'a2', status: 'attack_confirmed' },
+  ];
+  assert.deepEqual(MR.countsByManageTab(items), {
+    inbox: 3, queue: 2, resolved: 0, archived: 2,
+  });
+});
+
+test('countsByManageTab: lista vuota o assente → tutti zero', () => {
+  assert.deepEqual(MR.countsByManageTab([]), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.countsByManageTab(), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
+});
+
+test('countsByManageTab: il gate DB3 sposta i done non spediti da Risolti a In coda', () => {
+  const items = [
+    { _id: 'd1', status: 'done', resolvedInVersion: '1.2.0' },
+    { _id: 'd2', status: 'done', resolvedInVersion: '9.9.9' }, // non ancora rilasciata
+  ];
+  // Senza versione rilasciata nota: nessun done è "spedito" → tutti In coda.
+  assert.deepEqual(MR.countsByManageTab(items).queue, 2);
+  assert.deepEqual(MR.countsByManageTab(items).resolved, 0);
+  const c = MR.countsByManageTab(items, { releasedVersion: '1.2.0' });
+  assert.deepEqual(c.resolved, 1);
+  assert.deepEqual(c.queue, 1);
+});
+
+test('countsByManageTab: il numero degli Archiviati segue i filtri ⭐ / confermati', () => {
+  const items = [
+    { _id: 'a1', status: 'archived' },
+    { _id: 'a2', status: 'archived', starred: true },
+    { _id: 'k1', status: 'attack_confirmed' },
+    { _id: 't1', status: 'todo', starred: true },
+  ];
+  // Senza filtri: tutti gli archived (archived + i confermati).
+  assert.equal(MR.countsByManageTab(items).archived, 3);
+  // ⭐: tutti i preferiti, di qualunque status — come la lista che vedrai.
+  assert.equal(MR.countsByManageTab(items, { starredOnly: true }).archived, 2);
+  // Bloccati confermati.
+  assert.equal(MR.countsByManageTab(items, { confirmedOnly: true }).archived, 1);
+  // I filtri degli Archiviati non toccano le altre schede.
+  assert.equal(MR.countsByManageTab(items, { starredOnly: true }).queue, 1);
+});
+
+test('countsByManageTab: il conteggio è la LUNGHEZZA della lista della scheda', () => {
+  // Invariante: nessun numero può dire una cosa e la lista un'altra.
+  const items = [
+    { _id: 'u1', status: 'unlabeled', createdAt: '2026-01-01' },
+    { _id: 'u2', status: 'spam', createdAt: '2026-02-01' },
+    { _id: 'q1', status: 'revision_security', createdAt: '2026-03-01' },
+    { _id: 'd1', status: 'done', resolvedInVersion: '1.0.0', createdAt: '2026-04-01' },
+    { _id: 'a1', status: 'archived', createdAt: '2026-05-01' },
+  ];
+  const opts = { releasedVersion: '1.0.0' };
+  const counts = MR.countsByManageTab(items, opts);
+  for (const tab of ['inbox', 'queue', 'resolved']) {
+    assert.equal(counts[tab], MR.listForManageTab(items, tab, opts).length, tab);
+  }
+  assert.equal(counts.archived, MR.listArchiveTab(items, opts).length);
+});
+
 // ── Riapertura a pagamento dalla board (DC4) ────────────────────────────────
 
 test('espone hasReopenRequest e canReopen', () => {
