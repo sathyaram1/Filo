@@ -142,6 +142,73 @@ test('#495 — negli Archiviati il numero segue il filtro ⭐ (dice quello che s
   await expect(tab(page, 'archived')).toHaveText('Archiviati (3)');
 });
 
+// ── Il numero è parte del nome, anche a finestra stretta ──────────────────
+// Alla larghezza minima consentita alla finestra (720) i bottoni si
+// stringevano e spezzavano le parole: "In" / "coda" / "(0)" su tre righe, e la
+// barra alta il doppio. Il numero smetteva di leggersi come parte del nome.
+// La pagina gemella dei feedback risolve lo stesso problema mandando a capo le
+// schede INTERE (tests/feedback-tabs-wrap.spec.mjs): stessa regola qui.
+//
+// Senza il fix (`flex-wrap: wrap` + `white-space: nowrap`) il primo assert è
+// rosso: i pezzi di una stessa scheda stanno su righe diverse.
+
+test('#495 — a finestra stretta il nome e il suo numero restano sulla stessa riga', async ({ app, openTab }) => {
+  // Larghezza minima consentita alla finestra (src/main/window.js: minWidth 720).
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    if (w) w.setContentSize(720, 800);
+  });
+
+  const page = await apriPagina(openTab);
+  await page.setViewportSize({ width: 720, height: 800 });
+  await page.evaluate((items) => window.__mgTest.setData(items), [
+    fb('i1', 'unlabeled'), fb('q1', 'todo'), fb('r1', 'done'), fb('z1', 'archived'),
+  ]);
+  await expect(tab(page, 'queue')).toHaveText('In coda (1)');
+
+  // Ogni scheda visibile sta su UNA riga sola: tutti i pezzi del suo contenuto
+  // (nome e numero) hanno lo stesso bordo superiore.
+  const righe = await page.evaluate(() => {
+    const out = [];
+    for (const btn of document.querySelectorAll('.mg-tab')) {
+      if (btn.hidden) continue;
+      const range = document.createRange();
+      range.selectNodeContents(btn);
+      const tops = [...range.getClientRects()].map((r) => Math.round(r.top));
+      out.push({ txt: btn.textContent, righe: new Set(tops).size });
+    }
+    return out;
+  });
+  expect(righe.length).toBeGreaterThan(0);
+  for (const t of righe) expect(t, `"${t.txt}" spezzata su più righe`).toMatchObject({ righe: 1 });
+
+  // Vanno a capo le schede intere: l'ultima sta più in basso della prima e
+  // resta dentro il bordo destro, senza scorrimento laterale della pagina.
+  const geo = await page.evaluate(() => {
+    const list = [...document.querySelectorAll('.mg-tab')].filter((b) => !b.hidden);
+    const first = list[0].getBoundingClientRect();
+    const last = list[list.length - 1].getBoundingClientRect();
+    const lente = document.getElementById('mgSearchToggle').getBoundingClientRect();
+    const doc = document.documentElement;
+    return {
+      firstTop: first.top, lastTop: last.top, lastRight: last.right,
+      lenteRight: lente.right,
+      scrollWidth: doc.scrollWidth, clientWidth: doc.clientWidth,
+    };
+  });
+  expect(geo.lastTop).toBeGreaterThan(geo.firstTop);
+  expect(geo.lastRight).toBeLessThanOrEqual(geo.clientWidth + 1);
+  expect(geo.lenteRight).toBeLessThanOrEqual(geo.clientWidth + 1);
+  expect(geo.scrollWidth).toBeLessThanOrEqual(geo.clientWidth);
+
+  // E le schede andate a capo restano cliccabili: l'ultima si apre davvero.
+  await tab(page, 'log').click();
+  await expect(tab(page, 'log')).toHaveClass(/mg-tab--active/);
+  // La ricerca, in fondo alla barra, resta raggiungibile anche lì.
+  await page.locator('#mgSearchToggle').click();
+  await expect(page.locator('#mgSearchInput')).toBeVisible();
+});
+
 // ── La ricerca è una lista come le altre: dice quanti ne ha trovati ────────
 // Era l'unica intestazione rimasta senza numero: si cercava una parola, si
 // ottenevano due risultati, e la colonna diceva solo "Ricerca". Quanti ne ha
