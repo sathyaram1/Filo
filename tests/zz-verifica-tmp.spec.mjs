@@ -279,8 +279,9 @@ test('finestra rimpicciolita a menu aperto: il menu rientra e l\'ultima voce res
   // La finestra si accorcia sotto il menu posato.
   const nuovaAltezza = Math.max(320, Math.round(prima.height * 0.6));
   await altezzaFinestra(page, nuovaAltezza);
+  // Tolleranza di 2px: setViewportSize può arrotondare per il DPI scaling.
   await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
-    .toBeLessThanOrEqual(nuovaAltezza);
+    .toBeLessThanOrEqual(nuovaAltezza + 2);
 
   // SUCCESSO: il menu rientra da solo (si sposta e/o si dà un tetto e scorre).
   await expect.poll(async () => {
