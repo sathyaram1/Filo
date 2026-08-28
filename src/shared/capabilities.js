@@ -364,7 +364,7 @@
       id: 'filo-alarms', title: 'Sveglie', category: 'assistant',
       desc: 'Chiedi a Filo una sveglia ("mettimi una sveglia alle 7 per lavoro", "sveglia tra 3 ore"): all’orario stabilito parte un avviso sonoro nella nuova scheda e una notifica di sistema. Se l’orario è già passato oggi, la sveglia viene messa per domani. Può anche ripetersi: dille quando ("il lunedì e il mercoledì", "nei giorni feriali", "tutte le mattine") e suona a ogni giorno indicato, senza rimetterla ogni volta. Le sveglie già messe le gestisci sempre a parole: cancellarne una, cancellarle tutte, o spostarne l’orario.',
       invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate compaiono in alto nella nuova scheda con il loro orario (e i giorni, se si ripete) e puoi rimuoverle con la ×. A parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8".',
-      doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera.',
+      doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera. La ripetizione va a giorni della settimana: non sa fare "ogni due settimane" o "il primo del mese".',
     },
     {
       id: 'filo-notifications', title: 'Avvisi di Filo', category: 'assistant',
