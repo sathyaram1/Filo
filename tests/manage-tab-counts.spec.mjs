@@ -351,3 +351,31 @@ test('#495 — caricamento al tetto: i numeri diventano "+" e l\'hover spiega pe
   await page.evaluate(() => window.__mgTest.setTab('archived'));
   await expect(page.locator('#mgListEmpty')).toContainText(String(CAP));
 });
+
+// ── Caricamento fallito: il riquadro vuoto non è una risposta ────────────────
+// Senza rete la colonna scrive "Errore nel caricamento dei feedback.". Ma il
+// primo click su una scheda la rirende, e senza memoria del guasto ci scriveva
+// "Nessun feedback in coda." — cioè una risposta al posto di un guasto, mentre
+// le schede (giustamente) non dicono nessun numero.
+//
+// Precondizione senza il fix: dopo il click il riquadro dice "Nessun feedback…"
+// → l'assert sul testo dell'errore diventa rosso.
+test('#495 — caricamento fallito: nessun numero e nessun "vuoto" inventato', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  // In questo ambiente non c'è Firestore: il caricamento fallisce da solo.
+  await page.evaluate(() => window.__mgTest.whenReady());
+
+  const vuoto = page.locator('#mgListEmpty');
+  await expect(vuoto).toContainText('Errore');
+
+  for (const t of ['queue', 'resolved', 'archived', 'inbox']) {
+    await page.evaluate((x) => window.__mgTest.setTab(x), t);
+    await expect(vuoto, `scheda ${t}`).toContainText('Errore');
+    await expect(vuoto, `scheda ${t}`).not.toContainText('Nessun feedback');
+  }
+  for (const t of await page.locator('.mg-tab[data-tab]').allInnerTexts()) {
+    expect(t, `scheda "${t}" dopo un caricamento fallito`).not.toMatch(/\(\d/);
+  }
+});

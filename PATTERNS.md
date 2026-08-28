@@ -1752,6 +1752,17 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   caricamento fallito, la scheda resta col solo nome: uno "(0)" là dove non si
   sa è peggio del silenzio. `(0)` si scrive solo quando la sezione è davvero
   vuota — ed è lì che serve, perché dice "vuota" invece di lasciarlo intuire.
+- **Il guasto va RICORDATO in una variabile, non scritto una volta sola.** Il
+  disegno dello stato d'errore muore al primo re-render, e il primo re-render è
+  a un click di distanza: l'utente che non vede numeri clicca una sezione, e
+  quel giro ricalcolava tutto da una lista vuota — nove "(0)" e, al posto
+  dell'errore, "Nessun feedback in arrivo." con l'unico tasto "Riprova"
+  portato via. Un flag "dati arrivati" + un flag "caricamento fallito" tengono
+  la pagina onesta a ogni ridisegno.
+- **Vale anche per le PAROLE, non solo per le cifre.** "Nessun feedback in
+  coda." dopo un caricamento fallito è la stessa bugia di uno "(0)": afferma
+  che lì non c'è niente mentre la verità è che non lo sappiamo. Il riquadro
+  vuoto, in quello stato, dice il guasto e lascia la via d'uscita.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
   anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
   a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
