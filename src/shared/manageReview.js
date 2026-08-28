@@ -595,7 +595,7 @@
     normalizeStatus,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     workProgress, WORK_STAGES,
-    isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
+    isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
