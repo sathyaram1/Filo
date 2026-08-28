@@ -119,6 +119,16 @@
       margin-bottom: -1px;
     }
     .mg-tab:hover { color: var(--sn-fg); }
+    /* Quante ne contiene la scheda (#495): accanto al nome, più tenue del nome
+       stesso — è un'informazione, non un'etichetta. Cifre a larghezza fissa
+       così la barra non balla mentre i numeri cambiano. */
+    .mg-tab-count {
+      color: var(--sn-muted);
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      opacity: 0.8;
+    }
+    .mg-tab--active .mg-tab-count { opacity: 1; }
     .mg-tab--active {
       color: var(--sn-fg);
       font-weight: 600;
