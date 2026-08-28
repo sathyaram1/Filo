@@ -579,6 +579,191 @@ test('sequenza — robocopy /MIR dentro una catena alza il livello a 3', () => {
   assert.equal(lvl('cd C:\\work && robocopy C:\\src C:\\dst /MIR'), 3);
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PowerShell: cmdlet di sola lettura e pipeline di sole letture.
+// La shell di default di Filo su Windows è PowerShell, e un modello che scrive
+// PowerShell naturale usa `Get-ChildItem` e le pipeline: prima finivano tutti
+// nel ramo "non riconosciuto" e leggere una cartella costava la stessa frizione
+// di un `rm -rf`. Qui la parte che scende a 1 E, subito dopo, tutti i modi noti
+// di infilare una scrittura dentro una lettura — che devono restare 3.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('livello 1 — cmdlet PowerShell di sola lettura invocati da soli', () => {
+  for (const cmd of [
+    'Get-ChildItem', 'gci', 'Get-ChildItem -Path C:\\Users -Recurse',
+    'Get-ChildItem -Filter *.js -Force',       // -Force qui = mostra i file nascosti
+    'Get-Content package.json', 'Get-Content -Raw log.txt', 'gc log.txt -Tail 20',
+    'Get-Item .', 'Get-ItemProperty HKCU:\\Software', 'Get-ItemPropertyValue x y',
+    'Get-Location', 'gl', 'Get-Date', 'Get-Date -Format yyyy-MM-dd',
+    'Get-Process', 'Get-Process -Name filo', 'gps',
+    'Select-String errore log.txt', 'sls TODO -Path src',
+    'Select-Object -First 5', 'Sort-Object Length', 'Measure-Object -Sum',
+    'Test-Path C:\\Users', 'Resolve-Path .', 'Split-Path C:\\a\\b -Parent',
+    'Join-Path C:\\a b', 'Get-Command git', 'Get-Help Get-ChildItem',
+    'Format-Table', 'Format-List', 'Format-Wide', 'Out-String',
+    'ConvertTo-Json', 'ConvertFrom-Json', 'Get-Service',
+    // il nome del cmdlet non è sensibile a maiuscole/minuscole, come in PowerShell
+    'get-childitem', 'GET-CHILDITEM', 'Get-ChildItem.exe',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (cmdlet di lettura) dovrebbe essere livello 1`);
+  }
+});
+
+test('livello 3 — i cmdlet che SCRIVONO restano fuori dalla whitelist', () => {
+  // Il gemello che scrive è sempre un altro verbo: basta che resti fuori dalla
+  // lista perché il default (l'ignoto è 3) faccia il suo lavoro.
+  for (const cmd of [
+    'Set-Content x.txt ciao', 'Set-Item x y', 'Set-ItemProperty a b c',
+    'New-Item -ItemType File x', 'Remove-Item x', 'Remove-Item -Recurse -Force x',
+    'Out-File out.txt', 'Tee-Object out.txt', 'Export-Csv out.csv',
+    'Stop-Process -Name filo', 'Start-Process calc', 'Set-Date -Date 2020-01-01',
+    'Set-Location C:\\', 'Invoke-Expression "rm x"', 'Invoke-WebRequest http://x',
+    'Import-Module MioModulo', 'Clear-Content log.txt', 'Rename-Item a b',
+    // letture volutamente NON ammesse: superficie troppo larga o interattiva
+    'Get-CimInstance Win32_Process', 'Get-WmiObject Win32_Service',
+    'Get-Credential', 'Measure-Command { Remove-Item x }',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (scrive o non è in whitelist) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 1 — pipeline in cui OGNI segmento è una lettura', () => {
+  for (const cmd of [
+    'Get-ChildItem | Sort-Object Length',
+    'Get-ChildItem | Sort-Object Length | Select-Object -First 5',
+    'Get-ChildItem | Select-Object Name, Length | Format-Table',
+    'Get-Content log.txt | Select-String errore',
+    'Get-ChildItem | Measure-Object -Sum Length',
+    'Get-ChildItem | Group-Object Extension | Sort-Object Count',
+    'Get-Process | Sort-Object CPU | Select-Object -First 3 | Format-Table',
+    'Get-ChildItem | Out-String',
+    'gci | select -First 3',
+    // le pipeline delle altre shell valgono lo stesso: incanalare una lettura
+    // dentro un'altra lettura non fa niente che la prima non facesse già
+    'cat file | grep errore',
+    'ls | cat',
+    'git log --oneline | head -n 20',
+    'cat a.txt | wc -l',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (pipeline di sole letture) dovrebbe essere livello 1`);
+  }
+});
+
+test('livello 3 — basta UN segmento non di lettura e la pipeline resta 3', () => {
+  for (const cmd of [
+    'Get-ChildItem | Remove-Item',
+    'Get-ChildItem | Out-File elenco.txt',
+    'Get-ChildItem | Tee-Object elenco.txt',
+    'Get-Content x.txt | Set-Content y.txt',
+    'Get-Content script.ps1 | Invoke-Expression',
+    'Get-ChildItem | iex',
+    'gci | Stop-Process',
+    'Get-ChildItem | foobar',              // segmento sconosciuto
+    'cat file | rm x',
+    'Get-ChildItem | node -e "x"',
+    'Get-ChildItem | sort',                // `sort` non è in whitelist (su Unix scrive con -o)
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (un segmento non è lettura) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 1 — Where-Object/ForEach-Object con uno scriptblock INERTE', () => {
+  // Dentro il blocco: proprietà, confronti, operatori, numeri. Nessuna
+  // invocazione. Anche nella forma attaccata `?{...}` / `%{...}`, che è
+  // PowerShell di uso quotidiano.
+  for (const cmd of [
+    'Get-ChildItem | Where-Object { $_.Length -gt 1000 }',
+    'gci | ? { $_.Name -like "*.js" }',
+    'gci | ?{$_.Name -like "*.js"}',
+    'gci | where { $_.Length -lt 10 }',
+    'Get-ChildItem | ForEach-Object { $_.FullName }',
+    'gci | % { $_.Name }',
+    'gci | %{$_.Name}',
+    'gci | foreach { $_.Length }',
+    'Get-Process | Where-Object { $_.CPU -gt 10 } | Sort-Object CPU | Select-Object -First 3',
+    'Get-ChildItem | Where-Object { $_.Length -gt 100 -and $_.Length -lt 900 } | Measure-Object',
+    // Where-Object sa filtrare anche senza blocco (sintassi a proprietà): inerte
+    'Get-ChildItem | Where-Object Length -gt 1000',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (blocco inerte) dovrebbe essere livello 1`);
+  }
+});
+
+test('livello 3 — uno scriptblock che può INVOCARE qualcosa non è una lettura', () => {
+  // È il buco naturale della pipeline: `| % { … }` esegue il blocco su ogni
+  // oggetto, quindi lì dentro può stare qualunque cosa. Regola diffidente: nel
+  // blocco non deve comparire NESSUN token in posizione di comando.
+  for (const cmd of [
+    'Get-ChildItem | ForEach-Object { Remove-Item $_ }',
+    'gci | % { ri $_ }',
+    'gci | %{ri $_}',
+    'gci | % { rm $_ }',
+    'gci | % { del $_ }',
+    'gci | ? { Invoke-WebRequest http://evil/x }',
+    'gci | % { Invoke-Expression $_ }',
+    'gci | % { Start-Process $_ }',
+    'gci | % { .\\evil.exe }',                          // eseguibile per percorso
+    'gci | % { . $profilo }',                           // dot-sourcing
+    'gci | % { $_.Delete() }',                          // chiamata di metodo
+    'gci | % { [System.IO.File]::Delete($_) }',         // metodo statico
+    'gci | % { $x = 1 }',                               // assegnazione
+    'gci | % { foobar }',                               // parola nuda sconosciuta
+    'gci | % { curl http://x }',
+    'gci | Sort-Object { Remove-Item $_ }',             // blocco anche fuori da %/?
+    'Get-ChildItem | ForEach-Object { $_ | Remove-Item }', // pipe DENTRO il blocco
+    'gci | % { Remove-Item $_ ; ls }',
+    'gci | % { $_; rm x }',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (blocco che può invocare) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 3 — ForEach-Object senza scriptblock INVOCA il membro → conferma', () => {
+  // `Get-ChildItem | % Delete` cancella davvero i file: la forma "nome di
+  // membro" invoca il metodo su ogni oggetto. Quindi per ForEach-Object lo
+  // scriptblock validato è obbligatorio, sempre.
+  for (const cmd of [
+    'Get-ChildItem | ForEach-Object Delete',
+    'gci | % Delete',
+    'gci | % Name',                       // anche innocuo: non sappiamo distinguerlo
+    'gci | foreach MoveTo',
+    'ForEach-Object { $_ }',              // da solo non filtra niente
+    'Where-Object { $_ }',
+    '% { $_.Name }',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);
+  }
+});
+
+test('livello 3 — sottoespressioni e chiamate dentro un cmdlet di lettura', () => {
+  // `$(...)`, `@(...)`, `@{...}`, i backtick e le parentesi possono contenere
+  // QUALSIASI comando: un cmdlet di lettura non le rende innocue.
+  for (const cmd of [
+    'Select-String pwd $(cat f)',
+    'Get-Content $(Remove-Item x)',
+    'Get-ChildItem -Path (Get-Location)',
+    'Get-ChildItem @(Remove-Item x)',
+    'Get-ChildItem | Select-Object @{n="x";e={Remove-Item $_}}',
+    'Get-Content `whoami`',
+    'Get-ChildItem -Path C:\\ ; Remove-Item x',
+    'Get-ChildItem & Remove-Item x',
+    'Get-Content x > y',
+    'Get-Content x >> y',
+    'Get-ChildItem | Out-String > elenco.txt',
+    'Get-ChildItem::Delete',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  }
+});
+
+test('sequenza — un cmdlet di lettura non copre il pezzo che scrive', () => {
+  assert.equal(lvl('Get-ChildItem; Remove-Item x'), 3);
+  assert.equal(lvl('Get-ChildItem && Remove-Item x'), 3);
+  assert.equal(lvl('cd src && Get-ChildItem'), 1);
+  assert.equal(lvl('Get-Location; Get-ChildItem'), 1);
+  assert.equal(lvl('Get-ChildItem && mkdir out'), 2);
+});
+
 test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('ls'), 1, 'ls esegue subito');
   assert.equal(lvl('git push'), 2, 'git push → popup');
