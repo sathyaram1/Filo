@@ -291,3 +291,54 @@ test('un nuovo orario non interpretabile non tocca niente', async () => {
   const list = await M.listTimers();
   assert.equal(list.find((t) => t.id === 'a2').endsAt, LISTA[1].endsAt);
 });
+
+// ─── Livello di conferma e stato letto dall'agente ─────────────────────────
+//
+// Il criterio è QUANTE voci sparirebbero, non come è scritta la richiesta:
+// togliere quella nominata è immediato, toglierne più d'una passa dal popup
+// che le elenca. Il conteggio arriva dal main (`_targets`), mai dall'LLM.
+
+require(join(root, 'src', 'shared', 'preferences.js'));
+require(join(root, 'src', 'shared', 'themeTokens.js'));
+require(join(root, 'src', 'shared', 'cmdClassify.js'));
+require(join(root, 'src', 'shared', 'actionLevels.js'));
+require(join(root, 'src', 'shared', 'filoState.js'));
+
+const AL = globalThis.SN_ACTION_LEVELS;
+
+test('cancellare UNA sveglia si fa subito; più d\'una chiede conferma', () => {
+  assert.equal(AL.levelFor({ type: 'CANCELLA_SVEGLIA', etichetta: 'palestra', _targets: ['Sveglia “palestra” 07:00'] }), 1);
+  assert.equal(AL.levelFor({ type: 'CANCELLA_SVEGLIA', tutte: true, _targets: ['a', 'b', 'c'] }), 2);
+  // "tutte" che in realtà prende una cosa sola non merita un popup.
+  assert.equal(AL.levelFor({ type: 'CANCELLA_SVEGLIA', tutte: true, _targets: ['a'] }), 1);
+  // Senza conteggio (registro consultato fuori dal main) si sta prudenti.
+  assert.equal(AL.levelFor({ type: 'CANCELLA_SVEGLIA', tutte: true }), 2);
+  assert.equal(AL.levelFor({ type: 'CANCELLA_SVEGLIA', etichetta: 'palestra' }), 1);
+});
+
+test('il popup elenca cosa sta per sparire, non solo "delle sveglie"', () => {
+  const d = AL.describe({
+    type: 'CANCELLA_SVEGLIA', tutte: true,
+    _targets: ['Sveglia “palestra” 07:00 (lun+mer)', 'Sveglia “antibiotico” 20:00'],
+  });
+  assert.match(d, /palestra/);
+  assert.match(d, /antibiotico/);
+});
+
+test('spostare un orario si fa subito; spostarne più d\'uno chiede conferma', () => {
+  assert.equal(AL.levelFor({ type: 'MODIFICA_SVEGLIA', etichetta: 'palestra', orario: '08:00', _targets: ['a'] }), 1);
+  assert.equal(AL.levelFor({ type: 'MODIFICA_SVEGLIA', orario: '08:00', _targets: ['a', 'b'] }), 2);
+});
+
+test('lo STATO che legge l\'agente dice la ricorrenza', () => {
+  const text = globalThis.SN_FILO_STATE.renderForPrompt({
+    time: { humanNow: 'x', timeSinceLastInteractionMin: null, session: null },
+    tabs: [], notifications: [], recentActions: [], dashboard: null, credits: null,
+    timers: [
+      { id: 'a1', kind: 'alarm', label: 'lezione', repeat: ['lun', 'mer'], endsAt: new Date(2026, 8, 7, 7, 55).toISOString(), paused: false, remainingSec: 99 },
+      { id: 'a2', kind: 'alarm', label: 'dentista', repeat: null, endsAt: new Date(2026, 8, 3, 9, 0).toISOString(), paused: false, remainingSec: 99 },
+    ],
+  });
+  assert.match(text, /Sveglia "lezione" ricorrente lun\+mer: suona alle 07:55/);
+  assert.match(text, /Sveglia "dentista": suona alle 09:00/);
+});
