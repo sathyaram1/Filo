@@ -179,9 +179,9 @@ function scenario({ conflitto }) {
   const work = resolve(base, 'work');
   const altro = resolve(base, 'altro');
   mkdirSync(origin);
+  mkdirSync(work);
   g(origin, ['init', '--bare', '-q', '--initial-branch=main']);
-  const clone = (dir) => {
-    execFileSync('git', ['clone', '-q', origin, dir], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const identita = (dir) => {
     g(dir, ['config', 'user.email', 't@t']);
     g(dir, ['config', 'user.name', 't']);
   };
@@ -190,8 +190,9 @@ function scenario({ conflitto }) {
     g(dir, ['add', '-A']);
     g(dir, ['commit', '-q', '-m', msg]);
   };
-  clone(work);
-  g(work, ['checkout', '-q', '-b', 'main']);
+  g(work, ['init', '-q', '--initial-branch=main']);
+  g(work, ['remote', 'add', 'origin', origin]);
+  identita(work);
   commit(work, 'comune.txt', 'base\n', 'base');
   g(work, ['push', '-q', 'origin', 'refs/heads/main:refs/heads/main']);
 
