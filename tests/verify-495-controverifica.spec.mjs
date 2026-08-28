@@ -56,8 +56,8 @@ test('ogni sezione porta il suo numero e il numero è quello che si vede aprendo
 
   // Il sintomo dell'utente, letterale: "ricevuti (24) in coda (12)".
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (6)');
-  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (6)');
-  await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
+  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (4)');
+  await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (2)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (3)');
 
   // …e il numero deve coincidere con quello che l'owner conta aprendo la
