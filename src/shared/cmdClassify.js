@@ -715,7 +715,7 @@
     // Basta UN segmento non riconosciuto — o uno scriptblock che potrebbe
     // invocare qualcosa — e si torna al 3 di prima.
     const pipe = splitSafePipeline(trimmed);
-    if (pipe) return pipe.every((p) => segmentIsRead(dequote(p), true)) ? 1 : 3;
+    if (pipe) return pipe.every((p) => segmentIsRead(p, true)) ? 1 : 3;
 
     // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
     if (!seq && CHAIN_RE.test(trimmed)) return 3;
