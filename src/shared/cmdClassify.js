@@ -639,7 +639,13 @@
     const trimmed = dequote(raw);
     const prog = programOf(trimmed);
     if (!prog) return 3;
-    if (ALWAYS_3.has(prog)) return 3;
+    if (ALWAYS_3.has(prog)) return 3; // backstop: vale anche col percorso (`/bin/rm`)
+
+    // Superato il backstop dei distruttivi, la whitelist FIDA di un nome solo se
+    // è invocato nudo. Un file su disco che si chiama come un comando fidato
+    // (`.\Get-ChildItem.exe`, `C:\tmp\ls.exe`, `git.exe` dal PATH) NON è quel
+    // comando: è un eseguibile arbitrario → livello 3 di default.
+    if (!isBareName(tokens(trimmed)[0])) return 3;
 
     if (prog === 'git') return classifyGit(trimmed);
     if (prog === 'npm' || prog === 'pip' || prog === 'pip3') return classifyNpm(trimmed);
