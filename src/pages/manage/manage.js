@@ -1219,7 +1219,10 @@
       const el = document.querySelector(`.mg-tab-count[data-count="${tab}"]`);
       if (!el) continue;
       const n = counts[tab] || 0;
-      el.textContent = `(${n})`;
+      // Lo spazio sta nel testo (non solo nel margine): letto ad alta voce
+      // "Ricevuti (24)" e non "Ricevuti(24)". Stessa forma della tab bar dei
+      // feedback (`updateTabCounts` in feedback.js).
+      el.textContent = ` (${n})`;
       // Hover: il numero da solo non dice di cosa sia il conto.
       el.title = n === 1
         ? `1 feedback ${TAB_COUNT_NOUN[tab]}`
