@@ -102,7 +102,8 @@ test('matrice COMPLETA stati×stati×attori identica alla spec §3 (nessun allar
 });
 
 test('la lista degli stati del codice è esattamente quella della spec §2', () => {
-  assert.deepEqual(S.STATUSES.slice().sort(), STATUSES.slice().sort());
+  assert.deepEqual(S.CANONICAL.slice().sort(), STATUSES.slice().sort());
+  assert.deepEqual(globalThis.SN_FB_TRANSITIONS.STATUSES.slice().sort(), STATUSES.slice().sort());
   assert.deepEqual(S.ACTORS.slice().sort(), ACTORS.slice().sort());
 });
 
