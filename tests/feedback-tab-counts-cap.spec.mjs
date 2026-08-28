@@ -14,19 +14,8 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const URL = 'filo://feedback/feedback.html';
 
-// `status: 'new'` → sezione "Ricevuti" (statusOf). Niente clientId d'agente,
-// altrimenti finirebbero in "Agente".
-const item = (i) => ({
-  _id: `c${i}`,
-  text: `segnalazione ${i}`,
-  name: `segnalazione ${i}`,
-  seq: i + 1,
-  subSeq: 0,
-  status: 'new',
-  clientId: 'tester@example.com',
-  createdAt: '2026-06-20T10:00:00Z',
-  images: [],
-});
+// `status: 'new'` → sezione "Ricevuti" (statusOf). Il clientId non è quello di
+// un agente, altrimenti i feedback finirebbero nella sezione "Agente".
 
 test('#495 — al tetto del caricamento i numeri delle sezioni diventano un minimo', async ({ openTab }) => {
   const page = await openTab(URL);
