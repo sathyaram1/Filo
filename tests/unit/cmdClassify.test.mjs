@@ -112,17 +112,21 @@ test('sequenza — il livello è il MASSIMO dei pezzi', () => {
   assert.equal(lvl('cd x && node app.js'), 3, 'cd(1) && interprete(3) → 3');
 });
 
-test('una sequenza con pipe/background/redirezione NON è sicura → resta 3', () => {
-  // Solo `&&`/`||`/`;` contano come sequenziamento sicuro: tutto il resto è 3
-  // anche se i singoli pezzi sarebbero letture.
+test('mescolare sequenza e pipe NON è sicuro → resta 3', () => {
+  // Una pipeline di sole letture scende a 1 (vedi più sotto), ma MESCOLARLA con
+  // `&&`/`;`/`&`/redirezioni no: il comando non è più interamente riconoscibile.
   for (const cmd of [
-    'ls | cat',          // pipe
     'cat a && ls | cat', // pipe dentro una sequenza
+    'ls | cat && rm x',  // sequenza dentro una pipe
     'ls & pwd',          // background
     'cd x && ls > out',  // redirezione
     'cd x && echo $(pwd)',
+    'ls | cat > out.txt',// pipe che finisce in una redirezione
+    'ls || cat',         // || non è una pipe
+    'ls |',              // pipe monca
+    '| ls',
   ]) {
-    assert.equal(lvl(cmd), 3, `"${cmd}" non è una sequenza sicura → livello 3`);
+    assert.equal(lvl(cmd), 3, `"${cmd}" non è riconoscibile per intero → livello 3`);
   }
 });
 
