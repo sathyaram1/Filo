@@ -559,6 +559,14 @@
     if (!items.length) {
       listEl.innerHTML = '';
       emptyEl.hidden = false;
+      // Caricamento fallito: qui non c'è una sezione vuota, c'è una sezione che
+      // non sappiamo. "Nessun feedback in arrivo." sarebbe la stessa bugia dello
+      // "(0)" sulle sezioni, per giunta al posto dell'unico tasto che permette
+      // di riprovare. Resta l'errore finché il dato non arriva davvero.
+      if (loadError && !dataLoaded) {
+        showLoadError(loadError);
+        return;
+      }
       // Se il vuoto dipende dalla ricerca (e non dal tab davvero vuoto),
       // dillo: il testo "Nessun feedback…" sembrerebbe un tab svuotato.
       const q = (searchEl.value || '').trim();
