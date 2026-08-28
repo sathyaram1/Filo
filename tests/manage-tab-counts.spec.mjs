@@ -91,9 +91,10 @@ test('archiviare un feedback sposta subito il conteggio fra le schede', async ({
   await page.waitForLoadState('domcontentloaded');
   // Il pulsante Archivia parla col main: fingi un aggiornamento riuscito, così
   // lo spec resta deterministico e offline.
+  await page.waitForFunction(() => window.filo && window.filo.message);
   await page.evaluate(() => {
-    const orig = window.filo.sendMessage.bind(window.filo);
-    window.filo.sendMessage = (msg) => (
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = (msg) => (
       msg && msg.type === 'feedback_update' ? Promise.resolve({ ok: true }) : orig(msg)
     );
   });
