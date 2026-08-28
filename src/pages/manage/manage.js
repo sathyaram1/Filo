@@ -1209,14 +1209,17 @@
   // elencano niente: lì un numero non vorrebbe dire nulla e non si scrive.
   // Il conteggio degli Archiviati segue i filtri della colonna (⭐ e "Bloccati
   // confermati"), altrimenti direbbe un numero diverso da quello che si vede.
+  // Finché i feedback non sono arrivati (caricamento in corso, o fallito) non
+  // si scrive nessun numero: uno "(0)" là dove il dato manca è un numero falso.
   function updateTabCounts() {
-    const counts = MR.manageTabCounts(allFeedbacks, {
-      releasedVersion, starredOnly, confirmedOnly,
-    });
+    const counts = dataLoaded
+      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
+      : null;
     for (const tab of LIST_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
-      btn.textContent = `${TAB_LABELS[tab] || tab} `;
+      btn.textContent = counts ? `${TAB_LABELS[tab] || tab} ` : (TAB_LABELS[tab] || tab);
+      if (!counts) continue;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
       badge.textContent = `(${counts[tab]})`;
