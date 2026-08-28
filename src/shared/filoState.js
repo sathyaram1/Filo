@@ -120,6 +120,10 @@
           id: t.id,
           kind: t.kind || 'timer', // 'alarm' per le sveglie (#322)
           label: t.label,
+          // Giorni in cui la sveglia si ripete (['lun','mer']); assente = una
+          // volta sola. Serve all'agente per rispondere "quali sveglie ho?" e
+          // per capire a quale l'utente si riferisce.
+          repeat: Array.isArray(t.repeat) && t.repeat.length ? t.repeat : null,
           endsAt: t.endsAt,
           paused: !!t.paused,
           remainingSec: Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000)),
