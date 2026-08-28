@@ -12,7 +12,7 @@ import { test, expect } from './fixtures/electron.mjs';
 
 // Provider finto nel processo main: risponde dopo `attesaMs` con un testo di
 // `ripetizioni` frasi che finisce con "SPIEGONE FINE" (marcatore d'arrivo).
-async function preparaProvider(app, { attesaMs = 2000, ripetizioni = 12 } = {}) {
+async function preparaProvider(app, { attesaMs = 2000, ripetizioni = 12, aPezzi = false } = {}) {
   await app.evaluate(async (_electron, opts) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
