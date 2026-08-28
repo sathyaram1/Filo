@@ -445,14 +445,20 @@
     });
     div.appendChild(stopBtn);
 
-    // Pulsante × per dismissione rapida (stessa azione di "Ferma").
+    // Pulsante × per dismissione rapida (stessa azione di "Ferma"). Sulle
+    // sveglie RICORRENTI i due pulsanti non fanno più la stessa cosa: "Ferma"
+    // zittisce quella di adesso e la lascia per la prossima volta, la × la
+    // toglie del tutto — che è quello che la × fa su ogni altra card della
+    // colonna, e senza questo ramo una sveglia ricorrente non si potrebbe
+    // togliere proprio mentre suona.
     const dismissBtn = document.createElement('button');
     dismissBtn.className = 'dash-live-dismiss';
     dismissBtn.type = 'button';
-    dismissBtn.setAttribute('aria-label', 'Ferma');
+    dismissBtn.setAttribute('aria-label', rep ? 'Rimuovi la sveglia' : 'Ferma');
+    if (rep) dismissBtn.title = 'Rimuovi la sveglia';
     dismissBtn.textContent = '\xD7';
     dismissBtn.addEventListener('click', () => {
-      send({ type: MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
+      send({ type: rep ? MSG.FILO_DELETE_TIMER : MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
     });
     div.appendChild(dismissBtn);
 
