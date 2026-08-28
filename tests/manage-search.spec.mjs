@@ -152,7 +152,7 @@ test('la "x" e il tasto Esc chiudono la ricerca e riportano alla lista della sch
   await expect(page.locator('#mgSearchBar')).toBeVisible();
   await page.locator('#mgSearchClose').click();
   await expect(page.locator('#mgSearchBar')).toBeHidden();
-  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item').first()).toHaveAttribute('data-id', 'fb-x');
 

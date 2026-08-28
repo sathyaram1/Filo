@@ -787,7 +787,7 @@ test('un feedback "non filtrato" è bianco, sta nei Ricevuti, mostra i giudici m
   // Owner + dati: il bianco vive nei Ricevuti (tab di default).
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_UNFILTERED);
 
-  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item--unfiltered')).toHaveCount(1);
   const border = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
@@ -1436,7 +1436,7 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   }, CLARIFY_FB);
 
   // Compare in Ricevuti.
-  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
   // Apri il dettaglio: il box risposta chiarimenti è visibile. Con la macchina
