@@ -1632,13 +1632,20 @@
     mgList.innerHTML = '';
     setSearchMsg(fallback ? 'Modello non disponibile: mostro i risultati per testo.' : '', null);
 
+    // "Nessun risultato" al tetto del caricamento significa "nessuno fra quelli
+    // caricati": la ricerca legge solo i feedback che stanno in pagina.
+    const nessuno = () => {
+      mgList.hidden = true;
+      mgListEmpty.hidden = false;
+      mgListEmpty.textContent = 'Nessun feedback pertinente.'
+        + (loadHitCap() ? ` ${FB.COUNT_CAP_HINT}` : '');
+    };
+
     if (!results.length) {
       // Quanti ne ha trovati è esattamente la domanda della ricerca: zero è una
       // risposta, e si scrive come le altre (#495).
       setListHead('Ricerca', 0);
-      mgList.hidden = true;
-      mgListEmpty.hidden = false;
-      mgListEmpty.textContent = 'Nessun feedback pertinente.';
+      nessuno();
       return;
     }
     mgListEmpty.hidden = true;
