@@ -95,6 +95,13 @@
     revision_security: {
       done:   ['routine'], // PASS secaudit + merge-gate fonde su main
       design: ['routine'], // FAIL fixer-loop → statusReason loop
+      // Conflitto di fusione: main è andato avanti mentre il lavoro aspettava
+      // e le modifiche non si incastrano più da sole. Non è una bocciatura di
+      // qualità: il ramo torna in lavorazione per il RIALLINEAMENTO (rifare la
+      // base su main risolvendo i conflitti) e ripassa verifica e sicurezza
+      // sul contenuto nuovo. Senza questa riga il giro di riallineamento
+      // moriva alla consegna: la macchina rifiutava il rientro.
+      revision_capability: ['routine'],
     },
     done: {
       archived: ['owner'],  // verifica umana ok
