@@ -1768,6 +1768,13 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
 - **Superfici gemelle si allineano.** La pagina dei feedback e la dashboard di
   gestione sono la stessa barra vista da due ruoli: la seconda era rimasta
   senza numeri per anni proprio perché nessuno le guardava affiancate.
+- **Il numero fa corpo unico col nome, a qualsiasi larghezza.** Una barra di
+  schede a `display:flex` senza `flex-wrap` stringe i bottoni finché le parole
+  si spezzano: alla larghezza minima della finestra (720) si leggeva "In" /
+  "coda" / "(0)" su tre righe, col numero staccato dal nome che qualifica. La
+  barra manda a capo le SCHEDE INTERE (`flex-wrap: wrap` sul contenitore) e la
+  singola scheda non si spezza mai (`white-space: nowrap`): niente scorrimento
+  laterale, e ogni nome resta col suo numero accanto.
 - **Dove:** `manageTabCounts` in `src/shared/manageReview.js`; il tetto e la
   sua resa onesta (`LIST_PAGE_SIZE`, `listHitCap`, `countLabel`,
   `COUNT_CAP_HINT`) in `src/shared/feedback.js`; `updateTabCounts()` /
