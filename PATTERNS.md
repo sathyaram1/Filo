@@ -1731,6 +1731,35 @@ sezioni chiuse — #385).
 - **Dove:** `revealCollapsedFor` / `reapplyCollapseState` in
   `src/pages/editor/editor.js`. Test `tests/editor-find-collapsed.spec.mjs`.
 
+## Una barra di sezioni dice quante cose contiene ogni sezione
+
+Una fila di schede che dividono una stessa lista (Ricevuti / In coda / Risolti /
+Archiviati) senza numeri costringe ad aprirle una per una solo per sapere dove
+c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
+
+- **Solo dove significa qualcosa.** Le schede che non elencano niente
+  (statistiche, impostazioni, log) non prendono un numero: sarebbe un dato
+  inventato accanto a un nome.
+- **Il numero è la LUNGHEZZA della lista che quella scheda mostrerebbe**, e si
+  calcola con la stessa funzione che la costruisce. Se la scheda ha dei filtri
+  (⭐, "solo confermati"), il conteggio li segue: un contatore che non concorda
+  con quello che si vede aprendo sembra mentire, e l'errore si scopre tardi.
+- **Segue i dati, non i ricaricamenti.** Ogni cosa che sposta un elemento da
+  una sezione all'altra aggiorna entrambi i numeri sul posto — anche quando la
+  lista visibile è un'altra (es. il filtro ⭐ acceso mentre guardi un'altra
+  scheda).
+- **Nessun numero finché il dato non c'è.** In caricamento, o dopo un
+  caricamento fallito, la scheda resta col solo nome: uno "(0)" là dove non si
+  sa è peggio del silenzio. `(0)` si scrive solo quando la sezione è davvero
+  vuota — ed è lì che serve, perché dice "vuota" invece di lasciarlo intuire.
+- **Superfici gemelle si allineano.** La pagina dei feedback e la dashboard di
+  gestione sono la stessa barra vista da due ruoli: la seconda era rimasta
+  senza numeri per anni proprio perché nessuno le guardava affiancate.
+- **Dove:** `manageTabCounts` in `src/shared/manageReview.js`,
+  `updateTabCounts()` in `src/pages/manage/manage.js` (`.mg-tab-count`),
+  `updateTabCounts()` in `src/pages/feedback/feedback.js`. Test:
+  `tests/manage-tab-counts.spec.mjs`, `tests/unit/manageReview.test.mjs`.
+
 ## Se un dato ESCE da Filo, deve poter RIENTRARE (e l'import mostra prima cosa scrive)
 
 Un "esporta" senza il gemello "importa" non è una mezza feature: è una promessa
