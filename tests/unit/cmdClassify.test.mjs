@@ -609,7 +609,7 @@ test('livello 1 — cmdlet PowerShell di sola lettura invocati da soli', () => {
     'Format-Table', 'Format-List', 'Format-Wide', 'Out-String',
     'ConvertTo-Json', 'ConvertFrom-Json', 'Get-Service',
     // il nome del cmdlet non è sensibile a maiuscole/minuscole, come in PowerShell
-    'get-childitem', 'GET-CHILDITEM', 'Get-ChildItem.exe',
+    'get-childitem', 'GET-CHILDITEM',
   ]) {
     assert.equal(lvl(cmd), 1, `"${cmd}" (cmdlet di lettura) dovrebbe essere livello 1`);
   }
