@@ -464,7 +464,7 @@
     });
   }
 
-  // ── Quanti feedback c'è in ogni scheda-lista (#495) ───────────────────────
+  // ── Quanti feedback ci sono in ogni scheda-lista (#495) ───────────────────
   // Conta ESATTAMENTE ciò che la scheda elencherebbe, riusando le stesse
   // funzioni che costruiscono le liste: un numero calcolato con una regola sua
   // prima o poi diverge da quello che si vede aprendo la scheda. Per Ricevuti /
