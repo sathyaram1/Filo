@@ -73,18 +73,29 @@ test('debug provider stub', async ({ app, shell }) => {
     globalThis.SN_PROVIDERS.completeWithFallback = fake;
   }, { percorso: PDF });
 
+  await app.evaluate(() => {
+    const orig = globalThis.SN_EXECUTE_FILO_ACTION;
+    globalThis.__vfActions = [];
+    globalThis.SN_EXECUTE_FILO_ACTION = async (action, opts) => {
+      const res = await orig(action, opts);
+      try { globalThis.__vfActions.push({ action, out: res && res.output }); } catch (_) {}
+      return res;
+    };
+  });
   await page.locator('#input').fill('quanto ho di giacenza?');
   await page.locator('#sendBtn').click();
 
   await page.waitForTimeout(25_000);
   const dump = await app.evaluate(() => ({
     n: globalThis.__vfCalls.length,
-    tails: globalThis.__vfCalls.map((c) => c.slice(-600)),
+    tails: globalThis.__vfCalls.map((c) => c.slice(-1800)),
     errors: globalThis.__vfErrors,
   }));
   console.log('CALLS:', dump.n);
   dump.tails.forEach((t, i) => console.log(`--- CALL ${i + 1} TAIL ---\n${t}\n`));
   console.log('ERRORS:', JSON.stringify(dump.errors, null, 2));
+  const acts = await app.evaluate(() => globalThis.__vfActions.map((x) => ({ a: x.action, ok: x.out && x.out.ok, err: x.out && x.out.error, det: x.out && x.out.detail, name: x.out && x.out.name, len: x.out && String(x.out.text || '').length })));
+  console.log('ACTIONS:', JSON.stringify(acts, null, 2));
   const bubbles = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-filo')].map((b) => b.textContent.slice(0, 200)));
   console.log('BUBBLES:', JSON.stringify(bubbles, null, 2));
 });
