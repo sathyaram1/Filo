@@ -522,7 +522,9 @@
       if (byWord.length) return byWord;
     }
     // 4) riferimento all'ORARIO ("quella delle 7", "la sveglia delle 07:30").
-    const hm = /(\d{1,2})(?:[:.](\d{2}))?/.exec(q);
+    // Sul testo GREZZO: la normalizzazione toglie i due punti e "06:30"
+    // diventerebbe "06 30", cioè le 6 in punto.
+    const hm = /(\d{1,2})(?:[:.](\d{2}))?/.exec(String(ref.label || ''));
     if (hm) {
       const want = fmtClock({ h: Number(hm[1]), m: Number(hm[2] || 0) });
       const byTime = pool.filter((t) => t.kind === 'alarm' && alarmClockText(t) === want);
