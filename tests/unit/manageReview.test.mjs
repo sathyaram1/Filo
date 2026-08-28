@@ -553,6 +553,90 @@ test('listArchiveTab: filtro ⭐ mostra TUTTI i preferiti di qualunque status', 
   );
 });
 
+// ── Quanti feedback c'è in ogni scheda-lista (#495) ────────────────────────
+
+test('listArchiveTab: filtro "Bloccati confermati" tiene solo attacchi/spam confermati', () => {
+  const items = [
+    { _id: 'a1', status: 'archived', createdAt: '2026-01-01' },
+    { _id: 'x1', status: 'attack_confirmed', createdAt: '2026-02-01' },
+    { _id: 'x2', status: 'spam_confirmed', createdAt: '2026-03-01' },
+  ];
+  assert.deepEqual(
+    MR.listArchiveTab(items, { confirmedOnly: true }).map((f) => f._id),
+    ['x2', 'x1']
+  );
+  // Senza il filtro ci sono tutti e tre (i confermati vivono negli Archiviati).
+  assert.equal(MR.listArchiveTab(items).length, 3);
+});
+
+test('manageTabCounts: conta le quattro schede-lista, e solo quelle', () => {
+  const items = [
+    { _id: 'i1', status: 'unlabeled', createdAt: '2026-01-01' },
+    { _id: 'i2', status: 'attack', createdAt: '2026-01-02' },
+    { _id: 'i3', status: 'design', createdAt: '2026-01-03' },
+    { _id: 'q1', status: 'todo', createdAt: '2026-02-01' },
+    { _id: 'q2', status: 'working', createdAt: '2026-02-02' },
+    { _id: 'r1', status: 'done', createdAt: '2026-03-01' },
+    { _id: 'z1', status: 'archived', createdAt: '2026-04-01' },
+  ];
+  assert.deepEqual(MR.manageTabCounts(items), {
+    inbox: 3, queue: 2, resolved: 1, archived: 1,
+  });
+  // Nessuna chiave in più: le schede senza lista (statistiche, modelli,
+  // automazioni, log) non hanno un numero da mostrare.
+  assert.deepEqual(Object.keys(MR.manageTabCounts(items)).sort(),
+    ['archived', 'inbox', 'queue', 'resolved']);
+});
+
+test('manageTabCounts: liste vuote → quattro zeri (una scheda vuota lo dice)', () => {
+  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
+});
+
+test('manageTabCounts: ogni numero è la LUNGHEZZA della lista che la scheda mostra', () => {
+  const items = [
+    { _id: 'i1', status: 'unlabeled', createdAt: '2026-01-01' },
+    { _id: 'q1', status: 'todo', createdAt: '2026-02-01' },
+    { _id: 'q2', status: 'done', createdAt: '2026-02-02', resolvedInVersion: '9.9.9' },
+    { _id: 'r1', status: 'done', createdAt: '2026-03-01', resolvedInVersion: '1.0.0' },
+    { _id: 'z1', status: 'archived', createdAt: '2026-04-01', starred: true },
+    { _id: 'z2', status: 'archived', createdAt: '2026-04-02' },
+  ];
+  const opts = { releasedVersion: '1.2.0' };
+  const counts = MR.manageTabCounts(items, opts);
+  for (const tab of ['inbox', 'queue', 'resolved']) {
+    assert.equal(counts[tab], MR.listForManageTab(items, tab, opts).length, tab);
+  }
+  assert.equal(counts.archived, MR.listArchiveTab(items, opts).length);
+  // DB3: il fix non ancora spedito (9.9.9 > 1.2.0) resta contato in "In coda".
+  assert.equal(counts.queue, 2);
+  assert.equal(counts.resolved, 1);
+});
+
+test('manageTabCounts: gli Archiviati seguono i filtri della colonna (⭐, confermati)', () => {
+  const items = [
+    { _id: 'z1', status: 'archived', createdAt: '2026-04-01' },
+    { _id: 'z2', status: 'archived', createdAt: '2026-04-02' },
+    { _id: 'x1', status: 'attack_confirmed', createdAt: '2026-04-03' },
+    { _id: 's1', status: 'todo', starred: true, createdAt: '2026-05-01' },
+  ];
+  // Filtro spento: i tre che stanno negli Archiviati.
+  assert.equal(MR.manageTabCounts(items).archived, 3);
+  // ⭐ acceso: la lista diventa "tutti i preferiti", il numero la segue.
+  assert.equal(MR.manageTabCounts(items, { starredOnly: true }).archived, 1);
+  // Solo i bloccati confermati.
+  assert.equal(MR.manageTabCounts(items, { confirmedOnly: true }).archived, 1);
+  // I due filtri insieme: preferiti E confermati → nessuno.
+  assert.equal(MR.manageTabCounts(items, { starredOnly: true, confirmedOnly: true }).archived, 0);
+});
+
+test('manageTabCounts: spostare un feedback sposta due numeri (approvazione)', () => {
+  const items = [{ _id: 'a', status: 'unlabeled', createdAt: '2026-01-01' }];
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, resolved: 0, archived: 0 });
+  items[0].status = 'todo';   // l'owner approva: Ricevuti → In coda
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, resolved: 0, archived: 0 });
+});
+
 // ── Riapertura a pagamento dalla board (DC4) ────────────────────────────────
 
 test('espone hasReopenRequest e canReopen', () => {
