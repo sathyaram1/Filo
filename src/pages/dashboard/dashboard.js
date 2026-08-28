@@ -1211,6 +1211,7 @@
       || (isType(a, 'CAPACITA_DETTAGLIO') && a._output)
       || (isType(a, 'CERCA_WEB') && a._output)
       || (isType(a, 'LEGGI_FILE') && a._output)
+      || (isType(a, 'LEGGI_DOCUMENTO') && a._output)
       || (isType(a, 'LEGGI_TRASPARENZA') && a._output));
   }
 
