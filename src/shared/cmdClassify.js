@@ -144,6 +144,124 @@
     'ln',
   ]);
 
+  // ── PowerShell: cmdlet di sola lettura e pipeline di sole letture ─────────
+  //
+  // Su Windows la shell di Filo È PowerShell (src/main/services/terminal.js), e
+  // un LLM che scrive PowerShell naturale usa `Get-ChildItem` e le pipeline, non
+  // `ls`. Prima di questo blocco OGNI cmdlet e OGNI pipeline cadevano nel ramo
+  // "non riconosciuto" → livello 3: elencare una cartella costava all'utente la
+  // stessa frizione di un `rm -rf` (misurato su un banco con modelli reali: 26
+  // comandi bloccati su 33, quasi tutti letture innocue).
+  //
+  // Il rimedio resta il principio del file — WHITELIST, l'ignoto è 3 — applicato
+  // ai cmdlet. Criterio di ammissione: entra solo il cmdlet che NON ha una forma
+  // capace di scrivere. In PowerShell è la norma, perché il gemello che scrive è
+  // sempre un ALTRO verbo (Get-Item legge, Set-Item scrive; Get-Content legge,
+  // Set-Content/Out-File/Tee-Object scrivono; Get-Process legge, Stop-Process
+  // uccide; Get-Date legge l'orologio, Set-Date lo imposta): il cmdlet in lista
+  // non ha quindi flag distruttivi da intercettare come in LEVEL1_MUTATES —
+  // basta che il gemello che scrive resti FUORI, dove il default lo tiene a 3.
+  // Restano fuori di proposito anche i cmdlet di sola lettura ma con una
+  // superficie troppo larga o ambigua (Get-CimInstance/Get-WmiObject, che
+  // arrivano ovunque nel sistema; Get-Credential, che apre una richiesta di
+  // password; Measure-Command, che ESEGUE lo scriptblock che riceve).
+  const PS_READ = new Set([
+    'get-childitem', 'gci', 'get-content', 'gc', 'get-item', 'gi',
+    'get-itemproperty', 'gp', 'get-itempropertyvalue', 'get-location', 'gl',
+    'get-date', 'get-process', 'gps', 'get-service', 'get-help', 'get-member',
+    'get-alias', 'get-variable', 'get-module', 'get-psdrive', 'get-host',
+    'get-command', 'get-history', 'get-computerinfo', 'get-culture',
+    'get-timezone', 'get-random', 'get-unique',
+    'select-string', 'sls', 'select-object', 'select', 'sort-object',
+    'measure-object', 'measure', 'group-object', 'group', 'compare-object',
+    'test-path', 'resolve-path', 'split-path', 'join-path', 'convert-path',
+    'format-table', 'ft', 'format-list', 'fl', 'format-wide', 'fw',
+    'out-string', 'out-host', 'out-null', 'write-output', 'write-host',
+    'convertto-json', 'convertfrom-json', 'convertto-csv', 'convertfrom-csv',
+    'convertfrom-stringdata',
+  ]);
+  // Alias VOLUTAMENTE esclusi perché su un'altra shell sono un programma che
+  // SCRIVE, e il classificatore non sa quale shell eseguirà il comando: `sort`
+  // (Sort-Object in PowerShell, ma `sort -o file` su Unix scrive un file), `gm`
+  // (Get-Member, ma anche GraphicsMagick, che converte e sovrascrive immagini),
+  // `gcm` (Get-Command, ma anche git-credential-manager, che cancella
+  // credenziali), `compare` (Compare-Object, ma anche ImageMagick, che scrive
+  // l'immagine di confronto). I nomi lunghi corrispondenti restano ammessi.
+
+  // Where-Object/ForEach-Object (e gli alias `?`, `%`, `where`, `foreach`) hanno
+  // senso solo DENTRO una pipeline: da soli non ricevono niente da filtrare.
+  const PS_PIPE_ONLY = new Set(['where-object', 'where', '?', 'foreach-object', 'foreach', '%']);
+  // ForEach-Object senza scriptblock usa la forma "nome di membro", che INVOCA
+  // il metodo su ogni oggetto: `Get-ChildItem | % Delete` CANCELLA i file. Quindi
+  // per questi lo scriptblock (validato) è obbligatorio.
+  const PS_FOREACH = new Set(['foreach-object', 'foreach', '%']);
+
+  // Uno SCRIPTBLOCK `{ … }` è il buco naturale della pipeline: `gci | % {
+  // Remove-Item $_ }` è una cancellazione travestita da lettura. Non proviamo a
+  // classificare cosa c'è dentro (sarebbe interpretare PowerShell): pretendiamo
+  // che il blocco sia INERTE, cioè che non contenga NESSUN token in posizione di
+  // comando. Passano proprietà, confronti, operatori e numeri (`{ $_.Length -gt
+  // 1000 }`); non passa niente che possa invocare qualcosa — parole nude
+  // (`Remove-Item`, `ri`, `foobar`), percorsi di eseguibili (`.\x.exe`),
+  // dot-sourcing, chiamate di metodo `(`, assegnazioni `=`, membri statici `::`.
+  // È volutamente più severo del necessario: un blocco di lettura respinto costa
+  // una conferma in più, un blocco ostile accettato costa i file dell'utente.
+  function scriptBlockIsInert(inner) {
+    const s = String(inner);
+    if (/[=(){}`;&|<>@]|::/.test(s)) return false;
+    for (const t of s.trim().split(/\s+/).filter(Boolean)) {
+      if (/^[A-Za-z_]/.test(t)) return false;              // parola nuda = comando
+      if (/^\.{1,2}$/.test(t)) return false;               // dot-sourcing
+      if (/[\\/]/.test(t) && !/^-/.test(t)) return false;  // percorso di un eseguibile
+    }
+    return true;
+  }
+
+  // Un SEGMENTO (comando singolo, o un pezzo di pipeline) è di sola lettura?
+  // Serve sia per il cmdlet isolato sia per ogni pezzo di una pipeline, così i
+  // due cammini non possono divergere. `seg` arriva già senza virgolette
+  // (dequote): come nel resto del file, toglierle può solo far VEDERE più
+  // roba pericolosa, mai meno.
+  function segmentIsRead(seg, inPipeline) {
+    // `%{...}` e `?{...}` (senza spazio) sono scrittura PowerShell normalissima:
+    // isoliamo le graffe come token a sé prima di guardare programma e blocco.
+    const norm = String(seg).replace(/\{/g, ' { ').replace(/\}/g, ' } ');
+    // Sottoespressioni, chiamate, hashtable, redirezioni, operatore di chiamata:
+    // dentro può nascondersi qualunque cosa → non è lettura riconoscibile.
+    if (/[`()<>;&|@]|\$\{|::/.test(norm)) return false;
+    const open = (norm.match(/\{/g) || []).length;
+    const close = (norm.match(/\}/g) || []).length;
+    if (open !== close || open > 1) return false; // graffe sbilanciate o annidate
+    if (open === 1) {
+      const i = norm.indexOf('{');
+      const j = norm.lastIndexOf('}');
+      if (j < i || !scriptBlockIsInert(norm.slice(i + 1, j))) return false;
+    }
+    const prog = programOf(norm);
+    if (!prog) return false;
+    if (ALWAYS_3.has(prog) || ARBITRARY_CODE.has(prog)) return false;
+    if (PS_PIPE_ONLY.has(prog)) {
+      if (!inPipeline) return false;
+      return PS_FOREACH.has(prog) ? open === 1 : true;
+    }
+    if (PS_READ.has(prog)) return true;
+    // Dentro una pipeline vale come lettura anche tutto ciò che il
+    // classificatore riconosce già come livello 1 (`ls`, `cat`, `grep`, `head`,
+    // `git log`…): `cat file | grep errore` non compie nulla di più di `cat file`.
+    return inPipeline && classifyOne(seg) === 1;
+  }
+
+  // Il comando è una pura PIPELINE (solo `|`), senza sequenziamento, background,
+  // redirezioni o sostituzioni? Ritorna i segmenti, altrimenti null. Nota: `||`
+  // produce un segmento vuoto e fa fallire il controllo, quindi non passa di qui.
+  function splitSafePipeline(cmd) {
+    if (/[`<>;&]|\$\(|\$\{|\r|\n/.test(cmd)) return null;
+    if (cmd.indexOf('|') === -1) return null;
+    const parts = cmd.split('|').map((p) => p.trim());
+    if (parts.length < 2 || parts.some((p) => !p)) return null;
+    return parts;
+  }
+
   // Flag che alzano a 3 un comando altrimenti ≤2.
   const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
 
