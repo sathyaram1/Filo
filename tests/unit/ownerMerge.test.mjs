@@ -135,9 +135,10 @@ describe('cosa legge l’owner', () => {
     assert.doesNotMatch(msg, /prima schermata|in cima alla home/i);
     // Quanto dura si dice QUI: è l'unico posto dove l'owner sta guardando nel
     // momento in cui la richiesta nasce, e sapere se deve correre o no cambia
-    // cosa fa dopo. Un giorno, non mezz'ora: rifarla costa un giro intero.
-    assert.match(msg, /24 ore/);
-    assert.doesNotMatch(msg, /mezz'ora|mezz’ora/);
+    // cosa fa dopo. Una settimana (decisione owner 2026-08-28): l'approvazione
+    // non deve essere un appuntamento quotidiano.
+    assert.match(msg, /7 giorni/);
+    assert.doesNotMatch(msg, /24 ore|mezz'ora|mezz’ora/);
     // E che una pagina già aperta se ne accorge da sola: senza questa riga
     // l'owner chiude e riapre una scheda per far comparire l'avviso.
     assert.match(msg, /già apert/i);
