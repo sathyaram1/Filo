@@ -298,7 +298,7 @@
     // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro:
     // mandare l'owner a lanciare la pubblicazione locale per un ramo scritto da
     // un'automazione è un consiglio che non porta a niente.
-    exp.title = 'Vale per il commit esaminato e per un giorno. Passata la scadenza, ' + lowerFirst(howToRetry(req));
+    exp.title = 'Vale per il commit esaminato e per una settimana. Passata la scadenza, ' + lowerFirst(howToRetry(req));
     head.appendChild(exp);
     card.appendChild(head);
 
