@@ -599,9 +599,9 @@ test('countsByManageTab: il gate DB3 sposta i done non spediti da Risolti a In c
     { _id: 'd1', status: 'done', resolvedInVersion: '1.2.0' },
     { _id: 'd2', status: 'done', resolvedInVersion: '9.9.9' }, // non ancora rilasciata
   ];
-  // Senza versione rilasciata nota: nessun done è "spedito" → tutti In coda.
-  assert.deepEqual(MR.countsByManageTab(items).queue, 2);
-  assert.deepEqual(MR.countsByManageTab(items).resolved, 0);
+  // Senza versione rilasciata nota il gate è inattivo: done → Risolti (come prima di DB3).
+  assert.deepEqual(MR.countsByManageTab(items).resolved, 2);
+  assert.deepEqual(MR.countsByManageTab(items).queue, 0);
   const c = MR.countsByManageTab(items, { releasedVersion: '1.2.0' });
   assert.deepEqual(c.resolved, 1);
   assert.deepEqual(c.queue, 1);
