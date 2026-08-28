@@ -615,10 +615,13 @@ conversazione (#500).
   il riquadro — l'arrivo di un pezzo di risposta — chiedi la rimisura anche lì,
   fusa per fotogramma. L'osservatore resta la rete per tutto il resto.
 - **Le superfici che crescono sono due.** Il menu del tasto destro e il riquadro
-  della risposta di Filo hanno lo STESSO difetto e la stessa cura: chi ne
-  sistema uno sistemi anche l'altro, o chi ha segnalato il primo incontra il
-  secondo il giorno dopo (#500). La geometria sta in un posto solo,
-  `src/shared/overlayPlacement.js`; menu e riquadro la usano, non la ricopiano.
+  della risposta di Filo hanno lo STESSO difetto: chi ne sistema uno sistemi
+  anche l'altro, o chi ha segnalato il primo incontra il secondo il giorno dopo
+  (#500 il menu, #502 il riquadro). Le cure oggi sono due: il menu usa la
+  geometria condivisa di `src/shared/overlayPlacement.js`; il riquadro ha la sua
+  posa ancorata al lato fermo (vedi la sezione «Un riquadro che si riempie dopo
+  si ancora dal lato che non si muove»). Se le si unifica, la geometria va in un
+  posto solo, non ricopiata.
 - **A muoversi sono in due: il riquadro e la finestra.** Quello che conta non è
   che il riquadro sia cresciuto, è che il posto per stargli non basti più — e ci
   si arriva anche dall'altro verso, con la finestra che si accorcia sotto a un
