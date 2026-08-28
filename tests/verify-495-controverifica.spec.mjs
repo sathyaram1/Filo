@@ -118,16 +118,26 @@ test('i filtri della sezione Archiviati muovono il numero insieme alla lista', a
   expect((await tabCount(page, 'archived')).n).toBe(await page.locator('#mgList .mg-item').count());
 
   // ⭐ acceso: la sezione elenca i preferiti di QUALUNQUE stato.
-  const star = page.locator('#mgArchiveFilter input[type="checkbox"], #mgArchiveFilter button').first();
-  if (await star.count()) {
-    await star.click();
-    await page.waitForTimeout(150);
-    const n = (await tabCount(page, 'archived')).n;
-    const shown = await page.locator('#mgList .mg-item').count();
-    expect(n, 'col filtro ⭐ acceso il numero non segue la lista').toBe(shown);
-    await star.click();
-    await page.waitForTimeout(150);
-  }
+  const star = page.locator('#mgStarFilter');
+  await star.check();
+  await page.waitForTimeout(150);
+  expect((await tabCount(page, 'archived')).n, 'col filtro ⭐ acceso il numero non segue la lista')
+    .toBe(await page.locator('#mgList .mg-item').count());
+
+  // "Bloccati confermati" sopra il ⭐: due filtri insieme.
+  const conf = page.locator('#mgConfirmedFilter');
+  await conf.check();
+  await page.waitForTimeout(150);
+  expect((await tabCount(page, 'archived')).n, 'coi due filtri insieme il numero non segue la lista')
+    .toBe(await page.locator('#mgList .mg-item').count());
+
+  await star.uncheck();
+  await page.waitForTimeout(150);
+  expect((await tabCount(page, 'archived')).n, 'solo "bloccati confermati": il numero non segue la lista')
+    .toBe(await page.locator('#mgList .mg-item').count());
+
+  await conf.uncheck();
+  await page.waitForTimeout(150);
   expect((await tabCount(page, 'archived')).n).toBe(await page.locator('#mgList .mg-item').count());
 });
 
