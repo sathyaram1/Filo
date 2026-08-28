@@ -1194,6 +1194,46 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           output: { fileRead: String(fileId == null ? '' : fileId), found: !!(r && r.ok), title: (r && r.title) || '', text: (r && r.text) || '' },
         };
       }
+      case 'LEGGI_DOCUMENTO': {
+        // Lettura di un DOCUMENTO dal disco dell'utente: PDF (estrazione del
+        // testo) e testo semplice. Prima di questa azione i documenti che
+        // contano — bollette, estratti conto, contratti — erano illeggibili:
+        // il terminale li trova ma un PDF è binario, e "quant'è la giacenza
+        // media?" restava senza risposta possibile. Il testo torna come
+        // `output`, che il client re-immette nel contesto (auto-continue).
+        // Sola lettura: nessuna scrittura, nessuna esecuzione.
+        const percorso = action.percorso ?? action.path ?? action.file ?? action.documento ?? action.nome;
+        let r = null;
+        try {
+          const DR = require('./documentRead');
+          r = await DR.readDocument(percorso);
+        } catch (e) {
+          console.warn('[Filo] lettura documento fallita', e?.message || e);
+        }
+        if (!r) {
+          return {
+            executed: false,
+            kept: true,
+            output: { documentRead: String(percorso == null ? '' : percorso), ok: false, error: 'unreadable', detail: 'lettura non disponibile' },
+          };
+        }
+        return {
+          executed: !!r.ok,
+          kept: true,
+          output: {
+            documentRead: String(percorso == null ? '' : percorso),
+            ok: !!r.ok,
+            name: r.name || '',
+            kind: r.kind || '',
+            pages: r.pages || 0,
+            empty: !!r.empty,
+            truncated: !!r.truncated,
+            text: r.text || '',
+            error: r.error || null,
+            detail: r.detail || '',
+          },
+        };
+      }
       case 'PULISCI_TAB':
         // Non eseguiamo subito: il client mostra un bottone di conferma; al
         // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
