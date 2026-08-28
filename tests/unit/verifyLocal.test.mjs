@@ -202,7 +202,8 @@ function scenario({ conflitto }) {
   g(work, ['push', '-q', 'origin', 'refs/heads/claude/prova:refs/heads/claude/prova']);
 
   // …mentre main su origin va avanti alle sue spalle.
-  clone(altro);
+  execFileSync('git', ['clone', '-q', origin, altro], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  identita(altro);
   commit(altro, conflitto ? 'comune.txt' : 'principale.txt', 'loro\n', 'avanzamento');
   g(altro, ['push', '-q', 'origin', 'refs/heads/main:refs/heads/main']);
 
