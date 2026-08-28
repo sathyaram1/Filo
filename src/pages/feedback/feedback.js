@@ -986,11 +986,17 @@
       const s = statusOf(f);
       if (s in counts) counts[s]++;
     }
+    // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
+    // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
+    // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
+    const capped = SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
     for (const [tab, n] of Object.entries(counts)) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
       const label = { inbox: 'Ricevuti', agent: 'Agente', draft: 'Bozze', todo: 'Da risolvere', review: 'In revisione', blocked: 'Bloccati', clarify: 'Chiarimenti', done: 'Risolti', verified: 'Verificati' }[tab];
-      btn.textContent = `${label} (${n})`;
+      btn.textContent = `${label} ${SN_FEEDBACK.countLabel(n, capped)}`;
+      if (capped) btn.title = SN_FEEDBACK.COUNT_CAP_HINT;
+      else btn.removeAttribute('title');
     }
   }
 
