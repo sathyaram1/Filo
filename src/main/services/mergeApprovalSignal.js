@@ -201,9 +201,12 @@ function watchSignal(onRing, { base, debounceMs = DEBOUNCE_MS } = {}) {
 function signature(reply) {
   const r = reply || {};
   const pend = (Array.isArray(r.pending) ? r.pending : []).map((x) => String(x && x.id));
+  // Le approvate-mai-avvenute contano quanto le pendenti: una che compare o
+  // sparisce È un cambiamento da mostrare.
+  const fail = (Array.isArray(r.failed) ? r.failed : []).map((x) => String(x && x.id));
   const rec = (Array.isArray(r.recent) ? r.recent : [])
     .map((x) => `${String(x && x.id)}:${String((x && x.outcome) || '')}:${x && x.discarded ? 'd' : ''}`);
-  return `${pend.join(',')}|${rec.join(',')}`;
+  return `${pend.join(',')}|${fail.join(',')}|${rec.join(',')}`;
 }
 
 /**
