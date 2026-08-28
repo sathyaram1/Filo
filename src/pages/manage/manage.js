@@ -2580,7 +2580,9 @@
     }
 
     try {
-      allFeedbacks = await FB.list({ pageSize: 500 });
+      // Il tetto viene dal modulo condiviso: `loadHitCap()` confronta contro
+      // QUELLO, e due numeri scritti a mano prima o poi divergono.
+      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE });
       dataLoaded = true;
     } catch (err) {
       mgListLoading.hidden = true;
