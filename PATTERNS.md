@@ -688,15 +688,15 @@ conversazione (#500).
 - **Dove:** `computeCap` / `computeOffset` / `computePinnedLimit` / `applyCap` /
   `observeGrowth` in `src/shared/overlayPlacement.js`; `place` /
   `computeSubOffset` / `repositionSub` / `dismissTooltip` e il gestore `resize`
-  in `src/content/menu.js`; `placePopup` / `richiediPosa` e il suo `resize` in
-  `src/content/popup.js`. Va caricato PRIMA di `popup.js` e
-  `menu.js` in `src/preload/page-preload.js` e `src/preload/internal-preload.js`.
-  Test: `tests/unit/menuPlacement.test.mjs` e
-  `tests/unit/popupPlacement.test.mjs` (geometria pura),
+  in `src/content/menu.js`. Va caricato PRIMA di `menu.js` in
+  `src/preload/page-preload.js` e `src/preload/internal-preload.js`.
+  Il riquadro della risposta ha la sua posa in `src/content/popup.js` (sezione
+  «si ancora dal lato che non si muove»). Test: `tests/unit/menuPlacement.test.mjs`
+  e `tests/unit/popupPlacement.test.mjs` (geometria pura),
   `tests/context-menu-grow.spec.mjs` (il menu vero che cresce, scorre, si porta
   dietro il pannello, rientra quando la finestra si accorcia e non lascia
-  etichette appese), `tests/popup-grow.spec.mjs` (il riquadro vero che cresce,
-  resta scrivibile e non si muove se l'hai trascinato).
+  etichette appese); per il riquadro `tests/popup-pose-streaming.spec.mjs`,
+  `tests/popup-pose-casi-limite.spec.mjs` e `tests/popup-scroll-streaming.spec.mjs`.
 
 ## Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
