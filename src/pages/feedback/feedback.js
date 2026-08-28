@@ -1083,6 +1083,9 @@
       // illeggibile mostriamo la frase scritta per chi ha segnalato — e se non
       // c'è, niente: una bolla vuota è meglio di una bolla di ciphertext.
       all = list.map(sanitizeReportForReader);
+      // Da qui in poi i numeri delle sezioni sono veri e si possono scrivere.
+      dataLoaded = true;
+      loadError = null;
       applyFilter();
     } catch (e) {
       if (gen !== loadGen) return;
@@ -1090,23 +1093,13 @@
       // grezzo) + un tasto per riprovare, invece di lasciare l'utente bloccato a
       // chiudere e riaprire la pagina. Stesso pattern della bacheca (SN_CHAT_ERRORS).
       console.error('[feedback] errore caricamento:', e);
-      listEl.innerHTML = '';
-      countEl.textContent = '';
-      const msg = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+      loadError = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
         ? SN_CHAT_ERRORS.sentence(e)
         : 'Non è stato possibile caricare i feedback: controlla la connessione e riprova.';
-      emptyEl.innerHTML = '';
-      const p = document.createElement('p');
-      p.className = 'fb-load-error-msg';
-      p.textContent = msg;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'fb-load-retry';
-      btn.textContent = '↻ Riprova';
-      btn.addEventListener('click', () => load());
-      emptyEl.appendChild(p);
-      emptyEl.appendChild(btn);
-      emptyEl.hidden = false;
+      // Le sezioni tornano al solo nome: quello che avevano detto prima (se
+      // c'erano dati vecchi) non vale più per una lista che non abbiamo.
+      if (!dataLoaded) updateTabCounts();
+      showLoadError(loadError);
     }
   }
 
