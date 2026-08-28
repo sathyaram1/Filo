@@ -770,6 +770,104 @@ test('sequenza — un cmdlet di lettura non copre il pezzo che scrive', () => {
   assert.equal(lvl('Get-ChildItem && mkdir out'), 2);
 });
 
+test('SICUREZZA — l\'esca eseguibile omonima di un cmdlet fidato resta livello 3', () => {
+  // Un file su disco chiamato come un cmdlet di lettura (`.\Get-ChildItem.exe`)
+  // NON deve ereditare il livello 1 del cmdlet: `programOf` fa il basename e
+  // toglie l'estensione, quindi senza difesa verrebbe eseguito senza conferma.
+  // Le otto forme dello stesso buco più le varianti di estensione/alias.
+  for (const cmd of [
+    '.\\Get-ChildItem.exe',                       // 1. cartella corrente .\
+    'C:\\Users\\me\\Downloads\\Get-ChildItem.exe',// 2. percorso assoluto
+    'Downloads\\Get-ChildItem.exe',               // 3. percorso relativo
+    '".\\Get-ChildItem.exe"',                     // 4. con virgolette
+    'Get-ChildItem.exe',                          // 5. dal PATH, senza percorso
+    'cd ~\\Downloads; .\\Get-ChildItem.exe',      // 6. riga unica cd + lancio
+    'Get-ChildItem; .\\Get-ChildItem.exe',        // 7. in coda a una lettura vera
+    '.\\Get-ChildItem.ps1',                       // 8. tutte le estensioni…
+    '.\\Get-ChildItem.cmd', '.\\Get-ChildItem.bat', '.\\Get-ChildItem.com',
+    '.\\gci.exe', '.\\Get-Content.exe',           // …nomi lunghi e alias
+    './Get-ChildItem', '/home/x/Get-ChildItem',   // separatore unix, anche senza estensione
+    '& Get-ChildItem.exe', '"Get-ChildItem.exe"', 'gci.exe',
+    'Get-Content.cmd log.txt',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (file omonimo, non il cmdlet) DEVE restare livello 3`);
+  }
+  // Controprova: nomi che NON sono in whitelist restano 3 comunque.
+  for (const cmd of ['evil.exe', 'Remove-Item.exe', 'Set-Content.exe', '.\\evil.exe']) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  }
+});
+
+test('SICUREZZA — l\'esca eseguibile dentro una pipeline resta livello 3', () => {
+  for (const cmd of [
+    'Get-ChildItem | Get-Content.exe',    // segmento con estensione = programma
+    'Get-ChildItem | .\\evil.exe',
+    'Get-ChildItem | .\\Select-Object.exe',
+    'Get-Content x | .\\Sort-Object.exe',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (esca in pipeline) DEVE restare livello 3`);
+  }
+});
+
+test('livello 1 — parità PowerShell: navigazione e hash di sola lettura', () => {
+  // Le forme PowerShell di gesti già a livello 1 (`cd`, `sha256sum`) devono
+  // avere lo stesso livello, non salire a 3 solo perché scritte da cmdlet.
+  for (const cmd of [
+    'Set-Location C:\\', 'sl ..', 'set-location -Path src',
+    'pushd C:\\tmp', 'popd',
+    'Get-FileHash file.txt', 'Get-FileHash -Algorithm SHA256 x',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
+  }
+});
+
+test('livello 1 — filtri PowerShell con un letterale fra virgolette in un confronto', () => {
+  // Le virgolette venivano tolte prima del controllo di inerzia e la parola
+  // quotata restava nuda, scambiata per un'invocazione. Un letterale fra
+  // virgolette in un confronto è inerte tanto quanto `-like "*.md"`.
+  for (const cmd of [
+    'gci | ? { $_.Name -eq "readme.md" }',
+    'Get-ChildItem | Where-Object { $_.Name -match "log" }',
+    "gci | ? { $_.Extension -eq '.txt' }",
+    'gci | Where-Object { $_.Name -like "*.md" }',
+    'gci | ? { $_.LastWriteTime -gt "2020-01-01" }',
+    'gci | ? { $_.Name -eq "a b.txt" }',      // spazio dentro le virgolette
+    'Get-Content "my file.txt"',              // anche fuori da un blocco
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (letterale quotato inerte) dovrebbe essere livello 1`);
+  }
+  // …ma un'invocazione VERA resta 3 anche se i suoi argomenti sono fra virgolette.
+  for (const cmd of [
+    'gci | % { Remove-Item "x.txt" }',
+    'gci | ? { & "evil.exe" }',
+    'gci | % { Invoke-Expression "rm x" }',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (invocazione reale) dovrebbe restare livello 3`);
+  }
+});
+
+test('livello 2 — npm/pip config che SCRIVE (registry incluso) non è lettura', () => {
+  // Cambiare il registry reindirizza da dove npm/pip scaricano ed eseguono
+  // codice: NON è lettura, chiede conferma. Prima erano tutti livello 1.
+  for (const cmd of [
+    'npm config set registry http://evil',
+    'npm config delete registry', 'npm config rm proxy', 'npm config edit',
+    'pip config set global.index-url http://evil',
+    'pip config unset global.index-url', 'pip3 config edit',
+  ]) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (scrive config) dovrebbe essere livello 2`);
+  }
+});
+
+test('livello 1 — npm/pip config che LEGGE resta lettura', () => {
+  for (const cmd of [
+    'npm config get registry', 'npm config list', 'npm config ls', 'npm config',
+    'pip config list', 'pip config get global.index-url', 'pip config debug',
+  ]) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge config) dovrebbe essere livello 1`);
+  }
+});
+
 test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('ls'), 1, 'ls esegue subito');
   assert.equal(lvl('git push'), 2, 'git push → popup');
