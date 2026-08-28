@@ -427,8 +427,12 @@
 
     const textEl = document.createElement('div');
     textEl.className = 'dash-live-text';
+    // Su una sveglia ricorrente diciamo anche i giorni: "Ferma" la zittisce ora
+    // e la lascia in lista per la prossima volta, quindi va detto.
+    const M = self.SN_FILO_MEMORY;
+    const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
     textEl.textContent = t.kind === 'alarm'
-      ? `⏰ Sveglia${t.label ? ` — ${t.label}` : ''}`
+      ? `⏰ Sveglia${t.label ? ` — ${t.label}` : ''}${rep ? ` · ${rep}` : ''}`
       : `⏰ ${t.label} — scaduto`;
     div.appendChild(textEl);
 
