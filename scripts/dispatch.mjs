@@ -511,6 +511,10 @@ export function buildPayload(bucket, ctx = {}) {
         // riscritto quando ci si posiziona sul ramo — ed è così che la critica
         // spariva senza che nessuno se ne accorgesse.
         verifierCritique: bucket.serverCritique || bucket.state?.verifierCritique || '',
+        // TUTTE le critiche dei giri passati, dalla più vecchia: la singola
+        // critica dice cosa correggere, la serie dice se stai tappando porte
+        // una alla volta invece di chiudere la causa.
+        history: Array.isArray(ctx.history) ? ctx.history : [],
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
