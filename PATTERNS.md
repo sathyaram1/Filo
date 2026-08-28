@@ -1102,6 +1102,37 @@ una conseguenza; va fatto il contrario.
   chiesto la spiegazione sparisce, e alla chiusura deve rifarla a mano per
   tradurla o copiarla. Tieni da parte il `Range` all'apertura e rimettilo alla
   chiusura, ma solo se nel frattempo l'utente non ne ha fatta una sua.
+- **Anche il limite del TRASCINAMENTO misura l'ingombro visibile.** Il guardiano
+  lo faceva già; il pezzo di codice che ferma il mouse al bordo no, leggeva
+  `offsetWidth`/`offsetHeight`. Le due misure coincidono solo al 100% di zoom,
+  perché la compensazione mette una `scale()` sul riquadro. Con la pagina
+  rimpicciolita (Ctrl+meno: due gesti, e in Filo si fa di continuo) la scala è
+  maggiore di 1, il riquadro occupa PIÙ di quanto dice `offsetHeight`, e il
+  limite lascia passare la differenza: al 50% la riga per scrivere finiva 464px
+  sotto il bordo dello schermo, e lì restava. Nessuno la riportava dentro,
+  perché finché la dimensione non cambia il guardiano non gira. Con la pagina
+  ingrandita la stessa formula si ferma prima del bordo e butta via una fascia
+  di schermo che c'è. Un errore solo, due direzioni, e la seconda si vede solo
+  se la cerchi.
+- **Cambiare il bordo ancorato vuol dire cambiare anche la `transform-origin`.**
+  Un riquadro posato sopra la parola è agganciato col fondo, quindi la
+  compensazione zoom scala da `bottom left`. Quando l'utente lo prende in mano
+  il bordo ancorato diventa la cima (`bottom: auto`, comanda `top`): se il punto
+  da cui scala resta quello di prima, il browser lo disegna a un'altezza intera
+  di distanza da dove dice `style.top`, e ogni conto fatto sulle sue coordinate
+  parla di un posto dove il riquadro non è. Al 50% di zoom saltava di 484px al
+  primo pixel di trascinamento. Riscrivi l'origine nello stesso istante in cui
+  cambi il bordo ancorato, senza aspettare il prossimo evento di zoom.
+- **Il corpo che scorre non insegue il fondo:** vale la regola delle chat in
+  streaming (§ "Liste/chat che si ricostruiscono in streaming"). Da quando il
+  tetto stringe il corpo allo spazio che c'è, leggere scorrendo mentre la
+  risposta arriva è l'uso normale del riquadro, e portare la vista in fondo a
+  ogni pezzo che arriva vuol dire che chi torna su a rileggere viene sbalzato
+  giù di nuovo, a ogni pezzo, finché il modello non ha finito. Due dettagli
+  perché funzioni qui. La posizione va RIMESSA e non solo lasciata stare: la
+  riscrittura finale del markdown può essere più corta del parziale, e il
+  browser clampa `scrollTop` da solo. E va rimessa DOPO la posa, perché
+  `reflow()` accorcia il corpo e con esso lo scorrimento massimo.
 - **Il guardiano guarda TUTTI E DUE i bordi, non solo quello previsto.** Finché
   la finestra non cambia sborda solo il lato libero, e lì si stringe il tetto.
   Ma quando lo spazio si accorcia dopo la posa, a uscire è il lato ANCORATO — un
