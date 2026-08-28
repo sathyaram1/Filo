@@ -1113,7 +1113,13 @@ una conseguenza; va fatto il contrario.
   perché finché la dimensione non cambia il guardiano non gira. Con la pagina
   ingrandita la stessa formula si ferma prima del bordo e butta via una fascia
   di schermo che c'è. Un errore solo, due direzioni, e la seconda si vede solo
-  se la cerchi.
+  se la cerchi. Due contorni dello stesso pezzo di codice. **I due limiti vanno
+  applicati nello stesso ordine del guardiano**, cioè con la cima che vince sul
+  fondo: quando il riquadro è più alto della finestra i due non possono valere
+  insieme, e con l'ordine invertito a uscire è l'intestazione, che è l'unica
+  presa per rimetterlo a posto. E **quando l'utente lo lascia, l'ultima parola è
+  del guardiano**: il limite del mouse sa solo spostare, lui sa anche stringere
+  il tetto.
 - **Cambiare il bordo ancorato vuol dire cambiare anche la `transform-origin`.**
   Un riquadro posato sopra la parola è agganciato col fondo, quindi la
   compensazione zoom scala da `bottom left`. Quando l'utente lo prende in mano
