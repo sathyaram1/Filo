@@ -72,11 +72,16 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo l'intestazione.
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.setData([]));
+
+  // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo
+  // l'intestazione — che dice anche quanti feedback sta mostrando (#495).
   for (const [tab, head] of [['queue', 'In coda'], ['resolved', 'Risolti'], ['archived', 'Archiviati'], ['inbox', 'Ricevuti']]) {
     await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
     await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
-    await expect(page.locator('#mgListHead')).toHaveText(head);
+    await expect(page.locator('#mgListHead')).toHaveText(`${head} (0)`);
   }
 
   // Statistiche Red Team → segnaposto dedicato.
