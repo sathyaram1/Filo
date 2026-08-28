@@ -283,8 +283,13 @@ test('finestra rimpicciolita a menu aperto: il menu rientra e l\'ultima voce res
 
   const menu = await apriMenuSuSelezione(page);
   await expect(menu.locator('.sn-menu-inline')).toContainText('SPIEGONE FINE', { timeout: 15_000 });
+  // La riposa dopo la crescita passa dal ciclo di disegno: si aspetta che si
+  // assesti, non si misura il fotogramma della mutazione.
+  await expect.poll(async () => {
+    const m = await page.evaluate(misuraMenu);
+    return m ? m.bottom - m.vh : 999;
+  }, { timeout: 5000, message: 'il menu non è rientrato dopo la crescita' }).toBeLessThanOrEqual(1);
   const prima = await page.evaluate(misuraMenu);
-  expect(prima.bottom).toBeLessThanOrEqual(prima.vh + 1);
 
   // La finestra si accorcia sotto il menu posato.
   const nuovaAltezza = Math.max(320, Math.round(prima.height * 0.6));
