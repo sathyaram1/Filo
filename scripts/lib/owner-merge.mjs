@@ -107,7 +107,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo') {
           ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
             + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
             + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
-            + '  Vale per il commit appena controllato e per 24 ore: se scade, o se il\n'
+            + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
             + '  ramo si muove, rilancia npm run finish.'
           : '\n  Non sono riuscito a metterla in attesa: nell\'app non comparirà niente da\n'
             + '  approvare. Riprova, e se non torna vanno rideployate le funzioni di sicurezza.');
