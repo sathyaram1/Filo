@@ -501,10 +501,15 @@
 
     try {
       allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      dataLoaded = true;
+      lastLoadError = null;
     } catch (err) {
       // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
       // il tasto Riprova e fermati qui (renderList mostrerebbe #bdEmpty).
+      // Il guasto resta in `lastLoadError`: i ridisegni successivi lo rileggono
+      // invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
+      lastLoadError = err;
       showLoadError(err);
       return;
     }
