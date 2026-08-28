@@ -195,6 +195,54 @@ function git(args, root = ROOT) {
   catch (_) { return ''; }
 }
 
+// Come `git`, ma distingue il successo dal fallimento e non lascia che il
+// `fatal:` di un tentativo gestito finisca a schermo come se fosse un guasto.
+function tryGit(args, root = ROOT) {
+  try { return { ok: true, out: execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() }; }
+  catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
+}
+
+// Inchiodato, non letto dall'ambiente: stessa regola della guardia di
+// finish-local — un nome che si sposta con una variabile non protegge niente.
+const MAIN = 'main';
+
+/**
+ * Riallinea il ramo corrente a origin/main. Ritorna false solo sul conflitto:
+ * lì la verifica non deve nemmeno partire, verificherebbe un contenuto che non
+ * si può fondere. Le decisioni sono nelle funzioni pure qui sopra; qui si
+ * eseguono e basta.
+ */
+function realignBeforeStart(root = ROOT) {
+  const branch = currentBranch(root);
+  const workBranch = !!branch && branch !== 'HEAD' && !['main', 'master'].includes(branch.toLowerCase());
+  const fetchOk = tryGit(['fetch', 'origin', MAIN], root).ok;
+  const behind = fetchOk ? Number(tryGit(['rev-list', '--count', `HEAD..origin/${MAIN}`], root).out) : 0;
+  const plan = realignPlan({ fetchOk, dirty: isDirty(root), behind, workBranch });
+  if (plan.message) console.log(`${plan.message}\n`);
+  if (plan.action !== 'rebase') return true;
+
+  const reb = tryGit(['rebase', `origin/${MAIN}`], root);
+  if (!reb.ok) {
+    // I file in conflitto si leggono PRIMA dell'abort: dopo non esistono più.
+    const files = tryGit(['diff', '--name-only', '--diff-filter=U'], root).out.split('\n').filter(Boolean);
+    tryGit(['rebase', '--abort'], root);
+    console.error(afterRebase({ ok: false, conflictFiles: files }).message);
+    return false;
+  }
+  console.log(`${afterRebase({ ok: true, behind }).message}\n`);
+  // Il rebase riscrive i commit: senza forza il push verrebbe rifiutato; la
+  // "lease" evita di sovrascrivere lavoro che qualcun altro avesse spedito nel
+  // frattempo sullo stesso ramo. La destinazione è nel refspec, per intero:
+  // non la sceglie la configurazione locale di git (stessa forma di ogni altra
+  // spedizione del repo).
+  const push = tryGit(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], root);
+  if (!push.ok) {
+    console.error(`Ramo riallineato qui, ma non riesco a rispedirlo su origin:\n${push.out.slice(0, 300)}`);
+    console.error('La verifica può proseguire; prima di chiudere serve che il ramo arrivi su origin (di solito basta riprovare con la rete).');
+  }
+  return true;
+}
+
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
 export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); }
 /** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
