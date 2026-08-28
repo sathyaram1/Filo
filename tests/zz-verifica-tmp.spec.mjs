@@ -41,9 +41,11 @@ function fallita(over = {}) {
 async function stub(page, { admin = true, pending = [], failed = [], recent = [] } = {}) {
   await page.evaluate((cfg) => {
     window.__vfCalls = [];
+    window.__vfLog = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
+      window.__vfLog.push(t);
       if (t === 'auth_status') return { ok: true, signedIn: cfg.admin, isAdmin: cfg.admin, profile: null };
       if (t === 'merge_approvals_get') {
         if (!cfg.admin) return { ok: false, error: 'Operazione riservata agli amministratori.' };
