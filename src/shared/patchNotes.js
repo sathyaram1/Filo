@@ -17,6 +17,9 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.207', date: '2026-08-28',
+      features: [
+        'Filo legge i tuoi documenti, PDF compresi: indicagli la bolletta o l\'estratto conto che hai sul computer e chiedigli quello che ti serve sapere — quant\'è la giacenza media, quanto hai pagato a marzo, cosa dice una clausola. Se il PDF è una scansione te lo dice, invece di inventarsi il contenuto.',
+      ],
       fixes: [
         'Quando la spiegazione dentro al menu del tasto destro finisce di caricare e si allunga, il menu si sposta da solo invece di uscire dal fondo della finestra. L\'ultima voce resta intera e si può cliccare.',
         'Se la spiegazione è così lunga da non starci, il menu si scorre fino in fondo e ci resta: prima un giro di rotella in più faceva scorrere la pagina e il menu spariva.',
