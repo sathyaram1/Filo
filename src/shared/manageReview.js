@@ -319,10 +319,36 @@
     if (status === 'aligned') return worstVerdictBlock(fb);
     const info = fs.STATUSES[status];
     if (!info || info.tab !== 'inbox') return null;
+    // Bocciatura di sicurezza sul fix: lo stato è `design` (torna all'owner),
+    // ma NON è una questione di design — è un blocco di sicurezza. Rosso.
+    if (status === 'design' && statusReason === 'secaudit') {
+      return { reason: 'secaudit', ...REASONS.secaudit };
+    }
+    // Panel COMPLETO su un feedback rimasto `unlabeled`: succede ai mittenti
+    // fidati che i giudici hanno segnalato (la pipeline non li marchia mai
+    // attack/spam, li lascia "da ri-giudicare"). Ma un panel completo non ha
+    // niente da ri-giudicare: mostrarlo bianco ("non filtrato") era falso, e il
+    // bottone "Ri-valuta" lo ritentava per sempre rispondendo "nessun giudice
+    // recuperato". La card prende la categoria più alta segnalata; decide l'owner.
+    if (status === 'unlabeled' && panelComplete(fb)) {
+      const worst = worstVerdictBlock(fb);
+      if (worst) return worst;
+    }
     const base = { reason: reasonOf(status, statusReason), color: info.color, severity: info.severity, label: info.label };
     const worst = worstVerdictBlock(fb);
     if (worst && worst.severity > base.severity) return worst;
     return base;
+  }
+
+  // Panel dei giudici COMPLETO: tutti i verdetti attesi ci sono e la pipeline
+  // non lo dichiara parziale/degradato. È il discrimine fra "non filtrato" vero
+  // (manca un giudice: ha senso ri-valutare) e "giudicato per intero".
+  function panelComplete(fb) {
+    const p = fb && fb.pipeline;
+    if (!p || typeof p !== 'object') return false;
+    if (p.l2Unfiltered === true || p.l2Degraded === true) return false;
+    const verdicts = Array.isArray(p.verdicts) ? p.verdicts.filter((v) => v && v.class) : [];
+    return verdicts.length > 0 && verdicts.length >= panelSize(p);
   }
 
   // "Allineato" = status normalizzato `aligned` (badge blu, aspetta approvazione).
