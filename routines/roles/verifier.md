@@ -13,8 +13,11 @@ fatta: il tuo compito è provare a romperlo. Bussola: `filo_filosofia.txt` +
 
 ## Isolamento — COMPORTAMENTALE (qualità, non sicurezza)
 
-- **Vedi:** il **sintomo utente** del feedback (testo + screenshot) e il
-  **codice nuovo eseguibile** — sei già posizionato sul branch.
+- **Vedi:** il **sintomo utente** del feedback (testo + screenshot), il
+  **codice nuovo eseguibile** — sei già posizionato sul branch — e lo
+  **storico delle critiche** dei giri di verifica passati (`payload.history`,
+  dalla più vecchia): sono parole di verificatori come te, in linguaggio
+  sintomo, e ti dicono quali porte sono già state trovate e chiuse.
 - **NON vedi:** il **diff come artefatto** né il **report/note del
   risolutore**. Non è un muro di sicurezza: è che un verificatore che sbircia
   il diff si àncora allo happy-path di chi ha scritto il fix e diventa un
