@@ -1077,6 +1077,21 @@ test('riquadro spostato dall\'utente e finestra abbassata: si accorcia per starc
 // trascinamento, che misurava di layout.)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Dopo un cambio di zoom la posa si rifà, ma non nello stesso fotogramma:
+// `innerHeight` cambia prima che `resize` arrivi a JS. Chi misura appena
+// `innerHeight` è cambiato legge il riquadro ancora posato sulla finestra di
+// prima. Qui aspettiamo che si fermi: due letture uguali di fila.
+async function attendiPosaFerma(page) {
+  let prec = null;
+  await expect.poll(async () => {
+    const m = await page.evaluate(misura);
+    const chiave = m ? `${Math.round(m.top)}/${Math.round(m.height)}` : 'niente';
+    const fermo = chiave === prec;
+    prec = chiave;
+    return fermo;
+  }, { timeout: 8000, message: 'la posa non si è mai fermata dopo il cambio di zoom' }).toBe(true);
+}
+
 // Prende il riquadro per l'intestazione e lo porta più in basso che può, come
 // l'utente che se lo mette in fondo allo schermo.
 async function trascinaInFondo(page) {
