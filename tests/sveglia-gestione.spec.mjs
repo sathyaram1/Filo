@@ -130,6 +130,10 @@ test('una sveglia che non esiste non fa sparire quella che c\'è', async ({ app,
 });
 
 test('una sveglia ricorrente suona e resta: "Ferma" non la disdice', async ({ app, openTab }) => {
+  // Qui si aspetta una sveglia che suona per davvero e poi la suoneria che si
+  // spegne: sotto il carico della suite intera i 60s di default finiscono nello
+  // spegnimento dell'app, non nel test.
+  test.slow();
   const page = await openTab(NEWTAB);
   await page.waitForLoadState('domcontentloaded');
 
