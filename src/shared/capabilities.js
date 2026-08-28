@@ -331,6 +331,12 @@
       doesNot: 'Non interviene sulla pagina web che stai guardando: per farti assistere SU una pagina aperta usa l’assistente laterale (Alt+H). Le risposte si basano sui tuoi dati locali, non condivide nulla all’esterno senza chiedertelo.',
     },
     {
+      id: 'read-user-documents', title: 'Filo legge i tuoi documenti, anche PDF', category: 'assistant',
+      desc: 'Indica a Filo un documento sul tuo computer e lui lo legge davvero: bollette, estratti conto, contratti, visure. Vale per i PDF, che prima erano illeggibili, e per i file di testo (txt, csv, md e simili). Puoi chiedergli cose sul contenuto: quant’è la giacenza media, quanto hai pagato di luce a marzo, cosa dice una clausola. Se non ricordi dove hai salvato il file, digli come si chiama più o meno e dove potrebbe essere: lo cerca e poi lo legge.',
+      invoke: 'Chiedilo a parole all’assistente (nuova scheda): "leggi l’estratto conto nei Download", "riassumimi il contratto sul desktop", oppure incolla il percorso del file.',
+      doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì.',
+    },
+    {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
       desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te.',
       invoke: 'Si genera da sola all’apertura di una nuova scheda; il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home").',
