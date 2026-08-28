@@ -392,7 +392,7 @@
     // ORIGINE: solo pagine `filo://`. Un sito visitato non deve poter né sapere
     // che c'è una fusione in attesa (dice cosa sta facendo l'owner) né tentare
     // di approvarla o scartarla.
-    MERGE_APPROVALS_GET: 'merge_approvals_get',        // → { ok, pending:[…], recent:[…], ttlMs } | { ok:false, error }
+    MERGE_APPROVALS_GET: 'merge_approvals_get',        // → { ok, pending:[…], failed:[…], recent:[…], ttlMs } | { ok:false, error }
     MERGE_APPROVAL_APPROVE: 'merge_approval_approve',  // { id } → { ok, result:'merged'|'conflict'|'stale', sha? } | { ok:false, error }
     MERGE_APPROVAL_DISCARD: 'merge_approval_discard',  // { id } → { ok, result:'discarded' } | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
