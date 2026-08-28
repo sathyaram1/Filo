@@ -784,6 +784,9 @@
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
     // timer + sveglie (#322)
     listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, pauseTimer, resumeTimer, gcTimers, stopTimerAlarm,
+    // ricorrenza + gestione dalla chat
+    normalizeRepeat, parseClock, nextRecurrence, nextAlarmOccurrence, formatRepeat, isRecurring,
+    resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
     listNotifications, addNotification, dismissNotification,
     // dashboard cache
