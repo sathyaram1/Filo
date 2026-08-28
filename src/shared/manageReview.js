@@ -445,15 +445,45 @@
   // Lista per la tab Archiviati:
   //   starredOnly=false → i feedback in stato `archived` (recenti prima);
   //   starredOnly=true  → tutti i preferiti ⭐, di qualunque status (recenti prima).
+  //   confirmedOnly=true → solo gli attacchi/spam CONFERMATI dall'owner (status
+  //     `*_confirmed`), che vivono qui come storico. Si combina col filtro ⭐.
+  // I due filtri stanno qui e non nella pagina perché il contatore sulla scheda
+  // deve poter contare ESATTAMENTE la lista che vedrai cliccandola.
   function listArchiveTab(feedbacks, opts) {
     const starredOnly = !!(opts && opts.starredOnly);
-    const items = (feedbacks || []).filter((f) =>
+    const confirmedOnly = !!(opts && opts.confirmedOnly);
+    let items = (feedbacks || []).filter((f) =>
       starredOnly ? isStarred(f) : manageTabFor(f) === 'archived');
+    if (confirmedOnly) {
+      items = items.filter((f) => String(normalizeStatus(f).status).endsWith('_confirmed'));
+    }
     return items.slice().sort((a, b) => {
       const ta = new Date(a.createdAt || 0).getTime();
       const tb = new Date(b.createdAt || 0).getTime();
       return tb - ta;
     });
+  }
+
+  // ── Quanti feedback per scheda (badge della tab bar) ──────────────────────
+  // Un solo passaggio sulla lista per le quattro schede-lista, così l'owner
+  // vede da fuori dove si è accumulato il lavoro senza aprire una scheda per
+  // volta. Conta ESATTAMENTE quello che la lista mostrerebbe: per gli
+  // Archiviati passano anche i filtri ⭐ / "bloccati confermati", altrimenti il
+  // numero direbbe una cosa e la lista un'altra.
+  // `opts`: { releasedVersion, starredOnly, confirmedOnly, now }.
+  function countsByManageTab(feedbacks, opts) {
+    const list = feedbacks || [];
+    const counts = { inbox: 0, queue: 0, resolved: 0, archived: 0 };
+    for (const fb of list) {
+      const tab = manageTabFor(fb, opts);
+      if (tab && Object.prototype.hasOwnProperty.call(counts, tab)) counts[tab] += 1;
+    }
+    // Gli Archiviati hanno filtri propri: quando sono attivi la lista cambia,
+    // e il contatore deve seguirla.
+    if (opts && (opts.starredOnly || opts.confirmedOnly)) {
+      counts.archived = listArchiveTab(list, opts).length;
+    }
+    return counts;
   }
 
   // ── DC1: la board utente (filo://board/) ─────────────────────────────────
