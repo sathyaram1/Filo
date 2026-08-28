@@ -1202,9 +1202,35 @@
     reflectSortBtn();
   }
 
+  // ── Conteggi sulle schede ─────────────────────────────────────────────────
+  // "Ricevuti (24) · In coda (12)": quanti feedback ci sono in ogni scheda,
+  // senza doverle aprire una per una. Il numero è quello della lista VERA di
+  // quella scheda (filtri degli Archiviati compresi), calcolato dalla stessa
+  // logica pura che la costruisce. Finché i dati non sono arrivati gli spazi
+  // restano vuoti: meglio niente che uno zero falso.
+  const TAB_COUNT_NOUN = {
+    inbox: 'ricevuti', queue: 'in coda', resolved: 'risolti', archived: 'archiviati',
+  };
+  function renderTabCounts() {
+    const counts = MR.countsByManageTab(allFeedbacks, {
+      releasedVersion, starredOnly, confirmedOnly,
+    });
+    for (const tab of LIST_TABS) {
+      const el = document.querySelector(`.mg-tab-count[data-count="${tab}"]`);
+      if (!el) continue;
+      const n = counts[tab] || 0;
+      el.textContent = `(${n})`;
+      // Hover: il numero da solo non dice di cosa sia il conto.
+      el.title = n === 1
+        ? `1 feedback ${TAB_COUNT_NOUN[tab]}`
+        : `${n} feedback ${TAB_COUNT_NOUN[tab]}`;
+    }
+  }
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
+    renderTabCounts();
     if (mgListHead) mgListHead.textContent = TAB_LABELS[currentTab] || '';
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
 
