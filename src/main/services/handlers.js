@@ -925,6 +925,22 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     } catch (_) {}
   }
 
+  // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
+  // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
+  // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
+  // `_targets` (le voci in chiaro, per il popup) e `_targetIds` (su cui agire
+  // dopo la conferma, così la risoluzione non viene rifatta su una lista nel
+  // frattempo cambiata). Mai calcolati dall'LLM.
+  if (type === 'CANCELLA_SVEGLIA' || type === 'MODIFICA_SVEGLIA') {
+    try {
+      const ref = timerRefOf(action);
+      const list = await FiloMem.listTimers();
+      const targets = FiloMem.resolveTimerRefs(list, ref);
+      action._targets = targets.map(describeTimerEntry);
+      action._targetIds = targets.map((t) => t.id);
+    } catch (_) {}
+  }
+
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
   // Filo non può eseguire ALCUN comando se l'utente non ha attivato la modalità
   // terminale nelle impostazioni. Controllo PRIMA del gate dei livelli: così un
