@@ -88,7 +88,12 @@ da `unlabeled`. Solo le routine (via coda triage) muovono `todo→working→revi
 e `revision_*→design(loop)`. Transizioni non elencate = illegali: il writer le rifiuta.
 
 **Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:`): mai `attack`/`spam`; se un
-livello identità li flagga è un errore → `unlabeled` per ri-giudizio. `local:` è la
+livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
+PANEL COMPLETO segnala un fidato (L2 dice attack/spam a verdetti pieni), lo status resta
+`unlabeled` ma non c'è niente da ri-giudicare — la dashboard lo mostra con la categoria
+segnalata (rosso/arancio, frase "decidi tu") invece del bianco "non filtrato", e il
+bottone «Ri-valuta» lo salta (scelta owner 2026-08-29: la segnalazione resta visibile,
+utile come dato sui falsi positivi; sbloccarlo è un gesto suo). `local:` è la
 **sessione locale**: Claude che lavora sulla macchina dell'owner, in chat con lui (lo
 strumento che apre un feedback da lì è `npm run feedback:apri`). In dashboard è una
 categoria d'autore PROPRIA — né agente esploratore né automazione cloud: il contesto in
