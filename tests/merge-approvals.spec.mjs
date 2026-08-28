@@ -82,7 +82,7 @@ async function avvisaDalMain(app, payload) {
  * può asserire che il gesto è arrivato davvero al main — non solo che la UI ha
  * cambiato colore.
  */
-async function stubApprovals(page, { admin = true, pending = [], recent = [], approveReply = null } = {}) {
+async function stubApprovals(page, { admin = true, pending = [], failed = [], recent = [], approveReply = null } = {}) {
   await page.evaluate((cfg) => {
     window.__macCalls = [];
     const orig = window.filo.message.bind(window.filo);
@@ -91,7 +91,11 @@ async function stubApprovals(page, { admin = true, pending = [], recent = [], ap
       if (t === 'auth_status') return { ok: true, signedIn: cfg.admin, isAdmin: cfg.admin, profile: null };
       if (t === 'merge_approvals_get') {
         if (!cfg.admin) return { ok: false, error: 'Operazione riservata agli amministratori.' };
-        return { ok: true, pending: cfg.pending, recent: cfg.recent, ttlMs: 24 * 60 * 60 * 1000 };
+        // Al primo scarto la scheda "approvata ma non avvenuta" esce
+        // dall'elenco, come farebbe il server: serve per asserire che dopo
+        // "Segna come sistemata" la scheda sparisce davvero.
+        const failedNow = cfg.failed.filter((f) => !window.__macCalls.some((c) => c.op === 'discard' && c.id === f.id));
+        return { ok: true, pending: cfg.pending, failed: failedNow, recent: cfg.recent, ttlMs: 7 * 24 * 60 * 60 * 1000 };
       }
       if (t === 'merge_approval_approve') {
         window.__macCalls.push({ op: 'approve', id: msg.id });
@@ -103,7 +107,7 @@ async function stubApprovals(page, { admin = true, pending = [], recent = [], ap
       }
       return orig(msg);
     };
-  }, { admin, pending, recent, approveReply });
+  }, { admin, pending, failed, recent, approveReply });
 }
 
 /** Gestione, sulla scheda di partenza: i Ricevuti. */
@@ -149,6 +153,44 @@ test('Ricevuti: con una fusione in attesa l’avviso c’è, e dice ramo, commit
   const lista = await page.locator('#mgReviewGrid').boundingBox();
   expect(suo.y).toBeGreaterThanOrEqual(schede.y + schede.height - 1);
   expect(suo.y + suo.height).toBeLessThanOrEqual(lista.y + 1);
+});
+
+// ── 1bis. Un sì già dato che non ha prodotto niente resta in vista ──────────
+//
+// Caso vero (#500, 27/08): approvata, conflitto di merge, e la scheda è
+// sparita fra le decisioni passate — l'owner si è ritrovato con "niente da
+// accettare" e un ramo mai fuso, senza nessun segno visibile.
+
+test('una fusione approvata ma non avvenuta resta nei Ricevuti, con la spiegazione', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const conflitto = richiesta({
+    id: 'ff12cd34ef56ab12cd34ef56',
+    branch: 'worker/lavoro-in-conflitto',
+    used: true,
+    outcome: 'conflict',
+    decidedAtMs: Date.now() - 60 * 60 * 1000,
+  });
+  // Anche SENZA nessuna richiesta in attesa: il conflitto basta da solo.
+  await apriGestione(page, { pending: [], failed: [conflitto] });
+
+  const avviso = page.locator('#mgMergeApprovals .sn-mac-failed');
+  await expect(avviso).toBeVisible({ timeout: 8_000 });
+  await expect(avviso).toContainText('Una fusione approvata non è avvenuta');
+  await expect(avviso).toContainText('worker/lavoro-in-conflitto');
+  await expect(avviso).toContainText('la fusione NON è avvenuta');
+  // Niente "Approva": non c'è più niente da approvare.
+  await expect(avviso.locator('.sn-mac-btn-go')).toHaveCount(0);
+});
+
+test('"Segna come sistemata" arriva al main e la scheda sparisce', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const conflitto = richiesta({ id: 'ff12cd34ef56ab12cd34ef56', used: true, outcome: 'conflict' });
+  await apriGestione(page, { pending: [], failed: [conflitto] });
+
+  await page.locator('#mgMergeApprovals .sn-mac-card-failed button', { hasText: 'Segna come sistemata' }).click();
+  await expect(page.locator('#mgMergeApprovals .sn-mac-failed')).toHaveCount(0, { timeout: 8_000 });
+  const calls = await page.evaluate(() => window.__macCalls);
+  expect(calls).toEqual([{ op: 'discard', id: 'ff12cd34ef56ab12cd34ef56' }]);
 });
 
 test('due richieste = due schede, e il titolo lo dice', async ({ openTab }) => {

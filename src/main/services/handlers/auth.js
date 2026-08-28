@@ -530,6 +530,9 @@ module.exports = function register(on, ctx) {
     return {
       ok: true,
       pending: (r && r.pending) || [],
+      // Le fusioni approvate e mai avvenute (conflitto): restano in vista
+      // finché non vengono sistemate, non sono decisioni passate.
+      failed: (r && r.failed) || [],
       recent: (r && r.recent) || [],
       ttlMs: Number(r && r.ttlMs) || 0,
     };
