@@ -1692,7 +1692,9 @@
       return;
     }
 
-    // Stato "sto cercando".
+    // Stato "sto cercando": via il numero della ricerca precedente, che qui
+    // sarebbe già falso.
+    setListHead('Ricerca', null);
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.hidden = true; mgList.innerHTML = '';
