@@ -338,7 +338,7 @@
     },
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
-      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, impostare timer e sveglie, salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
+      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H).',
       doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto.',
     },
