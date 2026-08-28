@@ -91,6 +91,47 @@
       level: 1,
       describe: (a) => `Impostare una sveglia ${a.time || a.orario || ''}`.trim(),
     },
+    // Cancellare e spostare sveglie e timer dalla chat. Il criterio del livello
+    // è QUANTE cose sparirebbero, non come la richiesta è formulata: togliere la
+    // sveglia che l'utente ha appena nominato è reversibile a costo zero (la
+    // richiede di nuovo) → livello 1, si fa e basta. Cancellarne PIÙ D'UNA con
+    // un colpo solo no: "leva tutte le sveglie, sono in ferie" porta via anche
+    // quella dell'antibiotico, e chi l'ha detto se ne accorge il giorno dopo →
+    // livello 2, il popup elenca cosa sta per sparire. Il conto (`_targets`) lo
+    // fa il main, che ha la lista vera; mai l'LLM. Senza il conto ripieghiamo
+    // sulla forma della richiesta ("tutte" → 2), che è il caso prudente.
+    CANCELLA_SVEGLIA: {
+      level: (a) => (targetCount(a) > 1 || (targetCount(a) == null && wantsAll(a)) ? 2 : 1),
+      describe: (a) => {
+        const list = targetList(a);
+        if (list.length) {
+          return `Filo sta per togliere ${list.length === 1 ? 'questa voce' : `queste ${list.length} voci`}:\n`
+            + list.map((t) => `• ${t}`).join('\n')
+            + '\n\nUna volta tolte non suoneranno più.';
+        }
+        const what = timerRefLabel(a);
+        return `Togliere ${what}`;
+      },
+    },
+    MODIFICA_SVEGLIA: {
+      // Spostare un orario è reversibile (basta rispostarlo) → livello 1.
+      // Stesso freno della cancellazione quando il riferimento ne prende più
+      // d'una: cambiare in blocco l'orario di cose che l'utente non ha in mente
+      // è indistinguibile da un errore di comprensione.
+      level: (a) => (targetCount(a) > 1 ? 2 : 1),
+      describe: (a) => {
+        const list = targetList(a);
+        const when = String(a.orario ?? a.time ?? a.at ?? '').trim();
+        const rip = repeatLabel(a);
+        const dove = when ? ` alle ${when}` : '';
+        const quando = rip ? ` (${rip})` : '';
+        if (list.length > 1) {
+          return `Filo sta per spostare${dove}${quando} queste ${list.length} voci:\n`
+            + list.map((t) => `• ${t}`).join('\n');
+        }
+        return `Spostare ${timerRefLabel(a)}${dove}${quando}`;
+      },
+    },
     SALVA_APPUNTO: {
       level: 1,
       describe: () => 'Salvare un appunto',
