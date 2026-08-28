@@ -7,21 +7,20 @@ test('gemella 720 con numeri', async ({ app, openTab }) => {
     if (w) w.setContentSize(720, 820);
   });
   const page = await openTab('filo://feedback/feedback.html');
-  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
+  await page.setViewportSize({ width: 720, height: 820 });
   await page.evaluate(() => {
     const st = ['new', 'agent', 'draft', 'todo', 'review', 'blocked', 'clarify', 'done', 'verified'];
     const items = [];
     let n = 0;
     st.forEach((s, i) => {
-      for (let k = 0; k <= i * 3 + 11; k++) {
-        items.push({ _id: `x${n}`, seq: ++n, subSeq: 0, name: `t${n}`, text: `t${n}`, status: s, createdAt: '2026-06-20T10:00:00Z', images: [] });
+      for (let k = 0; k <= i * 3 + 120; k++) {
+        items.push({ _id: `x${n}`, seq: ++n, subSeq: 0, name: `t${n}`, text: `t${n}`, status: s, clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [] });
       }
     });
-    SN_FEEDBACK.list = async () => items;
+    window.__fbTest.setData(items);
   });
-  await page.reload();
-  await page.waitForTimeout(2500);
-  await page.setViewportSize({ width: 720, height: 820 });
   await page.waitForTimeout(500);
   const res = await page.evaluate(() => {
     const out = [];
