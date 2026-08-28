@@ -42,8 +42,8 @@
   }
 
   /**
-   * "adesso" / "N minuti fa" / "N ore fa". PURA.
-   * Una richiesta vive un giorno: servono sia i minuti sia le ore.
+   * "adesso" / "N minuti fa" / "N ore fa" / "N giorni fa". PURA.
+   * Una richiesta vive una settimana: servono minuti, ore e giorni.
    */
   function timeAgo(atMs, nowMs) {
     var at = Number(atMs);
