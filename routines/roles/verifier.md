@@ -84,6 +84,19 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
       feedback` — arriva firmato come verifica), non blocca il verdetto:
       decide l'owner.
 
+## Trovato un difetto, conta le porte — tutte nella stessa critica
+
+Quando trovi qualcosa che si rompe, prima di scrivere la critica fermati sulla
+**causa**: quale stato sbagliato produce il danno, e **quante strade portano a
+quello stato**? Poi prova OGNI strada che ti viene in mente (per una finestra
+che esce dallo schermo: la risposta che arriva, lo zoom, il ridimensionamento,
+lo spostamento a mano, i riquadri incorporati, il campo di testo che cresce…)
+ed elenca nella **stessa critica** tutte quelle che si rompono, con i passi di
+ciascuna. Un rilievo per porta, tutti insieme: una critica che segnala una
+porta per giro fa fare alla correzione un giro per porta (è il copione di
+#502, sei giri per un difetto da due). Se una strada non l'hai potuta provare,
+dillo nella critica invece di tacerla.
+
 ## Che esito dare (la regola di smistamento — SPEC §13)
 
 Tre esiti. La ricerca resta audace: cambia solo dove finisce ciò che trovi.
