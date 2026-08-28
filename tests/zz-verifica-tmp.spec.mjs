@@ -21,6 +21,7 @@ async function preparaProvider(app, { attesaMs = 2000, ripetizioni = 12 } = {}) 
       models: {
         [C.ACTIONS.EXPLAIN]: 'flash-lite-3',
         [C.ACTIONS.DESCRIBE_IMAGE]: 'flash-lite-3',
+        [C.ACTIONS.EXPLAIN_LINK]: 'flash-lite-3',
       },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
