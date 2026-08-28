@@ -880,6 +880,7 @@
     if (!r || r.ok === false) return spegni();
     const n = UI.render(mgMergeApprovals, {
       requests: r.pending || [],
+      failed: r.failed || [],
       onDone: () => { setTimeout(loadMergeApprovals, 1200); },
       onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
       onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
