@@ -74,6 +74,7 @@
     ]
   },
   "dependencies": {
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.3",
+    "unpdf": "^1.8.1"
   }
 }
