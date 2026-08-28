@@ -1165,6 +1165,9 @@
     if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'LEGGI_FILE') && a._output)) {
       return AUTO_CONTINUE_FILE;
     }
+    if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'LEGGI_DOCUMENTO') && a._output)) {
+      return AUTO_CONTINUE_DOCUMENT;
+    }
     if (!cmd && Array.isArray(actions) && actions.some((a) => isType(a, 'LEGGI_TRASPARENZA') && a._output)) {
       return AUTO_CONTINUE_TRANSPARENCY;
     }
