@@ -181,6 +181,8 @@ function scenario({ conflitto }) {
   mkdirSync(origin);
   mkdirSync(work);
   g(origin, ['init', '--bare', '-q', '--initial-branch=main']);
+  // L'identità va nel config del repo (non inline sul commit): il rebase la
+  // farà servire anche al CLI sotto test, che non può passarla lui.
   const identita = (dir) => {
     g(dir, ['config', 'user.email', 't@t']);
     g(dir, ['config', 'user.name', 't']);
