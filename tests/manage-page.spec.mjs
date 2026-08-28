@@ -45,10 +45,11 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
 
   // 8 tab della dashboard unificata.
   await expect(page.locator('.mg-tab')).toHaveCount(8);
-  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti');
-  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda');
-  await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti');
-  await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati');
+  // Le quattro schede-lista portano accanto al nome quante ne contengono (#495).
+  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText(/^Ricevuti \(\d+\)$/);
+  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText(/^In coda \(\d+\)$/);
+  await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText(/^Risolti \(\d+\)$/);
+  await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText(/^Archiviati \(\d+\)$/);
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
