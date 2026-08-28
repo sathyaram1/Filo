@@ -1627,13 +1627,15 @@
   // (il perché è pertinente) vive nel tooltip, non nel colore del bordo.
   function renderSearchResults(results, opts) {
     const fallback = !!(opts && opts.fallback);
-    if (mgListHead) mgListHead.textContent = 'Ricerca';
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.innerHTML = '';
     setSearchMsg(fallback ? 'Modello non disponibile: mostro i risultati per testo.' : '', null);
 
     if (!results.length) {
+      // Quanti ne ha trovati è esattamente la domanda della ricerca: zero è una
+      // risposta, e si scrive come le altre (#495).
+      setListHead('Ricerca', 0);
       mgList.hidden = true;
       mgListEmpty.hidden = false;
       mgListEmpty.textContent = 'Nessun feedback pertinente.';
@@ -1641,9 +1643,11 @@
     }
     mgListEmpty.hidden = true;
     mgList.hidden = false;
+    let shown = 0;
     for (const res of results) {
       const fb = allFeedbacks.find((f) => f._id === res.id);
       if (!fb) continue;
+      shown++;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const item = document.createElement('div');
