@@ -2636,6 +2636,7 @@
     setData(fbs) {
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
       dataLoaded = true;
+      loadFailed = false;
       // Reindicizza per mittente (il pannello laterale lo usa).
       allByClient = {};
       for (const fb of allFeedbacks) {
