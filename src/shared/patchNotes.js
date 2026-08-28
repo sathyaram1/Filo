@@ -16,6 +16,7 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+<<<<<<< HEAD
       version: '0.2.205', date: '2026-08-27',
       fixes: [
         'Chiedi la spiegazione approfondita su una parola in basso nella pagina e la riga per scrivere la domanda dopo resta dove puoi cliccarla, anche se la domanda prende più righe.',
@@ -45,6 +46,15 @@
       version: '0.2.198', date: '2026-08-22',
       fixes: [
         'Nelle home dei siti di video, nei social e nelle pagine di risultati il tasto destro su una scheda ti dà «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» insieme ai comandi della copertina, anche mentre parte l\'anteprima animata. Prima il menu cambiava a seconda di come il sito aveva costruito la scheda, e quasi sempre metà delle voci non c\'era.',
+=======
+      version: '0.2.203', date: '2026-08-26',
+      features: [],
+      fixes: [
+        'Quando la spiegazione dentro al menu del tasto destro finisce di caricare e si allunga, il menu si sposta da solo invece di uscire dal fondo della finestra. L\'ultima voce resta intera e si può cliccare.',
+        'Se la spiegazione è così lunga da non starci, il menu si scorre fino in fondo e ci resta: prima un giro di rotella in più faceva scorrere la pagina e il menu spariva.',
+        'Anche il riquadro con la risposta di Filo resta dentro la finestra mentre la risposta arriva e lo allunga. La riga del modello e il campo per la domanda successiva restano dove puoi usarli, e se lo sposti a mano ci resta.',
+        'Se rimpicciolisci la finestra mentre il menu del tasto destro è aperto, il menu si sposta da solo e resta tutto visibile.',
+>>>>>>> c6cee27a8834338868099e01d279fa49a01ee804
       ],
     },
     {
