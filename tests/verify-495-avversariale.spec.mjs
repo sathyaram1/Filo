@@ -212,9 +212,11 @@ test('#495 — numeri grandi: la barra delle schede non straborda né balla', as
     ]);
   });
 
+  // 3000 caricati insieme superano il tetto del caricamento (500): i numeri
+  // sono minimi, non totali, e lo dicono con il "+".
   const t = await tabTexts(page);
-  expect(t.inbox).toBe('Ricevuti (1000)');
-  expect(t.queue).toBe('In coda (1000)');
+  expect(t.inbox).toBe('Ricevuti (1000+)');
+  expect(t.queue).toBe('In coda (1000+)');
 
   // La pagina non deve scrollare in orizzontale per colpa dei numeri.
   const over = await page.evaluate(() => {
