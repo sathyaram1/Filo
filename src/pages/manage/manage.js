@@ -2571,6 +2571,7 @@
   window.__mgTest = {
     setData(fbs) {
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      dataLoaded = true;
       // Reindicizza per mittente (il pannello laterale lo usa).
       allByClient = {};
       for (const fb of allFeedbacks) {
