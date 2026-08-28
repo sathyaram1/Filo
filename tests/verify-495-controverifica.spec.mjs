@@ -219,7 +219,7 @@ test('ricerca: i risultati dicono quanti sono e la barra non resta con numeri al
   expect((await tabCount(page, 'inbox')).n).toBe(prima.n);
 });
 
-test('aspetto: i numeri stanno nella barra anche a finestra stretta, in chiaro e in scuro', async ({ openTab }) => {
+test('aspetto: i numeri stanno nella barra in chiaro, in scuro e alla finestra minima', async ({ openTab }) => {
   const page = await openTab(URL);
   await ready(page);
   await page.evaluate((d) => window.__mgTest.setData(d), MIXED);
@@ -230,18 +230,52 @@ test('aspetto: i numeri stanno nella barra anche a finestra stretta, in chiaro e
   await page.screenshot({ path: 'tests/.shots/495-tabs-scuro.png' });
   await page.emulateMedia({ colorScheme: 'light' });
 
-  // La barra delle schede non deve sfondare la pagina (8 schede + numeri).
-  await page.setViewportSize({ width: 900, height: 700 });
-  await page.waitForTimeout(200);
-  await page.screenshot({ path: 'tests/.shots/495-tabs-stretta.png' });
-  const overflow = await page.evaluate(() => {
+  // 720 è la larghezza MINIMA che la finestra di Filo può assumere: lì la barra
+  // delle schede (8 nomi + 4 numeri) non deve trascinare la pagina in uno
+  // scorrimento laterale.
+  await page.setViewportSize({ width: 720, height: 800 });
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: 'tests/.shots/495-tabs-minima.png' });
+  const m = await page.evaluate(() => {
     const nav = document.getElementById('mgTabs');
     return {
-      scroll: nav.scrollWidth, client: nav.clientWidth,
+      altezzaBarra: Math.round(nav.getBoundingClientRect().height),
+      righe: new Set([...nav.querySelectorAll('.mg-tab')].map((b) => Math.round(b.getBoundingClientRect().top))).size,
       docScroll: document.documentElement.scrollWidth,
       docClient: document.documentElement.clientWidth,
-      righe: new Set([...nav.querySelectorAll('.mg-tab')].map((b) => Math.round(b.getBoundingClientRect().top))).size,
     };
   });
-  console.log('[495] barra schede a 900px:', JSON.stringify(overflow));
+  console.log('[495] barra schede alla finestra minima:', JSON.stringify(m));
+  expect(m.docScroll, 'la pagina scorre di lato alla finestra minima').toBeLessThanOrEqual(m.docClient + 1);
+  // I numeri ci sono comunque, anche stretti.
+  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toContainText('(6)');
+  await expect(page.locator('.mg-tab[data-tab="archived"]')).toContainText('(3)');
+});
+
+test('abusi di interazione: doppi clic e salti rapidi fra sezioni non sdoppiano né perdono i numeri', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await ready(page);
+  await page.evaluate((d) => window.__mgTest.setData(d), MIXED);
+
+  const tabs = ['inbox', 'queue', 'resolved', 'archived', 'stats', 'log', 'inbox'];
+  for (const t of tabs) {
+    const btn = page.locator(`.mg-tab[data-tab="${t}"]`);
+    await btn.dblclick();
+    await btn.click();
+  }
+  await page.waitForTimeout(200);
+
+  // Un solo numero per scheda (non "Ricevuti (6) (6)"), e sempre quello giusto.
+  for (const [tab, atteso] of [['inbox', 6], ['queue', 4], ['resolved', 2], ['archived', 3]]) {
+    const txt = (await page.locator(`.mg-tab[data-tab="${tab}"]`).textContent()).trim();
+    expect((txt.match(/\(\d+\+?\)/g) || []).length, `${tab}: numeri sdoppiati → "${txt}"`).toBe(1);
+    expect(txt, `${tab}: numero sbagliato dopo i salti rapidi`).toContain(`(${atteso})`);
+    expect(await page.locator(`.mg-tab[data-tab="${tab}"] .mg-tab-count`).count()).toBe(1);
+  }
+
+  // Aprire e chiudere la ricerca a raffica non lascia la barra in uno stato strano.
+  for (let i = 0; i < 5; i++) await page.locator('#mgSearchToggle').click();
+  await page.waitForTimeout(200);
+  const dopo = (await page.locator('.mg-tab[data-tab="inbox"]').textContent()).trim();
+  expect((dopo.match(/\(\d+\+?\)/g) || []).length).toBe(1);
 });
