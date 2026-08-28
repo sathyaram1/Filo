@@ -1278,9 +1278,12 @@
     // #495: quante ne contiene ogni scheda, senza doverle aprire. L'ordinamento
     // non cambia il numero, quindi si può contare qui.
     updateTabCounts();
-    if (mgListHead) {
-      const label = TAB_LABELS[currentTab] || '';
-      mgListHead.textContent = dataLoaded ? `${label} (${currentList.length})` : label;
+    setListHead(TAB_LABELS[currentTab] || '', dataLoaded ? currentList.length : null);
+
+    // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
+    // feedback più vecchi non sono qui. Il vuoto lo dice, invece di negarli.
+    if (loadHitCap() && dataLoaded) {
+      mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_CAP_HINT}`;
     }
 
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
