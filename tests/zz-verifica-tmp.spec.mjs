@@ -178,7 +178,8 @@ test('un non-owner non vede né fallite né in attesa', async ({ openTab }) => {
 // 6. La scadenza si dice in GIORNI, con una richiesta che vale 7 giorni.
 test('la scadenza di una richiesta da 7 giorni si legge in giorni', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apri(page, { pending: [pendente({ expiresAtMs: Date.now() + 7 * GIORNO })] });
+  // +10 minuti di margine: fra il calcolo qui e il disegno passa il boot.
+  await apri(page, { pending: [pendente({ expiresAtMs: Date.now() + 7 * GIORNO + 10 * 60 * 1000 })] });
   const exp = page.locator('#mgMergeApprovals .sn-mac-expiry');
   await expect(exp).toBeVisible({ timeout: 8_000 });
   await expect(exp).toContainText(/scade fra 7 giorni/);
