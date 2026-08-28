@@ -1216,7 +1216,7 @@
     for (const tab of LIST_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
-      btn.textContent = TAB_LABELS[tab] || tab;
+      btn.textContent = `${TAB_LABELS[tab] || tab} `;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
       badge.textContent = `(${counts[tab]})`;
