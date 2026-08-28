@@ -175,10 +175,31 @@ let streamCounter = 0;
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
 const broadcastListeners = new Set();
+// #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
+// riquadro i content script si montano solo quando l'utente lo tocca; ma
+// «Traduci la pagina» arriva dalla pagina che lo ospita, non da un clic lì
+// dentro, e un riquadro addormentato lascerebbe il suo testo in lingua
+// originale sotto un avviso che dichiara finito. La costante di SN_MSG qui non
+// c'è ancora (i moduli condivisi si caricano dopo): il valore letterale è
+// l'unico modo, ed è lo stesso trucco della consegna delle scorciatoie.
+const WAKE_BROADCASTS = new Set(['frame_translate']);
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
-  for (const fn of broadcastListeners) {
-    try { fn(msg, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo CS] listener err', e); }
+  const deliver = () => {
+    for (const fn of broadcastListeners) {
+      try { fn(msg, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo CS] listener err', e); }
+    }
+  };
+  const type = msg && msg.type;
+  // Il ritorno all'originale non sveglia nessuno: un riquadro che dorme non ha
+  // mai tradotto niente, e montarci Filo dentro per non fare nulla sarebbe
+  // lavoro pagato per niente.
+  const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore';
+  if (IS_SUBFRAME && !contentScriptsStarted && wakes) {
+    ensureContentScripts();
+    waitForContentScripts(deliver);
+    return;
   }
+  deliver();
 });
 
 const chromeShim = {
@@ -370,6 +391,10 @@ function loadScripts() {
   // caricano affatto (#405).
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
+  // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
+  // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
+  // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
+  try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi

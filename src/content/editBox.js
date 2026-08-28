@@ -31,6 +31,7 @@
 
     const root = document.createElement('div');
     root.className = 'sn-editbox-overlay';
+    global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     root.innerHTML = `
       <div class="sn-editbox" role="dialog" aria-label="${I18n.t('edit_box_title')}">

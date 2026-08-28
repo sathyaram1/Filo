@@ -54,6 +54,7 @@
     if (document.getElementById('sn-read-style')) return;
     const st = document.createElement('style');
     st.id = 'sn-read-style';
+    global.SN_FILO_UI?.mark(st);
     // color-mix con l'accent del tema (con fallback letterale se il token manca,
     // es. pagine senza theme.css). ::highlight accetta solo poche proprietà:
     // background-color/color/text-decoration sono tra queste.

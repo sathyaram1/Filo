@@ -415,6 +415,7 @@
     if (state.overlay && document.body.contains(state.overlay)) return;
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
+    global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
     document.body.appendChild(o);
     state.overlay = o;

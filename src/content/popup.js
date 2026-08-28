@@ -989,6 +989,7 @@
   function createPopup({ title, anchor }) {
     const root = document.createElement('div');
     root.className = 'sn-popup';
+    global.SN_FILO_UI?.mark(root);
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     root.style.zIndex = String(Z_BASE + popups.length * Z_STEP);
     root.innerHTML = `
@@ -1303,6 +1304,7 @@
     if (!toastHostEl || !toastHostEl.isConnected) {
       toastHostEl = document.createElement('div');
       toastHostEl.className = 'sn-toasts';
+      global.SN_FILO_UI?.mark(toastHostEl);
       document.documentElement.appendChild(toastHostEl);
     }
     return toastHostEl;

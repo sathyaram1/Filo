@@ -1418,6 +1418,7 @@
 
       const overlay = document.createElement('div');
       overlay.className = 'sn-region-overlay';
+      global.SN_FILO_UI?.mark(overlay);
       // Stili inline per evitare di dipendere da CSS esterni: l'overlay deve
       // funzionare in qualsiasi pagina, anche con CSP/style restrittivo.
       Object.assign(overlay.style, {
@@ -1710,6 +1711,7 @@
     // sotto): è l'unica parte che NON segue il tema, per restare scansionabile.
     const overlay = document.createElement('div');
     overlay.className = 'sn-qr-overlay';
+    global.SN_FILO_UI?.mark(overlay);
     overlay.style.cssText = [
       'position:fixed', 'inset:0', 'z-index:2147483646',
       'display:flex', 'align-items:center', 'justify-content:center',
