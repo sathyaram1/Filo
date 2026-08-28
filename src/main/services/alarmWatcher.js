@@ -31,6 +31,12 @@ async function tick() {
   if (!FiloMem) return;
   let list;
   try { list = await FiloMem.gcTimers(); } catch (_) { return; }
+  // Una sveglia RICORRENTE resta in lista dopo essere stata fermata: senza
+  // dimenticarla qui, la stessa sveglia non avviserebbe mai più (l'id è già
+  // "notificato" per sempre). Si dimentica appena smette di suonare — la volta
+  // dopo è una scadenza nuova a tutti gli effetti.
+  const ringingNow = new Set((list || []).filter((t) => t.ringing).map((t) => t.id));
+  for (const id of notified) if (!ringingNow.has(id)) notified.delete(id);
   const fresh = (list || []).filter((t) => t.ringing && !notified.has(t.id));
   if (!fresh.length) return;
   for (const t of fresh) {
