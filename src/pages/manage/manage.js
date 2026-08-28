@@ -1223,6 +1223,17 @@
     return FB.countLabel(n, loadHitCap());
   }
 
+  // Intestazione della colonna: nome + quante ne sta mostrando. `n === null`
+  // (dato non ancora arrivato, o ricerca non ancora fatta) → solo il nome.
+  function setListHead(label, n) {
+    if (!mgListHead) return;
+    mgListHead.textContent = (n === null || n === undefined)
+      ? label
+      : `${label} ${countText(n)}`;
+    if (n !== null && n !== undefined && loadHitCap()) mgListHead.title = FB.COUNT_CAP_HINT;
+    else mgListHead.removeAttribute('title');
+  }
+
   function updateTabCounts() {
     const counts = dataLoaded
       ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
