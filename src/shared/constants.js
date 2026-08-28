@@ -1489,6 +1489,11 @@
       `    {"type": "NAVIGA", "url": "...", "label": "..."},\n` +
       `    {"type": "TIMER", "seconds": 1500, "label": "Pomodoro"},\n` +
       `    {"type": "SVEGLIA", "time": "07:00", "label": "..."},\n` +
+      `    {"type": "SVEGLIA", "time": "07:55", "label": "lezione", "ripeti": ["lun", "mer"]},\n` +
+      `    {"type": "SVEGLIA", "time": "06:30", "label": "palestra", "ripeti": "feriali"},\n` +
+      `    {"type": "CANCELLA_SVEGLIA", "etichetta": "palestra"},\n` +
+      `    {"type": "CANCELLA_SVEGLIA", "tutte": true, "tipo": "sveglia"},\n` +
+      `    {"type": "MODIFICA_SVEGLIA", "etichetta": "palestra", "orario": "08:00"},\n` +
       `    {"type": "SALVA_APPUNTO", "text": "...", "context": "..."},\n` +
       `    {"type": "INVIA_FEEDBACK", "testo": "...", "titolo": "..."},\n` +
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
