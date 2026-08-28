@@ -421,6 +421,29 @@
     return bare.split(/[\\/]/).pop().toLowerCase().replace(/\.(exe|cmd|bat|ps1|com|msi)$/i, '');
   }
 
+  // Estensioni di file ESEGUIBILI: se il primo token ne ha una, quel token è un
+  // FILE su disco, non il comando di sistema che ne condivide il nome.
+  const EXE_EXT_RE = /\.(exe|cmd|bat|ps1|psm1|com|msi|vbs|vbe|wsf|wsh|scr|pif|cpl|msc|jar|js|jse|ps1xml)$/i;
+
+  // `programOf` fa il BASENAME del percorso e toglie l'estensione: serve al
+  // backstop dei distruttivi (`/bin/rm` deve restare 3 anche col percorso). Ma
+  // per FIDARSI di un comando (livello 1 o 2) quella normalizzazione è un buco:
+  // un eseguibile piantato in una cartella e chiamato come un cmdlet di lettura
+  // (`.\Get-ChildItem.exe`, `C:\tmp\ls.exe`, o `Get-ChildItem.exe` dal PATH)
+  // verrebbe scambiato per il cmdlet ed eseguito SENZA conferma. Un comando è
+  // "nudo" — cioè davvero quel comando di sistema, non un file omonimo — solo se
+  // il primo token non ha separatori di percorso, né un'estensione eseguibile,
+  // né un prefisso di chiamata (`.\`, `./`, `.`, `&`). Altrimenti è un programma
+  // arbitrario e la whitelist non lo copre → resta al livello 3 di default.
+  function isBareName(tok) {
+    const t = unquote(String(tok || ''));
+    if (!t) return false;
+    if (/[\\/]/.test(t)) return false;   // qualunque separatore di percorso
+    if (/^[.&]/.test(t)) return false;   // .\  ./  .  &  (chiamata / dot-source)
+    if (EXE_EXT_RE.test(t)) return false; // estensione eseguibile = file, non cmdlet
+    return true;
+  }
+
   // sotto-comando = primo token che non è una flag (dopo il programma)
   function subcommandOf(cmd) {
     const t = tokens(cmd).slice(1).map(unquote);
