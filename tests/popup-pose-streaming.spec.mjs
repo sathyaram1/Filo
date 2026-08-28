@@ -1175,6 +1175,7 @@ test('riquadro posato sopra la parola, pagina al 50% e trascinamento: non salta 
     () => page.evaluate(() => window.innerHeight),
     { timeout: 5000, message: 'lo zoom non ha allargato la finestra: lo scenario non è quello vero' },
   ).toBeGreaterThan(prima.vh + 50);
+  await attendiPosaFerma(page);
   const primaDelPresa = await page.evaluate(misura);
 
   // Una presa e uno spostamento piccolo: quello che deve succedere è che il
