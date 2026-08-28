@@ -1309,6 +1309,15 @@
     // restare la card vecchia in un contenitore nascosto.
     mgList.innerHTML = '';
 
+    // Dato non arrivato (caricamento in corso, o fallito): il riquadro vuoto non
+    // può dire "qui non c'è niente", perché non lo sappiamo. È la stessa cautela
+    // dei numeri sulle schede (#495), applicata alle parole.
+    if (!dataLoaded) {
+      mgListEmpty.textContent = loadFailed
+        ? 'Errore nel caricamento dei feedback.'
+        : 'Caricamento dei feedback…';
+    }
+
     if (currentList.length === 0) {
       mgList.hidden = true;
       mgListEmpty.hidden = false;
