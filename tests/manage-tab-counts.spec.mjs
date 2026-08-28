@@ -141,3 +141,144 @@ test('#495 — negli Archiviati il numero segue il filtro ⭐ (dice quello che s
   await expect(page.locator('.mg-item')).toHaveCount(3);
   await expect(tab(page, 'archived')).toHaveText('Archiviati (3)');
 });
+
+// ── La ricerca è una lista come le altre: dice quanti ne ha trovati ────────
+// Era l'unica intestazione rimasta senza numero: si cercava una parola, si
+// ottenevano due risultati, e la colonna diceva solo "Ricerca". Quanti ne ha
+// trovati è ESATTAMENTE la domanda a cui la ricerca risponde.
+
+test('#495 — la ricerca dice quanti risultati ha trovato, e zero è una risposta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_MANAGE_SEARCH && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+
+  // Il modello risponde con la classifica che gli diciamo noi: qui conta il
+  // numero scritto in cima alla colonna, non chi ha scelto l'ordine.
+  await page.evaluate(() => {
+    window.__rank = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'ai_request') return { ok: true, text: JSON.stringify(window.__rank) };
+      return orig(msg);
+    };
+  });
+
+  await page.evaluate((items) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(items); }, [
+    fb('a1', 'unlabeled'), fb('a2', 'todo'), fb('a3', 'done'),
+  ]);
+
+  const head = page.locator('#mgListHead');
+  await expect(head).toHaveText('Ricevuti (1)');
+
+  // Aperta la ricerca, non c'è ancora niente da contare: solo il nome.
+  await page.locator('#mgSearchToggle').click();
+  await expect(head).toHaveText('Ricerca');
+
+  // Due risultati → "(2)", e sono davvero due card.
+  await page.evaluate(() => { window.__rank = [{ id: 'a1', reason: 'x' }, { id: 'a3', reason: 'y' }]; });
+  await page.locator('#mgSearchInput').fill('feedback');
+  await page.locator('#mgSearchInput').press('Enter');
+  await expect(page.locator('.mg-item')).toHaveCount(2);
+  await expect(head).toHaveText('Ricerca (2)');
+
+  // Nessun risultato → "(0)": la ricerca ha risposto, e la risposta è zero.
+  await page.evaluate(() => { window.__rank = []; });
+  await page.locator('#mgSearchInput').fill('zzzqqq');
+  await page.locator('#mgSearchInput').press('Enter');
+  await expect(page.locator('#mgListEmpty')).toBeVisible();
+  await expect(head).toHaveText('Ricerca (0)');
+
+  // Chiusa la ricerca si torna al numero della scheda.
+  await page.locator('#mgSearchClose').click();
+  await expect(head).toHaveText('Ricevuti (1)');
+});
+
+test('#495 — un risultato che punta a un feedback non più caricato non viene contato', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_MANAGE_SEARCH && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+
+  // Il modello nomina anche un id che in pagina non c'è: la card non si
+  // disegna, e il numero deve essere quello delle card, non quello della
+  // risposta del modello (altrimenti dice 2 e se ne vede 1).
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'ai_request') {
+        return { ok: true, text: JSON.stringify([{ id: 'a1', reason: 'x' }, { id: 'fantasma', reason: 'y' }]) };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate((items) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(items); }, [
+    fb('a1', 'unlabeled'), fb('a2', 'todo'),
+  ]);
+
+  await page.locator('#mgSearchToggle').click();
+  await page.locator('#mgSearchInput').fill('feedback');
+  await page.locator('#mgSearchInput').press('Enter');
+  await expect(page.locator('.mg-item')).toHaveCount(1);
+  await expect(page.locator('#mgListHead')).toHaveText('Ricerca (1)');
+});
+
+// ── Quando il caricamento tocca il tetto, il numero è un MINIMO e lo dice ──
+// La pagina carica i 500 feedback più recenti. Oltre quella soglia i più vecchi
+// restano fuori: "Archiviati (312)" quando ce ne sono 400 sembra una risposta e
+// non lo è. Il "+" toglie l'affermazione senza costare una lettura in più.
+
+test('#495 — caricamento al tetto: i numeri diventano "+" e l\'hover spiega perché', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+
+  const CAP = await page.evaluate(() => window.SN_FEEDBACK.LIST_PAGE_SIZE);
+
+  // Una in meno del tetto: il caricamento ha visto tutto, i numeri sono totali.
+  await page.evaluate((cap) => {
+    const items = [];
+    for (let i = 0; i < cap - 1; i++) {
+      items.push({
+        _id: `p${i}`, text: `t${i}`, name: `t${i}`, seq: i + 1, subSeq: 0,
+        clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [],
+        status: i === 0 ? 'todo' : 'unlabeled',
+      });
+    }
+    window.__mgTest.setData(items);
+  }, CAP);
+  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP - 2})`);
+  await expect(tab(page, 'queue')).toHaveText('In coda (1)');
+  await expect(tab(page, 'archived')).toHaveText('Archiviati (0)');
+  await expect(tab(page, 'inbox')).not.toHaveAttribute('title', /./);
+
+  // Tetto toccato: gli stessi numeri smettono di affermare un totale.
+  await page.evaluate((cap) => {
+    const items = [];
+    for (let i = 0; i < cap; i++) {
+      items.push({
+        _id: `p${i}`, text: `t${i}`, name: `t${i}`, seq: i + 1, subSeq: 0,
+        clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [],
+        status: i === 0 ? 'todo' : 'unlabeled',
+      });
+    }
+    window.__mgTest.setData(items);
+  }, CAP);
+  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP - 1}+)`);
+  await expect(tab(page, 'queue')).toHaveText('In coda (1+)');
+  // Una sezione "vuota" al tetto non è vuota davvero: nemmeno lo zero afferma.
+  await expect(tab(page, 'archived')).toHaveText('Archiviati (0+)');
+  await expect(page.locator('#mgListHead')).toHaveText(`Ricevuti (${CAP - 1}+)`);
+
+  // Il "+" non resta un enigma: l'hover dice quanti se ne sono caricati.
+  const hint = await page.evaluate(() => window.SN_FEEDBACK.COUNT_CAP_HINT);
+  expect(hint).toContain(String(CAP));
+  await expect(tab(page, 'inbox')).toHaveAttribute('title', hint);
+  await expect(page.locator('#mgListHead')).toHaveAttribute('title', hint);
+
+  // E la sezione vuota lo dice a parole, invece di negare i feedback più vecchi.
+  await page.evaluate(() => window.__mgTest.setTab('archived'));
+  await expect(page.locator('#mgListEmpty')).toContainText(String(CAP));
+});
