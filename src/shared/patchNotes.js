@@ -18,7 +18,6 @@
     {
       version: '0.2.207', date: '2026-08-28',
       features: [
-<<<<<<< HEAD
         'Le sveglie e i timer che hai messo ora li gestisci a parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8". Prima si potevano solo creare.',
         'Una sveglia può ripetersi nei giorni che dici tu: "il lunedì e il mercoledì", "nei giorni feriali", "tutte le mattine". Suona a ogni giorno indicato senza che tu la rimetta, e i giorni si leggono sulla sua scheda in alto nella nuova scheda.',
         'Filo legge i tuoi documenti, PDF compresi: indicagli la bolletta o l\'estratto conto che hai sul computer e chiedigli quello che ti serve sapere — quant\'è la giacenza media, quanto hai pagato a marzo, cosa dice una clausola. Se il PDF è una scansione te lo dice, invece di inventarsi il contenuto.',
