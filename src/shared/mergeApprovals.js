@@ -66,9 +66,10 @@
    * minuto"): un conto alla rovescia al secondo su una cosa da decidere con
    * calma è solo ansia.
    *
-   * La finestra è di un giorno (il perché sta nel server, dove il valore vive),
-   * quindi la scala normale sono le ORE: si arrotondano per DIFETTO, così
-   * l'avviso non promette mai più tempo di quanto ce n'è davvero.
+   * La finestra è di una settimana (il perché sta nel server, dove il valore
+   * vive), quindi la scala normale sono i GIORNI, e sotto il giorno le ore: si
+   * arrotonda per DIFETTO, così l'avviso non promette mai più tempo di quanto
+   * ce n'è davvero.
    */
   function expiresIn(expiresAtMs, nowMs) {
     var exp = Number(expiresAtMs);
@@ -80,7 +81,9 @@
     if (m === 1) return 'scade fra 1 minuto';
     if (m < 60) return 'scade fra ' + m + ' minuti';
     var h = Math.floor(m / 60);
-    return h === 1 ? 'scade fra 1 ora' : 'scade fra ' + h + ' ore';
+    if (h < 24) return h === 1 ? 'scade fra 1 ora' : 'scade fra ' + h + ' ore';
+    var d = Math.floor(h / 24);
+    return d === 1 ? 'scade fra 1 giorno' : 'scade fra ' + d + ' giorni';
   }
 
   /**
