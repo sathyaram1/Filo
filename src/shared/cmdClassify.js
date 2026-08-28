@@ -688,7 +688,9 @@
     // solo se supera anche i controlli strutturali (niente sottoespressioni,
     // niente scriptblock che invoca). Where-Object/ForEach-Object NON passano di
     // qui: da soli non filtrano niente, valgono solo dentro una pipeline.
-    if (PS_READ.has(prog) && segmentIsRead(trimmed, false)) return 1;
+    // Passiamo `raw` (con le virgolette): segmentIsRead deve poter riconoscere i
+    // letterali quotati come inerti.
+    if (PS_READ.has(prog) && segmentIsRead(raw, false)) return 1;
 
     return 3; // comando non riconosciuto → livello 3 di default
   }
