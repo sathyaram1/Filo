@@ -64,7 +64,7 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   // "Ricevuti" attiva di default → mostra il pannello lista condiviso.
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveClass(/mg-tab--active/);
   await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
-  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (0)');
 });
 
 test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arrivo" (DB1)', async ({ openTab }) => {
