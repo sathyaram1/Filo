@@ -885,6 +885,34 @@ function consumePendingConfirm(sender, action) {
   return exp > Date.now();
 }
 
+// Riferimento dell'utente a una sveglia / un timer, normalizzato dai sinonimi
+// che un modello può produrre. `tipo` restringe a sveglie o a countdown quando
+// la richiesta lo dice ("tutte le SVEGLIE"), altrimenti si guardano entrambi.
+function timerRefOf(action) {
+  const a = action || {};
+  const kindRaw = String(a.tipo ?? a.kind ?? a.genere ?? '').toLowerCase();
+  const kind = /svegli|alarm/.test(kindRaw) ? 'alarm' : (/timer|countdown/.test(kindRaw) ? 'timer' : null);
+  const allRaw = a.tutte ?? a.tutti ?? a.all;
+  const all = allRaw === true || /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(allRaw ?? ''));
+  return {
+    id: a.id || null,
+    label: String(a.etichetta ?? a.label ?? a.nome ?? a.riferimento ?? '').trim(),
+    all,
+    kind,
+  };
+}
+
+// Voce in chiaro per il popup di conferma e per la risposta al modello:
+// «Sveglia “palestra” 07:00 (feriali)», «Timer “pasta”».
+function describeTimerEntry(t) {
+  const label = t && t.label ? `“${t.label}”` : '(senza nome)';
+  if (!t || t.kind !== 'alarm') return `Timer ${label}`;
+  const d = new Date(t.endsAt);
+  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const rep = (t.repeat && t.repeat.length && FiloMem.formatRepeat) ? FiloMem.formatRepeat(t.repeat) : '';
+  return `Sveglia ${label} ${hhmm}${rep ? ` (${rep})` : ''}`;
+}
+
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
