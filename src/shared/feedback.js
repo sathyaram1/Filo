@@ -481,8 +481,10 @@
   }
 
   // Perché c'è il "+": lo spiega l'hover, così il segno non resta un enigma.
+  // La stessa frase serve anche a una sezione che sembra vuota (i feedback più
+  // vecchi non sono in pagina), quindi non nomina il numero: vale in entrambi.
   const COUNT_CAP_HINT =
-    `Caricati i ${LIST_PAGE_SIZE} feedback più recenti: più vecchi di questi potrebbero essercene altri, non contati.`;
+    `Caricati i ${LIST_PAGE_SIZE} feedback più recenti: se ce ne sono di più vecchi, non sono in pagina e non entrano nel conto.`;
 
   // Lista tutti i feedback (più recenti prima). Usata dalla dashboard e dalla
   // bacheca. `timeoutMs` (opzionale): se > 0, la fetch si arrende dopo quel tempo
