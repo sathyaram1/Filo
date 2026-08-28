@@ -213,8 +213,10 @@
   // 1000 }`); non passa niente che possa invocare qualcosa — parole nude
   // (`Remove-Item`, `ri`, `foobar`), percorsi di eseguibili (`.\x.exe`),
   // dot-sourcing, chiamate di metodo `(`, assegnazioni `=`, membri statici `::`.
-  // È volutamente più severo del necessario: un blocco di lettura respinto costa
-  // una conferma in più, un blocco ostile accettato costa i file dell'utente.
+  // I LETTERALI FRA VIRGOLETTE sono già stati neutralizzati a `0` da chi chiama
+  // (segmentIsRead): un confronto `-eq "readme.md"` è inerte, la stringa non è
+  // un comando. È volutamente più severo del necessario: un blocco di lettura
+  // respinto costa una conferma in più, uno ostile accettato costa i file.
   function scriptBlockIsInert(inner) {
     const s = String(inner);
     if (/[=(){}`;&|<>@]|::/.test(s)) return false;
@@ -228,23 +230,34 @@
 
   // Un SEGMENTO (comando singolo, o un pezzo di pipeline) è di sola lettura?
   // Serve sia per il cmdlet isolato sia per ogni pezzo di una pipeline, così i
-  // due cammini non possono divergere. `seg` arriva già senza virgolette
-  // (dequote): come nel resto del file, toglierle può solo far VEDERE più
-  // roba pericolosa, mai meno.
+  // due cammini non possono divergere. Riceve il segmento GREZZO (con le
+  // virgolette): i letterali quotati vanno riconosciuti come inerti PRIMA di
+  // togliere le virgolette, altrimenti una parola quotata resta nuda e sembra un
+  // comando.
   function segmentIsRead(seg, inPipeline) {
     // `%{...}` e `?{...}` (senza spazio) sono scrittura PowerShell normalissima:
     // isoliamo le graffe come token a sé prima di guardare programma e blocco.
     const norm = String(seg).replace(/\{/g, ' { ').replace(/\}/g, ' } ');
-    // Sottoespressioni, chiamate, hashtable, redirezioni, operatore di chiamata:
-    // dentro può nascondersi qualunque cosa → non è lettura riconoscibile.
-    if (/[`()<>;&|@]|\$\{|::/.test(norm)) return false;
-    const open = (norm.match(/\{/g) || []).length;
-    const close = (norm.match(/\}/g) || []).length;
+    // Il primo token deve essere il comando NUDO, non un file omonimo su disco
+    // (`.\Get-ChildItem.exe`): senza questo, `programOf` (che fa basename e
+    // toglie l'estensione) lo scambierebbe per il cmdlet fidato.
+    if (!isBareName(tokens(norm)[0])) return false;
+    // I letterali fra virgolette sono inerti: li rimpiazziamo con `0` (un numero,
+    // che scriptBlockIsInert accetta). Così un confronto `-eq "readme.md"` passa,
+    // e un metacarattere DENTRO le virgolette non fa salire il livello. Ciò che
+    // invoca davvero (parole nude, `&`, `(`, `.`) sta FUORI dalle virgolette e
+    // viene comunque intercettato.
+    const noStr = norm.replace(/'[^']*'/g, ' 0 ').replace(/"[^"]*"/g, ' 0 ');
+    // Sottoespressioni, chiamate, hashtable/array, redirezioni, operatore di
+    // chiamata, membri statici: dentro può nascondersi qualunque cosa.
+    if (/[`()<>;&|@]|\$\(|\$\{|::/.test(noStr)) return false;
+    const open = (noStr.match(/\{/g) || []).length;
+    const close = (noStr.match(/\}/g) || []).length;
     if (open !== close || open > 1) return false; // graffe sbilanciate o annidate
     if (open === 1) {
-      const i = norm.indexOf('{');
-      const j = norm.lastIndexOf('}');
-      if (j < i || !scriptBlockIsInert(norm.slice(i + 1, j))) return false;
+      const i = noStr.indexOf('{');
+      const j = noStr.lastIndexOf('}');
+      if (j < i || !scriptBlockIsInert(noStr.slice(i + 1, j))) return false;
     }
     const prog = programOf(norm);
     if (!prog) return false;
