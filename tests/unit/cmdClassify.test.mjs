@@ -77,7 +77,7 @@ test('livello 3 — concatenazioni e redirezioni (non interamente riconoscibili)
   for (const cmd of [
     'ls && rm -rf x',          // && con un comando di per sé livello 1
     'git status; rm file',     // ;
-    'cat file | grep x',       // | pipe
+    'cat file | rm x',         // | pipe con un pezzo distruttivo
     'echo ciao > file.txt',    // > redirezione
     'echo ciao >> file.txt',   // >>
     'cat < input.txt',         // < redirezione
