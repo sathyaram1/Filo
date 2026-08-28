@@ -60,6 +60,37 @@
     return action.dominio ?? action.domain ?? action.sito;
   }
 
+  // ── sveglie e timer: da cosa dipende il livello ───────────────────────────
+  // `_targets` è l'elenco (già leggibile) di ciò che l'azione colpirebbe
+  // DAVVERO: lo calcola il main leggendo la lista, mai l'LLM. Quando manca
+  // (registro consultato fuori dal main) i conti tornano null e si ripiega
+  // sulla forma della richiesta.
+  function targetList(action) {
+    return Array.isArray(action && action._targets) ? action._targets : [];
+  }
+  function targetCount(action) {
+    return Array.isArray(action && action._targets) ? action._targets.length : null;
+  }
+  function wantsAll(action) {
+    const v = action && (action.tutte ?? action.tutti ?? action.all);
+    if (v === true) return true;
+    return /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(v ?? ''));
+  }
+  function timerRefLabel(action) {
+    const kind = String((action && (action.tipo ?? action.kind)) || '').toLowerCase();
+    const cosa = /timer/.test(kind) ? 'i timer' : (/svegli|alarm/.test(kind) ? 'le sveglie' : 'sveglie e timer');
+    const etichetta = String((action && (action.etichetta ?? action.label ?? action.nome)) || '').trim();
+    if (wantsAll(action) && !etichetta) return `TUTTI ${cosa}`;
+    if (etichetta) return `“${etichetta}”`;
+    return cosa;
+  }
+  function repeatLabel(action) {
+    const M = global.SN_FILO_MEMORY;
+    const raw = action && (action.ripeti ?? action.repeat ?? action.giorni);
+    if (!raw || !M || !M.formatRepeat) return '';
+    return M.formatRepeat(raw);
+  }
+
   const REGISTRY = {
     NAVIGA: {
       // Aprire un link è di norma innocuo → livello 1, diretto. ECCEZIONE
