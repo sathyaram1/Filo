@@ -63,7 +63,8 @@ async function apri(page, opts) {
   await page.evaluate(() => window.__mgTest.whenReady());
   await stub(page, opts);
   await page.evaluate((admin) => window.__mgTest.setAdmin(admin), opts?.admin !== false);
-  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  const n = await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  console.log('[verifica] loadMergeApprovals →', n);
 }
 
 // 1. Solo una fusione fallita, NESSUNA in attesa: resta bene in vista.
