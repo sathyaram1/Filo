@@ -22,6 +22,12 @@
     // ai fini dell'instradamento (mai in coda: resta nei Ricevuti finché l'owner
     // non lo risolve o ri-valuta i giudici mancanti).
     unfiltered: { label: 'Non filtrato', color: '#ffffff', severity: 4 },
+    // Bocciatura di SICUREZZA sul fix (statusReason `secaudit`): il feedback era
+    // approvato e lavorato, ma l'audit di sicurezza (o il cancello di fusione)
+    // ha detto no e la pratica è tornata all'owner. ROSSO come l'attacco: il
+    // verde di `design` faceva sembrare "questione di gusto" un allarme di
+    // sicurezza — scelta dell'owner, 2026-08-29.
+    secaudit:   { label: 'Bloccato dalla sicurezza', color: '#c0392b', severity: 3 },
     attack:     { label: 'Attacco',      color: '#c0392b', severity: 3 },
     spam:       { label: 'Spam',         color: '#e08e0b', severity: 2 },
     design:     { label: 'Design',       color: '#2e9e5b', severity: 1 },
