@@ -553,7 +553,7 @@ test('listArchiveTab: filtro ⭐ mostra TUTTI i preferiti di qualunque status', 
   );
 });
 
-// ── Quanti feedback c'è in ogni scheda-lista (#495) ────────────────────────
+// ── Quanti feedback ci sono in ogni scheda-lista (#495) ────────────────────
 
 test('listArchiveTab: filtro "Bloccati confermati" tiene solo attacchi/spam confermati', () => {
   const items = [
