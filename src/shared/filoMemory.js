@@ -321,7 +321,7 @@
     return String(s == null ? '' : s)
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '');
   }
 
@@ -474,7 +474,7 @@
     return String(s == null ? '' : s)
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, ' ')
       .trim();
   }
@@ -600,6 +600,15 @@
         // Già marcato ringing: teniamolo in lista (l'utente non ha ancora
         // premuto Ferma). Non invalidiamo la cache ogni secondo.
         result.push(t);
+      } else if (isRecurring(t)) {
+        // Sveglia RICORRENTE: suona, ma non si consuma. Insieme a `ringing`
+        // spostiamo già `endsAt` sull'occorrenza successiva, così il tick dopo
+        // non la vede più scaduta e la settimana prossima suona di nuovo. Se
+        // per qualche motivo la prossima non è calcolabile, si comporta come
+        // una sveglia normale (suona una volta e la si ferma).
+        const next = nextAlarmOccurrence(t, now);
+        result.push(next ? { ...t, ringing: true, endsAt: new Date(next).toISOString() } : { ...t, ringing: true });
+        changed = true;
       } else {
         // Prima volta che scade: passa a ringing e invalida la cache.
         result.push({ ...t, ringing: true });
