@@ -39,6 +39,14 @@
 //     solo far riconoscere PIÙ bersagli/flag pericolosi, mai di meno.
 //   • un backstop di programmi distruttivi (rm/del/format/…) resta 3 anche se
 //     per errore comparisse in una whitelist.
+//   • la whitelist FIDA di un nome solo se invocato NUDO (nessun separatore di
+//     percorso, nessuna estensione eseguibile, nessun prefisso `.\`/`.`/`&`).
+//     Un file su disco chiamato come un comando fidato — `.\Get-ChildItem.exe`,
+//     `C:\tmp\ls.exe`, `Get-ChildItem.exe` dal PATH — NON è quel comando: è un
+//     eseguibile arbitrario e resta al livello 3 di default. Il backstop dei
+//     distruttivi invece guarda il basename (così `/bin/rm` resta 3 col
+//     percorso): catturare un nome pericoloso travestito è sempre giusto,
+//     fidarsi di uno fidato travestito no.
 //   • flag pericolosi (--force, --hard, -rf…) alzano un livello ≤2 a 3.
 //   • curl/wget con un flag di output-su-file (-o/-O/--output/--remote-name…),
 //     wget con un flag di cartella di destinazione (-P/--directory-prefix) o curl
