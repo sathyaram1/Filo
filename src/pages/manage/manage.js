@@ -2534,6 +2534,7 @@
 
     try {
       allFeedbacks = await FB.list({ pageSize: 500 });
+      dataLoaded = true;
     } catch (err) {
       mgListLoading.hidden = true;
       mgListEmpty.hidden = false;
