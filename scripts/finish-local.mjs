@@ -162,6 +162,52 @@ function run(cmd, args, label) {
   return r.status === 0;
 }
 
+/**
+ * La BASE del confronto per scegliere gli spec mirati. PURA.
+ *
+ * Il confronto DEVE partire dallo stato REMOTO della linea principale: su una
+ * macchina col ref locale rimasto indietro (feedback #508: 455 commit), il
+ * diff col ref locale contiene il lavoro degli ALTRI già pubblicato, e la
+ * selezione lancia decine di spec estranei — coi loro rossi (158 spec invece
+ * di 1). Stessa logica, stesso motivo, del diff per il secaudit in
+ * scripts/dispatch.mjs.
+ *
+ * Se il fetch fallisce (rete assente) si ripiega su quel che c'è, ma la
+ * `note` va stampata: un ripiego silenzioso è indistinguibile dal difetto.
+ */
+export function resolveDiffBase({ fetchOk, remoteRefOk }) {
+  if (remoteRefOk) {
+    return {
+      base: `origin/${MAIN}`,
+      note: fetchOk ? '' : 'Non raggiungo origin: confronto il lavoro con l\'ultima copia scaricata della linea principale, che potrebbe essere indietro.',
+    };
+  }
+  return {
+    base: MAIN,
+    note: 'Non ho una copia remota della linea principale: confronto con quella locale, che su questa macchina può essere molto indietro. Se partono più spec del previsto, è per questo.',
+  };
+}
+
+/**
+ * Il messaggio che ferma la chiusura quando il ramo è rimasto indietro
+ * rispetto alla linea principale. '' = via libera. PURA.
+ *
+ * Fermarsi QUI, prima dei controlli, è il punto (caso #500): un conflitto di
+ * fusione scoperto dopo 15 minuti di spec, o dopo l'approvazione dell'owner,
+ * costa un giro intero; scoperto adesso costa cinque secondi. Un conteggio
+ * illeggibile non blocca: la guardia non inventa conflitti.
+ */
+export function behindMainStop(behind) {
+  const n = Number(behind);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return [
+    `Il ramo è indietro di ${n} commit rispetto alla linea principale: chiedere la fusione così`,
+    'finisce in conflitto alla fine, a controlli già pagati.',
+    'Riallinealo rifacendo la verifica, che se ne occupa da sola in partenza:',
+    '  node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"',
+  ].join('\n');
+}
+
 /** Gli spec Playwright che toccano le aree modificate dal branch. Puro. */
 export function specsForChangedFiles(changed) {
   const files = Array.isArray(changed) ? changed : [];
