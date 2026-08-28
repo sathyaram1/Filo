@@ -214,9 +214,9 @@ async function readDocument(input) {
     }
     base.pages = out.pages;
     const text = String(out.text || '').trim();
-    // Un PDF di sole immagini può restituire comunque spazi e a capo: se tolti
-    // quelli non resta nulla, allora testo estraibile non ce n'è.
-    if (!text.replace(/[s ]/g, '')) {
+    // `trim()` toglie anche gli spazi unificatori: un PDF di sole immagini
+    // restituisce spesso spazi e a capo, e se non resta nulla testo estraibile non ce n'è.
+    if (!text) {
       // PDF senza testo estraibile: è una scansione o una foto. Risposta onesta,
       // niente OCR (per ora) e soprattutto niente contenuto inventato.
       return { ...base, ok: true, kind: 'pdf', empty: true, text: '' };
