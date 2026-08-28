@@ -633,6 +633,12 @@
       return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
     }
 
+    // Cmdlet PowerShell di sola lettura (`Get-ChildItem`, `Select-String`…): 1
+    // solo se supera anche i controlli strutturali (niente sottoespressioni,
+    // niente scriptblock che invoca). Where-Object/ForEach-Object NON passano di
+    // qui: da soli non filtrano niente, valgono solo dentro una pipeline.
+    if (PS_READ.has(prog) && segmentIsRead(trimmed, false)) return 1;
+
     return 3; // comando non riconosciuto → livello 3 di default
   }
 
