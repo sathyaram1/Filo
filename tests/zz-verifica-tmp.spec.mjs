@@ -50,8 +50,7 @@ async function stub(page, { admin = true, pending = [], failed = [], recent = []
       if (t === 'merge_approvals_get') {
         if (!cfg.admin) return { ok: false, error: 'Operazione riservata agli amministratori.' };
         const failedNow = cfg.failed.filter((f) => !window.__vfCalls.some((c) => c.op === 'discard' && c.id === f.id));
-        window.__vfLog.push('reply p=' + cfg.pending.length + ' f=' + failedNow.length);
-        return { ok: true, pending: cfg.pending, failed: failedNow, recent: cfg.recent, ttlMs: 7 * GIORNO };
+        return { ok: true, pending: cfg.pending, failed: failedNow, recent: cfg.recent, ttlMs: 7 * 24 * 60 * 60 * 1000 };
       }
       if (t === 'merge_approval_approve') { window.__vfCalls.push({ op: 'approve', id: msg.id }); return { ok: true, result: 'merged', sha: 'cafecafe' }; }
       if (t === 'merge_approval_discard') { window.__vfCalls.push({ op: 'discard', id: msg.id }); return { ok: true, result: 'discarded' }; }
