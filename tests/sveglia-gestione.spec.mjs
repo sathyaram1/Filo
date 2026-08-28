@@ -128,3 +128,41 @@ test('una sveglia che non esiste non fa sparire quella che c\'è', async ({ app,
   await expect(page.locator('.dash-live-card', { hasText: 'palestra' })).toBeVisible({ timeout: 10_000 });
   expect((await readTimers(page)).length).toBe(1);
 });
+
+test('una sveglia ricorrente suona e resta: "Ferma" non la disdice', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.waitForLoadState('domcontentloaded');
+
+  await execAction(app, { type: 'SVEGLIA', time: '07:00', label: 'pillola', ripeti: 'ogni giorno' });
+
+  // Portiamo la scadenza a fra pochi secondi senza aspettare le 07:00: è la
+  // stessa cosa che farà l'orologio, e la ricorrenza resta quella vera.
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    const KEY = globalThis.SN_CONST.STORAGE_KEYS.FILO_TIMERS;
+    const list = await M.listTimers();
+    list[0].endsAt = new Date(Date.now() + 4000).toISOString();
+    await chrome.storage.local.set({ [KEY]: list });
+  });
+
+  // Suona.
+  await expect(page.locator('#live')).toHaveAttribute('data-ringing', '1', { timeout: 20_000 });
+  const card = page.locator('.dash-live-card', { hasText: 'pillola' });
+  await expect(card).toContainText('ogni giorno');
+
+  // "Ferma" la zittisce, ma domani suona ancora: resta in colonna con la sua
+  // ricorrenza e con la prossima occorrenza nel futuro. Prima una sveglia
+  // fermata spariva, e questo è il passo che senza la ricorrenza è rosso.
+  await page.locator('.dash-live-stop').click();
+  await expect(page.locator('#live')).toHaveAttribute('data-ringing', '0', { timeout: 10_000 });
+  await expect(page.locator('.dash-live-card', { hasText: 'pillola' })).toContainText('ogni giorno');
+
+  const left = await readTimers(page);
+  expect(left.length).toBe(1);
+  expect(left[0].ringing).toBeFalsy();
+  expect(new Date(left[0].endsAt).getTime()).toBeGreaterThan(Date.now());
+
+  // La × invece la toglie davvero, anche se si ripete.
+  await page.locator('.dash-live-card', { hasText: 'pillola' }).locator('.dash-live-dismiss').click();
+  await expect(page.locator('.dash-live-card', { hasText: 'pillola' })).toHaveCount(0, { timeout: 10_000 });
+});
