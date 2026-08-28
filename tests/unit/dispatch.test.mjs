@@ -36,6 +36,7 @@ const {
   applySecaudit,
   buildPayload,
   readRoleInstructions,
+  serialAwarenessNote,
   defaultState,
   readState,
   writeState,
