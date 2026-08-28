@@ -535,7 +535,8 @@
 
   // ── Hook di test (Playwright) — inerte in produzione ────────────────────
   window.__boardTest = {
-    setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; renderList(); },
+    // Dati iniettati = dati arrivati: azzera anche l'eventuale guasto ricordato.
+    setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; dataLoaded = true; lastLoadError = null; renderList(); },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
