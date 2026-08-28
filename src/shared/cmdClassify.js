@@ -656,6 +656,14 @@
     if (seq && seq.length) {
       return seq.reduce((max, part) => Math.max(max, classifyOne(part)), 1);
     }
+    // Pipeline di sole letture (`Get-ChildItem | Sort-Object | Select-Object
+    // -First 5`, `cat file | grep errore`) → livello 1: incanalare una lettura
+    // dentro un'altra lettura non produce niente che la prima non facesse già.
+    // Basta UN segmento non riconosciuto — o uno scriptblock che potrebbe
+    // invocare qualcosa — e si torna al 3 di prima.
+    const pipe = splitSafePipeline(trimmed);
+    if (pipe) return pipe.every((p) => segmentIsRead(dequote(p), true)) ? 1 : 3;
+
     // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
     if (!seq && CHAIN_RE.test(trimmed)) return 3;
 
