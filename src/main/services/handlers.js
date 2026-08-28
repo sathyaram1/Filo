@@ -885,6 +885,34 @@ function consumePendingConfirm(sender, action) {
   return exp > Date.now();
 }
 
+// Riferimento dell'utente a una sveglia / un timer, normalizzato dai sinonimi
+// che un modello può produrre. `tipo` restringe a sveglie o a countdown quando
+// la richiesta lo dice ("tutte le SVEGLIE"), altrimenti si guardano entrambi.
+function timerRefOf(action) {
+  const a = action || {};
+  const kindRaw = String(a.tipo ?? a.kind ?? a.genere ?? '').toLowerCase();
+  const kind = /svegli|alarm/.test(kindRaw) ? 'alarm' : (/timer|countdown/.test(kindRaw) ? 'timer' : null);
+  const allRaw = a.tutte ?? a.tutti ?? a.all;
+  const all = allRaw === true || /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(allRaw ?? ''));
+  return {
+    id: a.id || null,
+    label: String(a.etichetta ?? a.label ?? a.nome ?? a.riferimento ?? '').trim(),
+    all,
+    kind,
+  };
+}
+
+// Voce in chiaro per il popup di conferma e per la risposta al modello:
+// «Sveglia “palestra” 07:00 (feriali)», «Timer “pasta”».
+function describeTimerEntry(t) {
+  const label = t && t.label ? `“${t.label}”` : '(senza nome)';
+  if (!t || t.kind !== 'alarm') return `Timer ${label}`;
+  const d = new Date(t.endsAt);
+  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const rep = (t.repeat && t.repeat.length && FiloMem.formatRepeat) ? FiloMem.formatRepeat(t.repeat) : '';
+  return `Sveglia ${label} ${hhmm}${rep ? ` (${rep})` : ''}`;
+}
+
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -922,6 +950,22 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const v = Exfil.assess(url, { corpus, fromUntrusted });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
       }
+    } catch (_) {}
+  }
+
+  // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
+  // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
+  // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
+  // `_targets` (le voci in chiaro, per il popup) e `_targetIds` (su cui agire
+  // dopo la conferma, così la risoluzione non viene rifatta su una lista nel
+  // frattempo cambiata). Mai calcolati dall'LLM.
+  if (type === 'CANCELLA_SVEGLIA' || type === 'MODIFICA_SVEGLIA') {
+    try {
+      const ref = timerRefOf(action);
+      const list = await FiloMem.listTimers();
+      const targets = FiloMem.resolveTimerRefs(list, ref);
+      action._targets = targets.map(describeTimerEntry);
+      action._targetIds = targets.map((t) => t.id);
     } catch (_) {}
   }
 
@@ -1047,9 +1091,40 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const entry = await FiloMem.addAlarm({
           label: String(action.label ?? action.etichetta ?? '').trim(),
           time: action.time ?? action.orario ?? action.at ?? '',
+          repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
         });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: false };
+      }
+      case 'CANCELLA_SVEGLIA': {
+        // Prima non esisteva: dalla chat si potevano solo CREARE sveglie e
+        // timer, e i modelli o dichiaravano di averli tolti o si arrendevano.
+        // Se non abbiamo capito a cosa si riferisce non cancelliamo niente:
+        // `removed` vuoto torna al modello, che chiede quale.
+        const ids = Array.isArray(action._targetIds) ? action._targetIds : null;
+        const r = await FiloMem.removeTimersByRef(ids ? { ids } : timerRefOf(action));
+        const removed = r.removed || [];
+        if (removed.length) broadcastLiveUpdate();
+        return {
+          executed: removed.length > 0,
+          kept: false,
+          output: { removed: removed.map(describeTimerEntry) },
+        };
+      }
+      case 'MODIFICA_SVEGLIA': {
+        const ids = Array.isArray(action._targetIds) ? action._targetIds : null;
+        const r = await FiloMem.updateTimersByRef(ids ? { ids } : timerRefOf(action), {
+          time: action.orario ?? action.time ?? action.at ?? action.nuovoOrario,
+          repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
+          seconds: action.secondi ?? action.seconds,
+        });
+        const updated = r.updated || [];
+        if (updated.length) broadcastLiveUpdate();
+        return {
+          executed: updated.length > 0,
+          kept: false,
+          output: { updated: updated.map(describeTimerEntry) },
+        };
       }
       case 'SALVA_APPUNTO': {
         // Filo scrive l'appunto DIRETTAMENTE in un file dell'editor (fine

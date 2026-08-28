@@ -340,7 +340,7 @@
         // rimuove, come per i timer.
         liveEl.appendChild(renderLiveCard({
           kind: 'process',
-          text: `⏰ Sveglia ${fmtAlarmTime(t.endsAt)}${t.label ? `\n${t.label}` : ''}`,
+          text: `⏰ Sveglia ${fmtAlarmWhen(t)}${t.label ? `\n${t.label}` : ''}`,
           onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
         }));
       } else {
@@ -393,6 +393,19 @@
     }
   }
 
+  // Quando suona una sveglia. Se si RIPETE, il giorno della prossima occorrenza
+  // non è l'informazione utile ("07:55 di domani" per una sveglia del lunedì e
+  // del mercoledì dice meno del vero): si mostrano l'orario e i giorni, con la
+  // stessa dicitura che legge l'assistente ("feriali", "lun+mer").
+  function fmtAlarmWhen(t) {
+    const M = self.SN_FILO_MEMORY;
+    const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
+    if (!rep) return fmtAlarmTime(t.endsAt);
+    const d = new Date(t.endsAt);
+    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `${hhmm} · ${rep}`;
+  }
+
   // Orario "umano" di una sveglia: HH:MM, con l'indicazione del giorno solo se
   // non è oggi (#322).
   function fmtAlarmTime(iso) {
@@ -414,8 +427,12 @@
 
     const textEl = document.createElement('div');
     textEl.className = 'dash-live-text';
+    // Su una sveglia ricorrente diciamo anche i giorni: "Ferma" la zittisce ora
+    // e la lascia in lista per la prossima volta, quindi va detto.
+    const M = self.SN_FILO_MEMORY;
+    const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
     textEl.textContent = t.kind === 'alarm'
-      ? `⏰ Sveglia${t.label ? ` — ${t.label}` : ''}`
+      ? `⏰ Sveglia${t.label ? ` — ${t.label}` : ''}${rep ? ` · ${rep}` : ''}`
       : `⏰ ${t.label} — scaduto`;
     div.appendChild(textEl);
 
@@ -428,14 +445,20 @@
     });
     div.appendChild(stopBtn);
 
-    // Pulsante × per dismissione rapida (stessa azione di "Ferma").
+    // Pulsante × per dismissione rapida (stessa azione di "Ferma"). Sulle
+    // sveglie RICORRENTI i due pulsanti non fanno più la stessa cosa: "Ferma"
+    // zittisce quella di adesso e la lascia per la prossima volta, la × la
+    // toglie del tutto — che è quello che la × fa su ogni altra card della
+    // colonna, e senza questo ramo una sveglia ricorrente non si potrebbe
+    // togliere proprio mentre suona.
     const dismissBtn = document.createElement('button');
     dismissBtn.className = 'dash-live-dismiss';
     dismissBtn.type = 'button';
-    dismissBtn.setAttribute('aria-label', 'Ferma');
+    dismissBtn.setAttribute('aria-label', rep ? 'Rimuovi la sveglia' : 'Ferma');
+    if (rep) dismissBtn.title = 'Rimuovi la sveglia';
     dismissBtn.textContent = '\xD7';
     dismissBtn.addEventListener('click', () => {
-      send({ type: MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
+      send({ type: rep ? MSG.FILO_DELETE_TIMER : MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
     });
     div.appendChild(dismissBtn);
 

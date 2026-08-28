@@ -120,6 +120,10 @@
           id: t.id,
           kind: t.kind || 'timer', // 'alarm' per le sveglie (#322)
           label: t.label,
+          // Giorni in cui la sveglia si ripete (['lun','mer']); assente = una
+          // volta sola. Serve all'agente per rispondere "quali sveglie ho?" e
+          // per capire a quale l'utente si riferisce.
+          repeat: Array.isArray(t.repeat) && t.repeat.length ? t.repeat : null,
           endsAt: t.endsAt,
           paused: !!t.paused,
           remainingSec: Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000)),
@@ -188,7 +192,11 @@
           // countdown (che per una sveglia a ore di distanza confonderebbe).
           const d = new Date(t.endsAt);
           const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}: suona alle ${hhmm}`);
+          // Ricorrenza: dicitura unica con la colonna destra (SN_FILO_MEMORY),
+          // così l'agente e l'utente leggono la stessa cosa.
+          const M = global.SN_FILO_MEMORY;
+          const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
+          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`);
         } else {
           const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
           lines.push(`- Timer "${t.label}": ${rem}`);

@@ -338,7 +338,7 @@
     },
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
-      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, impostare timer e sveglie, salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
+      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H).',
       doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto.',
     },
@@ -356,15 +356,15 @@
     },
     {
       id: 'filo-timers', title: 'Timer', category: 'assistant',
-      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema. Puoi mettere in pausa un timer e riprenderlo quando vuoi.',
-      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda. Sulla scheda del timer trovi ⏸ per metterlo in pausa e ▶ per riprenderlo.',
+      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema. Puoi mettere in pausa un timer e riprenderlo quando vuoi, e puoi chiedere a Filo di annullarlo o di cambiargli la durata invece di rifarlo da capo.',
+      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda. Sulla scheda del timer trovi ⏸ per metterlo in pausa e ▶ per riprenderlo. Per toglierlo, la × sulla scheda oppure chiedilo a Filo ("annulla il timer della pasta").',
       doesNot: 'La suoneria si sente quando la nuova scheda è aperta; la notifica di sistema arriva comunque finché Filo è in esecuzione, anche ridotto a icona. Con Filo completamente chiuso non suona nulla.',
     },
     {
       id: 'filo-alarms', title: 'Sveglie', category: 'assistant',
-      desc: 'Chiedi a Filo una sveglia ("mettimi una sveglia alle 7 per lavoro", "sveglia tra 3 ore"): all’orario stabilito parte un avviso sonoro nella nuova scheda e una notifica di sistema. Se l’orario è già passato oggi, la sveglia viene messa per domani.',
-      invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate compaiono in alto nella nuova scheda con il loro orario e puoi rimuoverle con la ×.',
-      doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera.',
+      desc: 'Chiedi a Filo una sveglia ("mettimi una sveglia alle 7 per lavoro", "sveglia tra 3 ore"): all’orario stabilito parte un avviso sonoro nella nuova scheda e una notifica di sistema. Se l’orario è già passato oggi, la sveglia viene messa per domani. Può anche ripetersi: dille quando ("il lunedì e il mercoledì", "nei giorni feriali", "tutte le mattine") e suona a ogni giorno indicato, senza rimetterla ogni volta. Le sveglie già messe le gestisci sempre a parole: cancellarne una, cancellarle tutte, o spostarne l’orario.',
+      invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate compaiono in alto nella nuova scheda con il loro orario (e i giorni, se si ripete) e puoi rimuoverle con la ×. A parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8".',
+      doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera. La ripetizione va a giorni della settimana: non sa fare "ogni due settimane" o "il primo del mese".',
     },
     {
       id: 'filo-notifications', title: 'Avvisi di Filo', category: 'assistant',
