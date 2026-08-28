@@ -22,6 +22,8 @@
         'La finestrella della spiegazione non copre più la parola su cui l\'hai chiesta.',
         'Dopo Alt+E il cursore è già nella riga per scrivere, quindi la domanda successiva la fai senza passare dal mouse.',
         'Se chiedi la spiegazione dentro un box dei commenti o un\'anteprima incorporata nella pagina, della risposta vedi diverse righe invece di una fessura da scorrere.',
+        'Mentre la risposta arriva puoi tornare su a rileggere un pezzo: la finestrella non ti riporta più in fondo a ogni riga nuova.',
+        'Con la pagina rimpicciolita con Ctrl+meno, la finestrella della spiegazione si ferma al bordo dello schermo quando la trascini, invece di scivolarci sotto e portare fuori vista la riga per scrivere.',
       ],
     },
     {

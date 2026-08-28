@@ -1126,6 +1126,7 @@ for (const { zoom, sintomo } of CASI_ZOOM_TRASCINATO) {
       async () => fuoriDaiBordi(await page.evaluate(misura)),
       { timeout: 5000 },
     ).toEqual([]);
+    await attendiPosaFerma(page);
 
     // L'utente lo prende per la barra del titolo e lo porta in fondo.
     await trascinaInFondo(page);
@@ -1215,6 +1216,7 @@ test('pagina ingrandita al 150% e riquadro trascinato in fondo: arriva davvero a
     async () => fuoriDaiBordi(await page.evaluate(misura)),
     { timeout: 5000 },
   ).toEqual([]);
+  await attendiPosaFerma(page);
 
   await trascinaInFondo(page);
   const m = await page.evaluate(misura);
