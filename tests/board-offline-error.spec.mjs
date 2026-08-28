@@ -106,3 +106,39 @@ test('Riprova recupera: dopo un caricamento riuscito il fix compare come scheda 
   await expect(page.locator('.bd-card .bd-vote-works')).toHaveCount(1);
   await expect(page.locator('.bd-card .bd-vote-broken')).toHaveCount(1);
 });
+
+// Il guasto va RICORDATO, non disegnato una volta sola: qualunque ridisegno
+// successivo (qui il login dal banner "Accedi per votare") ripartiva da una
+// lista vuota e rimpiazzava l'errore con "Nessun miglioramento…", portandosi
+// via il tasto Riprova. Stessa regola dei conteggi (#495): un vuoto è
+// un'affermazione, e dopo un caricamento fallito non la sappiamo.
+//
+// Precondizione senza il fix: dopo il login #bdError è nascosto e #bdEmpty
+// visibile → i primi due assert diventano rossi.
+test('caricamento fallito: un login (o altro ridisegno) non cancella l\'errore', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await ready(page);
+
+  await page.evaluate(() => {
+    window.__boardTest.setList(() => Promise.reject(new TypeError('Failed to fetch')));
+  });
+  await page.evaluate(() => window.__boardTest.reload());
+  await expect(page.locator('#bdError')).toBeVisible();
+
+  // L'utente accede per votare: la pagina si ridisegna.
+  await page.evaluate(() => window.__boardTest.setSignedIn('tester@example.com'));
+
+  await expect(page.locator('#bdError')).toBeVisible();
+  await expect(page.locator('#bdEmpty')).toBeHidden();
+  await expect(page.locator('#bdRetry')).toBeVisible();
+
+  // E il retry funziona ancora: rete tornata → i miglioramenti compaiono.
+  await page.evaluate((shipped) => {
+    window.__boardTest.setReleasedVersion('0.2.71');
+    window.__boardTest.setList(() => Promise.resolve([shipped]));
+  }, SHIPPED);
+  await page.locator('#bdRetry').click();
+  await expect(page.locator('#bdError')).toBeHidden();
+  await expect(page.locator('.bd-card')).toHaveCount(1);
+});

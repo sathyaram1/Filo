@@ -1096,9 +1096,6 @@
       loadError = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
         ? SN_CHAT_ERRORS.sentence(e)
         : 'Non è stato possibile caricare i feedback: controlla la connessione e riprova.';
-      // Le sezioni tornano al solo nome: quello che avevano detto prima (se
-      // c'erano dati vecchi) non vale più per una lista che non abbiamo.
-      if (!dataLoaded) updateTabCounts();
       showLoadError(loadError);
     }
   }
