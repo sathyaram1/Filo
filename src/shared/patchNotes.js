@@ -17,6 +17,10 @@
     // ↓ Nuove versioni in cima.
     {
       version: '0.2.207', date: '2026-08-28',
+      features: [
+        'Le sveglie e i timer che hai messo ora li gestisci a parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8". Prima si potevano solo creare.',
+        'Una sveglia può ripetersi nei giorni che dici tu — "il lunedì e il mercoledì", "nei giorni feriali", "tutte le mattine" — e suona a ogni giorno indicato senza che tu la rimetta. I giorni si leggono sulla sua scheda in alto nella nuova scheda.',
+      ],
       fixes: [
         'Quando la spiegazione dentro al menu del tasto destro finisce di caricare e si allunga, il menu si sposta da solo invece di uscire dal fondo della finestra. L\'ultima voce resta intera e si può cliccare.',
         'Se la spiegazione è così lunga da non starci, il menu si scorre fino in fondo e ci resta: prima un giro di rotella in più faceva scorrere la pagina e il menu spariva.',
