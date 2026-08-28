@@ -1038,6 +1038,26 @@
     return { ...f, notes: String((f && f.userNote) || '').trim(), reportIllegibile: true };
   }
 
+  // La frase d'errore comprensibile (mai il "Failed to fetch" grezzo) + il tasto
+  // per riprovare. Sta in una funzione perché serve in due momenti: quando il
+  // caricamento fallisce e ogni volta che un re-render svuoterebbe il riquadro.
+  function showLoadError(msg) {
+    listEl.innerHTML = '';
+    countEl.textContent = '';
+    emptyEl.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'fb-load-error-msg';
+    p.textContent = msg;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fb-load-retry';
+    btn.textContent = '↻ Riprova';
+    btn.addEventListener('click', () => load());
+    emptyEl.appendChild(p);
+    emptyEl.appendChild(btn);
+    emptyEl.hidden = false;
+  }
+
   async function load() {
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
