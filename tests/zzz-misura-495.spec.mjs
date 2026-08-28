@@ -1,4 +1,4 @@
-// TEMPORANEO — misura la barra delle schede di manage a finestra stretta.
+// TEMPORANEO — cattura visiva della barra delle schede di manage.
 import { test } from './fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
@@ -12,33 +12,25 @@ function fb(id, status) {
   };
 }
 
-test('misura', async ({ app, openTab }) => {
-  await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows()[0];
-    if (w) w.setContentSize(720, 800);
+for (const larghezza of [720, 1100]) {
+  test(`scatto ${larghezza}`, async ({ app, openTab }) => {
+    await app.evaluate(async ({ BrowserWindow }, w0) => {
+      const w = BrowserWindow.getAllWindows()[0];
+      if (w) w.setContentSize(w0, 820);
+    }, larghezza);
+    const page = await openTab(URL);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK && window.filo);
+    await page.evaluate(() => window.__mgTest.whenReady());
+    await page.evaluate(() => window.__mgTest.setAdmin(true));
+    await page.setViewportSize({ width: larghezza, height: 820 });
+    await page.evaluate((items) => window.__mgTest.setData(items), [
+      fb('i1', 'unlabeled'), fb('i2', 'unlabeled'), fb('i3', 'design'),
+      fb('q1', 'todo'), fb('q2', 'working'),
+      fb('r1', 'done'), fb('r2', 'done'),
+      fb('z1', 'archived'),
+    ]);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `tests/.shots/manage-tabs-${larghezza}.png` });
   });
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK && window.filo);
-  await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(() => window.__mgTest.setAdmin(true));
-  await page.setViewportSize({ width: 720, height: 800 });
-  await page.evaluate((items) => window.__mgTest.setData(items), [
-    fb('i1', 'unlabeled'), fb('q1', 'todo'), fb('r1', 'done'), fb('z1', 'archived'),
-  ].map((o) => o));
-
-  const geo = await page.evaluate(() => {
-    const bar = document.getElementById('mgTabs');
-    const tabs = [...document.querySelectorAll('.mg-tab')].filter((t) => !t.hidden);
-    return {
-      client: document.documentElement.clientWidth,
-      scroll: document.documentElement.scrollWidth,
-      barHeight: bar.getBoundingClientRect().height,
-      tabs: tabs.map((t) => ({
-        txt: t.textContent, w: Math.round(t.getBoundingClientRect().width),
-        h: Math.round(t.getBoundingClientRect().height), top: Math.round(t.getBoundingClientRect().top),
-      })),
-    };
-  });
-  console.log(JSON.stringify(geo, null, 1));
-});
+}
