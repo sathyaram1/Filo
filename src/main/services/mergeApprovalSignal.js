@@ -246,6 +246,7 @@ function makePoker({ isAdmin, read, broadcast, type = 'merge_approvals_changed',
     broadcast({
       type,
       pending: reply.pending || [],
+      failed: reply.failed || [],
       recent: reply.recent || [],
       ttlMs: Number(reply.ttlMs) || 0,
     });
