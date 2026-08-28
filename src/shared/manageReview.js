@@ -351,6 +351,73 @@
     return verdicts.length > 0 && verdicts.length >= panelSize(p);
   }
 
+  // ── Frase accanto ai pallini dei giudici (dettaglio dashboard) ────────────
+  // I pallini dicono COSA hanno votato i giudici; la frase dice PERCHÉ il
+  // feedback è nello stato in cui è — che non sempre coincide (#462: giudici
+  // tutti allineati, ma il fix è stato poi bocciato dalla sicurezza). Ritorna
+  // { text, color } (color null = colore neutro), o null se non c'è niente da
+  // spiegare (feedback in coda/chiusi: i pallini sono solo storia).
+  function judgesNote(fb) {
+    const fs = FS();
+    const S = fs.STATUSES;
+    const { status, statusReason } = normalizeStatus(fb);
+    if (status === 'design') {
+      if (statusReason === 'secaudit') {
+        return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
+      }
+      if (statusReason === 'clarify') {
+        return { text: 'La routine ha domande: rispondi qui sotto.', color: S.design.color };
+      }
+      if (statusReason === 'loop') {
+        return { text: 'La verifica ha bocciato il fix troppe volte: decidi tu.', color: S.design.color };
+      }
+      if (statusReason === 'arenato') {
+        return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
+      }
+      return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
+    }
+    if (status === 'aligned') {
+      const worst = worstVerdictBlock(fb);
+      if (worst) {
+        return { text: `Un giudice ha segnalato: ${worst.label.toLowerCase()}. Da esaminare prima di approvare.`, color: worst.color };
+      }
+      return { text: 'Tutti d’accordo: aspetta la tua approvazione.', color: S.aligned.color };
+    }
+    if (status === 'attack') return { text: 'Segnalato come attacco.', color: S.attack.color };
+    if (status === 'spam') return { text: 'Segnalato come spam.', color: S.spam.color };
+    if (status === 'unlabeled') {
+      if (panelComplete(fb)) {
+        const worst = worstVerdictBlock(fb);
+        if (worst) {
+          return { text: `Mittente fidato segnalato come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
+        }
+        return null;
+      }
+      const p = fb && fb.pipeline;
+      const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
+      if (!verdicts.length) return { text: 'In attesa del giudizio.', color: null };
+      const missing = Math.max(0, panelSize(p) - verdicts.length);
+      return { text: `Panel incompleto: ${missing} giudic${missing === 1 ? 'e' : 'i'} senza verdetto.`, color: null };
+    }
+    return null;
+  }
+
+  // Motivo dello stato (statusReason) in parole: per tooltip e sottotesti. I
+  // codici grezzi ('secaudit', 'clarify'…) non dicono niente a chi legge la
+  // lista; un motivo sconosciuto passa invariato (meglio grezzo che muto).
+  const REASON_TEXTS = {
+    secaudit: 'bloccato dalla sicurezza',
+    clarify: 'domande per te',
+    loop: 'fix bocciato troppe volte',
+    arenato: 'lavorazione arenata',
+    judges: 'verdetto dei giudici',
+    duplicate: 'duplicato',
+  };
+  function reasonText(statusReason) {
+    const k = String(statusReason || '');
+    return REASON_TEXTS[k] || k;
+  }
+
   // "Allineato" = status normalizzato `aligned` (badge blu, aspetta approvazione).
   // Ma se anche un solo giudice ha segnalato un rischio (attack/spam/design), NON
   // è allineato: non deve finire nell'approvazione in blocco degli allineati —
