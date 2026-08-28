@@ -135,13 +135,21 @@ locale. Adesso i due assi coincidono — chi si vede separato si regola separato
 valore a tutte le sue istanze (`resolveAutoApprove`, in entrambe le copie). Senza,
 sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiuso.
 
-## 5. Chat del feedback distingue i sotto-casi di `design`
+## 5. La dashboard distingue i sotto-casi di `design`
 
-Un solo stato `design`, tre origini leggibili dalla chat/thread (`notes`): (1) verdetto
-giudici; (2) domande della routine (appende le domande alla chat + `statusReason:
-clarify`); (3) fix fallito 3× (dispatch appende l'ultima critica del verifier +
-`statusReason: loop`). La risposta dell'owner appende alla chat e (se decide) muove a
-`todo`.
+Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
+giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
+alla chat + `statusReason: clarify`); (3) fix bocciato troppe volte dalla verifica
+(`statusReason: loop`, con l'ultima critica del verifier in chat); (4) fix bocciato
+dal **controllo di sicurezza** o dal cancello di fusione (`statusReason: secaudit`);
+(5) lavorazione arenata ripetutamente (`statusReason: arenato`). La risposta
+dell'owner appende alla chat e (se decide) muove a `todo`.
+
+Presentazione (scelta owner 2026-08-29): il caso `secaudit` è **ROSSO** in dashboard
+(è un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel
+dettaglio, accanto ai pallini dei giudici, una frase spiega il PERCHÉ dello stato
+(`judgesNote` in `manageReview.js`): i pallini raccontano il voto dei giudici, che
+può essere tutto allineato anche su un feedback tornato indietro dopo.
 
 ## 6. Lock di lavorazione (`working`)
 
