@@ -1598,8 +1598,9 @@
     if (mgSearchBar) mgSearchBar.hidden = false;
     toggleSearchIcon(true);
     setSearchMsg('', null);
-    // La lista mostra un invito finché non si cerca davvero.
-    if (mgListHead) mgListHead.textContent = 'Ricerca';
+    // La lista mostra un invito finché non si cerca davvero: nessun numero,
+    // perché non c'è ancora niente da contare (#495).
+    setListHead('Ricerca', null);
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.hidden = true;
