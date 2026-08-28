@@ -190,8 +190,8 @@ test('sopra il giorno si parla di giorni, sotto di ore', async ({ openTab }) => 
   const page = await openTab(MANAGE);
   await apri(page, {
     pending: [
-      pendente({ id: '11'.repeat(12), expiresAtMs: Date.now() + 30 * 60 * 60 * 1000 }),
-      pendente({ id: '22'.repeat(12), branch: 'claude/quasi-scaduta', expiresAtMs: Date.now() + 5 * 60 * 60 * 1000 }),
+      pendente({ id: '11'.repeat(12), expiresAtMs: Date.now() + 30 * 60 * 60 * 1000 + 10 * 60 * 1000 }),
+      pendente({ id: '22'.repeat(12), branch: 'claude/quasi-scaduta', expiresAtMs: Date.now() + 5 * 60 * 60 * 1000 + 10 * 60 * 1000 }),
     ],
   });
   const exps = page.locator('#mgMergeApprovals .sn-mac-expiry');
