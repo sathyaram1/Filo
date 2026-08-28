@@ -1663,13 +1663,22 @@
       item.addEventListener('click', () => openDetail(fb._id));
       mgList.appendChild(item);
     }
+    // Il numero è quello delle card DAVVERO disegnate: un risultato il cui
+    // feedback non è più fra i caricati non viene mostrato, e non va contato.
+    setListHead('Ricerca', shown);
+    if (!shown) {
+      mgList.hidden = true;
+      mgListEmpty.hidden = false;
+      mgListEmpty.textContent = 'Nessun feedback pertinente.';
+    }
   }
 
   async function runSearch(rawQuery) {
     if (!searchMode || !SRCH) return;
     const query = String(rawQuery || '').trim();
     if (!query) {
-      // Campo svuotato: torna all'invito.
+      // Campo svuotato: torna all'invito — e il numero se ne va con i risultati.
+      setListHead('Ricerca', null);
       mgList.hidden = true; mgList.innerHTML = '';
       mgListEmpty.hidden = false; mgListEmpty.textContent = 'Scrivi cosa cerchi e premi Invio.';
       setSearchMsg('', null);
