@@ -178,12 +178,13 @@ test('selezione in basso: la spiegazione allunga il menu ma il fondo resta dentr
 });
 
 // ── 2. Menu più alto della finestra: scorre, e in fondo c'è l'ultima voce ──
-test('finestra bassa: il menu diventa scorrevole e l\'ultima voce si raggiunge scorrendo', async ({ app, openTab, testServer }) => {
+for (const altezza of [420, 280]) {
+test(`finestra bassa (${altezza}px): il menu diventa scorrevole e l'ultima voce si raggiunge scorrendo`, async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, PAGINA_SELEZIONE);
-  await altezzaFinestra(page, 420);
+  await altezzaFinestra(page, altezza);
   await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
-    .toBeLessThanOrEqual(420);
+    .toBeLessThanOrEqual(altezza + 2);
   await preparaProvider(app, { attesaMs: 1500, ripetizioni: 40 });
 
   const menu = await apriMenuSuSelezione(page);
