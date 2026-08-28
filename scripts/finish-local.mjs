@@ -274,7 +274,7 @@ async function main() {
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira nel cancello di
     //    pubblicazione e nelle routine: qui serve il segnale rapido.
-    const changed = git(['diff', '--name-only', `${MAIN}...HEAD`]).out.split('\n').filter(Boolean);
+    const changed = git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
