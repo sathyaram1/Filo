@@ -2594,7 +2594,12 @@
       // QUELLO, e due numeri scritti a mano prima o poi divergono.
       allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE });
       dataLoaded = true;
+      loadFailed = false;
     } catch (err) {
+      // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
+      // una scheda rirende il riquadro, e senza questo flag ci scriverebbe
+      // "Nessun feedback in coda." — cioè una risposta al posto di un guasto.
+      loadFailed = true;
       mgListLoading.hidden = true;
       mgListEmpty.hidden = false;
       mgListEmpty.textContent = 'Errore nel caricamento dei feedback.';
