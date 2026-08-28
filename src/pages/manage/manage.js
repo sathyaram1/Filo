@@ -1243,8 +1243,8 @@
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
       if (!btn) continue;
       btn.textContent = counts ? `${TAB_LABELS[tab] || tab} ` : (TAB_LABELS[tab] || tab);
-      btn.title = capped ? FB.COUNT_CAP_HINT : '';
-      if (!capped) btn.removeAttribute('title');
+      if (capped) btn.title = FB.COUNT_CAP_HINT;
+      else btn.removeAttribute('title');
       if (!counts) continue;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
