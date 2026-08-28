@@ -996,12 +996,15 @@
     // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
     // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
     // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
-    const capped = SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
+    // E finché i feedback non sono arrivati (caricamento in corso, o fallito)
+    // non si scrive nessun numero: "(0)" direbbe "qui non c'è niente" mentre la
+    // verità è che non lo sappiamo ancora.
+    const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
     for (const [tab, n] of Object.entries(counts)) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
       const label = { inbox: 'Ricevuti', agent: 'Agente', draft: 'Bozze', todo: 'Da risolvere', review: 'In revisione', blocked: 'Bloccati', clarify: 'Chiarimenti', done: 'Risolti', verified: 'Verificati' }[tab];
-      btn.textContent = `${label} ${SN_FEEDBACK.countLabel(n, capped)}`;
+      btn.textContent = dataLoaded ? `${label} ${SN_FEEDBACK.countLabel(n, capped)}` : label;
       if (capped) btn.title = SN_FEEDBACK.COUNT_CAP_HINT;
       else btn.removeAttribute('title');
     }
