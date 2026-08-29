@@ -292,6 +292,19 @@ test('S9 pannello opaco assoluto sopra un link statico in flusso: nessuna voce d
   await expectNoLinkEntries(menu);
 });
 
+test('S10 striscia cookie fissa sopra una riga-link in FLUSSO a fondo pagina: nessuna voce del link', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:15px sans-serif">
+    <div style="height:calc(100vh - 80px)">Contenuto.</div>
+    <a id="riga" href="https://malizia.test/riga-in-flusso" style="display:block;height:80px;line-height:80px;background:#fff;margin:0">Riga collegamento in fondo (flusso)</a>
+    <div id="cookie" style="position:fixed;left:0;right:0;bottom:0;height:80px;background:#222;color:#fff;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:0 20px;box-sizing:border-box">
+      <span>Questo sito usa i cookie.</span><button>OK</button>
+    </div>
+  </body></html>`);
+  const r = await rectOf(page, '#cookie');
+  const menu = await openMenuAt(page, r.x + r.w / 2 - 60, r.y + r.h / 2);
+  await expectNoLinkEntries(menu);
+});
+
 test('S8 scheda VIDEO-link sepolta per intero sotto un pannello opaco a bordi condivisi: né voci del link né del filmato', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:15px sans-serif;padding:40px">
     <div style="position:relative;width:320px;height:180px">
