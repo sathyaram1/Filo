@@ -1972,7 +1972,10 @@
   function renderDetailState(fb) {
     if (!mgDetailState) return;
     const b = MR.stateBadge(fb);
-    if (!b) {
+    // Stato illeggibile: l'unica cosa vera (aperta/chiusa) questa pagina la
+    // scrive già accanto ai pallini dei giudici, con le stesse parole della
+    // gemella. Ripeterla qui sarebbe la stessa riga due volte.
+    if (!b || b.encrypted) {
       mgDetailState.hidden = true;
       mgDetailState.textContent = '';
       mgDetailState.removeAttribute('title');
