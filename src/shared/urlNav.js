@@ -196,7 +196,9 @@
   const DEST_MAX = 300;
 
   function describeDestination(raw) {
-    const s = String(raw || '').replace(/[ -]+/g, ' ').trim();
+    // A capo e caratteri di controllo: un href può contenerli, e in una riga sola
+    // diventano spazi o sparizioni. Via prima di guardare cosa c'è scritto.
+    const s = String(raw || '').replace(/[\u0000-\u001f\u007f]+/g, '').trim();
     if (!s) return null;
     let u = null;
     try { u = new URL(s); } catch (_) { u = null; }
@@ -245,6 +247,6 @@
 
   global.SN_URL_NAV = {
     isLocalHost, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
-    canonicalizeFiloUrl, isShareableAddress,
+    canonicalizeFiloUrl, isShareableAddress, describeDestination,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
