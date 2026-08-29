@@ -1022,19 +1022,22 @@
         });
         ta.focus();
         // Esc annulla, Ctrl/Cmd+Enter conferma — più comodo che cliccare.
+        // Annullare rimette i pulsanti originali NELLA SCHEDA, senza ridisegnare
+        // la lista: un ridisegno da qui rimescolerebbe l'elenco (e porterebbe via
+        // le schede già decise) mentre il puntatore è fermo su «Annulla».
         ta.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
             e.preventDefault();
-            applyFilter();
+            ripristinaAzioni(card, id);
           } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             actionsDiv.querySelector('.fb-reopen-confirm').click();
           }
         });
         actionsDiv.querySelector('.fb-reopen-cancel').addEventListener('click', () => {
-          applyFilter(); // ridisegna la card con le azioni originali
+          ripristinaAzioni(card, id);
         });
-        actionsDiv.querySelector('.fb-reopen-confirm').addEventListener('click', () => {
+        actionsDiv.querySelector('.fb-reopen-confirm').addEventListener('click', (ev) => {
           const item = all.find((f) => f._id === id);
           const oldNotes = (item && item.notes) || '';
           const reason = ta.value.trim();
