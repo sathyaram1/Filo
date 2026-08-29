@@ -1454,6 +1454,17 @@
     }
   }
 
+  // Aperta/Chiusa: quello che si sa di una segnalazione il cui stato fine è
+  // cifrato. Viene dall'enum grossolano in chiaro (`statusPublic`), lo stesso
+  // che guarda la ricompensa; le parole le sceglie il modulo condiviso, così la
+  // gemella non ne usa altre. Se manca anche quello non si scrive niente: una
+  // riga vuota è meglio di un'etichetta inventata.
+  function statePublicHtml(fb) {
+    const label = MR.publicStateLabel(fb);
+    if (!label) return '';
+    return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
+  }
+
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
   // Traduce l'avanzamento (MR.workProgress) in una riga leggibile: i tre
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
