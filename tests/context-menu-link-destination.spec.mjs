@@ -152,3 +152,22 @@ test('#499 nessun collegamento nel menu, nessuna riga della destinazione', async
     await expect(menu.getByText(label, { exact: true })).toHaveCount(0);
   }
 });
+
+test('#499 un collegamento nascosto per davvero non entra nel menu, e non ha niente da annunciare', async ({ openTab, testServer }) => {
+  // `visibility:hidden` toglie l'elemento anche dalla pila sotto il cursore:
+  // il menu non lo adotta, ed è giusto così. Il confine sta qui e ci resta:
+  // la riga della destinazione racconta i link che il menu adotta, non è il
+  // permesso di adottarne di nuovi.
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="zona" style="position:relative;width:520px;height:120px">
+      <a id="nascosto" href="https://sito-che-decide.example/mai" style="position:absolute;inset:0;display:block;visibility:hidden"></a>
+      <p id="testo" style="position:absolute;inset:0;margin:0;background:#fffdf8">Un paragrafo qualunque.</p>
+    </div>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#testo');
+
+  await expect(menu.locator('.sn-menu-dest')).toHaveCount(0);
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: true })).toHaveCount(0);
+  }
+});
