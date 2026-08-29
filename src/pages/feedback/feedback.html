@@ -327,6 +327,13 @@
       <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>
     </div>
 
+    <!-- Lo stato di un feedback viaggia cifrato: senza la chiave dell'owner
+         resta un blob. Chi non può leggerlo non può sapere in che sezione va,
+         e allora le sezioni non si disegnano: prima la pagina le mostrava
+         tutte e quattro, scriveva "In coda (0) · Risolti (0) · Archiviati (0)"
+         e ammucchiava tutto nei Ricevuti, risolti compresi. -->
+    <p class="fb-no-sections" id="noSections" hidden></p>
+
     <div class="fb-toolbar">
       <input type="search" id="search" class="fb-search" placeholder="Cerca per testo, URL, clientId…" />
       <!-- I ritrovamenti automatici (agente esploratore e audit delle routine)
