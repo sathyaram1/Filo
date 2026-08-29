@@ -508,10 +508,12 @@
       // esposti alle pagine — vedi SECURITY.md §3).
       const r = await sendToMain({ type: 'feedback_update', id, ...payload });
       if (!r || r.ok === false) throw new Error(r?.error || 'aggiornamento rifiutato');
+      return true;
     } catch (e) {
       Object.assign(item, prev);
-      applyFilter();
+      if (!inPlace) applyFilter();
       alert('Errore: ' + (e?.message || e));
+      return false;
     }
   }
 
