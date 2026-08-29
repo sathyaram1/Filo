@@ -215,10 +215,9 @@
     // ha in mano è l'enum grossolano in chiaro (`statusPublic`), lo stesso che
     // guarda la ricompensa: aperta o chiusa, niente di più.
     if (statoCifrato(f)) {
-      const pub = String((f && f.statusPublic) || '');
-      if (pub !== 'open' && pub !== 'closed') return '';
-      const label = pub === 'closed' ? 'Chiusa' : 'Aperta';
-      return `<span class="fb-state" title="Stato: ${label} — il dettaglio si legge solo con la chiave dell'owner">`
+      const label = MR.publicStateLabel(f);
+      if (!label) return '';
+      return `<span class="fb-state" title="${escapeHtml(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">`
         + `${escapeHtml(label)}</span>`;
     }
     const status = statusOf(f);
