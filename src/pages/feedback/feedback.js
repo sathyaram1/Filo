@@ -781,7 +781,9 @@
         emptyEl.textContent = 'Nessun ritrovamento automatico in questa sezione.';
         return;
       }
-      emptyEl.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
+      emptyEl.textContent = sezioniAttendibili()
+        ? (TAB_EMPTY[currentTab] || 'Nessun feedback.')
+        : 'Nessun feedback ricevuto.';
       // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
       // feedback più vecchi non sono in pagina. Il vuoto lo dice, come la gemella.
       if (dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE)) {
