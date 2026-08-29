@@ -1080,7 +1080,11 @@
         const newNotes = window.SN_FEEDBACK_THREAD
           ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply, { attachments: atts })
           : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
-        patch(id, { status: 'todo', notes: newNotes }, { status: 'todo', notes: newNotes });
+        azioneScheda(btn, {
+          id,
+          payload: { status: 'todo', notes: newNotes },
+          optimistic: { status: 'todo', notes: newNotes },
+        });
       };
       btn.addEventListener('click', send);
       // Ctrl/Cmd+Enter invia (come negli altri composer di Filo).
@@ -1091,16 +1095,29 @@
 
     // Pallini priorità: clic sul pallino N imposta priorità = N; ri-clic sul
     // pallino già attivo (== priorità corrente) la azzera.
-    listEl.querySelectorAll('.fb-dot').forEach((dot) => {
-      dot.addEventListener('click', () => {
+    // In "In coda" la priorità è un criterio di ORDINAMENTO: ridisegnando la
+    // lista la scheda saltava di posto sotto il dito e il pallino successivo
+    // finiva sotto il cursore. Come le altre azioni, si aggiorna al proprio
+    // posto: i pallini si ridipingono nella scheda, la lista resta ferma.
+    root.querySelectorAll('.fb-dot').forEach((dot) => {
+      dot.addEventListener('click', async () => {
         const id = dot.dataset.id;
         const n = Number(dot.dataset.n);
         const item = all.find((f) => f._id === id);
-        const cur = item ? priorityOf(item) : 0;
+        if (!item || inScrittura.has(id) || decise.has(id)) return;
+        const cur = priorityOf(item);
         const next = cur === n ? 0 : n;
+        const card = dot.closest('.fb-card');
+        inScrittura.add(id);
+        spegniScheda(card);
         // priorityManual:true segnala al backend che questa è una scelta manuale
         // dell'owner: il giudice di priorità automatico non sovrascriverà.
-        patch(id, { priority: next, priorityManual: true }, { priority: next });
+        const ok = await patch(id, { priority: next, priorityManual: true }, { priority: next }, { inPlace: true });
+        inScrittura.delete(id);
+        if (card && card.isConnected) {
+          riaccendiScheda(card);
+          if (ok) ridipingiPriorita(card, item);
+        }
       });
     });
 
