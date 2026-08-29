@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.209', date: '2026-08-29',
+      features: [
+        'Ora puoi insegnare una regola a Filo a parole: «ricordati che non bevo caffè», «d\'ora in poi rispondimi senza elenchi». La fissa nelle sue lezioni e vale da subito in tutte le conversazioni; la ritrovi (e la cancelli) fra le sue memorie.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.207', date: '2026-08-28',
       features: [
         'Le sveglie e i timer che hai messo ora li gestisci a parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8". Prima si potevano solo creare.',
