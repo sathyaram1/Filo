@@ -2145,6 +2145,11 @@
     if (!mgReopen) return;
     mgReopen.hidden = true;
     if (mgReopenText) mgReopenText.value = '';
+    // I due bottoni del modulo vivono nell'HTML, non li rigenera nessuno: senza
+    // riaccenderli qui, una riapertura andata a buon fine li lascerebbe spenti
+    // per sempre (setActionsBusy li aveva spenti insieme alla riga).
+    if (mgReopenConfirm) mgReopenConfirm.disabled = false;
+    if (mgReopenCancel) mgReopenCancel.disabled = false;
   }
 
   function conversazioneIlleggibile(fb) {
