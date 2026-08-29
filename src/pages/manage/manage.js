@@ -1225,6 +1225,38 @@
   function loadHitCap() {
     return FB.listHitCap(allFeedbacks, FB.LIST_PAGE_SIZE);
   }
+
+  // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
+  // La regola sta nel modulo condiviso (MR.sectionsReliable), la stessa che usa
+  // la pagina dei feedback: due copie della stessa regola divergono, ed è
+  // proprio così che questa pagina è rimasta indietro (#509).
+  //
+  // È UNA regola e le copre tutte: qui non si chiude "la barra" e basta. Tutto
+  // ciò che questa pagina afferma partendo dallo status — i numeri delle
+  // sezioni, il nome della sezione in cima alla colonna, il colore del bordo
+  // della scheda ("Non filtrato" è un'affermazione), le barre "Ri-valuta i non
+  // filtrati" / "Approva tutti gli allineati", i pulsanti di decisione del
+  // dettaglio, la frase accanto ai giudici — passa da qui.
+  function sezioniAttendibili() {
+    return MR.sectionsReliable(allFeedbacks);
+  }
+
+  // Mostra o nasconde le SEZIONI (le quattro schede-lista) e l'avviso che ne
+  // spiega l'assenza. Le altre schede della barra non sono sezioni — Statistiche,
+  // Modelli, Automazioni, Log non dipendono dallo stato delle segnalazioni e
+  // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
+  function mostraSezioni() {
+    const ok = sezioniAttendibili();
+    for (const tab of LIST_TABS) {
+      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
+      if (btn) btn.hidden = !ok;
+    }
+    if (mgNoSections) {
+      mgNoSections.hidden = ok;
+      if (!ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
+    }
+    return ok;
+  }
   // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
   // l'intestazione della colonna e per la ricerca.
   function countText(n) {
