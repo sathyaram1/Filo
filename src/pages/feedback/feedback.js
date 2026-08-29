@@ -1184,6 +1184,7 @@
   }
 
   function selectTab(tab) {
+    if (!TABS.includes(tab)) return;
     currentTab = tab;
     tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
       b.classList.toggle('fb-tab--active', b.dataset.tab === tab);
