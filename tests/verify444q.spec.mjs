@@ -450,6 +450,14 @@ test.describe('#444 quater — verifica indipendente', () => {
       await closeMenu(page);
     }
 
+    // S13 — link che non riceve i click: per il menu non esiste (l'immagine sì).
+    {
+      const { labels } = await clickOver('#s13img');
+      expectImage(labels, 'S13 scheda con link pointer-events:none');
+      expectNoLink(labels, 'S13 link pointer-events:none');
+      await closeMenu(page);
+    }
+
     // Manto invisibile su tutta la pagina + link trasparente sotto il testo.
     await gotoReady(page, testServer, mantlePage());
     {
