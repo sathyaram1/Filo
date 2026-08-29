@@ -873,7 +873,13 @@
       if (Number.isFinite(layerOpacity) && layerOpacity < 0.5) continue;
       const bg = cs.backgroundImage;
       if (bg && bg !== 'none' && bg.includes('url(')) continue;
-      const opaqueBg = (bg && bg !== 'none') || colorAlpha(cs.backgroundColor) >= 0.5;
+      // Una SFUMATURA che da qualche parte è trasparente è un velo, non una
+      // copertura: attraverso la parte chiara si vede la scheda, ed è la forma
+      // più comune del velo del titolo (terzo giro di verifica: contarla come
+      // copertura spegneva le voci proprio lì). Nasconde solo la sfumatura
+      // interamente coprente — tutti i colori con alfa piena.
+      const gradientHides = bg && bg !== 'none' ? minAlphaInCssImage(bg) >= 0.5 : false;
+      const opaqueBg = gradientHides || colorAlpha(cs.backgroundColor) >= 0.5;
       if (!opaqueBg) continue;
       const r = L.getBoundingClientRect();
       const w = Math.min(r.right, rb.right) - Math.max(r.left, rb.left);
