@@ -508,6 +508,141 @@
     return FS().tabFor(status, { shipped });
   }
 
+  // ── Le AZIONI dell'owner: UNA tabella per tutte le superfici ──────────────
+  //
+  // Stessa storia delle sezioni (#509), un gradino più in dentro. Le due pagine
+  // avevano finito per disegnare le stesse sezioni con la stessa regola, ma i
+  // pulsanti sopra quelle sezioni se li costruiva ognuna per conto suo — e sulla
+  // STESSA segnalazione offrivano azioni diverse:
+  //   · un archiviato: «↩ Ripristina» sulla pagina dei feedback, «Archivia»
+  //     sulla dashboard di gestione. Su un attacco confermato quel bottone non
+  //     era un doppione innocuo: scriveva `archived` SOPRA la conferma, cioè
+  //     cancellava in silenzio una decisione di sicurezza, e da lì l'attacco era
+  //     indistinguibile da una segnalazione archiviata qualsiasi;
+  //   · un file sospetto: due conferme di là (attacco e spam), una sola di qua;
+  //   · un fix uscito: riapribile di là, non di qua.
+  //
+  // Da qui in avanti le azioni si LEGGONO, non si riscrivono in ogni pagina: la
+  // sezione (manageTabFor) e lo status canonico (normalizeStatus) decidono
+  // QUALI sono, con quale etichetta, e verso quale stato scrivono. Chi vuole
+  // un'azione in più la aggiunge QUI, e la gemella ce l'ha nello stesso commit.
+  //
+  // Invariante che la tabella incarna: se puoi archiviare, puoi togliere
+  // dall'archivio — e mai il contrario nello stesso posto. La sezione
+  // "Archiviati" offre SOLO il ripristino, così non esiste più un cammino che
+  // riscrive uno stato terminale (attack_confirmed / spam_confirmed) con
+  // `archived`.
+  //
+  // `kind` dice cosa scrive il pulsante oltre allo status:
+  //   'accept'  override di revisione dell'owner (reviewDecision 'accepted');
+  //   'reject'  conferma di un blocco (reviewDecision 'rejected');
+  //   'archive' archiviazione manuale (archiveOverride 'archived');
+  //   'restore' uscita dall'archivio (archiveOverride 'keep_open');
+  //   'resolve' chiusura a mano;
+  //   'reopen'  chiede PRIMA cosa manca ancora, poi rimette in coda.
+  //
+  // Stato ILLEGGIBILE → nessuna azione: i pulsanti nascono dalla sezione, e la
+  // sezione qui non si sa. È la stessa regola della barra delle sezioni, e vale
+  // per tutt'e due le pagine perché vive qui.
+  function ownerActions(fb, opts) {
+    if (statusUnreadable(fb)) return [];
+    const { status } = normalizeStatus(fb);
+    const tab = manageTabFor(fb, opts);
+    if (tab === 'inbox') {
+      // Aspetta una decisione: approvare È scrivere `todo`.
+      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: true }];
+      // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
+      // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
+      // ancora classificato: le conferme possibili sono DUE, non una.
+      if (status === 'attack' || status === 'suspicious_file') {
+        acts.push({ key: 'confirm_attack', kind: 'reject', to: 'attack_confirmed', label: 'Conferma attacco', primary: false });
+      }
+      if (status === 'spam' || status === 'suspicious_file') {
+        acts.push({ key: 'confirm_spam', kind: 'reject', to: 'spam_confirmed', label: 'Conferma spam', primary: false });
+      }
+      acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
+      return acts;
+    }
+    if (tab === 'queue') {
+      // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
+      const acts = [];
+      if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
+      acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
+      return acts;
+    }
+    if (tab === 'resolved') {
+      // Fix uscito: si archivia (verifica umana ok) o si riapre spiegando cosa
+      // manca ancora.
+      return [
+        { key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: true },
+        { key: 'reopen', kind: 'reopen', to: 'todo', label: 'Riapri', primary: false },
+      ];
+    }
+    if (tab === 'archived') {
+      // Il ripristino rimette in coda (`todo`) — anche un attacco/spam
+      // confermato, che è la strada dichiarata del "era legittimo".
+      return [{ key: 'restore', kind: 'restore', to: 'todo', label: '↩ Ripristina', primary: false }];
+    }
+    return [];
+  }
+
+  /** L'azione con questa chiave, se la segnalazione la offre ORA. */
+  function ownerActionFor(fb, key, opts) {
+    return ownerActions(fb, opts).find((a) => a.key === String(key)) || null;
+  }
+
+  /**
+   * Questa scrittura di stato è UNA DELLE AZIONI che la segnalazione offre in
+   * questo momento? È il guardiano che sta sotto ai pulsanti, non accanto: un
+   * pannello rimasto aperto mentre lo stato cambiava, un doppio cammino, una
+   * pagina non aggiornata, e la scrittura sarebbe di nuovo quella che cancella
+   * una conferma. Chiudere la porta nella tabella e lasciare libero il writer
+   * significa richiuderla una volta per giro.
+   */
+  function ownerActionAllowsStatus(fb, to, opts) {
+    const t = String(to == null ? '' : to);
+    return ownerActions(fb, opts).some((a) => a.to === t);
+  }
+
+  /**
+   * L'etichetta di stato di una segnalazione, in DATI: le due pagine la
+   * disegnano col loro markup ma dicono le STESSE parole. Serve anche a non
+   * lasciare muta una superficie — la dashboard di gestione non scriveva da
+   * nessuna parte che una segnalazione era un attacco confermato, e nel
+   * dettaglio la conversazione continuava a dire che Filo "non ha ancora un
+   * parere".
+   * Ritorna { label, color, hint, reason, reasonText, showReason, encrypted },
+   * o null quando non c'è niente di vero da scrivere.
+   */
+  function stateBadge(fb) {
+    const fs = FS();
+    // Stato cifrato: la macchina lo ridurrebbe a "Non filtrato" anche su una
+    // segnalazione già chiusa. L'unica cosa vera è l'enum grossolano in chiaro.
+    if (statusUnreadable(fb)) {
+      const label = publicStateLabel(fb);
+      if (!label) return null;
+      return {
+        label, color: null, hint: `Stato: ${label} — ${PUBLIC_STATE_HINT}`,
+        reason: null, reasonText: '', showReason: false, encrypted: true,
+      };
+    }
+    const { status, statusReason } = normalizeStatus(fb);
+    const info = fs.STATUSES[status];
+    if (!info) return null;
+    // Il motivo si SCRIVE solo se ha una traduzione umana: un codice grezzo
+    // ('legacy-ignored') in mezzo alla riga non dice niente. Resta nell'hover.
+    const txt = statusReason ? reasonText(statusReason) : '';
+    return {
+      label: info.label,
+      color: info.color || null,
+      hint: `Stato: ${info.label}${statusReason ? ` (${txt})` : ''}`,
+      reason: statusReason || null,
+      reasonText: txt,
+      showReason: !!txt && txt !== String(statusReason),
+      encrypted: false,
+    };
+  }
+
   // Priorità di un feedback, normalizzata: 1-3 (più alta = affrontata prima dalle
   // routine di Claude), 0 = nessuna. Robusta a valori cifrati/non numerici (NaN→0).
   function priorityOf(fb) {
