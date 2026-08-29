@@ -551,16 +551,45 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   scritto nell'item (`subject`) e finisce su `data-subject` del riquadro: è
   leggibile prima che la risposta sostituisca il testo d'attesa, e i test lo
   controllano di lì invece di fare la corsa con la rete.
+- **Un'azione su un indirizzo dice sempre QUALE indirizzo (#499).** Adottare il
+  collegamento che sta sotto è giusto, ma apre una porta che nessuna misura può
+  richiudere: un collegamento invisibile ritagliato con lo stesso ingombro del
+  paragrafo che gli sta sopra è, per la geometria e per la prova del "si vede",
+  identico alla copertina di una scheda vera. Provare a distinguerli è la strada
+  sbagliata — si ributterebbero fuori le schede vere, che è il difetto di
+  partenza (#444). La strada giusta è che il menu **dica dove porta**: «Apri in
+  nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link» agiscono su
+  un indirizzo, e Filo non ha una barra di stato che lo mostri fermando il
+  mouse, quindi il menu è l'unico posto dove può stare scritto. Regola generale:
+  **una voce che agisce su un indirizzo che l'utente non ha scelto e non può
+  leggere non è un'azione, è una firma in bianco.** Dettagli che contano:
+  - la riga sta in `buildLinkActionItems`, non nei rami che la chiamano: il
+    collegamento adottato compare in cinque punti della matrice e una riga da
+    ricordarsi cinque volte prima o poi manca in uno;
+  - vale anche per il link cliccato di proposito — il testo dell'ancora può dire
+    una cosa e l'href un'altra, e due modi di aprire il menu sulla stessa scheda
+    devono dare lo stesso menu;
+  - l'**host non si accorcia e non si abbellisce** (`describeDestination` in
+    `src/shared/urlNav.js`): niente `www.` tolto, niente punycode decodificato,
+    la porta compresa. Le elisioni di comodo sono il buco da cui passano
+    `banca.it@altro.example` e i domini omografi. Ad accorciarsi coi puntini è
+    il percorso; l'host, se è lunghissimo, va a capo. `dir="ltr"` sulla riga, se
+    no un indirizzo con caratteri di un alfabeto che si scrive da destra a
+    sinistra si riordina davanti agli occhi.
 - **Dove:** `buildContextualItems` (+ `buildImageActionItems`/`buildLinkActionItems`),
   `detectContext`, `findMedia`, `findUnder`, `findLinkUnder`, `sameSurface`
   (+ `swallows`, `coveredAt`, `paintsSomething`, `hasVisibleText`), `belongsTo`
   (+ `containsAcrossShadow`),
   `closestAcrossShadow` e `deepElementsFromPoint` in `src/content/content.js`, voci in
-  `src/content/actions.js` (`subject` sugli item `inline`), reso da
-  `src/content/menu.js`. Test: `tests/context-menu-media.spec.mjs`,
+  `src/content/actions.js` (`subject` sugli item `inline`),
+  `describeDestination` in `src/shared/urlNav.js`, reso da
+  `src/content/menu.js` (item `dest`, stili `.sn-menu-dest*` in
+  `src/styles/menu.css`). Test: `tests/context-menu-media.spec.mjs`,
   `tests/context-menu-image-link.spec.mjs`,
   `tests/context-menu-media-link.spec.mjs`,
-  `tests/context-menu-video-preview-link.spec.mjs`.
+  `tests/context-menu-video-preview-link.spec.mjs`,
+  `tests/context-menu-link-destination.spec.mjs`,
+  `tests/unit/urlNav.test.mjs`.
 
 ## Riquadri incorporati (iframe): Filo gira anche lì, ma un riquadro non è la pagina
 
