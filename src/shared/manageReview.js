@@ -266,6 +266,67 @@
     return { status: 'unlabeled', statusReason: null };
   }
 
+  // ── Quando lo stato non si LEGGE, il criterio delle sezioni non esiste ─────
+  // Lo `status` fine viaggia CIFRATO (#476): senza la chiave privata dell'owner
+  // resta un blob, e `normalizeStatus` non ha niente da sciogliere — ogni
+  // feedback ricade in `unlabeled`, cioè nei Ricevuti. Le pagine disegnavano lo
+  // stesso le quattro sezioni, "In coda (0) · Risolti (0) · Archiviati (0)",
+  // con dentro anche i feedback già chiusi: tre numeri che DICHIARANO IL VUOTO
+  // dove la verità è che non lo sappiamo.
+  //
+  // La regola vive QUI, non dentro una pagina. Quando stava dentro la pagina
+  // dei feedback, la dashboard di gestione ha continuato a mentire e nessuno se
+  // n'è accorto finché non si sono guardate affiancate (#509, secondo giro):
+  // due copie della stessa regola divergono, una sola no.
+  const CIPHER_PREFIXES = ['FENC', '[cifrato'];
+  function looksEncrypted(value) {
+    const raw = String(value == null ? '' : value).trim();
+    return CIPHER_PREFIXES.some((p) => raw.startsWith(p));
+  }
+
+  /**
+   * Lo status di QUESTO feedback è illeggibile (ciphertext)? Riconoscimento
+   * STRETTO apposta: solo il testo cifrato. Uno status assente, vuoto o
+   * inventato la macchina lo scioglie davvero (→ `unlabeled`), e lì le pagine
+   * restano allineate come devono.
+   */
+  function statusUnreadable(fb) {
+    return looksEncrypted(fb && fb.status);
+  }
+
+  /**
+   * Si possono disegnare le sezioni per QUESTA lista? No solo quando la pagina
+   * non legge NESSUNO stato: è il caso vero (o hai la chiave e li leggi tutti,
+   * o non ce l'hai e non ne leggi uno). Un documento storto in mezzo a mille
+   * leggibili lascia la barra al suo posto: toglierla a tutti sarebbe
+   * sproporzionato, e farebbe divergere le due superfici.
+   * Lista vuota → non c'è niente che dica il contrario: sezioni sì (e "(0)"
+   * lì è la verità).
+   */
+  function sectionsReliable(feedbacks) {
+    const list = feedbacks || [];
+    return !list.length || !list.every(statusUnreadable);
+  }
+
+  /**
+   * L'unica cosa vera che resta in mano a chi non ha la chiave: l'enum
+   * grossolano in chiaro (`statusPublic`), lo stesso che guarda la ricompensa.
+   * 'Aperta' | 'Chiusa' | '' (non si sa nemmeno quello). Le due pagine lo
+   * scrivono con QUESTE parole, non con due sinonimi.
+   */
+  function publicStateLabel(fb) {
+    const pub = String((fb && fb.statusPublic) || '');
+    if (pub === 'closed') return 'Chiusa';
+    if (pub === 'open') return 'Aperta';
+    return '';
+  }
+  const PUBLIC_STATE_HINT = 'il dettaglio si legge solo con la chiave dell’owner';
+
+  /** Anche la priorità viaggia cifrata: senza chiave i pallini non sanno nulla. */
+  function priorityUnreadable(fb) {
+    return looksEncrypted(fb && fb.priority);
+  }
+
   // Come si presenta lo status in "Ricevuti": reason per lo storico dei consumer
   // (unfiltered/attack/spam/design/loop) + colore/label/severity dal vocabolario.
   function reasonOf(status, statusReason) {
