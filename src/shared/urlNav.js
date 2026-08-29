@@ -172,6 +172,55 @@
     return !NON_ADDRESS_SCHEMES.has(proto);
   }
 
+  // #499 — DOVE PORTA un collegamento, scritto per essere LETTO da chi decide se
+  // aprirlo, copiarlo o mandarlo a qualcuno. Il menu del tasto destro offre
+  // «Apri in nuova tab», «Copia URL», «Salva link per dopo» e «Condividi link»
+  // su un indirizzo che da nessuna parte si legge: sul collegamento ripescato da
+  // sotto il punto cliccato l'utente non lo ha nemmeno scelto, ma anche su un
+  // link normale il testo che si vede può dire una cosa e l'href un'altra — e
+  // Filo non ha una barra di stato che mostri la destinazione al passaggio del
+  // mouse. Qui l'indirizzo viene spezzato in due parti perché quella che conta
+  // non venga mai tagliata via:
+  //   • `label` — CHI risponde: host e porta, esattamente come stanno nell'URL.
+  //     Niente `www.` tolto e niente punycode decodificato: l'elisione di
+  //     comodo è proprio il buco da cui passano gli inganni (`paypal.com` scritto
+  //     con caratteri di un altro alfabeto, o `sito.it@altro.example`, che è
+  //     l'altro host). Sugli schemi diversi da http/https lo schema resta scritto
+  //     davanti, perché `filo://` o `mailto:` cambiano il senso della frase.
+  //   • `rest` — il resto (percorso, query, frammento): utile, ma è la parte che
+  //     si può accorciare senza mentire, ed è quella che chi mostra il dato
+  //     taglia con i puntini.
+  // `full` è l'indirizzo intero, per chi vuole mostrarlo per esteso (un hover).
+  // Un indirizzo che non si lascia analizzare non viene inventato: torna com'è,
+  // ripulito dagli a capo, tutto nella parte accorciabile.
+  const DEST_MAX = 300;
+
+  function describeDestination(raw) {
+    const s = String(raw || '').replace(/[ -]+/g, ' ').trim();
+    if (!s) return null;
+    let u = null;
+    try { u = new URL(s); } catch (_) { u = null; }
+    if (!u) return { label: '', rest: s.slice(0, DEST_MAX), full: s };
+    const proto = (u.protocol || '').toLowerCase();
+    const web = proto === 'http:' || proto === 'https:';
+    if (u.hostname) {
+      const rest = (u.pathname || '') + (u.search || '') + (u.hash || '');
+      return {
+        label: (web ? '' : proto + '//') + u.host,
+        rest: (rest === '/' ? '' : rest).slice(0, DEST_MAX),
+        full: u.href,
+      };
+    }
+    // Schemi senza host: mailto:, tel:, javascript:, data:. Lo schema è la cosa
+    // che l'utente deve vedere per prima — «javascript:» non è una destinazione,
+    // è codice che gira lì.
+    return {
+      label: proto,
+      rest: s.slice(proto.length).replace(/^\/+/, '').slice(0, DEST_MAX),
+      full: s,
+    };
+  }
+
   // #252 — INDIRIZZO CANONICO di una pagina interna filo://.
   // Storicamente il codice portato dall'estensione apriva le pagine interne con
   // `chrome.runtime.getURL('src/pages/<page>/<file>')`, che lo shim traduce in
