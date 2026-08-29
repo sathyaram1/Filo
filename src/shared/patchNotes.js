@@ -20,7 +20,9 @@
       features: [
         'Ora puoi insegnare una regola a Filo a parole: «ricordati che non bevo caffè», «d\'ora in poi rispondimi senza elenchi». La fissa nelle sue lezioni e vale da subito in tutte le conversazioni; la ritrovi (e la cancelli) fra le sue memorie.',
       ],
-      fixes: [],
+      fixes: [
+        'Quando la risposta dell\'assistente arrivava in un formato illeggibile, in chat compariva testo pieno di parentesi e virgolette. Ora Filo riprova da solo un paio di volte prima di mostrartela: quel testo strano dovresti vederlo molto più di rado.',
+      ],
     },
     {
       version: '0.2.207', date: '2026-08-28',
