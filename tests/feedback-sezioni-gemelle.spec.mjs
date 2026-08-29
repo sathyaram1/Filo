@@ -182,11 +182,13 @@ test('#509 — stato illeggibile: nessuna decisione offerta su ciò che non si l
   await expect(mg.locator('#mgAlignedBar')).toBeHidden();
 
   await mg.locator('.mg-item').first().click();
-  // "Accetta e sblocca" / "Conferma attacco" su una pratica che potrebbe essere
-  // già chiusa: la gemella qui non offre nulla, e nemmeno questa.
+  // "→ In coda" / "Conferma attacco" su una pratica che potrebbe essere già
+  // chiusa: la gemella qui non offre nulla, e nemmeno questa.
   await expect(mg.locator('#mgActions')).toBeHidden();
-  // "Archivia" direbbe sempre "Archivia", anche su una già archiviata.
-  await expect(mg.locator('#mgArchiveBtn')).toBeHidden();
+  // Nessuna azione di stato, nemmeno una: "Archivia" direbbe sempre "Archivia",
+  // anche su una già archiviata.
+  await expect(mg.locator('#mgActionsRow button')).toHaveCount(0);
+  await expect(mg.locator('#mgArchiveBtn')).toHaveCount(0);
   // ⭐ e la frase per chi ha segnalato sono in chiaro: restano.
   await expect(mg.locator('#mgStarBtn')).toBeVisible();
   await expect(mg.locator('#mgUserNote')).toBeVisible();
@@ -216,4 +218,126 @@ test('#509 — i ritrovamenti automatici sono un filtro, non una sezione', async
   await expect(page.locator('#tabs [data-tab="inbox"]')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.fb-card')).toHaveCount(1);
   await expect(page.locator('.fb-card')).toContainText('ritrovamento audit');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #509 (terzo giro) — LE AZIONI. Mettere la stessa segnalazione nella stessa
+// sezione non basta: sulla stessa segnalazione le due pagine devono offrire le
+// STESSE AZIONI, con le stesse parole.
+//
+// Prima non era così, e la differenza faceva danno:
+//   · negli Archiviati la dashboard di gestione offriva "Archivia" al posto di
+//     "Ripristina" per l'attacco confermato, lo spam confermato e le due forme
+//     vecchie di archiviazione (verified, ignored): da lì quelle quattro non si
+//     potevano più togliere dall'archivio;
+//   · e premere quel bottone su un attacco confermato scriveva `archived` SOPRA
+//     la conferma — una decisione di sicurezza cancellata senza avviso;
+//   · su un file sospetto offriva una conferma sola invece di due;
+//   · un fix uscito non si poteva riaprire.
+//
+// Precondizione che senza il fix fallisce: gli elenchi di pulsanti delle due
+// pagine differiscono su archiviato/confermati/legacy, su suspicious_file e su
+// un `done` uscito.
+const CODA_AZIONI = [
+  { _id: 'z1', seq: 61, status: 'unlabeled',        name: 'non filtrata',       text: 'a', createdAt: '2026-08-01T10:00:00Z' },
+  { _id: 'z2', seq: 62, status: 'attack',           name: 'attacco',            text: 'b', createdAt: '2026-08-02T10:00:00Z' },
+  { _id: 'z3', seq: 63, status: 'spam',             name: 'spammosa',           text: 'c', createdAt: '2026-08-03T10:00:00Z' },
+  { _id: 'z4', seq: 64, status: 'suspicious_file',  name: 'file sospetto',      text: 'd', createdAt: '2026-08-04T10:00:00Z' },
+  { _id: 'z5', seq: 65, status: 'todo',             name: 'in coda',            text: 'e', createdAt: '2026-08-05T10:00:00Z' },
+  { _id: 'z6', seq: 66, status: 'done', resolvedInVersion: '0.9.0', name: 'fix uscito', text: 'f', createdAt: '2026-08-06T10:00:00Z' },
+  { _id: 'z7', seq: 67, status: 'archived',         name: 'archiviata',         text: 'g', createdAt: '2026-08-07T10:00:00Z' },
+  { _id: 'z8', seq: 68, status: 'attack_confirmed', name: 'attacco confermato', text: 'h', createdAt: '2026-08-08T10:00:00Z' },
+  { _id: 'z9', seq: 69, status: 'spam_confirmed',   name: 'spam confermato',    text: 'i', createdAt: '2026-08-09T10:00:00Z' },
+  { _id: 'zA', seq: 70, status: 'verified',         name: 'verificata legacy',  text: 'l', createdAt: '2026-08-10T10:00:00Z' },
+  { _id: 'zB', seq: 71, status: 'ignored',          name: 'ignorata legacy',    text: 'm', createdAt: '2026-08-11T10:00:00Z' },
+];
+
+// La sezione dove ciascuna vive (le due pagine sono già allineate su questo).
+const SEZIONE = {
+  z1: 'inbox', z2: 'inbox', z3: 'inbox', z4: 'inbox',
+  z5: 'queue', z6: 'resolved',
+  z7: 'archived', z8: 'archived', z9: 'archived', zA: 'archived', zB: 'archived',
+};
+
+test('#509 — le due pagine offrono le stesse azioni sulla stessa segnalazione', async ({ openTab }) => {
+  // ── Pagina dei feedback ──────────────────────────────────────────────────
+  const fb = await openTab(FEEDBACK);
+  await fb.waitForLoadState('domcontentloaded');
+  await fb.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
+  await fb.evaluate(() => window.__fbTest.setAdmin(true));
+  await fb.evaluate((items) => window.__fbTest.setData(items), CODA_AZIONI);
+  await fb.evaluate((v) => window.__fbTest.setReleasedVersion(v), VERSIONE);
+
+  const azioniFb = {};
+  for (const item of CODA_AZIONI) {
+    await fb.evaluate((t) => window.__fbTest.setTab(t), SEZIONE[item._id]);
+    const card = fb.locator(`.fb-card[data-id="${item._id}"]`);
+    await expect(card, `la scheda ${item.name} è nella sezione ${SEZIONE[item._id]}`).toHaveCount(1);
+    azioniFb[item._id] = await card.locator('.fb-actions button')
+      .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+    // Ogni segnalazione ha almeno un'azione: una scheda muta è la porta
+    // dell'archivio senza uscita.
+    expect(azioniFb[item._id].length, `azioni su ${item.name}`).toBeGreaterThan(0);
+  }
+
+  // Le due invarianti dette per esteso, sulla pagina di riferimento.
+  expect(azioniFb.z4).toEqual(['→ In coda', 'Conferma attacco', 'Conferma spam', 'Archivia']);
+  expect(azioniFb.z6).toEqual(['Archivia', 'Riapri']);
+  for (const id of ['z7', 'z8', 'z9', 'zA', 'zB']) {
+    expect(azioniFb[id], `archiviata ${id}: solo il ripristino`).toEqual(['↩ Ripristina']);
+  }
+
+  // ── Dashboard di gestione, stessa coda ───────────────────────────────────
+  const mg = await openTab(MANAGE);
+  await mg.waitForLoadState('domcontentloaded');
+  await mg.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await mg.evaluate(() => window.__mgTest.whenReady());
+  await mg.evaluate(() => window.__mgTest.setAdmin(true));
+  await mg.evaluate((items) => window.__mgTest.setData(items), CODA_AZIONI);
+  await mg.evaluate((v) => window.__mgTest.setReleasedVersion(v), VERSIONE);
+
+  for (const item of CODA_AZIONI) {
+    await mg.evaluate((t) => window.__mgTest.setTab(t), SEZIONE[item._id]);
+    await mg.evaluate((id) => window.__mgTest.openDetail(id), item._id);
+    const azioni = await mg.locator('#mgActionsRow button')
+      .evaluateAll((els) => els.map((e) => e.textContent.trim()));
+    // È QUESTO il confronto del giro: stessa segnalazione, stesse azioni.
+    expect(azioni, `azioni su "${item.name}" nelle due pagine`).toEqual(azioniFb[item._id]);
+  }
+});
+
+test('#509 — su «Gestione» un attacco confermato non si può riscrivere ad "archiviato"', async ({ openTab }) => {
+  const mg = await openTab(MANAGE);
+  await mg.waitForLoadState('domcontentloaded');
+  await mg.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await mg.evaluate(() => window.__mgTest.whenReady());
+  await mg.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+  });
+  await mg.evaluate(() => window.__mgTest.setAdmin(true));
+  await mg.evaluate((items) => window.__mgTest.setData(items), CODA_AZIONI);
+  await mg.evaluate((v) => window.__mgTest.setReleasedVersion(v), VERSIONE);
+  await mg.evaluate(() => window.__mgTest.setTab('archived'));
+  await mg.evaluate(() => window.__mgTest.openDetail('z8'));
+
+  // Il pannello DICE che è un attacco confermato: prima non lo diceva da
+  // nessuna parte, e la conversazione scriveva "Filo non ha ancora un parere".
+  await expect(mg.locator('#mgDetailState')).toContainText('Attacco confermato');
+
+  // L'unico bottone è il ripristino, e rimette in coda: la conferma non si
+  // cancella premendo l'unica cosa disponibile.
+  await expect(mg.locator('#mgActionsRow button')).toHaveCount(1);
+  await expect(mg.locator('#mgArchiveBtn')).toHaveText('↩ Ripristina');
+  await mg.locator('#mgArchiveBtn').click();
+
+  await expect.poll(() => mg.evaluate(() => window.__updates.length)).toBe(1);
+  const patch = await mg.evaluate(() => window.__updates[0]);
+  expect(patch.id).toBe('z8');
+  expect(patch.status).toBe('todo');
+  expect(patch.archiveOverride).toBe('keep_open');
 });

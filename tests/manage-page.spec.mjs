@@ -1425,7 +1425,7 @@ test('un allineato ha il border-left BLU e sta nei Ricevuti finché l automatica
   expect(border).toBe('rgb(91, 110, 224)');
 });
 
-test('un allineato nei Ricevuti mostra "Approva e metti in coda" → patch corretto + esce dai Ricevuti (#2)', async ({ openTab }) => {
+test('un allineato nei Ricevuti mostra "→ In coda" → patch corretto + esce dai Ricevuti (#2)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
@@ -1446,9 +1446,14 @@ test('un allineato nei Ricevuti mostra "Approva e metti in coda" → patch corre
     window.__mgTest.openDetail(fb._id);
   }, FAKE_FB_ALIGNED);
 
-  // Il box azione è visibile col testo di approvazione (non "sblocca").
+  // Il box azione è visibile. L'etichetta la detta la tabella condivisa delle
+  // azioni (MR.ownerActions), la stessa della pagina dei feedback: sulla stessa
+  // segnalazione le due superfici dicono le stesse parole (#509).
   await expect(page.locator('#mgActions')).toBeVisible();
-  await expect(page.locator('#mgAcceptBtn')).toHaveText('Approva e metti in coda');
+  await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
+  // Un allineato non ha blocchi da confermare.
+  await expect(page.locator('#mgConfirmBtn')).toHaveCount(0);
+  await expect(page.locator('#mgConfirmSpamBtn')).toHaveCount(0);
 
   await page.locator('#mgAcceptBtn').click();
 
@@ -1536,11 +1541,11 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
 
   // Apri il dettaglio: il box risposta chiarimenti è visibile. Con la macchina
   // a stati `clarify` normalizza a `design` (bloccato, decide l'owner), quindi
-  // ANCHE "Accetta e sblocca" è legittimamente visibile accanto al box.
+  // ANCHE le azioni dei Ricevuti sono legittimamente visibili accanto al box.
   await page.evaluate((id) => window.__mgTest.openDetail(id), CLARIFY_FB._id);
   await expect(page.locator('#mgClarify')).toBeVisible();
   await expect(page.locator('#mgActions')).toBeVisible();
-  await expect(page.locator('#mgAcceptBtn')).toHaveText('Accetta e sblocca');
+  await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
   // Niente riga giudici per un feedback mai passato dal pipeline.
   await expect(page.locator('#mgJudgesRow')).toBeHidden();
 
@@ -1690,8 +1695,10 @@ test('owner ripristina un feedback archiviato → bottone "Ripristina" + patch s
     window.__mgTest.openDetail(fb._id);
   }, FB_ARCHIVED);
 
-  // Su un feedback già archiviato il bottone ripristina.
-  await expect(page.locator('#mgArchiveBtn')).toHaveText('Ripristina');
+  // Su un feedback già archiviato il bottone ripristina — e negli Archiviati è
+  // l'UNICA azione: non esiste più un "Archivia" che ci riscriva sopra.
+  await expect(page.locator('#mgArchiveBtn')).toHaveText('↩ Ripristina');
+  await expect(page.locator('#mgActionsRow button')).toHaveCount(1);
   await page.locator('#mgArchiveBtn').click();
 
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
