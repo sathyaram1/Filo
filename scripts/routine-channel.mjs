@@ -91,12 +91,14 @@ const ROOT = process.env.FILO_REPO_ROOT
 const BASE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
-// Il battito va più fitto della scadenza del semaforo (30 minuti lato server):
-// dieci minuti lasciano il margine per due battiti persi di fila.
+// Il battito va più fitto della scadenza del semaforo (60 minuti lato server):
+// dieci minuti lasciano il margine per cinque battiti persi di fila.
 const BEAT_EVERY_MS = 10 * 60 * 1000;
-// Quanto dura il semaforo lato server senza battito. Serve come tetto
-// all'insistenza: oltre, il biglietto è morto comunque.
-const LEASE_TTL_MS = 30 * 60 * 1000;
+// Quanto dura il semaforo lato server senza battito (policy.js di
+// filo-security: LEASE_TTL_MS, portato a 60 minuti dopo i biglietti morti a
+// metà lavorazione del 24-28/08). Serve come tetto all'insistenza: oltre, il
+// biglietto è morto comunque.
+const LEASE_TTL_MS = 60 * 60 * 1000;
 // Su un intoppo si ribatte più fitto: dentro mezz'ora ci stanno quindici
 // tentativi, abbastanza per attraversare un buco di rete senza perdere il lavoro.
 const RETRY_EVERY_MS = 2 * 60 * 1000;
