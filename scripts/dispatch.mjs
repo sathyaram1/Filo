@@ -1398,6 +1398,14 @@ if (isMainModule) {
     const t = stripTicketArg(args);
     if (t.error) { console.error('Uso: --ticket richiede il codice del biglietto subito dopo'); process.exit(1); }
     if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
+    // RIARMA il battito, comunque sia arrivato il biglietto: il processo
+    // staccato avviato all'inizio del giro in cloud non sopravvive a lungo (il
+    // beatAt specchiato sui feedback si ferma sempre a pochi secondi dal
+    // biglietto), e ogni --record-* è un momento in cui il biglietto è in mano
+    // per costruzione. startBeat è idempotente: se il battito è vivo non fa
+    // niente.
+    const vivo = t.ticket || process.env.FILO_ROUTINE_TICKET || readRoutineTicket(ROOT);
+    if (vivo) startBeat(ROOT, vivo);
     return t.args;
   };
   // I quattro esiti di un --record-* respinto: biglietto introvabile (esci 1:
