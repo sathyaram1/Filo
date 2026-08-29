@@ -254,7 +254,7 @@
     },
     {
       id: 'share-copy-link', title: 'Condividi o copia un link', category: 'links',
-      desc: 'Condivide un link col sistema operativo o ne copia l’indirizzo. Sopra queste voci il menu scrive dove porta il link — il sito a cui appartiene e il resto dell’indirizzo — così sai cosa stai per copiare o mandare a qualcuno prima di farlo, anche quando il collegamento sotto al punto cliccato non si vede.',
+      desc: 'Condivide un link col sistema operativo o ne copia l’indirizzo. Sopra queste voci il menu scrive dove porta il link, cioè il sito di destinazione e il resto dell’indirizzo, così sai cosa stai per copiare o mandare a qualcuno prima di farlo. Vale anche quando il collegamento sta sotto al punto cliccato e non si vede.',
       invoke: 'Clic destro su un link → "Condividi link" / "Copia URL".',
       doesNot: 'Se il link non porta davvero da nessuna parte (al posto dell’indirizzo il sito ci ha messo un frammento di codice) Filo te lo dice invece di copiare una stringa che non apre niente.',
     },
