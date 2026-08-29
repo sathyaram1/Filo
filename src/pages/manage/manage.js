@@ -2666,7 +2666,9 @@
 
     let listHtml = '';
     for (const fb of group) {
-      const cl  = MR.classifyBlock(fb);
+      // Stesso criterio della lista: un bordo colorato è un'affermazione sullo
+      // stato, e su una segnalazione cifrata la macchina lo inventa.
+      const cl  = MR.statusUnreadable(fb) ? null : MR.classifyBlock(fb);
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const color = cl ? cl.color : 'var(--sn-border)';
