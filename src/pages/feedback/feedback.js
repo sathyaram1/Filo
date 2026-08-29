@@ -111,6 +111,28 @@
     return MR.manageTabFor(f, { releasedVersion });
   }
 
+  // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
+  // Lo `status` fine viaggia CIFRATO (#476): senza la chiave privata dell'owner
+  // resta un blob, e la macchina a stati non ha niente da sciogliere — ogni
+  // feedback ricadeva in `unlabeled`, cioè nei Ricevuti. La pagina disegnava
+  // comunque le quattro sezioni e scriveva "In coda (0) · Risolti (0) ·
+  // Archiviati (0)": tre numeri che DICHIARANO IL VUOTO dove la verità è che
+  // non lo sappiamo, mentre nei Ricevuti finivano anche i feedback già risolti.
+  // È la stessa bugia che i numeri delle sezioni dovevano togliere.
+  // Il riconoscimento è stretto apposta: solo il ciphertext. Uno stato assente
+  // o inventato la macchina lo scioglie davvero (→ `unlabeled`), e lì le due
+  // pagine restano allineate come devono.
+  function statoCifrato(f) {
+    const raw = String((f && f.status) || '').trim();
+    return raw.startsWith('FENC') || raw.startsWith('[cifrato');
+  }
+  // Le sezioni si mostrano solo se la pagina sa leggere lo stato di TUTTE le
+  // segnalazioni che ha in mano: una sola illeggibile basta a rendere falsi sia
+  // il numero sia lo scaffale in cui finisce.
+  function sezioniAttendibili() {
+    return !all.some(statoCifrato);
+  }
+
   // Ritrovamenti automatici (filtro "Solo automatici"). Due fonti:
   //   - agente esploratore LLM: clientId "agent:<model>" (vedi tests/agent/feedback.mjs);
   //   - audit proattivo di una routine cloud: clientId "routine:<slug>" ancora
