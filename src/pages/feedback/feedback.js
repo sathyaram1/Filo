@@ -1172,7 +1172,7 @@
     // blur). È l'altra metà dei due testi, e senza questa casella la dashboard
     // era l'unica strada da cui quella metà si perdeva: chiudendo un feedback
     // col pulsante, a chi l'aveva mandato restava solo la riga generica.
-    listEl.querySelectorAll('.fb-usernote').forEach((input) => {
+    root.querySelectorAll('.fb-usernote').forEach((input) => {
       let timer;
       const flush = () => {
         const id = input.dataset.id;
