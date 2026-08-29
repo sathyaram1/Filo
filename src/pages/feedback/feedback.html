@@ -78,8 +78,24 @@
     }
     .fb-lightbox img { max-width: 95vw; max-height: 95vh; }
     .fb-lightbox.open { display: flex; }
+    .fb-filter {
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      font-size: 12px; color: var(--sn-muted); cursor: pointer;
+    }
+    .fb-filter:hover { color: var(--sn-fg); }
     .fb-actions { margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
-    .fb-card--done { opacity: 0.65; }
+    /* Le sezioni sono quattro, ma gli stati dentro "Ricevuti"/"In coda" sono
+       tanti: l'etichetta dello stato sta sulla card, come nella gemella. */
+    .fb-state {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--sn-muted);
+    }
+    .fb-state-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      border: 1px solid var(--sn-border); background: currentColor;
+    }
+    .fb-state-reason { font-style: italic; }
+    .fb-card--tab-resolved, .fb-card--tab-archived { opacity: 0.65; }
     .fb-notes-label { display: block; margin-top: 10px; font-size: 12px; color: var(--sn-muted); }
     .fb-notes { width: 100%; box-sizing: border-box; margin-top: 4px; padding: 6px 8px; font: inherit; font-size: 13px; background: var(--sn-bg, transparent); color: inherit; border: 1px solid var(--sn-border); border-radius: 6px; resize: vertical; }
     .fb-usernote-label { display: block; margin-top: 10px; font-size: 12px; color: var(--sn-muted); }
