@@ -490,7 +490,7 @@
     if (item.reportIllegibile && payload && typeof payload.notes === 'string') {
       alert('Il report di questo feedback non è leggibile su questo computer: manca la chiave privata. '
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
-      return;
+      return false;
     }
     // Tutto ciò che l'aggiornamento ottimistico può toccare va salvato: se la
     // scrittura fallisce, ripristinarne solo una parte lascia la card che dice
