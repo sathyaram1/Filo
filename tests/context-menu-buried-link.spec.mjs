@@ -88,11 +88,14 @@ test('porta 4: collegamento invisibile steso su tutta la pagina sotto testo a fi
   await expectNoLinkEntries(menu);
 });
 
-test('porta 5 (#499): collegamento trasparente e inerte ai click, stesso ingombro del paragrafo — non esiste per il menu', async ({ openTab, testServer }) => {
+test('porta 5 (#499): collegamento trasparente sotto un paragrafo, stesso ingombro — non esiste per il menu', async ({ openTab, testServer }) => {
+  // Il repro esatto del #499: il link è SOTTO il testo (mai raggiungibile da
+  // un click sinistro) e ritagliato sullo stesso rettangolo del paragrafo,
+  // quindi la sola geometria lo scambiava per "la stessa cosa".
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
     <div style="position:relative;width:480px">
-      <p id="testo" style="margin:0">Un paragrafo qualunque, con sotto un collegamento ritagliato sul suo stesso ingombro che nessun click sinistro potrà mai raggiungere.</p>
-      <a id="inerte" href="https://attacker.example/inerte" style="position:absolute;inset:0;display:block;pointer-events:none;z-index:2"></a>
+      <a id="sepolto" href="https://attacker.example/scelto-dalla-pagina" style="position:absolute;inset:0;display:block;z-index:0"></a>
+      <p id="testo" style="position:relative;z-index:1;margin:0">Un paragrafo qualunque, con sotto un collegamento ritagliato sul suo stesso ingombro che nessun click sinistro potrà mai raggiungere.</p>
     </div>
   </body></html>`);
   const menu = await openMenuOn(page, '#testo');
