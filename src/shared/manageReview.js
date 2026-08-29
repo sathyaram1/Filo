@@ -322,11 +322,6 @@
   }
   const PUBLIC_STATE_HINT = 'il dettaglio si legge solo con la chiave dell’owner';
 
-  /** Anche la priorità viaggia cifrata: senza chiave i pallini non sanno nulla. */
-  function priorityUnreadable(fb) {
-    return looksEncrypted(fb && fb.priority);
-  }
-
   // Come si presenta lo status in "Ricevuti": reason per lo storico dei consumer
   // (unfiltered/attack/spam/design/loop) + colore/label/severity dal vocabolario.
   function reasonOf(status, statusReason) {
