@@ -17,6 +17,11 @@ const VIDEO_LABELS = ['Copia URL video', 'Salva video come…'];
 const IMAGE_LABELS = ['Copia immagine', 'Salva immagine come…'];
 
 async function openMenu(page, selector, position) {
+  // Scroll separato dal click: se lo scroll e il tasto destro avvengono nello
+  // stesso gesto, gli eventi di scroll residui chiudono il menu appena aperto
+  // (comportamento voluto dell'app, non del lavoro in verifica).
+  await page.locator(selector).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
   await page.locator(selector).click({ button: 'right', position });
   const menu = page.locator('.sn-menu').first();
   await expect(menu).toBeVisible({ timeout: 8000 });
