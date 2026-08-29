@@ -934,13 +934,23 @@
             <div class="mg-actions" id="mgActions" hidden>
               <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
                 placeholder="Commento (opzionale): perché lo sblocchi…"></textarea>
-              <div class="mg-actions-row">
-                <button type="button" class="sn-btn" id="mgAcceptBtn">Accetta e sblocca</button>
-                <!-- Macchina a stati: per attacchi/spam/file sospetti l'owner può
-                     CONFERMARE il blocco (terminale, va negli Archiviati sotto
-                     "Bloccati confermati"). -->
-                <button type="button" class="sn-btn sn-btn-secondary" id="mgConfirmBtn" hidden>Conferma attacco</button>
+              <!-- I pulsanti li GENERA la pagina leggendo MR.ownerActions: la
+                   stessa tabella che disegna quelli della pagina dei feedback,
+                   così sulla stessa segnalazione le due superfici offrono le
+                   stesse azioni. Il messaggio d'esito resta in fondo alla riga. -->
+              <div class="mg-actions-row" id="mgActionsRow">
                 <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
+              </div>
+              <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo
+                   appende alla conversazione, come la gemella. -->
+              <div class="mg-reopen" id="mgReopen" hidden>
+                <label class="mg-usernote-label" for="mgReopenText">Cosa non va / cosa manca</label>
+                <textarea id="mgReopenText" class="mg-accept-comment" rows="3"
+                  placeholder="Spiega meglio il problema, indica i passi per riprodurre…"></textarea>
+                <div class="mg-actions-row">
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgReopenCancelBtn">Annulla</button>
+                  <button type="button" class="sn-btn" id="mgReopenConfirmBtn">Conferma riapertura</button>
+                </div>
               </div>
             </div>
 
