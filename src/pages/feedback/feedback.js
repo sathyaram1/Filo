@@ -16,8 +16,13 @@
   'use strict';
 
   // Vocabolario unico della macchina a stati + logica di sezione condivisa.
+  // Se mancano, fermarsi subito con un errore leggibile è meglio di una pagina
+  // che disegna sezioni vuote senza dire perché.
   const FS = window.SN_FB_STATUS;
   const MR = window.SN_MANAGE_REVIEW;
+  if (!FS || !MR) {
+    throw new Error('feedback.js: carica shared/feedbackTransitions.js, feedbackStatus.js e manageReview.js prima di questa pagina');
+  }
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
