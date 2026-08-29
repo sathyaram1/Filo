@@ -295,6 +295,17 @@
   }
 
   /**
+   * Questo VALORE è arrivato cifrato (chiave assente)? Stesso riconoscimento
+   * stretto di statusUnreadable, per gli altri campi che viaggiano cifrati
+   * insieme allo status — la revisione dell'owner (decisione, commento, data)
+   * e la conversazione. Mostrare un blob al posto di un testo è la stessa
+   * bugia delle sezioni, in piccolo.
+   */
+  function valueUnreadable(value) {
+    return looksEncrypted(value);
+  }
+
+  /**
    * Si possono disegnare le sezioni per QUESTA lista? No solo quando la pagina
    * non legge NESSUNO stato: è il caso vero (o hai la chiave e li leggi tutti,
    * o non ce l'hai e non ne leggi uno). Un documento storto in mezzo a mille
