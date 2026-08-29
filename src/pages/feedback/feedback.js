@@ -126,11 +126,14 @@
     const raw = String((f && f.status) || '').trim();
     return raw.startsWith('FENC') || raw.startsWith('[cifrato');
   }
-  // Le sezioni si mostrano solo se la pagina sa leggere lo stato di TUTTE le
-  // segnalazioni che ha in mano: una sola illeggibile basta a rendere falsi sia
-  // il numero sia lo scaffale in cui finisce.
+  // Le sezioni spariscono quando la pagina non sa leggere NESSUNO stato: è il
+  // caso vero (o hai la chiave e li leggi tutti, o non ce l'hai e non ne leggi
+  // uno). Il caso misto lascia la barra al suo posto: togliere le sezioni a
+  // tutti per un documento storto sarebbe sproporzionato, e soprattutto
+  // farebbe divergere questa pagina dalla dashboard di gestione — la
+  // divergenza che #509 esiste per togliere.
   function sezioniAttendibili() {
-    return !all.some(statoCifrato);
+    return !all.length || !all.every(statoCifrato);
   }
 
   // Ritrovamenti automatici (filtro "Solo automatici"). Due fonti:
