@@ -854,6 +854,14 @@
     // I rettangoli si misurano solo se sono davvero quelli del punto cliccato.
     // Quando uno dei due è nella pila per uno pseudo-elemento, il suo
     // rettangolo sta da un'altra parte e ogni conto su di lui è rumore.
+    // Un confine fisso non si attraversa: se uno dei due sta in una barra o in
+    // un riquadro che non scorre con la pagina e l'altro nella pagina, non sono
+    // la stessa superficie per costruzione — la barra copre quello che le
+    // scivola sotto, non lo contiene. Senza questa riga bastava che barra e
+    // riga sepolta condividessero un bordo (la forma normale delle barre a
+    // tutta larghezza) perché il conto sui rettangoli dicesse "stessa scheda"
+    // (verifica avversariale del 29/08, porte 1-3).
+    if (inFixedLayer(a) !== inFixedLayer(b)) return false;
     if (coversPoint(ra, view) && coversPoint(rb, view)) {
       const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
       const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
