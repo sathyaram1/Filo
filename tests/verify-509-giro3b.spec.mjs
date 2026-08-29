@@ -120,3 +120,31 @@ test('#509/3b — «Ripristina» su un attacco confermato: le due pagine scrivon
   });
   expect(scritturaMg.status).toBe(scritturaFb.status);
 });
+
+test('#509/3b — «Archivia» su un attacco confermato cancella la conferma dell owner', async ({ openTab }) => {
+  const uno = [
+    { _id: 'z2', seq: 2, status: 'attack_confirmed', name: 'attacco confermato', text: '2', createdAt: '2026-08-02T10:00:00Z' },
+    { _id: 'z1', seq: 1, status: 'archived',         name: 'archiviato',         text: '1', createdAt: '2026-08-01T10:00:00Z' },
+  ];
+  const mg = await apriManage(openTab, uno);
+  await mg.evaluate(() => window.__mgTest.setTab('archived'));
+  await mg.waitForTimeout(150);
+  await mg.locator('#mgConfirmedFilter').check();
+  await mg.waitForTimeout(150);
+  // Prima: il filtro "Bloccati confermati" lo trova.
+  await expect(mg.locator('#mgList .mg-item')).toHaveCount(1);
+  await mg.locator('#mgConfirmedFilter').uncheck();
+  await mg.waitForTimeout(150);
+
+  // L'owner preme l'unico bottone che il pannello gli offre.
+  await mg.evaluate(() => window.__mgTest.openDetail('z2'));
+  await mg.waitForTimeout(150);
+  await mg.locator('#mgArchiveBtn').click();
+  await mg.waitForTimeout(400);
+
+  await mg.locator('#mgConfirmedFilter').check();
+  await mg.waitForTimeout(200);
+  // Dopo: la conferma non c'è più, e il filtro non lo trova.
+  await expect(mg.locator('#mgList .mg-item'),
+    'l\'attacco confermato è sparito dal filtro «Bloccati confermati»').toHaveCount(1);
+});
