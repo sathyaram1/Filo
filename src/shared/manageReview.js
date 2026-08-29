@@ -759,6 +759,8 @@
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
     panelComplete, judgesNote, reasonText,
+    statusUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
+    priorityUnreadable,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
   };
 
