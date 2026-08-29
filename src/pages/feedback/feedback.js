@@ -200,12 +200,17 @@
     const info = FS.STATUSES[status];
     if (!info) return '';
     const reason = statusReasonOf(f);
+    // Il motivo si scrive solo se c'è una traduzione umana: un codice grezzo
+    // ('legacy-ignored') in mezzo alla riga non dice niente a chi legge. Resta
+    // comunque nell'hover, dove serve a chi lo sta cercando.
     const reasonTxt = reason ? MR.reasonText(reason) : '';
+    const reasonLeggibile = reasonTxt && reasonTxt !== String(reason);
     const dot = info.color
       ? `<span class="fb-state-dot" style="color:${escapeHtml(info.color)}"></span>`
       : '';
-    return `<span class="fb-state" title="Stato: ${escapeHtml(info.label)}">${dot}${escapeHtml(info.label)}`
-      + `${reasonTxt ? ` <span class="fb-state-reason">— ${escapeHtml(reasonTxt)}</span>` : ''}</span>`;
+    const hover = `Stato: ${info.label}${reason ? ` (${reasonTxt})` : ''}`;
+    return `<span class="fb-state" title="${escapeHtml(hover)}">${dot}${escapeHtml(info.label)}`
+      + `${reasonLeggibile ? ` <span class="fb-state-reason">— ${escapeHtml(reasonTxt)}</span>` : ''}</span>`;
   }
 
   function fmtTs(ts) {
