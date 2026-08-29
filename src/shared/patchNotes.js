@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.209', date: '2026-08-29',
+      fixes: [
+        'Il menu del tasto destro su un link scrive dove porta, sopra «Apri in nuova tab» e «Copia URL»: vedi il sito di destinazione prima di aprirlo, copiarlo o mandarlo a qualcuno. Serve soprattutto quando il collegamento non si vede — una pagina può nasconderne uno sotto a un paragrafo qualsiasi e farti copiare un indirizzo scelto da lei.',
+      ],
+    },
+    {
       version: '0.2.207', date: '2026-08-28',
       features: [
         'Le sveglie e i timer che hai messo ora li gestisci a parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8". Prima si potevano solo creare.',
