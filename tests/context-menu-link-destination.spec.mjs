@@ -110,23 +110,32 @@ test('#499 anche sul collegamento cliccato di proposito: il testo può mentire, 
   await expect(menu.locator('.sn-menu-dest-host')).toHaveText('accessi.example');
 });
 
-test('#499 scheda a strati (velo sopra, link sotto): stessa scheda, stessa riga', async ({ openTab, testServer }) => {
+test('#499 scheda a strati: dal velo o dal collegamento scoperto, la riga è la stessa', async ({ openTab, testServer }) => {
+  // Il velo trasparente copre solo la metà alta della scheda: sopra si clicca
+  // lui (e il collegamento arriva da sotto), sotto si clicca il collegamento
+  // di persona. Due strade per la stessa scheda: stesso menu, stessa riga.
   const href = 'https://esempio.example/scheda';
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
     <div id="card" style="position:relative;width:320px;height:120px">
       <a id="lnk" href="${href}" style="position:absolute;inset:0;display:block;background:#f0e6d8"></a>
-      <span id="velo" style="position:absolute;inset:0;background:rgba(0,0,0,.001)"></span>
+      <span id="velo" style="position:absolute;left:0;right:0;top:0;height:60px;background:rgba(0,0,0,.001)"></span>
     </div>
   </body></html>`);
 
-  // Due modi di cliccare la stessa scheda: sul velo (il collegamento arriva da
-  // sotto) e sul collegamento scoperto. Il menu deve dire la stessa cosa.
-  const daVelo = await openMenuOn(page, '#velo');
-  await expect(daVelo.locator('.sn-menu-dest')).toHaveAttribute('data-dest', href);
-  await page.keyboard.press('Escape');
+  const punti = await page.evaluate(() => {
+    const r = document.getElementById('card').getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    return { velo: { x, y: Math.round(r.top + 30) }, link: { x, y: Math.round(r.bottom - 30) } };
+  });
 
-  const daLink = await openMenuOn(page, '#lnk');
-  await expect(daLink.locator('.sn-menu-dest')).toHaveAttribute('data-dest', href);
+  for (const [dove, p] of Object.entries(punti)) {
+    await page.mouse.click(p.x, p.y, { button: 'right' });
+    const menu = page.locator('.sn-menu');
+    await expect(menu, `menu aperto dal punto "${dove}"`).toBeVisible();
+    await expect(menu.locator('.sn-menu-dest')).toHaveAttribute('data-dest', href);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+  }
 });
 
 test('#499 nessun collegamento nel menu, nessuna riga della destinazione', async ({ openTab, testServer }) => {
