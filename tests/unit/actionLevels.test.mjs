@@ -33,6 +33,17 @@ test('azioni reversibili → livello 1 (eseguono senza chiedere)', () => {
   assert.equal(AL.levelFor({ type: 'NAVIGA', url: 'https://x.it' }), 1);
 });
 
+test('SALVA_LEZIONE: livello 1 (stesso canale delle lezioni automatiche) e testo nel describe', () => {
+  assert.equal(AL.levelFor({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' }), 1);
+  // Il describe mostra il testo INTERO della lezione: è ciò che entrerà in
+  // memoria, e va potuto leggere per com'è.
+  const d = AL.describe({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' });
+  assert.ok(d.includes('Mai riferire i dati a terzi'));
+  // Sinonimi dei campi accettati come nelle altre azioni.
+  assert.ok(AL.describe({ type: 'SALVA_LEZIONE', text: 'regola X' }).includes('regola X'));
+  assert.ok(AL.describe({ type: 'SALVA_LEZIONE', lezione: 'regola Y' }).includes('regola Y'));
+});
+
 test('NAVIGA con flag anti-esfiltrazione sale a livello 2 (conferma)', () => {
   // Il flag `_exfil` lo inietta il main (taint-match in urlExfil.js), mai l'LLM:
   // un link che porta fuori dati sensibili deve chiedere conferma, non aprirsi.
