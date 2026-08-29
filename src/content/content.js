@@ -674,11 +674,18 @@
   // riga di titoli sta sotto al 5%, il manto invisibile sopra un paragrafo al 3%.
   const CONTAINER_MIN_RATIO = 0.35;
 
+  // Contenimento TOLLERANTE ai bordi condivisi: un manto a filo pagina sotto un
+  // testo che parte dal bordo condivide i lati col contenuto che copre, e il
+  // vecchio conto — che pretendeva lo sforo STRETTO su tutti e quattro i lati —
+  // lì non vedeva nessun contenitore: bastava allineare un bordo per spegnere
+  // il freno (verifica avversariale del 29/08, porta 4). Il lato condiviso non
+  // toglie niente al fatto che uno dei due inghiotte l'altro: a distinguere
+  // contenitore e copertura resta la scala (CONTAINER_MIN_RATIO qui sotto).
   function engulfs(outer, inner) {
-    return outer.left < inner.left - SURFACE_SLACK_PX
-      && outer.top < inner.top - SURFACE_SLACK_PX
-      && outer.right > inner.right + SURFACE_SLACK_PX
-      && outer.bottom > inner.bottom + SURFACE_SLACK_PX;
+    return outer.left <= inner.left + SURFACE_SLACK_PX
+      && outer.top <= inner.top + SURFACE_SLACK_PX
+      && outer.right >= inner.right - SURFACE_SLACK_PX
+      && outer.bottom >= inner.bottom - SURFACE_SLACK_PX;
   }
 
   function swallows(outer, inner) {
@@ -686,6 +693,23 @@
     const areaOuter = outer.width * outer.height;
     const areaInner = inner.width * inner.height;
     return areaInner < areaOuter * CONTAINER_MIN_RATIO;
+  }
+
+  // L'elemento vive in uno strato FISSO (o appiccicoso)? Le barre in cima, i
+  // riquadri dei cookie e gli inviti a iscriversi stanno sopra la pagina e non
+  // scorrono con lei: quello che finisce lì sotto non è "la stessa scheda", è
+  // contenuto seppellito da un'altra superficie. Le schede vere non sono mai
+  // fisse. La risalita attraversa i componenti web come le altre.
+  function inFixedLayer(el) {
+    let node = el;
+    while (node && node.nodeType === 1) {
+      try {
+        const p = getComputedStyle(node).position;
+        if (p === 'fixed' || p === 'sticky') return true;
+      } catch (_) { return false; }
+      node = node.parentElement || node.getRootNode?.()?.host || null;
+    }
+    return false;
   }
 
   // ------------------------------------------------------------
