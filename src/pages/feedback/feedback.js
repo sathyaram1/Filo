@@ -1337,6 +1337,14 @@
       applyFilter();
     },
     setTab(tab) { selectTab(tab); },
+    // DB3: negli spec non c'è un aggiornamento da interrogare, e il gate di
+    // "Risolti" dipende dalla versione rilasciata: iniettabile, come in manage.
+    setReleasedVersion(v) { releasedVersion = v || ''; applyFilter(); },
+    setAgentOnly(v) {
+      agentOnly = !!v;
+      if (agentOnlyEl) agentOnlyEl.checked = agentOnly;
+      applyFilter();
+    },
   };
 
   // Carica prima lo stato admin, poi i feedback: così il primo render già
