@@ -944,7 +944,20 @@
       });
     });
 
-    listEl.querySelectorAll('.fb-act').forEach((b) => {
+    bindCardActions(listEl);
+
+    // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
+    // captureFocus): salvare le note non deve più "deselezionare" il campo.
+    restoreFocus(focusSnap);
+  }
+
+  // Aggancia i pulsanti di una scheda (o di tutta la lista). Sta in una
+  // funzione perché serve in due momenti: dopo un render completo e quando una
+  // sola scheda si riscrive AL PROPRIO POSTO (annullare la riapertura, i
+  // pallini della priorità) — che è l'unico modo di aggiornarla senza
+  // rimescolare la lista sotto il puntatore.
+  function bindCardActions(root) {
+    root.querySelectorAll('.fb-act').forEach((b) => {
       b.addEventListener('click', () => {
         const to = b.dataset.to; // stato CANONICO (todo | done | archived | *_confirmed)
         const id = b.dataset.id;
