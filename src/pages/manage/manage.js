@@ -2625,7 +2625,14 @@
       const fromVerdicts = filoOpinionFromVerdicts(fb);
       if (fromVerdicts) opinionHtml = fromVerdicts;         // parere completo dai giudici
       else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
-      else opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
+      // "non ha ANCORA un parere" si legge come "sta arrivando": vero solo
+      // finché la segnalazione aspetta una decisione. Su una già decisa (un
+      // attacco confermato, un fix chiuso) quella parola diceva il falso.
+      else if (MR.manageTabFor(fb, { releasedVersion }) === 'inbox') {
+        opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
+      } else {
+        opinionHtml = '<em>I giudici non hanno mai valutato questo feedback.</em>';
+      }
     }
     appendBubble('model', 'Filo', opinionHtml);
 
