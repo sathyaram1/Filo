@@ -1886,7 +1886,7 @@
     // Striscia "a che punto è la lavorazione" (solo per i feedback nell'iter
     // working/revision_*): stessi contenuti della card pinnata in lista.
     if (mgWorkState) {
-      const progress = MR.workProgress(fb);
+      const progress = leggibile ? MR.workProgress(fb) : null;
       mgWorkState.hidden = !progress;
       mgWorkState.innerHTML = progress ? workStateHtml(progress) : '';
     }
