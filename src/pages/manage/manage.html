@@ -651,6 +651,11 @@
 
     /* ── Gestione feedback (⭐ + archivia/ripristina), owner-only ────────── */
     .mg-manage[hidden] { display: none; }
+    /* Archivia/Ripristina sparisce quando lo stato non si legge: il bottone DICE
+       dov'è la segnalazione, e senza chiave direbbe sempre "Archivia".
+       (.sn-btn dichiara un display suo, quindi l'attributo hidden da solo non
+       basterebbe.) */
+    #mgArchiveBtn[hidden] { display: none; }
     .mg-star-btn {
       all: unset; cursor: pointer;
       padding: 7px 12px; border-radius: 8px;
