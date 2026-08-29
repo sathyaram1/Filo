@@ -668,10 +668,22 @@
   // L'azione è andata: la scheda resta dov'è (nessuno la vede sparire da sotto
   // il cursore) ma smette di essere premibile e DICE cosa è successo. Sparisce
   // alla prima ricomposizione della lista, che è sempre una richiesta esplicita.
-  function marcaDecisa(card, esito) {
+  function marcaDecisa(card, esito, item) {
     if (!card) return;
     card.classList.remove('fb-card--busy');
     card.classList.add('fb-card--decisa');
+    // L'etichetta dello stato si riscrive: la scheda resta a schermo, e senza
+    // questo continuerebbe a dire lo stato di prima. Su «Conferma attacco» è la
+    // differenza fra leggere "Attacco" e leggere "Attacco confermato".
+    const badge = card.querySelector('.fb-state');
+    if (badge && item) {
+      const html = stateBadgeHtml(item);
+      if (html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        if (tmp.firstElementChild) badge.replaceWith(tmp.firstElementChild);
+      }
+    }
     const box = card.querySelector('.fb-actions');
     if (box) {
       box.textContent = '';
