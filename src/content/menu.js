@@ -204,9 +204,11 @@
     placeSub(sub, anchor, activeMenu.subMode);
   }
 
-  // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
+  // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste'|'dest', label, shortcut, disabled, onClick, items? }
   // - 'inline': sezione che mostra contenuto dinamico (es. spiegazione AI). { content?: string, onMount?: (el) => cleanup }
   // - 'paste': come 'item' ma con freccetta a destra che apre il sotto-menu della cronologia
+  // - 'dest': riga non cliccabile che dice DOVE PORTA il collegamento delle voci
+  //   che seguono (#499). { label, rest, full }
   function open({ x, y, items, keepOnScroll }) {
     close();
     const root = document.createElement('div');
