@@ -1255,12 +1255,31 @@
   }
 
   function sectionItems(tab) {
-    const items = sectionBase(tab);
+    // Stati illeggibili: niente sezioni, un elenco solo (i più recenti in cima).
+    const items = sezioniAttendibili()
+      ? sectionBase(tab)
+      : all.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     return agentOnly ? items.filter(isAgent) : items;
+  }
+
+  // Mostra o nasconde la barra delle sezioni. Non è una decorazione: se gli
+  // stati non si leggono, quella barra scriverebbe numeri inventati.
+  function mostraSezioni() {
+    const ok = sezioniAttendibili();
+    if (tabsEl) tabsEl.hidden = !ok;
+    if (noSectionsEl) {
+      noSectionsEl.hidden = ok;
+      if (!ok) {
+        noSectionsEl.textContent = 'Su questo computer gli stati delle segnalazioni non si leggono: '
+          + 'le trovi tutte qui sotto, in un elenco solo.';
+      }
+    }
+    return ok;
   }
 
   function applyFilter() {
     const q = (searchEl.value || '').trim().toLowerCase();
+    const sezioni = mostraSezioni();
     const base = sectionItems();
     const filtered = q
       ? base.filter((f) => {
