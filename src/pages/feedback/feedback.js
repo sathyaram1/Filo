@@ -1124,7 +1124,7 @@
     // Compositore allegati per la nota editabile (il "capo"): inizializzato con
     // gli allegati del capo. Persiste subito (onChange → patch): notesValueOf
     // ricompone capo (testo + allegati) + coda intatta.
-    listEl.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
+    root.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
       const id = mount.dataset.id;
       const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
       if (!ta || ta._attachComposer) return;
