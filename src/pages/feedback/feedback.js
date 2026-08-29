@@ -1288,7 +1288,7 @@
             .join(' ').toLowerCase().includes(q);
         })
       : base;
-    if (currentTab === 'resolved') {
+    if (sezioni && currentTab === 'resolved') {
       // Sezione "Risolti": ordina per numero (#1, #2, … #22.1, #22.2). I
       // feedback senza numero (seq assente) finiscono in coda. Confronto
       // numerico su seq e poi subSeq, così #22.2 viene prima di #22.10 —
