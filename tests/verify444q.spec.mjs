@@ -334,6 +334,14 @@ test.describe('#444 quater — verifica indipendente', () => {
       await closeMenu(page);
     }
 
+    // F10 — scheda a componente (video nello shadow root) + velo sfumato.
+    {
+      const { labels } = await openMenu(page, '#f10veil', { x: 160, y: 120 });
+      expectVideo(labels, 'F10 componente shadow + velo');
+      expectLink(labels, 'F10 componente shadow + velo');
+      await closeMenu(page);
+    }
+
     // F9 — velo FISSO trasparente sopra un collegamento ben visibile: il link resta.
     await gotoReady(page, testServer, veilFixedPage());
     {
