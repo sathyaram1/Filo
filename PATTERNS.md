@@ -1994,9 +1994,13 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   `setListHead()` in `src/pages/manage/manage.js` (`.mg-tab-count`),
   `updateTabCounts()` in `src/pages/feedback/feedback.js`. I flag di onestà:
   `dataLoaded`/`loadFailed` in `manage.js`, `dataLoaded`/`loadError` +
-  `showLoadError()` in `feedback.js`. Test:
+  `showLoadError()` in `feedback.js`. Stato illeggibile: `statusUnreadable`,
+  `sectionsReliable`, `publicStateLabel`, `PUBLIC_STATE_HINT` in
+  `src/shared/manageReview.js`, consumati da `sezioniAttendibili()` /
+  `mostraSezioni()` in tutt'e due le pagine. Test:
   `tests/manage-tab-counts.spec.mjs`, `tests/feedback-tab-counts-cap.spec.mjs`,
-  `tests/unit/manageReview.test.mjs`, `tests/unit/feedbackCountCap.test.mjs`.
+  `tests/feedback-sezioni-gemelle.spec.mjs`, `tests/unit/manageReview.test.mjs`,
+  `tests/unit/feedbackCountCap.test.mjs`.
 
 ## Sezioni con lo stesso nome, una regola sola (e la regola è codice condiviso)
 
