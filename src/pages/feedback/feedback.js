@@ -535,56 +535,29 @@
   // ignored/blocked): ogni clic spingeva il feedback FUORI dalla macchina a
   // stati, e la gemella doveva poi ridurlo a forza. Due cammini equivalenti
   // devono fare la stessa cosa, non due cose che si somigliano.
+  // QUALI azioni esistono lo decide il modulo condiviso (MR.ownerActions): la
+  // dashboard di gestione legge la stessa tabella, quindi sulla stessa
+  // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
+  // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
     // Stato illeggibile: i pulsanti nascono dalla sezione, e la sezione qui non
     // si sa. Offrire "→ In coda" a un feedback che potrebbe essere già chiuso
-    // sarebbe peggio che non offrire niente.
+    // sarebbe peggio che non offrire niente. (ownerActions lo verifica sulla
+    // singola scheda; qui vale anche per la lista intera.)
     if (!sezioniAttendibili()) return '';
     const id = escapeHtml(f._id);
-    const status = statusOf(f);
-    const tab = tabOf(f);
-    const btn = (to, label, primary, extra) =>
-      `<button class="sn-btn${primary ? '' : ' sn-btn-secondary'} fb-act" data-id="${id}" data-to="${to}"${extra || ''}>${label}</button>`;
-
-    if (tab === 'inbox') {
-      // Aspetta una decisione: l'approvazione È scrivere `todo` (come la
-      // gemella, con l'override di revisione che toglie il blocco).
-      const parts = [btn('todo', '→ In coda', true, ' data-accept="1"')];
-      // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
-      // Ricevuti e resta consultabile negli Archiviati.
-      if (status === 'attack' || status === 'suspicious_file') {
-        parts.push(btn('attack_confirmed', 'Conferma attacco', false, ' data-reject="1"'));
+    const EXTRA = { accept: ' data-accept="1"', reject: ' data-reject="1"',
+      archive: ' data-archive="1"', restore: ' data-restore="1"' };
+    return MR.ownerActions(f, { releasedVersion }).map((a) => {
+      // "Riapri" non scrive subito: apre il modulo che chiede COSA manca ancora.
+      if (a.kind === 'reopen') {
+        return `<button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">${escapeHtml(a.label)}</button>`;
       }
-      if (status === 'spam' || status === 'suspicious_file') {
-        parts.push(btn('spam_confirmed', 'Conferma spam', false, ' data-reject="1"'));
-      }
-      parts.push(btn('archived', 'Archivia', false, ' data-archive="1"'));
-      return parts.join('\n');
-    }
-    if (tab === 'queue') {
-      // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
-      const parts = [];
-      if (status !== 'done') parts.push(btn('done', '✓ Risolto', true));
-      parts.push(btn('archived', 'Archivia', false, ' data-archive="1"'));
-      return parts.join('\n');
-    }
-    if (tab === 'resolved') {
-      // Fix uscito: si archivia (verifica umana ok) o si riapre col modulo che
-      // chiede COSA manca ancora.
-      return `
-        ${btn('archived', 'Archivia', true, ' data-archive="1"')}
-        <button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">Riapri</button>
-      `;
-    }
-    if (tab === 'archived') {
-      // Invariante: se puoi archiviare, puoi togliere dall'archivio. Il
-      // ripristino rimette in coda (todo) — anche per un attacco/spam
-      // confermato, che è la strada del "era legittimo".
-      return btn('todo', '↩ Ripristina', false, ' data-restore="1"');
-    }
-    return '';
+      return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act"`
+        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}>${escapeHtml(a.label)}</button>`;
+    }).join('\n');
   }
 
   // ── UN CLIC, UNA SCHEDA ───────────────────────────────────────────────────
