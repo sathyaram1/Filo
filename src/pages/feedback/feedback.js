@@ -477,7 +477,14 @@
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
       return;
     }
-    const prev = { status: item.status, notes: item.notes, userNote: item.userNote, priority: item.priority };
+    // Tutto ciò che l'aggiornamento ottimistico può toccare va salvato: se la
+    // scrittura fallisce, ripristinarne solo una parte lascia la card che dice
+    // una cosa e il database un'altra.
+    const prev = {
+      status: item.status, notes: item.notes, userNote: item.userNote,
+      priority: item.priority, reviewDecision: item.reviewDecision,
+      archiveOverride: item.archiveOverride, starred: item.starred,
+    };
     Object.assign(item, optimistic);
     if (!silenzioso) applyFilter();
     try {
