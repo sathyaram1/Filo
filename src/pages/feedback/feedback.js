@@ -1,8 +1,23 @@
 // Dashboard interna: triage dei feedback alpha.
 // Stato/note salvati su Firestore (via SN_FEEDBACK.updateStatus).
+//
+// LE SEZIONI SONO QUELLE DELLA MACCHINA A STATI (#509). Questa pagina aveva una
+// tassonomia sua — new/draft/todo/review/blocked/clarify/done/verified — che
+// non era più quella di nessuno: gli stati canonici che non riconosceva
+// (archived, working, attack_confirmed…) finivano tutti in "Ricevuti". Con i
+// numeri accanto ai nomi (#495) il difetto è diventato visibile: le stesse
+// segnalazioni si leggevano "Ricevuti (3)" nella dashboard di gestione e
+// "Ricevuti (9)" qui, e chi guardava una pagina sola non aveva modo di
+// accorgersene. Ora sezione, ordinamento e conteggio passano dalle STESSE
+// funzioni pure della gemella (SN_MANAGE_REVIEW): due liste calcolate dallo
+// stesso codice non possono divergere.
 
 (function () {
   'use strict';
+
+  // Vocabolario unico della macchina a stati + logica di sezione condivisa.
+  const FS = window.SN_FB_STATUS;
+  const MR = window.SN_MANAGE_REVIEW;
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
