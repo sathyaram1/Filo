@@ -112,28 +112,15 @@
   }
 
   // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
-  // Lo `status` fine viaggia CIFRATO (#476): senza la chiave privata dell'owner
-  // resta un blob, e la macchina a stati non ha niente da sciogliere — ogni
-  // feedback ricadeva in `unlabeled`, cioè nei Ricevuti. La pagina disegnava
-  // comunque le quattro sezioni e scriveva "In coda (0) · Risolti (0) ·
-  // Archiviati (0)": tre numeri che DICHIARANO IL VUOTO dove la verità è che
-  // non lo sappiamo, mentre nei Ricevuti finivano anche i feedback già risolti.
-  // È la stessa bugia che i numeri delle sezioni dovevano togliere.
-  // Il riconoscimento è stretto apposta: solo il ciphertext. Uno stato assente
-  // o inventato la macchina lo scioglie davvero (→ `unlabeled`), e lì le due
-  // pagine restano allineate come devono.
+  // La REGOLA (cos'è illeggibile, quando la barra sparisce, che parole si
+  // scrivono al suo posto) vive nel modulo condiviso, insieme alla tassonomia
+  // delle sezioni: tenerne una copia qui è esattamente il modo in cui questa
+  // pagina e la dashboard di gestione hanno divergito (#509).
   function statoCifrato(f) {
-    const raw = String((f && f.status) || '').trim();
-    return raw.startsWith('FENC') || raw.startsWith('[cifrato');
+    return MR.statusUnreadable(f);
   }
-  // Le sezioni spariscono quando la pagina non sa leggere NESSUNO stato: è il
-  // caso vero (o hai la chiave e li leggi tutti, o non ce l'hai e non ne leggi
-  // uno). Il caso misto lascia la barra al suo posto: togliere le sezioni a
-  // tutti per un documento storto sarebbe sproporzionato, e soprattutto
-  // farebbe divergere questa pagina dalla dashboard di gestione — la
-  // divergenza che #509 esiste per togliere.
   function sezioniAttendibili() {
-    return !all.length || !all.every(statoCifrato);
+    return MR.sectionsReliable(all);
   }
 
   // Ritrovamenti automatici (filtro "Solo automatici"). Due fonti:
