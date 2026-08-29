@@ -1302,6 +1302,20 @@
     mgListLoading.hidden = true;
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
 
+    // Stato illeggibile → niente sezioni: un elenco solo, i più recenti in cima,
+    // come la gemella. Nessun nome di sezione in cima alla colonna e nessun
+    // filtro di sezione: sono tutti criteri che qui non si possono applicare.
+    const sezioni = mostraSezioni();
+    if (!sezioni) {
+      if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+      currentList = applySortMode(allFeedbacks.slice().sort((a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
+      mgListEmpty.textContent = TAB_EMPTY.inbox;
+      setListHead(SENZA_SEZIONI_LABEL, dataLoaded ? currentList.length : null);
+      renderListBody();
+      return;
+    }
+
     // Il filtro ⭐ esiste solo nella tab Archiviati (DB2).
     const isArchived = currentTab === 'archived';
     if (mgArchiveFilter) mgArchiveFilter.hidden = !isArchived;
