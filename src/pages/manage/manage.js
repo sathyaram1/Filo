@@ -1867,6 +1867,11 @@
     mgDetailEmpty.hidden = true;
     mgDetail.hidden = false;
 
+    // Lo stato di QUESTA segnalazione si legge? Tutto ciò che il pannello dice
+    // e offre a partire dallo stato passa da qui — la stessa regola della barra
+    // delle sezioni, un gradino più in dentro.
+    const leggibile = !MR.statusUnreadable(fb);
+
     // Intestazione
     const clientId = fb.clientId || 'anonimo';
     const dateStr  = formatDate(fb.createdAt);
