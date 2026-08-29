@@ -344,6 +344,7 @@ function commitExists(g, sha) {
 export const SESSION_MARKERS = Object.freeze([
   '.claude/routine-ticket.json',
   '.claude/routine-beat.json',
+  '.claude/routine-beat-hook.stamp',
   '.claude/routine-role.json',
   '.claude/branch-expect.json',
   '.claude/verify-local.json',
