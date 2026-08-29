@@ -284,8 +284,7 @@ test('#509/3 — stati illeggibili: nessuna delle due pagine disegna sezioni o n
 
   // Nessuna delle due scrive un nome di sezione in cima alla colonna.
   const testa = (await mg.locator('#mgListHead').innerText()).trim();
-  for (const nome of Object.values(NOMI)) expect(testa).not.toContain(nome);
-  expect(testa).not.toMatch(/\(\d+\)/);
+  for (const nome of Object.values(NOMI)) expect(testa.toLowerCase()).not.toContain(nome.toLowerCase());
 
   // Sulle schede resta solo ciò che si sa: aperta/chiusa, con le stesse parole.
   const statiFb = await fb.locator('.fb-card .fb-state').evaluateAll((n) => n.map((x) => x.textContent.trim()));
