@@ -277,20 +277,26 @@
       </div>
     </div>
 
+    <!-- Le sezioni sono quelle della macchina a stati, identiche alla dashboard
+         di gestione (#509): stesso nome, stessa regola, stesso numero — che è
+         il punto, visto che sono la stessa barra vista da due ruoli. -->
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
-      <button type="button" class="fb-tab" data-tab="agent">Agente</button>
-      <button type="button" class="fb-tab" data-tab="draft">Bozze</button>
-      <button type="button" class="fb-tab" data-tab="todo">Da risolvere</button>
-      <button type="button" class="fb-tab" data-tab="review">In revisione</button>
-      <button type="button" class="fb-tab" data-tab="blocked">Bloccati</button>
-      <button type="button" class="fb-tab" data-tab="clarify">Chiarimenti</button>
-      <button type="button" class="fb-tab" data-tab="done">Risolti</button>
-      <button type="button" class="fb-tab" data-tab="verified">Verificati</button>
+      <button type="button" class="fb-tab" data-tab="queue">In coda</button>
+      <button type="button" class="fb-tab" data-tab="resolved">Risolti</button>
+      <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>
     </div>
 
     <div class="fb-toolbar">
       <input type="search" id="search" class="fb-search" placeholder="Cerca per testo, URL, clientId…" />
+      <!-- I ritrovamenti automatici (agente esploratore e audit delle routine)
+           avevano una sezione tutta loro; una sezione in più però è una regola
+           in più che diverge dalla gemella. Sono un FILTRO: la sezione resta
+           quella della macchina a stati, e il numero segue il filtro. -->
+      <label class="fb-filter" title="Mostra solo i ritrovamenti dell'agente esploratore e degli audit delle routine">
+        <input type="checkbox" id="agentOnly" />
+        <span>🤖 Solo automatici</span>
+      </label>
       <button class="sn-btn sn-btn-secondary" id="refresh">Aggiorna</button>
       <span class="fb-count" id="count"></span>
     </div>
