@@ -1908,48 +1908,24 @@
     // Bolle chat
     renderThread(fb);
 
-    // Azioni contestuali (owner-only):
-    //  - feedback bloccato dal pipeline → "Accetta e sblocca";
-    //  - feedback allineato ancora nei Ricevuti (automatica OFF) → "Approva e
-    //    metti in coda" (problema #2: senza automatica serve un'approvazione manuale);
-    //  - feedback in chiarimento → box di risposta che lo rimette in coda;
-    //  - altrimenti nessuna azione.
+    // L'etichetta di stato: le stesse parole della gemella, lette dal modulo
+    // condiviso. Senza, questa pagina non diceva da nessuna parte che una
+    // segnalazione era, per esempio, un attacco confermato.
+    renderDetailState(fb);
+
+    // Azioni di stato (owner-only). QUALI sono NON lo decide più questa pagina:
+    // le legge da MR.ownerActions, la stessa tabella che disegna i pulsanti
+    // della pagina dei feedback. Prima erano due insiemi costruiti a mano, e
+    // sulla stessa segnalazione offrivano cose diverse (#509, terzo giro).
     //
-    // Stato illeggibile: nessuna. I pulsanti nascono dallo stato, e su una
-    // segnalazione cifrata la macchina lo inventa (`unlabeled` → "bloccato"):
-    // offrire "Accetta e sblocca" o "Conferma attacco" su una pratica che
-    // potrebbe essere già chiusa è peggio che non offrire niente. È la stessa
-    // regola della gemella, che lì spegne i pulsanti della scheda.
-    const isBlocked = leggibile && MR.classifyBlock(fb) !== null;
-    const tab = leggibile ? MR.manageTabFor(fb, { releasedVersion }) : null;
-    const alignedInbox = leggibile && MR.isAligned(fb) && tab === 'inbox';
+    // Stato illeggibile: la tabella non offre niente e il blocco sparisce. I
+    // pulsanti nascono dallo stato, e su una segnalazione cifrata la macchina
+    // lo inventa (`unlabeled`): offrire "→ In coda" o "Conferma attacco" su una
+    // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
     const normSel = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
     // design con domande (ex clarify) → box risposta; legacy clarify idem.
     const isClarify = normSel.status === 'design' && (normSel.statusReason === 'clarify' || (fb.status || '') === 'clarify');
-    mgActions.hidden = !(isAdmin && (isBlocked || alignedInbox));
-    // "Conferma blocco" (macchina a stati): per attack/spam/suspicious_file
-    // l'owner può confermare — il feedback diventa attack_confirmed/
-    // spam_confirmed (terminale, esce dai Ricevuti, resta in Archiviati sotto
-    // il filtro "Bloccati confermati").
-    if (mgConfirmBtn) {
-      const conf = normSel.status === 'spam' ? 'spam_confirmed'
-        : (normSel.status === 'attack' || normSel.status === 'suspicious_file') ? 'attack_confirmed'
-        : null;
-      mgConfirmBtn.hidden = !conf;
-      mgConfirmBtn.dataset.confirmStatus = conf || '';
-      mgConfirmBtn.textContent = conf === 'spam_confirmed' ? 'Conferma spam' : 'Conferma attacco';
-    }
-    // Etichetta/placeholder del box: sblocco per i bloccati, approvazione per gli
-    // allineati. L'azione sottostante è la stessa (accetta → In coda).
-    if (isBlocked) {
-      mgAcceptBtn.textContent = 'Accetta e sblocca';
-      mgAcceptComment.placeholder = 'Commento (opzionale): perché lo sblocchi…';
-    } else {
-      mgAcceptBtn.textContent = 'Approva e metti in coda';
-      mgAcceptComment.placeholder = 'Commento (opzionale): perché lo approvi…';
-    }
-    mgAcceptComment.value = '';
-    setActionMsg('', '');
+    renderActions(fb);
     mgClarify.hidden = !(isAdmin && isClarify);
     mgClarifyText.value = '';
     setClarifyMsg('', '');
