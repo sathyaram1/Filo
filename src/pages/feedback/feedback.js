@@ -470,13 +470,18 @@
   // testo che si salvano da sole mentre ci si scrive dentro: ridisegnare
   // rimpiazza la casella sotto le dita — mangia gli spazi appena battuti e fa
   // sparire il pulsante che si stava per premere, così il primo clic va perso.
-  async function patch(id, payload, optimistic, { silenzioso = false } = {}) {
+  // `inPlace`: non ridisegnare la lista MAI, né al successo né all'errore. Lo
+  // usano le azioni della scheda, che si aggiornano da sole al proprio posto
+  // (vedi "Un clic, una scheda" più sotto): anche un ridisegno al fallimento
+  // rimescolerebbe la lista sotto il puntatore fermo.
+  // Ritorna true se la scrittura è andata a buon fine.
+  async function patch(id, payload, optimistic, { silenzioso = false, inPlace = false } = {}) {
     if (!isAdmin) {
       alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
-      return;
+      return false;
     }
     const item = all.find((f) => f._id === id);
-    if (!item) return;
+    if (!item) return false;
     // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano
     // sta QUI e non sui singoli pulsanti perché i cammini che scrivono le note
     // sono più d'uno (la casella, gli allegati, la risposta ai chiarimenti): uno
