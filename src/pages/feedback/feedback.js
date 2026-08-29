@@ -726,7 +726,7 @@
     const viva = card && card.isConnected ? card : null;
     if (ok) {
       decise.set(id, esito);
-      marcaDecisa(viva, esito);
+      marcaDecisa(viva, esito, item);
     } else if (viva) {
       btn.classList.remove('fb-act--busy');
       riaccendiScheda(viva);
