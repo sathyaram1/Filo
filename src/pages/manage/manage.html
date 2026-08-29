@@ -943,9 +943,11 @@
                  passaggi dell'iter + se un'istanza ci lavora in questo momento. -->
             <div class="mg-work-state" id="mgWorkState" hidden></div>
             <div class="mg-thread" id="mgThread"></div>
-            <!-- Azioni di revisione (owner-only): sblocca il feedback con un
-                 commento opzionale; rientra nella coda di lavoro (todo).
-                 Mostrate solo per i feedback bloccati dal pipeline. -->
+            <!-- Azioni di stato (owner-only): quali siano lo dice la tabella
+                 condivisa (MR.ownerActions), non questa pagina. Il commento di
+                 revisione accompagna le decisioni sui Ricevuti. Il blocco
+                 sparisce quando lo stato non si legge: i pulsanti nascono dallo
+                 stato, e su una segnalazione cifrata la macchina se lo inventa. -->
             <div class="mg-actions" id="mgActions" hidden>
               <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
                 placeholder="Commento (opzionale): perché lo sblocchi…"></textarea>
