@@ -111,6 +111,14 @@ possibilità di crearne di nuovi.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 
+Le tab sono QUATTRO e valgono per OGNI superficie che elenca feedback — la
+dashboard di gestione (`filo://manage`) e la pagina dei feedback
+(`filo://feedback`), che fino al #509 aveva una tassonomia sua (la vecchia
+new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
+"Ricevuti" tutto ciò che non riconosceva: stessa coda, "Ricevuti (3)" di là e
+"Ricevuti (9)" di qua. Una superficie nuova non inventa sezioni: chiama
+`manageTabFor` / `listForManageTab` / `manageTabCounts`.
+
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
