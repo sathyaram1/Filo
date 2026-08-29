@@ -213,6 +213,12 @@ function trapPage() {
       <a id="s12a" href="https://trap.example/s12" style="position:absolute;left:60px;top:20px;width:320px;height:180px"><img id="s12img" src="${GIF}" style="width:320px;height:180px" alt=""></a>
       <div id="s12panel" style="position:absolute;inset:0;background:#fafafa"></div>
     </div>
+    <!-- S13: scheda con link che NON riceve i click (pointer-events:none) -->
+    <div id="s13" class="cardish" style="position:relative;width:320px;height:180px">
+      <img id="s13img" src="${GIF}" style="position:absolute;inset:0;width:100%;height:100%" alt="">
+      <a id="s13a" href="https://trap.example/s13" style="position:absolute;inset:0;pointer-events:none"></a>
+      <div id="s13veil" style="position:absolute;inset:0;background:transparent"></div>
+    </div>
     <div style="height:200px"></div>
   </body></html>`;
 }
