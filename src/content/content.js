@@ -841,6 +841,23 @@
   // devono fermarsi. Le misure vere stanno da una parte e dall'altra del 45%.
   const HIDDEN_FRACTION = 0.45;
 
+  // L'alfa più basso fra i colori di un'immagine CSS (i gradienti, nel
+  // computed style, serializzano i colori come rgb()/rgba()). Se non si trova
+  // nessun colore leggibile si risponde 1: nel dubbio la sfumatura copre —
+  // l'errore prudente spegne una voce di menu, quello imprudente regala al
+  // menu un collegamento scelto dalla pagina.
+  function minAlphaInCssImage(bg) {
+    let min = Infinity;
+    const re = /rgba?\([^)]+\)/g;
+    let m;
+    while ((m = re.exec(bg))) {
+      const a = colorAlpha(m[0]);
+      if (a < min) min = a;
+    }
+    if (/\btransparent\b/.test(bg)) min = 0;
+    return min === Infinity ? 1 : min;
+  }
+
   // Il candidato adottato da sotto è NASCOSTO da uno strato dipinto che non è
   // la sua faccia? La sua faccia sono: lui stesso, i suoi parenti nel DOM, una
   // copertina (immagine, filmato, disegno, o un contenitore con un'immagine di
