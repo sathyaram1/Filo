@@ -548,6 +548,10 @@
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
+    // Stato illeggibile: i pulsanti nascono dalla sezione, e la sezione qui non
+    // si sa. Offrire "→ In coda" a un feedback che potrebbe essere già chiuso
+    // sarebbe peggio che non offrire niente.
+    if (!sezioniAttendibili()) return '';
     const id = escapeHtml(f._id);
     const status = statusOf(f);
     const tab = tabOf(f);
