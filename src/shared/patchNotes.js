@@ -20,7 +20,9 @@
       features: [
         'Ora puoi insegnare una regola a Filo a parole: «ricordati che non bevo caffè», «d\'ora in poi rispondimi senza elenchi». La fissa nelle sue lezioni e vale da subito in tutte le conversazioni; la ritrovi (e la cancelli) fra le sue memorie.',
       ],
-      fixes: [],
+      fixes: [
+        'Nella pagina dei feedback le tue segnalazioni non finiscono più tutte sotto «Ricevuti» mentre le altre sezioni dicono zero. Le trovi in un elenco solo, e accanto a ognuna c\'è scritto se è aperta o chiusa.',
+      ],
     },
     {
       version: '0.2.207', date: '2026-08-28',
