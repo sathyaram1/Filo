@@ -1149,6 +1149,27 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (wrote) broadcastLiveUpdate();
         return { executed: wrote, kept: false };
       }
+      case 'SALVA_LEZIONE': {
+        // Filo fissa una lezione nella PROPRIA memoria su richiesta (o di sua
+        // iniziativa) in chat: la regola entra nel buffer delle lezioni — lo
+        // stesso che l'agente-lezioni riempie da solo — e da subito compare in
+        // LEZIONI RECENTI di ogni conversazione. Visibile e cancellabile
+        // dall'utente fra le memorie, come tutte le lezioni.
+        const lezione = String(action.testo ?? action.text ?? action.lezione ?? '').trim();
+        let fissata = false;
+        if (lezione) {
+          try {
+            await FiloMem.appendLesson(lezione);
+            fissata = true;
+            if (await FiloMem.lessonsBufferShouldCompact()) {
+              maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
+            }
+          } catch (e) {
+            console.warn('[Filo] salvataggio lezione fallito', e?.message || e);
+          }
+        }
+        return { executed: fissata, kept: false };
+      }
       case 'INVIA_FEEDBACK': {
         // Filo invia un feedback a nome dell'utente (#146.5). Livello 2: a
         // questo punto la conferma è già passata (il gate sopra ha lasciato
