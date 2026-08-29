@@ -1290,8 +1290,8 @@
     if (noSectionsEl) {
       noSectionsEl.hidden = ok;
       if (!ok) {
-        noSectionsEl.textContent = 'Su questo computer gli stati delle segnalazioni non si leggono: '
-          + 'le trovi tutte qui sotto, in un elenco solo.';
+        noSectionsEl.textContent = 'Questo computer non può leggere lo stato delle segnalazioni. '
+          + 'Le trovi tutte qui sotto, in un elenco solo.';
       }
     }
     return ok;
