@@ -75,7 +75,7 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
     // Il nome e il suo numero restano sulla stessa riga (una riga di testo,
     // più il padding verticale): mai "In coda" / "(0)" spezzati.
     expect(s.wrap, `scheda "${s.testo}"`).toBe('nowrap');
-    expect(s.height, `scheda "${s.testo}" su più righe`).toBeLessThan(s.riga * 2);
+    expect(s.righe, `scheda "${s.testo}" spezzata su più righe`).toBe(1);
   }
   // A questa larghezza almeno una scheda è andata a capo.
   expect(Math.max(...geo.schede.map((s) => s.top))).toBeGreaterThan(geo.firstTop);
