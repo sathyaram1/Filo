@@ -1252,6 +1252,11 @@
   // i bloccati gravi in cima ai Ricevuti, le lavorazioni attive in cima alla
   // coda). Sopra passa solo il filtro "Solo automatici", che è di questa pagina.
   function sectionBase(tab) {
+    // Stati illeggibili: niente sezioni, un elenco solo (i più recenti in cima).
+    if (!sezioniAttendibili()) {
+      return all.slice().sort((a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    }
     const t = tab || currentTab;
     // "Archiviati" ha regole sue (i confermati, i preferiti): la sua lista la
     // costruisce listArchiveTab, esattamente come nella gemella.
@@ -1261,10 +1266,7 @@
   }
 
   function sectionItems(tab) {
-    // Stati illeggibili: niente sezioni, un elenco solo (i più recenti in cima).
-    const items = sezioniAttendibili()
-      ? sectionBase(tab)
-      : all.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const items = sectionBase(tab);
     return agentOnly ? items.filter(isAgent) : items;
   }
 
