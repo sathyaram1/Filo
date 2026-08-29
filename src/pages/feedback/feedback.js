@@ -806,16 +806,35 @@
 
     listEl.querySelectorAll('.fb-act').forEach((b) => {
       b.addEventListener('click', () => {
-        const to = b.dataset.to; // 'todo' | 'done' | 'new' | 'ignored'
+        const to = b.dataset.to; // stato CANONICO (todo | done | archived | *_confirmed)
         const id = b.dataset.id;
         const payload = { status: to };
-        // Quando passo da inbox a "todo", porto con me eventuali note + allegati
-        // già scritti (notesValueOf ricompone capo modificato + coda intatta).
+        const ottimistico = { status: to };
+        // Gli stessi campi che scrive la dashboard di gestione, o le due pagine
+        // lascerebbero due tracce diverse della stessa decisione.
+        if (b.dataset.accept) {
+          // Override dell'owner: toglie il blocco dei giudici e rimette in coda.
+          payload.reviewDecision = 'accepted';
+          payload.reviewedAt = new Date().toISOString();
+          ottimistico.reviewDecision = 'accepted';
+        }
+        if (b.dataset.reject) {
+          payload.reviewDecision = 'rejected';
+          payload.reviewedAt = new Date().toISOString();
+          ottimistico.reviewDecision = 'rejected';
+        }
+        // Archiviazione a mano = scelta esplicita: vince per sempre
+        // sull'auto-archiviazione a punteggio (DC3), in un verso e nell'altro.
+        if (b.dataset.archive) { payload.archiveOverride = 'archived'; ottimistico.archiveOverride = 'archived'; }
+        if (b.dataset.restore) { payload.archiveOverride = 'keep_open'; ottimistico.archiveOverride = 'keep_open'; }
+        // Quando metto in coda un feedback appena arrivato porto con me le note
+        // + allegati già scritti (notesValueOf ricompone capo modificato + coda
+        // intatta).
         const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
-        if (ta) payload.notes = notesValueOf(ta);
+        if (ta) { payload.notes = notesValueOf(ta); ottimistico.notes = payload.notes; }
         const frase = listEl.querySelector(`.fb-usernote[data-id="${cssEsc(id)}"]`);
-        if (frase) payload.userNote = frase.value.slice(0, 500);
-        patch(id, payload, { status: to, notes: payload.notes, userNote: payload.userNote });
+        if (frase) { payload.userNote = frase.value.slice(0, 500); ottimistico.userNote = payload.userNote; }
+        patch(id, payload, ottimistico);
       });
     });
 
