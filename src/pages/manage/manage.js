@@ -2268,6 +2268,12 @@
         + 'rispondere adesso la sostituirebbe. Configura la chiave e riprova.', 'err');
       return;
     }
+    // Lo stesso guardiano delle azioni di stato: rispondere rimette in coda, e
+    // in coda ci si rimette solo da dove la tabella condivisa lo prevede.
+    if (fb && !MR.ownerActionAllowsStatus(fb, 'todo', { releasedVersion })) {
+      setClarifyMsg('Lo stato di questa segnalazione è cambiato: aggiorna e riprova.', 'err');
+      return;
+    }
     const newNotes = T
       ? T.appendUserTurn(oldNotes, reply, {})
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
