@@ -544,15 +544,42 @@
   // Lista per la tab Archiviati:
   //   starredOnly=false → i feedback in stato `archived` (recenti prima);
   //   starredOnly=true  → tutti i preferiti ⭐, di qualunque status (recenti prima).
+  //   confirmedOnly=true → di quelli, solo gli attacchi/spam CONFERMATI.
+  // I due filtri della colonna vivono qui, non nella pagina: il conteggio della
+  // scheda deve poter contare esattamente ciò che la lista mostra (un contatore
+  // che non segue i filtri sembra mentire).
   function listArchiveTab(feedbacks, opts) {
     const starredOnly = !!(opts && opts.starredOnly);
-    const items = (feedbacks || []).filter((f) =>
+    const confirmedOnly = !!(opts && opts.confirmedOnly);
+    let items = (feedbacks || []).filter((f) =>
       starredOnly ? isStarred(f) : manageTabFor(f) === 'archived');
+    if (confirmedOnly) {
+      items = items.filter((f) => String(normalizeStatus(f).status).endsWith('_confirmed'));
+    }
     return items.slice().sort((a, b) => {
       const ta = new Date(a.createdAt || 0).getTime();
       const tb = new Date(b.createdAt || 0).getTime();
       return tb - ta;
     });
+  }
+
+  // ── Quanti feedback ci sono in ogni scheda-lista (#495) ───────────────────
+  // Conta ESATTAMENTE ciò che la scheda elencherebbe, riusando le stesse
+  // funzioni che costruiscono le liste: un numero calcolato con una regola sua
+  // prima o poi diverge da quello che si vede aprendo la scheda. Per Ricevuti /
+  // In coda / Risolti l'ordinamento non cambia la lunghezza, quindi basta
+  // l'appartenenza (manageTabFor, lo stesso filtro di listForManageTab);
+  // Archiviati passa da listArchiveTab perché ha regole e filtri suoi.
+  // `opts`: { releasedVersion, starredOnly, confirmedOnly }. PURA.
+  function manageTabCounts(feedbacks, opts) {
+    const list = feedbacks || [];
+    const counts = { inbox: 0, queue: 0, resolved: 0, archived: 0 };
+    for (const f of list) {
+      const tab = manageTabFor(f, opts);
+      if (tab === 'inbox' || tab === 'queue' || tab === 'resolved') counts[tab]++;
+    }
+    counts.archived = listArchiveTab(list, opts).length;
+    return counts;
   }
 
   // ── DC1: la board utente (filo://board/) ─────────────────────────────────
@@ -667,7 +694,7 @@
     normalizeStatus,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     workProgress, WORK_STAGES,
-    isStarred, listArchiveTab, isShipped, cmpVersion, listBoardTab,
+    isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient,
     panelComplete, judgesNote, reasonText,

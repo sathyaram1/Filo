@@ -133,6 +133,8 @@
   // ── Stato ─────────────────────────────────────────────────────────────────
   let isAdmin       = false;
   let allFeedbacks  = [];       // tutti i feedback caricati
+  let dataLoaded    = false;    // i feedback sono arrivati davvero (vs. in corso/fallito)
+  let loadFailed    = false;    // l'ultimo caricamento è fallito (≠ non ancora finito)
   let currentTab    = 'inbox';  // tab lista attiva (inbox/queue/resolved/archived)
   let currentList   = [];       // feedback della tab corrente, ordinati
   let selectedId    = null;     // ID del feedback selezionato nel pannello centrale
@@ -1203,10 +1205,59 @@
     reflectSortBtn();
   }
 
+  // ── Quanti feedback ci sono in ogni scheda (#495) ─────────────────────────
+  // Le quattro schede che ELENCANO feedback (Ricevuti, In coda, Risolti,
+  // Archiviati) portano il loro numero accanto al nome, come la pagina gemella
+  // dei feedback. Le altre quattro (Statistiche, Modelli, Automazioni, Log) non
+  // elencano niente: lì un numero non vorrebbe dire nulla e non si scrive.
+  // Il conteggio degli Archiviati segue i filtri della colonna (⭐ e "Bloccati
+  // confermati"), altrimenti direbbe un numero diverso da quello che si vede.
+  // Finché i feedback non sono arrivati (caricamento in corso, o fallito) non
+  // si scrive nessun numero: uno "(0)" là dove il dato manca è un numero falso.
+  // Il caricamento si ferma ai 500 più recenti: quando li tocca tutti, i numeri
+  // diventano "(24+)" — sono minimi, non totali — e l'hover dice perché.
+  function loadHitCap() {
+    return FB.listHitCap(allFeedbacks, FB.LIST_PAGE_SIZE);
+  }
+  // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
+  // l'intestazione della colonna e per la ricerca.
+  function countText(n) {
+    return FB.countLabel(n, loadHitCap());
+  }
+
+  // Intestazione della colonna: nome + quante ne sta mostrando. `n === null`
+  // (dato non ancora arrivato, o ricerca non ancora fatta) → solo il nome.
+  function setListHead(label, n) {
+    if (!mgListHead) return;
+    mgListHead.textContent = (n === null || n === undefined)
+      ? label
+      : `${label} ${countText(n)}`;
+    if (n !== null && n !== undefined && loadHitCap()) mgListHead.title = FB.COUNT_CAP_HINT;
+    else mgListHead.removeAttribute('title');
+  }
+
+  function updateTabCounts() {
+    const counts = dataLoaded
+      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
+      : null;
+    const capped = counts ? loadHitCap() : false;
+    for (const tab of LIST_TABS) {
+      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
+      if (!btn) continue;
+      btn.textContent = counts ? `${TAB_LABELS[tab] || tab} ` : (TAB_LABELS[tab] || tab);
+      if (capped) btn.title = FB.COUNT_CAP_HINT;
+      else btn.removeAttribute('title');
+      if (!counts) continue;
+      const badge = document.createElement('span');
+      badge.className = 'mg-tab-count';
+      badge.textContent = countText(counts[tab]);
+      btn.appendChild(badge);
+    }
+  }
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
-    if (mgListHead) mgListHead.textContent = TAB_LABELS[currentTab] || '';
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
 
     // Il filtro ⭐ esiste solo nella tab Archiviati (DB2).
@@ -1216,11 +1267,10 @@
     // Sottoinsieme della tab corrente, ordinato (logica pura condivisa).
     if (isArchived) {
       // OFF = solo i feedback `archived`; ON = tutti i preferiti ⭐ (ogni stato).
-      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly });
-      // Filtro "Bloccati confermati": solo gli attacchi/spam confermati.
-      if (confirmedOnly) {
-        currentList = currentList.filter((f) => String(MR.normalizeStatus(f).status).endsWith('_confirmed'));
-      }
+      // Il filtro "Bloccati confermati" (solo attacchi/spam confermati) è dentro
+      // listArchiveTab: la stessa funzione conta la scheda, così il numero non
+      // può discostarsi dalla lista.
+      currentList = MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly });
       mgListEmpty.textContent = confirmedOnly
         ? 'Nessun attacco o spam confermato.'
         : starredOnly
@@ -1238,6 +1288,17 @@
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
     currentList = applySortMode(currentList);
 
+    // #495: quante ne contiene ogni scheda, senza doverle aprire. L'ordinamento
+    // non cambia il numero, quindi si può contare qui.
+    updateTabCounts();
+    setListHead(TAB_LABELS[currentTab] || '', dataLoaded ? currentList.length : null);
+
+    // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
+    // feedback più vecchi non sono qui. Il vuoto lo dice, invece di negarli.
+    if (loadHitCap() && dataLoaded) {
+      mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_CAP_HINT}`;
+    }
+
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
     // almeno un feedback bianco (panel parziale) da ri-valutare.
     updateReevalBar();
@@ -1248,6 +1309,15 @@
     // Svuota SEMPRE: se la lista torna vuota (es. dopo uno sblocco) non deve
     // restare la card vecchia in un contenitore nascosto.
     mgList.innerHTML = '';
+
+    // Dato non arrivato (caricamento in corso, o fallito): il riquadro vuoto non
+    // può dire "qui non c'è niente", perché non lo sappiamo. È la stessa cautela
+    // dei numeri sulle schede (#495), applicata alle parole.
+    if (!dataLoaded) {
+      mgListEmpty.textContent = loadFailed
+        ? 'Errore nel caricamento dei feedback.'
+        : 'Caricamento dei feedback…';
+    }
 
     if (currentList.length === 0) {
       mgList.hidden = true;
@@ -1539,8 +1609,9 @@
     if (mgSearchBar) mgSearchBar.hidden = false;
     toggleSearchIcon(true);
     setSearchMsg('', null);
-    // La lista mostra un invito finché non si cerca davvero.
-    if (mgListHead) mgListHead.textContent = 'Ricerca';
+    // La lista mostra un invito finché non si cerca davvero: nessun numero,
+    // perché non c'è ancora niente da contare (#495).
+    setListHead('Ricerca', null);
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.hidden = true;
@@ -1567,23 +1638,34 @@
   // (il perché è pertinente) vive nel tooltip, non nel colore del bordo.
   function renderSearchResults(results, opts) {
     const fallback = !!(opts && opts.fallback);
-    if (mgListHead) mgListHead.textContent = 'Ricerca';
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.innerHTML = '';
     setSearchMsg(fallback ? 'Modello non disponibile: mostro i risultati per testo.' : '', null);
 
-    if (!results.length) {
+    // "Nessun risultato" al tetto del caricamento significa "nessuno fra quelli
+    // caricati": la ricerca legge solo i feedback che stanno in pagina.
+    const nessuno = () => {
       mgList.hidden = true;
       mgListEmpty.hidden = false;
-      mgListEmpty.textContent = 'Nessun feedback pertinente.';
+      mgListEmpty.textContent = 'Nessun feedback pertinente.'
+        + (loadHitCap() ? ` ${FB.COUNT_CAP_HINT}` : '');
+    };
+
+    if (!results.length) {
+      // Quanti ne ha trovati è esattamente la domanda della ricerca: zero è una
+      // risposta, e si scrive come le altre (#495).
+      setListHead('Ricerca', 0);
+      nessuno();
       return;
     }
     mgListEmpty.hidden = true;
     mgList.hidden = false;
+    let shown = 0;
     for (const res of results) {
       const fb = allFeedbacks.find((f) => f._id === res.id);
       if (!fb) continue;
+      shown++;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const item = document.createElement('div');
@@ -1599,13 +1681,18 @@
       item.addEventListener('click', () => openDetail(fb._id));
       mgList.appendChild(item);
     }
+    // Il numero è quello delle card DAVVERO disegnate: un risultato il cui
+    // feedback non è più fra i caricati non viene mostrato, e non va contato.
+    setListHead('Ricerca', shown);
+    if (!shown) nessuno();
   }
 
   async function runSearch(rawQuery) {
     if (!searchMode || !SRCH) return;
     const query = String(rawQuery || '').trim();
     if (!query) {
-      // Campo svuotato: torna all'invito.
+      // Campo svuotato: torna all'invito — e il numero se ne va con i risultati.
+      setListHead('Ricerca', null);
       mgList.hidden = true; mgList.innerHTML = '';
       mgListEmpty.hidden = false; mgListEmpty.textContent = 'Scrivi cosa cerchi e premi Invio.';
       setSearchMsg('', null);
@@ -1619,7 +1706,9 @@
       return;
     }
 
-    // Stato "sto cercando".
+    // Stato "sto cercando": via il numero della ricerca precedente, che qui
+    // sarebbe già falso.
+    setListHead('Ricerca', null);
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.hidden = true; mgList.innerHTML = '';
@@ -1821,6 +1910,10 @@
       const r = await sendToMain({ type: 'feedback_update', id, starred: next });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.starred = next;
+      // Col filtro ⭐ acceso gli Archiviati elencano i preferiti: cambiarne uno
+      // cambia quel numero anche da un'altra scheda, dove la lista non si
+      // ridisegna. Il conteggio si aggiorna comunque.
+      updateTabCounts();
       // Nell'attesa il pannello può essere passato a un altro feedback:
       // ridipingerlo con lo stato di questo direbbe il falso su quello aperto.
       if (selectedId !== id) { if (currentTab === 'archived' && starredOnly) renderList(); return; }
@@ -2514,8 +2607,16 @@
     }
 
     try {
-      allFeedbacks = await FB.list({ pageSize: 500 });
+      // Il tetto viene dal modulo condiviso: `loadHitCap()` confronta contro
+      // QUELLO, e due numeri scritti a mano prima o poi divergono.
+      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE });
+      dataLoaded = true;
+      loadFailed = false;
     } catch (err) {
+      // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
+      // una scheda rirende il riquadro, e senza questo flag ci scriverebbe
+      // "Nessun feedback in coda." — cioè una risposta al posto di un guasto.
+      loadFailed = true;
       mgListLoading.hidden = true;
       mgListEmpty.hidden = false;
       mgListEmpty.textContent = 'Errore nel caricamento dei feedback.';
@@ -2551,6 +2652,8 @@
   window.__mgTest = {
     setData(fbs) {
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      dataLoaded = true;
+      loadFailed = false;
       // Reindicizza per mittente (il pannello laterale lo usa).
       allByClient = {};
       for (const fb of allFeedbacks) {

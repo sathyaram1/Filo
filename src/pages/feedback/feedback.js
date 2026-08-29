@@ -43,6 +43,13 @@
   // I 'ignored' restano nascosti (raggiungibili solo riaprendoli via DB).
   let all = [];
   let currentTab = 'inbox';
+  // I feedback sono arrivati davvero (vs. caricamento in corso o fallito).
+  // Finché è false la pagina non conosce nessun numero: le sezioni restano col
+  // solo nome — stessa cautela della dashboard di gestione (#495).
+  let dataLoaded = false;
+  // Ultimo caricamento fallito: la frase d'errore + "Riprova" da rimettere in
+  // pagina se un re-render (un click su una sezione) svuota il riquadro.
+  let loadError = null;
   // Numero di generazione dei caricamenti: ogni load() ne prende uno nuovo, e
   // butta il proprio risultato se nel frattempo ne è partito un altro (o un
   // test ha iniettato dati con __fbTest.setData). Senza questo, il caricamento
@@ -552,6 +559,14 @@
     if (!items.length) {
       listEl.innerHTML = '';
       emptyEl.hidden = false;
+      // Caricamento fallito: qui non c'è una sezione vuota, c'è una sezione che
+      // non sappiamo. "Nessun feedback in arrivo." sarebbe la stessa bugia dello
+      // "(0)" sulle sezioni, per giunta al posto dell'unico tasto che permette
+      // di riprovare. Resta l'errore finché il dato non arriva davvero.
+      if (loadError && !dataLoaded) {
+        showLoadError(loadError);
+        return;
+      }
       // Se il vuoto dipende dalla ricerca (e non dal tab davvero vuoto),
       // dillo: il testo "Nessun feedback…" sembrerebbe un tab svuotato.
       const q = (searchEl.value || '').trim();
@@ -986,11 +1001,20 @@
       const s = statusOf(f);
       if (s in counts) counts[s]++;
     }
+    // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
+    // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
+    // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
+    // E finché i feedback non sono arrivati (caricamento in corso, o fallito)
+    // non si scrive nessun numero: "(0)" direbbe "qui non c'è niente" mentre la
+    // verità è che non lo sappiamo ancora.
+    const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
     for (const [tab, n] of Object.entries(counts)) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
       const label = { inbox: 'Ricevuti', agent: 'Agente', draft: 'Bozze', todo: 'Da risolvere', review: 'In revisione', blocked: 'Bloccati', clarify: 'Chiarimenti', done: 'Risolti', verified: 'Verificati' }[tab];
-      btn.textContent = `${label} (${n})`;
+      btn.textContent = dataLoaded ? `${label} ${SN_FEEDBACK.countLabel(n, capped)}` : label;
+      if (capped) btn.title = SN_FEEDBACK.COUNT_CAP_HINT;
+      else btn.removeAttribute('title');
     }
   }
 
@@ -1014,6 +1038,26 @@
     return { ...f, notes: String((f && f.userNote) || '').trim(), reportIllegibile: true };
   }
 
+  // La frase d'errore comprensibile (mai il "Failed to fetch" grezzo) + il tasto
+  // per riprovare. Sta in una funzione perché serve in due momenti: quando il
+  // caricamento fallisce e ogni volta che un re-render svuoterebbe il riquadro.
+  function showLoadError(msg) {
+    listEl.innerHTML = '';
+    countEl.textContent = '';
+    emptyEl.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'fb-load-error-msg';
+    p.textContent = msg;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fb-load-retry';
+    btn.textContent = '↻ Riprova';
+    btn.addEventListener('click', () => load());
+    emptyEl.appendChild(p);
+    emptyEl.appendChild(btn);
+    emptyEl.hidden = false;
+  }
+
   async function load() {
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
@@ -1021,7 +1065,7 @@
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
-      let list = await SN_FEEDBACK.list({ pageSize: 500, timeoutMs: 8000 });
+      let list = await SN_FEEDBACK.list({ pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000 });
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).
@@ -1039,6 +1083,9 @@
       // illeggibile mostriamo la frase scritta per chi ha segnalato — e se non
       // c'è, niente: una bolla vuota è meglio di una bolla di ciphertext.
       all = list.map(sanitizeReportForReader);
+      // Da qui in poi i numeri delle sezioni sono veri e si possono scrivere.
+      dataLoaded = true;
+      loadError = null;
       applyFilter();
     } catch (e) {
       if (gen !== loadGen) return;
@@ -1046,23 +1093,10 @@
       // grezzo) + un tasto per riprovare, invece di lasciare l'utente bloccato a
       // chiudere e riaprire la pagina. Stesso pattern della bacheca (SN_CHAT_ERRORS).
       console.error('[feedback] errore caricamento:', e);
-      listEl.innerHTML = '';
-      countEl.textContent = '';
-      const msg = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+      loadError = (window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
         ? SN_CHAT_ERRORS.sentence(e)
         : 'Non è stato possibile caricare i feedback: controlla la connessione e riprova.';
-      emptyEl.innerHTML = '';
-      const p = document.createElement('p');
-      p.className = 'fb-load-error-msg';
-      p.textContent = msg;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'fb-load-retry';
-      btn.textContent = '↻ Riprova';
-      btn.addEventListener('click', () => load());
-      emptyEl.appendChild(p);
-      emptyEl.appendChild(btn);
-      emptyEl.hidden = false;
+      showLoadError(loadError);
     }
   }
 
@@ -1207,6 +1241,9 @@
     setData(fbs) {
       loadGen++; // il caricamento reale in volo, se c'è, viene scartato
       all = (Array.isArray(fbs) ? fbs : []).map(sanitizeReportForReader);
+      // Dati iniettati = dati arrivati: da qui i numeri delle sezioni si scrivono.
+      dataLoaded = true;
+      loadError = null;
       applyFilter();
     },
     setTab(tab) { selectTab(tab); },

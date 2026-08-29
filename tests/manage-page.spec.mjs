@@ -45,10 +45,15 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
 
   // 8 tab della dashboard unificata.
   await expect(page.locator('.mg-tab')).toHaveCount(8);
-  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti');
-  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda');
-  await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti');
-  await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati');
+  // Con i feedback caricati (qui: nessuno) le quattro schede-lista dicono
+  // quante ne contengono, le altre quattro no (#495).
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.setData([]));
+  await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
+  await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
+  await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
+  await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
@@ -60,18 +65,23 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   // "Ricevuti" attiva di default → mostra il pannello lista condiviso.
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveClass(/mg-tab--active/);
   await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
-  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (0)');
 });
 
 test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arrivo" (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo l'intestazione.
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.setData([]));
+
+  // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo
+  // l'intestazione — che dice anche quanti feedback sta mostrando (#495).
   for (const [tab, head] of [['queue', 'In coda'], ['resolved', 'Risolti'], ['archived', 'Archiviati'], ['inbox', 'Ricevuti']]) {
     await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
     await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
-    await expect(page.locator('#mgListHead')).toHaveText(head);
+    await expect(page.locator('#mgListHead')).toHaveText(`${head} (0)`);
   }
 
   // Statistiche Red Team → segnaposto dedicato.
@@ -777,7 +787,7 @@ test('un feedback "non filtrato" è bianco, sta nei Ricevuti, mostra i giudici m
   // Owner + dati: il bianco vive nei Ricevuti (tab di default).
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_UNFILTERED);
 
-  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item--unfiltered')).toHaveCount(1);
   const border = await page.locator('.mg-item').evaluate((el) => getComputedStyle(el).borderLeftColor);
@@ -1521,7 +1531,7 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   }, CLARIFY_FB);
 
   // Compare in Ricevuti.
-  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti');
+  await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
   // Apri il dettaglio: il box risposta chiarimenti è visibile. Con la macchina

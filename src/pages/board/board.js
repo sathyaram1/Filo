@@ -42,6 +42,12 @@
   let signedIn = false;
   let uid = null;               // uid Firebase REALE (claim id token), per votes.<uid>
   let allFeedbacks = [];
+  // I miglioramenti sono arrivati davvero, e — se no — perché. Serve a ogni
+  // ridisegno, non solo al primo: un re-render (es. dopo un login) ripartirebbe
+  // da una lista vuota e scriverebbe "Nessun miglioramento…" al posto
+  // dell'errore, portandosi via il tasto "Riprova" (#495).
+  let dataLoaded = false;
+  let lastLoadError = null;
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
@@ -97,6 +103,12 @@
 
   // ── Render ──────────────────────────────────────────────────────────────
   function renderList() {
+    // Caricamento fallito e mai riuscito: la lista è vuota perché non l'abbiamo,
+    // non perché non ci sia niente. Resta l'errore, con la via d'uscita.
+    if (!dataLoaded && lastLoadError) {
+      showLoadError(lastLoadError);
+      return;
+    }
     const items = MR.listBoardTab(allFeedbacks, { releasedVersion });
     bdLoading.hidden = true;
     if (bdError) bdError.hidden = true;
@@ -488,11 +500,16 @@
     }
 
     try {
-      allFeedbacks = await FB.list({ pageSize: 500, timeoutMs: LOAD_TIMEOUT_MS });
+      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      dataLoaded = true;
+      lastLoadError = null;
     } catch (err) {
       // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
       // il tasto Riprova e fermati qui (renderList mostrerebbe #bdEmpty).
+      // Il guasto resta in `lastLoadError`: i ridisegni successivi lo rileggono
+      // invece di ripiegare sul vuoto.
       console.error('[board] errore caricamento:', err);
+      lastLoadError = err;
       showLoadError(err);
       return;
     }
@@ -518,7 +535,8 @@
 
   // ── Hook di test (Playwright) — inerte in produzione ────────────────────
   window.__boardTest = {
-    setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; renderList(); },
+    // Dati iniettati = dati arrivati: azzera anche l'eventuale guasto ricordato.
+    setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; dataLoaded = true; lastLoadError = null; renderList(); },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     // Rilancia il caricamento reale (loadData): usato dai test per esercitare il
