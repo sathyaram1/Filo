@@ -29,7 +29,7 @@
 // test girano su repo git temporanei con un finto `origin`.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
