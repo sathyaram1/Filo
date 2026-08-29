@@ -181,3 +181,22 @@ test('#509 — se gli stati non si leggono la pagina tace invece di scrivere «(
   await expect(page.locator('.fb-card[data-id="c1"] .fb-state')).toHaveText('Chiusa');
   await expect(page.locator('.fb-card[data-id="c2"] .fb-state')).toHaveText('Aperta');
 });
+
+test('#509 — una segnalazione storta non toglie le sezioni a tutte le altre', async ({ openTab }) => {
+  // Il silenzio scatta quando la pagina non legge NESSUNO stato, che è il caso
+  // vero (o hai la chiave, o non ce l'hai). Con una sola illeggibile in mezzo a
+  // stati buoni la barra resta: toglierla farebbe divergere questa pagina dalla
+  // dashboard di gestione, cioè rimetterebbe il difetto che #509 doveva togliere.
+  const page = await openTab(FEEDBACK_URL);
+  await page.waitForFunction(() => Boolean(window.__fbTest), null, { timeout: 10_000 });
+  await page.evaluate(() => window.__fbTest.setData([
+    { _id: 'm1', seq: 41, status: 'FENC1:blob', statusPublic: 'open', name: 'Storta', text: 'Una', createdAt: '2026-08-20T10:00:00Z' },
+    { _id: 'm2', seq: 42, status: 'todo', name: 'In coda', text: 'Due', createdAt: '2026-08-19T10:00:00Z' },
+    { _id: 'm3', seq: 43, status: 'archived', name: 'Archiviata', text: 'Tre', createdAt: '2026-08-18T10:00:00Z' },
+  ]));
+
+  await expect(page.locator('#tabs')).toBeVisible();
+  await expect(page.locator('#noSections')).toBeHidden();
+  await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
+  await expect(page.locator('#tabs [data-tab="archived"]')).toHaveText('Archiviati (1)');
+});
