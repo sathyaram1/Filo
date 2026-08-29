@@ -984,14 +984,14 @@
               </div>
             </div>
 
-            <!-- Gestione del feedback (owner-only): preferito ⭐ + archivia /
-                 ripristina. Visibile per QUALUNQUE feedback selezionato, accanto
-                 alle azioni contestuali (sblocco / risposta ai chiarimenti). -->
+            <!-- Preferito ⭐ (owner-only): un flag in chiaro, indipendente dallo
+                 stato — per questo NON sta con le azioni di stato, che invece
+                 spariscono quando lo stato non si legge. Archivia/Ripristina
+                 è un'azione di stato e vive nella riga generata qui sopra. -->
             <div class="mg-actions mg-manage" id="mgManage" hidden>
               <div class="mg-actions-row">
                 <button type="button" class="mg-star-btn" id="mgStarBtn"
                   aria-pressed="false" title="Aggiungi ai preferiti">☆ Preferito</button>
-                <button type="button" class="sn-btn" id="mgArchiveBtn">Archivia</button>
                 <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
               </div>
             </div>
