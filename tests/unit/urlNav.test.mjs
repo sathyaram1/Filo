@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'urlNav.js'));
 const {
   looksLikeAddress, normalizeUrl, isLocalHost, isLocalNetworkName,
-  canonicalizeFiloUrl, isShareableAddress,
+  canonicalizeFiloUrl, isShareableAddress, describeDestination,
 } = globalThis.SN_URL_NAV;
 
 // ─── il cuore del fix #398: gli indirizzi locali sono INDIRIZZI ──────────────
@@ -203,4 +203,76 @@ test('#437 gli indirizzi veri restano copiabili', () => {
   assert.equal(isShareableAddress('tel:+390123'), true);
   assert.equal(isShareableAddress('magnet:?xt=urn:btih:abc'), true);
   assert.equal(isShareableAddress('filo://home/home.html'), true); // riapribile dentro Filo
+});
+
+// ─── #499: il menu deve dire DOVE PORTA il collegamento ─────────────────────
+//
+// Il tasto destro guarda anche sotto al punto cliccato per ritrovare il
+// collegamento di una scheda (#444). Una pagina può approfittarne: un
+// collegamento invisibile ritagliato con lo stesso ingombro di un paragrafo,
+// messo sotto, viene adottato dal menu — geometricamente è identico alla
+// copertina di una scheda vera, e nessuna misura sa distinguerli. Le quattro
+// voci del link agiscono allora su un indirizzo scelto dal sito, che da nessuna
+// parte si legge (Filo non ha una barra di stato che lo mostri col mouse).
+// `describeDestination` prepara la riga che lo dice, e il punto delicato è che
+// la parte che risponde a "chi c'è dall'altra parte" — l'host — non venga mai
+// accorciata, elisa o abbellita: è esattamente lì che passano gli inganni.
+
+test('#499 la destinazione si legge: host da una parte, resto dall\'altra', () => {
+  assert.deepEqual(
+    describeDestination('https://esempio.it/promo/estate?x=1#in-fondo'),
+    { label: 'esempio.it', rest: '/promo/estate?x=1#in-fondo', full: 'https://esempio.it/promo/estate?x=1#in-fondo' });
+  // Radice: niente percorso da mostrare, resta il solo host.
+  assert.deepEqual(
+    describeDestination('https://esempio.it/'),
+    { label: 'esempio.it', rest: '', full: 'https://esempio.it/' });
+  // La porta fa parte di "chi risponde".
+  assert.equal(describeDestination('http://192.168.1.4:8080/setup').label, '192.168.1.4:8080');
+});
+
+test('#499 l\'host mostrato è quello VERO, non quello che sembra', () => {
+  // Il trucco più vecchio: quello che precede la @ è un nome utente, non l'host.
+  assert.equal(describeDestination('https://www.banca.it@altro.example/accedi').label, 'altro.example');
+  // Sottodominio civetta: l'host si mostra intero, mai accorciato dall'inizio.
+  assert.equal(describeDestination('https://banca.it.accessi.example/login').label, 'banca.it.accessi.example');
+  // `www.` NON si toglie: è parte del nome, e toglierlo è un'elisione di comodo.
+  assert.equal(describeDestination('https://www.esempio.it/x').label, 'www.esempio.it');
+  // Omografo (la "a" cirillica): il punycode resta scritto com'è, perché è
+  // l'unica forma in cui la differenza con paypal.com si vede.
+  assert.equal(describeDestination('https://pаypal.com/login').label, 'xn--pypal-4ve.com');
+});
+
+test('#499 gli schemi che non sono una destinazione lo dicono', () => {
+  const js = describeDestination('javascript:frode()');
+  assert.equal(js.label, 'javascript:');
+  assert.equal(js.rest, 'frode()');
+  assert.equal(describeDestination('mailto:qualcuno@esempio.it').label, 'mailto:');
+  // Schemi con host diverso da http/https: lo schema resta davanti, perché
+  // cambia il senso della frase.
+  assert.equal(describeDestination('filo://home/home.html').label, 'filo://home');
+  assert.equal(describeDestination('ftp://esempio.it/file.zip').label, 'ftp://esempio.it');
+});
+
+test('#499 niente indirizzo, niente riga inventata', () => {
+  assert.equal(describeDestination(''), null);
+  assert.equal(describeDestination('   '), null);
+  assert.equal(describeDestination(null), null);
+  // Non parsabile: torna com'è, senza spacciarlo per un host.
+  assert.deepEqual(describeDestination('{{item.url}}'), { label: '', rest: '{{item.url}}', full: '{{item.url}}' });
+});
+
+test('#499 a capo e caratteri di controllo non spezzano la riga', () => {
+  const d = describeDestination('https://esempio.it/\n\tpagina');
+  assert.equal(d.label, 'esempio.it');
+  assert.ok(
+    !/[\u0000-\u001f\u007f]/.test(d.label + d.rest),
+    'la riga mostrata non deve contenere caratteri di controllo');
+});
+
+test('#499 un indirizzo lunghissimo non sfonda la riga (host intero, resto accorciato)', () => {
+  const lungo = 'https://esempio.it/' + 'x'.repeat(2000);
+  const d = describeDestination(lungo);
+  assert.equal(d.label, 'esempio.it');
+  assert.ok(d.rest.length <= 300, 'il percorso va accorciato');
+  assert.equal(d.full, lungo, 'l\'indirizzo intero resta disponibile per chi ferma il mouse');
 });
