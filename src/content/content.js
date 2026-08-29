@@ -834,6 +834,46 @@
     return true;
   }
 
+  // Quanto del candidato può essere nascosto da uno strato dipinto ESTRANEO
+  // prima che smetta di essere "quello che l'utente sta guardando". La striscia
+  // del titolo copre il 31% della sua scheda e deve passare; un titolo
+  // scivolato per metà sotto una barra, un pannello su mezza scheda o su tutta
+  // devono fermarsi. Le misure vere stanno da una parte e dall'altra del 45%.
+  const HIDDEN_FRACTION = 0.45;
+
+  // Il candidato adottato da sotto è NASCOSTO da uno strato dipinto che non è
+  // la sua faccia? La sua faccia sono: lui stesso, i suoi parenti nel DOM, una
+  // copertina (immagine, filmato, disegno, o un contenitore con un'immagine di
+  // sfondo). Tutto il resto — testo, pannelli, sfondi — quando ne copre più di
+  // HIDDEN_FRACTION lo sta seppellendo: la verifica avversariale del 29/08
+  // (secondo giro) è entrata proprio da qui, con coperture opache DENTRO la
+  // pagina (dove il confine fisso non distingue niente) e con coppie
+  // barra-e-riga entrambe fisse.
+  function hiddenBehindForeignPaint(cand, view) {
+    if (!cand || !Array.isArray(view?.stack)) return false;
+    const rb = cand.getBoundingClientRect?.();
+    if (!rb || !(rb.width * rb.height > 0)) return false;
+    for (const L of view.stack) {
+      // Arrivati al candidato o alla sua famiglia DOM: da qui in giù è la sua
+      // stessa faccia, non una copertura.
+      if (L === cand || containsAcrossShadow(cand, L) || containsAcrossShadow(L, cand)) return false;
+      if (!coversPoint(L.getBoundingClientRect?.(), view)) continue;
+      if (!paintsSomething(L)) continue;
+      if (COVER_TAGS.has(L.tagName)) continue;
+      let coverLike = false;
+      try {
+        const bg = getComputedStyle(L).backgroundImage;
+        coverLike = !!bg && bg !== 'none' && bg.includes('url(');
+      } catch (_) {}
+      if (coverLike) continue;
+      const r = L.getBoundingClientRect();
+      const w = Math.min(r.right, rb.right) - Math.max(r.left, rb.left);
+      const h = Math.min(r.bottom, rb.bottom) - Math.max(r.top, rb.top);
+      if (w > 0 && h > 0 && (w * h) > rb.width * rb.height * HIDDEN_FRACTION) return true;
+    }
+    return false;
+  }
+
   // Un contenuto "appartiene" a un collegamento quando ci sta dentro (nel DOM) o
   // quando ne occupa la superficie (i player veri coprono il filmato col proprio
   // overlay, e le schede impilano copertina e link invece di annidarli). Il DOM
