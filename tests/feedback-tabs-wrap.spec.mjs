@@ -1,14 +1,15 @@
-// La fila di schede in cima alla pagina dei feedback (Ricevuti, Agente, Bozze,
-// Da risolvere, In revisione, Bloccati, Chiarimenti, Risolti, Verificati) deve
+// La fila di schede in cima alla pagina dei feedback (Ricevuti, In coda,
+// Risolti, Archiviati — le stesse della dashboard di gestione, #509) deve
 // adattarsi alla larghezza della finestra: su finestre strette va a capo invece
 // di sforare il bordo destro e trascinare TUTTA la pagina in uno scorrimento
-// orizzontale.
+// orizzontale. E ogni scheda resta di un pezzo solo: il numero non si stacca
+// mai dal nome che qualifica.
 //
 // Pre-condizione che senza il fix fallirebbe: con `.fb-tabs` a `display:flex`
-// senza `flex-wrap`, i nove bottoni restano su una riga sola, il contenitore
-// sfora e `documentElement.scrollWidth` supera `clientWidth` (misurato 777 vs
-// 710 dall'utente). L'assert `scrollWidth <= clientWidth` sotto diventa rosso
-// rimuovendo il `flex-wrap: wrap`.
+// senza `flex-wrap`, i bottoni restano su una riga sola, il contenitore sfora e
+// `documentElement.scrollWidth` supera `clientWidth`; togliendo il
+// `white-space: nowrap` dalla singola scheda, "In coda (0)" si spezza su tre
+// righe e l'assert sull'altezza diventa rosso.
 //
 // Stub di SN_FEEDBACK.list per restare offline: il layout delle tab non dipende
 // da Firestore né dallo stato admin.
@@ -25,32 +26,55 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
   });
 
   const page = await openTab(FEEDBACK_URL);
-  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined');
+  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
   await page.evaluate(() => { SN_FEEDBACK.list = async () => []; });
-  await page.setViewportSize({ width: 720, height: 800 });
+  // Dati veri (vuoti) → le schede portano il loro numero: è la larghezza da
+  // misurare, non quella dei soli nomi.
+  await page.evaluate(() => window.__fbTest.setData([]));
 
-  // Tutte e nove le schede sono presenti...
+  // Le quattro sezioni della macchina a stati.
   const tabs = page.locator('.fb-tab');
-  await expect(tabs).toHaveCount(9);
+  await expect(tabs).toHaveCount(4);
 
-  // ...e il corpo della pagina NON produce scorrimento orizzontale.
+  // Larghezza stretta davvero: qui le quattro schede NON stanno su una riga.
+  await page.setViewportSize({ width: 360, height: 800 });
+
+  // Il corpo della pagina NON produce scorrimento orizzontale.
   const overflow = await page.evaluate(() => {
     const el = document.documentElement;
     return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
   });
-  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
 
-  // Le tab vanno a capo: l'ultima ("Verificati") sta su una riga più in basso
-  // della prima ("Ricevuti"), non oltre il bordo destro.
   const geo = await page.evaluate(() => {
     const list = [...document.querySelectorAll('.fb-tab')];
     const first = list[0].getBoundingClientRect();
-    const last = list[list.length - 1].getBoundingClientRect();
-    return { firstTop: first.top, lastTop: last.top, lastRight: last.right, clientWidth: document.documentElement.clientWidth };
+    return {
+      firstTop: first.top,
+      clientWidth: document.documentElement.clientWidth,
+      schede: list.map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          testo: el.textContent.trim(),
+          top: r.top, right: r.right, height: r.height,
+          riga: parseFloat(getComputedStyle(el).lineHeight) || 16,
+          wrap: getComputedStyle(el).whiteSpace,
+        };
+      }),
+    };
   });
-  expect(geo.lastTop).toBeGreaterThan(geo.firstTop);
-  // "Verificati" resta dentro il bordo destro visibile.
-  expect(geo.lastRight).toBeLessThanOrEqual(geo.clientWidth + 1);
+
+  // Nessuna scheda finisce oltre il bordo destro visibile: se non ci stanno
+  // tutte su una riga, la barra manda a capo le schede INTERE.
+  for (const s of geo.schede) {
+    expect(s.right, `scheda "${s.testo}" oltre il bordo`).toBeLessThanOrEqual(geo.clientWidth + 1);
+    // Il nome e il suo numero restano sulla stessa riga (una riga di testo,
+    // più il padding verticale): mai "In coda" / "(0)" spezzati.
+    expect(s.wrap, `scheda "${s.testo}"`).toBe('nowrap');
+    expect(s.height, `scheda "${s.testo}" su più righe`).toBeLessThan(s.riga * 2);
+  }
+  // A questa larghezza almeno una scheda è andata a capo.
+  expect(Math.max(...geo.schede.map((s) => s.top))).toBeGreaterThan(geo.firstTop);
 
   // L'ultima scheda è cliccabile e diventa attiva (prima era tagliata/fuori).
   await tabs.last().click();
