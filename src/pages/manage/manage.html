@@ -664,13 +664,13 @@
     .mg-usernote-hint { color: var(--sn-muted); font-size: 12px; }
     #mgUserNoteText { margin-bottom: 8px; }
 
-    /* ── Gestione feedback (⭐ + archivia/ripristina), owner-only ────────── */
+    /* ── Preferito ⭐, owner-only ────────────────────────────────────────── */
+    /* Archivia/Ripristina non sta più qui: è un'azione di STATO e vive nella
+       riga generata da renderActions, che sparisce insieme alle altre quando lo
+       stato non si legge (il bottone DICE dov'è la segnalazione, e senza chiave
+       direbbe sempre "Archivia"). Il preferito invece è un flag in chiaro e
+       resta. */
     .mg-manage[hidden] { display: none; }
-    /* Archivia/Ripristina sparisce quando lo stato non si legge: il bottone DICE
-       dov'è la segnalazione, e senza chiave direbbe sempre "Archivia".
-       (.sn-btn dichiara un display suo, quindi l'attributo hidden da solo non
-       basterebbe.) */
-    #mgArchiveBtn[hidden] { display: none; }
     .mg-star-btn {
       all: unset; cursor: pointer;
       padding: 7px 12px; border-radius: 8px;

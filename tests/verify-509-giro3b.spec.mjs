@@ -4,6 +4,12 @@
 // le riempiono con regole diverse. Qui si guarda un gradino più in dentro:
 // preso lo STESSO feedback, nella STESSA sezione, le due pagine offrono la
 // stessa azione?
+//
+// La risposta era no: su «Gestione» l'unico bottone diceva «Archivia» al posto
+// di «Ripristina» per l'attacco confermato, lo spam confermato e le due forme
+// vecchie di archiviazione — e premerlo scriveva `archived` sopra la conferma.
+// Adesso negli Archiviati esiste una sola azione, il ripristino, su tutt'e due
+// le pagine (la tabella sta in MR.ownerActions).
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -93,7 +99,10 @@ test('#509/3b — in «Archiviati» le due pagine offrono la stessa azione su og
     await mg.evaluate((id) => window.__mgTest.openDetail(id), item._id);
     await mg.waitForTimeout(150);
     const bottoneMg = (await mg.locator('#mgArchiveBtn').innerText()).trim();
-    expect(bottoneMg, `gestione/${item.status}`).toBe('Ripristina');
+    expect(bottoneMg, `gestione/${item.status}`).toContain('Ripristina');
+    // E il ripristino è l'UNICA azione: non c'è nessun «Archivia» accanto che
+    // possa riscrivere `archived` sopra una conferma.
+    await expect(mg.locator('#mgActionsRow button'), `gestione/${item.status}: una sola azione`).toHaveCount(1);
   }
 });
 
@@ -121,7 +130,7 @@ test('#509/3b — «Ripristina» su un attacco confermato: le due pagine scrivon
   expect(scritturaMg.status).toBe(scritturaFb.status);
 });
 
-test('#509/3b — «Archivia» su un attacco confermato cancella la conferma dell owner', async ({ openTab }) => {
+test('#509/3b — negli Archiviati non esiste un\'azione che cancelli la conferma', async ({ openTab }) => {
   const uno = [
     { _id: 'z2', seq: 2, status: 'attack_confirmed', name: 'attacco confermato', text: '2', createdAt: '2026-08-02T10:00:00Z' },
     { _id: 'z1', seq: 1, status: 'archived',         name: 'archiviato',         text: '1', createdAt: '2026-08-01T10:00:00Z' },
@@ -131,20 +140,25 @@ test('#509/3b — «Archivia» su un attacco confermato cancella la conferma del
   await mg.waitForTimeout(150);
   await mg.locator('#mgConfirmedFilter').check();
   await mg.waitForTimeout(150);
-  // Prima: il filtro "Bloccati confermati" lo trova.
+  // Il filtro "Bloccati confermati" lo trova.
   await expect(mg.locator('#mgList .mg-item')).toHaveCount(1);
   await mg.locator('#mgConfirmedFilter').uncheck();
   await mg.waitForTimeout(150);
 
-  // L'owner preme l'unico bottone che il pannello gli offre.
   await mg.evaluate(() => window.__mgTest.openDetail('z2'));
   await mg.waitForTimeout(150);
+  // Il pannello dice CHE COS'È, e offre una cosa sola: togliere dall'archivio.
+  await expect(mg.locator('#mgDetailState')).toContainText('Attacco confermato');
+  const azioni = await mg.locator('#mgActionsRow button')
+    .evaluateAll((n) => n.map((b) => b.textContent.trim()));
+  expect(azioni).toEqual(['↩ Ripristina']);
+
+  // E premerla NON scrive `archived`: rimette in coda, che è la strada
+  // dichiarata del "era legittimo".
   await mg.locator('#mgArchiveBtn').click();
   await mg.waitForTimeout(400);
-
-  await mg.locator('#mgConfirmedFilter').check();
-  await mg.waitForTimeout(200);
-  // Dopo: la conferma non c'è più, e il filtro non lo trova.
-  await expect(mg.locator('#mgList .mg-item'),
-    'l\'attacco confermato è sparito dal filtro «Bloccati confermati»').toHaveCount(1);
+  const scritture = await updates(mg);
+  expect(scritture).toHaveLength(1);
+  expect(scritture[0].status).toBe('todo');
+  expect(scritture[0].status).not.toBe('archived');
 });
