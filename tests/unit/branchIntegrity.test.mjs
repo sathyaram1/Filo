@@ -350,6 +350,9 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     const { work } = makeRepo();
     const id = 'feed507';
     const branch = 'worker/feed507-x';
+    // Come nel repo vero: i marcatori di sessione sono esclusi da git (senza,
+    // il `git add -A` del commit di prova li imbarcherebbe nel ramo).
+    ensureSessionExcludes(work);
     git(work, ['checkout', '-q', '-b', branch]);
     const base = git(work, ['rev-parse', 'HEAD']);
     // Come positionOnBranch: punto fermo alla base, identità attesa scritta.
