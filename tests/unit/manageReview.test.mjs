@@ -931,3 +931,52 @@ test('reasonText: traduce i codici noti e lascia passare gli ignoti', () => {
   assert.equal(MR.reasonText('boh-nuovo'), 'boh-nuovo');
   assert.equal(MR.reasonText(null), '');
 });
+
+// ── Stato illeggibile: la regola delle sezioni, in un posto solo (#509) ──────
+//
+// Senza il fix questi assert sono rossi: la regola viveva dentro
+// src/pages/feedback/feedback.js, quindi non esisteva come funzione condivisa e
+// la dashboard di gestione continuava a disegnare quattro sezioni su stati che
+// non sapeva leggere.
+
+const CIFRATO = 'FENC1:AAAAAAAAAAAAAAAAAAAAAAAA';
+
+test('statusUnreadable: solo il ciphertext, non gli stati storti', () => {
+  assert.equal(MR.statusUnreadable({ status: CIFRATO }), true);
+  assert.equal(MR.statusUnreadable({ status: '[cifrato]' }), true);
+  // Stato assente, vuoto o inventato: la macchina lo scioglie davvero
+  // (→ unlabeled). Toglierci le sezioni sarebbe sproporzionato.
+  assert.equal(MR.statusUnreadable({}), false);
+  assert.equal(MR.statusUnreadable({ status: '' }), false);
+  assert.equal(MR.statusUnreadable({ status: 'pinco-pallino' }), false);
+  assert.equal(MR.statusUnreadable({ status: 'todo' }), false);
+  assert.equal(MR.statusUnreadable(null), false);
+});
+
+test('sectionsReliable: sezioni via solo se NESSUNO stato si legge', () => {
+  const cifrato = { _id: 'a', status: CIFRATO };
+  const chiaro = { _id: 'b', status: 'todo' };
+  // Coda vuota: niente dice il contrario, e "(0)" lì è la verità.
+  assert.equal(MR.sectionsReliable([]), true);
+  assert.equal(MR.sectionsReliable(undefined), true);
+  assert.equal(MR.sectionsReliable([chiaro, chiaro]), true);
+  // Caso misto: un documento storto non toglie le sezioni a tutti (e non fa
+  // divergere le due pagine, che è il difetto che #509 esiste per togliere).
+  assert.equal(MR.sectionsReliable([cifrato, chiaro]), true);
+  // Nessuna chiave su questo computer: nessuno stato si legge.
+  assert.equal(MR.sectionsReliable([cifrato, cifrato]), false);
+});
+
+test('publicStateLabel: aperta/chiusa, e niente quando non si sa nemmeno quello', () => {
+  assert.equal(MR.publicStateLabel({ statusPublic: 'open' }), 'Aperta');
+  assert.equal(MR.publicStateLabel({ statusPublic: 'closed' }), 'Chiusa');
+  assert.equal(MR.publicStateLabel({}), '');
+  assert.equal(MR.publicStateLabel({ statusPublic: 'boh' }), '');
+});
+
+test('judgesNote: stato cifrato → nessuna frase (non "In attesa del giudizio")', () => {
+  // Prima diceva "In attesa del giudizio." anche su una segnalazione già
+  // CHIUSA: la macchina la riduceva a `unlabeled` senza verdetti.
+  assert.equal(MR.judgesNote({ status: CIFRATO, statusPublic: 'closed' }), null);
+  assert.equal(MR.judgesNote({ status: CIFRATO, statusPublic: 'open' }), null);
+});

@@ -87,6 +87,111 @@ test('#509 — le due pagine contano le stesse sezioni allo stesso modo', async 
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Stato ILLEGGIBILE (un computer senza la chiave privata dell'owner): le due
+// pagine devono comportarsi allo stesso modo anche qui.
+//
+// Lo status fine viaggia cifrato: senza chiave la macchina a stati non ha
+// niente da sciogliere e ogni segnalazione ricade nei Ricevuti. La pagina dei
+// feedback toglie le sezioni e ne fa un elenco solo; la dashboard di gestione
+// scriveva ancora "Ricevuti (3) · In coda (0) · Risolti (0) · Archiviati (0)",
+// coi chiusi dentro i Ricevuti, e sulla scheda aperta "In attesa del giudizio"
+// su una segnalazione già chiusa.
+//
+// Precondizione che senza il fix fallisce: su filo://manage le quattro schede
+// restano visibili e numerate, non c'è nessuna riga che spieghi l'assenza del
+// criterio, l'intestazione della colonna dice "Ricevuti (3)" e il dettaglio
+// non dice mai "Chiusa".
+const CODA_CIFRATA = [
+  { _id: 'k1', seq: 41, status: 'FENC1:aaaaaaaaaaaaaaaaaaaaaaaa', statusPublic: 'open',
+    name: 'aperta', text: 'uno', createdAt: '2026-08-01T10:00:00Z' },
+  { _id: 'k2', seq: 42, status: 'FENC1:bbbbbbbbbbbbbbbbbbbbbbbb', statusPublic: 'closed',
+    name: 'chiusa', text: 'due', createdAt: '2026-08-02T10:00:00Z' },
+  { _id: 'k3', seq: 43, status: 'FENC1:cccccccccccccccccccccccc', statusPublic: 'closed',
+    name: 'chiusa pure', text: 'tre', createdAt: '2026-08-03T10:00:00Z' },
+];
+
+test('#509 — stato illeggibile: niente sezioni su ENTRAMBE le pagine', async ({ openTab }) => {
+  // ── Pagina dei feedback: il comportamento di riferimento ─────────────────
+  const fb = await openTab(FEEDBACK);
+  await fb.waitForLoadState('domcontentloaded');
+  await fb.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
+  await fb.evaluate((items) => window.__fbTest.setData(items), CODA_CIFRATA);
+
+  await expect(fb.locator('#tabs')).toBeHidden();
+  await expect(fb.locator('#noSections')).toBeVisible();
+  const avvisoFb = (await fb.locator('#noSections').innerText()).trim();
+  await expect(fb.locator('.fb-card')).toHaveCount(3);
+
+  // ── Dashboard di gestione, stessa coda ───────────────────────────────────
+  const mg = await openTab(MANAGE);
+  await mg.waitForLoadState('domcontentloaded');
+  await mg.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await mg.evaluate(() => window.__mgTest.whenReady());
+  await mg.evaluate((items) => window.__mgTest.setData(items), CODA_CIFRATA);
+
+  // 1. Le sezioni non si disegnano. Le schede che NON sono sezioni
+  //    (Statistiche, Modelli, Automazioni, Log) non dipendono dallo stato delle
+  //    segnalazioni e restano raggiungibili.
+  for (const tab of ['inbox', 'queue', 'resolved', 'archived']) {
+    await expect(mg.locator(`.mg-tab[data-tab="${tab}"]`)).toBeHidden();
+  }
+  await expect(mg.locator('.mg-tab[data-tab="log"]')).toBeVisible();
+
+  // 2. Una riga dice perché — le stesse parole della gemella.
+  await expect(mg.locator('#mgNoSections')).toBeVisible();
+  expect((await mg.locator('#mgNoSections').innerText()).trim()).toBe(avvisoFb);
+
+  // 3. L'intestazione della colonna non ripete il nome di una sezione che non
+  //    è stata scelta: un elenco solo, con quante ne contiene.
+  const testa = (await mg.locator('#mgListHead').innerText()).trim();
+  expect(testa).toContain('(3)');
+  expect(testa).not.toMatch(/Ricevuti|In coda|Risolti|Archiviati/);
+
+  // 4. Un elenco solo, con dentro TUTTE le segnalazioni (i chiusi compresi, e
+  //    non ammucchiati nei Ricevuti).
+  await expect(mg.locator('.mg-item')).toHaveCount(3);
+  const idsMg = await mg.locator('.mg-item').evaluateAll((els) => els.map((e) => e.dataset.id));
+  expect(idsMg.slice().sort()).toEqual(CODA_CIFRATA.map((f) => f._id).sort());
+
+  // 5. Sulla scheda solo ciò che si sa davvero: aperta o chiusa.
+  await expect(mg.locator('.mg-item', { hasText: 'chiusa pure' }).locator('.mg-state')).toHaveText('Chiusa');
+  await expect(mg.locator('.mg-item', { hasText: 'aperta' }).first().locator('.mg-state')).toHaveText('Aperta');
+  // Nessuna scheda dipinta come "Non filtrato": è un'affermazione sullo stato.
+  await expect(mg.locator('.mg-item--unfiltered')).toHaveCount(0);
+
+  // 6. Aprendo una segnalazione già chiusa, il dettaglio lo dice — invece di
+  //    "In attesa del giudizio".
+  await mg.locator('.mg-item', { hasText: 'chiusa pure' }).click();
+  await expect(mg.locator('#mgJudgesRow')).toContainText('Chiusa');
+  await expect(mg.locator('#mgJudgesRow')).not.toContainText('In attesa del giudizio');
+});
+
+test('#509 — stato illeggibile: nessuna decisione offerta su ciò che non si legge', async ({ openTab }) => {
+  const mg = await openTab(MANAGE);
+  await mg.waitForLoadState('domcontentloaded');
+  await mg.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await mg.evaluate(() => window.__mgTest.whenReady());
+  // L'owner può essere loggato su una macchina dove la chiave privata non c'è:
+  // i pulsanti nascono dallo stato, e qui lo stato la pagina se lo inventa.
+  await mg.evaluate(() => window.__mgTest.setAdmin(true));
+  await mg.evaluate((items) => window.__mgTest.setData(items), CODA_CIFRATA);
+
+  // Le due barre di massa contano feedback per stato: senza criterio, zero.
+  await expect(mg.locator('#mgReevalBar')).toBeHidden();
+  await expect(mg.locator('#mgAlignedBar')).toBeHidden();
+
+  await mg.locator('.mg-item').first().click();
+  // "Accetta e sblocca" / "Conferma attacco" su una pratica che potrebbe essere
+  // già chiusa: la gemella qui non offre nulla, e nemmeno questa.
+  await expect(mg.locator('#mgActions')).toBeHidden();
+  // "Archivia" direbbe sempre "Archivia", anche su una già archiviata.
+  await expect(mg.locator('#mgArchiveBtn')).toBeHidden();
+  // ⭐ e la frase per chi ha segnalato sono in chiaro: restano.
+  await expect(mg.locator('#mgStarBtn')).toBeVisible();
+  await expect(mg.locator('#mgUserNote')).toBeVisible();
+});
+
 // Il filtro "Solo automatici" ha preso il posto della vecchia sezione "Agente":
 // i ritrovamenti dell'agente esploratore e degli audit delle routine restano
 // isolabili, ma senza inventare una sezione che la gemella non ha.
