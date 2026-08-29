@@ -1024,11 +1024,17 @@
   // stessa funzione pura della dashboard di gestione (ordinamento compreso —
   // i bloccati gravi in cima ai Ricevuti, le lavorazioni attive in cima alla
   // coda). Sopra passa solo il filtro "Solo automatici", che è di questa pagina.
-  function sectionItems(tab) {
+  function sectionBase(tab) {
     const t = tab || currentTab;
-    const items = t === 'archived'
+    // "Archiviati" ha regole sue (i confermati, i preferiti): la sua lista la
+    // costruisce listArchiveTab, esattamente come nella gemella.
+    return t === 'archived'
       ? MR.listArchiveTab(all, { releasedVersion })
       : MR.listForManageTab(all, t, { releasedVersion });
+  }
+
+  function sectionItems(tab) {
+    const items = sectionBase(tab);
     return agentOnly ? items.filter(isAgent) : items;
   }
 
