@@ -1348,7 +1348,13 @@
     // non cambia il numero, quindi si può contare qui.
     updateTabCounts();
     setListHead(TAB_LABELS[currentTab] || '', dataLoaded ? currentList.length : null);
+    renderListBody();
+  }
 
+  // Disegna la colonna a partire da `currentList`: è la parte che NON dipende
+  // da quale sezione si sta guardando, e la condivide anche l'elenco unico di
+  // quando le sezioni non ci sono.
+  function renderListBody() {
     // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
     // feedback più vecchi non sono qui. Il vuoto lo dice, invece di negarli.
     if (loadHitCap() && dataLoaded) {
