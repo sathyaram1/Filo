@@ -145,6 +145,54 @@ test('porta 9: pannello opaco assoluto sopra un collegamento normale in flusso �
   await expectNoLinkEntries(menu);
 });
 
+// ── Controprove: il velo SFUMATO è un velo, non una copertura ───────────────
+// Terzo giro di verifica: trattare i gradienti come coperture opache spegneva
+// le voci della scheda proprio sulla sua forma più comune. Attraverso la parte
+// trasparente della sfumatura la scheda si vede: il menu resta completo.
+
+const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const SCRIM = 'background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.75))';
+
+test('controprova: scheda a strati con velo sfumato in cima — il menu resta completo (link e filmato)', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div id="card" style="position:relative;width:320px;height:180px">
+      <a id="lnk" href="https://example.com/scheda-scrim" style="position:absolute;inset:0;display:block"></a>
+      <video id="clip" src="/clip.mp4" style="position:absolute;inset:0;width:100%;height:100%;background:#333"></video>
+      <span id="scrim" style="position:absolute;inset:0;${SCRIM};color:#fff;display:flex;align-items:flex-end">Il titolo</span>
+    </div>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#scrim');
+  await expect(menu.getByText('Riproduci', { exact: false }).first()).toBeVisible();
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+});
+
+test('controprova: velo sfumato dentro il collegamento, copertina ferma — le voci dell\'immagine restano', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <a id="lnk" href="https://example.com/scheda-scrim-img" style="position:relative;display:block;width:320px;height:180px">
+      <img id="cover" src="${PX}" style="width:100%;height:100%;background:#e07b39">
+      <span id="scrim" style="position:absolute;inset:0;${SCRIM};color:#fff;display:flex;align-items:flex-end">Il titolo</span>
+    </a>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#scrim');
+  await expect(menu.getByText('Salva immagine come', { exact: false }).first()).toBeVisible();
+  for (const label of LINK_LABELS) {
+    await expect(menu.getByText(label, { exact: false }).first()).toBeVisible();
+  }
+});
+
+test('controprova: la sfumatura INTERAMENTE coprente invece nasconde (tutti i colori pieni)', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif">
+    <div style="position:relative;width:320px;height:180px">
+      <a id="buried" href="https://attacker.example/dietro-il-gradiente" style="position:absolute;inset:0;display:block">Scheda sepolta</a>
+      <div id="panel" style="position:absolute;inset:0;background:linear-gradient(rgb(40,40,60),rgb(70,70,90));color:#fff;z-index:2">Pannello sfumato ma opaco</div>
+    </div>
+  </body></html>`);
+  const menu = await openMenuOn(page, '#panel');
+  await expectNoLinkEntries(menu);
+});
+
 test('porta 5 (#499): collegamento trasparente sotto un paragrafo, stesso ingombro — non esiste per il menu', async ({ openTab, testServer }) => {
   // Il repro esatto del #499: il link è SOTTO il testo (mai raggiungibile da
   // un click sinistro) e ritagliato sullo stesso rettangolo del paragrafo,
