@@ -680,7 +680,9 @@
       riga.textContent = `✓ ${esito}`;
       box.appendChild(riga);
     }
-    card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    // Anche le caselle: la scheda non appartiene più a questa sezione, e una
+    // casella ancora scrivibile ("Commento:") direbbe il contrario.
+    card.querySelectorAll('button, textarea, input').forEach((b) => { b.disabled = true; });
   }
 
   // Il totale in alto dice anche quante schede sono già state decise, altrimenti
