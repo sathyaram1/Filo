@@ -9,7 +9,17 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/feedback.js"></script>
+  <!-- Vocabolario UNICO della macchina a stati + la logica di sezione condivisa
+       con la dashboard di gestione (#509). Prima questa pagina aveva una sua
+       tassonomia (new/draft/todo/review/blocked/clarify/done/verified) e mandava
+       in "Ricevuti" tutto ciò che non riconosceva: le stesse segnalazioni si
+       leggevano "Ricevuti (3)" di là e "Ricevuti (9)" di qua. L'ordine conta:
+       feedbackStatus legge le tabelle di feedbackTransitions, manageReview legge
+       feedbackStatus. -->
+  <script src="filo://shared/feedbackTransitions.js"></script>
+  <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
+  <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
   <style>
     .fb-list { display: flex; flex-direction: column; gap: 16px; }
