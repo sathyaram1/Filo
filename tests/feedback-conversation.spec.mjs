@@ -7,7 +7,7 @@
 // `.fb-bubble--report` / `--model` (Filo) / `--user` (Tu), in ordine
 // cronologico. E nel tab Chiarimenti la risposta dell'utente si invia col
 // composer (che appende la risposta allo storico e riporta il feedback in
-// "Da risolvere"), non editando un blob di note.
+// "In coda"), non editando un blob di note.
 //
 // Come la spec del fuoco note, mockiamo SN_FEEDBACK.list e intercettiamo
 // window.filo.message per restare deterministici e offline (admin simulato).
@@ -134,7 +134,7 @@ test('riaprire + ri-risolvere conserva report iniziale, nota utente e nuovo repo
   await expect(page.locator('.fb-bubble--model').last()).toContainText('Ora supporto anche il pinch');
 });
 
-test('nel tab Chiarimenti la risposta si invia col composer: appende lo storico e torna in Da risolvere', async ({ app, openTab }) => {
+test('quando Filo ha domande la risposta si invia col composer: appende lo storico e rimette in coda', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
 
   await setupAdmin(app, page, {
@@ -147,7 +147,7 @@ test('nel tab Chiarimenti la risposta si invia col composer: appende lo storico 
     createdAt: new Date().toISOString(),
   }, /* captureUpdates */ true);
 
-  await page.locator('[data-tab="clarify"]').click();
+  await page.locator('[data-tab="inbox"]').click();
 
   // La domanda di Filo è una bolla; il composer è presente.
   await expect(page.locator('.fb-bubble--model')).toContainText('Quale provider preferisci');

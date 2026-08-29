@@ -1,13 +1,13 @@
 // Feedback #PIP "Migliorare gestione commenti e allegati", parte 2: l'admin
-// deve poter COMMENTARE un feedback appena ricevuto (tab "Ricevuti", status
-// `new`), non solo quelli "Da risolvere", e il commento deve viaggiare con lo
-// spostamento in "Da risolvere" ("commenta POI metti in da risolvere").
+// deve poter COMMENTARE un feedback appena ricevuto (sezione "Ricevuti"), non
+// solo quelli già presi in carico, e il commento deve viaggiare con lo
+// spostamento in coda ("commenta POI metti in coda").
 //
 // Pre-condizione che senza il fix fallirebbe: prima la casella commento
-// (`.fb-notes`) era editabile SOLO su todo/bozze/agente — sul tab "Ricevuti"
-// non compariva affatto, quindi il primo assert (textarea visibile) sarebbe
-// rosso. Qui asseriamo il SUCCESSO: la casella c'è, e il testo digitato finisce
-// nel payload di aggiornamento quando si clicca "→ Da risolvere".
+// (`.fb-notes`) era editabile SOLO sui feedback già in lavorazione — sui
+// "Ricevuti" non compariva affatto, quindi il primo assert (textarea visibile)
+// sarebbe rosso. Qui asseriamo il SUCCESSO: la casella c'è, e il testo digitato
+// finisce nel payload di aggiornamento quando si clicca "→ In coda".
 //
 // Come le altre spec della dashboard feedback (vedi feedback-conversation):
 // mockiamo SN_FEEDBACK.list e intercettiamo window.filo.message per restare
@@ -79,13 +79,13 @@ test('Ricevuti: l\'admin vede la casella commento su un feedback "new"', async (
   await expect(page.locator('.fb-card .fb-notes-label')).toContainText('Commento');
 });
 
-test('Ricevuti: il commento viaggia con lo spostamento in "Da risolvere"', async ({ app, openTab }) => {
+test('Ricevuti: il commento viaggia con lo spostamento in "In coda"', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, SAMPLE, true);
 
   // Impostiamo il testo senza dare/togliere fuoco alla casella: così evitiamo
   // che il salvataggio su blur ridisegni la card proprio mentre clicchiamo il
-  // bottone. Verifichiamo il cammino canonico: "→ Da risolvere" porta con sé il
+  // bottone. Verifichiamo il cammino canonico: "→ In coda" porta con sé il
   // commento già scritto (il gestore .fb-act legge la textarea).
   await page.evaluate(() => {
     document.querySelector('.fb-notes[data-id="mock-inbox-1"]').value = 'Ho riprodotto, è un bug reale';

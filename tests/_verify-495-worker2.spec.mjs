@@ -72,15 +72,15 @@ test('#495 — superficie gemella: anche la pagina dei feedback dice quante ne h
   expect(prima).not.toMatch(/\(\d/);
 
   await page.evaluate(() => window.__fbTest.setData([
-    { _id: 'n1', seq: 1, status: 'new', text: 'uno', createdAt: '2026-01-01T00:00:00Z' },
-    { _id: 'n2', seq: 2, status: 'new', text: 'due', createdAt: '2026-01-02T00:00:00Z' },
+    { _id: 'n1', seq: 1, status: 'unlabeled', text: 'uno', createdAt: '2026-01-01T00:00:00Z' },
+    { _id: 'n2', seq: 2, status: 'unlabeled', text: 'due', createdAt: '2026-01-02T00:00:00Z' },
     { _id: 't1', seq: 3, status: 'todo', text: 'tre', createdAt: '2026-01-03T00:00:00Z' },
     { _id: 'd1', seq: 4, status: 'done', text: 'quattro', createdAt: '2026-01-04T00:00:00Z' },
   ]));
   await expect(page.locator('.fb-tab[data-tab="inbox"]')).toHaveText('Ricevuti (2)');
-  await expect(page.locator('.fb-tab[data-tab="todo"]')).toHaveText('Da risolvere (1)');
-  await expect(page.locator('.fb-tab[data-tab="done"]')).toHaveText('Risolti (1)');
-  await expect(page.locator('.fb-tab[data-tab="blocked"]')).toHaveText('Bloccati (0)');
+  await expect(page.locator('.fb-tab[data-tab="queue"]')).toHaveText('In coda (1)');
+  await expect(page.locator('.fb-tab[data-tab="resolved"]')).toHaveText('Risolti (1)');
+  await expect(page.locator('.fb-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
 });
 
 test('#495 — gemella: filtrando col campo di ricerca, il numero della scheda non mente su cosa si vede', async ({ openTab }) => {
@@ -88,9 +88,9 @@ test('#495 — gemella: filtrando col campo di ricerca, il numero della scheda n
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__fbTest);
   await page.evaluate(() => window.__fbTest.setData([
-    { _id: 'n1', seq: 1, status: 'new', text: 'mela', createdAt: '2026-01-01T00:00:00Z' },
-    { _id: 'n2', seq: 2, status: 'new', text: 'pera', createdAt: '2026-01-02T00:00:00Z' },
-    { _id: 'n3', seq: 3, status: 'new', text: 'pesca', createdAt: '2026-01-03T00:00:00Z' },
+    { _id: 'n1', seq: 1, status: 'unlabeled', text: 'mela', createdAt: '2026-01-01T00:00:00Z' },
+    { _id: 'n2', seq: 2, status: 'unlabeled', text: 'pera', createdAt: '2026-01-02T00:00:00Z' },
+    { _id: 'n3', seq: 3, status: 'unlabeled', text: 'pesca', createdAt: '2026-01-03T00:00:00Z' },
   ]));
   await expect(page.locator('.fb-tab[data-tab="inbox"]')).toHaveText('Ricevuti (3)');
   await page.fill('#search', 'mela');

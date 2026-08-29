@@ -4,7 +4,7 @@
 // di comparire come una BOLLA separata, divisa dalla segnalazione e dalla nota.
 //
 // Contratto (asserisce il SUCCESSO):
-//   • nei tab dove l'admin lavora (es. "Da risolvere") la textarea editabile
+//   • nelle sezioni dove l'admin lavora (es. "In coda") la textarea editabile
 //     contiene SOLO la nota dell'agente (il "capo"), non il testo di riapertura;
 //   • la riapertura compare come bolla di sola lettura separata, sotto la nota;
 //   • salvando una modifica alla nota, la riapertura (la "coda") resta intatta.
@@ -18,7 +18,7 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const FEEDBACK_URL = 'filo://feedback/feedback.html';
 
-// Un feedback "Da risolvere" con: nota dell'agente + una riapertura dell'utente.
+// Un feedback "In coda" con: nota dell'agente + una riapertura dell'utente.
 const SAMPLE = {
   _id: 'mock-reopen-1',
   clientId: 'owner:abc',

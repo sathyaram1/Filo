@@ -12,12 +12,12 @@ import { test, expect } from './fixtures/electron.mjs';
 const FAKE = [
   {
     _id: 'a', text: 'Il pulsante di copia non funziona su Windows', name: 'copia rotta',
-    seq: 10, subSeq: 0, status: 'new',
+    seq: 10, subSeq: 0, status: 'unlabeled',
     createdAt: '2026-06-22T11:00:00Z',
   },
   {
     _id: 'b', text: 'La finestra si apre troppo piccola al primo avvio', name: 'finestra piccola',
-    seq: 11, subSeq: 0, status: 'new',
+    seq: 11, subSeq: 0, status: 'unlabeled',
     createdAt: '2026-06-22T10:30:00Z',
   },
 ];

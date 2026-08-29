@@ -15,7 +15,7 @@ const FAKE = [
     subSeq: 1,
     // clientId neutro: questo spec verifica numero (#22.1) + titolo + ricerca,
     // che dipendono da seq/subSeq/name, NON dall'origine. La categorizzazione
-    // per origine (routine → tab "Agente") è coperta da feedback-agent-tab.spec.
+    // per origine (routine → filtro "Solo automatici") è coperta da feedback-agent-tab.spec.
     clientId: 'web-7f3a',
     createdAt: '2026-06-12T11:00:00Z',
   },

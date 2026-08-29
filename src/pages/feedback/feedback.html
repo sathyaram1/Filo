@@ -198,6 +198,11 @@
       background: transparent; border: 0; padding: 8px 14px;
       color: var(--sn-muted); cursor: pointer; font: inherit;
       border-bottom: 2px solid transparent; margin-bottom: -1px;
+      /* Il numero fa corpo unico col nome: la barra manda a capo le SCHEDE
+         INTERE (flex-wrap sul contenitore), la singola scheda non si spezza
+         mai — o alla larghezza minima si leggeva "In" / "coda" / "(0)" su tre
+         righe, col numero staccato dal nome che qualifica. */
+      white-space: nowrap;
     }
     .fb-tab--active { color: var(--sn-text, inherit); border-bottom-color: currentColor; }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }

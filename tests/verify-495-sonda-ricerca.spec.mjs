@@ -22,7 +22,7 @@ test('sonda: col filtro di ricerca attivo, cosa dice il numero della sezione?', 
       items.push({
         _id: `s${i}`, text: i === 0 ? 'aghinunpagliaio' : `segnalazione ordinaria ${i}`,
         name: i === 0 ? 'aghinunpagliaio' : `segnalazione ordinaria ${i}`,
-        seq: i + 1, subSeq: 0, status: 'new', clientId: 'tester@example.com',
+        seq: i + 1, subSeq: 0, status: 'unlabeled', clientId: 'tester@example.com',
         createdAt: '2026-06-20T10:00:00Z', images: [],
       });
     }

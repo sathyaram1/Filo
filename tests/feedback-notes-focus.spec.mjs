@@ -81,7 +81,7 @@ test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', 
     }
   });
 
-  // 3) Ricarica con il mock e vai sul tab "Da risolvere" (todo): lì le note
+  // 3) Ricarica con il mock e vai sulla sezione "In coda" (todo): lì le note
   //    sono editabili per gli admin.
   await page.locator('#refresh').click();
   await page.locator('[data-tab="queue"]').click();
