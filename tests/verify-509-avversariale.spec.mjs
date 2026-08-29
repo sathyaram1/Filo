@@ -68,6 +68,7 @@ test('#509 — due clic fermi su «→ In coda» non toccano la segnalazione suc
   const page = await apriFeedback(openTab, coda);
   await expect(page.locator('#tabs [data-tab="inbox"]')).toHaveText('Ricevuti (4)');
 
+  const primo = await page.locator('.fb-card').first().getAttribute('data-id');
   const p = await puntoDi(page, '.fb-card:first-child .fb-act[data-to="todo"]');
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(400);
@@ -78,7 +79,7 @@ test('#509 — due clic fermi su «→ In coda» non toccano la segnalazione suc
   await page.waitForTimeout(400);
 
   const u = await updates(page);
-  expect(u.map((x) => `${x.id}:${x.status}`)).toEqual(['c1:todo']);
+  expect(u.map((x) => `${x.id}:${x.status}`)).toEqual([`${primo}:todo`]);
 });
 
 test('#509 — doppio clic velocissimo (dblclick) su «→ In coda»: una sola scrittura', async ({ openTab }) => {
@@ -87,11 +88,12 @@ test('#509 — doppio clic velocissimo (dblclick) su «→ In coda»: una sola s
     { _id: 'c2', seq: 2, status: 'attack', name: 'seconda', text: 'due', createdAt: '2026-08-02T10:00:00Z' },
   ];
   const page = await apriFeedback(openTab, coda, { ritardo: 500 });
+  const primo = await page.locator('.fb-card').first().getAttribute('data-id');
   const p = await puntoDi(page, '.fb-card:first-child .fb-act[data-to="todo"]');
   await page.mouse.dblclick(p.x, p.y);
   await page.waitForTimeout(1200);
   const u = await updates(page);
-  expect(u.map((x) => `${x.id}:${x.status}`)).toEqual(['c1:todo']);
+  expect(u.map((x) => `${x.id}:${x.status}`)).toEqual([`${primo}:todo`]);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ test('#509 — due clic fermi su «↩ Ripristina» ne rimettono in coda una sol
   await page.locator('#tabs [data-tab="archived"]').click();
   await expect(page.locator('.fb-card')).toHaveCount(3);
 
+  const primo = await page.locator('.fb-card').first().getAttribute('data-id');
   const p = await puntoDi(page, '.fb-card:first-child .fb-act[data-to="todo"]');
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(400);
@@ -139,7 +142,8 @@ test('#509 — due clic fermi su «↩ Ripristina» ne rimettono in coda una sol
 
   const u = await updates(page);
   expect(u.length).toBe(1);
-  expect(u[0].id).toBe('a1');
+  expect(u[0].id).toBe(primo);
+  expect(u[0].status).toBe('todo');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,6 +156,7 @@ test('#509 — «Archivia» premuto mentre «→ In coda» è in volo non scrive
     { _id: 'c2', seq: 2, status: 'unlabeled', name: 'seconda', text: 'due', createdAt: '2026-08-02T10:00:00Z' },
   ];
   const page = await apriFeedback(openTab, coda, { ritardo: 900 });
+  const primo = await page.locator('.fb-card').first().getAttribute('data-id');
   const pTodo = await puntoDi(page, '.fb-card:first-child .fb-act[data-to="todo"]');
   const pArch = await puntoDi(page, '.fb-card:first-child .fb-act[data-to="archived"]');
   await page.mouse.click(pTodo.x, pTodo.y);
@@ -159,7 +164,7 @@ test('#509 — «Archivia» premuto mentre «→ In coda» è in volo non scrive
   await page.mouse.click(pArch.x, pArch.y);
   await page.waitForTimeout(1500);
   const u = await updates(page);
-  expect(u.map((x) => `${x.id}:${x.status}`)).toEqual(['c1:todo']);
+  expect(u.map((x) => `${x.id}:${x.status}`)).toEqual([`${primo}:todo`]);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,6 +180,7 @@ test('#509 — due clic fermi su un pallino di priorità non toccano la scheda v
   const page = await apriFeedback(openTab, coda);
   await page.locator('#tabs [data-tab="queue"]').click();
   await expect(page.locator('.fb-card')).toHaveCount(3);
+  const primo = await page.locator('.fb-card').first().getAttribute('data-id');
   const p = await puntoDi(page, '.fb-card:first-child .fb-dot[data-n="3"]');
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(400);
@@ -183,7 +189,7 @@ test('#509 — due clic fermi su un pallino di priorità non toccano la scheda v
   const u = await updates(page);
   // Due clic voluti sullo stesso pallino = imposta 3, poi azzera. Purché
   // riguardino SEMPRE la stessa scheda.
-  expect(new Set(u.map((x) => x.id))).toEqual(new Set(['q1']));
+  expect(new Set(u.map((x) => x.id))).toEqual(new Set([primo]));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -357,4 +363,81 @@ test('#509 — scrittura rifiutata: la scheda torna premibile e il numero non me
   await expect(card.locator('.fb-act[data-to="todo"]')).toBeEnabled({ timeout: 8000 });
   await expect(page.locator('#tabs [data-tab="inbox"]')).toHaveText('Ricevuti (2)');
   await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (0)');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPOSTAMENTO SOTTO IL PUNTATORE — quanto si muove la lista dopo una decisione?
+// La scheda decisa resta al suo posto ma la riga dei pulsanti diventa una riga
+// di testo: se la scheda si accorcia, tutte quelle sotto RISALGONO, e il
+// puntatore fermo sopra il pulsante della scheda successiva si ritrova su
+// un'altra. È la stessa causa del giro precedente, un gradino più in là.
+// ─────────────────────────────────────────────────────────────────────────────
+test('#509 — dopo una decisione le schede sotto non risalgono sotto il puntatore', async ({ openTab }) => {
+  const coda = Array.from({ length: 6 }, (_, i) => ({
+    _id: `n${i}`, seq: 100 + i, status: 'unlabeled', name: `scheda ${i}`, text: `testo ${i}`,
+    createdAt: `2026-08-0${i + 1}T10:00:00Z`,
+  }));
+  const page = await apriFeedback(openTab, coda);
+  const bottoni = page.locator('.fb-card .fb-act[data-to="todo"]');
+  const prima = await bottoni.nth(1).boundingBox();
+  // Decide la PRIMA scheda.
+  await bottoni.nth(0).click();
+  await expect(page.locator('.fb-card').first().locator('.fb-esito')).toBeVisible({ timeout: 5000 });
+  const dopo = await bottoni.nth(1).boundingBox().catch(() => null);
+  const spostamento = dopo ? Math.abs(dopo.y - prima.y) : null;
+  test.info().annotations.push({ type: 'spostamento', description: `il pulsante della scheda successiva si è spostato di ${spostamento}px` });
+  // Il puntatore fermo dove stava il pulsante della SECONDA scheda deve
+  // continuare a trovarci quel pulsante, non quello della terza.
+  const sotto = await page.evaluate(({ x, y }) => {
+    const el = document.elementFromPoint(x, y);
+    const b = el && el.closest ? el.closest('.fb-act') : null;
+    const card = el && el.closest ? el.closest('.fb-card') : null;
+    return { bottone: b ? b.dataset.to : null, scheda: card ? card.dataset.id : null };
+  }, { x: prima.x + prima.width / 2, y: prima.y + prima.height / 2 });
+  const attesa = await page.locator('.fb-card').nth(1).getAttribute('data-id');
+  expect(sotto.scheda === null || sotto.scheda === attesa,
+    `sotto il puntatore ora c'è la scheda ${sotto.scheda} (attesa ${attesa}) con il pulsante ${sotto.bottone}`).toBe(true);
+});
+
+// Traccia visiva (tema chiaro e scuro) delle due pagine con la stessa coda.
+test('#509 — traccia visiva delle due pagine', async ({ openTab }) => {
+  const fb = await apriFeedback(openTab, CODA_STORTA);
+  await fb.screenshot({ path: 'tests/.shots/509-feedback-coda-storta.png', fullPage: true });
+  const mg = await apriManage(openTab, CODA_STORTA);
+  await mg.screenshot({ path: 'tests/.shots/509-manage-coda-storta.png', fullPage: true });
+
+  const fb2 = await apriFeedback(openTab, CODA_CIFRATA);
+  await fb2.screenshot({ path: 'tests/.shots/509-feedback-cifrato.png', fullPage: true });
+  const mg2 = await apriManage(openTab, CODA_CIFRATA);
+  await mg2.screenshot({ path: 'tests/.shots/509-manage-cifrato.png', fullPage: true });
+});
+
+// Traccia visiva della scheda DECISA nei due temi: resta leggibile?
+test('#509 — la scheda decisa nei due temi', async ({ openTab }) => {
+  const coda = [
+    { _id: 'v1', seq: 1, status: 'unlabeled', name: 'prima', text: 'uno', createdAt: '2026-08-01T10:00:00Z' },
+    { _id: 'v2', seq: 2, status: 'attack', name: 'seconda', text: 'due', createdAt: '2026-08-02T10:00:00Z' },
+  ];
+  for (const tema of ['light', 'dark']) {
+    const page = await apriFeedback(openTab, coda);
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.locator('.fb-card').first().locator('.fb-act[data-to="todo"]').click();
+    await expect(page.locator('.fb-card').first().locator('.fb-esito')).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: `tests/.shots/509-decisa-${tema}.png`, fullPage: true });
+  }
+});
+
+// Quante porte ha la stessa causa sulla gemella? Barra, intestazione della
+// colonna e scheda aperta.
+test('#509 — stato illeggibile: cosa dice la gemella, punto per punto', async ({ openTab }) => {
+  const mg = await apriManage(openTab, CODA_CIFRATA);
+  const barra = await etichetteManage(mg);
+  const intestazione = await mg.locator('#mgListHead, .mg-list-head').first().innerText().catch(() => '(non trovata)');
+  await mg.locator('.mg-item, .mg-row, [data-id]').first().click().catch(() => {});
+  await mg.waitForTimeout(500);
+  await mg.screenshot({ path: 'tests/.shots/509-manage-cifrato-scheda.png', fullPage: true });
+  test.info().annotations.push({
+    type: 'gemella',
+    description: `barra=${JSON.stringify(barra)} intestazione=${JSON.stringify(intestazione)}`,
+  });
 });
