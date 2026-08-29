@@ -125,6 +125,27 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
 
+### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
+
+Stessa regola delle tab, un gradino più in dentro: la sezione dice quali azioni
+esistono, e la tabella sta in `src/shared/manageReview.js` (`ownerActions`), non
+nelle pagine. Fino al #509 le due superfici se la costruivano ognuna a mano e
+divergevano sulla STESSA segnalazione.
+
+- Ricevuti: `→ In coda` (`todo`, con `reviewDecision: accepted`) · `Conferma attacco`
+  (`attack_confirmed`) su `attack` e `suspicious_file` · `Conferma spam`
+  (`spam_confirmed`) su `spam` e `suspicious_file` · `Archivia`.
+- In coda: `✓ Risolto` (`done`, non offerto se è già `done` non rilasciato) · `Archivia`.
+- Risolti: `Archivia` · `Riapri` (chiede cosa manca, poi `todo`).
+- Archiviati: `↩ Ripristina` (`todo`) e basta. **Nessun cammino riscrive uno stato
+  terminale**: su `attack_confirmed`/`spam_confirmed` un `Archivia` cancellerebbe la
+  conferma, e la segnalazione sparirebbe dal filtro "Bloccati confermati".
+- Stato illeggibile (nessuna chiave privata): nessuna azione, su nessuna superficie.
+
+Il writer di ogni pagina passa da `ownerActionAllowsStatus(fb, to)`: si scrive solo
+uno stato che la segnalazione offre in quel momento, così un pannello rimasto aperto
+mentre lo stato cambiava non deposita una decisione che la pagina non offre più.
+
 La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; sicuro + OFF
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco
 dalla dashboard (azione bulk `aligned→todo`, da aggiungere alla UI).
