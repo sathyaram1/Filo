@@ -422,10 +422,14 @@ async function setRoutinesEnabled(on, idToken) {
 // segnalato. Campo assente ⇒ true (il comportamento che c'è sempre stato): solo
 // un `false` scritto apposta ferma l'esplorazione.
 async function getAutomationProberIdle(idToken) {
+  // SOLO config/routines: è il documento che il server legge davvero. Il
+  // ripiego sul documento vecchio (config/automation) mostrava all'owner un
+  // valore che il server ignorava — la manopola girava, le ruote no. È già
+  // successo: la migrazione ha seminato i default nel documento nuovo e le
+  // scelte fatte prima (esplorazione spenta, tetto a 5) sono rimaste in
+  // ombra nel vecchio, mai più lette da nessuno.
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   if (doc && typeof doc.proberWhenIdle === 'boolean') return doc.proberWhenIdle;
-  const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
-  if (legacy && typeof legacy.proberWhenIdle === 'boolean') return legacy.proberWhenIdle;
   return true;
 }
 
