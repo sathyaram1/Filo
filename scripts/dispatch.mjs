@@ -1159,8 +1159,17 @@ function prepareForProber() {
 function positionOnBranch(bucket) {
   const isNew = bucket.role === 'new-work';
   const prev = readState(bucket.id);
-  const branch = isNew ? newWorkBranch(bucket.id) : (prev?.branch || bucket.branch || '');
+  // Il ramo lo dice il BIGLIETTO: lo stato locale è un residuo di questa
+  // macchina e può descrivere un tentativo precedente. Con la precedenza
+  // invertita, uno stato vecchio posizionava il lavoratore sul ramo di un
+  // giro passato ignorando quello assegnato dal server (#507, seconda porta).
+  const branch = isNew ? newWorkBranch(bucket.id) : (bucket.branch || prev?.branch || '');
   if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
+
+  // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
+  // di questo: lo sha esiste nel repo, quindi prepareBranch lo prenderebbe per
+  // buono e riporterebbe il ramo al contenuto di un tentativo diverso.
+  const checkpoint = (!isNew && prev?.branch === branch) ? lastCheckpoint(prev) : null;
 
   const res = prepareBranch({
     root: ROOT,
@@ -1170,7 +1179,7 @@ function positionOnBranch(bucket) {
     // erano il Modello B dei sotto-feedback, abolito (SPEC-RIDISEGNO-MAX.md §1).
     base: '',
     mainBranch: MAIN_BRANCH,
-    checkpoint: isNew ? null : lastCheckpoint(prev),
+    checkpoint,
   });
   if (!res.ok) return res;
   if (res.discarded) {
