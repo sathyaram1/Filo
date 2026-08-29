@@ -1860,15 +1860,27 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const Caps = globalThis.SN_CAPABILITIES;
   const capacita = Caps ? Caps.renderIndexForPrompt() : '';
 
-  const r = await handleAIRequest({
-    action: ACTIONS.FILO_CHAT,
-    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
-    origin: 'filo:chat',
-    onReasoning,
-    onText,
-  });
-
-  const parsed = extractJson(r.text) || { text: r.text || '', actions: [] };
+  // Un JSON rotto non si consegna al primo colpo: si RITENTA, fino a 3
+  // tentativi in tutto (decisione owner 2026-08-29). Dopo il terzo, amen: il
+  // testo grezzo diventa la bolla come prima — meglio una risposta strana che
+  // nessuna. Solo il PRIMO tentativo streamma il testo live: i ritentativi
+  // sono silenziosi e la risposta finale sostituisce comunque la bolla, così
+  // l'utente non vede il testo ripartire da capo a ogni giro.
+  let r = null;
+  let parsed = null;
+  for (let tentativo = 1; tentativo <= 3; tentativo++) {
+    r = await handleAIRequest({
+      action: ACTIONS.FILO_CHAT,
+      payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
+      origin: 'filo:chat',
+      onReasoning: tentativo === 1 ? onReasoning : null,
+      onText: tentativo === 1 ? onText : null,
+    });
+    parsed = extractJson(r.text);
+    if (parsed) break;
+    console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
+  }
+  parsed = parsed || { text: r.text || '', actions: [] };
   const rawActions = Array.isArray(parsed.actions) ? parsed.actions : [];
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
   // deve scrivere testo di riempimento: il "(vuoto)" che compariva era un
