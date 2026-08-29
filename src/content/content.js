@@ -1324,8 +1324,29 @@
   }
 
   // Azioni sul collegamento (senza la sezione "Spiega", come sopra).
+  //
+  // #499 — In cima ci sta scritto DOVE PORTA. Quattro voci che aprono, copiano,
+  // mettono da parte e mandano a qualcuno un indirizzo, e l'indirizzo da nessuna
+  // parte si leggeva: Filo non ha una barra di stato che lo mostri fermando il
+  // mouse, quindi l'unico modo di sapere dove si stava andando era andarci. Il
+  // caso che ha fatto emergere la mancanza è il collegamento ripescato da SOTTO
+  // il punto cliccato (#444): una pagina può stendere un collegamento invisibile
+  // sotto a un paragrafo qualunque, ritagliato con lo stesso ingombro — per il
+  // freno geometrico è indistinguibile dalla copertina di una scheda vera, ed è
+  // giusto così — e allora l'utente crede di copiare la pagina che sta leggendo
+  // e si ritrova in mano l'indirizzo scelto dal sito.
+  //
+  // La riga sta QUI, in fondo a tutte le strade, e non nei singoli rami: il
+  // collegamento adottato da sotto compare in cinque punti diversi della matrice
+  // (col filmato, con l'immagine, da solo, dentro il ramo del link cliccato…) e
+  // una riga da ricordarsi cinque volte è una riga che prima o poi manca in uno.
+  // Vale anche per il link cliccato di proposito: il testo che si vede può dire
+  // una cosa e l'href un'altra, e due modi di aprire lo stesso menu sulla stessa
+  // scheda devono dare lo stesso menu.
   function buildLinkActionItems(linkEl) {
-    const out = [
+    const dest = self.SN_URL_NAV?.describeDestination?.(linkEl.href);
+    const out = dest ? [{ type: 'dest', ...dest }] : [];
+    out.push(
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
