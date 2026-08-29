@@ -495,7 +495,7 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null }) {
+async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null, noCache = false }) {
   const settings = await getEffectiveSettings();
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
   // poteva imporre un modello scritto nel codice, scavalcando la configurazione
@@ -519,7 +519,12 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   let messages = await buildMessages(action, { ...payload, modelName });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 
-  const cached = await AICache.get({ provider: settings.provider, model, messages });
+  // `noCache` salta la LETTURA della cache (la scrittura resta: una risposta
+  // buona arrivata al secondo giro sovrascrive quella rotta del primo). Serve
+  // ai ritentativi sul JSON illeggibile: la chiave della cache e' identica fra
+  // i tentativi, e senza questo salto il retry rileggerebbe all'infinito la
+  // stessa risposta rotta appena salvata (trovato dalla verifica indipendente).
+  const cached = noCache ? null : await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
     return { text: cached.text, model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
@@ -1875,6 +1880,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       origin: 'filo:chat',
       onReasoning: tentativo === 1 ? onReasoning : null,
       onText: tentativo === 1 ? onText : null,
+      // Dal secondo tentativo si salta la cache: la chiave e' la stessa e
+      // riconsegnerebbe la risposta rotta appena messa via.
+      noCache: tentativo > 1,
     });
     parsed = extractJson(r.text);
     if (parsed) break;
