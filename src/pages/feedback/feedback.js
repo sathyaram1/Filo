@@ -185,25 +185,22 @@
     return `<span class="fb-branch" title="Branch del fix: ${escapeHtml(b)}">⎇ ${escapeHtml(b)}</span>`;
   }
 
-  function statusOf(f) {
-    const s = f.status || 'new';
-    if (s === 'ignored') return 'ignored';
-    if (s === 'done') return 'done';
-    if (s === 'verified') return 'verified';
-    // Le issue d'agente NON triagiate (status new) vivono nella loro categoria,
-    // così non annegano i feedback degli utenti reali. Promuovendole a "todo"
-    // entrano nel flusso normale (restano marcate come agente dai badge).
-    if (isAgent(f) && s === 'new') return 'agent';
-    if (s === 'new') return 'inbox';
-    if (s === 'draft') return 'draft';
-    if (s === 'todo') return 'todo';
-    // Cancello di merge delle routine: `review` = fix pronto su un branch in
-    // attesa di verifica avversariale; `blocked` = in pausa (3 loop falliti o
-    // file sensibile), decide l'utente. Entrambi mostrano il branch.
-    if (s === 'review') return 'review';
-    if (s === 'blocked') return 'blocked';
-    if (s === 'clarify') return 'clarify';
-    return 'inbox';
+  // Etichetta dello stato sulla card. Le sezioni sono quattro, ma dentro
+  // "Ricevuti" e "In coda" vivono stati diversi (allineato vs attacco, in
+  // lavorazione vs audit di sicurezza): senza questa riga la card non direbbe
+  // più a che punto è. Colore e testo vengono dal vocabolario unico, il motivo
+  // (`statusReason`) dalla traduzione condivisa.
+  function stateBadgeHtml(f) {
+    const status = statusOf(f);
+    const info = FS.STATUSES[status];
+    if (!info) return '';
+    const reason = statusReasonOf(f);
+    const reasonTxt = reason ? MR.reasonText(reason) : '';
+    const dot = info.color
+      ? `<span class="fb-state-dot" style="color:${escapeHtml(info.color)}"></span>`
+      : '';
+    return `<span class="fb-state" title="Stato: ${escapeHtml(info.label)}">${dot}${escapeHtml(info.label)}`
+      + `${reasonTxt ? ` <span class="fb-state-reason">— ${escapeHtml(reasonTxt)}</span>` : ''}</span>`;
   }
 
   function fmtTs(ts) {
