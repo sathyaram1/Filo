@@ -899,7 +899,10 @@
           const newNotes = window.SN_FEEDBACK_THREAD
             ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il', attachments: atts })
             : (reason ? (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`) : oldNotes);
-          patch(id, { status: 'new', notes: newNotes }, { status: 'new', notes: newNotes });
+          // Riaprire = rimettere in coda (`todo`), la transizione che la
+          // macchina a stati prevede per "manca qualcosa". Prima si scriveva il
+          // legacy `new`, che nessuno riconosceva più.
+          patch(id, { status: 'todo', notes: newNotes }, { status: 'todo', notes: newNotes });
         });
       });
     });
