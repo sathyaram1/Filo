@@ -97,18 +97,19 @@
   cursor: default;
 }
 
+/* L'host non si accorcia: se è lunghissimo (i domini d'inganno lo sono spesso)
+   va a capo, non finisce nei puntini. */
 .sn-menu-dest-host {
   flex: 0 1 auto;
   min-width: 0;
   color: var(--sn-fg);
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .sn-menu-dest-rest {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   color: var(--sn-muted);
   overflow: hidden;
