@@ -1210,7 +1210,7 @@
     const nuovo = tmp.firstElementChild;
     if (!nuovo) return;
     vecchio.replaceWith(nuovo);
-    bindCardActions(nuovo.parentElement || card);
+    bindCardActions(nuovo);
   }
 
   // I feedback della SEZIONE corrente, già ordinati: la lista la costruisce la
