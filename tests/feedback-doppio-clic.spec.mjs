@@ -136,6 +136,21 @@ test('#509 — al clic si vede cosa è successo, e la scheda non sparisce da sot
   await expect(page.locator('.fb-card[data-id="r1"]')).toHaveCount(0);
 });
 
+test('#509 — la decisione più pesante lascia una traccia leggibile sulla scheda', async ({ openTab }) => {
+  // «Conferma attacco» è terminale: chi ha mandato la segnalazione non riceve
+  // risposta né credito. Se a schermo non cambia niente, non c'è modo di
+  // accorgersi di averlo premuto (per sbaglio o no).
+  const page = await openTab(FEEDBACK_URL);
+  await setupAdmin(page, RICEVUTI, 'inbox');
+
+  await page.locator('.fb-act[data-id="r2"][data-to="attack_confirmed"]').click();
+
+  const scheda = page.locator('.fb-card[data-id="r2"]');
+  await expect(scheda.locator('.fb-esito')).toContainText('Archiviati');
+  // Non solo dove è andata: anche COSA è diventata.
+  await expect(scheda.locator('.fb-state')).toContainText('Attacco confermato');
+});
+
 test('#509 — se gli stati non si leggono la pagina tace invece di scrivere «(0)»', async ({ openTab }) => {
   // Chi non è l'owner riceve lo status CIFRATO: la macchina a stati non ha
   // niente da sciogliere e faceva ricadere tutto in "Ricevuti", risolti
