@@ -238,6 +238,38 @@
         root.appendChild(sep);
         continue;
       }
+      if (it.type === 'dest') {
+        // #499 — Dove portano le voci che seguono. Non è un bottone: non fa
+        // niente, dice soltanto. L'host non si taglia MAI (è la parte che
+        // risponde alla domanda "chi è dall'altra parte"); ad accorciarsi con i
+        // puntini è il percorso. `dir=ltr` perché un indirizzo con caratteri di
+        // un alfabeto che si scrive da destra a sinistra, lasciato al verso del
+        // testo, si riordina davanti agli occhi e mostra un dominio che non è
+        // quello vero.
+        const dest = document.createElement('div');
+        dest.className = 'sn-menu-dest';
+        dest.setAttribute('dir', 'ltr');
+        if (it.full) {
+          dest.title = I18n.t('menu_link_destination', it.full);
+          // Leggibile dai test senza fare la corsa con l'impaginazione, e
+          // sempre l'indirizzo INTERO, anche quando a schermo è accorciato.
+          dest.dataset.dest = it.full;
+        }
+        if (it.label) {
+          const h = document.createElement('span');
+          h.className = 'sn-menu-dest-host';
+          h.textContent = it.label;
+          dest.appendChild(h);
+        }
+        if (it.rest) {
+          const r = document.createElement('span');
+          r.className = 'sn-menu-dest-rest';
+          r.textContent = it.rest;
+          dest.appendChild(r);
+        }
+        root.appendChild(dest);
+        continue;
+      }
       if (it.type === 'row') {
         const row = document.createElement('div');
         row.className = 'sn-menu-row';
