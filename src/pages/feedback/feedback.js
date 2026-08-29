@@ -723,6 +723,11 @@
 
   function render(items) {
     const focusSnap = captureFocus();
+    // Ricomporre la lista è SEMPRE una richiesta esplicita (cambio sezione,
+    // ricerca, filtro, Aggiorna, dati nuovi): è il momento in cui le schede già
+    // decise lasciano il posto, e l'unico in cui la lista si rimescola.
+    decise.clear();
+    disegnate = items.length;
     countEl.textContent = items.length ? `${items.length} feedback` : '';
     if (!items.length) {
       listEl.innerHTML = '';
