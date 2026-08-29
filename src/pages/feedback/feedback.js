@@ -1214,6 +1214,12 @@
   });
   refreshBtn.addEventListener('click', load);
   searchEl.addEventListener('input', applyFilter);
+  if (agentOnlyEl) {
+    agentOnlyEl.addEventListener('change', () => {
+      agentOnly = agentOnlyEl.checked;
+      applyFilter();
+    });
+  }
 
   // ── Stato admin ──────────────────────────────────────────────────────────
   function renderAuthState(profile) {
