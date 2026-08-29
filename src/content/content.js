@@ -940,7 +940,14 @@
     if (!Array.isArray(view?.stack)) return false;
     for (const other of view.stack) {
       if (other === hit) return false;
-      if (COVER_TAGS.has(other.tagName) && coversPoint(other.getBoundingClientRect?.(), view)) return true;
+      if (!coversPoint(other.getBoundingClientRect?.(), view)) continue;
+      if (COVER_TAGS.has(other.tagName)) return true;
+      // Molte copertine vere sono un contenitore con l'immagine di SFONDO, non
+      // un tag immagine: per chi guarda è la stessa faccia della scheda.
+      try {
+        const bg = getComputedStyle(other).backgroundImage;
+        if (bg && bg !== 'none') return true;
+      } catch (_) {}
     }
     return false;
   }
