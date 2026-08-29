@@ -43,6 +43,9 @@
     menu_copy_link: 'Copia URL',
     menu_save_file: 'Salva file',
     menu_save_link_for_later: 'Salva link per dopo',
+    // #499 — l'indirizzo intero, fermando il mouse sulla riga della destinazione
+    // (nel menu è accorciato quando non ci sta).
+    menu_link_destination: 'Il link porta a: %s',
     menu_copy_image: 'Copia immagine',
     menu_save_image_as: 'Salva immagine come…',
     menu_copy_image_link: 'Copia URL immagine',
