@@ -910,6 +910,7 @@
       // velo fisso trasparente sopra un collegamento ben visibile sì, che è
       // l'unico caso onesto di quella forma.
       if (inFixedLayer(a) === inFixedLayer(b)
+        && !hiddenBehindForeignPaint(b, view)
         && !swallows(ra, rb) && !swallows(rb, ra)) return true;
     }
     // Il conto sui rettangoli non decide. Resta la prova diretta, e vale da
