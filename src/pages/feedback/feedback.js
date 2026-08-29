@@ -1151,7 +1151,7 @@
 
     // Salvataggio note: debounce su input + blur. Salva capo (testo + allegati)
     // ricomposto con la coda (notesValueOf).
-    listEl.querySelectorAll('.fb-notes').forEach((ta) => {
+    root.querySelectorAll('.fb-notes').forEach((ta) => {
       let timer;
       const flush = () => {
         const id = ta.dataset.id;
