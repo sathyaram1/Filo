@@ -97,12 +97,16 @@
   const mgSideClose  = document.getElementById('mgSideClose');
   const mgSideBody   = document.getElementById('mgSideBody');
 
-  // Azioni (accetta/sblocca un bloccato, owner-only)
+  // Azioni di stato (owner-only): i pulsanti li genera renderActions() leggendo
+  // MR.ownerActions — la stessa tabella della pagina dei feedback.
   const mgActions       = document.getElementById('mgActions');
   const mgAcceptComment = document.getElementById('mgAcceptComment');
-  const mgAcceptBtn     = document.getElementById('mgAcceptBtn');
-  const mgConfirmBtn    = document.getElementById('mgConfirmBtn');
+  const mgActionsRow    = document.getElementById('mgActionsRow');
   const mgActionMsg     = document.getElementById('mgActionMsg');
+  const mgReopen        = document.getElementById('mgReopen');
+  const mgReopenText    = document.getElementById('mgReopenText');
+  const mgReopenCancel  = document.getElementById('mgReopenCancelBtn');
+  const mgReopenConfirm = document.getElementById('mgReopenConfirmBtn');
 
   // Risposta ai chiarimenti (owner-only)
   const mgClarify     = document.getElementById('mgClarify');
