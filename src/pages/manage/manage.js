@@ -1954,27 +1954,249 @@
     closeSidebar();
   }
 
-  // Riflette lo stato corrente del feedback sui controlli di gestione:
-  // il bottone ⭐ acceso se è preferito; "Archivia" o "Ripristina" a seconda
-  // che il feedback sia già archiviato.
+  // Riflette lo stato corrente del feedback sul bottone ⭐. Il preferito è un
+  // flag in chiaro, indipendente dallo stato: resta anche su una segnalazione
+  // che questa macchina non riesce a leggere. Archivia/Ripristina invece è
+  // un'AZIONE DI STATO e vive nella riga generata da renderActions.
   function reflectManage(fb) {
     mgStarBtn.disabled = false;
-    mgArchiveBtn.disabled = false;
     const starred = MR.isStarred(fb);
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
-    // ⭐ resta: il preferito è un flag in chiaro, indipendente dallo stato.
-    // "Archivia"/"Ripristina" no: il bottone DICE dov'è la segnalazione, e su
-    // uno stato cifrato direbbe sempre "Archivia" — anche su una già
-    // archiviata, che il clic riporterebbe indietro senza che nessuno lo
-    // volesse. Non si mostra un verso solo di un'azione a due versi.
-    mgArchiveBtn.hidden = MR.statusUnreadable(fb);
-    const archived = (fb.status || '') === 'archived';
-    mgArchiveBtn.textContent = archived ? 'Ripristina' : 'Archivia';
-    mgArchiveBtn.title = archived
-      ? 'Riporta il feedback in coda'
-      : 'Sposta il feedback negli archiviati';
+  }
+
+  // ── L'etichetta di stato del dettaglio ────────────────────────────────────
+  // Le parole (etichetta, motivo, hover) vengono dal modulo condiviso: la
+  // gemella scrive esattamente la stessa riga sulla scheda.
+  function renderDetailState(fb) {
+    if (!mgDetailState) return;
+    const b = MR.stateBadge(fb);
+    if (!b) {
+      mgDetailState.hidden = true;
+      mgDetailState.textContent = '';
+      mgDetailState.removeAttribute('title');
+      return;
+    }
+    mgDetailState.hidden = false;
+    mgDetailState.title = b.hint;
+    mgDetailState.innerHTML =
+      (b.color ? `<span class="mg-detail-state-dot" style="color:${esc(b.color)}"></span>` : '')
+      + `<span>${esc(b.label)}</span>`
+      + (b.showReason ? `<span class="mg-detail-state-reason">— ${esc(b.reasonText)}</span>` : '');
+  }
+
+  // ── Le azioni di stato: una riga GENERATA dalla tabella condivisa ─────────
+  // Ogni azione ha un id stabile, così resta indirizzabile da fuori. Archivia e
+  // Ripristina condividono l'id perché sono i due versi della STESSA azione, e
+  // non compaiono mai insieme: nella sezione Archiviati esiste solo il
+  // ripristino — così non c'è più un cammino che riscrive uno stato terminale
+  // (attacco/spam confermato) con "archiviato", cancellando la conferma.
+  const ACTION_BTN_ID = {
+    accept: 'mgAcceptBtn',
+    confirm_attack: 'mgConfirmBtn',
+    confirm_spam: 'mgConfirmSpamBtn',
+    archive: 'mgArchiveBtn',
+    restore: 'mgArchiveBtn',
+    resolve: 'mgResolveBtn',
+    reopen: 'mgReopenBtn',
+  };
+  const ACTION_TITLE = {
+    accept: 'Approva la segnalazione e mettila in coda di lavorazione',
+    confirm_attack: 'Conferma che è un attacco: esce dai Ricevuti e resta consultabile negli Archiviati',
+    confirm_spam: 'Conferma che è spam: esce dai Ricevuti e resta consultabile negli Archiviati',
+    archive: 'Sposta la segnalazione negli archiviati',
+    restore: 'Riporta la segnalazione in coda',
+    resolve: 'Chiudi la segnalazione a mano',
+    reopen: 'Riapri spiegando cosa manca ancora',
+  };
+  const ACTION_PROGRESS = {
+    accept: 'Metto in coda…',
+    confirm_attack: 'Conferma in corso…',
+    confirm_spam: 'Conferma in corso…',
+    archive: 'Archivio…',
+    restore: 'Ripristino…',
+    resolve: 'Chiudo…',
+    reopen: 'Riapro…',
+  };
+
+  function renderActions(fb) {
+    if (!mgActions || !mgActionsRow) return;
+    chiudiRiapertura();
+    setActionMsg('', '');
+    mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
+    const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
+    mgActions.hidden = !azioni.length;
+    if (!azioni.length) {
+      if (mgAcceptComment) mgAcceptComment.hidden = true;
+      return;
+    }
+    // Il commento di revisione accompagna le decisioni sui Ricevuti (è ciò che
+    // l'owner scrive quando approva o conferma un blocco). Altrove non c'è
+    // niente da commentare e la casella sarebbe solo rumore.
+    if (mgAcceptComment) {
+      const conCommento = azioni.some((a) => a.kind === 'accept' || a.kind === 'reject');
+      mgAcceptComment.hidden = !conCommento;
+      mgAcceptComment.value = '';
+      mgAcceptComment.placeholder = MR.classifyBlock(fb)
+        ? 'Commento (opzionale): perché lo sblocchi…'
+        : 'Commento (opzionale): perché lo approvi…';
+    }
+    for (const a of azioni) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-btn' + (a.primary ? '' : ' sn-btn-secondary');
+      const id = ACTION_BTN_ID[a.key];
+      if (id) b.id = id;
+      b.dataset.actionKey = a.key;
+      b.textContent = a.label;
+      b.title = ACTION_TITLE[a.key] || a.label;
+      b.addEventListener('click', () => {
+        // "Riapri" non scrive subito: chiede prima cosa manca ancora.
+        if (a.kind === 'reopen') { apriRiapertura(); return; }
+        applyAction(a, null);
+      });
+      mgActionsRow.insertBefore(b, mgActionMsg);
+    }
+  }
+
+  // Una scrittura in volo spegne TUTTA la riga, non solo il bottone premuto:
+  // «Archivia» premuto mentre «→ In coda» è ancora in volo scriverebbe due
+  // decisioni sulla stessa segnalazione.
+  function setActionsBusy(busy) {
+    if (mgActionsRow) mgActionsRow.querySelectorAll('button').forEach((b) => { b.disabled = !!busy; });
+    if (mgReopenConfirm) mgReopenConfirm.disabled = !!busy;
+    if (mgReopenCancel) mgReopenCancel.disabled = !!busy;
+  }
+
+  // Il cammino UNICO di ogni azione di stato del pannello.
+  async function applyAction(action, extra) {
+    if (!selectedId || !action) return;
+    const id = selectedId;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    // Il guardiano sta SOTTO ai pulsanti, non accanto: si scrive solo uno stato
+    // che la segnalazione offre in questo momento. Un pannello rimasto aperto
+    // mentre lo stato cambiava scriverebbe altrimenti una decisione che la
+    // pagina non offre più — ed è esattamente così che un attacco confermato si
+    // ritrovava riscritto ad "archiviato", senza avviso.
+    if (!MR.ownerActionAllowsStatus(fb, action.to, { releasedVersion })) {
+      renderActions(fb);
+      setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
+      return;
+    }
+    const payload = { type: 'feedback_update', id, status: action.to };
+    const locale = { status: action.to };
+    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
+    if (action.kind === 'accept' || action.kind === 'reject') {
+      const decision = action.kind === 'accept' ? 'accepted' : 'rejected';
+      payload.reviewDecision = decision;
+      payload.reviewComment = comment;
+      payload.reviewedAt = new Date().toISOString();
+      locale.reviewDecision = decision;
+      locale.reviewComment = comment;
+      locale.reviewedAt = payload.reviewedAt;
+    }
+    // Archiviazione/ripristino a mano = scelta esplicita: vince per sempre
+    // sull'auto-archiviazione a punteggio (DC3), in un verso e nell'altro.
+    if (action.kind === 'archive') { payload.archiveOverride = 'archived'; locale.archiveOverride = 'archived'; }
+    if (action.kind === 'restore') { payload.archiveOverride = 'keep_open'; locale.archiveOverride = 'keep_open'; }
+    if (extra && typeof extra.notes === 'string') { payload.notes = extra.notes; locale.notes = extra.notes; }
+
+    setActionsBusy(true);
+    setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
+    try {
+      const r = await sendToMain(payload);
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      Object.assign(fb, locale);
+      updateTabCounts();
+      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
+      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
+      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
+      // sparirebbe sotto le mani senza motivo apparente.
+      if (selectedId !== id) { renderList(); return; }
+      // La segnalazione cambia sezione: chiudi il dettaglio e ricalcola la lista.
+      selectedId = null;
+      mgDetail.hidden = true;
+      mgDetailEmpty.hidden = false;
+      mgActions.hidden = true;
+      mgClarify.hidden = true;
+      if (mgUserNote) mgUserNote.hidden = true;
+      mgManage.hidden = true;
+      if (mgDetailState) mgDetailState.hidden = true;
+      chiudiRiapertura();
+      closeSidebar();
+      renderList();
+    } catch (e) {
+      setActionsBusy(false);
+      if (selectedId !== id) return;
+      setActionMsg(e.message || 'Errore', 'err');
+    }
+  }
+
+  // ── Riapertura di un fix già uscito ───────────────────────────────────────
+  // Come la gemella: non scrive subito, chiede COSA manca ancora e lo appende
+  // alla conversazione come turno dell'utente, così il report di chi ci ha
+  // lavorato resta leggibile.
+  function chiudiRiapertura() {
+    if (!mgReopen) return;
+    mgReopen.hidden = true;
+    if (mgReopenText) mgReopenText.value = '';
+  }
+
+  function conversazioneIlleggibile(fb) {
+    const T = window.SN_FEEDBACK_THREAD;
+    const notes = String((fb && fb.notes) || '');
+    return !!(T && T.reportUnreadable && T.reportUnreadable(notes));
+  }
+
+  const RIAPERTURA_ILLEGGIBILE = 'La conversazione di questo feedback non è leggibile su questo computer '
+    + '(manca la chiave privata): riaprirlo adesso sostituirebbe il report. Configura la chiave e riprova.';
+
+  function apriRiapertura() {
+    if (!mgReopen) return;
+    const fb = allFeedbacks.find((f) => f._id === selectedId);
+    if (!fb) return;
+    // Stessa regola della risposta ai chiarimenti: non si riscrive una
+    // conversazione che non si è potuta leggere.
+    if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
+    setActionMsg('', '');
+    mgReopen.hidden = false;
+    if (mgReopenText) mgReopenText.focus();
+  }
+
+  function confermaRiapertura() {
+    const fb = allFeedbacks.find((f) => f._id === selectedId);
+    if (!fb) return;
+    const azione = MR.ownerActionFor(fb, 'reopen', { releasedVersion });
+    if (!azione) {
+      chiudiRiapertura();
+      renderActions(fb);
+      setActionMsg('Questa segnalazione non è più riapribile: lo stato è cambiato.', 'err');
+      return;
+    }
+    const oldNotes = String(fb.notes || '');
+    if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
+    const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
+    let extra = null;
+    if (reason) {
+      const T = window.SN_FEEDBACK_THREAD;
+      const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+      const newNotes = T
+        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il' })
+        : (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`);
+      extra = { notes: newNotes };
+    }
+    applyAction(azione, extra);
+  }
+
+  if (mgReopenCancel) mgReopenCancel.addEventListener('click', () => { chiudiRiapertura(); });
+  if (mgReopenConfirm) mgReopenConfirm.addEventListener('click', confermaRiapertura);
+  if (mgReopenText) {
+    mgReopenText.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); chiudiRiapertura(); }
+      else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); confermaRiapertura(); }
+    });
   }
 
   function setManageMsg(text, kind) {
