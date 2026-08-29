@@ -1514,7 +1514,9 @@
   }
   function updateReevalBar() {
     if (!mgReevalBar) return;
-    const whites = unfilteredFeedbacks();
+    // Senza il criterio non c'è nessun "bianco": ogni segnalazione cifrata
+    // ricadrebbe lì, e la barra offrirebbe di ri-giudicare anche i chiusi.
+    const whites = sezioniAttendibili() ? unfilteredFeedbacks() : [];
     // Solo l'owner, solo nei Ricevuti (dove vivono i bianchi), solo se ce n'è.
     const show = isAdmin && currentTab === 'inbox' && whites.length > 0;
     mgReevalBar.hidden = !show;
