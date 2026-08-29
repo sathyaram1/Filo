@@ -1020,9 +1020,21 @@
     restoreFocus(focusSnap);
   }
 
+  // I feedback della SEZIONE corrente, già ordinati: la lista la costruisce la
+  // stessa funzione pura della dashboard di gestione (ordinamento compreso —
+  // i bloccati gravi in cima ai Ricevuti, le lavorazioni attive in cima alla
+  // coda). Sopra passa solo il filtro "Solo automatici", che è di questa pagina.
+  function sectionItems(tab) {
+    const t = tab || currentTab;
+    const items = t === 'archived'
+      ? MR.listArchiveTab(all, { releasedVersion })
+      : MR.listForManageTab(all, t, { releasedVersion });
+    return agentOnly ? items.filter(isAgent) : items;
+  }
+
   function applyFilter() {
     const q = (searchEl.value || '').trim().toLowerCase();
-    const base = all.filter((f) => statusOf(f) === currentTab);
+    const base = sectionItems();
     const filtered = q
       ? base.filter((f) => {
           const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
@@ -1030,11 +1042,11 @@
             .join(' ').toLowerCase().includes(q);
         })
       : base;
-    if (currentTab === 'done') {
-      // Tab "Risolti": ordina per numero (#1, #2, … #22.1, #22.2). I feedback
-      // senza numero (seq assente) finiscono in coda. Confronto numerico su
-      // seq e poi subSeq, così #22.2 viene dopo #22.10? No: numerico, quindi
-      // #22.2 < #22.10 — l'ordine "umano" atteso per i sub-feedback.
+    if (currentTab === 'resolved') {
+      // Sezione "Risolti": ordina per numero (#1, #2, … #22.1, #22.2). I
+      // feedback senza numero (seq assente) finiscono in coda. Confronto
+      // numerico su seq e poi subSeq, così #22.2 viene prima di #22.10 —
+      // l'ordine "umano" atteso per i sub-feedback.
       const numKey = (f) => {
         const seq = Number(f.seq);
         const sub = Number(f.subSeq);
@@ -1048,21 +1060,19 @@
         const kb = numKey(b);
         return ka.seq - kb.seq || ka.sub - kb.sub;
       });
-    } else {
-      // Priorità più alta in cima. `all` è già ordinato per data DESC e il sort
-      // di JS è stabile, quindi a parità di priorità restano i più recenti prima.
-      filtered.sort((a, b) => priorityOf(b) - priorityOf(a));
     }
     updateTabCounts();
     render(filtered);
   }
 
   function updateTabCounts() {
-    const counts = { inbox: 0, agent: 0, draft: 0, todo: 0, review: 0, blocked: 0, clarify: 0, done: 0, verified: 0 };
-    for (const f of all) {
-      const s = statusOf(f);
-      if (s in counts) counts[s]++;
-    }
+    // Il numero è la LUNGHEZZA della lista che quella sezione mostrerebbe, e si
+    // calcola con la stessa funzione che la costruisce (#495). Senza il filtro
+    // "Solo automatici" attivo sono ESATTAMENTE i numeri della dashboard di
+    // gestione: manageTabCounts è la funzione che conta anche là (#509).
+    const counts = agentOnly
+      ? TABS.reduce((acc, t) => { acc[t] = sectionItems(t).length; return acc; }, {})
+      : MR.manageTabCounts(all, { releasedVersion });
     // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
     // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
     // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
@@ -1070,11 +1080,13 @@
     // non si scrive nessun numero: "(0)" direbbe "qui non c'è niente" mentre la
     // verità è che non lo sappiamo ancora.
     const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
-    for (const [tab, n] of Object.entries(counts)) {
+    for (const tab of TABS) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
-      const label = { inbox: 'Ricevuti', agent: 'Agente', draft: 'Bozze', todo: 'Da risolvere', review: 'In revisione', blocked: 'Bloccati', clarify: 'Chiarimenti', done: 'Risolti', verified: 'Verificati' }[tab];
-      btn.textContent = dataLoaded ? `${label} ${SN_FEEDBACK.countLabel(n, capped)}` : label;
+      const label = TAB_LABELS[tab];
+      btn.textContent = dataLoaded
+        ? `${label} ${SN_FEEDBACK.countLabel(counts[tab] || 0, capped)}`
+        : label;
       if (capped) btn.title = SN_FEEDBACK.COUNT_CAP_HINT;
       else btn.removeAttribute('title');
     }
