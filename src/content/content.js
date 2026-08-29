@@ -674,6 +674,15 @@
   // riga di titoli sta sotto al 5%, il manto invisibile sopra un paragrafo al 3%.
   const CONTAINER_MIN_RATIO = 0.35;
 
+  // Il conto pretende lo sforo STRETTO su tutti e quattro i lati: la striscia
+  // del titolo dentro una scheda condivide i bordi con la copertina, e un
+  // contenimento tollerante ai bordi condivisi la scambiava per una copertura
+  // (riprovato: spegneva le voci della scheda proprio sulla sfumatura del
+  // titolo). Il buco opposto — il manto a filo pagina che condivide i bordi
+  // col testo che copre (verifica avversariale del 29/08, porta 4) — non si
+  // chiude qui: lo chiude la regola sui collegamenti invisibili in
+  // findLinkUnder, che di un link senza niente di dipinto e senza copertina
+  // davanti dice che per il menu non esiste.
   function engulfs(outer, inner) {
     return outer.left < inner.left - SURFACE_SLACK_PX
       && outer.top < inner.top - SURFACE_SLACK_PX
@@ -686,6 +695,23 @@
     const areaOuter = outer.width * outer.height;
     const areaInner = inner.width * inner.height;
     return areaInner < areaOuter * CONTAINER_MIN_RATIO;
+  }
+
+  // L'elemento vive in uno strato FISSO (o appiccicoso)? Le barre in cima, i
+  // riquadri dei cookie e gli inviti a iscriversi stanno sopra la pagina e non
+  // scorrono con lei: quello che finisce lì sotto non è "la stessa scheda", è
+  // contenuto seppellito da un'altra superficie. Le schede vere non sono mai
+  // fisse. La risalita attraversa i componenti web come le altre.
+  function inFixedLayer(el) {
+    let node = el;
+    while (node && node.nodeType === 1) {
+      try {
+        const p = getComputedStyle(node).position;
+        if (p === 'fixed' || p === 'sticky') return true;
+      } catch (_) { return false; }
+      node = node.parentElement || node.getRootNode?.()?.host || null;
+    }
+    return false;
   }
 
   // ------------------------------------------------------------
@@ -808,6 +834,78 @@
     return true;
   }
 
+  // Quanto del candidato può essere nascosto da uno strato dipinto ESTRANEO
+  // prima che smetta di essere "quello che l'utente sta guardando". La striscia
+  // del titolo copre il 31% della sua scheda e deve passare; un titolo
+  // scivolato per metà sotto una barra, un pannello su mezza scheda o su tutta
+  // devono fermarsi. Le misure vere stanno da una parte e dall'altra del 45%.
+  const HIDDEN_FRACTION = 0.45;
+
+  // L'alfa più basso fra i colori di un'immagine CSS (i gradienti, nel
+  // computed style, serializzano i colori come rgb()/rgba()). Se non si trova
+  // nessun colore leggibile si risponde 1: nel dubbio la sfumatura copre —
+  // l'errore prudente spegne una voce di menu, quello imprudente regala al
+  // menu un collegamento scelto dalla pagina.
+  function minAlphaInCssImage(bg) {
+    let min = Infinity;
+    const re = /rgba?\([^)]+\)/g;
+    let m;
+    while ((m = re.exec(bg))) {
+      const a = colorAlpha(m[0]);
+      if (a < min) min = a;
+    }
+    if (/\btransparent\b/.test(bg)) min = 0;
+    return min === Infinity ? 1 : min;
+  }
+
+  // Il candidato adottato da sotto è NASCOSTO da uno strato dipinto che non è
+  // la sua faccia? La sua faccia sono: lui stesso, i suoi parenti nel DOM, una
+  // copertina (immagine, filmato, disegno, o un contenitore con un'immagine di
+  // sfondo). Tutto il resto — testo, pannelli, sfondi — quando ne copre più di
+  // HIDDEN_FRACTION lo sta seppellendo: la verifica avversariale del 29/08
+  // (secondo giro) è entrata proprio da qui, con coperture opache DENTRO la
+  // pagina (dove il confine fisso non distingue niente) e con coppie
+  // barra-e-riga entrambe fisse.
+  function hiddenBehindForeignPaint(cand, view) {
+    if (!cand || !Array.isArray(view?.stack)) return false;
+    const rb = cand.getBoundingClientRect?.();
+    if (!rb || !(rb.width * rb.height > 0)) return false;
+    for (const L of view.stack) {
+      // Arrivati al candidato o alla sua famiglia DOM: da qui in giù è la sua
+      // stessa faccia, non una copertura.
+      if (L === cand || containsAcrossShadow(cand, L) || containsAcrossShadow(L, cand)) return false;
+      if (!coversPoint(L.getBoundingClientRect?.(), view)) continue;
+      // Le copertine sono la faccia della scheda, non una copertura.
+      if (COVER_TAGS.has(L.tagName)) continue;
+      // A nascondere è uno SFONDO COPRENTE. Il testo no: attorno ai glifi si
+      // vede quello che c'è dietro — la striscia quasi trasparente col titolo
+      // sopra una copertina è la forma normale delle schede, e contarla come
+      // copertura spegneva le voci proprio lì. I gradienti si contano per
+      // prudenza (un pannello sfumato scuro copre), l'immagine di sfondo no:
+      // è una copertina scritta in CSS.
+      let cs = null;
+      try { cs = getComputedStyle(L); } catch (_) { continue; }
+      if (!cs || cs.visibility === 'hidden') continue;
+      const layerOpacity = parseFloat(cs.opacity);
+      if (Number.isFinite(layerOpacity) && layerOpacity < 0.5) continue;
+      const bg = cs.backgroundImage;
+      if (bg && bg !== 'none' && bg.includes('url(')) continue;
+      // Una SFUMATURA che da qualche parte è trasparente è un velo, non una
+      // copertura: attraverso la parte chiara si vede la scheda, ed è la forma
+      // più comune del velo del titolo (terzo giro di verifica: contarla come
+      // copertura spegneva le voci proprio lì). Nasconde solo la sfumatura
+      // interamente coprente — tutti i colori con alfa piena.
+      const gradientHides = bg && bg !== 'none' ? minAlphaInCssImage(bg) >= 0.5 : false;
+      const opaqueBg = gradientHides || colorAlpha(cs.backgroundColor) >= 0.5;
+      if (!opaqueBg) continue;
+      const r = L.getBoundingClientRect();
+      const w = Math.min(r.right, rb.right) - Math.max(r.left, rb.left);
+      const h = Math.min(r.bottom, rb.bottom) - Math.max(r.top, rb.top);
+      if (w > 0 && h > 0 && (w * h) > rb.width * rb.height * HIDDEN_FRACTION) return true;
+    }
+    return false;
+  }
+
   // Un contenuto "appartiene" a un collegamento quando ci sta dentro (nel DOM) o
   // quando ne occupa la superficie (i player veri coprono il filmato col proprio
   // overlay, e le schede impilano copertina e link invece di annidarli). Il DOM
@@ -835,7 +933,17 @@
       const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
       if (w <= 0 || h <= 0) return false;
       if ((w * h) * 2 < Math.min(areaA, areaB)) return false;
-      if (!swallows(ra, rb) && !swallows(rb, ra)) return true;
+      // Ai RETTANGOLI un confine fisso non si può chiedere: una barra o un
+      // riquadro che non scorrono con la pagina condividono i bordi con quello
+      // che gli scivola sotto (la forma normale delle barre a tutta larghezza),
+      // e il conto diceva "stessa scheda" proprio lì (verifica avversariale del
+      // 29/08, porte 1-3). Con fissità diverse la geometria non decide: resta
+      // la prova di visibilità qui sotto, che una barra OPACA non passa — e un
+      // velo fisso trasparente sopra un collegamento ben visibile sì, che è
+      // l'unico caso onesto di quella forma.
+      if (inFixedLayer(a) === inFixedLayer(b)
+        && !hiddenBehindForeignPaint(b, view)
+        && !swallows(ra, rb) && !swallows(rb, ra)) return true;
     }
     // Il conto sui rettangoli non decide. Resta la prova diretta, e vale da
     // sola: se né l'uno né l'altro hanno qualcosa di dipinto davanti, in questo
@@ -895,9 +1003,51 @@
   // titolo, quindi la geometria da sola diceva di no proprio dove la struttura
   // diceva di sì. Solo quando il DOM non lega niente si guarda la pila di strati
   // sotto il cursore, e lì il freno geometrico è l'unica cosa che regge.
+  // Il collegamento sepolto è coperto da una COPERTINA nel punto cliccato?
+  // Una copertina (immagine, filmato, disegno) è la faccia visibile di una
+  // scheda: un link invisibile lì sotto è la scheda stessa, e adottarlo è
+  // giusto. Del TESTO o uno sfondo dipinto non sono la faccia di nessun link:
+  // un collegamento invisibile sotto un paragrafo è l'esca del #499, non una
+  // scheda — l'utente sta guardando il paragrafo, e il paragrafo non è "sua"
+  // rappresentazione.
+  const COVER_TAGS = new Set(['IMG', 'VIDEO', 'CANVAS', 'SVG', 'PICTURE', 'OBJECT', 'EMBED']);
+  function coverInFront(hit, view) {
+    if (!Array.isArray(view?.stack)) return false;
+    for (const other of view.stack) {
+      if (other === hit) return false;
+      if (!coversPoint(other.getBoundingClientRect?.(), view)) continue;
+      if (COVER_TAGS.has(other.tagName)) return true;
+      // Molte copertine vere sono un contenitore con l'immagine di SFONDO, non
+      // un tag immagine: per chi guarda è la stessa faccia della scheda.
+      try {
+        const bg = getComputedStyle(other).backgroundImage;
+        if (bg && bg !== 'none') return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
   function findLinkUnder(view, target, contentUnder) {
     const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
-    return owner || findUnder(view, 'a[href]', target);
+    const hit = owner || findUnder(view, 'a[href]', target);
+    if (!hit) return null;
+    try {
+      // Un collegamento che non riceve i click per il menu NON ESISTE
+      // (decisione owner sul #499): non è un'affordance della pagina — un
+      // click sinistro lì non navigherebbe mai. I collegamenti trasparenti
+      // delle schede vere i click li ricevono: questa riga non li tocca.
+      if (getComputedStyle(hit).pointerEvents === 'none') return null;
+      // Ed è la seconda metà della stessa decisione: un collegamento che non
+      // disegna niente e che nel punto cliccato è coperto da qualcosa che non
+      // è la sua copertina (testo, sfondi) è invisibile PER COSTRUZIONE, e per
+      // il menu non esiste. È il repro esatto del #499: il link trasparente
+      // ritagliato sull'ingombro di un paragrafo. Le schede vere passano da
+      // `owner` (il DOM lo lega alla copertina) o hanno una copertina davanti.
+      if (!owner && !paintsSomething(hit) && !coverInFront(hit, view) && coveredAt(hit, view)) {
+        return null;
+      }
+    } catch (_) {}
+    return hit;
   }
 
   function isEditable(el) {
