@@ -167,6 +167,24 @@
       level: 1,
       describe: () => 'Salvare un appunto',
     },
+    SALVA_LEZIONE: {
+      // Filo fissa una LEZIONE nella propria memoria su richiesta in chat (o di
+      // sua iniziativa quando una regola va fissata subito, es. proteggere i
+      // dati dell'utente da una richiesta sospetta): entra nel buffer delle
+      // lezioni — lo stesso che l'agente-lezioni riempie da solo dopo ogni
+      // scambio — e vale da subito in tutte le conversazioni. Livello 1 per la
+      // stessa ragione per cui le lezioni automatiche non chiedono conferma:
+      // stesso canale, stesso grado di fiducia, e le lezioni restano visibili e
+      // cancellabili dall'utente fra le memorie. Un popup qui sarebbe anche
+      // controproducente nel caso d'uso di protezione: confermerebbe chiunque
+      // sia alla tastiera in quel momento, che è proprio chi la lezione vuole
+      // tenere fuori.
+      level: 1,
+      describe: (a) => {
+        const testo = String(a?.testo ?? a?.text ?? a?.lezione ?? '').trim();
+        return `Fissare una lezione nella memoria di Filo:\n“${testo || '(vuota)'}”`;
+      },
+    },
     INVIA_FEEDBACK: {
       // Filo invia un feedback agli sviluppatori a NOME dell'utente (#146.5).
       // Esce dall'app verso un servizio esterno (Firestore) → livello 2:
