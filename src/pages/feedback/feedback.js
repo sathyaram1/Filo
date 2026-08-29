@@ -679,7 +679,7 @@
       decise.set(id, esito);
       marcaDecisa(viva, esito);
     } else if (viva) {
-      viva.querySelector('.fb-act--busy')?.classList.remove('fb-act--busy');
+      btn.classList.remove('fb-act--busy');
       riaccendiScheda(viva);
     }
     updateTabCounts();
