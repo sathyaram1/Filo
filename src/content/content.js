@@ -929,7 +929,17 @@
   // sotto il cursore, e lì il freno geometrico è l'unica cosa che regge.
   function findLinkUnder(view, target, contentUnder) {
     const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
-    return owner || findUnder(view, 'a[href]', target);
+    const hit = owner || findUnder(view, 'a[href]', target);
+    // Un collegamento che non riceve i click per il menu NON ESISTE (decisione
+    // owner sul #499): non è un'affordance della pagina — un click sinistro lì
+    // non navigherebbe mai — quindi offrirne «Copia URL» o «Condividi» significa
+    // inventare un'azione che la pagina non ha, sull'indirizzo scelto da lei.
+    // I collegamenti trasparenti delle schede vere i click li ricevono: questa
+    // riga non li tocca.
+    if (hit) {
+      try { if (getComputedStyle(hit).pointerEvents === 'none') return null; } catch (_) {}
+    }
+    return hit;
   }
 
   function isEditable(el) {
