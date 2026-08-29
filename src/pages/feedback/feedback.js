@@ -493,73 +493,55 @@
     }
   }
 
+  // I pulsanti scrivono STATI CANONICI, gli stessi che scrive la dashboard di
+  // gestione. Prima scrivevano il vocabolario vecchio (new/draft/verified/
+  // ignored/blocked): ogni clic spingeva il feedback FUORI dalla macchina a
+  // stati, e la gemella doveva poi ridurlo a forza. Due cammini equivalenti
+  // devono fare la stessa cosa, non due cose che si somigliano.
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
-    const tab = statusOf(f);
-    if (tab === 'agent') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
-      `;
-    }
+    const id = escapeHtml(f._id);
+    const status = statusOf(f);
+    const tab = tabOf(f);
+    const btn = (to, label, primary, extra) =>
+      `<button class="sn-btn${primary ? '' : ' sn-btn-secondary'} fb-act" data-id="${id}" data-to="${to}"${extra || ''}>${label}</button>`;
+
     if (tab === 'inbox') {
+      // Aspetta una decisione: l'approvazione È scrivere `todo` (come la
+      // gemella, con l'override di revisione che toglie il blocco).
+      const parts = [btn('todo', '→ In coda', true, ' data-accept="1"')];
+      // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
+      // Ricevuti e resta consultabile negli Archiviati.
+      if (status === 'attack' || status === 'suspicious_file') {
+        parts.push(btn('attack_confirmed', 'Conferma attacco', false, ' data-reject="1"'));
+      }
+      if (status === 'spam' || status === 'suspicious_file') {
+        parts.push(btn('spam_confirmed', 'Conferma spam', false, ' data-reject="1"'));
+      }
+      parts.push(btn('archived', 'Archivia', false, ' data-archive="1"'));
+      return parts.join('\n');
+    }
+    if (tab === 'queue') {
+      // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
+      const parts = [];
+      if (status !== 'done') parts.push(btn('done', '✓ Risolto', true));
+      parts.push(btn('archived', 'Archivia', false, ' data-archive="1"'));
+      return parts.join('\n');
+    }
+    if (tab === 'resolved') {
+      // Fix uscito: si archivia (verifica umana ok) o si riapre col modulo che
+      // chiede COSA manca ancora.
       return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
+        ${btn('archived', 'Archivia', true, ' data-archive="1"')}
+        <button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">Riapri</button>
       `;
     }
-    if (tab === 'draft') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">← Ricevuti</button>
-      `;
-    }
-    if (tab === 'todo') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">← Ricevuti</button>
-      `;
-    }
-    if (tab === 'review') {
-      // Fix pronto su un branch, in attesa di verifica avversariale. L'utente
-      // può promuoverlo (✓ Risolto), rimandarlo a "Da risolvere" o bloccarlo.
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="blocked">⛔ Blocca</button>
-      `;
-    }
-    if (tab === 'blocked') {
-      // In pausa (3 loop falliti o file sensibile nel cancello di merge): decide
-      // l'utente. Può rimetterlo in coda, marcarlo risolto a mano o ignorarlo.
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
-      `;
-    }
-    if (tab === 'done') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="verified">✓ Verificato</button>
-        <button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${escapeHtml(f._id)}">Riapri</button>
-      `;
-    }
-    if (tab === 'clarify') {
-      // L'utente legge le domande di Filo (bolle) e risponde col composer
-      // "Invia risposta" (che riporta il feedback in "Da risolvere"); in
-      // alternativa lo sposta a mano in Bozze (scelta di design) o lo ignora.
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
-      `;
-    }
-    if (tab === 'verified') {
-      return `<button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">← Risolti</button>`;
+    if (tab === 'archived') {
+      // Invariante: se puoi archiviare, puoi togliere dall'archivio. Il
+      // ripristino rimette in coda (todo) — anche per un attacco/spam
+      // confermato, che è la strada del "era legittimo".
+      return btn('todo', '↩ Ripristina', false, ' data-restore="1"');
     }
     return '';
   }
