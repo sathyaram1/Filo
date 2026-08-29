@@ -18,18 +18,19 @@ async function countLinkItems(menu) {
 // una riga di link a tutta larghezza.
 test('porta C: barra cookie in basso sopra una riga-link a tutta larghezza', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
-    <div style="height:400px"></div>
-    <a id="row" href="https://esempio.test/riga-sotto-cookie" style="display:block;position:absolute;left:0;right:0;top:520px;height:28px;font:18px sans-serif">Riga di collegamento finita sotto il banner</a>
+    <a id="row" href="https://esempio.test/riga-sotto-cookie" style="display:block;position:absolute;left:0;right:0;height:28px;font:18px sans-serif">Riga di collegamento finita sotto il banner</a>
     <div id="cookie" style="position:fixed;left:0;right:0;bottom:0;height:180px;background:#fff;border-top:1px solid #ccc;z-index:50;font:15px sans-serif;padding:20px">
       Usiamo i cookie per migliorare il servizio.
     </div>
   </body></html>`);
 
-  // clic dentro il banner, nel punto dove sotto passa la riga-link
-  const vh = await page.evaluate(() => window.innerHeight);
-  const rowY = await page.evaluate(() => document.getElementById('row').getBoundingClientRect().top + 10);
-  // se la riga non è sotto il banner, sistemiamo il clic dove si sovrappongono
-  const y = Math.max(rowY, vh - 170);
+  // posiziona la riga DENTRO la fascia del banner (a metà della sua altezza)
+  const y = await page.evaluate(() => {
+    const vh = window.innerHeight;
+    const top = vh - 90; // banner copre vh-180..vh
+    document.getElementById('row').style.top = `${top}px`;
+    return top + 14;
+  });
   const menu = await rightClickAt(page, 200, y);
   const n = await countLinkItems(menu);
   console.log('PORTA C — voci link adottate:', n, '(0 = corretto)');
