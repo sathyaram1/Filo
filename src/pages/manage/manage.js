@@ -1528,6 +1528,10 @@
   // più nulla nelle liste, quindi i blu si mettono in coda da qui (o uno a uno
   // dal dettaglio).
   function alignedFeedbacks() {
+    // Stesso motivo dei bianchi: "allineato" è una lettura dello status, e
+    // approvare in blocco quello che non si è potuto leggere è la scrittura
+    // più pesante della pagina.
+    if (!sezioniAttendibili()) return [];
     return allFeedbacks.filter((f) => MR.isAligned(f));
   }
   function updateAlignedBar() {
