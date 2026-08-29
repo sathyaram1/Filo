@@ -52,13 +52,30 @@
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // 'inbox' = ricevuti (status: new); 'draft' = bozze (richiedono decisioni di
-  // design); 'todo' = da risolvere; 'clarify' = bloccati su ambiguità/info
-  // mancanti (le routine cloud li spostano qui quando non possono procedere);
-  // 'done' = risolti (in attesa di verifica); 'verified' = verificati dall'utente.
-  // I 'ignored' restano nascosti (raggiungibili solo riaprendoli via DB).
+  // Le quattro sezioni della macchina a stati, le stesse della dashboard di
+  // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
+  // In coda (l'iter di lavorazione), 'resolved' Risolti (fix usciti davvero in
+  // una versione rilasciata), 'archived' Archiviati.
+  const TABS = ['inbox', 'queue', 'resolved', 'archived'];
+  const TAB_LABELS = {
+    inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
+  };
+  const TAB_EMPTY = {
+    inbox: 'Nessun feedback in attesa di una tua decisione.',
+    queue: 'Nessun feedback in lavorazione.',
+    resolved: 'Nessun fix uscito in una versione rilasciata.',
+    archived: 'Nessun feedback archiviato.',
+  };
+
   let all = [];
   let currentTab = 'inbox';
+  // Solo i ritrovamenti automatici (agente esploratore + audit delle routine).
+  // Era una sezione a sé; adesso è un filtro trasversale alle quattro sezioni.
+  let agentOnly = false;
+  // DB3: la versione dell'app in esecuzione è, per definizione, l'ultima
+  // rilasciata. Senza, un `done` non ancora spedito comparirebbe in "Risolti"
+  // qui e in "In coda" nella gemella — la divergenza da capo.
+  let releasedVersion = '';
   // I feedback sono arrivati davvero (vs. caricamento in corso o fallito).
   // Finché è false la pagina non conosce nessun numero: le sezioni restano col
   // solo nome — stessa cautela della dashboard di gestione (#495).
