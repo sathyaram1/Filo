@@ -612,7 +612,7 @@
       // Stessa cosa per il filtro "Solo automatici": la sezione non è vuota, è
       // vuota DI RITROVAMENTI AUTOMATICI. Dirlo evita di far credere che i
       // feedback siano spariti.
-      if (agentOnly && MR.listForManageTab(all, currentTab, { releasedVersion }).length) {
+      if (agentOnly && sectionBase(currentTab).length) {
         emptyEl.textContent = 'Nessun ritrovamento automatico in questa sezione.';
         return;
       }
