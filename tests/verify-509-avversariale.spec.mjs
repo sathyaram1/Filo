@@ -268,14 +268,9 @@ test('#509 — coda storta: stessi nomi, stessi numeri, stessi contenuti nelle d
   const eMg = await etichetteManage(mg);
   expect(eMg, 'nomi e numeri delle sezioni').toEqual(eFb);
 
-  // E gli stessi elementi dentro, non solo lo stesso conteggio.
-  const contenutoMg = await mg.evaluate((v) => {
-    const MR = window.SN_MANAGE_REVIEW;
-    const items = window.__mgTest.getData ? window.__mgTest.getData() : null;
-    return items ? null : null;
-  }, VERSIONE).catch(() => null);
-  // (il confronto per id sulla gemella passa dalla stessa funzione pura)
-  const contenutoAtteso = await fb.evaluate(({ items, v }) => {
+  // E gli stessi elementi dentro, non solo lo stesso conteggio: il contenuto
+  // atteso lo calcolano le funzioni pure della gemella.
+  const contenutoAtteso = await mg.evaluate(({ items, v }) => {
     const MR = window.SN_MANAGE_REVIEW;
     const out = {};
     for (const t of ['inbox', 'queue', 'resolved']) {
