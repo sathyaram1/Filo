@@ -674,18 +674,20 @@
   // riga di titoli sta sotto al 5%, il manto invisibile sopra un paragrafo al 3%.
   const CONTAINER_MIN_RATIO = 0.35;
 
-  // Contenimento TOLLERANTE ai bordi condivisi: un manto a filo pagina sotto un
-  // testo che parte dal bordo condivide i lati col contenuto che copre, e il
-  // vecchio conto — che pretendeva lo sforo STRETTO su tutti e quattro i lati —
-  // lì non vedeva nessun contenitore: bastava allineare un bordo per spegnere
-  // il freno (verifica avversariale del 29/08, porta 4). Il lato condiviso non
-  // toglie niente al fatto che uno dei due inghiotte l'altro: a distinguere
-  // contenitore e copertura resta la scala (CONTAINER_MIN_RATIO qui sotto).
+  // Il conto pretende lo sforo STRETTO su tutti e quattro i lati: la striscia
+  // del titolo dentro una scheda condivide i bordi con la copertina, e un
+  // contenimento tollerante ai bordi condivisi la scambiava per una copertura
+  // (riprovato: spegneva le voci della scheda proprio sulla sfumatura del
+  // titolo). Il buco opposto — il manto a filo pagina che condivide i bordi
+  // col testo che copre (verifica avversariale del 29/08, porta 4) — non si
+  // chiude qui: lo chiude la regola sui collegamenti invisibili in
+  // findLinkUnder, che di un link senza niente di dipinto e senza copertina
+  // davanti dice che per il menu non esiste.
   function engulfs(outer, inner) {
-    return outer.left <= inner.left + SURFACE_SLACK_PX
-      && outer.top <= inner.top + SURFACE_SLACK_PX
-      && outer.right >= inner.right - SURFACE_SLACK_PX
-      && outer.bottom >= inner.bottom - SURFACE_SLACK_PX;
+    return outer.left < inner.left - SURFACE_SLACK_PX
+      && outer.top < inner.top - SURFACE_SLACK_PX
+      && outer.right > inner.right + SURFACE_SLACK_PX
+      && outer.bottom > inner.bottom + SURFACE_SLACK_PX;
   }
 
   function swallows(outer, inner) {
