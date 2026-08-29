@@ -1926,6 +1926,16 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   coda." dopo un caricamento fallito è la stessa bugia di uno "(0)": afferma
   che lì non c'è niente mentre la verità è che non lo sappiamo. Il riquadro
   vuoto, in quello stato, dice il guasto e lascia la via d'uscita.
+- **E vale per la BARRA INTERA: se il criterio non si legge, le sezioni non si
+  disegnano.** Lo status dei feedback viaggia cifrato: chi non ha la chiave
+  dell'owner non può sapere in che sezione va niente, e la pagina disegnava lo
+  stesso quattro schede — "In coda (0) · Risolti (0) · Archiviati (0)" — con
+  tutto ammucchiato nei Ricevuti, risolti compresi. Tre numeri che dichiarano
+  il vuoto dove non si sa, cioè la stessa bugia in formato più grande. Senza il
+  criterio: niente barra, un elenco solo, una riga che lo dice, e sulla scheda
+  solo ciò che si sa davvero (qui l'enum grossolano in chiaro, aperta/chiusa).
+  Il riconoscimento dev'essere STRETTO — solo il ciphertext: uno stato assente o
+  inventato la macchina lo scioglie davvero, e lì le sezioni restano.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
   anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
   a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
