@@ -82,6 +82,40 @@
   margin-left: 4px;
 }
 
+/* #499 — Dove porta il collegamento delle voci che seguono. Una riga sola, sopra
+   le voci del link: l'host per intero (mai accorciato: è la parte che dice chi
+   c'è dall'altra parte), il percorso dopo, in tono più basso e con i puntini se
+   non ci sta. Non è cliccabile e non reagisce al passaggio del mouse — non è
+   un'azione, è l'etichetta di quelle sotto. */
+.sn-menu-dest {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 6px 12px 2px;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: default;
+}
+
+.sn-menu-dest-host {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--sn-fg);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sn-menu-dest-rest {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--sn-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sn-menu-sep {
   height: 1px;
   background: var(--sn-border);
