@@ -219,6 +219,18 @@
   // più a che punto è. Colore e testo vengono dal vocabolario unico, il motivo
   // (`statusReason`) dalla traduzione condivisa.
   function stateBadgeHtml(f) {
+    // Stato cifrato: qui non c'è uno stato da leggere, e la macchina lo
+    // ridurrebbe a "Non filtrato" anche su un feedback già chiuso — la stessa
+    // bugia delle sezioni, in piccolo. L'unica cosa vera che questa macchina
+    // ha in mano è l'enum grossolano in chiaro (`statusPublic`), lo stesso che
+    // guarda la ricompensa: aperta o chiusa, niente di più.
+    if (statoCifrato(f)) {
+      const pub = String((f && f.statusPublic) || '');
+      if (pub !== 'open' && pub !== 'closed') return '';
+      const label = pub === 'closed' ? 'Chiusa' : 'Aperta';
+      return `<span class="fb-state" title="Stato: ${label} — il dettaglio si legge solo con la chiave dell'owner">`
+        + `${escapeHtml(label)}</span>`;
+    }
     const status = statusOf(f);
     const info = FS.STATUSES[status];
     if (!info) return '';
