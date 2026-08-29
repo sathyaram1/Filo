@@ -118,10 +118,9 @@
   const mgUserNoteBtn  = document.getElementById('mgUserNoteBtn');
   const mgUserNoteMsg  = document.getElementById('mgUserNoteMsg');
 
-  // Gestione feedback: preferito ⭐ + archivia/ripristina (owner-only)
+  // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgStarBtn    = document.getElementById('mgStarBtn');
-  const mgArchiveBtn = document.getElementById('mgArchiveBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
   // Ricerca "a senso" (semantica)
