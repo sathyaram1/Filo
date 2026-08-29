@@ -899,7 +899,7 @@
            </div>`
         : '';
       return `
-        <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}">
+        <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}" data-id="${escapeHtml(f._id)}">
           <div class="fb-meta">
             <span>${escapeHtml(when)}</span>
             ${stateBadgeHtml(f)}
