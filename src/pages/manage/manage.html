@@ -376,6 +376,14 @@
       flex: 1 1 auto; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    /* Aperta/Chiusa: l'unica cosa che si sa di una segnalazione il cui stato
+       fine è cifrato. Stesse parole e stesso peso visivo di .fb-state nella
+       gemella. */
+    .mg-state {
+      flex: 0 0 auto; align-self: center;
+      font-size: 11px; color: var(--sn-muted);
+      white-space: nowrap;
+    }
     /* Priorità (1-3 pallini) sulle card "In coda"/"Ricevuti": indicatore a colpo
        d'occhio e, per l'owner, modificabile col click (pieno = priorità). */
     .mg-priority {
