@@ -505,6 +505,17 @@
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
       return false;
     }
+    // Un cambio di stato passa SOLO se è una delle azioni che la segnalazione
+    // offre in questo momento (la stessa tabella che disegna i pulsanti). Il
+    // guardiano sta qui e non sui pulsanti: uno stato può essere cambiato
+    // mentre il pannello era aperto, e senza questo il clic scriverebbe una
+    // decisione che la pagina non offre più — è così che un attacco confermato
+    // si ritrovava riscritto ad "archiviato".
+    if (payload && payload.status !== undefined
+        && !MR.ownerActionAllowsStatus(item, payload.status, { releasedVersion })) {
+      alert('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile. Aggiorna la lista e riprova.');
+      return false;
+    }
     // Tutto ciò che l'aggiornamento ottimistico può toccare va salvato: se la
     // scrittura fallisce, ripristinarne solo una parte lascia la card che dice
     // una cosa e il database un'altra.
