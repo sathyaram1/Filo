@@ -570,6 +570,122 @@
     return '';
   }
 
+  // ── UN CLIC, UNA SCHEDA ───────────────────────────────────────────────────
+  // Qui i pulsanti vivono DENTRO la scheda, in una lista che si riordina da sé.
+  // Finché ogni azione ridisegnava la lista, appena la scheda usciva dalla
+  // sezione le altre risalivano e sotto il puntatore FERMO arrivava il pulsante
+  // della scheda successiva: il secondo clic — anche mezzo secondo dopo, anche
+  // voluto, perché al primo non si vedeva succedere niente — cadeva su un ALTRO
+  // feedback. Due volte «→ In coda» nei Ricevuti mettevano in coda il primo e
+  // marcavano il secondo come ATTACCO CONFERMATO; due volte «Risolto» ne
+  // chiudevano due; due volte «Ripristina» ne ripristinavano due. Nella gemella
+  // non succede perché l'azione sta in un pannello fermo e riguarda la scheda
+  // selezionata.
+  //
+  // La regola che chiude tutte le porte insieme (non una per giro) è una sola:
+  // NESSUNA AZIONE PRESA DENTRO UNA SCHEDA RICOMPONE LA LISTA. La scheda si
+  // aggiorna al proprio posto — si spegne mentre scrive, poi dice cosa è
+  // successo — e la lista si ricompone solo quando lo chiedi tu (cambio
+  // sezione, ricerca, filtro, Aggiorna). Vale per tutte le vie che scrivono da
+  // una scheda: i pulsanti di stato, «Conferma riapertura», «Invia risposta» e
+  // i pallini della priorità (che in «In coda» sono un criterio di ordinamento,
+  // quindi anche loro rimescolavano la lista sotto il dito).
+
+  // Schede con una scrittura in volo: il loro secondo clic non deve partire.
+  const inScrittura = new Set();
+  // Schede su cui l'azione è già andata: restano a schermo, spente, con l'esito.
+  const decise = new Map(); // id -> esito (testo)
+  // Quante schede ha disegnato l'ultimo render: serve alla riga del totale, che
+  // non viene più riscritta a ogni azione (la lista non si ridisegna).
+  let disegnate = 0;
+
+  function schedaDi(id) {
+    return listEl.querySelector(`.fb-card[data-id="${cssEsc(id)}"]`);
+  }
+
+  // Spegne TUTTI i pulsanti della scheda, non solo quello premuto: la scrittura
+  // in corso riguarda la scheda intera, e «Archivia» premuto mentre «→ In coda»
+  // è in volo scriverebbe due decisioni sullo stesso feedback.
+  function spegniScheda(card) {
+    if (!card) return;
+    card.classList.add('fb-card--busy');
+    card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  }
+
+  function riaccendiScheda(card) {
+    if (!card) return;
+    card.classList.remove('fb-card--busy');
+    card.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+  }
+
+  // Dove è finita la scheda dopo l'azione, detto con il nome della sezione che
+  // si legge nella barra. Si calcola con la stessa funzione che riempie le
+  // sezioni, così l'esito non può dire una cosa diversa da dove la scheda si
+  // troverà davvero.
+  function esitoDi(item, optimistic) {
+    const dopo = Object.assign({}, item, optimistic);
+    const dest = MR.manageTabFor(dopo, { releasedVersion });
+    const nome = TAB_LABELS[dest];
+    if (!nome || dest === currentTab) return 'Fatto';
+    return `Spostata in «${nome}»`;
+  }
+
+  // L'azione è andata: la scheda resta dov'è (nessuno la vede sparire da sotto
+  // il cursore) ma smette di essere premibile e DICE cosa è successo. Sparisce
+  // alla prima ricomposizione della lista, che è sempre una richiesta esplicita.
+  function marcaDecisa(card, esito) {
+    if (!card) return;
+    card.classList.remove('fb-card--busy');
+    card.classList.add('fb-card--decisa');
+    const box = card.querySelector('.fb-actions');
+    if (box) {
+      box.textContent = '';
+      const riga = document.createElement('div');
+      riga.className = 'fb-esito';
+      riga.textContent = `✓ ${esito}`;
+      box.appendChild(riga);
+    }
+    card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  }
+
+  // Il totale in alto dice anche quante schede sono già state decise, altrimenti
+  // il numero della sezione (che scende subito, ed è vero) sembrerebbe non
+  // tornare con le schede che restano a schermo.
+  function aggiornaTotale() {
+    if (!disegnate) return;
+    const n = decise.size;
+    countEl.textContent = n
+      ? `${disegnate} feedback · ${n} ${n === 1 ? 'decisa' : 'decise'}`
+      : `${disegnate} feedback`;
+  }
+
+  // Il cammino unico di ogni azione presa dentro una scheda.
+  async function azioneScheda(btn, { id, payload, optimistic }) {
+    if (!id || inScrittura.has(id) || decise.has(id)) return;
+    const item = all.find((f) => f._id === id);
+    if (!item) return;
+    const card = btn.closest('.fb-card');
+    const esito = esitoDi(item, optimistic);
+    inScrittura.add(id);
+    btn.classList.add('fb-act--busy');
+    spegniScheda(card);
+    const ok = await patch(id, payload, optimistic, { inPlace: true });
+    inScrittura.delete(id);
+    // Nel frattempo la lista può essere stata ricomposta (cambio sezione,
+    // Aggiorna): la scheda di prima non è più a schermo e non c'è niente da
+    // spegnere o riaccendere. Il dato è salvato lo stesso.
+    const viva = card && card.isConnected ? card : null;
+    if (ok) {
+      decise.set(id, esito);
+      marcaDecisa(viva, esito);
+    } else if (viva) {
+      viva.querySelector('.fb-act--busy')?.classList.remove('fb-act--busy');
+      riaccendiScheda(viva);
+    }
+    updateTabCounts();
+    aggiornaTotale();
+  }
+
   // Cattura il campo (textarea/input) attualmente a fuoco dentro la lista, se
   // identificabile da data-id, così da poterlo riselezionare dopo un re-render.
   // Senza questo, salvare le note (patch → applyFilter → render rigenera tutto
