@@ -598,21 +598,23 @@
       // Se il vuoto dipende dalla ricerca (e non dal tab davvero vuoto),
       // dillo: il testo "Nessun feedback…" sembrerebbe un tab svuotato.
       const q = (searchEl.value || '').trim();
-      if (q && all.some((f) => statusOf(f) === currentTab)) {
+      if (q && sectionItems().length) {
         emptyEl.textContent = `Nessun risultato per "${q}".`;
         return;
       }
-      emptyEl.textContent = {
-        inbox: 'Nessun feedback in arrivo.',
-        agent: 'Nessun ritrovamento automatico (agente esploratore o audit delle routine).',
-        draft: 'Nessuna bozza in attesa di decisioni.',
-        todo: 'Nessun feedback da risolvere.',
-        review: 'Nessun fix in revisione.',
-        blocked: 'Nessun feedback bloccato.',
-        clarify: 'Nessun feedback in attesa di chiarimenti.',
-        done: 'Nessun feedback risolto.',
-        verified: 'Nessun feedback verificato.',
-      }[currentTab] || 'Nessun feedback.';
+      // Stessa cosa per il filtro "Solo automatici": la sezione non è vuota, è
+      // vuota DI RITROVAMENTI AUTOMATICI. Dirlo evita di far credere che i
+      // feedback siano spariti.
+      if (agentOnly && MR.listForManageTab(all, currentTab, { releasedVersion }).length) {
+        emptyEl.textContent = 'Nessun ritrovamento automatico in questa sezione.';
+        return;
+      }
+      emptyEl.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
+      // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
+      // feedback più vecchi non sono in pagina. Il vuoto lo dice, come la gemella.
+      if (dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE)) {
+        emptyEl.textContent = `${emptyEl.textContent} ${SN_FEEDBACK.COUNT_CAP_HINT}`;
+      }
       return;
     }
     emptyEl.hidden = true;
