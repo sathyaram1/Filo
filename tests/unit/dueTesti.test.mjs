@@ -111,6 +111,10 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
       FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
       FILO_ROUTINES_ENABLED: '1',
       FILO_ROUTINE_TICKET: 'biglietto-di-prova',
+      // Come negli altri test che spawnano il CLI: senza, il riarmo del battito
+      // (#507) lascerebbe un processo staccato con questa cartella come cwd, e
+      // il cleanup fallirebbe con EBUSY su Windows.
+      FILO_NO_BEAT: '1',
     });
 
     const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));

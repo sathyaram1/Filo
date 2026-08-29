@@ -632,6 +632,26 @@ test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il 
   }
 });
 
+test('#507: il ramo lo dice il biglietto, e le fini di giro sigillano', () => {
+  const qui = fileURLToPath(new URL('.', import.meta.url));
+  const dispatchSrc = readFileSync(resolve(qui, '..', '..', 'scripts', 'dispatch.mjs'), 'utf8');
+  // Lo stato locale è un residuo di questa macchina: se torna a battere il ramo
+  // del biglietto, un worker può essere posizionato sul ramo di un tentativo
+  // precedente ignorando quello assegnato dal server.
+  assert.match(dispatchSrc, /bucket\.branch \|\| prev\?\.branch/,
+    'il ramo assegnato dal server deve vincere sullo stato locale');
+  // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
+  // di questo (lo sha esiste nel repo e passerebbe per buono).
+  assert.match(dispatchSrc, /prev\?\.branch === branch\) \? lastCheckpoint\(prev\) : null/,
+    'il checkpoint vale solo se appartiene al ramo su cui ci si posiziona');
+  // Le due fini di giro che non sigillavano (#507): la consegna via canale e il
+  // rilascio del biglietto. La logica è in branch-integrity (sealCurrentWork,
+  // coperta dai suoi test): qui si controlla che le due strade la chiamino.
+  const canaleSrc = readFileSync(resolve(qui, '..', '..', 'scripts', 'routine-channel.mjs'), 'utf8');
+  assert.equal((canaleSrc.match(/sealCurrentWork\(/g) || []).length >= 2, true,
+    'consegna e rilascio devono sigillare il punto fermo');
+});
+
 test('cleanup STATE_DIR temporanea', () => {
   rmSync(TMP, { recursive: true, force: true });
   assert.ok(!existsSync(TMP));

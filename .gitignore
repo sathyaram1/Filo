@@ -53,6 +53,10 @@ test-results/
 # biglietto a cui è appeso). Contiene un biglietto: vale la riga qui sopra.
 .claude/routine-beat.json
 
+# Orologio del battito di riserva lanciato dall'hook di salvataggio (solo una
+# data: serve a non battere più di una volta ogni cinque minuti).
+.claude/routine-beat-hook.stamp
+
 # Stato locale del giro (ripiego: quello vero vive sul server). Effimero come
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.

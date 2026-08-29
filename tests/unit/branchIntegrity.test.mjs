@@ -26,6 +26,7 @@ import {
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
   ensureSessionExcludes, SESSION_MARKERS,
+  sealCurrentWork, findStateIdByBranch,
 } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -335,6 +336,90 @@ describe('D — l’interruzione torna all’ultimo punto fermo', () => {
     const b = discardedBranchName('worker/x', Date.parse('2026-08-07T10:00:01Z'));
     assert.notEqual(a, b);
     assert.match(a, /^discarded\/worker\/x-/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', () => {
+  // Lo scenario dell'incidente, per intero: new-work si posiziona (punto fermo
+  // = base), lavora, l'hook pusha, consegna via canale. Se la consegna NON
+  // sigilla, il posizionamento successivo nello stesso clone riporta il ramo
+  // alla base e parcheggia il lavoro su discarded/ — è quello che è successo a
+  // #502 (8 commit, 828 righe) e a #495.
+  function scenaConsegna() {
+    const { work } = makeRepo();
+    const id = 'feed507';
+    const branch = 'worker/feed507-x';
+    // Come nel repo vero: i marcatori di sessione sono esclusi da git (senza,
+    // il `git add -A` del commit di prova li imbarcherebbe nel ramo).
+    ensureSessionExcludes(work);
+    git(work, ['checkout', '-q', '-b', branch]);
+    const base = git(work, ['rev-parse', 'HEAD']);
+    // Come positionOnBranch: punto fermo alla base, identità attesa scritta.
+    writeBranchState(work, withCheckpoint({ id, branch }, base, 'new-work:checkout'));
+    writeExpectation(work, { branch, id });
+    // Il lavoro: commit + push (l'hook di salvataggio pusha sempre).
+    const consegna = commit(work, 'lavoro.txt', 'fatto\n');
+    git(work, ['push', '-q', 'origin', branch]);
+    return { work, id, branch, base, consegna };
+  }
+
+  test('senza sigillo il posizionamento successivo SCARTA la consegna (il guasto)', () => {
+    const { work, id, branch, base, consegna } = scenaConsegna();
+    const r = prepareBranch({ root: work, branch, checkpoint: lastCheckpoint(readBranchState(work, id)) });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, base, 'questo è il guasto documentato dal #507: la consegna sparisce');
+    assert.notEqual(r.head, consegna);
+    assert.ok(r.discarded, 'la consegna finisce parcheggiata su discarded/');
+  });
+
+  test('con il sigillo alla consegna il lavoro RESTA (la cura)', () => {
+    const { work, id, branch, consegna } = scenaConsegna();
+    const s = sealCurrentWork(work, { by: 'deliver:status' });
+    assert.equal(s.sealed, true, s.why);
+    assert.equal(s.id, id, 'l’id si ritrova da solo dall’identità attesa');
+    assert.equal(s.sha, consegna);
+    const r = prepareBranch({ root: work, branch, checkpoint: lastCheckpoint(readBranchState(work, id)) });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, consegna, 'il punto fermo sigillato È la consegna: niente da scartare');
+    assert.equal(r.discarded, null);
+  });
+
+  test('il sigillo ritrova l’id anche senza identità attesa (dallo stato per branch)', () => {
+    const { work, id, branch, consegna } = scenaConsegna();
+    clearExpectation(work);
+    assert.equal(findStateIdByBranch(work, branch), id);
+    const s = sealCurrentWork(work, { by: 'release' });
+    assert.equal(s.sealed, true, s.why);
+    assert.equal(lastCheckpoint(readBranchState(work, id)), consegna);
+  });
+
+  test('il sigillo si rifiuta di scrivere dove non deve', () => {
+    const { work, id } = scenaConsegna();
+    // Stato che nomina un ALTRO branch: sigillare qui sposterebbe il punto
+    // fermo di un lavoro diverso da quello che si sta consegnando.
+    writeBranchState(work, { id, branch: 'worker/un-altro' });
+    clearExpectation(work);
+    assert.equal(sealCurrentWork(work, { id }).sealed, false);
+    // Sulla linea principale non c'è niente da sigillare.
+    git(work, ['checkout', '-q', 'main']);
+    assert.equal(sealCurrentWork(work, {}).sealed, false);
+  });
+
+  test('la variante del 27/08: i commit fatti DOPO l’ultimo verdetto si salvano col sigillo al rilascio', () => {
+    // Il verificatore sigilla il verdetto, poi fa un commit di pulizia: senza
+    // il sigillo al rilascio, quel commit veniva scartato al giro dopo (e lo
+    // scarto ripristinava pure i file che la pulizia toglieva).
+    const { work, id, branch } = scenaConsegna();
+    sealCurrentWork(work, { by: 'verifier:pass' });
+    const pulizia = commit(work, 'pulizia.txt', 'tolto lo spec temporaneo\n');
+    git(work, ['push', '-q', 'origin', branch]);
+    const s = sealCurrentWork(work, { by: 'release' });
+    assert.equal(s.sealed, true, s.why);
+    const r = prepareBranch({ root: work, branch, checkpoint: lastCheckpoint(readBranchState(work, id)) });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.head, pulizia, 'la pulizia del verificatore non è un moncone da scartare');
+    assert.equal(r.discarded, null);
   });
 });
 

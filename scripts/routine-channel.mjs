@@ -91,12 +91,14 @@ const ROOT = process.env.FILO_REPO_ROOT
 const BASE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
-// Il battito va più fitto della scadenza del semaforo (30 minuti lato server):
-// dieci minuti lasciano il margine per due battiti persi di fila.
+// Il battito va più fitto della scadenza del semaforo (60 minuti lato server):
+// dieci minuti lasciano il margine per cinque battiti persi di fila.
 const BEAT_EVERY_MS = 10 * 60 * 1000;
-// Quanto dura il semaforo lato server senza battito. Serve come tetto
-// all'insistenza: oltre, il biglietto è morto comunque.
-const LEASE_TTL_MS = 30 * 60 * 1000;
+// Quanto dura il semaforo lato server senza battito (policy.js di
+// filo-security: LEASE_TTL_MS, portato a 60 minuti dopo i biglietti morti a
+// metà lavorazione del 24-28/08). Serve come tetto all'insistenza: oltre, il
+// biglietto è morto comunque.
+const LEASE_TTL_MS = 60 * 60 * 1000;
 // Su un intoppo si ribatte più fitto: dentro mezz'ora ci stanno quindici
 // tentativi, abbastanza per attraversare un buco di rete senza perdere il lavoro.
 const RETRY_EVERY_MS = 2 * 60 * 1000;
@@ -421,6 +423,14 @@ if (isMain) {
     if (r.ok) {
       const { stopBeat } = await import('./lib/routine-beat.mjs');
       stopBeat(ROOT, { ticket: args[0] });
+      // Fine giro LEGITTIMA: il punto fermo si sigilla sul contenuto attuale
+      // (#507). Senza, i commit fatti dopo l'ultima consegna — la pulizia del
+      // verificatore, per esempio — al posizionamento successivo nello stesso
+      // clone verrebbero scartati come moncone di un'istanza morta.
+      try {
+        const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
+        sealCurrentWork(ROOT, { by: 'release' });
+      } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
@@ -466,6 +476,18 @@ if (isMain) {
       } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
     }
     const r = await deliver(biglietto, intento, data);
+    if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed')) {
+      // La consegna è REGISTRATA dal server: da questo istante il contenuto
+      // della directory è la consegna, e il punto fermo va sigillato qui
+      // (#507). Era la simmetria mancante: le consegne via dispatch
+      // (--record-*) sigillavano, questa strada no — e il posizionamento
+      // successivo nello stesso clone riportava il ramo alla base,
+      // parcheggiando su discarded/ un lavoro intero già consegnato.
+      try {
+        const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
+        sealCurrentWork(ROOT, { by: `deliver:${intento}` });
+      } catch (_) { /* best-effort: la consegna è già registrata */ }
+    }
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);

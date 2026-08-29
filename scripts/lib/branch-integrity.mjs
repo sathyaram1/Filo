@@ -29,7 +29,7 @@
 // test girano su repo git temporanei con un finto `origin`.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
@@ -254,6 +254,70 @@ export function clearExpectation(root) {
   if (existsSync(f)) rmSync(f, { force: true });
 }
 
+// ─── Sigillo di fine giro (#507) ─────────────────────────────────────────────
+//
+// Il ripristino D preferisce il punto fermo locale al ramo remoto, ed è giusto
+// così: l'hook di salvataggio spinge anche il lavoro di un'istanza morta a
+// metà, quindi "origin è più avanti" non distingue una consegna da un moncone.
+// A distinguere è il SIGILLO: ogni fine giro legittima deve lasciare il punto
+// fermo sul contenuto che consegna. Le consegne di verifica/correzione/audit lo
+// facevano (sealTransition in dispatch.mjs); la consegna del primo passaggio e
+// il rilascio del biglietto no — e al posizionamento successivo nello stesso
+// clone il ripristino riportava il ramo alla base, parcheggiando su discarded/
+// una consegna intera (feedback #507: due lavori interi buttati in tre giorni).
+
+/** L'id del feedback il cui stato nomina questo branch, o ''. */
+export function findStateIdByBranch(root, branch) {
+  if (!branch) return '';
+  try {
+    const dir = stateDir(root);
+    if (!existsSync(dir)) return '';
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith('.json')) continue;
+      const o = readBranchState(root, f.slice(0, -5));
+      if (o && o.branch === branch) return String(o.id || f.slice(0, -5));
+    }
+  } catch (_) { /* best-effort */ }
+  return '';
+}
+
+/**
+ * Sigilla il punto fermo del giro corrente sul contenuto ATTUALE della
+ * directory. Da chiamare a ogni fine giro legittima: consegna del primo
+ * passaggio, rilascio del biglietto. Best-effort: non poterlo scrivere è un
+ * rischio per il giro DOPO, non un motivo per non consegnare adesso.
+ *
+ * L'id si trova da solo (identità attesa, poi stato per branch): chi consegna
+ * non deve ricordarsi di passarlo — è la stessa scommessa già persa sul
+ * biglietto e sulla firma dei feedback.
+ */
+export function sealCurrentWork(root, { id = '', by = 'consegna' } = {}) {
+  const branch = currentBranch(root);
+  if (!branch || branch === 'HEAD' || isProtectedBranch(branch)) return { sealed: false, why: 'no_branch' };
+  const sha = headSha(root);
+  if (!sha) return { sealed: false, why: 'no_head' };
+  let fid = String(id || '');
+  if (!fid) {
+    const exp = readExpectation(root);
+    if (exp && exp.branch === branch) fid = String(exp.id || '');
+  }
+  if (!fid) fid = findStateIdByBranch(root, branch);
+  if (!fid) return { sealed: false, why: 'no_id' };
+  const prev = readBranchState(root, fid);
+  // Uno stato che nomina un ALTRO branch non si tocca: sigillare lì sposterebbe
+  // il punto fermo di un lavoro diverso da quello che si sta consegnando.
+  if (prev && prev.branch && prev.branch !== branch) return { sealed: false, why: 'other_branch' };
+  const base = { id: fid, branch, ...(prev || {}) };
+  base.id = fid; base.branch = branch;
+  try {
+    writeBranchState(root, clearRejects(withCheckpoint(base, sha, by)));
+  } catch (_) {
+    return { sealed: false, why: 'write_failed' };
+  }
+  clearExpectation(root);
+  return { sealed: true, id: fid, sha };
+}
+
 // ─── A + D: posizionare la directory sul branch giusto ───────────────────────
 
 function refExists(g, ref) {
@@ -280,6 +344,7 @@ function commitExists(g, sha) {
 export const SESSION_MARKERS = Object.freeze([
   '.claude/routine-ticket.json',
   '.claude/routine-beat.json',
+  '.claude/routine-beat-hook.stamp',
   '.claude/routine-role.json',
   '.claude/branch-expect.json',
   '.claude/verify-local.json',

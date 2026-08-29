@@ -1159,8 +1159,17 @@ function prepareForProber() {
 function positionOnBranch(bucket) {
   const isNew = bucket.role === 'new-work';
   const prev = readState(bucket.id);
-  const branch = isNew ? newWorkBranch(bucket.id) : (prev?.branch || bucket.branch || '');
+  // Il ramo lo dice il BIGLIETTO: lo stato locale è un residuo di questa
+  // macchina e può descrivere un tentativo precedente. Con la precedenza
+  // invertita, uno stato vecchio posizionava il lavoratore sul ramo di un
+  // giro passato ignorando quello assegnato dal server (#507, seconda porta).
+  const branch = isNew ? newWorkBranch(bucket.id) : (bucket.branch || prev?.branch || '');
   if (!branch) return { ok: false, kind: 'permanent', message: `nessun branch assegnato per ${bucket.id}` };
+
+  // Un punto fermo registrato per un ALTRO ramo non deve guidare il ripristino
+  // di questo: lo sha esiste nel repo, quindi prepareBranch lo prenderebbe per
+  // buono e riporterebbe il ramo al contenuto di un tentativo diverso.
+  const checkpoint = (!isNew && prev?.branch === branch) ? lastCheckpoint(prev) : null;
 
   const res = prepareBranch({
     root: ROOT,
@@ -1170,7 +1179,7 @@ function positionOnBranch(bucket) {
     // erano il Modello B dei sotto-feedback, abolito (SPEC-RIDISEGNO-MAX.md §1).
     base: '',
     mainBranch: MAIN_BRANCH,
-    checkpoint: isNew ? null : lastCheckpoint(prev),
+    checkpoint,
   });
   if (!res.ok) return res;
   if (res.discarded) {
@@ -1389,6 +1398,14 @@ if (isMainModule) {
     const t = stripTicketArg(args);
     if (t.error) { console.error('Uso: --ticket richiede il codice del biglietto subito dopo'); process.exit(1); }
     if (t.ticket) process.env.FILO_ROUTINE_TICKET = t.ticket;
+    // RIARMA il battito, comunque sia arrivato il biglietto: il processo
+    // staccato avviato all'inizio del giro in cloud non sopravvive a lungo (il
+    // beatAt specchiato sui feedback si ferma sempre a pochi secondi dal
+    // biglietto), e ogni --record-* è un momento in cui il biglietto è in mano
+    // per costruzione. startBeat è idempotente: se il battito è vivo non fa
+    // niente.
+    const vivo = t.ticket || process.env.FILO_ROUTINE_TICKET || readRoutineTicket(ROOT);
+    if (vivo) startBeat(ROOT, vivo);
     return t.args;
   };
   // I quattro esiti di un --record-* respinto: biglietto introvabile (esci 1:

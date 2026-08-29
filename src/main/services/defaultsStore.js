@@ -422,10 +422,14 @@ async function setRoutinesEnabled(on, idToken) {
 // segnalato. Campo assente ⇒ true (il comportamento che c'è sempre stato): solo
 // un `false` scritto apposta ferma l'esplorazione.
 async function getAutomationProberIdle(idToken) {
+  // SOLO config/routines: è il documento che il server legge davvero. Il
+  // ripiego sul documento vecchio (config/automation) mostrava all'owner un
+  // valore che il server ignorava — la manopola girava, le ruote no. È già
+  // successo: la migrazione ha seminato i default nel documento nuovo e le
+  // scelte fatte prima (esplorazione spenta, tetto a 5) sono rimaste in
+  // ombra nel vecchio, mai più lette da nessuno.
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   if (doc && typeof doc.proberWhenIdle === 'boolean') return doc.proberWhenIdle;
-  const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
-  if (legacy && typeof legacy.proberWhenIdle === 'boolean') return legacy.proberWhenIdle;
   return true;
 }
 
@@ -464,14 +468,12 @@ async function getRoutineCaps(idToken) {
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   const out = { failCap: failDef, improvableCap: improvableDef };
   // `loopCap` è il nome VECCHIO di failCap: il valore che l'owner aveva già
-  // scelto resta valido sotto il nome nuovo (si migra il valore visuale, non i
-  // dati). Cerca anche nel documento legacy config/automation, per lo storico.
+  // scelto resta valido sotto il nome nuovo. SOLO config/routines: è il
+  // documento che il server legge davvero, e mostrare un valore pescato
+  // altrove significa mostrare una regola che nessuno applica (vedi il
+  // commento in getAutomationProberIdle).
   if (doc && doc.failCap != null) out.failCap = clampCap(doc.failCap, failDef);
   else if (doc && doc.loopCap != null) out.failCap = clampCap(doc.loopCap, failDef);
-  else {
-    const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
-    if (legacy && legacy.loopCap != null) out.failCap = clampCap(legacy.loopCap, failDef);
-  }
   if (doc && doc.improvableCap != null) out.improvableCap = clampCap(doc.improvableCap, improvableDef);
   return out;
 }
