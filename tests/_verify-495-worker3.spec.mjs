@@ -50,6 +50,43 @@ test('#495 — la ricerca dice quante ne ha trovate, e zero è una risposta', as
   await expect(page.locator('#mgList .mg-item')).toHaveCount(2);
 });
 
+test('#495 — leggibilità del numero: contrasto e ritaglio della barra nei due temi', async ({ openTab }) => {
+  const page = await boot(openTab);
+  const misura = async () => page.evaluate(() => {
+    const parse = (s) => {
+      const m = String(s).match(/rgba?\(([^)]+)\)/);
+      if (!m) return [0, 0, 0, 1];
+      const p = m[1].split(',').map((x) => parseFloat(x));
+      return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+    };
+    const lin = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    const bgEl = getComputedStyle(document.body).backgroundColor;
+    const bg = parse(bgEl);
+    const out = {};
+    for (const tab of ['inbox', 'queue']) {
+      const btn = document.querySelector(`.mg-tab[data-tab="${tab}"]`);
+      const span = btn.querySelector('.mg-tab-count');
+      const cs = getComputedStyle(span);
+      const fg = parse(cs.color);
+      const a = parseFloat(cs.opacity) * (fg[3] == null ? 1 : fg[3]);
+      const mix = [0, 1, 2].map((i) => fg[i] * a + bg[i] * (1 - a));
+      const l1 = Math.max(lum(mix), lum(bg));
+      const l2 = Math.min(lum(mix), lum(bg));
+      out[tab] = Math.round(((l1 + 0.05) / (l2 + 0.05)) * 100) / 100;
+    }
+    return out;
+  });
+  const chiaro = await misura();
+  await page.locator('#mgTabs').screenshot({ path: 'tests/.shots/495-barra-chiaro.png' });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(300);
+  const scuro = await misura();
+  await page.locator('#mgTabs').screenshot({ path: 'tests/.shots/495-barra-scuro.png' });
+  console.log(`[495] contrasto numero — chiaro ${JSON.stringify(chiaro)} scuro ${JSON.stringify(scuro)}`);
+  expect(chiaro.inbox).toBeGreaterThan(1);
+});
+
 test('#495 — campo di ricerca svuotato: il numero se ne va coi risultati', async ({ openTab }) => {
   const page = await boot(openTab);
   await page.click('#mgSearchToggle');
