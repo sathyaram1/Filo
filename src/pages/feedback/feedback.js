@@ -1136,6 +1136,15 @@
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
+    // DB3: la versione dell'app in esecuzione è l'ultima rilasciata. Serve al
+    // gate di "Risolti" — la stessa domanda che si fa la gemella, con la stessa
+    // risposta, o un `done` non ancora uscito starebbe in due sezioni diverse.
+    if (!releasedVersion) {
+      try {
+        const r = await sendToMain({ type: 'get_update_recap' });
+        if (r && r.current) releasedVersion = r.current;
+      } catch (_) { /* gate inattivo: senza versione, done→Risolti come prima */ }
+    }
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
