@@ -987,7 +987,7 @@
         if (ta) { payload.notes = notesValueOf(ta); ottimistico.notes = payload.notes; }
         const frase = listEl.querySelector(`.fb-usernote[data-id="${cssEsc(id)}"]`);
         if (frase) { payload.userNote = frase.value.slice(0, 500); ottimistico.userNote = payload.userNote; }
-        patch(id, payload, ottimistico);
+        azioneScheda(b, { id, payload, optimistic: ottimistico });
       });
     });
 
@@ -995,7 +995,7 @@
     // può spiegare meglio cosa non funziona. La spiegazione viene appesa alle
     // note esistenti (con separatore + timestamp), così il commento del primo
     // agente che ha lavorato al feedback resta visibile anche dopo la riapertura.
-    listEl.querySelectorAll('.fb-reopen-start').forEach((b) => {
+    root.querySelectorAll('.fb-reopen-start').forEach((b) => {
       b.addEventListener('click', () => {
         const id = b.dataset.id;
         const card = b.closest('.fb-card');
