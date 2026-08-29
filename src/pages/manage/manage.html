@@ -142,6 +142,14 @@
       border-bottom-color: var(--sn-accent);
     }
     .mg-tab[hidden] { display: none; }
+    /* Stato illeggibile (nessuna chiave su questo computer): le SEZIONI non si
+       disegnano e una riga dice perché, come nella gemella. Le schede che non
+       sono sezioni (Statistiche, Modelli, Automazioni, Log) restano dove sono:
+       non dipendono dallo stato delle segnalazioni. */
+    .mg-no-sections {
+      margin: -12px 0 16px; font-size: 12px; color: var(--sn-muted);
+    }
+    .mg-no-sections[hidden] { display: none; }
     .mg-panel { display: none; }
     .mg-panel--active { display: block; }
 
