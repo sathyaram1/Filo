@@ -857,7 +857,9 @@
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
     const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
     if (!fb) return;
-    selectTab(MR.manageTabFor(fb, { releasedVersion }));
+    // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
+    // la segnalazione è già lì.
+    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion }));
     openDetail(fb._id);
   }
 
