@@ -18,7 +18,7 @@
     {
       version: '0.2.209', date: '2026-08-29',
       fixes: [
-        'Il menu del tasto destro su un link scrive dove porta, sopra «Apri in nuova tab» e «Copia URL»: vedi il sito di destinazione prima di aprirlo, copiarlo o mandarlo a qualcuno. Serve soprattutto quando il collegamento non si vede — una pagina può nasconderne uno sotto a un paragrafo qualsiasi e farti copiare un indirizzo scelto da lei.',
+        'Il tasto destro su un link adesso dice dove porta, sopra «Apri in nuova tab» e «Copia URL». Leggi il sito di destinazione prima di aprire, copiare o mandare a qualcuno, anche quando il collegamento sta nascosto sotto a quello che stai leggendo.',
       ],
     },
     {
