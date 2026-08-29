@@ -125,7 +125,11 @@ test('lezione vuota non salvata; sinonimi di campo accettati; CANCELLA_MEMORIA l
   expect(buf.map((l) => l.text)).toEqual(['Rispondere sempre senza elenchi puntati', 'L\'utente non beve caffè']);
 
   // Cancellabile: CANCELLA_MEMORIA (confermata) svuota anche le lezioni.
-  const r3 = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_MEMORIA' }, { confirmed: true }));
+  // Il mittente reale è la dashboard (pagina filo://, fidata per origine).
+  const r3 = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'CANCELLA_MEMORIA' },
+    { confirmed: true, sender: { url: 'filo://newtab/index.html' } },
+  ));
   expect(r3.executed).toBe(true);
   buf = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
   expect(buf.length).toBe(0);
