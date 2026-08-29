@@ -501,7 +501,7 @@
       archiveOverride: item.archiveOverride, starred: item.starred,
     };
     Object.assign(item, optimistic);
-    if (!silenzioso) applyFilter();
+    if (!silenzioso && !inPlace) applyFilter();
     try {
       // Instradata dal main process, che allega il Firebase ID token come
       // Bearer e rifiuta se l'utente loggato non è admin (i token non sono mai
