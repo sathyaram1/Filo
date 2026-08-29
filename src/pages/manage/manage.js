@@ -1389,20 +1389,26 @@
     mgListEmpty.hidden = true;
     mgList.hidden = false;
 
+    // Stato illeggibile: il bordo colorato, la riga dell'iter e il sottotesto
+    // del motivo sono tutte AFFERMAZIONI sullo stato. Su una segnalazione
+    // cifrata la macchina le ricava da un `unlabeled` finto: ogni scheda
+    // diventerebbe bianca ("Non filtrato") anche se è già chiusa.
+    const sezioni = sezioniAttendibili();
+
     for (const fb of currentList) {
-      const cl = MR.classifyBlock(fb);
+      const cl = sezioni ? MR.classifyBlock(fb) : null;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
 
       const item = document.createElement('div');
       const unfilteredCls = cl && cl.reason === 'unfiltered' ? ' mg-item--unfiltered' : '';
       // Allineato (tutti i giudici d'accordo, nessun blocco) → bordo BLU.
-      const aligned = !cl && MR.isAligned(fb);
+      const aligned = sezioni && !cl && MR.isAligned(fb);
       const alignedCls = aligned ? ' mg-item--aligned' : '';
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = currentTab === 'queue' ? MR.workProgress(fb) : null;
+      const progress = (sezioni && currentTab === 'queue') ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
