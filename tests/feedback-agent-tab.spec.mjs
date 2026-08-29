@@ -1,13 +1,15 @@
-// I ritrovamenti automatici delle routine cloud (audit proattivo, clientId
-// "routine:<slug>" con stato `new`) devono comparire nella tab "Agente" —
-// insieme ai ritrovamenti dell'agente esploratore LLM — NON in "Ricevuti", così
-// non annegano i feedback dei tester reali. In più la dashboard colora ogni card
-// per ORIGINE: arancione (tester esterno), verde (invio dell'owner), blu (audit
-// routine), accento (agente esploratore).
+// I ritrovamenti automatici — agente esploratore LLM (clientId "agent:<model>")
+// e audit proattivo di una routine cloud (clientId "routine:<slug>" ancora da
+// triagiare) — restano isolabili sulla pagina dei feedback: dal #509 non con una
+// SEZIONE tutta loro (che la dashboard di gestione non ha, e che faceva contare
+// "Ricevuti" in modo diverso sulle due pagine) ma col filtro "Solo automatici".
+// In più la pagina colora ogni card per ORIGINE: arancione (tester esterno),
+// verde (invio dell'owner), blu (audit routine), accento (agente esploratore).
 //
-// Pre-condizione che senza il fix fallirebbe: prima `isAgent` riconosceva solo
-// "agent:", quindi un audit "routine:"+`new` finiva in "Ricevuti" e nessuna card
-// portava la classe d'origine. Gli assert sotto diventano rossi rimuovendo il fix.
+// Pre-condizione che senza il fix fallirebbe: `isAgent` guardava lo status
+// grezzo (`=== 'new'`), quindi un audit già normalizzato (`unlabeled`) non
+// veniva riconosciuto e il filtro non lo pescava; e i sub-feedback di routine
+// (todo) non devono entrarci.
 //
 // Tutto in UN test su una sola pagina: la fixture Electron è worker-scoped e i
 // tab feedback si accumulano tra test, quindi un selettore globale potrebbe
@@ -22,19 +24,19 @@ const FEEDBACK_URL = 'filo://feedback/feedback.html';
 
 const FAKE = [
   {
-    // Audit di una routine cloud → tab "Agente".
+    // Audit di una routine cloud, ancora da triagiare → ritrovamento automatico.
     _id: 'audit1',
     text: 'Lo stato vuoto della cronologia non ha messaggio',
     name: 'cronologia stato vuoto',
     seq: 200,
     subSeq: 0,
-    status: 'new',
+    status: 'unlabeled',
     clientId: 'routine:nightly-audit',
     createdAt: '2026-06-15T11:00:00Z',
   },
   {
-    // Sub-feedback di una routine: stesso prefisso ma stato `todo` → NON è un
-    // ritrovamento d'agente, vive in "Da risolvere" come task normale.
+    // Sub-feedback di una routine: stesso prefisso ma già in coda → NON è un
+    // ritrovamento d'agente, vive in "In coda" come task normale.
     _id: 'sub1',
     text: 'Implementare la rotazione automatica delle chiavi',
     name: 'rotazione chiavi',
@@ -51,7 +53,7 @@ const FAKE = [
     name: 'bottone condividi piccolo',
     seq: 199,
     subSeq: 0,
-    status: 'new',
+    status: 'unlabeled',
     clientId: 'owner:abc-123',
     createdAt: '2026-06-15T10:00:00Z',
   },
@@ -62,29 +64,29 @@ const FAKE = [
     name: 'incolla immagini chat',
     seq: 198,
     subSeq: 0,
-    status: 'new',
+    status: 'unlabeled',
     clientId: 'tester-xyz',
     createdAt: '2026-06-15T09:00:00Z',
   },
 ];
 
-test('audit routine → tab Agente, sub-feedback → Da risolvere, card colorate per origine', async ({ openTab }) => {
+test('audit routine: filtro "Solo automatici", sub-feedback in coda, card colorate per origine', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
-  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined');
+  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
   await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, FAKE);
   await page.click('#refresh');
 
-  // --- Tab "Ricevuti" (default): solo i due feedback umani, NON l'audit. ---
-  await expect(page.locator('.fb-card')).toHaveCount(2);
-  await expect(page.locator('.fb-card', { hasText: 'cronologia stato vuoto' })).toHaveCount(0);
+  // --- "Ricevuti" (default): i tre non ancora triagiati, audit compreso —
+  // come nella dashboard di gestione, che non ha una sezione a parte. ---
+  await expect(page.locator('.fb-card')).toHaveCount(3);
   // Colore per origine: owner → verde (origin-owner), tester → arancione (origin-user).
   await expect(page.locator('.fb-card--origin-owner')).toHaveCount(1);
   await expect(page.locator('.fb-card--origin-owner')).toContainText('bottone condividi');
   await expect(page.locator('.fb-card--origin-user')).toHaveCount(1);
   await expect(page.locator('.fb-card--origin-user')).toContainText('incolla immagini');
 
-  // --- Tab "Agente": c'è solo l'audit della routine, col badge giusto. ---
-  await page.locator('[data-tab="agent"]').click();
+  // --- Filtro "Solo automatici": resta il solo audit, col badge giusto. ---
+  await page.locator('#agentOnly').check();
   await expect(page.locator('.fb-card')).toHaveCount(1);
   const auditCard = page.locator('.fb-card');
   await expect(auditCard).toContainText('cronologia stato vuoto');
@@ -99,11 +101,15 @@ test('audit routine → tab Agente, sub-feedback → Da risolvere, card colorate
   // Traccia visiva (tests/.shots/ è gitignorata).
   await page.screenshot({ path: 'tests/.shots/feedback-agent-tab.png' }).catch(() => {});
 
-  // --- Tab "Da risolvere": il sub-feedback di routine (todo) NON è in Agente,
-  // ed è reso come task normale col suo numero #22.1. ---
-  await page.locator('[data-tab="todo"]').click();
+  // --- "In coda": il sub-feedback di routine NON è un ritrovamento automatico
+  // (il filtro non lo pesca), ed è reso come task normale col suo numero #22.1. ---
+  await page.locator('#agentOnly').uncheck();
+  await page.locator('#tabs [data-tab="queue"]').click();
   const todoCard = page.locator('.fb-card');
   await expect(todoCard).toHaveCount(1);
   await expect(todoCard).toContainText('#22.1');
   await expect(todoCard).toContainText('rotazione chiavi');
+  await page.locator('#agentOnly').check();
+  await expect(page.locator('.fb-card')).toHaveCount(0);
+  await page.locator('#agentOnly').uncheck();
 });
