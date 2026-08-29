@@ -928,18 +928,43 @@
   // titolo, quindi la geometria da sola diceva di no proprio dove la struttura
   // diceva di sì. Solo quando il DOM non lega niente si guarda la pila di strati
   // sotto il cursore, e lì il freno geometrico è l'unica cosa che regge.
+  // Il collegamento sepolto è coperto da una COPERTINA nel punto cliccato?
+  // Una copertina (immagine, filmato, disegno) è la faccia visibile di una
+  // scheda: un link invisibile lì sotto è la scheda stessa, e adottarlo è
+  // giusto. Del TESTO o uno sfondo dipinto non sono la faccia di nessun link:
+  // un collegamento invisibile sotto un paragrafo è l'esca del #499, non una
+  // scheda — l'utente sta guardando il paragrafo, e il paragrafo non è "sua"
+  // rappresentazione.
+  const COVER_TAGS = new Set(['IMG', 'VIDEO', 'CANVAS', 'SVG', 'PICTURE', 'OBJECT', 'EMBED']);
+  function coverInFront(hit, view) {
+    if (!Array.isArray(view?.stack)) return false;
+    for (const other of view.stack) {
+      if (other === hit) return false;
+      if (COVER_TAGS.has(other.tagName) && coversPoint(other.getBoundingClientRect?.(), view)) return true;
+    }
+    return false;
+  }
+
   function findLinkUnder(view, target, contentUnder) {
     const owner = contentUnder ? closestAcrossShadow(contentUnder, 'a[href]') : null;
     const hit = owner || findUnder(view, 'a[href]', target);
-    // Un collegamento che non riceve i click per il menu NON ESISTE (decisione
-    // owner sul #499): non è un'affordance della pagina — un click sinistro lì
-    // non navigherebbe mai — quindi offrirne «Copia URL» o «Condividi» significa
-    // inventare un'azione che la pagina non ha, sull'indirizzo scelto da lei.
-    // I collegamenti trasparenti delle schede vere i click li ricevono: questa
-    // riga non li tocca.
-    if (hit) {
-      try { if (getComputedStyle(hit).pointerEvents === 'none') return null; } catch (_) {}
-    }
+    if (!hit) return null;
+    try {
+      // Un collegamento che non riceve i click per il menu NON ESISTE
+      // (decisione owner sul #499): non è un'affordance della pagina — un
+      // click sinistro lì non navigherebbe mai. I collegamenti trasparenti
+      // delle schede vere i click li ricevono: questa riga non li tocca.
+      if (getComputedStyle(hit).pointerEvents === 'none') return null;
+      // Ed è la seconda metà della stessa decisione: un collegamento che non
+      // disegna niente e che nel punto cliccato è coperto da qualcosa che non
+      // è la sua copertina (testo, sfondi) è invisibile PER COSTRUZIONE, e per
+      // il menu non esiste. È il repro esatto del #499: il link trasparente
+      // ritagliato sull'ingombro di un paragrafo. Le schede vere passano da
+      // `owner` (il DOM lo lega alla copertina) o hanno una copertina davanti.
+      if (!owner && !paintsSomething(hit) && !coverInFront(hit, view) && coveredAt(hit, view)) {
+        return null;
+      }
+    } catch (_) {}
     return hit;
   }
 
