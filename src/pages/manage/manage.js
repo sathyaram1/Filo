@@ -2241,55 +2241,7 @@
     }
   }
 
-  // ── Azione: archivia / ripristina ───────────────────────────────────────────
-  // Archivia → status `archived` (tab Archiviati). Su un feedback già archiviato
-  // il bottone ripristina, riportandolo in coda (todo): invariante UX "se puoi
-  // archiviare, puoi togliere dall'archivio".
-  async function toggleArchive() {
-    if (!selectedId) return;
-    const id = selectedId;
-    const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb) return;
-    const wasArchived = (fb.status || '') === 'archived';
-    const next = wasArchived ? 'todo' : 'archived';
-    // Override owner (DC3, SN_BOARD_ARCHIVE.hasOwnerOverride): un'azione manuale
-    // qui è sempre esplicita → vince per sempre sull'auto-archiviazione a
-    // punteggio. Archivio a mano → 'archived' (non riarchiviabile/non
-    // riapribile dall'automazione); ripristino a mano → 'keep_open' (il
-    // punteggio NON lo farà ri-archiviare anche se sopra soglia).
-    const nextOverride = wasArchived ? 'keep_open' : 'archived';
-
-    mgArchiveBtn.disabled = true;
-    setManageMsg(wasArchived ? 'Ripristino…' : 'Archivio…', '');
-    try {
-      const r = await sendToMain({ type: 'feedback_update', id, status: next, archiveOverride: nextOverride });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      fb.status = next;
-      fb.archiveOverride = nextOverride;
-      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
-      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
-      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
-      // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
-      // Il feedback cambia tab: chiudi il dettaglio e ricalcola la lista corrente.
-      selectedId = null;
-      mgDetail.hidden = true;
-      mgDetailEmpty.hidden = false;
-      mgActions.hidden = true;
-      mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
-      mgManage.hidden = true;
-      closeSidebar();
-      renderList();
-    } catch (e) {
-      mgArchiveBtn.disabled = false;
-      if (selectedId !== id) return;
-      setManageMsg(e.message || 'Errore', 'err');
-    }
-  }
-
   mgStarBtn.addEventListener('click', toggleStarred);
-  mgArchiveBtn.addEventListener('click', toggleArchive);
 
   function setClarifyMsg(text, kind) {
     mgClarifyMsg.textContent = text || '';
@@ -2449,105 +2401,11 @@
     });
   }
 
-  // ── Azione: accetta e sblocca un feedback bloccato ──────────────────────────
+  // Il messaggio d'esito della riga delle azioni di stato.
   function setActionMsg(text, kind) {
     mgActionMsg.textContent = text || '';
     mgActionMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
   }
-
-  async function acceptSelected() {
-    if (!selectedId) return;
-    const id = selectedId;
-    const comment = (mgAcceptComment.value || '').trim();
-    const fbSel = allFeedbacks.find((f) => f._id === id);
-    const wasBlocked = fbSel ? MR.classifyBlock(fbSel) !== null : true;
-    mgAcceptBtn.disabled = true;
-    setActionMsg(wasBlocked ? 'Sblocco in corso…' : 'Approvazione in corso…', '');
-    try {
-      // Override owner: il feedback esce dai bloccati e rientra nella coda (todo).
-      const r = await sendToMain({
-        type: 'feedback_update',
-        id,
-        reviewDecision: 'accepted',
-        reviewComment: comment,
-        reviewedAt: new Date().toISOString(),
-        status: 'todo',
-      });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-
-      // Aggiorna lo stato locale (ottimistico): l'override "accepted" toglie il
-      // blocco e il feedback diventa un `todo` — resta in "In coda", non più tra
-      // i bloccati. renderList ricalcola la lista dalla sorgente.
-      const fb = allFeedbacks.find((f) => f._id === id);
-      if (fb) { fb.reviewDecision = 'accepted'; fb.reviewComment = comment; fb.status = 'todo'; }
-
-      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
-      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
-      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
-      // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
-      // Il feedback non è più in revisione: torna allo stato vuoto del dettaglio.
-      selectedId = null;
-      mgDetail.hidden = true;
-      mgDetailEmpty.hidden = false;
-      mgActions.hidden = true;
-      mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
-      closeSidebar();
-      renderList();
-    } catch (e) {
-      if (selectedId !== id) return;
-      setActionMsg(e.message || (wasBlocked ? 'Errore nello sblocco' : 'Errore nell\'approvazione'), 'err');
-    } finally {
-      mgAcceptBtn.disabled = false;
-    }
-  }
-
-  mgAcceptBtn.addEventListener('click', acceptSelected);
-
-  // ── Azione: conferma un attacco/spam (terminale, macchina a stati) ─────────
-  async function confirmSelected() {
-    if (!selectedId || !mgConfirmBtn) return;
-    const id = selectedId;
-    const to = mgConfirmBtn.dataset.confirmStatus;
-    if (!to) return;
-    const comment = (mgAcceptComment.value || '').trim();
-    mgConfirmBtn.disabled = true;
-    setActionMsg('Conferma in corso…', '');
-    try {
-      const r = await sendToMain({
-        type: 'feedback_update',
-        id,
-        reviewDecision: 'rejected',
-        reviewComment: comment,
-        reviewedAt: new Date().toISOString(),
-        status: to,
-      });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      const fb = allFeedbacks.find((f) => f._id === id);
-      if (fb) { fb.reviewDecision = 'rejected'; fb.reviewComment = comment; fb.status = to; }
-      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
-      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
-      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
-      // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
-      selectedId = null;
-      mgDetail.hidden = true;
-      mgDetailEmpty.hidden = false;
-      mgActions.hidden = true;
-      mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
-      closeSidebar();
-      renderList();
-    } catch (e) {
-      if (selectedId !== id) return;
-      setActionMsg(e.message || 'Errore nella conferma', 'err');
-    } finally {
-      mgConfirmBtn.disabled = false;
-    }
-  }
-
-  if (mgConfirmBtn) mgConfirmBtn.addEventListener('click', confirmSelected);
 
   function renderJudgesRow(fb) {
     // Pulisce tutto tranne la label
@@ -2757,11 +2615,22 @@
     }
     appendBubble('model', 'Filo', opinionHtml);
 
-    // Bolla 3: il commento dell'owner alla revisione (approvazione/sblocco/
-    // conferma). Prima era scritto ma non mostrato da nessuna parte.
-    if (String(fb.reviewComment || '').trim()) {
-      const when = fb.reviewedAt ? ` — ${formatDate(fb.reviewedAt)}` : '';
-      appendBubble('user', `Tu (revisione${when})`, esc(fb.reviewComment));
+    // Bolla 3: LA DECISIONE dell'owner in revisione, col suo commento se c'è.
+    // Prima compariva solo quando c'era un commento: una conferma presa senza
+    // commentarla non lasciava traccia nella conversazione, che continuava a
+    // dire "Filo non ha ancora un parere" su una segnalazione già decisa.
+    // I campi della revisione viaggiano cifrati insieme allo status: senza la
+    // chiave non si scrive un blob, si tace.
+    const decisione = MR.valueUnreadable(fb.reviewDecision) ? '' : String(fb.reviewDecision || '').trim();
+    const commento = MR.valueUnreadable(fb.reviewComment) ? '' : String(fb.reviewComment || '').trim();
+    const DECISION_TEXT = {
+      accepted: 'Approvata: rimessa in coda di lavorazione.',
+      rejected: 'Blocco confermato.',
+    };
+    if (DECISION_TEXT[decisione] || commento) {
+      const when = (fb.reviewedAt && !MR.valueUnreadable(fb.reviewedAt)) ? ` — ${formatDate(fb.reviewedAt)}` : '';
+      const corpo = [DECISION_TEXT[decisione] || '', commento].filter(Boolean).map(esc).join('\n');
+      appendBubble('user', `Tu (revisione${when})`, corpo);
     }
 
     // Turni della lavorazione: le note contengono i report delle istanze che
