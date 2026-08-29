@@ -1307,11 +1307,12 @@
         return ka.seq - kb.seq || ka.sub - kb.sub;
       });
     }
-    updateTabCounts();
+    if (sezioni) updateTabCounts();
     render(filtered);
   }
 
   function updateTabCounts() {
+    if (!sezioniAttendibili()) return;
     // Il numero è la LUNGHEZZA della lista che quella sezione mostrerebbe, e si
     // calcola con la stessa funzione che la costruisce (#495). Senza il filtro
     // "Solo automatici" attivo sono ESATTAMENTE i numeri della dashboard di
