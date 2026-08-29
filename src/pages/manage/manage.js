@@ -1979,6 +1979,12 @@
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
+    // ⭐ resta: il preferito è un flag in chiaro, indipendente dallo stato.
+    // "Archivia"/"Ripristina" no: il bottone DICE dov'è la segnalazione, e su
+    // uno stato cifrato direbbe sempre "Archivia" — anche su una già
+    // archiviata, che il clic riporterebbe indietro senza che nessuno lo
+    // volesse. Non si mostra un verso solo di un'azione a due versi.
+    mgArchiveBtn.hidden = MR.statusUnreadable(fb);
     const archived = (fb.status || '') === 'archived';
     mgArchiveBtn.textContent = archived ? 'Ripristina' : 'Archivia';
     mgArchiveBtn.title = archived
