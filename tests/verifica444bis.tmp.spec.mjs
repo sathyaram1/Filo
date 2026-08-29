@@ -280,6 +280,18 @@ test('S7 barra sticky opaca: la riga-link scivolata sotto durante lo scroll non 
   await expectNoLinkEntries(menu);
 });
 
+test('S9 pannello opaco assoluto sopra un link statico in flusso: nessuna voce del link', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:15px sans-serif;padding:40px">
+    <div style="position:relative;width:360px">
+      <a id="lnk" href="https://malizia.test/statico-coperto" style="display:block;height:48px;line-height:48px;background:#eef">Link statico in flusso</a>
+      <div id="overlay" style="position:absolute;inset:0;background:#fff;border:1px solid #999;display:flex;align-items:center;justify-content:center">Pannello opaco sopra</div>
+    </div>
+  </body></html>`);
+  const r = await rectOf(page, '#overlay');
+  const menu = await openMenuAt(page, r.x + r.w / 2, r.y + r.h / 2);
+  await expectNoLinkEntries(menu);
+});
+
 test('S8 scheda VIDEO-link sepolta per intero sotto un pannello opaco a bordi condivisi: né voci del link né del filmato', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:15px sans-serif;padding:40px">
     <div style="position:relative;width:320px;height:180px">
