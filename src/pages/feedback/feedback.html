@@ -214,6 +214,9 @@
     /* Feedback visivo quando si trascina un file sopra una textarea-composer. */
     .fb-drop-hover { outline: 2px dashed var(--sn-accent); outline-offset: -2px; }
     .fb-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--sn-border); }
+    /* `display: flex` batte l'attributo hidden: senza questa riga la barra
+       resterebbe a schermo anche quando la pagina decide di non disegnarla. */
+    .fb-tabs[hidden] { display: none; }
     .fb-tab {
       background: transparent; border: 0; padding: 8px 14px;
       color: var(--sn-muted); cursor: pointer; font: inherit;
