@@ -1140,7 +1140,11 @@
           const v = notesValueOf(ta);
           const it = all.find((f) => f._id === id);
           if (it && it.notes === v) return;
-          patch(id, { notes: v }, { notes: v });
+          // Silenzioso come il salvataggio della casella: il compositore tiene
+          // già aggiornate le sue miniature, e un ridisegno le rigenererebbe
+          // sotto il cursore — la × appena premuta lascerebbe il posto a quella
+          // dell'allegato successivo.
+          patch(id, { notes: v }, { notes: v }, { silenzioso: true });
         },
       });
     });
