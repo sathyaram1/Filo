@@ -474,6 +474,18 @@ if (isMain) {
       } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
     }
     const r = await deliver(biglietto, intento, data);
+    if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed')) {
+      // La consegna è REGISTRATA dal server: da questo istante il contenuto
+      // della directory è la consegna, e il punto fermo va sigillato qui
+      // (#507). Era la simmetria mancante: le consegne via dispatch
+      // (--record-*) sigillavano, questa strada no — e il posizionamento
+      // successivo nello stesso clone riportava il ramo alla base,
+      // parcheggiando su discarded/ un lavoro intero già consegnato.
+      try {
+        const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
+        sealCurrentWork(ROOT, { by: `deliver:${intento}` });
+      } catch (_) { /* best-effort: la consegna è già registrata */ }
+    }
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
