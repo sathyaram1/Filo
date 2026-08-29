@@ -48,7 +48,7 @@ async function setupAdmin(page, feedback) {
     window.__fbTest.setAdmin(true, { email: 'owner@example.com' });
     window.__fbTest.setData([fb]);
     // I feedback di prova sono "da risolvere": la scheda aperta all'avvio è un'altra.
-    window.__fbTest.setTab('todo');
+    window.__fbTest.setTab('queue');
   }, feedback);
   await page.waitForFunction(() => document.querySelectorAll('.fb-card').length > 0, null, { timeout: 10_000 });
 }

@@ -14,8 +14,7 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const URL = 'filo://feedback/feedback.html';
 
-// `status: 'new'` → sezione "Ricevuti" (statusOf). Il clientId non è quello di
-// un agente, altrimenti i feedback finirebbero nella sezione "Agente".
+// `status: 'unlabeled'` → sezione "Ricevuti" (macchina a stati, #509).
 
 test('#495 — al tetto del caricamento i numeri delle sezioni diventano un minimo', async ({ openTab }) => {
   const page = await openTab(URL);
@@ -31,7 +30,7 @@ test('#495 — al tetto del caricamento i numeri delle sezioni diventano un mini
     for (let i = 0; i < cap - 1; i++) {
       items.push({
         _id: `c${i}`, text: `segnalazione ${i}`, name: `segnalazione ${i}`,
-        seq: i + 1, subSeq: 0, status: 'new', clientId: 'tester@example.com',
+        seq: i + 1, subSeq: 0, status: 'unlabeled', clientId: 'tester@example.com',
         createdAt: '2026-06-20T10:00:00Z', images: [],
       });
     }
@@ -47,7 +46,7 @@ test('#495 — al tetto del caricamento i numeri delle sezioni diventano un mini
     for (let i = 0; i < cap; i++) {
       items.push({
         _id: `c${i}`, text: `segnalazione ${i}`, name: `segnalazione ${i}`,
-        seq: i + 1, subSeq: 0, status: 'new', clientId: 'tester@example.com',
+        seq: i + 1, subSeq: 0, status: 'unlabeled', clientId: 'tester@example.com',
         createdAt: '2026-06-20T10:00:00Z', images: [],
       });
     }
@@ -60,7 +59,7 @@ test('#495 — al tetto del caricamento i numeri delle sezioni diventano un mini
   await expect(inbox).toHaveAttribute('title', hint);
 
   // Una sezione vuota al tetto non è vuota davvero: nemmeno lo zero afferma.
-  await expect(page.locator('[data-tab="done"]')).toHaveText('Risolti (0+)');
+  await expect(page.locator('[data-tab="resolved"]')).toHaveText('Risolti (0+)');
 });
 
 // ── Caricamento fallito: un numero è un'affermazione ─────────────────────────
@@ -91,7 +90,7 @@ test('#495 — caricamento fallito: nessun numero, e l\'errore con "Riprova" res
   }
 
   // L'utente prova un'altra sezione.
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
   for (const t of await sezioni.allInnerTexts()) {
     expect(t, `sezione "${t}" dopo un click a caricamento fallito`).not.toMatch(/\(/);
   }
@@ -102,7 +101,7 @@ test('#495 — caricamento fallito: nessun numero, e l\'errore con "Riprova" res
   // Rete tornata: da qui i numeri si sanno, e si scrivono.
   await page.evaluate(() => {
     window.SN_FEEDBACK.list = () => Promise.resolve([
-      { _id: 'r1', text: 'uno', name: 'uno', seq: 1, subSeq: 0, status: 'new',
+      { _id: 'r1', text: 'uno', name: 'uno', seq: 1, subSeq: 0, status: 'unlabeled',
         clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [] },
       { _id: 'r2', text: 'due', name: 'due', seq: 2, subSeq: 0, status: 'todo',
         clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [] },
@@ -110,7 +109,7 @@ test('#495 — caricamento fallito: nessun numero, e l\'errore con "Riprova" res
   });
   await page.locator('.fb-load-retry').click();
   await expect(page.locator('[data-tab="inbox"]')).toHaveText('Ricevuti (1)');
-  await expect(page.locator('[data-tab="todo"]')).toHaveText('Da risolvere (1)');
-  await expect(page.locator('[data-tab="done"]')).toHaveText('Risolti (0)');
+  await expect(page.locator('[data-tab="queue"]')).toHaveText('In coda (1)');
+  await expect(page.locator('[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.fb-load-retry')).toBeHidden();
 });

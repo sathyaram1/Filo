@@ -673,11 +673,11 @@
       // coda. "Ricevuti" è incluso così si può COMMENTARE un feedback appena
       // arrivato e poi metterlo in coda (il commento viaggia col cambio di
       // stato — vedi il gestore .fb-act).
-      const notesEditable = isAdmin && !f.reportIllegibile
-        && (currentTab === 'inbox' || currentTab === 'queue');
       // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
       // (è una decisione che aspetta l'owner), non più in una sezione sua.
       const clarifyReply = isAdmin && statusOf(f) === 'design' && statusReasonOf(f) === 'clarify';
+      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
+        && (currentTab === 'inbox' || currentTab === 'queue');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';

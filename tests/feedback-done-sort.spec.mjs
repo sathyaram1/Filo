@@ -43,7 +43,7 @@ test('tab Risolti: ordine per numero (#1, #3, #22.2, #22.10, poi senza numero)',
   await page.click('#refresh');
 
   // Passa alla tab "Risolti".
-  await page.click('[data-tab="done"]');
+  await page.click('[data-tab="resolved"]');
   await expect(page.locator('.fb-card')).toHaveCount(5);
 
   // Atteso: #1, #3, #22.2, #22.10 (numerico: 2 < 10), e i senza-numero in coda.

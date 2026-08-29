@@ -71,7 +71,7 @@ async function setupAdmin(app, page, feedback, capture = false) {
 test('la riapertura è una bolla separata, non dentro la casella della nota', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, SAMPLE);
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
 
   const card = page.locator('.fb-card');
   await expect(card).toHaveCount(1);
@@ -94,7 +94,7 @@ test('la riapertura è una bolla separata, non dentro la casella della nota', as
 test('modificando la nota, la riapertura (coda) resta intatta nel salvataggio', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, SAMPLE, true);
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
 
   const card = page.locator('.fb-card');
   // Cambio il testo della nota e clicco "✓ Risolto": il salvataggio deve

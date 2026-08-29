@@ -103,7 +103,7 @@ test('un allegato in una RISPOSTA si mostra nella sua bolla, NON nella segnalazi
     createdAt: new Date().toISOString(),
   });
 
-  await page.locator('[data-tab="done"]').click();
+  await page.locator('[data-tab="resolved"]').click();
 
   // L'allegato compare — e si RISOLVE come immagine — nell'area immagini della
   // bolla RISPOSTA (lato utente, non report). Col decrypt mockato (admin vero),
@@ -176,7 +176,7 @@ test('Da risolvere: allegare alla nota la salva subito nelle note (persistita)',
     createdAt: new Date().toISOString(),
   }, /* captureUpdates */ true);
 
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
 
   const card = page.locator('.fb-card');
   await card.locator('.fb-notes').fill('Riprodotto, allego il log.');

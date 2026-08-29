@@ -78,7 +78,7 @@ test('un feedback risolto mostra la conversazione a bolle distinte (Segnalazione
     createdAt: new Date().toISOString(),
   });
 
-  await page.locator('[data-tab="done"]').click();
+  await page.locator('[data-tab="resolved"]').click();
 
   // Tre bolle distinte (NON un unico blocco): segnalazione + nota Filo + risposta.
   await expect(page.locator('.fb-bubble--report')).toContainText('tasto copia quando seleziono');
@@ -120,7 +120,7 @@ test('riaprire + ri-risolvere conserva report iniziale, nota utente e nuovo repo
     createdAt: new Date().toISOString(),
   });
 
-  await page.locator('[data-tab="done"]').click();
+  await page.locator('[data-tab="resolved"]').click();
 
   // Tutto è ancora lì, in 4 bolle distinte e nell'ordine giusto.
   const whos = await page.locator('.fb-bubble-who').allTextContents();
