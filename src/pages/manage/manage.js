@@ -1900,10 +1900,16 @@
     //    metti in coda" (problema #2: senza automatica serve un'approvazione manuale);
     //  - feedback in chiarimento → box di risposta che lo rimette in coda;
     //  - altrimenti nessuna azione.
-    const isBlocked = MR.classifyBlock(fb) !== null;
-    const tab = MR.manageTabFor(fb, { releasedVersion });
-    const alignedInbox = MR.isAligned(fb) && tab === 'inbox';
-    const normSel = MR.normalizeStatus(fb);
+    //
+    // Stato illeggibile: nessuna. I pulsanti nascono dallo stato, e su una
+    // segnalazione cifrata la macchina lo inventa (`unlabeled` → "bloccato"):
+    // offrire "Accetta e sblocca" o "Conferma attacco" su una pratica che
+    // potrebbe essere già chiusa è peggio che non offrire niente. È la stessa
+    // regola della gemella, che lì spegne i pulsanti della scheda.
+    const isBlocked = leggibile && MR.classifyBlock(fb) !== null;
+    const tab = leggibile ? MR.manageTabFor(fb, { releasedVersion }) : null;
+    const alignedInbox = leggibile && MR.isAligned(fb) && tab === 'inbox';
+    const normSel = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
     // design con domande (ex clarify) → box risposta; legacy clarify idem.
     const isClarify = normSel.status === 'design' && (normSel.statusReason === 'clarify' || (fb.status || '') === 'clarify');
     mgActions.hidden = !(isAdmin && (isBlocked || alignedInbox));
