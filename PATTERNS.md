@@ -1941,6 +1941,28 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   sezioni a tutti per un documento storto sarebbe sproporzionato, e farebbe
   divergere la pagina dalla sua gemella: la divergenza che il pattern qui sopra
   esiste per togliere.
+- **La regola sta nel modulo, non nella pagina — o la gemella resta indietro.**
+  Scritta dentro `feedback.js`, questa regola è valsa per una pagina sola: la
+  dashboard di gestione ha continuato a scrivere "Ricevuti (3) · In coda (0) ·
+  Risolti (0) · Archiviati (0)" e "In attesa del giudizio" su segnalazioni già
+  chiuse, e la riga di changelog prometteva all'utente una cosa che su
+  «Gestione» non era vera (#509, secondo giro). Adesso il predicato
+  (`statusUnreadable`), la soglia (`sectionsReliable`) e le parole
+  (`publicStateLabel`) sono in `manageReview.js` e le due pagine le chiamano.
+- **Non è "nascondi la barra": è tutto ciò che parte dallo stato.** Chiusa la
+  barra, restano aperte le altre porte, e ognuna costa un giro di verifica: il
+  nome della sezione in cima alla colonna, il bordo colorato della scheda
+  ("Non filtrato" è un'affermazione), le barre di massa che contano per stato
+  ("Ri-valuta i non filtrati (3)", "Approva tutti gli allineati"), i pulsanti di
+  decisione del dettaglio, "Archivia" che senza chiave dice sempre "Archivia"
+  anche su una già archiviata, la frase accanto ai giudici. Il criterio è uno:
+  *se l'affermazione nasce dallo stato e lo stato non si legge, non si scrive*.
+  Restano invece le cose che stanno in chiaro e con lo stato non c'entrano —
+  ⭐ preferito, la frase per chi ha segnalato, le fusioni ferme.
+- **Sezione non è sinonimo di scheda.** La barra della dashboard di gestione
+  porta anche Statistiche Red Team, Modelli di supporto, Automazioni e Log:
+  non elencano segnalazioni e non dipendono dal loro stato, quindi restano
+  raggiungibili. Spariscono le quattro sezioni, non la barra come oggetto.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
   anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
   a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
