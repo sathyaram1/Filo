@@ -1934,8 +1934,13 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   il vuoto dove non si sa, cioè la stessa bugia in formato più grande. Senza il
   criterio: niente barra, un elenco solo, una riga che lo dice, e sulla scheda
   solo ciò che si sa davvero (qui l'enum grossolano in chiaro, aperta/chiusa).
-  Il riconoscimento dev'essere STRETTO — solo il ciphertext: uno stato assente o
-  inventato la macchina lo scioglie davvero, e lì le sezioni restano.
+  Il riconoscimento dev'essere STRETTO in due sensi. Solo il ciphertext conta
+  (uno stato assente o inventato la macchina lo scioglie davvero); e il silenzio
+  scatta solo quando NON si legge nessuno stato, che è il caso vero — o hai la
+  chiave e li leggi tutti, o non ce l'hai e non ne leggi uno. Togliere le
+  sezioni a tutti per un documento storto sarebbe sproporzionato, e farebbe
+  divergere la pagina dalla sua gemella: la divergenza che il pattern qui sopra
+  esiste per togliere.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
   anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
   a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
