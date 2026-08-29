@@ -85,6 +85,7 @@
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
   const mgDetail      = document.getElementById('mgDetail');
   const mgDetailHead  = document.getElementById('mgDetailHead');
+  const mgDetailState = document.getElementById('mgDetailState');
   const mgJudgesRow   = document.getElementById('mgJudgesRow');
   const mgWorkState   = document.getElementById('mgWorkState');
   const mgThread      = document.getElementById('mgThread');
