@@ -858,14 +858,23 @@
       // stessa faccia, non una copertura.
       if (L === cand || containsAcrossShadow(cand, L) || containsAcrossShadow(L, cand)) return false;
       if (!coversPoint(L.getBoundingClientRect?.(), view)) continue;
-      if (!paintsSomething(L)) continue;
+      // Le copertine sono la faccia della scheda, non una copertura.
       if (COVER_TAGS.has(L.tagName)) continue;
-      let coverLike = false;
-      try {
-        const bg = getComputedStyle(L).backgroundImage;
-        coverLike = !!bg && bg !== 'none' && bg.includes('url(');
-      } catch (_) {}
-      if (coverLike) continue;
+      // A nascondere è uno SFONDO COPRENTE. Il testo no: attorno ai glifi si
+      // vede quello che c'è dietro — la striscia quasi trasparente col titolo
+      // sopra una copertina è la forma normale delle schede, e contarla come
+      // copertura spegneva le voci proprio lì. I gradienti si contano per
+      // prudenza (un pannello sfumato scuro copre), l'immagine di sfondo no:
+      // è una copertina scritta in CSS.
+      let cs = null;
+      try { cs = getComputedStyle(L); } catch (_) { continue; }
+      if (!cs || cs.visibility === 'hidden') continue;
+      const layerOpacity = parseFloat(cs.opacity);
+      if (Number.isFinite(layerOpacity) && layerOpacity < 0.5) continue;
+      const bg = cs.backgroundImage;
+      if (bg && bg !== 'none' && bg.includes('url(')) continue;
+      const opaqueBg = (bg && bg !== 'none') || colorAlpha(cs.backgroundColor) >= 0.5;
+      if (!opaqueBg) continue;
       const r = L.getBoundingClientRect();
       const w = Math.min(r.right, rb.right) - Math.max(r.left, rb.left);
       const h = Math.min(r.bottom, rb.bottom) - Math.max(r.top, rb.top);
