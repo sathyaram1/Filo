@@ -1500,6 +1500,7 @@
       `    {"type": "CANCELLA_SVEGLIA", "tutte": true, "tipo": "sveglia"},\n` +
       `    {"type": "MODIFICA_SVEGLIA", "etichetta": "palestra", "orario": "08:00"},\n` +
       `    {"type": "SALVA_APPUNTO", "text": "...", "context": "..."},\n` +
+      `    {"type": "SALVA_LEZIONE", "testo": "..."},\n` +
       `    {"type": "INVIA_FEEDBACK", "testo": "...", "titolo": "..."},\n` +
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
       `    {"type": "CAPACITA_DETTAGLIO", "ids": ["save-for-later"]},\n` +
