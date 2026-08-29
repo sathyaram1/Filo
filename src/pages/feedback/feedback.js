@@ -1051,7 +1051,11 @@
           // Riaprire = rimettere in coda (`todo`), la transizione che la
           // macchina a stati prevede per "manca qualcosa". Prima si scriveva il
           // legacy `new`, che nessuno riconosceva più.
-          patch(id, { status: 'todo', notes: newNotes }, { status: 'todo', notes: newNotes });
+          azioneScheda(ev.currentTarget, {
+            id,
+            payload: { status: 'todo', notes: newNotes },
+            optimistic: { status: 'todo', notes: newNotes },
+          });
         });
       });
     });
@@ -1059,7 +1063,7 @@
     // Composer "Invia risposta" del tab Chiarimenti: appende la risposta
     // dell'utente come turno (conservando la domanda di Filo nello storico) e
     // rimette il feedback in "Da risolvere" perché una routine lo riprenda.
-    listEl.querySelectorAll('.fb-reply-send').forEach((btn) => {
+    root.querySelectorAll('.fb-reply-send').forEach((btn) => {
       const id = btn.dataset.id;
       const card = btn.closest('.fb-card');
       const ta = card && card.querySelector('.fb-reply-text');
