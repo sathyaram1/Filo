@@ -1275,6 +1275,10 @@
   }
 
   function updateTabCounts() {
+    // Sezioni non disegnabili: non c'è niente da numerare. Uscire QUI evita di
+    // lasciare "(3) (0) (0) (0)" appiccicato ai bottoni nascosti, pronto a
+    // ricomparire al primo dato leggibile che non passa da renderList.
+    if (!sezioniAttendibili()) return;
     const counts = dataLoaded
       ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
       : null;
