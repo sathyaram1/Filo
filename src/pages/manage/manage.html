@@ -822,6 +822,12 @@
         title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
     </nav>
 
+    <!-- Lo stato delle segnalazioni viaggia cifrato: su un computer senza la
+         chiave dell'owner non si legge, e allora le quattro sezioni non si
+         disegnano (PATTERNS.md → "se il criterio non si legge, le sezioni non
+         si disegnano"). Questa riga dice perché, esattamente come la gemella. -->
+    <p class="mg-no-sections" id="mgNoSections" hidden></p>
+
     <!-- Barra di ricerca semantica (nascosta finché non apri la lente). -->
     <div class="mg-searchbar" id="mgSearchBar" hidden>
       <span class="mg-search-ico" id="mgSearchIco" aria-hidden="true"></span>
