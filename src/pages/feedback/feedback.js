@@ -1188,10 +1188,29 @@
         timer = setTimeout(flush, 1500);
       });
     });
+  }
 
-    // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
-    // captureFocus): salvare le note non deve più "deselezionare" il campo.
-    restoreFocus(focusSnap);
+  // Rimette i pulsanti originali di una scheda AL SUO POSTO, senza toccare il
+  // resto della lista.
+  function ripristinaAzioni(card, id) {
+    const item = all.find((f) => f._id === id);
+    const box = card && card.querySelector('.fb-actions');
+    if (!box || !item) return;
+    box.innerHTML = actionsFor(item);
+    bindCardActions(box);
+  }
+
+  // Ridipinge i pallini della priorità nella scheda (stessa idea: la scheda si
+  // aggiorna da sé, la lista non si muove).
+  function ridipingiPriorita(card, item) {
+    const vecchio = card && card.querySelector('.fb-priority');
+    if (!vecchio || !item) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = priorityDotsHtml(item);
+    const nuovo = tmp.firstElementChild;
+    if (!nuovo) return;
+    vecchio.replaceWith(nuovo);
+    bindCardActions(nuovo.parentElement || card);
   }
 
   // I feedback della SEZIONE corrente, già ordinati: la lista la costruisce la
