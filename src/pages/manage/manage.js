@@ -845,7 +845,10 @@
   let mergeApprovalsCount = 0;
   function applyMergeApprovalsVisibility() {
     if (!mgMergeApprovals) return;
-    mgMergeApprovals.hidden = mergeApprovalsCount === 0 || currentTab !== 'inbox';
+    // Le fusioni ferme non vengono dallo status dei feedback: senza sezioni non
+    // c'è una scheda "Ricevuti" in cui metterle, ma restano vere e si mostrano.
+    const sezione = sezioniAttendibili() ? currentTab === 'inbox' : true;
+    mgMergeApprovals.hidden = mergeApprovalsCount === 0 || !sezione;
   }
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
