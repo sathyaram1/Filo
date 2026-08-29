@@ -736,11 +736,11 @@
       }
       const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
       const tailThreadHtml = tailBubblesHtml ? `<div class="fb-thread fb-thread--tail">${tailBubblesHtml}</div>` : '';
-      // Su "Ricevuti" la casella è un COMMENTO al volo (poi sposti in "Da
-      // risolvere"); altrove è la nota di triage/decisioni di design.
+      // Su "Ricevuti" la casella è un COMMENTO al volo (poi lo metti in coda);
+      // altrove è la nota di triage/decisioni di design.
       const notesLabelText = currentTab === 'inbox' ? 'Commento:' : 'Note / decisioni di design:';
       const notesPlaceholder = currentTab === 'inbox'
-        ? 'Aggiungi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
+        ? 'Aggiungi un commento… (verrà conservato quando metti il feedback in coda)'
         : 'Dettagli aggiuntivi, vincoli, scelte di design…';
       // La textarea mostra il capo pulito (senza le righe-marcatore degli
       // allegati: quelle vivono come thumbnail nel compositore) e porta la coda
