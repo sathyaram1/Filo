@@ -214,27 +214,16 @@
     // bugia delle sezioni, in piccolo. L'unica cosa vera che questa macchina
     // ha in mano è l'enum grossolano in chiaro (`statusPublic`), lo stesso che
     // guarda la ricompensa: aperta o chiusa, niente di più.
-    if (statoCifrato(f)) {
-      const label = MR.publicStateLabel(f);
-      if (!label) return '';
-      return `<span class="fb-state" title="${escapeHtml(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">`
-        + `${escapeHtml(label)}</span>`;
-    }
-    const status = statusOf(f);
-    const info = FS.STATUSES[status];
-    if (!info) return '';
-    const reason = statusReasonOf(f);
-    // Il motivo si scrive solo se c'è una traduzione umana: un codice grezzo
-    // ('legacy-ignored') in mezzo alla riga non dice niente a chi legge. Resta
-    // comunque nell'hover, dove serve a chi lo sta cercando.
-    const reasonTxt = reason ? MR.reasonText(reason) : '';
-    const reasonLeggibile = reasonTxt && reasonTxt !== String(reason);
-    const dot = info.color
-      ? `<span class="fb-state-dot" style="color:${escapeHtml(info.color)}"></span>`
+    // Le PAROLE (etichetta, motivo, hover) vengono dal modulo condiviso: la
+    // dashboard di gestione mostra la stessa riga, e due copie di questo
+    // calcolo sono esattamente il modo in cui le due pagine hanno divergito.
+    const b = MR.stateBadge(f);
+    if (!b) return '';
+    const dot = b.color
+      ? `<span class="fb-state-dot" style="color:${escapeHtml(b.color)}"></span>`
       : '';
-    const hover = `Stato: ${info.label}${reason ? ` (${reasonTxt})` : ''}`;
-    return `<span class="fb-state" title="${escapeHtml(hover)}">${dot}${escapeHtml(info.label)}`
-      + `${reasonLeggibile ? ` <span class="fb-state-reason">— ${escapeHtml(reasonTxt)}</span>` : ''}</span>`;
+    return `<span class="fb-state" title="${escapeHtml(b.hint)}">${dot}${escapeHtml(b.label)}`
+      + `${b.showReason ? ` <span class="fb-state-reason">— ${escapeHtml(b.reasonText)}</span>` : ''}</span>`;
   }
 
   function fmtTs(ts) {
