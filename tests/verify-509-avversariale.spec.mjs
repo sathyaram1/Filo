@@ -297,25 +297,65 @@ const CODA_CIFRATA = [
   { _id: 'x3', seq: 3, status: 'FENC1:cccccccccccccccccccc', statusPublic: 'closed', name: 'tre', text: 'c', createdAt: '2026-08-03T10:00:00Z' },
 ];
 
+// Cosa si misura, e perché non la barra intera. Su filo://feedback la barra È
+// le sezioni, e guardare l'elemento contenitore basta. Sulla dashboard di
+// gestione la stessa barra porta anche quattro schede che sezioni NON sono
+// (Statistiche Red Team, Modelli di supporto, Automazioni, Log): non elencano
+// segnalazioni, non dipendono dal loro stato, e nasconderle a chi non ha la
+// chiave toglierebbe l'accesso a superfici che con questo non c'entrano.
+// Quindi la domanda giusta — quella del pattern, "se il criterio non si legge
+// le sezioni non si disegnano" — si fa alle SEZIONI, una per una.
+async function sezioniVisibili(page, selettore) {
+  const out = {};
+  for (const tab of ['inbox', 'queue', 'resolved', 'archived']) {
+    out[tab] = await page.locator(selettore(tab)).isVisible().catch(() => false);
+  }
+  return out;
+}
+const NESSUNA_SEZIONE = { inbox: false, queue: false, resolved: false, archived: false };
+
 test('#509 — stato illeggibile: le due pagine devono dire la stessa cosa', async ({ openTab }) => {
   const fb = await apriFeedback(openTab, CODA_CIFRATA);
-  const tabsVisibiliFb = await fb.locator('#tabs').isVisible();
-  const testoFb = tabsVisibiliFb ? await etichetteFeedback(fb) : null;
+  const sezioniFb = await sezioniVisibili(fb, (t) => `#tabs [data-tab="${t}"]`);
+  const disegnaFb = Object.values(sezioniFb).some(Boolean);
+  const testoFb = disegnaFb ? await etichetteFeedback(fb) : null;
+  const avvisoFb = await fb.locator('#noSections').innerText().catch(() => '');
 
   const mg = await apriManage(openTab, CODA_CIFRATA);
-  const tabsVisibiliMg = await mg.locator('.mg-tabs, #mgTabs').first().isVisible().catch(() => true);
-  const testoMg = await etichetteManage(mg);
+  const sezioniMg = await sezioniVisibili(mg, (t) => `.mg-tab[data-tab="${t}"]`);
+  const disegnaMg = Object.values(sezioniMg).some(Boolean);
+  const testoMg = disegnaMg ? await etichetteManage(mg) : null;
+  const avvisoMg = await mg.locator('#mgNoSections').innerText().catch(() => '');
 
   // Diagnostica leggibile nel report anche quando passa.
   test.info().annotations.push({
     type: 'cifrato',
-    description: `feedback: sezioni ${tabsVisibiliFb ? JSON.stringify(testoFb) : 'NASCOSTE'} — manage: sezioni ${tabsVisibiliMg ? JSON.stringify(testoMg) : 'NASCOSTE'}`,
+    description: `feedback: sezioni ${disegnaFb ? JSON.stringify(testoFb) : 'NASCOSTE'} — manage: sezioni ${disegnaMg ? JSON.stringify(testoMg) : 'NASCOSTE'}`,
   });
 
   expect(
-    { tabs: tabsVisibiliFb, testo: testoFb },
+    { sezioni: sezioniFb, testo: testoFb },
     'le due pagine davanti a uno stato che non si legge',
-  ).toEqual({ tabs: tabsVisibiliMg, testo: tabsVisibiliMg ? testoMg : null });
+  ).toEqual({ sezioni: sezioniMg, testo: testoMg });
+
+  // E la direzione: non "uguali comunque", ma uguali PERCHÉ nessuna delle due
+  // disegna le sezioni — con la stessa riga a dire perché.
+  expect(sezioniFb, 'la pagina dei feedback non disegna le sezioni').toEqual(NESSUNA_SEZIONE);
+  expect(sezioniMg, 'la dashboard di gestione non disegna le sezioni').toEqual(NESSUNA_SEZIONE);
+  expect(avvisoMg.trim(), 'la riga che spiega perché mancano le sezioni').toBe(avvisoFb.trim());
+  expect(avvisoMg.trim().length, 'e non è vuota').toBeGreaterThan(0);
+
+  // Le schede che sezioni non sono restano dove stanno: non dipendono dallo
+  // stato delle segnalazioni.
+  await expect(mg.locator('.mg-tab[data-tab="log"]')).toBeVisible();
+
+  // L'intestazione della colonna non ripete il nome di una sezione che nessuno
+  // ha scelto, e la scheda aperta dice l'unica cosa che si sa: aperta o chiusa.
+  const testa = (await mg.locator('#mgListHead').innerText()).trim();
+  expect(testa, 'intestazione della colonna').not.toMatch(/Ricevuti|In coda|Risolti|Archiviati/);
+  await mg.locator('.mg-item', { hasText: 'due' }).first().click();
+  await expect(mg.locator('#mgJudgesRow')).toContainText('Chiusa');
+  await expect(mg.locator('#mgJudgesRow')).not.toContainText('In attesa del giudizio');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
