@@ -421,6 +421,14 @@ if (isMain) {
     if (r.ok) {
       const { stopBeat } = await import('./lib/routine-beat.mjs');
       stopBeat(ROOT, { ticket: args[0] });
+      // Fine giro LEGITTIMA: il punto fermo si sigilla sul contenuto attuale
+      // (#507). Senza, i commit fatti dopo l'ultima consegna — la pulizia del
+      // verificatore, per esempio — al posizionamento successivo nello stesso
+      // clone verrebbero scartati come moncone di un'istanza morta.
+      try {
+        const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
+        sealCurrentWork(ROOT, { by: 'release' });
+      } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
     else console.log(`rilascio non riuscito (${r.reason})`);
