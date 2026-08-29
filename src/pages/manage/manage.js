@@ -66,6 +66,7 @@
   const mgChannelList    = document.getElementById('mgChannelList');
 
   // Lista (tab corrente)
+  const mgNoSections   = document.getElementById('mgNoSections');
   const mgListHead     = document.getElementById('mgListHead');
   const mgListLoading  = document.getElementById('mgListLoading');
   const mgList         = document.getElementById('mgList');
