@@ -26,6 +26,7 @@ import {
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
   ensureSessionExcludes, SESSION_MARKERS,
+  sealCurrentWork, findStateIdByBranch,
 } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
