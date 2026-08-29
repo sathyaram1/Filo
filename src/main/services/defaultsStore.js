@@ -468,14 +468,12 @@ async function getRoutineCaps(idToken) {
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   const out = { failCap: failDef, improvableCap: improvableDef };
   // `loopCap` è il nome VECCHIO di failCap: il valore che l'owner aveva già
-  // scelto resta valido sotto il nome nuovo (si migra il valore visuale, non i
-  // dati). Cerca anche nel documento legacy config/automation, per lo storico.
+  // scelto resta valido sotto il nome nuovo. SOLO config/routines: è il
+  // documento che il server legge davvero, e mostrare un valore pescato
+  // altrove significa mostrare una regola che nessuno applica (vedi il
+  // commento in getAutomationProberIdle).
   if (doc && doc.failCap != null) out.failCap = clampCap(doc.failCap, failDef);
   else if (doc && doc.loopCap != null) out.failCap = clampCap(doc.loopCap, failDef);
-  else {
-    const legacy = await fetchDoc(AUTOMATION_DOC, idToken);
-    if (legacy && legacy.loopCap != null) out.failCap = clampCap(legacy.loopCap, failDef);
-  }
   if (doc && doc.improvableCap != null) out.improvableCap = clampCap(doc.improvableCap, improvableDef);
   return out;
 }
