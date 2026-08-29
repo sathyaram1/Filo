@@ -2359,14 +2359,14 @@
     // giudizio." anche su una segnalazione già chiusa. Al loro posto va l'unica
     // cosa che si sa: aperta o chiusa, con le stesse parole della gemella.
     if (MR.statusUnreadable(fb)) {
-      const label = MR.publicStateLabel(fb);
-      if (!label) { mgJudgesRow.hidden = true; return; }
+      const pubblico = MR.publicStateLabel(fb);
+      if (!pubblico) { mgJudgesRow.hidden = true; return; }
       mgJudgesRow.hidden = false;
       mgJudgesRow.innerHTML = '';
       const span = document.createElement('span');
       span.className = 'mg-state';
-      span.textContent = label;
-      span.title = `Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`;
+      span.textContent = pubblico;
+      span.title = `Stato: ${pubblico} — ${MR.PUBLIC_STATE_HINT}`;
       mgJudgesRow.appendChild(span);
       return;
     }
