@@ -421,6 +421,11 @@
   function judgesNote(fb) {
     const fs = FS();
     const S = fs.STATUSES;
+    // Stato illeggibile: qui non c'è niente da spiegare. La macchina lo
+    // ridurrebbe a `unlabeled` e la frase direbbe "In attesa del giudizio."
+    // anche su una segnalazione già chiusa — la stessa bugia delle sezioni, in
+    // piccolo. Chi disegna mette al suo posto l'enum grossolano in chiaro.
+    if (statusUnreadable(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (status === 'design') {
       if (statusReason === 'secaudit') {
