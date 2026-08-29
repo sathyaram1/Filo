@@ -27,6 +27,7 @@
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightboxImg');
   const tabsEl = document.getElementById('tabs');
+  const agentOnlyEl = document.getElementById('agentOnly');
   const adminBanner = document.getElementById('adminBanner');
   const adminBannerText = document.getElementById('adminBannerText');
   const adminSignInBtn = document.getElementById('adminSignIn');
