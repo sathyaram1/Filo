@@ -2354,6 +2354,23 @@
       mgJudgesRow.appendChild(lbl);
     }
 
+    // Stato illeggibile: i pallini tratteggiati nascono da "non filtrato", che
+    // qui la macchina si inventa — e la frase accanto diceva "In attesa del
+    // giudizio." anche su una segnalazione già chiusa. Al loro posto va l'unica
+    // cosa che si sa: aperta o chiusa, con le stesse parole della gemella.
+    if (MR.statusUnreadable(fb)) {
+      const label = MR.publicStateLabel(fb);
+      if (!label) { mgJudgesRow.hidden = true; return; }
+      mgJudgesRow.hidden = false;
+      mgJudgesRow.innerHTML = '';
+      const span = document.createElement('span');
+      span.className = 'mg-state';
+      span.textContent = label;
+      span.title = `Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`;
+      mgJudgesRow.appendChild(span);
+      return;
+    }
+
     // Un pallino per ogni giudice ATTESO del panel (non per verdetto): un panel
     // parziale mostra i mancanti come pallini tratteggiati, non un panel
     // "accorciato". Pipeline NUOVA → posizioni esatte da `expectedJudges`.
