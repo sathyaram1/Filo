@@ -193,4 +193,26 @@ done
 # qui sopra. Una cartella che si trova sul ramo principale non viene toccata, e
 # l'hook lo dice riga per riga nel ciclo — qui non serve ripeterlo.
 
+# ─── Battito del semaforo (scripts/lib/routine-beat.mjs) ─────────────────────
+#
+# Il processo staccato che dovrebbe battere ogni 10 minuti in cloud non
+# sopravvive alla sessione di comando che lo ha avviato: sui feedback il
+# battito specchiato si ferma sempre a pochi secondi dal biglietto, il semaforo
+# cade a meta' lavorazione e la consegna arriva con un biglietto morto (#507 e
+# registro dei rifiuti: dead_ticket su consegne di lavori interi). Questo hook
+# gira a ogni salvataggio — cioe' esattamente quando qualcuno sta lavorando — e
+# rilancia un battito SINGOLO, non piu' di uno ogni 5 minuti. Senza biglietto
+# (macchina dell'owner, giro finito) non fa niente; con un biglietto morto il
+# battito esce da solo al primo rifiuto.
+TICKET_FILE="$PROJECT_DIR/.claude/routine-ticket.json"
+BEAT_STAMP="$PROJECT_DIR/.claude/routine-beat-hook.stamp"
+if [ -f "$TICKET_FILE" ] && command -v node >/dev/null 2>&1; then
+  now_s=$(date +%s)
+  last_s=$(date -r "$BEAT_STAMP" +%s 2>/dev/null || echo 0)
+  if [ $((now_s - last_s)) -ge 300 ]; then
+    touch "$BEAT_STAMP" 2>/dev/null
+    (cd "$PROJECT_DIR" && node scripts/routine-channel.mjs heartbeat >/dev/null 2>&1 &)
+  fi
+fi
+
 exit 0
