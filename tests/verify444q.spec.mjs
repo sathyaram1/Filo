@@ -121,6 +121,23 @@ function funcPage() {
       <a id="f7a" class="layer" href="https://cards.example/f7"></a>
       <div id="f7veil" class="layer" style="background:transparent"></div>
     </div>
+
+    <!-- F10: scheda a COMPONENTE (video dentro uno shadow root) nel link, velo sfumato sopra -->
+    <a id="f10a" href="https://cards.example/f10" style="position:relative;display:block;width:320px;height:180px;margin:14px 0">
+      <x-vid id="f10c" style="position:absolute;inset:0;display:block"></x-vid>
+      <div id="f10veil" class="layer grad"></div>
+    </a>
+    <script>
+      class XV extends HTMLElement {
+        connectedCallback() {
+          const r = this.attachShadow({ mode: 'open' });
+          const v = document.createElement('video');
+          v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:#333';
+          r.appendChild(v);
+        }
+      }
+      customElements.define('x-vid', XV);
+    </script>
   </body></html>`;
 }
 
