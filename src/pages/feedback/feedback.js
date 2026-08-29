@@ -90,16 +90,32 @@
   // atterrerebbe DOPO e sovrascriverebbe quello più recente.
   let loadGen = 0;
 
-  // Ritrovamenti automatici → categoria "Agente". Due fonti:
+  // Stato CANONICO di un feedback (spec FEEDBACK-STATES.md §2). Unica porta
+  // d'ingresso: normalizeStatus scioglie anche gli stati legacy dello storico
+  // (new/blocked/draft/review/clarify/verified/ignored).
+  function statusOf(f) {
+    return MR.normalizeStatus(f).status;
+  }
+  function statusReasonOf(f) {
+    return MR.normalizeStatus(f).statusReason;
+  }
+
+  // Sezione di un feedback: la STESSA funzione della dashboard di gestione.
+  function tabOf(f) {
+    return MR.manageTabFor(f, { releasedVersion });
+  }
+
+  // Ritrovamenti automatici (filtro "Solo automatici"). Due fonti:
   //   - agente esploratore LLM: clientId "agent:<model>" (vedi tests/agent/feedback.mjs);
-  //   - audit proattivo di una routine cloud: clientId "routine:<slug>" e status
-  //     `new` (l'audit deposita i ritrovamenti come `new`). I sub-feedback di una
-  //     routine portano lo stesso prefisso ma nascono `todo`/`clarify`: NON sono
-  //     ritrovamenti d'agente, quindi qui si escludono col vincolo su status.
+  //   - audit proattivo di una routine cloud: clientId "routine:<slug>" ancora
+  //     da triagiare (status canonico `unlabeled`, o il legacy `new` che ci si
+  //     normalizza). I sub-feedback di una routine portano lo stesso prefisso ma
+  //     nascono `todo`/`design`: NON sono ritrovamenti d'agente, quindi qui si
+  //     escludono col vincolo sullo stato.
   function isAgent(f) {
     const c = String(f.clientId || '');
     if (c.startsWith('agent:')) return true;
-    if (c.startsWith('routine:') && (f.status || 'new') === 'new') return true;
+    if (c.startsWith('routine:') && statusOf(f) === 'unlabeled') return true;
     return false;
   }
   // Origine del feedback (per la colorazione di card/bolle). Delega alla logica
