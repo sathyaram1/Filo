@@ -638,10 +638,6 @@
   // non viene più riscritta a ogni azione (la lista non si ridisegna).
   let disegnate = 0;
 
-  function schedaDi(id) {
-    return listEl.querySelector(`.fb-card[data-id="${cssEsc(id)}"]`);
-  }
-
   // Spegne TUTTI i pulsanti della scheda, non solo quello premuto: la scrittura
   // in corso riguarda la scheda intera, e «Archivia» premuto mentre «→ In coda»
   // è in volo scriverebbe due decisioni sullo stesso feedback.
