@@ -95,9 +95,11 @@ modifica:
   (`npx playwright test tests/<feature>.spec.mjs`); se non esiste, scrivilo;
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
   screenshot (`tests/agent/.out/`); `test:explore` (LLM) è facoltativo;
-- **in cloud, prima di consegnare al verificatore** → `npm test` completo:
-  le regressioni incrociate sono responsabilità di chi ha scritto il codice,
-  non del verificatore e non di un controllo cumulativo a fine giro;
+- **nelle routine** (dal 2026-09-03): chi risolve NON lancia la suite
+  completa; la lancia il verificatore, una volta, prima di dare `pass`. Un
+  rosso fuori dalla lista dei rossi noti torna a chi risolve con l'elenco
+  degli spec rotti. Le regressioni restano responsabilità di chi le
+  introduce: i minimi qui sopra (unit + spec mirato) valgono sempre;
 - **in locale** → la suite completa solo per modifiche trasversali o se non
   sai cosa tocchi (~25 min: avvisa l'owner, gli occupi la macchina). Se temi
   una regressione precisa, verificala subito: non rimandarla.

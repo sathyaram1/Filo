@@ -46,10 +46,16 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
 
 ## Loop
 
-Un worker generico alla volta (`subagent_type: general-purpose`,
-`model: "opus"` — mai Fable, consuma crediti a parte; mai degradare: se lo
-spawn fallisce, chiudi). MAI worker in parallelo: l'hook di salvataggio itera
-le worktree e due worker si pestano sui lock.
+Un worker alla volta, scelto dal ruolo che il biglietto porta (`role` nel
+JSON del canale): `subagent_type: routine-secaudit` se il ruolo è
+`secaudit`, altrimenti `subagent_type: routine-worker` (definiti in
+`.claude/agents/`: Opus a sforzo `high`, il controllo di sicurezza a
+`medium` perché è una lettura di diff — decisione owner 2026-09-03). Mai
+Fable, consuma crediti a parte; mai degradare: se lo spawn fallisce, chiudi.
+Se quei tipi di agente non risultano disponibili (cartella caricata solo al
+riavvio della sessione), ripiega su `general-purpose` con `model: "opus"`.
+MAI worker in parallelo: l'hook di salvataggio itera le worktree e due worker
+si pestano sui lock.
 
 Prompt del worker (minimo): dichiarati routine (`export FILO_ROUTINE=1`),
 lancia `node scripts/dispatch.mjs --ticket <biglietto>`, diventa il ruolo che
@@ -83,10 +89,10 @@ L'orchestratore NON riaccende mai il giro successivo: chiude e basta, per
 qualunque motivo (fine coda, contesto pieno, guasto, crash). Il pacemaker se
 ne accorge dai battiti e riaccende lui.
 
-(Niente `npm test` qui: la suite completa la lancia OGNI worker che scrive
-codice, prima di consegnare al verificatore — le regressioni sono
-responsabilità di chi le introduce, non di un controllo cumulativo a fine
-giro.)
+(Niente `npm test` qui, e nemmeno da chi scrive codice: dal 2026-09-03 la
+suite completa la lancia SOLO il verificatore, una volta, prima di dare
+`pass`. Chi risolve fa unit test e spec mirati. Un rosso fuori dalla lista
+dei rossi noti torna in correzione con l'elenco degli spec rotti.)
 
 ## Regole dure (cicatrici, non stile)
 

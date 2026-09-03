@@ -55,8 +55,11 @@ né per "spezzare di fatto".
 
 È tutto in CLAUDE.md e vale per intero: sintomo-vs-causa, invarianti UX e
 deviazioni dichiarate, la Verifica coi minimi per tipo di modifica (unit,
-spec mirato, visivo) e la **suite completa prima di consegnare**, le fonti di
-verità da aggiornare nello stesso commit. Non fondere su `main`: l'hook
+spec mirato, visivo), le fonti di verità da aggiornare nello stesso commit.
+**Niente suite completa prima di consegnare** (dal 2026-09-03): la lancia il
+verificatore, una volta, prima di dare `pass`; se trova un rosso nuovo torna
+a te con l'elenco degli spec rotti, e tu rilanci quelli. Venticinque minuti
+di attesa a ogni consegna erano metà del costo di un giro. Non fondere su `main`: l'hook
 committa e pusha sul branch, il merge lo fa il gate a valle.
 
 ## Consegna
