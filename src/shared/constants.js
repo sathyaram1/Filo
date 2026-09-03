@@ -2118,6 +2118,7 @@
     DEFAULT_EXCLUDED_PROVIDERS,
     normalizeProviderName,
     isProviderExcluded,
+    missingExcludedProviders,
     providerIgnoreList,
     PRODUCER_DIRECT_PROVIDERS,
     OPEN_WEIGHT_MODEL_FAMILIES,
