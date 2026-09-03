@@ -508,7 +508,6 @@ test('livello 2 — i flag curl/wget di LETTURA simili ai write accessori restan
     'curl --etag-compare etag.txt http://x',     // confronta l'ETag (legge)
     'curl -k http://x',                          // -k minuscolo = --insecure, non --config
     'curl --insecure http://x',
-    'curl --etag-compare etag.txt http://x',
     'curl -w "%{http_code}" http://x',           // -w che stampa e basta (nessun %output{})
     'curl --write-out "%{time_total}\\n" http://x',
     'curl --cert-status http://x',
