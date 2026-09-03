@@ -337,6 +337,10 @@
     return row;
   }
 
+  // Lista com'era all'ultimo caricamento: serve a distinguere "non l'ho
+  // toccata" da "l'ho svuotata".
+  let loadedExcluded = [];
+
   function renderExcluded(list) {
     const host = $('excludedList');
     host.innerHTML = '';
