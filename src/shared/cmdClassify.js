@@ -48,14 +48,20 @@
 //     percorso): catturare un nome pericoloso travestito è sempre giusto,
 //     fidarsi di uno fidato travestito no.
 //   • flag pericolosi (--force, --hard, -rf…) alzano un livello ≤2 a 3.
-//   • curl/wget con un flag di output-su-file (-o/-O/--output/--remote-name…),
-//     wget con un flag di cartella di destinazione (-P/--directory-prefix) o curl
-//     con un dump degli header su file (-D/--dump-header) scrivono in un percorso
-//     arbitrario e possono sovrascrivere file sensibili (chiavi SSH, script
-//     d'avvio): salgono da 2 a 3. Stessa classe (scrittura in un percorso scelto
-//     di DATI ACCESSORI il cui contenuto è influenzato dal server) le opzioni più
-//     di nicchia di curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii,
-//     --stderr e l'analoga wget --save-cookies: salgono anch'esse a 3.
+//   • SCARICARE DALLA RETE FACENDO ATTERRARE UN FILE SU DISCO è sempre livello 3
+//     (digita "conferma"). L'invariante è sull'EFFETTO, non sul nome del flag:
+//     wget scrive un file anche senza alcun flag di output, e la CARTELLA in cui
+//     lo scrive la sceglie l'assistente da sé con un `cd` (livello 1, nessuna
+//     conferma, persistente). Vedi WGET_NO_DOWNLOAD_RE più sotto.
+//     Ricadono nella stessa regola i flag che scelgono esplicitamente dove
+//     atterrare — output-su-file (-o/-O/--output/--remote-name…), cartella di
+//     destinazione di wget (-P/--directory-prefix) — e quelli che scrivono in un
+//     percorso scelto DATI ACCESSORI il cui contenuto è influenzato dal server:
+//     curl -D/--dump-header, -c/--cookie-jar, --etag-save, --trace/--trace-ascii,
+//     --stderr, -K/--config e l'analoga wget --save-cookies.
+//     curl invece, SENZA quei flag, stampa a schermo e non fa atterrare niente:
+//     resta 2. Due programmi che si comportano diversamente prendono regole
+//     diverse — è l'effetto a decidere.
 
 (function (global) {
   'use strict';
