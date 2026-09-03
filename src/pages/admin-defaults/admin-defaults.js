@@ -97,6 +97,9 @@
     $('h-models').textContent = I18n.t('options_models');
     $('models-desc').textContent = I18n.t('options_models_desc');
     $('addModelRow').textContent = I18n.t('options_model_add');
+    $('h-excluded').textContent = I18n.t('admin_defaults_excluded');
+    $('excluded-desc').textContent = I18n.t('admin_defaults_excluded_desc');
+    $('addExcludedRow').textContent = I18n.t('admin_defaults_excluded_add');
     $('saveBtn').textContent = I18n.t('admin_defaults_save');
   }
 
