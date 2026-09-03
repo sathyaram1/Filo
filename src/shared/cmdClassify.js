@@ -734,6 +734,13 @@
       if (prog === 'curl' && CURL_ACCESSORY_WRITE_RE.test(trimmed)) return 3;
       // wget --save-cookies: scrive i cookie del sito in un percorso scelto → 3.
       if (prog === 'wget' && WGET_SAVE_COOKIES_RE.test(trimmed)) return 3;
+      // curl -K/--config: le opzioni (output compreso) arrivano da un file, quindi
+      // l'effetto non si legge nel comando → 3.
+      if (prog === 'curl' && CURL_CONFIG_RE.test(trimmed)) return 3;
+      // wget fa SEMPRE atterrare un file su disco (nome dall'URL, cartella = cwd,
+      // che l'assistente sposta da sé con un `cd` senza conferma) → 3. Solo
+      // `--spider`, che si limita a controllare se l'URL esiste, resta 2.
+      if (prog === 'wget' && !WGET_NO_DOWNLOAD_RE.test(trimmed)) return 3;
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
