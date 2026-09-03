@@ -460,6 +460,9 @@
     const config = {
       modelRegistry: collectModelRegistry(),
       models: collectModels(),
+      // Sempre inviata: l'array è la lista completa, e mandarla solo "se
+      // cambiata" renderebbe impossibile toglierne l'ultima voce.
+      excludedProviders: collectExcluded(),
     };
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
