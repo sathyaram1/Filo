@@ -823,6 +823,21 @@ function setAssistantCwd(sender, cwd) {
   else _assistantCwdFallback = cwd;
 }
 
+// Cartella di lavoro come va MOSTRATA nel popup di conferma: la home abbreviata
+// in `~`. Più corta da leggere (`~/.ssh` invece di `/home/mario/.ssh`) e senza
+// il nome utente, che altrimenti finirebbe nel testo del popup — popup che
+// l'agente di pagina disegna DENTRO una pagina web qualsiasi.
+function displayCwd(cwd) {
+  const p = String(cwd || '');
+  if (!p) return '';
+  let home = '';
+  try { home = require('node:os').homedir() || ''; } catch (_) {}
+  if (home && (p === home || p.startsWith(`${home}/`) || p.startsWith(`${home}\\`))) {
+    return `~${p.slice(home.length).replace(/\\/g, '/')}`;
+  }
+  return p;
+}
+
 // Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): SOLO i
 // dati personali persistenti che il modello aveva nel contesto — memoria
 // (profilo/preferenze/espansioni) e appunti. NON lo stato delle schede né le
