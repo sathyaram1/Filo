@@ -151,7 +151,14 @@ function defaultSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
  */
 export function readTicketReply(status, body) {
   const b = body || {};
-  if (status === 200 && b.ok && b.work && b.ticket) return { outcome: 'work', ticket: String(b.ticket) };
+  if (status === 200 && b.ok && b.work && b.ticket) {
+    // Il ruolo, quando il server lo manda, serve a chi guida per scegliere il
+    // tipo di worker PRIMA di lanciarlo (sforzo per ruolo). Assente = server
+    // vecchio: chi guida ripiega sul worker generico.
+    const out = { outcome: 'work', ticket: String(b.ticket) };
+    if (typeof b.role === 'string' && b.role) out.role = b.role;
+    return out;
+  }
   if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
   return { outcome: 'fault', reason: String(b.reason || `http_${status}`) };
 }
@@ -360,7 +367,9 @@ if (isMain) {
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'ticket') {
     const r = await ticket(args[0]);
-    if (r.outcome === 'work') { console.log(r.ticket); process.exit(0); }
+    // `--json`: biglietto E ruolo, per chi deve scegliere il worker prima di
+    // lanciarlo. Senza flag resta la sola stringa, come sempre.
+    if (r.outcome === 'work') { console.log(args.includes('--json') ? JSON.stringify({ ticket: r.ticket, role: r.role || '' }) : r.ticket); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'work') {

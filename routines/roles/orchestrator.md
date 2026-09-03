@@ -39,7 +39,8 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
      da sé prima di fissare gli strumenti, perché una copia presa da un
      checkout indietro sarebbe vecchia in partenza. Questo passo resta come
      rete, e per il caso in cui `main` si sia mosso nel frattempo.
-5. **Biglietto**: `node scripts/routine-channel.mjs ticket "<parola-d-ordine>"`.
+5. **Biglietto**: `node scripts/routine-channel.mjs ticket "<parola-d-ordine>" --json`
+   → `{"ticket":"…","role":"…"}`: il ruolo ti serve per scegliere il worker.
    La parola d'ordine arriva nel prompt della schedulazione e NON va mai
    esportata nell'ambiente. exit 2 → chiudi (niente da fare); exit 3 → chiudi
    (in dubbio ci si ferma: meglio un giro saltato che un giro senza controlli).
@@ -47,7 +48,8 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
 ## Loop
 
 Un worker alla volta, scelto dal ruolo che il biglietto porta (`role` nel
-JSON del canale): `subagent_type: routine-secaudit` se il ruolo è
+JSON di `ticket … --json`; vuoto = server vecchio, usa il worker generico):
+`subagent_type: routine-secaudit` se il ruolo è
 `secaudit`, altrimenti `subagent_type: routine-worker` (definiti in
 `.claude/agents/`: Opus a sforzo `high`, il controllo di sicurezza a
 `medium` perché è una lettura di diff — decisione owner 2026-09-03). Mai
