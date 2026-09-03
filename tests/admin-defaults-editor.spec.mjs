@@ -173,6 +173,70 @@ test('livello di reasoning per-modello: mostra il valore salvato e lo ripropaga 
   await page.screenshot({ path: 'tests/.shots/admin-defaults-reasoning.png', fullPage: true }).catch(() => {});
 });
 
+// ── Fornitori esclusi (#518) ────────────────────────────────────────────────
+// Un host che serve male (nel banco di prova rispondeva ad alcune richieste con
+// la risposta di un'altra) va tolto di mezzo per TUTTI gli utenti. La lista che
+// lo fa vive nella config condivisa, e la lista scritta lì sostituisce quella
+// del codice: senza un posto dove scriverla, l'owner non poteva applicarla.
+
+test('la lista dei fornitori esclusi si modifica e si salva nella config condivisa', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'OpenAI'] });
+
+  // La lista effettiva arriva in pagina, una riga per fornitore.
+  const rows = page.locator('#excludedList .sn-excluded-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0).locator('.sn-excluded-name')).toHaveValue('Google');
+
+  // L'owner ne aggiunge uno a mano e ne toglie un altro.
+  await page.click('#addExcludedRow');
+  await page.locator('#excludedList .sn-excluded-row').last().locator('.sn-excluded-name')
+    .fill('Novita');
+  await rows.nth(1).getByRole('button', { name: 'Rimuovi' }).click();
+
+  await page.click('#saveBtn');
+
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd?.config?.excludedProviders).toEqual(['Google', 'Novita']);
+
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-excluded.png', fullPage: true }).catch(() => {});
+});
+
+test('esclusioni del codice che la lista condivisa non copre: la pagina le nomina e le rimette', async ({ openTab }) => {
+  // Lista remota vecchia: non contiene Novita (né gli altri aggiunti dopo).
+  const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'OpenAI'] });
+
+  const drift = page.locator('#excludedDrift');
+  await expect(drift).toBeVisible();
+  await expect(drift).toContainText('Novita');
+
+  await drift.getByRole('button', { name: 'Rimettili nella lista' }).click();
+
+  // Rimessi tutti: l'avviso sparisce perché non c'è più niente di scoperto.
+  await expect(drift).toBeHidden();
+  const names = await page.locator('#excludedList .sn-excluded-name')
+    .evaluateAll((els) => els.map((e) => e.value));
+  expect(names).toContain('Novita');
+
+  // E il salvataggio propaga la lista completa, Novita compreso.
+  await page.click('#saveBtn');
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd?.config?.excludedProviders).toContain('Novita');
+  expect(upd?.config?.excludedProviders).toContain('Google');
+});
+
+test('un salvataggio che non tocca le esclusioni non congela la lista del codice', async ({ openTab }) => {
+  // Nessun override remoto: la lista in pagina è quella del codice.
+  const page = await openStubbedEditor(openTab);
+  await expect(page.locator('#excludedDrift')).toBeHidden();
+
+  await page.click('#saveBtn');
+
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  // Niente campo → il doc condiviso non riceve una copia della lista di build,
+  // che da lì in poi bloccherebbe ogni esclusione aggiunta con un rilascio.
+  expect('excludedProviders' in (upd?.config || {})).toBe(false);
+});
+
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
   const page = await openTab(ADMIN_URL);
   await page.waitForSelector('#title', { timeout: 8_000 });
