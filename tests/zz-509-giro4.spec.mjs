@@ -259,7 +259,7 @@ test('#509 giro4 — pannello vecchio: la scrittura che cancellerebbe una confer
 // ═══════════════════════════════════════════════════════════════════════════
 const CIFRATA = CODA.slice(0, 8).map((f, i) => ({
   _id: f._id, seq: f.seq, name: f.name, text: f.text, createdAt: f.createdAt,
-  statusEnc: 'AAAA' + i, statusPublic: i % 2 ? 'closed' : 'open',
+  status: 'FENC-blob-' + i, statusPublic: i % 2 ? 'closed' : 'open',
 }));
 
 test('#509 giro4 — stati illeggibili: nessuna delle due pagine inventa numeri o azioni', async ({ openTab }) => {
