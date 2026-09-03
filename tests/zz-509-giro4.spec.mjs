@@ -139,10 +139,6 @@ test('#509 giro4 — sulla stessa segnalazione le due pagine offrono le stesse a
   const diff = [];
   for (const item of CODA) {
     // Vai nella sezione dove vive, su entrambe.
-    const tab = await fb.evaluate((id) => {
-      const f = window.__fbTest && null;
-      return null;
-    }, item._id).catch(() => null);
     for (const t of SEZIONI) {
       await fb.evaluate((t) => window.__fbTest.setTab(t), t);
       await fb.waitForTimeout(40);
