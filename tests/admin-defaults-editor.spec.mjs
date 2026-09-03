@@ -56,13 +56,26 @@ async function openStubbedEditor(openTab, overrides = {}) {
           // Il main risponderebbe ok solo se riceve la stringa modello.
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
           return { ok: true, ttftMs: 123, tokensPerSec: 45.6, provider: msg.provider, model: msg.model };
+        case 'defaults_update':
+          // Come il main: risponde con la config effettiva DOPO la scrittura.
+          return {
+            ok: true,
+            config: {
+              apiKeysPresent: fakeConfig.apiKeysPresent,
+              safeBrowsingKeyPresent: fakeConfig.safeBrowsingKeyPresent,
+              modelRegistry: (msg.config && msg.config.modelRegistry) || fakeConfig.modelRegistry,
+              models: (msg.config && msg.config.models) || fakeConfig.models,
+              excludedProviders: (msg.config && msg.config.excludedProviders)
+                || fakeConfig.excludedProviders,
+            },
+          };
         default:
           return { ok: true };
       }
     };
     if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
     else window.chrome = { runtime: { sendMessage: stub } };
-  });
+  }, overrides);
   await page.reload();
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   return page;
