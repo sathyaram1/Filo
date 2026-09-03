@@ -324,7 +324,7 @@
   // `cp /mir file` (una cartella chiamata "mir"); solo robocopy usa questi flag.
   const ROBOCOPY_DESTRUCTIVE_RE = /(^|\s)\/(MIR|PURGE|MOVE|MOV)(\s|$)/i;
 
-  // curl/wget con un flag di OUTPUT-SU-FILE scrivono i byte scaricati in un
+  // curl con un flag di OUTPUT-SU-FILE scrive i byte scaricati in un
   // percorso scelto da chi lancia il comando (l'LLM, potenzialmente pilotato da
   // una pagina ostile): può SOVRASCRIVERE qualsiasi file — chiavi SSH
   // (~/.ssh/authorized_keys), script d'avvio della shell (~/.bashrc, ~/.profile)
