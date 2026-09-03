@@ -66,6 +66,40 @@ test('la lista di esclusione di default esiste e NON contiene Anthropic', () => 
   assert.equal(C.isProviderExcluded('Google Vertex', list), true);
 });
 
+test('Novita è escluso: host che ha restituito la risposta di un\'altra richiesta (#518)', () => {
+  const list = C.DEFAULT_EXCLUDED_PROVIDERS;
+  assert.equal(C.isProviderExcluded('Novita', list), true);
+  // Varianti del nome (come per i produttori): la forma base le copre.
+  assert.equal(C.isProviderExcluded('Novita AI', list), true);
+  assert.equal(C.isProviderExcluded('novita', list), true);
+  // L'esclusione parte per ogni modello che instrada, non solo per quello su
+  // cui è stato colto: la lista non ha condizioni sul modello, quindi finisce
+  // nell'ignore di QUALSIASI richiesta.
+  assert.ok(C.providerIgnoreList(list).includes('Novita'));
+  // Gli host indipendenti sani restano ammessi.
+  for (const ok of ['DeepInfra', 'Modal', 'Relace', 'Together']) {
+    assert.equal(C.isProviderExcluded(ok, list), false);
+  }
+});
+
+// ── Deriva fra la lista del codice e quella scritta a mano ───────────────────
+// La lista remota (config/models) SOSTITUISCE quella di build: un'esclusione
+// aggiunta al codice non arriva dove esiste già una lista scritta a mano. Questa
+// funzione è ciò che rende visibile la differenza.
+
+test('missingExcludedProviders: nomina le voci del codice che la lista non copre', () => {
+  const base = ['Google', 'Novita', 'Z.AI'];
+  // Lista che ne copre solo una (con una variante: la forma base basta).
+  assert.deepEqual(C.missingExcludedProviders(base, ['Google AI Studio']), ['Novita', 'Z.AI']);
+  // Lista completa → niente da segnalare.
+  assert.deepEqual(C.missingExcludedProviders(base, base), []);
+  // Lista vuota/assente → mancano tutte (è il caso peggiore, non silenzio).
+  assert.deepEqual(C.missingExcludedProviders(base, []), base);
+  assert.deepEqual(C.missingExcludedProviders(base, null), base);
+  // Doppioni e vuoti nella lista di partenza non si moltiplicano nell'esito.
+  assert.deepEqual(C.missingExcludedProviders(['Novita', 'novita', '', null], []), ['Novita']);
+});
+
 // ── 2. La politica arriva nel body OpenRouter ────────────────────────────────
 
 function jsonResponse(obj) {
