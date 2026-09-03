@@ -460,10 +460,15 @@
     const config = {
       modelRegistry: collectModelRegistry(),
       models: collectModels(),
-      // Sempre inviata: l'array è la lista completa, e mandarla solo "se
-      // cambiata" renderebbe impossibile toglierne l'ultima voce.
-      excludedProviders: collectExcluded(),
     };
+    // Fornitori esclusi: si invia la lista SOLO se l'owner l'ha toccata (anche
+    // per svuotarla: [] è un valore, e viaggia). Salvarla a ogni salvataggio
+    // congelerebbe nel doc remoto la lista letta dal codice, e da lì in poi
+    // un'esclusione aggiunta con un rilascio non arriverebbe più a nessuno.
+    const excluded = collectExcluded();
+    if (JSON.stringify(excluded) !== JSON.stringify(loadedExcluded)) {
+      config.excludedProviders = excluded;
+    }
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();
