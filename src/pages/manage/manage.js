@@ -1435,7 +1435,7 @@
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
       // implicito nel colore del border-left; il titolo completo nel tooltip,
       // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
-      const norm = sezioni ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
+      const norm = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
       // Quante volte questo lavoro si è arenato ed è rientrato in coda da solo.
       // Senza scriverlo da qualche parte, un feedback che si impianta sempre
       // sullo stesso scoglio sembra semplicemente lento.
