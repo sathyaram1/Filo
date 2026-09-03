@@ -1406,19 +1406,24 @@
     const sezioni = sezioniAttendibili();
 
     for (const fb of currentList) {
-      const cl = sezioni ? MR.classifyBlock(fb) : null;
+      // La domanda "questo stato si legge?" è di QUESTA scheda, non della lista
+      // (vedi statoLeggibile): in una coda mista basta un documento cifrato in
+      // mezzo a mille leggibili perché le sezioni restino — ed è proprio lì che
+      // la scheda cifrata tornava a dirsi "Non filtrato".
+      const leggibile = sezioni && statoLeggibile(fb);
+      const cl = leggibile ? MR.classifyBlock(fb) : null;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
 
       const item = document.createElement('div');
       const unfilteredCls = cl && cl.reason === 'unfiltered' ? ' mg-item--unfiltered' : '';
       // Allineato (tutti i giudici d'accordo, nessun blocco) → bordo BLU.
-      const aligned = sezioni && !cl && MR.isAligned(fb);
+      const aligned = leggibile && !cl && MR.isAligned(fb);
       const alignedCls = aligned ? ' mg-item--aligned' : '';
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = (sezioni && currentTab === 'queue') ? MR.workProgress(fb) : null;
+      const progress = (leggibile && currentTab === 'queue') ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
