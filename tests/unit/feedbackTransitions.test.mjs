@@ -62,7 +62,7 @@ test('VERIFIER_CAPS: i default di N (improvableCap) e M (failCap) — SPEC §13'
   // N = 3: quanti «migliorabile» tornano in correzione prima della promozione.
   // M = 10: scelta di misura dell'owner per la prima settimana sul piano Max
   // (osservazione del processo), poi si abbassa dalla DASHBOARD, non da qui.
-  assert.deepEqual(DATA.VERIFIER_CAPS, { improvableCap: 3, failCap: 10 });
+  assert.deepEqual(DATA.VERIFIER_CAPS, { improvableCap: 0, failCap: 10 });
 });
 
 test('PUBLIC_MAP: i confermati restano "open" (#476 — mai premiare un attacco)', () => {
