@@ -347,6 +347,7 @@
     for (const name of (Array.isArray(list) ? list : [])) {
       if (typeof name === 'string' && name.trim()) host.appendChild(makeExcludedRow(name.trim()));
     }
+    loadedExcluded = collectExcluded();
     renderExcludedDrift();
   }
 
