@@ -267,16 +267,20 @@ test('#509 giro4 — stati illeggibili: nessuna delle due pagine inventa numeri 
   const mg = await apriManage(openTab, CIFRATA);
   await fb.waitForTimeout(150); await mg.waitForTimeout(150);
 
-  const barraFb = await fb.evaluate(() => {
-    const t = document.querySelector('#tabs');
-    return !t || t.hidden || t.offsetParent === null ? null : t.innerText.trim();
-  });
-  const barraMg = await mg.evaluate(() => {
-    const t = document.querySelector('#mgTabs');
-    return !t || t.hidden || t.offsetParent === null ? null : t.innerText.trim();
-  });
-  expect(barraFb, 'la pagina dei feedback disegna ancora le sezioni').toBeNull();
-  expect(barraMg, 'la dashboard di gestione disegna ancora le sezioni').toBeNull();
+  // Le sezioni-lista devono sparire su ENTRAMBE (i tab di Statistiche, Modelli,
+  // Automazioni, Log su manage restano — non dipendono dallo status).
+  const sezioniVisibiliFb = await fb.evaluate((s) =>
+    s.filter((t) => {
+      const b = document.querySelector(`#tabs [data-tab="${t}"]`);
+      return b && !b.hidden && b.offsetParent !== null;
+    }), SEZIONI);
+  const sezioniVisibiliMg = await mg.evaluate((s) =>
+    s.filter((t) => {
+      const b = document.querySelector(`#mgTabs .mg-tab[data-tab="${t}"]`);
+      return b && !b.hidden && b.offsetParent !== null;
+    }), SEZIONI);
+  expect(sezioniVisibiliFb, 'la pagina dei feedback disegna ancora le sezioni').toEqual([]);
+  expect(sezioniVisibiliMg, 'la dashboard di gestione disegna ancora le sezioni').toEqual([]);
 
   // Nessuna azione di stato su nessuna delle due.
   const aFb = await azioniFeedback(fb, 'a02');
