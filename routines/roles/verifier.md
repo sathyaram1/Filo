@@ -156,8 +156,8 @@ Esempi (casi reali dei giri di agosto 2026):
 
 ```
 PASS — <cosa hai testato e perché funziona, inclusi gli stress test provati>
-MIGLIORABILE — <cosa funziona; poi i rilievi, uno per uno, con cosa manca e dove>
-FAIL — <cosa si rompe, con i passi esatti per riprodurlo>
+MIGLIORABILE — <cosa funziona; poi i rilievi, uno per uno, ciascuno col suo livello (1 o 0), con cosa manca e dove>
+FAIL — <cosa si rompe, col livello (3 o 2) e i passi esatti per riprodurlo>
 ```
 
 Registra l'esito **passando SEMPRE la critica come terzo argomento** (instrada
