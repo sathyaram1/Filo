@@ -1241,12 +1241,13 @@
   // la pagina dei feedback: due copie della stessa regola divergono, ed è
   // proprio così che questa pagina è rimasta indietro (#509).
   //
-  // È UNA regola e le copre tutte: qui non si chiude "la barra" e basta. Tutto
-  // ciò che questa pagina afferma partendo dallo status — i numeri delle
-  // sezioni, il nome della sezione in cima alla colonna, il colore del bordo
-  // della scheda ("Non filtrato" è un'affermazione), le barre "Ri-valuta i non
-  // filtrati" / "Approva tutti gli allineati", i pulsanti di decisione del
-  // dettaglio, la frase accanto ai giudici — passa da qui.
+  // Qui non si chiude "la barra" e basta: tutto ciò che questa pagina afferma
+  // partendo dallo status — i numeri delle sezioni, il nome della sezione in
+  // cima alla colonna, il colore del bordo della scheda ("Non filtrato" è
+  // un'affermazione), le barre "Ri-valuta i non filtrati" / "Approva tutti gli
+  // allineati", i pulsanti di decisione del dettaglio, la frase accanto ai
+  // giudici, la bolla del parere di Filo — passa da una delle due funzioni qui
+  // sotto, a seconda che l'affermazione riguardi la lista o una segnalazione.
   function sezioniAttendibili() {
     return MR.sectionsReliable(allFeedbacks);
   }
@@ -1906,7 +1907,7 @@
     // Lo stato di QUESTA segnalazione si legge? Tutto ciò che il pannello dice
     // e offre a partire dallo stato passa da qui — la stessa regola della barra
     // delle sezioni, un gradino più in dentro.
-    const leggibile = !MR.statusUnreadable(fb);
+    const leggibile = statoLeggibile(fb);
 
     // Intestazione
     const clientId = fb.clientId || 'anonimo';
@@ -2464,7 +2465,7 @@
     // qui la macchina si inventa — e la frase accanto diceva "In attesa del
     // giudizio." anche su una segnalazione già chiusa. Al loro posto va l'unica
     // cosa che si sa: aperta o chiusa, con le stesse parole della gemella.
-    if (MR.statusUnreadable(fb)) {
+    if (!statoLeggibile(fb)) {
       const pubblico = MR.publicStateLabel(fb);
       if (!pubblico) { mgJudgesRow.hidden = true; return; }
       mgJudgesRow.hidden = false;
@@ -2790,7 +2791,7 @@
     for (const fb of group) {
       // Stesso criterio della lista: un bordo colorato è un'affermazione sullo
       // stato, e su una segnalazione cifrata la macchina lo inventa.
-      const cl  = MR.statusUnreadable(fb) ? null : MR.classifyBlock(fb);
+      const cl  = statoLeggibile(fb) ? MR.classifyBlock(fb) : null;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const color = cl ? cl.color : 'var(--sn-border)';
