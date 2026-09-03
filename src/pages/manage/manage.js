@@ -1532,6 +1532,11 @@
   // Un feedback è "non filtrato" (bianco) quando il panel dei giudici è rimasto
   // parziale. Il bottone ne ri-prova SOLO i giudici mancanti (lato backend).
   function isUnfiltered(fb) {
+    // "Non filtrato" è una lettura dello status: su una cifrata la macchina la
+    // inventa (unlabeled finto) e la segnalazione finiva nel mucchio da
+    // rimandare ai giudici — crediti spesi per ri-giudicare una pratica che
+    // potrebbe essere già chiusa.
+    if (!statoLeggibile(fb)) return false;
     const cl = MR.classifyBlock(fb);
     return !!(cl && cl.reason === 'unfiltered');
   }
