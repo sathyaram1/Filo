@@ -375,13 +375,18 @@
   // leggono un certificato, --trace-time/--trace-ids sono modificatori senza
   // file) NON combaciano: la parte long è ancorata con `(=|\s|$)` e il ramo short
   // matcha solo la `c` minuscola in un bundle a trattino singolo.
-  const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
+  const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr|--libcurl|--hsts|--alt-svc)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
 
-  // wget con `--save-cookies <file>` scrive i cookie del sito (contenuto
-  // influenzato dal server) in un percorso arbitrario: stessa classe di
-  // curl --cookie-jar → 3. `--load-cookies` (LEGGE i cookie) è innocuo e, essendo
-  // esplicito il nome, NON combacia.
-  const WGET_SAVE_COOKIES_RE = /(^|\s)--save-cookies(=|\s|$)/;
+  // curl `-w`/`--write-out` è un formato di stampa, ma dal 2023 (curl 8.3)
+  // conosce `%output{FILE}`: da lì in poi il testo formattato non va più a
+  // schermo, va NEL FILE indicato (`%output{>>FILE}` accoda). È un flag "di
+  // formato" che in realtà fa atterrare un file scelto da chi compone il comando
+  // → stessa classe di `-o` → 3. Cerchiamo la direttiva, non il flag: `-w` senza
+  // `%output{` stampa e basta (`curl -s -w '%{http_code}' <url>` resta 2), e la
+  // direttiva non può nascondersi spezzata in due token, perché `%output{` deve
+  // arrivare a curl dentro un unico argomento (e `unquote` ricompone le
+  // virgolette incollate dentro il token, vedi `dequote`).
+  const CURL_WRITE_OUT_FILE_RE = /%output\{/i;
 
   // curl con `-K`/`--config <file>` LEGGE le opzioni da un file: dentro può
   // esserci `output = /home/utente/.ssh/authorized_keys`, cioè lo stesso
