@@ -577,11 +577,23 @@
   // regionali (es. "Google" copre "Google AI Studio" e "Google Vertex") — usare
   // la variante singola le lascerebbe sfuggire.
   //
+  // SECONDO motivo di esclusione: un host che serve MALE. La politica nasce per
+  // tenere fuori i produttori, ma la lista è la stessa leva anche quando un host
+  // indipendente si dimostra rotto — risposte troncate, risposte di qualcun
+  // altro, contenuti che non c'entrano. Vale a prescindere dal modello: un host
+  // che sbaglia a instradare sbaglia su tutto quello che ospita.
+  //
   // NOTA: è un punto di partenza CURABILE senza toccare il codice. L'owner può
   // sovrascriverlo interamente dal doc Firestore `config/models`
-  // (campo `excludedProviders`), e l'elenco dei fornitori esistenti su OpenRouter
+  // (campo `excludedProviders`) — dalla pagina «Modelli predefiniti», sezione
+  // «Fornitori esclusi» —, e l'elenco dei fornitori esistenti su OpenRouter
   // è interrogabile, quindi la lista va ricontrollata periodicamente. Anthropic
   // NON è qui: la politica ammette esplicitamente i suoi modelli.
+  //
+  // ATTENZIONE: la lista remota SOSTITUISCE questa per intero (defaultsStore).
+  // Aggiungere un nome qui non basta a farlo valere dove l'owner ha già scritto
+  // la sua lista: va aggiunto anche là. La pagina «Modelli predefiniti» segnala
+  // da sola le voci di questa lista che quella remota non copre.
   const DEFAULT_EXCLUDED_PROVIDERS = [
     'Google',       // produttore di Gemini (copre Google AI Studio / Vertex)
     'OpenAI',
@@ -594,6 +606,11 @@
     'Cohere',
     'Meta',         // produttore di Llama
     'Z.AI',         // Zhipu / GLM
+    // Non è un produttore: è un host che nel banco di prova del 30/08 ha
+    // risposto ad alcune richieste con la risposta di un'ALTRA richiesta in
+    // corso (media 0.42 contro 0.84-0.91 degli altri host). Escluso per tutti i
+    // modelli che instrada, non solo per quello su cui è stato colto.
+    'Novita',
   ];
 
   function normalizeProviderName(name) {
