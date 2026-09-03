@@ -287,7 +287,8 @@ test('#509/g4 — doppio clic secco e clic su un secondo pulsante mentre il prim
   expect((await p.evaluate(() => window.__updates)).length, 'doppio clic secco').toBe(1);
 
   // «Archivia» premuto subito dopo «→ In coda» sulla STESSA scheda.
-  const p2 = await apriFeedback(openTab, CODA);
+  const p2 = p;
+  await reset(p2, '__fbTest', CODA);
   await p2.evaluate((t) => window.__fbTest.setTab(t), 'inbox');
   await p2.evaluate(() => {
     const card = document.querySelector('.fb-card[data-id="c_attack"]');
