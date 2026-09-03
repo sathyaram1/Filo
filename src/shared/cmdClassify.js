@@ -729,8 +729,8 @@
       // percorso arbitrario → 3.
       if (prog === 'curl' && CURL_DUMP_RE.test(trimmed)) return 3;
       // curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr,
-      // --libcurl, --hsts, --alt-svc: salvano dati accessori influenzati dal
-      // server in un percorso scelto → 3.
+      // --libcurl, --hsts, --alt-svc, --metalink: fanno atterrare su un percorso
+      // scelto dati influenzati dal server → 3.
       if (prog === 'curl' && CURL_ACCESSORY_WRITE_RE.test(trimmed)) return 3;
       // curl -w '%output{FILE}': il "formato di stampa" atterra su un file → 3.
       if (prog === 'curl' && CURL_WRITE_OUT_FILE_RE.test(trimmed)) return 3;
