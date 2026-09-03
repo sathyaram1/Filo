@@ -378,7 +378,7 @@
   // leggono un certificato, --trace-time/--trace-ids sono modificatori senza
   // file) NON combaciano: la parte long è ancorata con `(=|\s|$)` e il ramo short
   // matcha solo la `c` minuscola in un bundle a trattino singolo.
-  const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr|--libcurl|--hsts|--alt-svc)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
+  const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr|--libcurl|--hsts|--alt-svc|--metalink)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
 
   // curl `-w`/`--write-out` è un formato di stampa, ma dal 2023 (curl 8.3)
   // conosce `%output{FILE}`: da lì in poi il testo formattato non va più a
