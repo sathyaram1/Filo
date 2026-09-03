@@ -70,7 +70,7 @@
 //     atterrare qualcosa: output-su-file (-o/-O/--output/--remote-name…), i DATI
 //     ACCESSORI il cui contenuto è influenzato dal server (-D/--dump-header,
 //     -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr, --libcurl,
-//     --hsts, --alt-svc, `-w '%output{...}'`) e -K/--config, che nasconde
+//     --hsts, --alt-svc, --metalink, `-w '%output{...}'`) e -K/--config, che nasconde
 //     l'output dentro un file di opzioni.
 
 (function (global) {
