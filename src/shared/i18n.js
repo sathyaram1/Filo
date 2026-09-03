@@ -387,6 +387,16 @@
     reasoning_low: 'Basso',
     reasoning_medium: 'Medio',
     reasoning_high: 'Alto',
+    // Fornitori esclusi (politica sui modelli, #421 / #518)
+    admin_defaults_excluded: 'Fornitori esclusi',
+    admin_defaults_excluded_desc:
+      'Gli host che non devono servire nessuna richiesta di Filo: i produttori dei modelli (la politica ammette i modelli a pesi aperti solo da fornitori indipendenti) e gli host che si sono dimostrati inaffidabili. Basta il nome base — «Google» copre anche «Google AI Studio» e «Google Vertex». Questa lista vale per tutti gli utenti e sostituisce quella scritta nel codice.',
+    admin_defaults_excluded_name: 'Nome del fornitore',
+    admin_defaults_excluded_add: 'Aggiungi fornitore',
+    admin_defaults_excluded_remove: 'Rimuovi',
+    admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
+    admin_defaults_excluded_drift: 'Questa lista sostituisce quella del codice, e queste esclusioni non ci sono: %s. Finché mancano, quegli host possono servire le richieste.',
+    admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
