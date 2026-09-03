@@ -92,15 +92,6 @@ async function azioniManage(page, id) {
   });
 }
 
-// Porta la pagina dei feedback sulla sezione dove vive questa segnalazione.
-async function vaiDove(page, id, all, releasedVersion = VERSIONE) {
-  const tab = await page.evaluate(([id, rv]) => {
-    const f = (window.__all || []).find((x) => x._id === id);
-    return null;
-  }, [id, releasedVersion]).catch(() => null);
-  return tab;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // La coda più storta che riesco a costruire: ogni forma di stato che esiste
 // nel repo, più quelle che non dovrebbero esistere.
