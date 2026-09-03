@@ -23,6 +23,7 @@
       fixes: [
         'Quando la risposta dell\'assistente arrivava in un formato illeggibile, in chat compariva testo pieno di parentesi e virgolette. Ora Filo riprova da solo un paio di volte prima di mostrartela: quel testo strano dovresti vederlo molto più di rado.',
         'Le tue segnalazioni non finiscono più tutte sotto «Ricevuti» con le altre sezioni a zero, né nella pagina dei feedback né in «Gestione». Le trovi in un elenco solo, e accanto a ognuna c\'è scritto se è aperta o chiusa.',
+        'Ogni tanto l\'assistente rispondeva a una domanda che non era la tua: al posto della risposta arrivava quella di qualcun altro. Filo ha smesso di passare dal servizio che scambiava le risposte fra una richiesta e l\'altra.',
         'In modalità terminale, un comando che scarica un file ora ti chiede sempre di digitare "conferma", anche quando dal comando non si capisce dove il file andrà a finire. Il riquadro ti dice pure in quale cartella scriverà. Prima l\'assistente poteva spostarsi da solo in una cartella delicata, per esempio quella delle tue chiavi, e lì per sovrascriverci dentro bastava un OK distratto.',
       ],
     },
