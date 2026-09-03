@@ -349,7 +349,7 @@ sicurezza blocca tutto e rende il cancello inutilizzabile.
   pratica si interrompe e viene **segnalata all'owner** invece di richiamare
   ancora chi corregge.
 
-Valori di partenza: **N = 3**, **M = 10**. Sono **impostabili dalla dashboard**
+Valori di partenza: **N = 0** (dal 2026-09-03; era 3: un «migliorabile» passa subito, i rilievi diventano un feedback residuo a priorità minima, e il verificatore dà «fail» solo per rilievi di livello 3 o 2 della scala delle priorità, vedi `routines/roles/verifier.md`), **M = 10**. Sono **impostabili dalla dashboard**
 (§6), non costanti nel codice.
 
 ### Quale esito, quando (va scritto nel prompt, o il modello sceglie a caso)

@@ -164,3 +164,11 @@ test('merge: un rifiuto del server non si ritenta (il no è una risposta)', asyn
   assert.equal(calls, 1);
   assert.deepEqual(r, { ok: false, reason: 'not_approved' });
 });
+
+// Sforzo per ruolo (2026-09-03): il ruolo viaggia col biglietto, se il server lo manda.
+test('biglietto con ruolo → il ruolo passa; senza ruolo → nessuna chiave in più', () => {
+  assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', role: 'secaudit' }),
+    { outcome: 'work', ticket: 'abc', role: 'secaudit' });
+  assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', role: '' }),
+    { outcome: 'work', ticket: 'abc' });
+});

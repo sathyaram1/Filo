@@ -495,7 +495,7 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null }) {
+async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null, noCache = false }) {
   const settings = await getEffectiveSettings();
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
   // poteva imporre un modello scritto nel codice, scavalcando la configurazione
@@ -519,7 +519,12 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   let messages = await buildMessages(action, { ...payload, modelName });
   messages = SN_CONST.injectAgentStyle(messages, action, settings.agentStyle);
 
-  const cached = await AICache.get({ provider: settings.provider, model, messages });
+  // `noCache` salta la LETTURA della cache (la scrittura resta: una risposta
+  // buona arrivata al secondo giro sovrascrive quella rotta del primo). Serve
+  // ai ritentativi sul JSON illeggibile: la chiave della cache e' identica fra
+  // i tentativi, e senza questo salto il retry rileggerebbe all'infinito la
+  // stessa risposta rotta appena salvata (trovato dalla verifica indipendente).
+  const cached = noCache ? null : await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
     return { text: cached.text, model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
@@ -1860,15 +1865,30 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const Caps = globalThis.SN_CAPABILITIES;
   const capacita = Caps ? Caps.renderIndexForPrompt() : '';
 
-  const r = await handleAIRequest({
-    action: ACTIONS.FILO_CHAT,
-    payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
-    origin: 'filo:chat',
-    onReasoning,
-    onText,
-  });
-
-  const parsed = extractJson(r.text) || { text: r.text || '', actions: [] };
+  // Un JSON rotto non si consegna al primo colpo: si RITENTA, fino a 3
+  // tentativi in tutto (decisione owner 2026-08-29). Dopo il terzo, amen: il
+  // testo grezzo diventa la bolla come prima — meglio una risposta strana che
+  // nessuna. Solo il PRIMO tentativo streamma il testo live: i ritentativi
+  // sono silenziosi e la risposta finale sostituisce comunque la bolla, così
+  // l'utente non vede il testo ripartire da capo a ogni giro.
+  let r = null;
+  let parsed = null;
+  for (let tentativo = 1; tentativo <= 3; tentativo++) {
+    r = await handleAIRequest({
+      action: ACTIONS.FILO_CHAT,
+      payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
+      origin: 'filo:chat',
+      onReasoning: tentativo === 1 ? onReasoning : null,
+      onText: tentativo === 1 ? onText : null,
+      // Dal secondo tentativo si salta la cache: la chiave e' la stessa e
+      // riconsegnerebbe la risposta rotta appena messa via.
+      noCache: tentativo > 1,
+    });
+    parsed = extractJson(r.text);
+    if (parsed) break;
+    console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
+  }
+  parsed = parsed || { text: r.text || '', actions: [] };
   const rawActions = Array.isArray(parsed.actions) ? parsed.actions : [];
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
   // deve scrivere testo di riempimento: il "(vuoto)" che compariva era un
