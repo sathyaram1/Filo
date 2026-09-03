@@ -152,18 +152,15 @@ test('sonda D — ricerca con le sezioni spente, e ritorno', async ({ openTab })
     .filter((el) => !el.hidden && ['inbox', 'queue', 'resolved', 'archived'].includes(el.dataset.tab)).length);
   expect(await barra()).toBe(0);
   // Apri la lente e cerca (fallback per testo: nessun modello negli spec).
-  await mg.evaluate(() => window.__mgTest.runSearch && null);
-  await mg.evaluate(() => { document.getElementById('mgSearchBtn').click(); });
+  await mg.evaluate(() => { document.getElementById('mgSearchToggle').click(); });
   await mg.waitForTimeout(200);
   await mg.evaluate(() => window.__mgTest.runSearch('coda'));
   await mg.waitForTimeout(1500);
   const testa = await mg.evaluate(() => document.getElementById('mgListHead').textContent.trim());
   console.log('SONDA-D testa ricerca=', testa);
   // Esci dalla ricerca: le sezioni restano spente, non tornano coi numeri.
-  await mg.keyboard.press('Escape');
-  await mg.waitForTimeout(400);
-  await mg.evaluate(() => { const b = document.getElementById('mgSearchBtn'); if (b) b.click(); });
-  await mg.waitForTimeout(400);
+  await mg.evaluate(() => { document.getElementById('mgSearchClose').click(); });
+  await mg.waitForTimeout(500);
   const n = await barra();
   const testa2 = await mg.evaluate(() => document.getElementById('mgListHead').textContent.trim());
   const avviso = await mg.evaluate(() => { const e = document.getElementById('mgNoSections'); return e.hidden ? '' : e.textContent.trim(); });
