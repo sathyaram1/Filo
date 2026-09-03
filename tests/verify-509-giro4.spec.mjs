@@ -275,7 +275,6 @@ test('#509/g4 — tre clic fermi sullo stesso punto scrivono una volta sola (tut
     expect(u[0].status).toBe(porta.to);
     expect(u.some((x) => String(x.status).endsWith('_confirmed')),
       'nessuna conferma di attacco/spam presa per sbaglio').toBe(false);
-    await p.close();
   }
 });
 
