@@ -633,6 +633,24 @@
     });
   }
 
+  // Forme base di `base` che `list` NON copre. PURA.
+  // Serve dove una lista scritta a mano SOSTITUISCE quella di build (la lista
+  // remota in config/models): senza questo confronto, un'esclusione aggiunta al
+  // codice resta lettera morta sulle installazioni che leggono la lista remota,
+  // e nessuno se ne accorge finché non ricapita il guasto che l'aveva motivata.
+  function missingExcludedProviders(base, list) {
+    const out = [];
+    for (const b of (Array.isArray(base) ? base : [])) {
+      const name = String(b == null ? '' : b).trim();
+      if (!name) continue;
+      if (isProviderExcluded(name, list)) continue;
+      const k = normalizeProviderName(name);
+      if (out.some((x) => normalizeProviderName(x) === k)) continue;
+      out.push(name);
+    }
+    return out;
+  }
+
   // Lista pulita (deduplicata, senza vuoti) da passare a OpenRouter come
   // `provider.ignore` (le forme base). Preserva le maiuscole come nel registry.
   function providerIgnoreList(excluded) {
