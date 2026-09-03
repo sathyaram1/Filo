@@ -1251,6 +1251,22 @@
     return MR.sectionsReliable(allFeedbacks);
   }
 
+  // Le due domande sono DIVERSE e vanno tenute separate, altrimenti il difetto
+  // rientra dalla porta della coda MISTA:
+  //   · sezioniAttendibili() è una domanda sulla LISTA — si può disegnare la
+  //     barra delle sezioni? Un solo documento storto non la toglie a tutti.
+  //   · statoLeggibile(fb) è una domanda su QUESTA segnalazione — posso
+  //     affermare qualcosa sul suo stato? Vale ovunque si parli di UNA
+  //     segnalazione: bordo e classe della scheda, riga dell'iter, sottotesto
+  //     del motivo, pallini dei giudici, pulsanti del dettaglio, la bolla del
+  //     parere di Filo, e i mucchi su cui agiscono le barre in cima ai Ricevuti.
+  // È la stessa regola della gemella, che se la fa per ogni segnalazione: farla
+  // una volta sola per l'intera lista è ciò che ha fatto divergere le due
+  // pagine appena una cifrata capitava in mezzo a tante leggibili (#509).
+  function statoLeggibile(fb) {
+    return !MR.statusUnreadable(fb);
+  }
+
   // Mostra o nasconde le SEZIONI (le quattro schede-lista) e l'avviso che ne
   // spiega l'assenza. Le altre schede della barra non sono sezioni — Statistiche,
   // Modelli, Automazioni, Log non dipendono dallo stato delle segnalazioni e
