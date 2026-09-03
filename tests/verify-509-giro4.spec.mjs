@@ -248,6 +248,7 @@ test('#509/g4 — stessa azione, stessa scrittura: nessuna decisione cancellata'
 
 // ── Le porte del giro 1: un clic, una scheda (ri-prova) ────────────────────
 async function clicRipetuti(page, sel, volte = 3, pausa = 400) {
+  await page.locator(sel).scrollIntoViewIfNeeded();
   const box = await page.locator(sel).boundingBox();
   expect(box, `il pulsante ${sel} deve essere a schermo`).not.toBeNull();
   const x = box.x + box.width / 2; const y = box.y + box.height / 2;
