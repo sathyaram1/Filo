@@ -264,8 +264,9 @@ test('#509/g4 — tre clic fermi sullo stesso punto scrivono una volta sola (tut
     { tab: 'queue',    sel: '.fb-act[data-id="c_todo"][data-to="done"]',      id: 'c_todo',      to: 'done' },
     { tab: 'archived', sel: '.fb-act[data-id="c_archived"][data-to="todo"]',  id: 'c_archived',  to: 'todo' },
   ];
+  const p = await apriFeedback(openTab, CODA);
   for (const porta of porte) {
-    const p = await apriFeedback(openTab, CODA);
+    await reset(p, '__fbTest', CODA);
     await p.evaluate((t) => window.__fbTest.setTab(t), porta.tab);
     await clicRipetuti(p, porta.sel);
     const u = await p.evaluate(() => window.__updates);
