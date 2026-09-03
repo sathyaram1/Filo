@@ -52,16 +52,26 @@
 //     (digita "conferma"). L'invariante è sull'EFFETTO, non sul nome del flag:
 //     wget scrive un file anche senza alcun flag di output, e la CARTELLA in cui
 //     lo scrive la sceglie l'assistente da sé con un `cd` (livello 1, nessuna
-//     conferma, persistente). Vedi WGET_NO_DOWNLOAD_RE più sotto.
-//     Ricadono nella stessa regola i flag che scelgono esplicitamente dove
-//     atterrare — output-su-file (-o/-O/--output/--remote-name…), cartella di
-//     destinazione di wget (-P/--directory-prefix) — e quelli che scrivono in un
-//     percorso scelto DATI ACCESSORI il cui contenuto è influenzato dal server:
-//     curl -D/--dump-header, -c/--cookie-jar, --etag-save, --trace/--trace-ascii,
-//     --stderr, -K/--config e l'analoga wget --save-cookies.
-//     curl invece, SENZA quei flag, stampa a schermo e non fa atterrare niente:
-//     resta 2. Due programmi che si comportano diversamente prendono regole
-//     diverse — è l'effetto a decidere.
+//     conferma, persistente).
+//     Quindi WGET È SEMPRE 3, senza eccezioni: l'unica sua forma che davvero non
+//     fa atterrare niente (`--spider`) NON viene più esentata. Un'esenzione la si
+//     decide per forza leggendo il TESTO del comando, ma chi il comando lo compone
+//     può far comparire quella parola dove wget non la applica — dopo un `--`
+//     (`wget -N -- http://x --spider`: da lì in poi sono indirizzi), dentro le
+//     virgolette (`wget "http://x" " --spider "`), dentro l'URL stesso
+//     (`wget "http://x#  --spider "`) — e riavere lo scaricamento con un solo
+//     clic. Riconoscere "davvero un'opzione" richiederebbe di riprodurre il
+//     parsing di getopt e del quoting: fuori dal principio del file. Toglierla
+//     costa una conferma in più su un comando raro (per la sola verifica di un
+//     indirizzo c'è `curl -I`, che stampa a schermo e resta 2) e chiude la porta.
+//     curl invece, SENZA flag che scrivono, stampa a schermo e non fa atterrare
+//     niente: resta 2. Due programmi che si comportano diversamente prendono
+//     regole diverse — è l'effetto a decidere. Salgono a 3 i flag curl che fanno
+//     atterrare qualcosa: output-su-file (-o/-O/--output/--remote-name…), i DATI
+//     ACCESSORI il cui contenuto è influenzato dal server (-D/--dump-header,
+//     -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr, --libcurl,
+//     --hsts, --alt-svc, `-w '%output{...}'`) e -K/--config, che nasconde
+//     l'output dentro un file di opzioni.
 
 (function (global) {
   'use strict';
