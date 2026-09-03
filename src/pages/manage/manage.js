@@ -2654,8 +2654,11 @@
       else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
       // "non ha ANCORA un parere" si legge come "sta arrivando": vero solo
       // finché la segnalazione aspetta una decisione. Su una già decisa (un
-      // attacco confermato, un fix chiuso) quella parola diceva il falso.
-      else if (MR.manageTabFor(fb, { releasedVersion }) === 'inbox') {
+      // attacco confermato, un fix chiuso) quella parola diceva il falso — e su
+      // una cifrata è la macchina a inventarsi che aspetta, perché la sezione
+      // qui non si legge. Senza il criterio si dice solo il fatto: nessun
+      // verdetto è mai arrivato, punto. La gemella quella frase non la scrive.
+      else if (statoLeggibile(fb) && MR.manageTabFor(fb, { releasedVersion }) === 'inbox') {
         opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
       } else {
         opinionHtml = '<em>I giudici non hanno mai valutato questo feedback.</em>';
