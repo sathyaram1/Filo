@@ -187,19 +187,28 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
     action: { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' },
   }));
 
-  // 1) Lo spostamento resta gratuito: è la primitiva di navigazione dell'assistente.
-  const cd = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'cd .ssh' });
-  expect(cd.needsConfirm).toBeFalsy();
+  const scarica = { type: 'ESEGUI_COMANDO', comando: 'wget http://esempio.test/authorized_keys' };
 
-  // 2) Il download SENZA flag di output — la strada che restava scoperta —
-  //    ora chiede di digitare "conferma".
-  const dl = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'wget http://esempio.test/authorized_keys' });
-  expect(dl.executed).toBe(false);
-  expect(dl.needsConfirm).toBe(3);
-  // 3) …e il popup dice in quale cartella il file andrebbe a finire.
-  expect(dl.describe).toContain('wget http://esempio.test/authorized_keys');
-  expect(dl.describe).toMatch(/Cartella di lavoro:\s*\S+/);
-  expect(dl.describe).toContain('.ssh');
+  // 1) Il download SENZA flag di output — la strada che restava scoperta —
+  //    ora chiede di digitare "conferma" invece del semplice OK.
+  const prima = await execAction(app, scarica);
+  expect(prima.executed).toBe(false);
+  expect(prima.needsConfirm).toBe(3);
+  // 2) …e il popup dice in quale cartella il file andrebbe a finire: nel testo
+  //    del comando quell'informazione non c'è.
+  expect(prima.describe).toContain('wget http://esempio.test/authorized_keys');
+  expect(prima.describe).toMatch(/Cartella di lavoro:\s*\S+/);
+
+  // 3) Lo spostamento resta gratuito (è la primitiva di navigazione
+  //    dell'assistente), ma il popup del comando successivo lo RACCONTA: la
+  //    cartella scritta nella conferma segue il `cd` appena fatto.
+  const cd = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'cd ..' });
+  expect(cd.needsConfirm).toBeFalsy();
+  const dopo = await execAction(app, scarica);
+  expect(dopo.needsConfirm).toBe(3);
+  const cartella = (d) => (String(d).match(/Cartella di lavoro:\s*(.+)/) || [])[1];
+  expect(cartella(dopo)).toBeTruthy();
+  expect(cartella(dopo)).not.toBe(cartella(prima));
 
   // Anche la forma che sceglie la CARTELLA, e quella che riprende un download
   // su un file già esistente, sono allo stesso livello.
