@@ -648,6 +648,12 @@ section:has(#dictList) .sn-spell-add-row {
   white-space: nowrap;
 }
 
+/* Fornitori esclusi (admin): una riga per nome, nome | Rimuovi. Stessa cornice
+   delle righe del registry, due sole colonne. */
+.sn-excluded-row {
+  grid-template-columns: 1fr auto;
+}
+
 /* Censimento (sola lettura) degli altri punti in cui Filo usa un modello:
    quelli che girano sui suoi server e quelli che un modello non lo usano.
    Due colonne — cosa è, dove si imposta — senza cornice: è un elenco, non una
