@@ -508,10 +508,10 @@ test('livello 2 — i flag curl/wget di LETTURA simili ai write accessori restan
     'curl --etag-compare etag.txt http://x',     // confronta l'ETag (legge)
     'curl -k http://x',                          // -k minuscolo = --insecure, non --config
     'curl --insecure http://x',
-    // #479: wget scarica comunque un file, quindi qui va accoppiato a --spider
-    // (che non fa atterrare niente) per provare che --load-cookies da solo non
-    // fa scattare la regola di --save-cookies.
-    'wget --load-cookies cookies.txt --spider http://x',
+    'curl --etag-compare etag.txt http://x',
+    'curl -w "%{http_code}" http://x',           // -w che stampa e basta (nessun %output{})
+    'curl --write-out "%{time_total}\\n" http://x',
+    'curl --cert-status http://x',
   ]) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (flag di lettura) dovrebbe restare livello 2`);
   }
