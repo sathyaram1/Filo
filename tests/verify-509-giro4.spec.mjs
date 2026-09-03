@@ -352,6 +352,61 @@ test('#509/g4 — stato illeggibile: le due pagine tacciono allo stesso modo, e 
   expect(det.includes('non ha ancora un parere'), 'Gestione su una segnalazione chiusa').toBe(false);
 });
 
+// ── La coda MISTA: una illeggibile in mezzo a tante leggibili ──────────────
+// È il caso per cui la regola dice di lasciare le sezioni al loro posto. Ma su
+// «Gestione» la domanda "questo stato si legge?" si fa una volta sola per tutta
+// la lista, mentre la gemella se la fa per ogni segnalazione: appena le sezioni
+// restano, su quella segnalazione la dashboard torna a dire cose che non sa.
+const MISTA = [
+  { _id: 'm_todo',   seq: 61, status: 'todo',     name: 'in coda leggibile' },
+  { _id: 'm_arch',   seq: 62, status: 'archived', name: 'archiviato leggibile' },
+  { _id: 'm_closed', seq: 63, status: 'FENC1:dddddddddddddddd', statusPublic: 'closed', name: 'cifrata chiusa' },
+].map((f, i) => Object.assign({ text: 'testo', createdAt: `2026-08-0${i + 1}T10:00:00Z` }, f));
+
+test('#509/g4 — coda mista: la segnalazione illeggibile dice le stesse cose sulle due pagine', async ({ openTab }) => {
+  const fb = await apriFeedback(openTab, MISTA);
+  const mg = await apriManage(openTab, MISTA);
+
+  // Le sezioni restano (un documento storto non le toglie a tutti).
+  expect((await barraFb(fb)).length, 'sezioni sulla pagina dei feedback').toBe(4);
+  expect(await barraMg(mg), 'sezioni su Gestione').toEqual(await barraFb(fb));
+
+  // 1. L'unica cosa vera che si sa di lei sta scritta su tutt'e due le schede.
+  await fb.evaluate(() => window.__fbTest.setTab('inbox'));
+  await mg.evaluate(() => window.__mgTest.setTab('inbox'));
+  const schedaFb = await fb.evaluate(() => {
+    const c = document.querySelector('.fb-card[data-id="m_closed"]');
+    return c ? c.innerText : '';
+  });
+  const schedaMg = await mg.evaluate(() => {
+    const c = document.querySelector('#mgList .mg-item[data-id="m_closed"]');
+    return c ? { testo: c.innerText, classi: c.className } : null;
+  });
+  expect(schedaFb.includes('Chiusa'), 'la scheda della gemella dice "Chiusa"').toBe(true);
+  expect(schedaMg, 'la segnalazione è nei Ricevuti anche su Gestione').not.toBeNull();
+  expect(schedaMg.testo.includes('Chiusa'), 'anche la scheda di Gestione dice "Chiusa"').toBe(true);
+
+  // 2. E non la si dipinge come "non filtrata": è un'affermazione sullo stato,
+  //    e lo stato qui non si legge. Una pratica già chiusa non è da giudicare.
+  expect(schedaMg.classi.includes('mg-item--unfiltered'),
+    'la scheda di Gestione NON prende il bordo bianco dei "non filtrati"').toBe(false);
+
+  // 3. Quindi non finisce nemmeno nel mucchio da rimandare ai giudici: sarebbero
+  //    crediti spesi per ri-giudicare una pratica che potrebbe essere chiusa.
+  const barra = await mg.evaluate(() => {
+    const b = document.getElementById('mgReevalBar');
+    const btn = document.getElementById('mgReevalBtn');
+    return { visibile: b ? !b.hidden : false, testo: btn ? btn.textContent.trim() : '' };
+  });
+  expect(barra.visibile, `«${barra.testo}» non deve contare la segnalazione illeggibile`).toBe(false);
+
+  // 4. E la conversazione non dichiara un giudizio che non è mai arrivato.
+  await mg.evaluate(() => window.__mgTest.openDetail('m_closed'));
+  const conversazione = await mg.evaluate(() => document.getElementById('mgThread').innerText);
+  expect(conversazione.includes('non ha ancora un parere'),
+    'Gestione su una segnalazione che non sa leggere').toBe(false);
+});
+
 // ── Chi non è l'owner ──────────────────────────────────────────────────────
 test('#509/g4 — senza i permessi nessuna delle due pagine offre decisioni', async ({ openTab }) => {
   const fb = await apriFeedback(openTab, CODA, { admin: false });
