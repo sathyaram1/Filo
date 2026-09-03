@@ -495,6 +495,12 @@
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
     });
+    $('addExcludedRow').addEventListener('click', () => {
+      const row = makeExcludedRow('');
+      $('excludedList').appendChild(row);
+      row.querySelector('.sn-excluded-name').focus();
+    });
+    $('excludedDriftFix').addEventListener('click', addMissingExcluded);
     $('saveBtn').addEventListener('click', save);
   });
 })();
