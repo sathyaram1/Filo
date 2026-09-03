@@ -306,6 +306,84 @@
     }
   }
 
+  // ── Fornitori esclusi (politica sui modelli, #421/#518) ─────────────────────
+  // La lista salvata qui SOSTITUISCE per intero quella scritta nel codice
+  // (defaultsStore.get): è voluto — l'owner deve poterla svuotare o riscrivere —
+  // ma significa che un'esclusione aggiunta al codice non arriva dove questa
+  // lista esiste già. Perciò la pagina confronta le due e lo dice.
+  function makeExcludedRow(name) {
+    const row = document.createElement('div');
+    row.className = 'sn-model-row sn-excluded-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'sn-excluded-name';
+    input.placeholder = I18n.t('admin_defaults_excluded_name');
+    input.setAttribute('autocomplete', 'off');
+    input.value = name || '';
+    input.addEventListener('input', renderExcludedDrift);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'sn-btn sn-btn-secondary';
+    del.textContent = I18n.t('admin_defaults_excluded_remove');
+    del.addEventListener('click', () => { row.remove(); renderExcludedDrift(); });
+
+    row.appendChild(input);
+    row.appendChild(del);
+    return row;
+  }
+
+  function renderExcluded(list) {
+    const host = $('excludedList');
+    host.innerHTML = '';
+    for (const name of (Array.isArray(list) ? list : [])) {
+      if (typeof name === 'string' && name.trim()) host.appendChild(makeExcludedRow(name.trim()));
+    }
+    renderExcludedDrift();
+  }
+
+  function collectExcluded() {
+    const host = $('excludedList');
+    const out = [];
+    const seen = new Set();
+    for (const input of host.querySelectorAll('.sn-excluded-name')) {
+      const v = input.value.trim();
+      if (!v) continue;
+      const k = v.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(v);
+    }
+    return out;
+  }
+
+  // Voci escluse dal codice che la lista in pagina non copre: se ce ne sono,
+  // l'avviso le nomina e offre di rimetterle (un elenco senza il modo di
+  // rimediare sarebbe solo una brutta notizia).
+  function excludedMissingFromBuild() {
+    const C = window.SN_CONST;
+    if (!C || typeof C.missingExcludedProviders !== 'function') return [];
+    return C.missingExcludedProviders(C.DEFAULT_EXCLUDED_PROVIDERS || [], collectExcluded());
+  }
+
+  function renderExcludedDrift() {
+    const box = $('excludedDrift');
+    if (!box) return;
+    const missing = excludedMissingFromBuild();
+    if (!missing.length) { box.hidden = true; return; }
+    $('excludedDriftTitle').textContent = I18n.t('admin_defaults_excluded_drift_title');
+    $('excludedDriftText').textContent = I18n.t('admin_defaults_excluded_drift', missing.join(', '));
+    $('excludedDriftFix').textContent = I18n.t('admin_defaults_excluded_drift_fix');
+    box.hidden = false;
+  }
+
+  function addMissingExcluded() {
+    const host = $('excludedList');
+    for (const name of excludedMissingFromBuild()) host.appendChild(makeExcludedRow(name));
+    renderExcludedDrift();
+  }
+
   // ── Modelli per azione (stesso editor a segmenti della pagina Opzioni) ───────
   function renderModelsGrid(models) {
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
