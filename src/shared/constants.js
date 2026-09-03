@@ -119,7 +119,7 @@
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
   // dashboard Gestione). Il RANGE dei due contatori del verificatore vive qui;
-  // i DEFAULT (failCap 10, improvableCap 3) vivono con le transizioni promosse
+  // i DEFAULT (failCap 10, improvableCap 0) vivono con le transizioni promosse
   // a dati (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS): una sola
   // sorgente, letta dalla dashboard e incorporata dal server al deploy.
   const AUTOMATION = {
