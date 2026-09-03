@@ -492,7 +492,7 @@ test('livello 3 — curl che salva DATI ACCESSORI influenzati dal server su un f
   }
 });
 
-test('livello 2 — i flag curl/wget di LETTURA simili ai write accessori restano 2', () => {
+test('livello 2 — i flag curl di LETTURA simili ai write accessori restano 2', () => {
   // Non devono salire a 3: -C/--continue-at (riprende un download normale),
   // --cookie/-b e --load-cookies (LEGGONO i cookie), --etag-compare, --cacert/
   // --cert (leggono un certificato), --trace-time/--trace-ids (modificatori).
