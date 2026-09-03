@@ -89,8 +89,11 @@ test('Novita è escluso: host che ha restituito la risposta di un\'altra richies
 
 test('missingExcludedProviders: nomina le voci del codice che la lista non copre', () => {
   const base = ['Google', 'Novita', 'Z.AI'];
-  // Lista che ne copre solo una (con una variante: la forma base basta).
-  assert.deepEqual(C.missingExcludedProviders(base, ['Google AI Studio']), ['Novita', 'Z.AI']);
+  // Lista che ne copre solo una.
+  assert.deepEqual(C.missingExcludedProviders(base, ['Google', 'DeepInfra']), ['Novita', 'Z.AI']);
+  // La sola variante regionale NON copre la forma base ("Google AI Studio"
+  // lascia passare "Google Vertex"): resta segnalata.
+  assert.deepEqual(C.missingExcludedProviders(['Google'], ['Google AI Studio']), ['Google']);
   // Lista completa → niente da segnalare.
   assert.deepEqual(C.missingExcludedProviders(base, base), []);
   // Lista vuota/assente → mancano tutte (è il caso peggiore, non silenzio).
