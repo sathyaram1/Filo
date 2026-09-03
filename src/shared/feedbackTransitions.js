@@ -165,10 +165,14 @@
   //                      diventano un feedback nuovo (`routine:residuo`).
   //   failCap (M):       quante bocciature «fail» prima di fermare la pratica
   //                      e chiamare l'owner (statusReason `loop`).
+  // improvableCap = 0 dal 2026-09-03 (decisione owner): un «migliorabile» passa
+  // subito e i rilievi diventano un feedback residuo a priorità minima. La coda
+  // va spesa sul cammino principale, non sui casi rari (vedi
+  // routines/roles/verifier.md § Che esito dare).
   // failCap = 10 è una scelta di misura per la prima settimana sul piano Max
   // (osservazione del processo), non una stima di quanto serve: si abbassa
   // dalla dashboard senza toccare il codice.
-  const VERIFIER_CAPS = { improvableCap: 3, failCap: 10 };
+  const VERIFIER_CAPS = { improvableCap: 0, failCap: 10 };
 
   global.SN_FB_TRANSITIONS = {
     STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAPS,

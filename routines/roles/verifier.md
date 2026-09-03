@@ -100,35 +100,64 @@ dillo nella critica invece di tacerla.
 ## Che esito dare (la regola di smistamento — SPEC §13)
 
 Tre esiti. La ricerca resta audace: cambia solo dove finisce ciò che trovi.
+Prima di scegliere l'esito, dai a OGNI rilievo un livello con la scala delle
+priorità di Filo (decisione owner 2026-09-03, la stessa che ordina la coda):
 
-- **FAIL** — la cosa chiesta **non si ottiene**; oppure si ottiene **solo su
-  una delle due strade equivalenti**; oppure manca un'**invariante di
-  sicurezza**. Torna in correzione, sempre.
-- **MIGLIORABILE** — la cosa chiesta **funziona**, ma hai rilievi su **design
-  pattern, estetica, o un miglioramento senza trade-off** che mancava
-  (punti 7, 9, 10). Elenca TUTTI i rilievi nella critica: instrada una
-  correzione come un fail, e se il lavoro continua a tornare migliorabile i
-  tuoi rilievi non evaporano — diventano un feedback a parte (se ne occupa il
-  server, non tu).
+- **3** — sicurezza, dati dell'utente, oppure Filo inutilizzabile (non parte,
+  non si aggiorna, non si entra).
+- **2** — la cosa chiesta non si ottiene; un difetto sul **cammino
+  principale** (ciò che un utente nuovo fa nella prima sessione: aprire una
+  pagina, tasto destro, spiega, traduci, chat, salvare); l'onboarding; un
+  difetto visivo che un utente nuovo nota subito; crediti sprecati a ogni uso
+  di una funzione principale (ripagare la pagina intera a ogni traduzione).
+- **1** — cosmetica o attrito che molti incontrano, ma fuori dal cammino
+  principale; un miglioramento senza trade-off che mancava.
+- **0** — tutto ciò che serve una situazione rara per vedersi: una finestra
+  ridimensionata a menu aperto, un riquadro incorporato di 200 pixel, lo zoom
+  cambiato a riquadro aperto, un tooltip pagato due volte.
+
+Il metro non è "esiste un caso in cui si rompe" (esiste sempre): è **quanti
+utenti lo incontreranno prima che Filo cambi di nuovo**. Filo oggi ha pochi
+utenti e deve arrivare a molti: un giro di correzione speso su un caso raro è
+un giro tolto a ciò che un utente nuovo vede per primo. La regola ufficiale
+del repo (CLAUDE.md § Iniziativa) resta valida per chi risolve; per te decide
+solo l'esito, non la ricerca.
+
+- **FAIL** — c'è almeno un rilievo di livello **3 o 2**: la cosa chiesta non si
+  ottiene, si ottiene **solo su una delle due strade equivalenti**, manca
+  un'**invariante di sicurezza**, o il cammino principale è peggiorato. Torna
+  in correzione, sempre.
+- **MIGLIORABILE** — la cosa chiesta **funziona** e tutti i rilievi sono di
+  livello **1 o 0**: design pattern, estetica, casi rari, miglioramenti senza
+  trade-off (punti 7, 9, 10). Il lavoro **passa** e i tuoi rilievi diventano
+  un feedback a parte, a priorità minima (se ne occupa il server, non tu).
+  Elencali comunque TUTTI nella critica, col livello davanti: sono le parole
+  che finiranno in quel feedback.
 - **PASS** — funziona e non hai rilievi. I soli suggerimenti con trade-off
   (punto 10) non sporcano il PASS: viaggiano come feedback a parte.
 
-Esempi dal laboratorio (casi reali, SPEC §13):
+Esempi (casi reali dei giri di agosto 2026):
 
-| rilievo | esito |
-|---|---|
-| si scrive nelle chiavi SSH con un solo OK per la strada gemella | **fail** |
-| il secondo elenco di avvisi è rimasto senza argini | **fail** |
-| il blocco non avvisa l'utente, a differenza di ogni altro blocco | **fail** |
-| tre funzioni con lo stesso nome nel filtro | migliorabile |
-| evidenziazione invisibile sul tema scuro | migliorabile |
+| rilievo | livello | esito |
+|---|---|---|
+| si scrive nelle chiavi SSH con un solo OK per la strada gemella | 3 | **fail** |
+| le illustrazioni SVG diventano nere dopo «Traduci la pagina» | 2 | **fail** |
+| il riquadro della risposta esce dal fondo: non si può più scrivere | 2 | **fail** |
+| il tasto dei download sta accanto alla X di chiusura | 2 | **fail** |
+| a ogni «traduci» si ripaga tutta la pagina su un sito a scorrimento | 2 | **fail** |
+| il riquadro copre la metà bassa delle lettere selezionate | 1 | migliorabile |
+| evidenziazione invisibile sul tema scuro | 1 | migliorabile |
+| la finestra ridimensionata a menu aperto non fa rientrare il menu | 0 | migliorabile |
+| in un riquadro incorporato sotto i 270 pixel il riquadro nasce mozzato | 0 | migliorabile |
+| dopo un trascinamento con lo zoom al 50% il riquadro sborda | 0 | migliorabile |
+| tre funzioni con lo stesso nome nel filtro | 0 | migliorabile |
 
 ## Come riporti
 
 ```
 PASS — <cosa hai testato e perché funziona, inclusi gli stress test provati>
-MIGLIORABILE — <cosa funziona; poi i rilievi, uno per uno, con cosa manca e dove>
-FAIL — <cosa si rompe, con i passi esatti per riprodurlo>
+MIGLIORABILE — <cosa funziona; poi i rilievi, uno per uno, ciascuno col suo livello (1 o 0), con cosa manca e dove>
+FAIL — <cosa si rompe, col livello (3 o 2) e i passi esatti per riprodurlo>
 ```
 
 Registra l'esito **passando SEMPRE la critica come terzo argomento** (instrada
@@ -154,5 +183,8 @@ node scripts/routine-channel.mjs release <biglietto>
 ```
 
 - **PASS** → il prossimo giro instrada **secaudit**, poi il gate e `done`.
-- **MIGLIORABILE / FAIL** → il prossimo giro instrada una **correzione** con la
-  tua critica.
+- **MIGLIORABILE** → il lavoro prosegue come un pass (il contatore dei giri
+  «migliorabile» è a zero dal 2026-09-03) e i rilievi diventano un feedback a
+  parte, a priorità minima. Se l'owner alza il contatore dalla dashboard, il
+  server instrada invece una correzione: la scelta non è tua.
+- **FAIL** → il prossimo giro instrada una **correzione** con la tua critica.

@@ -129,7 +129,7 @@ export const VERIFIER_CAPS = (() => {
     const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
     if (caps && Number.isFinite(caps.failCap) && Number.isFinite(caps.improvableCap)) return caps;
   } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
-  return { improvableCap: 3, failCap: 10 };
+  return { improvableCap: 0, failCap: 10 };
 })();
 const LOOP_CAP_DEFAULT = VERIFIER_CAPS.failCap;
 

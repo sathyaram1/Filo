@@ -119,11 +119,14 @@
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
   // dashboard Gestione). Il RANGE dei due contatori del verificatore vive qui;
-  // i DEFAULT (failCap 10, improvableCap 3) vivono con le transizioni promosse
+  // i DEFAULT (failCap 10, improvableCap 0) vivono con le transizioni promosse
   // a dati (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS): una sola
   // sorgente, letta dalla dashboard e incorporata dal server al deploy.
   const AUTOMATION = {
     LOOP_CAP_MIN: 1,
+    // Il tetto dei «migliorabile» può essere 0 (dal 2026-09-03: un migliorabile
+    // passa subito); quello dei «fail» no, o la pratica non si fermerebbe mai.
+    IMPROVABLE_CAP_MIN: 0,
     LOOP_CAP_MAX: 10,
     // Timeout di ogni giudice di sicurezza (secondi). I modelli "thinking"
     // ragionano per qualche secondo prima del verdetto: troppo basso e quel
