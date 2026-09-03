@@ -1001,6 +1001,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     if (!s.terminal || !s.terminal.enabled) {
       return { executed: false, kept: true, output: { command: cmd, blocked: 'disabled' } };
     }
+    // Cartella di lavoro per il popup di conferma. L'assistente la sposta da sé
+    // (`cd` è livello 1: eseguito subito, senza chiedere niente, e valido per i
+    // comandi successivi), quindi il solo testo del comando non dice DOVE il
+    // comando andrà a scrivere. Calcolata qui dal main sulla cwd vera: mai
+    // dall'LLM, e mai usata per decidere il livello. Il prefisso `_` la tiene
+    // fuori dalla firma dell'azione (actionSignature), così RUN e CONFIRM
+    // continuano a combaciare.
+    action._cwd = displayCwd(getAssistantCwd(sender));
   }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
