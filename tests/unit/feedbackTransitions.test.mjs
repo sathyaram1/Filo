@@ -59,7 +59,8 @@ test('riallineamento: dopo un conflitto di fusione la routine può riportare il 
 });
 
 test('VERIFIER_CAPS: i default di N (improvableCap) e M (failCap) — SPEC §13', () => {
-  // N = 3: quanti «migliorabile» tornano in correzione prima della promozione.
+  // N = 0 (dal 2026-09-03): un «migliorabile» passa subito e i rilievi diventano
+  // un feedback residuo a priorità minima; prima era 3.
   // M = 10: scelta di misura dell'owner per la prima settimana sul piano Max
   // (osservazione del processo), poi si abbassa dalla DASHBOARD, non da qui.
   assert.deepEqual(DATA.VERIFIER_CAPS, { improvableCap: 0, failCap: 10 });

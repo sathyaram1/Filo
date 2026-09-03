@@ -450,21 +450,22 @@ function automationDefaults() {
   const CAPS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS) || {};
   return {
     failDef: Number.isFinite(CAPS.failCap) ? CAPS.failCap : 10,
-    improvableDef: Number.isFinite(CAPS.improvableCap) ? CAPS.improvableCap : 3,
+    improvableDef: Number.isFinite(CAPS.improvableCap) ? CAPS.improvableCap : 0,
     min: Number.isFinite(A.LOOP_CAP_MIN) ? A.LOOP_CAP_MIN : 1,
+    improvableMin: Number.isFinite(A.IMPROVABLE_CAP_MIN) ? A.IMPROVABLE_CAP_MIN : 0,
     max: Number.isFinite(A.LOOP_CAP_MAX) ? A.LOOP_CAP_MAX : 10,
   };
 }
 
-function clampCap(n, def) {
+function clampCap(n, def, minOverride) {
   const { min, max } = automationDefaults();
   const v = Math.round(Number(n));
   if (!Number.isFinite(v)) return def;
-  return Math.min(max, Math.max(min, v));
+  return Math.min(max, Math.max(Number.isFinite(minOverride) ? minOverride : min, v));
 }
 
 async function getRoutineCaps(idToken) {
-  const { failDef, improvableDef } = automationDefaults();
+  const { failDef, improvableDef, improvableMin } = automationDefaults();
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   const out = { failCap: failDef, improvableCap: improvableDef };
   // `loopCap` è il nome VECCHIO di failCap: il valore che l'owner aveva già
@@ -474,13 +475,13 @@ async function getRoutineCaps(idToken) {
   // commento in getAutomationProberIdle).
   if (doc && doc.failCap != null) out.failCap = clampCap(doc.failCap, failDef);
   else if (doc && doc.loopCap != null) out.failCap = clampCap(doc.loopCap, failDef);
-  if (doc && doc.improvableCap != null) out.improvableCap = clampCap(doc.improvableCap, improvableDef);
+  if (doc && doc.improvableCap != null) out.improvableCap = clampCap(doc.improvableCap, improvableDef, improvableMin);
   return out;
 }
 
 async function setRoutineCaps(patch, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per cambiare i contatori del verificatore.');
-  const { failDef, improvableDef } = automationDefaults();
+  const { failDef, improvableDef, improvableMin } = automationDefaults();
   const p = patch && typeof patch === 'object' ? patch : {};
   const fields = {};
   const mask = [];
@@ -494,7 +495,7 @@ async function setRoutineCaps(patch, idToken) {
     mask.push('failCap', 'loopCap');
   }
   if (p.improvableCap != null) {
-    fields.improvableCap = toFsValue(clampCap(p.improvableCap, improvableDef));
+    fields.improvableCap = toFsValue(clampCap(p.improvableCap, improvableDef, improvableMin));
     mask.push('improvableCap');
   }
   if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);

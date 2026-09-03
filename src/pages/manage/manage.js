@@ -267,7 +267,7 @@
   const AUTOMATION = window.SN_CONST?.AUTOMATION || { LOOP_CAP_MIN: 1, LOOP_CAP_MAX: 10 };
   // Default dei contatori dalla fonte unica (feedbackTransitions.js): la stessa
   // che il server incorpora al deploy. Mai due copie a mano.
-  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { improvableCap: 3, failCap: 10 };
+  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { improvableCap: 0, failCap: 10 };
 
   // ── Canale main process ───────────────────────────────────────────────────
   function sendToMain(msg) {
@@ -501,10 +501,10 @@
   //                     aprire il feedback dei rilievi residui.
   // Li applica il SERVER quando registra i verdetti; chrome.storage.local è
   // solo una CACHE per mostrare subito un valore (e un ripiego offline).
-  function clampCap(n, def) {
+  function clampCap(n, def, min = AUTOMATION.LOOP_CAP_MIN) {
     n = Math.round(Number(n));
     if (!Number.isFinite(n)) return def;
-    return Math.min(AUTOMATION.LOOP_CAP_MAX, Math.max(AUTOMATION.LOOP_CAP_MIN, n));
+    return Math.min(AUTOMATION.LOOP_CAP_MAX, Math.max(min, n));
   }
 
   const CAPS_GET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_GET) || 'automation_caps_get';
@@ -514,11 +514,12 @@
   const CAP_FIELDS = {
     failCap: {
       input: mgFailCap, save: mgFailCapSave, msg: mgFailCapMsg,
-      def: VERIFIER_CAPS.failCap, cacheKey: FAIL_CAP_KEY,
+      def: VERIFIER_CAPS.failCap, cacheKey: FAIL_CAP_KEY, min: AUTOMATION.LOOP_CAP_MIN,
     },
     improvableCap: {
       input: mgImprovableCap, save: mgImprovableCapSave, msg: mgImprovableCapMsg,
       def: VERIFIER_CAPS.improvableCap, cacheKey: IMPROVABLE_CAP_KEY,
+      min: Number.isFinite(AUTOMATION.IMPROVABLE_CAP_MIN) ? AUTOMATION.IMPROVABLE_CAP_MIN : 0,
     },
   };
 
@@ -544,13 +545,13 @@
       if (!f.input) continue;
       let val = f.def;
       if (remote[field] != null) {
-        val = clampCap(remote[field], f.def);
+        val = clampCap(remote[field], f.def, f.min);
         chrome.storage.local.set({ [f.cacheKey]: val }).catch(() => {});
       } else {
         // Ripiego sulla cache locale (non admin / offline).
         try {
           const data = await chrome.storage.local.get(f.cacheKey);
-          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.def);
+          if (data[f.cacheKey] != null) val = clampCap(data[f.cacheKey], f.def, f.min);
         } catch (_) {}
       }
       f.input.value = String(val);
@@ -560,7 +561,7 @@
   async function saveCap(field) {
     const f = CAP_FIELDS[field];
     if (!f.input) return;
-    const val = clampCap(f.input.value, f.def);
+    const val = clampCap(f.input.value, f.def, f.min);
     f.input.value = String(val); // normalizza eventuali fuori-range
     try {
       // Scrive su Firestore (la config che il server dei verdetti legge); il
@@ -571,7 +572,7 @@
         if (r?.error) console.error(`[manage] salvataggio ${field}:`, r.error);
         return;
       }
-      const saved = clampCap(r[field] != null ? r[field] : val, f.def);
+      const saved = clampCap(r[field] != null ? r[field] : val, f.def, f.min);
       f.input.value = String(saved);
       chrome.storage.local.set({ [f.cacheKey]: saved }).catch(() => {});
       setCapMsg(field, 'Salvato.', 'ok');

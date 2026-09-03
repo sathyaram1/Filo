@@ -124,6 +124,9 @@
   // sorgente, letta dalla dashboard e incorporata dal server al deploy.
   const AUTOMATION = {
     LOOP_CAP_MIN: 1,
+    // Il tetto dei «migliorabile» può essere 0 (dal 2026-09-03: un migliorabile
+    // passa subito); quello dei «fail» no, o la pratica non si fermerebbe mai.
+    IMPROVABLE_CAP_MIN: 0,
     LOOP_CAP_MAX: 10,
     // Timeout di ogni giudice di sicurezza (secondi). I modelli "thinking"
     // ragionano per qualche secondo prima del verdetto: troppo basso e quel
