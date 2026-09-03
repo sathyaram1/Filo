@@ -232,22 +232,8 @@ test('#509 giro4 — pannello vecchio: la scrittura che cancellerebbe una confer
   expect(prima.join('|')).toContain('Archivia');
 
   // Sotto le mani, l'attacco diventa CONFERMATO (l'ha fatto l'altra pagina).
-  await mg.evaluate(() => {
-    // niente re-render del dettaglio: cambio solo il dato
-    const arr = window.__mgTest.currentOrder ? null : null;
-  });
-  await mg.evaluate(() => {
-    const btn = null;
-  });
-  await mg.evaluate(() => {
-    // muta il dato in memoria senza toccare il pannello aperto
-    const ev = new Event('noop');
-  });
-  await mg.evaluate(() => {
-    const app = window;
-    // accesso al dato via il modulo: rileggo dalla lista renderizzata non basta.
-  });
-  // Via ufficiale: reinietto la coda con lo stato cambiato, il pannello resta.
+  // Reinietto la coda con lo stato cambiato: la lista si ridisegna, il pannello
+  // aperto resta com'è.
   await mg.evaluate((coda) => {
     const c = coda.map((f) => (f._id === 'a02' ? { ...f, status: 'attack_confirmed' } : f));
     // setData ridisegna la lista ma NON chiude il dettaglio aperto
