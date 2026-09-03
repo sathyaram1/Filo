@@ -1,6 +1,6 @@
 // Feedback #190.3 "Incollare immagini/file nei commenti della dashboard".
 // L'admin deve poter ALLEGARE immagini e file mentre commenta un feedback, in
-// tutti i compositori (note di triage su Ricevuti/Da risolvere, risposta nei
+// tutti i compositori (note di triage su Ricevuti/In coda, risposta nei
 // Chiarimenti), e l'allegato deve restare ANCORATO al singolo turno — non finire
 // nella griglia immagini della segnalazione originale (scelta di design (b)).
 //
@@ -103,7 +103,7 @@ test('un allegato in una RISPOSTA si mostra nella sua bolla, NON nella segnalazi
     createdAt: new Date().toISOString(),
   });
 
-  await page.locator('[data-tab="done"]').click();
+  await page.locator('[data-tab="resolved"]').click();
 
   // L'allegato compare — e si RISOLVE come immagine — nell'area immagini della
   // bolla RISPOSTA (lato utente, non report). Col decrypt mockato (admin vero),
@@ -121,7 +121,7 @@ test('un allegato in una RISPOSTA si mostra nella sua bolla, NON nella segnalazi
   await expect(replyBubble).not.toContainText('@@filo-attachment');
 });
 
-test('Chiarimenti: allegare un file alla risposta lo ancora al turno (URL nelle note)', async ({ app, openTab }) => {
+test('Domande di Filo: allegare un file alla risposta lo ancora al turno (URL nelle note)', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
 
   await setupAdmin(app, page, {
@@ -134,7 +134,7 @@ test('Chiarimenti: allegare un file alla risposta lo ancora al turno (URL nelle 
     createdAt: new Date().toISOString(),
   }, /* captureUpdates */ true);
 
-  await page.locator('[data-tab="clarify"]').click();
+  await page.locator('[data-tab="inbox"]').click();
 
   const card = page.locator('.fb-card');
   const reply = card.locator('.fb-reply-text');
@@ -163,7 +163,7 @@ test('Chiarimenti: allegare un file alla risposta lo ancora al turno (URL nelle 
   expect(upd.notes).toContain('screen.png');
 });
 
-test('Da risolvere: allegare alla nota la salva subito nelle note (persistita)', async ({ app, openTab }) => {
+test('In coda: allegare alla nota la salva subito nelle note (persistita)', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
 
   await setupAdmin(app, page, {
@@ -176,7 +176,7 @@ test('Da risolvere: allegare alla nota la salva subito nelle note (persistita)',
     createdAt: new Date().toISOString(),
   }, /* captureUpdates */ true);
 
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
 
   const card = page.locator('.fb-card');
   await card.locator('.fb-notes').fill('Riprodotto, allego il log.');

@@ -9,7 +9,17 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/feedback.js"></script>
+  <!-- Vocabolario UNICO della macchina a stati + la logica di sezione condivisa
+       con la dashboard di gestione (#509). Prima questa pagina aveva una sua
+       tassonomia (new/draft/todo/review/blocked/clarify/done/verified) e mandava
+       in "Ricevuti" tutto ciò che non riconosceva: le stesse segnalazioni si
+       leggevano "Ricevuti (3)" di là e "Ricevuti (9)" di qua. L'ordine conta:
+       feedbackStatus legge le tabelle di feedbackTransitions, manageReview legge
+       feedbackStatus. -->
+  <script src="filo://shared/feedbackTransitions.js"></script>
+  <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
+  <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
   <style>
     .fb-list { display: flex; flex-direction: column; gap: 16px; }
@@ -68,8 +78,44 @@
     }
     .fb-lightbox img { max-width: 95vw; max-height: 95vh; }
     .fb-lightbox.open { display: flex; }
+    .fb-filter {
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      font-size: 12px; color: var(--sn-muted); cursor: pointer;
+    }
+    .fb-filter:hover { color: var(--sn-fg); }
     .fb-actions { margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
-    .fb-card--done { opacity: 0.65; }
+    /* UN CLIC, UNA SCHEDA. Mentre la scrittura è in volo la scheda si spegne:
+       il clic si VEDE (prima non si vedeva niente, ed è per questo che veniva
+       naturale premere una seconda volta) e nessun pulsante suo resta
+       premibile. Poi la scheda resta al proprio posto con l'esito scritto:
+       niente si sposta da sotto il puntatore fermo. */
+    .fb-card--busy { opacity: 0.55; }
+    .fb-card--busy .sn-btn { cursor: progress; }
+    .fb-act--busy { position: relative; }
+    .fb-act--busy::after {
+      content: '…'; margin-left: 6px;
+      animation: fb-pulse 900ms ease-in-out infinite;
+    }
+    @keyframes fb-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+    .fb-card--decisa { opacity: 0.55; }
+    .fb-no-sections { margin: 0 0 12px; font-size: 12px; color: var(--sn-muted); }
+    .fb-esito {
+      font-size: 12px; color: var(--sn-muted);
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    @media (prefers-reduced-motion: reduce) { .fb-act--busy::after { animation: none; } }
+    /* Le sezioni sono quattro, ma gli stati dentro "Ricevuti"/"In coda" sono
+       tanti: l'etichetta dello stato sta sulla card, come nella gemella. */
+    .fb-state {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--sn-muted);
+    }
+    .fb-state-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      border: 1px solid var(--sn-border); background: currentColor;
+    }
+    .fb-state-reason { font-style: italic; }
+    .fb-card--tab-resolved, .fb-card--tab-archived { opacity: 0.65; }
     .fb-notes-label { display: block; margin-top: 10px; font-size: 12px; color: var(--sn-muted); }
     .fb-notes { width: 100%; box-sizing: border-box; margin-top: 4px; padding: 6px 8px; font: inherit; font-size: 13px; background: var(--sn-bg, transparent); color: inherit; border: 1px solid var(--sn-border); border-radius: 6px; resize: vertical; }
     .fb-usernote-label { display: block; margin-top: 10px; font-size: 12px; color: var(--sn-muted); }
@@ -168,10 +214,18 @@
     /* Feedback visivo quando si trascina un file sopra una textarea-composer. */
     .fb-drop-hover { outline: 2px dashed var(--sn-accent); outline-offset: -2px; }
     .fb-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--sn-border); }
+    /* `display: flex` batte l'attributo hidden: senza questa riga la barra
+       resterebbe a schermo anche quando la pagina decide di non disegnarla. */
+    .fb-tabs[hidden] { display: none; }
     .fb-tab {
       background: transparent; border: 0; padding: 8px 14px;
       color: var(--sn-muted); cursor: pointer; font: inherit;
       border-bottom: 2px solid transparent; margin-bottom: -1px;
+      /* Il numero fa corpo unico col nome: la barra manda a capo le SCHEDE
+         INTERE (flex-wrap sul contenitore), la singola scheda non si spezza
+         mai — o alla larghezza minima si leggeva "In" / "coda" / "(0)" su tre
+         righe, col numero staccato dal nome che qualifica. */
+      white-space: nowrap;
     }
     .fb-tab--active { color: var(--sn-text, inherit); border-bottom-color: currentColor; }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
@@ -267,20 +321,33 @@
       </div>
     </div>
 
+    <!-- Le sezioni sono quelle della macchina a stati, identiche alla dashboard
+         di gestione (#509): stesso nome, stessa regola, stesso numero — che è
+         il punto, visto che sono la stessa barra vista da due ruoli. -->
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
-      <button type="button" class="fb-tab" data-tab="agent">Agente</button>
-      <button type="button" class="fb-tab" data-tab="draft">Bozze</button>
-      <button type="button" class="fb-tab" data-tab="todo">Da risolvere</button>
-      <button type="button" class="fb-tab" data-tab="review">In revisione</button>
-      <button type="button" class="fb-tab" data-tab="blocked">Bloccati</button>
-      <button type="button" class="fb-tab" data-tab="clarify">Chiarimenti</button>
-      <button type="button" class="fb-tab" data-tab="done">Risolti</button>
-      <button type="button" class="fb-tab" data-tab="verified">Verificati</button>
+      <button type="button" class="fb-tab" data-tab="queue">In coda</button>
+      <button type="button" class="fb-tab" data-tab="resolved">Risolti</button>
+      <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>
     </div>
+
+    <!-- Lo stato di un feedback viaggia cifrato: senza la chiave dell'owner
+         resta un blob. Chi non può leggerlo non può sapere in che sezione va,
+         e allora le sezioni non si disegnano: prima la pagina le mostrava
+         tutte e quattro, scriveva "In coda (0) · Risolti (0) · Archiviati (0)"
+         e ammucchiava tutto nei Ricevuti, risolti compresi. -->
+    <p class="fb-no-sections" id="noSections" hidden></p>
 
     <div class="fb-toolbar">
       <input type="search" id="search" class="fb-search" placeholder="Cerca per testo, URL, clientId…" />
+      <!-- I ritrovamenti automatici (agente esploratore e audit delle routine)
+           avevano una sezione tutta loro; una sezione in più però è una regola
+           in più che diverge dalla gemella. Sono un FILTRO: la sezione resta
+           quella della macchina a stati, e il numero segue il filtro. -->
+      <label class="fb-filter" title="Mostra solo i ritrovamenti dell'agente esploratore e degli audit delle routine">
+        <input type="checkbox" id="agentOnly" />
+        <span>🤖 Solo automatici</span>
+      </label>
       <button class="sn-btn sn-btn-secondary" id="refresh">Aggiorna</button>
       <span class="fb-count" id="count"></span>
     </div>

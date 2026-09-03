@@ -931,3 +931,184 @@ test('reasonText: traduce i codici noti e lascia passare gli ignoti', () => {
   assert.equal(MR.reasonText('boh-nuovo'), 'boh-nuovo');
   assert.equal(MR.reasonText(null), '');
 });
+
+// ── Stato illeggibile: la regola delle sezioni, in un posto solo (#509) ──────
+//
+// Senza il fix questi assert sono rossi: la regola viveva dentro
+// src/pages/feedback/feedback.js, quindi non esisteva come funzione condivisa e
+// la dashboard di gestione continuava a disegnare quattro sezioni su stati che
+// non sapeva leggere.
+
+const CIFRATO = 'FENC1:AAAAAAAAAAAAAAAAAAAAAAAA';
+
+test('statusUnreadable: solo il ciphertext, non gli stati storti', () => {
+  assert.equal(MR.statusUnreadable({ status: CIFRATO }), true);
+  assert.equal(MR.statusUnreadable({ status: '[cifrato]' }), true);
+  // Stato assente, vuoto o inventato: la macchina lo scioglie davvero
+  // (→ unlabeled). Toglierci le sezioni sarebbe sproporzionato.
+  assert.equal(MR.statusUnreadable({}), false);
+  assert.equal(MR.statusUnreadable({ status: '' }), false);
+  assert.equal(MR.statusUnreadable({ status: 'pinco-pallino' }), false);
+  assert.equal(MR.statusUnreadable({ status: 'todo' }), false);
+  assert.equal(MR.statusUnreadable(null), false);
+});
+
+test('sectionsReliable: sezioni via solo se NESSUNO stato si legge', () => {
+  const cifrato = { _id: 'a', status: CIFRATO };
+  const chiaro = { _id: 'b', status: 'todo' };
+  // Coda vuota: niente dice il contrario, e "(0)" lì è la verità.
+  assert.equal(MR.sectionsReliable([]), true);
+  assert.equal(MR.sectionsReliable(undefined), true);
+  assert.equal(MR.sectionsReliable([chiaro, chiaro]), true);
+  // Caso misto: un documento storto non toglie le sezioni a tutti (e non fa
+  // divergere le due pagine, che è il difetto che #509 esiste per togliere).
+  assert.equal(MR.sectionsReliable([cifrato, chiaro]), true);
+  // Nessuna chiave su questo computer: nessuno stato si legge.
+  assert.equal(MR.sectionsReliable([cifrato, cifrato]), false);
+});
+
+test('publicStateLabel: aperta/chiusa, e niente quando non si sa nemmeno quello', () => {
+  assert.equal(MR.publicStateLabel({ statusPublic: 'open' }), 'Aperta');
+  assert.equal(MR.publicStateLabel({ statusPublic: 'closed' }), 'Chiusa');
+  assert.equal(MR.publicStateLabel({}), '');
+  assert.equal(MR.publicStateLabel({ statusPublic: 'boh' }), '');
+});
+
+test('judgesNote: stato cifrato → nessuna frase (non "In attesa del giudizio")', () => {
+  // Prima diceva "In attesa del giudizio." anche su una segnalazione già
+  // CHIUSA: la macchina la riduceva a `unlabeled` senza verdetti.
+  assert.equal(MR.judgesNote({ status: CIFRATO, statusPublic: 'closed' }), null);
+  assert.equal(MR.judgesNote({ status: CIFRATO, statusPublic: 'open' }), null);
+});
+
+// ── ownerActions: LE AZIONI, una tabella sola per tutte le superfici (#509) ─
+//
+// Il difetto che questi test tengono chiuso: le due pagine avevano finito per
+// disegnare le stesse sezioni ma ci mettevano sopra due insiemi di pulsanti
+// diversi, e sulla STESSA segnalazione offrivano cose diverse. Il caso più
+// pesante: negli Archiviati la dashboard di gestione offriva "Archivia" al
+// posto di "Ripristina", e premerlo su un attacco confermato ci scriveva sopra
+// `archived`, cancellando in silenzio una decisione di sicurezza.
+
+const chiavi = (fb, opts) => MR.ownerActions(fb, opts).map((a) => a.key);
+const stati  = (fb, opts) => MR.ownerActions(fb, opts).map((a) => a.to);
+
+test('ownerActions: Ricevuti → in coda, le conferme che servono, archivia', () => {
+  // Allineato: nessuna conferma da offrire.
+  assert.deepEqual(chiavi({ status: 'aligned' }), ['accept', 'archive']);
+  // Attacco: una conferma sola, quella giusta.
+  assert.deepEqual(chiavi({ status: 'attack' }), ['accept', 'confirm_attack', 'archive']);
+  assert.deepEqual(chiavi({ status: 'spam' }), ['accept', 'confirm_spam', 'archive']);
+  // File sospetto: non è ancora classificato, quindi le conferme sono DUE.
+  // Ne offriva una sola sulla dashboard di gestione: una delle due decisioni
+  // esisteva su una strada sola.
+  assert.deepEqual(chiavi({ status: 'suspicious_file' }),
+    ['accept', 'confirm_attack', 'confirm_spam', 'archive']);
+  assert.deepEqual(stati({ status: 'suspicious_file' }),
+    ['todo', 'attack_confirmed', 'spam_confirmed', 'archived']);
+});
+
+test('ownerActions: In coda → chiudi a mano o archivia; un `done` non ancora uscito non si richiude', () => {
+  assert.deepEqual(chiavi({ status: 'todo' }), ['resolve', 'archive']);
+  assert.deepEqual(chiavi({ status: 'working' }), ['resolve', 'archive']);
+  assert.deepEqual(chiavi({ status: 'revision_security' }), ['resolve', 'archive']);
+  // `done` col fix non ancora rilasciato resta visibile "In coda": lì "Risolto"
+  // non ha senso (lo è già), archiviare sì.
+  const nonUscito = { status: 'done', resolvedInVersion: '9.9.9' };
+  assert.equal(MR.manageTabFor(nonUscito, { releasedVersion: '1.0.0' }), 'queue');
+  assert.deepEqual(chiavi(nonUscito, { releasedVersion: '1.0.0' }), ['archive']);
+});
+
+test('ownerActions: un fix USCITO si può riaprire (mancava su «Gestione»)', () => {
+  const uscito = { status: 'done', resolvedInVersion: '1.0.0' };
+  assert.equal(MR.manageTabFor(uscito, { releasedVersion: '1.0.0' }), 'resolved');
+  assert.deepEqual(chiavi(uscito, { releasedVersion: '1.0.0' }), ['archive', 'reopen']);
+  const reopen = MR.ownerActionFor(uscito, 'reopen', { releasedVersion: '1.0.0' });
+  assert.equal(reopen.to, 'todo');
+  assert.equal(reopen.kind, 'reopen');
+});
+
+test('ownerActions: negli Archiviati c\'è SOLO il ripristino — per tutte e cinque le forme', () => {
+  // L'invariante: se puoi archiviare, puoi togliere dall'archivio. Su
+  // «Gestione» valeva solo per l'archiviata "normale"; le altre quattro non si
+  // potevano più togliere dall'archivio da quella pagina.
+  for (const fb of [
+    { status: 'archived' },
+    { status: 'attack_confirmed' },
+    { status: 'spam_confirmed' },
+    { status: 'verified' },          // legacy → archived
+    { status: 'ignored' },           // legacy → archived
+  ]) {
+    assert.equal(MR.manageTabFor(fb), 'archived', `sezione di ${fb.status}`);
+    assert.deepEqual(chiavi(fb), ['restore'], `azioni di ${fb.status}`);
+    assert.deepEqual(stati(fb), ['todo'], `destinazione di ${fb.status}`);
+  }
+});
+
+test('ownerActions: nessun cammino riscrive «archiviato» sopra una conferma', () => {
+  // La cosa più pesante del giro: su un attacco confermato l'unico bottone
+  // disponibile scriveva `archived` sopra la conferma, senza avviso, e da lì la
+  // segnalazione era indistinguibile da una archiviata qualsiasi.
+  for (const status of ['attack_confirmed', 'spam_confirmed']) {
+    assert.equal(MR.ownerActionAllowsStatus({ status }, 'archived'), false, status);
+    assert.equal(MR.ownerActionAllowsStatus({ status }, 'todo'), true, status);
+    // E nemmeno da un'altra direzione: la conferma non si riscrive con se stessa.
+    assert.equal(MR.ownerActionAllowsStatus({ status }, 'attack_confirmed'), false, status);
+    assert.equal(MR.ownerActionAllowsStatus({ status }, 'spam_confirmed'), false, status);
+    assert.equal(MR.ownerActionAllowsStatus({ status }, 'done'), false, status);
+  }
+});
+
+test('ownerActions: stato illeggibile → nessuna azione (su tutte le superfici)', () => {
+  // I pulsanti nascono dalla sezione, e la sezione qui non si sa: la macchina
+  // ridurrebbe la segnalazione a `unlabeled` e offrirebbe "→ In coda" su una
+  // pratica che potrebbe essere già chiusa.
+  assert.deepEqual(MR.ownerActions({ status: CIFRATO, statusPublic: 'closed' }), []);
+  assert.deepEqual(MR.ownerActions({ status: CIFRATO, statusPublic: 'open' }), []);
+  assert.equal(MR.ownerActionAllowsStatus({ status: CIFRATO }, 'todo'), false);
+  assert.equal(MR.ownerActionAllowsStatus({ status: CIFRATO }, 'archived'), false);
+});
+
+test('ownerActions: stati storti (assente, vuoto, nullo, inventato) → trattati come Ricevuti', () => {
+  for (const fb of [{}, { status: '' }, { status: null }, { status: 'zzz-inventato' }]) {
+    assert.deepEqual(chiavi(fb), ['accept', 'archive'], JSON.stringify(fb));
+  }
+});
+
+test('ownerActionAllowsStatus: passa solo ciò che la segnalazione offre ORA', () => {
+  assert.equal(MR.ownerActionAllowsStatus({ status: 'attack' }, 'attack_confirmed'), true);
+  assert.equal(MR.ownerActionAllowsStatus({ status: 'attack' }, 'spam_confirmed'), false);
+  assert.equal(MR.ownerActionAllowsStatus({ status: 'spam' }, 'attack_confirmed'), false);
+  assert.equal(MR.ownerActionAllowsStatus({ status: 'todo' }, 'done'), true);
+  assert.equal(MR.ownerActionAllowsStatus({ status: 'archived' }, 'done'), false);
+});
+
+// ── stateBadge: le stesse parole su tutte e due le pagine ─────────────────
+
+test('stateBadge: etichetta, colore e motivo dal vocabolario unico', () => {
+  const b = MR.stateBadge({ status: 'attack_confirmed' });
+  assert.equal(b.label, 'Attacco confermato');
+  assert.equal(b.encrypted, false);
+  assert.match(b.hint, /^Stato: Attacco confermato/);
+  // Il motivo si scrive solo se ha una traduzione umana.
+  const conMotivo = MR.stateBadge({ status: 'design', statusReason: 'secaudit' });
+  assert.equal(conMotivo.showReason, true);
+  assert.equal(conMotivo.reasonText, 'bloccato dalla sicurezza');
+  const motivoGrezzo = MR.stateBadge({ status: 'archived', statusReason: 'legacy-ignored' });
+  assert.equal(motivoGrezzo.showReason, false);
+});
+
+test('stateBadge: stato cifrato → solo aperta/chiusa, o niente', () => {
+  assert.equal(MR.stateBadge({ status: CIFRATO, statusPublic: 'closed' }).label, 'Chiusa');
+  assert.equal(MR.stateBadge({ status: CIFRATO, statusPublic: 'closed' }).encrypted, true);
+  assert.equal(MR.stateBadge({ status: CIFRATO, statusPublic: 'open' }).label, 'Aperta');
+  assert.equal(MR.stateBadge({ status: CIFRATO }), null);
+});
+
+test('valueUnreadable: riconosce i campi arrivati cifrati (revisione dell\'owner)', () => {
+  assert.equal(MR.valueUnreadable(CIFRATO), true);
+  assert.equal(MR.valueUnreadable('[cifrato: chiave assente]'), true);
+  assert.equal(MR.valueUnreadable('accepted'), false);
+  assert.equal(MR.valueUnreadable(''), false);
+  assert.equal(MR.valueUnreadable(undefined), false);
+});

@@ -22,6 +22,7 @@
       ],
       fixes: [
         'Quando la risposta dell\'assistente arrivava in un formato illeggibile, in chat compariva testo pieno di parentesi e virgolette. Ora Filo riprova da solo un paio di volte prima di mostrartela: quel testo strano dovresti vederlo molto più di rado.',
+        'Le tue segnalazioni non finiscono più tutte sotto «Ricevuti» con le altre sezioni a zero, né nella pagina dei feedback né in «Gestione». Le trovi in un elenco solo, e accanto a ognuna c\'è scritto se è aperta o chiusa.',
       ],
     },
     {

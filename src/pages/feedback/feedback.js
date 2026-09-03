@@ -1,8 +1,28 @@
 // Dashboard interna: triage dei feedback alpha.
 // Stato/note salvati su Firestore (via SN_FEEDBACK.updateStatus).
+//
+// LE SEZIONI SONO QUELLE DELLA MACCHINA A STATI (#509). Questa pagina aveva una
+// tassonomia sua — new/draft/todo/review/blocked/clarify/done/verified — che
+// non era più quella di nessuno: gli stati canonici che non riconosceva
+// (archived, working, attack_confirmed…) finivano tutti in "Ricevuti". Con i
+// numeri accanto ai nomi (#495) il difetto è diventato visibile: le stesse
+// segnalazioni si leggevano "Ricevuti (3)" nella dashboard di gestione e
+// "Ricevuti (9)" qui, e chi guardava una pagina sola non aveva modo di
+// accorgersene. Ora sezione, ordinamento e conteggio passano dalle STESSE
+// funzioni pure della gemella (SN_MANAGE_REVIEW): due liste calcolate dallo
+// stesso codice non possono divergere.
 
 (function () {
   'use strict';
+
+  // Vocabolario unico della macchina a stati + logica di sezione condivisa.
+  // Se mancano, fermarsi subito con un errore leggibile è meglio di una pagina
+  // che disegna sezioni vuote senza dire perché.
+  const FS = window.SN_FB_STATUS;
+  const MR = window.SN_MANAGE_REVIEW;
+  if (!FS || !MR) {
+    throw new Error('feedback.js: carica shared/feedbackTransitions.js, feedbackStatus.js e manageReview.js prima di questa pagina');
+  }
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
@@ -12,6 +32,8 @@
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightboxImg');
   const tabsEl = document.getElementById('tabs');
+  const noSectionsEl = document.getElementById('noSections');
+  const agentOnlyEl = document.getElementById('agentOnly');
   const adminBanner = document.getElementById('adminBanner');
   const adminBannerText = document.getElementById('adminBannerText');
   const adminSignInBtn = document.getElementById('adminSignIn');
@@ -36,13 +58,30 @@
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // 'inbox' = ricevuti (status: new); 'draft' = bozze (richiedono decisioni di
-  // design); 'todo' = da risolvere; 'clarify' = bloccati su ambiguità/info
-  // mancanti (le routine cloud li spostano qui quando non possono procedere);
-  // 'done' = risolti (in attesa di verifica); 'verified' = verificati dall'utente.
-  // I 'ignored' restano nascosti (raggiungibili solo riaprendoli via DB).
+  // Le quattro sezioni della macchina a stati, le stesse della dashboard di
+  // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
+  // In coda (l'iter di lavorazione), 'resolved' Risolti (fix usciti davvero in
+  // una versione rilasciata), 'archived' Archiviati.
+  const TABS = ['inbox', 'queue', 'resolved', 'archived'];
+  const TAB_LABELS = {
+    inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
+  };
+  const TAB_EMPTY = {
+    inbox: 'Nessun feedback in attesa di una tua decisione.',
+    queue: 'Nessun feedback in lavorazione.',
+    resolved: 'Nessun fix uscito in una versione rilasciata.',
+    archived: 'Nessun feedback archiviato.',
+  };
+
   let all = [];
   let currentTab = 'inbox';
+  // Solo i ritrovamenti automatici (agente esploratore + audit delle routine).
+  // Era una sezione a sé; adesso è un filtro trasversale alle quattro sezioni.
+  let agentOnly = false;
+  // DB3: la versione dell'app in esecuzione è, per definizione, l'ultima
+  // rilasciata. Senza, un `done` non ancora spedito comparirebbe in "Risolti"
+  // qui e in "In coda" nella gemella — la divergenza da capo.
+  let releasedVersion = '';
   // I feedback sono arrivati davvero (vs. caricamento in corso o fallito).
   // Finché è false la pagina non conosce nessun numero: le sezioni restano col
   // solo nome — stessa cautela della dashboard di gestione (#495).
@@ -57,16 +96,44 @@
   // atterrerebbe DOPO e sovrascriverebbe quello più recente.
   let loadGen = 0;
 
-  // Ritrovamenti automatici → categoria "Agente". Due fonti:
+  // Stato CANONICO di un feedback (spec FEEDBACK-STATES.md §2). Unica porta
+  // d'ingresso: normalizeStatus scioglie anche gli stati legacy dello storico
+  // (new/blocked/draft/review/clarify/verified/ignored).
+  function statusOf(f) {
+    return MR.normalizeStatus(f).status;
+  }
+  function statusReasonOf(f) {
+    return MR.normalizeStatus(f).statusReason;
+  }
+
+  // Sezione di un feedback: la STESSA funzione della dashboard di gestione.
+  function tabOf(f) {
+    return MR.manageTabFor(f, { releasedVersion });
+  }
+
+  // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
+  // La REGOLA (cos'è illeggibile, quando la barra sparisce, che parole si
+  // scrivono al suo posto) vive nel modulo condiviso, insieme alla tassonomia
+  // delle sezioni: tenerne una copia qui è esattamente il modo in cui questa
+  // pagina e la dashboard di gestione hanno divergito (#509).
+  function statoCifrato(f) {
+    return MR.statusUnreadable(f);
+  }
+  function sezioniAttendibili() {
+    return MR.sectionsReliable(all);
+  }
+
+  // Ritrovamenti automatici (filtro "Solo automatici"). Due fonti:
   //   - agente esploratore LLM: clientId "agent:<model>" (vedi tests/agent/feedback.mjs);
-  //   - audit proattivo di una routine cloud: clientId "routine:<slug>" e status
-  //     `new` (l'audit deposita i ritrovamenti come `new`). I sub-feedback di una
-  //     routine portano lo stesso prefisso ma nascono `todo`/`clarify`: NON sono
-  //     ritrovamenti d'agente, quindi qui si escludono col vincolo su status.
+  //   - audit proattivo di una routine cloud: clientId "routine:<slug>" ancora
+  //     da triagiare (status canonico `unlabeled`, o il legacy `new` che ci si
+  //     normalizza). I sub-feedback di una routine portano lo stesso prefisso ma
+  //     nascono `todo`/`design`: NON sono ritrovamenti d'agente, quindi qui si
+  //     escludono col vincolo sullo stato.
   function isAgent(f) {
     const c = String(f.clientId || '');
     if (c.startsWith('agent:')) return true;
-    if (c.startsWith('routine:') && (f.status || 'new') === 'new') return true;
+    if (c.startsWith('routine:') && statusOf(f) === 'unlabeled') return true;
     return false;
   }
   // Origine del feedback (per la colorazione di card/bolle). Delega alla logica
@@ -136,25 +203,27 @@
     return `<span class="fb-branch" title="Branch del fix: ${escapeHtml(b)}">⎇ ${escapeHtml(b)}</span>`;
   }
 
-  function statusOf(f) {
-    const s = f.status || 'new';
-    if (s === 'ignored') return 'ignored';
-    if (s === 'done') return 'done';
-    if (s === 'verified') return 'verified';
-    // Le issue d'agente NON triagiate (status new) vivono nella loro categoria,
-    // così non annegano i feedback degli utenti reali. Promuovendole a "todo"
-    // entrano nel flusso normale (restano marcate come agente dai badge).
-    if (isAgent(f) && s === 'new') return 'agent';
-    if (s === 'new') return 'inbox';
-    if (s === 'draft') return 'draft';
-    if (s === 'todo') return 'todo';
-    // Cancello di merge delle routine: `review` = fix pronto su un branch in
-    // attesa di verifica avversariale; `blocked` = in pausa (3 loop falliti o
-    // file sensibile), decide l'utente. Entrambi mostrano il branch.
-    if (s === 'review') return 'review';
-    if (s === 'blocked') return 'blocked';
-    if (s === 'clarify') return 'clarify';
-    return 'inbox';
+  // Etichetta dello stato sulla card. Le sezioni sono quattro, ma dentro
+  // "Ricevuti" e "In coda" vivono stati diversi (allineato vs attacco, in
+  // lavorazione vs audit di sicurezza): senza questa riga la card non direbbe
+  // più a che punto è. Colore e testo vengono dal vocabolario unico, il motivo
+  // (`statusReason`) dalla traduzione condivisa.
+  function stateBadgeHtml(f) {
+    // Stato cifrato: qui non c'è uno stato da leggere, e la macchina lo
+    // ridurrebbe a "Non filtrato" anche su un feedback già chiuso — la stessa
+    // bugia delle sezioni, in piccolo. L'unica cosa vera che questa macchina
+    // ha in mano è l'enum grossolano in chiaro (`statusPublic`), lo stesso che
+    // guarda la ricompensa: aperta o chiusa, niente di più.
+    // Le PAROLE (etichetta, motivo, hover) vengono dal modulo condiviso: la
+    // dashboard di gestione mostra la stessa riga, e due copie di questo
+    // calcolo sono esattamente il modo in cui le due pagine hanno divergito.
+    const b = MR.stateBadge(f);
+    if (!b) return '';
+    const dot = b.color
+      ? `<span class="fb-state-dot" style="color:${escapeHtml(b.color)}"></span>`
+      : '';
+    return `<span class="fb-state" title="${escapeHtml(b.hint)}">${dot}${escapeHtml(b.label)}`
+      + `${b.showReason ? ` <span class="fb-state-reason">— ${escapeHtml(b.reasonText)}</span>` : ''}</span>`;
   }
 
   function fmtTs(ts) {
@@ -414,13 +483,18 @@
   // testo che si salvano da sole mentre ci si scrive dentro: ridisegnare
   // rimpiazza la casella sotto le dita — mangia gli spazi appena battuti e fa
   // sparire il pulsante che si stava per premere, così il primo clic va perso.
-  async function patch(id, payload, optimistic, { silenzioso = false } = {}) {
+  // `inPlace`: non ridisegnare la lista MAI, né al successo né all'errore. Lo
+  // usano le azioni della scheda, che si aggiornano da sole al proprio posto
+  // (vedi "Un clic, una scheda" più sotto): anche un ridisegno al fallimento
+  // rimescolerebbe la lista sotto il puntatore fermo.
+  // Ritorna true se la scrittura è andata a buon fine.
+  async function patch(id, payload, optimistic, { silenzioso = false, inPlace = false } = {}) {
     if (!isAdmin) {
       alert('Operazione riservata agli amministratori: accedi con un account autorizzato.');
-      return;
+      return false;
     }
     const item = all.find((f) => f._id === id);
-    if (!item) return;
+    if (!item) return false;
     // Non si riscrive una conversazione che non si è potuta leggere. Il guardiano
     // sta QUI e non sui singoli pulsanti perché i cammini che scrivono le note
     // sono più d'uno (la casella, gli allegati, la risposta ai chiarimenti): uno
@@ -429,93 +503,198 @@
     if (item.reportIllegibile && payload && typeof payload.notes === 'string') {
       alert('Il report di questo feedback non è leggibile su questo computer: manca la chiave privata. '
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
-      return;
+      return false;
     }
-    const prev = { status: item.status, notes: item.notes, userNote: item.userNote, priority: item.priority };
+    // Un cambio di stato passa SOLO se è una delle azioni che la segnalazione
+    // offre in questo momento (la stessa tabella che disegna i pulsanti). Il
+    // guardiano sta qui e non sui pulsanti: uno stato può essere cambiato
+    // mentre il pannello era aperto, e senza questo il clic scriverebbe una
+    // decisione che la pagina non offre più — è così che un attacco confermato
+    // si ritrovava riscritto ad "archiviato".
+    if (payload && payload.status !== undefined
+        && !MR.ownerActionAllowsStatus(item, payload.status, { releasedVersion })) {
+      alert('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile. Aggiorna la lista e riprova.');
+      return false;
+    }
+    // Tutto ciò che l'aggiornamento ottimistico può toccare va salvato: se la
+    // scrittura fallisce, ripristinarne solo una parte lascia la card che dice
+    // una cosa e il database un'altra.
+    const prev = {
+      status: item.status, notes: item.notes, userNote: item.userNote,
+      priority: item.priority, reviewDecision: item.reviewDecision,
+      archiveOverride: item.archiveOverride, starred: item.starred,
+    };
     Object.assign(item, optimistic);
-    if (!silenzioso) applyFilter();
+    if (!silenzioso && !inPlace) applyFilter();
     try {
       // Instradata dal main process, che allega il Firebase ID token come
       // Bearer e rifiuta se l'utente loggato non è admin (i token non sono mai
       // esposti alle pagine — vedi SECURITY.md §3).
       const r = await sendToMain({ type: 'feedback_update', id, ...payload });
       if (!r || r.ok === false) throw new Error(r?.error || 'aggiornamento rifiutato');
+      return true;
     } catch (e) {
       Object.assign(item, prev);
-      applyFilter();
+      if (!inPlace) applyFilter();
       alert('Errore: ' + (e?.message || e));
+      return false;
     }
   }
 
+  // I pulsanti scrivono STATI CANONICI, gli stessi che scrive la dashboard di
+  // gestione. Prima scrivevano il vocabolario vecchio (new/draft/verified/
+  // ignored/blocked): ogni clic spingeva il feedback FUORI dalla macchina a
+  // stati, e la gemella doveva poi ridurlo a forza. Due cammini equivalenti
+  // devono fare la stessa cosa, non due cose che si somigliano.
+  // QUALI azioni esistono lo decide il modulo condiviso (MR.ownerActions): la
+  // dashboard di gestione legge la stessa tabella, quindi sulla stessa
+  // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
+  // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
-    const tab = statusOf(f);
-    if (tab === 'agent') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
-      `;
+    // Stato illeggibile: i pulsanti nascono dalla sezione, e la sezione qui non
+    // si sa. Offrire "→ In coda" a un feedback che potrebbe essere già chiuso
+    // sarebbe peggio che non offrire niente. (ownerActions lo verifica sulla
+    // singola scheda; qui vale anche per la lista intera.)
+    if (!sezioniAttendibili()) return '';
+    const id = escapeHtml(f._id);
+    const EXTRA = { accept: ' data-accept="1"', reject: ' data-reject="1"',
+      archive: ' data-archive="1"', restore: ' data-restore="1"' };
+    return MR.ownerActions(f, { releasedVersion }).map((a) => {
+      // "Riapri" non scrive subito: apre il modulo che chiede COSA manca ancora.
+      if (a.kind === 'reopen') {
+        return `<button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">${escapeHtml(a.label)}</button>`;
+      }
+      return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act"`
+        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}>${escapeHtml(a.label)}</button>`;
+    }).join('\n');
+  }
+
+  // ── UN CLIC, UNA SCHEDA ───────────────────────────────────────────────────
+  // Qui i pulsanti vivono DENTRO la scheda, in una lista che si riordina da sé.
+  // Finché ogni azione ridisegnava la lista, appena la scheda usciva dalla
+  // sezione le altre risalivano e sotto il puntatore FERMO arrivava il pulsante
+  // della scheda successiva: il secondo clic — anche mezzo secondo dopo, anche
+  // voluto, perché al primo non si vedeva succedere niente — cadeva su un ALTRO
+  // feedback. Due volte «→ In coda» nei Ricevuti mettevano in coda il primo e
+  // marcavano il secondo come ATTACCO CONFERMATO; due volte «Risolto» ne
+  // chiudevano due; due volte «Ripristina» ne ripristinavano due. Nella gemella
+  // non succede perché l'azione sta in un pannello fermo e riguarda la scheda
+  // selezionata.
+  //
+  // La regola che chiude tutte le porte insieme (non una per giro) è una sola:
+  // NESSUNA AZIONE PRESA DENTRO UNA SCHEDA RICOMPONE LA LISTA. La scheda si
+  // aggiorna al proprio posto — si spegne mentre scrive, poi dice cosa è
+  // successo — e la lista si ricompone solo quando lo chiedi tu (cambio
+  // sezione, ricerca, filtro, Aggiorna). Vale per tutte le vie che scrivono da
+  // una scheda: i pulsanti di stato, «Conferma riapertura», «Invia risposta» e
+  // i pallini della priorità (che in «In coda» sono un criterio di ordinamento,
+  // quindi anche loro rimescolavano la lista sotto il dito).
+
+  // Schede con una scrittura in volo: il loro secondo clic non deve partire.
+  const inScrittura = new Set();
+  // Schede su cui l'azione è già andata: restano a schermo, spente, con l'esito.
+  const decise = new Map(); // id -> esito (testo)
+  // Quante schede ha disegnato l'ultimo render: serve alla riga del totale, che
+  // non viene più riscritta a ogni azione (la lista non si ridisegna).
+  let disegnate = 0;
+
+  // Spegne TUTTI i pulsanti della scheda, non solo quello premuto: la scrittura
+  // in corso riguarda la scheda intera, e «Archivia» premuto mentre «→ In coda»
+  // è in volo scriverebbe due decisioni sullo stesso feedback.
+  function spegniScheda(card) {
+    if (!card) return;
+    card.classList.add('fb-card--busy');
+    card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  }
+
+  function riaccendiScheda(card) {
+    if (!card) return;
+    card.classList.remove('fb-card--busy');
+    card.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+  }
+
+  // Dove è finita la scheda dopo l'azione, detto con il nome della sezione che
+  // si legge nella barra. Si calcola con la stessa funzione che riempie le
+  // sezioni, così l'esito non può dire una cosa diversa da dove la scheda si
+  // troverà davvero.
+  function esitoDi(item, optimistic) {
+    const dopo = Object.assign({}, item, optimistic);
+    const dest = MR.manageTabFor(dopo, { releasedVersion });
+    const nome = TAB_LABELS[dest];
+    if (!nome || dest === currentTab) return 'Fatto';
+    return `Spostata in «${nome}»`;
+  }
+
+  // L'azione è andata: la scheda resta dov'è (nessuno la vede sparire da sotto
+  // il cursore) ma smette di essere premibile e DICE cosa è successo. Sparisce
+  // alla prima ricomposizione della lista, che è sempre una richiesta esplicita.
+  function marcaDecisa(card, esito, item) {
+    if (!card) return;
+    card.classList.remove('fb-card--busy');
+    card.classList.add('fb-card--decisa');
+    // L'etichetta dello stato si riscrive: la scheda resta a schermo, e senza
+    // questo continuerebbe a dire lo stato di prima. Su «Conferma attacco» è la
+    // differenza fra leggere "Attacco" e leggere "Attacco confermato".
+    const badge = card.querySelector('.fb-state');
+    if (badge && item) {
+      const html = stateBadgeHtml(item);
+      if (html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        if (tmp.firstElementChild) badge.replaceWith(tmp.firstElementChild);
+      }
     }
-    if (tab === 'inbox') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
-      `;
+    const box = card.querySelector('.fb-actions');
+    if (box) {
+      box.textContent = '';
+      const riga = document.createElement('div');
+      riga.className = 'fb-esito';
+      riga.textContent = `✓ ${esito}`;
+      box.appendChild(riga);
     }
-    if (tab === 'draft') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">← Ricevuti</button>
-      `;
+    // Anche le caselle: la scheda non appartiene più a questa sezione, e una
+    // casella ancora scrivibile ("Commento:") direbbe il contrario.
+    card.querySelectorAll('button, textarea, input').forEach((b) => { b.disabled = true; });
+  }
+
+  // Il totale in alto dice anche quante schede sono già state decise, altrimenti
+  // il numero della sezione (che scende subito, ed è vero) sembrerebbe non
+  // tornare con le schede che restano a schermo.
+  function aggiornaTotale() {
+    if (!disegnate) return;
+    const n = decise.size;
+    countEl.textContent = n
+      ? `${disegnate} feedback · ${n} ${n === 1 ? 'decisa' : 'decise'}`
+      : `${disegnate} feedback`;
+  }
+
+  // Il cammino unico di ogni azione presa dentro una scheda.
+  async function azioneScheda(btn, { id, payload, optimistic }) {
+    if (!id || inScrittura.has(id) || decise.has(id)) return;
+    const item = all.find((f) => f._id === id);
+    if (!item) return;
+    const card = btn.closest('.fb-card');
+    const esito = esitoDi(item, optimistic);
+    inScrittura.add(id);
+    btn.classList.add('fb-act--busy');
+    spegniScheda(card);
+    const ok = await patch(id, payload, optimistic, { inPlace: true });
+    inScrittura.delete(id);
+    // Nel frattempo la lista può essere stata ricomposta (cambio sezione,
+    // Aggiorna): la scheda di prima non è più a schermo e non c'è niente da
+    // spegnere o riaccendere. Il dato è salvato lo stesso.
+    const viva = card && card.isConnected ? card : null;
+    if (ok) {
+      decise.set(id, esito);
+      marcaDecisa(viva, esito, item);
+    } else if (viva) {
+      btn.classList.remove('fb-act--busy');
+      riaccendiScheda(viva);
     }
-    if (tab === 'todo') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="new">← Ricevuti</button>
-      `;
-    }
-    if (tab === 'review') {
-      // Fix pronto su un branch, in attesa di verifica avversariale. L'utente
-      // può promuoverlo (✓ Risolto), rimandarlo a "Da risolvere" o bloccarlo.
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="blocked">⛔ Blocca</button>
-      `;
-    }
-    if (tab === 'blocked') {
-      // In pausa (3 loop falliti o file sensibile nel cancello di merge): decide
-      // l'utente. Può rimetterlo in coda, marcarlo risolto a mano o ignorarlo.
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">✓ Risolto</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
-      `;
-    }
-    if (tab === 'done') {
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="verified">✓ Verificato</button>
-        <button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${escapeHtml(f._id)}">Riapri</button>
-      `;
-    }
-    if (tab === 'clarify') {
-      // L'utente legge le domande di Filo (bolle) e risponde col composer
-      // "Invia risposta" (che riporta il feedback in "Da risolvere"); in
-      // alternativa lo sposta a mano in Bozze (scelta di design) o lo ignora.
-      return `
-        <button class="sn-btn fb-act" data-id="${escapeHtml(f._id)}" data-to="todo">→ Da risolvere</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="draft">→ Bozze</button>
-        <button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="ignored">Ignora</button>
-      `;
-    }
-    if (tab === 'verified') {
-      return `<button class="sn-btn sn-btn-secondary fb-act" data-id="${escapeHtml(f._id)}" data-to="done">← Risolti</button>`;
-    }
-    return '';
+    updateTabCounts();
+    aggiornaTotale();
   }
 
   // Cattura il campo (textarea/input) attualmente a fuoco dentro la lista, se
@@ -555,6 +734,11 @@
 
   function render(items) {
     const focusSnap = captureFocus();
+    // Ricomporre la lista è SEMPRE una richiesta esplicita (cambio sezione,
+    // ricerca, filtro, Aggiorna, dati nuovi): è il momento in cui le schede già
+    // decise lasciano il posto, e l'unico in cui la lista si rimescola.
+    decise.clear();
+    disegnate = items.length;
     countEl.textContent = items.length ? `${items.length} feedback` : '';
     if (!items.length) {
       listEl.innerHTML = '';
@@ -570,21 +754,25 @@
       // Se il vuoto dipende dalla ricerca (e non dal tab davvero vuoto),
       // dillo: il testo "Nessun feedback…" sembrerebbe un tab svuotato.
       const q = (searchEl.value || '').trim();
-      if (q && all.some((f) => statusOf(f) === currentTab)) {
+      if (q && sectionItems().length) {
         emptyEl.textContent = `Nessun risultato per "${q}".`;
         return;
       }
-      emptyEl.textContent = {
-        inbox: 'Nessun feedback in arrivo.',
-        agent: 'Nessun ritrovamento automatico (agente esploratore o audit delle routine).',
-        draft: 'Nessuna bozza in attesa di decisioni.',
-        todo: 'Nessun feedback da risolvere.',
-        review: 'Nessun fix in revisione.',
-        blocked: 'Nessun feedback bloccato.',
-        clarify: 'Nessun feedback in attesa di chiarimenti.',
-        done: 'Nessun feedback risolto.',
-        verified: 'Nessun feedback verificato.',
-      }[currentTab] || 'Nessun feedback.';
+      // Stessa cosa per il filtro "Solo automatici": la sezione non è vuota, è
+      // vuota DI RITROVAMENTI AUTOMATICI. Dirlo evita di far credere che i
+      // feedback siano spariti.
+      if (agentOnly && sectionBase(currentTab).length) {
+        emptyEl.textContent = 'Nessun ritrovamento automatico in questa sezione.';
+        return;
+      }
+      emptyEl.textContent = sezioniAttendibili()
+        ? (TAB_EMPTY[currentTab] || 'Nessun feedback.')
+        : 'Nessun feedback ricevuto.';
+      // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
+      // feedback più vecchi non sono in pagina. Il vuoto lo dice, come la gemella.
+      if (dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE)) {
+        emptyEl.textContent = `${emptyEl.textContent} ${SN_FEEDBACK.COUNT_CAP_HINT}`;
+      }
       return;
     }
     emptyEl.hidden = true;
@@ -632,13 +820,15 @@
       const convoTurns = turns.filter((t) => t.kind !== 'report');
       const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
       const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
-      // Note editabili (textarea) dove l'admin sta lavorando: ricevuti/todo/
-      // bozze/agente. "Ricevuti" è incluso così si può COMMENTARE un feedback
-      // appena arrivato e poi spostarlo in "Da risolvere" (il commento viaggia
-      // col cambio di stato — vedi il gestore .fb-act).
-      const notesEditable = isAdmin && !f.reportIllegibile
-        && (currentTab === 'inbox' || currentTab === 'todo' || currentTab === 'draft' || currentTab === 'agent');
-      const clarifyReply = isAdmin && currentTab === 'clarify';
+      // Note editabili (textarea) dove l'admin sta lavorando: Ricevuti e In
+      // coda. "Ricevuti" è incluso così si può COMMENTARE un feedback appena
+      // arrivato e poi metterlo in coda (il commento viaggia col cambio di
+      // stato — vedi il gestore .fb-act).
+      // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
+      // (è una decisione che aspetta l'owner), non più in una sezione sua.
+      const clarifyReply = isAdmin && statusOf(f) === 'design' && statusReasonOf(f) === 'clarify';
+      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
+        && (currentTab === 'inbox' || currentTab === 'queue');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
@@ -692,11 +882,11 @@
       }
       const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
       const tailThreadHtml = tailBubblesHtml ? `<div class="fb-thread fb-thread--tail">${tailBubblesHtml}</div>` : '';
-      // Su "Ricevuti" la casella è un COMMENTO al volo (poi sposti in "Da
-      // risolvere"); altrove è la nota di triage/decisioni di design.
+      // Su "Ricevuti" la casella è un COMMENTO al volo (poi lo metti in coda);
+      // altrove è la nota di triage/decisioni di design.
       const notesLabelText = currentTab === 'inbox' ? 'Commento:' : 'Note / decisioni di design:';
       const notesPlaceholder = currentTab === 'inbox'
-        ? 'Aggiungi un commento… (verrà conservato quando sposti il feedback in "Da risolvere")'
+        ? 'Aggiungi un commento… (verrà conservato quando metti il feedback in coda)'
         : 'Dettagli aggiuntivi, vincoli, scelte di design…';
       // La textarea mostra il capo pulito (senza le righe-marcatore degli
       // allegati: quelle vivono come thumbnail nel compositore) e porta la coda
@@ -727,9 +917,10 @@
            </div>`
         : '';
       return `
-        <article class="fb-card fb-card--${statusOf(f)} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}">
+        <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}" data-id="${escapeHtml(f._id)}">
           <div class="fb-meta">
             <span>${escapeHtml(when)}</span>
+            ${stateBadgeHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">${escapeHtml(url).slice(0, 80)}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url).slice(0, 80)}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
@@ -771,18 +962,50 @@
       });
     });
 
-    listEl.querySelectorAll('.fb-act').forEach((b) => {
+    bindCardActions(listEl);
+
+    // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
+    // captureFocus): salvare le note non deve più "deselezionare" il campo.
+    restoreFocus(focusSnap);
+  }
+
+  // Aggancia i pulsanti di una scheda (o di tutta la lista). Sta in una
+  // funzione perché serve in due momenti: dopo un render completo e quando una
+  // sola scheda si riscrive AL PROPRIO POSTO (annullare la riapertura, i
+  // pallini della priorità) — che è l'unico modo di aggiornarla senza
+  // rimescolare la lista sotto il puntatore.
+  function bindCardActions(root) {
+    root.querySelectorAll('.fb-act').forEach((b) => {
       b.addEventListener('click', () => {
-        const to = b.dataset.to; // 'todo' | 'done' | 'new' | 'ignored'
+        const to = b.dataset.to; // stato CANONICO (todo | done | archived | *_confirmed)
         const id = b.dataset.id;
         const payload = { status: to };
-        // Quando passo da inbox a "todo", porto con me eventuali note + allegati
-        // già scritti (notesValueOf ricompone capo modificato + coda intatta).
+        const ottimistico = { status: to };
+        // Gli stessi campi che scrive la dashboard di gestione, o le due pagine
+        // lascerebbero due tracce diverse della stessa decisione.
+        if (b.dataset.accept) {
+          // Override dell'owner: toglie il blocco dei giudici e rimette in coda.
+          payload.reviewDecision = 'accepted';
+          payload.reviewedAt = new Date().toISOString();
+          ottimistico.reviewDecision = 'accepted';
+        }
+        if (b.dataset.reject) {
+          payload.reviewDecision = 'rejected';
+          payload.reviewedAt = new Date().toISOString();
+          ottimistico.reviewDecision = 'rejected';
+        }
+        // Archiviazione a mano = scelta esplicita: vince per sempre
+        // sull'auto-archiviazione a punteggio (DC3), in un verso e nell'altro.
+        if (b.dataset.archive) { payload.archiveOverride = 'archived'; ottimistico.archiveOverride = 'archived'; }
+        if (b.dataset.restore) { payload.archiveOverride = 'keep_open'; ottimistico.archiveOverride = 'keep_open'; }
+        // Quando metto in coda un feedback appena arrivato porto con me le note
+        // + allegati già scritti (notesValueOf ricompone capo modificato + coda
+        // intatta).
         const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
-        if (ta) payload.notes = notesValueOf(ta);
+        if (ta) { payload.notes = notesValueOf(ta); ottimistico.notes = payload.notes; }
         const frase = listEl.querySelector(`.fb-usernote[data-id="${cssEsc(id)}"]`);
-        if (frase) payload.userNote = frase.value.slice(0, 500);
-        patch(id, payload, { status: to, notes: payload.notes, userNote: payload.userNote });
+        if (frase) { payload.userNote = frase.value.slice(0, 500); ottimistico.userNote = payload.userNote; }
+        azioneScheda(b, { id, payload, optimistic: ottimistico });
       });
     });
 
@@ -790,7 +1013,7 @@
     // può spiegare meglio cosa non funziona. La spiegazione viene appesa alle
     // note esistenti (con separatore + timestamp), così il commento del primo
     // agente che ha lavorato al feedback resta visibile anche dopo la riapertura.
-    listEl.querySelectorAll('.fb-reopen-start').forEach((b) => {
+    root.querySelectorAll('.fb-reopen-start').forEach((b) => {
       b.addEventListener('click', () => {
         const id = b.dataset.id;
         const card = b.closest('.fb-card');
@@ -817,19 +1040,22 @@
         });
         ta.focus();
         // Esc annulla, Ctrl/Cmd+Enter conferma — più comodo che cliccare.
+        // Annullare rimette i pulsanti originali NELLA SCHEDA, senza ridisegnare
+        // la lista: un ridisegno da qui rimescolerebbe l'elenco (e porterebbe via
+        // le schede già decise) mentre il puntatore è fermo su «Annulla».
         ta.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
             e.preventDefault();
-            applyFilter();
+            ripristinaAzioni(card, id);
           } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             actionsDiv.querySelector('.fb-reopen-confirm').click();
           }
         });
         actionsDiv.querySelector('.fb-reopen-cancel').addEventListener('click', () => {
-          applyFilter(); // ridisegna la card con le azioni originali
+          ripristinaAzioni(card, id);
         });
-        actionsDiv.querySelector('.fb-reopen-confirm').addEventListener('click', () => {
+        actionsDiv.querySelector('.fb-reopen-confirm').addEventListener('click', (ev) => {
           const item = all.find((f) => f._id === id);
           const oldNotes = (item && item.notes) || '';
           const reason = ta.value.trim();
@@ -840,7 +1066,14 @@
           const newNotes = window.SN_FEEDBACK_THREAD
             ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il', attachments: atts })
             : (reason ? (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`) : oldNotes);
-          patch(id, { status: 'new', notes: newNotes }, { status: 'new', notes: newNotes });
+          // Riaprire = rimettere in coda (`todo`), la transizione che la
+          // macchina a stati prevede per "manca qualcosa". Prima si scriveva il
+          // legacy `new`, che nessuno riconosceva più.
+          azioneScheda(ev.currentTarget, {
+            id,
+            payload: { status: 'todo', notes: newNotes },
+            optimistic: { status: 'todo', notes: newNotes },
+          });
         });
       });
     });
@@ -848,7 +1081,7 @@
     // Composer "Invia risposta" del tab Chiarimenti: appende la risposta
     // dell'utente come turno (conservando la domanda di Filo nello storico) e
     // rimette il feedback in "Da risolvere" perché una routine lo riprenda.
-    listEl.querySelectorAll('.fb-reply-send').forEach((btn) => {
+    root.querySelectorAll('.fb-reply-send').forEach((btn) => {
       const id = btn.dataset.id;
       const card = btn.closest('.fb-card');
       const ta = card && card.querySelector('.fb-reply-text');
@@ -865,7 +1098,11 @@
         const newNotes = window.SN_FEEDBACK_THREAD
           ? SN_FEEDBACK_THREAD.appendUserTurn(oldNotes, reply, { attachments: atts })
           : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
-        patch(id, { status: 'todo', notes: newNotes }, { status: 'todo', notes: newNotes });
+        azioneScheda(btn, {
+          id,
+          payload: { status: 'todo', notes: newNotes },
+          optimistic: { status: 'todo', notes: newNotes },
+        });
       };
       btn.addEventListener('click', send);
       // Ctrl/Cmd+Enter invia (come negli altri composer di Filo).
@@ -876,23 +1113,36 @@
 
     // Pallini priorità: clic sul pallino N imposta priorità = N; ri-clic sul
     // pallino già attivo (== priorità corrente) la azzera.
-    listEl.querySelectorAll('.fb-dot').forEach((dot) => {
-      dot.addEventListener('click', () => {
+    // In "In coda" la priorità è un criterio di ORDINAMENTO: ridisegnando la
+    // lista la scheda saltava di posto sotto il dito e il pallino successivo
+    // finiva sotto il cursore. Come le altre azioni, si aggiorna al proprio
+    // posto: i pallini si ridipingono nella scheda, la lista resta ferma.
+    root.querySelectorAll('.fb-dot').forEach((dot) => {
+      dot.addEventListener('click', async () => {
         const id = dot.dataset.id;
         const n = Number(dot.dataset.n);
         const item = all.find((f) => f._id === id);
-        const cur = item ? priorityOf(item) : 0;
+        if (!item || inScrittura.has(id) || decise.has(id)) return;
+        const cur = priorityOf(item);
         const next = cur === n ? 0 : n;
+        const card = dot.closest('.fb-card');
+        inScrittura.add(id);
+        spegniScheda(card);
         // priorityManual:true segnala al backend che questa è una scelta manuale
         // dell'owner: il giudice di priorità automatico non sovrascriverà.
-        patch(id, { priority: next, priorityManual: true }, { priority: next });
+        const ok = await patch(id, { priority: next, priorityManual: true }, { priority: next }, { inPlace: true });
+        inScrittura.delete(id);
+        if (card && card.isConnected) {
+          riaccendiScheda(card);
+          if (ok) ridipingiPriorita(card, item);
+        }
       });
     });
 
     // Compositore allegati per la nota editabile (il "capo"): inizializzato con
     // gli allegati del capo. Persiste subito (onChange → patch): notesValueOf
     // ricompone capo (testo + allegati) + coda intatta.
-    listEl.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
+    root.querySelectorAll('.fb-attach-mount[data-kind="notes"]').forEach((mount) => {
       const id = mount.dataset.id;
       const ta = listEl.querySelector(`.fb-notes[data-id="${cssEsc(id)}"]`);
       if (!ta || ta._attachComposer) return;
@@ -908,14 +1158,18 @@
           const v = notesValueOf(ta);
           const it = all.find((f) => f._id === id);
           if (it && it.notes === v) return;
-          patch(id, { notes: v }, { notes: v });
+          // Silenzioso come il salvataggio della casella: il compositore tiene
+          // già aggiornate le sue miniature, e un ridisegno le rigenererebbe
+          // sotto il cursore — la × appena premuta lascerebbe il posto a quella
+          // dell'allegato successivo.
+          patch(id, { notes: v }, { notes: v }, { silenzioso: true });
         },
       });
     });
 
     // Salvataggio note: debounce su input + blur. Salva capo (testo + allegati)
     // ricomposto con la coda (notesValueOf).
-    listEl.querySelectorAll('.fb-notes').forEach((ta) => {
+    root.querySelectorAll('.fb-notes').forEach((ta) => {
       let timer;
       const flush = () => {
         const id = ta.dataset.id;
@@ -936,7 +1190,7 @@
     // blur). È l'altra metà dei due testi, e senza questa casella la dashboard
     // era l'unica strada da cui quella metà si perdeva: chiudendo un feedback
     // col pulsante, a chi l'aveva mandato restava solo la riga generica.
-    listEl.querySelectorAll('.fb-usernote').forEach((input) => {
+    root.querySelectorAll('.fb-usernote').forEach((input) => {
       let timer;
       const flush = () => {
         const id = input.dataset.id;
@@ -952,15 +1206,73 @@
         timer = setTimeout(flush, 1500);
       });
     });
+  }
 
-    // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
-    // captureFocus): salvare le note non deve più "deselezionare" il campo.
-    restoreFocus(focusSnap);
+  // Rimette i pulsanti originali di una scheda AL SUO POSTO, senza toccare il
+  // resto della lista.
+  function ripristinaAzioni(card, id) {
+    const item = all.find((f) => f._id === id);
+    const box = card && card.querySelector('.fb-actions');
+    if (!box || !item) return;
+    box.innerHTML = actionsFor(item);
+    bindCardActions(box);
+  }
+
+  // Ridipinge i pallini della priorità nella scheda (stessa idea: la scheda si
+  // aggiorna da sé, la lista non si muove).
+  function ridipingiPriorita(card, item) {
+    const vecchio = card && card.querySelector('.fb-priority');
+    if (!vecchio || !item) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = priorityDotsHtml(item);
+    const nuovo = tmp.firstElementChild;
+    if (!nuovo) return;
+    vecchio.replaceWith(nuovo);
+    bindCardActions(nuovo);
+  }
+
+  // I feedback della SEZIONE corrente, già ordinati: la lista la costruisce la
+  // stessa funzione pura della dashboard di gestione (ordinamento compreso —
+  // i bloccati gravi in cima ai Ricevuti, le lavorazioni attive in cima alla
+  // coda). Sopra passa solo il filtro "Solo automatici", che è di questa pagina.
+  function sectionBase(tab) {
+    // Stati illeggibili: niente sezioni, un elenco solo (i più recenti in cima).
+    if (!sezioniAttendibili()) {
+      return all.slice().sort((a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    }
+    const t = tab || currentTab;
+    // "Archiviati" ha regole sue (i confermati, i preferiti): la sua lista la
+    // costruisce listArchiveTab, esattamente come nella gemella.
+    return t === 'archived'
+      ? MR.listArchiveTab(all, { releasedVersion })
+      : MR.listForManageTab(all, t, { releasedVersion });
+  }
+
+  function sectionItems(tab) {
+    const items = sectionBase(tab);
+    return agentOnly ? items.filter(isAgent) : items;
+  }
+
+  // Mostra o nasconde la barra delle sezioni. Non è una decorazione: se gli
+  // stati non si leggono, quella barra scriverebbe numeri inventati.
+  function mostraSezioni() {
+    const ok = sezioniAttendibili();
+    if (tabsEl) tabsEl.hidden = !ok;
+    if (noSectionsEl) {
+      noSectionsEl.hidden = ok;
+      if (!ok) {
+        noSectionsEl.textContent = 'Questo computer non può leggere lo stato delle segnalazioni. '
+          + 'Le trovi tutte qui sotto, in un elenco solo.';
+      }
+    }
+    return ok;
   }
 
   function applyFilter() {
     const q = (searchEl.value || '').trim().toLowerCase();
-    const base = all.filter((f) => statusOf(f) === currentTab);
+    const sezioni = mostraSezioni();
+    const base = sectionItems();
     const filtered = q
       ? base.filter((f) => {
           const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
@@ -968,11 +1280,11 @@
             .join(' ').toLowerCase().includes(q);
         })
       : base;
-    if (currentTab === 'done') {
-      // Tab "Risolti": ordina per numero (#1, #2, … #22.1, #22.2). I feedback
-      // senza numero (seq assente) finiscono in coda. Confronto numerico su
-      // seq e poi subSeq, così #22.2 viene dopo #22.10? No: numerico, quindi
-      // #22.2 < #22.10 — l'ordine "umano" atteso per i sub-feedback.
+    if (sezioni && currentTab === 'resolved') {
+      // Sezione "Risolti": ordina per numero (#1, #2, … #22.1, #22.2). I
+      // feedback senza numero (seq assente) finiscono in coda. Confronto
+      // numerico su seq e poi subSeq, così #22.2 viene prima di #22.10 —
+      // l'ordine "umano" atteso per i sub-feedback.
       const numKey = (f) => {
         const seq = Number(f.seq);
         const sub = Number(f.subSeq);
@@ -986,21 +1298,20 @@
         const kb = numKey(b);
         return ka.seq - kb.seq || ka.sub - kb.sub;
       });
-    } else {
-      // Priorità più alta in cima. `all` è già ordinato per data DESC e il sort
-      // di JS è stabile, quindi a parità di priorità restano i più recenti prima.
-      filtered.sort((a, b) => priorityOf(b) - priorityOf(a));
     }
-    updateTabCounts();
+    if (sezioni) updateTabCounts();
     render(filtered);
   }
 
   function updateTabCounts() {
-    const counts = { inbox: 0, agent: 0, draft: 0, todo: 0, review: 0, blocked: 0, clarify: 0, done: 0, verified: 0 };
-    for (const f of all) {
-      const s = statusOf(f);
-      if (s in counts) counts[s]++;
-    }
+    if (!sezioniAttendibili()) return;
+    // Il numero è la LUNGHEZZA della lista che quella sezione mostrerebbe, e si
+    // calcola con la stessa funzione che la costruisce (#495). Senza il filtro
+    // "Solo automatici" attivo sono ESATTAMENTE i numeri della dashboard di
+    // gestione: manageTabCounts è la funzione che conta anche là (#509).
+    const counts = agentOnly
+      ? TABS.reduce((acc, t) => { acc[t] = sectionItems(t).length; return acc; }, {})
+      : MR.manageTabCounts(all, { releasedVersion });
     // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
     // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
     // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
@@ -1008,11 +1319,13 @@
     // non si scrive nessun numero: "(0)" direbbe "qui non c'è niente" mentre la
     // verità è che non lo sappiamo ancora.
     const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
-    for (const [tab, n] of Object.entries(counts)) {
+    for (const tab of TABS) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
-      const label = { inbox: 'Ricevuti', agent: 'Agente', draft: 'Bozze', todo: 'Da risolvere', review: 'In revisione', blocked: 'Bloccati', clarify: 'Chiarimenti', done: 'Risolti', verified: 'Verificati' }[tab];
-      btn.textContent = dataLoaded ? `${label} ${SN_FEEDBACK.countLabel(n, capped)}` : label;
+      const label = TAB_LABELS[tab];
+      btn.textContent = dataLoaded
+        ? `${label} ${SN_FEEDBACK.countLabel(counts[tab] || 0, capped)}`
+        : label;
       if (capped) btn.title = SN_FEEDBACK.COUNT_CAP_HINT;
       else btn.removeAttribute('title');
     }
@@ -1062,6 +1375,15 @@
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
+    // DB3: la versione dell'app in esecuzione è l'ultima rilasciata. Serve al
+    // gate di "Risolti" — la stessa domanda che si fa la gemella, con la stessa
+    // risposta, o un `done` non ancora uscito starebbe in due sezioni diverse.
+    if (!releasedVersion) {
+      try {
+        const r = await sendToMain({ type: 'get_update_recap' });
+        if (r && r.current) releasedVersion = r.current;
+      } catch (_) { /* gate inattivo: senza versione, done→Risolti come prima */ }
+    }
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
@@ -1101,6 +1423,7 @@
   }
 
   function selectTab(tab) {
+    if (!TABS.includes(tab)) return;
     currentTab = tab;
     tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
       b.classList.toggle('fb-tab--active', b.dataset.tab === tab);
@@ -1130,6 +1453,12 @@
   });
   refreshBtn.addEventListener('click', load);
   searchEl.addEventListener('input', applyFilter);
+  if (agentOnlyEl) {
+    agentOnlyEl.addEventListener('change', () => {
+      agentOnly = agentOnlyEl.checked;
+      applyFilter();
+    });
+  }
 
   // ── Stato admin ──────────────────────────────────────────────────────────
   function renderAuthState(profile) {
@@ -1247,6 +1576,14 @@
       applyFilter();
     },
     setTab(tab) { selectTab(tab); },
+    // DB3: negli spec non c'è un aggiornamento da interrogare, e il gate di
+    // "Risolti" dipende dalla versione rilasciata: iniettabile, come in manage.
+    setReleasedVersion(v) { releasedVersion = v || ''; applyFilter(); },
+    setAgentOnly(v) {
+      agentOnly = !!v;
+      if (agentOnlyEl) agentOnlyEl.checked = agentOnly;
+      applyFilter();
+    },
   };
 
   // Carica prima lo stato admin, poi i feedback: così il primo render già

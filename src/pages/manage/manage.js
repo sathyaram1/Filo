@@ -66,6 +66,7 @@
   const mgChannelList    = document.getElementById('mgChannelList');
 
   // Lista (tab corrente)
+  const mgNoSections   = document.getElementById('mgNoSections');
   const mgListHead     = document.getElementById('mgListHead');
   const mgListLoading  = document.getElementById('mgListLoading');
   const mgList         = document.getElementById('mgList');
@@ -84,6 +85,7 @@
   const mgDetailEmpty = document.getElementById('mgDetailEmpty');
   const mgDetail      = document.getElementById('mgDetail');
   const mgDetailHead  = document.getElementById('mgDetailHead');
+  const mgDetailState = document.getElementById('mgDetailState');
   const mgJudgesRow   = document.getElementById('mgJudgesRow');
   const mgWorkState   = document.getElementById('mgWorkState');
   const mgThread      = document.getElementById('mgThread');
@@ -95,12 +97,16 @@
   const mgSideClose  = document.getElementById('mgSideClose');
   const mgSideBody   = document.getElementById('mgSideBody');
 
-  // Azioni (accetta/sblocca un bloccato, owner-only)
+  // Azioni di stato (owner-only): i pulsanti li genera renderActions() leggendo
+  // MR.ownerActions — la stessa tabella della pagina dei feedback.
   const mgActions       = document.getElementById('mgActions');
   const mgAcceptComment = document.getElementById('mgAcceptComment');
-  const mgAcceptBtn     = document.getElementById('mgAcceptBtn');
-  const mgConfirmBtn    = document.getElementById('mgConfirmBtn');
+  const mgActionsRow    = document.getElementById('mgActionsRow');
   const mgActionMsg     = document.getElementById('mgActionMsg');
+  const mgReopen        = document.getElementById('mgReopen');
+  const mgReopenText    = document.getElementById('mgReopenText');
+  const mgReopenCancel  = document.getElementById('mgReopenCancelBtn');
+  const mgReopenConfirm = document.getElementById('mgReopenConfirmBtn');
 
   // Risposta ai chiarimenti (owner-only)
   const mgClarify     = document.getElementById('mgClarify');
@@ -112,10 +118,9 @@
   const mgUserNoteBtn  = document.getElementById('mgUserNoteBtn');
   const mgUserNoteMsg  = document.getElementById('mgUserNoteMsg');
 
-  // Gestione feedback: preferito ⭐ + archivia/ripristina (owner-only)
+  // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgStarBtn    = document.getElementById('mgStarBtn');
-  const mgArchiveBtn = document.getElementById('mgArchiveBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
   // Ricerca "a senso" (semantica)
@@ -160,6 +165,11 @@
     archived: 'Nessun feedback archiviato.',
   };
   const LIST_TABS = ['inbox', 'queue', 'resolved', 'archived'];
+  // Come si chiama la lista quando le sezioni non ci sono: nessun nome di
+  // sezione, perché nessuna sezione è stata scelta.
+  const SENZA_SEZIONI_LABEL = 'Segnalazioni';
+  const SENZA_SEZIONI_AVVISO = 'Questo computer non può leggere lo stato delle segnalazioni. '
+    + 'Le trovi tutte qui sotto, in un elenco solo.';
 
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
@@ -840,7 +850,10 @@
   let mergeApprovalsCount = 0;
   function applyMergeApprovalsVisibility() {
     if (!mgMergeApprovals) return;
-    mgMergeApprovals.hidden = mergeApprovalsCount === 0 || currentTab !== 'inbox';
+    // Le fusioni ferme non vengono dallo status dei feedback: senza sezioni non
+    // c'è una scheda "Ricevuti" in cui metterle, ma restano vere e si mostrano.
+    const sezione = sezioniAttendibili() ? currentTab === 'inbox' : true;
+    mgMergeApprovals.hidden = mergeApprovalsCount === 0 || !sezione;
   }
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
@@ -852,7 +865,9 @@
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
     const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
     if (!fb) return;
-    selectTab(MR.manageTabFor(fb, { releasedVersion }));
+    // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
+    // la segnalazione è già lì.
+    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion }));
     openDetail(fb._id);
   }
 
@@ -1220,6 +1235,55 @@
   function loadHitCap() {
     return FB.listHitCap(allFeedbacks, FB.LIST_PAGE_SIZE);
   }
+
+  // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
+  // La regola sta nel modulo condiviso (MR.sectionsReliable), la stessa che usa
+  // la pagina dei feedback: due copie della stessa regola divergono, ed è
+  // proprio così che questa pagina è rimasta indietro (#509).
+  //
+  // Qui non si chiude "la barra" e basta: tutto ciò che questa pagina afferma
+  // partendo dallo status — i numeri delle sezioni, il nome della sezione in
+  // cima alla colonna, il colore del bordo della scheda ("Non filtrato" è
+  // un'affermazione), le barre "Ri-valuta i non filtrati" / "Approva tutti gli
+  // allineati", i pulsanti di decisione del dettaglio, la frase accanto ai
+  // giudici, la bolla del parere di Filo — passa da una delle due funzioni qui
+  // sotto, a seconda che l'affermazione riguardi la lista o una segnalazione.
+  function sezioniAttendibili() {
+    return MR.sectionsReliable(allFeedbacks);
+  }
+
+  // Le due domande sono DIVERSE e vanno tenute separate, altrimenti il difetto
+  // rientra dalla porta della coda MISTA:
+  //   · sezioniAttendibili() è una domanda sulla LISTA — si può disegnare la
+  //     barra delle sezioni? Un solo documento storto non la toglie a tutti.
+  //   · statoLeggibile(fb) è una domanda su QUESTA segnalazione — posso
+  //     affermare qualcosa sul suo stato? Vale ovunque si parli di UNA
+  //     segnalazione: bordo e classe della scheda, riga dell'iter, sottotesto
+  //     del motivo, pallini dei giudici, pulsanti del dettaglio, la bolla del
+  //     parere di Filo, e i mucchi su cui agiscono le barre in cima ai Ricevuti.
+  // È la stessa regola della gemella, che se la fa per ogni segnalazione: farla
+  // una volta sola per l'intera lista è ciò che ha fatto divergere le due
+  // pagine appena una cifrata capitava in mezzo a tante leggibili (#509).
+  function statoLeggibile(fb) {
+    return !MR.statusUnreadable(fb);
+  }
+
+  // Mostra o nasconde le SEZIONI (le quattro schede-lista) e l'avviso che ne
+  // spiega l'assenza. Le altre schede della barra non sono sezioni — Statistiche,
+  // Modelli, Automazioni, Log non dipendono dallo stato delle segnalazioni e
+  // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
+  function mostraSezioni() {
+    const ok = sezioniAttendibili();
+    for (const tab of LIST_TABS) {
+      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
+      if (btn) btn.hidden = !ok;
+    }
+    if (mgNoSections) {
+      mgNoSections.hidden = ok;
+      if (!ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
+    }
+    return ok;
+  }
   // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
   // l'intestazione della colonna e per la ricerca.
   function countText(n) {
@@ -1238,6 +1302,10 @@
   }
 
   function updateTabCounts() {
+    // Sezioni non disegnabili: non c'è niente da numerare. Uscire QUI evita di
+    // lasciare "(3) (0) (0) (0)" appiccicato ai bottoni nascosti, pronto a
+    // ricomparire al primo dato leggibile che non passa da renderList.
+    if (!sezioniAttendibili()) return;
     const counts = dataLoaded
       ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly })
       : null;
@@ -1260,6 +1328,20 @@
   function renderList() {
     mgListLoading.hidden = true;
     mgListEmpty.textContent = TAB_EMPTY[currentTab] || 'Nessun feedback.';
+
+    // Stato illeggibile → niente sezioni: un elenco solo, i più recenti in cima,
+    // come la gemella. Nessun nome di sezione in cima alla colonna e nessun
+    // filtro di sezione: sono tutti criteri che qui non si possono applicare.
+    const sezioni = mostraSezioni();
+    if (!sezioni) {
+      if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+      currentList = applySortMode(allFeedbacks.slice().sort((a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
+      mgListEmpty.textContent = TAB_EMPTY.inbox;
+      setListHead(SENZA_SEZIONI_LABEL, dataLoaded ? currentList.length : null);
+      renderListBody();
+      return;
+    }
 
     // Il filtro ⭐ esiste solo nella tab Archiviati (DB2).
     const isArchived = currentTab === 'archived';
@@ -1293,7 +1375,13 @@
     // non cambia il numero, quindi si può contare qui.
     updateTabCounts();
     setListHead(TAB_LABELS[currentTab] || '', dataLoaded ? currentList.length : null);
+    renderListBody();
+  }
 
+  // Disegna la colonna a partire da `currentList`: è la parte che NON dipende
+  // da quale sezione si sta guardando, e la condivide anche l'elenco unico di
+  // quando le sezioni non ci sono.
+  function renderListBody() {
     // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
     // feedback più vecchi non sono qui. Il vuoto lo dice, invece di negarli.
     if (loadHitCap() && dataLoaded) {
@@ -1328,20 +1416,31 @@
     mgListEmpty.hidden = true;
     mgList.hidden = false;
 
+    // Stato illeggibile: il bordo colorato, la riga dell'iter e il sottotesto
+    // del motivo sono tutte AFFERMAZIONI sullo stato. Su una segnalazione
+    // cifrata la macchina le ricava da un `unlabeled` finto: ogni scheda
+    // diventerebbe bianca ("Non filtrato") anche se è già chiusa.
+    const sezioni = sezioniAttendibili();
+
     for (const fb of currentList) {
-      const cl = MR.classifyBlock(fb);
+      // La domanda "questo stato si legge?" è di QUESTA scheda, non della lista
+      // (vedi statoLeggibile): in una coda mista basta un documento cifrato in
+      // mezzo a mille leggibili perché le sezioni restino — ed è proprio lì che
+      // la scheda cifrata tornava a dirsi "Non filtrato".
+      const leggibile = sezioni && statoLeggibile(fb);
+      const cl = leggibile ? MR.classifyBlock(fb) : null;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
 
       const item = document.createElement('div');
       const unfilteredCls = cl && cl.reason === 'unfiltered' ? ' mg-item--unfiltered' : '';
       // Allineato (tutti i giudici d'accordo, nessun blocco) → bordo BLU.
-      const aligned = !cl && MR.isAligned(fb);
+      const aligned = leggibile && !cl && MR.isAligned(fb);
       const alignedCls = aligned ? ' mg-item--aligned' : '';
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = currentTab === 'queue' ? MR.workProgress(fb) : null;
+      const progress = (leggibile && currentTab === 'queue') ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
@@ -1353,7 +1452,7 @@
       // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
       // implicito nel colore del border-left; il titolo completo nel tooltip,
       // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
-      const norm = MR.normalizeStatus(fb);
+      const norm = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
       // Quante volte questo lavoro si è arenato ed è rientrato in coda da solo.
       // Senza scriverlo da qualche parte, un feedback che si impianta sempre
       // sullo stesso scoglio sembra semplicemente lento.
@@ -1371,6 +1470,7 @@
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
+        ${leggibile ? '' : statePublicHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
@@ -1384,6 +1484,17 @@
       });
       mgList.appendChild(item);
     }
+  }
+
+  // Aperta/Chiusa: quello che si sa di una segnalazione il cui stato fine è
+  // cifrato. Viene dall'enum grossolano in chiaro (`statusPublic`), lo stesso
+  // che guarda la ricompensa; le parole le sceglie il modulo condiviso, così la
+  // gemella non ne usa altre. Se manca anche quello non si scrive niente: una
+  // riga vuota è meglio di un'etichetta inventata.
+  function statePublicHtml(fb) {
+    const label = MR.publicStateLabel(fb);
+    if (!label) return '';
+    return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
   }
 
   // ── Riga di stato della lavorazione (card pinnate + dettaglio) ────────────
@@ -1422,6 +1533,11 @@
   // Un feedback è "non filtrato" (bianco) quando il panel dei giudici è rimasto
   // parziale. Il bottone ne ri-prova SOLO i giudici mancanti (lato backend).
   function isUnfiltered(fb) {
+    // "Non filtrato" è una lettura dello status: su una cifrata la macchina la
+    // inventa (unlabeled finto) e la segnalazione finiva nel mucchio da
+    // rimandare ai giudici — crediti spesi per ri-giudicare una pratica che
+    // potrebbe essere già chiusa.
+    if (!statoLeggibile(fb)) return false;
     const cl = MR.classifyBlock(fb);
     return !!(cl && cl.reason === 'unfiltered');
   }
@@ -1435,7 +1551,9 @@
   }
   function updateReevalBar() {
     if (!mgReevalBar) return;
-    const whites = unfilteredFeedbacks();
+    // Senza il criterio non c'è nessun "bianco": ogni segnalazione cifrata
+    // ricadrebbe lì, e la barra offrirebbe di ri-giudicare anche i chiusi.
+    const whites = sezioniAttendibili() ? unfilteredFeedbacks() : [];
     // Solo l'owner, solo nei Ricevuti (dove vivono i bianchi), solo se ce n'è.
     const show = isAdmin && currentTab === 'inbox' && whites.length > 0;
     mgReevalBar.hidden = !show;
@@ -1447,7 +1565,11 @@
   // più nulla nelle liste, quindi i blu si mettono in coda da qui (o uno a uno
   // dal dettaglio).
   function alignedFeedbacks() {
-    return allFeedbacks.filter((f) => MR.isAligned(f));
+    // Stesso motivo dei bianchi: "allineato" è una lettura dello status, e
+    // approvare in blocco quello che non si è potuto leggere è la scrittura
+    // più pesante della pagina.
+    if (!sezioniAttendibili()) return [];
+    return allFeedbacks.filter((f) => statoLeggibile(f) && MR.isAligned(f));
   }
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
@@ -1782,6 +1904,11 @@
     mgDetailEmpty.hidden = true;
     mgDetail.hidden = false;
 
+    // Lo stato di QUESTA segnalazione si legge? Tutto ciò che il pannello dice
+    // e offre a partire dallo stato passa da qui — la stessa regola della barra
+    // delle sezioni, un gradino più in dentro.
+    const leggibile = statoLeggibile(fb);
+
     // Intestazione
     const clientId = fb.clientId || 'anonimo';
     const dateStr  = formatDate(fb.createdAt);
@@ -1801,7 +1928,7 @@
     // Striscia "a che punto è la lavorazione" (solo per i feedback nell'iter
     // working/revision_*): stessi contenuti della card pinnata in lista.
     if (mgWorkState) {
-      const progress = MR.workProgress(fb);
+      const progress = leggibile ? MR.workProgress(fb) : null;
       mgWorkState.hidden = !progress;
       mgWorkState.innerHTML = progress ? workStateHtml(progress) : '';
     }
@@ -1809,42 +1936,24 @@
     // Bolle chat
     renderThread(fb);
 
-    // Azioni contestuali (owner-only):
-    //  - feedback bloccato dal pipeline → "Accetta e sblocca";
-    //  - feedback allineato ancora nei Ricevuti (automatica OFF) → "Approva e
-    //    metti in coda" (problema #2: senza automatica serve un'approvazione manuale);
-    //  - feedback in chiarimento → box di risposta che lo rimette in coda;
-    //  - altrimenti nessuna azione.
-    const isBlocked = MR.classifyBlock(fb) !== null;
-    const tab = MR.manageTabFor(fb, { releasedVersion });
-    const alignedInbox = MR.isAligned(fb) && tab === 'inbox';
-    const normSel = MR.normalizeStatus(fb);
+    // L'etichetta di stato: le stesse parole della gemella, lette dal modulo
+    // condiviso. Senza, questa pagina non diceva da nessuna parte che una
+    // segnalazione era, per esempio, un attacco confermato.
+    renderDetailState(fb);
+
+    // Azioni di stato (owner-only). QUALI sono NON lo decide più questa pagina:
+    // le legge da MR.ownerActions, la stessa tabella che disegna i pulsanti
+    // della pagina dei feedback. Prima erano due insiemi costruiti a mano, e
+    // sulla stessa segnalazione offrivano cose diverse (#509, terzo giro).
+    //
+    // Stato illeggibile: la tabella non offre niente e il blocco sparisce. I
+    // pulsanti nascono dallo stato, e su una segnalazione cifrata la macchina
+    // lo inventa (`unlabeled`): offrire "→ In coda" o "Conferma attacco" su una
+    // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
+    const normSel = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
     // design con domande (ex clarify) → box risposta; legacy clarify idem.
     const isClarify = normSel.status === 'design' && (normSel.statusReason === 'clarify' || (fb.status || '') === 'clarify');
-    mgActions.hidden = !(isAdmin && (isBlocked || alignedInbox));
-    // "Conferma blocco" (macchina a stati): per attack/spam/suspicious_file
-    // l'owner può confermare — il feedback diventa attack_confirmed/
-    // spam_confirmed (terminale, esce dai Ricevuti, resta in Archiviati sotto
-    // il filtro "Bloccati confermati").
-    if (mgConfirmBtn) {
-      const conf = normSel.status === 'spam' ? 'spam_confirmed'
-        : (normSel.status === 'attack' || normSel.status === 'suspicious_file') ? 'attack_confirmed'
-        : null;
-      mgConfirmBtn.hidden = !conf;
-      mgConfirmBtn.dataset.confirmStatus = conf || '';
-      mgConfirmBtn.textContent = conf === 'spam_confirmed' ? 'Conferma spam' : 'Conferma attacco';
-    }
-    // Etichetta/placeholder del box: sblocco per i bloccati, approvazione per gli
-    // allineati. L'azione sottostante è la stessa (accetta → In coda).
-    if (isBlocked) {
-      mgAcceptBtn.textContent = 'Accetta e sblocca';
-      mgAcceptComment.placeholder = 'Commento (opzionale): perché lo sblocchi…';
-    } else {
-      mgAcceptBtn.textContent = 'Approva e metti in coda';
-      mgAcceptComment.placeholder = 'Commento (opzionale): perché lo approvi…';
-    }
-    mgAcceptComment.value = '';
-    setActionMsg('', '');
+    renderActions(fb);
     mgClarify.hidden = !(isAdmin && isClarify);
     mgClarifyText.value = '';
     setClarifyMsg('', '');
@@ -1873,21 +1982,257 @@
     closeSidebar();
   }
 
-  // Riflette lo stato corrente del feedback sui controlli di gestione:
-  // il bottone ⭐ acceso se è preferito; "Archivia" o "Ripristina" a seconda
-  // che il feedback sia già archiviato.
+  // Riflette lo stato corrente del feedback sul bottone ⭐. Il preferito è un
+  // flag in chiaro, indipendente dallo stato: resta anche su una segnalazione
+  // che questa macchina non riesce a leggere. Archivia/Ripristina invece è
+  // un'AZIONE DI STATO e vive nella riga generata da renderActions.
   function reflectManage(fb) {
     mgStarBtn.disabled = false;
-    mgArchiveBtn.disabled = false;
     const starred = MR.isStarred(fb);
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
-    const archived = (fb.status || '') === 'archived';
-    mgArchiveBtn.textContent = archived ? 'Ripristina' : 'Archivia';
-    mgArchiveBtn.title = archived
-      ? 'Riporta il feedback in coda'
-      : 'Sposta il feedback negli archiviati';
+  }
+
+  // ── L'etichetta di stato del dettaglio ────────────────────────────────────
+  // Le parole (etichetta, motivo, hover) vengono dal modulo condiviso: la
+  // gemella scrive esattamente la stessa riga sulla scheda.
+  function renderDetailState(fb) {
+    if (!mgDetailState) return;
+    const b = MR.stateBadge(fb);
+    // Stato illeggibile: l'unica cosa vera (aperta/chiusa) questa pagina la
+    // scrive già accanto ai pallini dei giudici, con le stesse parole della
+    // gemella. Ripeterla qui sarebbe la stessa riga due volte.
+    if (!b || b.encrypted) {
+      mgDetailState.hidden = true;
+      mgDetailState.textContent = '';
+      mgDetailState.removeAttribute('title');
+      return;
+    }
+    mgDetailState.hidden = false;
+    mgDetailState.title = b.hint;
+    mgDetailState.innerHTML =
+      (b.color ? `<span class="mg-detail-state-dot" style="color:${esc(b.color)}"></span>` : '')
+      + `<span>${esc(b.label)}</span>`
+      + (b.showReason ? `<span class="mg-detail-state-reason">— ${esc(b.reasonText)}</span>` : '');
+  }
+
+  // ── Le azioni di stato: una riga GENERATA dalla tabella condivisa ─────────
+  // Ogni azione ha un id stabile, così resta indirizzabile da fuori. Archivia e
+  // Ripristina condividono l'id perché sono i due versi della STESSA azione, e
+  // non compaiono mai insieme: nella sezione Archiviati esiste solo il
+  // ripristino — così non c'è più un cammino che riscrive uno stato terminale
+  // (attacco/spam confermato) con "archiviato", cancellando la conferma.
+  const ACTION_BTN_ID = {
+    accept: 'mgAcceptBtn',
+    confirm_attack: 'mgConfirmBtn',
+    confirm_spam: 'mgConfirmSpamBtn',
+    archive: 'mgArchiveBtn',
+    restore: 'mgArchiveBtn',
+    resolve: 'mgResolveBtn',
+    reopen: 'mgReopenBtn',
+  };
+  const ACTION_TITLE = {
+    accept: 'Approva la segnalazione e mettila in coda di lavorazione',
+    confirm_attack: 'Conferma che è un attacco: esce dai Ricevuti e resta consultabile negli Archiviati',
+    confirm_spam: 'Conferma che è spam: esce dai Ricevuti e resta consultabile negli Archiviati',
+    archive: 'Sposta la segnalazione negli archiviati',
+    restore: 'Riporta la segnalazione in coda',
+    resolve: 'Chiudi la segnalazione a mano',
+    reopen: 'Riapri spiegando cosa manca ancora',
+  };
+  const ACTION_PROGRESS = {
+    accept: 'Metto in coda…',
+    confirm_attack: 'Conferma in corso…',
+    confirm_spam: 'Conferma in corso…',
+    archive: 'Archivio…',
+    restore: 'Ripristino…',
+    resolve: 'Chiudo…',
+    reopen: 'Riapro…',
+  };
+
+  function renderActions(fb) {
+    if (!mgActions || !mgActionsRow) return;
+    chiudiRiapertura();
+    setActionMsg('', '');
+    mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
+    const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
+    mgActions.hidden = !azioni.length;
+    if (!azioni.length) {
+      if (mgAcceptComment) mgAcceptComment.hidden = true;
+      return;
+    }
+    // Il commento di revisione accompagna le decisioni sui Ricevuti (è ciò che
+    // l'owner scrive quando approva o conferma un blocco). Altrove non c'è
+    // niente da commentare e la casella sarebbe solo rumore.
+    if (mgAcceptComment) {
+      const conCommento = azioni.some((a) => a.kind === 'accept' || a.kind === 'reject');
+      mgAcceptComment.hidden = !conCommento;
+      mgAcceptComment.value = '';
+      mgAcceptComment.placeholder = MR.classifyBlock(fb)
+        ? 'Commento (opzionale): perché lo sblocchi…'
+        : 'Commento (opzionale): perché lo approvi…';
+    }
+    for (const a of azioni) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-btn' + (a.primary ? '' : ' sn-btn-secondary');
+      const id = ACTION_BTN_ID[a.key];
+      if (id) b.id = id;
+      b.dataset.actionKey = a.key;
+      b.textContent = a.label;
+      b.title = ACTION_TITLE[a.key] || a.label;
+      b.addEventListener('click', () => {
+        // "Riapri" non scrive subito: chiede prima cosa manca ancora.
+        if (a.kind === 'reopen') { apriRiapertura(); return; }
+        applyAction(a, null);
+      });
+      mgActionsRow.insertBefore(b, mgActionMsg);
+    }
+  }
+
+  // Una scrittura in volo spegne TUTTA la riga, non solo il bottone premuto:
+  // «Archivia» premuto mentre «→ In coda» è ancora in volo scriverebbe due
+  // decisioni sulla stessa segnalazione.
+  function setActionsBusy(busy) {
+    if (mgActionsRow) mgActionsRow.querySelectorAll('button').forEach((b) => { b.disabled = !!busy; });
+    if (mgReopenConfirm) mgReopenConfirm.disabled = !!busy;
+    if (mgReopenCancel) mgReopenCancel.disabled = !!busy;
+  }
+
+  // Il cammino UNICO di ogni azione di stato del pannello.
+  async function applyAction(action, extra) {
+    if (!selectedId || !action) return;
+    const id = selectedId;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    // Il guardiano sta SOTTO ai pulsanti, non accanto: si scrive solo uno stato
+    // che la segnalazione offre in questo momento. Un pannello rimasto aperto
+    // mentre lo stato cambiava scriverebbe altrimenti una decisione che la
+    // pagina non offre più — ed è esattamente così che un attacco confermato si
+    // ritrovava riscritto ad "archiviato", senza avviso.
+    if (!MR.ownerActionAllowsStatus(fb, action.to, { releasedVersion })) {
+      renderActions(fb);
+      setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
+      return;
+    }
+    const payload = { type: 'feedback_update', id, status: action.to };
+    const locale = { status: action.to };
+    const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
+    if (action.kind === 'accept' || action.kind === 'reject') {
+      const decision = action.kind === 'accept' ? 'accepted' : 'rejected';
+      payload.reviewDecision = decision;
+      payload.reviewComment = comment;
+      payload.reviewedAt = new Date().toISOString();
+      locale.reviewDecision = decision;
+      locale.reviewComment = comment;
+      locale.reviewedAt = payload.reviewedAt;
+    }
+    // Archiviazione/ripristino a mano = scelta esplicita: vince per sempre
+    // sull'auto-archiviazione a punteggio (DC3), in un verso e nell'altro.
+    if (action.kind === 'archive') { payload.archiveOverride = 'archived'; locale.archiveOverride = 'archived'; }
+    if (action.kind === 'restore') { payload.archiveOverride = 'keep_open'; locale.archiveOverride = 'keep_open'; }
+    if (extra && typeof extra.notes === 'string') { payload.notes = extra.notes; locale.notes = extra.notes; }
+
+    setActionsBusy(true);
+    setActionMsg(ACTION_PROGRESS[action.key] || 'Salvo…', '');
+    try {
+      const r = await sendToMain(payload);
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      Object.assign(fb, locale);
+      updateTabCounts();
+      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
+      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
+      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
+      // sparirebbe sotto le mani senza motivo apparente.
+      if (selectedId !== id) { renderList(); return; }
+      // La segnalazione cambia sezione: chiudi il dettaglio e ricalcola la lista.
+      selectedId = null;
+      mgDetail.hidden = true;
+      mgDetailEmpty.hidden = false;
+      mgActions.hidden = true;
+      mgClarify.hidden = true;
+      if (mgUserNote) mgUserNote.hidden = true;
+      mgManage.hidden = true;
+      if (mgDetailState) mgDetailState.hidden = true;
+      chiudiRiapertura();
+      closeSidebar();
+      renderList();
+    } catch (e) {
+      setActionsBusy(false);
+      if (selectedId !== id) return;
+      setActionMsg(e.message || 'Errore', 'err');
+    }
+  }
+
+  // ── Riapertura di un fix già uscito ───────────────────────────────────────
+  // Come la gemella: non scrive subito, chiede COSA manca ancora e lo appende
+  // alla conversazione come turno dell'utente, così il report di chi ci ha
+  // lavorato resta leggibile.
+  function chiudiRiapertura() {
+    if (!mgReopen) return;
+    mgReopen.hidden = true;
+    if (mgReopenText) mgReopenText.value = '';
+    // I due bottoni del modulo vivono nell'HTML, non li rigenera nessuno: senza
+    // riaccenderli qui, una riapertura andata a buon fine li lascerebbe spenti
+    // per sempre (setActionsBusy li aveva spenti insieme alla riga).
+    if (mgReopenConfirm) mgReopenConfirm.disabled = false;
+    if (mgReopenCancel) mgReopenCancel.disabled = false;
+  }
+
+  function conversazioneIlleggibile(fb) {
+    const T = window.SN_FEEDBACK_THREAD;
+    const notes = String((fb && fb.notes) || '');
+    return !!(T && T.reportUnreadable && T.reportUnreadable(notes));
+  }
+
+  const RIAPERTURA_ILLEGGIBILE = 'La conversazione di questo feedback non è leggibile su questo computer '
+    + '(manca la chiave privata): riaprirlo adesso sostituirebbe il report. Configura la chiave e riprova.';
+
+  function apriRiapertura() {
+    if (!mgReopen) return;
+    const fb = allFeedbacks.find((f) => f._id === selectedId);
+    if (!fb) return;
+    // Stessa regola della risposta ai chiarimenti: non si riscrive una
+    // conversazione che non si è potuta leggere.
+    if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
+    setActionMsg('', '');
+    mgReopen.hidden = false;
+    if (mgReopenText) mgReopenText.focus();
+  }
+
+  function confermaRiapertura() {
+    const fb = allFeedbacks.find((f) => f._id === selectedId);
+    if (!fb) return;
+    const azione = MR.ownerActionFor(fb, 'reopen', { releasedVersion });
+    if (!azione) {
+      chiudiRiapertura();
+      renderActions(fb);
+      setActionMsg('Questa segnalazione non è più riapribile: lo stato è cambiato.', 'err');
+      return;
+    }
+    const oldNotes = String(fb.notes || '');
+    if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
+    const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
+    let extra = null;
+    if (reason) {
+      const T = window.SN_FEEDBACK_THREAD;
+      const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+      const newNotes = T
+        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il' })
+        : (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`);
+      extra = { notes: newNotes };
+    }
+    applyAction(azione, extra);
+  }
+
+  if (mgReopenCancel) mgReopenCancel.addEventListener('click', () => { chiudiRiapertura(); });
+  if (mgReopenConfirm) mgReopenConfirm.addEventListener('click', confermaRiapertura);
+  if (mgReopenText) {
+    mgReopenText.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); chiudiRiapertura(); }
+      else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); confermaRiapertura(); }
+    });
   }
 
   function setManageMsg(text, kind) {
@@ -1932,55 +2277,7 @@
     }
   }
 
-  // ── Azione: archivia / ripristina ───────────────────────────────────────────
-  // Archivia → status `archived` (tab Archiviati). Su un feedback già archiviato
-  // il bottone ripristina, riportandolo in coda (todo): invariante UX "se puoi
-  // archiviare, puoi togliere dall'archivio".
-  async function toggleArchive() {
-    if (!selectedId) return;
-    const id = selectedId;
-    const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb) return;
-    const wasArchived = (fb.status || '') === 'archived';
-    const next = wasArchived ? 'todo' : 'archived';
-    // Override owner (DC3, SN_BOARD_ARCHIVE.hasOwnerOverride): un'azione manuale
-    // qui è sempre esplicita → vince per sempre sull'auto-archiviazione a
-    // punteggio. Archivio a mano → 'archived' (non riarchiviabile/non
-    // riapribile dall'automazione); ripristino a mano → 'keep_open' (il
-    // punteggio NON lo farà ri-archiviare anche se sopra soglia).
-    const nextOverride = wasArchived ? 'keep_open' : 'archived';
-
-    mgArchiveBtn.disabled = true;
-    setManageMsg(wasArchived ? 'Ripristino…' : 'Archivio…', '');
-    try {
-      const r = await sendToMain({ type: 'feedback_update', id, status: next, archiveOverride: nextOverride });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      fb.status = next;
-      fb.archiveOverride = nextOverride;
-      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
-      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
-      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
-      // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
-      // Il feedback cambia tab: chiudi il dettaglio e ricalcola la lista corrente.
-      selectedId = null;
-      mgDetail.hidden = true;
-      mgDetailEmpty.hidden = false;
-      mgActions.hidden = true;
-      mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
-      mgManage.hidden = true;
-      closeSidebar();
-      renderList();
-    } catch (e) {
-      mgArchiveBtn.disabled = false;
-      if (selectedId !== id) return;
-      setManageMsg(e.message || 'Errore', 'err');
-    }
-  }
-
   mgStarBtn.addEventListener('click', toggleStarred);
-  mgArchiveBtn.addEventListener('click', toggleArchive);
 
   function setClarifyMsg(text, kind) {
     mgClarifyMsg.textContent = text || '';
@@ -2005,6 +2302,12 @@
     if (T && T.reportUnreadable && T.reportUnreadable(oldNotes)) {
       setClarifyMsg('La conversazione di questo feedback non è leggibile su questo computer (manca la chiave privata): '
         + 'rispondere adesso la sostituirebbe. Configura la chiave e riprova.', 'err');
+      return;
+    }
+    // Lo stesso guardiano delle azioni di stato: rispondere rimette in coda, e
+    // in coda ci si rimette solo da dove la tabella condivisa lo prevede.
+    if (fb && !MR.ownerActionAllowsStatus(fb, 'todo', { releasedVersion })) {
+      setClarifyMsg('Lo stato di questa segnalazione è cambiato: aggiorna e riprova.', 'err');
       return;
     }
     const newNotes = T
@@ -2140,105 +2443,11 @@
     });
   }
 
-  // ── Azione: accetta e sblocca un feedback bloccato ──────────────────────────
+  // Il messaggio d'esito della riga delle azioni di stato.
   function setActionMsg(text, kind) {
     mgActionMsg.textContent = text || '';
     mgActionMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
   }
-
-  async function acceptSelected() {
-    if (!selectedId) return;
-    const id = selectedId;
-    const comment = (mgAcceptComment.value || '').trim();
-    const fbSel = allFeedbacks.find((f) => f._id === id);
-    const wasBlocked = fbSel ? MR.classifyBlock(fbSel) !== null : true;
-    mgAcceptBtn.disabled = true;
-    setActionMsg(wasBlocked ? 'Sblocco in corso…' : 'Approvazione in corso…', '');
-    try {
-      // Override owner: il feedback esce dai bloccati e rientra nella coda (todo).
-      const r = await sendToMain({
-        type: 'feedback_update',
-        id,
-        reviewDecision: 'accepted',
-        reviewComment: comment,
-        reviewedAt: new Date().toISOString(),
-        status: 'todo',
-      });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-
-      // Aggiorna lo stato locale (ottimistico): l'override "accepted" toglie il
-      // blocco e il feedback diventa un `todo` — resta in "In coda", non più tra
-      // i bloccati. renderList ricalcola la lista dalla sorgente.
-      const fb = allFeedbacks.find((f) => f._id === id);
-      if (fb) { fb.reviewDecision = 'accepted'; fb.reviewComment = comment; fb.status = 'todo'; }
-
-      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
-      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
-      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
-      // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
-      // Il feedback non è più in revisione: torna allo stato vuoto del dettaglio.
-      selectedId = null;
-      mgDetail.hidden = true;
-      mgDetailEmpty.hidden = false;
-      mgActions.hidden = true;
-      mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
-      closeSidebar();
-      renderList();
-    } catch (e) {
-      if (selectedId !== id) return;
-      setActionMsg(e.message || (wasBlocked ? 'Errore nello sblocco' : 'Errore nell\'approvazione'), 'err');
-    } finally {
-      mgAcceptBtn.disabled = false;
-    }
-  }
-
-  mgAcceptBtn.addEventListener('click', acceptSelected);
-
-  // ── Azione: conferma un attacco/spam (terminale, macchina a stati) ─────────
-  async function confirmSelected() {
-    if (!selectedId || !mgConfirmBtn) return;
-    const id = selectedId;
-    const to = mgConfirmBtn.dataset.confirmStatus;
-    if (!to) return;
-    const comment = (mgAcceptComment.value || '').trim();
-    mgConfirmBtn.disabled = true;
-    setActionMsg('Conferma in corso…', '');
-    try {
-      const r = await sendToMain({
-        type: 'feedback_update',
-        id,
-        reviewDecision: 'rejected',
-        reviewComment: comment,
-        reviewedAt: new Date().toISOString(),
-        status: to,
-      });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      const fb = allFeedbacks.find((f) => f._id === id);
-      if (fb) { fb.reviewDecision = 'rejected'; fb.reviewComment = comment; fb.status = to; }
-      // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
-      // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
-      // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
-      // sparirebbe sotto le mani senza motivo apparente.
-      if (selectedId !== id) { renderList(); return; }
-      selectedId = null;
-      mgDetail.hidden = true;
-      mgDetailEmpty.hidden = false;
-      mgActions.hidden = true;
-      mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
-      closeSidebar();
-      renderList();
-    } catch (e) {
-      if (selectedId !== id) return;
-      setActionMsg(e.message || 'Errore nella conferma', 'err');
-    } finally {
-      mgConfirmBtn.disabled = false;
-    }
-  }
-
-  if (mgConfirmBtn) mgConfirmBtn.addEventListener('click', confirmSelected);
 
   function renderJudgesRow(fb) {
     // Pulisce tutto tranne la label
@@ -2250,6 +2459,23 @@
       lbl.className = 'mg-judge-label';
       lbl.textContent = 'Giudici:';
       mgJudgesRow.appendChild(lbl);
+    }
+
+    // Stato illeggibile: i pallini tratteggiati nascono da "non filtrato", che
+    // qui la macchina si inventa — e la frase accanto diceva "In attesa del
+    // giudizio." anche su una segnalazione già chiusa. Al loro posto va l'unica
+    // cosa che si sa: aperta o chiusa, con le stesse parole della gemella.
+    if (!statoLeggibile(fb)) {
+      const pubblico = MR.publicStateLabel(fb);
+      if (!pubblico) { mgJudgesRow.hidden = true; return; }
+      mgJudgesRow.hidden = false;
+      mgJudgesRow.innerHTML = '';
+      const span = document.createElement('span');
+      span.className = 'mg-state';
+      span.textContent = pubblico;
+      span.title = `Stato: ${pubblico} — ${MR.PUBLIC_STATE_HINT}`;
+      mgJudgesRow.appendChild(span);
+      return;
     }
 
     // Un pallino per ogni giudice ATTESO del panel (non per verdetto): un panel
@@ -2427,15 +2653,36 @@
       const fromVerdicts = filoOpinionFromVerdicts(fb);
       if (fromVerdicts) opinionHtml = fromVerdicts;         // parere completo dai giudici
       else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
-      else opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
+      // "non ha ANCORA un parere" si legge come "sta arrivando": vero solo
+      // finché la segnalazione aspetta una decisione. Su una già decisa (un
+      // attacco confermato, un fix chiuso) quella parola diceva il falso — e su
+      // una cifrata è la macchina a inventarsi che aspetta, perché la sezione
+      // qui non si legge. Senza il criterio si dice solo il fatto: nessun
+      // verdetto è mai arrivato, punto. La gemella quella frase non la scrive.
+      else if (statoLeggibile(fb) && MR.manageTabFor(fb, { releasedVersion }) === 'inbox') {
+        opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
+      } else {
+        opinionHtml = '<em>I giudici non hanno mai valutato questo feedback.</em>';
+      }
     }
     appendBubble('model', 'Filo', opinionHtml);
 
-    // Bolla 3: il commento dell'owner alla revisione (approvazione/sblocco/
-    // conferma). Prima era scritto ma non mostrato da nessuna parte.
-    if (String(fb.reviewComment || '').trim()) {
-      const when = fb.reviewedAt ? ` — ${formatDate(fb.reviewedAt)}` : '';
-      appendBubble('user', `Tu (revisione${when})`, esc(fb.reviewComment));
+    // Bolla 3: LA DECISIONE dell'owner in revisione, col suo commento se c'è.
+    // Prima compariva solo quando c'era un commento: una conferma presa senza
+    // commentarla non lasciava traccia nella conversazione, che continuava a
+    // dire "Filo non ha ancora un parere" su una segnalazione già decisa.
+    // I campi della revisione viaggiano cifrati insieme allo status: senza la
+    // chiave non si scrive un blob, si tace.
+    const decisione = MR.valueUnreadable(fb.reviewDecision) ? '' : String(fb.reviewDecision || '').trim();
+    const commento = MR.valueUnreadable(fb.reviewComment) ? '' : String(fb.reviewComment || '').trim();
+    const DECISION_TEXT = {
+      accepted: 'Approvata: rimessa in coda di lavorazione.',
+      rejected: 'Blocco confermato.',
+    };
+    if (DECISION_TEXT[decisione] || commento) {
+      const when = (fb.reviewedAt && !MR.valueUnreadable(fb.reviewedAt)) ? ` — ${formatDate(fb.reviewedAt)}` : '';
+      const corpo = [DECISION_TEXT[decisione] || '', commento].filter(Boolean).map(esc).join('\n');
+      appendBubble('user', `Tu (revisione${when})`, corpo);
     }
 
     // Turni della lavorazione: le note contengono i report delle istanze che
@@ -2542,7 +2789,9 @@
 
     let listHtml = '';
     for (const fb of group) {
-      const cl  = MR.classifyBlock(fb);
+      // Stesso criterio della lista: un bordo colorato è un'affermazione sullo
+      // stato, e su una segnalazione cifrata la macchina lo inventa.
+      const cl  = statoLeggibile(fb) ? MR.classifyBlock(fb) : null;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const color = cl ? cl.color : 'var(--sn-border)';

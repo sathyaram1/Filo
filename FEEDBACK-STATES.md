@@ -111,11 +111,40 @@ possibilità di crearne di nuovi.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 
+Le tab sono QUATTRO e valgono per OGNI superficie che elenca feedback — la
+dashboard di gestione (`filo://manage`) e la pagina dei feedback
+(`filo://feedback`), che fino al #509 aveva una tassonomia sua (la vecchia
+new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
+"Ricevuti" tutto ciò che non riconosceva: stessa coda, "Ricevuti (3)" di là e
+"Ricevuti (9)" di qua. Una superficie nuova non inventa sezioni: chiama
+`manageTabFor` / `listForManageTab` / `manageTabCounts`.
+
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
+
+### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
+
+Stessa regola delle tab, un gradino più in dentro: la sezione dice quali azioni
+esistono, e la tabella sta in `src/shared/manageReview.js` (`ownerActions`), non
+nelle pagine. Fino al #509 le due superfici se la costruivano ognuna a mano e
+divergevano sulla STESSA segnalazione.
+
+- Ricevuti: `→ In coda` (`todo`, con `reviewDecision: accepted`) · `Conferma attacco`
+  (`attack_confirmed`) su `attack` e `suspicious_file` · `Conferma spam`
+  (`spam_confirmed`) su `spam` e `suspicious_file` · `Archivia`.
+- In coda: `✓ Risolto` (`done`, non offerto se è già `done` non rilasciato) · `Archivia`.
+- Risolti: `Archivia` · `Riapri` (chiede cosa manca, poi `todo`).
+- Archiviati: `↩ Ripristina` (`todo`) e basta. **Nessun cammino riscrive uno stato
+  terminale**: su `attack_confirmed`/`spam_confirmed` un `Archivia` cancellerebbe la
+  conferma, e la segnalazione sparirebbe dal filtro "Bloccati confermati".
+- Stato illeggibile (nessuna chiave privata): nessuna azione, su nessuna superficie.
+
+Il writer di ogni pagina passa da `ownerActionAllowsStatus(fb, to)`: si scrive solo
+uno stato che la segnalazione offre in quel momento, così un pannello rimasto aperto
+mentre lo stato cambiava non deposita una decisione che la pagina non offre più.
 
 La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; sicuro + OFF
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco

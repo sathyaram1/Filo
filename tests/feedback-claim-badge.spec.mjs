@@ -34,8 +34,8 @@ test('dashboard: badge "in lavorazione" solo dove il claim è vivo', async ({ op
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined');
   await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, FAKE);
   await page.click('#refresh');
-  // Vai sul tab "Da risolvere" dove vivono i todo.
-  await page.click('[data-tab="todo"]');
+  // Vai sulla sezione "In coda" dove vivono i todo.
+  await page.click('[data-tab="queue"]');
   await expect(page.locator('.fb-card')).toHaveCount(3);
 
   // Un solo badge in tutta la lista: quello del feedback con claim vivo.

@@ -36,7 +36,7 @@ test('#495/vfx3 — feedback: caricamento fallito → le sezioni non devono dire
   console.log('DOPO IL FALLIMENTO:', JSON.stringify(primaDelClick));
 
   // L'utente fa la cosa più naturale del mondo: prova un'altra sezione.
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
   await page.waitForTimeout(200);
   const dopoIlClick = await page.locator('[data-tab]').allInnerTexts();
   console.log('DOPO IL CLICK:', JSON.stringify(dopoIlClick));

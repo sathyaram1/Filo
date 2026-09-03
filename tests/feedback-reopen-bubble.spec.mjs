@@ -4,7 +4,7 @@
 // di comparire come una BOLLA separata, divisa dalla segnalazione e dalla nota.
 //
 // Contratto (asserisce il SUCCESSO):
-//   • nei tab dove l'admin lavora (es. "Da risolvere") la textarea editabile
+//   • nelle sezioni dove l'admin lavora (es. "In coda") la textarea editabile
 //     contiene SOLO la nota dell'agente (il "capo"), non il testo di riapertura;
 //   • la riapertura compare come bolla di sola lettura separata, sotto la nota;
 //   • salvando una modifica alla nota, la riapertura (la "coda") resta intatta.
@@ -18,7 +18,7 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const FEEDBACK_URL = 'filo://feedback/feedback.html';
 
-// Un feedback "Da risolvere" con: nota dell'agente + una riapertura dell'utente.
+// Un feedback "In coda" con: nota dell'agente + una riapertura dell'utente.
 const SAMPLE = {
   _id: 'mock-reopen-1',
   clientId: 'owner:abc',
@@ -71,7 +71,7 @@ async function setupAdmin(app, page, feedback, capture = false) {
 test('la riapertura è una bolla separata, non dentro la casella della nota', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, SAMPLE);
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
 
   const card = page.locator('.fb-card');
   await expect(card).toHaveCount(1);
@@ -94,7 +94,7 @@ test('la riapertura è una bolla separata, non dentro la casella della nota', as
 test('modificando la nota, la riapertura (coda) resta intatta nel salvataggio', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, SAMPLE, true);
-  await page.locator('[data-tab="todo"]').click();
+  await page.locator('[data-tab="queue"]').click();
 
   const card = page.locator('.fb-card');
   // Cambio il testo della nota e clicco "✓ Risolto": il salvataggio deve

@@ -1926,6 +1926,43 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   coda." dopo un caricamento fallito è la stessa bugia di uno "(0)": afferma
   che lì non c'è niente mentre la verità è che non lo sappiamo. Il riquadro
   vuoto, in quello stato, dice il guasto e lascia la via d'uscita.
+- **E vale per la BARRA INTERA: se il criterio non si legge, le sezioni non si
+  disegnano.** Lo status dei feedback viaggia cifrato: chi non ha la chiave
+  dell'owner non può sapere in che sezione va niente, e la pagina disegnava lo
+  stesso quattro schede — "In coda (0) · Risolti (0) · Archiviati (0)" — con
+  tutto ammucchiato nei Ricevuti, risolti compresi. Tre numeri che dichiarano
+  il vuoto dove non si sa, cioè la stessa bugia in formato più grande. Senza il
+  criterio: niente barra, un elenco solo, una riga che lo dice, e sulla scheda
+  solo ciò che si sa davvero (qui l'enum grossolano in chiaro, aperta/chiusa).
+  Il riconoscimento dev'essere STRETTO in due sensi. Solo il ciphertext conta
+  (uno stato assente o inventato la macchina lo scioglie davvero); e il silenzio
+  scatta solo quando NON si legge nessuno stato, che è il caso vero — o hai la
+  chiave e li leggi tutti, o non ce l'hai e non ne leggi uno. Togliere le
+  sezioni a tutti per un documento storto sarebbe sproporzionato, e farebbe
+  divergere la pagina dalla sua gemella: la divergenza che il pattern qui sopra
+  esiste per togliere.
+- **La regola sta nel modulo, non nella pagina — o la gemella resta indietro.**
+  Scritta dentro `feedback.js`, questa regola è valsa per una pagina sola: la
+  dashboard di gestione ha continuato a scrivere "Ricevuti (3) · In coda (0) ·
+  Risolti (0) · Archiviati (0)" e "In attesa del giudizio" su segnalazioni già
+  chiuse, e la riga di changelog prometteva all'utente una cosa che su
+  «Gestione» non era vera (#509, secondo giro). Adesso il predicato
+  (`statusUnreadable`), la soglia (`sectionsReliable`) e le parole
+  (`publicStateLabel`) sono in `manageReview.js` e le due pagine le chiamano.
+- **Non è "nascondi la barra": è tutto ciò che parte dallo stato.** Chiusa la
+  barra, restano aperte le altre porte, e ognuna costa un giro di verifica: il
+  nome della sezione in cima alla colonna, il bordo colorato della scheda
+  ("Non filtrato" è un'affermazione), le barre di massa che contano per stato
+  ("Ri-valuta i non filtrati (3)", "Approva tutti gli allineati"), i pulsanti di
+  decisione del dettaglio, "Archivia" che senza chiave dice sempre "Archivia"
+  anche su una già archiviata, la frase accanto ai giudici. Il criterio è uno:
+  *se l'affermazione nasce dallo stato e lo stato non si legge, non si scrive*.
+  Restano invece le cose che stanno in chiaro e con lo stato non c'entrano —
+  ⭐ preferito, la frase per chi ha segnalato, le fusioni ferme.
+- **Sezione non è sinonimo di scheda.** La barra della dashboard di gestione
+  porta anche Statistiche Red Team, Modelli di supporto, Automazioni e Log:
+  non elencano segnalazioni e non dipendono dal loro stato, quindi restano
+  raggiungibili. Spariscono le quattro sezioni, non la barra come oggetto.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
   anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
   a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
@@ -1941,7 +1978,9 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   scorciatoia per far tornare i numeri.
 - **Superfici gemelle si allineano.** La pagina dei feedback e la dashboard di
   gestione sono la stessa barra vista da due ruoli: la seconda era rimasta
-  senza numeri per anni proprio perché nessuno le guardava affiancate.
+  senza numeri per anni proprio perché nessuno le guardava affiancate. E
+  allineare i numeri non basta se le sezioni non sono le stesse: vedi il
+  pattern qui sotto.
 - **Il numero fa corpo unico col nome, a qualsiasi larghezza.** Una barra di
   schede a `display:flex` senza `flex-wrap` stringe i bottoni finché le parole
   si spezzano: alla larghezza minima della finestra (720) si leggeva "In" /
@@ -1955,9 +1994,143 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   `setListHead()` in `src/pages/manage/manage.js` (`.mg-tab-count`),
   `updateTabCounts()` in `src/pages/feedback/feedback.js`. I flag di onestà:
   `dataLoaded`/`loadFailed` in `manage.js`, `dataLoaded`/`loadError` +
-  `showLoadError()` in `feedback.js`. Test:
+  `showLoadError()` in `feedback.js`. Stato illeggibile: `statusUnreadable`,
+  `sectionsReliable`, `publicStateLabel`, `PUBLIC_STATE_HINT` in
+  `src/shared/manageReview.js`, consumati da `sezioniAttendibili()` /
+  `mostraSezioni()` in tutt'e due le pagine. Test:
   `tests/manage-tab-counts.spec.mjs`, `tests/feedback-tab-counts-cap.spec.mjs`,
-  `tests/unit/manageReview.test.mjs`, `tests/unit/feedbackCountCap.test.mjs`.
+  `tests/feedback-sezioni-gemelle.spec.mjs`, `tests/unit/manageReview.test.mjs`,
+  `tests/unit/feedbackCountCap.test.mjs`.
+
+## Sezioni con lo stesso nome, una regola sola (e la regola è codice condiviso)
+
+Due pagine che elencano la stessa cosa possono avere due liste diverse, ma non
+due sezioni che si chiamano allo stesso modo e si riempiono in modo diverso. La
+pagina dei feedback e la dashboard di gestione avevano entrambe una sezione
+"Ricevuti": la seconda ci metteva ciò che aspetta una decisione dell'owner, la
+prima ci faceva cadere tutto quello che la sua tassonomia (vecchia) non
+riconosceva — archiviati, in lavorazione, attacchi confermati. Con la stessa
+coda si leggeva "Ricevuti (3)" di là e "Ricevuti (9)" di qua (#509), e chi
+guardava una pagina sola non aveva modo di accorgersene: il numero era fedele
+alla SUA lista, il difetto stava a monte.
+
+- **Il nome è un contratto.** Riusare il nome di una sezione che esiste
+  altrove significa promettere la stessa regola. Se la regola dev'essere
+  diversa, allora è un'altra cosa e va chiamata in un altro modo.
+- **Una tassonomia sola, e sta in un modulo.** Le sezioni non si ricalcolano in
+  ogni pagina: la funzione che decide dove va un elemento (`manageTabFor`),
+  quella che costruisce la lista (`listForManageTab`) e quella che la conta
+  (`manageTabCounts`) sono le stesse per tutte le superfici. Due liste calcolate
+  dallo stesso codice non possono divergere; due liste calcolate da due copie
+  divergono, e la scoperta arriva anni dopo.
+- **Vale anche per ciò che le pagine SCRIVONO.** I pulsanti della pagina
+  vecchia scrivevano ancora il vocabolario vecchio (`new`, `draft`, `verified`,
+  `ignored`): ogni clic spingeva un feedback fuori dalla macchina a stati, e la
+  gemella doveva poi ridurlo a forza. Cammini equivalenti fanno la STESSA cosa,
+  non due cose che si somigliano.
+- **Le sezioni in meno tornano come FILTRO, non come sezione in più.** La
+  pagina dei feedback aveva una sezione "Agente" che la gemella non ha: toglierla
+  avrebbe perso una capacità, tenerla avrebbe rimesso la divergenza. È diventata
+  una casella "Solo automatici" nella barra degli strumenti, come il filtro ⭐
+  degli Archiviati: il conteggio la segue, e a filtro spento i numeri delle due
+  pagine coincidono per costruzione.
+- **La granularità persa dalle sezioni torna sulla CARD.** Quattro sezioni al
+  posto di nove non devono nascondere a che punto è un feedback: l'etichetta
+  dello stato (col suo colore e il suo motivo) sta sulla scheda, letta dal
+  vocabolario unico.
+- **Dove:** `src/shared/feedbackTransitions.js` (le tabelle),
+  `src/shared/feedbackStatus.js` (vocabolario e presentazione),
+  `src/shared/manageReview.js` (`normalizeStatus`, `manageTabFor`,
+  `listForManageTab`, `listArchiveTab`, `manageTabCounts`, `reasonText`);
+  consumate da `src/pages/manage/manage.js` e `src/pages/feedback/feedback.js`.
+  Test: `tests/feedback-sezioni-gemelle.spec.mjs` (apre le due pagine con la
+  stessa coda e confronta le schede una a una).
+
+## Stessa cosa, stesse AZIONI: la tabella dei pulsanti sta nel modulo
+
+Mettere lo stesso elemento nella stessa sezione non basta. Sulla STESSA
+segnalazione le due pagine offrivano pulsanti diversi, perché ognuna se li
+costruiva a mano dai propri `if`: negli Archiviati la pagina dei feedback
+diceva «↩ Ripristina», la dashboard di gestione «Archivia». Non era un doppione
+innocuo — su un attacco confermato quel clic scriveva `archived` SOPRA la
+conferma: una decisione di sicurezza cancellata senza avviso, e da lì la
+segnalazione era indistinguibile da una archiviata qualsiasi (#509, terzo giro).
+
+- **Un'azione a due versi si mostra tutta, o non si mostra.** Se puoi
+  archiviare devi poter togliere dall'archivio; se puoi aggiungere devi poter
+  togliere. Il verso disponibile lo decide lo stato dell'elemento, non il posto
+  dove il pulsante è stato scritto a mano.
+- **La tabella delle azioni sta nel modulo condiviso, come quella delle
+  sezioni.** `ownerActions(fb, opts)` ritorna l'elenco ordinato — chiave,
+  etichetta, stato scritto, `kind` — derivandolo da sezione + status canonico.
+  Le pagine ne disegnano il *modo* (pulsanti dentro la scheda di là, riga in un
+  pannello fermo di qua), mai il *quale*. Un'azione nuova si aggiunge lì, e la
+  gemella ce l'ha nello stesso commit.
+- **Chiudere la porta nella tabella non basta: serve il guardiano sotto.**
+  `ownerActionAllowsStatus(fb, to)` sta sul cammino di scrittura di tutt'e due
+  le pagine: si scrive solo uno stato che la segnalazione offre *in questo
+  momento*. Un pannello rimasto aperto mentre lo stato cambiava, o una lista non
+  aggiornata, sono le porte che restano quando si sistemano solo i pulsanti.
+- **Le decisioni terminali non si riscrivono di fianco.** Uno stato terminale
+  (attacco/spam confermato) si lascia solo per le destinazioni che la macchina a
+  stati dichiara — nella pratica il ritorno in coda, cioè "era legittimo". Non
+  esiste un cammino che ci scriva sopra un altro stato "vicino".
+- **La granularità torna anche nel DETTAGLIO, non solo nella lista.** La
+  dashboard di gestione non scriveva da nessuna parte che una segnalazione era
+  un attacco confermato, e nella conversazione leggevi ancora "Filo non ha
+  ancora un parere". L'etichetta di stato (`MR.stateBadge`) e la bolla della
+  decisione dell'owner sono le stesse parole della gemella.
+- **Dove:** `ownerActions`, `ownerActionFor`, `ownerActionAllowsStatus`,
+  `stateBadge`, `valueUnreadable` in `src/shared/manageReview.js`; consumate da
+  `actionsFor()`/`patch()` in `src/pages/feedback/feedback.js` e da
+  `renderActions()`/`applyAction()`/`renderDetailState()` in
+  `src/pages/manage/manage.js`. Test:
+  `tests/feedback-sezioni-gemelle.spec.mjs` (confronta gli elenchi di pulsanti
+  delle due pagine, segnalazione per segnalazione) e
+  `tests/unit/manageReview.test.mjs`.
+
+## Un clic, una scheda: nessuna azione ricompone la lista sotto il cursore
+
+Un pulsante che sta DENTRO una riga di una lista che si riordina da sé è una
+trappola: al clic la riga esce dalla sezione, le altre risalgono e sotto il
+puntatore FERMO arriva il pulsante della riga successiva. Il secondo clic cade
+su un altro elemento. Non è il doppio clic accidentale — succede anche a quattro
+decimi di secondo di distanza, e cliccare due volte viene naturale proprio
+perché al primo clic non si vede succedere niente. Sulla pagina dei feedback due
+volte «→ In coda» mettevano in coda il primo e marcavano il SECONDO come attacco
+confermato: la decisione più pesante della pagina, presa per sbaglio, in
+silenzio, su una segnalazione che nessuno aveva scelto (#509).
+
+- **La regola è una sola e le copre tutte.** Non "disabilita quel bottone":
+  *nessuna azione presa dentro una scheda ricompone la lista*. Chiudere una
+  porta per volta (prima «In coda», poi «Risolto», poi «Ripristina», poi i
+  pallini della priorità che in una sezione sono un criterio di ordinamento)
+  costa un giro di verifica a testa e ne lascia sempre una aperta.
+- **La scheda si aggiorna AL PROPRIO POSTO.** Si spegne mentre scrive (il clic
+  così si vede, ed è il motivo per cui non se ne dà un secondo), poi resta dov'è
+  con l'esito scritto al posto dei pulsanti: «✓ Spostata in «In coda»». Niente
+  si muove da sotto il puntatore, e un secondo clic non trova niente da premere.
+- **La lista si ricompone solo su richiesta esplicita** — cambio sezione,
+  ricerca, filtro, Aggiorna, dati nuovi. È lì, e solo lì, che le schede già
+  decise lasciano il posto.
+- **I numeri, invece, dicono subito la verità.** Il conteggio della sezione
+  scende all'istante: la scheda decisa è visibilmente marcata come non più
+  appartenente, quindi il numero non contraddice ciò che si vede. Il totale in
+  cima lo dice a parole («4 feedback · 1 decisa»).
+- **Vale anche dentro la scheda.** La × che toglie un allegato ridisegnava la
+  scheda e faceva scorrere le miniature: la seconda × cadeva su un allegato
+  diverso. Stesso rimedio, stesso motivo.
+- **L'aggiornamento ottimistico non è il colpevole; il ridisegno sì.** Scrivere
+  subito nel modello va benissimo: quello che non si può fare è ricostruire
+  l'elenco mentre la mano dell'utente è ancora lì. Serve anche nel ramo
+  d'errore, o il ripristino rimescola la lista esattamente come il successo.
+- **Dove:** `azioneScheda` / `spegniScheda` / `marcaDecisa` / `bindCardActions`
+  e l'opzione `inPlace` di `patch()` in `src/pages/feedback/feedback.js`; la
+  gemella `src/pages/manage/manage.js` non ha il problema perché l'azione vive
+  in un pannello fermo e riguarda la scheda selezionata. Test:
+  `tests/feedback-doppio-clic.spec.mjs` (clicca due volte alle STESSE
+  coordinate con `page.mouse.click`, non sul locator: un locator seguirebbe il
+  pulsante ovunque vada e il difetto non si vedrebbe).
 
 ## Se un dato ESCE da Filo, deve poter RIENTRARE (e l'import mostra prima cosa scrive)
 

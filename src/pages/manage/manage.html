@@ -142,6 +142,14 @@
       border-bottom-color: var(--sn-accent);
     }
     .mg-tab[hidden] { display: none; }
+    /* Stato illeggibile (nessuna chiave su questo computer): le SEZIONI non si
+       disegnano e una riga dice perché, come nella gemella. Le schede che non
+       sono sezioni (Statistiche, Modelli, Automazioni, Log) restano dove sono:
+       non dipendono dallo stato delle segnalazioni. */
+    .mg-no-sections {
+      margin: -12px 0 16px; font-size: 12px; color: var(--sn-muted);
+    }
+    .mg-no-sections[hidden] { display: none; }
     .mg-panel { display: none; }
     .mg-panel--active { display: block; }
 
@@ -368,6 +376,26 @@
       flex: 1 1 auto; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    /* Aperta/Chiusa: l'unica cosa che si sa di una segnalazione il cui stato
+       fine è cifrato. Stesse parole e stesso peso visivo di .fb-state nella
+       gemella. */
+    .mg-state {
+      flex: 0 0 auto; align-self: center;
+      font-size: 11px; color: var(--sn-muted);
+      white-space: nowrap;
+    }
+    /* Etichetta di stato nel dettaglio: stesse parole e stesso peso visivo di
+       .fb-state nella gemella (pallino del colore di rischio + motivo). */
+    .mg-detail-state {
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 12px 0; font-size: 11px; color: var(--sn-muted);
+    }
+    .mg-detail-state[hidden] { display: none; }
+    .mg-detail-state-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+      border: 1px solid var(--sn-border); background: currentColor;
+    }
+    .mg-detail-state-reason { font-style: italic; }
     /* Priorità (1-3 pallini) sulle card "In coda"/"Ricevuti": indicatore a colpo
        d'occhio e, per l'owner, modificabile col click (pieno = priorità). */
     .mg-priority {
@@ -622,8 +650,11 @@
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
       color: var(--sn-fg);
     }
-    .mg-actions-row { display: flex; align-items: center; gap: 10px; }
+    .mg-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .mg-action-msg { font-size: 12px; color: var(--sn-muted); }
+    /* Modulo di riapertura: chiuso finché non lo si chiede. */
+    .mg-reopen { display: flex; flex-direction: column; gap: 8px; }
+    .mg-reopen[hidden] { display: none; }
     .mg-action-msg.mg-ok  { color: #2e9e5b; }
     .mg-action-msg.mg-err { color: #c0392b; }
 
@@ -633,7 +664,12 @@
     .mg-usernote-hint { color: var(--sn-muted); font-size: 12px; }
     #mgUserNoteText { margin-bottom: 8px; }
 
-    /* ── Gestione feedback (⭐ + archivia/ripristina), owner-only ────────── */
+    /* ── Preferito ⭐, owner-only ────────────────────────────────────────── */
+    /* Archivia/Ripristina non sta più qui: è un'azione di STATO e vive nella
+       riga generata da renderActions, che sparisce insieme alle altre quando lo
+       stato non si legge (il bottone DICE dov'è la segnalazione, e senza chiave
+       direbbe sempre "Archivia"). Il preferito invece è un flag in chiaro e
+       resta. */
     .mg-manage[hidden] { display: none; }
     .mg-star-btn {
       all: unset; cursor: pointer;
@@ -806,6 +842,12 @@
         title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
     </nav>
 
+    <!-- Lo stato delle segnalazioni viaggia cifrato: su un computer senza la
+         chiave dell'owner non si legge, e allora le quattro sezioni non si
+         disegnano (PATTERNS.md → "se il criterio non si legge, le sezioni non
+         si disegnano"). Questa riga dice perché, esattamente come la gemella. -->
+    <p class="mg-no-sections" id="mgNoSections" hidden></p>
+
     <!-- Barra di ricerca semantica (nascosta finché non apri la lente). -->
     <div class="mg-searchbar" id="mgSearchBar" hidden>
       <span class="mg-search-ico" id="mgSearchIco" aria-hidden="true"></span>
@@ -889,6 +931,11 @@
           </div>
           <div class="mg-detail" id="mgDetail" hidden>
             <div class="mg-detail-head" id="mgDetailHead"></div>
+            <!-- L'etichetta di stato della segnalazione aperta, con le stesse
+                 parole della gemella (MR.stateBadge). Senza, questa pagina non
+                 diceva da nessuna parte che una segnalazione era, per esempio,
+                 un attacco confermato. -->
+            <div class="mg-detail-state" id="mgDetailState" hidden></div>
             <div class="mg-judges-row" id="mgJudgesRow">
               <span class="mg-judge-label">Giudici:</span>
             </div>
@@ -896,19 +943,31 @@
                  passaggi dell'iter + se un'istanza ci lavora in questo momento. -->
             <div class="mg-work-state" id="mgWorkState" hidden></div>
             <div class="mg-thread" id="mgThread"></div>
-            <!-- Azioni di revisione (owner-only): sblocca il feedback con un
-                 commento opzionale; rientra nella coda di lavoro (todo).
-                 Mostrate solo per i feedback bloccati dal pipeline. -->
+            <!-- Azioni di stato (owner-only): quali siano lo dice la tabella
+                 condivisa (MR.ownerActions), non questa pagina. Il commento di
+                 revisione accompagna le decisioni sui Ricevuti. Il blocco
+                 sparisce quando lo stato non si legge: i pulsanti nascono dallo
+                 stato, e su una segnalazione cifrata la macchina se lo inventa. -->
             <div class="mg-actions" id="mgActions" hidden>
               <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
                 placeholder="Commento (opzionale): perché lo sblocchi…"></textarea>
-              <div class="mg-actions-row">
-                <button type="button" class="sn-btn" id="mgAcceptBtn">Accetta e sblocca</button>
-                <!-- Macchina a stati: per attacchi/spam/file sospetti l'owner può
-                     CONFERMARE il blocco (terminale, va negli Archiviati sotto
-                     "Bloccati confermati"). -->
-                <button type="button" class="sn-btn sn-btn-secondary" id="mgConfirmBtn" hidden>Conferma attacco</button>
+              <!-- I pulsanti li GENERA la pagina leggendo MR.ownerActions: la
+                   stessa tabella che disegna quelli della pagina dei feedback,
+                   così sulla stessa segnalazione le due superfici offrono le
+                   stesse azioni. Il messaggio d'esito resta in fondo alla riga. -->
+              <div class="mg-actions-row" id="mgActionsRow">
                 <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
+              </div>
+              <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo
+                   appende alla conversazione, come la gemella. -->
+              <div class="mg-reopen" id="mgReopen" hidden>
+                <label class="mg-usernote-label" for="mgReopenText">Cosa non va / cosa manca</label>
+                <textarea id="mgReopenText" class="mg-accept-comment" rows="3"
+                  placeholder="Spiega meglio il problema, indica i passi per riprodurre…"></textarea>
+                <div class="mg-actions-row">
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgReopenCancelBtn">Annulla</button>
+                  <button type="button" class="sn-btn" id="mgReopenConfirmBtn">Conferma riapertura</button>
+                </div>
               </div>
             </div>
 
@@ -942,14 +1001,14 @@
               </div>
             </div>
 
-            <!-- Gestione del feedback (owner-only): preferito ⭐ + archivia /
-                 ripristina. Visibile per QUALUNQUE feedback selezionato, accanto
-                 alle azioni contestuali (sblocco / risposta ai chiarimenti). -->
+            <!-- Preferito ⭐ (owner-only): un flag in chiaro, indipendente dallo
+                 stato — per questo NON sta con le azioni di stato, che invece
+                 spariscono quando lo stato non si legge. Archivia/Ripristina
+                 è un'azione di stato e vive nella riga generata qui sopra. -->
             <div class="mg-actions mg-manage" id="mgManage" hidden>
               <div class="mg-actions-row">
                 <button type="button" class="mg-star-btn" id="mgStarBtn"
                   aria-pressed="false" title="Aggiungi ai preferiti">☆ Preferito</button>
-                <button type="button" class="sn-btn" id="mgArchiveBtn">Archivia</button>
                 <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
               </div>
             </div>
