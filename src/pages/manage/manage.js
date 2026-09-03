@@ -1568,7 +1568,7 @@
     // approvare in blocco quello che non si è potuto leggere è la scrittura
     // più pesante della pagina.
     if (!sezioniAttendibili()) return [];
-    return allFeedbacks.filter((f) => MR.isAligned(f));
+    return allFeedbacks.filter((f) => statoLeggibile(f) && MR.isAligned(f));
   }
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
