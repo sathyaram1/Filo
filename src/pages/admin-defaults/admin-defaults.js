@@ -408,6 +408,9 @@
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
+    // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
+    // è quella che il salvataggio riscrive per intero.
+    renderExcluded(cfg.excludedProviders || []);
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
     seedDatalistsFromRegistry(cfg.modelRegistry || {});
