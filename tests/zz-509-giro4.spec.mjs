@@ -172,12 +172,15 @@ const SCRITTURE = [
   { id: 'a07', etichetta: 'Risolto', attesa: 'done' },
 ];
 
-test('#509 giro4 — lo stesso pulsante scrive lo stesso stato sulle due pagine', async ({ openTab }) => {
+// La misuro riaprendo UNA pagina per caso (una a fondo pagina non regge 18 tab
+// insieme: openTab timeouta dopo 5s e la fixture si arrende).
+test('#509 giro4 — lo stesso pulsante scrive lo stesso stato su feedback', async ({ openTab }) => {
   const rotti = [];
+  const fb = await apriFeedback(openTab, CODA);
   for (const caso of SCRITTURE) {
-    const fb = await apriFeedback(openTab, CODA);
-    const mg = await apriManage(openTab, CODA);
-    // pagina feedback: trova la sezione, poi premi
+    // Ricarico i dati (l'azione precedente ha già scritto in fb.all).
+    await fb.evaluate((i) => window.__fbTest.setData(i), CODA);
+    await fb.evaluate(() => { window.__updates.length = 0; });
     let premuto = false;
     for (const t of SEZIONI) {
       await fb.evaluate((t) => window.__fbTest.setTab(t), t);
@@ -192,28 +195,40 @@ test('#509 giro4 — lo stesso pulsante scrive lo stesso stato sulle due pagine'
       }, [caso.id, caso.etichetta]);
       if (premuto) break;
     }
-    await fb.waitForTimeout(250);
-    const uFb = await updates(fb);
+    await fb.waitForTimeout(300);
+    const u = await updates(fb);
+    const s = u.length === 1 ? u[0].status : `SCRITTURE(${u.length})`;
+    if (!premuto || s !== caso.attesa) {
+      rotti.push(`FB ${caso.id} «${caso.etichetta}»: ${premuto ? s : 'BOTTONE ASSENTE'} (atteso ${caso.attesa})`);
+    }
+  }
+  await fb.close();
+  expect(rotti, 'scritture feedback anomale').toEqual([]);
+});
 
+test('#509 giro4 — lo stesso pulsante scrive lo stesso stato su gestione', async ({ openTab }) => {
+  const rotti = [];
+  const mg = await apriManage(openTab, CODA);
+  for (const caso of SCRITTURE) {
+    await mg.evaluate((i) => window.__mgTest.setData(i), CODA);
+    await mg.evaluate(() => { window.__updates.length = 0; });
     await mg.evaluate((id) => window.__mgTest.openDetail(id), caso.id);
-    await mg.waitForTimeout(60);
-    const premutoMg = await mg.evaluate((et) => {
+    await mg.waitForTimeout(80);
+    const premuto = await mg.evaluate((et) => {
       const b = Array.from(document.querySelectorAll('#mgActionsRow button'))
         .find((x) => x.textContent.includes(et));
       if (!b) return false;
       b.click(); return true;
     }, caso.etichetta);
-    await mg.waitForTimeout(250);
-    const uMg = await updates(mg);
-
-    const sFb = uFb.length === 1 ? uFb[0].status : `NIENTE(${uFb.length})`;
-    const sMg = uMg.length === 1 ? uMg[0].status : `NIENTE(${uMg.length})`;
-    if (!premuto || !premutoMg || sFb !== caso.attesa || sMg !== caso.attesa) {
-      rotti.push(`${caso.id} «${caso.etichetta}»: feedback=${premuto ? sFb : 'BOTTONE ASSENTE'} gestione=${premutoMg ? sMg : 'BOTTONE ASSENTE'} (atteso ${caso.attesa})`);
+    await mg.waitForTimeout(300);
+    const u = await updates(mg);
+    const s = u.length === 1 ? u[0].status : `SCRITTURE(${u.length})`;
+    if (!premuto || s !== caso.attesa) {
+      rotti.push(`MG ${caso.id} «${caso.etichetta}»: ${premuto ? s : 'BOTTONE ASSENTE'} (atteso ${caso.attesa})`);
     }
-    await fb.close(); await mg.close();
   }
-  expect(rotti, 'scritture diverse fra le due pagine').toEqual([]);
+  await mg.close();
+  expect(rotti, 'scritture gestione anomale').toEqual([]);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
