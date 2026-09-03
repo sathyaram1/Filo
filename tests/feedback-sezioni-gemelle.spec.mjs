@@ -341,3 +341,62 @@ test('#509 — su «Gestione» un attacco confermato non si può riscrivere ad "
   expect(patch.status).toBe('todo');
   expect(patch.archiveOverride).toBe('keep_open');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La coda MISTA: una segnalazione cifrata in mezzo a tante leggibili.
+//
+// "Le sezioni si possono disegnare?" è una domanda sulla LISTA; "questo stato
+// si legge?" è una domanda su UNA segnalazione. La pagina dei feedback se le
+// faceva tutt'e due, «Gestione» solo la prima: finché nessuno stato si leggeva
+// le due pagine coincidevano, ma bastava una cifrata in mezzo a tante
+// leggibili — il caso in cui la regola dice di LASCIARE le sezioni al loro
+// posto — e su quella segnalazione «Gestione» tornava a dire cose che non sa.
+//
+// Precondizione che senza il fix fallisce: su «Gestione» la scheda cifrata non
+// scrive "Chiusa", prende il bordo bianco dei "non filtrati", viene contata dal
+// bottone "Ri-valuta i non filtrati" e la conversazione dichiara un giudizio
+// che non è mai arrivato.
+const MISTA = [
+  { _id: 'x1', seq: 81, status: 'todo',     name: 'in coda leggibile',   text: 'a', createdAt: '2026-08-01T10:00:00Z' },
+  { _id: 'x2', seq: 82, status: 'archived', name: 'archiviata leggibile', text: 'b', createdAt: '2026-08-02T10:00:00Z' },
+  { _id: 'x3', seq: 83, status: 'FENC1:dddddddddddddddd', statusPublic: 'closed',
+    name: 'cifrata chiusa', text: 'c', createdAt: '2026-08-03T10:00:00Z' },
+];
+
+test('#509 — coda mista: la cifrata dice le stesse cose sulle due pagine', async ({ openTab }) => {
+  const fb = await openTab(FEEDBACK);
+  await fb.waitForLoadState('domcontentloaded');
+  await fb.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
+  await fb.evaluate(() => window.__fbTest.setAdmin(true));
+  await fb.evaluate((items) => window.__fbTest.setData(items), MISTA);
+  await fb.evaluate((v) => window.__fbTest.setReleasedVersion(v), VERSIONE);
+
+  const mg = await openTab(MANAGE);
+  await mg.waitForLoadState('domcontentloaded');
+  await mg.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await mg.evaluate(() => window.__mgTest.whenReady());
+  await mg.evaluate(() => window.__mgTest.setAdmin(true));
+  await mg.evaluate((items) => window.__mgTest.setData(items), MISTA);
+  await mg.evaluate((v) => window.__mgTest.setReleasedVersion(v), VERSIONE);
+
+  // Un solo documento storto non toglie le sezioni a tutti: restano su entrambe.
+  await expect(fb.locator('#tabs [data-tab="queue"]')).toBeVisible();
+  await expect(mg.locator('.mg-tab[data-tab="queue"]')).toBeVisible();
+
+  await fb.evaluate(() => window.__fbTest.setTab('inbox'));
+  await mg.evaluate(() => window.__mgTest.setTab('inbox'));
+
+  // 1. L'unica cosa vera che si sa di lei sta scritta su tutt'e due le schede.
+  await expect(fb.locator('.fb-card[data-id="x3"]')).toContainText('Chiusa');
+  await expect(mg.locator('#mgList .mg-item[data-id="x3"]')).toContainText('Chiusa');
+
+  // 2. E non la si dipinge come "non filtrata": è un'affermazione sullo stato.
+  await expect(mg.locator('#mgList .mg-item[data-id="x3"]')).not.toHaveClass(/mg-item--unfiltered/);
+
+  // 3. Quindi non finisce nel mucchio da rimandare ai giudici.
+  await expect(mg.locator('#mgReevalBar')).toBeHidden();
+
+  // 4. E la conversazione non dichiara un giudizio che non è mai arrivato.
+  await mg.evaluate(() => window.__mgTest.openDetail('x3'));
+  await expect(mg.locator('#mgThread')).not.toContainText('non ha ancora un parere');
+});
