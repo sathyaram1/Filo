@@ -16,15 +16,24 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
 
-async function openStubbedEditor(openTab) {
+async function openStubbedEditor(openTab, overrides = {}) {
   const page = await openTab(ADMIN_URL);
-  await page.addInitScript(() => {
+  await page.addInitScript((over) => {
     const fakeConfig = {
       apiKeysPresent: { openrouter: true, gemini: false, tavily: false },
       safeBrowsingKeyPresent: false,
       modelRegistry: { esistente: { provider: 'openrouter', model: 'vendor/gia-salvato', reasoning: 'medium' } },
       models: {},
+      // Senza override: la lista di esclusione EFFETTIVA coincide con quella del
+      // codice (nessun override remoto), che è il caso normale.
+      excludedProviders: null,
+      ...over,
     };
+    if (fakeConfig.excludedProviders == null) {
+      Object.defineProperty(fakeConfig, 'excludedProviders', {
+        get: () => (window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [],
+      });
+    }
     window.__sent = [];
     const stub = async (msg) => {
       window.__sent.push(msg);
