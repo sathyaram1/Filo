@@ -1453,7 +1453,7 @@
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
-        ${sezioni ? '' : statePublicHtml(fb)}
+        ${leggibile ? '' : statePublicHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
