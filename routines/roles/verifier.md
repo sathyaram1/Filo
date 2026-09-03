@@ -84,6 +84,23 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
       feedback` — arriva firmato come verifica), non blocca il verdetto:
       decide l'owner.
 
+## La suite completa: una volta, prima del PASS
+
+Chi risolve non lancia più `npm test` (dal 2026-09-03). Lo lanci tu, **solo
+quando stai per dare PASS** (o MIGLIORABILE, che passa lo stesso): una corsa
+per feedback invece di una per consegna. Prima confronta gli spec toccati e
+gli unit test; la suite intera è l'ultimo passo, non il primo.
+
+- Rossi **fuori dalla lista dei rossi noti** → **FAIL**, con l'elenco esatto
+  degli spec rotti nella critica: chi corregge rilancia quelli, non tutto.
+- Rossi noti (schermo intero, cattura dello schermo, finestra nascosta, un
+  sito esterno, il percorso abbreviato di Windows: quelli che sono rossi anche
+  su `main` in quell'ambiente) non contano. In dubbio, confronta con `main`
+  sullo stesso spec prima di bocciare: un rosso d'ambiente spacciato per
+  regressione costa un giro intero.
+- Se stai per dare FAIL per altri motivi, la suite completa non serve: la
+  farai al giro in cui il lavoro passa.
+
 ## Trovato un difetto, conta le porte — tutte nella stessa critica
 
 Quando trovi qualcosa che si rompe, prima di scrivere la critica fermati sulla
