@@ -225,3 +225,26 @@ test('#518 traccia visiva della sezione', async ({ openTab }) => {
   await page.screenshot({ path: 'tests/.shots/verify-518-esclusi.png', fullPage: true }).catch(() => {});
   await expect(page.locator('#sec-excluded')).toBeVisible();
 });
+
+// Il tema scuro è metà degli utenti: un avviso che lì diventa illeggibile è
+// come non averlo scritto.
+test('#518 tema scuro: la sezione e l\'avviso restano leggibili', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'OpenAI'] });
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
+  await page.locator('#sec-excluded').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: 'tests/.shots/verify-518-esclusi-dark.png', fullPage: true }).catch(() => {});
+  // Contrasto minimo: testo dell'avviso diverso dallo sfondo del riquadro.
+  const c = await page.evaluate(() => {
+    const box = document.getElementById('excludedDrift');
+    const txt = document.getElementById('excludedDriftText');
+    return {
+      bg: getComputedStyle(box).backgroundColor,
+      fg: getComputedStyle(txt).color,
+      inputFg: getComputedStyle(document.querySelector('.sn-excluded-name')).color,
+      inputBg: getComputedStyle(document.querySelector('.sn-excluded-name')).backgroundColor,
+    };
+  });
+  expect(c.bg).not.toBe(c.fg);
+  expect(c.inputBg).not.toBe(c.inputFg);
+});
