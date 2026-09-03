@@ -823,6 +823,21 @@ function setAssistantCwd(sender, cwd) {
   else _assistantCwdFallback = cwd;
 }
 
+// Cartella di lavoro come va MOSTRATA nel popup di conferma: la home abbreviata
+// in `~`. Più corta da leggere (`~/.ssh` invece di `/home/mario/.ssh`) e senza
+// il nome utente, che altrimenti finirebbe nel testo del popup — popup che
+// l'agente di pagina disegna DENTRO una pagina web qualsiasi.
+function displayCwd(cwd) {
+  const p = String(cwd || '');
+  if (!p) return '';
+  let home = '';
+  try { home = require('node:os').homedir() || ''; } catch (_) {}
+  if (home && (p === home || p.startsWith(`${home}/`) || p.startsWith(`${home}\\`))) {
+    return `~${p.slice(home.length).replace(/\\/g, '/')}`;
+  }
+  return p;
+}
+
 // Corpus sensibile per il taint-match di NAVIGA (anti-esfiltrazione): SOLO i
 // dati personali persistenti che il modello aveva nel contesto — memoria
 // (profilo/preferenze/espansioni) e appunti. NON lo stato delle schede né le
@@ -986,6 +1001,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     if (!s.terminal || !s.terminal.enabled) {
       return { executed: false, kept: true, output: { command: cmd, blocked: 'disabled' } };
     }
+    // Cartella di lavoro per il popup di conferma. L'assistente la sposta da sé
+    // (`cd` è livello 1: eseguito subito, senza chiedere niente, e valido per i
+    // comandi successivi), quindi il solo testo del comando non dice DOVE il
+    // comando andrà a scrivere. Calcolata qui dal main sulla cwd vera: mai
+    // dall'LLM, e mai usata per decidere il livello. Il prefisso `_` la tiene
+    // fuori dalla firma dell'azione (actionSignature), così RUN e CONFIRM
+    // continuano a combaciare.
+    action._cwd = displayCwd(getAssistantCwd(sender));
   }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────

