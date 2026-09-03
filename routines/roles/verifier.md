@@ -183,5 +183,8 @@ node scripts/routine-channel.mjs release <biglietto>
 ```
 
 - **PASS** → il prossimo giro instrada **secaudit**, poi il gate e `done`.
-- **MIGLIORABILE / FAIL** → il prossimo giro instrada una **correzione** con la
-  tua critica.
+- **MIGLIORABILE** → il lavoro prosegue come un pass (il contatore dei giri
+  «migliorabile» è a zero dal 2026-09-03) e i rilievi diventano un feedback a
+  parte, a priorità minima. Se l'owner alza il contatore dalla dashboard, il
+  server instrada invece una correzione: la scelta non è tua.
+- **FAIL** → il prossimo giro instrada una **correzione** con la tua critica.
