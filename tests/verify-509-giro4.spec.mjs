@@ -188,51 +188,55 @@ test('#509/g4 — stessa segnalazione, stesse azioni: tutte e 34, non un campion
   expect(diff, 'segnalazioni su cui le due pagine offrono azioni diverse').toEqual([]);
 });
 
+// Rimette la pagina allo stato di partenza (dati freschi, contatore azzerato):
+// la fixture apre una window per URL, quindi si riusa la stessa.
+const reset = (p, hook, coda) => p.evaluate(({ h, list }) => {
+  window.__updates = [];
+  window[h].setData(list);
+}, { h: hook, list: coda });
+
 test('#509/g4 — stessa azione, stessa scrittura: nessuna decisione cancellata', async ({ openTab }) => {
+  const fb = await apriFeedback(openTab, CODA);
+  const mg = await apriManage(openTab, CODA);
   const diff = [];
+
   for (const item of CODA) {
     const id = item._id;
-    const fb = await apriFeedback(openTab, CODA);
-    const mg = await apriManage(openTab, CODA);
-
-    // Su ogni pagina premi TUTTI i pulsanti disponibili (uno per volta, su una
-    // pagina fresca) e confronta ciò che finisce scritto.
     let etichette = null;
     for (const t of TABS) {
       await fb.evaluate((tt) => window.__fbTest.setTab(tt), t);
       const a = await azioniFb(fb, id);
       if (a) { etichette = a; break; }
     }
-    if (!etichette || !etichette.length) { await fb.close(); await mg.close(); continue; }
+    if (!etichette || !etichette.length) continue;
 
     for (const label of etichette) {
       // «Riapri» apre un modulo, non scrive: fuori da questo confronto.
       if (label === 'Riapri') continue;
-      const f2 = await apriFeedback(openTab, CODA);
+
+      await reset(fb, '__fbTest', CODA);
       for (const t of TABS) {
-        await f2.evaluate((tt) => window.__fbTest.setTab(tt), t);
-        if (await azioniFb(f2, id)) break;
+        await fb.evaluate((tt) => window.__fbTest.setTab(tt), t);
+        if (await azioniFb(fb, id)) break;
       }
-      await f2.evaluate(({ fid, lab }) => {
+      await fb.evaluate(({ fid, lab }) => {
         const card = document.querySelector(`.fb-card[data-id="${CSS.escape(fid)}"]`);
         const btn = Array.from(card.querySelectorAll('.fb-actions button'))
           .find((b) => b.textContent.trim() === lab);
         btn.click();
       }, { fid: id, lab: label });
-      await f2.waitForTimeout(400);
-      const wf = await f2.evaluate(() => window.__updates);
-      await f2.close();
+      await fb.waitForTimeout(250);
+      const wf = await fb.evaluate(() => window.__updates);
 
-      const m2 = await apriManage(openTab, CODA);
-      await m2.evaluate((fid) => window.__mgTest.openDetail(fid), id);
-      await m2.evaluate((lab) => {
+      await reset(mg, '__mgTest', CODA);
+      await mg.evaluate((fid) => window.__mgTest.openDetail(fid), id);
+      await mg.evaluate((lab) => {
         const btn = Array.from(document.querySelectorAll('#mgActionsRow button'))
           .find((b) => b.textContent.trim() === lab);
         btn.click();
       }, label);
-      await m2.waitForTimeout(400);
-      const wm = await m2.evaluate(() => window.__updates);
-      await m2.close();
+      await mg.waitForTimeout(250);
+      const wm = await mg.evaluate(() => window.__updates);
 
       const pulisci = (u) => u.map((x) => {
         const { type, reviewedAt, notes, userNote, reviewComment, ...resto } = x;
@@ -241,7 +245,6 @@ test('#509/g4 — stessa azione, stessa scrittura: nessuna decisione cancellata'
       const A = pulisci(wf); const B = pulisci(wm);
       if (JSON.stringify(A) !== JSON.stringify(B)) diff.push({ id, label, feedback: A, gestione: B });
     }
-    await fb.close(); await mg.close();
   }
   expect(diff, 'azioni che scrivono cose diverse sulle due pagine').toEqual([]);
 });
