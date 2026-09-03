@@ -17,8 +17,13 @@ test('Automazioni: il tetto dei migliorabile accetta 0', async ({ openTab }) => 
   const state = await page.evaluate(() => {
     const imp = document.getElementById('mgImprovableCap');
     const fail = document.getElementById('mgFailCap');
+    // Da non-admin i campi sono disabilitati e un campo disabilitato è sempre
+    // "valido": per misurare davvero il vincolo min li riabilito qui.
+    const impDis = imp.disabled, failDis = fail.disabled;
+    imp.disabled = false; fail.disabled = false;
     imp.value = '0';
     return {
+      disabledForNonAdmin: impDis && failDis,
       impMin: imp.getAttribute('min'),
       impMax: imp.getAttribute('major') || imp.getAttribute('max'),
       failMin: fail.getAttribute('min'),
