@@ -359,7 +359,10 @@
   // il comando, con un contenuto comunque INFLUENZATO dal server (quindi da una
   // pagina ostile che pilota l'assistente): -c/--cookie-jar (i cookie del sito),
   // --etag-save (l'ETag della risposta), --trace/--trace-ascii (la traccia di
-  // debug della richiesta/risposta), --stderr (log/diagnostica di curl). Sono la
+  // debug della richiesta/risposta), --stderr (log/diagnostica di curl),
+  // --libcurl (il programma C equivalente, che contiene URL e header), --hsts e
+  // --alt-svc (le cache HSTS/Alt-Svc: curl le RILEGGE e le RISCRIVE con quanto
+  // dichiara il server, quindi creano/aggiornano il file indicato). Sono la
   // stessa classe logica di -D/--dump-header — scrittura-su-file arbitraria di
   // roba decisa dal remoto — solo più di nicchia e col contenuto più vincolato
   // (formato cookie netscape, ETag quotato, dump esadecimale): l'iniezione è meno
