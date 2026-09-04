@@ -373,7 +373,7 @@
     return {
       type: 'paste',
       label: I18n.t('menu_paste'),
-      shortcut: 'Ctrl+V',
+      shortcut: Tasti.etichetta('Ctrl+V'),
       history: clipboardHistory,
       onClick: () => pasteFromClipboard(),
       onPickHistory: (entry) => pasteHistoryEntry(entry),
