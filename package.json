@@ -26,6 +26,8 @@
     "feedback:login": "node scripts/admin-login.mjs",
     "build": "electron-builder --win",
     "release": "electron-builder --win --publish always",
+    "build:mac": "electron-builder --mac",
+    "release:mac": "electron-builder --mac --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
     "feedback:apri": "node scripts/claude-feedback.mjs"
   },
