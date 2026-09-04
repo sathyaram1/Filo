@@ -2018,6 +2018,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // l'utente non vede il testo ripartire da capo a ogni giro.
   let r = null;
   let parsed = null;
+  try {
   for (let tentativo = 1; tentativo <= 3; tentativo++) {
     r = await handleAIRequest({
       action: ACTIONS.FILO_CHAT,
