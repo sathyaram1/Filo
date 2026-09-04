@@ -406,6 +406,21 @@ test('il manifesto delle capacità non nomina un tasto solo per Windows', () => 
     'queste voci nominano un tasto di Windows senza dire come si fa su Mac:\n' + colpevoli.join('\n'));
 });
 
+test('i testi fissi dell\'interfaccia non nominano un tasto solo per Windows', () => {
+  // Le scritte di i18n.js sono le stesse su tutti i sistemi (non c'è un posto
+  // dove chiedere): quando una nomina un tasto deve nominare anche quello del
+  // Mac, sulla stessa riga.
+  const testo = stripComments(readFileSync(join(ROOT, 'src', 'shared', 'i18n.js'), 'utf8'));
+  const colpevoli = [];
+  testo.split('\n').forEach((line, i) => {
+    if (!/\b(Ctrl|Alt)\b/.test(line)) return;
+    if (/\bMac\b/.test(line)) return;
+    colpevoli.push(`src/shared/i18n.js:${i + 1}  ${line.trim()}`);
+  });
+  assert.deepEqual(colpevoli, [],
+    'queste scritte nominano un tasto di Windows senza dire come si fa su Mac:\n' + colpevoli.join('\n'));
+});
+
 // ── Il primo avvio su Mac: l'istruzione deve essere quella vera ─────────────
 
 test('l\'istruzione per sbloccare Filo al primo avvio arriva PRIMA del primo avvio', () => {
