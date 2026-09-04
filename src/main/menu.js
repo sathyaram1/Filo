@@ -274,6 +274,7 @@ function template() {
 
 // Da chiamare una volta sola, dopo `app.whenReady()`.
 function installaMenuApplicazione() {
+  const { Menu, app } = require('electron');
   try {
     app.setAboutPanelOptions({ applicationName: 'Filo', applicationVersion: app.getVersion() });
   } catch (_) {}
