@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
-    providerRouting, openWeightsBlockReason, auditServedByLater,
+    providerRouting, openWeightsBlockReason, auditServedByLater, applyLimitToChain,
     Defaults, isAdmin, broadcastToTabs,
   } = ctx;
   const { SN_CONST } = globalThis;
@@ -133,7 +133,9 @@ module.exports = function register(on, ctx) {
       const model = modelForAction(settings, SN_CONST.ACTIONS.TTS);
       let attempts;
       try {
-        attempts = buildAttemptChain(settings, model, SN_CONST.ACTIONS.TTS);
+        // Stesso limite di spesa delle altre funzioni: la voce del modello
+        // costa, e oltre il limite si legge con quella del sistema.
+        attempts = await applyLimitToChain(settings, buildAttemptChain(settings, model, SN_CONST.ACTIONS.TTS));
       } catch (e) {
         // Nessun modello di sintesi vocale configurato (o la scorciatoia citata
         // non esiste): si legge con la voce del browser, ma il motivo VERO viene

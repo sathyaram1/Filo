@@ -128,7 +128,7 @@
 
   const models = {
     [A.EXPLAIN]: 'deepseek-flash, gemma-lite',
-    [A.EXPLAIN_DEEP]: 'claude, deepseek',
+    [A.EXPLAIN_DEEP]: 'claude',
     [A.TRANSLATE_SELECTION]: 'deepseek-flash, gemma-lite',
     [A.TRANSLATE_PAGE]: 'deepseek-flash, gemma-lite',
     [A.HELP]: 'deepseek, gemma',

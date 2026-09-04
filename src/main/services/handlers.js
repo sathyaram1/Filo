@@ -2654,6 +2654,9 @@ async function embedTexts(texts, settingsIn) {
   const settings = settingsIn || await getEffectiveSettings();
   const a = embedAttempt(settings);
   if (!a) return null;
+  // Stesso limite di spesa delle altre funzioni: oltre il limite niente
+  // indicizzazione (la ricerca per parole continua a funzionare).
+  await ensureUnderLimit(settings);
   const P = Providers.getProvider(a.provider);
   const r = await P.embed({
     apiKey: a.apiKey, model: a.model, texts, dim: SN_CONST.EMBED_DIM,
