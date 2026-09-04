@@ -949,6 +949,17 @@
       const name = a.label || a.etichetta || '';
       return { icon: '⏰', text: `Sveglia impostata${when ? ` · ${when}` : ''}${name ? ` · ${name}` : ''}` };
     },
+    // Il main descrive cosa ha tolto o spostato («Sveglia “lezione” 07:55»):
+    // se si può aggiungere una sveglia dalla chat, si deve vedere anche
+    // quando la si toglie.
+    CANCELLA_SVEGLIA: (a) => {
+      const list = (a._output && Array.isArray(a._output.removed)) ? a._output.removed : [];
+      return { icon: '⏰', text: `Cancellata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+    },
+    MODIFICA_SVEGLIA: (a) => {
+      const list = (a._output && Array.isArray(a._output.updated)) ? a._output.updated : [];
+      return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+    },
     EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.

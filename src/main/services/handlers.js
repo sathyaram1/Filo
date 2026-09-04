@@ -1122,7 +1122,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const label = String(action.label || action.etichetta || 'Timer');
         const entry = await FiloMem.addTimer({ label, seconds });
         if (entry) broadcastLiveUpdate();
-        return { executed: !!entry, kept: false };
+        return { executed: !!entry, kept: !!entry };
       }
       case 'SVEGLIA': {
         // #322 — prima qui c'era solo una notifica statica ("Sveglia: 07:00")
@@ -1135,7 +1135,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
         });
         if (entry) broadcastLiveUpdate();
-        return { executed: !!entry, kept: false };
+        return { executed: !!entry, kept: !!entry };
       }
       case 'CANCELLA_SVEGLIA': {
         // Prima non esisteva: dalla chat si potevano solo CREARE sveglie e
