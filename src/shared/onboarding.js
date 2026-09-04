@@ -122,22 +122,39 @@
   // richiesta di uscita, non contenerne una. «basta che tu non sia prolisso» è
   // una risposta all'intervista, non un modo di chiuderla — e chiudere per
   // sbaglio l'accoglienza di chi voleva farla è il danno opposto.
+  //
+  // CHIEDERE DI USCIRE ≠ DIRE DI NO A UNA PROPOSTA. Durante l'intervista Filo
+  // PROPONE: l'accesso Google, il tema scuro, un approfondimento sui modelli. A
+  // una proposta si risponde «no grazie», «magari dopo», «non ora»: sono no a
+  // QUELLA proposta, non all'accoglienza. Trattarli da parola di stop chiudeva
+  // tutto al primo rifiuto — delle sei cose da scoprire e da dire l'utente ne
+  // sentiva due, e le altre quattro non le sentiva più. Quindi due elenchi:
+  //   STOP_PHRASES     — chiedono di uscire e non vogliono dire altro: chiude
+  //                      l'app, sempre, anche col modello muto;
+  //   DECLINE_PHRASES  — rifiutano qualcosa, e QUALCOSA lo dice la domanda a
+  //                      cui rispondono: le gestisce il modello, che quella
+  //                      domanda ce l'ha davanti (e se il rifiuto era di tutta
+  //                      l'intervista, chiude lui).
   const STOP_PHRASES = [
     'basta', 'basta cosi', 'basta con le domande', 'basta domande',
+    'basta le domande', 'niente intervista', 'niente domande',
     'salta', 'saltiamo', 'saltala', 'salta questa', 'salta pure', 'salta tutto',
     'salta l accoglienza', 'salta l intervista', 'salta la presentazione',
+    'salta le domande', 'saltiamo l intervista', 'saltiamo tutto',
     'chiudi', 'chiudiamo', 'chiudi qui', 'chiudiamo qui', 'chiudila',
     'finiamola', 'finiscila', 'stop', 'stop cosi',
+  ];
+  const DECLINE_PHRASES = [
     'lascia stare', 'lascia perdere', 'lasciamo stare', 'lasciamo perdere',
     'non mi va', 'non ho voglia', 'non ora', 'non adesso', 'no grazie',
     'magari dopo', 'magari un altra volta', 'un altra volta', 'piu tardi',
-    'salto', 'passo', 'niente intervista', 'niente domande',
+    'salto', 'passo', 'no', 'niente', 'forse dopo', 'ci penso',
   ];
   const STOP_SET = new Set(STOP_PHRASES);
+  const DECLINE_SET = new Set(DECLINE_PHRASES);
   // Riempitivi di cortesia: si tolgono e si riprova. Attenzione a «no grazie» —
-  // togliere «grazie» lascerebbe «no», che durante l'intervista è la risposta a
-  // una domanda, non un'uscita: per questo l'insieme si controlla PRIMA di ogni
-  // sfrondatura, e «no» da solo non è mai una parola di stop.
+  // togliere «grazie» lascerebbe «no»: per questo l'insieme si controlla PRIMA
+  // di ogni sfrondatura.
   const POLITE_HEAD = /^(?:ok|okay|okey|va bene|vabbe|vabbene|no|si|eh|dai|ma|beh|mah|senti|guarda|scusa|per ora|per adesso|adesso|allora)\s+/;
   const POLITE_TAIL = /\s+(?:grazie|per favore|per piacere|per ora|per adesso|adesso|ora|dai|eh|va bene|ok|cosi)$/;
 
