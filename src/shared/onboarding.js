@@ -332,11 +332,11 @@
   }
 
   global.SN_ONBOARDING = {
-    WELCOME_MESSAGE, RESUME_NOTE,
-    MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP,
-    ITEMS, ITEM_IDS,
-    emptyState, normalize, isActive, isTicked, tick, close, restart,
-    remaining, isComplete, appendTurn, userTurns, shouldForceClose,
-    renderChecklistForPrompt,
+    WELCOME_MESSAGE, RESUME_NOTE, CLOSING_MESSAGE,
+    MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
+    ITEMS, ITEM_IDS, STOP_PHRASES,
+    emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
+    remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
+    isStopRequest, renderChecklistForPrompt,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
