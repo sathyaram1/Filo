@@ -108,5 +108,45 @@
     return `${testo} (${etichetta(accel, esplicita)})`;
   }
 
-  global.SN_TASTI = { piattaforma, suMac, etichetta, frase };
+  // ── Il salto da una scheda all'altra ───────────────────────────────────────
+  // Sta qui, accanto al suo nome, perché nome e comportamento devono cambiare
+  // INSIEME: erano due posti diversi, e su Mac dicevano due cose diverse.
+  //
+  // Su Windows e Linux: Alt+cifra. Alt perché non ruba il Ctrl+cifra del
+  // browser e perché mentre si scrive non produce testo.
+  // Su Mac: Cmd+cifra. Lì Opzione+cifra SCRIVE (¡™£¢∞…), e Filo prendendosela
+  // impediva di digitare quei simboli in qualunque pagina finché c'erano
+  // schede aperte. Cmd+cifra è la forma di ogni browser su Mac e non scrive.
+  //
+  // L'evento arriva in due forme: quello del DOM (altKey/ctrlKey/metaKey) e
+  // quello di `before-input-event` del main (alt/control/meta). Le leggiamo
+  // entrambe. Torna l'INDICE della scheda (0-based, 0 → la decima), o null.
+  function indiceSaltoScheda(ev, esplicita) {
+    if (!ev) return null;
+    const alt = ev.altKey === undefined ? !!ev.alt : !!ev.altKey;
+    const ctrl = ev.ctrlKey === undefined ? !!ev.control : !!ev.ctrlKey;
+    const meta = ev.metaKey === undefined ? !!ev.meta : !!ev.metaKey;
+    const shift = ev.shiftKey === undefined ? !!ev.shift : !!ev.shiftKey;
+    if (shift) return null;
+
+    const giusto = suMac(esplicita)
+      ? (meta && !ctrl && !alt)
+      : (alt && !ctrl && !meta);
+    if (!giusto) return null;
+
+    // La cifra si legge dal tasto FISICO (Digit0–9: regge qualunque layout, e
+    // su Mac Opzione trasformerebbe comunque il carattere); `key` è il ripiego
+    // per gli eventi sintetici dei test.
+    const m = /^Digit([0-9])$/.exec(String(ev.code || ''));
+    const cifra = m ? m[1] : (/^[0-9]$/.test(String(ev.key || '')) ? String(ev.key) : null);
+    if (cifra == null) return null;
+    return cifra === '0' ? 9 : Number(cifra) - 1;
+  }
+
+  // Come si chiama, quel salto, per chi lo legge in un elenco.
+  function etichettaSaltoScheda(esplicita) {
+    return etichetta('Alt+1', esplicita).replace(/1$/, 'cifra');
+  }
+
+  global.SN_TASTI = { piattaforma, suMac, etichetta, frase, indiceSaltoScheda, etichettaSaltoScheda };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
