@@ -275,11 +275,11 @@ export function applyVerifierVerdict(state, verdict, critique = '') {
   } else if (verdict === 'migliorabile') {
     s.verifierVerdict = 'migliorabile';
     s.improvableCount = (Number(s.improvableCount) || 0) + 1;
-    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
+    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = capCritique(critique.trim());
   } else {
     s.verifierVerdict = 'fail';
     s.loopCount = (Number(s.loopCount) || 0) + 1;
-    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
+    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = capCritique(critique.trim());
   }
   return s;
 }
