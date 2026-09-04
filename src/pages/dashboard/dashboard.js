@@ -2938,6 +2938,9 @@
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
     if (onbState) await openOnboarding(onbState);
+    // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
+    // dice — finché l'utente non risponde a quella riga.
+    else refreshOnboardingNotice().catch(() => {});
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
