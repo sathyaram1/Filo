@@ -341,6 +341,73 @@
     // La home appena generata È la risposta finale. Se non è arrivata (chiave
     // assente, provider giù) la si carica per la strada normale.
     if (!msg?.message) loadDashboard().catch(() => {});
+    // Chiusa prima della fine? Il congedo era in chat, e la chat è appena
+    // sparita: la riga qui sotto è quello che ne resta.
+    refreshOnboardingNotice().catch(() => {});
+  }
+
+  // ── Dopo un'accoglienza chiusa a metà ─────────────────────────────────────
+  //
+  // Il congedo spiega che l'intervista si rifà da Preferenze, ma vive in chat e
+  // la chat sparisce appena la home è pronta — a volte in un istante. E il segno
+  // «già accolto» è definitivo: chi non fa in tempo a leggerlo non ha modo di
+  // capire perché Filo ha smesso di presentarsi. Questa riga resta sulla home
+  // finché non la si toglie, e porta con sé la strada per tornarci.
+  async function refreshOnboardingNotice() {
+    let st = null;
+    try {
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING, peek: true });
+      st = r?.ok ? r.onboarding : null;
+    } catch (_) { return; }
+    if (st && st.done && st.notice === 'early') showOnboardingNotice();
+    else hideOnboardingNotice();
+  }
+
+  function hideOnboardingNotice() {
+    const box = $('onbNotice');
+    if (!box) return;
+    box.innerHTML = '';
+    box.hidden = true;
+  }
+
+  function showOnboardingNotice() {
+    const box = $('onbNotice');
+    if (!box || !box.hidden) return; // già a schermo: non la ricostruiamo
+    box.innerHTML = '';
+    const text = document.createElement('span');
+    text.className = 'dash-onb-notice-text';
+    text.textContent = 'Abbiamo chiuso la presentazione a metà. Quando vuoi la riprendiamo.';
+    const redo = document.createElement('button');
+    redo.type = 'button';
+    redo.id = 'onbNoticeRedo';
+    redo.textContent = 'Riprendiamola';
+    redo.title = 'Riapre l’intervista di benvenuto qui, da capo. La trovi anche in Preferenze.';
+    redo.addEventListener('click', restartOnboardingHere);
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.id = 'onbNoticeDismiss';
+    ok.textContent = 'No, va bene così';
+    ok.title = 'Toglie questa riga. L’intervista resta rifacibile da Preferenze.';
+    ok.addEventListener('click', dismissOnboardingNotice);
+    box.appendChild(text);
+    box.appendChild(redo);
+    box.appendChild(ok);
+    box.hidden = false;
+  }
+
+  async function dismissOnboardingNotice() {
+    hideOnboardingNotice();
+    try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
+  }
+
+  // Rifarla da qui: la stessa cosa del pulsante in Preferenze, ma senza mandare
+  // l'utente a cercarlo — l'intervista riparte nella scheda che ha davanti.
+  async function restartOnboardingHere() {
+    hideOnboardingNotice();
+    try {
+      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING });
+      if (r?.ok && r.onboarding) await openOnboarding({ ...r.onboarding, resume: false });
+    } catch (_) {}
   }
 
 
