@@ -195,33 +195,106 @@
       // niente chiave): l'intervista aspetta e la home spiega come attivare
       // Filo, invece di accoglierlo con una chat che non può rispondere.
       if (!r?.ok || !r.onboarding || !r.ready) return null;
-      return r.onboarding.done ? null : r.onboarding;
+      if (r.onboarding.done) return null;
+      // `resume` lo decide il main: di schede nuove se ne aprono due insieme, e
+      // il turno rimasto a metà lo deve riprendere UNA sola.
+      return { ...r.onboarding, resume: !!r.resume };
     } catch (_) { return null; }
   }
 
-  // Apre (o riprende) l'intervista: la conversazione salvata torna a schermo
-  // come bolle normali — per l'utente è una chat, non una procedura guidata. Se
-  // l'ultimo messaggio è suo (ha risposto e ha chiuso la finestra prima della
-  // risposta), il turno riparte da solo: non deve riscrivere niente.
-  async function openOnboarding(state) {
-    onboardingActive = true;
-    goThread();
-    const thread = Array.isArray(state.thread) ? state.thread : [];
-    const resuming = thread.length > 1;
-    if (resuming && Onb?.RESUME_NOTE) bubblesEl.appendChild(stepTrace(Onb.RESUME_NOTE));
+  // La conversazione salvata torna a schermo come bolle normali — per l'utente
+  // è una chat, non una procedura guidata. Usata sia all'apertura sia quando
+  // un'altra scheda fa avanzare la stessa intervista.
+  function renderOnboardingThread(state) {
+    const thread = Array.isArray(state?.thread) ? state.thread : [];
+    bubblesEl.innerHTML = '';
     threadHistory = [];
+    if (thread.length > 1 && Onb?.RESUME_NOTE) bubblesEl.appendChild(stepTrace(Onb.RESUME_NOTE));
     for (const m of thread) {
       const role = m.role === 'filo' ? 'filo' : 'user';
       threadHistory.push({ role, text: m.text });
       bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
+  // Apre (o riprende) l'intervista. Se l'ultimo messaggio è dell'utente (ha
+  // risposto e ha chiuso la finestra prima della risposta), il turno riparte da
+  // solo: non deve riscrivere niente.
+  async function openOnboarding(state) {
+    onboardingActive = true;
+    goThread();
+    renderOnboardingThread(state);
+    showSkipOnboarding();
     inputEl.focus();
-    const last = thread[thread.length - 1];
-    if (last && last.role === 'user' && !sending) {
+    const last = (state.thread || [])[(state.thread || []).length - 1];
+    if (state.resume && last && last.role === 'user' && !sending) {
       sending = true;
       sendBtn.disabled = true;
       await runTurnAndContinue({ userMessage: last.text });
+    }
+  }
+
+  // Un'altra scheda ha fatto avanzare l'intervista: questa si riallinea, invece
+  // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
+  // stiamo scrivendo noi — le bolle in corso sono già la verità.
+  function onboardingUpdated(state) {
+    if (!onboardingActive || sending) return;
+    if (!state || state.done) return;
+    renderOnboardingThread(state);
+  }
+
+  // ── La via d'uscita che non passa dal modello ─────────────────────────────
+  //
+  // Il benvenuto promette «scrivi "basta così" e chiudiamo»: la parola la
+  // riconosce il main da sé, senza chiamare nessuno. Questo pulsante è il suo
+  // gemello visibile, per chi la frase non la ricorda o si trova davanti a una
+  // bolla d'errore. Senza, chi apre Filo la prima volta senza rete resta chiuso
+  // dentro l'accoglienza con il solo "Riprova" davanti.
+  function makeSkipOnboardingBtn(label) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'skipOnboarding';
+    b.className = 'dash-skip-onboarding';
+    b.textContent = label || 'Salta l’accoglienza';
+    b.title = 'Chiudi l’intervista e vai alla home. Puoi rifarla da Preferenze.';
+    b.addEventListener('click', skipOnboarding);
+    return b;
+  }
+
+  function showSkipOnboarding() {
+    if (!onboardingActive || $('skipOnboarding')) return;
+    const row = document.createElement('div');
+    row.className = 'dash-skip-row';
+    row.id = 'skipOnboardingRow';
+    row.appendChild(makeSkipOnboardingBtn());
+    threadView.appendChild(row);
+  }
+
+  function hideSkipOnboarding() {
+    const row = $('skipOnboardingRow');
+    if (row) row.remove();
+  }
+
+  let skipping = false;
+  async function skipOnboarding() {
+    if (skipping) return;
+    skipping = true;
+    hideSkipOnboarding();
+    try {
+      const r = await send({ type: MSG.FILO_CLOSE_ONBOARDING });
+      // Il congedo è un testo fisso: arriva anche col modello irraggiungibile.
+      if (r?.closing) {
+        bubblesEl.appendChild(makeBubble({ role: 'filo', text: r.closing, markdown: true }));
+      }
+      onboardingClosing();
+      // Se la home personale non arriva entro pochi secondi (nessun modello),
+      // andiamo comunque alla home: l'uscita non può dipendere da una risposta.
+      setTimeout(() => { if (body.dataset.state === 'thread') onboardingDone(null); }, 6000);
+    } catch (_) {
+      onboardingDone(null);
+    } finally {
+      skipping = false;
     }
   }
 
