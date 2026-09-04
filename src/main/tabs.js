@@ -1423,7 +1423,9 @@ class TabManager {
       // Intercettiamo qui (per-webContents) invece che con un globalShortcut
       // OS-wide, così la combinazione resta disponibile alle altre app.
       if (input.type === 'keyDown') {
-        const idx = indiceSaltoScheda(input);
+        // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
+        // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
+        const idx = indiceSaltoScheda(input, undefined, this.tabs.length);
         if (idx != null) {
           const target = this.tabs[idx];
           if (target) {
