@@ -706,7 +706,13 @@ async function deliverToChannel(intent, data) {
 export function verifierNoteText(verdict, critique = '') {
   // Il ruolo scrive la critica come "PASS — …"/"MIGLIORABILE — …"/"FAIL — …":
   // il prefisso è ridondante col nostro incipit, toglilo (resta la sostanza).
-  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, 4000);
+  // Il tetto è quello della fonte unica, e un taglio lascia un segno visibile
+  // (#531): la nota che nasce qui è la stessa che, sui rilievi non risolti,
+  // diventa il testo del feedback residuo — troncata in silenzio a metà frase
+  // arrivava a chi la doveva lavorare senza il pezzo che serviva.
+  const c = capCritique(
+    String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, ''),
+  );
   if (verdict === 'pass') {
     return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
   }
