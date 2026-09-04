@@ -85,9 +85,17 @@
     const raw = b64ToBytes(b64url);
     return subtle().importKey('raw', raw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
   }
-  function importPrivateKey(b64) {
+  // La chiave privata importata viene tenuta in memoria (una sola voce: la
+  // dashboard decifra centinaia di campi con la STESSA chiave, e importarla
+  // da capo ogni volta costava più della decifratura stessa). Se cambia la
+  // stringa cambia la voce; un import fallito non resta in cache.
+  let privKeyCache = null; // { b64, key }
+  async function importPrivateKey(b64) {
+    if (privKeyCache && privKeyCache.b64 === b64) return privKeyCache.key;
     const pkcs8 = b64ToBytes(b64);
-    return subtle().importKey('pkcs8', pkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+    const key = await subtle().importKey('pkcs8', pkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+    privKeyCache = { b64, key };
+    return key;
   }
 
   // ECDH -> HKDF-SHA256 -> AES-256-GCM. `info` = chiave effimera, lega la chiave
