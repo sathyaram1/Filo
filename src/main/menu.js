@@ -72,6 +72,7 @@ function schedaAttiva() {
 // schede) o la pagina dentro la scheda attiva.
 function contenutoAFuoco() {
   try {
+    const { webContents } = require('electron');
     const wc = webContents.getFocusedWebContents();
     if (wc && !wc.isDestroyed()) return wc;
   } catch (_) {}
