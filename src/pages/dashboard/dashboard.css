@@ -384,6 +384,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Un tentativo andato male: resta leggibile, ma non sembra un lavoro riuscito. */
+.dash-activity[data-failed="1"] .dash-activity-label { color: var(--dash-accent); }
 .dash-activity-icon {
   width: 12px;
   height: 12px;

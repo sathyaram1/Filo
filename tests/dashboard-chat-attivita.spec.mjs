@@ -293,3 +293,51 @@ test('D — un lavoro in due turni: un blocco solo, il commento a metà finisce 
 
   await app.evaluate(() => { try { globalThis.__restoreProvider4?.(); } catch (_) {} });
 });
+
+test('E — un tentativo fallito lo dice in riga; un’impostazione applicata subito compare come riga e nel riassunto', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  // Prima chiamata: ragiona un po' e poi il provider cade. Seconda (il
+  // «Riprova»): risponde applicando un'impostazione di livello 1 (il tema).
+  await app.evaluate(async () => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__restoreProvider5 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    let calls = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onReasoning, onDelta }) => {
+      calls += 1;
+      if (calls === 1) {
+        try { onReasoning && onReasoning('Provo a rispondere ma qualcosa va storto. '); } catch (_) {}
+        await new Promise((r) => setTimeout(r, 200));
+        const e = new Error('fetch failed'); e.code = 'NETWORK'; throw e;
+      }
+      const text = JSON.stringify({ text: 'Tema scuro applicato.', actions: [{ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }] });
+      try { onDelta && onDelta(text); } catch (_) {}
+      return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  });
+
+  await page.locator('#input').fill('metti il tema scuro');
+  await page.locator('#sendBtn').click();
+
+  // Il tentativo fallito resta leggibile ma dichiarato tale.
+  const failed = page.locator('.dash-activity[data-failed="1"]');
+  await expect(failed).toHaveCount(1, { timeout: 8_000 });
+  await expect(failed.locator('.dash-activity-label')).toContainText('Tentativo non riuscito');
+  const retry = page.locator('.dash-action-btn', { hasText: 'Riprova' });
+  await expect(retry).toBeVisible();
+
+  await retry.click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Tema scuro applicato.' })).toBeVisible({ timeout: 8_000 });
+  const ok = page.locator('.dash-activity:not([data-failed])');
+  await expect(ok).toHaveCount(1);
+  await expect(ok.locator('.dash-activity-label')).toHaveText(/^Ha cambiato un'impostazione · \d+ s$/);
+  await ok.locator('.dash-activity-head').click();
+  await expect(ok.locator('.dash-activity-row', { hasText: 'Impostato · tema = scuro' })).toBeVisible();
+  await page.screenshot({ path: 'tests/agent/.out/attivita-fallito-e-riprova.png' });
+
+  await app.evaluate(() => { try { globalThis.__restoreProvider5?.(); } catch (_) {} });
+});

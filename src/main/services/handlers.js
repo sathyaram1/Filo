@@ -1265,7 +1265,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
         await applySettingsUpdate(built.partial);
-        return { executed: true, kept: false };
+        return { executed: true, kept: true };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
