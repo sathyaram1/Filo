@@ -252,7 +252,7 @@
   // Azzera spunte e conversazione e riporta l'utente dove l'intervista vive:
   // una scheda nuova. Non tocca né la memoria né le impostazioni già applicate
   // — rifarla non è disfare quello che Filo ha imparato — e nemmeno la
-  // conversazione di prima: quella finisce nell'archizio qui sotto.
+  // conversazione di prima: quella finisce nell'archivio qui sotto.
   async function restartOnboarding() {
     const r = await chrome.runtime.sendMessage({ type: MSG.FILO_RESTART_ONBOARDING });
     if (!r || !r.ok) return;
