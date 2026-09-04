@@ -293,6 +293,63 @@ test('rifare l’intervista ARCHIVIA quella di prima, non la cancella', () => {
   assert.deepEqual(O.restart(O.emptyState()).past, []);
 });
 
+// ── L'archivio conserva le CONVERSAZIONI, non i ripensamenti ───────────────
+// Rosse senza il fix: si archiviava qualunque cosa avesse anche solo il
+// benvenuto dentro. Bastava aprire e richiudere sei volte «Rifai l'intervista»
+// dalle Preferenze — sei voci «0 tue risposte», tutte con la stessa ora — per
+// buttare fuori dai cinque posti la prima conversazione vera con Filo.
+test('rilanciare senza rispondere non archivia niente (e non butta fuori la vera)', () => {
+  // Una conversazione vera, chiusa e archiviata.
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna, insegnante di lettere' });
+  s = O.appendTurn(s, { role: 'filo', text: 'Piacere Anna.' });
+  s = O.restart(O.close(s));
+  assert.equal(s.past.length, 1);
+
+  // L'utente clicca «Rifai l'intervista», guarda, ci ripensa, torna indietro e
+  // riclicca. Sei volte. Nessuno di quei rilanci è una conversazione.
+  for (let i = 0; i < 6; i++) {
+    s = O.appendTurn(s, { role: 'filo', text: O.WELCOME_MESSAGE });
+    s = O.restart(s);
+  }
+  assert.equal(s.past.length, 1, 'i ripensamenti non occupano posti');
+  assert.match(JSON.stringify(s.past), /insegnante di lettere/,
+    'la prima conversazione con Filo deve restare rileggibile');
+
+  // E un archivio già sporcato si ripulisce da sé alla lettura.
+  const sporco = O.normalize({
+    done: true,
+    past: [
+      { thread: [{ role: 'filo', text: O.WELCOME_MESSAGE }] },
+      { thread: [{ role: 'filo', text: 'ciao' }, { role: 'user', text: 'sono Anna' }] },
+    ],
+  });
+  assert.equal(sporco.past.length, 1);
+  assert.equal(sporco.past[0].thread[1].text, 'sono Anna');
+});
+
+// ── Chiusa a metà: la home lo dice ─────────────────────────────────────────
+// Il congedo vive in chat e la chat sparisce appena arriva la home: chi non fa
+// in tempo a leggerlo non ha modo di sapere perché Filo ha smesso di
+// presentarsi, né che si può rifare — il segno «già accolto» è definitivo.
+// Rossa senza il fix: `notice` non esisteva.
+test('una chiusura anticipata lascia una riga da mostrare; una completa no', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna' });
+  const meta = O.close(s);
+  assert.equal(meta.notice, 'early', 'chiusa con l’elenco a metà: l’utente va avvisato');
+  assert.equal(O.normalize(JSON.parse(JSON.stringify(meta))).notice, 'early', 'sopravvive allo storage');
+  assert.equal(O.dismissNotice(meta).notice, '', 'letta, si spegne');
+  assert.equal(O.dismissNotice(meta).done, true, 'e non riapre niente');
+
+  // Elenco finito: l'accoglienza ha fatto il suo, niente da spiegare.
+  const completa = O.close(O.tick(s, O.ITEM_IDS).state);
+  assert.equal(completa.notice, '');
+
+  // Rifarla toglie la riga: l'intervista è di nuovo aperta.
+  assert.equal(O.restart(meta).notice, '');
+});
+
 test('conversations(): le interviste conservate, dalla più recente', () => {
   let s = O.appendTurn(O.emptyState(), { role: 'filo', text: 'prima' });
   s = O.appendTurn(s, { role: 'user', text: 'io sono io' });
