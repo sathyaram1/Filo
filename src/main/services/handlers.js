@@ -28,6 +28,7 @@ const Paths = globalThis.SN_PATHS;
 const LlmsTxt = globalThis.SN_LLMS_TXT;
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const FiloState = globalThis.SN_FILO_STATE;
+const Onboarding = globalThis.SN_ONBOARDING;
 const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
 
 const KNOWN_PATHS_BUDGET_CHARS = 20 * 1024;
