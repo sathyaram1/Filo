@@ -74,7 +74,7 @@ test('A — chiuso mentre ragiona con l’ultima frase in riga; a fine lavoro il
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onReasoning, onDelta }) => {
       for (const t of thoughts) {
         try { onReasoning && onReasoning(t + ' '); } catch (_) {}
-        await new Promise((r) => setTimeout(r, 450));
+        await new Promise((r) => setTimeout(r, 900));
       }
       const text = JSON.stringify({
         text: 'Ecco la risposta finale.',
