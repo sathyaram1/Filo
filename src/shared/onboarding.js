@@ -144,7 +144,7 @@
   function normalizePhrase(text) {
     return String(text || '')
       .toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '') // via gli accenti: «così» = «cosi»
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // via gli accenti: «così» = «cosi»
       .replace(/[^a-z0-9 ]+/g, ' ') // via punteggiatura e apostrofi
       .replace(/\s+/g, ' ')
       .trim();
@@ -232,10 +232,36 @@
     return { ...cur, done: true, closedAt: nowIso || new Date().toISOString() };
   }
 
-  // Ricomincia da capo: è ciò che fa il pulsante in Preferenze. La
-  // conversazione precedente non viene riproposta — si riparte dal benvenuto.
-  function restart(nowIso) {
-    return { ...emptyState(), startedAt: nowIso || new Date().toISOString() };
+  // Ricomincia da capo: è ciò che fa il pulsante in Preferenze. Si riparte dal
+  // benvenuto, con l'elenco tutto da spuntare — ma l'intervista di PRIMA non si
+  // butta: finisce nell'archivio, da dove si rilegge. Rifarla non è cancellare
+  // quella che c'era (prima la sostituiva, e chi la rifaceva perdeva la sua
+  // prima conversazione con Filo per sempre).
+  function restart(prev, nowIso) {
+    const cur = normalize(prev);
+    const at = nowIso || new Date().toISOString();
+    const past = cur.thread.length
+      ? [...cur.past, {
+        startedAt: cur.startedAt || null,
+        closedAt: cur.closedAt || at,
+        thread: cur.thread,
+      }].slice(-PAST_CAP)
+      : cur.past;
+    return { ...emptyState(), past, startedAt: at };
+  }
+
+  // Le interviste conservate, dalla più recente: quella corrente (appena ha una
+  // conversazione) e quelle archiviate dai rilanci. È quello che Preferenze
+  // mostra per rileggerle.
+  function conversations(state) {
+    const cur = normalize(state);
+    const list = cur.past.slice().reverse().map((p) => ({ ...p, current: false }));
+    if (cur.thread.length) {
+      list.unshift({
+        startedAt: cur.startedAt, closedAt: cur.closedAt, thread: cur.thread, current: true,
+      });
+    }
+    return list;
   }
 
   function remaining(state) {
