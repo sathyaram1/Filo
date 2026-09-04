@@ -159,3 +159,35 @@ test('«Ingrandisci» ingrandisce la pagina, non la fila delle schede', async ({
   await voceDellaBarra(app, 'Dimensione reale');
   await expect.poll(async () => (await zoom()).pagina).toBe(0);
 });
+
+// L'editor zooma il FOGLIO, non la finestra, e si tira fuori dallo zoom del
+// preload: senza una consegna esplicita, su Mac il suo zoom moriva in silenzio
+// — là il tasto non arriva mai alla pagina, se lo prende la barra dei menu.
+// (Su Windows e Linux l'editor riceve il tasto da sé; questa è la strada che
+// vale su Mac, ed è la stessa su tutti i sistemi.)
+test('«Ingrandisci» ingrandisce il foglio anche nell\'editor, che zooma da sé', async ({ app, openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+
+  const foglio = () => page.evaluate(() => document.getElementById('doc').style.zoom || '');
+  expect(await foglio()).toBe('');
+
+  await voceDellaBarra(app, 'Ingrandisci');
+  await expect.poll(foglio, { message: 'il foglio dell\'editor non è stato ingrandito' })
+    .not.toBe('');
+  expect(Number(await foglio())).toBeGreaterThan(1);
+
+  // E la finestra NON è stata zoomata due volte: l'editor resta l'unico a
+  // scalare, il preload sta fuori.
+  const zoomFinestra = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w.isDestroyed());
+    const tabs = win._filoTabs;
+    const attiva = tabs.tabs.find((t) => t.id === tabs.activeId);
+    return attiva.view.webContents.getZoomLevel();
+  });
+  expect(zoomFinestra, 'lo zoom è stato applicato due volte: foglio E finestra').toBe(0);
+
+  await voceDellaBarra(app, 'Dimensione reale');
+  await expect.poll(foglio).toBe('');
+});

@@ -2441,6 +2441,14 @@ comportamento (`indiceSaltoScheda`), il suo nome (`etichettaSaltoScheda`) e la s
 descrizione (`descrizioneSaltoScheda`): tenerli in file diversi è come sono nate le due
 promesse contraddittorie.
 
+Corollario: **una pagina che si tira fuori da un comportamento va comunque avvisata.**
+L'editor scala il foglio invece della finestra e si esclude dallo zoom del preload
+(`dataset.filoOwnZoom`); finché il tasto gli arrivava, se lo gestiva da sé. Su Mac non gli
+arriva mai, quindi il preload ora gli CONSEGNA il verso (`filo:zoom-in/out/reset` sul
+`document`) invece di limitarsi a non fare niente — altrimenti lo zoom dell'editor su Mac
+non succedeva affatto. Il verso sta nel nome dell'evento: fra il mondo isolato del preload
+e quello della pagina un `detail` non passa.
+
 **Quando una scorciatoia esiste in due posti, la regola che decide sta in un terzo.**
 `Ctrl/Cmd+Z` annulla dentro un campo di testo e torna indietro fuori: la domanda "si sta
 scrivendo qui?" arriva dalla pagina (Windows, Linux) e dalla barra (Mac). La regola vive
