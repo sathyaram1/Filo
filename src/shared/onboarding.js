@@ -107,8 +107,74 @@
   const ITEM_IDS = ITEMS.map((i) => i.id);
   const ITEM_BY_ID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
+  // ── L'uscita che NON passa dal modello ────────────────────────────────────
+  //
+  // Il benvenuto promette: «scrivi "basta così" e chiudiamo». Una promessa che
+  // dipende dalla buona volontà del modello non è una promessa: un modello
+  // piccolo se ne dimentica (l'istruzione è una fra molte) e un provider giù
+  // non risponde affatto — e chi apre Filo la prima volta senza rete resterebbe
+  // chiuso dentro l'accoglienza, con davanti una frase che gli dice di scrivere
+  // una cosa che non funziona. Perciò la parola di stop la riconosce l'APP,
+  // prima di qualunque chiamata: il modello resta la strada normale, questa è
+  // la rete di sicurezza.
+  //
+  // Il riconoscimento è volutamente STRETTO: l'intera frase deve essere una
+  // richiesta di uscita, non contenerne una. «basta che tu non sia prolisso» è
+  // una risposta all'intervista, non un modo di chiuderla — e chiudere per
+  // sbaglio l'accoglienza di chi voleva farla è il danno opposto.
+  const STOP_PHRASES = [
+    'basta', 'basta cosi', 'basta con le domande', 'basta domande',
+    'salta', 'saltiamo', 'saltala', 'salta questa', 'salta pure', 'salta tutto',
+    'salta l accoglienza', 'salta l intervista', 'salta la presentazione',
+    'chiudi', 'chiudiamo', 'chiudi qui', 'chiudiamo qui', 'chiudila',
+    'finiamola', 'finiscila', 'stop', 'stop cosi',
+    'lascia stare', 'lascia perdere', 'lasciamo stare', 'lasciamo perdere',
+    'non mi va', 'non ho voglia', 'non ora', 'non adesso', 'no grazie',
+    'magari dopo', 'magari un altra volta', 'un altra volta', 'piu tardi',
+    'salto', 'passo', 'niente intervista', 'niente domande',
+  ];
+  const STOP_SET = new Set(STOP_PHRASES);
+  // Riempitivi di cortesia: si tolgono e si riprova. Attenzione a «no grazie» —
+  // togliere «grazie» lascerebbe «no», che durante l'intervista è la risposta a
+  // una domanda, non un'uscita: per questo l'insieme si controlla PRIMA di ogni
+  // sfrondatura, e «no» da solo non è mai una parola di stop.
+  const POLITE_HEAD = /^(?:ok|okay|okey|va bene|vabbe|vabbene|no|si|eh|dai|ma|beh|mah|senti|guarda|scusa|per ora|per adesso|adesso|allora)\s+/;
+  const POLITE_TAIL = /\s+(?:grazie|per favore|per piacere|per ora|per adesso|adesso|ora|dai|eh|va bene|ok|cosi)$/;
+
+  function normalizePhrase(text) {
+    return String(text || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '') // via gli accenti: «così» = «cosi»
+      .replace(/[^a-z0-9 ]+/g, ' ') // via punteggiatura e apostrofi
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function isStopRequest(text) {
+    let p = normalizePhrase(text);
+    // Un messaggio lungo è una risposta all'intervista, non un modo di uscirne.
+    if (!p || p.length > 60) return false;
+    for (let i = 0; i < 4; i++) {
+      if (STOP_SET.has(p)) return true;
+      const next = p.replace(POLITE_HEAD, '').replace(POLITE_TAIL, '').trim();
+      if (next === p) break;
+      p = next;
+    }
+    return STOP_SET.has(p);
+  }
+
   function emptyState() {
-    return { done: false, ticked: [], thread: [], startedAt: null, closedAt: null };
+    return { done: false, ticked: [], thread: [], past: [], startedAt: null, closedAt: null };
+  }
+
+  function normalizeThread(raw) {
+    return Array.isArray(raw)
+      ? raw
+        .filter((m) => m && typeof m === 'object')
+        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || '') }))
+        .filter((m) => m.text)
+        .slice(-THREAD_CAP)
+      : [];
   }
 
   // Rende utilizzabile qualsiasi cosa arrivi dallo storage (assente, vecchia,
@@ -118,17 +184,22 @@
     const ticked = Array.isArray(s.ticked)
       ? s.ticked.map((x) => String(x || '').trim().toLowerCase()).filter((x) => ITEM_BY_ID[x])
       : [];
-    const thread = Array.isArray(s.thread)
-      ? s.thread
-        .filter((m) => m && typeof m === 'object')
-        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || '') }))
-        .filter((m) => m.text)
-        .slice(-THREAD_CAP)
+    const past = Array.isArray(s.past)
+      ? s.past
+        .filter((p) => p && typeof p === 'object')
+        .map((p) => ({
+          startedAt: p.startedAt || null,
+          closedAt: p.closedAt || null,
+          thread: normalizeThread(p.thread),
+        }))
+        .filter((p) => p.thread.length)
+        .slice(-PAST_CAP)
       : [];
     return {
       done: !!s.done,
       ticked: Array.from(new Set(ticked)),
-      thread,
+      thread: normalizeThread(s.thread),
+      past,
       startedAt: s.startedAt || null,
       closedAt: s.closedAt || null,
     };
