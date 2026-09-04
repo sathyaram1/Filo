@@ -140,11 +140,127 @@ test('restart(): si riparte da capo, elenco tutto da spuntare', () => {
   let s = O.tick(O.emptyState(), ['profilo', 'crediti']).state;
   s = O.appendTurn(s, { role: 'user', text: 'ciao' });
   s = O.close(s);
-  const nuova = O.restart();
+  const nuova = O.restart(s);
   assert.equal(nuova.done, false);
   assert.deepEqual(nuova.ticked, []);
   assert.deepEqual(nuova.thread, []);
   assert.ok(nuova.startedAt, 'una ripartenza ha una data');
+});
+
+// ── RILIEVO 1: l'uscita che non passa dal modello ──────────────────────────
+// Il benvenuto promette «scrivi "basta così" e chiudiamo». Senza questo,
+// quella promessa vale solo se il modello collabora: col provider giù (o con un
+// modello piccolo che si dimentica di chiudere) l'utente resta chiuso dentro
+// l'accoglienza. Rosse senza il fix: isStopRequest() non esisteva.
+test('«basta così» la riconosce l’APP, non il modello', () => {
+  for (const frase of [
+    'basta così', 'basta cosi', 'Basta così.', 'BASTA COSÌ!', 'basta',
+    'ok basta così', 'va bene basta', 'salta', 'saltiamo', 'salta l’accoglienza',
+    "salta l'intervista", 'chiudiamo', 'chiudi qui', 'stop', 'lascia stare',
+    'lascia perdere', 'non mi va', 'no grazie', 'magari dopo', 'più tardi',
+    'non ho voglia', 'basta domande', '  basta così  ',
+  ]) {
+    assert.equal(O.isStopRequest(frase), true, `non riconosciuta: "${frase}"`);
+  }
+});
+
+test('…ma non chiude l’intervista a chi stava rispondendo', () => {
+  for (const frase of [
+    'basta che tu non sia prolisso', 'mi basta poco', 'no', 'sì', 'ok',
+    'lavoro in banca, mi basta il browser',
+    'preferisco risposte brevi, senza tanti giri',
+    'Sono Anna, faccio la maestra e uso il computer per preparare le lezioni',
+    'chiudi le schede quando ho finito', 'stop motion', 'salta la coda',
+    '', '   ', null, undefined,
+  ]) {
+    assert.equal(O.isStopRequest(frase), false, `chiusa per sbaglio da: "${frase}"`);
+  }
+});
+
+test('il congedo scritto a mano esiste: è l’unica risposta possibile senza modello', () => {
+  assert.ok(O.CLOSING_MESSAGE.length > 40);
+  assert.match(O.CLOSING_MESSAGE, /Preferenze/, 'deve dire come rifarla');
+});
+
+// ── RILIEVO 2: il turno interrotto non deve contare due volte ──────────────
+// Tre strade allo stesso guaio — finestra chiusa mentre Filo scriveva, «Riprova»
+// dopo un errore, seconda scheda aperta durante l'attesa — e in tutte e tre lo
+// stesso messaggio ripassa da appendTurn. Rossa senza il fix: la conversazione
+// finiva con due copie e userTurns() ne contava due dei cinque scambi.
+test('lo stesso messaggio ripetuto di fila è lo STESSO turno, non uno nuovo', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna, insegnante' });
+  const dopoRipresa = O.appendTurn(s, { role: 'user', text: 'sono Anna, insegnante' });
+  assert.equal(dopoRipresa.thread.length, 2, 'la risposta non deve entrare due volte');
+  assert.equal(O.userTurns(dopoRipresa), 1, 'e non deve consumare due dei cinque scambi');
+  // Spazi a parte, è lo stesso messaggio: anche quello è lo stesso turno.
+  assert.equal(O.userTurns(O.appendTurn(s, { role: 'user', text: ' sono Anna, insegnante ' })), 1);
+  // Un messaggio DIVERSO invece prosegue normalmente.
+  const avanti = O.appendTurn(s, { role: 'user', text: 'e preferisco risposte brevi' });
+  assert.equal(avanti.thread.length, 3);
+  assert.equal(O.userTurns(avanti), 2);
+  // E lo stesso testo tornato dopo la risposta di Filo è un turno vero.
+  let ripetuto = O.appendTurn(s, { role: 'filo', text: 'Piacere Anna.' });
+  ripetuto = O.appendTurn(ripetuto, { role: 'user', text: 'sono Anna, insegnante' });
+  assert.equal(O.userTurns(ripetuto), 2, 'non è più consecutivo: è un turno nuovo');
+});
+
+test('hasPendingTurn(): riparte solo il turno che è rimasto davvero a metà', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  assert.equal(O.hasPendingTurn(s), false, 'ha solo letto il benvenuto: niente da riprendere');
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna' });
+  assert.equal(O.hasPendingTurn(s), true, 'Filo non ha ancora risposto');
+  s = O.appendTurn(s, { role: 'filo', text: 'Piacere.' });
+  assert.equal(O.hasPendingTurn(s), false);
+  assert.equal(O.hasPendingTurn(O.close(O.appendTurn(s, { role: 'user', text: 'x' }))), false,
+    'un’intervista chiusa non ha turni da riprendere');
+});
+
+// ── RILIEVO 3: rifare l'intervista non cancella quella di prima ────────────
+// Rossa senza il fix: restart() sostituiva la conversazione e chi la rifaceva
+// perdeva la prima per sempre.
+test('rifare l’intervista ARCHIVIA quella di prima, non la cancella', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna, insegnante' });
+  s = O.appendTurn(s, { role: 'filo', text: 'Piacere Anna.' });
+  s = O.close(s, '2026-09-04T10:00:00.000Z');
+
+  const nuova = O.restart(s, '2026-09-10T09:00:00.000Z');
+  assert.equal(nuova.thread.length, 0, 'la nuova parte pulita');
+  assert.equal(nuova.past.length, 1, 'ma la precedente resta da parte');
+  assert.equal(nuova.past[0].thread.length, 3);
+  assert.match(nuova.past[0].thread[1].text, /Anna/);
+  assert.equal(nuova.past[0].closedAt, '2026-09-04T10:00:00.000Z');
+
+  // Sopravvive al giro dallo storage.
+  assert.deepEqual(O.normalize(JSON.parse(JSON.stringify(nuova))).past, nuova.past);
+
+  // Rifarla ancora accumula, senza crescere all'infinito.
+  let acc = nuova;
+  for (let i = 0; i < O.PAST_CAP + 3; i++) {
+    acc = O.appendTurn(acc, { role: 'user', text: `giro ${i}` });
+    acc = O.restart(O.close(acc));
+  }
+  assert.equal(acc.past.length, O.PAST_CAP);
+  assert.match(acc.past[acc.past.length - 1].thread[0].text, new RegExp(`giro ${O.PAST_CAP + 2}`));
+
+  // Un rilancio su un'intervista mai cominciata non archivia una conversazione vuota.
+  assert.deepEqual(O.restart(O.emptyState()).past, []);
+});
+
+test('conversations(): le interviste conservate, dalla più recente', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: 'prima' });
+  s = O.appendTurn(s, { role: 'user', text: 'io sono io' });
+  s = O.restart(O.close(s, '2026-09-01T10:00:00.000Z'), '2026-09-05T10:00:00.000Z');
+  s = O.appendTurn(s, { role: 'filo', text: 'seconda' });
+
+  const list = O.conversations(s);
+  assert.equal(list.length, 2, 'quella in corso e quella archiviata');
+  assert.equal(list[0].current, true);
+  assert.equal(list[0].thread[0].text, 'seconda');
+  assert.equal(list[1].current, false);
+  assert.equal(list[1].thread[0].text, 'prima');
+  assert.deepEqual(O.conversations(O.emptyState()), [], 'niente ancora, niente da rileggere');
 });
 
 test('il prompt della chat riceve l’elenco di cosa resta da scoprire e da dire', () => {
