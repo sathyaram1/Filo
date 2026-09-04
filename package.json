@@ -60,8 +60,28 @@
       "uninstallerIcon": "assets/icons/icon.ico"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "assets/icons/icon-256.png"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "artifactName": "Filo-Mac.${ext}",
+      "icon": "assets/icons/icon-1024.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "artifactName": "Filo-Mac.${ext}"
     },
     "linux": {
       "target": "AppImage",
@@ -73,7 +93,8 @@
         "owner": "sathyaram1",
         "repo": "Filo"
       }
-    ]
+    ],
+    "afterPack": "scripts/after-pack-mac.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
