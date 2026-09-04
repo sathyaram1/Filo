@@ -1576,6 +1576,7 @@
       `═══ FORMATO OUTPUT (rigoroso) ═══\n` +
       `Rispondi SOLO con un JSON valido, niente markdown, niente \`\`\`:\n` +
       `Il campo "text" deve venire SEMPRE per PRIMO, PRIMA di "actions": viene mostrato all'utente MANO A MANO che lo scrivi, quindi scrivilo tutto d'un fiato e lascia le "actions" alla fine. Se la risposta è solo un'azione (es. apri un link) e non hai nulla da dire, "text" è la stringa vuota "" — non scrivere frasi di riempimento.\n` +
+      `Quando emetti un'azione il cui risultato ti torna nel turno successivo (CERCA_WEB, LEGGI_FILE, LEGGI_DOCUMENTO, LEGGI_TRASPARENZA, CAPACITA_DETTAGLIO, ESEGUI_COMANDO), lascia "text" vuoto: l'utente vede già cosa stai facendo, e la risposta la darai col risultato in mano. Scrivi qualcosa solo se il lavoro sarà lungo e vale la pena dirlo (es. "Preparo la presentazione, ci vorrà un minuto").\n` +
       `{\n` +
       `  "text": "<testo della bolla, markdown leggero ammesso>",\n` +
       `  "actions": [\n` +
