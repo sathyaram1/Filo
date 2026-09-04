@@ -496,7 +496,12 @@
   // (offline, un `fetch` del renderer può impiegare ~13 s prima di fallire da
   // solo). Chi lo passa vuole poter mostrare uno stato d'errore in tempi umani;
   // chi lo omette mantiene il comportamento storico (nessun timeout).
-  async function list({ pageSize = 200, timeoutMs = 0 } = {}) {
+  // `fields` (opzionale): i soli campi da scaricare (proiezione). Senza, arriva
+  // il documento intero. La dashboard di gestione lo usa in due modi: per
+  // rimandare i campi pesanti che servono solo nel dettaglio, e — con il solo
+  // `__name__` — per chiedere a Firestore "cosa è cambiato?" pagando pochi
+  // byte: ogni riga porta comunque `updateTime`.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null } = {}) {
     // structuredQuery via runQuery, ordinamento per createdAt DESC.
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const body = {
@@ -508,6 +513,9 @@
         limit: pageSize,
       },
     };
+    if (Array.isArray(fields) && fields.length > 0) {
+      body.structuredQuery.select = { fields: fields.map((f) => ({ fieldPath: String(f) })) };
+    }
     const opts = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
