@@ -147,6 +147,7 @@
   let starredOnly   = false;    // filtro ⭐ della tab Archiviati (DB2)
   let confirmedOnly = false;    // filtro "Bloccati confermati" (attack/spam confermati)
   let releasedVersion = '';     // versione dell'app in esecuzione = ultima rilasciata (DB3)
+  let firstListPromise = null;  // prima lettura della lista, avviata da init PRIMA del resto
   // Modalità automatica: agisce UNA volta al momento del giudizio (lato
   // pipeline: sicuro+ON → todo, sicuro+OFF → aligned). NON è più una lente
   // sulle liste: le tab derivano solo dallo status (macchina a stati).
@@ -3467,7 +3468,9 @@
     await loadLayout();
     await refreshAuth();
     applyAutoModeGate();
-    await Promise.all([loadAutoMode(), loadSortMode(), loadCaps(), loadJudgeTimeout(), loadMergeApprovals()]);
+    // In parallelo e senza che una fallita fermi le altre (ognuna gestisce già
+    // il proprio errore; allSettled è la cintura).
+    await Promise.allSettled([loadAutoMode(), loadSortMode(), loadCaps(), loadJudgeTimeout(), loadMergeApprovals()]);
     await loadData();
     startLive();
   }
