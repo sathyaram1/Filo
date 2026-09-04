@@ -42,11 +42,18 @@ name: Suite completa
 
 on:
   push:
-    branches: ['**']      # tutti i rami, mai i tag: una release non è lavoro nuovo
-    # I rami usa-e-getta della prova di fusione del server (nascono e muoiono
-    # in pochi secondi, prima di chiedere all'owner di approvare): un verdetto
-    # su di loro non servirebbe a nessuno.
-    branches-ignore: ['prova-fusione/**']
+    # Tutti i rami, mai i tag: una release non è lavoro nuovo. L'esclusione si
+    # scrive QUI DENTRO, come motivo negativo: `branches` e `branches-ignore`
+    # insieme sono un errore di sintassi, e un errore di sintassi qui non fa
+    # rosso un lavoro — non lo fa PARTIRE. Le corse 107 e 108 sono morte in
+    # zero secondi, senza un job, e il verdetto risultava semplicemente
+    # assente: la suite era spenta e nessuno lo vedeva.
+    branches:
+      - '**'
+      # I rami usa-e-getta della prova di fusione del server (nascono e muoiono
+      # in pochi secondi, prima di chiedere all'owner di approvare): un verdetto
+      # su di loro non servirebbe a nessuno.
+      - '!prova-fusione/**'
   workflow_dispatch: {}
 
 # Una corsa per ramo: il salvataggio automatico committa a ogni modifica di
