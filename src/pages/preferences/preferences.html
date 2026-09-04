@@ -15,6 +15,31 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/onboarding.js"></script>
+  <style>
+    /* #524 — le interviste di benvenuto conservate. Rifarne una non cancella
+       quella di prima: restano qui, rileggibili. */
+    .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .onb-conv > summary {
+      cursor: pointer;
+      padding: 8px 10px;
+      border-radius: 8px;
+      list-style: none;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .onb-conv > summary::-webkit-details-marker { display: none; }
+    .onb-conv > summary::before { content: '▸'; opacity: 0.6; transition: transform 0.15s ease; }
+    .onb-conv[open] > summary::before { content: '▾'; }
+    .onb-conv > summary:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
+    .onb-conv-when { font-weight: 600; }
+    .onb-conv-turns { opacity: 0.65; font-size: 0.9em; }
+    .onb-lines { padding: 6px 10px 12px 26px; display: flex; flex-direction: column; gap: 8px; }
+    .onb-line { display: flex; gap: 8px; line-height: 1.45; }
+    .onb-who { flex: 0 0 auto; font-weight: 600; opacity: 0.75; }
+    .onb-what { white-space: pre-wrap; }
+  </style>
 </head>
 <body>
   <main class="sn-page" id="page">
