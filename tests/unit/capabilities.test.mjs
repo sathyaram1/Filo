@@ -101,6 +101,10 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   // ragione esplicita così la lista resta onesta.
   const INTERNAL = new Set([
     'FILO_GET_STATE', // assemblaggio dello stato (schede/cronologia) per il prompt dell'agente
+    // Compattazione forzata della memoria (#524): meccanica interna del sistema
+    // di memoria, che l'utente conosce già come "filo-memory". Non è una voce a
+    // sé: nessuno chiede "compatta le lezioni", chiede "ricordati questo".
+    'FILO_COMPACT_MEMORY',
   ]);
 
   // Mappa handler → id della capacità che lo descrive nel manifesto. Più handler
