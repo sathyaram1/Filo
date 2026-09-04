@@ -699,14 +699,20 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
   }
 }
 
+// Compatta il buffer delle lezioni dentro i moduli di memoria (PROFILO,
+// PREFERENZE, espansioni). Di norma parte quando il buffer supera la soglia;
+// `runCompactor()` è anche l'entrata per FORZARLA subito — serviva alla fine
+// della micro-intervista di benvenuto (#524), dove le lezioni appena raccolte
+// devono essere già in memoria quando Filo genera la prima home personale, e
+// prima non c'era alcun modo di chiederla. Ritorna true se ha compattato.
 async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return;
+    if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return false;
     const memory = await FiloMem.getMemory();
     const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
-    if (!buf.length) return;
+    if (!buf.length) return false;
     const lezioniText = buf.map((l) => `- ${l.text}`).join('\n');
     const r = await handleAIRequest({
       action: ACTIONS.FILO_COMPACT,
