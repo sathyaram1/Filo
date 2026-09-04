@@ -148,6 +148,7 @@
   let confirmedOnly = false;    // filtro "Bloccati confermati" (attack/spam confermati)
   let releasedVersion = '';     // versione dell'app in esecuzione = ultima rilasciata (DB3)
   let firstListPromise = null;  // prima lettura della lista, avviata da init PRIMA del resto
+  let testDataInjected = false; // uno spec ha iniettato la lista: il caricamento vero non la tocca più
   // Modalità automatica: agisce UNA volta al momento del giudizio (lato
   // pipeline: sicuro+ON → todo, sicuro+OFF → aligned). NON è più una lente
   // sulle liste: le tab derivano solo dallo status (macchina a stati).
@@ -2856,6 +2857,7 @@
         if (r && r.current) releasedVersion = r.current;
       } catch (_) { /* gate inattivo: senza versione, done→Risolti come prima */ }
     }
+    if (testDataInjected) return;
 
     try {
       // Il tetto viene dal modulo condiviso: `loadHitCap()` confronta contro
@@ -3039,6 +3041,7 @@
       // non deve ripartire e rimpiazzare i dati finti con Firestore.
       stopLive();
       liveBlocked = true;
+      testDataInjected = true;
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
       dataLoaded = true;
       loadFailed = false;
