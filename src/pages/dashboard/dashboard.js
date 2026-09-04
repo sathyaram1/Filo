@@ -1561,7 +1561,7 @@
         }
         if (!data.delta) return;
         if (!streamBubble) {
-          pending.remove(); // il ragionamento lascia il posto alla risposta
+          pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
           streamBubble = document.createElement('div');
           streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
           bubblesEl.appendChild(streamBubble);
