@@ -1,10 +1,15 @@
 // Scorciatoie numeriche per le tab (#feedback scorciatoie numeriche).
 //
-// Alt+1…9 porta alla N-esima tab, Alt+0 alla decima. Usiamo Alt (non Ctrl/Cmd)
+// Alt+1…9 porta alla N-esima tab, Alt+0 alla decima. Usiamo Alt (non Ctrl)
 // così la combinazione funziona anche MENTRE si scrive in una pagina — Alt+cifra
-// non produce testo — e non ruba il Ctrl/Cmd+numero del browser. L'intercettazione
+// non produce testo — e non ruba il Ctrl+numero del browser. L'intercettazione
 // avviene sia a livello shell (focus sulla barra) sia per-pagina nel main
 // (before-input-event), così vale ovunque.
+//
+// Su Mac la combinazione è un'altra (Cmd+cifra: lì Opzione+cifra SCRIVE), e la
+// decide `src/shared/tasti.js`. Questi due test girano su Windows/Linux; il caso
+// Mac lo copre `tests/unit/macSupport.test.mjs`, che interroga la stessa regola
+// dichiarando il sistema.
 
 import { test, expect } from './fixtures/electron.mjs';
 
