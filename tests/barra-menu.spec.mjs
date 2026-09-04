@@ -66,8 +66,8 @@ test('la barra dei menu è quella di Filo, e parla italiano', async ({ app, shel
 
   // Copia/incolla su Mac dipendono da questa barra: se spariscono, smettono di
   // funzionare in ogni campo di testo dell'app.
-  const ruoli = new Set(tutte.map((v) => v.role).filter(Boolean));
-  for (const ruolo of ['cut', 'copy', 'paste', 'selectAll']) expect(ruoli).toContain(ruolo);
+  const ruoli = new Set(tutte.map((v) => String(v.role || '').toLowerCase()).filter(Boolean));
+  for (const ruolo of ['cut', 'copy', 'paste', 'selectall']) expect(ruoli).toContain(ruolo);
 });
 
 test('«Chiudi scheda» chiude la scheda, non la finestra con dentro tutte le altre', async ({ app, shell, openTab, testServer }) => {
