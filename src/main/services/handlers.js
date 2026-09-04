@@ -1549,6 +1549,64 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   }
 }
 
+// ── Intervista di benvenuto: scrittura di stato e coordinamento fra schede ──
+//
+// Ogni scrittura dello stato passa di qui, e ogni scrittura viene ANNUNCIATA a
+// tutte le schede: l'accoglienza vive nella scheda nuova, e di schede nuove se
+// ne aprono quante se ne vuole. Senza l'annuncio, la seconda restava ferma alla
+// conversazione com'era quando l'ha letta — la stessa intervista in due punti
+// diversi.
+async function saveOnboarding(state) {
+  const next = await FiloMem.setOnboarding(state);
+  try { broadcastToTabs({ type: MSG.FILO_ONBOARDING_UPDATED, onboarding: next }); } catch (_) {}
+  return next;
+}
+
+// Un turno rimasto a metà riparte da solo quando l'utente riapre. Ma di schede
+// nuove se ne aprono due insieme, e allora ripartirebbe due volte: due chiamate
+// al modello per lo stesso messaggio, e due risposte diverse che si accodano
+// alla stessa conversazione. Chi arriva primo prende la ripresa; l'altra scheda
+// guarda e si aggiorna da sé con l'annuncio. In memoria e non su disco: se il
+// processo muore, la prenotazione muore con lui, che è esattamente giusto.
+const ONB_RESUME_CLAIM_MS = 120000;
+let onbResumeClaimedAt = 0;
+function claimOnboardingResume() {
+  const now = Date.now();
+  if (onbResumeClaimedAt && now - onbResumeClaimedAt < ONB_RESUME_CLAIM_MS) return false;
+  onbResumeClaimedAt = now;
+  return true;
+}
+function releaseOnboardingResume() { onbResumeClaimedAt = 0; }
+
+// La chiusura dell'intervista, in un posto solo. L'ordine non è un dettaglio:
+// prima l'agente-lezioni estrae quello che l'ultimo turno ha insegnato, POI la
+// compattazione lo porta dentro PROFILO/PREFERENZE (forzata: senza aspettare la
+// soglia), e solo allora Filo genera la PRIMA home personale — che è l'ultimo
+// atto dell'accoglienza, al posto di un "fatto".
+// Vale per tutte e tre le strade che la chiudono: il modello che dichiara
+// `fine`, la parola di stop riconosciuta dall'app, il pulsante «Salta».
+function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true } = {}) {
+  const done = (d) => broadcastToTabs({
+    type: MSG.FILO_ONBOARDING_DONE,
+    message: d?.message || '', suggestions: d?.suggestions || [], ts: d?.ts || new Date().toISOString(),
+  });
+  const first = lessons
+    ? maybeRunLessonAgent({ userMessage, filoReply, stateText })
+    : Promise.resolve();
+  first
+    .then(() => maybeRunCompactor())
+    .then(() => handleFiloGenerateDashboard({ force: true }))
+    .then(done)
+    .catch((e) => {
+      console.warn('[Filo] chiusura onboarding', e);
+      // La home personale non è arrivata (chiave assente, provider giù): la
+      // chat non può restare appesa in attesa. Diciamo comunque che è finita,
+      // senza dashboard — il client torna alla home e la genera per la sua
+      // strada normale. Restare dentro l'accoglienza sarebbe il vicolo cieco.
+      done(null);
+    });
+}
+
 function broadcastLiveUpdate() {
   const msg = { type: MSG.FILO_LIVE_UPDATED };
   try {
