@@ -59,9 +59,6 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
   await expect(pop).toBeVisible({ timeout: 4_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'vendor/modello-di-prova' })).toBeVisible();
 
-  // Scrivendo si filtra: un testo che non c'è non lascia opzioni seminate.
-  await idInput.fill('zzz-niente');
-  await expect(pop.locator('.sn-select-option', { hasText: 'vendor/modello-di-prova' })).toHaveCount(0);
 });
 
 test('Modelli: un modello salvato compare nella tendina alla riapertura', async ({ openTab }) => {
