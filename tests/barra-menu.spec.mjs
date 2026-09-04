@@ -12,6 +12,9 @@
 //   DELLA BARRA — che è quello che su Mac fa il tasto — e si guarda che succeda
 //   quello che Filo promette. La barra è la stessa su tutti i sistemi, quindi
 //   lo spec vale anche dove non si vede.
+//
+//   Una porta per test, tutte e quattro quelle da cui il difetto entrava:
+//   chiudi scheda, torna indietro (e annulla mentre si scrive), ricarica, zoom.
 import { test, expect } from './fixtures/electron.mjs';
 
 // Aziona una voce della barra per etichetta, come farebbe il tasto su Mac.
@@ -117,4 +120,42 @@ test('«Annulla» mentre si scrive annulla il testo e NON porta via la pagina', 
   await expect.poll(async () => page.inputValue('#c'), {
     message: 'dentro un campo di testo Ctrl/Cmd+Z deve annullare quello che si sta scrivendo',
   }).not.toBe('una riga appena scritta');
+});
+
+test('«Ricarica» ricarica il sito che si sta guardando', async ({ app, shell, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<html><body>
+    <span id="t"></span>
+    <script>document.getElementById('t').textContent = String(Math.random());</script>
+  </body></html>`);
+  const prima = await page.textContent('#t');
+  expect(prima).toBeTruthy();
+
+  await voceDellaBarra(app, 'Ricarica');
+
+  await expect.poll(async () => {
+    try { return await page.textContent('#t'); } catch (_) { return prima; }
+  }, { message: 'la pagina non è stata ricaricata' }).not.toBe(prima);
+});
+
+test('«Ingrandisci» ingrandisce la pagina, non la fila delle schede', async ({ app, shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<html><body><p>una pagina qualsiasi</p></body></html>');
+
+  const zoom = () => app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w.isDestroyed());
+    const tabs = win._filoTabs;
+    const attiva = tabs.tabs.find((t) => t.id === tabs.activeId);
+    return { pagina: attiva.view.webContents.getZoomLevel(), barra: win.webContents.getZoomLevel() };
+  });
+
+  const prima = await zoom();
+  await voceDellaBarra(app, 'Ingrandisci');
+  await expect.poll(async () => (await zoom()).pagina, {
+    message: 'lo zoom non è arrivato alla pagina',
+  }).toBeGreaterThan(prima.pagina);
+
+  const dopo = await zoom();
+  expect(dopo.barra, 'è stata ingrandita la fila delle schede invece della pagina').toBe(prima.barra);
+
+  await voceDellaBarra(app, 'Dimensione reale');
+  await expect.poll(async () => (await zoom()).pagina).toBe(0);
 });
