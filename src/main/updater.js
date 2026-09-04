@@ -65,7 +65,35 @@ function initAutoUpdater() {
 
   autoUpdater.checkForUpdatesAndNotify().catch((e) => {
     console.error('[updater] controllo update fallito:', e?.message || e);
+    avvisaSeAggiornamentoBloccato(versioneTrovata);
   });
 }
 
-module.exports = { initAutoUpdater };
+// Scrive fra le notifiche che c'è una versione nuova e va presa a mano.
+//
+// Solo su Mac, e solo se una versione nuova ESISTE davvero: altrove
+// l'aggiornamento si installa da sé e un avviso sarebbe rumore; senza una
+// versione trovata l'errore è del controllo, non dell'installazione, e non
+// cambia niente per l'utente.
+//
+// Una notifica per versione: se l'app riparte dieci volte prima che l'utente
+// scarichi, la scheda resta una. Chi l'ha già scartata non se la ritrova.
+async function avvisaSeAggiornamentoBloccato(versione) {
+  if (process.platform !== 'darwin' || !versione) return;
+  try {
+    const FiloMem = globalThis.SN_FILO_MEMORY;
+    if (!FiloMem?.addNotification) return;
+    const marcatore = `filo-aggiornamento-mac:${versione}`;
+    const gia = await FiloMem.listNotifications({ includeDismissed: true });
+    if (gia.some((n) => String(n.text || '').includes(marcatore))) return;
+    await FiloMem.addNotification({
+      kind: 'alert',
+      text: `C'è la versione ${versione} di Filo, ma su Mac non riesce a installarsi da sola.\n`
+        + `Scaricala da filo.red e sostituisci l'app: ci vuole un minuto.\n${marcatore}`,
+    });
+  } catch (e) {
+    console.error('[updater] avviso aggiornamento non scritto:', e?.message || e);
+  }
+}
+
+module.exports = { initAutoUpdater, avvisaSeAggiornamentoBloccato };
