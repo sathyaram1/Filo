@@ -104,6 +104,9 @@ module.exports = function register(on, ctx) {
     const settings = await ctx.getEffectiveSettings();
     const ready = !!(settings.apiKeys?.[settings.provider] || settings.apiKeys?.gemini);
     let state = await FiloMem.getOnboarding();
+    // `peek`: chi legge soltanto (Preferenze, per rileggere le interviste
+    // conservate) non deve aprire niente né prenotare la ripresa di un turno.
+    if (msg?.peek) return { ok: true, onboarding: state, ready, resume: false };
     if (!ready) return { ok: true, onboarding: state, ready: false };
     if (!state.done && !state.thread.length) {
       state = await saveOnboarding(
