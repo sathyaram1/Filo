@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 const KEY = (readFileSync('C:/Users/agenti AI/Desktop/Filo/agent-bench/.env', 'utf8')
   .match(/OPENROUTER_KEY=(\S+)/) || [])[1];
 
-test('archivio: la ricerca per senso trova la scheda giusta', async ({ openTab, testServer }) => {
+test('archivio: la ricerca per senso trova la scheda giusta', async ({ openTab, testServer, shell }) => {
   test.setTimeout(300000);
   const opt = await openTab('filo://options/options.html');
   await opt.waitForTimeout(2500);
