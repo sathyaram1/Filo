@@ -111,6 +111,7 @@ module.exports = function register(on, ctx) {
     }
     return {
       ok: true,
+      ready: true,
       onboarding: state,
       welcome: Onboarding.WELCOME_MESSAGE,
       resumeNote: Onboarding.RESUME_NOTE,
