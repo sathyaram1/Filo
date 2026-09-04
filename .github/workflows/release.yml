@@ -35,7 +35,7 @@
 #   minuti, al massimo 12 al giorno), quindi due avvii a mano ravvicinati
 #   trovano un rifiuto — voluto, non un guasto.
 
-name: Release Filo (Windows)
+name: Release Filo (Windows + Mac)
 
 on:
   schedule:
