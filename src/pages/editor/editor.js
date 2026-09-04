@@ -35,6 +35,11 @@
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
+  // I nomi dei tasti nelle etichette: su Mac sono un'altra cosa (Cmd+B, non
+  // Ctrl+B). Si chiedono sempre qui, non si scrivono a mano.
+  const TASTI = window.SN_TASTI;
+  const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
+  const conTasto = (testo, accel) => `${testo} (${tasto(accel)})`;
 
   // ── Riferimenti DOM ───────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
