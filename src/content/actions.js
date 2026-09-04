@@ -625,7 +625,7 @@
           const arrow = document.createElement('button');
           arrow.type = 'button';
           arrow.className = 'sn-menu-inline-arrow';
-          arrow.title = I18n.t('menu_explain_deep') + ' (Alt+E)';
+          arrow.title = Tasti.frase(I18n.t('menu_explain_deep'), 'Alt+E');
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();
