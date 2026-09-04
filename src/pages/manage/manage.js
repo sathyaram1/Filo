@@ -2998,7 +2998,12 @@
       if (!Array.isArray(remote)) throw new Error('versioni non lette');
       const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
       const ids = changed.concat(added);
-      if (ids.length === 0 && removed.length === 0) return { changed: 0 };
+      if (ids.length === 0 && removed.length === 0) {
+        // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
+        // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
+        closeDetailIfGone();
+        return { changed: 0 };
+      }
       let fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
       if (isAdmin && fresh.length > 0) {
         try {
