@@ -46,13 +46,15 @@
       "file": "capture-composite.spec.mjs",
       "titolo": "screenshot newtab: file esiste e non è vuoto",
       "dove": "cloud",
-      "perche": "sotto Xvfb non c'è niente da fotografare: anche con lo strumento di cattura installato (scrot) il PNG esce di 6 KB, cioè una schermata nera. Misurato il 2026-09-04."
+      "tranne": "actions",
+      "perche": "sulla macchina delle routine, sotto Xvfb, non c'è niente da fotografare: anche con scrot installato il PNG esce di 6 KB, cioè una schermata nera. Sul runner di GitHub Actions, con lo stesso scrot e lo schermo dichiarato a 1920x1080x24, la cattura riesce e il test passa: lì la scusa non vale. Misurato il 2026-09-04, su entrambe."
     },
     {
       "file": "capture-composite.spec.mjs",
       "titolo": "screenshot dashboard (filo://dashboard): file esiste e non è vuoto",
       "dove": "cloud",
-      "perche": "sotto Xvfb non c'è niente da fotografare: anche con lo strumento di cattura installato (scrot) il PNG esce di 6 KB, cioè una schermata nera. Misurato il 2026-09-04."
+      "tranne": "actions",
+      "perche": "sulla macchina delle routine, sotto Xvfb, non c'è niente da fotografare: anche con scrot installato il PNG esce di 6 KB, cioè una schermata nera. Sul runner di GitHub Actions, con lo stesso scrot e lo schermo dichiarato a 1920x1080x24, la cattura riesce e il test passa: lì la scusa non vale. Misurato il 2026-09-04, su entrambe."
     },
     {
       "file": "clipboard-history-remove.spec.mjs",
