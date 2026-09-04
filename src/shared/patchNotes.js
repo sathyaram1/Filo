@@ -18,7 +18,7 @@
     {
       version: '0.2.214', date: '2026-09-04',
       features: [
-        'Filo si scarica anche per Mac: un solo file, buono sia sui Mac Intel sia su quelli con chip Apple. La prima volta macOS dice che l\'app non è di uno sviluppatore riconosciuto — aprila col tasto destro → «Apri» e da lì in poi parte normalmente.',
+        'Filo si scarica anche per Mac: un solo file, buono sia sui Mac Intel sia su quelli con chip Apple. La prima volta macOS avvisa che l\'app non è di uno sviluppatore riconosciuto. Aprila col tasto destro e scegli «Apri», e da lì in poi parte come tutte le altre.',
       ],
     },
     {
