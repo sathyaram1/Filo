@@ -2247,9 +2247,14 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.FILO_ONBOARDING_DONE) {
+      // #524 — intervista finita: la chat lascia il posto alla prima home
+      // personale, già costruita col profilo appena imparato.
+      onboardingDone(msg);
     } else if (msg?.type === MSG.FILO_DASHBOARD_UPDATED) {
       // #155 — il ricalcolo in background della home è pronto: aggiorna
       // messaggio + suggerimenti senza rifare la chiamata all'LLM.
+      if (onboardingActive) return; // l'intervista è ancora a schermo
       if (showHomeMessage) {
         homeMessageEl.classList.remove('dash-home-msg-loading');
         homeMessageEl.textContent = msg.message || 'Filo è in ascolto.';
