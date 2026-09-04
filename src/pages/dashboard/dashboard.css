@@ -182,11 +182,50 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-home {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 22px;
   height: 100%;
   padding: 40px 0;
 }
+/* #524 — dopo un'accoglienza chiusa prima della fine. Una riga sopra il
+   messaggio della home, con l'azione accanto: dice cosa è successo e come
+   tornarci. Sta sopra e non sotto perché è una cosa appena successa, e resta
+   finché non la si toglie — il segno "già accolto" è definitivo, questa riga è
+   l'unico posto in cui l'utente può accorgersene. */
+.dash-onb-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 640px;
+  padding: 8px 14px;
+  border: 1px solid var(--dash-ink);
+  border-radius: 999px;
+  color: var(--dash-ink);
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+.dash-onb-notice:hover { opacity: 1; }
+.dash-onb-notice-text { text-align: center; }
+.dash-onb-notice button {
+  border: none;
+  background: transparent;
+  color: var(--dash-ink);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.dash-onb-notice button:hover { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }
 .dash-home-msg {
   font-size: 28px;
   font-weight: 400;
@@ -199,29 +238,9 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-home-msg.dash-home-msg-loading { color: var(--dash-ink-mute); font-style: italic; }
 
-/* Benvenuto di Filo: reso come una classica bolla di chat (come una risposta
-   dell'LLM), non più come grande titolo centrato. Vedi feedback alpha. */
-.dash-home:has(.dash-home-msg[data-welcome="1"]) {
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding-top: 48px;
-}
-.dash-home-msg[data-welcome="1"] {
-  font-size: 14.5px;
-  font-weight: 400;
-  line-height: 1.5;
-  letter-spacing: normal;
-  text-align: left;
-  white-space: pre-wrap;
-  background: var(--dash-card);
-  color: var(--dash-ink);
-  border: 1px solid var(--dash-line);
-  border-radius: 16px;
-  border-bottom-left-radius: 6px;
-  padding: 12px 16px;
-  max-width: 86%;
-  margin: 0;
-}
+/* Il benvenuto NON è più un messaggio al centro della home travestito da bolla
+   (#524): è la prima bolla di una conversazione vera, quindi usa lo stile delle
+   bolle qui sotto e non ha più regole sue. */
 
 /* Conversation */
 .dash-thread {
@@ -362,6 +381,38 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   font-family: inherit;
 }
 .dash-action-btn:hover { background: var(--dash-ink); color: var(--dash-paper); }
+/* #524 — l'uscita dall'accoglienza. Sta sotto la conversazione, discreta:
+   l'intervista è la strada principale, questa è la porta di servizio, e deve
+   essere lì anche quando il modello non risponde. */
+.dash-skip-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 10px;
+}
+.dash-skip-onboarding {
+  border: none;
+  background: transparent;
+  color: var(--dash-ink);
+  opacity: 0.55;
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s ease;
+}
+.dash-skip-onboarding:hover { opacity: 1; }
+/* Accanto al «Riprova» della bolla d'errore è un bottone come gli altri: lì
+   l'utente sta cercando una via d'uscita, non un ripensamento. */
+.dash-bubble-actions .dash-skip-onboarding {
+  border: 1px solid var(--dash-ink);
+  opacity: 0.75;
+  text-decoration: none;
+  padding: 6px 12px;
+  font-size: 13px;
+}
 /* #376 — traccia di un passo intermedio (cerco sul web, leggo un file…): è un
    racconto di cosa sta facendo Filo, non un bottone. Niente pill né bordo: così
    nella conversazione resta cliccabile solo il risultato vero. */

@@ -186,6 +186,39 @@
     return { profilo, preferenze, espansioni };
   }
 
+  // ===== Onboarding (#524) =====
+  //
+  // Lo stato della micro-intervista di benvenuto sta in UNA chiave e passa
+  // sempre da `SN_ONBOARDING.normalize`: qualunque cosa ci sia in storage
+  // (assente, vecchia, manomessa) torna una forma usabile, perché queste
+  // letture stanno sul cammino di apertura della home.
+
+  function Onb() {
+    return global.SN_ONBOARDING;
+  }
+
+  // Il segno "già accolto" è UNO: `done` qui dentro, scritto quando
+  // l'intervista FINISCE. La vecchia chiave FILO_WELCOMED sopravvive solo come
+  // segnale di migrazione — chi era già stato accolto dalla versione precedente
+  // non si ritrova l'intervista addosso a un aggiornamento — e non viene più
+  // scritta da nessuno: appena esiste lo stato qui, comanda lui.
+  async function getOnboarding() {
+    const raw = await getRaw(KEYS.FILO_ONBOARDING, null);
+    const O = Onb();
+    if (raw == null) {
+      const legacy = await getRaw(KEYS.FILO_WELCOMED, false);
+      if (legacy) return O ? O.normalize({ done: true }) : { done: true, ticked: [], thread: [] };
+    }
+    return O ? O.normalize(raw) : (raw || { done: false, ticked: [], thread: [] });
+  }
+
+  async function setOnboarding(state) {
+    const O = Onb();
+    const next = O ? O.normalize(state) : state;
+    await setRaw(KEYS.FILO_ONBOARDING, next);
+    return next;
+  }
+
   // ===== Notes / appunti =====
   //
   // Non esistono più qui: gli appunti sono file dell'editor (ci scrive Filo
@@ -790,6 +823,8 @@
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
+    // onboarding (#524)
+    getOnboarding, setOnboarding,
     // timer + sveglie (#322)
     listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, pauseTimer, resumeTimer, gcTimers, stopTimerAlarm,
     // ricorrenza + gestione dalla chat

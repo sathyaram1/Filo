@@ -1772,6 +1772,142 @@ restava rosso e muto).
   `tests/dashboard-local-network-address.spec.mjs`,
   `tests/unit/urlNav.test.mjs`, `tests/unit/hostResolve.test.mjs`.
 
+## Accogliere un utente nuovo è una CONVERSAZIONE, e il segno "già accolto" si scrive alla fine
+
+Un'accoglienza fatta di schermate a passi contraddice tutto Filo: qui si fa
+parlando, dentro la chat che l'utente userà comunque. Il modello riceve
+l'**elenco** di cosa Filo vuole scoprire e cosa vuole dire, con la regola "una
+cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
+(`src/shared/onboarding.js`, blocco `PROMPTS.filoChatOnboarding`).
+
+- **Il primo messaggio è scritto a mano, dal secondo parla il modello.** Su
+  quella riga l'utente giudica Filo: non la si affida a un LLM.
+- **Il segno "già accolto" si scrive alla FINE.** Scriverlo all'apertura è il
+  difetto originale (#524): chi chiudeva la finestra senza rispondere non
+  rivedeva più il benvenuto. Il segno unico è `done` nello stato
+  dell'accoglienza; la vecchia chiave sopravvive solo come migrazione, per non
+  ributtare nell'intervista chi era già stato accolto.
+- **Sopravvive alla chiusura a metà**: la conversazione si salva turno per turno
+  (lato main, non lato pagina) e alla riapertura torna a schermo com'era. Se
+  l'ultimo messaggio era dell'utente, il turno riparte da solo.
+- **Chi decide che è finita lo dice con un'azione** (`ONBOARDING` nel registro
+  dei livelli), ma il codice ha comunque le sue due uscite: elenco finito, o
+  troppi scambi. Un'accoglienza che non finisce mai è peggio di una incompleta.
+- **L'ultimo atto è il RISULTATO, non un "fatto"**: alla chiusura le lezioni
+  raccolte vengono compattate **subito** in memoria (compattazione forzata, non
+  la soglia normale) e Filo genera la prima home personale. L'ordine conta:
+  lezioni → compattazione → home, altrimenti la home nasce su un profilo vuoto.
+- **Niente modello, niente accoglienza**: senza accesso e senza chiave la chat
+  non può rispondere. L'intervista aspetta e la home spiega come attivare Filo;
+  parte da sola appena l'accesso arriva.
+- **Si rifà, e rifarla non cancella quella di prima**:
+  `Preferenze → Rifai l'intervista di benvenuto`. Tutto ciò che Filo può fare
+  una volta sola diventa una trappola se non si può rifare. E la prima
+  conversazione con Filo è la prima cosa che l'utente gli ha raccontato di sé:
+  il rilancio la ARCHIVIA (`past`), e nella stessa sezione di Preferenze si
+  rilegge. Sostituirla non costava niente in meno. **Ma si archivia solo ciò che
+  è davvero una conversazione**: se l'utente non ha mai risposto, quello che
+  c'era è il solo benvenuto. Archiviarlo lo stesso riempiva l'archivio di voci
+  «0 tue risposte» e, siccome se ne conservano cinque, bastava aprire e chiudere
+  sei volte il pulsante per buttare fuori la prima conversazione vera. Il filtro
+  sta in `normalize`, non solo dove si archivia, così ripulisce anche gli
+  archivi già sporcati.
+- **Chiusa a metà, la home lo dice**: il congedo vive in chat e la chat sparisce
+  appena la home è pronta — col modello giù, in un istante. Il segno «già
+  accolto» però è definitivo, e chi non fa in tempo a leggerlo non ha modo di
+  capire perché Filo ha smesso di presentarsi. Se l'accoglienza si chiude prima
+  della fine, lo stato porta `notice: 'early'` e la home mostra una riga con
+  «Riprendiamola» e «No, va bene così», finché l'utente non risponde. Chi arriva
+  in fondo non vede niente: non c'è niente da spiegare.
+- **Una scheda non è l'unica**: l'accoglienza vive nella scheda nuova, e di
+  schede nuove se ne aprono quante se ne vuole. Ogni scrittura dello stato viene
+  annunciata (`FILO_ONBOARDING_UPDATED`) e le altre schede si riallineano; il
+  turno rimasto a metà lo riprende **una sola** scheda (prenotazione in memoria
+  nel main). Senza, la seconda scheda restava ferma a com'era e rilanciava lo
+  stesso messaggio una seconda volta.
+- **Test**: `tests/unit/onboarding.test.mjs` (elenco, spunte, ripresa, chiusura,
+  parola di stop, rifiuti, archivio), `tests/onboarding.spec.mjs` (il giro
+  reale, compresa la home finale), `tests/onboarding-uscita.spec.mjs` (le vie
+  d'uscita e le strade che si rompono: provider giù, "Riprova", due schede),
+  `tests/onboarding-ripresa.spec.mjs` (la riga sulla home dopo una chiusura a
+  metà), `tests/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
+  vuoto, testo ostile, tre schede).
+
+## Una promessa fatta all'utente non può dipendere dal modello
+
+Il benvenuto scrive «se non ti va, scrivi "basta così" e chiudiamo». Quella
+frase è un **contratto**, e affidarne l'esecuzione al modello significa non
+averlo firmato: un modello piccolo si dimentica l'istruzione (è una fra molte) e
+un modello irraggiungibile non risponde affatto. In #524 l'utente senza rete
+restava chiuso dentro l'accoglienza, col solo "Riprova" davanti e sotto gli
+occhi la frase che gli diceva di scrivere una cosa che non funzionava.
+
+La regola: **ogni volta che un testo dell'app promette un comportamento
+all'utente, quel comportamento deve avere una strada che non passa dall'LLM.**
+Il modello resta la strada normale, più intelligente e più naturale; quella di
+sotto è la rete di sicurezza.
+
+- **Riconoscimento locale della parola chiave** (`SN_ONBOARDING.isStopRequest`):
+  frase intera normalizzata (accenti, punteggiatura, riempitivi di cortesia)
+  confrontata con un elenco chiuso. Volutamente **stretto**: la frase deve
+  ESSERE un'uscita, non contenerne una. «basta che tu non sia prolisso» è una
+  risposta all'intervista, e chiudere per sbaglio è il danno opposto. Il resto lo copre il
+  modello.
+- **E un controllo visibile**, per chi la frase non la ricorda o si trova
+  davanti a una bolla d'errore: `#skipOnboarding`, sotto la conversazione, più
+  la stessa uscita accanto al «Riprova» della bolla d'errore, che è il punto in
+  cui l'utente si accorge di essere in trappola.
+- **La chiusura non può dipendere dalla risposta**: il congedo è un testo fisso,
+  e se la prima home non arriva (nessun modello) il client va alla home lo
+  stesso dopo qualche secondo, invece di restare davanti a una chat chiusa.
+
+## Una parola che l'app riconosce da sé deve sapere A COSA l'utente sta rispondendo
+
+La rete di sicurezza qui sopra ha un costo: l'app decide **senza capire**, e in
+una conversazione lo stesso pugno di parole vuol dire cose diverse a seconda di
+cosa è stato appena chiesto. Nell'accoglienza (#524) l'elenco delle uscite
+conteneva «no grazie», «magari dopo», «non ora», «lascia stare», «passo» — cioè
+esattamente i modi in cui in italiano si **declina una proposta**. E Filo, in
+quell'intervista, propone: l'accesso Google, il tema scuro, un approfondimento
+sui modelli. Chi rispondeva «no grazie» all'accesso si vedeva chiudere tutta
+l'accoglienza: delle sei cose da scoprire e da dire ne aveva sentite due, e le
+altre quattro non le avrebbe sentite più.
+
+La regola: **un riconoscimento locale può coprire solo le frasi che significano
+la stessa cosa in qualunque punto della conversazione.** Tutto ciò che dipende
+da cosa è stato appena chiesto resta al modello, che quella domanda ce l'ha
+davanti.
+
+- **Due elenchi, non uno** (`SN_ONBOARDING`): `STOP_PHRASES` («basta così»,
+  «salta», «stop», «chiudiamo») chiedono di uscire e non vogliono dire altro →
+  chiude l'app, sempre, anche col modello muto. `DECLINE_PHRASES` («no grazie»,
+  «magari dopo», «non ora») rifiutano *qualcosa*, e quel qualcosa lo dice la
+  domanda a cui rispondono → le gestisce il modello.
+- **La decisione sta in UNA funzione**, `isExitRequest(state, text)`, che guarda
+  anche lo stato: se nella conversazione non c'è nessuna battuta di Filo, un
+  rifiuto non può riferirsi ad altro che all'accoglienza e allora chiude.
+- **Anche il prompt va corretto**, non solo il codice: il modello è la seconda
+  porta da cui lo stesso danno rientra. `PROMPTS.filoChatOnboarding` distingue
+  «chiudi l'accoglienza» da «no a questa proposta», con l'ordine esplicito di
+  non chiudere nel secondo caso.
+- **Il test giusto non è la frase, è la coppia domanda-risposta**: «no grazie»
+  dopo una proposta di Filo (`tests/verify-524-g2.spec.mjs`,
+  `tests/unit/onboarding.test.mjs`).
+
+## Uno stesso messaggio, di fila a sé stesso, è lo stesso turno
+
+Un turno di chat che si interrompe riparte per tre strade diverse: la finestra
+chiusa mentre l'assistente scriveva e riaperta, il «Riprova» dopo un errore, una
+seconda scheda aperta durante l'attesa. Tutte e tre rispediscono lo STESSO
+messaggio. Dove il testo viene anche salvato (la conversazione dell'accoglienza)
+finiva scritto due volte, e dove viene anche CONTATO (i cinque scambi
+dell'intervista) un intoppo di rete costava una delle domande.
+
+`SN_ONBOARDING.appendTurn` scarta il messaggio identico al precedente dello
+stesso ruolo. Non è deduplicazione generica. È la definizione giusta di «turno».
+Se salvi o conti i turni di una conversazione che può essere ripresa, chiediti
+quale ripartenza li fa contare due volte prima di fidarti del contatore.
+
 ## Filo ammette una mancanza → propone lui la segnalazione, non la chiede
 
 Quando l'agente risponde "non lo so fare / non ho accesso a quel dato", il buco

@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.213', date: '2026-09-04',
+      features: [
+        'Al primo avvio Filo ti accoglie parlando. Ti chiede chi sei e come vuoi che ti risponda, applica subito quello che gli dici e ti racconta in poche righe come funziona. Quando ne hai abbastanza scrivi «basta così», oppure clicca «Salta l\'accoglienza» sotto la conversazione. Funzionano anche senza rete. Se chiudi la finestra a metà, riaprendo riprende da dove eravate. Alla fine ti prepara la tua prima home. Puoi rifarla quando vuoi da Preferenze, dove restano anche quelle già fatte, da rileggere.',
+      ],
+    },
+    {
       version: '0.2.209', date: '2026-08-29',
       features: [
         'Ora puoi insegnare una regola a Filo a parole: «ricordati che non bevo caffè», «d\'ora in poi rispondimi senza elenchi». La fissa nelle sue lezioni e vale da subito in tutte le conversazioni; la ritrovi (e la cancelli) fra le sue memorie.',

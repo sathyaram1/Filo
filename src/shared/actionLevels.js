@@ -203,6 +203,21 @@
       level: 1,
       describe: (a) => `Cercare sul web "${a.query || ''}"`,
     },
+    ONBOARDING: {
+      // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
+      // le cose che ha scoperto o detto e dichiara quando l'intervista è
+      // finita. Non tocca nulla dell'utente — le impostazioni che l'intervista
+      // applica passano dalle LORO azioni (IMPOSTA_PREFERENZA, SALVA_LEZIONE),
+      // ognuna col proprio livello — e non ha nulla da annullare: chiudere
+      // l'accoglienza è quello che l'utente vuole appena dice "basta così", e
+      // dalle Preferenze la si rilancia quando vuole. Livello 1.
+      level: 1,
+      describe: (a) => {
+        if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
+        const ids = Array.isArray(a?.spunta) ? a.spunta : [];
+        return `Segnare come fatto nell’intervista di benvenuto${ids.length ? `: ${ids.join(', ')}` : ''}`;
+      },
+    },
     CAPACITA_DETTAGLIO: {
       // Filo consulta il proprio manifesto delle capacità per rispondere a "puoi
       // fare X?" (#F2). Sola lettura di dati statici interni, nessun effetto

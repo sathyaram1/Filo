@@ -18,6 +18,7 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
 </head>
@@ -46,6 +47,11 @@
     <section class="dash-center" id="center">
       <!-- Home state -->
       <div class="dash-home" id="homeView">
+        <!-- #524 — riga di ritorno dopo un'accoglienza chiusa a metà: il congedo
+             in chat dura quanto ci mette la home ad arrivare, e senza questa
+             riga chi non fa in tempo a leggerlo non sa perché Filo ha smesso di
+             presentarsi né che si può rifare. -->
+        <div class="dash-onb-notice" id="onbNotice" hidden></div>
         <p class="dash-home-msg" id="homeMessage">…</p>
       </div>
 

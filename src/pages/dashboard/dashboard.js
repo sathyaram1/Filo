@@ -14,16 +14,11 @@
   const { MSG } = self.SN_MSG;
   const { STORAGE_KEYS } = self.SN_CONST;
 
-  // Messaggio di benvenuto mostrato UNA sola volta, la prima volta che l'utente
-  // apre Filo dopo averlo scaricato (feedback alpha). Compare come una bolla di
-  // Filo, "come appena inviato da lui", così l'utente può rispondere subito
-  // raccontandosi e Filo si configura nel tempo.
-  const WELCOME_MESSAGE =
-    'Ciao, sono Filo. Se mi racconti brevemente chi sei e come usi di solito ' +
-    'il computer mi configuro io. Altrimenti imparerò nel tempo.\n' +
-    'Qualsiasi dubbio tu abbia chiedimi pure, conosco abbastanza bene come ' +
-    'funziono. Ricorda che puoi sempre cliccare il tasto destro se vuoi fare ' +
-    'qualcosa con quello che stai guardando.';
+  // #524 — il benvenuto non è più un cartello: è l'inizio di una conversazione
+  // vera (la micro-intervista). Il testo del primo messaggio, l'elenco delle
+  // cose da scoprire e da dire e lo stato della ripresa vivono in
+  // src/shared/onboarding.js; qui c'è solo la chat che l'utente vede.
+  const Onb = self.SN_ONBOARDING;
 
   // ===== DOM =====
   const $ = (id) => document.getElementById(id);
@@ -186,25 +181,263 @@
     threadView.hidden = false;
   }
 
-  // Vero solo alla PRIMISSIMA apertura dell'app (flag su storage non ancora
-  // impostato). Letto in init() prima di caricare la dashboard.
-  async function isFirstRun() {
+  // ===== Micro-intervista di benvenuto (#524) =====
+  //
+  // Lo stato lo tiene il main (una chiave sola): all'apertura chiediamo se
+  // l'intervista è aperta e, se sì, ricomponiamo la conversazione com'era.
+  // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
+  let onboardingActive = false;
+
+  async function fetchOnboarding() {
     try {
-      return !(await self.SN_STORAGE?.getRaw?.(STORAGE_KEYS.FILO_WELCOMED, false));
-    } catch (_) { return false; }
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING });
+      // `ready: false` = nessun modello disponibile ancora (niente accesso,
+      // niente chiave): l'intervista aspetta e la home spiega come attivare
+      // Filo, invece di accoglierlo con una chat che non può rispondere.
+      if (!r?.ok || !r.onboarding || !r.ready) return null;
+      if (r.onboarding.done) return null;
+      // `resume` lo decide il main: di schede nuove se ne aprono due insieme, e
+      // il turno rimasto a metà lo deve riprendere UNA sola.
+      return { ...r.onboarding, resume: !!r.resume };
+    } catch (_) { return null; }
   }
 
-  // Alla primissima apertura mostra il messaggio di benvenuto di Filo come suo
-  // commento centrale nella home ("come appena inviato da lui"): l'utente lo
-  // legge e può rispondere subito dalla barra qui sotto, così Filo si configura.
-  // Resta in stato home (niente thread) per non rompere il resto della dashboard.
-  function showWelcomeMessage() {
-    homeMessageEl.classList.remove('dash-home-msg-loading');
-    homeMessageEl.id = 'homeMessage';
-    homeMessageEl.dataset.welcome = '1';
-    homeMessageEl.textContent = WELCOME_MESSAGE;
-    applyHomeMessageVisibility();
+  // La conversazione salvata torna a schermo come bolle normali — per l'utente
+  // è una chat, non una procedura guidata. Usata sia all'apertura sia quando
+  // un'altra scheda fa avanzare la stessa intervista.
+  function renderOnboardingThread(state) {
+    const thread = Array.isArray(state?.thread) ? state.thread : [];
+    bubblesEl.innerHTML = '';
+    threadHistory = [];
+    if (thread.length > 1 && Onb?.RESUME_NOTE) bubblesEl.appendChild(stepTrace(Onb.RESUME_NOTE));
+    for (const m of thread) {
+      const role = m.role === 'filo' ? 'filo' : 'user';
+      threadHistory.push({ role, text: m.text });
+      bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
+    }
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
+  // Apre (o riprende) l'intervista. Se l'ultimo messaggio è dell'utente (ha
+  // risposto e ha chiuso la finestra prima della risposta), il turno riparte da
+  // solo: non deve riscrivere niente.
+  async function openOnboarding(state) {
+    onboardingActive = true;
+    hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
+    goThread();
+    renderOnboardingThread(state);
+    showSkipOnboarding();
     inputEl.focus();
+    const last = (state.thread || [])[(state.thread || []).length - 1];
+    if (state.resume && last && last.role === 'user' && !sending) {
+      sending = true;
+      sendBtn.disabled = true;
+      await runTurnAndContinue({ userMessage: last.text });
+    }
+  }
+
+  // Un'altra scheda ha fatto avanzare l'intervista: questa si riallinea, invece
+  // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
+  // stiamo scrivendo noi — le bolle in corso sono già la verità.
+  function onboardingUpdated(state) {
+    if (!state || state.done) return;
+    // Qui l'intervista non è a schermo, ma da qualche parte è di nuovo aperta:
+    // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
+    if (!onboardingActive) { hideOnboardingNotice(); return; }
+    if (sending) return;
+    renderOnboardingThread(state);
+  }
+
+  // ── La via d'uscita che non passa dal modello ─────────────────────────────
+  //
+  // Il benvenuto promette «scrivi "basta così" e chiudiamo»: la parola la
+  // riconosce il main da sé, senza chiamare nessuno. Questo pulsante è il suo
+  // gemello visibile, per chi la frase non la ricorda o si trova davanti a una
+  // bolla d'errore. Senza, chi apre Filo la prima volta senza rete resta chiuso
+  // dentro l'accoglienza con il solo "Riprova" davanti.
+  function makeSkipOnboardingBtn(label) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dash-skip-onboarding';
+    b.textContent = label || 'Salta l’accoglienza';
+    b.title = 'Chiudi l’intervista e vai alla home. Puoi rifarla da Preferenze.';
+    b.addEventListener('click', skipOnboarding);
+    return b;
+  }
+
+  function showSkipOnboarding() {
+    if (!onboardingActive || $('skipOnboardingRow')) return;
+    const row = document.createElement('div');
+    row.className = 'dash-skip-row';
+    row.id = 'skipOnboardingRow';
+    const btn = makeSkipOnboardingBtn();
+    btn.id = 'skipOnboarding';
+    row.appendChild(btn);
+    threadView.appendChild(row);
+  }
+
+  function hideSkipOnboarding() {
+    const row = $('skipOnboardingRow');
+    if (row) row.remove();
+  }
+
+  let skipping = false;
+  let onboardingHomeFallback = null;
+  async function skipOnboarding() {
+    if (skipping) return;
+    skipping = true;
+    hideSkipOnboarding();
+    try {
+      const r = await send({ type: MSG.FILO_CLOSE_ONBOARDING });
+      // Il congedo è un testo fisso: arriva anche col modello irraggiungibile.
+      if (r?.closing) {
+        bubblesEl.appendChild(makeBubble({ role: 'filo', text: r.closing, markdown: true }));
+      }
+      onboardingClosing();
+    } catch (_) {
+      onboardingDone(null);
+    } finally {
+      skipping = false;
+    }
+  }
+
+  // L'intervista era in attesa di un modello (nessun accesso, nessuna chiave) e
+  // adesso c'è: la apriamo, ma solo se l'utente è ancora sulla home e non sta
+  // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
+  // che aspettare la prossima scheda.
+  async function maybeOpenOnboardingLater() {
+    if (onboardingActive || sending) return;
+    if (body.dataset.state !== 'home') return;
+    const state = await fetchOnboarding();
+    if (!state || onboardingActive || sending || body.dataset.state !== 'home') return;
+    await openOnboarding(state);
+  }
+
+  // Chiusura: l'ultimo atto non è un "fatto", è il risultato — la prima home
+  // costruita sul profilo appena imparato. Finché non arriva, la chat dice cosa
+  // sta succedendo invece di restare muta.
+  function onboardingClosing() {
+    if (!onboardingActive) return;
+    onboardingActive = false;
+    closingShownAt = Date.now();
+    hideSkipOnboarding();
+    bubblesEl.appendChild(stepTrace('Preparo la tua home…'));
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    // La home personale è l'ultimo atto dell'accoglienza, ma non può esserne la
+    // condizione: se non arriva (nessun modello, provider giù) l'utente va alla
+    // home lo stesso invece di restare davanti a una chat chiusa.
+    clearTimeout(onboardingHomeFallback);
+    onboardingHomeFallback = setTimeout(() => {
+      if (body.dataset.state === 'thread' && !sending) onboardingDone(null);
+    }, 8000);
+  }
+
+  // Il congedo («chiudo qui, la rifacciamo quando vuoi») è l'ultima cosa che
+  // l'utente legge dell'accoglienza, e la home lo cancella: quando la home
+  // arriva nello stesso istante — col modello giù è così — non lo legge
+  // nessuno. Gli lasciamo il tempo di essere letto; se la home ci mette di suo
+  // più di così, non si aspetta niente.
+  const CLOSING_DWELL_MS = 2600;
+  let closingShownAt = 0;
+  let closingDwellTimer = null;
+
+  function onboardingDone(msg) {
+    onboardingActive = false;
+    clearTimeout(onboardingHomeFallback);
+    const atteso = closingShownAt ? Date.now() - closingShownAt : CLOSING_DWELL_MS;
+    if (atteso < CLOSING_DWELL_MS) {
+      if (closingDwellTimer) return; // il primo che arriva è quello buono
+      closingDwellTimer = setTimeout(() => {
+        closingDwellTimer = null;
+        onboardingDoneNow(msg);
+      }, CLOSING_DWELL_MS - atteso);
+      return;
+    }
+    onboardingDoneNow(msg);
+  }
+
+  function onboardingDoneNow(msg) {
+    onboardingActive = false;
+    closingShownAt = 0;
+    clearTimeout(onboardingHomeFallback);
+    hideSkipOnboarding();
+    goHome(); // svuota bolle e storico: l'intervista è finita
+    if (showHomeMessage) {
+      homeMessageEl.classList.remove('dash-home-msg-loading');
+      homeMessageEl.textContent = msg?.message || 'Filo è in ascolto.';
+    }
+    suggestions = Array.isArray(msg?.suggestions) ? msg.suggestions : [];
+    renderSuggestions();
+    // La home appena generata È la risposta finale. Se non è arrivata (chiave
+    // assente, provider giù) la si carica per la strada normale.
+    if (!msg?.message) loadDashboard().catch(() => {});
+    // Chiusa prima della fine? Il congedo era in chat, e la chat è appena
+    // sparita: la riga qui sotto è quello che ne resta.
+    refreshOnboardingNotice().catch(() => {});
+  }
+
+  // ── Dopo un'accoglienza chiusa a metà ─────────────────────────────────────
+  //
+  // Il congedo spiega che l'intervista si rifà da Preferenze, ma vive in chat e
+  // la chat sparisce appena la home è pronta — a volte in un istante. E il segno
+  // «già accolto» è definitivo: chi non fa in tempo a leggerlo non ha modo di
+  // capire perché Filo ha smesso di presentarsi. Questa riga resta sulla home
+  // finché non la si toglie, e porta con sé la strada per tornarci.
+  async function refreshOnboardingNotice() {
+    let st = null;
+    try {
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING, peek: true });
+      st = r?.ok ? r.onboarding : null;
+    } catch (_) { return; }
+    if (st && st.done && st.notice === 'early') showOnboardingNotice();
+    else hideOnboardingNotice();
+  }
+
+  function hideOnboardingNotice() {
+    const box = $('onbNotice');
+    if (!box) return;
+    box.innerHTML = '';
+    box.hidden = true;
+  }
+
+  function showOnboardingNotice() {
+    const box = $('onbNotice');
+    if (!box || !box.hidden) return; // già a schermo: non la ricostruiamo
+    box.innerHTML = '';
+    const text = document.createElement('span');
+    text.className = 'dash-onb-notice-text';
+    text.textContent = 'Abbiamo chiuso la presentazione a metà.';
+    const redo = document.createElement('button');
+    redo.type = 'button';
+    redo.id = 'onbNoticeRedo';
+    redo.textContent = 'Riprendiamola';
+    redo.title = 'Riapre l’intervista di benvenuto qui, da capo. La trovi anche in Preferenze.';
+    redo.addEventListener('click', restartOnboardingHere);
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.id = 'onbNoticeDismiss';
+    ok.textContent = 'No, va bene così';
+    ok.title = 'Toglie questa riga. L’intervista resta rifacibile da Preferenze.';
+    ok.addEventListener('click', dismissOnboardingNotice);
+    box.appendChild(text);
+    box.appendChild(redo);
+    box.appendChild(ok);
+    box.hidden = false;
+  }
+
+  async function dismissOnboardingNotice() {
+    hideOnboardingNotice();
+    try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
+  }
+
+  // Rifarla da qui: la stessa cosa del pulsante in Preferenze, ma senza mandare
+  // l'utente a cercarlo — l'intervista riparte nella scheda che ha davanti.
+  async function restartOnboardingHere() {
+    hideOnboardingNotice();
+    try {
+      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING });
+      if (r?.ok && r.onboarding) await openOnboarding({ ...r.onboarding, resume: false });
+    } catch (_) {}
   }
 
 
@@ -1304,6 +1537,11 @@
       retry.title = 'Rimanda lo stesso messaggio';
       retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
       row.appendChild(retry);
+      // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
+      // modello non risponde (rete assente, provider giù, crediti finiti) alla
+      // home non ci si arriva più. L'uscita sta qui, accanto, dove l'utente
+      // guarda.
+      if (onboardingActive) row.appendChild(makeSkipOnboardingBtn('Salta e vai alla home'));
       err.appendChild(row);
       bubblesEl.appendChild(err);
     } else {
@@ -1393,6 +1631,11 @@
     sending = false;
     sendBtn.disabled = false;
     inputEl.focus();
+
+    // #524 — l'intervista di benvenuto si è appena chiusa: il main sta
+    // compattando quello che ha imparato e generando la prima home. Lo diciamo
+    // subito, la home arriva con FILO_ONBOARDING_DONE.
+    if (r?.ok && r.onboardingClosed) onboardingClosing();
 
     // Aggiorna live (potrebbe esserci un timer/sveglia appena creato).
     refreshLive().catch(() => {});
@@ -2201,9 +2444,18 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.FILO_ONBOARDING_UPDATED) {
+      // #524 — un'altra scheda ha fatto avanzare la stessa intervista: qui la
+      // conversazione si riallinea invece di restare ferma a com'era.
+      onboardingUpdated(msg.onboarding);
+    } else if (msg?.type === MSG.FILO_ONBOARDING_DONE) {
+      // #524 — intervista finita: la chat lascia il posto alla prima home
+      // personale, già costruita col profilo appena imparato.
+      onboardingDone(msg);
     } else if (msg?.type === MSG.FILO_DASHBOARD_UPDATED) {
       // #155 — il ricalcolo in background della home è pronto: aggiorna
       // messaggio + suggerimenti senza rifare la chiamata all'LLM.
+      if (onboardingActive) return; // l'intervista è ancora a schermo
       if (showHomeMessage) {
         homeMessageEl.classList.remove('dash-home-msg-loading');
         homeMessageEl.textContent = msg.message || 'Filo è in ascolto.';
@@ -2234,6 +2486,10 @@
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       isOwner = !!(msg.signedIn && msg.isAdmin);
       applyAccountProfile(msg.signedIn ? msg.profile : null);
+      // #524 — l'accoglienza aspettava un modello: appena l'accesso lo rende
+      // disponibile, Filo si presenta subito invece di rimandare alla prossima
+      // scheda nuova.
+      if (msg.signedIn) maybeOpenOnboardingLater();
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
@@ -2700,22 +2956,28 @@
     applyHomeMessageVisibility();
     if (terminalMode) await initCwd();
     applyTerminalMode();
-    // Primissima apertura? In tal caso il benvenuto di Filo prende il posto del
-    // commento generato (che senza storico sarebbe comunque generico).
-    const firstRun = await isFirstRun();
-    if (firstRun) {
-      try { await self.SN_STORAGE?.setRaw?.(STORAGE_KEYS.FILO_WELCOMED, true); } catch (_) {}
-    }
+    // #524 — intervista di benvenuto aperta (primo avvio, o ripresa a metà, o
+    // rilanciata dalle Preferenze)? Allora la home non serve: quello che
+    // l'utente deve vedere è la conversazione, dal punto in cui era rimasta. Il
+    // segno "già accolto" NON si scrive qui — si scrive quando l'intervista
+    // finisce, altrimenti chi chiude la finestra adesso non la rivede più.
+    const onbState = await fetchOnboarding();
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
-      firstRun ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
-    if (firstRun) showWelcomeMessage();
+    if (onbState) await openOnboarding(onbState);
+    // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
+    // dice — finché l'utente non risponde a quella riga.
+    else refreshOnboardingNotice().catch(() => {});
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
-    // il ringraziamento parte subito.
+    // il ringraziamento parte subito. Con l'intervista di benvenuto a schermo
+    // (#524) non parte niente: un popup sopra l'accoglienza è la prima cosa che
+    // l'utente vedrebbe di Filo.
+    if (onbState) return;
     (async () => {
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());

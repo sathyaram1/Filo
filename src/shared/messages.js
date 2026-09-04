@@ -479,6 +479,30 @@
     FILO_GENERATE_DASHBOARD: 'filo_generate_dashboard',
     // CRUD memoria/contenuti dashboard
     FILO_GET_MEMORY: 'filo_get_memory',
+    // Compattazione FORZATA della memoria: svuota subito il buffer delle
+    // lezioni dentro PROFILO/PREFERENZE senza aspettare la soglia dei 3000
+    // caratteri. Serve alla fine della micro-intervista di benvenuto (#524),
+    // dove le lezioni appena raccolte devono essere già in memoria quando Filo
+    // genera la prima home personale. Solo pagine filo://: legge e riscrive la
+    // memoria dell'utente.
+    // Risposta: { ok, compacted }
+    FILO_COMPACT_MEMORY: 'filo_compact_memory',
+    // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
+    // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
+    FILO_GET_ONBOARDING: 'filo_get_onboarding',
+    // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte,
+    // conversazione e il segno "già accolto". Solo pagine filo://.
+    // L'intervista precedente NON si perde: viene archiviata in `past`.
+    FILO_RESTART_ONBOARDING: 'filo_restart_onboarding',
+    // Chiude l'intervista SENZA passare dal modello: è il pulsante "Salta
+    // l'accoglienza" della chat, la via d'uscita che funziona anche quando il
+    // modello non risponde (rete assente, provider giù, crediti finiti). Solo
+    // pagine filo://. Risposta: { ok, onboarding }
+    FILO_CLOSE_ONBOARDING: 'filo_close_onboarding',
+    // L'utente ha letto la riga che la home mostra dopo un'accoglienza chiusa a
+    // metà («la rifacciamo quando vuoi»): si spegne. Solo pagine filo://.
+    // Risposta: { ok, onboarding }
+    FILO_ONBOARDING_NOTICE_SEEN: 'filo_onboarding_notice_seen',
     // (Gli appunti non hanno più messaggi propri: sono file dell'editor, scritti
     // dall'azione SALVA_APPUNTO e letti aprendo l'editor.)
     FILO_GET_TIMERS: 'filo_get_timers',
@@ -562,6 +586,18 @@
     // della home è pronto. La scheda aggiorna messaggio + suggerimenti senza
     // rifare la chiamata all'LLM. { message, suggestions, ts }
     FILO_DASHBOARD_UPDATED: 'filo_dashboard_updated',
+    // Broadcast da background -> dashboard (#524): la micro-intervista di
+    // benvenuto è finita, le lezioni sono già compattate in memoria e la PRIMA
+    // home personale è pronta. La chat lascia il posto alla home appena
+    // generata: l'ultimo atto dell'accoglienza è il risultato, non un "fatto".
+    // { message, suggestions, ts }
+    FILO_ONBOARDING_DONE: 'filo_onboarding_done',
+    // Broadcast da background -> dashboard (#524): la conversazione
+    // dell'intervista è cambiata (un turno in più, una spunta). Le schede che
+    // hanno l'accoglienza a schermo ma non stanno scrivendo si riallineano: due
+    // schede nuove aperte insieme mostrano la stessa conversazione, non una
+    // ferma a com'era. { onboarding }
+    FILO_ONBOARDING_UPDATED: 'filo_onboarding_updated',
     // Broadcast da background -> content: una lettura ad alta voce è attiva
     // (in QUALCHE scheda) oppure no. Ogni scheda usa questo flag per mostrare
     // "Interrompi lettura" nel menu anche se non è lei a leggere. { active: bool }

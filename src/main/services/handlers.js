@@ -28,6 +28,7 @@ const Paths = globalThis.SN_PATHS;
 const LlmsTxt = globalThis.SN_LLMS_TXT;
 const FiloMem = globalThis.SN_FILO_MEMORY;
 const FiloState = globalThis.SN_FILO_STATE;
+const Onboarding = globalThis.SN_ONBOARDING;
 const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
 
 const KNOWN_PATHS_BUDGET_CHARS = 20 * 1024;
@@ -698,14 +699,20 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
   }
 }
 
+// Compatta il buffer delle lezioni dentro i moduli di memoria (PROFILO,
+// PREFERENZE, espansioni). Di norma parte quando il buffer supera la soglia;
+// `runCompactor()` è anche l'entrata per FORZARLA subito — serviva alla fine
+// della micro-intervista di benvenuto (#524), dove le lezioni appena raccolte
+// devono essere già in memoria quando Filo genera la prima home personale, e
+// prima non c'era alcun modo di chiederla. Ritorna true se ha compattato.
 async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return;
+    if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return false;
     const memory = await FiloMem.getMemory();
     const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
-    if (!buf.length) return;
+    if (!buf.length) return false;
     const lezioniText = buf.map((l) => `- ${l.text}`).join('\n');
     const r = await handleAIRequest({
       action: ACTIONS.FILO_COMPACT,
@@ -715,13 +722,15 @@ async function maybeRunCompactor() {
     const text = (r?.text || '').trim();
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
       await FiloMem.clearLessonsBuffer();
-      return;
+      return true;
     }
     const patch = FiloMem.parseCompactorOutput(text);
     if (Object.keys(patch).length) await FiloMem.patchMemory(patch);
     await FiloMem.clearLessonsBuffer();
+    return true;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
+    return false;
   }
 }
 
@@ -1177,6 +1186,28 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (wrote) broadcastLiveUpdate();
         return { executed: wrote, kept: false };
       }
+      case 'ONBOARDING': {
+        // #524 — l'unica cosa che questa azione tocca è il taccuino
+        // dell'intervista: cosa Filo ha già scoperto o detto, e se ha finito.
+        // Ciò che l'intervista APPLICA passa dalle azioni vere
+        // (IMPOSTA_PREFERENZA, SALVA_LEZIONE), col loro livello.
+        if (!Onboarding) return { executed: false, kept: false };
+        const state = await FiloMem.getOnboarding();
+        if (state.done) return { executed: false, kept: false };
+        const raw = action.spunta ?? action.spunte ?? action.fatto ?? action.done_items ?? action.ids;
+        const ids = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const { state: ticked } = Onboarding.tick(state, ids);
+        const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+        // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
+        // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
+        // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
+        const wantsEnd = truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
+        const next = (wantsEnd || Onboarding.shouldForceClose(ticked))
+          ? Onboarding.close(ticked)
+          : ticked;
+        await saveOnboarding(next);
+        return { executed: true, kept: false };
+      }
       case 'SALVA_LEZIONE': {
         // Filo fissa una lezione nella PROPRIA memoria su richiesta (o di sua
         // iniziativa) in chat: la regola entra nel buffer delle lezioni — lo
@@ -1518,6 +1549,64 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
   }
 }
 
+// ── Intervista di benvenuto: scrittura di stato e coordinamento fra schede ──
+//
+// Ogni scrittura dello stato passa di qui, e ogni scrittura viene ANNUNCIATA a
+// tutte le schede: l'accoglienza vive nella scheda nuova, e di schede nuove se
+// ne aprono quante se ne vuole. Senza l'annuncio, la seconda restava ferma alla
+// conversazione com'era quando l'ha letta — la stessa intervista in due punti
+// diversi.
+async function saveOnboarding(state) {
+  const next = await FiloMem.setOnboarding(state);
+  try { broadcastToTabs({ type: MSG.FILO_ONBOARDING_UPDATED, onboarding: next }); } catch (_) {}
+  return next;
+}
+
+// Un turno rimasto a metà riparte da solo quando l'utente riapre. Ma di schede
+// nuove se ne aprono due insieme, e allora ripartirebbe due volte: due chiamate
+// al modello per lo stesso messaggio, e due risposte diverse che si accodano
+// alla stessa conversazione. Chi arriva primo prende la ripresa; l'altra scheda
+// guarda e si aggiorna da sé con l'annuncio. In memoria e non su disco: se il
+// processo muore, la prenotazione muore con lui, che è esattamente giusto.
+const ONB_RESUME_CLAIM_MS = 120000;
+let onbResumeClaimedAt = 0;
+function claimOnboardingResume() {
+  const now = Date.now();
+  if (onbResumeClaimedAt && now - onbResumeClaimedAt < ONB_RESUME_CLAIM_MS) return false;
+  onbResumeClaimedAt = now;
+  return true;
+}
+function releaseOnboardingResume() { onbResumeClaimedAt = 0; }
+
+// La chiusura dell'intervista, in un posto solo. L'ordine non è un dettaglio:
+// prima l'agente-lezioni estrae quello che l'ultimo turno ha insegnato, POI la
+// compattazione lo porta dentro PROFILO/PREFERENZE (forzata: senza aspettare la
+// soglia), e solo allora Filo genera la PRIMA home personale — che è l'ultimo
+// atto dell'accoglienza, al posto di un "fatto".
+// Vale per tutte e tre le strade che la chiudono: il modello che dichiara
+// `fine`, la parola di stop riconosciuta dall'app, il pulsante «Salta».
+function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true } = {}) {
+  const done = (d) => broadcastToTabs({
+    type: MSG.FILO_ONBOARDING_DONE,
+    message: d?.message || '', suggestions: d?.suggestions || [], ts: d?.ts || new Date().toISOString(),
+  });
+  const first = lessons
+    ? maybeRunLessonAgent({ userMessage, filoReply, stateText })
+    : Promise.resolve();
+  first
+    .then(() => maybeRunCompactor())
+    .then(() => handleFiloGenerateDashboard({ force: true }))
+    .then(done)
+    .catch((e) => {
+      console.warn('[Filo] chiusura onboarding', e);
+      // La home personale non è arrivata (chiave assente, provider giù): la
+      // chat non può restare appesa in attesa. Diciamo comunque che è finita,
+      // senza dashboard — il client torna alla home e la genera per la sua
+      // strada normale. Restare dentro l'accoglienza sarebbe il vicolo cieco.
+      done(null);
+    });
+}
+
 function broadcastLiveUpdate() {
   const msg = { type: MSG.FILO_LIVE_UPDATED };
   try {
@@ -1831,6 +1920,37 @@ async function editorFileSummaries() {
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
+
+  // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
+  // perché la parola di stop deve funzionare anche quando il resto non
+  // funziona: nessuna chiamata al modello, nessuna rete. Vedi
+  // `SN_ONBOARDING.isExitRequest`.
+  let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
+  const onbActive = !!(Onboarding && !onbBefore.done);
+  // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
+  // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
+  // nudge di prosecuzione automatica) non sono parole dell'utente e non entrano;
+  // lo stesso messaggio ripetuto di fila non è un turno nuovo (appendTurn).
+  if (onbActive && !internal && String(userMessage || '').trim()) {
+    onbBefore = await saveOnboarding(
+      Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage) }),
+    );
+  }
+  if (onbActive && !internal && Onboarding.isExitRequest(onbBefore, userMessage)) {
+    // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
+    // testo fisso — l'unica risposta che si può garantire anche senza modello.
+    // Un «no grazie» invece NON passa di qui: rifiuta la proposta che Filo ha
+    // appena fatto, e a quella risponde il modello (vedi `isExitRequest`).
+    const bye = Onboarding.CLOSING_MESSAGE;
+    const closed = Onboarding.close(Onboarding.appendTurn(onbBefore, { role: 'filo', text: bye }));
+    await saveOnboarding(closed);
+    releaseOnboardingResume();
+    // Le lezioni si estraggono comunque: se prima di dire «basta» l'utente
+    // aveva raccontato qualcosa, quel qualcosa è suo e resta.
+    finishOnboarding({ userMessage, filoReply: bye, stateText: '' });
+    return { text: bye, actions: [], onboardingClosed: true };
+  }
+
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
@@ -1839,6 +1959,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
   const fileSummaries = await editorFileSummaries();
+  // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
+  // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
+  // chat normale: nessuna schermata a passi, nessun modulo.
+  const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
@@ -1896,20 +2020,34 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // l'utente non vede il testo ripartire da capo a ogni giro.
   let r = null;
   let parsed = null;
-  for (let tentativo = 1; tentativo <= 3; tentativo++) {
-    r = await handleAIRequest({
-      action: ACTIONS.FILO_CHAT,
-      payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
-      origin: 'filo:chat',
-      onReasoning: tentativo === 1 ? onReasoning : null,
-      onText: tentativo === 1 ? onText : null,
-      // Dal secondo tentativo si salta la cache: la chiave e' la stessa e
-      // riconsegnerebbe la risposta rotta appena messa via.
-      noCache: tentativo > 1,
-    });
-    parsed = extractJson(r.text);
-    if (parsed) break;
-    console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
+  try {
+    for (let tentativo = 1; tentativo <= 3; tentativo++) {
+      r = await handleAIRequest({
+        action: ACTIONS.FILO_CHAT,
+        payload: {
+          profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita,
+          files: fileSummaries,
+          onboarding: onboardingText,
+          onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
+          onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
+        },
+        origin: 'filo:chat',
+        onReasoning: tentativo === 1 ? onReasoning : null,
+        onText: tentativo === 1 ? onText : null,
+        // Dal secondo tentativo si salta la cache: la chiave e' la stessa e
+        // riconsegnerebbe la risposta rotta appena messa via.
+        noCache: tentativo > 1,
+      });
+      parsed = extractJson(r.text);
+      if (parsed) break;
+      console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
+    }
+  } catch (e) {
+    // Il turno è fallito (rete, provider, crediti): la prenotazione della
+    // ripresa va rilasciata subito, altrimenti nessuna scheda potrebbe
+    // riprendere il turno rimasto a metà finché non scade.
+    if (onbActive && !internal) releaseOnboardingResume();
+    throw e;
   }
   parsed = parsed || { text: r.text || '', actions: [] };
   const rawActions = Array.isArray(parsed.actions) ? parsed.actions : [];
@@ -1941,12 +2079,35 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     renderedActions.push(rendered);
   }
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
-  maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
+  // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
+  // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene
+  // messo da parte per la ripresa.
+  let onboardingClosed = false;
+  if (onbActive) {
+    let after = await FiloMem.getOnboarding();
+    if (textReply && textReply !== '(vuoto)') {
+      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply });
+    }
+    if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
+    await saveOnboarding(after);
+    onboardingClosed = !!after.done;
+    if (!internal) releaseOnboardingResume();
+  }
+  if (onboardingClosed) {
+    finishOnboarding({ userMessage, filoReply: textReply, stateText });
+  } else {
+    maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
+  }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
   // Se in questo turno abbiamo già proposto la segnalazione all'utente (#360),
   // quella anonima non parte: una sola segnalazione per lo stesso buco.
   maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
-  return { text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur };
+  return {
+    text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur,
+    // Il client lo usa per dire subito che sta preparando la home invece di
+    // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
+    ...(onboardingClosed ? { onboardingClosed: true } : {}),
+  };
 }
 
 // #155 — raccoglie gli input della home (letture locali, NIENTE chiamata LLM) e
@@ -2200,6 +2361,12 @@ const handlerCtx = {
   handleFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
+  maybeRunCompactor,
+  // Intervista di benvenuto (#524)
+  saveOnboarding,
+  finishOnboarding,
+  claimOnboardingResume,
+  releaseOnboardingResume,
 };
 
 require('./handlers/nav')(on, handlerCtx);
