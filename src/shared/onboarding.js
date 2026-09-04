@@ -428,9 +428,9 @@
   global.SN_ONBOARDING = {
     WELCOME_MESSAGE, RESUME_NOTE, CLOSING_MESSAGE,
     MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
-    ITEMS, ITEM_IDS, STOP_PHRASES,
+    ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
     remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
-    isStopRequest, renderChecklistForPrompt,
+    isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
