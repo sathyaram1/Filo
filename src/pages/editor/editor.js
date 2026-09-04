@@ -3939,7 +3939,14 @@
   function matchShortcut(e, sc) {
     if (!sc) return false;
     const parts = sc.toLowerCase().split('+').map((s) => s.trim());
-    const need = { ctrl: parts.includes('ctrl'), shift: parts.includes('shift'), alt: parts.includes('alt') };
+    // Cmd vale quanto Ctrl: su Mac l'utente scrive la scorciatoia con il tasto
+    // che ha davvero sotto le dita, e il campo gli propone "Cmd+…". Senza
+    // questa riga la scorciatoia si salva, sembra valida e poi non parte mai.
+    const need = {
+      ctrl: parts.includes('ctrl') || parts.includes('cmd') || parts.includes('command') || parts.includes('meta'),
+      shift: parts.includes('shift'),
+      alt: parts.includes('alt') || parts.includes('option'),
+    };
     const key = parts[parts.length - 1];
     return (e.ctrlKey || e.metaKey) === need.ctrl && e.shiftKey === need.shift && e.altKey === need.alt && eventKeyCandidates(e).has(key);
   }
