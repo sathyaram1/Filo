@@ -91,7 +91,7 @@ async function avvisaSeAggiornamentoBloccato(versione) {
       kind: 'alert',
       action: { tipo: 'aggiornamento-mac', versione },
       text: `C'è la versione ${versione} di Filo, ma su Mac non riesce a installarsi da sola.\n`
-        + 'Scaricala da filo.red e sostituisci l\'app: ci vuole un minuto.',
+        + 'Scaricala da filo.red e sostituisci l\'app. Ci vuole un minuto.',
     });
   } catch (e) {
     console.error('[updater] avviso aggiornamento non scritto:', e?.message || e);
