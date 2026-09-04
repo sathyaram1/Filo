@@ -5,6 +5,7 @@
     "file": "nome dello spec. Il prefisso tests/ si può mettere o no: il confronto lo toglie da entrambe le parti",
     "titolo": "titolo esatto del test. Se manca, la scusa vale per TUTTO il file, e va evitato quando si può: un file intero scusato nasconde anche le regressioni dei suoi altri test",
     "dove": "actions | cloud | locale | ovunque. actions = il runner di GitHub Actions; cloud = qualunque macchina senza schermo (il runner incluso); locale = il PC dell'owner. Una scusa scritta per actions NON vale altrove: ci sono spec rosse solo lì, e scusarle ovunque spegnerebbe la suite dove invece funziona.",
+    "tranne": "facoltativo: un ambiente che questa voce NON scusa, anche se `dove` lo comprenderebbe. Serve dove \"senza schermo\" non basta a descrivere il guasto, come la cattura dello schermo: nera sulla macchina delle routine, vera sul runner. Senza il ritaglio la voce resterebbe cieca proprio dove la suite gira davvero.",
     "perche": "perché questo rosso non dipende dal codice. Senza motivo la voce è una scusa vuota: fra sei mesi nessuno saprà più se toglierla"
   },
   "_come_si_aggiorna": "Si GUARDA una corsa, non si va a memoria: node scripts/suite-reds.mjs <verbale o cartella> --ambiente cloud|locale --proponi stampa le voci già col titolo esatto. Il motivo lo scrive una persona, e dev'essere il motivo VERO di quel rosso — non l'osservazione che è rosso solo lì. Chi legge il verdetto vede anche le voci SCADUTE (spec in lista che oggi passano): vanno tolte, o la lista marcisce fino a coprire davvero una regressione.",
