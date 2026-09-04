@@ -942,7 +942,13 @@
         const note = document.createElement('div');
         note.className = 'dash-activity-note';
         note.textContent = text;
-        append(note);
+        // Nell'ordine vero: il testo è stato scritto PRIMA delle azioni del turno.
+        const at = (turnMark !== null && turnMark <= body.childElementCount) ? body.children[turnMark] || null : null;
+        body.insertBefore(note, at);
+        items += 1;
+        turnMark = null;
+        followBody();
+        followThread();
       },
       // Fine di un turno: chiude il ragionamento del turno e lo restituisce
       // (per lo storico del thread).
