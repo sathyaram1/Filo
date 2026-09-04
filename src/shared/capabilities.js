@@ -63,7 +63,7 @@
     {
       id: 'switch-tab-by-number', title: 'Salta a una scheda col numero', category: 'navigation',
       desc: 'Porta in primo piano la scheda in quella posizione: la prima, la seconda, e così via fino alla decima.',
-      invoke: 'Alt+1…9 per le prime nove, Alt+0 per la decima (su Mac Cmd al posto di Alt). Funziona anche mentre stai guardando un sito.',
+      invoke: 'Alt+1…9 per le prime nove, Alt+0 per la decima. Su Mac si usa Cmd al posto di Alt, e la decima diventa Cmd+9 (“l’ultima scheda”), perché lì Cmd+0 riporta la pagina al 100%. Funziona anche mentre stai guardando un sito.',
       doesNot: 'Se in quella posizione non c’è nessuna scheda non succede niente.',
     },
     {
