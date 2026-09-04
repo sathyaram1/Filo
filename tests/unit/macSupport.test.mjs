@@ -692,3 +692,90 @@ test('la barra dei menu non inventa scorciatoie che valgono solo su Mac', () => 
   assert.deepEqual(inventati, [],
     'questi tasti li registra solo la barra: su Windows e Linux non farebbero niente.\n' + inventati.join('\n'));
 });
+
+// ── Un tasto solo, una promessa sola ────────────────────────────────────────
+//
+// Su Mac la barra dei menu vede i tasti PRIMA di chiunque altro. Quindi ogni
+// tasto che sta nella barra è tolto a tutto il resto: alle scorciatoie di Filo
+// e alle scorciatoie che l'utente si assegna nell'Editor. È da qui che Cmd+0 è
+// finito promesso a due cose diverse (zoom della pagina e decima scheda), con
+// una delle due che non succedeva mai. La lista dei tasti "già presi" vive in
+// src/shared/tasti.js: queste prove tengono quella lista agganciata alla barra
+// vera e ai testi che l'utente legge.
+
+test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+
+  const scoperti = vociDellaBarra()
+    .map((v) => v.accelerator)
+    .filter(Boolean)
+    // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.
+    .map((a) => a.replace(/CommandOrControl/g, 'Ctrl'))
+    .filter((a) => !T.riservato(a, 'darwin'));
+  assert.deepEqual(scoperti, [],
+    'su Mac la barra si prende questi tasti, ma chi fa scegliere una scorciatoia all\'utente non lo sa:\n'
+    + scoperti.join('\n'));
+});
+
+test('nessuno può assegnarsi un tasto che Filo si prende prima', () => {
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+
+  // Ovunque: i tasti della shell del browser e il salto di scheda.
+  for (const accel of ['Ctrl+W', 'Ctrl+T', 'Ctrl+R', 'Ctrl+L']) {
+    assert.equal(T.riservato(accel, 'win32'), true, `${accel} non arriva a una pagina, ma risulta libero`);
+    assert.equal(T.riservato(accel, 'darwin'), true, `${accel} non arriva a una pagina, ma risulta libero`);
+  }
+  assert.equal(T.riservato('Alt+3', 'win32'), true);
+  assert.equal(T.riservato('Cmd+3', 'darwin'), true);
+  // Su Mac in più tutta la barra dei menu, compreso lo zoom.
+  assert.equal(T.riservato('Cmd+0', 'darwin'), true);
+  assert.equal(T.riservato('Cmd+Z', 'darwin'), true);
+  assert.equal(T.riservato('Cmd+Shift+Z', 'darwin'), true);
+  // Su Windows lo zoom NON passa dalla barra: quel tasto arriva alla pagina.
+  assert.equal(T.riservato('Ctrl+0', 'win32'), false);
+  // Le scorciatoie globali sono registrate a livello di sistema.
+  assert.equal(T.riservato('Alt+E', 'win32'), true);
+  assert.equal(T.riservato('Ctrl+Alt+E', 'darwin'), true);
+  // E una combinazione libera resta libera, altrimenti non se ne può usare più
+  // nessuna.
+  for (const accel of ['Ctrl+Shift+1', 'Ctrl+Shift+K', 'Alt+Shift+P']) {
+    assert.equal(T.riservato(accel, 'win32'), false, `${accel} dovrebbe essere assegnabile`);
+    assert.equal(T.riservato(accel, 'darwin'), false, `${accel} dovrebbe essere assegnabile`);
+  }
+
+  // E l'Editor, che è l'unico posto dove l'utente si assegna una scorciatoia,
+  // deve chiedere qui invece di accettarla e non farla partire mai.
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8'), /\.riservato\(/,
+    'l\'Editor salva ancora scorciatoie che non arriveranno mai al modulo');
+});
+
+test('quello che si legge sul salto di scheda è quello che succede', () => {
+  // Il nome, la descrizione e il comportamento del salto di scheda devono dire
+  // la stessa cosa sullo stesso sistema. È dividerli che ha fatto scrivere in
+  // due elenchi "Cmd+0 = decima scheda" mentre su Mac Cmd+0 era lo zoom.
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+
+  assert.match(T.descrizioneSaltoScheda('win32'), /0/);
+  assert.match(T.descrizioneSaltoScheda('darwin'), /9/);
+  assert.ok(!/0 = la decima/.test(T.descrizioneSaltoScheda('darwin')),
+    'su Mac la descrizione promette ancora la decima scheda con lo zero');
+
+  // L'elenco delle scorciatoie nelle Opzioni deve chiedere la descrizione alla
+  // regola, non scriversela in casa.
+  const altro = readFileSync(join(ROOT, 'src', 'pages', 'options', 'altro.js'), 'utf8');
+  assert.match(altro, /descrizioneSaltoScheda/,
+    'l\'elenco delle scorciatoie descrive il salto di scheda per conto suo: tornerà a mentire su Mac');
+
+  // Il manifesto delle capacità è un file solo per tutti i sistemi: lì la
+  // differenza va scritta, e deve nominare il tasto giusto.
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const cap = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'switch-tab-by-number');
+  assert.ok(cap, 'sparita la capacità del salto di scheda');
+  assert.match(cap.invoke, /Cmd\+9/,
+    'il manifesto non dice come si arriva all\'ultima scheda su Mac');
+  assert.ok(!/Cmd\+0/.test(cap.invoke) || /100%/.test(cap.invoke),
+    'il manifesto promette ancora una scheda su Cmd+0, che su Mac è lo zoom');
+});

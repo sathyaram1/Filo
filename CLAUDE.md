@@ -62,7 +62,8 @@ le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
   programma; una con Alt+cifra impedisce di digitare quei simboli in qualunque
   pagina. Su Mac Alt+lettera prende un Ctrl davanti
   (`src/main/shortcuts.js`) e Alt+cifra diventa Cmd+cifra (i salti fra schede,
-  come in ogni browser su Mac).
+  come in ogni browser su Mac) — tranne lo zero, che su Mac è già lo zoom al
+  100%: lì la scheda in fondo si raggiunge con Cmd+9, «l'ultima».
 - **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
   rispondevano già a Cmd — a mentire erano le SCRITTE, e mentivano una alla
   volta. `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')`
