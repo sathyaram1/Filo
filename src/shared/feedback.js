@@ -880,6 +880,8 @@
   global.SN_FEEDBACK = {
     submit,
     list,
+    listVersions,
+    getMany,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     listHitCap,
