@@ -3458,16 +3458,18 @@
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
+    // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
+    // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
+    // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
+    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE });
+    firstListPromise.catch(() => {});
     injectSearchIcons();
     await loadLayout();
     await refreshAuth();
     applyAutoModeGate();
-    await loadAutoMode();
-    await loadSortMode();
-    await loadCaps();
-    await loadJudgeTimeout();
-    await loadMergeApprovals();
+    await Promise.all([loadAutoMode(), loadSortMode(), loadCaps(), loadJudgeTimeout(), loadMergeApprovals()]);
     await loadData();
+    startLive();
   }
 
   const bootDone = init().catch((e) => { console.error('[manage] init:', e); });
