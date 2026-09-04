@@ -58,9 +58,17 @@ test('A — il ragionamento scorre in un riquadro, si richiude con la risposta e
 
   // Provider finto in streaming: ragionamento a pezzi, poi la risposta con
   // un'azione TIMER (livello 1: il main la esegue davvero e la conferma).
-  await app.evaluate(async (thoughts) => {
+  await app.evaluate(async () => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreProvider = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    // Stesse frasi di THOUGHTS (qui inline: il codice eseguito nel main non
+    // vede le costanti del test).
+    const thoughts = [
+      'Per prima cosa interpreto la domanda dell’utente.',
+      'Poi confronto le informazioni che ho a disposizione.',
+      'Quindi soppeso le possibili risposte una per una.',
+      'Infine scelgo la formulazione più chiara e utile.',
+    ];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onReasoning, onDelta }) => {
       for (const t of thoughts) {
         try { onReasoning && onReasoning(t + ' '); } catch (_) {}
