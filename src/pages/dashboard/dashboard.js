@@ -329,8 +329,33 @@
     }, 8000);
   }
 
+  // Il congedo («chiudo qui, la rifacciamo quando vuoi») è l'ultima cosa che
+  // l'utente legge dell'accoglienza, e la home lo cancella: quando la home
+  // arriva nello stesso istante — col modello giù è così — non lo legge
+  // nessuno. Gli lasciamo il tempo di essere letto; se la home ci mette di suo
+  // più di così, non si aspetta niente.
+  const CLOSING_DWELL_MS = 2600;
+  let closingShownAt = 0;
+  let closingDwellTimer = null;
+
   function onboardingDone(msg) {
     onboardingActive = false;
+    clearTimeout(onboardingHomeFallback);
+    const atteso = closingShownAt ? Date.now() - closingShownAt : CLOSING_DWELL_MS;
+    if (atteso < CLOSING_DWELL_MS) {
+      if (closingDwellTimer) return; // il primo che arriva è quello buono
+      closingDwellTimer = setTimeout(() => {
+        closingDwellTimer = null;
+        onboardingDoneNow(msg);
+      }, CLOSING_DWELL_MS - atteso);
+      return;
+    }
+    onboardingDoneNow(msg);
+  }
+
+  function onboardingDoneNow(msg) {
+    onboardingActive = false;
+    closingShownAt = 0;
     clearTimeout(onboardingHomeFallback);
     hideSkipOnboarding();
     goHome(); // svuota bolle e storico: l'intervista è finita
