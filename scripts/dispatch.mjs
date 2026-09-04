@@ -706,20 +706,24 @@ async function deliverToChannel(intent, data) {
 export function verifierNoteText(verdict, critique = '') {
   // Il ruolo scrive la critica come "PASS — …"/"MIGLIORABILE — …"/"FAIL — …":
   // il prefisso è ridondante col nostro incipit, toglilo (resta la sostanza).
-  // Il tetto è quello della fonte unica, e un taglio lascia un segno visibile
-  // (#531): la nota che nasce qui è la stessa che, sui rilievi non risolti,
-  // diventa il testo del feedback residuo — troncata in silenzio a metà frase
-  // arrivava a chi la doveva lavorare senza il pezzo che serviva.
-  const c = capCritique(
-    String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, ''),
-  );
+  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '');
+  let nota;
   if (verdict === 'pass') {
-    return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
+    nota = c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
+  } else if (verdict === 'migliorabile') {
+    nota = c ? `Verifica: funziona, ma migliorabile — ${c}` : 'Verifica: funziona, ma migliorabile.';
+  } else {
+    nota = c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
   }
-  if (verdict === 'migliorabile') {
-    return c ? `Verifica: funziona, ma migliorabile — ${c}` : 'Verifica: funziona, ma migliorabile.';
-  }
-  return c ? `Controllo funzionalità NON superato: ${c}` : 'Controllo funzionalità NON superato.';
+  // Il tetto vale sulla nota INTERA, incipit compreso, e il taglio lascia un
+  // segno visibile (#531). Sull'intera e non sulla sola critica per un motivo
+  // preciso: questo testo è quello che il canale consegna, e chi lo riceve
+  // applica lo stesso tetto — se qui uscisse anche solo qualche carattere più
+  // lungo, a tagliare sarebbe l'altro capo, in silenzio, portandosi via proprio
+  // il segno che dice che si è tagliato. La nota è anche il testo che, sui
+  // rilievi non risolti, diventa il feedback residuo: interrotta a metà frase
+  // arrivava a chi la doveva lavorare senza il pezzo che serviva.
+  return capCritique(nota);
 }
 
 /**
