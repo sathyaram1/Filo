@@ -61,11 +61,12 @@ test('impostare il modello dell\'indicizzazione lo salva e lo ripropone', async 
   await input.blur();
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
-  const saved = await page.evaluate(async () => {
+  // Il salvataggio è differito di qualche centinaio di ms: si aspetta il
+  // valore, non un istante fisso.
+  await expect.poll(() => page.evaluate(async () => {
     const s = await window.SN_STORAGE.getSettings();
     return s.models[window.SN_CONST.ACTIONS.ARCHIVE_EMBED];
-  });
-  expect(saved).toBe('mio-indicizzatore');
+  }), { timeout: 5_000 }).toBe('mio-indicizzatore');
 
   await page.reload();
   await page.waitForSelector('#modelsGrid .sn-chain', { timeout: 8_000 });

@@ -58,7 +58,6 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
   const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'vendor/modello-di-prova' })).toBeVisible();
-
 });
 
 test('Modelli: un modello salvato compare nella tendina alla riapertura', async ({ openTab }) => {
@@ -74,6 +73,11 @@ test('Modelli: un modello salvato compare nella tendina alla riapertura', async 
     row.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  // Il salvataggio è differito: si aspetta che il registro salvato contenga la riga.
+  await expect.poll(() => page.evaluate(async () => {
+    const s = await window.SN_STORAGE.getSettings();
+    return (s.modelRegistry && s.modelRegistry.miomodello && s.modelRegistry.miomodello.model) || '';
+  }), { timeout: 5_000 }).toBe('vendor/modello-salvato');
 
   // Ricarica: il seeding della tendina parte dal registry salvato.
   await page.reload();
