@@ -298,9 +298,16 @@ cui Filo usa — o volutamente NON usa — un modello, con `from`:
 
 - **Mai un id di modello scritto nel codice**, nemmeno come "default se manca":
   un ripiego scritto nel codice fa girare un modello che nessuno ha scelto e che
-  può violare la politica sui fornitori. L'unica eccezione è il registro dei
-  modelli configurabili in `constants.js` (`DEFAULT_MODEL_REGISTRY`,
-  `DEFAULT_MODELS`, listino prezzi), dove i nomi **sono** il dato configurabile.
+  può violare la politica sui fornitori. Dal 2026-09-04 vale anche per i
+  "predefiniti": `DEFAULT_MODEL_REGISTRY` è vuoto e `DEFAULT_MODELS` ha tutte
+  le catene vuote (le chiavi restano per il censimento). I modelli veri stanno
+  nella configurazione condivisa (Gestione → Modelli predefiniti) o nelle
+  Opzioni; una funzione senza modello si ferma e lo dice. Un default nel codice
+  invecchia in silenzio: costi e prestazioni peggiori senza che nessuno se ne
+  accorga. L'unico elenco di nomi che resta in `constants.js` è il listino
+  prezzi. I test usano un registro di prova (`tests/fixtures/testModels.js`,
+  caricato solo con `NODE_ENV=test`), che fa da registro "di build" per
+  `defaultsStore` e da seme dello storage.
 - **Mai prendere in prestito lo slot di un'altra funzione.** Se l'editor chiede
   il modello di «Spiega», chi cambia «Spiega» cambia l'editor senza saperlo, e
   chi vuole cambiare l'editor non trova dove: crea uno slot nuovo.

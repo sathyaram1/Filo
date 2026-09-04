@@ -115,3 +115,23 @@ test('ogni funzione impostabile ha un\'etichetta leggibile per i messaggi d\'err
       `la funzione "${action}" non ha un nome leggibile: l'errore mostrerebbe il codice interno`);
   }
 });
+
+// ── Nessun modello scritto nel codice ────────────────────────────────────────
+// I modelli veri stanno nella configurazione condivisa o in quella personale.
+// Se il codice ne portasse uno di suo, una funzione lasciata senza modello
+// partirebbe lo stesso su un modello vecchio scelto da nessuno: costi e
+// prestazioni peggiori, in silenzio. Meglio l'errore rumoroso.
+test('il registro di build è vuoto e nessuna funzione ha una catena scritta nel codice', () => {
+  assert.deepEqual(Object.keys(C.DEFAULT_MODEL_REGISTRY), [], 'il registro scritto nel codice deve restare vuoto');
+  const piene = Object.entries(C.DEFAULT_MODELS).filter(([, v]) => String(v || '').trim());
+  assert.deepEqual(piene, [], 'nessuna funzione deve partire da un modello scritto nel codice');
+  // Le chiavi restano: il censimento le confronta con le funzioni.
+  assert.ok(Object.keys(C.DEFAULT_MODELS).length > 10);
+});
+
+test('senza configurazione una funzione non produce nessun tentativo (errore, non ripiego)', () => {
+  const refs = C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.EXPLAIN]);
+  assert.deepEqual(refs, []);
+  const attempts = C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, ['openrouter'], { openrouter: 'k' });
+  assert.equal(attempts.length, 0);
+});
