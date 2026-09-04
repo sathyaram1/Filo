@@ -553,6 +553,54 @@
     return out;
   }
 
+  // Le sole "versioni" dei feedback: per ciascuno id + `_updateTime`, niente
+  // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
+  // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
+  async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
+    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'] });
+    return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
+  }
+
+  // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
+  // solo quelli trovati: un id cancellato nel frattempo non compare. Vuoto → [].
+  async function getMany(ids, { timeoutMs = 0 } = {}) {
+    const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
+    if (wanted.length === 0) return [];
+    const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
+    const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
+    const opts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documents: wanted.map((id) => prefix + id) }),
+    };
+    let timer = null;
+    let timedOut = false;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { timedOut = true; try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try {
+      res = await fetch(endpoint, opts);
+    } catch (e) {
+      if (timedOut) throw new Error('firestore batchGet: timeout di rete');
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`firestore batchGet fallito (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const arr = await res.json();
+    const out = [];
+    for (const row of Array.isArray(arr) ? arr : []) {
+      if (row && row.found) out.push(fsDocToObject(row.found));
+    }
+    return out;
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
