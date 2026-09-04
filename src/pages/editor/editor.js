@@ -66,9 +66,9 @@
     comment:          { label: 'Commenta', icon: 'share', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Seleziona testo e aggiungi commenti.' },
     chat:             { label: 'Chat', icon: 'filoLogo', defaultW: 3, defaultH: 3, minW: 3, minH: 3, desc: 'Chat con LLM che vede il documento.' },
     // ── Moduli di formattazione (agiscono sul testo selezionato nell'editor) ──
-    bold:             { label: 'Grassetto', glyph: '<b>B</b>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Grassetto sul testo selezionato (Ctrl+B).' },
-    italic:           { label: 'Corsivo', glyph: '<i>I</i>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Corsivo sul testo selezionato (Ctrl+I).' },
-    underline:        { label: 'Sottolineato', glyph: '<u>U</u>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Sottolineato sul testo selezionato (Ctrl+U).' },
+    bold:             { label: 'Grassetto', glyph: '<b>B</b>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Grassetto sul testo selezionato', 'Ctrl+B') + '.' },
+    italic:           { label: 'Corsivo', glyph: '<i>I</i>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Corsivo sul testo selezionato', 'Ctrl+I') + '.' },
+    underline:        { label: 'Sottolineato', glyph: '<u>U</u>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Sottolineato sul testo selezionato', 'Ctrl+U') + '.' },
     undo:             { label: 'Indietro', icon: 'back', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Annulla l\'ultima modifica.' },
     redo:             { label: 'Avanti', icon: 'forward', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Ripeti la modifica annullata.' },
     'text-size':      { label: 'Dimensione testo', glyph: 'A±', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Aumenta o riduci la dimensione del testo selezionato.' },
@@ -1878,9 +1878,9 @@
     return b;
   }
   const SIMPLE_FORMATS = {
-    bold:      { glyph: '<b>B</b>', title: 'Grassetto (Ctrl+B)', act: () => exec('bold') },
-    italic:    { glyph: '<i>I</i>', title: 'Corsivo (Ctrl+I)', act: () => exec('italic') },
-    underline: { glyph: '<u>U</u>', title: 'Sottolineato (Ctrl+U)', act: () => exec('underline') },
+    bold:      { glyph: '<b>B</b>', title: conTasto('Grassetto', 'Ctrl+B'), act: () => exec('bold') },
+    italic:    { glyph: '<i>I</i>', title: conTasto('Corsivo', 'Ctrl+I'), act: () => exec('italic') },
+    underline: { glyph: '<u>U</u>', title: conTasto('Sottolineato', 'Ctrl+U'), act: () => exec('underline') },
     undo:      { glyph: ICONS.back ? ICONS.back(16) : '↶', title: 'Indietro (annulla)', act: () => exec('undo') },
     redo:      { glyph: ICONS.forward ? ICONS.forward(16) : '↷', title: 'Avanti (ripeti)', act: () => exec('redo') },
   };
@@ -4172,6 +4172,10 @@
   function toggleSidebar() { root.classList.toggle('sidebar-hidden'); }
 
   sidebarToggle.addEventListener('click', toggleSidebar);
+
+  // Il suggerimento nomina un tasto, e su Mac quel tasto è Cmd: l'HTML non può
+  // saperlo (è un file solo per tutti i sistemi), quindi lo scriviamo qui.
+  sidebarToggle.title = conTasto('Mostra/nascondi sidebar', 'Ctrl+\\');
 
   if (ICONS.apps) sidebarToggle.innerHTML = ICONS.apps(16);
 
