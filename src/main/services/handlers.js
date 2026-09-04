@@ -36,7 +36,6 @@ const KNOWN_PATHS_BUDGET_CHARS = 20 * 1024;
 // scheda serve sempre la cache all'istante; il ricalcolo (costoso, con l'LLM)
 // avviene al massimo una volta ogni 2 minuti, accorpando le modifiche.
 const DASHBOARD_MIN_INTERVAL_MS = 2 * 60 * 1000;
-const FREE_PROVIDERS = new Set(['gemini']);
 
 // Finestra principale di Filo, quella che possiede il TabManager. NON usare
 // getAllWindows()[0]: le finestre figlie (tooltip, popup-menu — create con
@@ -158,12 +157,7 @@ async function buildMessages(action, payload) {
       { type: 'image_url', image_url: { url: payload.dataUrl } },
     ] }];
   }
-  if (action === ACTIONS.TRANSCRIBE_AUDIO) {
-    return [{ role: 'user', content: [
-      { type: 'text', text: PROMPTS.transcribeAudio({ lang: payload.lang }) },
-      { type: 'audio_url', audio_url: { url: payload.dataUrl } },
-    ] }];
-  }
+
   if (action === ACTIONS.SPELLCHECK_SEMANTIC) {
     return [{ role: 'user', content: PROMPTS.spellcheckSemantic({ text: payload.text, context: payload.context }) }];
   }
@@ -345,15 +339,11 @@ async function ensureUnderLimit(settings) {
   }
 }
 
+// Oltre il limite di spesa nessun tentativo parte: non esiste più un fornitore
+// "gratuito" su cui ripiegare (era l'API diretta di Google, oggi fuori da Filo).
 async function applyLimitToChain(settings, attempts) {
-  if (!(await Costs.isOverLimit(settings.monthlyLimitEur))) return attempts;
-  const free = attempts.filter((a) => FREE_PROVIDERS.has(a.provider));
-  if (!free.length) {
-    const e = new Error(I18n.t('err_limit_reached'));
-    e.code = 'LIMIT_REACHED';
-    throw e;
-  }
-  return free;
+  await ensureUnderLimit(settings);
+  return attempts;
 }
 
 // Catena di tentativi per servire una richiesta. L'UNICA sorgente dei modelli è
@@ -403,12 +393,10 @@ function buildAttemptChain(settings, modelRef, action) {
   }
 
   // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
-  // conta solo per i ref "legacy" (id grezzi senza nickname): proviamo prima
-  // Gemini (quota free) poi OpenRouter. buildModelAttempts scarta da sé i
-  // provider senza chiave o senza un id concreto per quel modello.
-  // A interruttore acceso Gemini esce dall'ordine: è l'API del produttore, e i
-  // modelli a pesi aperti serviti da lì restano soldi a chi li ha addestrati.
-  const providerOrder = openWeightsOnly ? ['openrouter'] : ['gemini', 'openrouter'];
+  // conta solo per i ref "legacy" (id grezzi senza nickname). Oggi il fornitore
+  // è uno solo, il router. buildModelAttempts scarta da sé i provider senza
+  // chiave o senza un id concreto per quel modello.
+  const providerOrder = ['openrouter'];
   const out = SN_CONST.buildModelAttempts(usable, registry, providerOrder, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
@@ -500,8 +488,124 @@ function noteServedProvider(settings, action, result) {
   return { servedBy, violation };
 }
 
+// ─── Chi ha servito, a posteriori (voce e dettatura) ─────────────────────────
+// Per le chiamate audio il router non mette il fornitore nella risposta; lo si
+// chiede dopo con l'id della generazione, che diventa leggibile qualche secondo
+// più tardi. Best-effort e FUORI dal cammino della risposta: la politica va
+// verificata, ma chi detta non deve aspettare la verifica. Se risulta un
+// escluso: log, toast a interruttore acceso, e la voce di cronologia (se c'è)
+// viene marchiata. Con `recordCost` registra anche il costo che il router
+// riporta lì (la lettura ad alta voce non lo dice nella risposta).
+function auditServedByLater({ settings, action, provider, model, apiKey, generationId, historyId, recordCost }) {
+  if (!generationId) return;
+  const P = Providers.getProvider(provider);
+  if (!P || typeof P.lookupServedBy !== 'function') return;
+  const delays = [4000, 10000, 25000];
+  let i = 0;
+  const schedule = () => {
+    if (i >= delays.length) return;
+    const t = setTimeout(tick, delays[i++]);
+    if (t && typeof t.unref === 'function') t.unref();
+  };
+  const tick = async () => {
+    let r = null;
+    try { r = await P.lookupServedBy({ apiKey, generationId }); } catch (_) { r = null; }
+    if (!r || !r.servedBy) { schedule(); return; }
+    const { servedBy, violation } = noteServedProvider(settings, action, { servedBy: r.servedBy });
+    if (historyId) {
+      try { await History.patch(historyId, { servedBy, policyViolation: violation }); } catch (_) {}
+    }
+    if (recordCost && Number.isFinite(r.costUsd) && r.costUsd > 0) {
+      try {
+        await Costs.record({
+          action, provider, model, usage: { costUsd: r.costUsd }, pricing: null, usdToEur: settings.usdToEur,
+        });
+      } catch (_) {}
+    }
+  };
+  schedule();
+}
+
+// ─── Dettatura ───────────────────────────────────────────────────────────────
+// Non è una chat: l'audio va all'endpoint di trascrizione, che risponde col
+// testo. Stessa catena di modelli, stesso limite di spesa, stesso riscontro su
+// chi ha servito. `payload`: { audioBase64, format, lang, interim } — oppure,
+// nella forma vecchia, { dataUrl, lang }.
+async function handleTranscription({ settings, payload, origin, signal }) {
+  const p = payload || {};
+  const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
+  const attempts = await applyLimitToChain(
+    settings, buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO),
+  );
+  let audioBase64 = typeof p.audioBase64 === 'string' ? p.audioBase64 : '';
+  let format = typeof p.format === 'string' && p.format ? p.format : 'wav';
+  if (!audioBase64 && typeof p.dataUrl === 'string') {
+    const m = /^data:audio\/([a-z0-9.+-]+)(?:;[^,]*)?;base64,(.*)$/i.exec(p.dataUrl);
+    if (m) {
+      const sub = m[1].toLowerCase();
+      format = sub === 'mpeg' ? 'mp3' : (sub === 'x-wav' || sub === 'wave' ? 'wav' : sub);
+      audioBase64 = m[2];
+    }
+  }
+  if (!audioBase64) {
+    const e = new Error('Audio mancante');
+    e.code = 'NO_AUDIO';
+    throw e;
+  }
+  const Voices = globalThis.SN_TTS_VOICES;
+  const language = Voices ? Voices.langOf(p.lang) : '';
+  const routing = providerRouting(settings);
+  let lastErr = null;
+  for (const a of attempts) {
+    const P = Providers.getProvider(a.provider);
+    if (!P || typeof P.transcribe !== 'function' || !a.model) continue;
+    try {
+      const r = await P.transcribe({
+        apiKey: a.apiKey, model: a.model, audioBase64, format,
+        language: language || undefined, providerRouting: routing, signal,
+      });
+      const text = String(r.text || '').trim();
+      const { servedBy, violation } = noteServedProvider(settings, ACTIONS.TRANSCRIBE_AUDIO, r);
+      let costEur = 0;
+      try {
+        costEur = await Costs.record({
+          action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
+          usage: r.usage, pricing: null, usdToEur: settings.usdToEur,
+        });
+      } catch (_) {}
+      // Le trascrizioni PROVVISORIE della dettatura in diretta non vanno in
+      // cronologia: ne arriverebbe una al secondo, tutte sostituite dalla
+      // definitiva. Il costo però si registra sempre.
+      let historyId = null;
+      if (!p.interim) {
+        try {
+          const h = await History.append({
+            action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model, servedBy,
+            policyViolation: violation,
+            input: { lang: p.lang || '', seconds: (r.usage && r.usage.seconds) || 0 },
+            output: text, origin, costEur, usage: r.usage,
+          });
+          historyId = h && h.id;
+        } catch (_) {}
+      }
+      if (!servedBy) {
+        auditServedByLater({
+          settings, action: ACTIONS.TRANSCRIBE_AUDIO, provider: a.provider, model: a.model,
+          apiKey: a.apiKey, generationId: r.generationId, historyId,
+        });
+      }
+      return { text, model: a.model, provider: a.provider, costEur, usage: r.usage };
+    } catch (e) {
+      lastErr = e;
+      console.warn(`[SN] dettatura ${a.provider}/${a.model} fallita:`, e.message || e);
+    }
+  }
+  throw lastErr || new Error('Nessun modello di dettatura disponibile');
+}
+
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null, noCache = false }) {
   const settings = await getEffectiveSettings();
+  if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
   // poteva imporre un modello scritto nel codice, scavalcando la configurazione
   // (era esattamente ciò che faceva la descrizione delle immagini). Il modello di
@@ -2360,6 +2464,8 @@ const handlerCtx = {
   openWeightsBlockReason,
   applyLimitToChain,
   handleAIRequest,
+  noteServedProvider,
+  auditServedByLater,
   maybeCategorizeAsync,
   searchArchivedTabs,
   handleFiloChat,
@@ -2529,29 +2635,73 @@ async function summarizeTab(title, content) {
 // impostabile come tutte le altre. Ritorna null (senza rumore) se non c'è un
 // modello configurato o manca la chiave: l'indicizzazione è un di più, la
 // ricerca per parole continua a funzionare comunque.
-async function embedTexts(texts) {
-  const G = globalThis.SN_PROVIDER_GEMINI;
-  if (!G || typeof G.embed !== 'function') return null;
-  const settings = await getEffectiveSettings();
-  const key = settings.apiKeys && settings.apiKeys.gemini;
-  if (!key) return null;
-  let model = '';
+// Ritorna { vectors, model }: il nome del modello viaggia coi vettori perché
+// vettori di modelli diversi non sono confrontabili — la ricerca confronta
+// solo quelli fatti dal modello in uso e reindicizza gli altri.
+function embedAttempt(settings) {
   try {
     const attempts = buildAttemptChain(
       settings, modelForAction(settings, ACTIONS.ARCHIVE_EMBED), ACTIONS.ARCHIVE_EMBED,
     );
-    // Filo sa chiamare modelli di indicizzazione solo su Gemini: prendiamo il
-    // primo della catena servito da lì. Gli altri restano nella catena per il
-    // giorno in cui un secondo fornitore saprà farlo.
-    const hit = attempts.find((a) => a.provider === 'gemini' && a.model);
-    model = hit ? hit.model : '';
-  } catch (_) { /* nessun modello configurato → niente indicizzazione */ }
-  if (!model) return null;
-  return G.embed({ apiKey: key, texts, model, dim: SN_CONST.EMBED_DIM });
+    return attempts.find((a) => {
+      const P = Providers.getProvider(a.provider);
+      return P && typeof P.embed === 'function' && a.model;
+    }) || null;
+  } catch (_) { return null; /* nessun modello configurato → niente indicizzazione */ }
+}
+
+async function embedTexts(texts, settingsIn) {
+  const settings = settingsIn || await getEffectiveSettings();
+  const a = embedAttempt(settings);
+  if (!a) return null;
+  const P = Providers.getProvider(a.provider);
+  const r = await P.embed({
+    apiKey: a.apiKey, model: a.model, texts, dim: SN_CONST.EMBED_DIM,
+    providerRouting: providerRouting(settings),
+  });
+  noteServedProvider(settings, ACTIONS.ARCHIVE_EMBED, r);
+  try {
+    await Costs.record({
+      action: ACTIONS.ARCHIVE_EMBED, provider: a.provider, model: a.model,
+      usage: r.usage, pricing: settings.pricing?.[a.model], usdToEur: settings.usdToEur,
+    });
+  } catch (_) {}
+  return { vectors: r.vectors || [], model: a.model };
+}
+
+// Reindicizza in background le schede i cui vettori vengono da un altro modello
+// (o mancano): a blocchi, le più recenti prima, una sola corsa alla volta. Il
+// costo è irrisorio (poche decine di parole a scheda) e senza questo, dopo un
+// cambio di modello di indicizzazione, la ricerca semantica troverebbe solo le
+// schede chiuse da quel momento in poi.
+let reindexRunning = false;
+async function reindexArchivedEmbeddings(settings, items) {
+  if (reindexRunning || !items.length) return;
+  reindexRunning = true;
+  try {
+    const todo = items.slice(0, 200);
+    for (let i = 0; i < todo.length; i += 50) {
+      const batch = todo.slice(i, i + 50);
+      const texts = batch.map((it) =>
+        `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
+      const emb = await embedTexts(texts, settings);
+      if (!emb) return;
+      for (let k = 0; k < batch.length; k++) {
+        const v = emb.vectors[k];
+        if (v && v.length) {
+          await ArchivedTabs.update(batch[k].id, { embedding: quantizeEmbedding(v), embedModel: emb.model });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[SN] reindicizzazione archivio fallita:', e.message || e);
+  } finally {
+    reindexRunning = false;
+  }
 }
 
 // §3.1/§3.2 — arricchisce una tab archiviata: genera un riassunto LLM, lo
-// embeddizza (modello Google) e salva riassunto + embedding + snippet, così la
+// embeddizza e salva riassunto + embedding + snippet, così la
 // tab diventa cercabile semanticamente e mostra una sintesi. `payload` può essere
 // { title, content } oppure una stringa (trattata come contenuto). Best-effort:
 // se manca la chiave o il testo, fa il possibile (anche solo snippet) e non rompe.
@@ -2567,12 +2717,16 @@ async function enrichArchivedTab(id, payload) {
 
     const summary = await summarizeTab(title, content); // best-effort (può essere '')
     const toEmbed = (summary || base).slice(0, 4000);
-    const vecs = await embedTexts([toEmbed]);
+    let emb = null;
+    try { emb = await embedTexts([toEmbed]); } catch (_) { emb = null; }
 
     const patch = {};
     if (summary) patch.summary = summary;
     patch.snippet = (summary || content || title).replace(/\s+/g, ' ').trim().slice(0, 240);
-    if (vecs && vecs[0] && vecs[0].length) patch.embedding = quantizeEmbedding(vecs[0]);
+    if (emb && emb.vectors[0] && emb.vectors[0].length) {
+      patch.embedding = quantizeEmbedding(emb.vectors[0]);
+      patch.embedModel = emb.model;
+    }
     if (Object.keys(patch).length) await ArchivedTabs.update(id, patch);
   } catch (_) { /* l'arricchimento non deve mai disturbare */ }
 }
@@ -2605,16 +2759,23 @@ async function rerankResults(query, items) {
 async function searchArchivedTabs(query, { topK = 40 } = {}) {
   const q = String(query == null ? '' : query).trim();
   if (!q) return { ok: true, results: null };
-  let qvecs = null;
-  try { qvecs = await embedTexts([q]); } catch (_) { qvecs = null; }
-  if (!qvecs || !qvecs[0] || !qvecs[0].length) return { ok: true, results: null, noEmbed: true };
-  const qv = quantizeEmbedding(qvecs[0]);
+  const settings = await getEffectiveSettings();
+  let emb = null;
+  try { emb = await embedTexts([q], settings); } catch (_) { emb = null; }
+  if (!emb || !emb.vectors[0] || !emb.vectors[0].length) return { ok: true, results: null, noEmbed: true };
+  const qv = quantizeEmbedding(emb.vectors[0]);
   const items = await ArchivedTabs.list();
   const scored = [];
+  // Si confrontano solo i vettori fatti dal modello in uso: quelli di un altro
+  // modello (o le schede senza vettore) si rifanno in background, e dalla
+  // ricerca successiva contano anche loro.
+  const stale = [];
   for (const it of items) {
-    if (!Array.isArray(it.embedding) || !it.embedding.length) continue;
-    scored.push({ score: cosineInt(qv, it.embedding), it });
+    const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
+    if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
+    if ((it.title || it.summary || it.snippet) && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
   }
+  if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
   scored.sort((a, b) => b.score - a.score);
   let results = scored.slice(0, topK).map(({ score, it }) => {
     const { embedding, ...meta } = it;

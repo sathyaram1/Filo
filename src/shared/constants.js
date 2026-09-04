@@ -167,12 +167,12 @@
     CATEGORIZE: 'categorize',
     DESCRIBE_IMAGE: 'describe_image',
     TRANSCRIBE_IMAGE: 'transcribe_image',
-    // Trascrizione audio dal microfono (dettatura). L'input è un data URL
-    // audio (es. audio/webm;base64,...) mandato a un modello multimodale.
+    // Trascrizione audio dal microfono (dettatura). L'audio (WAV, base64) va a
+    // un modello di TRASCRIZIONE (ascolta, risponde col testo), non a una chat.
     TRANSCRIBE_AUDIO: 'transcribe_audio',
     // Lettura ad alta voce (text-to-speech) via modello: produce AUDIO da TESTO.
-    // Richiede un modello TTS (es. gemini-2.5-flash-preview-tts). Se non
-    // disponibile, la lettura ripiega sulla voce del browser (Web Speech).
+    // Richiede un modello di sintesi vocale. Se non disponibile, la lettura
+    // ripiega sulla voce del browser (Web Speech).
     TTS: 'tts',
     SPELLCHECK_SEMANTIC: 'spellcheck_semantic',
     SPELLCHECK_WORD: 'spellcheck_word',
@@ -398,7 +398,7 @@
   // (campo `model`). Per avere un fallback basta creare un secondo modello e
   // indicarli entrambi nella lista di un'azione (vedi DEFAULT_MODELS).
   // I nickname sono case-sensitive e devono essere dei semplici slug (es.
-  // 'flash', 'claude-haiku') così l'utente li riconosce.
+  // 'deepseek', 'claude') così l'utente li riconosce.
   //
   // Retro-compatibilità: vecchie config potevano avere entry "duali"
   // { openrouter, gemini } (un nickname per due provider). resolveModel le
@@ -923,8 +923,8 @@
 
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
   // OpenRouter) nel nome concreto da inviare al provider indicato.
-  // Ritorna null se il provider non ha quel modello (es. nickname 'claude-haiku'
-  // → gemini: stringa vuota → caller deve saltare il provider).
+  // Ritorna null se il provider non ha quel modello (il caller salta il
+  // provider).
   //
   // Backwards compat: se il riferimento non è un nickname noto, lo trattiamo
   // come id raw stile OpenRouter. Così settings pre-refactor continuano a

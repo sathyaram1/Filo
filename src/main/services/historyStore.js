@@ -41,7 +41,7 @@
       model: entry.model,
       // Chi ha DAVVERO servito la risposta upstream (#421), quando il provider lo
       // riporta (OpenRouter). È la controprova della politica sui fornitori: null
-      // per il provider diretto (Gemini) o se il dato non è arrivato.
+      // se il dato non è arrivato (per voce e dettatura arriva dopo, via patch).
       servedBy: entry.servedBy || null,
       // Chi ha servito risultava fra i fornitori esclusi dalla politica: la voce
       // resta marchiata, così la prova di cosa è successo non vive solo in un
@@ -76,6 +76,19 @@
       await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: next });
     }
     return next;
+  }
+
+  // Aggiorna pochi campi di una voce già scritta. Serve al riscontro "chi ha
+  // servito" delle chiamate audio, che arriva qualche secondo DOPO la risposta:
+  // la voce nasce senza, e viene marchiata quando il dato c'è.
+  async function patch(id, fields) {
+    if (!id || !fields || typeof fields !== 'object') return null;
+    const items = await list();
+    const idx = items.findIndex((it) => it && it.id === id);
+    if (idx < 0) return null;
+    items[idx] = { ...items[idx], ...fields };
+    await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: items });
+    return items[idx];
   }
 
   async function clear() {
@@ -136,5 +149,5 @@
     return { changed: false };
   }
 
-  global.SN_HISTORY = { list, append, remove, clear, cleanupScreenshots };
+  global.SN_HISTORY = { list, append, patch, remove, clear, cleanupScreenshots };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

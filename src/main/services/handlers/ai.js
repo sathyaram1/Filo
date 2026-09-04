@@ -4,11 +4,12 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
-    providerRouting, openWeightsBlockReason,
+    providerRouting, openWeightsBlockReason, auditServedByLater,
     Defaults, isAdmin, broadcastToTabs,
   } = ctx;
   const { SN_CONST } = globalThis;
   const Providers = globalThis.SN_PROVIDERS;
+  const Costs = globalThis.SN_COSTS;
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
 
@@ -107,9 +108,11 @@ module.exports = function register(on, ctx) {
 
   on(MSG.TTS_SYNTH, async (msg) => {
     // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
-    // prova i provider che la implementano (oggi: Gemini). Se nessuno è
-    // disponibile o tutti falliscono, torna { ok:false } e il content script
-    // ripiega sulla voce del browser (Web Speech).
+    // prova i fornitori che la implementano (il router, verso un host
+    // indipendente). Se nessuno è disponibile o tutti falliscono, torna
+    // { ok:false } e il content script ripiega sulla voce del browser (Web
+    // Speech). `msg.lang` è la lingua del testo (la dichiara la pagina) e
+    // sceglie la voce, salvo una voce scelta a mano in Preferenze.
 
     // Seam di test OPT-IN: nel CI headless non esiste né una chiave Gemini né un
     // motore vocale del sistema, quindi nessuna lettura potrebbe mai partire
@@ -138,15 +141,26 @@ module.exports = function register(on, ctx) {
         // codice interno.
         return ttsFallback(e?.message || 'no_tts_model', e?.code);
       }
-      const voice = (settings && settings.tts && settings.tts.modelVoice) || '';
+      const Voices = globalThis.SN_TTS_VOICES;
+      const ttsPrefs = (settings && settings.tts) || {};
+      // Voce: quella scelta in Preferenze se c'è, altrimenti quella della
+      // lingua del testo; se la pagina non la dichiara, la lingua dell'app.
+      const chosen = String(ttsPrefs.modelVoice || '').trim();
+      let locale = '';
+      try { locale = require('electron').app.getLocale(); } catch (_) { locale = ''; }
+      const voice = chosen || (Voices ? Voices.defaultVoiceFor(msg.lang || locale) : '');
+      // La velocità delle Preferenze vale anche per la voce del modello.
+      const rate = Number(ttsPrefs.rate);
+      const speed = rate >= 0.5 && rate <= 2 ? rate : 1;
       const text = String(msg.text == null ? '' : msg.text);
+      const routing = providerRouting(settings);
       let lastErr = null;
       for (const a of attempts) {
-        // Solo Gemini implementa synthesizeSpeech; gli altri si saltano.
-        if (a.provider !== 'gemini') continue;
-        // Cache hit: stesso testo+voce+modello già sintetizzato in questa
-        // sessione → ritorno immediato, niente chiamata al modello.
-        const key = ttsCache ? ttsKey(a.model, voice, text) : null;
+        const P = Providers.getProvider(a.provider);
+        if (!P || typeof P.synthesizeSpeech !== 'function') continue;
+        // Cache hit: stesso testo+voce+velocità+modello già sintetizzato in
+        // questa sessione → ritorno immediato, niente chiamata al modello.
+        const key = ttsCache ? ttsKey(a.model, `${voice}@${speed}`, text) : null;
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
@@ -155,28 +169,34 @@ module.exports = function register(on, ctx) {
               ok: true,
               audioBase64: hit.audioBase64,
               mimeType: hit.mimeType,
-              provider: 'gemini',
+              provider: a.provider,
               model: a.model,
               cached: true,
             };
           }
         }
         try {
-          const r = await Providers.getProvider('gemini').synthesizeSpeech({
-            apiKey: a.apiKey, model: a.model, text, voice,
+          const r = await P.synthesizeSpeech({
+            apiKey: a.apiKey, model: a.model, text, voice, speed, providerRouting: routing,
           });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
           ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
+          // Chi ha servito (e quanto è costato) il router lo dice solo dopo:
+          // si chiede a parte, senza far aspettare la lettura.
+          auditServedByLater({
+            settings, action: SN_CONST.ACTIONS.TTS, provider: a.provider, model: a.model,
+            apiKey: a.apiKey, generationId: r.generationId, recordCost: true,
+          });
           return {
             ok: true,
             audioBase64: r.audioBase64,
             mimeType: r.mimeType,
-            provider: 'gemini',
+            provider: a.provider,
             model: a.model,
           };
         } catch (e) {
           lastErr = e;
-          console.warn('[SN] TTS gemini fallito:', e.message || e);
+          console.warn('[SN] TTS fallito:', e.message || e);
         }
       }
       return ttsFallback((lastErr && lastErr.message) || 'tts_failed');
@@ -240,6 +260,12 @@ module.exports = function register(on, ctx) {
       // accende.
       const modelBlocked = openWeightsBlockReason(s, { provider, model });
       if (modelBlocked) return { ok: false, error: modelBlocked };
+      // Riga di un modello che non è di testo (voce, dettatura, indicizzazione):
+      // si prova nel suo mestiere.
+      const kind = modelKind(provider, model, (s.modelRegistry || {})[msg.nickname] || null);
+      if (kind !== 'text') {
+        return await probeNonText({ kind, provider, apiKey, model, routing: providerRouting(s), nickname: msg.nickname || '' });
+      }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
@@ -273,14 +299,62 @@ module.exports = function register(on, ctx) {
   });
 
   // Normalizza una entry del registry (nuovo schema { provider, model } o
-  // vecchio duale { gemini, openrouter }) in { provider, model } — stessa
-  // logica delle pagine Opzioni/admin.
+  // vecchio duale { openrouter, … }) in { provider, model } — stessa logica
+  // delle pagine Opzioni/admin.
   function registryEntryToSingle(entry) {
     const e = entry || {};
     if (e.provider && e.model) return { provider: e.provider, model: e.model };
-    if (e.gemini) return { provider: 'gemini', model: e.gemini };
     if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
     return { provider: 'openrouter', model: '' };
+  }
+
+  // Il mestiere di un modello decide COME provarlo: a uno di testo si chiede di
+  // contare, a uno di voce di dire una frase, a uno di indicizzazione un
+  // vettore, a uno di dettatura di ascoltare un secondo di silenzio. Provarli
+  // tutti con una chat fallirebbe su tre mestieri su quattro.
+  function modelKind(provider, model, entry) {
+    const Caps = globalThis.SN_MODEL_CAPS;
+    if (!Caps) return 'text';
+    const meta = SN_CONST.entryModalities ? SN_CONST.entryModalities(entry || {}, '') : null;
+    const caps = Caps.capabilitiesFor(provider, model, meta || undefined);
+    if (caps.outputs.includes('embedding')) return 'embedding';
+    if (caps.outputs.includes('audio')) return 'tts';
+    if (!caps.uncertain && caps.inputs.includes('audio') && !caps.inputs.includes('image')) return 'stt';
+    return 'text';
+  }
+
+  async function probeNonText({ kind, provider, apiKey, model, routing, nickname }) {
+    const P = Providers.getProvider(provider);
+    const startMs = performance.now();
+    const done = (extra) => ({
+      ok: true, provider, model, nickname, kind,
+      ttftMs: Math.round(performance.now() - startMs),
+      totalMs: Math.round(performance.now() - startMs),
+      completionTokens: null, tokensPerSec: null,
+      ...extra,
+    });
+    if (kind === 'tts') {
+      if (typeof P.synthesizeSpeech !== 'function') return { ok: false, error: 'Questo fornitore non sa leggere ad alta voce' };
+      const r = await P.synthesizeSpeech({ apiKey, model, text: 'Uno, due, tre: prova della voce.', voice: '', providerRouting: routing });
+      if (!r || !r.audioBase64) return { ok: false, error: 'Il modello ha risposto senza audio' };
+      return done({ audioBytes: Math.round(r.audioBase64.length * 3 / 4) });
+    }
+    if (kind === 'embedding') {
+      if (typeof P.embed !== 'function') return { ok: false, error: 'Questo fornitore non sa indicizzare' };
+      const r = await P.embed({ apiKey, model, texts: ['prova'], dim: SN_CONST.EMBED_DIM, providerRouting: routing });
+      const v = r && r.vectors && r.vectors[0];
+      if (!v || !v.length) return { ok: false, error: 'Il modello ha risposto senza vettori' };
+      return done({ dims: v.length });
+    }
+    if (kind === 'stt') {
+      if (typeof P.transcribe !== 'function') return { ok: false, error: 'Questo fornitore non sa trascrivere' };
+      const Seg = globalThis.SN_DICTATION_SEGMENTER;
+      const wav = Seg.pcm16ToWav(new Int16Array(16000), 16000); // un secondo di silenzio
+      const r = await P.transcribe({ apiKey, model, audioBase64: Seg.bytesToBase64(wav), format: 'wav', providerRouting: routing });
+      if (!r || typeof r.text !== 'string') return { ok: false, error: 'Il modello non ha risposto' };
+      return done({});
+    }
+    return { ok: false, error: 'Tipo di modello non riconosciuto' };
   }
 
   // Chiave per il provider con la stessa precedenza di withDefaults: prima la
@@ -308,7 +382,7 @@ module.exports = function register(on, ctx) {
         if (!isAdmin()) {
           return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
         }
-        provider = msg.provider === 'gemini' ? 'gemini' : 'openrouter';
+        provider = 'openrouter';
         modelId = explicitModel;
       } else {
         // Lista read-only delle Opzioni: risolve il nickname nel registry
@@ -340,11 +414,13 @@ module.exports = function register(on, ctx) {
       if (blocked) return { ok: false, error: blocked };
       const apiKey = await defaultKeyFor(provider, d);
       if (!apiKey) return { ok: false, error: `Chiave ${provider} non configurata` };
-      // Il provider Gemini ora accetta i nomi nativi (es. gemini-3.1-flash-lite),
-      // quindi il modello del registry va passato così com'è: stesso percorso
-      // dell'uso reale (prima qui si anteponeva "google/" e l'uso reale no →
-      // il "Prova" passava ma la feature falliva).
+      // Il modello del registry va passato così com'è: stesso percorso
+      // dell'uso reale.
       const model = modelId;
+      const kind = modelKind(provider, model, regEntry);
+      if (kind !== 'text') {
+        return await probeNonText({ kind, provider, apiKey, model, routing: providerRouting(eff), nickname });
+      }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
@@ -385,28 +461,16 @@ module.exports = function register(on, ctx) {
       if (!isAdmin()) {
         return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
       }
-      const provider = msg.provider === 'gemini' ? 'gemini' : 'openrouter';
+      const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
-      let raw;
-      if (provider === 'gemini') {
-        // Il catalogo Gemini richiede la chiave (gratuita: solo metadati).
-        if (!apiKey) return { ok: false, error: 'Chiave gemini non configurata' };
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        raw = (data.models || [])
-          .map((m) => ({ id: (m.name || '').replace(/^models\//, ''), meta: m }))
-          .filter((it) => it.id);
-      } else {
-        // Il catalogo OpenRouter è pubblico: la chiave è facoltativa.
-        const res = await fetch('https://openrouter.ai/api/v1/models', {
-          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        raw = (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
-      }
+      // Il catalogo OpenRouter è pubblico: la chiave è facoltativa.
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const raw = (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
       const Caps = globalThis.SN_MODEL_CAPS;
       const items = Caps.sortByRecency(raw.map((it) => ({ ...it, provider })))
         .map((it) => ({ id: it.id, label: Caps.categoryLabel(provider, it.id, it.meta) }));
