@@ -1772,6 +1772,39 @@ restava rosso e muto).
   `tests/dashboard-local-network-address.spec.mjs`,
   `tests/unit/urlNav.test.mjs`, `tests/unit/hostResolve.test.mjs`.
 
+## Accogliere un utente nuovo è una CONVERSAZIONE, e il segno "già accolto" si scrive alla fine
+
+Un'accoglienza fatta di schermate a passi contraddice tutto Filo: qui si fa
+parlando, dentro la chat che l'utente userà comunque. Il modello riceve
+l'**elenco** di cosa Filo vuole scoprire e cosa vuole dire, con la regola "una
+cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
+(`src/shared/onboarding.js`, blocco `PROMPTS.filoChatOnboarding`).
+
+- **Il primo messaggio è scritto a mano, dal secondo parla il modello.** Su
+  quella riga l'utente giudica Filo: non la si affida a un LLM.
+- **Il segno "già accolto" si scrive alla FINE.** Scriverlo all'apertura è il
+  difetto originale (#524): chi chiudeva la finestra senza rispondere non
+  rivedeva più il benvenuto. Il segno unico è `done` nello stato
+  dell'accoglienza; la vecchia chiave sopravvive solo come migrazione, per non
+  ributtare nell'intervista chi era già stato accolto.
+- **Sopravvive alla chiusura a metà**: la conversazione si salva turno per turno
+  (lato main, non lato pagina) e alla riapertura torna a schermo com'era. Se
+  l'ultimo messaggio era dell'utente, il turno riparte da solo.
+- **Chi decide che è finita lo dice con un'azione** (`ONBOARDING` nel registro
+  dei livelli), ma il codice ha comunque le sue due uscite: elenco finito, o
+  troppi scambi. Un'accoglienza che non finisce mai è peggio di una incompleta.
+- **L'ultimo atto è il RISULTATO, non un "fatto"**: alla chiusura le lezioni
+  raccolte vengono compattate **subito** in memoria (compattazione forzata, non
+  la soglia normale) e Filo genera la prima home personale. L'ordine conta:
+  lezioni → compattazione → home, altrimenti la home nasce su un profilo vuoto.
+- **Niente modello, niente accoglienza**: senza accesso e senza chiave la chat
+  non può rispondere. L'intervista aspetta e la home spiega come attivare Filo;
+  parte da sola appena l'accesso arriva.
+- **Si rifà**: `Preferenze → Rifai l'intervista di benvenuto`. Tutto ciò che
+  Filo può fare una volta sola diventa una trappola se non si può rifare.
+- **Test**: `tests/unit/onboarding.test.mjs` (elenco, spunte, ripresa, chiusura),
+  `tests/onboarding.spec.mjs` (il giro reale, compresa la home finale).
+
 ## Filo ammette una mancanza → propone lui la segnalazione, non la chiede
 
 Quando l'agente risponde "non lo so fare / non ho accesso a quel dato", il buco
