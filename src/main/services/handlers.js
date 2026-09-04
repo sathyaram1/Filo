@@ -2019,27 +2019,27 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let r = null;
   let parsed = null;
   try {
-  for (let tentativo = 1; tentativo <= 3; tentativo++) {
-    r = await handleAIRequest({
-      action: ACTIONS.FILO_CHAT,
-      payload: {
-        profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita,
-        files: fileSummaries,
-        onboarding: onboardingText,
-        onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
-        onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
-      },
-      origin: 'filo:chat',
-      onReasoning: tentativo === 1 ? onReasoning : null,
-      onText: tentativo === 1 ? onText : null,
-      // Dal secondo tentativo si salta la cache: la chiave e' la stessa e
-      // riconsegnerebbe la risposta rotta appena messa via.
-      noCache: tentativo > 1,
-    });
-    parsed = extractJson(r.text);
-    if (parsed) break;
-    console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
-  }
+    for (let tentativo = 1; tentativo <= 3; tentativo++) {
+      r = await handleAIRequest({
+        action: ACTIONS.FILO_CHAT,
+        payload: {
+          profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita,
+          files: fileSummaries,
+          onboarding: onboardingText,
+          onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
+          onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
+        },
+        origin: 'filo:chat',
+        onReasoning: tentativo === 1 ? onReasoning : null,
+        onText: tentativo === 1 ? onText : null,
+        // Dal secondo tentativo si salta la cache: la chiave e' la stessa e
+        // riconsegnerebbe la risposta rotta appena messa via.
+        noCache: tentativo > 1,
+      });
+      parsed = extractJson(r.text);
+      if (parsed) break;
+      console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
+    }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
     // ripresa va rilasciata subito, altrimenti nessuna scheda potrebbe
