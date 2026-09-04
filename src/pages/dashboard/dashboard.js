@@ -1792,7 +1792,10 @@
   // di invio. Condiviso tra il primo invio e il "Riprova" della bolla d'errore:
   // riprovare deve comportarsi ESATTAMENTE come inviare.
   async function runTurnAndContinue(args) {
-    let r = await runFiloTurn(args);
+    // Un blocco di attività per tutta la sequenza (#521): i turni automatici
+    // sono passi dello stesso lavoro, non risposte diverse.
+    const activity = createActivity();
+    let r = await runFiloTurn({ ...args, activity });
 
     // Esecuzione autonoma in sequenza: finché Filo ha appena eseguito un comando
     // (e non c'è una conferma in sospeso), gli rimostriamo l'output e lo
@@ -1802,13 +1805,20 @@
     let steps = 0;
     while (r?.ok && shouldAutoContinue(r.actions) && steps < MAX_AUTO_STEPS) {
       steps += 1;
+      // Il turno non era l'ultimo: il suo testo («Provo subito…») è un commento
+      // a metà lavoro e finisce nella cronologia del blocco, non in una bolla.
+      // Se nella bolla c'è qualcosa da cliccare (un link aperto, una conferma)
+      // resta dov'è: non si nasconde ciò che l'utente deve poter usare.
+      const bubble = r._bubble;
+      if (bubble && !bubble.querySelector('.dash-bubble-actions')) activity.absorbBubble(bubble);
       // Il nudge entra nello storico come turno utente "silenzioso" (niente
       // bolla): dà al modello il contesto per il passo successivo. Il testo
       // dipende da cosa Filo ha appena fatto (comando vs lookup di capacità).
       const nudge = autoContinueNudge(r.actions);
       threadHistory.push({ role: 'user', text: nudge });
-      r = await runFiloTurn({ userMessage: nudge, internal: true });
+      r = await runFiloTurn({ userMessage: nudge, internal: true, activity });
     }
+    activity.finish();
 
     sending = false;
     sendBtn.disabled = false;
