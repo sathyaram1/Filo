@@ -208,7 +208,7 @@ function template() {
     label: 'Schede',
     submenu: [
       { label: 'Nuova scheda', accelerator: 'CommandOrControl+T', click: nuovaScheda, ...SOLO_SCRITTA },
-      { label: 'Nuova finestra in incognito', accelerator: 'CommandOrControl+Shift+N', click: finestraIncognito },
+      { label: 'Nuova finestra in incognito', click: finestraIncognito },
       { type: 'separator' },
       { label: 'Vai a un indirizzo', accelerator: 'CommandOrControl+L', click: vaiAScrivereUnIndirizzo, ...SOLO_SCRITTA },
       { label: 'Ricarica', accelerator: 'CommandOrControl+R', click: ricarica, ...SOLO_SCRITTA },
