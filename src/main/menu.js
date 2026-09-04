@@ -54,6 +54,7 @@ const SOLO_SCRITTA = MAC ? {} : { registerAccelerator: false };
 // ─── a chi si parla ─────────────────────────────────────────────────────────
 
 function finestra() {
+  const { BrowserWindow } = require('electron');
   const messa = BrowserWindow.getFocusedWindow();
   if (messa && messa._filoTabs) return messa;
   return BrowserWindow.getAllWindows().find((w) => w._filoTabs) || null;
