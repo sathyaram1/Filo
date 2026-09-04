@@ -2927,10 +2927,18 @@
   // pannello non si ridisegna sotto le sue dita: i dati si fondono lo stesso e
   // il pannello si aggiorna al giro dopo, o quando riapre la scheda.
   function detailBeingEdited() {
+    if (!mgDetail) return false;
     const el = document.activeElement;
-    if (!el || !mgDetail || !mgDetail.contains(el)) return false;
-    const tag = String(el.tagName || '').toLowerCase();
-    return tag === 'textarea' || tag === 'input' || tag === 'select' || !!el.isContentEditable;
+    if (el && mgDetail.contains(el)) {
+      const tag = String(el.tagName || '').toLowerCase();
+      if (tag === 'textarea' || tag === 'input' || tag === 'select' || el.isContentEditable) return true;
+    }
+    // Una bozza lasciata in una casella (cursore altrove, non ancora inviata)
+    // vale quanto il cursore dentro: ridisegnare la butterebbe via.
+    for (const box of mgDetail.querySelectorAll('textarea')) {
+      if (!box.hidden && box.offsetParent !== null && String(box.value || '').trim()) return true;
+    }
+    return false;
   }
 
   // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
