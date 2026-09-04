@@ -277,6 +277,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'i18n.js'));
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
+  safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   safe(path.join(SHARED, 'themeTokens.js'));
   safe(path.join(SHARED, 'confirmUi.js'));
