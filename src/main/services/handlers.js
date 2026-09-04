@@ -1920,6 +1920,35 @@ async function editorFileSummaries() {
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
+
+  // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
+  // perché la parola di stop deve funzionare anche quando il resto non
+  // funziona: nessuna chiamata al modello, nessuna rete. Vedi
+  // `SN_ONBOARDING.isStopRequest`.
+  let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
+  const onbActive = !!(Onboarding && !onbBefore.done);
+  // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
+  // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
+  // nudge di prosecuzione automatica) non sono parole dell'utente e non entrano;
+  // lo stesso messaggio ripetuto di fila non è un turno nuovo (appendTurn).
+  if (onbActive && !internal && String(userMessage || '').trim()) {
+    onbBefore = await saveOnboarding(
+      Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage) }),
+    );
+  }
+  if (onbActive && !internal && Onboarding.isStopRequest(userMessage)) {
+    // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
+    // testo fisso — l'unica risposta che si può garantire anche senza modello.
+    const bye = Onboarding.CLOSING_MESSAGE;
+    const closed = Onboarding.close(Onboarding.appendTurn(onbBefore, { role: 'filo', text: bye }));
+    await saveOnboarding(closed);
+    releaseOnboardingResume();
+    // Le lezioni si estraggono comunque: se prima di dire «basta» l'utente
+    // aveva raccontato qualcosa, quel qualcosa è suo e resta.
+    finishOnboarding({ userMessage, filoReply: bye, stateText: '' });
+    return { text: bye, actions: [], onboardingClosed: true };
+  }
+
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
