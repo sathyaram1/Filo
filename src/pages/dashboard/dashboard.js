@@ -243,9 +243,7 @@
   function onboardingClosing() {
     if (!onboardingActive) return;
     onboardingActive = false;
-    const el = stepTrace('Preparo la tua home…');
-    el.dataset.onboardingClosing = '1';
-    bubblesEl.appendChild(el);
+    bubblesEl.appendChild(stepTrace('Preparo la tua home…'));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
