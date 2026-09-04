@@ -1055,6 +1055,13 @@
       return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
     },
     EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
+    // Impostazione applicata subito (livello 1, es. il tema): prima non
+    // lasciava traccia in chat, come se non fosse successo niente.
+    IMPOSTA_PREFERENZA: (a) => {
+      const k = a.chiave || a.key || '';
+      const v = a.valore ?? a.value;
+      return { icon: '⚙', text: `Impostato · ${k}${v !== undefined && v !== '' ? ` = ${v}` : ''}` };
+    },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
