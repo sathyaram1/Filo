@@ -127,6 +127,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_DISMISS_NOTIFICATION: 'filo-notifications',
     FILO_GET_ONBOARDING: 'onboarding',
     FILO_RESTART_ONBOARDING: 'onboarding',
+    FILO_CLOSE_ONBOARDING: 'onboarding',
   };
 
   for (const h of handlers) {
