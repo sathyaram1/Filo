@@ -1541,8 +1541,8 @@
     // campo "text" dal JSON di risposta e ci pusha i delta (o un reset dopo un
     // fallback provider). La bolla NON si crea finché non arriva il PRIMO
     // carattere: una risposta di sola azione (apri un link, testo vuoto) non
-    // lascia una bolla vuota che poi si riempie. Quando il testo inizia,
-    // l'indicatore di ragionamento si ritira: i due non si accavallano.
+    // lascia una bolla vuota che poi si riempie. Quando il testo inizia, il
+    // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
     let streamBubble = null;
     let streamedText = '';
     const followBottomIfNear = () => {
