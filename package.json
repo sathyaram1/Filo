@@ -78,7 +78,15 @@
       "icon": "assets/icons/icon-1024.png",
       "category": "public.app-category.productivity",
       "identity": null,
-      "darkModeSupport": true
+      "darkModeSupport": true,
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "sathyaram1",
+          "repo": "Filo",
+          "releaseType": "release"
+        }
+      ]
     },
     "linux": {
       "target": "AppImage",
