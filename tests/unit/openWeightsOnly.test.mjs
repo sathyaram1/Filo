@@ -30,6 +30,12 @@ test('i pesi aperti si riconoscono dal NOME del modello, non dal fornitore nell\
   assert.equal(C.isOpenWeightsModelId('google/gemma-4-31b-it'), true);
   assert.equal(C.isOpenWeightsModelId('deepseek/deepseek-v4-pro'), true);
   assert.equal(C.isOpenWeightsModelId('moonshotai/kimi-k2.7-code'), true);
+  // Versione attaccata al nome della famiglia: è la forma di molti id reali.
+  assert.equal(C.isOpenWeightsModelId('qwen/qwen3-embedding-8b'), true);
+  assert.equal(C.isOpenWeightsModelId('hexgrad/kokoro-82m'), true);
+  assert.equal(C.isOpenWeightsModelId('openai/whisper-large-v3-turbo'), true);
+  // Ma non una parola che CONTIENE la famiglia: 'gemmastone' non è Gemma.
+  assert.equal(C.isOpenWeightsModelId('acme/gemmastone-1'), false);
   // Proprietari: stesso prefisso "google/", esito opposto.
   assert.equal(C.isOpenWeightsModelId('google/gemini-3.1-flash-lite-preview'), false);
   assert.equal(C.isOpenWeightsModelId('anthropic/claude-3.5-haiku'), false);

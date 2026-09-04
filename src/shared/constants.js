@@ -732,10 +732,14 @@
     const raw = String(modelId == null ? '' : modelId).toLowerCase().trim();
     if (!raw) return false;
     const name = raw.split('/').pop();
+    // Il nome può portare la versione attaccata alla famiglia ('qwen3-embedding',
+    // 'llama4-…', 'gemma3-…'): conta ciò che segue la famiglia, non un
+    // separatore fisso.
     return OPEN_WEIGHT_MODEL_FAMILIES.some((fam) => {
       const f = String(fam).toLowerCase();
-      return name === f || name.startsWith(f + '-') || name.startsWith(f + '.')
-        || name.startsWith(f + '_') || name.startsWith(f + ':');
+      if (!name.startsWith(f)) return false;
+      const rest = name.slice(f.length);
+      return rest === '' || /^[\d\-._:]/.test(rest);
     });
   }
 
