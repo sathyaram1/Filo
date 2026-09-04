@@ -294,10 +294,30 @@
     return { state: next, applied: valid.filter((x) => !cur.ticked.includes(x)) };
   }
 
+  // Chiude l'intervista. Da qui passano TUTTE le strade che la chiudono (il
+  // modello che dichiara `fine`, la parola di stop, il pulsante «Salta», il
+  // tetto duro): è l'unico posto dove decidere se l'utente merita una riga di
+  // spiegazione.
+  //
+  // Il congedo lo si legge in chat per pochi istanti — appena la home è pronta
+  // la chat sparisce — e il segno «già accolto» è definitivo: chi non fa in
+  // tempo a leggerlo non ha modo di capire perché Filo ha smesso di
+  // presentarsi. Se l'intervista si chiude PRIMA della fine, la home lo dice, e
+  // lì la riga resta finché non la si toglie.
   function close(state, nowIso) {
     const cur = normalize(state);
     if (cur.done) return cur;
-    return { ...cur, done: true, closedAt: nowIso || new Date().toISOString() };
+    return {
+      ...cur,
+      done: true,
+      closedAt: nowIso || new Date().toISOString(),
+      notice: isComplete(cur) ? '' : 'early',
+    };
+  }
+
+  // La riga sulla home è stata letta (o l'utente ha rifatto l'intervista): via.
+  function dismissNotice(state) {
+    return { ...normalize(state), notice: '' };
   }
 
   // Ricomincia da capo: è ciò che fa il pulsante in Preferenze. Si riparte dal
