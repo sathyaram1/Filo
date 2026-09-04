@@ -4,10 +4,16 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction,
+    executeFiloAction, maybeRunCompactor,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
+  const Onboarding = globalThis.SN_ONBOARDING;
+
+  // I messaggi che leggono o riscrivono la memoria dell'utente non sono roba da
+  // pagine web: il canale `filo:message` è uno solo e ci arrivano anche i
+  // content script dei siti visitati (PATTERNS.md → "Nuovo tipo di messaggio").
+  const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
   on(MSG.FILO_CHAT, async (msg, sender) => {
     try {
