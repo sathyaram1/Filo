@@ -16,7 +16,7 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
-      version: '0.2.215', date: '2026-09-04',
+      version: '0.2.217', date: '2026-09-04',
       features: [
         'Nella chat della nuova scheda, sopra ogni risposta, una riga discreta dice cosa Filo sta facendo («Sta ragionando · …», «Cerco sul web: …») e, quando ha finito, cosa ha fatto («Ha cercato sul web e letto un documento · 40 s»). Un click la apre e mostra tutto nell\'ordine: il ragionamento del modello per intero, le azioni compiute (timer, sveglie, ricerche, file letti) come righe con un\'icona, gli esiti dei comandi. Anche i lavori in più passi restano una riga sola e una risposta sola. Le frasi di riempimento inventate («Consulto la memoria…») non ci sono più.',
       ],
