@@ -92,6 +92,13 @@ le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
   e nessun acceleratore inventato — un tasto che vale solo su Mac è la stessa
   asimmetria. Toglierla e basta non è un'uscita: su Mac spegne copia e incolla
   in ogni campo di testo. Il pattern completo sta in PATTERNS.md.
+- **Un tasto della barra è tolto a tutto il resto.** Su Mac la barra arriva
+  prima: promettere quel tasto a un'altra cosa è promettere una cosa che non
+  succede mai (Cmd+0 era insieme «zoom al 100%» e «decima scheda», e la scheda
+  non arrivava mai). Chi assegna un tasto — Filo o l'utente, come le
+  scorciatoie dei moduli nell'Editor — chiede prima `SN_TASTI.riservato()`, che
+  tiene la lista dei tasti già presi; una sentinella la confronta con la barra
+  vera e diventa rossa se divergono.
 - **La ricetta del pacchetto si tocca con cautela**: `build.mac` in
   `package.json`, `scripts/after-pack-mac.js` (la firma locale, senza la quale
   sui Mac con chip Apple l'app non si apre) e il lavoro `release-mac`. Il
