@@ -251,12 +251,80 @@
   // ── Rilancio dell'intervista di benvenuto (#524) ─────────────────────────
   // Azzera spunte e conversazione e riporta l'utente dove l'intervista vive:
   // una scheda nuova. Non tocca né la memoria né le impostazioni già applicate
-  // — rifarla non è disfare quello che Filo ha imparato.
+  // — rifarla non è disfare quello che Filo ha imparato — e nemmeno la
+  // conversazione di prima: quella finisce nell'archizio qui sotto.
   async function restartOnboarding() {
     const r = await chrome.runtime.sendMessage({ type: MSG.FILO_RESTART_ONBOARDING });
     if (!r || !r.ok) return;
     flashSaved('onboardingHint');
+    renderOnboardingArchive(r.onboarding);
     chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://newtab/' });
+  }
+
+  function onboardingWhen(conv) {
+    const iso = conv.startedAt || conv.closedAt;
+    if (!iso) return 'Intervista di benvenuto';
+    try {
+      return new Date(iso).toLocaleString('it-IT', {
+        day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+    } catch (_) { return 'Intervista di benvenuto'; }
+  }
+
+  // Le interviste conservate, rileggibili. La prima conversazione con Filo è la
+  // prima cosa che l'utente gli ha raccontato di sé: rifarne una non la deve
+  // cancellare, e senza un posto dove rileggerla "conservata" non vuol dire
+  // niente. (Portarle anche nella cronologia delle chat è un feedback a parte.)
+  function renderOnboardingArchive(state) {
+    const box = $('onboardingArchive');
+    if (!box) return;
+    const O = window.SN_ONBOARDING;
+    const list = O ? O.conversations(state) : [];
+    box.innerHTML = '';
+    box.hidden = list.length === 0;
+    if (!list.length) return;
+    list.forEach((conv, i) => {
+      const det = document.createElement('details');
+      det.className = 'onb-conv';
+      const sum = document.createElement('summary');
+      const when = document.createElement('span');
+      when.className = 'onb-conv-when';
+      when.textContent = onboardingWhen(conv);
+      const meta = document.createElement('span');
+      meta.className = 'onb-conv-turns';
+      const scambi = conv.thread.filter((m) => m.role === 'user').length;
+      meta.textContent = conv.current && !state.done
+        ? 'in corso'
+        : `${scambi} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
+      sum.appendChild(when);
+      sum.appendChild(meta);
+      det.appendChild(sum);
+      const lines = document.createElement('div');
+      lines.className = 'onb-lines';
+      for (const m of conv.thread) {
+        const row = document.createElement('div');
+        row.className = 'onb-line';
+        const who = document.createElement('span');
+        who.className = 'onb-who';
+        who.textContent = m.role === 'filo' ? 'Filo' : 'Tu';
+        const what = document.createElement('span');
+        what.className = 'onb-what';
+        what.textContent = m.text;
+        row.appendChild(who);
+        row.appendChild(what);
+        lines.appendChild(row);
+      }
+      det.appendChild(lines);
+      if (i === 0) det.open = true;
+      box.appendChild(det);
+    });
+  }
+
+  async function loadOnboardingArchive() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_GET_ONBOARDING, peek: true });
+      if (r?.ok && r.onboarding) renderOnboardingArchive(r.onboarding);
+    } catch (_) {}
   }
 
   // ── Sezione "colore identità delle tab" (Preferenze avanzate) ────────────
