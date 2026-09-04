@@ -33,8 +33,8 @@ test('Opzioni: acceso, dichiara quali funzioni cambiano modello e quali si ferma
   const page = await openTab(OPTIONS_URL);
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
 
-  // Configurazione personale nota: una funzione con equivalente aperto e una
-  // (la sintesi vocale) che un equivalente non ce l'ha.
+  // Configurazione personale nota: le funzioni predefinite partono quasi tutte
+  // da pesi aperti; quelle su Anthropic hanno un equivalente aperto.
   await page.uncheck('#useDefaultModels');
   await expect(page.locator('#sec-models')).toBeVisible();
 
@@ -44,13 +44,12 @@ test('Opzioni: acceso, dichiara quali funzioni cambiano modello e quali si ferma
   const impact = page.locator('#openWeightsImpact');
   await expect(impact).toBeVisible();
   // Chi cambia modello: il nome del modello aperto che prenderà il posto.
-  await expect(impact).toContainText('gemma');
-  // Chi si ferma: la funzione è nominata, non lasciata scoprire all'uso.
-  await expect(impact).toContainText(/Lettura ad alta voce/i);
-  // La dettatura ha bisogno di ASCOLTARE: nessun sostituto a pesi aperti lo fa,
-  // quindi va annunciata fra quelle che si fermano — non fra quelle che
-  // "cambiano modello", che sarebbe una bugia scoperta al primo tentativo.
-  await expect(impact).toContainText(/Dettatura/i);
+  await expect(impact).toContainText('deepseek');
+  // Nessuna funzione si ferma: lettura ad alta voce, dettatura e indicizzazione
+  // partono già da modelli a pesi aperti, quindi non vanno annunciate come
+  // ferme (sarebbe un allarme per uno stato che non c'è).
+  await expect(impact).not.toContainText(/Si fermano/i);
+  await expect(impact).not.toContainText(/Dettatura/i);
 
   // Spegnendolo l'avviso sparisce: non resta un allarme per uno stato che non c'è.
   await page.uncheck('#openWeightsOnly');

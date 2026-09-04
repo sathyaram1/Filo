@@ -18,6 +18,9 @@
     {
       version: '0.2.217', date: '2026-09-04',
       features: [
+        'La lettura ad alta voce ha una voce naturale nuova, a pesi aperti. Sceglie da sola la voce in base alla lingua del testo (italiano, inglese, spagnolo, francese, portoghese, hindi, giapponese, cinese). In Preferenze puoi fissarne una e ascoltarla prima di scegliere.',
+        'La dettatura è in diretta. Il testo compare nel campo una frase alla volta mentre parli, appena fai una pausa, e la frase in corso si legge nel riquadro rosso. Non c\'è più da fermare la registrazione e aspettare. Si spegne da sola dopo cinque minuti.',
+        'Filo non passa più dai servizi di Google. Lettura ad alta voce, dettatura e ricerca fra le schede archiviate usano modelli a pesi aperti serviti da fornitori indipendenti, come tutto il resto. La chiave Gemini sparisce dalle Opzioni perché non serve più; le schede già indicizzate si aggiornano da sole alla prima ricerca.',
         'Nella chat della nuova scheda, sopra ogni risposta, una riga discreta dice cosa Filo sta facendo («Sta ragionando · …», «Cerco sul web: …») e, quando ha finito, cosa ha fatto («Ha cercato sul web e letto un documento · 40 s»). Un click la apre e mostra tutto nell\'ordine: il ragionamento del modello per intero, le azioni compiute (timer, sveglie, ricerche, file letti) come righe con un\'icona, gli esiti dei comandi. Anche i lavori in più passi restano una riga sola e una risposta sola. Le frasi di riempimento inventate («Consulto la memoria…») non ci sono più.',
       ],
       fixes: [

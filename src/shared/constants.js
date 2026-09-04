@@ -823,11 +823,17 @@
   // PURA.
   function entryModalities(entry, nickname) {
     const e = entry || {};
+    // Le righe delle Opzioni portano solo fornitore e stringa del modello: se
+    // il nickname è uno di quelli integrati, le modalità dichiarate nel
+    // registro di build valgono anche per la riga personale.
+    const builtin = (nickname && DEFAULT_MODEL_REGISTRY[nickname]) || {};
     const known = OPEN_WEIGHTS_SUBSTITUTE_MODALITIES[nickname] || {};
     const inputs = Array.isArray(e.inputs) ? e.inputs.filter(Boolean)
-      : (Array.isArray(known.inputs) ? known.inputs : null);
+      : (Array.isArray(known.inputs) ? known.inputs
+        : (Array.isArray(builtin.inputs) ? builtin.inputs : null));
     const outputs = Array.isArray(e.outputs) ? e.outputs.filter(Boolean)
-      : (Array.isArray(known.outputs) ? known.outputs : null);
+      : (Array.isArray(known.outputs) ? known.outputs
+        : (Array.isArray(builtin.outputs) ? builtin.outputs : null));
     if (!inputs && !outputs) return null;
     return {
       input_modalities: inputs && inputs.length ? inputs : ['text'],

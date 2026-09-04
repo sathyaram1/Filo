@@ -38,7 +38,7 @@ src/
 │       ├── handlers.js         Registro messaggi + helper condivisi (ex background.js)
 │       ├── handlers/           Handler per dominio (nav, tabs, storage, pages,
 │       │                       ai, filo, auth, safebrowse, misc)
-│       ├── providers/          OpenRouter, Gemini, fallback chain
+│       ├── providers/          OpenRouter (chat, voce, dettatura, embedding), fallback chain
 │       ├── safebrowse/         Protezione phishing/typosquatting (12 moduli)
 │       ├── categorizer.js, savedPages.js, historyStore.js,
 │       │   archivedTabs.js, cookies.js, costTracker.js, exportData.js,
