@@ -17,6 +17,9 @@
   const Actions = self.SN_ACTIONS;
   const MenuIcons = self.SN_MENU_ICONS;
   const TranslatePage = self.SN_TRANSLATE_PAGE;
+  // Come si chiama una scorciatoia sul sistema di chi legge (Ctrl o Cmd, Alt o
+  // Ctrl+Alt): mai scriverla a mano in un'etichetta.
+  const Tasti = self.SN_TASTI;
 
   // I moduli estratti (actions.js, menuIcons.js, tts.js, editBox.js) hanno
   // bisogno di pezzi che restano qui: settings correnti, gestione del
