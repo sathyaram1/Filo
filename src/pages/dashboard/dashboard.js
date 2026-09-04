@@ -254,7 +254,6 @@
   function makeSkipOnboardingBtn(label) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.id = 'skipOnboarding';
     b.className = 'dash-skip-onboarding';
     b.textContent = label || 'Salta l’accoglienza';
     b.title = 'Chiudi l’intervista e vai alla home. Puoi rifarla da Preferenze.';
@@ -263,11 +262,13 @@
   }
 
   function showSkipOnboarding() {
-    if (!onboardingActive || $('skipOnboarding')) return;
+    if (!onboardingActive || $('skipOnboardingRow')) return;
     const row = document.createElement('div');
     row.className = 'dash-skip-row';
     row.id = 'skipOnboardingRow';
-    row.appendChild(makeSkipOnboardingBtn());
+    const btn = makeSkipOnboardingBtn();
+    btn.id = 'skipOnboarding';
+    row.appendChild(btn);
     threadView.appendChild(row);
   }
 
