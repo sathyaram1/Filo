@@ -2859,7 +2859,12 @@
     try {
       // Il tetto viene dal modulo condiviso: `loadHitCap()` confronta contro
       // QUELLO, e due numeri scritti a mano prima o poi divergono.
-      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE });
+      // La prima lettura parte all'apertura della pagina (init), PRIMA delle
+      // altre letture di avvio: qui la si aspetta soltanto. Le volte dopo
+      // (ricaricamento dopo un errore) si legge da capo.
+      const pending = firstListPromise;
+      firstListPromise = null;
+      allFeedbacks = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE }));
       dataLoaded = true;
       loadFailed = false;
     } catch (err) {
