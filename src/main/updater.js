@@ -83,13 +83,15 @@ async function avvisaSeAggiornamentoBloccato(versione) {
   try {
     const FiloMem = globalThis.SN_FILO_MEMORY;
     if (!FiloMem?.addNotification) return;
-    const marcatore = `filo-aggiornamento-mac:${versione}`;
+    // Il riconoscimento passa da `action`, che la scheda NON mostra: un
+    // marcatore dentro al testo lo leggerebbe l'utente.
     const gia = await FiloMem.listNotifications({ includeDismissed: true });
-    if (gia.some((n) => String(n.text || '').includes(marcatore))) return;
+    if (gia.some((n) => n.action?.tipo === 'aggiornamento-mac' && n.action?.versione === versione)) return;
     await FiloMem.addNotification({
       kind: 'alert',
+      action: { tipo: 'aggiornamento-mac', versione },
       text: `C'è la versione ${versione} di Filo, ma su Mac non riesce a installarsi da sola.\n`
-        + `Scaricala da filo.red e sostituisci l'app: ci vuole un minuto.\n${marcatore}`,
+        + 'Scaricala da filo.red e sostituisci l\'app: ci vuole un minuto.',
     });
   } catch (e) {
     console.error('[updater] avviso aggiornamento non scritto:', e?.message || e);
