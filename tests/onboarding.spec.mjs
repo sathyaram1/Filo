@@ -95,13 +95,37 @@ const queueChat = (app, ...replies) => app.evaluate((_electron, rs) => {
 
 const onbState = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getOnboarding());
 
-test('primo avvio: parte una conversazione, e chi non risponde la ritrova', async ({ app, shell }) => {
+// La scheda nuova nasce col profilo di test, che non ha ancora un modello: la
+// chiave si può mettere solo a app avviata, quindi la mettiamo e ricarichiamo.
+// È lo stesso cammino dell'utente vero che accede e trova Filo che si presenta.
+async function apriIntervista(app, shell) {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await useFakeKey(app);
+  await stubAgents(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+  return page;
+}
+
+test('senza un modello disponibile l’accoglienza aspetta invece di rompersi', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
+  // Nessun accesso, nessuna chiave: la home dice come attivare Filo e
+  // l'intervista resta in attesa. Accoglierlo con una chat che non può
+  // rispondere sarebbe peggio del silenzio.
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/Accedi con un profilo/i, { timeout: 15_000 });
+  expect((await onbState(app)).done).toBe(false);
+});
+
+test('primo avvio: parte una conversazione, e chi non risponde la ritrova', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const page = await apriIntervista(app, shell);
 
   // Non un cartello al centro della home: una chat, con Filo che ha già parlato.
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 10_000 });
   const welcome = page.locator('.dash-bubble-filo').first();
   await expect(welcome).toBeVisible({ timeout: 10_000 });
   await expect(welcome).toContainText('Ciao, sono Filo');
