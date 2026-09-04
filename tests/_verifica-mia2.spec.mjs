@@ -130,6 +130,8 @@ test('R2. impostazione applicata subito: riga nella cronologia e nel riassunto',
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Provo.' })).toBeVisible({ timeout: 15000 });
   await page.waitForTimeout(800);
   console.log('R2d labels:', await page.locator('.dash-activity-label').allTextContents());
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+  console.log('R2d popup aperto dopo chiave invalida?', await page.locator('.sn-confirm-host').count());
   // livello 2 (conferma): resta bottone, non riga
   await stubProvider(app, [{ text: J('Attivo il terminale.', [{ type: 'IMPOSTA_PREFERENZA', chiave: 'modalita_terminale', valore: true }]) }]);
   await sendMsg(page, 'attiva terminale');
