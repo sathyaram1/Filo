@@ -9,7 +9,8 @@
     AI_REQUEST_STREAM_START: 'ai_request_stream', // streaming via port
     // Sintesi vocale via modello (TTS). Ritorna l'audio grezzo; se nessun
     // provider/modello TTS è disponibile torna { ok:false } e il chiamante
-    // ripiega sulla voce del browser (Web Speech). { text, voice? }
+    // ripiega sulla voce del browser (Web Speech). { text, lang? } — la lingua
+    // del testo sceglie la voce (salvo una voce fissata in Preferenze).
     TTS_SYNTH: 'tts_synth',                        // → { ok, audioBase64, mimeType } | { ok:false, error }
     // Stato lettura ad alta voce condiviso tra le schede. Il content script che
     // legge segnala l'avvio/arresto al main ({ reading: bool }); il main tiene il

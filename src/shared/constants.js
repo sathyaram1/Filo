@@ -1932,9 +1932,13 @@
     // - rate: velocità di lettura (0.5–2, 1 = normale)
     // - pitch: tono (0–2, 1 = normale)
     tts: {
+      // Voce del sistema (ripiego offline), velocità e tono.
       voice: '',
       rate: 1,
       pitch: 1,
+      // Voce del MODELLO di lettura ('' = automatica: segue la lingua del
+      // testo). Gli id stanno in ttsVoices.js.
+      modelVoice: '',
     },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.

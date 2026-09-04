@@ -1113,7 +1113,7 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
 
 ## Sintesi vocale/operazioni a modello lente: spezza in chunk + cache, non un colpo solo
 
-Il modello TTS (Gemini) sintetizza TUTTO l'audio prima di rispondere: su testo
+Il modello di sintesi vocale sintetizza TUTTO l'audio prima di rispondere: su testo
 lungo l'attesa iniziale è di parecchi secondi. Il pattern per le operazioni a
 modello con latenza che cresce con l'output è **spezzare in pezzi piccoli e fare
 pipeline**: sintetizza/elabora il PRIMO pezzo corto e usalo subito, mentre i

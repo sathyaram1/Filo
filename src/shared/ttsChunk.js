@@ -6,7 +6,7 @@
 // sapere quale parola evidenziare; i test unitari (tests/unit/ttsChunk.test.mjs)
 // la esercitano senza aprire Electron.
 //
-// Perché spezzare in chunk: il modello TTS (Gemini) sintetizza TUTTO l'audio
+// Perché spezzare in chunk: il modello di sintesi vocale sintetizza TUTTO l'audio
 // prima di rispondere, quindi su un testo lungo l'attesa iniziale è di parecchi
 // secondi. Sintetizzando prima una frase corta e suonandola mentre si prepara
 // la successiva, il tempo che precede la PRIMA parola crolla.

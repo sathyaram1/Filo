@@ -20,13 +20,13 @@
   // Cache dei cataloghi modelli per provider (come nelle Opzioni), ma recuperati
   // dal MAIN con le chiavi predefinite: questa pagina non vede mai le chiavi.
   // `null` = non ancora caricato; lista = caricato.
-  const providerModelCache = { gemini: null, openrouter: null };
+  const providerModelCache = { openrouter: null };
 
   function $(id) { return document.getElementById(id); }
 
   // Id della datalist (combobox) associata a un provider.
   function datalistIdFor(provider) {
-    return provider === 'gemini' ? 'models-list-gemini' : 'models-list-openrouter';
+    return `models-list-${provider}`;
   }
 
   // Sorgente delle opzioni per il dropdown custom del campo "stringa modello":
@@ -75,12 +75,11 @@
   // Semina i combobox con gli id già nel registry (per provider) così il valore
   // corrente compare subito; il fetch del catalogo completo poi li rimpiazza.
   function seedDatalistsFromRegistry(registry) {
-    const byProv = { gemini: [], openrouter: [] };
+    const byProv = { openrouter: [] };
     for (const nick of Object.keys(registry || {})) {
       const s = entryToSingle(registry[nick]);
       if (s.model && byProv[s.provider]) byProv[s.provider].push(s.model);
     }
-    if (!providerModelCache.gemini) populateDatalist('gemini', byProv.gemini);
     if (!providerModelCache.openrouter) populateDatalist('openrouter', byProv.openrouter);
   }
 
@@ -112,7 +111,6 @@
   function entryToSingle(entry) {
     const e = entry || {};
     if (e.provider && e.model) return { provider: e.provider, model: e.model };
-    if (e.gemini) return { provider: 'gemini', model: e.gemini };
     if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
     return { provider: 'openrouter', model: '' };
   }
@@ -144,7 +142,7 @@
 
     const provSel = document.createElement('select');
     provSel.className = 'sn-model-provider';
-    [['openrouter', 'OpenRouter'], ['gemini', 'Gemini API']].forEach(([val, label]) => {
+    [['openrouter', 'OpenRouter']].forEach(([val, label]) => {
       const opt = document.createElement('option');
       opt.value = val; opt.textContent = label;
       provSel.appendChild(opt);
@@ -408,7 +406,6 @@
   function applyConfig(cfg) {
     const present = cfg.apiKeysPresent || {};
     $('apiKey-state').textContent = `(${keyStateText(present.openrouter)})`;
-    $('apiKeyGemini-state').textContent = `(${keyStateText(present.gemini)})`;
     $('apiKeyTavily-state').textContent = `(${keyStateText(present.tavily)})`;
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
@@ -420,7 +417,6 @@
     // poi carica i cataloghi completi in background (non blocca il render).
     seedDatalistsFromRegistry(cfg.modelRegistry || {});
     ensureProviderModels('openrouter');
-    ensureProviderModels('gemini');
   }
 
   async function load() {
@@ -456,10 +452,8 @@
     // Per le chiavi: invia solo i campi non vuoti (vuoto = "non toccare").
     const apiKeys = {};
     const or = $('apiKey').value.trim();
-    const gem = $('apiKeyGemini').value.trim();
     const tav = $('apiKeyTavily').value.trim();
     if (or) apiKeys.openrouter = or;
-    if (gem) apiKeys.gemini = gem;
     if (tav) apiKeys.tavily = tav;
 
     const config = {
@@ -485,7 +479,6 @@
       // Svuota i campi chiave dopo il salvataggio (non li riteniamo in pagina) e
       // ri-applica lo stato "configurata/non" dalla config tornata dal main.
       $('apiKey').value = '';
-      $('apiKeyGemini').value = '';
       $('apiKeyTavily').value = '';
       $('apiKeySafebrowse').value = '';
       applyConfig(res.config || {});
