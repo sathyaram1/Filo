@@ -372,9 +372,24 @@ test('quello che la scritta promette è quello che i tasti fanno', () => {
   // che Opzione+cifra scrive.
   assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'darwin'), 1);
   assert.equal(T.indiceSaltoScheda(evento({ altKey: true }, 'Digit2'), 'darwin'), null);
-  // Lo zero è la decima scheda, su entrambi.
+  // Su Windows lo zero è la decima scheda: lì lo zoom sta su Ctrl e i due tasti
+  // non si incontrano.
   assert.equal(T.indiceSaltoScheda(evento({ altKey: true }, 'Digit0'), 'win32'), 9);
-  assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit0'), 'darwin'), 9);
+  // Su Mac NO: Cmd+0 è lo zoom al 100% e se lo prende la barra dei menu prima
+  // di chiunque altro. Promettere lì anche la decima scheda era promettere una
+  // cosa che non succede mai; al posto suo Cmd+9 porta all'ULTIMA scheda, come
+  // in ogni browser su Mac.
+  assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit0'), 'darwin'), null);
+  assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit9'), 'darwin', 12), 11);
+  assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit9'), 'darwin', 3), 2);
+  // Su Windows il nove resta la nona, non l'ultima.
+  assert.equal(T.indiceSaltoScheda(evento({ altKey: true }, 'Digit9'), 'win32', 12), 8);
+  // Chi ascolta i tasti deve passare il numero di schede, altrimenti su Mac
+  // "l'ultima" resta bloccata alla nona.
+  for (const rel of ['src/main/tabs.js', 'src/renderer/shell.js']) {
+    assert.match(readFileSync(join(ROOT, rel), 'utf8'), /indiceSaltoScheda\([^)]*,[^)]*,[^)]*\)/,
+      `${rel} non dice quante schede ci sono: su Mac Cmd+9 non arriverebbe mai all'ultima`);
+  }
   // La forma del main process (`before-input-event`) usa altri nomi di campo.
   assert.equal(T.indiceSaltoScheda({ alt: true, code: 'Digit3' }, 'win32'), 2);
   assert.equal(T.indiceSaltoScheda({ meta: true, code: 'Digit3' }, 'darwin'), 2);
