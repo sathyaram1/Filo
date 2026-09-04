@@ -101,7 +101,9 @@ export function withVerdict(state, branch, { verdict, critique, sha, at }) {
   s[branch] = {
     ...prev,
     verdict: verdict === 'pass' ? 'pass' : 'fail',
-    critique: String(critique || '').slice(0, 4000),
+    // Stesso tetto del canale delle routine, e un taglio si vede (#531): qui
+    // la critica è quella che l'owner rilegge con `status` prima di pubblicare.
+    critique: capCritique(String(critique || '')),
     sha: sha || '',
     at: at || new Date().toISOString(),
   };
