@@ -134,10 +134,19 @@
   // impediva di digitare quei simboli in qualunque pagina finché c'erano
   // schede aperte. Cmd+cifra è la forma di ogni browser su Mac e non scrive.
   //
+  // LO ZERO, SU MAC, NON È UNA SCHEDA. Cmd+0 riporta la pagina al 100%, e la
+  // barra dei menu (src/main/menu.js) se lo prende prima di chiunque altro:
+  // promettere lì la decima scheda significava promettere una cosa che non
+  // succede mai. Al posto suo Cmd+9 porta all'ULTIMA scheda aperta, come in
+  // ogni browser su Mac. Su Windows e Linux nulla cambia: lo zoom sta su Ctrl,
+  // il salto su Alt, e Alt+0 resta la decima scheda.
+  //
   // L'evento arriva in due forme: quello del DOM (altKey/ctrlKey/metaKey) e
   // quello di `before-input-event` del main (alt/control/meta). Le leggiamo
-  // entrambe. Torna l'INDICE della scheda (0-based, 0 → la decima), o null.
-  function indiceSaltoScheda(ev, esplicita) {
+  // entrambe. Torna l'INDICE della scheda (0-based) o null. `quante` è il
+  // numero di schede aperte, e serve solo su Mac per sapere qual è l'ultima:
+  // chi non lo passa ottiene la nona (il comportamento di prima).
+  function indiceSaltoScheda(ev, esplicita, quante) {
     if (!ev) return null;
     // I due nomi con cui ogni modificatore può arrivare: quello del DOM e
     // quello del main. Nessuno dei due è presente in entrambe le forme, quindi
