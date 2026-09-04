@@ -490,9 +490,6 @@
     // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
     // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
     FILO_GET_ONBOARDING: 'filo_get_onboarding',
-    // Salva la conversazione dell'intervista in corso, così chi chiude a metà
-    // la ritrova dov'era. { thread: [{role, text}] }. Solo pagine filo://.
-    FILO_SAVE_ONBOARDING_THREAD: 'filo_save_onboarding_thread',
     // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte,
     // conversazione e il segno "già accolto". Solo pagine filo://.
     FILO_RESTART_ONBOARDING: 'filo_restart_onboarding',
