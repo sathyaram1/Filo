@@ -284,10 +284,19 @@ export function leggiAttesi(dati, ambiente) {
  * per `cloud`. Non vale il contrario — ci sono spec rosse SOLO sul runner
  * (più lento della macchina delle routine) e scusarle anche altrove
  * spegnerebbe la suite in un posto dove funziona.
+ *
+ * `tranne` toglie UN ambiente da quelli che la scusa copre, ed esiste perché
+ * "senza schermo" non è una condizione sola: la cattura dello schermo, sotto
+ * Xvfb, dà una schermata nera sulla macchina delle routine e una immagine vera
+ * sul runner. Senza il ritaglio quelle due voci resterebbero in lista scusando
+ * anche il posto dove oggi funzionano, cioè proprio dove la suite gira davvero,
+ * e la spia "voci scadute" le riproporrebbe a ogni corsa finché nessuno la
+ * guarda più.
  */
-export function ambienteCopre(dove, ambiente) {
+export function ambienteCopre(dove, ambiente, tranne) {
   const d = dove || 'ovunque';
   const a = ambiente || 'cloud';
+  if (tranne && String(tranne) === a) return false;
   if (d === 'ovunque' || d === a) return true;
   return d === 'cloud' && a === 'actions';
 }
@@ -296,7 +305,7 @@ export function ambienteCopre(dove, ambiente) {
 export function scusaPer(fallito, noti, ambiente) {
   return (noti || []).find((n) => n.file === fallito.file
     && (!n.titolo || n.titolo === fallito.titolo)
-    && ambienteCopre(n.dove, ambiente)) || null;
+    && ambienteCopre(n.dove, ambiente, n.tranne)) || null;
 }
 
 /**
