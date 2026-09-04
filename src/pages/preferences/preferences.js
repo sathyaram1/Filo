@@ -248,6 +248,17 @@
     setTimeout(() => { try { location.reload(); } catch (_) {} }, 350);
   }
 
+  // ── Rilancio dell'intervista di benvenuto (#524) ─────────────────────────
+  // Azzera spunte e conversazione e riporta l'utente dove l'intervista vive:
+  // una scheda nuova. Non tocca né la memoria né le impostazioni già applicate
+  // — rifarla non è disfare quello che Filo ha imparato.
+  async function restartOnboarding() {
+    const r = await chrome.runtime.sendMessage({ type: MSG.FILO_RESTART_ONBOARDING });
+    if (!r || !r.ok) return;
+    flashSaved('onboardingHint');
+    chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://newtab/' });
+  }
+
   // ── Sezione "colore identità delle tab" (Preferenze avanzate) ────────────
   // Stessa estetica "a codice" dei token: una riga per ognuno dei sei parametri
   // di src/shared/tabColor.js, con nome, valore numerico editabile, intervallo
