@@ -99,8 +99,12 @@
     const altri = modificatori.filter((m) => !CTRL.test(m.toLowerCase()) && !ALT.test(m.toLowerCase()));
 
     // Alt+cifra: salto di scheda. Su Mac Opzione+cifra scrive un simbolo, quindi
-    // la forma è Cmd+cifra — quella di ogni browser su Mac.
-    if (haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) return `Cmd+${tastoFinale}`;
+    // la forma è Cmd+cifra — quella di ogni browser su Mac. Lo zero fa
+    // eccezione: su Mac Cmd+0 è lo zoom al 100%, e la decima scheda si raggiunge
+    // con Cmd+9 come "l'ultima" (vedi `indiceSaltoScheda`).
+    if (haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) {
+      return `Cmd+${tastoFinale === '0' ? '9' : tastoFinale}`;
+    }
 
     // Alt+lettera: scorciatoia GLOBALE. Su Mac prende un Control davanti (e qui
     // "Ctrl" è davvero il tasto Control del Mac, non Cmd): vedi shortcuts.js.
