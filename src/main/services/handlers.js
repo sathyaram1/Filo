@@ -1873,8 +1873,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
   // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
   // chat normale: nessuna schermata a passi, nessun modulo.
-  const onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
+  let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
   const onbActive = Onboarding && !onbBefore.done;
+  // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
+  // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
+  // nudge di prosecuzione automatica) non sono parole dell'utente e non entrano.
+  if (onbActive && !internal && String(userMessage || '').trim()) {
+    onbBefore = await FiloMem.setOnboarding(
+      Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage) }),
+    );
+  }
   const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
