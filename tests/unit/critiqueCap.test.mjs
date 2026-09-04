@@ -96,7 +96,20 @@ test('i tre punti che la maneggiano tagliano allo STESSO modo', () => {
   const locale = withVerdict({}, 'claude/x', { verdict: 'fail', critique: enorme, sha: 'a', at: 't' })['claude/x'].critique;
   for (const [nome, testo] of [['nota', nota], ['stato', stato], ['verifica locale', locale]]) {
     assert.ok(testo.endsWith(DATA.CRITIQUE_CUT_MARK), `${nome}: il taglio si vede`);
+    assert.ok(testo.length <= DATA.CRITIQUE_MAX, `${nome}: sta dentro il tetto`);
     assert.ok(testo.length >= DATA.CRITIQUE_MAX - 300, `${nome}: stesso tetto, non uno più stretto`);
   }
   assert.equal(stato, locale, 'stesso testo in ingresso, stesso taglio in uscita');
+});
+
+test('la nota consegnata al canale sta nel tetto INCIPIT COMPRESO', () => {
+  // Chi riceve la nota applica lo stesso tetto. Se qui uscisse una nota lunga
+  // «tetto + incipit», a tagliarla sarebbe l'altro capo — in silenzio, e
+  // portandosi via proprio il segno del taglio.
+  const enorme = 'un rilievo lungo con i suoi passi. '.repeat(1000);
+  for (const verdetto of ['pass', 'migliorabile', 'fail']) {
+    const nota = verifierNoteText(verdetto, enorme);
+    assert.ok(nota.length <= DATA.CRITIQUE_MAX, `${verdetto}: la nota intera sta sotto il tetto`);
+    assert.ok(nota.endsWith(DATA.CRITIQUE_CUT_MARK), `${verdetto}: e il segno del taglio sopravvive`);
+  }
 });
