@@ -34,6 +34,9 @@ require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
 require(path.join(SHARED, 'paths.js'));
+// Elenco e stato della micro-intervista di benvenuto (#524): logica pura, va
+// PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
+require(path.join(SHARED, 'onboarding.js'));
 require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
 require(path.join(SHARED, 'dashboardRefresh.js'));
