@@ -1,25 +1,61 @@
-// Sonda del verificatore #527 — chi possiede le scorciatoie Cmd su Mac.
+// #527 — su Mac la barra dei menu di sistema si prende le scorciatoie di Filo.
 //
-// Su macOS la barra dei menu e' dell'APPLICAZIONE (sta in cima allo schermo,
-// non nella finestra): esiste anche quando la finestra e' senza cornice. Se
-// l'app non ne dichiara una, Electron ne installa una di suo, e i tasti di
-// quella barra vincono sull'app. Qui guardo se quella barra c'e' e cosa
-// dichiara.
+// PERCHE' ESISTE QUESTO SPEC
+//   Su Windows e Linux la finestra di Filo e' senza cornice: la barra dei menu
+//   non viene attaccata a nessuna finestra e i suoi tasti non fanno niente. Su
+//   Mac quella barra e' dell'APPLICAZIONE — sta in cima allo schermo, esiste
+//   sempre — e i suoi tasti vincono su quelli che Filo ascolta dentro la
+//   pagina. Filo non ne dichiara nessuna, quindi ne resta appesa una di serie,
+//   in inglese, che si prende Cmd+W (chiudi la FINESTRA, non la scheda),
+//   Cmd+R (ricarica la shell, non la pagina), Cmd+ +/-/0 (ingrandisce la fila
+//   delle schede, non il sito) e Cmd+Z (annulla, non "pagina precedente") —
+//   proprio le scorciatoie che l'elenco delle capacita' promette su Mac.
+//
+// Lo spec gira su qualunque sistema perche' la barra e' la stessa ovunque: e'
+// solo su Mac che diventa visibile e attiva.
 import { test, expect } from './fixtures/electron.mjs';
 
-test('che menu ha l\'applicazione, e quali tasti si prende', async ({ app, shell }) => {
-  const menu = await app.evaluate(({ Menu }) => {
+// I ruoli i cui tasti Filo gestisce gia' per conto suo: se restano qui dentro,
+// su Mac vincono loro.
+const RUOLI_IN_CONFLITTO = ['close', 'reload', 'forcereload', 'zoomin', 'zoomout', 'resetzoom', 'undo', 'redo'];
+
+function appiattisci(items, out = []) {
+  for (const it of items) {
+    out.push(it);
+    if (it.sub) appiattisci(it.sub, out);
+  }
+  return out;
+}
+
+async function menuDellApp(app) {
+  return app.evaluate(({ Menu }) => {
     const m = Menu.getApplicationMenu();
     if (!m) return null;
     const dump = (items) => items.map((it) => ({
       label: it.label,
       role: it.role,
-      accel: it.accelerator,
       registra: it.registerAccelerator,
       sub: it.submenu ? dump(it.submenu.items) : null,
     }));
     return dump(m.items);
   });
-  console.log('MENU APPLICAZIONE:', JSON.stringify(menu, null, 1));
-  expect(menu === null, 'nessun menu applicazione dichiarato').toBe(true);
+}
+
+test('la barra dei menu non si prende le scorciatoie che Filo gestisce da se', async ({ app, shell }) => {
+  const menu = await menuDellApp(app);
+  if (menu === null) return; // nessuna barra: niente da rubare.
+  const rubati = appiattisci(menu)
+    .filter((it) => it.role && RUOLI_IN_CONFLITTO.includes(String(it.role).toLowerCase()))
+    .filter((it) => it.registra !== false)
+    .map((it) => `${it.label || it.role} (${it.role})`);
+  expect(rubati, 'su Mac questi tasti li intercetta la barra dei menu, non Filo').toEqual([]);
+});
+
+test('la barra dei menu non parla di un altro prodotto', async ({ app, shell }) => {
+  const menu = await menuDellApp(app);
+  if (menu === null) return;
+  const voci = appiattisci(menu).map((it) => String(it.label || ''));
+  const estranee = voci.filter((v) => /electron/i.test(v)
+    || ['Learn More', 'Documentation', 'Community Discussions', 'Search Issues'].includes(v));
+  expect(estranee, 'la barra in cima allo schermo, su Mac, e\' quella di serie di Electron').toEqual([]);
 });
