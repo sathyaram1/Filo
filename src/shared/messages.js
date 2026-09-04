@@ -479,6 +479,23 @@
     FILO_GENERATE_DASHBOARD: 'filo_generate_dashboard',
     // CRUD memoria/contenuti dashboard
     FILO_GET_MEMORY: 'filo_get_memory',
+    // Compattazione FORZATA della memoria: svuota subito il buffer delle
+    // lezioni dentro PROFILO/PREFERENZE senza aspettare la soglia dei 3000
+    // caratteri. Serve alla fine della micro-intervista di benvenuto (#524),
+    // dove le lezioni appena raccolte devono essere già in memoria quando Filo
+    // genera la prima home personale. Solo pagine filo://: legge e riscrive la
+    // memoria dell'utente.
+    // Risposta: { ok, compacted }
+    FILO_COMPACT_MEMORY: 'filo_compact_memory',
+    // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
+    // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
+    FILO_GET_ONBOARDING: 'filo_get_onboarding',
+    // Salva la conversazione dell'intervista in corso, così chi chiude a metà
+    // la ritrova dov'era. { thread: [{role, text}] }. Solo pagine filo://.
+    FILO_SAVE_ONBOARDING_THREAD: 'filo_save_onboarding_thread',
+    // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte,
+    // conversazione e il segno "già accolto". Solo pagine filo://.
+    FILO_RESTART_ONBOARDING: 'filo_restart_onboarding',
     // (Gli appunti non hanno più messaggi propri: sono file dell'editor, scritti
     // dall'azione SALVA_APPUNTO e letti aprendo l'editor.)
     FILO_GET_TIMERS: 'filo_get_timers',
