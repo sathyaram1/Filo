@@ -79,7 +79,7 @@ test('«Chiudi scheda» chiude la scheda, non la finestra con dentro tutte le al
 
   await expect.poll(async () => (await stato(app)).schede).toBe(prima.schede - 1);
   const dopo = await stato(app);
-  expect(dopo.finestre, 'la finestra si è chiusa: era il difetto').toBe(prima.finestre);
+  expect(dopo.finestra, 'la finestra con dentro le altre schede si è chiusa: era il difetto').toBe(prima.finestra);
 });
 
 test('«Annulla» torna alla pagina precedente quando non si sta scrivendo', async ({ app, shell, openTab, testServer }) => {
