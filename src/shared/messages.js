@@ -499,6 +499,10 @@
     // modello non risponde (rete assente, provider giù, crediti finiti). Solo
     // pagine filo://. Risposta: { ok, onboarding }
     FILO_CLOSE_ONBOARDING: 'filo_close_onboarding',
+    // L'utente ha letto la riga che la home mostra dopo un'accoglienza chiusa a
+    // metà («la rifacciamo quando vuoi»): si spegne. Solo pagine filo://.
+    // Risposta: { ok, onboarding }
+    FILO_ONBOARDING_NOTICE_SEEN: 'filo_onboarding_notice_seen',
     // (Gli appunti non hanno più messaggi propri: sono file dell'editor, scritti
     // dall'azione SALVA_APPUNTO e letti aprendo l'editor.)
     FILO_GET_TIMERS: 'filo_get_timers',
