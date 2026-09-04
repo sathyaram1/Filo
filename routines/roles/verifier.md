@@ -30,7 +30,9 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
 ## Passi
 
 1. Il feedback decifrato è nel payload (`feedback.text`, `feedback.images`,
-   `feedback.num`, `feedback.id`). Capisci il **sintomo**: cosa voleva fare
+   `feedback.num`, `feedback.id`; se ha documenti allegati, `feedback.documents`
+   li porta già aperti come testo, `[{ name, text }]`: una spec allegata sta lì,
+   non nel testo). Capisci il **sintomo**: cosa voleva fare
    l'utente e cosa lamentava. Se `payload.history` non è vuoto, leggi anche le
    critiche dei giri passati: le porte già trovate vanno **ri-provate** (una
    regressione lì è un FAIL), non ri-scoperte come rilievi nuovi.

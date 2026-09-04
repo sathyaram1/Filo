@@ -27,7 +27,15 @@
 // USO
 //   node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3]
 //                                                         [--url <indirizzo>]
+//                                                         [--allega <file>]…
 //                                                         [--dry-run]
+//
+//   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
+//   cifrato per l'owner come il testo. È la strada per una spec o un log che
+//   nel testo non entra (tetto ~6000 caratteri): il server la apre con la sua
+//   chiave e la consegna ai giudici e alle routine come testo. Ammessi i tipi
+//   dell'allowlist del gate L0 (md, txt, log, json, csv, tsv, yaml, pdf,
+//   immagini); un tipo diverso è un errore d'uso, non un feedback sospetto.
 //   node scripts/claude-feedback.mjs "<titolo>" -          ← testo da stdin
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
@@ -37,8 +45,8 @@
 //   3  rifiutato       — il server ha detto no (regole, campi, duplicato)
 //   4  non raggiungibile — rete assente, timeout, guasto del server
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, statSync } from 'node:fs';
+import { basename, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
@@ -56,6 +64,42 @@ const FB = globalThis.SN_FEEDBACK;
 
 /** Il mittente con cui si firma una sessione locale. Fonte unica: shared. */
 export const CLIENT_ID = (THREAD && THREAD.LOCAL_CLIENT_ID) || 'local:claude';
+
+// Tipo dichiarato per estensione: la stessa allowlist del gate deterministico
+// sugli allegati (filo-security, L0 fileGate) e delle storage.rules. Fuori da
+// qui il feedback diventerebbe `suspicious_file`: meglio fermarsi prima.
+const MIME_PER_ESTENSIONE = Object.freeze({
+  md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain', log: 'text/plain',
+  json: 'application/json', csv: 'text/csv', tsv: 'text/tab-separated-values',
+  yaml: 'application/x-yaml', yml: 'application/x-yaml', pdf: 'application/pdf',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+});
+export const MAX_ALLEGATI = 5;
+export const MAX_ALLEGATO_BYTES = 4 * 1024 * 1024; // lo storage rifiuta oltre
+
+/** Il tipo di un allegato dal nome, o '' se non è ammesso. PURA. */
+export function mimeDiAllegato(nome) {
+  const ext = extname(String(nome || '')).slice(1).toLowerCase();
+  return MIME_PER_ESTENSIONE[ext] || '';
+}
+
+/**
+ * Legge un file da allegare nella forma che `SN_FEEDBACK.submit` si aspetta
+ * ({ name, type, dataUrl }). Lancia con un messaggio d'uso se il file manca,
+ * è troppo grande o ha un tipo non ammesso.
+ */
+export function leggiAllegato(percorso) {
+  const p = resolve(String(percorso || ''));
+  let size;
+  try { size = statSync(p).size; } catch (_) { throw new Error(`allegato non trovato: ${percorso}`); }
+  const name = basename(p);
+  const type = mimeDiAllegato(name);
+  if (!type) throw new Error(`allegato di tipo non ammesso: ${name} (ammessi: ${Object.keys(MIME_PER_ESTENSIONE).join(', ')})`);
+  if (size > MAX_ALLEGATO_BYTES) throw new Error(`allegato troppo grande: ${name} (max 4 MB)`);
+  if (size === 0) throw new Error(`allegato vuoto: ${name}`);
+  const b64 = readFileSync(p).toString('base64');
+  return { name, type, dataUrl: `data:${type};base64,${b64}` };
+}
 
 export const EXIT = Object.freeze({
   FATTO: 0,
@@ -109,14 +153,14 @@ export function parsePriorita(raw) {
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, dryRun = false } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
   if (!text) return { ok: false, uso: true, motivo: 'testo mancante' };
 
   if (dryRun) {
-    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita };
+    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length };
   }
 
   let res;
@@ -130,11 +174,15 @@ export async function apri({ titolo, testo, url = '', priorita = null, dryRun = 
       title: '',
       userAgent: `filo-locale/${process.platform} node-${process.versions.node}`,
       clientId: CLIENT_ID,
+      files: Array.isArray(allegati) ? allegati : [],
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
   }
-  return { ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name };
+  // Un allegato che non si è caricato NON è silenzioso: il feedback esiste,
+  // ma senza il documento per cui magari è stato aperto. Si riporta.
+  const falliti = Array.isArray(res && res.failed) ? res.failed : [];
+  return { ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: ((res && res.files) || []).length, falliti };
 }
 
 /**
@@ -169,7 +217,7 @@ function leggiStdin() {
 }
 
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3] [--url <indirizzo>] [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
 }
 
@@ -181,8 +229,10 @@ export async function main(argv) {
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
+  // `--allega` è ripetibile: si raccolgono tutti i valori.
+  const percorsiAllegati = argv.flatMap((a, i) => (a === '--allega' && argv[i + 1] !== undefined ? [argv[i + 1]] : []));
 
-  const valoriDiFlag = new Set([prioritaRaw, url].filter((v) => v !== undefined));
+  const valoriDiFlag = new Set([prioritaRaw, url, ...percorsiAllegati].filter((v) => v !== undefined));
   const posizionali = argv.filter((a) => !a.startsWith('--') && !valoriDiFlag.has(a));
   const titolo = posizionali[0];
   let testo = posizionali.slice(1).join(' ');
@@ -194,14 +244,22 @@ export async function main(argv) {
   const p = parsePriorita(prioritaRaw);
   if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo}`); return EXIT.USO; }
 
-  const r = await apri({ titolo, testo, url, priorita: p.valore, dryRun });
+  if (percorsiAllegati.length > MAX_ALLEGATI) {
+    console.error(`USO: al più ${MAX_ALLEGATI} allegati`);
+    return EXIT.USO;
+  }
+  let allegati;
+  try { allegati = percorsiAllegati.map(leggiAllegato); }
+  catch (e) { console.error(`USO: ${e.message}`); return EXIT.USO; }
+
+  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}${p.valore ? `, priorità ${p.valore}` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}${p.valore ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -211,12 +269,19 @@ export async function main(argv) {
     ? `OK: feedback #${r.seq} aperto (${r.id}), mittente ${r.clientId}.`
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
 
+  if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
+  for (const f of (r.falliti || [])) {
+    console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
+  }
+
   if (p.valore) {
     const pr = await applicaPriorita(r.id, p.valore);
     if (pr.ok) console.log(`Priorità ${p.valore} impostata.`);
     else console.log(`Priorità NON impostata (${pr.motivo}): mettila dalla dashboard.`);
   }
-  return EXIT.FATTO;
+  // Un allegato mancante è un rifiuto parziale: chi lancia lo script deve
+  // accorgersene, perché il feedback senza il documento può non avere senso.
+  return (r.falliti && r.falliti.length) ? EXIT.RIFIUTATO : EXIT.FATTO;
 }
 
 if (isMain) {
