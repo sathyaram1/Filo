@@ -300,6 +300,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'pageColor.js'));
   safe(path.join(CONTENT, 'translatePage.js'));
   safe(path.join(SHARED, 'ttsChunk.js'));
+  safe(path.join(SHARED, 'modelCaps.js'));
   safe(path.join(SHARED, 'ttsVoices.js'));
   safe(path.join(SHARED, 'dictationSegmenter.js'));
   safe(path.join(CONTENT, 'tts.js'));

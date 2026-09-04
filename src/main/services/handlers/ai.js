@@ -145,7 +145,7 @@ module.exports = function register(on, ctx) {
       const ttsPrefs = (settings && settings.tts) || {};
       // Voce: quella scelta in Preferenze se c'è, altrimenti quella della
       // lingua del testo; se la pagina non la dichiara, la lingua dell'app.
-      const chosen = String(ttsPrefs.modelVoice || '').trim();
+      const chosen = String(msg.voice || ttsPrefs.modelVoice || '').trim();
       let locale = '';
       try { locale = require('electron').app.getLocale(); } catch (_) { locale = ''; }
       const voice = chosen || (Voices ? Voices.defaultVoiceFor(msg.lang || locale) : '');

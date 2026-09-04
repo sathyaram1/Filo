@@ -12,6 +12,7 @@
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/ttsVoices.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
@@ -116,8 +117,16 @@
 
     <section>
       <h2>Lettura ad alta voce</h2>
-      <p class="sn-muted">Seleziona del testo in una pagina e scegli <strong>🔊 Leggi</strong> dal menu del tasto destro per ascoltarlo. Usa le voci installate sul tuo sistema operativo: è <strong>gratis</strong>, non richiede alcuna chiave e funziona anche offline.</p>
-      <label for="ttsVoice" class="sn-muted" style="display:block;margin-bottom:4px;">Voce</label>
+      <p class="sn-muted">Seleziona del testo in una pagina e scegli <strong>🔊 Leggi</strong> dal menu del tasto destro per ascoltarlo. Legge con una voce naturale, scelta in base alla lingua del testo; se non è raggiungibile, usa una voce installata sul tuo sistema operativo, che funziona anche offline.</p>
+      <label for="ttsModelVoice" class="sn-muted" style="display:block;margin-bottom:4px;">Voce naturale</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <select id="ttsModelVoice">
+          <option value="">Automatica: segue la lingua del testo</option>
+        </select>
+        <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreview">Ascolta</button>
+        <span id="ttsModelPreviewStatus" class="sn-muted"></span>
+      </div>
+      <label for="ttsVoice" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Voce di riserva (sistema)</label>
       <select id="ttsVoice">
         <option value="">Voce predefinita del sistema</option>
       </select>

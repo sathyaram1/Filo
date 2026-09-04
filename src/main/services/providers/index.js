@@ -15,8 +15,13 @@
   // qui c'era, è stata tolta: era l'API del produttore, e la politica sui
   // modelli non la ammette. Lettura ad alta voce, dettatura e indicizzazione,
   // che erano le tre funzioni rimaste solo lì, passano ora dal router.
+  // Un fornitore si trova per nome su globalThis (SN_PROVIDER_<NOME>): oggi
+  // c'è solo 'openrouter'; un fornitore nuovo (es. modelli in locale) si
+  // aggiunge registrando il suo modulo, senza toccare questo elenco.
   function getProvider(name) {
-    if (name === 'openrouter') return global.SN_PROVIDER_OPENROUTER;
+    const key = 'SN_PROVIDER_' + String(name || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+    const p = name && global[key];
+    if (p) return p;
     throw new Error(`Provider non supportato: ${name}`);
   }
 
