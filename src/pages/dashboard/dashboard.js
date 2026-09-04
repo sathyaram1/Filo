@@ -181,25 +181,69 @@
     threadView.hidden = false;
   }
 
-  // Vero solo alla PRIMISSIMA apertura dell'app (flag su storage non ancora
-  // impostato). Letto in init() prima di caricare la dashboard.
-  async function isFirstRun() {
+  // ===== Micro-intervista di benvenuto (#524) =====
+  //
+  // Lo stato lo tiene il main (una chiave sola): all'apertura chiediamo se
+  // l'intervista è aperta e, se sì, ricomponiamo la conversazione com'era.
+  // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
+  let onboardingActive = false;
+
+  async function fetchOnboarding() {
     try {
-      return !(await self.SN_STORAGE?.getRaw?.(STORAGE_KEYS.FILO_WELCOMED, false));
-    } catch (_) { return false; }
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING });
+      if (!r?.ok || !r.onboarding) return null;
+      return r.onboarding.done ? null : r.onboarding;
+    } catch (_) { return null; }
   }
 
-  // Alla primissima apertura mostra il messaggio di benvenuto di Filo come suo
-  // commento centrale nella home ("come appena inviato da lui"): l'utente lo
-  // legge e può rispondere subito dalla barra qui sotto, così Filo si configura.
-  // Resta in stato home (niente thread) per non rompere il resto della dashboard.
-  function showWelcomeMessage() {
-    homeMessageEl.classList.remove('dash-home-msg-loading');
-    homeMessageEl.id = 'homeMessage';
-    homeMessageEl.dataset.welcome = '1';
-    homeMessageEl.textContent = WELCOME_MESSAGE;
-    applyHomeMessageVisibility();
+  // Apre (o riprende) l'intervista: la conversazione salvata torna a schermo
+  // come bolle normali — per l'utente è una chat, non una procedura guidata. Se
+  // l'ultimo messaggio è suo (ha risposto e ha chiuso la finestra prima della
+  // risposta), il turno riparte da solo: non deve riscrivere niente.
+  async function openOnboarding(state) {
+    onboardingActive = true;
+    goThread();
+    const thread = Array.isArray(state.thread) ? state.thread : [];
+    const resuming = thread.length > 1;
+    if (resuming && Onb?.RESUME_NOTE) stepTrace(Onb.RESUME_NOTE);
+    threadHistory = [];
+    for (const m of thread) {
+      const role = m.role === 'filo' ? 'filo' : 'user';
+      threadHistory.push({ role, text: m.text });
+      bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
+    }
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
+    const last = thread[thread.length - 1];
+    if (last && last.role === 'user' && !sending) {
+      sending = true;
+      sendBtn.disabled = true;
+      await runTurnAndContinue({ userMessage: last.text });
+    }
+  }
+
+  // Chiusura: l'ultimo atto non è un "fatto", è il risultato — la prima home
+  // costruita sul profilo appena imparato. Finché non arriva, la chat dice cosa
+  // sta succedendo invece di restare muta.
+  function onboardingClosing() {
+    if (!onboardingActive) return;
+    onboardingActive = false;
+    stepTrace('Preparo la tua home…');
+  }
+
+  function onboardingDone(msg) {
+    if (showHomeMessage) {
+      homeMessageEl.classList.remove('dash-home-msg-loading');
+      homeMessageEl.textContent = msg?.message || 'Filo è in ascolto.';
+    }
+    suggestions = Array.isArray(msg?.suggestions) ? msg.suggestions : [];
+    renderSuggestions();
+    threadHistory = [];
+    bubblesEl.textContent = '';
+    goHome();
+    // La home appena generata è la risposta: se il messaggio non è arrivato
+    // (chiave assente, provider giù) la si carica per la strada normale.
+    if (!msg?.message) loadDashboard().catch(() => {});
   }
 
 
