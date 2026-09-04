@@ -277,6 +277,7 @@
   }
 
   let skipping = false;
+  let onboardingHomeFallback = null;
   async function skipOnboarding() {
     if (skipping) return;
     skipping = true;
@@ -288,9 +289,6 @@
         bubblesEl.appendChild(makeBubble({ role: 'filo', text: r.closing, markdown: true }));
       }
       onboardingClosing();
-      // Se la home personale non arriva entro pochi secondi (nessun modello),
-      // andiamo comunque alla home: l'uscita non può dipendere da una risposta.
-      setTimeout(() => { if (body.dataset.state === 'thread') onboardingDone(null); }, 6000);
     } catch (_) {
       onboardingDone(null);
     } finally {
