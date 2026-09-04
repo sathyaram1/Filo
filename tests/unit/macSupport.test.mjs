@@ -269,6 +269,193 @@ test('le eccezioni sui percorsi Windows non sono avanzi', () => {
   }
 });
 
+// ── Le SCRITTE: nessuna scorciatoia si chiama a mano ───────────────────────
+// Le funzioni rispondevano già a Cmd; a mentire erano le etichette, e mentivano
+// una alla volta — il menu del tasto destro, i pulsanti dell'Editor, il
+// suggerimento della barra. Ogni giro ne chiudeva una e ne restavano altre,
+// perché ognuna era una stringa a sé. Ora la porta è una sola: src/shared/tasti.js.
+// Qui si controlla che nessuno la scavalchi tornando a scriverne una a mano.
+
+const SORGENTI_DEI_NOMI = {
+  'src/shared/tasti.js':
+    'è la regola stessa: qui i nomi delle scorciatoie si costruiscono',
+  'src/main/shortcuts.js':
+    'è la TABELLA canonica degli acceleratori da registrare, non un\'etichetta da leggere',
+  'src/shared/capabilities.js':
+    'manifesto unico letto su tutti i sistemi: cita entrambe le forme, e il test qui sotto lo verifica voce per voce',
+  'src/shared/patchNotes.js':
+    'diario delle versioni già uscite: si scrive una volta e non si riscrive',
+};
+
+// Le forme con cui si chiede il nome giusto invece di inventarlo.
+const CHIAMA_LA_REGOLA = /SN_TASTI|Tasti\.|\btasti\(|\btasto\(|\bconTasto\(/;
+const SCORCIATOIA_SCRITTA = /(Ctrl|Alt|Cmd|Command|Option)\s*\+\s*[A-Za-z0-9\\]/;
+
+function fileDiInterfaccia(dir, acc = []) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) fileDiInterfaccia(p, acc);
+    else if (/\.(js|mjs|html)$/.test(name)) acc.push(p);
+  }
+  return acc;
+}
+
+test('nessuna etichetta di scorciatoia scritta a mano', () => {
+  const colpevoli = [];
+  for (const file of fileDiInterfaccia(join(ROOT, 'src'))) {
+    const rel = relative(ROOT, file).split('\\').join('/');
+    if (SORGENTI_DEI_NOMI[rel]) continue;
+    const testo = readFileSync(file, 'utf8');
+    // Nell'HTML non c'è modo di chiedere: una scorciatoia scritta lì è per
+    // forza sbagliata su metà dei sistemi. Va composta dal JS della pagina.
+    const code = file.endsWith('.html') ? testo : stripComments(testo);
+    code.split('\n').forEach((line, i) => {
+      if (!SCORCIATOIA_SCRITTA.test(line)) return;
+      if (CHIAMA_LA_REGOLA.test(line)) return;
+      colpevoli.push(`${rel}:${i + 1}  ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(colpevoli, [],
+    'queste scritte nominano un tasto senza chiederlo a src/shared/tasti.js: su Mac dicono il tasto sbagliato.\n' + colpevoli.join('\n'));
+});
+
+test('le eccezioni sui nomi delle scorciatoie non sono avanzi', () => {
+  for (const [rel, motivo] of Object.entries(SORGENTI_DEI_NOMI)) {
+    assert.ok(existsSync(join(ROOT, rel)), `eccezione su un file che non esiste più: ${rel} (${motivo})`);
+  }
+});
+
+test('la regola dà il nome giusto su ogni sistema', () => {
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+
+  // Su Windows la forma canonica non si tocca.
+  for (const accel of ['Ctrl+V', 'Ctrl+B', 'Alt+E', 'Alt+1', 'Ctrl+Shift+1', 'Ctrl+\\']) {
+    assert.equal(T.etichetta(accel, 'win32'), accel, `su Windows ${accel} non deve cambiare`);
+  }
+
+  // Su Mac: Ctrl diventa Cmd…
+  assert.equal(T.etichetta('Ctrl+V', 'darwin'), 'Cmd+V');
+  assert.equal(T.etichetta('Ctrl+B', 'darwin'), 'Cmd+B');
+  assert.equal(T.etichetta('Ctrl+\\', 'darwin'), 'Cmd+\\');
+  assert.equal(T.etichetta('Ctrl+Shift+1', 'darwin'), 'Cmd+Shift+1');
+  assert.equal(T.etichetta('Ctrl', 'darwin'), 'Cmd');
+  // …le scorciatoie globali prendono il Control del Mac davanti (Opzione da
+  // sola è il tasto degli accenti: vedi shortcuts.js)…
+  assert.equal(T.etichetta('Alt+E', 'darwin'), 'Ctrl+Alt+E');
+  assert.equal(T.etichetta('Alt+H', 'darwin'), 'Ctrl+Alt+H');
+  // …e il salto di scheda passa a Cmd, perché Opzione+cifra su Mac SCRIVE.
+  assert.equal(T.etichetta('Alt+1', 'darwin'), 'Cmd+1');
+  assert.equal(T.etichetta('Alt+0', 'darwin'), 'Cmd+0');
+
+  // Un tasto senza modificatori si chiama uguale ovunque.
+  assert.equal(T.etichetta('Esc', 'darwin'), 'Esc');
+});
+
+test('quello che la scritta promette è quello che i tasti fanno', () => {
+  // Nome e comportamento del salto di scheda devono cambiare INSIEME: erano in
+  // due posti diversi ed è così che su Mac Filo si prendeva Opzione+cifra —
+  // cioè i simboli che l'utente stava provando a scrivere — pur chiamandola
+  // in un altro modo altrove.
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+
+  const evento = (mods, code) => ({ ...mods, code });
+
+  // Windows: Alt+2 → seconda scheda; Cmd+2 non fa niente.
+  assert.equal(T.indiceSaltoScheda(evento({ altKey: true }, 'Digit2'), 'win32'), 1);
+  assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'win32'), null);
+  // Mac: al contrario. Se Alt+cifra passasse ancora, Filo mangerebbe i simboli
+  // che Opzione+cifra scrive.
+  assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'darwin'), 1);
+  assert.equal(T.indiceSaltoScheda(evento({ altKey: true }, 'Digit2'), 'darwin'), null);
+  // Lo zero è la decima scheda, su entrambi.
+  assert.equal(T.indiceSaltoScheda(evento({ altKey: true }, 'Digit0'), 'win32'), 9);
+  assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit0'), 'darwin'), 9);
+  // La forma del main process (`before-input-event`) usa altri nomi di campo.
+  assert.equal(T.indiceSaltoScheda({ alt: true, code: 'Digit3' }, 'win32'), 2);
+  assert.equal(T.indiceSaltoScheda({ meta: true, code: 'Digit3' }, 'darwin'), 2);
+  // Shift o un modificatore in più non è un salto di scheda.
+  assert.equal(T.indiceSaltoScheda(evento({ altKey: true, shiftKey: true }, 'Digit1'), 'win32'), null);
+  assert.equal(T.indiceSaltoScheda(evento({ altKey: true, ctrlKey: true }, 'Digit1'), 'win32'), null);
+
+  // E chi ascolta i tasti deve passare di qui, non rifarsi la regola in casa.
+  for (const rel of ['src/main/tabs.js', 'src/renderer/shell.js']) {
+    assert.match(readFileSync(join(ROOT, rel), 'utf8'), /indiceSaltoScheda/,
+      `${rel} decide da sé quale tasto salta di scheda: su Mac tornerà a rubare Opzione+cifra`);
+  }
+});
+
+test('il manifesto delle capacità non nomina un tasto solo per Windows', () => {
+  // È la fonte unica di cosa Filo sa fare, ed è un file solo per tutti i
+  // sistemi: ogni volta che nomina un tasto deve dire anche la forma Mac,
+  // altrimenti su un Mac mente proprio dove l'utente va a cercare la verità.
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const CAPS = globalThis.SN_CAPABILITIES.CAPABILITIES;
+
+  const colpevoli = [];
+  for (const cap of CAPS) {
+    for (const campo of ['desc', 'invoke', 'doesNot']) {
+      const testo = cap[campo];
+      if (!testo || !/\b(Ctrl|Alt)\b/.test(testo)) continue;
+      if (/\bMac\b/.test(testo)) continue;
+      colpevoli.push(`${cap.id}.${campo}: ${testo}`);
+    }
+  }
+  assert.deepEqual(colpevoli, [],
+    'queste voci nominano un tasto di Windows senza dire come si fa su Mac:\n' + colpevoli.join('\n'));
+});
+
+// ── Il primo avvio su Mac: l'istruzione deve essere quella vera ─────────────
+
+test('l\'istruzione per sbloccare Filo al primo avvio arriva PRIMA del primo avvio', () => {
+  // Chi scarica Filo su un Mac si vede rifiutare l'apertura, e a quel punto non
+  // ha ancora visto niente di Filo: un'istruzione che vive solo dentro l'app è
+  // un'istruzione che non leggerà mai. Questa sta nel disco che ha appena
+  // aperto, accanto all'icona da trascinare.
+  const contenuti = pkg.build?.dmg?.contents;
+  assert.ok(Array.isArray(contenuti), 'build.dmg.contents sparito: il disco torna alla disposizione di default, senza istruzioni');
+
+  const foglio = contenuti.find((c) => typeof c.path === 'string' && /\.txt$/.test(c.path));
+  assert.ok(foglio, 'nel disco per Mac non c\'è più il foglio con le istruzioni del primo avvio');
+  assert.ok(existsSync(join(ROOT, foglio.path)), `il foglio delle istruzioni non esiste: ${foglio.path}`);
+
+  // E il disco deve restare usabile: l'app e la cartella Applicazioni.
+  assert.ok(contenuti.some((c) => c.type === 'file' && !c.path), 'nel disco non c\'è più l\'app');
+  assert.ok(contenuti.some((c) => c.type === 'link' && c.path === '/Applications'),
+    'sparita la cartella Applicazioni: non si può più installare trascinando');
+});
+
+test('l\'istruzione per il primo avvio su Mac è quella che funziona oggi', () => {
+  // Da macOS Sequoia (2024) Apple ha tolto il clic destro → "Apri": chi lo
+  // segue si vede rifiutare l'apertura una seconda volta, identica, e si ferma
+  // lì. L'unica strada rimasta passa dalle Impostazioni di sistema, e vale
+  // anche sulle versioni precedenti.
+  const foglio = pkg.build.dmg.contents.find((c) => typeof c.path === 'string' && /\.txt$/.test(c.path));
+  const testi = {
+    [foglio.path]: readFileSync(join(ROOT, foglio.path), 'utf8'),
+  };
+
+  require(join(ROOT, 'src', 'shared', 'patchNotes.js'));
+  const note = globalThis.SN_PATCH_NOTES.NOTES
+    .flatMap((n) => [...(n.features || []), ...(n.fixes || [])])
+    .filter((riga) => /macOS/.test(riga));
+  assert.ok(note.length, 'nessuna nota di versione parla di macOS: quella del Mac è sparita');
+  note.forEach((riga, i) => { testi[`patchNotes[${i}]`] = riga; });
+
+  for (const [dove, testo] of Object.entries(testi)) {
+    assert.match(testo, /Impostazioni di sistema/,
+      `${dove}: non indica le Impostazioni di sistema, l'unica strada che sblocca Filo sui Mac di oggi`);
+    assert.match(testo, /Apri comunque/,
+      `${dove}: non nomina il pulsante «Apri comunque», che è quello da premere`);
+    // Il clic destro può essere citato per dire che NON basta più; quello che
+    // non deve fare è proporlo come la strada.
+    const proponeIlClicDestro = /(clic|tasto|click)\s+destro[^.]*?(scegli|premi|seleziona|e poi)\s+«?"?Apri/i.test(testo);
+    assert.ok(!proponeIlClicDestro,
+      `${dove}: propone ancora il clic destro → "Apri", che da macOS Sequoia non sblocca più niente`);
+  }
+});
+
 // ── Il prompt dell'assistente deve sapere su che sistema gira ───────────────
 
 test('l\'assistente sa su che computer sta girando', () => {
