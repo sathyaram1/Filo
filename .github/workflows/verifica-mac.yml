@@ -33,6 +33,11 @@ on:
       - '.github/workflows/verifica-mac.yml'
       - 'scripts/after-pack-mac.js'
       - 'assets/icons/icon-1024.png'
+      # La ricetta del pacchetto sta qui dentro (build.mac). Il commit che alza
+      # il numero di versione porta `[skip ci]` e non fa scattare niente: qui
+      # arrivano solo le modifiche vere alla ricetta o alle dipendenze, che
+      # sono esattamente quelle che possono rompere la costruzione su Mac.
+      - 'package.json'
 
 permissions:
   contents: read
