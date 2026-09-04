@@ -2435,7 +2435,7 @@ partiva mai.
 
 La cura è **una lista sola dei tasti già presi**, chiesta da chiunque ne assegni uno:
 `SN_TASTI.riservato(accel)` in `src/shared/tasti.js`. La lista non si tiene allineata a
-mano — una sentenza negli unit test la confronta con gli acceleratori della barra vera e
+mano — una sentinella negli unit test la confronta con gli acceleratori della barra vera e
 diventa rossa se divergono. E dove un tasto si sposta, si spostano insieme il
 comportamento (`indiceSaltoScheda`), il suo nome (`etichettaSaltoScheda`) e la sua
 descrizione (`descrizioneSaltoScheda`): tenerli in file diversi è come sono nate le due
