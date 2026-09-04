@@ -63,8 +63,14 @@ test('dettatura: quel che dico finisce nel campo', async ({ openTab, testServer 
 
   const detta = page.locator('text=Detta').first();
   await expect(detta, 'la voce "Detta" esiste nel menu').toBeVisible({ timeout: 5000 });
+  page.on('console', (m) => console.log('[pagina]', m.type(), m.text()));
   await detta.click();
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(4000);
+  console.log('TOAST/CORPO:', await page.evaluate(() => {
+    const t = [...document.querySelectorAll('[class*="toast"], .sn-toast, [class*="sn-"]')]
+      .map((e) => e.className + ' :: ' + (e.innerText || '').slice(0, 120));
+    return t.join('\n');
+  }));
   const pill = page.locator('.sn-dictate-pill');
   await expect(pill, 'compare il riquadro "ti ascolto"').toBeVisible({ timeout: 8000 });
 
