@@ -1968,6 +1968,8 @@
     if (mgUserNote) {
       mgUserNote.hidden = !isAdmin;
       mgUserNoteText.value = String(fb.userNote || '');
+      // Il valore con cui la riga è stata riempita: una bozza è ciò che differisce.
+      mgUserNoteText.dataset.saved = mgUserNoteText.value;
       userNoteToccata = false;
       // Il salvataggio di un ALTRO feedback può essere ancora in volo: il
       // bottone è uno solo, e lasciarlo spento qui bloccherebbe una scrittura
