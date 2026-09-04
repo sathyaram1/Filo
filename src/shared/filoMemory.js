@@ -197,9 +197,18 @@
     return global.SN_ONBOARDING;
   }
 
+  // Il segno "già accolto" è UNO: `done` qui dentro, scritto quando
+  // l'intervista FINISCE. La vecchia chiave FILO_WELCOMED sopravvive solo come
+  // segnale di migrazione — chi era già stato accolto dalla versione precedente
+  // non si ritrova l'intervista addosso a un aggiornamento — e non viene più
+  // scritta da nessuno: appena esiste lo stato qui, comanda lui.
   async function getOnboarding() {
     const raw = await getRaw(KEYS.FILO_ONBOARDING, null);
     const O = Onb();
+    if (raw == null) {
+      const legacy = await getRaw(KEYS.FILO_WELCOMED, false);
+      if (legacy) return O ? O.normalize({ done: true }) : { done: true, ticked: [], thread: [] };
+    }
     return O ? O.normalize(raw) : (raw || { done: false, ticked: [], thread: [] });
   }
 
