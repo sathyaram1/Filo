@@ -205,7 +205,7 @@
     goThread();
     const thread = Array.isArray(state.thread) ? state.thread : [];
     const resuming = thread.length > 1;
-    if (resuming && Onb?.RESUME_NOTE) stepTrace(Onb.RESUME_NOTE);
+    if (resuming && Onb?.RESUME_NOTE) bubblesEl.appendChild(stepTrace(Onb.RESUME_NOTE));
     threadHistory = [];
     for (const m of thread) {
       const role = m.role === 'filo' ? 'filo' : 'user';
