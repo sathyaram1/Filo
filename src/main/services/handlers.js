@@ -2360,6 +2360,11 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   maybeRunCompactor,
+  // Intervista di benvenuto (#524)
+  saveOnboarding,
+  finishOnboarding,
+  claimOnboardingResume,
+  releaseOnboardingResume,
 };
 
 require('./handlers/nav')(on, handlerCtx);
