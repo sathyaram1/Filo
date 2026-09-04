@@ -186,6 +186,30 @@
     return { profilo, preferenze, espansioni };
   }
 
+  // ===== Onboarding (#524) =====
+  //
+  // Lo stato della micro-intervista di benvenuto sta in UNA chiave e passa
+  // sempre da `SN_ONBOARDING.normalize`: qualunque cosa ci sia in storage
+  // (assente, vecchia, manomessa) torna una forma usabile, perché queste
+  // letture stanno sul cammino di apertura della home.
+
+  function Onb() {
+    return global.SN_ONBOARDING;
+  }
+
+  async function getOnboarding() {
+    const raw = await getRaw(KEYS.FILO_ONBOARDING, null);
+    const O = Onb();
+    return O ? O.normalize(raw) : (raw || { done: false, ticked: [], thread: [] });
+  }
+
+  async function setOnboarding(state) {
+    const O = Onb();
+    const next = O ? O.normalize(state) : state;
+    await setRaw(KEYS.FILO_ONBOARDING, next);
+    return next;
+  }
+
   // ===== Notes / appunti =====
   //
   // Non esistono più qui: gli appunti sono file dell'editor (ci scrive Filo
