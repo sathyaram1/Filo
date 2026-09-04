@@ -1027,6 +1027,48 @@
 
   const DEFAULT_PROVIDER = 'openrouter';
 
+  // ─── IL SISTEMA SU CUI GIRA FILO, DETTO AL MODELLO ─────────────────────────
+  // Filo lancia comandi da terminale e legge file per percorso: due cose che
+  // hanno una forma DIVERSA su Windows, Mac e Linux. Finché il prompt non lo
+  // diceva, il modello poteva solo indovinare — e l'unico esempio di percorso
+  // che vedeva era `C:\Users\...`, quindi su un Mac indovinava Windows e
+  // proponeva comandi e percorsi che lì non esistono.
+  //
+  // Sta nella parte FISSA del prompt (non nel contesto): il sistema di una
+  // macchina non cambia fra un messaggio e l'altro, quindi non rompe il riuso
+  // della cache. Il valore arriva dal main process (process.platform): questo
+  // file gira anche nelle pagine, dove `process` non c'è.
+  const SISTEMI = {
+    darwin: {
+      nome: 'macOS (un Mac)',
+      shell: 'una shell POSIX (sh/zsh): comandi come `ls`, `cat`, `open`, `grep`',
+      percorsi: 'percorsi in stile Unix, con le barre in avanti: `/Users/anna/Downloads/estratto-conto.pdf`, o `~/Downloads/...`',
+      esempioPercorso: '/Users/anna/Downloads/estratto-conto.pdf',
+      shellPref: '"sh" | "bash"',
+    },
+    win32: {
+      nome: 'Windows',
+      shell: 'PowerShell (o cmd): comandi come `dir`, `Get-ChildItem`, `start`',
+      percorsi: 'percorsi in stile Windows, con la lettera di unità e le barre rovesciate: `C:\\Users\\anna\\Downloads\\estratto-conto.pdf`',
+      esempioPercorso: 'C:\\\\Users\\\\anna\\\\Downloads\\\\estratto-conto.pdf',
+      shellPref: '"powershell" | "cmd" | "bash"',
+    },
+    linux: {
+      nome: 'Linux',
+      shell: 'una shell POSIX (sh/bash): comandi come `ls`, `cat`, `xdg-open`, `grep`',
+      percorsi: 'percorsi in stile Unix, con le barre in avanti: `/home/anna/Downloads/estratto-conto.pdf`, o `~/Downloads/...`',
+      esempioPercorso: '/home/anna/Downloads/estratto-conto.pdf',
+      shellPref: '"sh" | "bash"',
+    },
+  };
+
+  // Windows è il ripiego: è dove Filo è nato e dove sta la stragrande
+  // maggioranza degli utenti di oggi. Se un giorno arriva un `platform` che non
+  // conosciamo, meglio il comportamento di prima che nessun comportamento.
+  function descriviSistema(platform) {
+    return SISTEMI[platform] || SISTEMI.win32;
+  }
+
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
     explain: ({ selection, sentence, fxLine }) =>
