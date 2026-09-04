@@ -1439,6 +1439,11 @@
       retry.title = 'Rimanda lo stesso messaggio';
       retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
       row.appendChild(retry);
+      // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
+      // modello non risponde (rete assente, provider giù, crediti finiti) alla
+      // home non ci si arriva più. L'uscita sta qui, accanto, dove l'utente
+      // guarda.
+      if (onboardingActive) row.appendChild(makeSkipOnboardingBtn('Salta e vai alla home'));
       err.appendChild(row);
       bubblesEl.appendChild(err);
     } else {
