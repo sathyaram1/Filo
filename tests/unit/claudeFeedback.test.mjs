@@ -202,7 +202,7 @@ test('--allega: un allegato non caricato si dice e l\'uscita non è "fatto"', as
   assert.ok(errori.some((r) => /ALLEGATO NON CARICATO: spec.md/.test(r)), 'l\'allegato mancante va detto');
 });
 
-test('--allega: un\x27immagine va nel campo delle immagini (i giudici la guardano), un documento nei file', async () => {
+test('--allega: una immagine va nel campo delle immagini (i giudici la guardano), un documento nei file', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
   const png = join(dir, 'shot.png');
   writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]));
