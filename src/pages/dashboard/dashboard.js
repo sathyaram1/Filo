@@ -2766,7 +2766,10 @@
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
-    // il ringraziamento parte subito.
+    // il ringraziamento parte subito. Con l'intervista di benvenuto a schermo
+    // (#524) non parte niente: un popup sopra l'accoglienza è la prima cosa che
+    // l'utente vedrebbe di Filo.
+    if (onbState) return;
     (async () => {
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
