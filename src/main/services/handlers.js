@@ -1992,7 +1992,40 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     renderedActions.push(rendered);
   }
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
-  maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
+  // #524 — chiusura dell'intervista di benvenuto. L'ordine non è un dettaglio:
+  // prima l'agente-lezioni estrae quello che questo turno ha insegnato, POI la
+  // compattazione lo porta dentro PROFILO/PREFERENZE (forzata: senza aspettare
+  // la soglia), e solo allora Filo genera la PRIMA home personale — che è
+  // l'ultimo atto dell'accoglienza, al posto di un "fatto". Se invece
+  // l'intervista prosegue, il turno di Filo viene messo da parte per la ripresa.
+  let onboardingClosed = false;
+  if (onbActive) {
+    let after = await FiloMem.getOnboarding();
+    if (textReply && textReply !== '(vuoto)') {
+      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply });
+    }
+    if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
+    await FiloMem.setOnboarding(after);
+    onboardingClosed = !!after.done;
+  }
+  if (onboardingClosed) {
+    maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText })
+      .then(() => maybeRunCompactor())
+      .then(() => handleFiloGenerateDashboard({ force: true }))
+      .then((d) => broadcastToTabs({
+        type: MSG.FILO_ONBOARDING_DONE,
+        message: d?.message || '', suggestions: d?.suggestions || [], ts: d?.ts || new Date().toISOString(),
+      }))
+      .catch((e) => {
+        console.warn('[Filo] chiusura onboarding', e);
+        // La home personale non è arrivata: la chat non può restare appesa in
+        // attesa. Diciamo comunque che è finita, senza dashboard: il client
+        // torna alla home e la genera per la sua strada normale.
+        broadcastToTabs({ type: MSG.FILO_ONBOARDING_DONE, message: '', suggestions: [], ts: new Date().toISOString() });
+      });
+  } else {
+    maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }).catch(() => {});
+  }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
   // Se in questo turno abbiamo già proposto la segnalazione all'utente (#360),
   // quella anonima non parte: una sola segnalazione per lo stesso buco.
