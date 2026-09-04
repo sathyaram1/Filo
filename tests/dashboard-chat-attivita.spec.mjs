@@ -81,7 +81,7 @@ test('A — il ragionamento scorre in un riquadro, si richiude con la risposta e
       try { onDelta && onDelta(text); } catch (_) {}
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
-  }, THOUGHTS);
+  });
 
   await page.locator('#input').fill('ciao filo');
   await page.locator('#sendBtn').click();
