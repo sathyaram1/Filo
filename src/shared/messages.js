@@ -588,6 +588,12 @@
     // generata: l'ultimo atto dell'accoglienza è il risultato, non un "fatto".
     // { message, suggestions, ts }
     FILO_ONBOARDING_DONE: 'filo_onboarding_done',
+    // Broadcast da background -> dashboard (#524): la conversazione
+    // dell'intervista è cambiata (un turno in più, una spunta). Le schede che
+    // hanno l'accoglienza a schermo ma non stanno scrivendo si riallineano: due
+    // schede nuove aperte insieme mostrano la stessa conversazione, non una
+    // ferma a com'era. { onboarding }
+    FILO_ONBOARDING_UPDATED: 'filo_onboarding_updated',
     // Broadcast da background -> content: una lettura ad alta voce è attiva
     // (in QUALCHE scheda) oppure no. Ogni scheda usa questo flag per mostrare
     // "Interrompi lettura" nel menu anche se non è lei a leggere. { active: bool }
