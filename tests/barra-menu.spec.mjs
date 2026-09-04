@@ -35,10 +35,10 @@ async function voceDellaBarra(app, etichetta) {
 }
 
 const stato = (app) => app.evaluate(({ BrowserWindow }) => {
-  const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+  const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w.isDestroyed());
   const tabs = win && win._filoTabs;
   return {
-    finestre: BrowserWindow.getAllWindows().length,
+    finestra: win ? win.id : null,
     schede: tabs ? tabs.tabs.length : 0,
     urlAttiva: tabs ? (tabs.tabs.find((t) => t.id === tabs.activeId) || {}).url || '' : '',
   };
