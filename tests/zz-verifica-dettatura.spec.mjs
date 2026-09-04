@@ -1,91 +1,90 @@
 // VERIFICA INDIPENDENTE — da cancellare a fine verifica.
-// Dettatura dal vivo: il "microfono" è una voce vera sintetizzata prima.
-import { test, expect } from './fixtures/electron.mjs';
-import { readFileSync } from 'node:fs';
+// Dettatura dal vivo: microfono finto di Chromium alimentato da una voce vera.
+import { test, expect, _electron as electron } from '@playwright/test';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:http';
 
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const KEY = (readFileSync('C:/Users/agenti AI/Desktop/Filo/agent-bench/.env', 'utf8')
   .match(/OPENROUTER_KEY=(\S+)/) || [])[1];
-const WAV_B64 = readFileSync(
-  'C:/Users/AGENTI~1/AppData/Local/Temp/claude/C--Users-agenti-AI-Desktop-Filo-Filo/868afa78-eb42-4303-8142-6ea39d549556/scratchpad/voce.wav',
-).toString('base64');
+const WAV = 'C:/Users/AGENTI~1/AppData/Local/Temp/claude/C--Users-agenti-AI-Desktop-Filo-Filo/868afa78-eb42-4303-8142-6ea39d549556/scratchpad/voce48.wav';
 
-async function setKey(openTab, key) {
-  const opt = await openTab('filo://options/options.html');
-  await opt.waitForLoadState('load');
-  await opt.waitForTimeout(2500);
-  const chk = opt.locator('#useDefaultModels');
-  if (await chk.isChecked()) await chk.click();
-  await opt.waitForTimeout(500);
-  await opt.locator('#apiKey').fill(key);
-  await opt.locator('#apiKey').blur();
-  await opt.waitForTimeout(2500);
-}
+test('dettatura dal vivo: quel che dico finisce nel campo', async () => {
+  test.setTimeout(300000);
+  const userData = mkdtempSync(join(tmpdir(), 'filo-zz-'));
+  const app = await electron.launch({
+    args: [
+      '--use-fake-ui-for-media-stream',
+      `--use-file-for-fake-audio-capture=${WAV}`,
+      '.',
+    ],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+  });
+  const server = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<html lang="it"><body style="font:16px sans-serif;padding:40px"><h1>Prova</h1><textarea id="campo" rows="5" cols="60"></textarea></body></html>');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
 
-test('dettatura: quel che dico finisce nel campo', async ({ openTab, testServer }) => {
-  test.setTimeout(240000);
-  await setKey(openTab, KEY);
-
-  const page = await testServer.openReady(openTab, `
-    <html lang="it"><body style="font:16px sans-serif;padding:40px">
-      <h1>Prova dettatura</h1>
-      <textarea id="campo" rows="5" cols="60"></textarea>
-    </body></html>`);
-
-  // Microfono finto: una voce VERA (WAV sintetizzato) al posto del microfono.
-  await page.evaluate(async (b64) => {
-    const bin = atob(b64);
-    const buf = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-    const ctx = new AudioContext();
-    const audio = await ctx.decodeAudioData(buf.buffer);
-    const dest = ctx.createMediaStreamDestination();
-    window.__filoFakeMic = () => {
-      const src = ctx.createBufferSource();
-      src.buffer = audio;
-      src.loop = true;
-      src.connect(dest);
-      src.start();
-      return dest.stream;
+  try {
+    const shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+    const openTab = async (url) => {
+      const target = new URL(url).hostname;
+      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+      const deadline = Date.now() + 15000;
+      while (Date.now() < deadline) {
+        const p = app.windows().find((w) => { try { return new URL(w.url()).hostname === target; } catch (_) { return false; } });
+        if (p) { await p.waitForLoadState('domcontentloaded').catch(() => {}); return p; }
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      throw new Error('nessuna window per ' + url);
     };
-    navigator.mediaDevices.getUserMedia = async () => window.__filoFakeMic();
-  }, WAV_B64);
 
-  await page.locator('#campo').click();
-  await page.locator('#campo').type('nota: ');
-  // Tasto destro sul campo → menu di Filo
-  await page.locator('#campo').click({ button: 'right' });
-  await page.waitForTimeout(1500);
-  const menuText = await page.evaluate(() => {
-    const m = document.querySelector('.sn-popup, .sn-context-menu, [class*="sn-menu"]');
-    return m ? m.innerText : '(nessun menu trovato)';
-  });
-  console.log('VOCI DEL MENU:\n' + menuText);
+    // chiave vera nelle Opzioni
+    const opt = await openTab('filo://options/options.html');
+    await opt.waitForTimeout(3000);
+    const chk = opt.locator('#useDefaultModels');
+    if (await chk.isChecked()) await chk.click();
+    await opt.waitForTimeout(500);
+    await opt.locator('#apiKey').fill(KEY);
+    await opt.locator('#apiKey').blur();
+    await opt.waitForTimeout(3000);
 
-  const detta = page.locator('text=Detta').first();
-  await expect(detta, 'la voce "Detta" esiste nel menu').toBeVisible({ timeout: 5000 });
-  page.on('console', (m) => console.log('[pagina]', m.type(), m.text()));
-  await detta.click();
-  await page.waitForTimeout(4000);
-  console.log('TOAST/CORPO:', await page.evaluate(() => {
-    const t = [...document.querySelectorAll('[class*="toast"], .sn-toast, [class*="sn-"]')]
-      .map((e) => e.className + ' :: ' + (e.innerText || '').slice(0, 120));
-    return t.join('\n');
-  }));
-  const pill = page.locator('.sn-dictate-pill');
-  await expect(pill, 'compare il riquadro "ti ascolto"').toBeVisible({ timeout: 8000 });
+    const page = await openTab(`http://127.0.0.1:${port}/x`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 15000 });
+    page.on('console', (m) => console.log('[pagina]', m.type(), m.text()));
 
-  // parla per un po', poi guarda la trascrizione provvisoria
-  await page.waitForTimeout(14000);
-  const live = await page.evaluate(() => {
-    const el = document.querySelector('.sn-dictate-pill-live');
-    return el && !el.hidden ? el.textContent : '';
-  });
-  console.log('PROVVISORIO IN DIRETTA:', JSON.stringify(live));
+    await page.locator('#campo').click();
+    await page.locator('#campo').type('nota: ');
+    await page.locator('#campo').click({ button: 'right' });
+    await page.waitForTimeout(1500);
+    await page.locator('text=Detta').first().click();
 
-  await pill.click();
-  await page.waitForTimeout(20000);
-  const val = await page.locator('#campo').inputValue();
-  console.log('CAMPO DOPO LA DETTATURA:', JSON.stringify(val));
-  expect(val.toLowerCase(), 'il testo dettato è finito nel campo').toContain('gatto');
-  expect(val.startsWith('nota: '), 'il testo si aggiunge dove stava il cursore').toBe(true);
+    const pill = page.locator('.sn-dictate-pill');
+    await expect(pill, 'compare il riquadro "ti ascolto"').toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(14000);
+    const live = await page.evaluate(() => {
+      const el = document.querySelector('.sn-dictate-pill-live');
+      return el && !el.hidden ? el.textContent : '';
+    });
+    console.log('PROVVISORIO IN DIRETTA:', JSON.stringify(live));
+
+    await pill.click();
+    await page.waitForTimeout(25000);
+    const val = await page.locator('#campo').inputValue();
+    console.log('CAMPO DOPO LA DETTATURA:', JSON.stringify(val));
+    expect(val.toLowerCase(), 'il testo dettato è finito nel campo').toContain('gatto');
+    expect(val.startsWith('nota: '), 'il testo si aggiunge dove stava il cursore').toBe(true);
+    expect(live, 'la trascrizione provvisoria si vede mentre parlo').not.toBe('');
+  } finally {
+    try { await app.close(); } catch (_) {}
+    await new Promise((r) => server.close(r));
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
 });
