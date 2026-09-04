@@ -281,6 +281,8 @@ const SORGENTI_DEI_NOMI = {
     'è la regola stessa: qui i nomi delle scorciatoie si costruiscono',
   'src/main/shortcuts.js':
     'è la TABELLA canonica degli acceleratori da registrare, non un\'etichetta da leggere',
+  'src/main/menu.js':
+    'è la tabella degli acceleratori della barra dei menu: la scritta la disegna Electron, e cosa contiene lo controllano i test qui sotto voce per voce',
   'src/shared/capabilities.js':
     'manifesto unico letto su tutti i sistemi: cita entrambe le forme, e il test qui sotto lo verifica voce per voce',
   'src/shared/patchNotes.js':
