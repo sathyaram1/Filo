@@ -28,10 +28,10 @@
   // giudica Filo, quindi non lo genera il modello. Dal secondo in poi parla lui.
   const WELCOME_MESSAGE =
     'Ciao, sono Filo. Se mi dai due minuti ti faccio qualche domanda e ti dico '
-    + 'un paio di cose su di me: alla fine mi trovi già impostato come vuoi tu, '
+    + 'un paio di cose su di me. Alla fine mi trovi già impostato come vuoi tu, '
     + 'e ti preparo la tua home.\n'
-    + 'Comincio da qui: chi sei, e a cosa ti serve di solito il computer?\n'
-    + 'Se non ti va, scrivi «basta così» e chiudiamo — vado avanti coi valori '
+    + 'Comincio io. Chi sei, e a cosa ti serve di solito il computer?\n'
+    + 'Se non ti va, scrivi «basta così» e chiudiamo. Vado avanti coi valori '
     + 'predefiniti.';
 
   // Quando l'utente riprende un'intervista lasciata a metà, la conversazione
