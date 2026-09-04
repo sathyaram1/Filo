@@ -89,8 +89,8 @@ async function stubAgents(app) {
   });
 }
 
-const queueChat = (app, ...replies) => app.evaluate((rs) => {
-  globalThis.__chatReplies.push(...rs);
+const queueChat = (app, ...replies) => app.evaluate((_electron, rs) => {
+  globalThis.__chatReplies = (globalThis.__chatReplies || []).concat(rs);
 }, replies.map((r) => JSON.stringify(r)));
 
 const onbState = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getOnboarding());
