@@ -42,11 +42,11 @@
   let signedIn = false;
   let uid = null;               // uid Firebase REALE (claim id token), per votes.<uid>
   let allFeedbacks = [];
-  // I miglioramenti sono arrivati davvero, e — se no — perché. Serve a ogni
-  // ridisegno, non solo al primo: un re-render (es. dopo un login) ripartirebbe
-  // da una lista vuota e scriverebbe "Nessun miglioramento…" al posto
-  // dell'errore, portandosi via il tasto "Riprova" (#495).
-  let dataLoaded = false;
+  // Perché i miglioramenti non ci sono, se non ci sono. Serve a ogni ridisegno,
+  // non solo al primo: un re-render (es. dopo un login) ripartirebbe da una
+  // lista vuota e scriverebbe "Nessun miglioramento…" al posto dell'errore,
+  // portandosi via il tasto "Riprova" (#495). `null` = l'ultimo caricamento è
+  // andato bene.
   let lastLoadError = null;
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
@@ -103,9 +103,17 @@
 
   // ── Render ──────────────────────────────────────────────────────────────
   function renderList() {
-    // Caricamento fallito e mai riuscito: la lista è vuota perché non l'abbiamo,
-    // non perché non ci sia niente. Resta l'errore, con la via d'uscita.
-    if (!dataLoaded && lastLoadError) {
+    // L'ULTIMO caricamento è fallito e non abbiamo niente da mostrare: la lista
+    // è vuota perché non ce l'abbiamo, non perché non ci sia niente. Resta
+    // l'errore, con la via d'uscita.
+    //
+    // La condizione guarda quello che abbiamo, non se un caricamento sia mai
+    // riuscito: con `!dataLoaded` bastava che il PRIMO caricamento fosse andato
+    // bene (una lista vuota, per esempio) perché un fallimento successivo
+    // tornasse a dire «Nessun miglioramento…» al primo ridisegno. È il difetto
+    // che questo spec doveva impedire, rientrato da un'altra porta, e si vedeva
+    // solo dove il primo caricamento riesce davvero.
+    if (lastLoadError && !allFeedbacks.length) {
       showLoadError(lastLoadError);
       return;
     }
@@ -501,7 +509,6 @@
 
     try {
       allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
-      dataLoaded = true;
       lastLoadError = null;
     } catch (err) {
       // Il caricamento è FALLITO: non fingere "lista vuota". Mostra l'errore con
@@ -536,7 +543,7 @@
   // ── Hook di test (Playwright) — inerte in produzione ────────────────────
   window.__boardTest = {
     // Dati iniettati = dati arrivati: azzera anche l'eventuale guasto ricordato.
-    setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; dataLoaded = true; lastLoadError = null; renderList(); },
+    setData(fbs) { allFeedbacks = Array.isArray(fbs) ? fbs : []; lastLoadError = null; renderList(); },
     setSignedIn(email) { signedIn = !!email; uid = email || null; reflectAuth(); renderList(); },
     setReleasedVersion(v) { releasedVersion = v || ''; renderList(); },
     // Rilancia il caricamento reale (loadData): usato dai test per esercitare il

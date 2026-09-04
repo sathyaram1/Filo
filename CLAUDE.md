@@ -180,11 +180,21 @@ modifica:
   (`npx playwright test tests/<feature>.spec.mjs`); se non esiste, scrivilo;
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
   screenshot (`tests/agent/.out/`); `test:explore` (LLM) è facoltativo;
-- **nelle routine** (dal 2026-09-03): chi risolve NON lancia la suite
-  completa; la lancia il verificatore, una volta, prima di dare `pass`. Un
-  rosso fuori dalla lista dei rossi noti torna a chi risolve con l'elenco
-  degli spec rotti. Le regressioni restano responsabilità di chi le
-  introduce: i minimi qui sopra (unit + spec mirato) valgono sempre;
+- **nelle routine** (dal 2026-09-04): la suite completa **non la lancia
+  nessuno a mano**. Gira da sola su GitHub Actions a ogni salvataggio del ramo
+  (`.github/workflows/suite.yml`, Electron sotto Xvfb, dieci fette in
+  parallelo: ~35 minuti di macchina, nessuno che aspetta), e il verdetto si
+  rilegge in un secondo con `node scripts/suite-verdict.mjs leggi` (0 verde ·
+  1 rossa con l'elenco degli spec e il perché di ciascuno · 2 in corso ·
+  3 assente). Il verificatore lo legge prima di dare `pass`; un rosso fuori
+  dalla lista dei rossi noti (`.github/workflows/rossi-noti.json`) torna a chi
+  risolve con l'elenco degli spec rotti. **Non è verde nemmeno una suite che
+  non ha ESEGUITO quello che doveva**: una fetta che non consegna, una che
+  esegue zero test, un errore fuori dai test (uno spec che non compila fa
+  morire la fetta intera senza far fallire un solo test) o un conto sceso sotto
+  il minimo di `.github/workflows/suite-attesi.json`. Le regressioni restano
+  responsabilità di chi le introduce: i minimi qui sopra (unit + spec mirato)
+  valgono sempre;
 - **in locale** → la suite completa solo per modifiche trasversali o se non
   sai cosa tocchi (~25 min: avvisa l'owner, gli occupi la macchina). Se temi
   una regressione precisa, verificala subito: non rimandarla.

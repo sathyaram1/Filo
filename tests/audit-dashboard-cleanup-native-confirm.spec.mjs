@@ -9,6 +9,7 @@
 // perche' src/pages/dashboard/dashboard.js:289 chiama window.confirm diretto.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { lento } from './fixtures/tempi.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -27,7 +28,7 @@ async function newtabPage(app) {
 // senza rendere rossa la regressione completa. Il fixer che chiude il feedback
 // toglie `.fixme` per farlo diventare un assert vivo (deve passare col fix).
 test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativo', async ({ app, shell }) => {
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: lento(8_000) });
   const page = await newtabPage(app);
 
   // Se scatta un dialog nativo (confirm) del browser, lo registriamo: e' il bug.
@@ -57,7 +58,7 @@ test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativ
 
   // Il suggerimento deve essere renderizzato.
   const sug = page.locator('.dash-suggestion');
-  await expect(sug.first()).toBeVisible({ timeout: 5_000 });
+  await expect(sug.first()).toBeVisible({ timeout: lento(5_000) });
 
   // Strumenta i due cammini di conferma per capire QUALE viene usato.
   await page.evaluate(() => {

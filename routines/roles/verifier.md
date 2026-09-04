@@ -46,6 +46,9 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
    guardando.
    Se gli strumenti E2E mancano davvero nell'ambiente: giudica su codice +
    `npm run test:unit` e dichiaralo nella critica — NON è un motivo di FAIL.
+   **Segnati subito la punta del ramo** (`git rev-parse HEAD`): è il commit su
+   cui la suite completa sta girando, e alla fine ti servirà per rileggerne il
+   verdetto (vedi "La suite completa", sotto).
 3. **Riproduci la lamentela** esattamente come la descriverebbe l'utente:
    esegui i suoi passi e verifica che la feature risponda. Asserisci il
    **successo** (la cosa che l'utente voleva accade), non l'assenza di un
@@ -86,22 +89,65 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
       feedback` — arriva firmato come verifica), non blocca il verdetto:
       decide l'owner.
 
-## La suite completa: una volta, prima del PASS
+## La suite completa: si LEGGE, non si lancia
 
-Chi risolve non lancia più `npm test` (dal 2026-09-03). Lo lanci tu, **solo
-quando stai per dare PASS** (o MIGLIORABILE, che passa lo stesso): una corsa
-per feedback invece di una per consegna. Prima confronta gli spec toccati e
-gli unit test; la suite intera è l'ultimo passo, non il primo.
+Dal 2026-09-04 la suite completa **non la lancia più nessuno a mano**: gira da
+sola su GitHub Actions (workflow "Suite completa", Electron sotto Xvfb, dieci
+fette in parallelo) a ogni salvataggio del ramo, mentre il lavoro è ancora in
+corso. Quando arrivi tu, di solito ha già finito. Tu la **leggi**, quando stai
+per dare PASS (o MIGLIORABILE, che passa lo stesso):
 
-- Rossi **fuori dalla lista dei rossi noti** → **FAIL**, con l'elenco esatto
-  degli spec rotti nella critica: chi corregge rilancia quelli, non tutto.
-- Rossi noti (schermo intero, cattura dello schermo, finestra nascosta, un
-  sito esterno, il percorso abbreviato di Windows: quelli che sono rossi anche
-  su `main` in quell'ambiente) non contano. In dubbio, confronta con `main`
-  sullo stesso spec prima di bocciare: un rosso d'ambiente spacciato per
-  regressione costa un giro intero.
-- Se stai per dare FAIL per altri motivi, la suite completa non serve: la
-  farai al giro in cui il lavoro passa.
+```bash
+node scripts/suite-verdict.mjs leggi --sha <la punta che ti eri segnato> --attendi 20
+```
+
+Il codice d'uscita è il verdetto:
+
+- **0 — VERDE**: nessun rosso fuori dalla lista dei rossi noti. Vai avanti.
+- **1 — ROSSA**: stampa **l'elenco esatto degli spec rotti**. È un **FAIL**, e
+  quell'elenco va nella critica riga per riga: chi corregge rilancia quelli,
+  non tutto.
+- **2 — IN CORSO**: la suite sta ancora girando su quel commit (`--attendi`
+  aspetta fino a N minuti prima di arrendersi).
+- **3 — ASSENTE**: nessun verdetto per QUEL commit — non è mai partita, è
+  morta, oppure il verdetto disponibile è di un commit precedente.
+- **4**: non si riesce nemmeno a chiedere (git, rete).
+
+**2, 3 e 4 non sono un verde, e non sono un rosso.** Non fingere né l'uno né
+l'altro: o dichiari nella critica che il verdetto non c'era (non è un motivo di
+FAIL da solo), oppure te la lanci qui, come si faceva prima:
+
+```bash
+npx playwright test --reporter=json > verbale.json
+node scripts/suite-reds.mjs verbale.json --ambiente cloud
+```
+
+`--ambiente cloud` non è un dettaglio: la lista dei rossi noti distingue i
+rossi di QUESTA macchina da quelli del runner di Actions. Chiedendo l'ambiente
+sbagliato ti ritrovi verde una suite che qui è rossa.
+
+Attenzione a cosa vuol dire ROSSA: non è solo "dei test sono falliti". È rossa
+anche una suite che **non ha eseguito** quello che doveva — una fetta che non
+consegna il verbale, una fetta che esegue zero test, un errore fuori
+dall'elenco dei test (uno spec che non compila fa morire la fetta intera senza
+far fallire un solo test), o un numero di test sceso sotto il minimo di
+`.github/workflows/suite-attesi.json`. Il riassunto dice quale dei casi è, e in
+tutti torna a chi risolve: sono regressioni, non incidenti.
+
+Per farla ripartire non serve nessun comando: la suite riparte a ogni
+salvataggio del ramo, quindi basta una modifica qualunque (il salvataggio
+automatico committa e spedisce, e il workflow riparte da quella punta).
+
+I **rossi noti** non li giudichi tu: sono un file nel repo
+(`.github/workflows/rossi-noti.json`, con il motivo di ciascuno) e il confronto
+lo fa la macchina prima di scrivere il verdetto. Se ti pare che uno spec sia
+rosso solo per l'ambiente e non sia in lista, non ignorarlo: dillo nella
+critica, e la voce si aggiunge alla lista (è una modifica in area protetta,
+quindi la fusione passa da un via libera dell'owner — è voluto: una lista di
+rossi da ignorare che si allunga da sola non sarebbe più una lista).
+
+Se stai per dare FAIL per altri motivi, il verdetto non serve: lo leggerai al
+giro in cui il lavoro passa.
 
 ## Trovato un difetto, conta le porte — tutte nella stessa critica
 

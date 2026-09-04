@@ -488,3 +488,71 @@ ma a scriverlo è il server.
   sopra una release già esistente.
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
+
+## 13. Il cancello aspetta la suite completa (2026-09-04)
+
+Fino a oggi il cancello di fusione guardava **chi** e **cosa** — biglietto vivo,
+ruolo giusto, verdetti registrati, L5 sul diff scaricato da GitHub — ma non ha
+mai guardato **se il codice funziona**: una funzione cloud non avvia Electron, e
+la suite completa girava altrove, dentro una sessione, cioè in un posto
+convincibile.
+
+Da oggi la suite gira su GitHub Actions a ogni push del ramo di lavoro
+(`SPEC-RIDISEGNO-MAX.md` §15) e lascia il verdetto in un ref git,
+`refs/suite/<ramo>` — un commit con dentro il solo file `verdetto.json`:
+
+```json
+{ "sha": "<il commit provato>", "ramo": "worker/…", "stato": "in-corso|finito",
+  "verde": true, "eseguiti": 1370,
+  "rossi": [ { "file": "…", "titolo": "…", "messaggio": "…" } ],
+  "riassunto": "…", "run": "https://github.com/…/actions/runs/…", "quando": "…" }
+```
+
+`verde` non vuol dire "nessun test fallito": vuol dire anche che la suite ha
+ESEGUITO quello che doveva. Il campo lo calcola `scripts/suite-reds.mjs`
+(funzione `verde`) tenendo conto delle fette che non hanno consegnato o non
+hanno eseguito niente, degli errori fuori dall'elenco dei test e del minimo di
+test attesi. Il cancello legge il campo: non deve ricalcolarlo.
+
+### Cosa deve fare `routineMerge` (filo-security, `functions/src/routine/mergeGate.js`)
+
+Fra il passo 3 (**punta vera del ramo**, lo `sha`) e il passo 4 (**L5 sul
+diff**), un controllo in più, fail-closed come gli altri:
+
+1. legge il ref `refs/suite/<chiave>` via API GitHub
+   (`GET /repos/{owner}/{repo}/git/ref/suite/<chiave>`, poi il blob
+   `verdetto.json` dell'albero di quel commit). La **chiave** è il nome del ramo
+   con le barre sostituite da `__` e tutto ciò che non è `[A-Za-z0-9._-]`
+   sostituito da `-`, più `-` e le prime 8 cifre esadecimali dello SHA-1 del
+   nome ORIGINALE del ramo. L'impronta non è un vezzo: senza, `lavoro/a b` e
+   `lavoro/a-b` finiscono sulla stessa chiave e il verdetto di un ramo vale per
+   l'altro. La funzione autorevole è `chiaveRef` in `scripts/suite-verdict.mjs`;
+2. **il verdetto vale solo per lo `sha` che si sta fondendo**. Un verdetto di un
+   altro commit è come se non ci fosse: altrimenti la punta nuova erediterebbe
+   il verde della vecchia, che è precisamente il modo in cui una regressione
+   passa. Vale come assente anche un verdetto **senza** `sha`, e un verdetto il
+   cui campo `ramo` non è il ramo che si sta fondendo: "non lo so" non è "a
+   posto", e l'eccezione dentro la regola è il modo in cui la regola sparisce;
+3. esiti:
+   - `verde` → si prosegue con L5 e la fusione;
+   - `finito` e non verde → **niente fusione**: risposta `suite_rossa` col
+     `riassunto` (contiene l'elenco degli spec rotti), e il feedback torna **in
+     correzione** con quell'elenco — non in `design`: non è una decisione
+     dell'owner, è codice rotto;
+   - `in-corso`, assente, o di un altro commit → **niente fusione**: risposta
+     `suite_in_attesa`. Non è un rifiuto e non è un guasto: il ramo è ancora
+     buono, semplicemente non si sa. Il giro successivo riprova.
+4. **Niente di tutto questo arriva dal chiamante.** Il verdetto lo legge il
+   server da GitHub, come già fa col diff: un verdetto raccontato nel corpo
+   della richiesta sarebbe il vecchio `FILO_L4_VERDICT` che il §11 ha tolto,
+   rientrato da un'altra porta.
+
+Perché il verde non basta da solo, e L5 resta: la suite dice che il codice
+funziona, non che è onesto. Sono due domande diverse e servono entrambe.
+
+**Stato**: il lato repo pubblico è fatto (workflow, lista dei rossi noti,
+pubblicazione e lettura del verdetto, ruolo del verificatore). Il lato server
+va applicato in filo-security, che è un altro repo: le routine non ci arrivano
+(la sessione vede solo il repo pubblico), quindi lo fa una sessione locale.
+Finché non è applicato, il verde lo legge il **verificatore** prima del `pass`
+— che è il cammino onesto, non il livello non convincibile.

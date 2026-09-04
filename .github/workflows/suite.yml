@@ -1,0 +1,210 @@
+# Suite completa di Filo su GitHub Actions (Electron sotto Xvfb).
+#
+# COSA FA
+#   A ogni push su un ramo di lavoro esegue TUTTA la suite Playwright — la
+#   stessa che `npm test` esegue sulla macchina dell'owner — divisa in fette
+#   parallele, e pubblica il verdetto dove chiunque possa rileggerlo senza
+#   rieseguire niente.
+#
+# PERCHÉ ESISTE
+#   Fino al 2026-09-04 la suite completa girava sulla macchina di chi verifica,
+#   una volta per feedback, prima del `pass`: venticinque minuti in cui un
+#   modello non faceva altro che aspettare, a ogni feedback. Il cancello di
+#   fusione del server non poteva rimediare, perché una funzione cloud non
+#   avvia Electron.
+#
+#   Qui i test partono da soli, mentre il lavoro è ancora in corso, su una
+#   macchina che non serve a nient'altro (repo pubblico: i minuti sono gratis).
+#   Quando il verificatore arriva a chiedere "com'è andata", di solito la
+#   risposta c'è già.
+#
+# PERCHÉ È DIVISO IN FETTE
+#   Un runner di Actions è più lento della macchina dell'owner e la suite gira a
+#   un worker solo (Electron e le scorciatoie globali non amano la concorrenza
+#   dentro lo stesso processo). Fette parallele = MACCHINE diverse, una worker
+#   ciascuna: nessuna concorrenza in più, e il tempo d'attesa si divide.
+#
+# DOVE FINISCE IL VERDETTO
+#   In un ref git, `refs/suite/<ramo>` (vedi scripts/suite-verdict.mjs). NON
+#   nelle API di GitHub: nell'ambiente delle routine le chiamate REST al repo
+#   sono chiuse, mentre git è il trasporto stesso del lavoro e c'è sempre.
+#   `refs/suite/*` non è un ramo: non tocca `main`, non compare fra i rami e
+#   non riaccende questo workflow.
+#
+# I ROSSI NOTI, E QUANTI TEST DEVONO GIRARE
+#   `.github/workflows/rossi-noti.json` e `.github/workflows/suite-attesi.json`,
+#   accanto a questo file — in area protetta dal controllo di sicurezza del
+#   server, perché sono esattamente i due file che un ramo catturato vorrebbe
+#   toccare per far tacere una regressione: allungare la lista delle scuse, o
+#   abbassare il numero di test che ci si aspetta di veder girare.
+
+name: Suite completa
+
+on:
+  push:
+    branches: ['**']      # tutti i rami, mai i tag: una release non è lavoro nuovo
+    # I rami usa-e-getta della prova di fusione del server (nascono e muoiono
+    # in pochi secondi, prima di chiedere all'owner di approvare): un verdetto
+    # su di loro non servirebbe a nessuno.
+    branches-ignore: ['prova-fusione/**']
+  workflow_dispatch: {}
+
+# Una corsa per ramo: il salvataggio automatico committa a ogni modifica di
+# file, e senza questo ogni salvataggio accenderebbe una suite intera in più.
+# Interrompere quella vecchia è la cosa giusta anche nel merito: il verdetto che
+# serve è quello della PUNTA del ramo, non di un commit che nessuno fonderà.
+concurrency:
+  group: suite-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # serve solo a spedire refs/suite/* (mai un ramo, mai main)
+
+jobs:
+  # ── 1. si dichiara che la suite è partita ───────────────────────────────────
+  # Senza questo passo, "verdetto assente" vorrebbe dire tre cose diverse (non
+  # è mai partita / sta girando / è morta) e chi legge non saprebbe se aspettare.
+  avvio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Segna la suite come in corso
+        run: |
+          node scripts/suite-verdict.mjs pubblica \
+            --ramo "${GITHUB_REF_NAME}" \
+            --sha "${GITHUB_SHA}" \
+            --stato in-corso \
+            --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+  # ── 2. la suite, a fette ────────────────────────────────────────────────────
+  suite:
+    needs: avvio
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false        # una fetta rossa non deve nascondere le altre
+      matrix:
+        # Dieci e non sei: Playwright divide per numero di test, non per durata,
+        # e con sei fette la più lenta ci metteva 37 minuti contro i 7 della più
+        # veloce. Il tempo che conta è quello della fetta più lenta.
+        fetta: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Dipendenze di sistema (Electron ha bisogno di un desktop finto)
+        run: |
+          sudo apt-get update
+          # scrot: la cattura composita dello schermo (capture-composite.spec)
+          # chiede uno strumento esterno, e senza si ferma con "nessun tool di
+          # cattura disponibile". Erano due voci nella lista dei rossi noti che
+          # incolpavano Xvfb; il motivo vero era un pacchetto mancante.
+          sudo apt-get install -y xvfb scrot
+          npx playwright install-deps chromium
+
+      - name: Dipendenze del progetto
+        run: |
+          npm ci
+          # Rete d'appoggio: se il download del binario Electron è saltato,
+          # questo script lo procura da solo ed è innocuo se c'è già.
+          node scripts/ensure-electron.mjs
+
+      # Due scelte, in questo passo:
+      #
+      # · il rosso NON ferma il lavoro. Il verdetto lo dà suite-reds
+      #   confrontando i fallimenti con la lista dei rossi noti, e per farlo il
+      #   verbale deve esistere: fermarsi qui butterebbe via proprio
+      #   l'informazione che stiamo raccogliendo.
+      # · lo schermo finto è dichiarato invece di lasciarlo al default di
+      #   xvfb-run, che non è lo stesso su tutte le distribuzioni. Uno schermo
+      #   più piccolo di quello che gli spec si aspettano fa fallire dei clic
+      #   per motivi che col codice non c'entrano niente.
+      #
+      # I tentativi restano i due della configurazione, gli stessi di `npm test`
+      # sulla macchina dell'owner. Provato a portarli a quattro il 2026-09-04
+      # sperando di assorbire i rossi del runner: non ne ha recuperato nemmeno
+      # uno (23 rossi contro 20), perché quei rossi non sono sfortuna — sono
+      # deterministici su quella macchina. Aggiungeva solo minuti.
+      - name: Suite completa (fetta ${{ matrix.fetta }}/10)
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: verbali/verbale-${{ matrix.fetta }}.json
+          # Questo runner è due o tre volte più lento del PC dell'owner, sul
+          # quale i tempi massimi degli spec sono tarati. Dichiararlo qui è ciò
+          # che ha tolto dalla lista dei rossi noti sette spec che fallivano solo
+          # qui: vedi playwright.config.js.
+          FILO_TEST_LENTEZZA: '3'
+        run: |
+          mkdir -p verbali
+          xvfb-run -a --server-args="-screen 0 1920x1080x24" npx playwright test \
+            --shard=${{ matrix.fetta }}/10 \
+            --reporter=list,json
+
+      - name: Consegna il verbale della fetta
+        uses: actions/upload-artifact@v4
+        with:
+          name: verbale-${{ matrix.fetta }}
+          path: verbali/verbale-${{ matrix.fetta }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── 3. il verdetto ──────────────────────────────────────────────────────────
+  verdetto:
+    needs: suite
+    # Anche se una fetta è rossa — è il caso interessante. Ma NON su corsa
+    # interrotta: una corsa superata da un push nuovo pubblicherebbe un verdetto
+    # "finito e rosso" per il commit vecchio, sopra quello in corso del nuovo.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Se non c'è nemmeno un verbale (corsa morta prima dei test) si prosegue
+      # lo stesso: il verdetto va pubblicato comunque, e sarà "non verde".
+      # Fermarsi qui lascerebbe il ref fermo su "in corso" per sempre, e chi
+      # legge aspetterebbe una risposta che non arriva più.
+      - name: Raccogli i verbali delle fette
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          path: verbali
+          pattern: verbale-*
+          merge-multiple: true
+
+      # Esce 1 se resta anche un solo rosso fuori dalla lista dei rossi noti.
+      # Esce 1 anche quando NESSUN test è fallito ma la suite non ha eseguito
+      # quello che doveva: una fetta che non consegna, una fetta che non esegue
+      # niente, un errore fuori dai test (uno spec che non compila fa morire la
+      # fetta intera senza far fallire un solo test), o un conto crollato sotto
+      # il minimo di `suite-attesi.json`. "Non eseguito" non deve mai somigliare
+      # a "tutto a posto".
+      - name: Rossi veri contro rossi noti
+        id: conto
+        continue-on-error: true
+        run: |
+          node scripts/suite-reds.mjs verbali \
+            --ambiente actions \
+            --fette 10 \
+            --proponi \
+            --json-out esito.json
+
+      - name: Pubblica il verdetto sul ref del ramo
+        run: |
+          node scripts/suite-verdict.mjs pubblica \
+            --ramo "${GITHUB_REF_NAME}" \
+            --sha "${GITHUB_SHA}" \
+            --stato finito \
+            --esito esito.json \
+            --run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+      # Il lavoro resta rosso su Actions quando la suite è rossa: il verdetto sul
+      # ref è per chi lo interroga, la spia verde/rossa è per chi guarda il repo.
+      - name: Rosso se la suite non è verde
+        if: steps.conto.outcome == 'failure'
+        run: |
+          echo "::error::Suite completa non verde: spec rotti fuori dalla lista dei rossi noti, oppure una parte della suite non è stata eseguita. Il riassunto qui sopra dice quale delle due."
+          exit 1

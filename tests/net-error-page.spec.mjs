@@ -12,9 +12,10 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { lento } from './fixtures/tempi.mjs';
 
 // La Page della pagina d'errore interna (filo://error/…), appena compare.
-async function waitErrorPage(app, timeout = 20_000) {
+async function waitErrorPage(app, timeout = lento(20_000)) {
   let page = null;
   await expect.poll(() => {
     page = app.windows().find((w) => {
@@ -48,7 +49,7 @@ test('dominio inesistente: pagina d\'errore con motivo e Riprova, titolo = sito 
     });
     const tab = s.find((t) => /dominio-inesistente-refuso-xyz\.com/.test(t.url || ''));
     return tab ? tab.title : '';
-  }, { timeout: 10_000 }).toMatch(/dominio-inesistente-refuso-xyz\.com/);
+  }, { timeout: lento(10_000) }).toMatch(/dominio-inesistente-refuso-xyz\.com/);
 
   // Traccia visiva della run (gitignorata).
   await errPage.screenshot({ path: 'tests/.shots/net-error-dns.png' }).catch(() => {});
@@ -81,7 +82,7 @@ test('server giù poi su: "Riprova" carica davvero la pagina', async ({ app, she
         try { return p.url() === `http://127.0.0.1:${port}/`; } catch (_) { return false; }
       });
       return !!w;
-    }, { timeout: 15_000 }).toBe(true);
+    }, { timeout: lento(15_000) }).toBe(true);
     const page = app.windows().find((p) => {
       try { return p.url() === `http://127.0.0.1:${port}/`; } catch (_) { return false; }
     });
@@ -120,5 +121,5 @@ test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', 
       try { return p.url() === url; } catch (_) { return false; }
     });
     return !!w;
-  }, { timeout: 15_000 }).toBe(true);
+  }, { timeout: lento(15_000) }).toBe(true);
 });

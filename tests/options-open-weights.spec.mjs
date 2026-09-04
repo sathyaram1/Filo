@@ -64,23 +64,33 @@ test('Opzioni: acceso, i «Prova» dei modelli proprietari non sono premibili', 
   const page = await openTab(OPTIONS_URL);
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
 
-  // ── Modelli predefiniti (crediti di Filo): la configurazione che gira davvero.
+  // ── Modelli predefiniti (crediti di Filo).
+  //
+  // ⚠️ Questo elenco NON è dato del test: arriva dai modelli predefiniti veri
+  // (l'override che l'owner tiene sul server, con le costanti come ripiego), e
+  // oggi contiene solo modelli a pesi aperti. Pretendere qui una riga di
+  // produttore proprietario voleva dire far fallire lo spec ogni volta che
+  // l'owner cambia i predefiniti: un rosso che non parla del codice, ed è
+  // finito nella lista dei rossi noti invece che qui. Quello che si può
+  // pretendere è la REGOLA, sulle righe che ci sono: proprietarie spente,
+  // ammesse accese. La parte con dati che il test controlla — il registry
+  // personale, più in basso — resta un'asserzione dura.
   await page.waitForSelector('#defaultModelsList .sn-default-model-row .sn-model-test', { timeout: 8_000 });
   const daFermare = page.locator('#defaultModelsList .sn-default-model-row')
     .filter({ hasText: /anthropic|gemini|text-embedding/i })
     .locator('.sn-model-test');
-  expect(await daFermare.count()).toBeGreaterThan(0);
-  for (let i = 0; i < await daFermare.count(); i++) {
+  const proprietarie = await daFermare.count();
+  for (let i = 0; i < proprietarie; i++) {
     await expect(daFermare.nth(i)).toBeEnabled();
   }
 
   await page.check('#openWeightsOnly');
-  for (let i = 0; i < await daFermare.count(); i++) {
+  for (let i = 0; i < proprietarie; i++) {
     await expect(daFermare.nth(i)).toBeDisabled();
   }
   // Non è un blocco a tappeto: i modelli ammessi restano provabili.
   const ammessi = page.locator('#defaultModelsList .sn-default-model-row')
-    .filter({ hasText: /gemma|deepseek/i })
+    .filter({ hasText: /gemma|deepseek|glm|kimi/i })
     .locator('.sn-model-test');
   if (await ammessi.count()) await expect(ammessi.first()).toBeEnabled();
 

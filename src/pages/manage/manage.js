@@ -2881,6 +2881,28 @@
   }
 
   // ── Caricamento dati ──────────────────────────────────────────────────────
+
+  /**
+   * Lo stato "caricamento fallito", in un posto solo.
+   *
+   * Il guasto va RICORDATO, non solo scritto una volta: il primo click su una
+   * scheda rirende il riquadro, e senza il flag ci scriverebbe "Nessun feedback
+   * in coda." — cioè una risposta al posto di un guasto.
+   *
+   * Sta in una funzione perché lo chiamano in due: il caricamento vero quando
+   * fallisce, e i test, che di questo stato hanno bisogno. Prima i test lo
+   * ottenevano sperando che la macchina non arrivasse al database: dove la rete
+   * c'era, il caricamento riusciva e lo spec falliva parlando dell'ambiente
+   * invece che del codice.
+   */
+  function segnaCaricamentoFallito() {
+    loadFailed = true;
+    dataLoaded = false;
+    mgListLoading.hidden = true;
+    mgListEmpty.hidden = false;
+    mgListEmpty.textContent = 'Errore nel caricamento dei feedback.';
+  }
+
   async function loadData() {
     mgListLoading.hidden = false;
     mgList.hidden = true;
@@ -2915,14 +2937,8 @@
       loadFailed = false;
     } catch (err) {
       if (testDataInjected) return;
-      // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
-      // una scheda rirende il riquadro, e senza questo flag ci scriverebbe
-      // "Nessun feedback in coda." — cioè una risposta al posto di un guasto.
-      loadFailed = true;
-      mgListLoading.hidden = true;
-      mgListEmpty.hidden = false;
-      mgListEmpty.textContent = 'Errore nel caricamento dei feedback.';
       console.error('[manage] errore caricamento:', err);
+      segnaCaricamentoFallito();
       return;
     }
 
@@ -3105,6 +3121,9 @@
     setLiveSources(src) { Object.assign(liveSources, src || {}); },
     isLiveOn() { return liveEnabled; },
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
+    // Il caricamento fallito, iniettato: è lo stesso stato del cammino vero
+    // (stessa funzione), ma non dipende da dove gira il test.
+    setLoadFailed() { allFeedbacks = []; allByClient = {}; segnaCaricamentoFallito(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.

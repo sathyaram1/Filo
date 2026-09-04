@@ -27,11 +27,17 @@ if (process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug'
 }
 if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
 
+// I tre tempi massimi qui sotto si adattano alla lentezza della macchina che
+// esegue la suite: il perché sta in `tests/fixtures/tempi.mjs`, insieme a
+// `lento()`, che serve agli spec che un tempo lo scrivono a mano. Chi lancia la
+// suite dichiara il numero (il workflow: FILO_TEST_LENTEZZA=3).
+import { LENTEZZA } from './tests/fixtures/tempi.mjs';
+
 export default defineConfig({
   testDir: './tests',
   testMatch: /.*\.spec\.(js|mjs)$/,
-  timeout: 60_000,
-  expect: { timeout: 5_000 },
+  timeout: 60_000 * LENTEZZA,
+  expect: { timeout: 5_000 * LENTEZZA },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza
   workers: 1,
   // La suite lancia+chiude Electron ~465 volte in serie (~11 min). Sotto questo
@@ -47,6 +53,6 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'tests/.report' }]],
   use: {
     trace: 'on-first-retry',
-    actionTimeout: 10_000,
+    actionTimeout: 10_000 * LENTEZZA,
   },
 });

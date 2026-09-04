@@ -2523,3 +2523,68 @@ valutare dentro la pagina. Due copie sarebbero divergute al primo ritocco.
 **Dove:** `src/main/menu.js` (la barra), `src/shared/campoTesto.js` (la regola), test:
 `tests/unit/macSupport.test.mjs` (forma della barra, in millisecondi, anche su Windows) e
 `tests/barra-menu.spec.mjs` (le voci azionate davvero, sull'app viva).
+
+## Un cancello che guarda solo i fallimenti non è un cancello
+
+Chi decide "verde o rosso" da un verbale di test deve guardare **due** cose: i
+test andati male, e i test che **non sono stati eseguiti**. La seconda è quella
+che si dimentica, ed è la più pericolosa, perché un test che non parte non
+compare fra i fallimenti: la suite esce verde con un pezzo mai eseguito.
+
+- **Le strade che ci portano** sono sempre le stesse quattro: uno spec che non
+  compila (l'esecutore abbandona la fetta intera e scrive l'errore FUORI
+  dall'elenco dei test), una fetta che esegue zero test, uno spec cancellato o
+  rinominato, un filtro dei file più stretto. Si chiudono con tre regole, non
+  con quattro toppe: **un errore fuori dai test che nomina uno spec è rosso**
+  (quello spec non è partito; un guasto del worker DOPO i test, che non ha un
+  file a cui appartenere, si dice ma non tinge di rosso: nasconderebbe niente e
+  farebbe bloccare la fusione a un rosso scusato apposta); il conto "zero
+  eseguiti" va fatto **per fetta** e mai sulla somma (una fetta viva copre una
+  morta); il numero di test eseguiti si confronta con un **minimo scritto nel
+  repo**, in area protetta, perché abbassarlo è l'altro modo di far tacere una
+  regressione.
+- **La regola del verde sta in una funzione sola** (`verde()` in
+  `scripts/suite-reds.mjs`): il codice d'uscita, il file dell'esito e il
+  verdetto pubblicato la chiedono a lei. Due copie della stessa regola, prima o
+  poi, dicono cose diverse.
+- **Dove:** `scripts/suite-reds.mjs`, `.github/workflows/suite-attesi.json`,
+  `.github/workflows/rossi-noti.json`. Test: `tests/unit/suiteReds.test.mjs`.
+
+## Un verdetto vale per un commit, e "non lo so" non è mai un verde
+
+Un risultato di test pubblicato in un posto che sopravvive alla sessione (qui:
+un ref git, `refs/suite/*`) è utile solo se chi lo rilegge può dire di CHE COSA
+parla. Tre asimmetrie da chiudere insieme, o la regola resta scritta e non
+vale:
+
+- il verdetto porta il **commit** provato, e vale solo per quello;
+- un verdetto **senza** commit vale come assente, e una domanda che non dice
+  quale commit interessa non riceve un verde. L'eccezione dentro la regola
+  ("confronta solo se il commit c'è") è il modo in cui la regola sparisce;
+- la chiave del ref porta **l'impronta del nome vero**, perché ripulire un nome
+  per farlo stare in un ref perde informazione: due rami diversi finirebbero
+  sulla stessa chiave, e il verdetto dell'uno varrebbe per l'altro.
+
+**Dove:** `scripts/suite-verdict.mjs` (`chiaveRef`, `interpreta`). Test:
+`tests/unit/suiteVerdict.test.mjs`.
+
+## I tempi massimi dei test si adattano alla macchina, il criterio no
+
+I `timeout` di Playwright sono tarati sulla macchina di chi li ha scritti. Su
+una macchina due o tre volte più lenta gli stessi spec falliscono LÌ e solo lì,
+e finiscono in una lista di "rossi noti" — cioè in un posto dove il cancello
+smette di guardarli.
+
+- **Un tempo massimo non è il criterio del test:** è la difesa contro un test
+  piantato. Moltiplicarlo dove la macchina è più lenta tiene il criterio
+  identico; lasciarlo fisso misura la macchina invece del codice.
+- **Chi lancia dichiara la lentezza** (`FILO_TEST_LENTEZZA`, 3 sul runner di
+  GitHub Actions), e il moltiplicatore vale per i tre tempi insieme: test,
+  `expect`, azione. Uno solo dei tre lascia aperta la porta degli altri due.
+- **L'avvio e lo smontaggio dell'app hanno un tetto LORO** (fixture con
+  `{ timeout }`), o si mangiano il tempo del test: un test che aveva fatto tutto
+  quello che doveva moriva in chiusura («Tearing down "app" exceeded the test
+  timeout»). E la chiusura gentile non può durare all'infinito: scaduto il suo
+  tetto, il processo si ammazza.
+- **Dove:** `playwright.config.js`, `tests/fixtures/electron.mjs`,
+  `.github/workflows/suite.yml`.

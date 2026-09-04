@@ -20,12 +20,36 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { lento } from './tempi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
 
+/**
+ * Chiude l'app senza poterci mettere un tempo indefinito.
+ *
+ * `app.close()` a volte non torna: sotto Xvfb, su una macchina lenta, Electron
+ * ci mette più del previsto a morire — e finché non torna il test è "in
+ * chiusura", cioè fermo. Qui la chiusura gentile ha un tetto suo; scaduto
+ * quello, il processo si ammazza. Un test già passato non deve poter diventare
+ * rosso per il modo in cui l'app si spegne.
+ */
+async function chiudiApp(app) {
+  const tetto = new Promise((r) => { setTimeout(r, lento(20_000)).unref?.(); });
+  try { await Promise.race([app.close(), tetto]); } catch (_) { /* chiusura sporca: sotto si ammazza */ }
+  try {
+    const p = app.process && app.process();
+    if (p && p.exitCode === null && p.pid) p.kill('SIGKILL');
+  } catch (_) { /* già morto */ }
+}
+
 export const test = base.extend({
-  app: async ({}, use) => {
+  // Il tetto è della FIXTURE, non del test: senza, l'avvio e lo smontaggio di
+  // Electron si mangiano il tempo del test, e su una macchina lenta un test che
+  // ha fatto tutto quello che doveva muore in chiusura ("Tearing down app
+  // exceeded the test timeout"). Erano sette spec rosse solo sul runner di
+  // GitHub Actions, scusate per mesi come se fossero rossi d'ambiente.
+  app: [async ({}, use) => {
     const userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
     const app = await electron.launch({
       // host-resolver-rules: fa risolvere il dominio finto "blocked.test" al
@@ -49,9 +73,9 @@ export const test = base.extend({
       },
     });
     await use(app);
-    try { await app.close(); } catch (_) {}
+    await chiudiApp(app);
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
-  },
+  }, { timeout: 90_000 }],
 
   // Pagina della shell del browser (tab bar + barra indirizzi). È la prima
   // window che Filo apre.
@@ -69,7 +93,7 @@ export const test = base.extend({
     const fn = async (url) => {
       const target = new URL(url).hostname;
       await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      const deadline = Date.now() + 10_000;
+      const deadline = Date.now() + lento(10_000);
       let page = null;
       while (Date.now() < deadline) {
         page = app.windows().find((w) => {
@@ -116,14 +140,21 @@ export const test = base.extend({
         await page.waitForFunction(
           () => document.documentElement.dataset.filoReady === '1',
           null,
-          { timeout: 8000 },
+          { timeout: lento(8000) },
         );
         return page;
       },
     };
     await use(api);
     try { server.closeAllConnections?.(); } catch (_) {}
-    await new Promise((r) => server.close(r));
+    // `server.close` chiama indietro solo quando l'ultima connessione è andata:
+    // se una resta appesa non torna MAI, e quell'attesa senza fine diventa un
+    // "Worker teardown timeout" che nessuno collega al server di prova. Il
+    // processo muore comunque alla fine della fetta.
+    await Promise.race([
+      new Promise((r) => server.close(r)),
+      new Promise((r) => { setTimeout(r, lento(5000)).unref?.(); }),
+    ]);
   },
 });
 

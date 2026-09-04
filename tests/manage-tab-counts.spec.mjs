@@ -364,8 +364,12 @@ test('#495 — caricamento fallito: nessun numero e nessun "vuoto" inventato', a
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
-  // In questo ambiente non c'è Firestore: il caricamento fallisce da solo.
   await page.evaluate(() => window.__mgTest.whenReady());
+  // Il guasto si INIETTA, non si spera: prima questo spec contava sul fatto che
+  // la macchina non arrivasse al database, e dove la rete c'era il caricamento
+  // riusciva e lo spec diventava rosso parlando dell'ambiente. È lo stesso stato
+  // in cui finisce il cammino vero quando la lista non arriva.
+  await page.evaluate(() => window.__mgTest.setLoadFailed());
 
   const vuoto = page.locator('#mgListEmpty');
   await expect(vuoto).toContainText('Errore');

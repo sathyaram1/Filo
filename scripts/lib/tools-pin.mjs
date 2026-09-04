@@ -69,6 +69,11 @@ export const PINNED_PATHS = [
   'src/main/auth',
   // Il campanello che avvisa l'owner quando una fusione resta in attesa.
   'src/main/services/mergeApprovalSignal.js',
+  // La lista dei rossi noti della suite completa, che `suite-reds.mjs` legge
+  // quando un ruolo si rilancia la suite a mano (verdetto assente o in corso).
+  // Senza, dalla copia fissata la lista risulterebbe vuota e ogni rosso
+  // d'ambiente passerebbe per regressione.
+  '.github/workflows',
 ];
 
 const REPO_MARK = '.filo-repo-root';

@@ -120,6 +120,11 @@ test('caricamento fallito: un login (o altro ridisegno) non cancella l\'errore',
   await page.waitForLoadState('domcontentloaded');
   await ready(page);
 
+  // Si parte da uno stato DICHIARATO, non da quello che ha risposto la rete: il
+  // caricamento vero, dove il database si raggiunge davvero, riempie la lista, e
+  // lo spec finiva per misurare la connessione della macchina invece del codice.
+  await page.evaluate(() => window.__boardTest.setData([]));
+
   await page.evaluate(() => {
     window.__boardTest.setList(() => Promise.reject(new TypeError('Failed to fetch')));
   });
@@ -141,4 +146,38 @@ test('caricamento fallito: un login (o altro ridisegno) non cancella l\'errore',
   await page.locator('#bdRetry').click();
   await expect(page.locator('#bdError')).toBeHidden();
   await expect(page.locator('.bd-card')).toHaveCount(1);
+});
+
+// Il difetto rientrato da un'altra porta: se il PRIMO caricamento riesce (anche
+// a mano vuota, che è lo stato normale di una bacheca appena nata), un
+// fallimento successivo tornava a scrivere «Nessun miglioramento…» al primo
+// ridisegno — cioè il guasto veniva dimenticato esattamente come prima del fix,
+// solo un passo più in là. Si vedeva solo dove il primo caricamento riesce
+// davvero, ed è per questo che è rimasto nascosto: sul PC di chi sviluppa la
+// prima fetch fallisce sempre.
+//
+// Senza il fix: il primo assert dopo il ridisegno diventa rosso (#bdError
+// nascosto, #bdEmpty visibile).
+test('primo caricamento riuscito e poi fallito: il guasto resta, anche ridisegnando', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await ready(page);
+
+  // Il primo caricamento è andato bene e non ha trovato niente: è lo stato che
+  // sul runner arriva da solo, e qui si dichiara invece di sperarci.
+  await page.evaluate(() => window.__boardTest.setData([]));
+  await expect(page.locator('#bdEmpty')).toBeVisible();
+
+  // Adesso la rete cade e si riprova.
+  await page.evaluate(() => {
+    window.__boardTest.setList(() => Promise.reject(new TypeError('Failed to fetch')));
+  });
+  await page.evaluate(() => window.__boardTest.reload());
+  await expect(page.locator('#bdError')).toBeVisible();
+
+  // Qualunque ridisegno: il guasto è ancora lì, e la via d'uscita anche.
+  await page.evaluate(() => window.__boardTest.setSignedIn('tester@example.com'));
+  await expect(page.locator('#bdError')).toBeVisible();
+  await expect(page.locator('#bdEmpty')).toBeHidden();
+  await expect(page.locator('#bdRetry')).toBeVisible();
 });

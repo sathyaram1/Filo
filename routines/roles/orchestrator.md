@@ -91,10 +91,11 @@ L'orchestratore NON riaccende mai il giro successivo: chiude e basta, per
 qualunque motivo (fine coda, contesto pieno, guasto, crash). Il pacemaker se
 ne accorge dai battiti e riaccende lui.
 
-(Niente `npm test` qui, e nemmeno da chi scrive codice: dal 2026-09-03 la
-suite completa la lancia SOLO il verificatore, una volta, prima di dare
-`pass`. Chi risolve fa unit test e spec mirati. Un rosso fuori dalla lista
-dei rossi noti torna in correzione con l'elenco degli spec rotti.)
+(Niente `npm test` qui, e nemmeno da chi scrive codice: dal 2026-09-04 la
+suite completa gira da sola su GitHub Actions a ogni salvataggio del ramo, e
+il verificatore ne LEGGE il verdetto prima di dare `pass`. Chi risolve fa unit
+test e spec mirati. Un rosso fuori dalla lista dei rossi noti torna in
+correzione con l'elenco degli spec rotti.)
 
 ## Regole dure (cicatrici, non stile)
 

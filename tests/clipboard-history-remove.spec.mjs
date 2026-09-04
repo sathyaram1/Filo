@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/electron.mjs';
+import { lento } from './fixtures/tempi.mjs';
 import { _electron as electron } from '@playwright/test';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -81,7 +82,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);
     expect(page, 'la pagina di test deve aprirsi').toBeTruthy();
-    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: lento(8000) });
 
     // (1) Apri il sotto-menu: 3 voci, ciascuna con il proprio "×".
     let sub = await openHistorySubmenu(page);
@@ -150,7 +151,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);
     expect(page, 'la pagina di test deve aprirsi').toBeTruthy();
-    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: lento(8000) });
 
     // Apri il menu e la cronologia passando col mouse sulla freccetta (senza
     // click: è così che il sotto-menu resta libero di richiudersi da solo).
@@ -170,7 +171,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     // Porta il mouse lontano: il sotto-menu si richiude da solo, il menu del
     // tasto destro resta aperto (si chiude solo con un click o Esc).
     await page.mouse.move(4, 4);
-    await expect(page.locator('.sn-menu-history-sub')).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator('.sn-menu-history-sub')).toHaveCount(0, { timeout: lento(5000) });
     await expect(page.locator('.sn-menu')).toBeVisible();
 
     // Riapri la cronologia dalla stessa freccetta: la voce rimossa NON torna.

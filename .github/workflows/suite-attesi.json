@@ -1,0 +1,14 @@
+{
+  "_cose": "Quanti test deve ESEGUIRE la suite completa. Contare solo i test falliti non basta: un test che non parte non fallisce, e una suite che non parte esce verde. Qui c'è il numero sotto il quale la corsa non è più la suite — è un pezzo di suite.",
+  "_perche_qui": "Stessa cartella dei rossi noti, e per la stessa ragione: è area protetta per il controllo di sicurezza del server. Abbassare questo numero è l'altro modo di far tacere una regressione (cancelli gli spec e allinei il conto), e qui abbassarlo non passa senza il via libera dell'owner.",
+  "_campi": {
+    "attesi": "il minimo per ambiente: actions = il runner di GitHub Actions, cloud = la macchina delle routine, locale = il PC dell'owner. Un ambiente senza numero non viene confrontato."
+  },
+  "_quando_scatta": "Solo su una corsa che si dichiara completa (scripts/suite-reds.mjs ... --fette N). Un ruolo che si rilancia due spec non sta pretendendo di aver eseguito la suite.",
+  "_come_si_aggiorna": "Si legge il numero dall'ultima corsa verde e si scrive qui, nello stesso commit che cambia il numero di test. Se cresce (test nuovi) il riassunto lo dice e si alza; se cala per una cancellazione voluta, si abbassa — ma è una cosa che si vede, ed è il punto.",
+  "_perche_un_margine": "È un MINIMO, non un'uguaglianza: una manciata di test si salta da sé a seconda della macchina (nell'ultima corsa: due), e un'uguaglianza li farebbe passare per regressione. Il margine è di pochi test, molto meno di quelli che porta via uno spec cancellato — che è la cosa da vedere.",
+  "aggiornato": "2026-09-04",
+  "attesi": {
+    "actions": 1365
+  }
+}

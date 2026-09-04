@@ -1,0 +1,69 @@
+{
+  "_cose": "I rossi NOTI della suite completa: spec che falliscono anche quando non è rotto niente, perché chiedono all'ambiente cose che quell'ambiente non ha. Li legge scripts/suite-reds.mjs e li sottrae ai fallimenti del verbale: quello che resta è la regressione.",
+  "_perche_qui": "Questa cartella è area protetta per il controllo di sicurezza del server: allungare la lista dei rossi da ignorare è esattamente ciò che farebbe un ramo catturato per far tacere una regressione, e qui allungarla non passa senza il via libera dell'owner. GitHub Actions ignora i file che non sono .yml, quindi stare qui non crea nessun workflow finto.",
+  "_campi": {
+    "file": "nome dello spec. Il prefisso tests/ si può mettere o no: il confronto lo toglie da entrambe le parti",
+    "titolo": "titolo esatto del test. Se manca, la scusa vale per TUTTO il file, e va evitato quando si può: un file intero scusato nasconde anche le regressioni dei suoi altri test",
+    "dove": "actions | cloud | locale | ovunque. actions = il runner di GitHub Actions; cloud = qualunque macchina senza schermo (il runner incluso); locale = il PC dell'owner. Una scusa scritta per actions NON vale altrove: ci sono spec rosse solo lì, e scusarle ovunque spegnerebbe la suite dove invece funziona.",
+    "perche": "perché questo rosso non dipende dal codice. Senza motivo la voce è una scusa vuota: fra sei mesi nessuno saprà più se toglierla"
+  },
+  "_come_si_aggiorna": "Si GUARDA una corsa, non si va a memoria: node scripts/suite-reds.mjs <verbale o cartella> --ambiente cloud|locale --proponi stampa le voci già col titolo esatto. Il motivo lo scrive una persona, e dev'essere il motivo VERO di quel rosso — non l'osservazione che è rosso solo lì. Chi legge il verdetto vede anche le voci SCADUTE (spec in lista che oggi passano): vanno tolte, o la lista marcisce fino a coprire davvero una regressione.",
+  "_una_lista_corta_e_il_punto": "Ogni voce è un test su cui il cancello è cieco, quindi la lunghezza della lista è la misura di quanto poco vale. Il 2026-09-04 erano trentuno; adesso sono nove, e ognuna porta il motivo MISURATO su una corsa, non l'osservazione che lì falliva. Delle ventidue tolte: diciassette erano spec usa-e-getta di vecchi giri di verifica, finite nel repo per sbaglio (tolte con i loro file); tre morivano perché sul runner, due o tre volte più lento, il tempo concesso a un test comprendeva anche lo smontaggio di Electron (curate in tests/fixtures/tempi.mjs e playwright.config.js); due erano difetti veri che la lista stava coprendo, uno nella bacheca e uno in uno spec che pretendeva una riga dei modelli predefiniti che non esiste più.",
+  "aggiornato": "2026-09-04",
+  "spec": [
+    {
+      "file": "hidden-window.spec.mjs",
+      "titolo": "durante i test la finestra sta fuori dallo schermo, è trasparente e non ruba il fuoco",
+      "dove": "cloud",
+      "perche": "sotto Xvfb non c'è nessun gestore di finestre: posizione, trasparenza e fuoco non sono quelli che lo spec misura"
+    },
+    {
+      "file": "hidden-window.spec.mjs",
+      "titolo": "nemmeno a tutto schermo la finestra diventa visibile",
+      "dove": "cloud",
+      "perche": "sotto Xvfb non c'è nessun gestore di finestre: posizione, trasparenza e fuoco non sono quelli che lo spec misura"
+    },
+    {
+      "file": "fullscreen-content.spec.mjs",
+      "titolo": "fullscreen: il contenuto copre la barra e Esc ripristina",
+      "dove": "cloud",
+      "perche": "lo schermo intero lo concede il gestore di finestre, e sotto Xvfb non ce n'è nessuno"
+    },
+    {
+      "file": "filo-window-command.spec.mjs",
+      "titolo": "COMANDO_FINESTRA fullscreen mette e toglie lo schermo intero",
+      "dove": "cloud",
+      "perche": "lo schermo intero lo concede il gestore di finestre, e sotto Xvfb non ce n'è nessuno"
+    },
+    {
+      "file": "tab-html-fullscreen.spec.mjs",
+      "titolo": "la richiesta di fullscreen della pagina porta la view a tutto schermo",
+      "dove": "cloud",
+      "perche": "lo schermo intero lo concede il gestore di finestre, e sotto Xvfb non ce n'è nessuno"
+    },
+    {
+      "file": "capture-composite.spec.mjs",
+      "titolo": "screenshot newtab: file esiste e non è vuoto",
+      "dove": "cloud",
+      "perche": "sotto Xvfb non c'è niente da fotografare: anche con lo strumento di cattura installato (scrot) il PNG esce di 6 KB, cioè una schermata nera. Misurato il 2026-09-04."
+    },
+    {
+      "file": "capture-composite.spec.mjs",
+      "titolo": "screenshot dashboard (filo://dashboard): file esiste e non è vuoto",
+      "dove": "cloud",
+      "perche": "sotto Xvfb non c'è niente da fotografare: anche con lo strumento di cattura installato (scrot) il PNG esce di 6 KB, cioè una schermata nera. Misurato il 2026-09-04."
+    },
+    {
+      "file": "clipboard-history-remove.spec.mjs",
+      "titolo": "paste history: la voce rimossa non ricompare riaprendo la cronologia nello stesso menu",
+      "dove": "actions",
+      "perche": "sul runner il sottomenu della cronologia non si chiude quando il puntatore esce: il conteggio resta 1 per tutti i quindici secondi concessi, mentre in locale e sulla macchina delle routine si chiude subito. Un puntatore sintetico senza gestore di finestre non produce l'uscita che il menu aspetta."
+    },
+    {
+      "file": "net-error-page.spec.mjs",
+      "titolo": "renderer crashato: pagina d'errore \"scheda bloccata\" invece del bianco",
+      "dove": "actions",
+      "perche": "sul runner, ammazzato il renderer della scheda, la pagina d'errore interna non compare entro i sessanta secondi concessi. Gli altri due test dello stesso file (dominio inesistente, server giù) passano: è la reazione al CRASH che lì non arriva."
+    }
+  ]
+}

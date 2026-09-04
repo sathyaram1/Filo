@@ -58,11 +58,24 @@ né per "spezzare di fatto".
 È tutto in CLAUDE.md e vale per intero: sintomo-vs-causa, invarianti UX e
 deviazioni dichiarate, la Verifica coi minimi per tipo di modifica (unit,
 spec mirato, visivo), le fonti di verità da aggiornare nello stesso commit.
-**Niente suite completa prima di consegnare** (dal 2026-09-03): la lancia il
-verificatore, una volta, prima di dare `pass`; se trova un rosso nuovo torna
-a te con l'elenco degli spec rotti, e tu rilanci quelli. Venticinque minuti
-di attesa a ogni consegna erano metà del costo di un giro. Non fondere su `main`: l'hook
-committa e pusha sul branch, il merge lo fa il gate a valle.
+**Niente suite completa qui** (dal 2026-09-04): gira da sola su GitHub Actions
+a ogni salvataggio del tuo ramo, e il suo verdetto lo legge il verificatore
+prima di dare `pass` — se trova un rosso nuovo torna a te con l'elenco degli
+spec rotti, e tu rilanci quelli. Venticinque minuti di attesa a ogni consegna
+erano metà del costo di un giro.
+
+Se vuoi sapere com'è andata prima di consegnare, si legge (non si lancia):
+
+```bash
+node scripts/suite-verdict.mjs leggi
+```
+
+0 verde · 1 rossa con l'elenco degli spec · 2 ancora in corso · 3 nessun
+verdetto per questo commit. Non è obbligatorio, ma un rosso scoperto adesso
+costa a te dieci minuti e non a tutto il giro.
+
+Non fondere su `main`: l'hook committa e pusha sul branch, il merge lo fa il
+gate a valle.
 
 ## Consegna
 

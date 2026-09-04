@@ -266,6 +266,11 @@ Collegato (18/08, revisione del ruolo secaudit con l'owner):
 
 ## 11. Suite completa: per worker, non a fine giro
 
+> **Superato due volte.** Il 2026-09-03 la corsa è passata da "ogni worker che
+> scrive codice" a "il verificatore, una volta". Dal **2026-09-04** non la lancia
+> più nessuno: gira su GitHub Actions e si LEGGE (§15). Il testo qui sotto resta
+> per la storia del ragionamento.
+
 `npm test` (suite intera) lo lancia OGNI worker che scrive codice
 (new-work/fixer), PRIMA di consegnare al verificatore: le regressioni
 incrociate sono responsabilità di chi le introduce, e scoperte subito, non un
@@ -457,3 +462,127 @@ mentre quello forte, con lo stesso identico prompt, ne ha trovati cinque veri
 8. Tre esiti del verificatore (§13): prompt che smista fail/migliorabile,
    contatori N ed M come dati applicati dal server, comandi in dashboard, e
    apertura automatica del feedback per i migliorabili scaduti.
+
+## 15. La suite completa gira su GitHub Actions (2026-09-04)
+
+Il §11 aveva spostato la corsa da "ogni worker" a "il verificatore, una volta
+prima del pass". Restava il costo vero: **venticinque minuti in cui un modello
+non fa altro che aspettare**, a ogni feedback — circa metà del costo di un giro.
+E il cancello di fusione del server non poteva rimediare, perché una funzione
+cloud non avvia Electron.
+
+La suite ora gira dove i minuti non costano niente e nessuno aspetta:
+
+- **`.github/workflows/suite.yml`** — a ogni push su un ramo (il salvataggio
+  automatico committa a ogni modifica di file, quindi: mentre il lavoro è
+  ancora in corso). Electron sotto **Xvfb**, **dieci fette parallele**
+  (`--shard`): fette = macchine diverse, una worker ciascuna, quindi nessuna
+  concorrenza in più dentro il processo — Electron e le scorciatoie globali non
+  la reggono — e il tempo d'attesa diviso per dieci. Dieci e non sei perché
+  Playwright divide per NUMERO di test, non per durata: con sei fette la più
+  lenta ci metteva 37 minuti contro i 7 della più veloce, e il tempo che conta è
+  quello della più lenta. `concurrency` per ramo con interruzione della corsa
+  vecchia: il verdetto che serve è quello della PUNTA, non di un commit che
+  nessuno fonderà.
+- **`.github/workflows/rossi-noti.json`** — i rossi noti come DATI, non a
+  memoria nel prompt di un ruolo. Ogni voce ha un motivo e un ambiente
+  (`actions` / `cloud` / `locale` / `ovunque`), e può scusare un singolo test
+  invece dell'intero file: un file intero scusato nasconde anche le
+  regressioni dei suoi altri test. Sta in `.github/workflows/` perché quella
+  cartella è **area protetta** per L5: allungare la lista è esattamente ciò
+  che farebbe un ramo catturato per far tacere una regressione, e lì
+  allungarla non passa senza il via libera dell'owner.
+- **`scripts/suite-reds.mjs`** — fa la sottrazione (rossi del verbale meno
+  rossi noti) e scrive il riassunto con l'**elenco degli spec da rilanciare**,
+  ciascuno con la prima riga del suo errore: chi corregge deve capire il perché
+  senza tornare nei log della corsa.
+- **Il conto dei falliti non basta**, ed è la cicatrice di questo pezzo: un test
+  che non parte non fallisce, e una suite che non parte usciva **verde**.
+  Provato: uno spec che non compila fa abbandonare a Playwright la fetta
+  INTERA, l'errore finisce fuori dall'elenco dei test, e nove fette sane più
+  quella persa davano «verde: 1305 test eseguiti» — 145 test mai partiti.
+  Quattro strade portavano lì (spec che non compila, fetta a zero test, spec
+  cancellato o rinominato, filtro dei test più stretto) e sono chiuse da tre
+  regole: gli **errori fuori dai test** sono rossi; il conto **"zero eseguiti" è
+  per FETTA** e non sulla somma (una fetta viva copriva una morta); il numero di
+  test eseguiti si confronta con un **minimo tenuto nel repo**
+  (`.github/workflows/suite-attesi.json`, stessa area protetta della lista dei
+  rossi noti: abbassarlo è l'altro modo di far tacere una regressione).
+- **`scripts/suite-verdict.mjs`** — pubblica e rilegge il verdetto. Non passa
+  dalle API di GitHub: nell'ambiente delle routine le chiamate REST al repo
+  sono **chiuse** (verificato: `api.github.com/repos/...` risponde "GitHub
+  access is not enabled for this session"). Passa da **git**, che è il
+  trasporto stesso del lavoro: un ref `refs/suite/<ramo ripulito>-<impronta>`
+  con dentro un solo file. Fuori da `refs/heads/*` — non è un ramo, non tocca
+  `main`, non accende nessun workflow. L'impronta del nome vero in coda esiste
+  perché la ripulitura perde informazione: senza, `lavoro/a b` e `lavoro/a-b`
+  finivano sullo stesso ref e il verdetto dell'uno valeva per l'altro. Un ref
+  per ramo, riscritto, non uno per commit: i commit di un ramo di lavoro sono
+  decine. Il commit a cui il verdetto si riferisce sta DENTRO il verdetto, e un
+  verdetto di un altro commit vale quanto un verdetto assente — altrimenti la
+  punta nuova erediterebbe il verde della vecchia. **Valgono come assenti anche
+  un verdetto che non dice quale commit ha provato e una domanda che non dice
+  quale commit interessa**: era l'eccezione che annullava la regola, e ci si
+  arrivava pubblicando da fuori una copia git.
+
+Contratto di lettura (`leggi`): **0** verde · **1** rossa, con l'elenco degli
+spec · **2** in corso · **3** assente o di un altro commit · **4** guasto. La
+regola dura è una sola: **2, 3 e 4 non sono un verde**. "Non lo so" non è "a
+posto".
+
+### Chi legge cosa
+
+- **Il verificatore** legge il verdetto prima di dare `pass` (ruolo aggiornato).
+  Rossa → FAIL con l'elenco degli spec nella critica: chi corregge rilancia
+  quelli, non tutto. In corso/assente → lancia la suite lì, come prima, e lo
+  dichiara.
+- **Il cancello di fusione del server** deve aspettare il verde prima di
+  fondere: è il livello non convincibile, l'unico che una sessione catturata
+  non può saltare. Vive in **filo-security** (`functions/src/routine/
+  mergeGate.js`), che è un altro repo: il contratto è scritto in
+  `ROUTINE-AUTH-SPEC.md` §13, il codice va applicato lì.
+
+### Quanti rossi noti, e perché sono nove (misurati, non stimati)
+
+Ogni voce della lista è un test su cui il cancello è cieco, quindi la lunghezza
+della lista è la misura di quanto poco vale. Erano trentuno; sono nove, e ognuna
+porta il motivo letto in una corsa vera, non l'osservazione che lì falliva.
+
+Le nove: cinque sono quello che concede il gestore di finestre, che sotto Xvfb
+non esiste (schermo intero, finestra nascosta); due sono la cattura dello
+schermo, che anche con lo strumento installato esce nera perché non c'è niente
+da fotografare; due sono reazioni che su quella macchina non arrivano (il
+sottomenu della cronologia che non si chiude quando il puntatore esce, la pagina
+d'errore dopo un crash del renderer).
+
+Le ventidue tolte, per come sono state tolte:
+
+- **17 erano spec usa-e-getta di vecchi giri di verifica** (`verify-*`,
+  `verifier-*`, `_verify-*`, `zz-verify-*`), finite nel repo per sbaglio —
+  `.gitignore` le esclude sotto i nomi con l'underscore, queste hanno un nome
+  senza — e da allora eseguite a ogni corsa. Tolte, con i loro undici file.
+- **3 morivano per il tempo**: il runner è due o tre volte più lento del PC
+  dell'owner, sul quale i tempi massimi sono tarati, e il tempo concesso a un
+  test comprendeva anche lo **smontaggio di Electron** (`Tearing down "app"
+  exceeded the test timeout`). Un test che aveva fatto tutto moriva in chiusura.
+  La fixture `app` ha ora un tetto suo e una chiusura che non dura all'infinito
+  (`tests/fixtures/electron.mjs`), e i tempi massimi si moltiplicano per la
+  lentezza dichiarata della macchina (`tests/fixtures/tempi.mjs`,
+  `FILO_TEST_LENTEZZA=3` sul runner). Un tempo massimo non è il criterio del
+  test: è la difesa contro un test piantato, e tenerlo fisso su una macchina più
+  lenta misura la macchina invece del codice.
+- **2 erano difetti veri che la lista stava coprendo**, ed è il motivo per cui
+  una lista lunga fa danno: la bacheca dimenticava un caricamento fallito appena
+  un caricamento precedente era riuscito (si vedeva solo dove il database si
+  raggiunge davvero), e uno spec dei modelli pretendeva fra i predefiniti una
+  riga di un produttore proprietario, che da quando i predefiniti sono a pesi
+  aperti non esiste più.
+
+Due spec sono stati resi indipendenti dall'ambiente invece che scusati: lo stato
+"caricamento fallito" ora si INIETTA (bacheca e gestione) invece di sperare che
+la macchina non arrivi al database.
+
+L'ambiente di una voce resta una gerarchia e non un'etichetta sola: `actions`
+eredita i rossi di `cloud` (il runner è anche lui senza schermo) ma non il
+contrario — scusare un rosso del runner anche sulla macchina delle routine
+spegnerebbe la suite in un posto dove funziona.
