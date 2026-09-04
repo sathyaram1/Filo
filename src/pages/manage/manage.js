@@ -2990,7 +2990,7 @@
   }
 
   function startLive() {
-    if (!LIVE || liveEnabled) return;
+    if (!LIVE || liveEnabled || liveBlocked) return;
     liveEnabled = true;
     liveTimer = setInterval(() => liveTickIfDue(true), LIVE.POLL_MS);
     // Scheda tornata in vista o finestra tornata in primo piano: se è passato
