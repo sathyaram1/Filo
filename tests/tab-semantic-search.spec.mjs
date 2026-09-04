@@ -18,8 +18,8 @@ async function setupStubs(app, { summary } = {}) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'test-key', tavily: '' },
-      models: { ...C.DEFAULT_MODELS },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+      models: { ...globalThis.SN_TEST_MODELS.models },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
     });
     globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [0.5, 0.2, 0.9, 0.1]) });
     if (args.summary != null) {
@@ -55,13 +55,13 @@ test('la ricerca semantica ordina per pertinenza e non espone gli embedding', as
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'test-key', tavily: '' },
-      models: { ...C.DEFAULT_MODELS },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+      models: { ...globalThis.SN_TEST_MODELS.models },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
     });
     const A = globalThis.SN_ARCHIVED_TABS;
     const a = await A.archive({ url: 'https://a.test/', title: 'DocA' });
     const b = await A.archive({ url: 'https://b.test/', title: 'DocB' });
-    const EM = C.DEFAULT_MODEL_REGISTRY['qwen-embed'].model;
+    const EM = globalThis.SN_TEST_MODELS.registry['qwen-embed'].model;
     await A.update(a.id, { embedding: [127, 0], embedModel: EM, snippet: 'documento A' });
     await A.update(b.id, { embedding: [0, 127], embedModel: EM, snippet: 'documento B' });
     globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [1, 0]) }); // ≈ DocA
@@ -88,13 +88,13 @@ test('il re-rank LLM può riordinare i risultati rispetto al coseno', async ({ a
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'test-key', tavily: '' },
-      models: { ...C.DEFAULT_MODELS },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+      models: { ...globalThis.SN_TEST_MODELS.models },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
     });
     const A = globalThis.SN_ARCHIVED_TABS;
     const a = await A.archive({ url: 'https://a.test/', title: 'DocA' });
     const b = await A.archive({ url: 'https://b.test/', title: 'DocB' });
-    const EM = C.DEFAULT_MODEL_REGISTRY['qwen-embed'].model;
+    const EM = globalThis.SN_TEST_MODELS.registry['qwen-embed'].model;
     await A.update(a.id, { embedding: [127, 0], embedModel: EM, snippet: 'A' });
     await A.update(b.id, { embedding: [0, 127], embedModel: EM, snippet: 'B' });
     globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => ({ vectors: texts.map(() => [1, 0]) }); // coseno → DocA primo
@@ -143,8 +143,8 @@ test('cambiando modello di indicizzazione, i vettori vecchi si rifanno da soli e
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'test-key', tavily: '' },
-      models: { ...C.DEFAULT_MODELS },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
+      models: { ...globalThis.SN_TEST_MODELS.models },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
     });
     const A = globalThis.SN_ARCHIVED_TABS;
     const vecchia = await A.archive({ url: 'https://vecchia.test/', title: 'Vecchia' });
@@ -166,7 +166,7 @@ test('cambiando modello di indicizzazione, i vettori vecchi si rifanno da soli e
   expect((prima.results || []).some((x) => x.title === 'Vecchia')).toBe(false);
 
   // …ma viene reindicizzata in background col modello in uso.
-  const EM = await app.evaluate(() => globalThis.SN_CONST.DEFAULT_MODEL_REGISTRY['qwen-embed'].model);
+  const EM = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['qwen-embed'].model);
   await expect.poll(async () => app.evaluate(async () => {
     const l = await globalThis.SN_ARCHIVED_TABS.list();
     const e = l.find((x) => x.title === 'Vecchia');

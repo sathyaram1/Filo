@@ -24,7 +24,7 @@ test('Modelli: la catena di fallback per azione ordina primario poi secondari', 
     const refs = C.parseModelRefs('deepseek-flash, gemma-lite, claude');
     const order = ['openrouter'];
     const keys = { openrouter: 'or' };
-    return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, order, keys);
+    return C.buildModelAttempts(refs, globalThis.SN_TEST_MODELS.registry, order, keys);
   });
 
   // Ogni nickname ha UN solo provider; la catena segue l'ordine scritto:
@@ -45,7 +45,7 @@ test('Modelli: un singolo nickname risolve solo sul suo provider', async ({ open
     const refs = C.parseModelRefs('deepseek-flash');
     // Un secondo fornitore (immaginario) con la sua chiave: il nickname non
     // deve produrre un tentativo anche lì.
-    return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, ['openrouter', 'altro'], { openrouter: 'or', altro: 'x' });
+    return C.buildModelAttempts(refs, globalThis.SN_TEST_MODELS.registry, ['openrouter', 'altro'], { openrouter: 'or', altro: 'x' });
   });
   expect(chain.map((a) => `${a.provider}:${a.model}`)).toEqual([
     'openrouter:deepseek/deepseek-v4-flash',

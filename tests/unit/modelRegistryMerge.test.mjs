@@ -22,6 +22,8 @@ const ROOT = join(__dirname, '..', '..');
 
 // Carica SN_CONST (IIFE su globalThis) e il defaultsStore.
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(ROOT, 'tests', 'fixtures', 'testModels.js'));
 const Defaults = require(join(ROOT, 'src', 'main', 'services', 'defaultsStore.js'));
 const C = globalThis.SN_CONST;
 
@@ -94,7 +96,7 @@ test('con il registry effettivo le azioni dei mazzi risolvono in modelli concret
   // Un nickname non risolto passerebbe grezzo al provider (es. model === 'flash',
   // che OpenRouter rifiuta con 400): ogni tentativo deve usare l'id concreto
   // del registry di build corrispondente a uno dei nickname della catena.
-  const concreteIds = refs.map((r) => C.DEFAULT_MODEL_REGISTRY[r]?.model).filter(Boolean);
+  const concreteIds = refs.map((r) => globalThis.SN_TEST_MODELS.registry[r]?.model).filter(Boolean);
   for (const a of attempts) {
     assert.ok(concreteIds.includes(a.model),
       `il tentativo usa "${a.model}" che non è un modello concreto della catena "${chain}"`);
@@ -102,9 +104,9 @@ test('con il registry effettivo le azioni dei mazzi risolvono in modelli concret
 });
 
 test('ogni nickname citato dalle catene di default esiste nel registry di build', () => {
-  for (const [action, chain] of Object.entries(C.DEFAULT_MODELS)) {
+  for (const [action, chain] of Object.entries(globalThis.SN_TEST_MODELS.models)) {
     for (const ref of C.parseModelRefs(chain)) {
-      assert.ok(C.DEFAULT_MODEL_REGISTRY[ref],
+      assert.ok(globalThis.SN_TEST_MODELS.registry[ref],
         `l'azione ${action} cita il nickname "${ref}" assente dal registry di build`);
     }
   }

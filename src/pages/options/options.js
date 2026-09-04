@@ -600,6 +600,11 @@
       if (label) entry.label = label;
       // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
+      // E ciò che la riga non modifica ma la voce dichiara (pesi aperti,
+      // cosa sa masticare): senza, un salvataggio dalle Opzioni lo perderebbe.
+      for (const k of ['weights', 'inputs', 'outputs']) {
+        if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
+      }
       out[nick] = entry;
     }
     return { registry: out, dups, missingNick, missingNickRows, dupRows };

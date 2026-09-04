@@ -67,7 +67,7 @@ async function mockProvider(app) {
         [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash',
         [C.ACTIONS.DECKS_SEARCH_FILTER]: 'deepseek-flash',
       },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__filterCalls = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {

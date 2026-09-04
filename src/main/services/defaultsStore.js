@@ -127,12 +127,21 @@ async function refreshIfStale(maxAgeMs = 5 * 60 * 1000) {
 }
 
 // Config predefinita effettiva = costanti/build  <  override remoti.
+// Registro e catene "di build": nell'app sono VUOTI (nessun modello scritto
+// nel codice); nei test è il registro di prova, così i test hanno una
+// configurazione nota senza che l'app ne abbia una.
+function buildModels() {
+  const C = globalThis.SN_CONST || {};
+  const T = process.env.NODE_ENV === 'test' && globalThis.SN_TEST_MODELS;
+  return T ? { registry: T.registry, models: T.models } : { registry: C.DEFAULT_MODEL_REGISTRY || {}, models: C.DEFAULT_MODELS || {} };
+}
+
 function get() {
   const C = globalThis.SN_CONST || {};
   const out = {
     provider: C.DEFAULT_PROVIDER || 'openrouter',
-    models: { ...(C.DEFAULT_MODELS || {}) },
-    modelRegistry: { ...(C.DEFAULT_MODEL_REGISTRY || {}) },
+    models: { ...buildModels().models },
+    modelRegistry: { ...buildModels().registry },
     // Politica sui fornitori (#421): lista di esclusione (forme base dei
     // produttori di modelli) e ordinamento fra gli host ammessi. Curabili senza
     // codice dal doc Firestore config/models: la lista remota SOSTITUISCE quella
@@ -263,7 +272,7 @@ async function update(partial, idToken) {
     // mostra build+remoto fusi), quindi ri-aggiungere un modello lo toglie dai
     // tombstone → auto-guarigione. Solo i nickname di BUILD possono finire qui:
     // quelli custom, se rimossi, sono già assenti dal doc e non serve marcarli.
-    const buildReg = (globalThis.SN_CONST && globalThis.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
+    const buildReg = buildModels().registry;
     const deleted = Object.keys(buildReg).filter((k) => !(k in partial.modelRegistry));
     modelFields.modelRegistryDeleted = toFsValue(deleted);
     modelMask.push('modelRegistryDeleted');

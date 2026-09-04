@@ -26,7 +26,7 @@ async function stubModel(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__vChunks = [];
     globalThis.__vCalls = 0;

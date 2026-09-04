@@ -65,6 +65,11 @@ require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)
 require(path.join(SHARED, 'dictationSegmenter.js')); // dettatura in diretta: spezzoni di parlato (logica pura)
+// Solo nei test: registro e catene di modelli di prova (l'app non ha modelli
+// scritti nel codice; vedi tests/fixtures/testModels.js).
+if (process.env.NODE_ENV === 'test') {
+  try { require(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'testModels.js')); } catch (e) { console.warn('[loader] testModels non caricato:', e.message); }
+}
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente

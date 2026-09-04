@@ -37,7 +37,10 @@
     // nello storage (utente pre-refactor), partiamo dai default. Un oggetto
     // vuoto salvato esplicitamente dall'utente viene rispettato (registry vuoto).
     if (!stored.modelRegistry) {
-      stored.modelRegistry = { ...global.SN_CONST.DEFAULT_MODEL_REGISTRY };
+      // Il registro di build è vuoto (nessun modello scritto nel codice); nei
+      // test c'è un registro di prova.
+      const seed = (global.SN_TEST_MODELS && global.SN_TEST_MODELS.registry) || global.SN_CONST.DEFAULT_MODEL_REGISTRY;
+      stored.modelRegistry = { ...seed };
     }
     return deepMerge(DEFAULT_SETTINGS, stored);
   }

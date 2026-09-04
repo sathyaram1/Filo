@@ -292,6 +292,7 @@
     // già calcolato dal router (usage.costUsd) e non passa da questo listino.
     'deepseek/deepseek-v4-flash': { input: 0.09, output: 0.18 },
     'moonshotai/kimi-k2.6': { input: 0.95, output: 4.00 },
+    'z-ai/glm-5.3-flash': { input: 0.075, output: 0.25 },
     // Sostituti a pesi aperti (fornitori indipendenti): costano meno dei
     // proprietari che sostituiscono, quindi accendere l'interruttore non fa mai
     // salire la spesa.
@@ -404,106 +405,12 @@
   // { openrouter, gemini } (un nickname per due provider). resolveModel le
   // gestisce ancora, così i settings salvati prima del refactor continuano a
   // funzionare finché l'utente non li ri-salva dalla pagina Opzioni.
-  const DEFAULT_MODEL_REGISTRY = {
-    // ── Anthropic, comprata da Anthropic (il router la serve da lì) ──────────
-    claude: {
-      label: 'Claude Haiku 4.5',
-      provider: 'openrouter',
-      model: 'anthropic/claude-haiku-4.5',
-      inputs: ['text', 'image'],
-      outputs: ['text'],
-    },
-    // ── Modelli a PESI APERTI, serviti da fornitori indipendenti ─────────────
-    // Sono i sostituti usati quando chi usa Filo accende "solo modelli a pesi
-    // aperti" (vedi OPEN_WEIGHTS_SUBSTITUTES). Stanno nel registry come tutti
-    // gli altri: si possono scegliere anche a interruttore spento.
-    // Provider 'openrouter' = smistatore, non il produttore dei pesi: l'host
-    // concreto lo sceglie lui, e la lista di esclusione tiene fuori i produttori.
-    // Cosa ciascuno sa masticare (testo? immagini? audio?) sta in
-    // OPEN_WEIGHTS_SUBSTITUTE_MODALITIES, accanto alla tabella delle
-    // sostituzioni: serve solo lì, e scriverlo una volta sola evita che le due
-    // liste divergano. Una voce può comunque dichiararlo da sé (`inputs`/
-    // `outputs`), così l'owner corregge dalla config condivisa senza rilasciare
-    // codice.
-    gemma: {
-      label: 'Gemma 4 31B (pesi aperti)',
-      provider: 'openrouter',
-      model: 'google/gemma-4-31b-it',
-      weights: 'open',
-    },
-    'gemma-lite': {
-      label: 'Gemma 4 26B A4B (pesi aperti)',
-      provider: 'openrouter',
-      model: 'google/gemma-4-26b-a4b-it',
-      weights: 'open',
-    },
-    deepseek: {
-      label: 'DeepSeek V4 Pro (pesi aperti)',
-      provider: 'openrouter',
-      model: 'deepseek/deepseek-v4-pro',
-      weights: 'open',
-      inputs: ['text'],
-      outputs: ['text'],
-    },
-    'deepseek-flash': {
-      label: 'DeepSeek V4 Flash (pesi aperti, economico)',
-      provider: 'openrouter',
-      model: 'deepseek/deepseek-v4-flash',
-      weights: 'open',
-      inputs: ['text'],
-      outputs: ['text'],
-    },
-    kimi: {
-      label: 'Kimi K2.6 (pesi aperti, legge le immagini)',
-      provider: 'openrouter',
-      model: 'moonshotai/kimi-k2.6',
-      weights: 'open',
-      inputs: ['text', 'image'],
-      outputs: ['text'],
-    },
-    // Dettatura: ascoltano un audio e restituiscono il testo. Le capacità sono
-    // dichiarate sulla voce così l'editor delle Opzioni e il menu «Detta» sanno
-    // che questi ascoltano e gli altri no, senza indovinarlo dal nome.
-    whisper: {
-      label: 'Whisper Large v3 Turbo (pesi aperti, dettatura)',
-      provider: 'openrouter',
-      model: 'openai/whisper-large-v3-turbo',
-      weights: 'open',
-      inputs: ['audio'],
-      outputs: ['text'],
-    },
-    'nemotron-asr': {
-      label: 'Nemotron ASR 0.6B (pesi aperti, dettatura)',
-      provider: 'openrouter',
-      model: 'nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b',
-      weights: 'open',
-      inputs: ['audio'],
-      outputs: ['text'],
-    },
-    // Lettura ad alta voce: produce AUDIO da testo. Usato SOLO dall'azione TTS
-    // (la validazione modello↔azione impedisce di assegnarlo a funzioni di
-    // testo). Le voci disponibili stanno in ttsVoices.js.
-    kokoro: {
-      label: 'Kokoro 82M (pesi aperti, voce)',
-      provider: 'openrouter',
-      model: 'hexgrad/kokoro-82m',
-      weights: 'open',
-      inputs: ['text'],
-      outputs: ['audio'],
-    },
-    // Indicizzazione (embedding): produce VETTORI da testo, non parole. Usato
-    // SOLO dall'indicizzazione dell'archivio schede. Cambiare modello vuol dire
-    // cambiare "lingua" dei vettori: i vecchi non sono confrontabili coi nuovi,
-    // e l'archivio si reindicizza da solo (vedi handlers.js, embedTexts).
-    'qwen-embed': {
-      label: 'Qwen3 Embedding 8B (pesi aperti, indicizzazione)',
-      provider: 'openrouter',
-      model: 'qwen/qwen3-embedding-8b',
-      weights: 'open',
-      inputs: ['text'],
-      outputs: ['embedding'],
-    },
-  };
+  // VUOTO di proposito: nessun modello scritto nel codice. I modelli veri
+  // stanno nella configurazione condivisa (Gestione → Modelli predefiniti) o
+  // nelle Opzioni di chi usa Filo. Una funzione senza modello si ferma e lo
+  // dice: meglio un errore rumoroso di una chiamata silenziosa a un modello
+  // vecchio scelto da nessuno. (Per i test: tests/fixtures/testModels.js.)
+  const DEFAULT_MODEL_REGISTRY = {};
 
   // Modello di default per ogni azione. I valori sono liste di NICKNAME dal
   // registry separate da virgola: il primo è il primario, gli altri sono
@@ -511,69 +418,46 @@
   // aperti serviti da fornitori indipendenti (DeepSeek per il testo, Gemma e
   // Kimi dove servono gli occhi, Whisper per l'orecchio, Kokoro per la voce,
   // Qwen per l'indicizzazione) e Anthropic dove serve più testa.
+  // Una chiave per funzione, tutte VUOTE: le catene vere vengono dalla
+  // configurazione (vedi DEFAULT_MODEL_REGISTRY). Le chiavi restano perché il
+  // censimento dei modelli (modelUsage.js) le confronta con le funzioni.
   const DEFAULT_MODELS = {
-    [ACTIONS.EXPLAIN]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.EXPLAIN_DEEP]: 'claude, deepseek',
-    [ACTIONS.TRANSLATE_SELECTION]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.HELP]: 'deepseek, gemma',
-    [ACTIONS.CATEGORIZE]: 'deepseek-flash, gemma-lite',
-    // Immagini: servono modelli che le leggano davvero (Gemma 4 e Kimi K2.6).
-    [ACTIONS.DESCRIBE_IMAGE]: 'gemma, kimi',
-    // OCR: come sopra, ma il testo piccolo chiede un modello attento.
-    [ACTIONS.TRANSCRIBE_IMAGE]: 'gemma, kimi',
-    // Dettatura: modelli di trascrizione (ascoltano un audio, rispondono col
-    // testo), non modelli di chat. Passano dall'endpoint di trascrizione.
-    [ACTIONS.TRANSCRIBE_AUDIO]: 'whisper, nemotron-asr',
-    [ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.EDIT_TEXT]: 'claude, deepseek',
-    [ACTIONS.EXPLAIN_LINK]: 'deepseek-flash, gemma-lite',
-    // Modelli "stupidi" per la pipeline di raccolta path: deve essere economico
-    // e deterministico, non creativo.
-    [ACTIONS.HELP_INTENT_GUESS]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.HELP_INTENT_JUDGE]: 'deepseek-flash, gemma-lite',
-    // Filo agenti: chat = modello principale; gli altri (background) usano il
-    // modello economico.
-    [ACTIONS.FILO_CHAT]: 'deepseek, gemma',
-    [ACTIONS.FILO_DASHBOARD]: 'deepseek, gemma',
-    [ACTIONS.FILO_LESSON]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.FILO_COMPACT]: 'deepseek, gemma',
-    // Chat del deck builder: traduzione NL→query Scryfall + risposte brevi.
-    [ACTIONS.DECKS_CHAT]: 'deepseek, gemma',
-    // Parere carta-vs-mazzo (§6): giudizio breve ma sensato.
-    [ACTIONS.DECKS_OPINION]: 'deepseek, gemma',
-    // Auto-tag (§7): giudizio booleano carta-per-tag → modello economico.
-    [ACTIONS.DECKS_AUTOTAG]: 'deepseek-flash, gemma-lite',
-    // Filtro ricerca (§4.1): giudizio booleano carta-vs-criterio in batch →
-    // modello piccolo ed economico (gira su molte carte, con cache).
-    [ACTIONS.DECKS_SEARCH_FILTER]: 'deepseek-flash, gemma-lite',
-    // Triage tab: decisione economica e frequente.
-    [ACTIONS.FILO_TAB_TRIAGE]: 'deepseek-flash, gemma-lite',
-    // Riassunto pagina alla chiusura: economico (gira spesso).
-    [ACTIONS.FILO_TAB_SUMMARY]: 'deepseek-flash, gemma-lite',
-    // Re-rank ricerca semantica: legge i top-K riassunti.
-    [ACTIONS.FILO_TAB_SEARCH]: 'deepseek-flash, gemma-lite',
-    // Lettura ad alta voce: modello di sintesi vocale. Se fallisce/è assente,
-    // la voce del browser (Web Speech) fa da fallback finale lato content script.
-    [ACTIONS.TTS]: 'kokoro',
-    // Funzioni di supporto: giudizi corti e frequenti → modello economico.
-    [ACTIONS.SAFEBROWSE_JUDGE]: 'deepseek-flash',
-    [ACTIONS.GEOBLOCK_CLASSIFY]: 'deepseek-flash',
-    [ACTIONS.FEEDBACK_TITLE]: 'deepseek-flash',
-    // Editor: titolo e riassunto sono automatici e frequenti (girano dopo ogni
-    // pausa nella scrittura) → modello economico. La chat col documento è
-    // conversazionale come le altre chat → stesso modello delle chat.
-    [ACTIONS.EDITOR_TITLE]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.EDITOR_SUMMARY]: 'deepseek-flash, gemma-lite',
-    [ACTIONS.EDITOR_CHAT]: 'deepseek, gemma',
-    // Ricerca fra i feedback: classifica una lista corta → modello economico.
-    [ACTIONS.MANAGE_SEARCH]: 'deepseek-flash, gemma-lite',
-    // Indicizzazione dell'archivio: modello di embedding, non di testo. Uno
-    // solo, senza ripiego: due modelli producono vettori non confrontabili.
-    [ACTIONS.ARCHIVE_EMBED]: 'qwen-embed',
-    // Prova di un fornitore: un modello economico basta a dire se risponde.
-    [ACTIONS.PROVIDER_TEST]: 'deepseek-flash, gemma-lite',
+    [ACTIONS.EXPLAIN]: '',
+    [ACTIONS.EXPLAIN_DEEP]: '',
+    [ACTIONS.TRANSLATE_SELECTION]: '',
+    [ACTIONS.TRANSLATE_PAGE]: '',
+    [ACTIONS.HELP]: '',
+    [ACTIONS.CATEGORIZE]: '',
+    [ACTIONS.DESCRIBE_IMAGE]: '',
+    [ACTIONS.TRANSCRIBE_IMAGE]: '',
+    [ACTIONS.TRANSCRIBE_AUDIO]: '',
+    [ACTIONS.SPELLCHECK_SEMANTIC]: '',
+    [ACTIONS.SPELLCHECK_WORD]: '',
+    [ACTIONS.EDIT_TEXT]: '',
+    [ACTIONS.EXPLAIN_LINK]: '',
+    [ACTIONS.HELP_INTENT_GUESS]: '',
+    [ACTIONS.HELP_INTENT_JUDGE]: '',
+    [ACTIONS.FILO_CHAT]: '',
+    [ACTIONS.FILO_DASHBOARD]: '',
+    [ACTIONS.FILO_LESSON]: '',
+    [ACTIONS.FILO_COMPACT]: '',
+    [ACTIONS.DECKS_CHAT]: '',
+    [ACTIONS.DECKS_OPINION]: '',
+    [ACTIONS.DECKS_AUTOTAG]: '',
+    [ACTIONS.DECKS_SEARCH_FILTER]: '',
+    [ACTIONS.FILO_TAB_TRIAGE]: '',
+    [ACTIONS.FILO_TAB_SUMMARY]: '',
+    [ACTIONS.FILO_TAB_SEARCH]: '',
+    [ACTIONS.TTS]: '',
+    [ACTIONS.SAFEBROWSE_JUDGE]: '',
+    [ACTIONS.GEOBLOCK_CLASSIFY]: '',
+    [ACTIONS.FEEDBACK_TITLE]: '',
+    [ACTIONS.EDITOR_TITLE]: '',
+    [ACTIONS.EDITOR_SUMMARY]: '',
+    [ACTIONS.EDITOR_CHAT]: '',
+    [ACTIONS.MANAGE_SEARCH]: '',
+    [ACTIONS.ARCHIVE_EMBED]: '',
+    [ACTIONS.PROVIDER_TEST]: '',
   };
 
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────

@@ -31,7 +31,7 @@ async function preparaProviderConGate(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__gatePopupScroll = new Promise((res) => { globalThis.__apriGatePopupScroll = res; });
     const paragrafo = (i) => `Paragrafo ${i}: una spiegazione distesa della parola selezionata, con abbastanza testo da far traboccare il corpo del riquadro e renderlo scorrevole. `;

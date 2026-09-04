@@ -39,8 +39,8 @@ test('Dettatura: le frasi arrivano nel campo mentre si parla, nell\'ordine detto
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
-      models: { ...C.DEFAULT_MODELS },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+      models: { ...globalThis.SN_TEST_MODELS.models },
     });
     // Modello di trascrizione finto: registra cosa riceve e risponde "frase N".
     globalThis.__dictCalls = [];

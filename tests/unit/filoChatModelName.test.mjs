@@ -17,6 +17,8 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(__dirname, '..', 'fixtures', 'testModels.js'));
 const C = globalThis.SN_CONST;
 
 const basePayload = { profilo: 'x', preferenze: 'y', stato: 'z' };
@@ -37,7 +39,7 @@ test('PROMPTS.filoChat: senza modelName resta retrocompatibile (niente riga rott
 });
 
 test('risoluzione: il nickname si risolve nell\'id CONCRETO del modello, non nel nickname/label', () => {
-  const registry = C.DEFAULT_MODEL_REGISTRY;
+  const registry = globalThis.SN_TEST_MODELS.registry;
   // 'deepseek-flash' è il nickname (chiave del registry); 'DeepSeek V4 Flash…'
   // è la label; 'deepseek/deepseek-v4-flash' è il nome con cui il codice lo invoca.
   const refs = C.parseModelRefs('deepseek-flash');
@@ -52,7 +54,7 @@ test('integrazione concettuale: ciò che l\'handler passa al prompt è l\'id con
   // Replica la catena dell'handler: parseModelRefs → buildModelAttempts →
   // attempts[0].model → PROMPTS.filoChat({ modelName }). Il prompt contiene l'id
   // concreto, mai il nickname.
-  const registry = C.DEFAULT_MODEL_REGISTRY;
+  const registry = globalThis.SN_TEST_MODELS.registry;
   const attempts = C.buildModelAttempts(C.parseModelRefs('deepseek-flash'), registry, ['openrouter'], { openrouter: 'k' });
   const modelName = attempts[0].model;
   const p = C.PROMPTS.filoChat({ ...basePayload, modelName });

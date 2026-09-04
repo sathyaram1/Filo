@@ -117,7 +117,7 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
       openWeightsOnly,
       apiKeys: { openrouter: 'k-test' },
       modelRegistry: {
-        ...C.DEFAULT_MODEL_REGISTRY,
+        ...globalThis.SN_TEST_MODELS.registry,
         // Voci proprietarie come quelle dei registri personali salvati prima
         // (i predefiniti oggi non passano più da Google): hanno un sostituto.
         flash: { provider: 'openrouter', model: 'google/gemini-2.0-flash-001' },

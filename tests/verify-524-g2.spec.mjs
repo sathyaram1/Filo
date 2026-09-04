@@ -35,7 +35,7 @@ async function useFakeKey(app) {
         [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
         [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
       },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
   });
 }

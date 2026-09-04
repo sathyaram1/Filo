@@ -133,6 +133,7 @@
     row.className = 'sn-model-row sn-model-row-reason';
     const single = entryToSingle(entry);
     row.dataset.label = (entry && entry.label) || '';
+    row._entry = { ...(entry || {}) };
 
     const nickIn = document.createElement('input');
     nickIn.type = 'text';
@@ -290,6 +291,10 @@
       // Salviamo il livello solo se diverso da 'auto' (default): così le voci
       // integrate restano pulite e "auto" non gonfia il doc condiviso.
       if (reasoning) entry.reasoning = reasoning;
+      // Ciò che la riga non modifica ma la voce dichiara resta com'era.
+      for (const k of ['weights', 'inputs', 'outputs']) {
+        if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
+      }
       out[nick] = entry;
     }
     return out;

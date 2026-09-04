@@ -28,7 +28,7 @@ test('fallback a metà streaming: il popup mostra solo la risposta pulita del se
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash,gemma-lite' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     // Provider finti: NON stubbiamo il router (streamCompleteWithFallback), che
     // resta quello vero — è proprio la sua logica di reset sotto test.
@@ -98,7 +98,7 @@ test('errore immediato del primo provider (nessun delta): fallback pulito come p
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash,gemma-lite' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__origGem2 = globalThis.SN_PROVIDER_OPENROUTER;
     globalThis.__origOr2 = globalThis.SN_PROVIDER_OPENROUTER;

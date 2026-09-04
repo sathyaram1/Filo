@@ -65,7 +65,7 @@ async function mockGatedProvider(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__gate = new Promise((res) => { globalThis.__releaseGate = res; });
     globalThis.__callN = 0;

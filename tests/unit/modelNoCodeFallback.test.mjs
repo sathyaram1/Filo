@@ -20,6 +20,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(ROOT, 'tests', 'fixtures', 'testModels.js'));
 const C = globalThis.SN_CONST;
 
 // Registry "configurato" realistico: nickname curati, nessuno di quelli
@@ -61,7 +63,7 @@ test('il registry scritto nel codice non risolve nulla se non è quello configur
   // 'deepseek' esiste fra i nickname integrati: è il genere di scorciatoia su
   // cui si ripiegava in silenzio. Con il registry configurato dell'utente deve
   // risultare assente.
-  assert.ok(C.DEFAULT_MODEL_REGISTRY.deepseek, 'presupposto del test: "deepseek" è un nickname integrato');
+  assert.ok(globalThis.SN_TEST_MODELS.registry.deepseek, 'presupposto del test: "deepseek" è un nickname integrato');
   assert.deepEqual(C.missingModelRefs(['deepseek'], REGISTRY), ['deepseek']);
 });
 
@@ -99,7 +101,7 @@ test('ogni funzione che consuma un modello si può impostare dall\'editor', asyn
   // Se una funzione ha un modello di default deve anche essere impostabile:
   // altrimenti, quando la sua catena non risolve, l'errore direbbe "impostalo"
   // indicando un posto dove la funzione non compare.
-  for (const action of Object.keys(C.DEFAULT_MODELS)) {
+  for (const action of Object.keys(globalThis.SN_TEST_MODELS.models)) {
     assert.ok(editable.has(action),
       `la funzione "${action}" usa un modello ma non compare nell'editor dei modelli per azione`);
   }

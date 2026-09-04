@@ -40,7 +40,7 @@ async function stubSequence(app, turns) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__filoTurnCount = 0;
     // Tieni la sequenza su globalThis: lo stub la legge da lì (un closure sul

@@ -39,7 +39,7 @@ async function stubTranslationProvider(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     const P = globalThis.SN_PROVIDERS;
     globalThis.__filoTranslateCalls = 0;

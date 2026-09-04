@@ -65,7 +65,7 @@ async function mockProvider(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const last = String(messages[messages.length - 1].content || '');

@@ -43,7 +43,7 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
 
     // Stub del provider: cattura i messages e ritorna un JSON valido (niente rete).
@@ -71,7 +71,7 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
 
     // Risolvi quale chiave-nickname del registry corrisponde a quell'id concreto.
     const eff = await globalThis.SN_STORAGE.getSettings();
-    const registry = (eff && eff.modelRegistry) || C.DEFAULT_MODEL_REGISTRY;
+    const registry = (eff && eff.modelRegistry) || globalThis.SN_TEST_MODELS.registry;
     const nicknameKey = Object.keys(registry).find((k) => registry[k].model === primaryModel) || null;
 
     return { sysContent, primaryModel, nicknameKey };

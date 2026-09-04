@@ -29,7 +29,7 @@ test('Capacità: la validazione modello↔funzione è corretta (main process)', 
     const Caps = globalThis.SN_MODEL_CAPS;
     const C = globalThis.SN_CONST;
     const A = C.ACTIONS;
-    const R = C.DEFAULT_MODEL_REGISTRY;
+    const R = globalThis.SN_TEST_MODELS.registry;
     // Le voci predefinite dichiarano le loro modalità: il controllo le usa.
     const m = (nick, a) => {
       const e = R[nick];

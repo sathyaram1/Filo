@@ -44,8 +44,8 @@ test('Dettatura: a pesi aperti si ferma nominando il motivo, non con l\'errore g
       useDefaultModels: false,
       openWeightsOnly: true,
       apiKeys: { openrouter: 'k-test' },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
-      models: { ...C.DEFAULT_MODELS, [C.ACTIONS.TRANSCRIBE_AUDIO]: 'claude' },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+      models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.TRANSCRIBE_AUDIO]: 'claude' },
     });
   });
 

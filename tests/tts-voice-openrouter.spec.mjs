@@ -18,8 +18,8 @@ test('Lettura: voce a pesi aperti via il router, nella lingua del testo, con chi
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
-      models: { ...C.DEFAULT_MODELS },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+      models: { ...globalThis.SN_TEST_MODELS.models },
       tts: { voice: '', rate: 1.3, pitch: 1, modelVoice: '' },
     });
     const P = globalThis.SN_PROVIDER_OPENROUTER;
@@ -77,8 +77,8 @@ test('Lettura: voce a pesi aperti via il router, nella lingua del testo, con chi
 test('Lettura: il modello di lettura non è più Google, e senza chiave si ripiega con grazia', async ({ app, openTab }) => {
   const info = await app.evaluate(() => {
     const C = globalThis.SN_CONST;
-    const nick = C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.TTS])[0];
-    const e = C.DEFAULT_MODEL_REGISTRY[nick];
+    const nick = C.parseModelRefs(globalThis.SN_TEST_MODELS.models[C.ACTIONS.TTS])[0];
+    const e = globalThis.SN_TEST_MODELS.registry[nick];
     return { provider: e.provider, model: e.model, open: C.isOpenWeightsEntry(e), hasGeminiProvider: !!globalThis.SN_PROVIDER_GEMINI };
   });
   expect(info.provider).toBe('openrouter');
@@ -91,8 +91,8 @@ test('Lettura: il modello di lettura non è più Google, e senza chiave si ripie
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: '' },
-      modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
-      models: { ...C.DEFAULT_MODELS },
+      modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+      models: { ...globalThis.SN_TEST_MODELS.models },
     });
   });
   const page = await openTab('filo://newtab/');

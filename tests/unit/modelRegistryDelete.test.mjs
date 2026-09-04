@@ -25,6 +25,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(ROOT, 'tests', 'fixtures', 'testModels.js'));
 const Defaults = require(join(ROOT, 'src', 'main', 'services', 'defaultsStore.js'));
 const C = globalThis.SN_CONST;
 
@@ -79,7 +81,7 @@ test('un modello integrato eliminato NON riappare dopo la riapertura', async () 
   await withFakeFirestore(async () => {
     // L'editor mostra build+remoto fusi; l'admin elimina la riga "kokoro" e salva:
     // arriva il registry completo SENZA "kokoro".
-    const kept = { ...C.DEFAULT_MODEL_REGISTRY };
+    const kept = { ...globalThis.SN_TEST_MODELS.registry };
     delete kept.kokoro;
     const publicCfg = await Defaults.update({ modelRegistry: kept }, 'fake-admin-token');
 
@@ -102,7 +104,7 @@ test('un modello integrato eliminato NON riappare dopo la riapertura', async () 
 test('ri-aggiungere un modello eliminato lo fa ricomparire (auto-guarigione dei tombstone)', async () => {
   await withFakeFirestore(async () => {
     // Prima elimina "kokoro"…
-    const withoutKokoro = { ...C.DEFAULT_MODEL_REGISTRY };
+    const withoutKokoro = { ...globalThis.SN_TEST_MODELS.registry };
     delete withoutKokoro.kokoro;
     await Defaults.update({ modelRegistry: withoutKokoro }, 'fake-admin-token');
     let eff = await Defaults.refresh();
@@ -110,7 +112,7 @@ test('ri-aggiungere un modello eliminato lo fa ricomparire (auto-guarigione dei 
 
     // …poi l'admin lo ri-aggiunge dall'editor e salva: il registry inviato lo
     // contiene di nuovo, quindi esce dai tombstone.
-    await Defaults.update({ modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY } }, 'fake-admin-token');
+    await Defaults.update({ modelRegistry: { ...globalThis.SN_TEST_MODELS.registry } }, 'fake-admin-token');
     eff = await Defaults.refresh();
     assert.ok(eff.modelRegistry.kokoro, '"kokoro" non è tornato dopo averlo ri-aggiunto (tombstone non guarito)');
   });
@@ -119,17 +121,17 @@ test('ri-aggiungere un modello eliminato lo fa ricomparire (auto-guarigione dei 
 test('eliminare un modello custom (non di build) non tocca i tombstone dei build', async () => {
   await withFakeFirestore(async () => {
     // Registry con un nickname custom in più.
-    const withCustom = { ...C.DEFAULT_MODEL_REGISTRY, mio: { provider: 'openrouter', model: 'vendor/mio' } };
+    const withCustom = { ...globalThis.SN_TEST_MODELS.registry, mio: { provider: 'openrouter', model: 'vendor/mio' } };
     await Defaults.update({ modelRegistry: withCustom }, 'fake-admin-token');
     let eff = await Defaults.refresh();
     assert.ok(eff.modelRegistry.mio, 'precondizione: il modello custom deve essere salvato');
 
     // Elimina il custom, tenendo tutti i build.
-    await Defaults.update({ modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY } }, 'fake-admin-token');
+    await Defaults.update({ modelRegistry: { ...globalThis.SN_TEST_MODELS.registry } }, 'fake-admin-token');
     eff = await Defaults.refresh();
     assert.ok(!('mio' in eff.modelRegistry), 'il modello custom eliminato è riapparso');
     // Nessun build è finito nei tombstone: ci sono ancora tutti.
-    for (const nick of Object.keys(C.DEFAULT_MODEL_REGISTRY)) {
+    for (const nick of Object.keys(globalThis.SN_TEST_MODELS.registry)) {
       assert.ok(eff.modelRegistry[nick], `nickname integrato "${nick}" perso eliminando un custom`);
     }
   });

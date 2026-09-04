@@ -87,7 +87,7 @@ test('#2 l’output di un comando rientra nel contesto del modello al turno dopo
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     // Stub del provider: cattura i messages costruiti e ritorna un JSON valido.
     const captured = {};
