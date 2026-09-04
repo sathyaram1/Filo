@@ -185,6 +185,7 @@ jobs:
       # su main parte da qui.
       - name: Allinea la copia di lavoro a main (lettura)
         if: steps.check.outputs.should_release == 'true'
+        id: allinea
         shell: bash
         run: |
           set -e
@@ -195,7 +196,12 @@ jobs:
             echo "::error::il manifesto qui dice v${LOCALE}, il server ha scritto ${ATTESA}: non costruisco alla cieca."
             exit 1
           fi
-          echo "Si costruisce ${ATTESA}."
+          # Il commit ESATTO che si sta costruendo. Serve alla meta' Mac, che
+          # deve partire dallo stesso codice: il tag della release nasce solo
+          # alla pubblicazione e punta a dove sta `main` in QUEL momento, che
+          # dopo un merge nel frattempo non e' piu' questo commit.
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Si costruisce ${ATTESA} da $(git rev-parse HEAD)."
 
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
