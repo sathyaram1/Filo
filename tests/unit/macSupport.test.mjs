@@ -288,7 +288,7 @@ const SORGENTI_DEI_NOMI = {
 };
 
 // Le forme con cui si chiede il nome giusto invece di inventarlo.
-const CHIAMA_LA_REGOLA = /SN_TASTI|Tasti\.|\btasti\(|\btasto\(|\bconTasto\(/;
+const CHIAMA_LA_REGOLA = /SN_TASTI|Tasti\.|etichetta|\btasti\(|\btasto\(|\bconTasto\(/;
 const SCORCIATOIA_SCRITTA = /(Ctrl|Alt|Cmd|Command|Option)\s*\+\s*[A-Za-z0-9\\]/;
 
 function fileDiInterfaccia(dir, acc = []) {
