@@ -330,6 +330,13 @@ module.exports = function register(on, ctx) {
           return { ok: false, error: 'decifratura immagine fallita' };
         }
       }
+      // Un DOCUMENTO (non immagine) torna con il tipo dichiarato dal chiamante:
+      // il link della dashboard lo scarica già decifrato, col nome originale.
+      // Prima il link puntava ai byte cifrati e l'owner apriva un file rotto.
+      const mime = String((msg && msg.mime) || '').trim();
+      if (mime && !/^image\//i.test(mime) && /^[\w.+-]+\/[\w.+-]+$/.test(mime)) {
+        return { ok: true, dataUrl: `data:${mime};base64,${Buffer.from(bytes).toString('base64')}` };
+      }
       return { ok: true, dataUrl: IMG.bytesToDataUrl(bytes) };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };

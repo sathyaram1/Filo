@@ -1039,6 +1039,39 @@
     });
   }
 
+  // I documenti allegati: al click si scaricano decifrati (stesso canale delle
+  // immagini, col tipo dichiarato) e si salvano col nome originale. Se la
+  // decifratura fallisce, il motivo finisce nel `title` del link.
+  function resolveBubbleFiles(bubble) {
+    bubble.querySelectorAll('.mg-file-link').forEach((a) => {
+      a.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const url = a.dataset.url || '';
+        const name = a.dataset.name || 'allegato';
+        const mime = a.dataset.type || 'application/octet-stream';
+        a.classList.add('mg-img-loading');
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_image', url, mime });
+          if (r && r.ok && r.dataUrl) {
+            const dl = document.createElement('a');
+            dl.href = r.dataUrl;
+            dl.download = name;
+            document.body.appendChild(dl);
+            dl.click();
+            dl.remove();
+          } else {
+            a.title = (r && r.error) ? String(r.error) : 'allegato non disponibile';
+            a.classList.add('mg-img-failed');
+          }
+        } catch (_) {
+          a.title = 'allegato non raggiungibile';
+        } finally {
+          a.classList.remove('mg-img-loading');
+        }
+      });
+    });
+  }
+
   // ── Lightbox ──────────────────────────────────────────────────────────────
   function openLightbox(src) {
     mgLightboxImg.src = src;
@@ -2580,10 +2613,13 @@
       html += `</div>`;
     }
     for (const f of files) {
-      html += `<div class="mg-bubble-file"><a href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name || 'allegato')}</a></div>`;
+      // Niente href diretto: l'URL punta a byte CIFRATI (un file rotto). Il
+      // click chiede al main di scaricare e decifrare, e salva col nome vero.
+      html += `<div class="mg-bubble-file"><a href="#" class="mg-file-link" data-url="${esc(f.url)}" data-name="${esc(f.name || 'allegato')}" data-type="${esc(f.type || '')}">📎 ${esc(f.name || 'allegato')}</a></div>`;
     }
     b.innerHTML = html;
     resolveBubbleImages(b);
+    resolveBubbleFiles(b);
     mgThread.appendChild(b);
     return b;
   }
@@ -2639,7 +2675,7 @@
     const imgs = (Array.isArray(fb.images) ? fb.images : []).map((url) => ({ kind: 'img', url }));
     const files = (Array.isArray(fb.files) ? fb.files : [])
       .filter((f) => f && typeof f.url === 'string' && f.url)
-      .map((f) => ({ kind: 'file', url: f.url, name: f.name }));
+      .map((f) => ({ kind: 'file', url: f.url, name: f.name, type: f.type }));
     appendBubble(fromModel ? 'model' : 'user', fromModel ? 'Filo (segnalazione automatica)' : 'Utente',
       esc(fb.text || ''), imgs.concat(files));
 

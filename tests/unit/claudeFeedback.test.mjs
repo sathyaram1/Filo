@@ -137,3 +137,83 @@ test('numero assegnato: si stampa, e quando manca non lo si inventa', async () =
   assert.ok(righe.some((r) => /Numero non assegnato/.test(r)), 'senza numero lo si deve dire');
   assert.ok(!righe.some((r) => /#null|#undefined|#NaN/.test(r)), 'mai un numero inventato');
 });
+
+// ── Allegati (`--allega`) ────────────────────────────────────────────────────
+// Il testo di un feedback ha un tetto (~6000 caratteri): una spec va allegata,
+// e deve partire CON il feedback nella forma che l'app usa per i file
+// ({ name, type, dataUrl }), così viene cifrata e caricata come dall'app.
+
+import { writeFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+test('mimeDiAllegato: solo i tipi dell\'allowlist del gate L0, dal nome', () => {
+  assert.equal(SCRIPT.mimeDiAllegato('spec.md'), 'text/markdown');
+  assert.equal(SCRIPT.mimeDiAllegato('SPEC.MD'), 'text/markdown');
+  assert.equal(SCRIPT.mimeDiAllegato('errori.log'), 'text/plain');
+  assert.equal(SCRIPT.mimeDiAllegato('dati.json'), 'application/json');
+  assert.equal(SCRIPT.mimeDiAllegato('pagina.html'), '', 'un tipo attivo non parte nemmeno');
+  assert.equal(SCRIPT.mimeDiAllegato('script.js'), '');
+  assert.equal(SCRIPT.mimeDiAllegato('senza-estensione'), '');
+});
+
+test('--allega: il documento parte con il feedback, nella forma dell\'app', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+  const spec = join(dir, 'spec.md');
+  writeFileSync(spec, '# Spec\n\nContenuto della spec.', 'utf8');
+  await conSubmit(async () => ({ id: 'd1', seq: 800, files: [{ url: 'u', name: 'spec.md', type: 'text/markdown' }], failed: [] }), async (visti) => {
+    const code = await SCRIPT.main(['Titolo', 'Testo', '--allega', spec]);
+    assert.equal(code, SCRIPT.EXIT.FATTO);
+    assert.equal(visti.length, 1);
+    const files = visti[0].files;
+    assert.equal(files.length, 1);
+    assert.equal(files[0].name, 'spec.md');
+    assert.equal(files[0].type, 'text/markdown');
+    assert.ok(files[0].dataUrl.startsWith('data:text/markdown;base64,'));
+    assert.equal(Buffer.from(files[0].dataUrl.split(',')[1], 'base64').toString('utf8'), '# Spec\n\nContenuto della spec.');
+    assert.equal(visti[0].text, 'Testo', 'il percorso dell\'allegato non finisce nel testo');
+  });
+});
+
+test('--allega: file mancante o di tipo non ammesso → errore d\'uso, niente deposito', async () => {
+  await conSubmit(async () => { throw new Error('submit non doveva essere chiamata'); }, async (visti) => {
+    assert.equal(await SCRIPT.main(['T', 'X', '--allega', join(tmpdir(), 'non-esiste-' + Date.now() + '.md')]), SCRIPT.EXIT.USO);
+    const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+    const html = join(dir, 'pagina.html');
+    writeFileSync(html, '<script>1</script>', 'utf8');
+    assert.equal(await SCRIPT.main(['T', 'X', '--allega', html]), SCRIPT.EXIT.USO);
+    assert.equal(visti.length, 0);
+  });
+});
+
+test('--allega: un allegato non caricato si dice e l\'uscita non è "fatto"', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+  const spec = join(dir, 'spec.md');
+  writeFileSync(spec, '# Spec', 'utf8');
+  const errori = [];
+  const orig = console.error;
+  console.error = (...a) => errori.push(a.join(' '));
+  try {
+    await conSubmit(async () => ({ id: 'd1', seq: 801, files: [], failed: [{ name: 'spec.md', reason: 'caricamento non riuscito' }] }), async () => {
+      const code = await SCRIPT.main(['T', 'X', '--allega', spec]);
+      assert.equal(code, SCRIPT.EXIT.RIFIUTATO);
+    });
+  } finally { console.error = orig; }
+  assert.ok(errori.some((r) => /ALLEGATO NON CARICATO: spec.md/.test(r)), 'l\'allegato mancante va detto');
+});
+
+test('--allega: una immagine va nel campo delle immagini (i giudici la guardano), un documento nei file', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+  const png = join(dir, 'shot.png');
+  writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]));
+  const md = join(dir, 'spec.md');
+  writeFileSync(md, '# spec', 'utf8');
+  await conSubmit(async () => ({ id: 'd1', seq: 900, images: ['u1'], files: [{ url: 'u2', name: 'spec.md' }], failed: [] }), async (visti) => {
+    const code = await SCRIPT.main(['T', 'X', '--allega', png, '--allega', md]);
+    assert.equal(code, SCRIPT.EXIT.FATTO);
+    assert.equal(visti[0].images.length, 1);
+    assert.ok(visti[0].images[0].dataUrl.startsWith('data:image/png;base64,'));
+    assert.equal(visti[0].files.length, 1);
+    assert.equal(visti[0].files[0].name, 'spec.md');
+  });
+});
