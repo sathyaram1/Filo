@@ -135,6 +135,7 @@ test('primo avvio: parte una conversazione, e chi non risponde la ritrova', asyn
   const prima = await onbState(app);
   expect(prima.done).toBe(false);
   expect(prima.ticked).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/524-benvenuto.png' }).catch(() => {});
 
   // Chiude la finestra senza rispondere (qui: ricarica la scheda) → il
   // benvenuto è ancora lì. Prima il flag era già scritto e non tornava più.
