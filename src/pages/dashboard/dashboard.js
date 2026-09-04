@@ -1071,9 +1071,16 @@
     wrap.className = 'dash-bubble-actions';
     let hasAck = false;
     for (const a of actions) {
+      // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
+      // va nella cronologia del blocco, non sotto la risposta. Se è stato
+      // bloccato (terminale spento) resta in vista: è un problema da leggere.
+      if (activity && isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
+        activity.addCommand(a._output);
+        continue;
+      }
       const row = activityRowFor(a);
       if (row) {
-        if (activity) activity.addRow(row.icon, row.text);
+        if (activity) activity.addRow(a.type, row.icon, row.text);
         else wrap.appendChild(makeActivityRow(row.icon, row.text));
         continue;
       }
