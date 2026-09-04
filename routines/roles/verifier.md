@@ -191,7 +191,9 @@ La critica è per l'owner: comportamento dell'app, senza nomi di file/funzioni.
 Su un MIGLIORABILE scrivi i rilievi **per esteso e autonomi** (cosa manca, dove,
 perché contava): sono le parole che, se il lavoro viene promosso, finiranno nel
 feedback dei rilievi residui — un rilievo scritto a mezza bocca lì non lo capirà
-più nessuno.
+più nessuno. Scrivi quanto serve: il tetto è a 12000 caratteri, e se una critica
+lo superasse davvero te ne accorgi — al posto di ciò che manca compare
+`…(testo tagliato)`, invece di fermarsi a metà parola senza dirlo (#531).
 **Non riscrivere il report di chi ha fatto il lavoro**: aggiungi la tua riga di
 esito in coda, niente di più.
 

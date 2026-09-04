@@ -2523,3 +2523,37 @@ valutare dentro la pagina. Due copie sarebbero divergute al primo ritocco.
 **Dove:** `src/main/menu.js` (la barra), `src/shared/campoTesto.js` (la regola), test:
 `tests/unit/macSupport.test.mjs` (forma della barra, in millisecondi, anche su Windows) e
 `tests/barra-menu.spec.mjs` (le voci azionate davvero, sull'app viva).
+
+## Un tetto sul testo: un valore solo, e il taglio si vede
+
+Il testo che passa di mano — una critica del verificatore, un report, il motivo di un
+guasto — un tetto ce l'ha, e deve averlo: arriva da chi legge roba non fidata e finisce
+in un documento. Il difetto non è il tetto, sono i due modi in cui viene messo.
+
+**Il primo è tagliare in silenzio.** Un testo che finisce a metà frase non si distingue da
+un testo finito: chi legge crede che il discorso sia quello. Su #509 la critica si è
+fermata su «…chiusa da set», e il feedback dei rilievi residui nato da lì portava il terzo
+rilievo monco — chi lo lavorava doveva indovinare cosa gli era stato chiesto. Il danno è
+stato zero per fortuna, non per costruzione: il correttore ha risolto leggendo il test che
+il verificatore aveva lasciato.
+
+**Il secondo è scrivere il tetto dove serve.** Lo stesso testo attraversa più punti (chi
+lo riceve, chi lo ricopia nel lavoro dopo, chi lo mostra), e ogni punto si tiene il suo
+numero. Due tetti diversi accorciano il testo a ogni passaggio, e un tetto alzato in un
+punto solo non si vede: il più stretto vince, e nessuno sa quale sia.
+
+**Regola.**
+
+- Il valore sta in **un posto solo**, e in un posto che raggiunge tutti quelli che devono
+  rispettarlo — qui `src/shared/feedbackTransitions.js` (`CRITIQUE_MAX`,
+  `CRITIQUE_CUT_MARK`), che la dashboard legge e il server incorpora al deploy. Chi non
+  può leggerlo tiene un paracadute con lo **stesso** valore, e un test lo inchioda: due
+  numeri che divergono spostano il tetto a seconda di dove gira il codice.
+- Il taglio lascia un **segno leggibile** (`…(testo tagliato)`), dentro il limite, e non
+  spezza l'ultima parola.
+- Il tetto si tara su **cosa passa di lì davvero**, con un ordine di grandezza di margine:
+  serve a fermare un testo fuori scala, non a stare stretto sul caso normale.
+
+**Dove:** `scripts/lib/critique.mjs` (la regola, pura), `scripts/dispatch.mjs` e
+`scripts/verify-local.mjs` (i punti che tagliavano a mano), test
+`tests/unit/critiqueCap.test.mjs`.
