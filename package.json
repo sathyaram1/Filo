@@ -80,9 +80,6 @@
       "identity": null,
       "darkModeSupport": true
     },
-    "dmg": {
-      "artifactName": "Filo-Mac.${ext}"
-    },
     "linux": {
       "target": "AppImage",
       "icon": "assets/icons/icon-256.png"
