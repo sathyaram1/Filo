@@ -240,8 +240,11 @@
   // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
   // stiamo scrivendo noi — le bolle in corso sono già la verità.
   function onboardingUpdated(state) {
-    if (!onboardingActive || sending) return;
     if (!state || state.done) return;
+    // Qui l'intervista non è a schermo, ma da qualche parte è di nuovo aperta:
+    // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
+    if (!onboardingActive) { hideOnboardingNotice(); return; }
+    if (sending) return;
     renderOnboardingThread(state);
   }
 
