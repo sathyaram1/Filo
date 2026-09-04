@@ -662,3 +662,15 @@ test('la regola risponde uguale da entrambe le strade', () => {
   const risposta = new Function('document', `return ${sorgente};`)(finto);
   assert.equal(risposta, true, 'valutata come fa il main, la regola non riconosce più un campo di testo');
 });
+
+test('la barra dei menu non inventa scorciatoie che valgono solo su Mac', () => {
+  // Un tasto che nella barra funziona (su Mac la barra è attaccata) e altrove
+  // no sarebbe di nuovo una promessa vera su un sistema e falsa sull'altro:
+  // esattamente l'asimmetria da cui nasce tutto questo. Qui dentro ci vanno
+  // SOLO tasti che Filo fa già ovunque.
+  const inventati = vociDellaBarra()
+    .map((v) => v.accelerator)
+    .filter((a) => a && !TASTI_DI_FILO[a]);
+  assert.deepEqual(inventati, [],
+    'questi tasti li registra solo la barra: su Windows e Linux non farebbero niente.\n' + inventati.join('\n'));
+});

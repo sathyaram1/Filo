@@ -81,6 +81,16 @@ le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
 - **Un ramo di piattaforma si scrive intero.** `if (process.platform ===
   'win32')` senza l'altro lato è un buco: o l'altro ramo c'è, o il ramo
   Windows è una scorciatoia in più su un comportamento che vale ovunque.
+- **Su Mac la barra dei menu esiste sempre, ed è la prima a vedere i tasti.**
+  Su Windows la finestra è senza cornice e la barra non si aggancia a niente:
+  è per questo che per mesi nessuno si è accorto che era quella di serie di
+  Electron, in inglese, e che si prendeva Cmd+W, Cmd+R, Cmd+Z e Cmd +/-/0
+  prima delle pagine. La barra di Filo è `src/main/menu.js`: i `role` di
+  Electron solo dove il tasto non è di Filo (taglia, copia, incolla, seleziona
+  tutto, esci), un `click` che chiama la funzione di Filo dove il tasto è suo,
+  e nessun acceleratore inventato — un tasto che vale solo su Mac è la stessa
+  asimmetria. Toglierla e basta non è un'uscita: su Mac spegne copia e incolla
+  in ogni campo di testo. Il pattern completo sta in PATTERNS.md.
 - **La ricetta del pacchetto si tocca con cautela**: `build.mac` in
   `package.json`, `scripts/after-pack-mac.js` (la firma locale, senza la quale
   sui Mac con chip Apple l'app non si apre) e il lavoro `release-mac`. Il
