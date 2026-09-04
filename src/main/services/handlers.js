@@ -250,7 +250,7 @@ function withDefaults(settings) {
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
-  for (const k of ['openrouter', 'gemini', 'tavily']) {
+  for (const k of ['openrouter', 'tavily']) {
     apiKeys[k] = d.apiKeys[k] || userKeys[k] || '';
   }
   return {
@@ -579,7 +579,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
   const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
+  const pricing = settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
     usage: result.usage, pricing, usdToEur: settings.usdToEur,
@@ -636,7 +636,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
   const { servedBy, violation } = noteServedProvider(settings, action, result);
-  const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
+  const pricing = settings.pricing?.[concreteModel];
   const costEur = await Costs.record({
     action, provider: usedProvider, model: concreteModel,
     usage: result.usage, pricing, usdToEur: settings.usdToEur,
@@ -678,7 +678,7 @@ async function lessonsBufferText() {
 async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return;
+    if (!settings.apiKeys?.[settings.provider]) return;
     const memory = await FiloMem.getMemory();
     const { profilo, preferenze } = FiloMem.renderMemoryForPrompt(memory);
     const lezioniText = await lessonsBufferText();
@@ -712,7 +712,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
 async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return false;
+    if (!settings.apiKeys?.[settings.provider]) return false;
     const memory = await FiloMem.getMemory();
     const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
@@ -2119,7 +2119,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
 // è la parte "economica" che si può fare a ogni apertura di scheda.
 async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const settings = await getEffectiveSettings();
-  const hasKey = !!(settings.apiKeys?.[settings.provider] || settings.apiKeys?.gemini);
+  const hasKey = !!(settings.apiKeys?.[settings.provider]);
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
@@ -2202,7 +2202,7 @@ function buildNoKeyDashboard(settings, saved) {
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
-  const message = settings.apiKeys?.openrouter || settings.apiKeys?.gemini
+  const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
     : 'Accedi con un profilo per attivare Filo: è gratis e non serve nessuna chiave (icona del profilo in alto a destra). In alternativa, se preferisci, puoi usare una tua chiave API dalle Opzioni. Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
@@ -2461,7 +2461,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
   try {
-    const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
+    const pricing = settings.pricing?.[concreteModel];
     await Costs.record({
       action: ACTIONS.FILO_TAB_TRIAGE, provider: usedProvider, model: concreteModel,
       usage: result.usage, pricing, usdToEur: settings.usdToEur,
@@ -2501,7 +2501,7 @@ async function runOneShot(action, messages) {
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
   try {
-    const pricing = usedProvider === 'gemini' ? null : settings.pricing?.[concreteModel];
+    const pricing = settings.pricing?.[concreteModel];
     await Costs.record({
       action, provider: usedProvider, model: concreteModel,
       usage: result.usage, pricing, usdToEur: settings.usdToEur,

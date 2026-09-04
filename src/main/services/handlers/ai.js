@@ -431,7 +431,7 @@ module.exports = function register(on, ctx) {
     (async () => {
       try {
         const settings = await getEffectiveSettings();
-        if (!settings.apiKeys?.[settings.provider] && !settings.apiKeys?.gemini) return;
+        if (!settings.apiKeys?.[settings.provider]) return;
         const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
         const cid = msg.payload?.clientId || '';
         const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });

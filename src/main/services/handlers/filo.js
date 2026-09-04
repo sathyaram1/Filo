@@ -102,7 +102,7 @@ module.exports = function register(on, ctx) {
     // mostra come attivare Filo. Aprirla comunque significherebbe accogliere
     // l'utente con una bolla d'errore. Appena c'è la chiave, parte da sola.
     const settings = await ctx.getEffectiveSettings();
-    const ready = !!(settings.apiKeys?.[settings.provider] || settings.apiKeys?.gemini);
+    const ready = !!(settings.apiKeys?.[settings.provider]);
     let state = await FiloMem.getOnboarding();
     // `peek`: chi legge soltanto (Preferenze, per rileggere le interviste
     // conservate) non deve aprire niente né prenotare la ripresa di un turno.

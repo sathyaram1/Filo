@@ -63,6 +63,8 @@ require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'pageRestyle.js'));
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
+require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)
+require(path.join(SHARED, 'dictationSegmenter.js')); // dettatura in diretta: spezzoni di parlato (logica pura)
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente
@@ -86,7 +88,6 @@ require(path.join(SHARED, 'editorVersions.js')); // storico/punti di ripristino 
 require(path.join(SHARED, 'editorNotes.js'));   // appunti di Filo dentro i file editor (dipende dai due sopra)
 require(path.join(SHARED, 'editorSummary.js')); // riassunto per file + estrazione testo (logica pura, #379.5)
 require(path.join(SVC, 'providers', 'openrouter.js'));
-require(path.join(SVC, 'providers', 'gemini.js'));
 require(path.join(SVC, 'providers', 'index.js'));
 require(path.join(SVC, 'feedbackOutbox.js')); // #341 — coda invio feedback offline (dipende da SN_FEEDBACK + SN_STORAGE)
 require(path.join(SVC, 'creditStore.js'));

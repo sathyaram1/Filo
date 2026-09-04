@@ -10,9 +10,13 @@
 (function (global) {
   'use strict';
 
+  // Un solo fornitore: il router (OpenRouter), che smista verso host
+  // indipendenti secondo la lista di esclusione. L'API diretta di Google, che
+  // qui c'era, è stata tolta: era l'API del produttore, e la politica sui
+  // modelli non la ammette. Lettura ad alta voce, dettatura e indicizzazione,
+  // che erano le tre funzioni rimaste solo lì, passano ora dal router.
   function getProvider(name) {
     if (name === 'openrouter') return global.SN_PROVIDER_OPENROUTER;
-    if (name === 'gemini') return global.SN_PROVIDER_GEMINI;
     throw new Error(`Provider non supportato: ${name}`);
   }
 

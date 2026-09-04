@@ -84,7 +84,7 @@
     // strutturato che i provider attaccano ai loro errori HTTP (err.provider)
     // o — rete di sicurezza per errori non marcati — dalla forma del messaggio
     // ("OpenRouter 400: …", "Gemini 503: …").
-    const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
+    const pm = /^(OpenRouter)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
       if (st === 401 || st === 403) {

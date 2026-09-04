@@ -25,8 +25,12 @@
     return state.months[month];
   }
 
-  // Stima costo (USD) -> ritorna EUR.
+  // Stima costo (USD) -> ritorna EUR. Se il fornitore ha già detto quanto è
+  // costata la chiamata (`usage.costUsd`: voce, dettatura, indicizzazione, che
+  // non si contano a token), quel numero vale più di qualunque listino.
   function estimateCostEur({ usage, pricing, usdToEur }) {
+    const direct = usage && Number(usage.costUsd);
+    if (Number.isFinite(direct) && direct > 0) return direct * (usdToEur || 0.92);
     if (!pricing) return 0;
     const inUsd = ((usage.promptTokens || 0) / 1_000_000) * (pricing.input || 0);
     const outUsd = ((usage.completionTokens || 0) / 1_000_000) * (pricing.output || 0);
@@ -50,12 +54,11 @@
     // resta qui dietro le quinte; il motore crediti converte e scala il saldo.
     // Coperti così TUTTI i call site AI senza ritoccarli uno per uno.
     //
-    // I crediti usano un costo NOZIONALE, non `eur`: `eur` è 0 quando la chiamata
-    // è servita gratis (Gemini via chiave diretta, free tier), e col setup di
-    // default quasi tutto passa da Gemini → il saldo non calerebbe MAI. Il prezzo
-    // nozionale (listino del modello) fa scendere i crediti anche sulle chiamate
-    // gratuite, senza toccare il limite di spesa REALE qui sopra (che resta su
-    // `eur`). Precedenza: prezzo reale passato → listino nozionale del modello →
+    // I crediti usano un costo NOZIONALE, non `eur`: `eur` è 0 quando non c'è
+    // un listino per il modello, e un saldo che non si muove sembra rotto. Il
+    // prezzo nozionale (listino del modello) fa scendere i crediti anche allora,
+    // senza toccare il limite di spesa REALE qui sopra (che resta su `eur`).
+    // Precedenza: prezzo reale passato → listino nozionale del modello →
     // ripiego, così una chiamata reale non costa mai 0 crediti.
     const C = global.SN_CONST || {};
     const creditPricing = pricing

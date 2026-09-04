@@ -191,7 +191,7 @@ function get() {
   if (remoteSecrets) {
     if (remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
       // Solo i valori non vuoti sovrascrivono le chiavi di build.
-      for (const k of ['openrouter', 'gemini', 'tavily']) {
+      for (const k of ['openrouter', 'tavily']) {
         const v = remoteSecrets.apiKeys[k];
         if (typeof v === 'string' && v.trim()) out.apiKeys[k] = v.trim();
       }
@@ -216,7 +216,6 @@ function getPublicForAdmin() {
     providerSort: eff.providerSort,
     apiKeysPresent: {
       openrouter: Boolean(eff.apiKeys.openrouter),
-      gemini: Boolean(eff.apiKeys.gemini),
       tavily: Boolean(eff.apiKeys.tavily),
     },
     safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
@@ -287,9 +286,9 @@ async function update(partial, idToken) {
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
   //
   // IMPORTANTE — merge, non replace: la maschera DEVE puntare ai singoli leaf
-  // (`apiKeys.gemini`, `apiKeys.openrouter`, …) e NON al map intero `apiKeys`.
+  // (`apiKeys.tavily`, `apiKeys.openrouter`, …) e NON al map intero `apiKeys`.
   // Con `updateMask=apiKeys` Firestore SOSTITUISCE l'intera mappa col valore
-  // inviato: salvando solo la chiave Gemini cancellavi l'override OpenRouter già
+  // inviato: salvando solo la chiave Tavily cancellavi l'override OpenRouter già
   // presente, che poi risultava «non configurata» (feedback alpha). Con la
   // maschera per-leaf Firestore fonde: tocca solo le chiavi digitate e lascia
   // intatte le altre.
@@ -297,7 +296,7 @@ async function update(partial, idToken) {
   const secretMask = [];
   const akFields = {};
   if (partial.apiKeys && typeof partial.apiKeys === 'object') {
-    for (const k of ['openrouter', 'gemini', 'tavily']) {
+    for (const k of ['openrouter', 'tavily']) {
       const v = partial.apiKeys[k];
       if (typeof v === 'string' && v.trim()) {
         akFields[k] = toFsValue(v.trim());
