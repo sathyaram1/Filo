@@ -9,7 +9,7 @@
   <header class="shell">
     <div class="tab-row">
       <div class="tabs" id="tabs" role="tablist"></div>
-      <button class="tab-new" id="tab-new" data-tip="Nuova scheda (Ctrl+T)" aria-label="Nuova scheda"></button>
+      <button class="tab-new" id="tab-new" data-tip="Nuova scheda" aria-label="Nuova scheda"></button>
       <div class="tab-drag-spacer"></div>
       <span class="incognito-badge" id="incognito-badge" hidden data-tip="Sessione incognito: niente cronologia né dati salvati su questo computer" aria-label="Finestra incognito"></span>
       <!-- Indicatore scaricamenti (#410.1): compare solo se c'è almeno un
@@ -46,6 +46,7 @@
        (i tratti restano a piena luminosità). Nascosta finché non si annota. -->
   <canvas id="feedback-draw" hidden></canvas>
   <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shell/shell.js"></script>

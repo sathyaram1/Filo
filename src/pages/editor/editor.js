@@ -3895,7 +3895,7 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  const SHORTCUT_MODIFIERS = ['ctrl', 'cmd', 'meta', 'alt', 'shift'];
+  const SHORTCUT_MODIFIERS = ['ctrl', 'control', 'cmd', 'command', 'meta', 'alt', 'option', 'shift'];
   function shortcutParts(sc) {
     return String(sc || '').toLowerCase().split('+').map((s) => s.trim()).filter(Boolean);
   }
@@ -3903,7 +3903,7 @@
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
     const parts = shortcutParts(sc);
-    return parts.includes('ctrl') || parts.includes('cmd') || parts.includes('meta') || parts.includes('alt');
+    return SHORTCUT_MODIFIERS.some((m) => m !== 'shift' && parts.includes(m));
   }
   // Una scorciatoia è valida solo se ha un modificatore reale + un tasto finale:
   // così non può coincidere con la normale digitazione di una lettera.

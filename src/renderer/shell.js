@@ -8,8 +8,15 @@
     return;
   }
 
+  // Come si chiamano i tasti sul sistema di chi guarda: su Mac la scheda nuova
+  // si apre con Cmd+T, e il suggerimento deve dire quello. L'HTML è uno solo
+  // per tutti i sistemi, quindi la scritta si compone qui.
+  const TASTI = window.SN_TASTI;
+  const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
+
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
+  if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
   const backBtn = document.getElementById('nav-back');
   const fwdBtn = document.getElementById('nav-forward');
   const reloadBtn = document.getElementById('nav-reload');
