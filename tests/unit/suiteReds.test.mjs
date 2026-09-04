@@ -99,6 +99,31 @@ test('il runner di Actions eredita i rossi di «cloud», ma non viceversa', () =
   assert.ok(!ambienteCopre('cloud', 'locale'));
 });
 
+test('«tranne» toglie un ambiente alla scusa, e la toglie anche dalle voci scadute', () => {
+  // La cattura dello schermo è nera sulla macchina delle routine e vera sul
+  // runner: la scusa vale sul cloud, tranne lì. Senza il ritaglio il cancello
+  // resterebbe cieco proprio dove la suite gira davvero.
+  assert.ok(ambienteCopre('cloud', 'cloud', 'actions'));
+  assert.ok(!ambienteCopre('cloud', 'actions', 'actions'));
+  // Un ritaglio che nomina un ambiente che non c'entra non cambia niente.
+  assert.ok(ambienteCopre('cloud', 'actions', 'locale'));
+
+  const noti = leggiNoti({
+    spec: [{
+      file: 'tests/cattura.spec.mjs', dove: 'cloud', tranne: 'actions', perche: 'schermata nera',
+    }],
+  });
+  assert.ok(scusaPer({ file: 'cattura.spec.mjs', titolo: 'x' }, noti, 'cloud'));
+  assert.equal(scusaPer({ file: 'cattura.spec.mjs', titolo: 'x' }, noti, 'actions'), null);
+
+  // E su Actions la voce non deve nemmeno comparire fra le "scadute": lì non
+  // scusa niente per scelta, non perché lo spec sia guarito. Una spia che
+  // ripropone la stessa voce a ogni corsa smette di essere guardata.
+  const vuoto = { suites: [{ title: 'tests', file: '', specs: [], suites: [] }] };
+  assert.deepEqual(classifica([vuoto], noti, 'actions').scaduti, []);
+  assert.deepEqual(classifica([vuoto], noti, 'cloud').scaduti, noti);
+});
+
 test('una scusa d’ambiente vale solo nel suo ambiente', () => {
   const noti = leggiNoti({
     spec: [
