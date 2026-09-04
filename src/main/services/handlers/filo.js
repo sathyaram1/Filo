@@ -76,6 +76,51 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
 
+  // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
+  // PROFILO/PREFERENZE senza aspettare la soglia. Prima non esisteva alcun modo
+  // di chiederla — la chiusura dell'intervista di benvenuto (#524) ne aveva
+  // bisogno, e serve a chiunque voglia "fissa adesso quello che hai imparato".
+  on(MSG.FILO_COMPACT_MEMORY, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    const compacted = await maybeRunCompactor();
+    return { ok: true, compacted: !!compacted, memory: await FiloMem.getMemory() };
+  });
+
+  // ── Micro-intervista di benvenuto (#524) ─────────────────────────────────
+  //
+  // La dashboard chiede lo stato all'apertura: se l'intervista è aperta e non è
+  // ancora cominciata, la apriamo QUI mettendo da parte il primo messaggio (il
+  // testo fisso). Così la conversazione esiste da subito e la ripresa dopo una
+  // chiusura a metà legge sempre lo stesso posto. Il segno "già accolto" NON si
+  // scrive adesso: si scrive alla fine.
+  on(MSG.FILO_GET_ONBOARDING, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    if (!Onboarding) return { ok: true, onboarding: { done: true, ticked: [], thread: [] } };
+    let state = await FiloMem.getOnboarding();
+    if (!state.done && !state.thread.length) {
+      state = await FiloMem.setOnboarding(
+        Onboarding.appendTurn(state, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
+      );
+    }
+    return {
+      ok: true,
+      onboarding: state,
+      welcome: Onboarding.WELCOME_MESSAGE,
+      resumeNote: Onboarding.RESUME_NOTE,
+    };
+  });
+
+  // Rilancio dell'intervista dalle Preferenze, anche dopo settimane: si
+  // riparte dal benvenuto, con l'elenco di nuovo tutto da spuntare.
+  on(MSG.FILO_RESTART_ONBOARDING, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
+    const state = await FiloMem.setOnboarding(
+      Onboarding.appendTurn(Onboarding.restart(), { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
+    );
+    return { ok: true, onboarding: state };
+  });
+
   // Gli appunti non hanno più un archivio proprio (né quindi handler CRUD): sono
   // file dell'editor, ci scrive l'azione SALVA_APPUNTO e si leggono/modificano
   // aprendo l'editor come qualsiasi altro documento.
