@@ -1936,9 +1936,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage) }),
     );
   }
-  if (onbActive && !internal && Onboarding.isStopRequest(userMessage)) {
+  if (onbActive && !internal && Onboarding.isExitRequest(onbBefore, userMessage)) {
     // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
     // testo fisso — l'unica risposta che si può garantire anche senza modello.
+    // Un «no grazie» invece NON passa di qui: rifiuta la proposta che Filo ha
+    // appena fatto, e a quella risponde il modello (vedi `isExitRequest`).
     const bye = Onboarding.CLOSING_MESSAGE;
     const closed = Onboarding.close(Onboarding.appendTurn(onbBefore, { role: 'filo', text: bye }));
     await saveOnboarding(closed);
