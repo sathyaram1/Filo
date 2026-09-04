@@ -86,6 +86,9 @@ async function getPrivateKey() {
 // la revisione dell'owner non deve essere leggibile da chi ha mandato il feedback.
 const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'reviewDecision', 'reviewedAt', 'status', 'clientId'];
 const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
+// Quanti feedback si decifrano insieme nel batch: il pool di thread di Node ha
+// 4 posti di default, oltre non si guadagna.
+const DECRYPT_CONCURRENCY = 4;
 
 // S1.F2.4: il campo `pipeline` (scritto dal backend di sicurezza sul documento
 // PUBBLICO) è cifrato come un'unica stringa FENC1: che racchiude l'INTERO oggetto
