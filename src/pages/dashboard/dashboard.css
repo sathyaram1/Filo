@@ -199,29 +199,9 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-home-msg.dash-home-msg-loading { color: var(--dash-ink-mute); font-style: italic; }
 
-/* Benvenuto di Filo: reso come una classica bolla di chat (come una risposta
-   dell'LLM), non più come grande titolo centrato. Vedi feedback alpha. */
-.dash-home:has(.dash-home-msg[data-welcome="1"]) {
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding-top: 48px;
-}
-.dash-home-msg[data-welcome="1"] {
-  font-size: 14.5px;
-  font-weight: 400;
-  line-height: 1.5;
-  letter-spacing: normal;
-  text-align: left;
-  white-space: pre-wrap;
-  background: var(--dash-card);
-  color: var(--dash-ink);
-  border: 1px solid var(--dash-line);
-  border-radius: 16px;
-  border-bottom-left-radius: 6px;
-  padding: 12px 16px;
-  max-width: 86%;
-  margin: 0;
-}
+/* Il benvenuto NON è più un messaggio al centro della home travestito da bolla
+   (#524): è la prima bolla di una conversazione vera, quindi usa lo stile delle
+   bolle qui sotto e non ha più regole sue. */
 
 /* Conversation */
 .dash-thread {
