@@ -123,11 +123,18 @@
   // entrambe. Torna l'INDICE della scheda (0-based, 0 → la decima), o null.
   function indiceSaltoScheda(ev, esplicita) {
     if (!ev) return null;
-    const alt = ev.altKey === undefined ? !!ev.alt : !!ev.altKey;
-    const ctrl = ev.ctrlKey === undefined ? !!ev.control : !!ev.ctrlKey;
-    const meta = ev.metaKey === undefined ? !!ev.meta : !!ev.metaKey;
-    const shift = ev.shiftKey === undefined ? !!ev.shift : !!ev.shiftKey;
-    if (shift) return null;
+    // I due nomi con cui ogni modificatore può arrivare: quello del DOM e
+    // quello del main. Nessuno dei due è presente in entrambe le forme, quindi
+    // basta chiedere tutti e due.
+    const NOMI = {
+      alt: ['altKey', 'alt'], ctrl: ['ctrlKey', 'control'],
+      meta: ['metaKey', 'meta'], shift: ['shiftKey', 'shift'],
+    };
+    const premuto = (quale) => NOMI[quale].some((nome) => !!ev[nome]);
+    const alt = premuto('alt');
+    const ctrl = premuto('ctrl');
+    const meta = premuto('meta');
+    if (premuto('shift')) return null;
 
     const giusto = suMac(esplicita)
       ? (meta && !ctrl && !alt)
