@@ -2889,15 +2889,110 @@
       } catch (_) { /* fallback: render con valori cifrati */ }
     }
 
-    // Indice per mittente
+    reindexByClient();
+    renderList();
+    liveLastAt = Date.now();
+  }
+
+  // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
+  // caricamento e a ogni giro di aggiornamento.
+  function reindexByClient() {
     allByClient = {};
     for (const fb of allFeedbacks) {
       const c = fb.clientId || '__anon__';
       if (!allByClient[c]) allByClient[c] = [];
       allByClient[c].push(fb);
     }
+  }
 
-    renderList();
+  // ── Aggiornamento continuo ────────────────────────────────────────────────
+  // La dashboard resta al passo da sola: a ogni giro chiede a Firestore le sole
+  // versioni dei feedback (id + ultima scrittura, pochi byte), riscarica i soli
+  // documenti cambiati o nuovi, li decifra e li fonde nella lista. Niente
+  // ricaricamento della pagina, niente riscaricamento dei 5 MB della lista.
+  // Il confronto e la fusione sono logica pura in SN_FEEDBACK_LIVE.
+  const LIVE = window.SN_FEEDBACK_LIVE;
+  // Sorgenti sostituibili dagli spec (che non hanno Firestore).
+  const liveSources = {
+    listVersions: (o) => FB.listVersions(o),
+    getMany: (ids) => FB.getMany(ids),
+  };
+  let liveEnabled = false;
+  let liveTimer   = null;
+  let liveTick    = null;   // promessa del giro in corso: uno alla volta
+  let liveLastAt  = 0;      // quando la lista è stata allineata l'ultima volta
+
+  // L'owner sta scrivendo nel pannello (commento, risposta, nota)? Allora il
+  // pannello non si ridisegna sotto le sue dita: i dati si fondono lo stesso e
+  // il pannello si aggiorna al giro dopo, o quando riapre la scheda.
+  function detailBeingEdited() {
+    const el = document.activeElement;
+    if (!el || !mgDetail || !mgDetail.contains(el)) return false;
+    const tag = String(el.tagName || '').toLowerCase();
+    return tag === 'textarea' || tag === 'input' || tag === 'select' || !!el.isContentEditable;
+  }
+
+  // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
+  // ricerca la lista mostra i risultati: quelli restano, i dati sotto sono
+  // comunque aggiornati (il dettaglio li legge da lì).
+  function rerenderAfterLive(touched) {
+    if (!dataLoaded) return;
+    if (!searchMode) {
+      const scrollers = [mgList, mgList && mgList.parentElement].filter(Boolean);
+      const tops = scrollers.map((el) => el.scrollTop);
+      renderList();
+      scrollers.forEach((el, i) => { el.scrollTop = tops[i]; });
+    }
+    if (selectedId && touched.has(selectedId) && !detailBeingEdited()) openDetail(selectedId);
+  }
+
+  // Un giro: versioni → differenze → documenti cambiati → decifratura → fusione.
+  // Ritorna { changed } (quanti feedback sono stati toccati). Un giro già in
+  // corso viene riusato, non raddoppiato.
+  async function refreshFromRemote() {
+    if (liveTick) return liveTick;
+    liveTick = (async () => {
+      const remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+      const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
+      const ids = changed.concat(added);
+      if (ids.length === 0 && removed.length === 0) return { changed: 0 };
+      let fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
+      if (isAdmin && fresh.length > 0) {
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: fresh });
+          if (r && r.ok && Array.isArray(r.list)) fresh = r.list;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh, removed });
+      reindexByClient();
+      rerenderAfterLive(new Set(ids));
+      return { changed: ids.length + removed.length };
+    })().finally(() => { liveTick = null; liveLastAt = Date.now(); });
+    return liveTick;
+  }
+
+  function liveTickIfDue(force) {
+    if (!liveEnabled || document.hidden) return;
+    if (!force && Date.now() - liveLastAt < LIVE.POLL_MS / 2) return;
+    // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
+    // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
+    if (!dataLoaded) { loadData().catch(() => {}); return; }
+    refreshFromRemote().catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
+  }
+
+  function startLive() {
+    if (!LIVE || liveEnabled) return;
+    liveEnabled = true;
+    liveTimer = setInterval(() => liveTickIfDue(true), LIVE.POLL_MS);
+    // Scheda tornata in vista o finestra tornata in primo piano: se è passato
+    // abbastanza tempo, non aspettare il prossimo battito.
+    document.addEventListener('visibilitychange', () => liveTickIfDue(false));
+    window.addEventListener('focus', () => liveTickIfDue(false));
+  }
+
+  function stopLive() {
+    liveEnabled = false;
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
   }
 
   // ── Hook di test ────────────────────────────────────────────────────────
