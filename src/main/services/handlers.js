@@ -194,8 +194,12 @@ async function buildMessages(action, payload) {
     }) }];
   }
   if (action === ACTIONS.FILO_CHAT) {
+    // Il sistema (Windows / Mac / Linux) lo sa solo il main process: la pagina
+    // che manda il payload non ha `process`. Senza, il modello indovina — e
+    // indovina Windows, perché è l'unico che gli esempi del prompt gli hanno
+    // mai mostrato: su un Mac proporrebbe comandi PowerShell e percorsi `C:\`.
     return [
-      { role: 'system', content: PROMPTS.filoChat(payload) },
+      { role: 'system', content: PROMPTS.filoChat({ ...payload, sistema: process.platform }) },
       ...(payload.threadMessages || []),
     ];
   }
