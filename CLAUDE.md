@@ -45,6 +45,51 @@ ruolo che ti viene consegnato.
   `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
   tracciato: `git rm --cached <file>`.
 
+## Filo gira anche su Mac
+
+Filo si scrive e si prova su Windows, e si scarica anche su Mac
+(`Filo-Mac.dmg`, allegato alla stessa release dall'altra metà di
+`.github/workflows/release.yml`). Nessuno di noi ha un Mac sotto mano: un Mac
+si rompe in silenzio e la notizia arriva settimane dopo, da un utente. Quindi
+le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
+
+- **Cmd vale quanto Ctrl.** Una scorciatoia si legge `e.ctrlKey || e.metaKey`,
+  mai `ctrlKey` da solo — su Mac il tasto delle scorciatoie è Cmd, e un
+  controllo che guarda solo Ctrl semplicemente tace. Gli acceleratori di
+  Electron si dichiarano `CommandOrControl+X`, non `Ctrl+X`.
+- **Alt su Mac è il tasto degli accenti.** Opzione+E compone `é`. Una
+  scorciatoia GLOBALE con Alt+lettera se lo prende in tutto il sistema, in ogni
+  programma: su Mac vuole un modificatore in più (vedi `src/main/shortcuts.js`).
+- **Niente percorsi di Windows scritti a mano** — né `C:\...`, né `%APPDATA%`,
+  né `process.env.APPDATA`. Le cartelle di sistema le dà Electron
+  (`app.getPath`), la home la dà `os.homedir()`, i pezzi si uniscono con
+  `path.join`. Vale anche dentro i prompt: un esempio è un'istruzione, e un
+  esempio `C:\Users\...` fa proporre percorsi di Windows a chi sta su un Mac.
+- **Un ramo di piattaforma si scrive intero.** `if (process.platform ===
+  'win32')` senza l'altro lato è un buco: o l'altro ramo c'è, o il ramo
+  Windows è una scorciatoia in più su un comportamento che vale ovunque.
+- **La ricetta del pacchetto si tocca con cautela**: `build.mac` in
+  `package.json`, `scripts/after-pack-mac.js` (la firma locale, senza la quale
+  sui Mac con chip Apple l'app non si apre) e il lavoro `release-mac`. Il
+  pacchetto è **universale**: nasce da due copie, Intel e Apple Silicon, che
+  vengono fuse — e la fusione pretende che i file non eseguibili delle due
+  copie siano identici, quindi le due copie NON vanno firmate, solo il
+  risultato.
+
+Come si verifica, dato che un Mac non ce l'abbiamo:
+
+- `tests/unit/macSupport.test.mjs` è la sentinella sempre accesa: diventa rossa
+  su tutto quanto sopra, in millisecondi, sulla macchina di chi ha scritto la
+  modifica. Se stabilisci una regola nuova per il Mac, aggiungila lì.
+- Il lavoro **«Verifica build Mac»** (`.github/workflows/verifica-mac.yml`)
+  costruisce davvero il `.dmg` su una macchina Apple senza pubblicare niente:
+  si lancia a mano da Actions → Run workflow, su qualunque ramo. È il modo di
+  rispondere a «il pacchetto si costruisce ancora?» senza bruciare un numero di
+  versione.
+- Quello che **nessuno dei due prova** è che l'app si apra e funzioni su un
+  Mac: quello lo dice solo un Mac vero. Dichiaralo nel report invece di darlo
+  per fatto.
+
 ## Sintomo vs causa
 
 Una lamentela descrive il sintomo come lo vede l'utente. La prima domanda non è
