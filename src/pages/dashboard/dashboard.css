@@ -342,6 +342,38 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   font-family: inherit;
 }
 .dash-action-btn:hover { background: var(--dash-ink); color: var(--dash-paper); }
+/* #524 — l'uscita dall'accoglienza. Sta sotto la conversazione, discreta:
+   l'intervista è la strada principale, questa è la porta di servizio, e deve
+   essere lì anche quando il modello non risponde. */
+.dash-skip-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 10px;
+}
+.dash-skip-onboarding {
+  border: none;
+  background: transparent;
+  color: var(--dash-ink);
+  opacity: 0.55;
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s ease;
+}
+.dash-skip-onboarding:hover { opacity: 1; }
+/* Accanto al «Riprova» della bolla d'errore è un bottone come gli altri: lì
+   l'utente sta cercando una via d'uscita, non un ripensamento. */
+.dash-bubble-actions .dash-skip-onboarding {
+  border: 1px solid var(--dash-ink);
+  opacity: 0.75;
+  text-decoration: none;
+  padding: 6px 12px;
+  font-size: 13px;
+}
 /* #376 — traccia di un passo intermedio (cerco sul web, leggo un file…): è un
    racconto di cosa sta facendo Filo, non un bottone. Niente pill né bordo: così
    nella conversazione resta cliccabile solo il risultato vero. */
