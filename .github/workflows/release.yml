@@ -52,6 +52,10 @@ concurrency:
 jobs:
   release:
     runs-on: windows-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.bump.outputs.version }}
+      sha: ${{ steps.allinea.outputs.sha }}
     steps:
       - name: Checkout main (con storia e tag completi)
         uses: actions/checkout@v4
