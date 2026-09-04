@@ -987,6 +987,7 @@
     MODIFICA_SVEGLIA: () => 'spostato una sveglia',
     EVENTO_CALENDARIO: (n) => (n > 1 ? `creato ${n} eventi` : 'creato un evento'),
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
+    IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
   };
   function summarizeActivity(types) {
     const counts = new Map();
