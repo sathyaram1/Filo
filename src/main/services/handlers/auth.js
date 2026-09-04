@@ -107,11 +107,14 @@ async function decryptPipelineField(out, C, priv) {
   }
 }
 
-async function decryptFeedbackObject(fields) {
+// `privKey` (opzionale): la chiave già letta dal chiamante. Il batch della
+// dashboard la passa una volta per tutti i documenti — rileggerla dal disco a
+// ogni feedback (500 volte per una lista) era solo tempo perso.
+async function decryptFeedbackObject(fields, privKey) {
   const C = globalThis.SN_FEEDBACK_CRYPTO;
   if (!C) return fields; // modulo non caricato: passthrough
 
-  const priv = await getPrivateKey();
+  const priv = privKey !== undefined ? privKey : await getPrivateKey();
   const out = { ...fields };
   for (const f of TEXT_FIELDS_TO_DECRYPT) {
     const v = out[f];
