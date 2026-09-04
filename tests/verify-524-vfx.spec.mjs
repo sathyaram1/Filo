@@ -162,14 +162,19 @@ test('P3 — rifaccio l’intervista: la conversazione di prima è ancora conser
   await prefs.locator('#restartOnboarding').click();
   await expect.poll(() => onbState(app).then((s) => s.done), { timeout: 15_000 }).toBe(false);
   const dopoRilancio = await onbState(app);
-  console.log('[P3] dopo il rilancio restano =', dopoRilancio.thread.length, 'messaggi:',
-    JSON.stringify(dopoRilancio.thread.map((m) => `${m.role}: ${m.text.slice(0, 30)}`)));
+  console.log('[P3] dopo il rilancio: nuova =', dopoRilancio.thread.length, 'messaggi, archiviate =',
+    (dopoRilancio.past || []).length);
 
   expect(dopoChiusura.thread.length, 'la conversazione chiusa resta conservata').toBeGreaterThan(1);
+  // La nuova intervista parte pulita (sarebbe un déjà vu ritrovarsi addosso la
+  // vecchia), ma quella di prima non è sparita: è archiviata…
+  const archiviate = dopoRilancio.past || [];
   expect(
-    dopoRilancio.thread.some((m) => m.text.includes('sono Anna')),
+    archiviate.some((c) => c.thread.some((m) => m.text.includes('sono Anna'))),
     'rifare l’intervista non cancella quella di prima',
   ).toBe(true);
+  // …e si rilegge, dalla stessa sezione delle Preferenze.
+  await expect(prefs.locator('#onboardingArchive')).toContainText('sono Anna', { timeout: 10_000 });
 });
 
 // ── P4: due schede nuove aperte insieme durante l'intervista ────────────────
