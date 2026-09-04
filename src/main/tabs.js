@@ -20,6 +20,8 @@ require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalH
 const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
+require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
+const { indiceSaltoScheda } = globalThis.SN_TASTI;
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
