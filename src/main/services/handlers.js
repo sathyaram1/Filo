@@ -722,13 +722,15 @@ async function maybeRunCompactor() {
     const text = (r?.text || '').trim();
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
       await FiloMem.clearLessonsBuffer();
-      return;
+      return true;
     }
     const patch = FiloMem.parseCompactorOutput(text);
     if (Object.keys(patch).length) await FiloMem.patchMemory(patch);
     await FiloMem.clearLessonsBuffer();
+    return true;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
+    return false;
   }
 }
 
