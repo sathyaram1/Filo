@@ -1349,7 +1349,9 @@
       // Salto alla N-esima scheda (quando il focus è sulla barra di Filo; per
       // le pagine ci pensa before-input-event nel main). Quale combinazione
       // sia lo decide src/shared/tasti.js: Alt+cifra qui, Cmd+cifra su Mac.
-      const idx = TASTI ? TASTI.indiceSaltoScheda(e) : null;
+      // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
+      // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
+      const idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, (state.tabs || []).length) : null;
       if (idx != null) {
         e.preventDefault();
         const tab = state.tabs[idx];
