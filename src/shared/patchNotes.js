@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.214', date: '2026-09-04',
+      features: [
+        'Filo si scarica anche per Mac: un solo file, buono sia sui Mac Intel sia su quelli con chip Apple. La prima volta macOS dice che l\'app non è di uno sviluppatore riconosciuto — aprila col tasto destro → «Apri» e da lì in poi parte normalmente.',
+      ],
+    },
+    {
       version: '0.2.213', date: '2026-09-04',
       features: [
         'Al primo avvio Filo ti accoglie parlando. Ti chiede chi sei e come vuoi che ti risponda, applica subito quello che gli dici e ti racconta in poche righe come funziona. Quando ne hai abbastanza scrivi «basta così», oppure clicca «Salta l\'accoglienza» sotto la conversazione. Funzionano anche senza rete. Se chiudi la finestra a metà, riaprendo riprende da dove eravate. Alla fine ti prepara la tua prima home. Puoi rifarla quando vuoi da Preferenze, dove restano anche quelle già fatte, da rileggere.',
