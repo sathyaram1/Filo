@@ -219,7 +219,10 @@
   // (Cmd e Ctrl sono lo stesso tasto logico nelle scorciatoie di Filo).
   const SINONIMI_TASTO = { '=': '+', plus: '+', minus: '-', esc: 'escape' };
   function forma(accel) {
-    const parti = pezzi(accel);
+    // Un "+" in ultima posizione è il TASTO più, non un separatore: "Ctrl++"
+    // si spezzerebbe in ["Ctrl"] e sparirebbe dalla lista.
+    const testo = String(accel || '').trim().replace(/\+\s*\+$/, '+Plus');
+    const parti = pezzi(testo);
     if (parti.length < 2) return '';
     const finale = parti[parti.length - 1].toLowerCase();
     const mods = parti.slice(0, -1).map((m) => m.toLowerCase());
