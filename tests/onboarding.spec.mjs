@@ -184,11 +184,8 @@ test('quello che Filo impara lo applica subito, lo spunta, e riprende da lì', a
 
 test('«basta così»: chiude, fissa in memoria quello che ha imparato e apre la prima home', async ({ app, shell }) => {
   test.setTimeout(120_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
+  const page = await apriIntervista(app, shell);
   await expect(page.locator('#input')).toBeVisible();
-  await useFakeKey(app);
-  await stubAgents(app);
 
   await queueChat(app, {
     text: 'Ci siamo capiti. Buon lavoro, Anna.',
