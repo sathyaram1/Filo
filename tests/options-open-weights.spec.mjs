@@ -84,9 +84,7 @@ test('Opzioni: acceso, i «Prova» dei modelli proprietari non sono premibili', 
     .locator('.sn-model-test');
   if (await ammessi.count()) await expect(ammessi.first()).toBeEnabled();
 
-  // ── Chiavi: l'API diretta del produttore resta spenta, lo smistatore no
-  // (prova un modello ammesso).
-  await expect(page.locator('#testGemini')).toBeDisabled();
+  // ── Chiavi: lo smistatore prova un modello ammesso, quindi resta vivo.
   await expect(page.locator('#testOpenrouter')).toBeEnabled();
 
   // ── Registry personale: stessa regola per le righe scritte dall'utente.
@@ -104,7 +102,6 @@ test('Opzioni: acceso, i «Prova» dei modelli proprietari non sono premibili', 
   // Spento, tutto torna premibile: la differenza la fa l'interruttore.
   await page.uncheck('#openWeightsOnly');
   await expect(riga.locator('.sn-model-test')).toBeEnabled();
-  await expect(page.locator('#testGemini')).toBeEnabled();
 });
 
 test('Opzioni: acceso, la pagina non interroga più i server di chi produce i modelli', async ({ app, openTab }) => {

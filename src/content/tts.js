@@ -582,6 +582,9 @@
       // (un AudioWorklet vorrebbe un modulo caricato da un URL, che un content
       // script non ha). 4096 campioni ≈ 85 ms a 48 kHz: latenza trascurabile.
       proc = ctx.createScriptProcessor(4096, 1, 1);
+      // Un contesto audio può nascere "sospeso" (politica di autoplay): senza
+      // resume non arriverebbe nessun campione.
+      try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (_) {}
     } catch (_) {
       try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
       try { if (ctx) ctx.close(); } catch (_) {}

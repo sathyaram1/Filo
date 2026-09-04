@@ -23,11 +23,11 @@ test('fallback a metà streaming: il popup mostra solo la risposta pulita del se
 
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    // Due nickname → catena reale di 2 attempt (gemini poi openrouter).
+    // Due nickname → catena reale di 2 attempt (entrambi sul router).
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN]: 'flash-lite-3,flash-lite-or' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash,gemma-lite' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     // Provider finti: NON stubbiamo il router (streamCompleteWithFallback), che
@@ -97,7 +97,7 @@ test('errore immediato del primo provider (nessun delta): fallback pulito come p
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN]: 'flash-lite-3,flash-lite-or' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash,gemma-lite' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     globalThis.__origGem2 = globalThis.SN_PROVIDER_OPENROUTER;

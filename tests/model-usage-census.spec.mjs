@@ -114,15 +114,15 @@ test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la co
   const page = await openTab(OPTIONS_URL);
   await revealAdvanced(page);
 
-  // Registro con due modelli riconoscibili, uno per fornitore, e la funzione
-  // «Prova di un fornitore» impostata su entrambi.
+  // Registro con due modelli riconoscibili e la funzione «Prova di un
+  // fornitore» impostata su entrambi: la prova parte sul PRIMO della catena.
   await page.evaluate(async () => {
     const s = await window.SN_STORAGE.getSettings();
     s.useDefaultModels = false;
     s.modelRegistry = {
       ...s.modelRegistry,
-      'prova-g': { label: 'Prova Gemini', provider: 'openrouter', model: 'modello-di-prova-gemini' },
-      'prova-o': { label: 'Prova OR', provider: 'openrouter', model: 'vendor/modello-di-prova-or' },
+      'prova-g': { label: 'Prova uno', provider: 'openrouter', model: 'vendor/modello-di-prova-uno' },
+      'prova-o': { label: 'Prova due', provider: 'openrouter', model: 'vendor/modello-di-prova-due' },
     };
     s.models = { ...s.models, [window.SN_CONST.ACTIONS.PROVIDER_TEST]: 'prova-g, prova-o' };
     // Chiavi NON ancora salvate: è il caso vero del pulsante «Prova», che serve
@@ -151,16 +151,15 @@ test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la co
     return seen;
   }, provider);
 
-  expect(await askedFor('gemini')).toBe('modello-di-prova-gemini');
-  expect(await askedFor('openrouter')).toBe('vendor/modello-di-prova-or');
+  expect(await askedFor('openrouter')).toBe('vendor/modello-di-prova-uno');
 
   // Cambio la configurazione → cambia il modello con cui si prova.
   await page.evaluate(async () => {
     const s = await window.SN_STORAGE.getSettings();
-    s.modelRegistry['prova-g'].model = 'altro-modello-gemini';
+    s.modelRegistry['prova-g'].model = 'vendor/altro-modello';
     await window.SN_STORAGE.setSettings(s);
   });
-  expect(await askedFor('gemini')).toBe('altro-modello-gemini');
+  expect(await askedFor('openrouter')).toBe('vendor/altro-modello');
 });
 
 test('l\'editor genera il titolo con la sua funzione, non con quella di «Spiega»', async ({ openTab }) => {
