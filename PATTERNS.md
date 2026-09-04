@@ -1826,9 +1826,12 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   nel main). Senza, la seconda scheda restava ferma a com'era e rilanciava lo
   stesso messaggio una seconda volta.
 - **Test**: `tests/unit/onboarding.test.mjs` (elenco, spunte, ripresa, chiusura,
-  parola di stop, archivio), `tests/onboarding.spec.mjs` (il giro reale,
-  compresa la home finale), `tests/onboarding-uscita.spec.mjs` (le vie d'uscita
-  e le strade che si rompono: provider giù, "Riprova", due schede).
+  parola di stop, rifiuti, archivio), `tests/onboarding.spec.mjs` (il giro
+  reale, compresa la home finale), `tests/onboarding-uscita.spec.mjs` (le vie
+  d'uscita e le strade che si rompono: provider giù, "Riprova", due schede),
+  `tests/onboarding-ripresa.spec.mjs` (la riga sulla home dopo una chiusura a
+  metà), `tests/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
+  vuoto, testo ostile, tre schede).
 
 ## Una promessa fatta all'utente non può dipendere dal modello
 
