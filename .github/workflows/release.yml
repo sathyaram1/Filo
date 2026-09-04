@@ -225,3 +225,115 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         shell: bash
         run: echo "Pubblicata ${{ steps.bump.outputs.version }}"
+
+  # ─── SECONDA META': LA VERSIONE PER MAC ──────────────────────────────────
+  # Un pacchetto per Mac lo puo' costruire SOLO un Mac (serve `lipo` per fondere
+  # Intel e Apple Silicon in un file solo, e gli strumenti di firma di Apple):
+  # per questo e' un lavoro a se', su una macchina Apple, e non un passo in piu'
+  # di quello per Windows.
+  #
+  # Parte DOPO che la versione per Windows e' stata pubblicata, e si attacca
+  # alla STESSA pubblicazione: stesso numero di versione, stessa pagina di
+  # download, due file. Cosi' il collegamento "Scarica per Mac" del sito
+  # (.../releases/latest/download/Filo-Mac.dmg) punta sempre all'ultima
+  # versione, come quello per Windows.
+  #
+  # DUE COSE DA SAPERE
+  #   1. Costruisce lo STESSO commit che ha costruito Windows (`needs...sha`),
+  #      non il tag: il tag nasce alla pubblicazione e punta a dove sta `main`
+  #      in quel momento — se nel frattempo e' entrato un merge, non e' piu' il
+  #      codice pubblicato per Windows, e i due file avrebbero lo stesso numero
+  #      di versione con dentro codice diverso.
+  #   2. Per una decina di minuti — il tempo di questa meta' — la release e'
+  #      gia' pubblicata ma il file per Mac non c'e' ancora: in quella finestra
+  #      il collegamento del sito risponde 404. E' il prezzo di non far
+  #      aspettare Windows, ed e' voluto.
+  #
+  # Se questa meta' fallisce, quella per Windows resta pubblicata e valida: e'
+  # marcata `continue-on-error` apposta: un problema sui Mac non deve togliere
+  # l'aggiornamento a chi e' su Windows.
+  release-mac:
+    needs: release
+    if: needs.release.outputs.should_release == 'true' && needs.release.outputs.version != ''
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout dello stesso commit costruito per Windows
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        run: npm ci
+
+      # Guardia: se il manifesto qui non dice il numero che il server ha
+      # scritto, si sta costruendo un codice diverso da quello pubblicato per
+      # Windows. Meglio fermarsi che allegare alla release un pacchetto Mac che
+      # non corrisponde.
+      - name: Stesso numero di versione della meta' Windows
+        shell: bash
+        run: |
+          set -e
+          LOCALE=$(node -p "require('./package.json').version")
+          ATTESA="${{ needs.release.outputs.version }}"
+          if [ "v${LOCALE}" != "$ATTESA" ]; then
+            echo "::error::qui il manifesto dice v${LOCALE}, la release e' ${ATTESA}: non allego un pacchetto sbagliato."
+            exit 1
+          fi
+
+      # Stesso passo dell'altra meta', e per lo stesso motivo: senza le chiavi
+      # incastonate l'app arriva muta. Va rifatto qui perche' il file generato
+      # non sta nel repo: vive solo dentro la macchina che costruisce.
+      - name: Incastona le chiavi di default nel build (bake)
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          FILO_DEFAULT_OPENROUTER_KEY: ${{ secrets.FILO_DEFAULT_OPENROUTER_KEY }}
+          FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
+          FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
+        run: node scripts/bake-default-config.mjs
+
+      # Senza certificato Apple lo strumento di impacchettamento salta la firma
+      # del tutto: ci pensa scripts/after-pack-mac.js a metterne una locale, che
+      # sui Mac con chip Apple e' obbligatoria perche' l'app parta.
+      #
+      # EP_GH_IGNORE_TIME: la release esiste gia' (l'ha pubblicata la meta'
+      # Windows). Lo strumento, per prudenza, si rifiuta di allegare file a una
+      # release pubblicata da piu' di due ore; qui il ritardo e' di minuti, ma
+      # se la meta' Windows e' stata lenta il rifiuto arriverebbe come un
+      # semplice avviso, con il lavoro verde e nessun file allegato.
+      - name: Build e upload sulla release esistente
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          EP_GH_IGNORE_TIME: "true"
+        run: npm run release:mac
+
+      # Il passo sopra puo' finire verde senza aver allegato niente (lo
+      # strumento, quando decide di non pubblicare, si limita a un avviso).
+      # Qui si guarda la release VERA: se i file che il sito e l'aggiornamento
+      # automatico si aspettano non ci sono, il lavoro e' rosso.
+      - name: I file per Mac sono davvero nella release?
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -e
+          ELENCO=$(gh release view "${{ needs.release.outputs.version }}" \
+            --repo "${{ github.repository }}" --json assets \
+            --jq '.assets[].name')
+          echo "Allegati nella release:"
+          echo "$ELENCO"
+          for ATTESO in Filo-Mac.dmg Filo-Mac.zip latest-mac.yml; do
+            echo "$ELENCO" | grep -qx "$ATTESO" || {
+              echo "::error::manca $ATTESO nella release ${{ needs.release.outputs.version }}"
+              exit 1
+            }
+          done
+
+      - name: Riepilogo
+        run: echo "Aggiunto il pacchetto Mac a ${{ needs.release.outputs.version }}"
