@@ -39,8 +39,10 @@
 //   La barra di serie apriva le DevTools con Opzione+Cmd+I a chiunque. Non è
 //   una voce per l'utente di Filo: qui non c'è.
 
-const { Menu, app, BrowserWindow, webContents } = require('electron');
-
+// Electron si chiede DENTRO le funzioni, non qui in cima: così `template()` —
+// la forma della barra, cioè la parte che va tenuta d'occhio — si legge anche
+// dalla sentinella negli unit test, che gira in Node puro e in millisecondi
+// sulla macchina di chi scrive la modifica.
 const MAC = process.platform === 'darwin';
 
 // Tasti che le pagine di Filo gestiscono già da sé: su Windows e Linux la voce
