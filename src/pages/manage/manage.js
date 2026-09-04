@@ -2963,6 +2963,9 @@
     if (liveTick) return liveTick;
     liveTick = (async () => {
       const remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+      // Una risposta che non è un elenco non è "tutto sparito": è un guasto,
+      // e un guasto lascia la lista com'è.
+      if (!Array.isArray(remote)) throw new Error('versioni non lette');
       const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
       const ids = changed.concat(added);
       if (ids.length === 0 && removed.length === 0) return { changed: 0 };
