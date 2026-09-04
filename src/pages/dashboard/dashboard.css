@@ -396,7 +396,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 /* In attesa o mentre ragiona: una rotella. Non c'è un avanzamento da stimare. */
 .dash-activity[data-phase="wait"] .dash-activity-icon,
-.dash-activity[data-phase="reason"] .dash-activity-icon {
+.dash-activity[data-phase="reason"] .dash-activity-icon,
+.dash-activity[data-phase="act"] .dash-activity-icon {
   border-radius: 50%;
   border: 2px solid currentColor;
   border-top-color: transparent;
@@ -409,19 +410,21 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-activity[data-phase="done"] .dash-activity-head[aria-expanded="true"] .dash-activity-icon::before { content: '▾'; }
 @media (prefers-reduced-motion: reduce) {
   .dash-activity[data-phase="wait"] .dash-activity-icon,
-  .dash-activity[data-phase="reason"] .dash-activity-icon {
+  .dash-activity[data-phase="reason"] .dash-activity-icon,
+  .dash-activity[data-phase="act"] .dash-activity-icon {
     animation: none;
     border-top-color: currentColor;
     opacity: 0.35;
   }
 }
-/* Il ragionamento: testo così com'è (a capo compresi), qualche riga poi
-   scorre da solo restando in fondo mentre cresce. Riaperto dopo, ha più spazio
-   per rileggere. Si può selezionare e copiare. */
+/* La cronologia: ragionamento, azioni, note e comandi nell'ordine in cui sono
+   avvenuti. Si apre solo a richiesta, scorre da sola restando in fondo mentre
+   il lavoro va avanti. Testo selezionabile. */
 .dash-activity-body {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  max-height: 11em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
   overflow-y: auto;
   padding: 4px 10px 4px 12px;
   margin: 0 0 2px 5px;
@@ -429,13 +432,18 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   font-size: 12.5px;
   user-select: text;
 }
-.dash-activity[data-phase="done"] .dash-activity-body { max-height: 40vh; }
-.dash-activity-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.dash-activity-reasoning {
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
-.dash-activity-rows:empty { display: none; }
+/* Commento a metà lavoro («Provo subito tutti e tre…»): era una bolla, è una nota. */
+.dash-activity-note {
+  font-style: italic;
+  color: var(--dash-ink-soft);
+}
+/* Esito di un comando dentro la cronologia: più piccolo, output limitato. */
+.dash-cmd-result.dash-activity-cmd { margin-top: 0; font-size: 12px; }
+.dash-activity-cmd .dash-cmd-output { max-height: 10em; overflow: auto; }
 /* Le righe delle azioni: icona e due parole, in tono col blocco (non corsive,
    non un bottone). */
 .dash-action-step.dash-activity-row {
