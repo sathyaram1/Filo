@@ -261,12 +261,21 @@ module.exports = function register(on, ctx) {
       if (!auth.isAdmin()) {
         return { ok: false, error: 'Operazione riservata agli amministratori.' };
       }
-      // Batch: array di oggetti feedback → decifra ciascuno in sequenza.
+      // Batch: array di oggetti feedback. La chiave si legge UNA volta e i
+      // documenti si decifrano a gruppi in parallelo: la crittografia gira nel
+      // pool di thread di Node, quindi in sequenza si usava un solo core e
+      // 500 feedback costavano diversi secondi di attesa alla dashboard.
       if (Array.isArray(msg.list)) {
-        const list = [];
-        for (const item of msg.list) {
-          list.push(await decryptFeedbackObject(item || {}));
-        }
+        const priv = await getPrivateKey();
+        const list = new Array(msg.list.length);
+        let next = 0;
+        const worker = async () => {
+          while (next < msg.list.length) {
+            const i = next++;
+            list[i] = await decryptFeedbackObject(msg.list[i] || {}, priv);
+          }
+        };
+        await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
         return { ok: true, list };
       }
       // Singolo (retrocompat).
