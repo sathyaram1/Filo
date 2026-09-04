@@ -242,12 +242,24 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
    (#524): è la prima bolla di una conversazione vera, quindi usa lo stile delle
    bolle qui sotto e non ha più regole sue. */
 
-/* Conversation */
+/* Conversation.
+   #521 — in conversazione la griglia ha un'altezza FISSA (la viewport, con la
+   stessa compensazione dello zoom del testo) e la colonna centrale può
+   restringersi (min-height: 0): così è il thread a scorrere al suo interno e
+   il campo di scrittura resta sempre in fondo alla finestra. Prima il thread
+   aveva un tetto a «100vh meno 160px» tirato a occhio: appena il campo
+   cresceva (Shift+Invio, anteprime immagini, riga della cartella in modalità
+   terminale) la somma superava la finestra, la pagina scorreva e il campo
+   finiva tagliato sotto il bordo. */
+body[data-state="thread"] .dash { height: calc(100vh / var(--sn-zoom, 1)); }
+body[data-state="thread"] .dash-left,
+body[data-state="thread"] .dash-center,
+body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-thread {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-height: calc(100vh - 160px);
+  min-height: 0;
   overflow: hidden;
 }
 .dash-bubbles {
@@ -331,34 +343,123 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   .dash-bubble-filo.dash-bubble-streaming::after { animation: none; }
 }
 
-/* "Filo sta pensando": 3 righe di reasoning che scorrono verso l'alto.
-   La riga in cima è quasi trasparente (sta uscendo), quella in basso è piena
-   (è appena entrata). Restano al massimo 3 righe visibili; ogni ~900ms le frasi
-   slittano verso l'alto e ne entra una nuova dal basso. */
-.dash-thinking {
+/* #521 — blocco di attività del turno: sta sopra la risposta e racconta cosa
+   Filo ha fatto prima di parlare (attesa → ragionamento → azioni). Colore
+   smorzato e niente cornice: è il retroscena, la risposta è la bolla sotto. */
+.dash-activity {
+  align-self: flex-start;
+  width: 86%;
+  max-width: 86%;
   color: var(--dash-ink-mute);
-  font-style: italic;
+  font-size: 13px;
+  line-height: 1.45;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  line-height: 1.35;
-  overflow: hidden;
+  gap: 3px;
+  padding-left: 4px;
 }
-.dash-thinking-line {
-  white-space: nowrap;
+/* La risposta si attacca al suo retroscena: meno aria fra i due che fra bolle. */
+.dash-activity + .dash-bubble-filo { margin-top: -6px; }
+.dash-activity-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 2px 6px 2px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+.dash-activity-head:hover { color: var(--dash-ink-soft); }
+/* La riga dice cosa succede adesso: una riga sola, il resto sfuma. */
+.dash-activity-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: opacity 350ms ease;
+  white-space: nowrap;
 }
-.dash-thinking-line[data-slot="0"] { opacity: 0.25; }
-.dash-thinking-line[data-slot="1"] { opacity: 0.55; }
-.dash-thinking-line[data-slot="2"] { opacity: 0.95; }
-.dash-thinking-line.dash-thinking-enter {
-  animation: dash-thinking-enter 350ms ease-out;
+/* Un tentativo andato male: resta leggibile, ma non sembra un lavoro riuscito. */
+.dash-activity[data-failed="1"] .dash-activity-label { color: var(--dash-accent); }
+.dash-activity-icon {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 11px;
 }
-@keyframes dash-thinking-enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 0.95; transform: translateY(0); }
+/* In attesa o mentre ragiona: una rotella. Non c'è un avanzamento da stimare. */
+.dash-activity[data-phase="wait"] .dash-activity-icon,
+.dash-activity[data-phase="reason"] .dash-activity-icon,
+.dash-activity[data-phase="act"] .dash-activity-icon {
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.7;
+  animation: dash-activity-spin 0.9s linear infinite;
+}
+@keyframes dash-activity-spin { to { transform: rotate(360deg); } }
+/* Finito: la riga è un interruttore, la freccetta dice da che parte è. */
+.dash-activity[data-phase="done"] .dash-activity-icon::before { content: '▸'; }
+.dash-activity[data-phase="done"] .dash-activity-head[aria-expanded="true"] .dash-activity-icon::before { content: '▾'; }
+@media (prefers-reduced-motion: reduce) {
+  .dash-activity[data-phase="wait"] .dash-activity-icon,
+  .dash-activity[data-phase="reason"] .dash-activity-icon,
+  .dash-activity[data-phase="act"] .dash-activity-icon {
+    animation: none;
+    border-top-color: currentColor;
+    opacity: 0.35;
+  }
+}
+/* La cronologia: ragionamento, azioni, note e comandi nell'ordine in cui sono
+   avvenuti. Si apre solo a richiesta, scorre da sola restando in fondo mentre
+   il lavoro va avanti. Testo selezionabile. */
+.dash-activity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 4px 10px 4px 12px;
+  margin: 0 0 2px 5px;
+  border-left: 2px solid var(--dash-line-strong);
+  font-size: 12.5px;
+  user-select: text;
+}
+.dash-activity-reasoning {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+/* Commento a metà lavoro («Provo subito tutti e tre…»): era una bolla, è una nota. */
+.dash-activity-note {
+  font-style: italic;
+  color: var(--dash-ink-soft);
+}
+/* Esito di un comando dentro la cronologia: più piccolo, output limitato. */
+.dash-cmd-result.dash-activity-cmd { margin-top: 0; font-size: 12px; }
+.dash-activity-cmd .dash-cmd-output { max-height: 10em; overflow: auto; }
+/* Le righe delle azioni: icona e due parole, in tono col blocco (non corsive,
+   non un bottone). */
+.dash-action-step.dash-activity-row {
+  font-style: normal;
+  opacity: 1;
+  color: inherit;
+  font-size: 12.5px;
+  gap: 8px;
+}
+.dash-activity-row-icon {
+  width: 12px;
+  flex: none;
+  text-align: center;
+  font-size: 12px;
 }
 .dash-bubble-actions {
   margin-top: 10px;

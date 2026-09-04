@@ -91,7 +91,7 @@ test('Filo prosegue da solo dopo un comando, fino a dichiararsi concluso', async
     .toBeVisible({ timeout: 15_000 });
   // L'output del comando del primo passo è davvero comparso in chat.
   await expect(page.locator('.dash-cmd-output', { hasText: 'PASSO_UNO_OK' }))
-    .toBeVisible();
+    .toHaveCount(1); // #521: l'esito vive nella cronologia del blocco di attività, chiusa di default
 
   // Il modello è stato interrogato DUE volte in un solo invio (1 comando + 1
   // chiusura): la prova dell'auto-continuazione. E l'utente ha una sola bolla.

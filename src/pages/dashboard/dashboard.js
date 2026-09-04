@@ -795,136 +795,328 @@
     send({ type: MSG.OPEN_URL, url });
   });
 
-  // Indicatore "sta pensando": 3 righe di reasoning che scorrono verso l'alto e
-  // svaniscono man mano che salgono (la riga in cima è quasi trasparente, quella
-  // in basso è piena). Restano sempre al massimo 3 righe visibili.
-  // Quando il modello fornisce il RAGIONAMENTO VERO in streaming (vedi
-  // pushReasoning più sotto), nelle righe scorre quel testo; finché non arriva
-  // (o per i modelli che non ragionano) si mostrano queste frasi indicative —
-  // abbastanza varie da non sembrare uno spinner statico.
-  // Stesso pattern della sidebar (src/content/sidebar.js).
-  const THINKING_PHRASES = [
-    'Leggo la tua richiesta…',
-    'Analizzo il contesto…',
-    'Consulto la memoria…',
-    'Controllo schede e cronologia…',
-    'Valuto il prossimo passo…',
-    'Capisco cosa ti serve…',
-    'Cerco le informazioni giuste…',
-    'Compongo la risposta…',
-    'Riconosco i pattern noti…',
-    'Verifico i dettagli…',
-    'Scelgo l’azione migliore…',
-    'Metto in ordine le idee…',
-  ];
-
-  function appendThinking() {
+  // ===== Blocco di attività della domanda (#521) =====
+  // UNO per messaggio dell'utente, sopra la risposta finale. Raccoglie tutto
+  // ciò che Filo fa prima di rispondere, anche su più turni automatici
+  // (ragiona, cerca, legge, ragiona ancora, risponde). Filo non «ragiona e
+  // basta»: agisce, e il blocco è «Filo sta facendo qualcosa».
+  //
+  // Chiuso di default, sempre: il 90 % delle volte l'utente vuole che il lavoro
+  // sia invisibile. La riga in testa dice cosa succede ADESSO — rotella e
+  // «Aspetto la risposta…», poi «Sta ragionando · …ultima frase», poi «Cerco
+  // sul web: …» — e a lavoro finito diventa il riassunto («Ha cercato sul web e
+  // letto un documento · 1 min 20 s»). Un click apre la cronologia completa:
+  // ragionamento, azioni, note intermedie, esiti dei comandi, nell'ordine in
+  // cui sono avvenuti. Niente frasi inventate: le vecchie righe «Consulto la
+  // memoria…» erano teatro, non stato.
+  //
+  // Se alla fine non c'è niente da raccontare, il blocco si toglie da solo.
+  function createActivity() {
     const wrap = document.createElement('div');
-    wrap.className = 'dash-bubble dash-bubble-filo dash-thinking';
-    const lines = [];
-    for (let i = 0; i < 3; i++) {
-      const ln = document.createElement('div');
-      ln.className = 'dash-thinking-line';
-      ln.dataset.slot = String(i); // 0=top fading out, 1=mid, 2=bottom fresh
-      wrap.appendChild(ln);
-      lines.push(ln);
-    }
+    wrap.className = 'dash-activity';
+    wrap.dataset.phase = 'wait';
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'dash-activity-head';
+    head.setAttribute('aria-expanded', 'false');
+    head.title = 'Mostra cosa ha fatto Filo';
+    const icon = document.createElement('span');
+    icon.className = 'dash-activity-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.className = 'dash-activity-label';
+    label.textContent = 'Aspetto la risposta…';
+    head.append(icon, label);
+    const body = document.createElement('div');
+    body.className = 'dash-activity-body';
+    body.hidden = true;
+    wrap.append(head, body);
     bubblesEl.appendChild(wrap);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    // Pool casuale senza ripetizioni ravvicinate
-    const pool = THINKING_PHRASES.slice();
-    const recent = [];
-    function nextPhrase() {
-      const candidates = pool.filter((p) => !recent.includes(p));
-      const src = candidates.length ? candidates : pool;
-      const phrase = src[Math.floor(Math.random() * src.length)];
-      recent.push(phrase);
-      if (recent.length > 4) recent.shift();
-      return phrase;
-    }
+    const startedAt = Date.now();
+    let phase = 'wait';
+    let open = false;
+    let items = 0;
+    // Ragionamento del turno in corso (un blocco per turno nella cronologia).
+    let reasoningEl = null;
+    let turnReasoning = '';
+    let turnStartedAt = 0;
+    let lastTurn = { text: '', ms: 0 };
+    // Quante voci c'erano quando è partito il testo del turno (vedi answerStarted).
+    let turnMark = null;
+    // Tipi delle azioni compiute, nell'ordine: da qui nasce il riassunto.
+    const doneTypes = [];
 
-    lines[0].textContent = nextPhrase();
-    lines[1].textContent = nextPhrase();
-    lines[2].textContent = nextPhrase();
-
-    let stopped = false;
-    // Mostra le ultime 3 righe di un elenco di segmenti, animando l'ingresso di
-    // quella in basso. Usato sia dalle frasi indicative sia dal reasoning vero.
-    const renderLines = (a, b, c) => {
-      if (lines[2].textContent === c) return; // niente cambi → niente flicker
-      lines[0].textContent = a || '';
-      lines[1].textContent = b || '';
-      lines[2].textContent = c || '';
-      lines[2].classList.remove('dash-thinking-enter');
-      void lines[2].offsetWidth;
-      lines[2].classList.add('dash-thinking-enter');
+    const followBody = () => {
+      const near = body.scrollHeight - body.scrollTop - body.clientHeight < 32;
+      if (near) body.scrollTop = body.scrollHeight;
     };
-    const tick = () => {
-      if (stopped || !wrap.isConnected) return;
-      // Shift verso l'alto: top esce, mid → top, bottom → mid, nuovo → bottom
-      renderLines(lines[1].textContent, lines[2].textContent, nextPhrase());
+    const followThread = () => {
+      const near = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 48;
+      if (near) bubblesEl.scrollTop = bubblesEl.scrollHeight;
     };
-    const interval = setInterval(tick, 900);
-    lines[2].classList.add('dash-thinking-enter');
-
-    // ── Reasoning VERO ─────────────────────────────────────────────────────
-    // Quando arriva il ragionamento reale del modello (stream di testo), si
-    // smette di animare le frasi indicative e si scorrono le righe vere: si
-    // spezza il testo in segmenti (a fine frase / a capo) e si tengono visibili
-    // gli ultimi 3, l'ultimo "in scrittura" finché non si chiude.
-    let realMode = false;
-    let buf = '';
-    const segments = [];
-    const splitSegments = (text) => {
-      // Divide su a-capo o terminatori di frase, mantenendo segmenti non vuoti.
-      return text
-        .split(/(?<=[.!?…])\s+|\n+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
+    const setOpen = (v) => {
+      open = !!v;
+      body.hidden = !open;
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
+      // Aperto a lavoro finito si legge dall'inizio; aperto mentre lavora si
+      // guarda l'ultima cosa.
+      if (open) body.scrollTop = phase === 'done' ? 0 : body.scrollHeight;
+      followThread();
     };
-    const renderReasoning = () => {
-      const done = splitSegments(buf);
-      // La coda senza terminatore è il segmento "in scrittura": tienilo come
-      // ultima riga così l'utente vede il testo comparire in diretta.
-      const all = done.slice();
-      const lastChunk = buf.split(/\n+/).pop().trim();
-      const matchedTail = done.length && buf.trimEnd().endsWith(done[done.length - 1]) && /[.!?…]\s*$/.test(buf);
-      if (lastChunk && (!done.length || !matchedTail)) {
-        if (!all.length || all[all.length - 1] !== lastChunk) all.push(lastChunk);
-      }
-      const n = all.length;
-      renderLines(all[n - 3], all[n - 2], all[n - 1]);
-      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    head.addEventListener('click', () => setOpen(!open));
+    const setPhase = (p, text) => {
+      phase = p;
+      wrap.dataset.phase = p;
+      label.textContent = text;
+    };
+    const lastSentence = (t) => {
+      const parts = String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…])\s+/);
+      return parts[parts.length - 1] || '';
+    };
+    const append = (el) => {
+      body.appendChild(el);
+      items += 1;
+      followBody();
+      followThread();
+    };
+    // Chiude il blocco di ragionamento del turno (se c'era) e lo mette da parte
+    // per lo storico del thread.
+    const closeTurnReasoning = () => {
+      if (!turnReasoning) return;
+      lastTurn = { text: turnReasoning, ms: Date.now() - turnStartedAt };
+      turnReasoning = '';
+      reasoningEl = null;
     };
 
     return {
       el: wrap,
-      // Riceve un chunk di reasoning vero dal modello.
+      // Un pezzo di ragionamento vero dal modello.
       pushReasoning(text) {
-        if (stopped || !text) return;
-        if (!realMode) { realMode = true; clearInterval(interval); }
-        buf += text;
-        renderReasoning();
+        if (phase === 'done' || !text) return;
+        if (!reasoningEl) {
+          reasoningEl = document.createElement('div');
+          reasoningEl.className = 'dash-activity-reasoning';
+          turnStartedAt = Date.now();
+          append(reasoningEl);
+        }
+        turnReasoning += text;
+        reasoningEl.textContent = turnReasoning;
+        setPhase('reason', `Sta ragionando · ${lastSentence(turnReasoning)}`);
+        followBody();
+        followThread();
       },
-      remove() { stopped = true; clearInterval(interval); wrap.remove(); },
+      // È partito il testo di una risposta (finale o intermedia). Da qui in poi
+      // le righe del turno (azioni, comandi) vengono DOPO il testo: se poi
+      // quel testo entra in cronologia come nota, va messo qui, non in coda.
+      answerStarted() {
+        closeTurnReasoning();
+        turnMark = body.childElementCount;
+        if (phase !== 'done') setPhase('act', 'Scrivo la risposta…');
+      },
+      // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
+      addRow(type, rowIcon, text) {
+        closeTurnReasoning();
+        doneTypes.push(String(type || '').toUpperCase());
+        append(makeActivityRow(rowIcon, text));
+        if (phase !== 'done') setPhase('act', text);
+      },
+      // Esito di un comando eseguito subito (livello 1): riga di comando e
+      // output, nella cronologia — non nella bolla della risposta.
+      addCommand(out) {
+        closeTurnReasoning();
+        doneTypes.push('ESEGUI_COMANDO');
+        const el = renderCommandResult(out);
+        el.classList.add('dash-activity-cmd');
+        append(el);
+        if (phase !== 'done') setPhase('act', `Eseguito · ${(out && out.command) || 'comando'}`);
+      },
+      // La bolla di un turno che NON era l'ultimo («Provo subito tutti e tre…»)
+      // entra nella cronologia come nota e sparisce dalla conversazione: per
+      // l'utente conta la risposta, non il commento a metà lavoro.
+      absorbBubble(bubble) {
+        if (!bubble || !bubble.isConnected) return;
+        const text = (bubble.textContent || '').trim();
+        bubble.remove();
+        if (!text) return;
+        const note = document.createElement('div');
+        note.className = 'dash-activity-note';
+        note.textContent = text;
+        // Nell'ordine vero: il testo è stato scritto PRIMA delle azioni del turno.
+        const at = (turnMark !== null && turnMark <= body.childElementCount) ? body.children[turnMark] || null : null;
+        body.insertBefore(note, at);
+        items += 1;
+        turnMark = null;
+        followBody();
+        followThread();
+      },
+      // Fine di un turno: chiude il ragionamento del turno e lo restituisce
+      // (per lo storico del thread).
+      endTurn() {
+        closeTurnReasoning();
+        const t = lastTurn;
+        lastTurn = { text: '', ms: 0 };
+        return t;
+      },
+      // Fine di tutto il lavoro: la riga diventa il riassunto; senza niente
+      // dentro, il blocco non ha ragione di restare.
+      // `failed`: il lavoro si è interrotto per un errore. Il blocco resta (il
+      // ragionamento aiuta a capire cosa stava tentando) ma lo dice in riga,
+      // così dopo un «Riprova» non sembra un lavoro riuscito impilato sopra
+      // l'altro.
+      finish({ failed = false } = {}) {
+        closeTurnReasoning();
+        if (!items) { wrap.remove(); setPhase('done', ''); return; }
+        const summary = `${summarizeActivity(doneTypes)} · ${fmtActivityDuration(Date.now() - startedAt)}`;
+        setPhase('done', failed ? `Tentativo non riuscito · ${summary}` : summary);
+        if (failed) wrap.dataset.failed = '1';
+        head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
+      },
+      remove() { wrap.remove(); },
     };
   }
 
-  function renderActions(container, actions, { onAck, autoConfirm = false } = {}) {
+  // «Ha cercato sul web, impostato una sveglia e letto un documento»: il
+  // riassunto delle azioni, nell'ordine in cui sono avvenute, con i doppioni
+  // contati. Senza azioni resta il solo ragionamento.
+  const ACTIVITY_VERBS = {
+    CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
+    LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
+    LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
+    CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
+    TIMER: (n) => (n > 1 ? `avviato ${n} timer` : 'avviato un timer'),
+    SVEGLIA: (n) => (n > 1 ? `impostato ${n} sveglie` : 'impostato una sveglia'),
+    CANCELLA_SVEGLIA: () => 'cancellato una sveglia',
+    MODIFICA_SVEGLIA: () => 'spostato una sveglia',
+    EVENTO_CALENDARIO: (n) => (n > 1 ? `creato ${n} eventi` : 'creato un evento'),
+    ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
+    IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
+  };
+  function summarizeActivity(types) {
+    const counts = new Map();
+    for (const t of types) counts.set(t, (counts.get(t) || 0) + 1);
+    const parts = [];
+    for (const [t, n] of counts) {
+      const fn = ACTIVITY_VERBS[t];
+      if (fn) parts.push(fn(n));
+    }
+    if (!parts.length) return 'Ragionamento';
+    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : parts[0];
+    return `Ha ${list}`;
+  }
+  function fmtActivityDuration(ms) {
+    const s = Math.max(1, Math.round(ms / 1000));
+    const m = Math.floor(s / 60);
+    if (!m) return `${s} s`;
+    return s % 60 ? `${m} min ${s % 60} s` : `${m} min`;
+  }
+
+  // Riga di attività: la stessa forma sia dentro il blocco del turno sia — per
+  // chi disegna una risposta senza blocco (replay, altre superfici) — fra le
+  // azioni della bolla. Tiene la classe della traccia (#376): non è un bottone
+  // e non deve sembrarlo.
+  function makeActivityRow(rowIcon, text) {
+    const el = document.createElement('div');
+    el.className = 'dash-action-step dash-activity-row';
+    const ic = document.createElement('span');
+    ic.className = 'dash-activity-row-icon';
+    ic.setAttribute('aria-hidden', 'true');
+    ic.textContent = rowIcon || '';
+    const tx = document.createElement('span');
+    tx.textContent = String(text || '').trim();
+    el.append(ic, tx);
+    return el;
+  }
+
+  // Le azioni che si raccontano con una riga (icona + due parole) invece che
+  // con un bottone: sono già eseguite dal main o sono passi intermedi, e
+  // cliccarle non farebbe niente (#376). Una sola tabella, così l'icona di
+  // un'azione sta in un posto solo. Ciò che è cliccabile — un link da aprire,
+  // una conferma da dare, l'esito di un comando — resta un bottone sotto la
+  // risposta e NON passa di qui.
+  const ACTIVITY_ROWS = {
+    TIMER: (a) => {
+      const sec = Number(a.seconds || a.secondi || 0);
+      // #323 — durata umana fedele all'intento: "30 sec", "2 h", "1 h 30 min".
+      const dur = (self.SN_TIME ? self.SN_TIME.fmtDurationLabel(sec) : `${Math.round(sec / 60)} min`);
+      const name = a.label || a.etichetta || '';
+      return { icon: '⏱', text: `Timer avviato · ${name ? `${name} · ` : ''}${dur}` };
+    },
+    SVEGLIA: (a) => {
+      const when = a.time || a.orario || '';
+      const name = a.label || a.etichetta || '';
+      return { icon: '⏰', text: `Sveglia impostata${when ? ` · ${when}` : ''}${name ? ` · ${name}` : ''}` };
+    },
+    // Il main descrive cosa ha tolto o spostato («Sveglia “lezione” 07:55»):
+    // se si può aggiungere una sveglia dalla chat, si deve vedere anche
+    // quando la si toglie.
+    CANCELLA_SVEGLIA: (a) => {
+      const list = (a._output && Array.isArray(a._output.removed)) ? a._output.removed : [];
+      return { icon: '⏰', text: `Cancellata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+    },
+    MODIFICA_SVEGLIA: (a) => {
+      const list = (a._output && Array.isArray(a._output.updated)) ? a._output.updated : [];
+      return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
+    },
+    EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
+    // Impostazione applicata subito (livello 1, es. il tema): prima non
+    // lasciava traccia in chat, come se non fosse successo niente.
+    IMPOSTA_PREFERENZA: (a) => {
+      const k = a.chiave || a.key || '';
+      const v = a.valore ?? a.value;
+      return { icon: '⚙', text: `Impostato · ${k}${v !== undefined && v !== '' ? ` = ${v}` : ''}` };
+    },
+    // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
+    // risultati rientrano nel turno successivo, dove compare la risposta.
+    CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
+    LEGGI_FILE: (a) => {
+      const title = (a._output && a._output.title) || '';
+      return { icon: '📄', text: title ? `Leggo: ${title}` : 'Leggo un file' };
+    },
+    LEGGI_DOCUMENTO: (a) => {
+      const nome = (a._output && a._output.name) || '';
+      return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
+    },
+    LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
+  };
+  function activityRowFor(a) {
+    // Un'azione sospesa in attesa di conferma è un bottone, qualunque sia il tipo.
+    if (!a || a._confirm) return null;
+    const fn = ACTIVITY_ROWS[String(a.type || '').toUpperCase()];
+    return fn ? fn(a) : null;
+  }
+
+  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null } = {}) {
     if (!actions || !actions.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
     let hasAck = false;
     for (const a of actions) {
+      // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
+      // va nella cronologia del blocco, non sotto la risposta. Se è stato
+      // bloccato (terminale spento) resta in vista: è un problema da leggere.
+      if (activity && isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
+        activity.addCommand(a._output);
+        continue;
+      }
+      const row = activityRowFor(a);
+      if (row) {
+        if (activity) activity.addRow(a.type, row.icon, row.text);
+        else wrap.appendChild(makeActivityRow(row.icon, row.text));
+        continue;
+      }
       const btn = renderActionButton(a, { onAck });
       if (btn) wrap.appendChild(btn);
-      if ((String(a.type || '').toUpperCase() === 'TIMER') || (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') || (String(a.type || '').toUpperCase() === 'SVEGLIA')) {
-        hasAck = true;
-      }
+      if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
     }
-    // Per i comandi (TIMER/SVEGLIA/SALVA_APPUNTO) le azioni sono già eseguite
-    // server-side: aggiungiamo un tasto ✓ che torna alla dashboard (spec).
+    if (!wrap.childElementCount && !(hasAck && onAck)) return;
+    // Per l'appunto salvato (già eseguito server-side) aggiungiamo un tasto ✓
+    // che torna alla dashboard (spec). Timer e sveglie non lo hanno più: la
+    // loro riga nel blocco di attività dice già tutto.
     if (hasAck && onAck) {
       const ok = document.createElement('button');
       ok.type = 'button';
@@ -1455,13 +1647,15 @@
   // utente" è un nudge scritto da noi, non una richiesta reale. Il main lo usa
   // per non trattarlo come parole dell'utente (#360: una segnalazione proposta
   // da Filo non deve citare un nudge interno).
-  async function runFiloTurn({ userMessage, images = [], internal = false }) {
-    // Bolla Filo "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
-    const pending = appendThinking();
+  async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
+    // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
+    // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
+    const pending = activity || createActivity();
+    const ownsActivity = !activity;
     // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
     // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
     // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
-    // restano le frasi indicative.
+    // il blocco resta in attesa finché non parte il testo.
     const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let offReasoning = null;
     if (window.filo?.onReasoning) {
@@ -1474,8 +1668,8 @@
     // campo "text" dal JSON di risposta e ci pusha i delta (o un reset dopo un
     // fallback provider). La bolla NON si crea finché non arriva il PRIMO
     // carattere: una risposta di sola azione (apri un link, testo vuoto) non
-    // lascia una bolla vuota che poi si riempie. Quando il testo inizia,
-    // l'indicatore di ragionamento si ritira: i due non si accavallano.
+    // lascia una bolla vuota che poi si riempie. Quando il testo inizia, il
+    // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
     let streamBubble = null;
     let streamedText = '';
     const followBottomIfNear = () => {
@@ -1494,7 +1688,7 @@
         }
         if (!data.delta) return;
         if (!streamBubble) {
-          pending.remove(); // il ragionamento lascia il posto alla risposta
+          pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
           streamBubble = document.createElement('div');
           streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
           bubblesEl.appendChild(streamBubble);
@@ -1519,8 +1713,11 @@
 
     if (offReasoning) { try { offReasoning(); } catch (_) {} }
     if (offAnswer) { try { offAnswer(); } catch (_) {} }
-    pending.remove();
     if (!r?.ok) {
+      // Il ragionamento già arrivato resta leggibile anche sotto un errore:
+      // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
+      pending.endTurn();
+      if (ownsActivity) pending.finish();
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
@@ -1570,9 +1767,19 @@
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
-      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true });
-      threadHistory.push({ role: 'filo', text: r.text || '', actions: r.actions || [] });
+      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending });
+      // Il ragionamento del turno entra nello storico del thread insieme al
+      // messaggio: non torna al modello (non è nel prompt), resta con la
+      // conversazione.
+      const turn = pending.endTurn();
+      if (ownsActivity) pending.finish();
+      const entry = { role: 'filo', text: r.text || '', actions: r.actions || [] };
+      if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
+      threadHistory.push(entry);
       applyCommandCwd(r.actions);
+      // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
+      // il turno non era l'ultimo.
+      r._bubble = filoBubble;
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     return r;
@@ -1610,7 +1817,10 @@
   // di invio. Condiviso tra il primo invio e il "Riprova" della bolla d'errore:
   // riprovare deve comportarsi ESATTAMENTE come inviare.
   async function runTurnAndContinue(args) {
-    let r = await runFiloTurn(args);
+    // Un blocco di attività per tutta la sequenza (#521): i turni automatici
+    // sono passi dello stesso lavoro, non risposte diverse.
+    const activity = createActivity();
+    let r = await runFiloTurn({ ...args, activity });
 
     // Esecuzione autonoma in sequenza: finché Filo ha appena eseguito un comando
     // (e non c'è una conferma in sospeso), gli rimostriamo l'output e lo
@@ -1620,13 +1830,20 @@
     let steps = 0;
     while (r?.ok && shouldAutoContinue(r.actions) && steps < MAX_AUTO_STEPS) {
       steps += 1;
+      // Il turno non era l'ultimo: il suo testo («Provo subito…») è un commento
+      // a metà lavoro e finisce nella cronologia del blocco, non in una bolla.
+      // Se nella bolla c'è qualcosa da cliccare (un link aperto, una conferma)
+      // resta dov'è: non si nasconde ciò che l'utente deve poter usare.
+      const bubble = r._bubble;
+      if (bubble && !bubble.querySelector('.dash-bubble-actions')) activity.absorbBubble(bubble);
       // Il nudge entra nello storico come turno utente "silenzioso" (niente
       // bolla): dà al modello il contesto per il passo successivo. Il testo
       // dipende da cosa Filo ha appena fatto (comando vs lookup di capacità).
       const nudge = autoContinueNudge(r.actions);
       threadHistory.push({ role: 'user', text: nudge });
-      r = await runFiloTurn({ userMessage: nudge, internal: true });
+      r = await runFiloTurn({ userMessage: nudge, internal: true, activity });
     }
+    activity.finish({ failed: !r?.ok });
 
     sending = false;
     sendBtn.disabled = false;

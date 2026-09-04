@@ -1122,7 +1122,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const label = String(action.label || action.etichetta || 'Timer');
         const entry = await FiloMem.addTimer({ label, seconds });
         if (entry) broadcastLiveUpdate();
-        return { executed: !!entry, kept: false };
+        return { executed: !!entry, kept: !!entry };
       }
       case 'SVEGLIA': {
         // #322 — prima qui c'era solo una notifica statica ("Sveglia: 07:00")
@@ -1135,7 +1135,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
         });
         if (entry) broadcastLiveUpdate();
-        return { executed: !!entry, kept: false };
+        return { executed: !!entry, kept: !!entry };
       }
       case 'CANCELLA_SVEGLIA': {
         // Prima non esisteva: dalla chat si potevano solo CREARE sveglie e
@@ -1265,7 +1265,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
         await applySettingsUpdate(built.partial);
-        return { executed: true, kept: false };
+        return { executed: true, kept: true };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su

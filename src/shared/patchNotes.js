@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.217', date: '2026-09-04',
+      features: [
+        'Nella chat della nuova scheda, sopra ogni risposta, una riga discreta dice cosa Filo sta facendo («Sta ragionando · …», «Cerco sul web: …») e, quando ha finito, cosa ha fatto («Ha cercato sul web e letto un documento · 40 s»). Un click la apre e mostra tutto nell\'ordine: il ragionamento del modello per intero, le azioni compiute (timer, sveglie, ricerche, file letti) come righe con un\'icona, gli esiti dei comandi. Anche i lavori in più passi restano una riga sola e una risposta sola. Le frasi di riempimento inventate («Consulto la memoria…») non ci sono più.',
+      ],
+      fixes: [
+        'In una conversazione lunga il campo dove scrivi non finisce più tagliato sotto il bordo della finestra, anche quando lo allarghi su più righe o alleghi immagini.',
+      ],
+    },
+    {
       version: '0.2.214', date: '2026-09-04',
       features: [
         'Filo si scarica anche per Mac: un solo file, buono sia sui Mac Intel sia su quelli con chip Apple. La prima volta macOS rifiuta di aprirlo, perché Filo non è ancora registrato presso Apple: dopo il rifiuto apri Impostazioni di sistema → Privacy e sicurezza, scorri in fondo e premi «Apri comunque». Da lì in poi Filo parte come qualsiasi altra app.',
