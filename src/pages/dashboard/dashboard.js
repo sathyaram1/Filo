@@ -1622,10 +1622,11 @@
   // utente" è un nudge scritto da noi, non una richiesta reale. Il main lo usa
   // per non trattarlo come parole dell'utente (#360: una segnalazione proposta
   // da Filo non deve citare un nudge interno).
-  async function runFiloTurn({ userMessage, images = [], internal = false }) {
-    // Blocco di attività del turno (#521): attesa, poi ragionamento in diretta,
-    // poi le righe delle azioni. Resta sopra la risposta.
-    const pending = createActivity();
+  async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
+    // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
+    // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
+    const pending = activity || createActivity();
+    const ownsActivity = !activity;
     // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
     // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
     // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
