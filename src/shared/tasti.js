@@ -77,7 +77,8 @@
     if (!testo || !suMac(esplicita)) return testo;
 
     const parti = pezzi(testo);
-    if (parti.length < 2) return testo; // un tasto solo (Esc, F5): uguale ovunque
+    // Il nome del modificatore da solo ("Ctrl", in una frase che lo cita).
+    if (parti.length === 1) return CTRL.test(parti[0].toLowerCase()) ? 'Cmd' : testo;
 
     const tastoFinale = parti[parti.length - 1];
     const modificatori = parti.slice(0, -1);
