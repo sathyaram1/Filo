@@ -76,6 +76,11 @@ vero su "qualcuno ci sta lavorando ORA").
   (riallineamento: main è avanzato e il merge non passa più da solo — non è una
   bocciatura di qualità, il contatore M non si muove; il ramo viene ribasato e
   ripassa verifica e sicurezza sul contenuto nuovo).
+- `design` —fusione bloccata da L5, approvata dall'owner e finita in conflitto→
+  `revision_capability` in DUE passi: la riapertura `design → todo` a nome
+  dell'owner (il click di approvazione è la sua decisione) e il rientro
+  `todo → revision_capability` della routine (#523: senza il primo passo il
+  rientro veniva rifiutato e la pratica restava ferma nei Ricevuti).
 - `done` —owner verifica→ `archived`; —owner "manca qualcosa"→ `todo` (riapertura).
 - `archived` —owner ripristina→ `todo`.
 - `attack_confirmed`/`spam_confirmed` —owner "era legittimo"→ `todo`.
