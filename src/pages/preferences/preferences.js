@@ -771,6 +771,7 @@
 
     const onbBtn = $('restartOnboarding');
     if (onbBtn) onbBtn.addEventListener('click', restartOnboarding);
+    loadOnboardingArchive();
 
     // Con tema "Come il sistema", il tema risolto può cambiare quando l'OS passa
     // chiaro↔scuro: ridisegna le righe così i default mostrati restano corretti.
