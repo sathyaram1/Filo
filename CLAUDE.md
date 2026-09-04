@@ -15,9 +15,16 @@ ruolo che ti viene consegnato.
 
 ## Letture obbligatorie prima di codice o revisioni
 
-- **`filo_filosofia.txt`** e **`filo_design.txt`** (root): ENTRAMBI, sempre.
+- **`filo_filosofia.txt`** e **`filo_design.txt`** sono già qui sotto, importati
+  per intero: NON rileggerli con uno strumento. Stanno nel prompt di sistema di
+  proposito: quel prefisso è identico per ogni agente che lavora su Filo e la
+  cache dei prompt lo serve a un decimo del prezzo, mentre una lettura si paga
+  piena e poi si ripaga a ogni turno per il resto della sessione.
 - **`PATTERNS.md`** prima di toccare la UI o prendere decisioni di design.
   Se stabilisci un pattern nuovo, aggiornalo.
+
+@filo_filosofia.txt
+@filo_design.txt
 
 ## Regole del repo
 

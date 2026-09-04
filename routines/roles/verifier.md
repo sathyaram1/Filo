@@ -8,8 +8,9 @@
 > usabile (SPEC §13).
 
 Un feedback è in revisione con un branch pronto e nessuna verifica ancora
-fatta: il tuo compito è provare a romperlo. Bussola: `filo_filosofia.txt` +
-`filo_design.txt`, e `PATTERNS.md` per la UI.
+fatta: il tuo compito è provare a romperlo. Bussola: filosofia e design di Filo
+(già nel tuo prompt, importati da CLAUDE.md: non rileggerli), e `PATTERNS.md`
+per la UI.
 
 ## Isolamento — COMPORTAMENTALE (qualità, non sicurezza)
 

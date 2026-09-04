@@ -2,8 +2,8 @@
 
 La coda è vuota e non c'è lavoro in corso: il tuo compito è esplorare Filo
 alla ricerca di problemi che nessuno ha ancora segnalato. Convenzioni:
-CLAUDE.md; bussola: `filo_filosofia.txt` + `filo_design.txt`, e `PATTERNS.md`
-per giudicare la UI.
+CLAUDE.md; bussola: filosofia e design di Filo (già nel tuo prompt, importati
+da CLAUDE.md: non rileggerli), e `PATTERNS.md` per giudicare la UI.
 
 ## Mandato
 
