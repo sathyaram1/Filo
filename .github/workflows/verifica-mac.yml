@@ -33,6 +33,12 @@ on:
       - '.github/workflows/verifica-mac.yml'
       - 'scripts/after-pack-mac.js'
       - 'assets/icons/icon-1024.png'
+      # Il primo passo di questo lavoro E' la sentinella: se cambia lei, cambia
+      # cosa questo lavoro controlla, e va rifatto girare.
+      - 'tests/unit/macSupport.test.mjs'
+      # Il foglio che finisce dentro al disco per Mac: se sparisce o cambia
+      # nome, la costruzione del .dmg si ferma qui invece che in pubblicazione.
+      - 'build/**'
       # La ricetta del pacchetto sta qui dentro (build.mac). Il commit che alza
       # il numero di versione porta `[skip ci]` e non fa scattare niente: qui
       # arrivano solo le modifiche vere alla ricetta o alle dipendenze, che
