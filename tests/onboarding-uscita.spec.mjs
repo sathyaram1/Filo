@@ -129,12 +129,15 @@ test('«basta così» chiude anche se il modello non risponde mai', async ({ app
   await page.locator('#input').fill('basta così');
   await page.locator('#sendBtn').click();
 
-  // Il congedo è un testo fisso: arriva comunque, senza chiedere niente a nessuno.
-  await expect(page.locator('.dash-bubble-filo').last())
-    .toContainText('chiudo qui', { timeout: 20_000 });
-  // …e l'utente arriva davvero alla home, che è il punto.
+  // L'utente arriva davvero alla home: è il punto. Prima, col provider giù,
+  // restava dentro l'accoglienza col solo "Riprova" davanti.
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 30_000 });
-  expect((await onbState(app)).done).toBe(true);
+  const s = await onbState(app);
+  expect(s.done).toBe(true);
+  // Il congedo è un testo fisso, scritto a mano: c'è comunque, senza aver
+  // chiesto niente a nessuno. (A schermo dura quanto ci mette la home ad
+  // arrivare — qui, con tutto giù, un istante.)
+  expect(s.thread[s.thread.length - 1].text).toContain('chiudo qui');
   // Nessuna chiamata al modello per chiudere: la parola la riconosce l'app.
   expect(await chatCalls(app)).toBe(primaDelleChiamate);
 
