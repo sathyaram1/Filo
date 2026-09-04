@@ -274,9 +274,13 @@ module.exports = function setupWheelZoom(webFrame, opts) {
         // Mac il suo zoom muore in silenzio: là questa è l'unica strada, perché
         // il tasto se lo prende la barra dei menu prima che arrivi alla pagina.
         // Su Windows e Linux il keydown della pagina arriva e basta a sé.
+        //
+        // Il verso sta nel NOME dell'evento, non in `detail`: fra il mondo
+        // isolato del preload e quello della pagina un `detail` non passa.
         if (pageHandlesZoom()) {
           try {
-            document.dispatchEvent(new CustomEvent('filo:zoom', { detail: { dir } }));
+            const nomi = { in: 'filo:zoom-in', out: 'filo:zoom-out', reset: 'filo:zoom-reset' };
+            if (nomi[dir]) document.dispatchEvent(new Event(nomi[dir]));
           } catch (_) {}
           return;
         }
