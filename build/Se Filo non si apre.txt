@@ -2,19 +2,19 @@ SE FILO NON SI APRE
 
 La prima volta macOS rifiuta di aprire Filo. Non è un errore, e non è un
 problema del file che hai appena scaricato: Filo non è ancora registrato
-presso Apple, e macOS per prudenza blocca tutto quello che non conosce.
+presso Apple, e macOS blocca per prudenza tutto quello che non conosce.
 
 Si sblocca una volta sola, così:
 
-  1. trascina Filo nella cartella Applicazioni (è qui accanto);
-  2. aprilo con un doppio clic e lascia che macOS lo rifiuti —
-     serve che il tentativo ci sia stato;
-  3. apri Impostazioni di sistema → Privacy e sicurezza;
-  4. scorri fino in fondo: c'è una riga su Filo con il pulsante
-     «Apri comunque». Premilo e conferma.
+  1. trascina Filo nella cartella Applicazioni, qui accanto;
+  2. aprilo con un doppio clic. macOS lo rifiuta, ed è quello che deve
+     succedere: senza il tentativo, il passo 4 non compare;
+  3. apri Impostazioni di sistema, poi Privacy e sicurezza;
+  4. scorri fino in fondo. C'è una riga su Filo con il pulsante
+     «Apri comunque»: premilo e conferma.
 
 Da qui in poi Filo si apre con un doppio clic, come qualsiasi altra app.
 
-(Il clic destro seguito da «Apri» non basta più: Apple ha tolto quella
-scorciatoia da macOS Sequoia in avanti. La strada qui sopra vale su tutte
-le versioni.)
+Il clic destro seguito da «Apri» non basta più. Apple ha tolto quella
+scorciatoia da macOS Sequoia in avanti; la strada qui sopra vale su tutte
+le versioni.
