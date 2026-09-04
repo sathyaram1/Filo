@@ -1,0 +1,58 @@
+// Firma "alla buona" l'app per Mac, subito dopo che è stata impacchettata.
+//
+// PERCHÉ ESISTE
+//   Filo non ha (ancora) un certificato Apple: non possiamo firmare l'app con
+//   un'identità vera. Su Mac con processore Intel un'app non firmata parte lo
+//   stesso — con l'avviso del sistema — mentre sui Mac con chip Apple NON parte
+//   proprio: il sistema pretende almeno una firma "locale", fatta dalla
+//   macchina che costruisce e valida solo per sé stessa. Senza, chi ha un Mac
+//   recente scarica un'app che si rifiuta di aprirsi, e non capisce perché.
+//
+//   Lo strumento di impacchettamento, quando non trova un certificato, salta la
+//   firma del tutto: non ne mette nemmeno una locale. Questo passo la aggiunge.
+//   NON toglie l'avviso al primo avvio (per quello serve un certificato Apple e
+//   la registrazione dell'app presso Apple): rende solo l'app avviabile ovunque.
+//
+//   Quando arriverà un certificato vero, questo passo va tolto e sostituito con
+//   la firma+registrazione ufficiale.
+
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+
+// Il pacchetto per Mac è UNO solo e vale su entrambi i processori: viene
+// costruito due volte (una copia Intel, una Apple Silicon) e poi le due copie
+// vengono fuse in una. Questo passo viene chiamato TRE volte: dopo ognuna delle
+// due copie, e infine sul risultato fuso.
+//
+// Le prime due NON vanno firmate. La fusione confronta uno per uno i file non
+// eseguibili delle due copie e pretende che siano identici: una firma li rende
+// diversi (contiene le impronte dei pezzi, che per Intel e Apple Silicon non
+// coincidono) e la costruzione si ferma con "Expected all non-binary files to
+// have identical SHAs". Si firma solo alla fine, il pacchetto fuso.
+//
+// Le due copie intermedie stanno in cartelle che lo strumento nomina lui, con
+// questo suffisso: è il modo per riconoscerle senza dipendere dai suoi numeri
+// interni. Una build per un solo processore non passa di qui e viene firmata
+// normalmente.
+const COPIA_INTERMEDIA = /-(?:x64|arm64)-temp$/;
+
+exports.default = async function afterPack(context) {
+  if (context.electronPlatformName !== 'darwin') return;
+  if (COPIA_INTERMEDIA.test(context.appOutDir)) {
+    console.log(`[after-pack-mac] copia intermedia, firma rimandata: ${context.appOutDir}`);
+    return;
+  }
+
+  const appName = context.packager.appInfo.productFilename;
+  const appPath = path.join(context.appOutDir, `${appName}.app`);
+
+  // --force: sovrascrive un'eventuale firma parziale già presente.
+  // --deep: firma anche i pezzi annidati (helper, framework).
+  // --sign -: è la firma locale, senza certificato.
+  execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'inherit' });
+
+  // Se la firma non regge, l'app non parte sui Mac con chip Apple e ce ne
+  // accorgeremmo solo dal tester. Verifichiamo qui, dove il rosso costa poco.
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'inherit' });
+  console.log(`[after-pack-mac] firma locale applicata e verificata su ${appPath}`);
+};
