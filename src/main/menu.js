@@ -189,7 +189,7 @@ function template() {
     submenu: [
       { role: 'about', label: 'Informazioni su Filo' },
       { type: 'separator' },
-      { label: 'Preferenze…', accelerator: 'CommandOrControl+,', click: () => apriPagina('filo://preferences/preferences.html') },
+      { label: 'Preferenze', click: () => apriPagina('filo://preferences/preferences.html') },
       { label: 'Opzioni', click: () => apriPagina('filo://options/options.html') },
       { type: 'separator' },
       ...(MAC ? [
