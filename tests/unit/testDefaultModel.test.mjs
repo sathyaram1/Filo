@@ -22,6 +22,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Moduli condivisi reali (IIFE su globalThis): costanti e messaggi.
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(__dirname, '..', 'fixtures', 'testModels.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'messages.js'));
 // Come nel main (loader.js): serve alla sostituzione a pesi aperti per sapere
 // se il sostituto fa il mestiere della funzione.
@@ -245,17 +247,17 @@ test('interruttore acceso: nemmeno la riga scritta a mano dall\'amministratore p
 test('interruttore acceso: la prova della chiave parte sul sostituto a pesi aperti', async () => {
   const C = globalThis.SN_CONST;
   state.effective = {
-    modelRegistry: C.DEFAULT_MODEL_REGISTRY,
-    models: { [C.ACTIONS.PROVIDER_TEST]: C.DEFAULT_MODELS[C.ACTIONS.PROVIDER_TEST] },
+    modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    models: { [C.ACTIONS.PROVIDER_TEST]: globalThis.SN_TEST_MODELS.models[C.ACTIONS.PROVIDER_TEST] },
     apiKeys: {},
     openWeightsOnly: true,
   };
   const res = await testProvider({ provider: 'openrouter', apiKey: 'sk-or-utente' });
   assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
   assert.equal(state.calls.length, 1);
-  const primo = C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.PROVIDER_TEST])[0];
-  assert.ok(C.isOpenWeightsRef(primo, C.DEFAULT_MODEL_REGISTRY), 'il modello della prova è a pesi aperti');
-  assert.equal(state.calls[0].model, C.DEFAULT_MODEL_REGISTRY[primo].model,
+  const primo = C.parseModelRefs(globalThis.SN_TEST_MODELS.models[C.ACTIONS.PROVIDER_TEST])[0];
+  assert.ok(C.isOpenWeightsRef(primo, globalThis.SN_TEST_MODELS.registry), 'il modello della prova è a pesi aperti');
+  assert.equal(state.calls[0].model, globalThis.SN_TEST_MODELS.registry[primo].model,
     'la prova doveva usare un modello a pesi aperti, non uno proprietario');
 });
 

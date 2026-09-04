@@ -132,7 +132,7 @@ async function refreshIfStale(maxAgeMs = 5 * 60 * 1000) {
 // configurazione nota senza che l'app ne abbia una.
 function buildModels() {
   const C = globalThis.SN_CONST || {};
-  const T = process.env.NODE_ENV === 'test' && globalThis.SN_TEST_MODELS;
+  const T = globalThis.SN_TEST_MODELS; // presente solo nei test (loader.js)
   return T ? { registry: T.registry, models: T.models } : { registry: C.DEFAULT_MODEL_REGISTRY || {}, models: C.DEFAULT_MODELS || {} };
 }
 

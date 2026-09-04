@@ -19,12 +19,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(ROOT, 'tests', 'fixtures', 'testModels.js'));
 // Le capacità dei modelli servono alla sostituzione automatica: senza, un
 // modello che macina solo testo finirebbe sulla dettatura.
 require(join(ROOT, 'src', 'shared', 'modelCaps.js'));
 const C = globalThis.SN_CONST;
 const A = C.ACTIONS;
-const REG = C.DEFAULT_MODEL_REGISTRY;
+const REG = globalThis.SN_TEST_MODELS.registry;
 
 test('i pesi aperti si riconoscono dal NOME del modello, non dal fornitore nell\'id', () => {
   assert.equal(C.isOpenWeightsModelId('google/gemma-4-31b-it'), true);
@@ -96,7 +98,7 @@ test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i 
   // funzione che fallisce con un errore qualunque — un ripiego silenzioso come
   // gli altri, solo con un finale diverso. Deve fermarsi e dirlo.
   const dettatura = C.applyOpenWeightsPolicy(
-    C.parseModelRefs(C.DEFAULT_MODELS[A.TRANSCRIBE_AUDIO]), REG, A.TRANSCRIBE_AUDIO,
+    C.parseModelRefs(globalThis.SN_TEST_MODELS.models[A.TRANSCRIBE_AUDIO]), REG, A.TRANSCRIBE_AUDIO,
   );
   assert.ok(dettatura.refs.length, 'la dettatura parte già da modelli a pesi aperti: resta viva');
   assert.deepEqual(dettatura.substituted, [], 'niente da sostituire: erano già aperti');
@@ -110,7 +112,7 @@ test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i 
   // Le funzioni che leggono immagini invece continuano: i sostituti dichiarano
   // di saperlo fare, quindi fermarle sarebbe un danno gratuito.
   const immagini = C.applyOpenWeightsPolicy(
-    C.parseModelRefs(C.DEFAULT_MODELS[A.DESCRIBE_IMAGE]), REG, A.DESCRIBE_IMAGE,
+    C.parseModelRefs(globalThis.SN_TEST_MODELS.models[A.DESCRIBE_IMAGE]), REG, A.DESCRIBE_IMAGE,
   );
   assert.ok(immagini.refs.length, 'la descrizione immagini ha un equivalente aperto e deve restare viva');
 
@@ -138,7 +140,7 @@ test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i 
 
 test('NESSUNA funzione predefinita resta con un modello proprietario a interruttore acceso', () => {
   const colpevoli = [];
-  for (const [action, value] of Object.entries(C.DEFAULT_MODELS)) {
+  for (const [action, value] of Object.entries(globalThis.SN_TEST_MODELS.models)) {
     const res = C.applyOpenWeightsPolicy(C.parseModelRefs(value), REG);
     for (const ref of res.refs) {
       if (!C.isOpenWeightsRef(ref, REG)) colpevoli.push(`${action} → ${ref}`);
@@ -149,7 +151,7 @@ test('NESSUNA funzione predefinita resta con un modello proprietario a interrutt
 });
 
 test('la catena di tentativi passa solo dal router, con modelli a pesi aperti', () => {
-  const refs = C.applyOpenWeightsPolicy(C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.EXPLAIN_DEEP]), REG).refs;
+  const refs = C.applyOpenWeightsPolicy(C.parseModelRefs(globalThis.SN_TEST_MODELS.models[C.ACTIONS.EXPLAIN_DEEP]), REG).refs;
   const attempts = C.buildModelAttempts(refs, REG, ['openrouter'], { openrouter: 'k' });
   assert.ok(attempts.length, 'deve restare almeno un tentativo, altrimenti la funzione muore');
   assert.deepEqual([...new Set(attempts.map((a) => a.provider))], ['openrouter']);
@@ -173,7 +175,7 @@ test('a interruttore acceso Anthropic entra fra i fornitori esclusi', () => {
 });
 
 test('l\'effetto dell\'interruttore è dichiarabile PRIMA di accenderlo', () => {
-  const impact = C.openWeightsImpact(C.DEFAULT_MODELS, REG);
+  const impact = C.openWeightsImpact(globalThis.SN_TEST_MODELS.models, REG);
   const cambiano = impact.substituted.map((s) => s.action);
   const ferme = impact.unavailable.map((u) => u.action);
 

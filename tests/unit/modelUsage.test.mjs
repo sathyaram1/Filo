@@ -28,6 +28,8 @@ const ROOT = join(__dirname, '..', '..');
 const SHARED = join(ROOT, 'src', 'shared');
 
 require(join(SHARED, 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(__dirname, '..', 'fixtures', 'testModels.js'));
 require(join(SHARED, 'i18n.js'));
 require(join(SHARED, 'modelCaps.js'));
 require(join(SHARED, 'modelUsage.js'));
@@ -81,7 +83,7 @@ test('ogni funzione dell\'app è censita, e il censimento non inventa funzioni',
 });
 
 test('ogni funzione censita ha un modello di default', () => {
-  const senza = Usage.userActions().filter((a) => !C.DEFAULT_MODELS[a]);
+  const senza = Usage.userActions().filter((a) => !globalThis.SN_TEST_MODELS.models[a]);
   assert.deepEqual(senza, [], `funzioni senza modello di partenza: ${senza.join(', ')}`);
 });
 
@@ -124,8 +126,8 @@ test('ogni funzione della griglia ha un\'etichetta leggibile (non il codice inte
 test('l\'indicizzazione dell\'archivio accetta solo modelli che producono vettori', () => {
   const Caps = globalThis.SN_MODEL_CAPS;
   const A = C.ACTIONS;
-  const reg = C.DEFAULT_MODEL_REGISTRY;
-  const embedRef = C.parseModelRefs(C.DEFAULT_MODELS[A.ARCHIVE_EMBED])[0];
+  const reg = globalThis.SN_TEST_MODELS.registry;
+  const embedRef = C.parseModelRefs(globalThis.SN_TEST_MODELS.models[A.ARCHIVE_EMBED])[0];
   const embedEntry = reg[embedRef];
   assert.ok(embedEntry, `il modello di partenza dell'indicizzazione (${embedRef}) deve esistere nel registro`);
 
