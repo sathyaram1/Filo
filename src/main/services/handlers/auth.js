@@ -86,6 +86,9 @@ async function getPrivateKey() {
 // la revisione dell'owner non deve essere leggibile da chi ha mandato il feedback.
 const TEXT_FIELDS_TO_DECRYPT = ['text', 'url', 'name', 'title', 'notes', 'reviewComment', 'reviewDecision', 'reviewedAt', 'status', 'clientId'];
 const PLACEHOLDER_NO_KEY = '[cifrato — chiave privata non configurata]';
+// Quanti feedback si decifrano insieme nel batch: il pool di thread di Node ha
+// 4 posti di default, oltre non si guadagna.
+const DECRYPT_CONCURRENCY = 4;
 
 // S1.F2.4: il campo `pipeline` (scritto dal backend di sicurezza sul documento
 // PUBBLICO) è cifrato come un'unica stringa FENC1: che racchiude l'INTERO oggetto
@@ -107,11 +110,14 @@ async function decryptPipelineField(out, C, priv) {
   }
 }
 
-async function decryptFeedbackObject(fields) {
+// `privKey` (opzionale): la chiave già letta dal chiamante. Il batch della
+// dashboard la passa una volta per tutti i documenti — rileggerla dal disco a
+// ogni feedback (500 volte per una lista) era solo tempo perso.
+async function decryptFeedbackObject(fields, privKey) {
   const C = globalThis.SN_FEEDBACK_CRYPTO;
   if (!C) return fields; // modulo non caricato: passthrough
 
-  const priv = await getPrivateKey();
+  const priv = privKey !== undefined ? privKey : await getPrivateKey();
   const out = { ...fields };
   for (const f of TEXT_FIELDS_TO_DECRYPT) {
     const v = out[f];
@@ -258,12 +264,21 @@ module.exports = function register(on, ctx) {
       if (!auth.isAdmin()) {
         return { ok: false, error: 'Operazione riservata agli amministratori.' };
       }
-      // Batch: array di oggetti feedback → decifra ciascuno in sequenza.
+      // Batch: array di oggetti feedback. La chiave si legge UNA volta e i
+      // documenti si decifrano a gruppi in parallelo: la crittografia gira nel
+      // pool di thread di Node, quindi in sequenza si usava un solo core e
+      // 500 feedback costavano diversi secondi di attesa alla dashboard.
       if (Array.isArray(msg.list)) {
-        const list = [];
-        for (const item of msg.list) {
-          list.push(await decryptFeedbackObject(item || {}));
-        }
+        const priv = await getPrivateKey();
+        const list = new Array(msg.list.length);
+        let next = 0;
+        const worker = async () => {
+          while (next < msg.list.length) {
+            const i = next++;
+            list[i] = await decryptFeedbackObject(msg.list[i] || {}, priv);
+          }
+        };
+        await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
         return { ok: true, list };
       }
       // Singolo (retrocompat).

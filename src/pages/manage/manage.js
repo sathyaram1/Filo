@@ -147,6 +147,8 @@
   let starredOnly   = false;    // filtro ⭐ della tab Archiviati (DB2)
   let confirmedOnly = false;    // filtro "Bloccati confermati" (attack/spam confermati)
   let releasedVersion = '';     // versione dell'app in esecuzione = ultima rilasciata (DB3)
+  let firstListPromise = null;  // prima lettura della lista, avviata da init PRIMA del resto
+  let testDataInjected = false; // uno spec ha iniettato la lista: il caricamento vero non la tocca più
   // Modalità automatica: agisce UNA volta al momento del giudizio (lato
   // pipeline: sicuro+ON → todo, sicuro+OFF → aligned). NON è più una lente
   // sulle liste: le tab derivano solo dallo status (macchina a stati).
@@ -1966,6 +1968,8 @@
     if (mgUserNote) {
       mgUserNote.hidden = !isAdmin;
       mgUserNoteText.value = String(fb.userNote || '');
+      // Il valore con cui la riga è stata riempita: una bozza è ciò che differisce.
+      mgUserNoteText.dataset.saved = mgUserNoteText.value;
       userNoteToccata = false;
       // Il salvataggio di un ALTRO feedback può essere ancora in volo: il
       // bottone è uno solo, e lasciarlo spento qui bloccherebbe una scrittura
@@ -2855,14 +2859,26 @@
         if (r && r.current) releasedVersion = r.current;
       } catch (_) { /* gate inattivo: senza versione, done→Risolti come prima */ }
     }
+    if (testDataInjected) return;
 
     try {
       // Il tetto viene dal modulo condiviso: `loadHitCap()` confronta contro
       // QUELLO, e due numeri scritti a mano prima o poi divergono.
-      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE });
+      // La prima lettura parte all'apertura della pagina (init), PRIMA delle
+      // altre letture di avvio: qui la si aspetta soltanto. Le volte dopo
+      // (ricaricamento dopo un errore) si legge da capo.
+      const pending = firstListPromise;
+      firstListPromise = null;
+      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE }));
+      // Nel frattempo uno spec ha iniettato dati finti? Quelli vincono: la
+      // lista vera arrivata dopo non li sovrascrive (era una gara persa a caso,
+      // e più il caricamento è veloce più spesso la si perdeva).
+      if (testDataInjected) return;
+      allFeedbacks = fresh;
       dataLoaded = true;
       loadFailed = false;
     } catch (err) {
+      if (testDataInjected) return;
       // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
       // una scheda rirende il riquadro, e senza questo flag ci scriverebbe
       // "Nessun feedback in coda." — cioè una risposta al posto di un guasto.
@@ -2880,19 +2896,151 @@
     if (isAdmin && allFeedbacks.length > 0) {
       try {
         const r = await sendToMain({ type: 'feedback_decrypt_fields', list: allFeedbacks });
+        if (testDataInjected) return;
         if (r && r.ok && Array.isArray(r.list)) allFeedbacks = r.list;
       } catch (_) { /* fallback: render con valori cifrati */ }
     }
+    if (testDataInjected) return;
 
-    // Indice per mittente
+    reindexByClient();
+    renderList();
+    liveLastAt = Date.now();
+  }
+
+  // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
+  // caricamento e a ogni giro di aggiornamento.
+  function reindexByClient() {
     allByClient = {};
     for (const fb of allFeedbacks) {
       const c = fb.clientId || '__anon__';
       if (!allByClient[c]) allByClient[c] = [];
       allByClient[c].push(fb);
     }
+  }
 
-    renderList();
+  // ── Aggiornamento continuo ────────────────────────────────────────────────
+  // La dashboard resta al passo da sola: a ogni giro chiede a Firestore le sole
+  // versioni dei feedback (id + ultima scrittura, pochi byte), riscarica i soli
+  // documenti cambiati o nuovi, li decifra e li fonde nella lista. Niente
+  // ricaricamento della pagina, niente riscaricamento dei 5 MB della lista.
+  // Il confronto e la fusione sono logica pura in SN_FEEDBACK_LIVE.
+  const LIVE = window.SN_FEEDBACK_LIVE;
+  // Sorgenti sostituibili dagli spec (che non hanno Firestore).
+  const liveSources = {
+    listVersions: (o) => FB.listVersions(o),
+    getMany: (ids) => FB.getMany(ids),
+  };
+  let liveEnabled = false;
+  let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo
+  let liveTimer   = null;
+  let liveTick    = null;   // promessa del giro in corso: uno alla volta
+  let liveLastAt  = 0;      // quando la lista è stata allineata l'ultima volta
+
+  // L'owner sta scrivendo nel pannello (commento, risposta, nota)? Allora il
+  // pannello non si ridisegna sotto le sue dita: i dati si fondono lo stesso e
+  // il pannello si aggiorna al giro dopo, o quando riapre la scheda.
+  function detailBeingEdited() {
+    if (!mgDetail) return false;
+    const el = document.activeElement;
+    if (el && mgDetail.contains(el)) {
+      const tag = String(el.tagName || '').toLowerCase();
+      if (tag === 'textarea' || tag === 'input' || tag === 'select' || el.isContentEditable) return true;
+    }
+    // Una bozza lasciata in una casella (cursore altrove, non ancora inviata)
+    // vale quanto il cursore dentro: ridisegnare la butterebbe via.
+    for (const box of mgDetail.querySelectorAll('textarea')) {
+      if (!box.hidden && box.offsetParent !== null && String(box.value || '').trim()) return true;
+    }
+    // La riga "frase per chi ha segnalato" parte già piena col valore salvato:
+    // è una bozza solo se differisce da quello.
+    if (mgUserNote && !mgUserNote.hidden && mgUserNoteText) {
+      if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
+    }
+    return false;
+  }
+
+  // La scheda aperta non è più in pagina: il pannello non può mostrare un
+  // feedback che non c'è. Si chiude (senza toccare una bozza in corso: quella
+  // resta finché l'owner non la svuota, e al giro dopo si chiude).
+  function closeDetailIfGone() {
+    if (!selectedId || allFeedbacks.some((f) => f._id === selectedId)) return false;
+    if (detailBeingEdited()) return true;
+    selectedId = null;
+    mgDetail.hidden = true;
+    mgDetailEmpty.hidden = false;
+    return true;
+  }
+
+  // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
+  // ricerca la lista mostra i risultati: quelli restano, i dati sotto sono
+  // comunque aggiornati (il dettaglio li legge da lì).
+  function rerenderAfterLive(touched) {
+    if (!dataLoaded) return;
+    if (!searchMode) {
+      const scrollers = [mgList, mgList && mgList.parentElement].filter(Boolean);
+      const tops = scrollers.map((el) => el.scrollTop);
+      renderList();
+      scrollers.forEach((el, i) => { el.scrollTop = tops[i]; });
+    }
+    if (!selectedId || closeDetailIfGone()) return;
+    if (touched.has(selectedId) && !detailBeingEdited()) openDetail(selectedId);
+  }
+
+  // Un giro: versioni → differenze → documenti cambiati → decifratura → fusione.
+  // Ritorna { changed } (quanti feedback sono stati toccati). Un giro già in
+  // corso viene riusato, non raddoppiato.
+  async function refreshFromRemote() {
+    if (liveTick) return liveTick;
+    liveTick = (async () => {
+      const remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+      // Una risposta che non è un elenco non è "tutto sparito": è un guasto,
+      // e un guasto lascia la lista com'è.
+      if (!Array.isArray(remote)) throw new Error('versioni non lette');
+      const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
+      const ids = changed.concat(added);
+      if (ids.length === 0 && removed.length === 0) {
+        // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
+        // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
+        closeDetailIfGone();
+        return { changed: 0 };
+      }
+      let fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
+      if (isAdmin && fresh.length > 0) {
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: fresh });
+          if (r && r.ok && Array.isArray(r.list)) fresh = r.list;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh, removed });
+      reindexByClient();
+      rerenderAfterLive(new Set(ids));
+      return { changed: ids.length + removed.length };
+    })().finally(() => { liveTick = null; liveLastAt = Date.now(); });
+    return liveTick;
+  }
+
+  function liveTickIfDue(force) {
+    if (!liveEnabled || document.hidden) return;
+    if (!force && Date.now() - liveLastAt < LIVE.POLL_MS / 2) return;
+    // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
+    // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
+    if (!dataLoaded) { loadData().catch(() => {}); return; }
+    refreshFromRemote().catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
+  }
+
+  function startLive() {
+    if (!LIVE || liveEnabled || liveBlocked) return;
+    liveEnabled = true;
+    liveTimer = setInterval(() => liveTickIfDue(true), LIVE.POLL_MS);
+    // Scheda tornata in vista o finestra tornata in primo piano: se è passato
+    // abbastanza tempo, non aspettare il prossimo battito.
+    document.addEventListener('visibilitychange', () => liveTickIfDue(false));
+    window.addEventListener('focus', () => liveTickIfDue(false));
+  }
+
+  function stopLive() {
+    liveEnabled = false;
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
   }
 
   // ── Hook di test ────────────────────────────────────────────────────────
@@ -2901,17 +3049,25 @@
   // test (vedi CLAUDE.md → "Test che servono davvero"). Inerte in produzione.
   window.__mgTest = {
     setData(fbs) {
+      // Dati finti al posto di quelli veri: l'aggiornamento continuo si ferma,
+      // o al primo giro li rimpiazzerebbe con Firestore. Gli spec che vogliono
+      // provarlo sostituiscono le sorgenti (setLiveSources) e chiamano pollNow.
+      // Fermo E bloccato: se l'avvio vero finisce DOPO l'iniezione, startLive
+      // non deve ripartire e rimpiazzare i dati finti con Firestore.
+      stopLive();
+      liveBlocked = true;
+      testDataInjected = true;
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
       dataLoaded = true;
       loadFailed = false;
-      // Reindicizza per mittente (il pannello laterale lo usa).
-      allByClient = {};
-      for (const fb of allFeedbacks) {
-        const c = fb.clientId || '__anon__';
-        (allByClient[c] || (allByClient[c] = [])).push(fb);
-      }
+      reindexByClient();
       renderList();
     },
+    // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
+    // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
+    pollNow() { return refreshFromRemote(); },
+    setLiveSources(src) { Object.assign(liveSources, src || {}); },
+    isLiveOn() { return liveEnabled; },
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
@@ -3354,16 +3510,20 @@
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
+    // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
+    // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
+    // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
+    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE });
+    firstListPromise.catch(() => {});
     injectSearchIcons();
     await loadLayout();
     await refreshAuth();
     applyAutoModeGate();
-    await loadAutoMode();
-    await loadSortMode();
-    await loadCaps();
-    await loadJudgeTimeout();
-    await loadMergeApprovals();
+    // In parallelo e senza che una fallita fermi le altre (ognuna gestisce già
+    // il proprio errore; allSettled è la cintura).
+    await Promise.allSettled([loadAutoMode(), loadSortMode(), loadCaps(), loadJudgeTimeout(), loadMergeApprovals()]);
     await loadData();
+    startLive();
   }
 
   const bootDone = init().catch((e) => { console.error('[manage] init:', e); });

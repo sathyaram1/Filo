@@ -215,6 +215,10 @@
     for (const [k, v] of Object.entries(doc.fields || {})) out[k] = fromFsValue(v);
     out._id = doc.name?.split('/').pop() || '';
     out._createTime = doc.createTime || null;
+    // Ultima scrittura sul documento (la mette Firestore, non chi scrive): è
+    // il segno con cui la dashboard riconosce, a ogni giro, quali feedback
+    // sono cambiati senza rileggerli tutti.
+    out._updateTime = doc.updateTime || null;
     return out;
   }
 
@@ -492,7 +496,12 @@
   // (offline, un `fetch` del renderer può impiegare ~13 s prima di fallire da
   // solo). Chi lo passa vuole poter mostrare uno stato d'errore in tempi umani;
   // chi lo omette mantiene il comportamento storico (nessun timeout).
-  async function list({ pageSize = 200, timeoutMs = 0 } = {}) {
+  // `fields` (opzionale): i soli campi da scaricare (proiezione). Senza, arriva
+  // il documento intero. La dashboard di gestione lo usa in due modi: per
+  // rimandare i campi pesanti che servono solo nel dettaglio, e — con il solo
+  // `__name__` — per chiedere a Firestore "cosa è cambiato?" pagando pochi
+  // byte: ogni riga porta comunque `updateTime`.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null } = {}) {
     // structuredQuery via runQuery, ordinamento per createdAt DESC.
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const body = {
@@ -504,6 +513,9 @@
         limit: pageSize,
       },
     };
+    if (Array.isArray(fields) && fields.length > 0) {
+      body.structuredQuery.select = { fields: fields.map((f) => ({ fieldPath: String(f) })) };
+    }
     const opts = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -537,6 +549,54 @@
     for (const row of arr) {
       if (!row.document) continue;
       out.push(fsDocToObject(row.document));
+    }
+    return out;
+  }
+
+  // Le sole "versioni" dei feedback: per ciascuno id + `_updateTime`, niente
+  // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
+  // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
+  async function listVersions({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
+    const rows = await list({ pageSize, timeoutMs, fields: ['__name__'] });
+    return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
+  }
+
+  // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
+  // solo quelli trovati: un id cancellato nel frattempo non compare. Vuoto → [].
+  async function getMany(ids, { timeoutMs = 0 } = {}) {
+    const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
+    if (wanted.length === 0) return [];
+    const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
+    const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
+    const opts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documents: wanted.map((id) => prefix + id) }),
+    };
+    let timer = null;
+    let timedOut = false;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { timedOut = true; try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try {
+      res = await fetch(endpoint, opts);
+    } catch (e) {
+      if (timedOut) throw new Error('firestore batchGet: timeout di rete');
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`firestore batchGet fallito (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const arr = await res.json();
+    const out = [];
+    for (const row of Array.isArray(arr) ? arr : []) {
+      if (row && row.found) out.push(fsDocToObject(row.found));
     }
     return out;
   }
@@ -820,6 +880,8 @@
   global.SN_FEEDBACK = {
     submit,
     list,
+    listVersions,
+    getMany,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     listHitCap,
