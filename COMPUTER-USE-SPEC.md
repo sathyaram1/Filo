@@ -1,7 +1,7 @@
 # Filo — Uso del computer ("Filo fa le cose al posto tuo")
 
 Stato: **spec approvata, non implementata** (2026-08-08).
-Prerequisiti di lettura: `filo_filosofia.txt`, `filo_design.txt`, `PATTERNS.md`,
+Prerequisiti di lettura (filosofia e design sono già nel prompt, via CLAUDE.md): `PATTERNS.md`,
 `src/shared/actionLevels.js`, `src/shared/cmdClassify.js`.
 
 ## Obiettivo

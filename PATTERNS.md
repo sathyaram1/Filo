@@ -14,8 +14,8 @@ Formato di una voce: titolo breve → la regola in una frase → il perché → 
 riferimento al codice dove vive il pattern.
 
 I principi a monte di questi pattern stanno in **`filo_filosofia.txt`** (filosofia
-generale) e **`filo_design.txt`** (principi di design concreti): leggili insieme a
-questo file prima di lavorare su codice o revisioni.
+generale) e **`filo_design.txt`** (principi di design concreti). Sono già nel tuo
+prompt, importati da CLAUDE.md: non rileggerli con uno strumento.
 
 ---
 
