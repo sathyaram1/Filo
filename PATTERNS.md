@@ -1805,7 +1805,20 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   una volta sola diventa una trappola se non si può rifare. E la prima
   conversazione con Filo è la prima cosa che l'utente gli ha raccontato di sé:
   il rilancio la ARCHIVIA (`past`), e nella stessa sezione di Preferenze si
-  rilegge. Sostituirla non costava niente in meno.
+  rilegge. Sostituirla non costava niente in meno. **Ma si archivia solo ciò che
+  è davvero una conversazione**: se l'utente non ha mai risposto, quello che
+  c'era è il solo benvenuto. Archiviarlo lo stesso riempiva l'archivio di voci
+  «0 tue risposte» e, siccome se ne conservano cinque, bastava aprire e chiudere
+  sei volte il pulsante per buttare fuori la prima conversazione vera. Il filtro
+  sta in `normalize`, non solo dove si archivia, così ripulisce anche gli
+  archivi già sporcati.
+- **Chiusa a metà, la home lo dice**: il congedo vive in chat e la chat sparisce
+  appena la home è pronta — col modello giù, in un istante. Il segno «già
+  accolto» però è definitivo, e chi non fa in tempo a leggerlo non ha modo di
+  capire perché Filo ha smesso di presentarsi. Se l'accoglienza si chiude prima
+  della fine, lo stato porta `notice: 'early'` e la home mostra una riga con
+  «Riprendiamola» e «No, va bene così», finché l'utente non risponde. Chi arriva
+  in fondo non vede niente: non c'è niente da spiegare.
 - **Una scheda non è l'unica**: l'accoglienza vive nella scheda nuova, e di
   schede nuove se ne aprono quante se ne vuole. Ogni scrittura dello stato viene
   annunciata (`FILO_ONBOARDING_UPDATED`) e le altre schede si riallineano; il
