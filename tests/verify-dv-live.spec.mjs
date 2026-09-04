@@ -71,11 +71,13 @@ test('1. caricamento iniziale con Firestore vera: tempo, live acceso, giro reale
   expect(r.changed).toBe(0);
   expect(await page.evaluate(() => window.__vvGM)).toEqual([]);
   // due giri contemporanei = uno solo
+  await useSources(page, [], []);
+  await page.evaluate(() => window.__mgTest.setData([]));
   const both = await page.evaluate(async () => {
-    const a = window.__mgTest.pollNow(); const b = window.__mgTest.pollNow();
-    return a === b;
+    await Promise.all([window.__mgTest.pollNow(), window.__mgTest.pollNow(), window.__mgTest.pollNow()]);
+    return window.__vvCalls.versions;
   });
-  expect(both).toBe(true);
+  expect(both).toBe(1);
   expect(n).toBeGreaterThan(0);
 });
 
