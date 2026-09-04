@@ -26,6 +26,27 @@ ruolo che ti viene consegnato.
 @filo_filosofia.txt
 @filo_design.txt
 
+## Il contesto si paga a ogni turno
+
+Ogni turno rilegge l'intero contesto della sessione. Misurato sulle sessioni di
+questa macchina (settembre 2026): le riletture della cache sono il 61% del
+costo, le scritture il 26%, l'output il 13%. Un file grosso letto una volta si
+ripaga a ogni turno successivo; dieci chiamate in dieci turni costano dieci
+riletture, in un turno solo una. Quindi:
+
+- **Chiamate indipendenti nello stesso turno.** Letture, ricerche, controlli
+  che non dipendono l'uno dall'esito dell'altro partono insieme. Una chiamata
+  che dipende da un esito va DOPO l'esito, oppure nella stessa riga di shell con
+  `&&`, mai in un batch che va avanti anche se il passo prima è fallito: un test
+  rosso deve fermare, non finire in coda a un commit.
+- **Le esplorazioni si delegano.** Se rispondere vuol dire leggere più di
+  qualche file, lo fa un sotto-agente e qui resta la conclusione, non i file.
+  Tieni in contesto solo ciò che ti servirà davvero nei turni dopo.
+- **Si legge la parte, non il file.** Intervalli di righe, uscite filtrate
+  (`tail`, `grep`), mai un file da centinaia di KB intero per una sezione.
+- **Sessioni che finiscono.** Un compito nuovo in una sessione lunga paga tutto
+  il passato a ogni turno: a un cambio di argomento si riparte.
+
 ## Regole del repo
 
 - **Salvataggio automatico**: a ogni modifica di file un hook committa e pusha
