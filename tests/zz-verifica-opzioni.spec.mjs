@@ -7,26 +7,19 @@ test('Opzioni: nessun Google/Gemini fra fornitori e chiavi', async ({ openTab })
   await page.waitForTimeout(3000);
 
   const dump = await page.evaluate(() => {
-    const inputs = [...document.querySelectorAll('input,select,textarea')].map((el) => ({
-      id: el.id, name: el.name, type: el.type,
-      placeholder: el.placeholder || '',
-      label: (el.closest('label')?.textContent || '').trim().slice(0, 80),
-    }));
     const selects = [...document.querySelectorAll('select')].map((s) => ({
-      id: s.id, options: [...s.options].map((o) => o.value + '|' + o.textContent.trim()),
-    }));
-    return {
-      inputs,
-      selects,
-      bodyText: document.body.innerText,
-      html: document.body.innerHTML,
-    };
+      id: s.id, cls: s.className,
+      options: [...s.options].map((o) => o.value + '|' + o.textContent.trim()),
+    })).filter((s) => s.options.length < 40);
+    // combo box "finti" (SN_COMBO) — voci di menu
+    const combos = [...document.querySelectorAll('.sn-select-option')]
+      .map((o) => (o.dataset.value || '') + '|' + o.textContent.trim());
+    const keys = [...document.querySelectorAll('input[type=password]')]
+      .map((el) => el.id + '|' + el.placeholder);
+    return { selects, combos: [...new Set(combos)], keys, text: document.body.innerText };
   });
-
-  const badText = (dump.bodyText.match(/.{0,60}(gemini|google).{0,60}/gi) || []);
-  const badHtml = (dump.html.match(/.{0,80}(gemini|google).{0,80}/gi) || []);
-  console.log('=== INPUTS ===\n' + JSON.stringify(dump.inputs, null, 1));
-  console.log('=== SELECTS ===\n' + JSON.stringify(dump.selects, null, 1));
-  console.log('=== TESTO con google/gemini ===\n' + badText.join('\n---\n'));
-  console.log('=== HTML con google/gemini ===\n' + badHtml.join('\n---\n'));
+  console.log('=== CHIAVI ===\n' + dump.keys.join('\n'));
+  console.log('=== SELECT (piccoli) ===\n' + JSON.stringify(dump.selects, null, 1));
+  console.log('=== COMBO OPTIONS ===\n' + dump.combos.join('\n'));
+  console.log('=== TESTO ===\n' + dump.text.slice(0, 6000));
 });
