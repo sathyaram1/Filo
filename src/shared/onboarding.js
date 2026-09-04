@@ -148,8 +148,10 @@
     'lascia stare', 'lascia perdere', 'lasciamo stare', 'lasciamo perdere',
     'non mi va', 'non ho voglia', 'non ora', 'non adesso', 'no grazie',
     'magari dopo', 'magari un altra volta', 'un altra volta', 'piu tardi',
-    'salto', 'passo', 'no', 'niente', 'forse dopo', 'ci penso',
+    'salto', 'passo', 'forse dopo', 'ci penso',
   ];
+  // Un «no» secco non sta in nessuno dei due elenchi: durante l'intervista è la
+  // risposta a una domanda, e fuori non vuol dire niente di deciso.
   const STOP_SET = new Set(STOP_PHRASES);
   const DECLINE_SET = new Set(DECLINE_PHRASES);
   // Riempitivi di cortesia: si tolgono e si riprova. Attenzione a «no grazie» —
