@@ -9,6 +9,6 @@
   "_perche_un_margine": "È un MINIMO, non un'uguaglianza: una manciata di test si salta da sé a seconda della macchina (nell'ultima corsa: due), e un'uguaglianza li farebbe passare per regressione. Il margine è di pochi test, molto meno di quelli che porta via uno spec cancellato — che è la cosa da vedere.",
   "aggiornato": "2026-09-04",
   "attesi": {
-    "actions": 1365
+    "actions": 1385
   }
 }
