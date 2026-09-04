@@ -95,8 +95,15 @@ module.exports = function register(on, ctx) {
   // scrive adesso: si scrive alla fine.
   on(MSG.FILO_GET_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    if (!Onboarding) return { ok: true, onboarding: { done: true, ticked: [], thread: [] } };
+    if (!Onboarding) return { ok: true, onboarding: { done: true, ticked: [], thread: [] }, ready: false };
+    // Senza un modello a disposizione (nessun accesso, nessuna chiave) Filo non
+    // può sostenere una conversazione: l'intervista resta in attesa e la home
+    // mostra come attivare Filo. Aprirla comunque significherebbe accogliere
+    // l'utente con una bolla d'errore. Appena c'è la chiave, parte da sola.
+    const settings = await ctx.getEffectiveSettings();
+    const ready = !!(settings.apiKeys?.[settings.provider] || settings.apiKeys?.gemini);
     let state = await FiloMem.getOnboarding();
+    if (!ready) return { ok: true, onboarding: state, ready: false };
     if (!state.done && !state.thread.length) {
       state = await FiloMem.setOnboarding(
         Onboarding.appendTurn(state, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
