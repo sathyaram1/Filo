@@ -1843,7 +1843,7 @@
       threadHistory.push({ role: 'user', text: nudge });
       r = await runFiloTurn({ userMessage: nudge, internal: true, activity });
     }
-    activity.finish();
+    activity.finish({ failed: !r?.ok });
 
     sending = false;
     sendBtn.disabled = false;
