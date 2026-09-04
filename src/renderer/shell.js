@@ -1345,14 +1345,16 @@
     } else if (meta && e.key.toLowerCase() === 'r') {
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.reload(a.id);
-    } else if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && /^Digit[0-9]$/.test(e.code)) {
-      // Alt+1…9 → N-esima tab, Alt+0 → la decima (quando il focus è sulla
-      // barra di Filo; per le pagine ci pensa before-input-event nel main).
-      e.preventDefault();
-      const d = e.code.slice('Digit'.length);
-      const idx = d === '0' ? 9 : Number(d) - 1;
-      const tab = state.tabs[idx];
-      if (tab) api.tabs.activate(tab.id);
+    } else {
+      // Salto alla N-esima scheda (quando il focus è sulla barra di Filo; per
+      // le pagine ci pensa before-input-event nel main). Quale combinazione
+      // sia lo decide src/shared/tasti.js: Alt+cifra qui, Cmd+cifra su Mac.
+      const idx = TASTI ? TASTI.indiceSaltoScheda(e) : null;
+      if (idx != null) {
+        e.preventDefault();
+        const tab = state.tabs[idx];
+        if (tab) api.tabs.activate(tab.id);
+      }
     }
   });
 
