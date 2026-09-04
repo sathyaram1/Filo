@@ -242,12 +242,24 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
    (#524): è la prima bolla di una conversazione vera, quindi usa lo stile delle
    bolle qui sotto e non ha più regole sue. */
 
-/* Conversation */
+/* Conversation.
+   #521 — in conversazione la griglia ha un'altezza FISSA (la viewport, con la
+   stessa compensazione dello zoom del testo) e la colonna centrale può
+   restringersi (min-height: 0): così è il thread a scorrere al suo interno e
+   il campo di scrittura resta sempre in fondo alla finestra. Prima il thread
+   aveva un tetto a «100vh meno 160px» tirato a occhio: appena il campo
+   cresceva (Shift+Invio, anteprime immagini, riga della cartella in modalità
+   terminale) la somma superava la finestra, la pagina scorreva e il campo
+   finiva tagliato sotto il bordo. */
+body[data-state="thread"] .dash { height: calc(100vh / var(--sn-zoom, 1)); }
+body[data-state="thread"] .dash-left,
+body[data-state="thread"] .dash-center,
+body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-thread {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-height: calc(100vh - 160px);
+  min-height: 0;
   overflow: hidden;
 }
 .dash-bubbles {
