@@ -37,7 +37,11 @@ test('riconosce uno shim npm (npm) — guard regressione "firebase rosso"', asyn
   assert.equal(await commandExists({ shell: SHELL, command: 'npm' }), true);
 });
 
-test('il probe veloce (where.exe) viene PRIMA di Get-Command — guard "firebase rosso"', () => {
+// `where.exe` e Get-Command sono programmi di Windows: fuori da lì il resolver
+// usa `command -v` e questo assert non ha niente da dire (misurerebbe solo su
+// che macchina gira la suite). Prima non era condizionato e diventava rosso su
+// Mac e Linux — un rosso che non segnala nessuna regressione.
+test('il probe veloce (where.exe) viene PRIMA di Get-Command — guard "firebase rosso"', { skip: process.platform !== 'win32' ? 'vale solo su Windows' : false }, () => {
   // Il guard sulla velocità era un assert col cronometro (<3s), ma su una
   // macchina carica (suite in parallelo, antivirus su node_modules fresco)
   // anche `where.exe` può metterci secondi: misurava il carico, non la
