@@ -314,12 +314,22 @@
   function onboardingClosing() {
     if (!onboardingActive) return;
     onboardingActive = false;
+    hideSkipOnboarding();
     bubblesEl.appendChild(stepTrace('Preparo la tua home…'));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    // La home personale è l'ultimo atto dell'accoglienza, ma non può esserne la
+    // condizione: se non arriva (nessun modello, provider giù) l'utente va alla
+    // home lo stesso invece di restare davanti a una chat chiusa.
+    clearTimeout(onboardingHomeFallback);
+    onboardingHomeFallback = setTimeout(() => {
+      if (body.dataset.state === 'thread' && !sending) onboardingDone(null);
+    }, 8000);
   }
 
   function onboardingDone(msg) {
     onboardingActive = false;
+    clearTimeout(onboardingHomeFallback);
+    hideSkipOnboarding();
     goHome(); // svuota bolle e storico: l'intervista è finita
     if (showHomeMessage) {
       homeMessageEl.classList.remove('dash-home-msg-loading');
