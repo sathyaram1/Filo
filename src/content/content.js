@@ -1452,7 +1452,7 @@
     return {
       type: 'item',
       label: I18n.t('menu_help'),
-      shortcut: 'Alt+H',
+      shortcut: Tasti.etichetta('Alt+H'),
       onClick: () => openSurface('help', () => openHelpSidebar()),
     };
   }
