@@ -145,7 +145,8 @@ test('una critica oltre il tetto si vede che è stata tagliata, e non a metà pa
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, feedbackCon(nota));
 
-  const bolla = page.locator('.fb-bubble .fb-bubble-body').last();
+  await page.locator('[data-tab="resolved"]').click();
+  const bolla = page.locator('.fb-bubble--model .fb-bubble-body').last();
   await expect(bolla).toBeVisible({ timeout: 15_000 });
   const testo = await bolla.innerText();
   expect(testo, 'il segno del taglio deve arrivare fino a chi legge').toContain('testo tagliato');
