@@ -843,6 +843,8 @@
     let turnReasoning = '';
     let turnStartedAt = 0;
     let lastTurn = { text: '', ms: 0 };
+    // Quante voci c'erano quando è partito il testo del turno (vedi answerStarted).
+    let turnMark = null;
     // Tipi delle azioni compiute, nell'ordine: da qui nasce il riassunto.
     const doneTypes = [];
 
