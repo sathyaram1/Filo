@@ -1205,7 +1205,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const next = (wantsEnd || Onboarding.shouldForceClose(ticked))
           ? Onboarding.close(ticked)
           : ticked;
-        await FiloMem.setOnboarding(next);
+        await saveOnboarding(next);
         return { executed: true, kept: false };
       }
       case 'SALVA_LEZIONE': {
