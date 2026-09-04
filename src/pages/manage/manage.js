@@ -3001,17 +3001,21 @@
   // test (vedi CLAUDE.md → "Test che servono davvero"). Inerte in produzione.
   window.__mgTest = {
     setData(fbs) {
+      // Dati finti al posto di quelli veri: l'aggiornamento continuo si ferma,
+      // o al primo giro li rimpiazzerebbe con Firestore. Gli spec che vogliono
+      // provarlo sostituiscono le sorgenti (setLiveSources) e chiamano pollNow.
+      stopLive();
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
       dataLoaded = true;
       loadFailed = false;
-      // Reindicizza per mittente (il pannello laterale lo usa).
-      allByClient = {};
-      for (const fb of allFeedbacks) {
-        const c = fb.clientId || '__anon__';
-        (allByClient[c] || (allByClient[c] = [])).push(fb);
-      }
+      reindexByClient();
       renderList();
     },
+    // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
+    // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
+    pollNow() { return refreshFromRemote(); },
+    setLiveSources(src) { Object.assign(liveSources, src || {}); },
+    isLiveOn() { return liveEnabled; },
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
