@@ -2040,6 +2040,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     if (parsed) break;
     console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
   }
+  } catch (e) {
+    // Il turno è fallito (rete, provider, crediti): la prenotazione della
+    // ripresa va rilasciata subito, altrimenti nessuna scheda potrebbe
+    // riprendere il turno rimasto a metà finché non scade.
+    if (onbActive && !internal) releaseOnboardingResume();
+    throw e;
+  }
   parsed = parsed || { text: r.text || '', actions: [] };
   const rawActions = Array.isArray(parsed.actions) ? parsed.actions : [];
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
