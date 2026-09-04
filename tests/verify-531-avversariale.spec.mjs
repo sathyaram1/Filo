@@ -94,6 +94,8 @@ const feedbackCon = (notes) => ({
   text: 'Una critica lunga deve arrivare intera a chi la legge.',
   status: 'done',
   statusPublic: 'closed',
+  url: 'https://example.com',
+  clientId: 'tester-531',
   notes,
   createdAt: '2026-09-04T10:00:00.000Z',
   images: [],
