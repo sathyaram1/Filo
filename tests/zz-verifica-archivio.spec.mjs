@@ -32,8 +32,13 @@ test('archivio: la ricerca per senso trova la scheda giusta', async ({ openTab, 
     const page = await openTab(url);
     await page.waitForLoadState('load');
     await page.waitForTimeout(1500);
-    await page.evaluate(() => window.close());
-    await arc.waitForTimeout(1500);
+    const url2 = page.url();
+    await shell.evaluate(async (u) => {
+      const s = await window.filoShell.tabs.snapshot();
+      const t = (s.tabs || s).find((x) => x.url === u);
+      if (t) await window.filoShell.tabs.close(t.id);
+    }, url2);
+    await arc.waitForTimeout(2000);
   }
   // enrichment (riassunto + embedding) in background
   await arc.waitForTimeout(30000);
