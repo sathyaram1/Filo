@@ -2892,9 +2892,11 @@
     if (isAdmin && allFeedbacks.length > 0) {
       try {
         const r = await sendToMain({ type: 'feedback_decrypt_fields', list: allFeedbacks });
+        if (testDataInjected) return;
         if (r && r.ok && Array.isArray(r.list)) allFeedbacks = r.list;
       } catch (_) { /* fallback: render con valori cifrati */ }
     }
+    if (testDataInjected) return;
 
     reindexByClient();
     renderList();
