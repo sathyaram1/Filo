@@ -225,6 +225,18 @@
     }
   }
 
+  // L'intervista era in attesa di un modello (nessun accesso, nessuna chiave) e
+  // adesso c'è: la apriamo, ma solo se l'utente è ancora sulla home e non sta
+  // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
+  // che aspettare la prossima scheda.
+  async function maybeOpenOnboardingLater() {
+    if (onboardingActive || sending) return;
+    if (body.dataset.state !== 'home') return;
+    const state = await fetchOnboarding();
+    if (!state || onboardingActive || sending || body.dataset.state !== 'home') return;
+    await openOnboarding(state);
+  }
+
   // Chiusura: l'ultimo atto non è un "fatto", è il risultato — la prima home
   // costruita sul profilo appena imparato. Finché non arriva, la chat dice cosa
   // sta succedendo invece di restare muta.
