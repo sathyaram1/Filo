@@ -1053,16 +1053,12 @@
     return hit;
   }
 
+  // La regola sta in un posto solo, src/shared/campoTesto.js: la stessa
+  // domanda ("si sta scrivendo qui?") arriva anche dal processo principale,
+  // perché su Mac è la barra dei menu a prendersi Ctrl/Cmd+Z prima di noi
+  // (#527). Due copie avrebbero cominciato a divergere subito.
   function isEditable(el) {
-    if (!el) return false;
-    if (el.matches?.('input, textarea')) {
-      const t = (el.getAttribute('type') || '').toLowerCase();
-      // input non testuali (button, checkbox, ecc) non sono editabili nel senso che ci interessa
-      const nonText = ['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image', 'color', 'range'];
-      if (el.tagName === 'INPUT' && nonText.includes(t)) return false;
-      return !el.disabled && !el.readOnly;
-    }
-    return !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
+    return !!(self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.campoDiTesto(el));
   }
 
   // ------------------------------------------------------------
