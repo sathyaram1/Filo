@@ -1206,7 +1206,6 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           ? Onboarding.close(ticked)
           : ticked;
         await FiloMem.setOnboarding(next);
-        if (next.done) await Storage.setRaw?.(STORAGE_KEYS_WELCOMED, true).catch?.(() => {});
         return { executed: true, kept: false };
       }
       case 'SALVA_LEZIONE': {
