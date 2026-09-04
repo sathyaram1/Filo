@@ -17,6 +17,7 @@ test('dettatura dal vivo: quel che dico finisce nel campo', async () => {
   const userData = mkdtempSync(join(tmpdir(), 'filo-zz-'));
   const app = await electron.launch({
     args: [
+      '--use-fake-device-for-media-stream',
       '--use-fake-ui-for-media-stream',
       `--use-file-for-fake-audio-capture=${WAV}`,
       '.',
@@ -68,11 +69,15 @@ test('dettatura dal vivo: quel che dico finisce nel campo', async () => {
 
     const pill = page.locator('.sn-dictate-pill');
     await expect(pill, 'compare il riquadro "ti ascolto"').toBeVisible({ timeout: 15000 });
-    await page.waitForTimeout(14000);
-    const live = await page.evaluate(() => {
-      const el = document.querySelector('.sn-dictate-pill-live');
-      return el && !el.hidden ? el.textContent : '';
-    });
+    let live = '';
+    for (let i = 0; i < 60; i++) {
+      const t = await page.evaluate(() => {
+        const el = document.querySelector('.sn-dictate-pill-live');
+        return el && !el.hidden ? el.textContent : '';
+      });
+      if (t && t.length > live.length) live = t;
+      await page.waitForTimeout(300);
+    }
     console.log('PROVVISORIO IN DIRETTA:', JSON.stringify(live));
 
     await pill.click();
