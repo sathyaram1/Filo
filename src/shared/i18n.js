@@ -405,7 +405,7 @@
     options_security_block_popups: 'Blocca popup non richiesti',
     options_security_block_popups_desc:
       'Blocca le finestre che i siti aprono da soli (i classici popup pubblicitari). ' +
-      'I link che apri tu cliccando con il tasto centrale o tenendo Ctrl, o quelli con target="_blank", ' +
+      'I link che apri tu cliccando con il tasto centrale o tenendo Ctrl (Cmd su Mac), o quelli con target="_blank", ' +
       'restano normalmente aperti. Quando un popup viene bloccato, una piccola etichetta nella barra ' +
       'in alto ti permette di aprirlo comunque se era legittimo.',
     options_security_adblock: 'Blocca pubblicità e tracker',
