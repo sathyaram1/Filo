@@ -191,7 +191,10 @@
   async function fetchOnboarding() {
     try {
       const r = await send({ type: MSG.FILO_GET_ONBOARDING });
-      if (!r?.ok || !r.onboarding) return null;
+      // `ready: false` = nessun modello disponibile ancora (niente accesso,
+      // niente chiave): l'intervista aspetta e la home spiega come attivare
+      // Filo, invece di accoglierlo con una chat che non può rispondere.
+      if (!r?.ok || !r.onboarding || !r.ready) return null;
       return r.onboarding.done ? null : r.onboarding;
     } catch (_) { return null; }
   }
