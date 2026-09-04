@@ -451,9 +451,9 @@
     },
     {
       id: 'onboarding', title: 'Intervista di benvenuto', category: 'settings',
-      desc: 'La prima volta che apri Filo, invece di una schermata di configurazione parte una chiacchierata. Ti chiede chi sei e come vuoi che ti parli, applica quello che gli dici mentre parlate, e ti racconta in poche righe l’aspetto, la privacy, come sceglie i modelli AI e come funzionano i crediti. Dì "basta così" e la chiude, in qualsiasi momento. Se chiudi la finestra a metà la ritrovi dov’era. Alla fine Filo ti prepara la tua prima home, costruita su quello che ha appena imparato.',
-      invoke: 'Parte da sola al primo avvio. Per rifarla in qualsiasi momento, Preferenze → "Rifai l’intervista di benvenuto".',
-      doesNot: 'Non è un modulo a passi e non ha campi da compilare. È una conversazione, al massimo cinque scambi, e non è obbligatoria: se la chiudi Filo usa i valori predefiniti e impara di te strada facendo.',
+      desc: 'La prima volta che apri Filo, invece di una schermata di configurazione parte una chiacchierata. Ti chiede chi sei e come vuoi che ti parli, applica quello che gli dici mentre parlate, e ti racconta in poche righe l’aspetto, la privacy, come sceglie i modelli AI e come funzionano i crediti. Dì "basta così" e la chiude, in qualsiasi momento: quella frase la riconosce l’app da sé, quindi funziona anche se l’AI non risponde. Sotto la conversazione c’è anche "Salta l’accoglienza". Se chiudi la finestra a metà la ritrovi dov’era. Alla fine Filo ti prepara la tua prima home, costruita su quello che ha appena imparato.',
+      invoke: 'Parte da sola al primo avvio. Per rifarla in qualsiasi momento, Preferenze → "Rifai l’intervista di benvenuto". Nella stessa sezione trovi le interviste che hai già fatto, da rileggere.',
+      doesNot: 'Non è un modulo a passi e non ha campi da compilare. È una conversazione, al massimo cinque scambi, e non è obbligatoria: se la chiudi Filo usa i valori predefiniti e impara di te strada facendo. Rifarla non cancella quella di prima.',
     },
 
     // ────────────────────────────── Crediti ──────────────────────────────────
