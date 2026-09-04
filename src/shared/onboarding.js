@@ -215,7 +215,16 @@
   }
 
   function emptyState() {
-    return { done: false, ticked: [], thread: [], past: [], startedAt: null, closedAt: null };
+    return {
+      done: false, ticked: [], thread: [], past: [],
+      startedAt: null, closedAt: null, notice: '',
+    };
+  }
+
+  // Una conversazione conta come conversazione solo se l'utente ha risposto:
+  // il solo benvenuto a schermo non è niente che qualcuno voglia rileggere.
+  function hasUserTurn(thread) {
+    return Array.isArray(thread) && thread.some((m) => m && m.role === 'user');
   }
 
   function normalizeThread(raw) {
