@@ -346,7 +346,10 @@ test('la regola dà il nome giusto su ogni sistema', () => {
   assert.equal(T.etichetta('Alt+H', 'darwin'), 'Ctrl+Alt+H');
   // …e il salto di scheda passa a Cmd, perché Opzione+cifra su Mac SCRIVE.
   assert.equal(T.etichetta('Alt+1', 'darwin'), 'Cmd+1');
-  assert.equal(T.etichetta('Alt+0', 'darwin'), 'Cmd+0');
+  // Lo ZERO no: su Mac Cmd+0 riporta la pagina al 100% (se lo prende la barra
+  // dei menu), quindi la scheda in fondo si chiama Cmd+9. Se questa riga torna
+  // a dire "Cmd+0", Filo ricomincia a promettere una scheda irraggiungibile.
+  assert.equal(T.etichetta('Alt+0', 'darwin'), 'Cmd+9');
 
   // Un tasto senza modificatori si chiama uguale ovunque.
   assert.equal(T.etichetta('Esc', 'darwin'), 'Esc');
