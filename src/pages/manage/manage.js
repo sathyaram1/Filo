@@ -3014,7 +3014,10 @@
       // Dati finti al posto di quelli veri: l'aggiornamento continuo si ferma,
       // o al primo giro li rimpiazzerebbe con Firestore. Gli spec che vogliono
       // provarlo sostituiscono le sorgenti (setLiveSources) e chiamano pollNow.
+      // Fermo E bloccato: se l'avvio vero finisce DOPO l'iniezione, startLive
+      // non deve ripartire e rimpiazzare i dati finti con Firestore.
       stopLive();
+      liveBlocked = true;
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
       dataLoaded = true;
       loadFailed = false;
