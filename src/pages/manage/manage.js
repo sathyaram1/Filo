@@ -2949,6 +2949,12 @@
     for (const box of mgDetail.querySelectorAll('textarea')) {
       if (!box.hidden && box.offsetParent !== null && String(box.value || '').trim()) return true;
     }
+    // La riga "frase per chi ha segnalato" parte già piena col valore salvato:
+    // è una bozza solo se differisce da quello.
+    if (mgUserNote && !mgUserNote.hidden && mgUserNoteText) {
+      const sel = allFeedbacks.find((f) => f._id === selectedId);
+      if (String(mgUserNoteText.value || '') !== String((sel && sel.userNote) || '')) return true;
+    }
     return false;
   }
 
