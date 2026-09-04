@@ -106,28 +106,56 @@ module.exports = function register(on, ctx) {
     let state = await FiloMem.getOnboarding();
     if (!ready) return { ok: true, onboarding: state, ready: false };
     if (!state.done && !state.thread.length) {
-      state = await FiloMem.setOnboarding(
+      state = await saveOnboarding(
         Onboarding.appendTurn(state, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
       );
     }
+    // Un turno rimasto a metà riparte da solo — ma UNA scheda sola lo riprende.
+    // Chi apre una seconda scheda nuova mentre la prima aspetta la risposta
+    // riceve `resume: false`: vede la conversazione e si aggiorna con
+    // FILO_ONBOARDING_UPDATED, invece di rilanciare lo stesso messaggio.
+    const resume = Onboarding.hasPendingTurn(state) && claimOnboardingResume();
     return {
       ok: true,
       ready: true,
       onboarding: state,
+      resume,
       welcome: Onboarding.WELCOME_MESSAGE,
       resumeNote: Onboarding.RESUME_NOTE,
     };
   });
 
   // Rilancio dell'intervista dalle Preferenze, anche dopo settimane: si
-  // riparte dal benvenuto, con l'elenco di nuovo tutto da spuntare.
+  // riparte dal benvenuto, con l'elenco di nuovo tutto da spuntare. Quella di
+  // prima finisce nell'archivio (`past`) — rifarla non è cancellarla.
   on(MSG.FILO_RESTART_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
-    const state = await FiloMem.setOnboarding(
-      Onboarding.appendTurn(Onboarding.restart(), { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
+    const prev = await FiloMem.getOnboarding();
+    const state = await saveOnboarding(
+      Onboarding.appendTurn(Onboarding.restart(prev), { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
     );
     return { ok: true, onboarding: state };
+  });
+
+  // «Salta l'accoglienza»: la via d'uscita che NON passa dal modello. È il
+  // gemello della parola di stop, per chi non la ricorda o si trova davanti a
+  // una bolla d'errore — senza, chi apre Filo la prima volta senza rete resta
+  // chiuso dentro l'intervista con il solo pulsante "Riprova". Chiude,
+  // compatta quel poco che ha imparato e manda l'utente alla home.
+  on(MSG.FILO_CLOSE_ONBOARDING, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
+    const cur = await FiloMem.getOnboarding();
+    if (cur.done) return { ok: true, onboarding: cur, already: true };
+    const bye = Onboarding.CLOSING_MESSAGE;
+    const state = await saveOnboarding(
+      Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye })),
+    );
+    // Niente agente-lezioni: qui non c'è un turno da cui estrarre nulla, ma
+    // quello che l'utente aveva già raccontato va comunque messo in memoria.
+    finishOnboarding({ lessons: false });
+    return { ok: true, onboarding: state, closing: bye };
   });
 
   // Gli appunti non hanno più un archivio proprio (né quindi handler CRUD): sono
