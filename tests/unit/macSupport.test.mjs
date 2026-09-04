@@ -55,6 +55,13 @@ test('il pacchetto per Mac vale su ENTRAMBI i processori', () => {
 test('esistono i comandi per costruire e pubblicare la versione Mac', () => {
   assert.ok(pkg.scripts['build:mac'], 'manca lo script build:mac');
   assert.ok(pkg.scripts['release:mac'], 'manca lo script release:mac');
+  // "Costruisci" deve costruire e basta. Su una macchina di CI lo strumento,
+  // se non glielo si vieta, decide DA SÉ di pubblicare: cerca un token che lì
+  // non c'è e la costruzione muore alla fine, dopo aver fatto tutto.
+  assert.match(pkg.scripts['build:mac'], /--publish never/,
+    'build:mac può provare a pubblicare da solo su una macchina di CI');
+  assert.match(pkg.scripts['release:mac'], /--publish always/,
+    'release:mac non pubblica più');
 });
 
 test("l'icona per Mac esiste ed è abbastanza grande", () => {
