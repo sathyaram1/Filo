@@ -16,15 +16,24 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
 
-async function openStubbedEditor(openTab) {
+async function openStubbedEditor(openTab, overrides = {}) {
   const page = await openTab(ADMIN_URL);
-  await page.addInitScript(() => {
+  await page.addInitScript((over) => {
     const fakeConfig = {
       apiKeysPresent: { openrouter: true, gemini: false, tavily: false },
       safeBrowsingKeyPresent: false,
       modelRegistry: { esistente: { provider: 'openrouter', model: 'vendor/gia-salvato', reasoning: 'medium' } },
       models: {},
+      // Senza override: la lista di esclusione EFFETTIVA coincide con quella del
+      // codice (nessun override remoto), che è il caso normale.
+      excludedProviders: null,
+      ...over,
     };
+    if (fakeConfig.excludedProviders == null) {
+      Object.defineProperty(fakeConfig, 'excludedProviders', {
+        get: () => (window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [],
+      });
+    }
     window.__sent = [];
     const stub = async (msg) => {
       window.__sent.push(msg);
@@ -47,13 +56,26 @@ async function openStubbedEditor(openTab) {
           // Il main risponderebbe ok solo se riceve la stringa modello.
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
           return { ok: true, ttftMs: 123, tokensPerSec: 45.6, provider: msg.provider, model: msg.model };
+        case 'defaults_update':
+          // Come il main: risponde con la config effettiva DOPO la scrittura.
+          return {
+            ok: true,
+            config: {
+              apiKeysPresent: fakeConfig.apiKeysPresent,
+              safeBrowsingKeyPresent: fakeConfig.safeBrowsingKeyPresent,
+              modelRegistry: (msg.config && msg.config.modelRegistry) || fakeConfig.modelRegistry,
+              models: (msg.config && msg.config.models) || fakeConfig.models,
+              excludedProviders: (msg.config && msg.config.excludedProviders)
+                || fakeConfig.excludedProviders,
+            },
+          };
         default:
           return { ok: true };
       }
     };
     if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
     else window.chrome = { runtime: { sendMessage: stub } };
-  });
+  }, overrides);
   await page.reload();
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   return page;
@@ -149,6 +171,70 @@ test('livello di reasoning per-modello: mostra il valore salvato e lo ripropaga 
   expect('reasoning' in (upd?.config?.modelRegistry?.senza || {})).toBe(false);
 
   await page.screenshot({ path: 'tests/.shots/admin-defaults-reasoning.png', fullPage: true }).catch(() => {});
+});
+
+// ── Fornitori esclusi (#518) ────────────────────────────────────────────────
+// Un host che serve male (nel banco di prova rispondeva ad alcune richieste con
+// la risposta di un'altra) va tolto di mezzo per TUTTI gli utenti. La lista che
+// lo fa vive nella config condivisa, e la lista scritta lì sostituisce quella
+// del codice: senza un posto dove scriverla, l'owner non poteva applicarla.
+
+test('la lista dei fornitori esclusi si modifica e si salva nella config condivisa', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'OpenAI'] });
+
+  // La lista effettiva arriva in pagina, una riga per fornitore.
+  const rows = page.locator('#excludedList .sn-excluded-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0).locator('.sn-excluded-name')).toHaveValue('Google');
+
+  // L'owner ne aggiunge uno a mano e ne toglie un altro.
+  await page.click('#addExcludedRow');
+  await page.locator('#excludedList .sn-excluded-row').last().locator('.sn-excluded-name')
+    .fill('Novita');
+  await rows.nth(1).getByRole('button', { name: 'Rimuovi' }).click();
+
+  await page.click('#saveBtn');
+
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd?.config?.excludedProviders).toEqual(['Google', 'Novita']);
+
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-excluded.png', fullPage: true }).catch(() => {});
+});
+
+test('esclusioni del codice che la lista condivisa non copre: la pagina le nomina e le rimette', async ({ openTab }) => {
+  // Lista remota vecchia: non contiene Novita (né gli altri aggiunti dopo).
+  const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'OpenAI'] });
+
+  const drift = page.locator('#excludedDrift');
+  await expect(drift).toBeVisible();
+  await expect(drift).toContainText('Novita');
+
+  await drift.getByRole('button', { name: 'Rimettili nella lista' }).click();
+
+  // Rimessi tutti: l'avviso sparisce perché non c'è più niente di scoperto.
+  await expect(drift).toBeHidden();
+  const names = await page.locator('#excludedList .sn-excluded-name')
+    .evaluateAll((els) => els.map((e) => e.value));
+  expect(names).toContain('Novita');
+
+  // E il salvataggio propaga la lista completa, Novita compreso.
+  await page.click('#saveBtn');
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd?.config?.excludedProviders).toContain('Novita');
+  expect(upd?.config?.excludedProviders).toContain('Google');
+});
+
+test('un salvataggio che non tocca le esclusioni non congela la lista del codice', async ({ openTab }) => {
+  // Nessun override remoto: la lista in pagina è quella del codice.
+  const page = await openStubbedEditor(openTab);
+  await expect(page.locator('#excludedDrift')).toBeHidden();
+
+  await page.click('#saveBtn');
+
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  // Niente campo → il doc condiviso non riceve una copia della lista di build,
+  // che da lì in poi bloccherebbe ogni esclusione aggiunta con un rilascio.
+  expect('excludedProviders' in (upd?.config || {})).toBe(false);
 });
 
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {

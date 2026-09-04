@@ -67,6 +67,23 @@
         <datalist id="nicknames-list"></datalist>
       </section>
 
+      <section id="sec-excluded">
+        <h2 id="h-excluded"></h2>
+        <p class="sn-muted" id="excluded-desc"></p>
+        <div id="excludedList"></div>
+        <div class="sn-row" style="margin-top: 10px;">
+          <button class="sn-btn sn-btn-secondary" id="addExcludedRow" type="button"></button>
+        </div>
+        <!-- Compare solo se questa lista NON copre voci escluse dal codice:
+             la lista salvata qui sostituisce quella di build, e senza avviso
+             un'esclusione aggiunta col codice resterebbe lettera morta. -->
+        <div class="sn-info-box" id="excludedDrift" hidden>
+          <div class="sn-info-box-title" id="excludedDriftTitle"></div>
+          <p id="excludedDriftText" style="margin: 0 0 8px;"></p>
+          <button class="sn-btn sn-btn-secondary" id="excludedDriftFix" type="button"></button>
+        </div>
+      </section>
+
       <div class="sn-toolbar" style="margin-top: 24px;">
         <button class="sn-btn" id="saveBtn" type="button"></button>
         <span id="saveStatus" class="sn-muted"></span>
