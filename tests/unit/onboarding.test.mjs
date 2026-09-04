@@ -34,7 +34,8 @@ const Levels = globalThis.SN_ACTION_LEVELS;
 test('si registra su globalThis con la sua API', () => {
   assert.ok(O, 'SN_ONBOARDING assente');
   for (const fn of ['emptyState', 'normalize', 'tick', 'close', 'restart', 'remaining',
-    'isComplete', 'appendTurn', 'userTurns', 'shouldForceClose', 'renderChecklistForPrompt']) {
+    'isComplete', 'appendTurn', 'userTurns', 'shouldForceClose', 'renderChecklistForPrompt',
+    'isStopRequest', 'isDecline', 'isExitRequest', 'dismissNotice']) {
     assert.equal(typeof O[fn], 'function', `manca ${fn}()`);
   }
   assert.ok(O.WELCOME_MESSAGE.length > 40, 'il primo messaggio è un testo fisso scritto a mano');
