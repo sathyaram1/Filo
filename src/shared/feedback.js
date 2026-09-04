@@ -215,6 +215,10 @@
     for (const [k, v] of Object.entries(doc.fields || {})) out[k] = fromFsValue(v);
     out._id = doc.name?.split('/').pop() || '';
     out._createTime = doc.createTime || null;
+    // Ultima scrittura sul documento (la mette Firestore, non chi scrive): è
+    // il segno con cui la dashboard riconosce, a ogni giro, quali feedback
+    // sono cambiati senza rileggerli tutti.
+    out._updateTime = doc.updateTime || null;
     return out;
   }
 
