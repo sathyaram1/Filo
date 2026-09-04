@@ -95,7 +95,8 @@ test('mentre l\'owner scrive nel pannello, il pannello non si ridisegna (i dati 
   await page.evaluate(() => window.__mgTest.whenReady());
 
   const A = fakeFb('live-a', 'Titolo vecchio', 'Testo vecchio.', { seq: 11 });
-  await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, A);
+  // Da admin: è l'owner che scrive nel pannello, e la casella del commento c'è solo per lui.
+  await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, A);
   await page.locator('.mg-item[data-id="live-a"]').click();
   await expect(page.locator('#mgDetail')).toContainText('Testo vecchio');
 
