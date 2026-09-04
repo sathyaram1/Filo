@@ -45,15 +45,13 @@
       "file": "capture-composite.spec.mjs",
       "titolo": "screenshot newtab: file esiste e non è vuoto",
       "dove": "cloud",
-      "tranne": "actions",
-      "perche": "sulla macchina delle routine, sotto Xvfb, non c'è niente da fotografare: anche con scrot installato il PNG esce di 6 KB, cioè una schermata nera. Sul runner di GitHub Actions, con lo stesso scrot e lo schermo dichiarato a 1920x1080x24, la cattura riesce e il test passa: lì la scusa non vale. Misurato il 2026-09-04, su entrambe."
+      "perche": "sotto Xvfb non c'è niente da fotografare: anche con scrot installato il PNG esce di 6136 byte, cioè una schermata nera. Sulla macchina delle routine è così ogni volta; sul runner dipende dalla macchina che tocca, e nelle due corse del 2026-09-04 la cattura è riuscita in una e ha dato la stessa schermata nera nell'altra. Una corsa verde non basta per togliere la voce: toglierla renderebbe rossa la metà delle corse."
     },
     {
       "file": "capture-composite.spec.mjs",
       "titolo": "screenshot dashboard (filo://dashboard): file esiste e non è vuoto",
       "dove": "cloud",
-      "tranne": "actions",
-      "perche": "sulla macchina delle routine, sotto Xvfb, non c'è niente da fotografare: anche con scrot installato il PNG esce di 6 KB, cioè una schermata nera. Sul runner di GitHub Actions, con lo stesso scrot e lo schermo dichiarato a 1920x1080x24, la cattura riesce e il test passa: lì la scusa non vale. Misurato il 2026-09-04, su entrambe."
+      "perche": "sotto Xvfb non c'è niente da fotografare: anche con scrot installato il PNG esce di 6136 byte, cioè una schermata nera. Sulla macchina delle routine è così ogni volta; sul runner dipende dalla macchina che tocca, e nelle due corse del 2026-09-04 la cattura è riuscita in una e ha dato la stessa schermata nera nell'altra. Una corsa verde non basta per togliere la voce: toglierla renderebbe rossa la metà delle corse."
     },
     {
       "file": "clipboard-history-remove.spec.mjs",
