@@ -368,7 +368,7 @@ export function classifica(verbali, noti, ambiente, opzioni = {}) {
     if (scusa) { scusati.push({ ...f, perche: scusa.perche }); usate.add(scusa); }
     else rossi.push(f);
   }
-  const scaduti = (noti || []).filter((n) => !usate.has(n) && ambienteCopre(n.dove, ambiente));
+  const scaduti = (noti || []).filter((n) => !usate.has(n) && ambienteCopre(n.dove, ambiente, n.tranne));
   const eseguiti = fette.reduce((n, f) => n + f.eseguiti, 0);
   const minimo = Number(opzioni.minimo || 0) || 0;
   return {
