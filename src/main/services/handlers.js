@@ -1936,7 +1936,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   for (let tentativo = 1; tentativo <= 3; tentativo++) {
     r = await handleAIRequest({
       action: ACTIONS.FILO_CHAT,
-      payload: { profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita, files: fileSummaries },
+      payload: {
+        profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita,
+        files: fileSummaries,
+        onboarding: onboardingText,
+        onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
+        onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
+      },
       origin: 'filo:chat',
       onReasoning: tentativo === 1 ? onReasoning : null,
       onText: tentativo === 1 ? onText : null,
