@@ -12,7 +12,7 @@
 // Il fix: al salvataggio l'editor registra i nickname di build ASSENTI dal
 // registry inviato in una lista `modelRegistryDeleted` (tombstone) sul doc
 // remoto; get() li rimuove dopo il merge. I nickname integrati NON toccati
-// restano (invariante flash: le catene di default che li citano risolvono).
+// restano (invariante dei nickname integrati: le catene di default che li citano risolvono).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -77,23 +77,23 @@ function withFakeFirestore(fn) {
 
 test('un modello integrato eliminato NON riappare dopo la riapertura', async () => {
   await withFakeFirestore(async () => {
-    // L'editor mostra build+remoto fusi; l'admin elimina la riga "tts" e salva:
-    // arriva il registry completo SENZA "tts".
+    // L'editor mostra build+remoto fusi; l'admin elimina la riga "kokoro" e salva:
+    // arriva il registry completo SENZA "kokoro".
     const kept = { ...C.DEFAULT_MODEL_REGISTRY };
-    delete kept.tts;
+    delete kept.kokoro;
     const publicCfg = await Defaults.update({ modelRegistry: kept }, 'fake-admin-token');
 
-    // Subito dopo il salvataggio (la config tornata all'editor): "tts" sparito…
-    assert.ok(!('tts' in publicCfg.modelRegistry), '"tts" ancora presente subito dopo il salvataggio');
-    // …ma gli altri nickname integrati non toccati restano (invariante flash).
-    for (const nick of ['flash', 'flash-or', 'flash-lite-3', 'claude-haiku']) {
+    // Subito dopo il salvataggio (la config tornata all'editor): "kokoro" sparito…
+    assert.ok(!('kokoro' in publicCfg.modelRegistry), '"kokoro" ancora presente subito dopo il salvataggio');
+    // …ma gli altri nickname integrati non toccati restano (invariante dei nickname integrati).
+    for (const nick of ['deepseek', 'deepseek-flash', 'gemma', 'claude']) {
       assert.ok(publicCfg.modelRegistry[nick], `nickname integrato "${nick}" sparito per errore`);
     }
 
     // Riapertura del menu = nuova lettura da Firestore (refresh + get).
     const reopened = await Defaults.refresh();
-    assert.ok(!('tts' in reopened.modelRegistry), '"tts" riapparso dopo la riapertura (bug #365)');
-    for (const nick of ['flash', 'flash-or', 'flash-lite-3', 'claude-haiku']) {
+    assert.ok(!('kokoro' in reopened.modelRegistry), '"kokoro" riapparso dopo la riapertura (bug #365)');
+    for (const nick of ['deepseek', 'deepseek-flash', 'gemma', 'claude']) {
       assert.ok(reopened.modelRegistry[nick], `nickname integrato "${nick}" perso dopo la riapertura`);
     }
   });
@@ -101,18 +101,18 @@ test('un modello integrato eliminato NON riappare dopo la riapertura', async () 
 
 test('ri-aggiungere un modello eliminato lo fa ricomparire (auto-guarigione dei tombstone)', async () => {
   await withFakeFirestore(async () => {
-    // Prima elimina "tts"…
-    const withoutTts = { ...C.DEFAULT_MODEL_REGISTRY };
-    delete withoutTts.tts;
-    await Defaults.update({ modelRegistry: withoutTts }, 'fake-admin-token');
+    // Prima elimina "kokoro"…
+    const withoutKokoro = { ...C.DEFAULT_MODEL_REGISTRY };
+    delete withoutKokoro.kokoro;
+    await Defaults.update({ modelRegistry: withoutKokoro }, 'fake-admin-token');
     let eff = await Defaults.refresh();
-    assert.ok(!('tts' in eff.modelRegistry), 'precondizione: "tts" deve essere eliminato');
+    assert.ok(!('kokoro' in eff.modelRegistry), 'precondizione: "kokoro" deve essere eliminato');
 
     // …poi l'admin lo ri-aggiunge dall'editor e salva: il registry inviato lo
     // contiene di nuovo, quindi esce dai tombstone.
     await Defaults.update({ modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY } }, 'fake-admin-token');
     eff = await Defaults.refresh();
-    assert.ok(eff.modelRegistry.tts, '"tts" non è tornato dopo averlo ri-aggiunto (tombstone non guarito)');
+    assert.ok(eff.modelRegistry.kokoro, '"kokoro" non è tornato dopo averlo ri-aggiunto (tombstone non guarito)');
   });
 });
 

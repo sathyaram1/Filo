@@ -30,14 +30,14 @@ async function preparaProvider(app, attesaMs = 4000) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'flash-lite-3' },
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     const pezzi = Array.from({ length: 12 }, (_, i) =>
       `Paragrafo ${i + 1}: una spiegazione distesa della parola selezionata, con abbastanza testo da far crescere il riquadro fino al suo tetto di altezza. `);
-    globalThis.__origGemPose = globalThis.SN_PROVIDER_GEMINI;
-    globalThis.SN_PROVIDER_GEMINI = {
+    globalThis.__origGemPose = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = {
       ...globalThis.__origGemPose,
       streamComplete: async ({ onDelta }) => {
         // Attesa iniziale come quella vera di un modello: è la finestra in cui
@@ -55,7 +55,7 @@ async function preparaProvider(app, attesaMs = 4000) {
 
 async function ripristinaProvider(app) {
   await app.evaluate(() => {
-    if (globalThis.__origGemPose) globalThis.SN_PROVIDER_GEMINI = globalThis.__origGemPose;
+    if (globalThis.__origGemPose) globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origGemPose;
   });
 }
 

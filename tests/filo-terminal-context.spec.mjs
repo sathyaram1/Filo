@@ -85,8 +85,8 @@ test('#2 l’output di un comando rientra nel contesto del modello al turno dopo
     // fermarsi su "API key mancante" prima di costruire i messages.
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'flash-lite-3' },
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     // Stub del provider: cattura i messages costruiti e ritorna un JSON valido.

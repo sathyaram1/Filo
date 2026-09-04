@@ -23,14 +23,14 @@ async function preparaProvider(app, attesaMs = 300, opts = {}) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'flash-lite-3' },
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     const pezzi = o.pezzi || Array.from({ length: 12 }, (_, i) =>
       `Paragrafo ${i + 1}: una spiegazione distesa della parola selezionata, con abbastanza testo da far crescere il riquadro fino al suo tetto di altezza. `);
-    if (!globalThis.__origGemVer) globalThis.__origGemVer = globalThis.SN_PROVIDER_GEMINI;
-    globalThis.SN_PROVIDER_GEMINI = {
+    if (!globalThis.__origGemVer) globalThis.__origGemVer = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = {
       ...globalThis.__origGemVer,
       streamComplete: async ({ onDelta }) => {
         if (o.errore) throw new Error('boom provider');
@@ -47,7 +47,7 @@ async function preparaProvider(app, attesaMs = 300, opts = {}) {
 
 async function ripristinaProvider(app) {
   await app.evaluate(() => {
-    if (globalThis.__origGemVer) globalThis.SN_PROVIDER_GEMINI = globalThis.__origGemVer;
+    if (globalThis.__origGemVer) globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origGemVer;
   });
 }
 

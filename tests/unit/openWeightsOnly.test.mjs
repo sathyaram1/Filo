@@ -39,9 +39,20 @@ test('i pesi aperti si riconoscono dal NOME del modello, non dal fornitore nell\
   assert.equal(C.isOpenWeightsModelId(''), false);
 });
 
-test('pesi aperti serviti dal produttore NON sono ammessi (Gemma su Google resta Google)', () => {
+test('pesi aperti serviti dal produttore NON sono ammessi; oggi nessun fornitore di Filo lo è', () => {
   assert.equal(C.isOpenWeightsEntry({ provider: 'openrouter', model: 'google/gemma-4-31b-it' }), true);
-  assert.equal(C.isOpenWeightsEntry({ provider: 'gemini', model: 'gemma-4-31b-it' }), false);
+  // La lista dei fornitori "API del produttore" esiste ancora (il meccanismo
+  // resta), ma è vuota: l'API diretta di Google è fuori da Filo, e il router
+  // non è un produttore.
+  assert.ok(Array.isArray(C.PRODUCER_DIRECT_PROVIDERS));
+  assert.ok(!C.PRODUCER_DIRECT_PROVIDERS.includes('openrouter'));
+  for (const p of C.PRODUCER_DIRECT_PROVIDERS) {
+    assert.equal(C.isOpenWeightsEntry({ provider: p, model: 'gemma-4-31b-it' }), false);
+  }
+  // Nessuna voce predefinita passa da un'API diretta del produttore.
+  for (const [nick, e] of Object.entries(REG)) {
+    assert.equal(e.provider, 'openrouter', `${nick} deve passare dal router`);
+  }
 });
 
 test('una voce può dichiarare i propri pesi (l\'owner corregge senza toccare il codice)', () => {
@@ -81,9 +92,14 @@ test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i 
   const dettatura = C.applyOpenWeightsPolicy(
     C.parseModelRefs(C.DEFAULT_MODELS[A.TRANSCRIBE_AUDIO]), REG, A.TRANSCRIBE_AUDIO,
   );
-  assert.deepEqual(dettatura.refs, [], 'la dettatura non può finire su un modello che l\'audio non lo sente');
-  assert.deepEqual(dettatura.substituted, []);
-  assert.ok(dettatura.dropped.length);
+  assert.ok(dettatura.refs.length, 'la dettatura parte già da modelli a pesi aperti: resta viva');
+  assert.deepEqual(dettatura.substituted, [], 'niente da sostituire: erano già aperti');
+  assert.deepEqual(dettatura.dropped, []);
+  // Un modello di chat proprietario messo sulla dettatura, invece, non viene
+  // sostituito da uno che l'audio non lo sente: la funzione si ferma e lo dice.
+  const chatSullaDettatura = C.applyOpenWeightsPolicy(['claude'], REG, A.TRANSCRIBE_AUDIO);
+  assert.deepEqual(chatSullaDettatura.refs, []);
+  assert.ok(chatSullaDettatura.dropped.length);
 
   // Le funzioni che leggono immagini invece continuano: i sostituti dichiarano
   // di saperlo fare, quindi fermarle sarebbe un danno gratuito.
@@ -103,7 +119,7 @@ test('il sostituto deve saper fare il MESTIERE della funzione, non solo avere i 
   // del modello: le capacità dei sostituti si sanno lo stesso, altrimenti
   // accendere l'interruttore con la propria configurazione fermerebbe TUTTO.
   const personale = {
-    flash: { provider: 'gemini', model: 'gemini-2.0-flash' },
+    flash: { provider: 'openrouter', model: 'google/gemini-2.0-flash-001' },
     gemma: { provider: 'openrouter', model: 'google/gemma-4-31b-it' },
     'gemma-lite': { provider: 'openrouter', model: 'google/gemma-4-26b-a4b-it' },
   };
@@ -126,12 +142,13 @@ test('NESSUNA funzione predefinita resta con un modello proprietario a interrutt
     'una funzione predefinita può girare su un modello proprietario nonostante l\'interruttore');
 });
 
-test('la catena di tentativi non contiene il provider diretto del produttore', () => {
-  const refs = C.applyOpenWeightsPolicy(C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.EXPLAIN]), REG).refs;
-  const attempts = C.buildModelAttempts(refs, REG, ['openrouter'], { gemini: 'k', openrouter: 'k' });
+test('la catena di tentativi passa solo dal router, con modelli a pesi aperti', () => {
+  const refs = C.applyOpenWeightsPolicy(C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.EXPLAIN_DEEP]), REG).refs;
+  const attempts = C.buildModelAttempts(refs, REG, ['openrouter'], { openrouter: 'k' });
   assert.ok(attempts.length, 'deve restare almeno un tentativo, altrimenti la funzione muore');
-  assert.deepEqual(attempts.map((a) => a.provider), ['openrouter']);
-  assert.deepEqual(attempts.map((a) => a.model), ['google/gemma-4-31b-it']);
+  assert.deepEqual([...new Set(attempts.map((a) => a.provider))], ['openrouter']);
+  for (const a of attempts) assert.ok(C.isOpenWeightsModelId(a.model), `${a.model} deve essere a pesi aperti`);
+  assert.ok(!attempts.some((a) => /claude/.test(a.model)), 'Anthropic esce dalla catena');
 });
 
 test('a interruttore acceso Anthropic entra fra i fornitori esclusi', () => {
@@ -154,15 +171,13 @@ test('l\'effetto dell\'interruttore è dichiarabile PRIMA di accenderlo', () => 
   const cambiano = impact.substituted.map((s) => s.action);
   const ferme = impact.unavailable.map((u) => u.action);
 
-  assert.ok(cambiano.includes(C.ACTIONS.EXPLAIN), 'le funzioni che cambiano modello vanno dichiarate');
-  assert.ok(cambiano.includes(C.ACTIONS.EXPLAIN_DEEP));
-  assert.ok(ferme.includes(C.ACTIONS.TTS), 'le funzioni che si fermano vanno dichiarate');
-  assert.ok(ferme.includes(C.ACTIONS.ARCHIVE_EMBED));
-  // La dettatura sta fra QUELLE CHE SI FERMANO, non fra quelle che cambiano
-  // modello: annunciarla come "cambia modello" sarebbe una bugia che l'utente
-  // scopre solo quando prova a dettare.
-  assert.ok(ferme.includes(C.ACTIONS.TRANSCRIBE_AUDIO));
+  assert.ok(cambiano.includes(C.ACTIONS.EXPLAIN_DEEP), 'le funzioni che cambiano modello vanno dichiarate');
+  assert.ok(cambiano.includes(C.ACTIONS.EDIT_TEXT));
+  // Le funzioni che partono già da un modello a pesi aperti non cambiano e
+  // non si fermano: voce, dettatura e indicizzazione oggi sono fra queste.
+  assert.ok(!cambiano.includes(C.ACTIONS.EXPLAIN));
   assert.ok(!cambiano.includes(C.ACTIONS.TRANSCRIBE_AUDIO));
+  assert.deepEqual(ferme, [], 'nessuna funzione predefinita si ferma a interruttore acceso');
   // Una funzione non può stare in tutt'e due gli elenchi.
   assert.deepEqual(cambiano.filter((a) => ferme.includes(a)), []);
 });

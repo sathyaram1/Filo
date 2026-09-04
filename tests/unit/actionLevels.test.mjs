@@ -90,8 +90,8 @@ test('IMPOSTA_PREFERENZA: impostazioni sensibili (#146.5) → livello 2 (conferm
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'navigazione_sicura', valore: 'off' }), 2);
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'protezione_ip', valore: 'off' }), 2);
   // Modelli / provider / chiavi / costi.
-  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'provider', valore: 'gemini' }), 2);
-  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_gemini', valore: 'AIzaXXXX1234' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'provider', valore: 'openrouter' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-XXXX1234' }), 2);
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '10' }), 2);
 });
 

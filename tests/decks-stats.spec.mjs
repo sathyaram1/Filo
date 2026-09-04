@@ -63,8 +63,8 @@ async function mockProvider(app) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.DECKS_CHAT]: 'flash-lite-3' },
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {

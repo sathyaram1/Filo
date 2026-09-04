@@ -31,7 +31,7 @@ test('Modelli predefiniti: il main rifiuta defaults_get e defaults_update da non
   expect(String(getRes.error || '')).toMatch(/amministrator/i);
 
   const updRes = await page.evaluate(() =>
-    window.filo.message({ type: 'defaults_update', config: { provider: 'gemini' } })
+    window.filo.message({ type: 'defaults_update', config: { provider: 'openrouter' } })
   );
   expect(updRes).toBeTruthy();
   expect(updRes.ok).toBe(false);

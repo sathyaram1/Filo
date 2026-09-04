@@ -74,7 +74,7 @@ test('il registry remoto si fonde con quello di build (i nickname integrati rest
   // L'override remoto vince sul nickname che definisce…
   assert.equal(eff.modelRegistry.text.model, 'deepseek/deepseek-v4-pro');
   // …ma i nickname integrati citati dalle catene di default restano risolvibili.
-  for (const nick of ['flash', 'flash-or', 'flash-lite-3', 'claude-haiku', 'tts']) {
+  for (const nick of ['deepseek', 'deepseek-flash', 'gemma', 'claude', 'kokoro', 'whisper', 'qwen-embed']) {
     assert.ok(eff.modelRegistry[nick], `nickname integrato "${nick}" sparito dal registry effettivo`);
   }
 });
@@ -87,8 +87,8 @@ test('con il registry effettivo le azioni dei mazzi risolvono in modelli concret
   assert.ok(chain, 'manca la catena di default per la chat dei mazzi');
 
   const refs = C.parseModelRefs(chain);
-  const attempts = C.buildModelAttempts(refs, eff.modelRegistry, ['gemini', 'openrouter'], {
-    gemini: 'k1', openrouter: 'k2',
+  const attempts = C.buildModelAttempts(refs, eff.modelRegistry, ['openrouter'], {
+    openrouter: 'k2',
   });
   assert.ok(attempts.length > 0, 'nessun tentativo costruito per la chat dei mazzi');
   // Un nickname non risolto passerebbe grezzo al provider (es. model === 'flash',

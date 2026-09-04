@@ -36,7 +36,7 @@ test('Capacità: la validazione modello↔funzione è corretta (main process)', 
       textOnTts: m('gemini', 'gemini-2.0-flash', A.TTS),
       gemmaOnImage: m('gemini', 'gemma-4-31b-it', A.DESCRIBE_IMAGE),
       geminiOnImage: m('gemini', 'gemini-2.0-flash', A.DESCRIBE_IMAGE),
-      hasSynth: typeof globalThis.SN_PROVIDER_GEMINI.synthesizeSpeech === 'function',
+      hasSynth: typeof globalThis.SN_PROVIDER_OPENROUTER.synthesizeSpeech === 'function',
     };
   });
   expect(r.textOnText).toBe(true);
@@ -164,8 +164,8 @@ test('TTS: senza un modello di lettura il motivo dice quale funzione manca (#416
     const C = window.SN_CONST;
     await window.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      modelRegistry: { tts: { provider: 'gemini', model: 'gemini-2.5-flash-preview-tts' } },
+      apiKeys: { openrouter: 'k-test' },
+      modelRegistry: { tts: { provider: 'openrouter', model: 'gemini-2.5-flash-preview-tts' } },
       models: { [C.ACTIONS.TTS]: '' },
     });
     return chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.TTS_SYNTH, text: 'ciao' });

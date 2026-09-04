@@ -29,16 +29,16 @@ async function preparaProviderConGate(app) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'flash-lite-3' },
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     globalThis.__gatePopupScroll = new Promise((res) => { globalThis.__apriGatePopupScroll = res; });
     const paragrafo = (i) => `Paragrafo ${i}: una spiegazione distesa della parola selezionata, con abbastanza testo da far traboccare il corpo del riquadro e renderlo scorrevole. `;
     const primi = Array.from({ length: 14 }, (_, i) => paragrafo(i + 1));
     const dopo = Array.from({ length: 14 }, (_, i) => paragrafo(i + 15));
-    globalThis.__origGemScroll = globalThis.SN_PROVIDER_GEMINI;
-    globalThis.SN_PROVIDER_GEMINI = {
+    globalThis.__origGemScroll = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = {
       ...globalThis.__origGemScroll,
       streamComplete: async ({ onDelta }) => {
         for (const p of primi) {
@@ -62,7 +62,7 @@ async function apriGate(app) {
 
 async function ripristinaProvider(app) {
   await app.evaluate(() => {
-    if (globalThis.__origGemScroll) globalThis.SN_PROVIDER_GEMINI = globalThis.__origGemScroll;
+    if (globalThis.__origGemScroll) globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origGemScroll;
   });
 }
 

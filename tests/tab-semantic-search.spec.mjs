@@ -2,7 +2,7 @@
 // (spec §3.1 riassunto, §3.2 ricerca/embedding/re-rank, §5 pulizia retroattiva).
 //
 // LLM ed embedding reali richiedono la chiave Google: nei test STUBBIAMO sia il
-// provider di embedding (SN_PROVIDER_GEMINI.embed) sia il completamento LLM
+// provider di embedding (SN_PROVIDER_OPENROUTER.embed) sia il completamento LLM
 // (SN_PROVIDERS.completeWithFallback) e impostiamo una chiave finta, così
 // verifichiamo il PLUMBING: indicizzazione (riassunto + embedding + snippet),
 // ranking per coseno, re-rank LLM, e cancellazione multipla.
@@ -17,14 +17,14 @@ async function setupStubs(app, { summary } = {}) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'test-key', openrouter: '', tavily: '' },
+      apiKeys: { openrouter: 'test-key', tavily: '' },
       models: { ...C.DEFAULT_MODELS },
       modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
     });
-    globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [0.5, 0.2, 0.9, 0.1]);
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => texts.map(() => [0.5, 0.2, 0.9, 0.1]);
     if (args.summary != null) {
       globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
-        text: args.summary, provider: 'gemini', model: 'stub', usage: {},
+        text: args.summary, provider: 'openrouter', model: 'stub', usage: {},
       });
     }
   }, { summary: summary ?? null });
@@ -54,7 +54,7 @@ test('la ricerca semantica ordina per pertinenza e non espone gli embedding', as
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'test-key', openrouter: '', tavily: '' },
+      apiKeys: { openrouter: 'test-key', tavily: '' },
       models: { ...C.DEFAULT_MODELS },
       modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
     });
@@ -63,9 +63,9 @@ test('la ricerca semantica ordina per pertinenza e non espone gli embedding', as
     const b = await A.archive({ url: 'https://b.test/', title: 'DocB' });
     await A.update(a.id, { embedding: [127, 0], snippet: 'documento A' });
     await A.update(b.id, { embedding: [0, 127], snippet: 'documento B' });
-    globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [1, 0]); // ≈ DocA
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => texts.map(() => [1, 0]); // ≈ DocA
     // Niente re-rank: il completamento torna vuoto → resta l'ordine per coseno.
-    globalThis.SN_PROVIDERS.completeWithFallback = async () => ({ text: '', provider: 'gemini', model: 'stub', usage: {} });
+    globalThis.SN_PROVIDERS.completeWithFallback = async () => ({ text: '', provider: 'openrouter', model: 'stub', usage: {} });
   });
 
   const page = await openTab('filo://newtab/');
@@ -86,7 +86,7 @@ test('il re-rank LLM può riordinare i risultati rispetto al coseno', async ({ a
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'test-key', openrouter: '', tavily: '' },
+      apiKeys: { openrouter: 'test-key', tavily: '' },
       models: { ...C.DEFAULT_MODELS },
       modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
     });
@@ -95,10 +95,10 @@ test('il re-rank LLM può riordinare i risultati rispetto al coseno', async ({ a
     const b = await A.archive({ url: 'https://b.test/', title: 'DocB' });
     await A.update(a.id, { embedding: [127, 0], snippet: 'A' });
     await A.update(b.id, { embedding: [0, 127], snippet: 'B' });
-    globalThis.SN_PROVIDER_GEMINI.embed = async ({ texts }) => texts.map(() => [1, 0]); // coseno → DocA primo
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async ({ texts }) => texts.map(() => [1, 0]); // coseno → DocA primo
     // Re-rank: l'LLM mette DocB davanti (head = [DocA, DocB], order [1,0]).
     globalThis.SN_PROVIDERS.completeWithFallback = async () => ({
-      text: '{"order":[1,0]}', provider: 'gemini', model: 'stub', usage: {},
+      text: '{"order":[1,0]}', provider: 'openrouter', model: 'stub', usage: {},
     });
   });
 

@@ -121,13 +121,13 @@ test('il pulsante «Prova» usa il modello configurato, e cambia se cambio la co
     s.useDefaultModels = false;
     s.modelRegistry = {
       ...s.modelRegistry,
-      'prova-g': { label: 'Prova Gemini', provider: 'gemini', model: 'modello-di-prova-gemini' },
+      'prova-g': { label: 'Prova Gemini', provider: 'openrouter', model: 'modello-di-prova-gemini' },
       'prova-o': { label: 'Prova OR', provider: 'openrouter', model: 'vendor/modello-di-prova-or' },
     };
     s.models = { ...s.models, [window.SN_CONST.ACTIONS.PROVIDER_TEST]: 'prova-g, prova-o' };
     // Chiavi NON ancora salvate: è il caso vero del pulsante «Prova», che serve
     // proprio a misurare una chiave appena digitata.
-    s.apiKeys = { ...s.apiKeys, gemini: '', openrouter: '' };
+    s.apiKeys = { ...s.apiKeys, openrouter: '' };
     await window.SN_STORAGE.setSettings(s);
   });
 

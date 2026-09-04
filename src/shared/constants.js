@@ -410,6 +410,8 @@
       label: 'Claude Haiku 4.5',
       provider: 'openrouter',
       model: 'anthropic/claude-haiku-4.5',
+      inputs: ['text', 'image'],
+      outputs: ['text'],
     },
     // ── Modelli a PESI APERTI, serviti da fornitori indipendenti ─────────────
     // Sono i sostituti usati quando chi usa Filo accende "solo modelli a pesi
@@ -440,6 +442,8 @@
       provider: 'openrouter',
       model: 'deepseek/deepseek-v4-pro',
       weights: 'open',
+      inputs: ['text'],
+      outputs: ['text'],
     },
     'deepseek-flash': {
       label: 'DeepSeek V4 Flash (pesi aperti, economico)',

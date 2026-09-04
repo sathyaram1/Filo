@@ -44,7 +44,7 @@ test('Modelli: un singolo nickname risolve solo sul suo provider', async ({ open
   const chain = await page.evaluate(() => {
     const C = window.SN_CONST;
     const refs = C.parseModelRefs('flash');
-    return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, ['gemini', 'openrouter'], { gemini: 'gm', openrouter: 'or' });
+    return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, ['openrouter'], { openrouter: 'or' });
   });
   // 'flash' è un modello Gemini: non deve comparire alcun tentativo OpenRouter.
   expect(chain.map((a) => `${a.provider}:${a.model}`)).toEqual([

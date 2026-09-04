@@ -115,7 +115,7 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
     const usaConfigPersonale = (openWeightsOnly) => Storage.setSettings({
       useDefaultModels: false,
       openWeightsOnly,
-      apiKeys: { openrouter: 'k-test', gemini: 'k-test' },
+      apiKeys: { openrouter: 'k-test' },
       modelRegistry: {
         ...C.DEFAULT_MODEL_REGISTRY,
         // Modello proprietario scelto a mano: nessun sostituto previsto per lui.

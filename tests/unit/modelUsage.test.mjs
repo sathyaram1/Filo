@@ -136,9 +136,13 @@ test('l\'indicizzazione dell\'archivio accetta solo modelli che producono vettor
   );
   // …e un modello di testo non lo è (altrimenti la ricerca semantica girerebbe
   // su un modello che non sa produrre vettori, fallendo a ogni scheda chiusa).
-  const textEntry = reg.flash;
+  // La voce del registro dichiara le sue modalità (testo → testo): con quelle
+  // il controllo sa che non produce vettori. Senza dichiarazione un modello
+  // del router resta "incerto" e non si blocca (vedi modelCaps).
+  const textEntry = reg.deepseek;
   assert.equal(
-    Caps.modelMatchesAction(textEntry.provider, textEntry.model, A.ARCHIVE_EMBED).ok,
+    Caps.modelMatchesAction(textEntry.provider, textEntry.model, A.ARCHIVE_EMBED,
+      C.entryModalities(textEntry, 'deepseek')).ok,
     false,
   );
   // Simmetrico: il modello di indicizzazione non può finire su una funzione di testo.

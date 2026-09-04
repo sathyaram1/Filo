@@ -253,8 +253,10 @@ test('interruttore acceso: la prova della chiave parte sul sostituto a pesi aper
   const res = await testProvider({ provider: 'openrouter', apiKey: 'sk-or-utente' });
   assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
   assert.equal(state.calls.length, 1);
-  assert.equal(state.calls[0].model, 'google/gemma-4-26b-a4b-it',
-    'la prova doveva usare l\'equivalente a pesi aperti, non il modello proprietario');
+  const primo = C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.PROVIDER_TEST])[0];
+  assert.ok(C.isOpenWeightsRef(primo, C.DEFAULT_MODEL_REGISTRY), 'il modello della prova è a pesi aperti');
+  assert.equal(state.calls[0].model, C.DEFAULT_MODEL_REGISTRY[primo].model,
+    'la prova doveva usare un modello a pesi aperti, non uno proprietario');
 });
 
 test('interruttore acceso: la prova su un modello proprietario scritto a mano non parte', async () => {

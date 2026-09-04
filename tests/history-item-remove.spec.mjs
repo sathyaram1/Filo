@@ -38,13 +38,13 @@ test('history page: rimuovi una singola voce e la rimozione persiste', async () 
   const PRIVATE = 'IBAN-privato-che-voglio-togliere-42';
   const aiHistory = [
     { id: 'h-private', timestamp: new Date(now).toISOString(), action: 'explain_selection',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: PRIVATE },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: PRIVATE },
       output: 'spiegazione riservata', origin: 'https://example.com', costEur: 0.0001 },
     { id: 'h-keep-1', timestamp: new Date(now - 1000).toISOString(), action: 'translate',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: 'hello world' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: 'hello world' },
       output: 'ciao mondo', origin: 'https://example.com', costEur: 0.0001 },
     { id: 'h-keep-2', timestamp: new Date(now - 2000).toISOString(), action: 'translate',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: 'good morning' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: 'good morning' },
       output: 'buongiorno', origin: 'https://example.com', costEur: 0.0001 },
   ];
 

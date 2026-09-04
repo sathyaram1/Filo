@@ -115,7 +115,7 @@ test('Opzioni: acceso, la pagina non interroga più i server di chi produce i mo
   // partita da un click e una partita da sola.
   const chiaveSalvata = (openWeightsOnly) => app.evaluate(async (_, on) => {
     await globalThis.SN_STORAGE.setSettings({
-      apiKeys: { gemini: 'AIza-finta-per-il-test' },
+      apiKeys: { openrouter: 'sk-or-finta-per-il-test' },
       openWeightsOnly: on,
     });
   }, openWeightsOnly);

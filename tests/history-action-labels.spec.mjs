@@ -38,7 +38,7 @@ test('history page shows readable labels and filter options for all action types
     id: `h-${i}`,
     timestamp: new Date(now - i * 1000).toISOString(),
     action,
-    provider: 'gemini',
+    provider: 'openrouter',
     model: 'gemini-2.0-flash',
     input: { selection: `testo di prova numero ${i}` },
     output: `risposta di prova numero ${i}`,

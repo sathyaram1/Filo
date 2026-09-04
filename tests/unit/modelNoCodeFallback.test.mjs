@@ -51,23 +51,24 @@ test('una catena fatta di soli fantasmi non produce nessun tentativo', () => {
   const refs = C.parseModelRefs('flash, flash-or');
   assert.deepEqual(C.usableModelRefs(refs, REGISTRY), []);
   const attempts = C.buildModelAttempts(
-    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['gemini', 'openrouter'], { gemini: 'k', openrouter: 'k' },
+    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['openrouter'], { openrouter: 'k' },
   );
   assert.equal(attempts.length, 0,
     'una catena di scorciatoie inesistenti non deve produrre nessun modello da chiamare');
 });
 
 test('il registry scritto nel codice non risolve nulla se non è quello configurato', () => {
-  // 'flash' esiste fra i nickname integrati: è proprio quello su cui si ripiegava
-  // in silenzio. Con il registry configurato dell'utente deve risultare assente.
-  assert.ok(C.DEFAULT_MODEL_REGISTRY.flash, 'presupposto del test: "flash" è un nickname integrato');
-  assert.deepEqual(C.missingModelRefs(['flash'], REGISTRY), ['flash']);
+  // 'deepseek' esiste fra i nickname integrati: è il genere di scorciatoia su
+  // cui si ripiegava in silenzio. Con il registry configurato dell'utente deve
+  // risultare assente.
+  assert.ok(C.DEFAULT_MODEL_REGISTRY.deepseek, 'presupposto del test: "deepseek" è un nickname integrato');
+  assert.deepEqual(C.missingModelRefs(['deepseek'], REGISTRY), ['deepseek']);
 });
 
 test('la catena di ripiego fra modelli configurati produce i tentativi in ordine', () => {
   const refs = C.parseModelRefs('text, immagine');
   const attempts = C.buildModelAttempts(
-    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['gemini', 'openrouter'], { openrouter: 'k' },
+    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['openrouter'], { openrouter: 'k' },
   );
   assert.deepEqual(attempts.map((a) => a.model), [
     'deepseek/deepseek-v4-flash-0731',

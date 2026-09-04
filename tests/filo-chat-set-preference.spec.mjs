@@ -68,7 +68,7 @@ test('SN_PREF mappa il linguaggio naturale sulle preferenze giuste', async ({ ap
   // #146.5 — ora TUTTE le impostazioni sono scrivibili, comprese le sensibili
   // (sicurezza, modelli, provider, chiavi, costi): quelle a livello 2 portano
   // `level: 2` così il dispatch chiede conferma prima di applicarle.
-  expect(await build(app, 'provider', 'gemini')).toMatchObject({ partial: { provider: 'gemini' }, level: 2 });
+  expect(await build(app, 'provider', 'gemini')).toMatchObject({ partial: { provider: 'openrouter' }, level: 2 });
   expect(await build(app, 'gestione_cookie', 'privacy')).toMatchObject({ partial: { security: { cookies: { mode: 'privacy' } } }, level: 2 });
   expect(await build(app, 'navigazione_sicura', 'disattiva')).toMatchObject({ partial: { security: { safeBrowse: { enabled: false } } }, level: 2 });
   expect(await build(app, 'limite_spesa', '12 euro')).toMatchObject({ partial: { monthlyLimitEur: 12 }, level: 2 });

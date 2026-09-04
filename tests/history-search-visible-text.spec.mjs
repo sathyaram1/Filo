@@ -42,13 +42,13 @@ test('history search: ignora le chiavi interne del payload, cerca solo i testi v
   // neutre e distinte fra loro.
   const aiHistory = [
     { id: 'h-1', timestamp: new Date(now).toISOString(), action: 'explain',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: 'melanzana viola' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: 'melanzana viola' },
       output: 'ortaggio estivo', origin: 'https://example.com', costEur: 0.0001 },
     { id: 'h-2', timestamp: new Date(now - 1000).toISOString(), action: 'translate_selection',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: 'cammello curioso' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: 'cammello curioso' },
       output: 'animale del deserto', origin: 'https://example.com', costEur: 0.0001 },
     { id: 'h-3', timestamp: new Date(now - 2000).toISOString(), action: 'filo_chat',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { userMessage: 'trombone lucido' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { userMessage: 'trombone lucido' },
       output: 'strumento a fiato', origin: 'https://example.com', costEur: 0.0001 },
   ];
 

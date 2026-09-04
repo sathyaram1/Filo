@@ -31,8 +31,8 @@ async function stubProvider(app, { mode = 'it', delay = 0 } = {}) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     const P = globalThis.SN_PROVIDERS;
@@ -367,8 +367,8 @@ test('D5 — se il modello non risponde MAI, non dice "Pagina tradotta"', async 
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash' },
       modelRegistry: C.DEFAULT_MODEL_REGISTRY,
     });
     const P = globalThis.SN_PROVIDERS;

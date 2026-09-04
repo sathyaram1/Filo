@@ -43,7 +43,7 @@ test('Dettatura: a pesi aperti si ferma nominando il motivo, non con l\'errore g
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false,
       openWeightsOnly: true,
-      apiKeys: { openrouter: 'k-test', gemini: 'k-test' },
+      apiKeys: { openrouter: 'k-test' },
       modelRegistry: { ...C.DEFAULT_MODEL_REGISTRY },
       models: { [C.ACTIONS.TRANSCRIBE_AUDIO]: 'flash, flash-or' },
     });
