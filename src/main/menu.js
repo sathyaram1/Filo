@@ -262,7 +262,6 @@ function template() {
     role: 'help',
     submenu: [
       { label: 'Assistente laterale', click: assistenteLaterale },
-      { label: 'Cronologia', click: () => apriPagina('filo://history/history.html') },
     ],
   };
 
