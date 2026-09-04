@@ -20,6 +20,10 @@ require(path.join(SHARED, 'i18n.js'));
 // Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
 // serve a chiunque disegni un'etichetta, quindi sta in alto.
 require(path.join(SHARED, 'tasti.js'));
+// "Il cursore è in un campo di testo?": la regola che decide se Ctrl/Cmd+Z
+// annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
+// (src/main/menu.js), i content script la chiamano direttamente.
+require(path.join(SHARED, 'campoTesto.js'));
 require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
 require(path.join(SHARED, 'modelCaps.js'));
 // Censimento dei punti in cui Filo usa un modello: è la sorgente di verità
