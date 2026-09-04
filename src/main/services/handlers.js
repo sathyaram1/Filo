@@ -1186,6 +1186,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (wrote) broadcastLiveUpdate();
         return { executed: wrote, kept: false };
       }
+      case 'ONBOARDING_INTERNAL_NEVER': {
+        return { executed: false, kept: false };
+      }
       case 'ONBOARDING': {
         // #524 — l'unica cosa che questa azione tocca è il taccuino
         // dell'intervista: cosa Filo ha già scoperto o detto, e se ha finito.
