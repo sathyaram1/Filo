@@ -11,7 +11,7 @@ async function svuotaModelli(openTab) {
   await opt.waitForTimeout(800);
   // rimuove ogni riga del registro
   for (let i = 0; i < 40; i++) {
-    const btn = opt.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head) button').last();
+    const btn = opt.locator('#modelRegistryList .sn-model-row button', { hasText: 'Rimuovi' }).first();
     if (!(await btn.count())) break;
     await btn.click();
     await opt.waitForTimeout(200);
