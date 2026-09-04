@@ -241,7 +241,7 @@
   const PRESI_SU_MAC = [
     // Le voci della barra dei menu (src/main/menu.js).
     'Ctrl+Z', 'Ctrl+Shift+Z',
-    'Ctrl++', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
+    'Ctrl+Plus', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
     'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Shift+V', 'Ctrl+A',
     'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H',
   ];
