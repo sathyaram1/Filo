@@ -36,7 +36,10 @@
       [tasti('Alt+T'), I18n.t('options_action_translate_sel')],
       [tasti('Alt+S'), 'Salva per dopo'],
       [tasti('Alt+H'), I18n.t('options_action_help') + ' (Fase 2)'],
-      [T ? T.etichettaSaltoScheda() : 'Alt+cifra', 'Vai alla scheda in quella posizione (0 = la decima)'],
+      [
+        T ? T.etichettaSaltoScheda() : 'Alt+cifra',
+        T ? T.descrizioneSaltoScheda() : 'Vai alla scheda in quella posizione (0 = la decima)',
+      ],
     ].forEach(([k, v]) => {
       const li = document.createElement('li');
       li.textContent = `${k} — ${v}`;
