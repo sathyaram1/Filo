@@ -2524,36 +2524,48 @@ valutare dentro la pagina. Due copie sarebbero divergute al primo ritocco.
 `tests/unit/macSupport.test.mjs` (forma della barra, in millisecondi, anche su Windows) e
 `tests/barra-menu.spec.mjs` (le voci azionate davvero, sull'app viva).
 
-## In chat: il blocco di attività del turno (attesa → ragionamento → azioni)
+## In chat: il blocco di attività della domanda (chiuso di default, uno per messaggio)
 
-Sopra ogni risposta di Filo nella chat della home c'è un blocco smorzato che
-racconta cosa ha fatto **prima di parlare** (#521). Tre fasi, una sola
-struttura (`createActivity()` in `src/pages/dashboard/dashboard.js`, stili
-`.dash-activity*` in `dashboard.css`):
+Sopra la risposta finale di Filo nella chat della home c'è un blocco smorzato
+che raccoglie tutto ciò che Filo fa **prima di rispondere** (#521). Filo non
+«ragiona e basta»: agisce, spesso su più turni automatici (ragiona, cerca,
+legge, ragiona ancora). Per l'utente è un lavoro solo, e il blocco è uno solo
+(`createActivity()` in `src/pages/dashboard/dashboard.js`, creato da chi guida
+la sequenza dei turni; stili `.dash-activity*` in `dashboard.css`).
 
-- **Attesa**: rotella e «Aspetto la risposta…». **Niente frasi inventate**
-  («Consulto la memoria…», «Metto in ordine le idee…»): erano teatro, non
-  stato, e l'utente le leggeva come ragionamento del modello.
-- **Ragionamento**: il testo VERO del modello scorre in un corpo che cresce
-  fino a qualche riga e poi scorre da solo restando in fondo (regola
-  auto-follow, vedi sopra). Si tiene TUTTO, non le ultime tre righe.
-- **Finito**: all'arrivo della prima parola della risposta il corpo si
-  richiude da solo in una riga «Ragionamento · 9 s»; un click la riapre e
-  da lì comanda l'utente. Il blocco resta nella conversazione e il
-  ragionamento entra nello storico del thread (`reasoning`, `reasoningMs`)
-  ma NON nel prompt del turno dopo.
-- **Righe delle azioni**: le azioni già eseguite dal main o i passi
-  intermedi (timer, sveglia, cerca sul web, leggo un file…) compaiono nel
-  blocco come righe «icona + due parole» (`ACTIVITY_ROWS`, una tabella
-  sola: l'icona di un'azione sta in un posto). Ciò che è cliccabile — un
-  link, una conferma, l'esito di un comando — resta un bottone sotto la
-  risposta, come da regola «i passi intermedi sono tracce, i risultati sono
-  bottoni». Perché una riga compaia il main deve RESTITUIRE l'azione
-  (`kept: true`): timer e sveglie prima venivano scartate e non arrivavano
+- **Chiuso di default, sempre.** Il 90 % delle volte l'utente vuole che il
+  lavoro sia invisibile. La riga in testa dice cosa succede ADESSO: rotella e
+  «Aspetto la risposta…», poi «Sta ragionando · …ultima frase del
+  ragionamento», poi l'azione in corso («Cerco sul web: …», «Eseguito · …»).
+  A lavoro finito diventa il riassunto: «Ha cercato sul web, impostato una
+  sveglia e letto un documento · 1 min 20 s» (`summarizeActivity`, verbi per
+  tipo con i doppioni contati) oppure «Ragionamento · 24 s».
+- **Niente frasi inventate.** Le vecchie righe «Consulto la memoria…» erano
+  teatro, non stato: l'utente le leggeva come ragionamento del modello.
+- **Un click apre la cronologia completa**, nell'ordine in cui è avvenuta:
+  ragionamento di ogni turno (tutto, non le ultime tre righe), righe delle
+  azioni «icona + due parole» (`ACTIVITY_ROWS`, tabella unica: l'icona di
+  un'azione sta in un posto solo), esiti dei comandi eseguiti subito, e le
+  **note**: il testo di un turno che non era l'ultimo («Provo subito tutti e
+  tre…») era una bolla e diventa una nota dentro il blocco. Per l'utente conta
+  la risposta, non il commento a metà lavoro. Il prompt chiede al modello di
+  lasciare vuoto quel testo salvo lavori lunghi.
+- **Ciò che si clicca resta fuori.** Un link da aprire, una conferma da dare,
+  l'esito di un comando bloccato: bottoni sotto la risposta, come da regola
+  «i passi intermedi sono tracce, i risultati sono bottoni». Una bolla
+  intermedia che contiene bottoni NON viene assorbita nel blocco (contenuto
+  nascosto: rivelalo, non toccarlo di nascosto).
+- Perché una riga compaia il main deve RESTITUIRE l'azione (`kept: true`):
+  timer e sveglie prima venivano scartati dopo l'esecuzione e non arrivavano
   mai alla chat.
-- Senza ragionamento né azioni il blocco si toglie da solo: nessun residuo.
+- Il ragionamento di ogni turno entra nello storico del thread (`reasoning`,
+  `reasoningMs`) ma NON torna nel prompt (vedi idee: con gli strumenti nativi
+  ha un posto suo).
+- Senza niente da raccontare il blocco si toglie da solo: nessun residuo.
 - Test: `tests/dashboard-chat-attivita.spec.mjs` (con screenshot in
-  `tests/agent/.out/attivita-*.png`).
+  `tests/agent/.out/attivita-*.png`). Gli spec che asseriscono una traccia
+  («Cerco sul web», «Verifico cosa so fare») contano l'elemento, non la
+  visibilità: vive nella cronologia chiusa.
 
 Le altre chat (Mazzi, barra laterale) hanno ancora le loro versioni: da
 unificare su questa.
