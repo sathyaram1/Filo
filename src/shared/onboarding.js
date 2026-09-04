@@ -45,7 +45,7 @@
   // quando il modello non risponde — è l'unica cosa che l'utente vede prima
   // della home.
   const CLOSING_MESSAGE =
-    'Va bene, chiudo qui: vado avanti coi valori predefiniti e imparo strada '
+    'Va bene, chiudo qui. Vado avanti coi valori predefiniti e imparo strada '
     + 'facendo.\n'
     + 'Se cambi idea la rifacciamo quando vuoi, da Preferenze → «Rifai '
     + 'l’intervista di benvenuto».';
