@@ -2179,6 +2179,8 @@
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
     injectAgentStyle,
+    SISTEMI,
+    descriviSistema,
     PROMPTS,
     HISTORY_LIMIT_BYTES,
     HISTORY_ITEMS_HARD_CAP,
