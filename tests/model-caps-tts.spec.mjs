@@ -45,7 +45,7 @@ test('Capacità: la validazione modello↔funzione è corretta (main process)', 
       textOnDictation: m('deepseek', A.TRANSCRIBE_AUDIO),
       embedOnArchive: m('qwen-embed', A.ARCHIVE_EMBED),
       textOnArchive: m('deepseek', A.ARCHIVE_EMBED),
-      kimiOnImage: m('kimi', A.DESCRIBE_IMAGE),
+      glmOnImage: m('glm', A.DESCRIBE_IMAGE),
       deepseekOnImage: m('deepseek', A.DESCRIBE_IMAGE),
       hasSynth: typeof P.synthesizeSpeech === 'function',
       hasTranscribe: typeof P.transcribe === 'function',
@@ -60,7 +60,7 @@ test('Capacità: la validazione modello↔funzione è corretta (main process)', 
   expect(r.textOnDictation).toBe(false);
   expect(r.embedOnArchive).toBe(true);
   expect(r.textOnArchive).toBe(false);
-  expect(r.kimiOnImage).toBe(true);     // Kimi legge le immagini
+  expect(r.glmOnImage).toBe(true);      // GLM 5.3 Flash legge le immagini
   expect(r.deepseekOnImage).toBe(false); // DeepSeek no
   // Il router sa fare tutti e tre i mestieri che prima erano solo di Google.
   expect(r.hasSynth).toBe(true);

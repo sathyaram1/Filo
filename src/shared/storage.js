@@ -42,6 +42,12 @@
       const seed = (global.SN_TEST_MODELS && global.SN_TEST_MODELS.registry) || global.SN_CONST.DEFAULT_MODEL_REGISTRY;
       stored.modelRegistry = { ...seed };
     }
+    // Stesso seme per le catene delle funzioni: nell'app restano vuote (una
+    // funzione senza modello si ferma e lo dice), nei test partono dal registro
+    // di prova.
+    if (!stored.models && global.SN_TEST_MODELS && global.SN_TEST_MODELS.models) {
+      stored.models = { ...global.SN_TEST_MODELS.models };
+    }
     return deepMerge(DEFAULT_SETTINGS, stored);
   }
 
