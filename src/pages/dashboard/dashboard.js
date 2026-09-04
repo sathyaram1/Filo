@@ -2347,6 +2347,10 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.FILO_ONBOARDING_UPDATED) {
+      // #524 — un'altra scheda ha fatto avanzare la stessa intervista: qui la
+      // conversazione si riallinea invece di restare ferma a com'era.
+      onboardingUpdated(msg.onboarding);
     } else if (msg?.type === MSG.FILO_ONBOARDING_DONE) {
       // #524 — intervista finita: la chat lascia il posto alla prima home
       // personale, già costruita col profilo appena imparato.
