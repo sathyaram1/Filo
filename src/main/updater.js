@@ -1,13 +1,27 @@
 // Auto-update via electron-updater.
 //
-// Funziona SOLO nelle build pacchettizzate (installer NSIS): a ogni avvio
-// controlla le GitHub Releases del repo configurato in package.json
-// (`build.publish`), scarica in background la versione più recente e la
-// applica automaticamente alla chiusura dell'app. Il tester non fa nulla.
+// Funziona SOLO nelle build pacchettizzate: a ogni avvio controlla le GitHub
+// Releases del repo configurato in package.json (`build.publish`), scarica in
+// background la versione più recente e la applica automaticamente alla
+// chiusura dell'app. Il tester non fa nulla.
 //
 // In dev (`npm start`/`electron .`) e nei test non c'è un feed di update,
 // quindi l'updater è disattivato: lì l'aggiornamento avviene via `git pull`
 // del `prestart`.
+//
+// SU MAC L'INSTALLAZIONE PUÒ NON RIUSCIRE, ED È PREVISTO
+//   Il controllo e lo scaricamento funzionano ovunque (nella release c'è
+//   `latest-mac.yml` accanto a `latest.yml`). L'INSTALLAZIONE su Mac la fa un
+//   meccanismo di sistema che pretende una firma vera, rilasciata da Apple:
+//   Filo per ora ha solo una firma locale, che cambia a ogni build, e quel
+//   meccanismo la rifiuta.
+//
+//   Il difetto grave non sarebbe il fallimento: sarebbe il SILENZIO. Un
+//   aggiornamento che non si installa e non lo dice lascia l'utente fermo su
+//   una versione vecchia per sempre, convinto di essere aggiornato. Quindi
+//   quando su Mac l'aggiornamento inciampa, lo scriviamo fra le notifiche: si
+//   scarica a mano, una volta, e si va avanti. Quando arriverà un certificato
+//   Apple questo ripiego diventa inutile e si toglie.
 
 const { app } = require('electron');
 
