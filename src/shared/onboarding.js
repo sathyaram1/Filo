@@ -301,6 +301,15 @@
     return normalize(state).thread.filter((m) => m.role === 'user').length;
   }
 
+  // C'è un turno rimasto a metà: l'ultima cosa nella conversazione è un
+  // messaggio dell'utente, quindi Filo non ha ancora risposto. Chi riapre trova
+  // il turno che riparte da solo, senza dover riscrivere niente.
+  function hasPendingTurn(state) {
+    const cur = normalize(state);
+    const last = cur.thread[cur.thread.length - 1];
+    return !cur.done && !!last && last.role === 'user';
+  }
+
   // Oltre il tetto duro l'intervista si chiude da sé, qualunque cosa faccia il
   // modello: un'accoglienza che non finisce mai è peggio di una incompleta.
   function shouldForceClose(state) {
