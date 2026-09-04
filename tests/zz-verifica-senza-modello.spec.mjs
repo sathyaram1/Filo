@@ -38,12 +38,9 @@ test('senza modello: la spiegazione lo dice in pagina', async ({ openTab, testSe
   await svuotaModelli(openTab);
   const page = await testServer.openReady(openTab,
     '<html lang="it"><body style="padding:40px"><p id="t">La fotosintesi clorofilliana trasforma la luce in zuccheri.</p></body></html>');
-  await page.evaluate(() => {
-    const n = document.getElementById('t').firstChild;
-    const r = document.createRange();
-    r.setStart(n, 3); r.setEnd(n, 14);
-    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-  });
+  await page.locator('#t').click({ clickCount: 3 });
+  await page.waitForTimeout(800);
+  console.log('SELEZIONE:', await page.evaluate(() => String(getSelection())));
   await page.locator('#t').click({ button: 'right' });
   await page.waitForTimeout(1500);
   const menu = await page.evaluate(() => {
