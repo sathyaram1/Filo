@@ -2424,6 +2424,23 @@ assente spegne copia e incolla in ogni campo di testo. Si sostituisce, non si ri
 Linux. Là è giusto usarlo (il tasto lo gestiscono già le pagine, la voce mostra la
 scritta e basta); su Mac l'unico modo di non prendersi un tasto è non scriverlo.
 
+**Un tasto della barra è tolto a tutto il resto — e va tolto anche sulla carta.** La
+barra arriva prima di chiunque, quindi ogni suo tasto smette di essere disponibile per
+altro: né per un'altra funzione dell'app, né per una scorciatoia che l'app lascia
+scegliere all'utente. `Cmd+0` era promesso insieme allo zoom al 100% e alla decima
+scheda: vinceva lo zoom, e alla decima scheda non ci si arrivava mai — mentre due elenchi
+continuavano a dire che sì. Nell'Editor la stessa causa rientrava dall'altra porta: una
+scorciatoia di modulo assegnata a un tasto della barra si salvava, sembrava valida e non
+partiva mai.
+
+La cura è **una lista sola dei tasti già presi**, chiesta da chiunque ne assegni uno:
+`SN_TASTI.riservato(accel)` in `src/shared/tasti.js`. La lista non si tiene allineata a
+mano — una sentenza negli unit test la confronta con gli acceleratori della barra vera e
+diventa rossa se divergono. E dove un tasto si sposta, si spostano insieme il
+comportamento (`indiceSaltoScheda`), il suo nome (`etichettaSaltoScheda`) e la sua
+descrizione (`descrizioneSaltoScheda`): tenerli in file diversi è come sono nate le due
+promesse contraddittorie.
+
 **Quando una scorciatoia esiste in due posti, la regola che decide sta in un terzo.**
 `Ctrl/Cmd+Z` annulla dentro un campo di testo e torna indietro fuori: la domanda "si sta
 scrivendo qui?" arriva dalla pagina (Windows, Linux) e dalla barra (Mac). La regola vive
