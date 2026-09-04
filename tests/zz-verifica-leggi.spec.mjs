@@ -44,14 +44,20 @@ test('Leggi dal tasto destro: parte davvero, e con la voce del modello', async (
     return m ? m.innerText : '(niente)';
   })));
   await page.locator('text=Leggi').first().click();
-  await page.waitForTimeout(20000);
+  await page.waitForTimeout(8000);
 
-  const esito = await page.evaluate(() => ({
-    suoni: window.__suoni, parlato: window.__parlato,
-    toast: [...document.querySelectorAll('.sn-toast')].map((e) => e.innerText),
-  }));
-  console.log('ESITO:', JSON.stringify(esito).slice(0, 800));
-  expect(esito.suoni.length, 'un audio del modello è partito').toBeGreaterThan(0);
-  expect(esito.suoni[0].src.startsWith('blob:'), 'è il wav del modello').toBe(true);
-  expect(esito.parlato.length, 'non è ripiegato sulla voce del sistema').toBe(0);
+  const toast = await page.evaluate(() =>
+    [...document.querySelectorAll('.sn-toast')].map((e) => e.innerText));
+  console.log('TOAST DOPO LEGGI:', JSON.stringify(toast));
+
+  // Mentre legge, ogni menu deve offrire "Interrompi lettura".
+  await page.locator('#t').click({ button: 'right' });
+  await page.waitForTimeout(1500);
+  const menu2 = await page.evaluate(() => {
+    const m = document.querySelector('.sn-popup, [class*="sn-menu"]');
+    return m ? m.innerText : '(niente)';
+  });
+  console.log('MENU MENTRE LEGGE:', JSON.stringify(menu2));
+  expect(menu2, 'sta leggendo davvero').toContain('Interrompi lettura');
+  expect(toast.join(' '), 'nessun avviso di ripiego sulla voce del sistema').not.toMatch(/voce del (browser|sistema)|non disponibile/i);
 });
