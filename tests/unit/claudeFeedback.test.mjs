@@ -201,3 +201,19 @@ test('--allega: un allegato non caricato si dice e l\'uscita non è "fatto"', as
   } finally { console.error = orig; }
   assert.ok(errori.some((r) => /ALLEGATO NON CARICATO: spec.md/.test(r)), 'l\'allegato mancante va detto');
 });
+
+test('--allega: un\x27immagine va nel campo delle immagini (i giudici la guardano), un documento nei file', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+  const png = join(dir, 'shot.png');
+  writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]));
+  const md = join(dir, 'spec.md');
+  writeFileSync(md, '# spec', 'utf8');
+  await conSubmit(async () => ({ id: 'd1', seq: 900, images: ['u1'], files: [{ url: 'u2', name: 'spec.md' }], failed: [] }), async (visti) => {
+    const code = await SCRIPT.main(['T', 'X', '--allega', png, '--allega', md]);
+    assert.equal(code, SCRIPT.EXIT.FATTO);
+    assert.equal(visti[0].images.length, 1);
+    assert.ok(visti[0].images[0].dataUrl.startsWith('data:image/png;base64,'));
+    assert.equal(visti[0].files.length, 1);
+    assert.equal(visti[0].files[0].name, 'spec.md');
+  });
+});

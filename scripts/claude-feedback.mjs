@@ -174,7 +174,10 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       title: '',
       userAgent: `filo-locale/${process.platform} node-${process.versions.node}`,
       clientId: CLIENT_ID,
-      files: Array.isArray(allegati) ? allegati : [],
+      // Le immagini vanno nel campo delle immagini, come dall'app: è quello che
+      // i giudici guardano (le vedono direttamente). Il resto sono documenti.
+      images: (Array.isArray(allegati) ? allegati : []).filter((a) => /^image//.test(a.type)),
+      files: (Array.isArray(allegati) ? allegati : []).filter((a) => !/^image//.test(a.type)),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
@@ -182,7 +185,8 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   // Un allegato che non si è caricato NON è silenzioso: il feedback esiste,
   // ma senza il documento per cui magari è stato aperto. Si riporta.
   const falliti = Array.isArray(res && res.failed) ? res.failed : [];
-  return { ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: ((res && res.files) || []).length, falliti };
+  const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
+  return { ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti };
 }
 
 /**
