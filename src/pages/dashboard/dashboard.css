@@ -182,11 +182,50 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 }
 .dash-home {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 22px;
   height: 100%;
   padding: 40px 0;
 }
+/* #524 — dopo un'accoglienza chiusa prima della fine. Una riga sopra il
+   messaggio della home, con l'azione accanto: dice cosa è successo e come
+   tornarci. Sta sopra e non sotto perché è una cosa appena successa, e resta
+   finché non la si toglie — il segno "già accolto" è definitivo, questa riga è
+   l'unico posto in cui l'utente può accorgersene. */
+.dash-onb-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 640px;
+  padding: 8px 14px;
+  border: 1px solid var(--dash-ink);
+  border-radius: 999px;
+  color: var(--dash-ink);
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+.dash-onb-notice:hover { opacity: 1; }
+.dash-onb-notice-text { text-align: center; }
+.dash-onb-notice button {
+  border: none;
+  background: transparent;
+  color: var(--dash-ink);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.dash-onb-notice button:hover { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }
 .dash-home-msg {
   font-size: 28px;
   font-weight: 400;
