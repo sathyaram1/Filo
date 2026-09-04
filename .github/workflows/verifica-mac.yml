@@ -1,0 +1,105 @@
+# Prova che il pacchetto per Mac si costruisca ancora — senza pubblicare niente.
+#
+# PERCHE' ESISTE
+#   Filo si sviluppa e si testa su Windows: nessuno di noi ha un Mac sotto mano.
+#   La ricetta del pacchetto Mac (package.json → build.mac, la firma locale in
+#   scripts/after-pack-mac.js) puo' rompersi senza che nessuno se ne accorga,
+#   perche' l'unico momento in cui viene eseguita e' DENTRO la pubblicazione
+#   vera — dove un errore arriva quando ormai la release e' fuori, e dove
+#   provare a mano costa un numero di versione bruciato.
+#
+#   Questo lavoro fa girare la costruzione su una macchina Apple e si ferma
+#   prima di pubblicare: e' il modo per rispondere a "il .dmg si costruisce?"
+#   senza toccare niente di vivo.
+#
+# QUANDO GIRA
+#   · a mano, dalla tab "Actions" → "Run workflow" (su qualunque ramo);
+#   · da solo, quando si tocca uno dei file che DEFINISCONO il pacchetto Mac —
+#     cosi' chi lo cambia scopre subito se l'ha rotto, invece di scoprirlo alla
+#     prossima pubblicazione.
+#
+# COSA NON PROVA
+#   Che l'app PARTA su un Mac. Quello lo puo' dire solo un Mac vero con dentro
+#   una persona: qui si controlla che il pacchetto esista, che contenga i file
+#   che il sito e l'aggiornamento automatico si aspettano, e che la firma locale
+#   ci sia (senza, sui Mac con chip Apple l'app non si apre).
+
+name: Verifica build Mac
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/verifica-mac.yml'
+      - 'scripts/after-pack-mac.js'
+      - 'assets/icons/icon-1024.png'
+
+permissions:
+  contents: read
+
+jobs:
+  verifica:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        run: npm ci
+
+      # La sentinella degli unit test guarda la CONFIGURAZIONE (che il pacchetto
+      # Mac sia ancora previsto, con i nomi giusti). Gira anche qui, prima della
+      # costruzione: se la ricetta e' gia' sbagliata sulla carta, si scopre in
+      # dieci secondi invece che in dieci minuti.
+      - name: Sentinella Mac negli unit test
+        run: npm run test:unit
+
+      # Niente `--publish`: si costruisce e basta. Il file delle chiavi di
+      # default non serve (qui non si consegna niente a nessuno) e cosi' questo
+      # lavoro non ha bisogno di vedere nessun segreto.
+      - name: Costruisci il pacchetto per Mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run build:mac
+
+      - name: I file attesi ci sono?
+        shell: bash
+        run: |
+          set -e
+          ls -la dist
+          for ATTESO in Filo-Mac.dmg Filo-Mac.zip latest-mac.yml; do
+            test -f "dist/$ATTESO" || {
+              echo "::error::manca dist/$ATTESO"
+              exit 1
+            }
+          done
+          # latest-mac.yml e' il file che l'aggiornamento automatico legge su
+          # Mac: deve nominare lo zip, altrimenti l'app trova l'aggiornamento e
+          # non sa da dove scaricarlo.
+          grep -q 'Filo-Mac.zip' dist/latest-mac.yml || {
+            echo "::error::latest-mac.yml non nomina Filo-Mac.zip"
+            cat dist/latest-mac.yml
+            exit 1
+          }
+          cat dist/latest-mac.yml
+
+      # Il pacchetto deve valere su ENTRAMBI i processori (Intel e Apple
+      # Silicon) e portare la firma locale: sono le due cose senza le quali,
+      # su meta' dei Mac, l'app non si apre proprio.
+      - name: Un solo pacchetto per entrambi i processori, e firmato
+        shell: bash
+        run: |
+          set -e
+          APP="dist/mac-universal/Filo.app"
+          test -d "$APP" || APP=$(find dist -maxdepth 2 -name 'Filo.app' -print -quit)
+          echo "app: $APP"
+          lipo -info "$APP/Contents/MacOS/Filo"
+          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'x86_64' || {
+            echo "::error::il pacchetto non contiene la parte Intel"; exit 1; }
+          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'arm64' || {
+            echo "::error::il pacchetto non contiene la parte Apple Silicon"; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$APP"
