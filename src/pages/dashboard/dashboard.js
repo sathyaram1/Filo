@@ -1639,8 +1639,13 @@
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
-      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true });
-      threadHistory.push({ role: 'filo', text: r.text || '', actions: r.actions || [] });
+      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending });
+      pending.finish();
+      // Il ragionamento entra nello storico del thread insieme al messaggio:
+      // non torna al modello (non è nel prompt), ma resta con la conversazione.
+      const entry = { role: 'filo', text: r.text || '', actions: r.actions || [] };
+      if (pending.reasoning()) { entry.reasoning = pending.reasoning(); entry.reasoningMs = pending.reasoningMs(); }
+      threadHistory.push(entry);
       applyCommandCwd(r.actions);
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
