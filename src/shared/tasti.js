@@ -24,9 +24,21 @@
 //     l'utente digita; Cmd+cifra è la forma che usa ogni browser su Mac e non
 //     produce testo. `src/main/tabs.js` e `src/renderer/shell.js` ascoltano di
 //     conseguenza.
+//   · Su Mac lo ZERO non salta a nessuna scheda: Cmd+0 riporta la pagina al
+//     100%, e quel tasto se lo prende la barra dei menu prima di chiunque
+//     altro. Al posto suo Cmd+9 porta all'ULTIMA scheda — la forma di ogni
+//     browser su Mac. Su Windows e Linux zoom (Ctrl) e schede (Alt) stanno su
+//     tasti diversi e non si toccano: lì Alt+0 resta la decima scheda.
 //
 // Chi cambia una di queste regole cambia INSIEME la tabella qui sotto e il
 // codice che ascolta i tasti: sono due metà della stessa cosa.
+//
+// QUELLO CHE UNA PAGINA NON PUÒ AVERE
+//   `riservato()` dice se una combinazione arriva mai a una pagina. Serve a chi
+//   fa scegliere una scorciatoia all'utente (le scorciatoie dei moduli
+//   dell'Editor): senza, la scorciatoia si salva, sembra valida e non parte mai
+//   — su Mac perché la barra dei menu la intercetta prima, ovunque perché è un
+//   tasto che Filo si tiene per sé.
 
 (function (global) {
   'use strict';
