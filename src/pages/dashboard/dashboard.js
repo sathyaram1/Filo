@@ -403,7 +403,7 @@
     box.innerHTML = '';
     const text = document.createElement('span');
     text.className = 'dash-onb-notice-text';
-    text.textContent = 'Abbiamo chiuso la presentazione a metà. Quando vuoi la riprendiamo.';
+    text.textContent = 'Abbiamo chiuso la presentazione a metà.';
     const redo = document.createElement('button');
     redo.type = 'button';
     redo.id = 'onbNoticeRedo';
