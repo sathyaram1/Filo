@@ -2954,10 +2954,21 @@
     // La riga "frase per chi ha segnalato" parte già piena col valore salvato:
     // è una bozza solo se differisce da quello.
     if (mgUserNote && !mgUserNote.hidden && mgUserNoteText) {
-      const sel = allFeedbacks.find((f) => f._id === selectedId);
-      if (String(mgUserNoteText.value || '') !== String((sel && sel.userNote) || '')) return true;
+      if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
     return false;
+  }
+
+  // La scheda aperta non è più in pagina: il pannello non può mostrare un
+  // feedback che non c'è. Si chiude (senza toccare una bozza in corso: quella
+  // resta finché l'owner non la svuota, e al giro dopo si chiude).
+  function closeDetailIfGone() {
+    if (!selectedId || allFeedbacks.some((f) => f._id === selectedId)) return false;
+    if (detailBeingEdited()) return true;
+    selectedId = null;
+    mgDetail.hidden = true;
+    mgDetailEmpty.hidden = false;
+    return true;
   }
 
   // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
