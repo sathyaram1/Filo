@@ -167,17 +167,51 @@
       .trim();
   }
 
-  function isStopRequest(text) {
+  // Cerca la frase INTERA in un insieme, togliendo mano a mano i riempitivi di
+  // cortesia («ok basta così, grazie» → «basta cosi»).
+  function matchesPhrase(set, text) {
     let p = normalizePhrase(text);
     // Un messaggio lungo è una risposta all'intervista, non un modo di uscirne.
     if (!p || p.length > 60) return false;
     for (let i = 0; i < 4; i++) {
-      if (STOP_SET.has(p)) return true;
+      if (set.has(p)) return true;
       const next = p.replace(POLITE_HEAD, '').replace(POLITE_TAIL, '').trim();
       if (next === p) break;
       p = next;
     }
-    return STOP_SET.has(p);
+    return set.has(p);
+  }
+
+  // «basta così», «salta», «stop»: chiedono di uscire, e non vogliono dire
+  // altro. Chiudono l'intervista senza chiamare nessuno.
+  function isStopRequest(text) {
+    return matchesPhrase(STOP_SET, text);
+  }
+
+  // «no grazie», «magari dopo», «non ora»: rifiutano. Da sole non dicono COSA —
+  // lo dice la domanda a cui rispondono.
+  function isDecline(text) {
+    return matchesPhrase(DECLINE_SET, text);
+  }
+
+  // C'è una battuta di Filo a cui rispondere? Durante l'intervista Filo parla
+  // per primo — il benvenuto è già nella conversazione prima che l'utente
+  // scriva — quindi quello che l'utente scrive risponde sempre a qualcosa.
+  function repliesToFilo(state) {
+    return normalize(state).thread.some((m) => m.role === 'filo');
+  }
+
+  // La decisione dell'app, in un posto solo: questo messaggio chiude
+  // l'intervista senza passare dal modello?
+  //
+  // Sì se è una richiesta di uscita esplicita. Un rifiuto invece resta al
+  // modello, che ha davanti la domanda a cui si riferisce — a meno che non ci
+  // sia niente a cui possa riferirsi (nessuna battuta di Filo): lì «lascia
+  // stare» non può che voler dire l'accoglienza.
+  function isExitRequest(state, text) {
+    if (isStopRequest(text)) return true;
+    if (!isDecline(text)) return false;
+    return !repliesToFilo(state);
   }
 
   function emptyState() {
