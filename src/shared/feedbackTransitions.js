@@ -174,8 +174,35 @@
   // dalla dashboard senza toccare il codice.
   const VERIFIER_CAPS = { improvableCap: 0, failCap: 10 };
 
+  // ── Tetto al testo della critica del verificatore (#531) ───────────────────
+  // La critica è testo di worker: un tetto ci vuole (dato non fidato che finisce
+  // in un documento). Quello che non ci vuole è un tetto BASSO applicato in
+  // SILENZIO, e in punti diversi con valori scelti a mano: su #509 una critica
+  // si è fermata a metà parola («…chiusa da set»), e il feedback dei rilievi
+  // residui nato da lì portava il terzo rilievo monco — chi lo lavorava doveva
+  // indovinare cosa chiedeva.
+  //
+  // Quindi: UN valore solo, ovunque il testo passi, e un taglio che si VEDE.
+  //   CRITIQUE_MAX      caratteri ammessi, mark compreso;
+  //   CRITIQUE_CUT_MARK cosa si trova al posto di ciò che è stato tolto.
+  // 12000 sono circa tre volte quello che tagliava prima e un ordine di
+  // grandezza più di una critica vera (quella di #509, la più lunga vista,
+  // stava sotto i 5000): serve a fermare un testo fuori scala, non a stare
+  // stretto. Anche al massimo, e con tutte le bocciature che il failCap
+  // consente, le note di un feedback restano molto sotto il limite di un
+  // documento Firestore.
+  //
+  // Chi deve leggerlo: il canale delle routine (scripts/dispatch.mjs,
+  // scripts/verify-local.mjs) E il server, che questo file lo incorpora al
+  // deploy (bake-shared) — lì il tetto vale nei due punti in cui la critica
+  // passa: quando arriva dal canale e quando entra nel carico di lavoro del
+  // giro successivo (nota in conversazione e testo del feedback residuo).
+  const CRITIQUE_MAX = 12000;
+  const CRITIQUE_CUT_MARK = '\n…(testo tagliato)';
+
   global.SN_FB_TRANSITIONS = {
     STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAPS,
+    CRITIQUE_MAX, CRITIQUE_CUT_MARK,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
