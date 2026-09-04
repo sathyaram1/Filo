@@ -1536,8 +1536,32 @@
     // fornitori). Sta SEMPRE dopo `filoChatStatic` — vedi la nota lì sopra: se
     // finisce prima, il blocco di istruzioni non è più riusabile e va ripagato a
     // ogni messaggio.
-    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, files }) =>
+    // Blocco dell'ONBOARDING (#524). Sta nella parte VARIABILE — e non fra le
+    // istruzioni fisse — per due ragioni: cambia a ogni messaggio (le spunte si
+    // muovono) e vale solo nei primi minuti di vita di un profilo. Metterlo
+    // sopra la frontiera farebbe ripagare l'intero manuale di istruzioni a
+    // ogni chat di ogni utente, per sempre.
+    filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax }) =>
+      (!onboarding ? '' :
+        `═══ STAI ACCOGLIENDO QUESTO UTENTE (intervista in corso) ═══\n`
+        + `È appena arrivato su Filo e questa è la sua prima conversazione. Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
+        + `Regole:\n`
+        + `- UNA cosa per volta. Mai due domande nello stesso messaggio, mai una domanda e un annuncio insieme.\n`
+        + `- L'ordine lo decide la conversazione, non l'elenco: aggancia quello che l'utente ha appena detto.\n`
+        + `- Applica SUBITO quello che impari, con l'azione che serve, poi vai avanti. Non promettere di farlo dopo.\n`
+        + `- Non chiedere ciò che puoi dedurre da una risposta precedente: se l'utente l'ha già detto, la voce è fatta e basta spuntarla.\n`
+        + `- Le cose da DIRE sono UNA frase ciascuna, nel tono che la conversazione ha preso. Approfondisci solo se te lo chiede. Niente prediche.\n`
+        + `- Ogni volta che hai scoperto o detto una voce, emetti nello STESSO turno l'azione ONBOARDING con {"spunta": ["id", …]}. Se non la spunti, te la ritrovi davanti al turno dopo.\n`
+        + `- Se l'utente dice «basta così» (o qualsiasi modo di dire che non gli va), chiudi SUBITO con ONBOARDING {"fine": true}: niente insistenze, i valori predefiniti vanno benissimo.\n`
+        + `- Quando l'elenco è finito, chiudi con ONBOARDING {"fine": true}. Alla chiusura NON scrivere "fatto" o un riepilogo: saluta in una riga e basta — il sistema mostra da sé la home che avrai appena imparato a costruire.\n`
+        + `- Scambi usati finora: ${Number(onboardingTurns) || 0} su ${Number(onboardingMax) || 5}. Al quinto chiudi, a meno che sia l'utente a voler continuare.\n`
+        + `Azione in più, disponibile solo adesso:\n`
+        + `ONBOARDING: {spunta?: ["profilo"|"stile"|"estetica"|"privacy"|"modelli"|"crediti", …], fine?: true}  — segna cosa hai scoperto o detto, e/o chiude l'intervista.\n\n`
+        + `${onboarding}\n\n`),
+
+    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
       `═══ CONTESTO (cambia a ogni messaggio) ═══\n` +
+      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
       (modelName
         ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
         : '') +
