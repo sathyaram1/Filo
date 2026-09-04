@@ -492,7 +492,13 @@
     FILO_GET_ONBOARDING: 'filo_get_onboarding',
     // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte,
     // conversazione e il segno "già accolto". Solo pagine filo://.
+    // L'intervista precedente NON si perde: viene archiviata in `past`.
     FILO_RESTART_ONBOARDING: 'filo_restart_onboarding',
+    // Chiude l'intervista SENZA passare dal modello: è il pulsante "Salta
+    // l'accoglienza" della chat, la via d'uscita che funziona anche quando il
+    // modello non risponde (rete assente, provider giù, crediti finiti). Solo
+    // pagine filo://. Risposta: { ok, onboarding }
+    FILO_CLOSE_ONBOARDING: 'filo_close_onboarding',
     // (Gli appunti non hanno più messaggi propri: sono file dell'editor, scritti
     // dall'azione SALVA_APPUNTO e letti aprendo l'editor.)
     FILO_GET_TIMERS: 'filo_get_timers',
