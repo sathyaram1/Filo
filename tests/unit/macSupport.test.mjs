@@ -504,3 +504,163 @@ test('il sistema arriva al prompt dal main process', () => {
   assert.match(src, /sistema:\s*process\.platform/,
     'handlers.js non passa più il sistema al prompt della chat');
 });
+
+// ── La barra dei menu (#527) ────────────────────────────────────────────────
+//
+// Su Windows e Linux la finestra di Filo è senza cornice: la barra dei menu non
+// viene attaccata a niente e i suoi tasti non fanno nulla. Su Mac quella barra
+// è dell'APPLICAZIONE, sta in cima allo schermo, c'è sempre — anche con la
+// finestra senza cornice — ed è la prima a vedere i tasti, prima di qualunque
+// cosa la pagina ascolti. Filo non ne dichiarava nessuna e restava appesa
+// quella di serie di Electron: in inglese, coi link al sito di un altro
+// prodotto, e con otto voci che si prendevano Cmd+W, Cmd+R, Cmd+Z e Cmd +/-/0.
+//
+// Qui si tiene la forma della barra, che è la parte che può tornare a rompersi:
+// il file la costruisce senza toccare Electron apposta, così questa sentinella
+// la legge in millisecondi anche su Windows.
+
+// I tasti che Filo gestisce già per conto suo, e cosa significano per LUI.
+// Il `role` di Electron per gli stessi tasti significherebbe un'altra cosa: è
+// il difetto. Perciò qui non ci può essere un role, ci deve essere un click.
+const TASTI_DI_FILO = {
+  'CommandOrControl+T': 'nuova scheda',
+  'CommandOrControl+W': 'chiudi la SCHEDA (il role "close" chiuderebbe la finestra con dentro tutte le altre)',
+  'CommandOrControl+R': 'ricarica la pagina (il role "reload" ricaricherebbe la fila delle schede)',
+  'CommandOrControl+L': 'vai a scrivere un indirizzo',
+  'CommandOrControl+Z': 'torna alla pagina precedente, o annulla se si sta scrivendo',
+  'CommandOrControl+Shift+Z': 'ripeti, mentre si scrive',
+  'CommandOrControl+Plus': 'ingrandisci la PAGINA (il role "zoomIn" ingrandirebbe la fila delle schede)',
+  'CommandOrControl+=': 'ingrandisci la PAGINA, col tasto con cui il "+" si preme davvero',
+  'CommandOrControl+-': 'rimpicciolisci la PAGINA',
+  'CommandOrControl+0': 'riporta la PAGINA al 100%',
+};
+
+// I `role` che, su Mac, farebbero la cosa sbagliata al posto di Filo.
+const RUOLI_VIETATI = ['undo', 'redo', 'close', 'reload', 'forcereload', 'zoomin', 'zoomout', 'resetzoom', 'toggledevtools'];
+
+function vociDellaBarra() {
+  const { template } = require(join(ROOT, 'src', 'main', 'menu.js'));
+  const piatte = [];
+  const scendi = (voci) => {
+    for (const v of voci) {
+      piatte.push(v);
+      if (v.submenu) scendi(v.submenu);
+    }
+  };
+  scendi(template());
+  return piatte;
+}
+
+test('la barra dei menu non si prende le scorciatoie che Filo gestisce da sé', () => {
+  const rubati = vociDellaBarra()
+    .filter((v) => v.role && RUOLI_VIETATI.includes(String(v.role).toLowerCase()))
+    .map((v) => `${v.label || ''} (role: ${v.role})`);
+  assert.deepEqual(rubati, [],
+    'su Mac questi tasti li eseguirebbe Electron, non Filo:\n' + rubati.join('\n'));
+});
+
+test('ogni scorciatoia di Filo che sta nella barra la esegue Filo', () => {
+  const voci = vociDellaBarra();
+  const guasti = [];
+  for (const v of voci) {
+    if (!v.accelerator || !TASTI_DI_FILO[v.accelerator]) continue;
+    if (typeof v.click !== 'function') guasti.push(`${v.accelerator}: nessuna azione di Filo (${TASTI_DI_FILO[v.accelerator]})`);
+    if (v.role) guasti.push(`${v.accelerator}: ha un role di Electron (${v.role})`);
+  }
+  assert.deepEqual(guasti, [], guasti.join('\n'));
+
+  // E le quattro che l'utente Mac si è vista portare via devono esserci: se una
+  // sparisce dalla barra, su Mac torna a prendersela Electron.
+  const presenti = new Set(voci.map((v) => v.accelerator).filter(Boolean));
+  for (const accel of ['CommandOrControl+W', 'CommandOrControl+R', 'CommandOrControl+Z', 'CommandOrControl+0']) {
+    assert.ok(presenti.has(accel),
+      `${accel} non è più nella barra: su Mac la barra di serie se lo riprende (${TASTI_DI_FILO[accel]})`);
+  }
+});
+
+test('su Windows e Linux la barra non toglie i tasti alle pagine', () => {
+  if (process.platform === 'darwin') return; // là il tasto se lo prende la barra, ed è il punto
+  const restati = vociDellaBarra()
+    .filter((v) => v.accelerator && TASTI_DI_FILO[v.accelerator] && v.registerAccelerator !== false)
+    .map((v) => v.accelerator);
+  assert.deepEqual(restati, [],
+    'qui questi tasti li gestiscono già le pagine: la barra deve mostrarli, non registrarli.\n' + restati.join('\n'));
+});
+
+test('la barra dei menu è di Filo, non di un altro prodotto', () => {
+  const estranee = vociDellaBarra()
+    .map((v) => String(v.label || ''))
+    .filter((l) => /electron/i.test(l) || ['Learn More', 'Documentation', 'Community Discussions', 'Search Issues'].includes(l));
+  assert.deepEqual(estranee, [], 'voci della barra di serie di Electron rimaste dentro');
+
+  // Su Mac la barra fa funzionare anche copia e incolla nei campi di testo:
+  // Chromium lì non ha scorciatoie di modifica proprie. Toglierla e basta
+  // spegnerebbe l'incolla in tutta l'app.
+  const ruoli = new Set(vociDellaBarra().map((v) => v.role).filter(Boolean));
+  for (const ruolo of ['cut', 'copy', 'paste', 'selectAll']) {
+    assert.ok(ruoli.has(ruolo), `manca "${ruolo}": su Mac senza questa voce la scorciatoia non funziona più in nessun campo di testo`);
+  }
+});
+
+test('la barra dei menu viene davvero installata all\'avvio', () => {
+  const src = readFileSync(join(ROOT, 'src', 'main', 'main.js'), 'utf8');
+  assert.match(src, /installaMenuApplicazione\s*\(\s*\)/,
+    'main.js non installa più la barra di Filo: al suo posto resta quella di serie di Electron');
+});
+
+// ── "Si sta scrivendo qui?": una regola sola ────────────────────────────────
+// Ctrl/Cmd+Z annulla dentro un campo di testo e torna indietro fuori. La
+// domanda arriva da due strade — la pagina (Windows, Linux) e la barra dei menu
+// (Mac) — e due copie della regola divergerebbero subito.
+
+test('la regola del campo di testo sta in un posto solo', () => {
+  const contenuto = readFileSync(join(ROOT, 'src', 'content', 'content.js'), 'utf8');
+  assert.match(contenuto, /SN_CAMPO_TESTO/,
+    'content.js si è riscritto la sua regola invece di chiedere a src/shared/campoTesto.js');
+
+  // E deve arrivare dappertutto: nel main (per la barra) e in entrambi i
+  // preload (per le pagine web e per le pagine interne di Filo).
+  for (const rel of [
+    ['src', 'main', 'services', 'loader.js'],
+    ['src', 'preload', 'page-preload.js'],
+    ['src', 'preload', 'internal-preload.js'],
+  ]) {
+    assert.match(readFileSync(join(ROOT, ...rel), 'utf8'), /campoTesto\.js/,
+      `${rel.join('/')} non carica campoTesto.js: là la regola non c'è`);
+  }
+});
+
+test('la regola risponde uguale da entrambe le strade', () => {
+  require(join(ROOT, 'src', 'shared', 'campoTesto.js'));
+  const CT = globalThis.SN_CAMPO_TESTO;
+
+  // Finti elementi: quel tanto di DOM che la regola guarda.
+  const el = (tag, extra = {}) => ({
+    tagName: tag.toUpperCase(),
+    matches: (sel) => sel.split(',').some((s) => s.trim().toLowerCase() === tag.toLowerCase()),
+    getAttribute: (n) => (n === 'type' ? extra.type || null : null),
+    closest: () => (extra.dentroContenteditable ? {} : null),
+    disabled: !!extra.disabled,
+    readOnly: !!extra.readOnly,
+    ...extra,
+  });
+
+  assert.equal(CT.campoDiTesto(el('textarea')), true);
+  assert.equal(CT.campoDiTesto(el('input', { type: 'text' })), true);
+  assert.equal(CT.campoDiTesto(el('input', { type: 'checkbox' })), false, 'una spunta non è un campo di testo');
+  assert.equal(CT.campoDiTesto(el('input', { type: 'text', readOnly: true })), false, 'un campo in sola lettura non ha niente da annullare');
+  assert.equal(CT.campoDiTesto(el('div', { dentroContenteditable: true })), true);
+  assert.equal(CT.campoDiTesto(el('div')), false);
+  assert.equal(CT.campoDiTesto(null), false);
+
+  // La forma che il processo principale spedisce nella pagina deve essere
+  // autosufficiente: se si porta dietro un riferimento a questo file, dentro la
+  // pagina non funziona e Cmd+Z si mangia il testo appena scritto.
+  const sorgente = CT.sorgenteScriveQui();
+  assert.ok(!/SN_CAMPO_TESTO|require\(/.test(sorgente),
+    'la sorgente mandata nella pagina cita cose che nella pagina non esistono');
+  const finto = { activeElement: el('textarea') };
+  // eslint-disable-next-line no-new-func
+  const risposta = new Function('document', `return ${sorgente};`)(finto);
+  assert.equal(risposta, true, 'valutata come fa il main, la regola non riconosce più un campo di testo');
+});
