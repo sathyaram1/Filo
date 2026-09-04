@@ -18,7 +18,7 @@
     {
       version: '0.2.215', date: '2026-09-04',
       features: [
-        'Nella chat della nuova scheda, sopra ogni risposta, vedi cosa Filo ha fatto prima di parlare. Mentre il modello ragiona, il ragionamento scorre in un riquadro che cresce; all\'arrivo della risposta si richiude in una riga («Ragionamento · 9 s») e un click la riapre per rileggerlo tutto, anche più tardi. Le azioni compiute (timer avviato, sveglia impostata, ricerca sul web) compaiono lì come righe con un\'icona. Finché il modello non risponde c\'è una rotella: le frasi di riempimento inventate non ci sono più.',
+        'Nella chat della nuova scheda, sopra ogni risposta, una riga discreta dice cosa Filo sta facendo («Sta ragionando · …», «Cerco sul web: …») e, quando ha finito, cosa ha fatto («Ha cercato sul web e letto un documento · 40 s»). Un click la apre e mostra tutto nell\'ordine: il ragionamento del modello per intero, le azioni compiute (timer, sveglie, ricerche, file letti) come righe con un\'icona, gli esiti dei comandi. Anche i lavori in più passi restano una riga sola e una risposta sola. Le frasi di riempimento inventate («Consulto la memoria…») non ci sono più.',
       ],
       fixes: [
         'In una conversazione lunga il campo dove scrivi non finisce più tagliato sotto il bordo della finestra, anche quando lo allarghi su più righe o alleghi immagini.',
