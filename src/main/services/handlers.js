@@ -1870,6 +1870,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
   const fileSummaries = await editorFileSummaries();
+  // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
+  // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
+  // chat normale: nessuna schermata a passi, nessun modulo.
+  const onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
+  const onbActive = Onboarding && !onbBefore.done;
+  const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
