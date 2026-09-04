@@ -23,18 +23,20 @@
     $('openHistory').textContent = 'Cronologia AI';
     $('openSpellcheck').textContent = 'Gestisci correttore';
 
-    // Lista scorciatoie da tastiera. Su Mac le stesse quattro si premono con un
-    // Ctrl in più (vedi src/main/shortcuts.js: da solo, Opzione serve a
-    // scrivere gli accenti): l'elenco deve dire quello che funziona DAVVERO
-    // sulla macchina di chi lo sta leggendo.
+    // Lista scorciatoie da tastiera. Su Mac le stesse si premono con altri
+    // tasti (vedi src/shared/tasti.js): l'elenco deve dire quello che funziona
+    // DAVVERO sulla macchina di chi lo sta leggendo, quindi i nomi si chiedono
+    // alla regola invece di scriverli.
     const sc = $('shortcutsList');
     sc.innerHTML = '';
-    const tasti = (accel) => (window.SN_TASTI ? window.SN_TASTI.etichetta(accel) : accel);
+    const T = window.SN_TASTI;
+    const tasti = (accel) => (T ? T.etichetta(accel) : accel);
     [
       [tasti('Alt+E'), I18n.t('options_action_explain')],
       [tasti('Alt+T'), I18n.t('options_action_translate_sel')],
       [tasti('Alt+S'), 'Salva per dopo'],
       [tasti('Alt+H'), I18n.t('options_action_help') + ' (Fase 2)'],
+      [T ? T.etichettaSaltoScheda() : 'Alt+cifra', 'Vai alla scheda in quella posizione (0 = la decima)'],
     ].forEach(([k, v]) => {
       const li = document.createElement('li');
       li.textContent = `${k} — ${v}`;
