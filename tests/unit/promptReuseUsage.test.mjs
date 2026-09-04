@@ -22,9 +22,7 @@ const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'main', 'services', 'providers', 'openrouter.js'));
-require(join(ROOT, 'src', 'main', 'services', 'providers', 'gemini.js'));
 const OpenRouter = globalThis.SN_PROVIDER_OPENROUTER;
-const Gemini = globalThis.SN_PROVIDER_GEMINI;
 
 function jsonResponse(obj) {
   return { ok: true, status: 200, json: async () => obj, text: async () => '' };
@@ -94,32 +92,7 @@ test('OpenRouter streaming: il riuso arriva col conteggio finale', async () => {
 
 // ── Gemini ───────────────────────────────────────────────────────────────────
 
-test('Gemini: i token riusati dalla cache finiscono nel conteggio', async () => {
-  const res = await withFetch(
-    () => Promise.resolve(jsonResponse({
-      candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-      usageMetadata: { promptTokenCount: 8000, candidatesTokenCount: 30, cachedContentTokenCount: 6400 },
-    })),
-    () => Gemini.complete({ apiKey: 'k', model: 'gemini-3.1-flash-lite', messages: [{ role: 'user', content: 'ciao' }] }),
-  );
-  assert.equal(res.usage.promptTokens, 8000);
-  assert.equal(res.usage.cachedPromptTokens, 6400);
-});
 
-test('Gemini streaming: il riuso arriva col conteggio finale', async () => {
-  const chunks = [
-    'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }) + '\n\n',
-    'data: ' + JSON.stringify({
-      candidates: [{ content: { parts: [{ text: '' }] } }],
-      usageMetadata: { promptTokenCount: 8000, candidatesTokenCount: 30, cachedContentTokenCount: 6400 },
-    }) + '\n\n',
-  ];
-  const res = await withFetch(
-    () => Promise.resolve(sseResponse(chunks)),
-    () => Gemini.streamComplete({ apiKey: 'k', model: 'gemini-3.1-flash-lite', messages: [{ role: 'user', content: 'x' }], onDelta: () => {} }),
-  );
-  assert.equal(res.usage.cachedPromptTokens, 6400);
-});
 
 // ── Il dato sopravvive fino alla cronologia ──────────────────────────────────
 

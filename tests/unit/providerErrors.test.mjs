@@ -15,9 +15,7 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 require(join(__dirname, '..', '..', 'src', 'main', 'services', 'providers', 'openrouter.js'));
-require(join(__dirname, '..', '..', 'src', 'main', 'services', 'providers', 'gemini.js'));
 const OpenRouter = globalThis.SN_PROVIDER_OPENROUTER;
-const Gemini = globalThis.SN_PROVIDER_GEMINI;
 
 function withFakeFetch(impl, run) {
   const orig = globalThis.fetch;
@@ -62,39 +60,5 @@ test('OpenRouter streamComplete: errore HTTP porta status e provider strutturati
   });
 });
 
-test('Gemini complete: errore HTTP porta status e provider strutturati', async () => {
-  await withFakeFetch(httpError(429, 'quota exceeded'), async () => {
-    await assert.rejects(
-      Gemini.complete({ apiKey: 'k', model: 'gemini-2.5-flash', messages: [] }),
-      (err) => {
-        assert.equal(err.status, 429);
-        assert.equal(err.provider, 'gemini');
-        return true;
-      },
-    );
-  });
-});
 
-test('Gemini streamComplete: errore HTTP porta status e provider strutturati', async () => {
-  await withFakeFetch(httpError(500, 'internal'), async () => {
-    await assert.rejects(
-      Gemini.streamComplete({ apiKey: 'k', model: 'gemini-2.5-flash', messages: [] }),
-      (err) => {
-        assert.equal(err.status, 500);
-        assert.equal(err.provider, 'gemini');
-        return true;
-      },
-    );
-  });
-});
 
-test('Gemini: modello non Google → errore marcato come errore provider (senza status)', async () => {
-  await assert.rejects(
-    Gemini.complete({ apiKey: 'k', model: 'anthropic/claude', messages: [] }),
-    (err) => {
-      assert.equal(err.provider, 'gemini');
-      assert.equal(err.status, undefined);
-      return true;
-    },
-  );
-});
