@@ -1522,12 +1522,13 @@
   // per non trattarlo come parole dell'utente (#360: una segnalazione proposta
   // da Filo non deve citare un nudge interno).
   async function runFiloTurn({ userMessage, images = [], internal = false }) {
-    // Bolla Filo "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
-    const pending = appendThinking();
+    // Blocco di attività del turno (#521): attesa, poi ragionamento in diretta,
+    // poi le righe delle azioni. Resta sopra la risposta.
+    const pending = createActivity();
     // Canale per il reasoning VERO in diretta: apriamo una sottoscrizione
     // filtrata per reqId e la passiamo al main, che ci pusha i thought summary
     // del modello mentre genera. Se il modello non ragiona, non arriva nulla e
-    // restano le frasi indicative.
+    // il blocco resta in attesa finché non parte il testo.
     const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let offReasoning = null;
     if (window.filo?.onReasoning) {
