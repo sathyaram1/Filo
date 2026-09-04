@@ -325,10 +325,16 @@
   // butta: finisce nell'archivio, da dove si rilegge. Rifarla non è cancellare
   // quella che c'era (prima la sostituiva, e chi la rifaceva perdeva la sua
   // prima conversazione con Filo per sempre).
+  //
+  // Si archivia però solo quello che è davvero una conversazione: se l'utente
+  // non ha risposto nemmeno una volta, quello che c'era è il solo benvenuto.
+  // Metterlo da parte lo stesso riempiva l'archivio di voci «0 tue risposte» —
+  // e, siccome se ne conservano cinque, bastava aprire e chiudere sei volte
+  // dalle Preferenze per buttare fuori la prima conversazione vera.
   function restart(prev, nowIso) {
     const cur = normalize(prev);
     const at = nowIso || new Date().toISOString();
-    const past = cur.thread.length
+    const past = hasUserTurn(cur.thread)
       ? [...cur.past, {
         startedAt: cur.startedAt || null,
         closedAt: cur.closedAt || at,
