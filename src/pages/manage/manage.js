@@ -2865,10 +2865,16 @@
       // (ricaricamento dopo un errore) si legge da capo.
       const pending = firstListPromise;
       firstListPromise = null;
-      allFeedbacks = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE }));
+      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE }));
+      // Nel frattempo uno spec ha iniettato dati finti? Quelli vincono: la
+      // lista vera arrivata dopo non li sovrascrive (era una gara persa a caso,
+      // e più il caricamento è veloce più spesso la si perdeva).
+      if (testDataInjected) return;
+      allFeedbacks = fresh;
       dataLoaded = true;
       loadFailed = false;
     } catch (err) {
+      if (testDataInjected) return;
       // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
       // una scheda rirende il riquadro, e senza questo flag ci scriverebbe
       // "Nessun feedback in coda." — cioè una risposta al posto di un guasto.
