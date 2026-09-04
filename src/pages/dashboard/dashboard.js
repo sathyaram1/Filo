@@ -223,6 +223,7 @@
   // solo: non deve riscrivere niente.
   async function openOnboarding(state) {
     onboardingActive = true;
+    hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
     goThread();
     renderOnboardingThread(state);
     showSkipOnboarding();
