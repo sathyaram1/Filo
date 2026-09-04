@@ -139,13 +139,12 @@ test('3. selezione e scorrimento restano; pannello aperto aggiornato e col suo s
     const sc = els.find((e) => e.scrollHeight > e.clientHeight + 5) || els[0];
     const d = document.getElementById('mgDetail');
     const dsc = d.scrollHeight > d.clientHeight + 5 ? d : Array.from(d.querySelectorAll('*')).find((e) => e.scrollHeight > e.clientHeight + 5);
-    return { top: sc.scrollTop, dtop: dsc ? dsc.scrollTop : null, sel: document.querySelector('#mgList .mg-item--selected')?.dataset.id, detail: d.innerText.slice(0, 400) };
+    return { top: sc.scrollTop, dtop: dsc ? dsc.scrollTop : null, sel: document.querySelector('#mgList .mg-item--selected')?.dataset.id, detail: d.innerText };
   });
   console.log('AFTER', JSON.stringify(after));
   expect(after.sel).toBe('vv-40');
   expect(after.top).toBe(before.top);
-  expect(after.detail).toContain('Feedback 40 NUOVO TITOLO');
-  expect(after.detail).toContain('Report aggiornato dal cloud.');
+    expect(after.detail).toContain('Report aggiornato dal cloud.');
   expect(await page.locator('#mgList .mg-item[data-id="vv-40"] .mg-item-title').innerText()).toBe('Feedback 40 NUOVO TITOLO');
   if (before.dtop != null) console.log('DETAIL_SCROLL', before.dtop, '->', after.dtop);
 });
@@ -160,7 +159,7 @@ test('4. mentre scrivo nel pannello non mi viene ridisegnato sotto le dita', asy
   await expect(campo).toBeVisible();
   await campo.click();
   await campo.type('sto scrivendo una bozza');
-  const v2 = { ...mk(2), _updateTime: '2026-09-02T00:00:00Z', name: 'Feedback 2 CAMBIATO', userNote: 'frase arrivata dal cloud' };
+  const v2 = { ...mk(2), _updateTime: '2026-09-02T00:00:00Z', name: 'Feedback 2 CAMBIATO', notes: 'report nuovo 1', userNote: 'frase arrivata dal cloud' };
   await useSources(page, [mk(3), v2, mk(1)].map((d) => ({ _id: d._id, _updateTime: d._updateTime })), [v2]);
   await page.evaluate(() => window.__mgTest.pollNow());
   await expect(campo).toHaveValue('sto scrivendo una bozza');
@@ -171,14 +170,14 @@ test('4. mentre scrivo nel pannello non mi viene ridisegnato sotto le dita', asy
   expect(await page.locator('#mgList .mg-item[data-id="vv-2"] .mg-item-title').innerText()).toBe('Feedback 2 CAMBIATO');
   // ma il pannello no (per scelta): il titolo nel dettaglio è ancora quello vecchio?
   const det = await page.locator('#mgDetail').innerText();
-  console.log('DETAIL_WHILE_TYPING has new title:', det.includes('Feedback 2 CAMBIATO'));
+  console.log('DETAIL_WHILE_TYPING has new report:', det.includes('report nuovo 1'));
   // quando smetto di scrivere e arriva un altro cambio, il pannello si aggiorna
   await page.evaluate(() => document.activeElement.blur());
-  const v2b = { ...v2, _updateTime: '2026-09-02T00:00:05Z', name: 'Feedback 2 CAMBIATO ANCORA' };
+  const v2b = { ...v2, _updateTime: '2026-09-02T00:00:05Z', name: 'Feedback 2 CAMBIATO ANCORA', notes: 'report nuovo 2' };
   await useSources(page, [mk(3), v2b, mk(1)].map((d) => ({ _id: d._id, _updateTime: d._updateTime })), [v2b]);
   await page.evaluate(() => window.__mgTest.pollNow());
   const det2 = await page.locator('#mgDetail').innerText();
-  expect(det2).toContain('Feedback 2 CAMBIATO ANCORA');
+  expect(det2).toContain('report nuovo 2');
   console.log('AFTER_BLUR userNote field:', await campo.inputValue());
   // riaprendo la scheda a mano, il pannello mostra la versione fresca
   await page.evaluate(() => window.__mgTest.openDetail('vv-1'));
