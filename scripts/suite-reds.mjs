@@ -259,6 +259,7 @@ export function leggiNoti(dati) {
       // non scusava niente pur sembrando a posto.
       titolo: normalizzaTitolo(v.titolo),
       dove: v.dove ? String(v.dove) : 'ovunque',
+      tranne: v.tranne ? String(v.tranne) : '',
       perche: v.perche ? String(v.perche) : '',
     }));
 }
