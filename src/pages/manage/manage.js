@@ -2982,16 +2982,7 @@
       renderList();
       scrollers.forEach((el, i) => { el.scrollTop = tops[i]; });
     }
-    if (!selectedId) return;
-    // La scheda aperta non è più in pagina: il pannello non può mostrare un
-    // feedback che non c'è. Si chiude (senza toccare una bozza in corso).
-    if (!allFeedbacks.some((f) => f._id === selectedId)) {
-      if (detailBeingEdited()) return;
-      selectedId = null;
-      mgDetail.hidden = true;
-      mgDetailEmpty.hidden = false;
-      return;
-    }
+    if (!selectedId || closeDetailIfGone()) return;
     if (touched.has(selectedId) && !detailBeingEdited()) openDetail(selectedId);
   }
 
