@@ -1508,7 +1508,7 @@
       `  • sidebar_aiuto: true | false ; categorizzazione: true | false\n` +
       `  • archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n` +
       `  • ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n` +
-      `  • modalita_terminale: true | false [conferma] ; shell_terminale: "powershell" | "cmd" | "bash" [conferma]\n` +
+      `  • modalita_terminale: true | false [conferma] ; shell_terminale: ${descriviSistema(sistema).shellPref} [conferma]\n` +
       `  • velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n` +
       `  • protezione_ip: true | false [conferma]  (anti-leak WebRTC)\n` +
       `  • blocco_popup: true | false [conferma]\n` +
