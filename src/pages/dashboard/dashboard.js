@@ -1743,13 +1743,18 @@
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
       renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending });
-      pending.finish();
-      // Il ragionamento entra nello storico del thread insieme al messaggio:
-      // non torna al modello (non è nel prompt), ma resta con la conversazione.
+      // Il ragionamento del turno entra nello storico del thread insieme al
+      // messaggio: non torna al modello (non è nel prompt), resta con la
+      // conversazione.
+      const turn = pending.endTurn();
+      if (ownsActivity) pending.finish();
       const entry = { role: 'filo', text: r.text || '', actions: r.actions || [] };
-      if (pending.reasoning()) { entry.reasoning = pending.reasoning(); entry.reasoningMs = pending.reasoningMs(); }
+      if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
       threadHistory.push(entry);
       applyCommandCwd(r.actions);
+      // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
+      // il turno non era l'ultimo.
+      r._bubble = filoBubble;
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     return r;
