@@ -228,21 +228,23 @@
   function onboardingClosing() {
     if (!onboardingActive) return;
     onboardingActive = false;
-    stepTrace('Preparo la tua home…');
+    const el = stepTrace('Preparo la tua home…');
+    el.dataset.onboardingClosing = '1';
+    bubblesEl.appendChild(el);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
   function onboardingDone(msg) {
+    onboardingActive = false;
+    goHome(); // svuota bolle e storico: l'intervista è finita
     if (showHomeMessage) {
       homeMessageEl.classList.remove('dash-home-msg-loading');
       homeMessageEl.textContent = msg?.message || 'Filo è in ascolto.';
     }
     suggestions = Array.isArray(msg?.suggestions) ? msg.suggestions : [];
     renderSuggestions();
-    threadHistory = [];
-    bubblesEl.textContent = '';
-    goHome();
-    // La home appena generata è la risposta: se il messaggio non è arrivato
-    // (chiave assente, provider giù) la si carica per la strada normale.
+    // La home appena generata È la risposta finale. Se non è arrivata (chiave
+    // assente, provider giù) la si carica per la strada normale.
     if (!msg?.message) loadDashboard().catch(() => {});
   }
 
