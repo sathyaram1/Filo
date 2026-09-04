@@ -104,6 +104,33 @@ jobs:
           }
           cat dist/latest-mac.yml
 
+      # Chi scarica Filo su un Mac si vede rifiutare l'apertura PRIMA di aver
+      # visto qualunque cosa di Filo: senza certificato Apple, macOS blocca il
+      # primo avvio. L'istruzione per sbloccarlo deve quindi stare nel disco che
+      # ha appena aperto, non solo dentro l'app (dove non arrivera' mai).
+      - name: Nel disco c'e' l'istruzione del primo avvio
+        shell: bash
+        run: |
+          set -e
+          PUNTO=$(mktemp -d)
+          hdiutil attach dist/Filo-Mac.dmg -mountpoint "$PUNTO" -nobrowse -readonly
+          ls -la "$PUNTO"
+          FOGLIO=$(find "$PUNTO" -maxdepth 1 -name '*.txt' -print -quit)
+          if [ -z "$FOGLIO" ]; then
+            hdiutil detach "$PUNTO" >/dev/null || true
+            echo "::error::nel disco per Mac manca il foglio con le istruzioni del primo avvio"
+            exit 1
+          fi
+          cat "$FOGLIO"
+          # Da macOS Sequoia il clic destro non sblocca piu' niente: l'unica
+          # strada e' il pulsante nelle Impostazioni di sistema.
+          if ! grep -q 'Apri comunque' "$FOGLIO"; then
+            hdiutil detach "$PUNTO" >/dev/null || true
+            echo "::error::il foglio non dice come si sblocca Filo"
+            exit 1
+          fi
+          hdiutil detach "$PUNTO"
+
       # Il pacchetto deve valere su ENTRAMBI i processori (Intel e Apple
       # Silicon) e portare la firma locale: sono le due cose senza le quali,
       # su meta' dei Mac, l'app non si apre proprio.
