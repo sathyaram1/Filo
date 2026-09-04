@@ -1802,7 +1802,7 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   parte da sola appena l'accesso arriva.
 - **Si rifà, e rifarla non cancella quella di prima**:
   `Preferenze → Rifai l'intervista di benvenuto`. Tutto ciò che Filo può fare
-  una volta sola diventa una trappola se non si può rifare — e la prima
+  una volta sola diventa una trappola se non si può rifare. E la prima
   conversazione con Filo è la prima cosa che l'utente gli ha raccontato di sé:
   il rilancio la ARCHIVIA (`past`), e nella stessa sezione di Preferenze si
   rilegge. Sostituirla non costava niente in meno.
@@ -1828,18 +1828,18 @@ occhi la frase che gli diceva di scrivere una cosa che non funzionava.
 
 La regola: **ogni volta che un testo dell'app promette un comportamento
 all'utente, quel comportamento deve avere una strada che non passa dall'LLM.**
-Il modello resta la strada normale — più intelligente, più naturale — e quella
-di sotto è la rete di sicurezza.
+Il modello resta la strada normale, più intelligente e più naturale; quella di
+sotto è la rete di sicurezza.
 
 - **Riconoscimento locale della parola chiave** (`SN_ONBOARDING.isStopRequest`):
   frase intera normalizzata (accenti, punteggiatura, riempitivi di cortesia)
   confrontata con un elenco chiuso. Volutamente **stretto**: la frase deve
-  ESSERE un'uscita, non contenerne una — «basta che tu non sia prolisso» è una
-  risposta, e chiudere per sbaglio è il danno opposto. Il resto lo copre il
+  ESSERE un'uscita, non contenerne una. «basta che tu non sia prolisso» è una
+  risposta all'intervista, e chiudere per sbaglio è il danno opposto. Il resto lo copre il
   modello.
 - **E un controllo visibile**, per chi la frase non la ricorda o si trova
   davanti a una bolla d'errore: `#skipOnboarding`, sotto la conversazione, più
-  la stessa uscita accanto al «Riprova» della bolla d'errore — che è il punto in
+  la stessa uscita accanto al «Riprova» della bolla d'errore, che è il punto in
   cui l'utente si accorge di essere in trappola.
 - **La chiusura non può dipendere dalla risposta**: il congedo è un testo fisso,
   e se la prima home non arriva (nessun modello) il client va alla home lo
@@ -1847,15 +1847,15 @@ di sotto è la rete di sicurezza.
 
 ## Uno stesso messaggio, di fila a sé stesso, è lo stesso turno
 
-Un turno di chat che si interrompe riparte per tre strade diverse — la finestra
+Un turno di chat che si interrompe riparte per tre strade diverse: la finestra
 chiusa mentre l'assistente scriveva e riaperta, il «Riprova» dopo un errore, una
-seconda scheda aperta durante l'attesa — e tutte e tre rispediscono lo STESSO
+seconda scheda aperta durante l'attesa. Tutte e tre rispediscono lo STESSO
 messaggio. Dove il testo viene anche salvato (la conversazione dell'accoglienza)
 finiva scritto due volte, e dove viene anche CONTATO (i cinque scambi
 dell'intervista) un intoppo di rete costava una delle domande.
 
 `SN_ONBOARDING.appendTurn` scarta il messaggio identico al precedente dello
-stesso ruolo. Non è deduplicazione generica: è la definizione giusta di "turno".
+stesso ruolo. Non è deduplicazione generica. È la definizione giusta di «turno».
 Se salvi o conti i turni di una conversazione che può essere ripresa, chiediti
 quale ripartenza li fa contare due volte prima di fidarti del contatore.
 
