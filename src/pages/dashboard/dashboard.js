@@ -2751,18 +2751,18 @@
     applyHomeMessageVisibility();
     if (terminalMode) await initCwd();
     applyTerminalMode();
-    // Primissima apertura? In tal caso il benvenuto di Filo prende il posto del
-    // commento generato (che senza storico sarebbe comunque generico).
-    const firstRun = await isFirstRun();
-    if (firstRun) {
-      try { await self.SN_STORAGE?.setRaw?.(STORAGE_KEYS.FILO_WELCOMED, true); } catch (_) {}
-    }
+    // #524 — intervista di benvenuto aperta (primo avvio, o ripresa a metà, o
+    // rilanciata dalle Preferenze)? Allora la home non serve: quello che
+    // l'utente deve vedere è la conversazione, dal punto in cui era rimasta. Il
+    // segno "già accolto" NON si scrive qui — si scrive quando l'intervista
+    // finisce, altrimenti chi chiude la finestra adesso non la rivede più.
+    const onbState = await fetchOnboarding();
     // Carico in parallelo dashboard cache e live state per non sequenziare.
     await Promise.all([
-      firstRun ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
     ]);
-    if (firstRun) showWelcomeMessage();
+    if (onbState) await openOnboarding(onbState);
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,
