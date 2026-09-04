@@ -16,13 +16,31 @@ const COMMANDS = {
   'Alt+H': 'open-help-sidebar',
 };
 
+// Su Mac le stesse quattro scorciatoie prendono un Ctrl in più.
+//
+// PERCHÉ: su Mac il tasto Alt si chiama Opzione e serve a SCRIVERE — è il tasto
+// morto degli accenti (Opzione+E poi "e" fa "é"). Queste scorciatoie sono
+// globali: valgono in tutto il sistema, non solo dentro Filo. Registrare
+// Opzione+E significherebbe togliere l'accento acuto a chi scrive in italiano,
+// in QUALSIASI programma, per tutto il tempo che Filo resta acceso — un danno
+// molto peggiore della comodità che dà la scorciatoia. Ctrl+Opzione non ha
+// questo ruolo e resta libero.
+//
+// La tabella qui sopra resta la forma canonica (è quella che il manifesto delle
+// capacità cita e che una sentinella negli unit test incrocia): qui si aggiunge
+// solo il modificatore che serve alla piattaforma.
+function acceleratorePerPiattaforma(accel) {
+  return process.platform === 'darwin' ? `Control+${accel}` : accel;
+}
+
 function registerShortcuts(window) {
   for (const [accel, command] of Object.entries(COMMANDS)) {
+    const reale = acceleratorePerPiattaforma(accel);
     try {
-      const ok = globalShortcut.register(accel, () => dispatch(command, window));
-      if (!ok) console.warn('[Filo] shortcut non registrato:', accel);
+      const ok = globalShortcut.register(reale, () => dispatch(command, window));
+      if (!ok) console.warn('[Filo] shortcut non registrato:', reale);
     } catch (e) {
-      console.warn('[Filo] register shortcut failed', accel, e);
+      console.warn('[Filo] register shortcut failed', reale, e);
     }
   }
 }
