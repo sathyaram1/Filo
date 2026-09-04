@@ -176,8 +176,8 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       clientId: CLIENT_ID,
       // Le immagini vanno nel campo delle immagini, come dall'app: è quello che
       // i giudici guardano (le vedono direttamente). Il resto sono documenti.
-      images: (Array.isArray(allegati) ? allegati : []).filter((a) => /^image//.test(a.type)),
-      files: (Array.isArray(allegati) ? allegati : []).filter((a) => !/^image//.test(a.type)),
+      images: (Array.isArray(allegati) ? allegati : []).filter((a) => a.type.startsWith('image/')),
+      files: (Array.isArray(allegati) ? allegati : []).filter((a) => !a.type.startsWith('image/')),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
