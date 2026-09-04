@@ -146,11 +146,8 @@ test('primo avvio: parte una conversazione, e chi non risponde la ritrova', asyn
 
 test('quello che Filo impara lo applica subito, lo spunta, e riprende da lì', async ({ app, shell }) => {
   test.setTimeout(120_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
+  const page = await apriIntervista(app, shell);
   await expect(page.locator('#input')).toBeVisible();
-  await useFakeKey(app);
-  await stubAgents(app);
 
   // Filo scopre chi è l'utente e come vuole essere trattato: applica lo stile
   // (azione vera) e spunta le due voci.
