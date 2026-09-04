@@ -273,11 +273,25 @@
     return remaining(state).length === 0;
   }
 
+  // Accoda un turno alla conversazione salvata — SALTANDO la ripetizione
+  // immediata dello stesso messaggio.
+  //
+  // Lo stesso messaggio subito dopo sé stesso non è un turno nuovo: è lo stesso
+  // turno ripartito. Succede in tre modi, e tutti e tre passano di qui: la
+  // finestra chiusa mentre Filo scriveva e riaperta (il turno riparte da solo),
+  // il «Riprova» dopo un errore, una seconda scheda aperta durante l'attesa.
+  // Ogni volta la risposta dell'utente finiva salvata due volte e contava per
+  // due dei cinque scambi: un intoppo di rete costava una delle cose che Filo
+  // doveva scoprire o dire.
   function appendTurn(state, turn) {
     const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
     const text = String((turn && turn.text) || '');
     if (!text) return cur;
+    const last = cur.thread[cur.thread.length - 1];
+    if (last && last.role === role && last.text.trim() === text.trim()) {
+      return { ...cur, startedAt: cur.startedAt || new Date().toISOString() };
+    }
     const thread = [...cur.thread, { role, text }].slice(-THREAD_CAP);
     return { ...cur, thread, startedAt: cur.startedAt || new Date().toISOString() };
   }
