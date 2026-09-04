@@ -814,6 +814,8 @@
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
+    // onboarding (#524)
+    getOnboarding, setOnboarding,
     // timer + sveglie (#322)
     listTimers, addTimer, addAlarm, resolveAlarmTime, deleteTimer, pauseTimer, resumeTimer, gcTimers, stopTimerAlarm,
     // ricorrenza + gestione dalla chat
