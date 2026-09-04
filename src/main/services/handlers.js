@@ -1924,7 +1924,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
   // funziona: nessuna chiamata al modello, nessuna rete. Vedi
-  // `SN_ONBOARDING.isStopRequest`.
+  // `SN_ONBOARDING.isExitRequest`.
   let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
   const onbActive = !!(Onboarding && !onbBefore.done);
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
