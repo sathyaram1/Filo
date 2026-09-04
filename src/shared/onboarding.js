@@ -252,7 +252,12 @@
           closedAt: p.closedAt || null,
           thread: normalizeThread(p.thread),
         }))
-        .filter((p) => p.thread.length)
+        // Solo le conversazioni VERE: una in cui l'utente non ha mai risposto
+        // non dice niente a nessuno, e occupava un posto dei cinque — bastavano
+        // cinque rilanci a cui non si risponde per buttare fuori la prima
+        // conversazione con Filo. Il filtro sta qui e non solo dove si archivia
+        // così ripulisce anche gli archivi già sporcati.
+        .filter((p) => hasUserTurn(p.thread))
         .slice(-PAST_CAP)
       : [];
     return {
@@ -262,6 +267,9 @@
       past,
       startedAt: s.startedAt || null,
       closedAt: s.closedAt || null,
+      // 'early' = chiusa prima di aver finito: la home lo dice, con la strada
+      // per rifarla. Si spegne appena l'utente l'ha letto.
+      notice: s.notice === 'early' ? 'early' : '',
     };
   }
 
