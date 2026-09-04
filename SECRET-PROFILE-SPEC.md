@@ -1,4 +1,4 @@
-<!-- Copia nel repo della spec dell'owner (Desktop/Filo/SPECIFICHE), portata qui il 2026-09-04 perché le routine possano leggerla. Feedback di implementazione: #546. Questa è la fonte di verità: aggiornare qui. -->
+<!-- Spec del profilo segreto, nel repo dal 2026-09-04 perché le routine possano leggerla. Feedback di implementazione: #546. Questa è la fonte di verità: aggiornare qui. -->
 
 # Filo — Secret Profile & Privacy Features Spec
 
@@ -68,12 +68,13 @@ Rivista il 2026-09-04 (owner + Claude). Feedback di implementazione: #546.
 
 - **Key derivation:** `key = Argon2id(NOME, device_salt)` with high memory/time parameters.
 - `device_salt` is random, generated at installation, stored in Filo's standard config. Not secret: it only defeats precomputed tables.
-- **Every block is encrypted and authenticated on its own** (AES-GCM, nonce derived from the block position). On open, Filo knows with certainty which blocks are its own and intact and which have been overwritten.
+- **Every block is encrypted and authenticated on its own** with AES-GCM. Each block carries its own fresh random 96-bit nonce in the clear next to the ciphertext (random bytes are indistinguishable from the filler, so nothing leaks) and the block position is bound in as associated data. Never derive the nonce from the position alone: rewriting a block with new content at the same position would repeat key+nonce and break GCM. On open, Filo knows with certainty which blocks are its own and intact and which have been overwritten.
 
 #### Placement: no index, positions derived from the key
 
 - Blocks of **4 KB**. **No master index**, no pointer table: nothing records how many secrets exist or where they live.
 - Logical block `j`, copy `c` lives at `hash(key, j, c) mod N`. Nothing to store.
+- Logical block 0 is the **header** of the secret: number of logical blocks, file table, creation and last-open metadata. It is the only thing Filo needs to read first; it is redundant like every other group (RS 10+10 applies to it too), and at creation it is what gets written before anything else.
 - If that position is occupied by a *declared* secret (see below), a retry counter is used: `hash(key, j, c, r)` with increasing `r`. On read, positions are tried in order until authentication succeeds. The counter is never stored.
 
 #### Redundancy and self-repair
@@ -102,7 +103,7 @@ Deleting a secret means overwriting all of its blocks with random data from insi
 | Brute force resistance | Argon2id with high parameters |
 | Survival of undeclared secrets | Probabilistic (RS 10+10 + repair on open); certain if names are declared |
 
-Known residual: the holder of a secret, seeing repairs happen, can infer that other secrets were written. Only the holder sees this, never an outside observer; accepted.
+Known residual: Filo says nothing about repairs, but the holder of a secret can still infer that other secrets were written (longer open times, or inspecting the container from outside). Only the holder can see this, never an outside observer; accepted.
 
 #### No Recovery by Design
 
