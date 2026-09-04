@@ -795,136 +795,202 @@
     send({ type: MSG.OPEN_URL, url });
   });
 
-  // Indicatore "sta pensando": 3 righe di reasoning che scorrono verso l'alto e
-  // svaniscono man mano che salgono (la riga in cima è quasi trasparente, quella
-  // in basso è piena). Restano sempre al massimo 3 righe visibili.
-  // Quando il modello fornisce il RAGIONAMENTO VERO in streaming (vedi
-  // pushReasoning più sotto), nelle righe scorre quel testo; finché non arriva
-  // (o per i modelli che non ragionano) si mostrano queste frasi indicative —
-  // abbastanza varie da non sembrare uno spinner statico.
-  // Stesso pattern della sidebar (src/content/sidebar.js).
-  const THINKING_PHRASES = [
-    'Leggo la tua richiesta…',
-    'Analizzo il contesto…',
-    'Consulto la memoria…',
-    'Controllo schede e cronologia…',
-    'Valuto il prossimo passo…',
-    'Capisco cosa ti serve…',
-    'Cerco le informazioni giuste…',
-    'Compongo la risposta…',
-    'Riconosco i pattern noti…',
-    'Verifico i dettagli…',
-    'Scelgo l’azione migliore…',
-    'Metto in ordine le idee…',
-  ];
-
-  function appendThinking() {
+  // ===== Blocco di attività del turno (#521) =====
+  // Sta SOPRA la risposta e racconta cosa Filo ha fatto prima di parlare:
+  // l'attesa, il ragionamento, le azioni. Tre fasi:
+  //   'wait'   — rotella e «Aspetto la risposta…»: la richiesta è partita e il
+  //              modello non ha ancora detto niente. Niente frasi inventate: le
+  //              vecchie righe «Consulto la memoria…» erano teatro, non stato.
+  //   'reason' — il ragionamento VERO del modello scorre in un corpo che cresce
+  //              (fino a qualche riga, poi scorre da solo restando in fondo).
+  //   'done'   — una riga collassata «Ragionamento · 9 s»; un click la riapre e
+  //              si può rileggere TUTTO il ragionamento, non solo la coda.
+  // Le azioni compiute arrivano come righe (icona e due parole) sotto la riga
+  // del ragionamento. Il blocco resta nella conversazione: prima veniva
+  // distrutto all'arrivo della risposta, e con lui il ragionamento.
+  // Se un turno non ha né ragionamento né azioni, il blocco si toglie da solo.
+  function createActivity() {
     const wrap = document.createElement('div');
-    wrap.className = 'dash-bubble dash-bubble-filo dash-thinking';
-    const lines = [];
-    for (let i = 0; i < 3; i++) {
-      const ln = document.createElement('div');
-      ln.className = 'dash-thinking-line';
-      ln.dataset.slot = String(i); // 0=top fading out, 1=mid, 2=bottom fresh
-      wrap.appendChild(ln);
-      lines.push(ln);
-    }
+    wrap.className = 'dash-activity';
+    wrap.dataset.phase = 'wait';
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'dash-activity-head';
+    head.setAttribute('aria-expanded', 'false');
+    const icon = document.createElement('span');
+    icon.className = 'dash-activity-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.className = 'dash-activity-label';
+    label.textContent = 'Aspetto la risposta…';
+    head.append(icon, label);
+    const body = document.createElement('div');
+    body.className = 'dash-activity-body';
+    body.hidden = true;
+    const rows = document.createElement('div');
+    rows.className = 'dash-activity-rows';
+    wrap.append(head, body, rows);
     bubblesEl.appendChild(wrap);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    // Pool casuale senza ripetizioni ravvicinate
-    const pool = THINKING_PHRASES.slice();
-    const recent = [];
-    function nextPhrase() {
-      const candidates = pool.filter((p) => !recent.includes(p));
-      const src = candidates.length ? candidates : pool;
-      const phrase = src[Math.floor(Math.random() * src.length)];
-      recent.push(phrase);
-      if (recent.length > 4) recent.shift();
-      return phrase;
-    }
+    let phase = 'wait';
+    let reasoning = '';
+    let startedAt = 0;
+    let endedAt = 0;
+    // null = nessuna scelta esplicita: il blocco si apre da solo mentre ragiona
+    // e si richiude da solo quando parte la risposta. Un click dell'utente
+    // fissa la sua scelta, e da lì in poi comanda lui.
+    let userChoice = null;
 
-    lines[0].textContent = nextPhrase();
-    lines[1].textContent = nextPhrase();
-    lines[2].textContent = nextPhrase();
-
-    let stopped = false;
-    // Mostra le ultime 3 righe di un elenco di segmenti, animando l'ingresso di
-    // quella in basso. Usato sia dalle frasi indicative sia dal reasoning vero.
-    const renderLines = (a, b, c) => {
-      if (lines[2].textContent === c) return; // niente cambi → niente flicker
-      lines[0].textContent = a || '';
-      lines[1].textContent = b || '';
-      lines[2].textContent = c || '';
-      lines[2].classList.remove('dash-thinking-enter');
-      void lines[2].offsetWidth;
-      lines[2].classList.add('dash-thinking-enter');
+    const setOpen = (open) => {
+      const can = open && !!reasoning;
+      body.hidden = !can;
+      head.setAttribute('aria-expanded', can ? 'true' : 'false');
+      head.title = reasoning ? (can ? 'Nascondi il ragionamento' : 'Mostra il ragionamento') : '';
     };
-    const tick = () => {
-      if (stopped || !wrap.isConnected) return;
-      // Shift verso l'alto: top esce, mid → top, bottom → mid, nuovo → bottom
-      renderLines(lines[1].textContent, lines[2].textContent, nextPhrase());
+    const followBody = () => {
+      const near = body.scrollHeight - body.scrollTop - body.clientHeight < 32;
+      if (near) body.scrollTop = body.scrollHeight;
     };
-    const interval = setInterval(tick, 900);
-    lines[2].classList.add('dash-thinking-enter');
-
-    // ── Reasoning VERO ─────────────────────────────────────────────────────
-    // Quando arriva il ragionamento reale del modello (stream di testo), si
-    // smette di animare le frasi indicative e si scorrono le righe vere: si
-    // spezza il testo in segmenti (a fine frase / a capo) e si tengono visibili
-    // gli ultimi 3, l'ultimo "in scrittura" finché non si chiude.
-    let realMode = false;
-    let buf = '';
-    const segments = [];
-    const splitSegments = (text) => {
-      // Divide su a-capo o terminatori di frase, mantenendo segmenti non vuoti.
-      return text
-        .split(/(?<=[.!?…])\s+|\n+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
+    const followThread = () => {
+      const near = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 48;
+      if (near) bubblesEl.scrollTop = bubblesEl.scrollHeight;
     };
-    const renderReasoning = () => {
-      const done = splitSegments(buf);
-      // La coda senza terminatore è il segmento "in scrittura": tienilo come
-      // ultima riga così l'utente vede il testo comparire in diretta.
-      const all = done.slice();
-      const lastChunk = buf.split(/\n+/).pop().trim();
-      const matchedTail = done.length && buf.trimEnd().endsWith(done[done.length - 1]) && /[.!?…]\s*$/.test(buf);
-      if (lastChunk && (!done.length || !matchedTail)) {
-        if (!all.length || all[all.length - 1] !== lastChunk) all.push(lastChunk);
+    const fmtSeconds = (ms) => `${Math.max(1, Math.round(ms / 1000))} s`;
+    head.addEventListener('click', () => {
+      if (!reasoning) return;
+      userChoice = body.hidden;
+      setOpen(body.hidden);
+    });
+    const closeReasoning = () => {
+      if (phase === 'done') return;
+      phase = 'done';
+      wrap.dataset.phase = 'done';
+      if (reasoning) {
+        endedAt = Date.now();
+        label.textContent = `Ragionamento · ${fmtSeconds(endedAt - startedAt)}`;
+        if (userChoice === null) setOpen(false);
+      } else {
+        // Il modello non ha ragionato (o non lo mostra): la riga non ha niente
+        // da dire e sparisce. Restano solo le eventuali righe delle azioni.
+        head.hidden = true;
       }
-      const n = all.length;
-      renderLines(all[n - 3], all[n - 2], all[n - 1]);
-      bubblesEl.scrollTop = bubblesEl.scrollHeight;
     };
 
     return {
       el: wrap,
-      // Riceve un chunk di reasoning vero dal modello.
+      // Un pezzo di ragionamento vero dal modello.
       pushReasoning(text) {
-        if (stopped || !text) return;
-        if (!realMode) { realMode = true; clearInterval(interval); }
-        buf += text;
-        renderReasoning();
+        if (phase === 'done' || !text) return;
+        if (!reasoning) {
+          startedAt = Date.now();
+          phase = 'reason';
+          wrap.dataset.phase = 'reason';
+          label.textContent = 'Sta ragionando…';
+        }
+        reasoning += text;
+        body.textContent = reasoning;
+        if (userChoice === null) setOpen(true);
+        followBody();
+        followThread();
       },
-      remove() { stopped = true; clearInterval(interval); wrap.remove(); },
+      // È partito il testo della risposta: il ragionamento è finito e si ritira.
+      answerStarted() { closeReasoning(); },
+      // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
+      addRow(rowIcon, text) {
+        rows.appendChild(makeActivityRow(rowIcon, text));
+        followThread();
+      },
+      // Fine turno: chiude quel che è aperto; senza ragionamento né azioni il
+      // blocco non ha ragione di restare.
+      finish() {
+        closeReasoning();
+        if (!reasoning && !rows.childElementCount) wrap.remove();
+      },
+      remove() { wrap.remove(); },
+      reasoning: () => reasoning,
+      reasoningMs: () => (reasoning ? (endedAt || Date.now()) - startedAt : 0),
     };
   }
 
-  function renderActions(container, actions, { onAck, autoConfirm = false } = {}) {
+  // Riga di attività: la stessa forma sia dentro il blocco del turno sia — per
+  // chi disegna una risposta senza blocco (replay, altre superfici) — fra le
+  // azioni della bolla. Tiene la classe della traccia (#376): non è un bottone
+  // e non deve sembrarlo.
+  function makeActivityRow(rowIcon, text) {
+    const el = document.createElement('div');
+    el.className = 'dash-action-step dash-activity-row';
+    const ic = document.createElement('span');
+    ic.className = 'dash-activity-row-icon';
+    ic.setAttribute('aria-hidden', 'true');
+    ic.textContent = rowIcon || '';
+    const tx = document.createElement('span');
+    tx.textContent = String(text || '').trim();
+    el.append(ic, tx);
+    return el;
+  }
+
+  // Le azioni che si raccontano con una riga (icona + due parole) invece che
+  // con un bottone: sono già eseguite dal main o sono passi intermedi, e
+  // cliccarle non farebbe niente (#376). Una sola tabella, così l'icona di
+  // un'azione sta in un posto solo. Ciò che è cliccabile — un link da aprire,
+  // una conferma da dare, l'esito di un comando — resta un bottone sotto la
+  // risposta e NON passa di qui.
+  const ACTIVITY_ROWS = {
+    TIMER: (a) => {
+      const sec = Number(a.seconds || a.secondi || 0);
+      // #323 — durata umana fedele all'intento: "30 sec", "2 h", "1 h 30 min".
+      const dur = (self.SN_TIME ? self.SN_TIME.fmtDurationLabel(sec) : `${Math.round(sec / 60)} min`);
+      const name = a.label || a.etichetta || '';
+      return { icon: '⏱', text: `Timer avviato · ${name ? `${name} · ` : ''}${dur}` };
+    },
+    SVEGLIA: (a) => {
+      const when = a.time || a.orario || '';
+      const name = a.label || a.etichetta || '';
+      return { icon: '⏰', text: `Sveglia impostata${when ? ` · ${when}` : ''}${name ? ` · ${name}` : ''}` };
+    },
+    EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
+    // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
+    // risultati rientrano nel turno successivo, dove compare la risposta.
+    CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
+    CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
+    LEGGI_FILE: (a) => {
+      const title = (a._output && a._output.title) || '';
+      return { icon: '📄', text: title ? `Leggo: ${title}` : 'Leggo un file' };
+    },
+    LEGGI_DOCUMENTO: (a) => {
+      const nome = (a._output && a._output.name) || '';
+      return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
+    },
+    LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
+  };
+  function activityRowFor(a) {
+    // Un'azione sospesa in attesa di conferma è un bottone, qualunque sia il tipo.
+    if (!a || a._confirm) return null;
+    const fn = ACTIVITY_ROWS[String(a.type || '').toUpperCase()];
+    return fn ? fn(a) : null;
+  }
+
+  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null } = {}) {
     if (!actions || !actions.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
     let hasAck = false;
     for (const a of actions) {
+      const row = activityRowFor(a);
+      if (row) {
+        if (activity) activity.addRow(row.icon, row.text);
+        else wrap.appendChild(makeActivityRow(row.icon, row.text));
+        continue;
+      }
       const btn = renderActionButton(a, { onAck });
       if (btn) wrap.appendChild(btn);
-      if ((String(a.type || '').toUpperCase() === 'TIMER') || (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') || (String(a.type || '').toUpperCase() === 'SVEGLIA')) {
-        hasAck = true;
-      }
+      if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
     }
-    // Per i comandi (TIMER/SVEGLIA/SALVA_APPUNTO) le azioni sono già eseguite
-    // server-side: aggiungiamo un tasto ✓ che torna alla dashboard (spec).
+    if (!wrap.childElementCount && !(hasAck && onAck)) return;
+    // Per l'appunto salvato (già eseguito server-side) aggiungiamo un tasto ✓
+    // che torna alla dashboard (spec). Timer e sveglie non lo hanno più: la
+    // loro riga nel blocco di attività dice già tutto.
     if (hasAck && onAck) {
       const ok = document.createElement('button');
       ok.type = 'button';
