@@ -1690,8 +1690,9 @@
     if (offAnswer) { try { offAnswer(); } catch (_) {} }
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
-      // aiuta a capire cosa stava tentando. Senza ragionamento il blocco sparisce.
-      pending.finish();
+      // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
+      pending.endTurn();
+      if (ownsActivity) pending.finish();
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
