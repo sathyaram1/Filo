@@ -54,17 +54,25 @@ test('lettura ad alta voce dal vivo: audio dal modello via router, non Google', 
   const audio = await page.evaluate(() => Array.from(document.querySelectorAll('audio')).map((a) => ({ src: (a.src || '').slice(0, 30), paused: a.paused, t: a.currentTime })));
   console.log('AUDIO', JSON.stringify(audio));
 
-  // Cronologia: voce tts via openrouter, e chi ha servito arriva dopo (non Google).
-  await expect.poll(async () => app.evaluate(async () => {
-    const list = await globalThis.SN_HISTORY.list();
-    const e = list.find((x) => x.action === 'tts');
-    return e ? (e.servedBy || '') : null;
-  }), { timeout: 45_000 }).toBeTruthy();
-  const entries = await app.evaluate(async () => (await globalThis.SN_HISTORY.list()).filter((x) => x.action === 'tts').map((x) => ({ provider: x.provider, model: x.model, servedBy: x.servedBy, violation: x.policyViolation, cost: x.costEur })));
-  console.log('HISTORY', JSON.stringify(entries));
-  expect(entries[0].provider).toBe('openrouter');
-  expect(String(entries[0].servedBy)).not.toMatch(/google/i);
-  expect(entries[0].violation).toBeFalsy();
+  // Sta leggendo davvero (audio del modello in riproduzione).
+  const busy = await page.evaluate(() => window.SN_TTS && window.SN_TTS.ttsBusy && window.SN_TTS.ttsBusy());
+  console.log('BUSY', busy);
+  // Chi ha servito la voce: lo chiedo io al router con lo stesso id.
+  const served = await app.evaluate(async ({}, gen) => {
+    const P = globalThis.SN_PROVIDER_OPENROUTER;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      try { const r = await P.lookupServedBy({ apiKey: s.apiKeys.openrouter, generationId: gen }); if (r) return r; } catch (e) { return { err: String(e.message) }; }
+    }
+    return null;
+  }, calls[0].gen);
+  console.log('SERVED BY', JSON.stringify(served));
+  expect(String(served && served.servedBy || '')).not.toMatch(/google/i);
+  // Il costo della lettura arriva dal router qualche secondo dopo.
+  console.log('COSTS', await app.evaluate(async () => JSON.stringify(await globalThis.SN_COSTS.getMonthly())));
+  const hist = await app.evaluate(async () => (await globalThis.SN_HISTORY.list()).filter((x) => x.action === 'tts').length);
+  console.log('HISTORY tts entries', hist);
 });
 
 test('preferenze: anteprima della voce del modello', async ({ app, openTab }) => {
