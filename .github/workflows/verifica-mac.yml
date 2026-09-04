@@ -51,12 +51,18 @@ jobs:
       - name: Install dipendenze
         run: npm ci
 
-      # La sentinella degli unit test guarda la CONFIGURAZIONE (che il pacchetto
-      # Mac sia ancora previsto, con i nomi giusti). Gira anche qui, prima della
-      # costruzione: se la ricetta e' gia' sbagliata sulla carta, si scopre in
-      # dieci secondi invece che in dieci minuti.
-      - name: Sentinella Mac negli unit test
-        run: npm run test:unit
+      # La sentinella guarda la CONFIGURAZIONE (che il pacchetto Mac sia ancora
+      # previsto, coi nomi giusti). Gira prima della costruzione: se la ricetta
+      # e' gia' sbagliata sulla carta, si scopre in dieci secondi invece che in
+      # dieci minuti.
+      #
+      # Solo questo file, non l'intera suite: la suite completa la fa girare il
+      # cancello prima della pubblicazione, su Windows, dov'e' il suo posto.
+      # Qui dentro finirebbero anche i test degli STRUMENTI delle routine, che
+      # su Mac non girano mai e infatti falliscono — un rosso che non dice
+      # niente sul pacchetto e coprirebbe quello che invece conta.
+      - name: Sentinella Mac
+        run: node --test tests/unit/macSupport.test.mjs
 
       # Niente `--publish`: si costruisce e basta. Il file delle chiavi di
       # default non serve (qui non si consegna niente a nessuno) e cosi' questo
