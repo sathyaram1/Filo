@@ -88,6 +88,14 @@ le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
   poi vengono fuse. La fusione pretende che i file non eseguibili delle due
   copie siano identici, quindi le copie NON vanno firmate: si firma solo il
   risultato.
+- **Senza certificato Apple, il primo avvio va spiegato dove l'utente è
+  bloccato.** macOS rifiuta di aprire Filo la prima volta, e a quel punto
+  l'utente non ha ancora visto niente dell'app: un'istruzione che vive solo
+  dentro Filo non la leggerà mai. Sta nel disco che ha appena aperto
+  (`build/Se Filo non si apre.txt`, allegato dal `build.dmg` del
+  `package.json`). E dev'essere **quella giusta**: da macOS Sequoia (2024) il
+  clic destro → «Apri» non sblocca più niente, l'unica strada è Impostazioni di
+  sistema → Privacy e sicurezza → «Apri comunque», dopo un tentativo fallito.
 
 Come si verifica, dato che un Mac non ce l'abbiamo:
 
