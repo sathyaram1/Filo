@@ -376,6 +376,11 @@ test('il prompt della chat riceve l’elenco di cosa resta da scoprire e da dire
   assert.match(conOnb, /STAI ACCOGLIENDO QUESTO UTENTE/);
   assert.match(conOnb, /ONBOARDING: \{spunta/, 'senza l’azione non può spuntare niente');
   assert.match(conOnb, /basta così/, 'deve saper chiudere quando glielo si chiede');
+  // …e altrettanto esplicitamente NON deve chiudere per un rifiuto: la
+  // distinzione la fa anche l'app, ma il modello è l'altra porta da cui lo
+  // stesso danno rientrava.
+  assert.match(conOnb, /no grazie/i, 'il modello deve sapere che un rifiuto non è un congedo');
+  assert.match(conOnb, /NON chiudere/, 'e deve sapere cosa NON fare');
   assert.match(conOnb, /Scambi usati finora: 1 su 5/);
   assert.ok(conOnb.includes(checklist), 'l’elenco deve arrivare davvero al modello');
 });
