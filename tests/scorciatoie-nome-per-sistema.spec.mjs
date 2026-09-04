@@ -27,35 +27,29 @@ const PAGINA = `<!doctype html><html><body style="padding:40px;font:16px sans-se
   <input id="campo" value="ciao" />
 </body></html>`;
 
-test('il menu del tasto destro nomina i tasti di CHI legge', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, PAGINA);
-
-  // La regola dev'essere arrivata dentro la pagina: senza, ogni scritta torna
-  // a essere una stringa fissa.
-  const regolaCePresente = await page.evaluate(() => typeof window.SN_TASTI?.etichetta === 'function');
-  expect(regolaCePresente).toBe(true);
-
-  // E deve saper cambiare risposta: interrogata per un Mac, dà i tasti del Mac.
-  const suMac = await page.evaluate(() => ({
-    incolla: window.SN_TASTI.etichetta('Ctrl+V', 'darwin'),
-    aiuto: window.SN_TASTI.etichetta('Alt+H', 'darwin'),
+test('il menu del tasto destro nomina i tasti di CHI legge', async ({ app, openTab, testServer }) => {
+  // Su una pagina web i moduli di Filo girano in un mondo separato da quello
+  // della pagina, quindi la risposta della regola la chiediamo al processo
+  // principale — stessa regola, stesso sistema.
+  const atteso = await app.evaluate(() => ({
+    incolla: globalThis.SN_TASTI.etichetta('Ctrl+V'),
+    aiuto: globalThis.SN_TASTI.etichetta('Alt+H'),
+    incollaSuMac: globalThis.SN_TASTI.etichetta('Ctrl+V', 'darwin'),
+    aiutoSuMac: globalThis.SN_TASTI.etichetta('Alt+H', 'darwin'),
   }));
-  expect(suMac.incolla).toBe('Cmd+V');
-  expect(suMac.aiuto).toBe('Ctrl+Alt+H');
+  // La regola sa cambiare risposta: interrogata per un Mac dà i tasti del Mac.
+  expect(atteso.incollaSuMac).toBe('Cmd+V');
+  expect(atteso.aiutoSuMac).toBe('Ctrl+Alt+H');
 
+  const page = await testServer.openReady(openTab, PAGINA);
   await page.locator('#campo').click({ button: 'right' });
   const menu = page.locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
-  // Le scritte del menu vengono dalla regola, non da una stringa fissa: quello
-  // che l'utente legge è quello che la regola dice per il suo sistema.
-  const atteso = await page.evaluate(() => ({
-    incolla: window.SN_TASTI.etichetta('Ctrl+V'),
-    aiuto: window.SN_TASTI.etichetta('Alt+H'),
-  }));
-
+  // Le voci del menu chiedono il nome alla regola invece di scriverlo: se la
+  // regola non arrivasse fin dentro la pagina, la voce non si costruirebbe
+  // affatto e queste due scritte non ci sarebbero.
   const scorciatoie = await menu.locator('.sn-menu-shortcut').allTextContents();
-  expect(scorciatoie.length).toBeGreaterThan(0);
   expect(scorciatoie).toContain(atteso.incolla);
   expect(scorciatoie).toContain(atteso.aiuto);
 });
