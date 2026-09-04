@@ -156,9 +156,8 @@ test('«basta così» la riconosce l’APP, non il modello', () => {
   for (const frase of [
     'basta così', 'basta cosi', 'Basta così.', 'BASTA COSÌ!', 'basta',
     'ok basta così', 'va bene basta', 'salta', 'saltiamo', 'salta l’accoglienza',
-    "salta l'intervista", 'chiudiamo', 'chiudi qui', 'stop', 'lascia stare',
-    'lascia perdere', 'non mi va', 'no grazie', 'magari dopo', 'più tardi',
-    'non ho voglia', 'basta domande', '  basta così  ',
+    "salta l'intervista", 'chiudiamo', 'chiudi qui', 'stop',
+    'basta domande', '  basta così  ', 'niente intervista',
   ]) {
     assert.equal(O.isStopRequest(frase), true, `non riconosciuta: "${frase}"`);
   }
@@ -175,6 +174,51 @@ test('…ma non chiude l’intervista a chi stava rispondendo', () => {
   ]) {
     assert.equal(O.isStopRequest(frase), false, `chiusa per sbaglio da: "${frase}"`);
   }
+});
+
+// ── Rifiutare una PROPOSTA non è chiedere di uscire ────────────────────────
+//
+// Filo, durante l'intervista, propone: l'accesso Google, il tema scuro, un
+// approfondimento sui modelli. A una proposta si risponde «no grazie», «magari
+// dopo», «non ora». Trattate da parola di stop, quelle frasi chiudevano tutta
+// l'accoglienza al primo rifiuto: delle sei cose da scoprire e da dire l'utente
+// ne sentiva due, e le altre quattro non le sentiva più.
+// Rosse senza il fix: stavano tutte nell'elenco delle parole di stop.
+const RIFIUTI = [
+  'no grazie', 'no, grazie', 'magari dopo', 'più tardi', 'non ora',
+  'non adesso', 'lascia stare', 'lascia perdere', 'passo', 'non mi va',
+  'magari un’altra volta', 'non ho voglia',
+];
+
+test('un rifiuto non è una richiesta di uscita', () => {
+  for (const frase of RIFIUTI) {
+    assert.equal(O.isStopRequest(frase), false, `«${frase}» non chiede di uscire: rifiuta`);
+    assert.equal(O.isDecline(frase), true, `«${frase}» non riconosciuta come rifiuto`);
+  }
+});
+
+test('durante l’intervista il rifiuto lo gestisce il modello, non l’app', () => {
+  // La conversazione com'è quando l'utente risponde: Filo ha appena proposto.
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna, insegnante' });
+  s = O.appendTurn(s, {
+    role: 'filo',
+    text: 'Con l’accesso Google i crediti restano tuoi anche dopo una reinstallazione. Vuoi accedere?',
+  });
+
+  for (const frase of RIFIUTI) {
+    const conRisposta = O.appendTurn(s, { role: 'user', text: frase });
+    assert.equal(O.isExitRequest(conRisposta, frase), false,
+      `«${frase}» risponde alla proposta di Filo: non deve chiudere l’accoglienza`);
+  }
+  // Le uscite vere continuano a funzionare senza passare dal modello.
+  for (const frase of ['basta così', 'salta', 'stop', 'ok basta così, grazie']) {
+    assert.equal(O.isExitRequest(O.appendTurn(s, { role: 'user', text: frase }), frase), true,
+      `«${frase}» è una richiesta di uscita: deve chiudere anche col modello muto`);
+  }
+  // Se non c'è nessuna battuta di Filo a cui rispondere, «lascia stare» non può
+  // che riferirsi all'accoglienza.
+  assert.equal(O.isExitRequest(O.emptyState(), 'lascia stare'), true);
 });
 
 test('il congedo scritto a mano esiste: è l’unica risposta possibile senza modello', () => {
