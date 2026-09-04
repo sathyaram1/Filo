@@ -173,12 +173,33 @@
     const m = /^Digit([0-9])$/.exec(String(ev.code || ''));
     const cifra = m ? m[1] : (/^[0-9]$/.test(String(ev.key || '')) ? String(ev.key) : null);
     if (cifra == null) return null;
+
+    if (suMac(esplicita)) {
+      // Lo zero è dello zoom: qui non è un salto.
+      if (cifra === '0') return null;
+      // Il nove è "l'ultima scheda": con meno di nove schede aperte porta
+      // comunque all'ultima, non nel vuoto.
+      if (cifra === '9') {
+        const n = Number(quante);
+        return Number.isFinite(n) && n > 0 ? n - 1 : 8;
+      }
+      return Number(cifra) - 1;
+    }
     return cifra === '0' ? 9 : Number(cifra) - 1;
   }
 
   // Come si chiama, quel salto, per chi lo legge in un elenco.
   function etichettaSaltoScheda(esplicita) {
     return etichetta('Alt+1', esplicita).replace(/1$/, 'cifra');
+  }
+
+  // Cosa fa, quel salto, per chi lo legge in un elenco. Sta accanto al nome e
+  // al comportamento perché le tre cose devono cambiare insieme: è dividerle
+  // che ha fatto promettere su Mac una decima scheda irraggiungibile.
+  function descrizioneSaltoScheda(esplicita) {
+    return suMac(esplicita)
+      ? 'Vai alla scheda in quella posizione (9 = l’ultima; Cmd+0 è lo zoom al 100%)'
+      : 'Vai alla scheda in quella posizione (0 = la decima)';
   }
 
   global.SN_TASTI = { piattaforma, suMac, etichetta, frase, indiceSaltoScheda, etichettaSaltoScheda };
