@@ -17,6 +17,9 @@ require(path.join(SHARED, 'constants.js'));
 require(path.join(SHARED, 'filoUi.js'));
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
+// Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
+// serve a chiunque disegni un'etichetta, quindi sta in alto.
+require(path.join(SHARED, 'tasti.js'));
 require(path.join(SHARED, 'timeFormat.js')); // formattazione durate/countdown (#323)
 require(path.join(SHARED, 'modelCaps.js'));
 // Censimento dei punti in cui Filo usa un modello: è la sorgente di verità
