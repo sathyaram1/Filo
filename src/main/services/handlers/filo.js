@@ -161,6 +161,17 @@ module.exports = function register(on, ctx) {
     return { ok: true, onboarding: state, closing: bye };
   });
 
+  // La riga che la home mostra dopo un'accoglienza chiusa a metà è stata letta.
+  // Il congedo in chat dura quanto ci mette la home ad arrivare — a volte un
+  // istante — e senza quella riga chi non fa in tempo a leggerlo non ha modo di
+  // sapere perché Filo ha smesso di presentarsi, né che si può rifare.
+  on(MSG.FILO_ONBOARDING_NOTICE_SEEN, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
+    const cur = await FiloMem.getOnboarding();
+    return { ok: true, onboarding: await saveOnboarding(Onboarding.dismissNotice(cur)) };
+  });
+
   // Gli appunti non hanno più un archivio proprio (né quindi handler CRUD): sono
   // file dell'editor, ci scrive l'azione SALVA_APPUNTO e si leggono/modificano
   // aprendo l'editor come qualsiasi altro documento.
