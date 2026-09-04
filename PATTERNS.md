@@ -1800,10 +1800,64 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
 - **Niente modello, niente accoglienza**: senza accesso e senza chiave la chat
   non può rispondere. L'intervista aspetta e la home spiega come attivare Filo;
   parte da sola appena l'accesso arriva.
-- **Si rifà**: `Preferenze → Rifai l'intervista di benvenuto`. Tutto ciò che
-  Filo può fare una volta sola diventa una trappola se non si può rifare.
-- **Test**: `tests/unit/onboarding.test.mjs` (elenco, spunte, ripresa, chiusura),
-  `tests/onboarding.spec.mjs` (il giro reale, compresa la home finale).
+- **Si rifà, e rifarla non cancella quella di prima**:
+  `Preferenze → Rifai l'intervista di benvenuto`. Tutto ciò che Filo può fare
+  una volta sola diventa una trappola se non si può rifare — e la prima
+  conversazione con Filo è la prima cosa che l'utente gli ha raccontato di sé:
+  il rilancio la ARCHIVIA (`past`), e nella stessa sezione di Preferenze si
+  rilegge. Sostituirla non costava niente in meno.
+- **Una scheda non è l'unica**: l'accoglienza vive nella scheda nuova, e di
+  schede nuove se ne aprono quante se ne vuole. Ogni scrittura dello stato viene
+  annunciata (`FILO_ONBOARDING_UPDATED`) e le altre schede si riallineano; il
+  turno rimasto a metà lo riprende **una sola** scheda (prenotazione in memoria
+  nel main). Senza, la seconda scheda restava ferma a com'era e rilanciava lo
+  stesso messaggio una seconda volta.
+- **Test**: `tests/unit/onboarding.test.mjs` (elenco, spunte, ripresa, chiusura,
+  parola di stop, archivio), `tests/onboarding.spec.mjs` (il giro reale,
+  compresa la home finale), `tests/onboarding-uscita.spec.mjs` (le vie d'uscita
+  e le strade che si rompono: provider giù, "Riprova", due schede).
+
+## Una promessa fatta all'utente non può dipendere dal modello
+
+Il benvenuto scrive «se non ti va, scrivi "basta così" e chiudiamo». Quella
+frase è un **contratto**, e affidarne l'esecuzione al modello significa non
+averlo firmato: un modello piccolo si dimentica l'istruzione (è una fra molte) e
+un modello irraggiungibile non risponde affatto. In #524 l'utente senza rete
+restava chiuso dentro l'accoglienza, col solo "Riprova" davanti e sotto gli
+occhi la frase che gli diceva di scrivere una cosa che non funzionava.
+
+La regola: **ogni volta che un testo dell'app promette un comportamento
+all'utente, quel comportamento deve avere una strada che non passa dall'LLM.**
+Il modello resta la strada normale — più intelligente, più naturale — e quella
+di sotto è la rete di sicurezza.
+
+- **Riconoscimento locale della parola chiave** (`SN_ONBOARDING.isStopRequest`):
+  frase intera normalizzata (accenti, punteggiatura, riempitivi di cortesia)
+  confrontata con un elenco chiuso. Volutamente **stretto**: la frase deve
+  ESSERE un'uscita, non contenerne una — «basta che tu non sia prolisso» è una
+  risposta, e chiudere per sbaglio è il danno opposto. Il resto lo copre il
+  modello.
+- **E un controllo visibile**, per chi la frase non la ricorda o si trova
+  davanti a una bolla d'errore: `#skipOnboarding`, sotto la conversazione, più
+  la stessa uscita accanto al «Riprova» della bolla d'errore — che è il punto in
+  cui l'utente si accorge di essere in trappola.
+- **La chiusura non può dipendere dalla risposta**: il congedo è un testo fisso,
+  e se la prima home non arriva (nessun modello) il client va alla home lo
+  stesso dopo qualche secondo, invece di restare davanti a una chat chiusa.
+
+## Uno stesso messaggio, di fila a sé stesso, è lo stesso turno
+
+Un turno di chat che si interrompe riparte per tre strade diverse — la finestra
+chiusa mentre l'assistente scriveva e riaperta, il «Riprova» dopo un errore, una
+seconda scheda aperta durante l'attesa — e tutte e tre rispediscono lo STESSO
+messaggio. Dove il testo viene anche salvato (la conversazione dell'accoglienza)
+finiva scritto due volte, e dove viene anche CONTATO (i cinque scambi
+dell'intervista) un intoppo di rete costava una delle domande.
+
+`SN_ONBOARDING.appendTurn` scarta il messaggio identico al precedente dello
+stesso ruolo. Non è deduplicazione generica: è la definizione giusta di "turno".
+Se salvi o conti i turni di una conversazione che può essere ripresa, chiediti
+quale ripartenza li fa contare due volte prima di fidarti del contatore.
 
 ## Filo ammette una mancanza → propone lui la segnalazione, non la chiede
 
