@@ -87,9 +87,15 @@
     FILO_NOTIFICATIONS: 'filo_notifications',
     // Stato sessione corrente dashboard: ultima interazione, contatori, ecc.
     FILO_SESSION: 'filo_session',
-    // Flag "primo avvio mostrato": true dopo che il messaggio di benvenuto di
-    // Filo è stato presentato la prima volta che l'utente apre l'app.
+    // Flag "già accolto": true quando la micro-intervista di benvenuto è
+    // FINITA (#524) — non quando è cominciata. Chi chiude la finestra a metà
+    // intervista, riaprendo, la ritrova dov'era.
     FILO_WELCOMED: 'filo_welcomed',
+    // Stato della micro-intervista di benvenuto (#524): cosa è già stato
+    // scoperto/detto, la conversazione per riprenderla, e se è chiusa.
+    // Forma: { done, ticked: [...], thread: [{role, text}], startedAt, closedAt }.
+    // La logica pura sta in src/shared/onboarding.js.
+    FILO_ONBOARDING: 'filo_onboarding',
     // Ultima cartella (cwd) in cui si trovava il terminale della dashboard.
     // Persiste tra le sessioni così, riaprendo Filo, si riparte dalla stessa
     // cartella invece di tornare alla home (#259). La aggiorna ogni `cd`.
