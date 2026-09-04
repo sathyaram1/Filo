@@ -449,6 +449,12 @@
       desc: 'Sceglie l’aspetto chiaro, scuro o automatico per le pagine di Filo.',
       invoke: 'Preferenze → Tema.',
     },
+    {
+      id: 'onboarding', title: 'Intervista di benvenuto', category: 'settings',
+      desc: 'La prima volta che apri Filo, invece di una schermata di configurazione parte una chiacchierata: ti chiede chi sei e come vuoi che ti parli, applica quello che gli dici mentre parlate, e ti racconta in poche righe l’aspetto, la privacy, come sceglie i modelli AI e come funzionano i crediti. Basta dire "basta così" per chiuderla in qualsiasi momento, e se chiudi la finestra a metà la ritrovi dov’era. Alla fine Filo ti prepara la tua prima home, costruita su quello che ha appena imparato.',
+      invoke: 'Parte da sola al primo avvio. Per rifarla in qualsiasi momento: Preferenze → "Rifai l’intervista di benvenuto".',
+      doesNot: 'Non è un modulo a passi e non ha campi da compilare: è una conversazione, al massimo cinque scambi. Non è obbligatoria — chiudendola Filo usa i valori predefiniti e impara di te strada facendo.',
+    },
 
     // ────────────────────────────── Crediti ──────────────────────────────────
     {
