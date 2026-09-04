@@ -2523,3 +2523,37 @@ valutare dentro la pagina. Due copie sarebbero divergute al primo ritocco.
 **Dove:** `src/main/menu.js` (la barra), `src/shared/campoTesto.js` (la regola), test:
 `tests/unit/macSupport.test.mjs` (forma della barra, in millisecondi, anche su Windows) e
 `tests/barra-menu.spec.mjs` (le voci azionate davvero, sull'app viva).
+
+## In chat: il blocco di attività del turno (attesa → ragionamento → azioni)
+
+Sopra ogni risposta di Filo nella chat della home c'è un blocco smorzato che
+racconta cosa ha fatto **prima di parlare** (#521). Tre fasi, una sola
+struttura (`createActivity()` in `src/pages/dashboard/dashboard.js`, stili
+`.dash-activity*` in `dashboard.css`):
+
+- **Attesa**: rotella e «Aspetto la risposta…». **Niente frasi inventate**
+  («Consulto la memoria…», «Metto in ordine le idee…»): erano teatro, non
+  stato, e l'utente le leggeva come ragionamento del modello.
+- **Ragionamento**: il testo VERO del modello scorre in un corpo che cresce
+  fino a qualche riga e poi scorre da solo restando in fondo (regola
+  auto-follow, vedi sopra). Si tiene TUTTO, non le ultime tre righe.
+- **Finito**: all'arrivo della prima parola della risposta il corpo si
+  richiude da solo in una riga «Ragionamento · 9 s»; un click la riapre e
+  da lì comanda l'utente. Il blocco resta nella conversazione e il
+  ragionamento entra nello storico del thread (`reasoning`, `reasoningMs`)
+  ma NON nel prompt del turno dopo.
+- **Righe delle azioni**: le azioni già eseguite dal main o i passi
+  intermedi (timer, sveglia, cerca sul web, leggo un file…) compaiono nel
+  blocco come righe «icona + due parole» (`ACTIVITY_ROWS`, una tabella
+  sola: l'icona di un'azione sta in un posto). Ciò che è cliccabile — un
+  link, una conferma, l'esito di un comando — resta un bottone sotto la
+  risposta, come da regola «i passi intermedi sono tracce, i risultati sono
+  bottoni». Perché una riga compaia il main deve RESTITUIRE l'azione
+  (`kept: true`): timer e sveglie prima venivano scartate e non arrivavano
+  mai alla chat.
+- Senza ragionamento né azioni il blocco si toglie da solo: nessun residuo.
+- Test: `tests/dashboard-chat-attivita.spec.mjs` (con screenshot in
+  `tests/agent/.out/attivita-*.png`).
+
+Le altre chat (Mazzi, barra laterale) hanno ancora le loro versioni: da
+unificare su questa.
