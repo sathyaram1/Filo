@@ -103,12 +103,12 @@ test('Opzioni: acceso, i «Prova» dei modelli proprietari non sono premibili', 
   await expect(riga.locator('.sn-model-test')).toBeEnabled();
 });
 
-test('Opzioni: acceso, la pagina non interroga più i server di chi produce i modelli', async ({ app, openTab }) => {
+test('Opzioni: la pagina non interroga i server di chi produce i modelli, acceso o spento', async ({ app, openTab }) => {
   // L'ultima cosa che questa pagina mandava a un fornitore escluso non era un
   // pulsante: era il caricamento del catalogo modelli, che parte DA SOLO
-  // all'apertura se una chiave del produttore è salvata. Il criterio dichiarato
-  // ("nessuna chiamata a un fornitore escluso") non distingue fra una richiesta
-  // partita da un click e una partita da sola.
+  // all'apertura. Oggi l'API diretta di Google non è più in Filo: il catalogo
+  // arriva dal router (pubblico, ammesso), e verso i produttori esclusi non
+  // parte niente, con l'interruttore spento come acceso.
   const chiaveSalvata = (openWeightsOnly) => app.evaluate(async (_, on) => {
     await globalThis.SN_STORAGE.setSettings({
       apiKeys: { openrouter: 'sk-or-finta-per-il-test' },
@@ -121,17 +121,21 @@ test('Opzioni: acceso, la pagina non interroga più i server di chi produce i mo
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
 
   const versoIlProduttore = [];
+  const versoIlRouter = [];
+  const PRODUTTORI = /generativelanguage\.googleapis\.com|api\.openai\.com|api\.mistral\.ai|api\.x\.ai|dashscope/i;
   page.on('request', (r) => {
-    if (r.url().includes('generativelanguage.googleapis.com')) versoIlProduttore.push(r.url());
+    if (PRODUTTORI.test(r.url())) versoIlProduttore.push(r.url());
+    if (r.url().includes('openrouter.ai/api/v1/models')) versoIlRouter.push(r.url());
   });
 
-  // Pre-condizione: a interruttore SPENTO la richiesta parte davvero. Senza
-  // questa metà, il test passerebbe anche se il catalogo non partisse mai.
+  // Pre-condizione: a interruttore SPENTO il catalogo parte davvero, dal
+  // router. Senza questa metà il test passerebbe anche a pagina muta.
   await page.reload();
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
-  await expect.poll(() => versoIlProduttore.length, { timeout: 8_000 }).toBeGreaterThan(0);
+  await expect.poll(() => versoIlRouter.length, { timeout: 8_000 }).toBeGreaterThan(0);
+  expect(versoIlProduttore, `partita una richiesta verso un produttore: ${versoIlProduttore[0]}`).toEqual([]);
 
-  // Acceso: la stessa pagina, con la stessa chiave, non ci parla più.
+  // Acceso: idem, niente verso i produttori.
   await chiaveSalvata(true);
   versoIlProduttore.length = 0;
   await page.reload();

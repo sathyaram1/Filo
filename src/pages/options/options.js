@@ -710,13 +710,38 @@
   // Il catalogo OpenRouter è PUBBLICO: la chiave non serve per elencarlo (è
   // solo metadati, niente inferenza → gratis). La passiamo se c'è, ma funziona
   // anche senza, così le categorie sono precise da subito.
+  // Il catalogo "semplice" del router elenca solo i modelli di testo: voce,
+  // dettatura e indicizzazione stanno in liste a parte, per modalità. Si
+  // chiedono tutte, così la tendina ha anche quei mestieri con le etichette giuste.
+  const OR_CATALOG_QUERIES = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
   async function fetchOpenRouterModels(key) {
-    const res = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: key ? { Authorization: `Bearer ${key}` } : {},
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
+    const headers = key ? { Authorization: `Bearer ${key}` } : {};
+    const lists = await Promise.all(OR_CATALOG_QUERIES.map(async (q) => {
+      const res = await fetch('https://openrouter.ai/api/v1/models' + q, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
+    }));
+    return lists.flat();
+  }
+
+  // Gli id del registro che il catalogo non conosce (modelli nuovi, o scritti a
+  // mano) restano nella tendina: toglierli farebbe sparire dalla lista proprio
+  // il modello che la riga usa.
+  function withRegistryIds(provider, catalog) {
+    const known = new Set(catalog.map((it) => it.id));
+    const extra = [];
+    try {
+      const reg = collectModelRegistry().registry || {};
+      for (const nick of Object.keys(reg)) {
+        const s = entryToSingle(reg[nick]);
+        if (s.provider === provider && s.model && !known.has(s.model)) {
+          known.add(s.model);
+          extra.push(s.model);
+        }
+      }
+    } catch (_) {}
+    return catalog.concat(extra);
   }
 
   function providerKey(provider) {
@@ -748,7 +773,7 @@
     try {
       const ids = await fetchOpenRouterModels(key);
       providerModelCache[provider] = ids;
-      populateDatalist(provider, ids);
+      populateDatalist(provider, withRegistryIds(provider, ids));
     } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
@@ -762,7 +787,7 @@
       try {
         const ids = await fetchOpenRouterModels(orKey);
         providerModelCache.openrouter = ids;
-        populateDatalist('openrouter', ids);
+        populateDatalist('openrouter', withRegistryIds('openrouter', ids));
         total += ids.length;
       } catch (e) { errors.push(`OpenRouter: ${e.message || e}`); }
     }

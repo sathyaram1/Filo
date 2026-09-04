@@ -464,13 +464,18 @@ module.exports = function register(on, ctx) {
       const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
-      // Il catalogo OpenRouter è pubblico: la chiave è facoltativa.
-      const res = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const raw = (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
+      // Il catalogo OpenRouter è pubblico: la chiave è facoltativa. La lista
+      // semplice ha solo i modelli di testo: voce, dettatura e indicizzazione si
+      // chiedono a parte, per modalità.
+      const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+      const queries = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
+      const lists = await Promise.all(queries.map(async (q) => {
+        const res = await fetch('https://openrouter.ai/api/v1/models' + q, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
+      }));
+      const raw = lists.flat();
       const Caps = globalThis.SN_MODEL_CAPS;
       const items = Caps.sortByRecency(raw.map((it) => ({ ...it, provider })))
         .map((it) => ({ id: it.id, label: Caps.categoryLabel(provider, it.id, it.meta) }));

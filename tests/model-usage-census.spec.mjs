@@ -55,7 +55,7 @@ test('impostare il modello dell\'indicizzazione lo salva e lo ripropone', async 
 
   const input = page.locator('#modelsGrid .sn-chain').nth(idx).locator('.sn-chain-input').first();
   // Precondizione: parte dal modello di indicizzazione predefinito.
-  await expect(input).toHaveValue('embed-004');
+  await expect(input).toHaveValue('qwen-embed');
 
   await input.fill('mio-indicizzatore');
   await input.blur();
