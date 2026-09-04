@@ -29,8 +29,7 @@
     // sulla macchina di chi lo sta leggendo.
     const sc = $('shortcutsList');
     sc.innerHTML = '';
-    const suMac = (() => { try { return window.filo?.sistema === 'darwin'; } catch (_) { return false; } })();
-    const tasti = (accel) => (suMac ? `Ctrl+${accel}` : accel);
+    const tasti = (accel) => (window.SN_TASTI ? window.SN_TASTI.etichetta(accel) : accel);
     [
       [tasti('Alt+E'), I18n.t('options_action_explain')],
       [tasti('Alt+T'), I18n.t('options_action_translate_sel')],
