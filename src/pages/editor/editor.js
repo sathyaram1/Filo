@@ -3853,7 +3853,8 @@
     openOverlay(`<h3>${meta.label}</h3>
       <div class="ed-field"><label>Scorciatoia da tastiera</label>
         <input type="text" id="cfgShortcut" placeholder="es. ${escapeHtml(tasto('Ctrl+Shift+1'))}" value="${escapeHtml(m.data.shortcut || '')}" />
-        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt), es. ${escapeHtml(tasto('Ctrl+Shift+1'))} — così non ruba una lettera mentre scrivi.</div></div>
+        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt), es. ${escapeHtml(tasto('Ctrl+Shift+1'))} — così non ruba una lettera mentre scrivi.</div>
+        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
         ${deletable ? '<button class="ed-btn danger" id="cfgDelete">Elimina</button>' : ''}
