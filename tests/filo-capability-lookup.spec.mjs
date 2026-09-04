@@ -91,7 +91,7 @@ test('Filo consulta il manifesto e risponde col dettaglio reale della capacità'
   // La traccia di trasparenza del lookup è comparsa (#376: traccia scritta, non
   // più un bottone).
   await expect(page.locator('.dash-action-step', { hasText: 'Verifico cosa so fare' }))
-    .toBeVisible();
+    .toHaveCount(1); // #521: vive nella cronologia del blocco di attività, chiusa di default
 
   // PROVA CHIAVE: al secondo turno il contesto contiene il DETTAGLIO VERO della
   // capacità (descrizione + "come si attiva"), preso dal manifesto — non un testo

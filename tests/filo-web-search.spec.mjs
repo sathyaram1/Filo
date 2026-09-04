@@ -88,7 +88,7 @@ test('Filo esegue la ricerca web e risponde con i risultati reali', async ({ app
   // La traccia di trasparenza della ricerca è comparsa (#376: è una traccia
   // scritta, non più un bottone — vedi filo-open-background-tab.spec.mjs).
   await expect(page.locator('.dash-action-step', { hasText: 'Cerco sul web' }))
-    .toBeVisible();
+    .toHaveCount(1); // #521: vive nella cronologia del blocco di attività, chiusa di default
 
   // PROVA CHIAVE: al secondo turno il contesto contiene i RISULTATI VERI della
   // ricerca (titolo + URL), non un chip vuoto. È questo che permette a Filo di

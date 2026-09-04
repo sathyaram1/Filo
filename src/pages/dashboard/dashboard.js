@@ -906,9 +906,12 @@
         followBody();
         followThread();
       },
-      // È partito il testo di una risposta (finale o intermedia).
+      // È partito il testo di una risposta (finale o intermedia). Da qui in poi
+      // le righe del turno (azioni, comandi) vengono DOPO il testo: se poi
+      // quel testo entra in cronologia come nota, va messo qui, non in coda.
       answerStarted() {
         closeTurnReasoning();
+        turnMark = body.childElementCount;
         if (phase !== 'done') setPhase('act', 'Scrivo la risposta…');
       },
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
