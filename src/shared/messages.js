@@ -579,6 +579,12 @@
     // della home è pronto. La scheda aggiorna messaggio + suggerimenti senza
     // rifare la chiamata all'LLM. { message, suggestions, ts }
     FILO_DASHBOARD_UPDATED: 'filo_dashboard_updated',
+    // Broadcast da background -> dashboard (#524): la micro-intervista di
+    // benvenuto è finita, le lezioni sono già compattate in memoria e la PRIMA
+    // home personale è pronta. La chat lascia il posto alla home appena
+    // generata: l'ultimo atto dell'accoglienza è il risultato, non un "fatto".
+    // { message, suggestions, ts }
+    FILO_ONBOARDING_DONE: 'filo_onboarding_done',
     // Broadcast da background -> content: una lettura ad alta voce è attiva
     // (in QUALCHE scheda) oppure no. Ogni scheda usa questo flag per mostrare
     // "Interrompi lettura" nel menu anche se non è lei a leggere. { active: bool }
