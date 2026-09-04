@@ -2290,7 +2290,6 @@ const handlerCtx = {
   handleFiloGenerateDashboard,
   executeFiloAction,
   maybeRunCompactor,
-  broadcastToTabs,
 };
 
 require('./handlers/nav')(on, handlerCtx);
