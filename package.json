@@ -24,9 +24,9 @@
     "feedback:backfill": "node scripts/backfill-feedback-numbers.mjs",
     "feedback:auto-archive": "node scripts/auto-archive.mjs",
     "feedback:login": "node scripts/admin-login.mjs",
-    "build": "electron-builder --win",
+    "build": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always",
-    "build:mac": "electron-builder --mac",
+    "build:mac": "electron-builder --mac --publish never",
     "release:mac": "electron-builder --mac --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
     "feedback:apri": "node scripts/claude-feedback.mjs"
