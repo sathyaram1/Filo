@@ -1435,6 +1435,11 @@
     sendBtn.disabled = false;
     inputEl.focus();
 
+    // #524 — l'intervista di benvenuto si è appena chiusa: il main sta
+    // compattando quello che ha imparato e generando la prima home. Lo diciamo
+    // subito, la home arriva con FILO_ONBOARDING_DONE.
+    if (r?.ok && r.onboardingClosed) onboardingClosing();
+
     // Aggiorna live (potrebbe esserci un timer/sveglia appena creato).
     refreshLive().catch(() => {});
     return r;
