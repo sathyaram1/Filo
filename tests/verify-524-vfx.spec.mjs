@@ -130,18 +130,20 @@ test('P2 — «basta così»: chiude comunque?', async ({ app, shell }) => {
   test.setTimeout(120_000);
   const page = await apriIntervista(app, shell);
 
-  // Il modello risponde a parole ma si dimentica di chiudere: è il caso
-  // realistico su un modello piccolo/economico.
+  // Il modello, se venisse interpellato, risponderebbe a parole senza chiudere:
+  // è il caso realistico su un modello piccolo/economico. La chiusura non deve
+  // dipendere da lui — la parola di stop la riconosce l'app, e infatti questa
+  // risposta non arriva mai a schermo.
   await queueChat(app, { text: 'Va bene! Allora, dimmi: che tipo di siti frequenti di solito?', actions: [] });
   await page.locator('#input').fill('basta così');
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'che tipo di siti' })).toBeVisible({ timeout: 30_000 });
 
-  await page.waitForTimeout(1500);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
   const s = await onbState(app);
   console.log('[P2] done dopo «basta così» =', s.done, '| stato pagina =', await page.locator('body').getAttribute('data-state'));
   await page.screenshot({ path: 'tests/.shots/524-vfx-p2.png' }).catch(() => {});
   expect(s.done, '«basta così» chiude tutto in qualsiasi momento').toBe(true);
+  await expect(page.locator('#bubbles')).not.toContainText('che tipo di siti');
 });
 
 // ── P3: rifare l'intervista non deve buttare via quella di prima ────────────
