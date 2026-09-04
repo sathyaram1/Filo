@@ -57,9 +57,22 @@ le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
   mai `ctrlKey` da solo. Su Mac il tasto delle scorciatoie è Cmd, e un
   controllo che guarda solo Ctrl tace. Gli acceleratori di Electron si
   dichiarano `CommandOrControl+X`, non `Ctrl+X`.
-- **Alt su Mac è il tasto degli accenti.** Opzione+E compone `é`. Una
+- **Alt su Mac scrive.** Opzione+E compone `é`, Opzione+cifra fa `¡™£¢`. Una
   scorciatoia GLOBALE con Alt+lettera se lo prende in tutto il sistema, in ogni
-  programma. Su Mac vuole un modificatore in più: vedi `src/main/shortcuts.js`.
+  programma; una con Alt+cifra impedisce di digitare quei simboli in qualunque
+  pagina. Su Mac Alt+lettera prende un Ctrl davanti
+  (`src/main/shortcuts.js`) e Alt+cifra diventa Cmd+cifra (i salti fra schede,
+  come in ogni browser su Mac).
+- **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
+  rispondevano già a Cmd — a mentire erano le SCRITTE, e mentivano una alla
+  volta. `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')`
+  dà `Ctrl+B` su Windows e `Cmd+B` su Mac. Vale ovunque compaia un tasto
+  (menu del tasto destro, suggerimenti, elenchi). Nell'HTML non si può
+  chiedere, quindi lì una scorciatoia non ci va: la compone il JS della pagina.
+  Le eccezioni sono tre e sono dichiarate nella sentinella: la tabella degli
+  acceleratori, il manifesto delle capacità (che cita entrambe le forme) e il
+  diario delle versioni. `SN_TASTI` tiene anche il COMPORTAMENTO del salto fra
+  schede (`indiceSaltoScheda`), perché nome e tasto devono cambiare insieme.
 - **Niente percorsi di Windows scritti a mano**, né `C:\...`, né `%APPDATA%`,
   né `process.env.APPDATA`. Le cartelle di sistema le dà Electron
   (`app.getPath`), la home la dà `os.homedir()`, i pezzi si uniscono con
