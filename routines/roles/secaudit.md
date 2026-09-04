@@ -69,7 +69,10 @@ server un verdetto raccontato non lo legge).
      trova in cima ai Ricevuti della dashboard di gestione, e da lì può dare il via libera
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
-   - `20` → conflitto → risolvi o accoda `design` (come sopra)
+   - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
+     solo. **Non fare niente**: il server ha già instradato il giro di
+     riallineamento (la pratica torna a chi risolve con la critica che spiega
+     il rebase). Niente `design`, niente nota: la sovrascriveresti.
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
      nell'output e il tentativo è già a registro).
 

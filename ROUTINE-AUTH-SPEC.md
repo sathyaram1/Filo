@@ -308,7 +308,11 @@ Da oggi la fusione è una consegna del canale come le altre:
   4. **L5 deterministico** sul diff `main...<sha>` che il server **scarica da
      GitHub** — mai su un diff consegnato dal chiamante. Qualunque trip →
      `blocked`, con l'elenco dei trip, e il blocco finisce nel registro dei
-     rifiuti;
+     rifiuti. Prima che il blocco diventi una richiesta per l'owner, una
+     **prova di fusione** (dal 2026-09-04, #523) chiede a GitHub se quello sha
+     si fonde ancora su main — su un ramo usa-e-getta `prova-fusione/<sha>`,
+     cancellato subito; se non si fonde, l'esito è `conflict` (riallineamento),
+     non una richiesta che verrebbe approvata e fallirebbe;
   5. fusione di **quello sha**, via API GitHub con l'identità del server.
      Conflitto → `conflict`, niente fusione.
 - **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
