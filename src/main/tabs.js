@@ -1436,7 +1436,7 @@ class TabManager {
       // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
       // quando il focus è dentro una pagina (WebContentsView): risultato, le
       // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
-      // comune. Come per Alt+cifra qui sopra, le intercettiamo per-webContents
+      // comune. Come per il salto di scheda qui sopra, le intercettiamo per-webContents
       // così valgono anche dalle pagine. In un browser questi tasti sono
       // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
       // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
