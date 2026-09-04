@@ -202,5 +202,75 @@
       : 'Vai alla scheda in quella posizione (0 = la decima)';
   }
 
-  global.SN_TASTI = { piattaforma, suMac, etichetta, frase, indiceSaltoScheda, etichettaSaltoScheda };
+  // ── I tasti che a una pagina non arrivano mai ─────────────────────────────
+  //
+  // Chi fa scegliere una scorciatoia all'utente (le scorciatoie dei moduli
+  // dell'Editor) deve poter rifiutare in faccia una combinazione che Filo si
+  // prende prima: altrimenti si salva, sembra valida e poi non parte, e
+  // l'utente non ha modo di capire perché.
+  //
+  // Su Mac la lista è più lunga perché la barra dei menu dell'applicazione vede
+  // i tasti PRIMA di qualunque pagina, e ce n'è sempre una. Le voci qui sotto
+  // sono le stesse di `src/main/menu.js`: una sentinella negli unit test
+  // confronta le due liste e diventa rossa se divergono.
+
+  // Forma confrontabile di un acceleratore: modificatori normalizzati + tasto
+  // finale. "Cmd+Shift+Z", "ctrl + shift + z" e "Control+Shift+Z" coincidono
+  // (Cmd e Ctrl sono lo stesso tasto logico nelle scorciatoie di Filo).
+  const SINONIMI_TASTO = { '=': '+', plus: '+', minus: '-', esc: 'escape' };
+  function forma(accel) {
+    const parti = pezzi(accel);
+    if (parti.length < 2) return '';
+    const finale = parti[parti.length - 1].toLowerCase();
+    const mods = parti.slice(0, -1).map((m) => m.toLowerCase());
+    const c = mods.some((m) => CTRL.test(m)) ? 'c' : '';
+    const a = mods.some((m) => ALT.test(m)) ? 'a' : '';
+    const s = mods.some((m) => m === 'shift') ? 's' : '';
+    return `${c}${a}${s}|${SINONIMI_TASTO[finale] || finale}`;
+  }
+
+  // Scritti in forma canonica (Windows): `riservato` confronta per forma, e
+  // Cmd vale Ctrl, quindi valgono anche scritti col tasto del Mac.
+  const PRESI_OVUNQUE = [
+    // La shell del browser se li prende prima della pagina (src/main/tabs.js).
+    'Ctrl+T', 'Ctrl+W', 'Ctrl+L', 'Ctrl+R',
+  ];
+  const PRESI_SU_MAC = [
+    // Le voci della barra dei menu (src/main/menu.js).
+    'Ctrl+Z', 'Ctrl+Shift+Z',
+    'Ctrl++', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
+    'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Shift+V', 'Ctrl+A',
+    'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H',
+  ];
+  // Le scorciatoie globali (src/main/shortcuts.js): registrate a livello di
+  // sistema, non arrivano a nessuna pagina.
+  const GLOBALI = ['Alt+E', 'Alt+T', 'Alt+S', 'Alt+H'];
+
+  // Tutte le combinazioni che su questo sistema non raggiungono una pagina,
+  // nella forma con cui l'utente le vedrebbe scritte.
+  function tastiRiservati(esplicita) {
+    const mac = suMac(esplicita);
+    const lista = [
+      ...PRESI_OVUNQUE,
+      ...(mac ? PRESI_SU_MAC : []),
+      ...GLOBALI.map((g) => etichetta(g, esplicita)),
+      // Il salto di scheda: Alt+cifra qui, Cmd+cifra su Mac.
+      ...'0123456789'.split('').map((d) => etichetta(`Alt+${d}`, esplicita)),
+    ];
+    // Su Mac le voci canoniche vanno mostrate col nome del Mac.
+    return [...new Set(lista.map((a) => etichetta(a, esplicita)))];
+  }
+
+  // La combinazione arriva mai a una pagina su questo sistema?
+  function riservato(accel, esplicita) {
+    const f = forma(accel);
+    if (!f) return false;
+    return tastiRiservati(esplicita).some((a) => forma(a) === f);
+  }
+
+  global.SN_TASTI = {
+    piattaforma, suMac, etichetta, frase,
+    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
+    tastiRiservati, riservato,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
