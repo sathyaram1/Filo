@@ -316,6 +316,7 @@
   function onboardingClosing() {
     if (!onboardingActive) return;
     onboardingActive = false;
+    closingShownAt = Date.now();
     hideSkipOnboarding();
     bubblesEl.appendChild(stepTrace('Preparo la tua home…'));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
