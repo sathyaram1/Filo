@@ -195,7 +195,7 @@
 
   function howToRetry(req) {
     return originOf(req) === 'routine'
-      ? 'Il lavoro resta fermo e la segnalazione torna a te.'
+      ? 'Il lavoro torna alla routine, che riallinea il ramo e rifà i controlli: poi ti arriva una nuova richiesta da approvare.'
       : 'Rilancia npm run finish.';
   }
 
