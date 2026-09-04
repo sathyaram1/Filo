@@ -1186,6 +1186,29 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (wrote) broadcastLiveUpdate();
         return { executed: wrote, kept: false };
       }
+      case 'ONBOARDING': {
+        // #524 — l'unica cosa che questa azione tocca è il taccuino
+        // dell'intervista: cosa Filo ha già scoperto o detto, e se ha finito.
+        // Ciò che l'intervista APPLICA passa dalle azioni vere
+        // (IMPOSTA_PREFERENZA, SALVA_LEZIONE), col loro livello.
+        if (!Onboarding) return { executed: false, kept: false };
+        const state = await FiloMem.getOnboarding();
+        if (state.done) return { executed: false, kept: false };
+        const raw = action.spunta ?? action.spunte ?? action.fatto ?? action.done_items ?? action.ids;
+        const ids = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const { state: ticked } = Onboarding.tick(state, ids);
+        const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+        // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
+        // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
+        // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
+        const wantsEnd = truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
+        const next = (wantsEnd || Onboarding.shouldForceClose(ticked))
+          ? Onboarding.close(ticked)
+          : ticked;
+        await FiloMem.setOnboarding(next);
+        if (next.done) await Storage.setRaw?.(STORAGE_KEYS_WELCOMED, true).catch?.(() => {});
+        return { executed: true, kept: false };
+      }
       case 'SALVA_LEZIONE': {
         // Filo fissa una lezione nella PROPRIA memoria su richiesta (o di sua
         // iniziativa) in chat: la regola entra nel buffer delle lezioni — lo
