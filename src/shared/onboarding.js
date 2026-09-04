@@ -37,7 +37,7 @@
   // Quando l'utente riprende un'intervista lasciata a metà, la conversazione
   // ricompare com'era: l'ultima bolla di Filo È la domanda in sospeso. Questa
   // riga la introduce, così non sembra un déjà vu.
-  const RESUME_NOTE = 'Bentornato — eravamo rimasti qui.';
+  const RESUME_NOTE = 'Bentornato. Eravamo rimasti qui.';
 
   // Cinque scambi in tutto, non di più, salvo che sia l'utente ad allungare.
   const MAX_EXCHANGES = 5;
