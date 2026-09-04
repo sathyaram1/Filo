@@ -39,6 +39,17 @@
   // riga la introduce, così non sembra un déjà vu.
   const RESUME_NOTE = 'Bentornato. Eravamo rimasti qui.';
 
+  // Quando a chiudere l'intervista è l'APP e non il modello (parola di stop,
+  // pulsante «Salta l'accoglienza»), l'ultima bolla di Filo è questa: fissa,
+  // scritta a mano, disponibile anche senza rete. Deve arrivare comunque, anche
+  // quando il modello non risponde — è l'unica cosa che l'utente vede prima
+  // della home.
+  const CLOSING_MESSAGE =
+    'Va bene, chiudo qui: vado avanti coi valori predefiniti e imparo strada '
+    + 'facendo.\n'
+    + 'Se cambi idea la rifacciamo quando vuoi, da Preferenze → «Rifai '
+    + 'l’intervista di benvenuto».';
+
   // Cinque scambi in tutto, non di più, salvo che sia l'utente ad allungare.
   const MAX_EXCHANGES = 5;
   // Tetto duro: l'intervista non può diventare infinita nemmeno se il modello
@@ -46,6 +57,8 @@
   const HARD_MAX_EXCHANGES = 12;
   // Cap difensivo sulla conversazione salvata (serve solo a riprendere).
   const THREAD_CAP = 60;
+  // Quante interviste passate si tengono da parte quando l'utente la rifà.
+  const PAST_CAP = 5;
 
   // Le cose che Filo vuole SCOPRIRE (`scoprire`) e quelle che vuole DIRE
   // (`dire`). `applica` dice cosa fare appena la cosa è nota: applicare subito
