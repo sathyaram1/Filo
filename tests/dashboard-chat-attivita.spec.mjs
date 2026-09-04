@@ -97,7 +97,9 @@ test('A — chiuso mentre ragiona con l’ultima frase in riga; a fine lavoro il
   await expect(activity).toHaveAttribute('data-phase', 'reason', { timeout: 4_000 });
   await expect(label).toContainText('Sta ragionando');
   await expect(body).toBeHidden();
-  await expect(label).toContainText('soppeso le possibili risposte', { timeout: 4_000 });
+  // In riga c'è una frase del ragionamento VERO (l'ultima arrivata), non una
+  // frase di riempimento.
+  await expect(label).toHaveText(/Sta ragionando · (Per prima cosa interpreto|Poi confronto|Quindi soppeso|Infine scelgo)/);
   await page.screenshot({ path: 'tests/agent/.out/attivita-ragiona.png' });
 
   // Un click mentre lavora apre la cronologia: c'è TUTTO il ragionamento
