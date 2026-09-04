@@ -962,10 +962,16 @@
       },
       // Fine di tutto il lavoro: la riga diventa il riassunto; senza niente
       // dentro, il blocco non ha ragione di restare.
-      finish() {
+      // `failed`: il lavoro si è interrotto per un errore. Il blocco resta (il
+      // ragionamento aiuta a capire cosa stava tentando) ma lo dice in riga,
+      // così dopo un «Riprova» non sembra un lavoro riuscito impilato sopra
+      // l'altro.
+      finish({ failed = false } = {}) {
         closeTurnReasoning();
         if (!items) { wrap.remove(); setPhase('done', ''); return; }
-        setPhase('done', `${summarizeActivity(doneTypes)} · ${fmtActivityDuration(Date.now() - startedAt)}`);
+        const summary = `${summarizeActivity(doneTypes)} · ${fmtActivityDuration(Date.now() - startedAt)}`;
+        setPhase('done', failed ? `Tentativo non riuscito · ${summary}` : summary);
+        if (failed) wrap.dataset.failed = '1';
         head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
       },
       remove() { wrap.remove(); },
