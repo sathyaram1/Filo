@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.214', date: '2026-09-04',
+      features: [
+        'Filo si scarica anche per Mac: un solo file, buono sia sui Mac Intel sia su quelli con chip Apple. La prima volta macOS rifiuta di aprirlo, perché Filo non è ancora registrato presso Apple: dopo il rifiuto apri Impostazioni di sistema → Privacy e sicurezza, scorri in fondo e premi «Apri comunque». Da lì in poi Filo parte come qualsiasi altra app.',
+        'Su Mac le scorciatoie si leggono come si premono: Cmd al posto di Ctrl nel menu del tasto destro, sui pulsanti dell\'Editor e nell\'elenco di cosa sa fare Filo. Per saltare da una scheda all\'altra tieni Cmd e premi il numero, così Opzione più il numero continua a scrivere i suoi simboli. Cmd+9 porta all\'ultima scheda: Cmd+0 lì riporta la pagina al 100%.',
+        'Nell\'Editor, se assegni a un modulo una scorciatoia che Filo usa già per sé (chiudere una scheda, ricaricare, saltare da una scheda all\'altra), te lo dice subito invece di accettarla e non farla partire mai.',
+        'Su Mac, in cima allo schermo, ora c\'è il menu di Filo, in italiano. E le scorciatoie fanno quello che promettono: Cmd+W chiude la scheda e non la finestra con dentro tutte le altre, Cmd+R ricarica il sito che stai guardando, Cmd + e Cmd - ingrandiscono la pagina, Cmd+Z torna indietro (e annulla, se stai scrivendo).',
+      ],
+    },
+    {
       version: '0.2.213', date: '2026-09-04',
       features: [
         'Al primo avvio Filo ti accoglie parlando. Ti chiede chi sei e come vuoi che ti risponda, applica subito quello che gli dici e ti racconta in poche righe come funziona. Quando ne hai abbastanza scrivi «basta così», oppure clicca «Salta l\'accoglienza» sotto la conversazione. Funzionano anche senza rete. Se chiudi la finestra a metà, riaprendo riprende da dove eravate. Alla fine ti prepara la tua prima home. Puoi rifarla quando vuoi da Preferenze, dove restano anche quelle già fatte, da rileggere.',

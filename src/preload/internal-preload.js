@@ -33,6 +33,12 @@ let streamCounter = 0;
 const filoApi = {
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
   getURL: (rel) => 'filo://' + String(rel || '').replace(/^\/+/, ''),
+  // Su quale sistema gira Filo: 'darwin' (Mac), 'win32' (Windows), 'linux'.
+  // Le pagine interne ne hanno bisogno per non MENTIRE all'utente — le
+  // scorciatoie hanno una forma diversa su Mac, e le shell fra cui scegliere
+  // nella modalità terminale non sono le stesse. È un dato pubblico del
+  // sistema, non un'informazione dell'utente: nessuna superficie in più.
+  sistema: process.platform,
   onBroadcast: (fn) => {
     const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
     ipcRenderer.on('filo:broadcast', wrapped);
@@ -270,6 +276,8 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'filoUi.js'));
   safe(path.join(SHARED, 'i18n.js'));
   safe(path.join(SHARED, 'messages.js'));
+  safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
+  safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   safe(path.join(SHARED, 'themeTokens.js'));
   safe(path.join(SHARED, 'confirmUi.js'));

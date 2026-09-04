@@ -26,7 +26,7 @@ src/
 │   ├── protocol.js             Custom protocol filo://
 │   ├── ipc.js                  Routing IPC main↔renderer
 │   ├── shortcuts.js            Hotkey globali Alt+E/T/S/H
-│   ├── updater.js              Auto-update (electron-builder/NSIS)
+│   ├── updater.js              Auto-update (electron-builder: NSIS su Windows, zip su Mac)
 │   ├── popup-menu.js, popup-tooltip.js   Popup nativi della shell
 │   ├── auth/                   Login Google (PKCE, token store)
 │   ├── config/                 Chiavi default incastonate dal build
@@ -113,12 +113,12 @@ main. Così le pagine girano quasi invariate.
 - [x] Storage su disco
 - [x] Servizi background (providers, savedPages, categorizer, costTracker, history, llmsTxt, paths, fxRates, aiCache, webSearch)
 - [x] IPC + streaming AI
-- [x] Hotkey globali (Alt+E/T/S/H)
+- [x] Hotkey globali (Alt+E/T/S/H; su Mac Ctrl+Alt, perché Alt da solo è il tasto degli accenti)
 - [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
 - [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
 - [x] Test Playwright adattati a `_electron.launch` (~100 spec)
 - [x] Auto-update (electron-builder/NSIS, vedi `src/main/updater.js`)
-- [x] Packaging Windows (NSIS); Mac/Linux non previsti per ora
+- [x] Packaging Windows (NSIS) e Mac (dmg universale, Intel + Apple Silicon); Linux non previsto per ora
 
 ## Test
 

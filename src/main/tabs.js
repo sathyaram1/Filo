@@ -20,6 +20,8 @@ require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalH
 const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
+require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
+const { indiceSaltoScheda } = globalThis.SN_TASTI;
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -1414,19 +1416,17 @@ class TabManager {
         this.setContentFullscreen(false);
         return;
       }
-      // Alt+1…9 → vai alla N-esima tab, Alt+0 → la decima. Alt (non Ctrl) per
-      // non rubare il classico Ctrl/Cmd+numero del browser, e perché funziona
-      // anche mentre si scrive in una pagina (Alt+cifra non produce testo).
+      // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
+      // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
+      // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
+      // scorciatoie, lo decide un posto solo: src/shared/tasti.js.
       // Intercettiamo qui (per-webContents) invece che con un globalShortcut
       // OS-wide, così la combinazione resta disponibile alle altre app.
-      if (input.type === 'keyDown' && input.alt && !input.control && !input.meta && !input.shift) {
-        // Riconosci la cifra dal codice fisico (Digit0–9, robusto al layout) o,
-        // in mancanza, dal key (0–9): copre sia la tastiera reale sia gli input
-        // sintetici.
-        const codeM = /^Digit([0-9])$/.exec(input.code || '');
-        const digit = codeM ? codeM[1] : (/^[0-9]$/.test(input.key || '') ? input.key : null);
-        if (digit != null) {
-          const idx = digit === '0' ? 9 : Number(digit) - 1;
+      if (input.type === 'keyDown') {
+        // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
+        // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
+        const idx = indiceSaltoScheda(input, undefined, this.tabs.length);
+        if (idx != null) {
           const target = this.tabs[idx];
           if (target) {
             event.preventDefault();
@@ -1438,7 +1438,7 @@ class TabManager {
       // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
       // quando il focus è dentro una pagina (WebContentsView): risultato, le
       // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
-      // comune. Come per Alt+cifra qui sopra, le intercettiamo per-webContents
+      // comune. Come per il salto di scheda qui sopra, le intercettiamo per-webContents
       // così valgono anche dalle pagine. In un browser questi tasti sono
       // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
       // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo

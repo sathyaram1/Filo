@@ -16,6 +16,9 @@
   const I18n = global.SN_I18N;
   const Popup = global.SN_POPUP;
   const Extract = global.SN_EXTRACT;
+  // Le scorciatoie si NOMINANO da qui: su Mac hanno un'altra forma e scriverle
+  // a mano è il modo con cui il menu del tasto destro è tornato a mentire.
+  const Tasti = global.SN_TASTI;
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
@@ -370,7 +373,7 @@
     return {
       type: 'paste',
       label: I18n.t('menu_paste'),
-      shortcut: 'Ctrl+V',
+      shortcut: Tasti.etichetta('Ctrl+V'),
       history: clipboardHistory,
       onClick: () => pasteFromClipboard(),
       onPickHistory: (entry) => pasteHistoryEntry(entry),
@@ -622,7 +625,7 @@
           const arrow = document.createElement('button');
           arrow.type = 'button';
           arrow.className = 'sn-menu-inline-arrow';
-          arrow.title = I18n.t('menu_explain_deep') + ' (Alt+E)';
+          arrow.title = Tasti.frase(I18n.t('menu_explain_deep'), 'Alt+E');
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();

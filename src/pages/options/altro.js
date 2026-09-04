@@ -23,14 +23,23 @@
     $('openHistory').textContent = 'Cronologia AI';
     $('openSpellcheck').textContent = 'Gestisci correttore';
 
-    // Lista scorciatoie da tastiera
+    // Lista scorciatoie da tastiera. Su Mac le stesse si premono con altri
+    // tasti (vedi src/shared/tasti.js): l'elenco deve dire quello che funziona
+    // DAVVERO sulla macchina di chi lo sta leggendo, quindi i nomi si chiedono
+    // alla regola invece di scriverli.
     const sc = $('shortcutsList');
     sc.innerHTML = '';
+    const T = window.SN_TASTI;
+    const tasti = (accel) => (T ? T.etichetta(accel) : accel);
     [
-      ['Alt+E', I18n.t('options_action_explain')],
-      ['Alt+T', I18n.t('options_action_translate_sel')],
-      ['Alt+S', 'Salva per dopo'],
-      ['Alt+H', I18n.t('options_action_help') + ' (Fase 2)'],
+      [tasti('Alt+E'), I18n.t('options_action_explain')],
+      [tasti('Alt+T'), I18n.t('options_action_translate_sel')],
+      [tasti('Alt+S'), 'Salva per dopo'],
+      [tasti('Alt+H'), I18n.t('options_action_help') + ' (Fase 2)'],
+      [
+        T ? T.etichettaSaltoScheda() : 'Alt+cifra',
+        T ? T.descrizioneSaltoScheda() : 'Vai alla scheda in quella posizione (0 = la decima)',
+      ],
     ].forEach(([k, v]) => {
       const li = document.createElement('li');
       li.textContent = `${k} — ${v}`;

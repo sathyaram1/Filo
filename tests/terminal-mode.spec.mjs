@@ -211,13 +211,26 @@ test('Preferenze: il toggle modalità terminale e la scelta della shell si persi
   // Default: spento.
   await expect(box).not.toBeChecked();
 
+  // La shell da scegliere è una di quelle che ESISTONO sul sistema dove gira il
+  // test: il menu si riscrive per piattaforma (PowerShell e cmd solo su
+  // Windows, sh e bash altrove). Chiedere qui una shell di Windows su Linux
+  // faceva restare appesa la selezione fino al timeout — e il controllo sulla
+  // persistenza spariva proprio dai sistemi non-Windows, cioè da Mac, Linux e
+  // dalle routine. La scelta NON è il valore predefinito, altrimenti "si è
+  // salvato" e "non è cambiato niente" sarebbero indistinguibili.
+  const suWindows = process.platform === 'win32';
+  const scelta = suWindows ? 'cmd' : 'bash';
+  const predefinita = suWindows ? 'powershell' : 'sh';
+  await expect(page.locator('#terminalShell')).toHaveValue(predefinita);
+  await expect(page.locator(`#terminalShell option[value="${scelta}"]`)).toHaveCount(1);
+
   // Attiva + scegli una shell: auto-save (il "Salvato" lampeggia).
   await box.check();
-  await page.selectOption('#terminalShell', 'cmd');
+  await page.selectOption('#terminalShell', scelta);
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   // Persistito: ricaricando, lo stato è conservato.
   await page.reload();
   await expect(page.locator('#terminalEnabled')).toBeChecked({ timeout: 8_000 });
-  await expect(page.locator('#terminalShell')).toHaveValue('cmd');
+  await expect(page.locator('#terminalShell')).toHaveValue(scelta);
 });

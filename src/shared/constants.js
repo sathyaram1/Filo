@@ -1062,6 +1062,48 @@
 
   const DEFAULT_PROVIDER = 'openrouter';
 
+  // ─── IL SISTEMA SU CUI GIRA FILO, DETTO AL MODELLO ─────────────────────────
+  // Filo lancia comandi da terminale e legge file per percorso: due cose che
+  // hanno una forma DIVERSA su Windows, Mac e Linux. Finché il prompt non lo
+  // diceva, il modello poteva solo indovinare — e l'unico esempio di percorso
+  // che vedeva era `C:\Users\...`, quindi su un Mac indovinava Windows e
+  // proponeva comandi e percorsi che lì non esistono.
+  //
+  // Sta nella parte FISSA del prompt (non nel contesto): il sistema di una
+  // macchina non cambia fra un messaggio e l'altro, quindi non rompe il riuso
+  // della cache. Il valore arriva dal main process (process.platform): questo
+  // file gira anche nelle pagine, dove `process` non c'è.
+  const SISTEMI = {
+    darwin: {
+      nome: 'macOS (un Mac)',
+      shell: 'una shell POSIX (sh/zsh): comandi come `ls`, `cat`, `open`, `grep`',
+      percorsi: 'percorsi in stile Unix, con le barre in avanti: `/Users/anna/Downloads/estratto-conto.pdf`, o `~/Downloads/...`',
+      esempioPercorso: '/Users/anna/Downloads/estratto-conto.pdf',
+      shellPref: '"sh" | "bash"',
+    },
+    win32: {
+      nome: 'Windows',
+      shell: 'PowerShell (o cmd): comandi come `dir`, `Get-ChildItem`, `start`',
+      percorsi: 'percorsi in stile Windows, con la lettera di unità e le barre rovesciate: `C:\\Users\\anna\\Downloads\\estratto-conto.pdf`',
+      esempioPercorso: 'C:\\\\Users\\\\anna\\\\Downloads\\\\estratto-conto.pdf',
+      shellPref: '"powershell" | "cmd" | "bash"',
+    },
+    linux: {
+      nome: 'Linux',
+      shell: 'una shell POSIX (sh/bash): comandi come `ls`, `cat`, `xdg-open`, `grep`',
+      percorsi: 'percorsi in stile Unix, con le barre in avanti: `/home/anna/Downloads/estratto-conto.pdf`, o `~/Downloads/...`',
+      esempioPercorso: '/home/anna/Downloads/estratto-conto.pdf',
+      shellPref: '"sh" | "bash"',
+    },
+  };
+
+  // Windows è il ripiego: è dove Filo è nato e dove sta la stragrande
+  // maggioranza degli utenti di oggi. Se un giorno arriva un `platform` che non
+  // conosciamo, meglio il comportamento di prima che nessun comportamento.
+  function descriviSistema(platform) {
+    return SISTEMI[platform] || SISTEMI.win32;
+  }
+
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
     explain: ({ selection, sentence, fxLine }) =>
@@ -1432,9 +1474,11 @@
     // per far ricalcolare l'intero blocco di istruzioni a ogni messaggio.
     // REGOLA per chi tocca questo prompt: sopra la frontiera non va NULLA che
     // dipenda dall'utente o dalla singola richiesta.
-    filoChatStatic: ({ capacita }) =>
+    filoChatStatic: ({ capacita, sistema }) =>
       `Sei Filo, un assistente personale. L'utente interagisce con te attraverso un campo di testo nella dashboard del browser.\n\n` +
       `Prima vengono le istruzioni, che valgono sempre. Il CONTESTO di questa conversazione — chi è l'utente, cosa ha in memoria, cosa sta guardando, che file ha, che modello ti sta eseguendo — arriva più sotto, dopo le istruzioni.\n\n` +
+      `═══ IL COMPUTER DELL'UTENTE ═══\n` +
+      `Gira su ${descriviSistema(sistema).nome}. Quando lanci un comando da terminale usa ${descriviSistema(sistema).shell}. Quando indichi un file usa ${descriviSistema(sistema).percorsi}. Non proporre comandi né percorsi di un altro sistema: qui non funzionano.\n\n` +
       `═══ COME RISPONDI ═══\n` +
       `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n` +
       `Se PROFILO e PREFERENZE (più sotto) sono vuoti significa solo che non hai ancora informazioni su questo utente: NON inventare una spiegazione del perché. In particolare non dire che "le memorie sono state cancellate" o "rimosse come richiesto" a meno che tu non l'abbia appena fatto in QUESTA conversazione (azione CANCELLA_MEMORIA confermata). Ogni scheda parte da una conversazione nuova: non puoi sapere cosa è successo in un'altra scheda se non è nel PROFILO/PREFERENZE/LEZIONI più sotto.\n\n` +
@@ -1499,7 +1543,7 @@
       `  • sidebar_aiuto: true | false ; categorizzazione: true | false\n` +
       `  • archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n` +
       `  • ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n` +
-      `  • modalita_terminale: true | false [conferma] ; shell_terminale: "powershell" | "cmd" | "bash" [conferma]\n` +
+      `  • modalita_terminale: true | false [conferma] ; shell_terminale: ${descriviSistema(sistema).shellPref} [conferma]\n` +
       `  • velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n` +
       `  • protezione_ip: true | false [conferma]  (anti-leak WebRTC)\n` +
       `  • blocco_popup: true | false [conferma]\n` +
@@ -1549,7 +1593,7 @@
       `    {"type": "CERCA_WEB", "query": "..."},\n` +
       `    {"type": "CAPACITA_DETTAGLIO", "ids": ["save-for-later"]},\n` +
       `    {"type": "LEGGI_FILE", "fileId": "file-abc123"},\n` +
-      `    {"type": "LEGGI_DOCUMENTO", "percorso": "C:\\\\Users\\\\anna\\\\Downloads\\\\estratto-conto.pdf"},\n` +
+      `    {"type": "LEGGI_DOCUMENTO", "percorso": "${descriviSistema(sistema).esempioPercorso}"},\n` +
       `    {"type": "EVENTO_CALENDARIO", "date": "YYYY-MM-DD", "time": "HH:MM", "title": "...", "details": "..."},\n` +
       `    {"type": "APRI_FILE", "path": "...", "label": "..."},\n` +
       `    {"type": "PULISCI_TAB"},\n` +
@@ -2171,6 +2215,8 @@
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
     injectAgentStyle,
+    SISTEMI,
+    descriviSistema,
     PROMPTS,
     HISTORY_LIMIT_BYTES,
     HISTORY_ITEMS_HARD_CAP,

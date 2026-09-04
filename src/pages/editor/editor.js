@@ -35,6 +35,11 @@
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
+  // I nomi dei tasti nelle etichette: su Mac sono un'altra cosa (Cmd+B, non
+  // Ctrl+B). Si chiedono sempre qui, non si scrivono a mano.
+  const TASTI = window.SN_TASTI;
+  const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
+  const conTasto = (testo, accel) => `${testo} (${tasto(accel)})`;
 
   // ── Riferimenti DOM ───────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
@@ -61,9 +66,9 @@
     comment:          { label: 'Commenta', icon: 'share', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Seleziona testo e aggiungi commenti.' },
     chat:             { label: 'Chat', icon: 'filoLogo', defaultW: 3, defaultH: 3, minW: 3, minH: 3, desc: 'Chat con LLM che vede il documento.' },
     // ── Moduli di formattazione (agiscono sul testo selezionato nell'editor) ──
-    bold:             { label: 'Grassetto', glyph: '<b>B</b>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Grassetto sul testo selezionato (Ctrl+B).' },
-    italic:           { label: 'Corsivo', glyph: '<i>I</i>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Corsivo sul testo selezionato (Ctrl+I).' },
-    underline:        { label: 'Sottolineato', glyph: '<u>U</u>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Sottolineato sul testo selezionato (Ctrl+U).' },
+    bold:             { label: 'Grassetto', glyph: '<b>B</b>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Grassetto sul testo selezionato', 'Ctrl+B') + '.' },
+    italic:           { label: 'Corsivo', glyph: '<i>I</i>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Corsivo sul testo selezionato', 'Ctrl+I') + '.' },
+    underline:        { label: 'Sottolineato', glyph: '<u>U</u>', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: conTasto('Sottolineato sul testo selezionato', 'Ctrl+U') + '.' },
     undo:             { label: 'Indietro', icon: 'back', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Annulla l\'ultima modifica.' },
     redo:             { label: 'Avanti', icon: 'forward', defaultW: 1, defaultH: 1, minW: 1, minH: 1, desc: 'Ripeti la modifica annullata.' },
     'text-size':      { label: 'Dimensione testo', glyph: 'A±', defaultW: 2, defaultH: 1, minW: 2, minH: 1, desc: 'Aumenta o riduci la dimensione del testo selezionato.' },
@@ -1873,9 +1878,9 @@
     return b;
   }
   const SIMPLE_FORMATS = {
-    bold:      { glyph: '<b>B</b>', title: 'Grassetto (Ctrl+B)', act: () => exec('bold') },
-    italic:    { glyph: '<i>I</i>', title: 'Corsivo (Ctrl+I)', act: () => exec('italic') },
-    underline: { glyph: '<u>U</u>', title: 'Sottolineato (Ctrl+U)', act: () => exec('underline') },
+    bold:      { glyph: '<b>B</b>', title: conTasto('Grassetto', 'Ctrl+B'), act: () => exec('bold') },
+    italic:    { glyph: '<i>I</i>', title: conTasto('Corsivo', 'Ctrl+I'), act: () => exec('italic') },
+    underline: { glyph: '<u>U</u>', title: conTasto('Sottolineato', 'Ctrl+U'), act: () => exec('underline') },
     undo:      { glyph: ICONS.back ? ICONS.back(16) : '↶', title: 'Indietro (annulla)', act: () => exec('undo') },
     redo:      { glyph: ICONS.forward ? ICONS.forward(16) : '↷', title: 'Avanti (ripeti)', act: () => exec('redo') },
   };
@@ -2374,12 +2379,28 @@
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomLevel * 100) / 100));
     docEl.style.zoom = zoomLevel === 1 ? '' : String(zoomLevel);
   }
+  function zoomVerso(dir) {
+    if (dir === 'in') zoomLevel += 0.1;
+    else if (dir === 'out') zoomLevel -= 0.1;
+    else if (dir === 'reset') zoomLevel = 1;
+    else return;
+    applyZoom();
+  }
   function handleZoomKey(e) {
     const k = e.key;
-    if (k === '+' || k === '=') { e.preventDefault(); zoomLevel += 0.1; applyZoom(); return true; }
-    if (k === '-' || k === '_') { e.preventDefault(); zoomLevel -= 0.1; applyZoom(); return true; }
-    if (k === '0') { e.preventDefault(); zoomLevel = 1; applyZoom(); return true; }
+    if (k === '+' || k === '=') { e.preventDefault(); zoomVerso('in'); return true; }
+    if (k === '-' || k === '_') { e.preventDefault(); zoomVerso('out'); return true; }
+    if (k === '0') { e.preventDefault(); zoomVerso('reset'); return true; }
     return false;
+  }
+  // Su Mac il tasto dello zoom non arriva mai a questa pagina: se lo prende la
+  // barra dei menu in cima allo schermo, che lo gira alla scheda attiva. Il
+  // preload lo consegna qui perché l'editor scala il FOGLIO, non la finestra —
+  // senza questa strada, su Mac lo zoom dell'editor non succedeva affatto.
+  // (Su Windows e Linux il tasto arriva al keydown qui sopra e questa strada
+  // non viene mai percorsa: nessun doppio zoom.)
+  for (const [evento, dir] of [['filo:zoom-in', 'in'], ['filo:zoom-out', 'out'], ['filo:zoom-reset', 'reset']]) {
+    document.addEventListener(evento, () => zoomVerso(dir));
   }
   docWrap.addEventListener('wheel', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
@@ -3847,8 +3868,9 @@
     const deletable = !isPinned(m);
     openOverlay(`<h3>${meta.label}</h3>
       <div class="ed-field"><label>Scorciatoia da tastiera</label>
-        <input type="text" id="cfgShortcut" placeholder="es. Ctrl+Shift+1" value="${escapeHtml(m.data.shortcut || '')}" />
-        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (Ctrl o Alt), es. Ctrl+Shift+1 — così non ruba una lettera mentre scrivi.</div></div>
+        <input type="text" id="cfgShortcut" placeholder="es. ${escapeHtml(tasto('Ctrl+Shift+1'))}" value="${escapeHtml(m.data.shortcut || '')}" />
+        <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt), es. ${escapeHtml(tasto('Ctrl+Shift+1'))} — così non ruba una lettera mentre scrivi.</div>
+        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
         ${deletable ? '<button class="ed-btn danger" id="cfgDelete">Elimina</button>' : ''}
@@ -3864,9 +3886,11 @@
     });
     const cfgShortcut = $('cfgShortcut');
     const cfgShortcutHint = $('cfgShortcutHint');
+    const cfgShortcutTaken = $('cfgShortcutTaken');
     cfgShortcut.addEventListener('input', () => {
       cfgShortcut.classList.remove('ed-field-invalid');
       cfgShortcutHint.hidden = true;
+      cfgShortcutTaken.hidden = true;
     });
     $('cfgSave').addEventListener('click', () => {
       const rawShortcut = cfgShortcut.value.trim();
@@ -3876,6 +3900,19 @@
       if (rawShortcut && !isValidShortcut(rawShortcut)) {
         cfgShortcut.classList.add('ed-field-invalid');
         cfgShortcutHint.hidden = false;
+        cfgShortcut.focus();
+        return;
+      }
+      // Certe combinazioni non arrivano MAI a questa pagina: Filo se le prende
+      // prima (chiudi scheda, ricarica, salto di scheda…) e su Mac ci sono anche
+      // quelle della barra dei menu in cima allo schermo. Salvarle significava
+      // dare all'utente una scorciatoia che sembra valida e non parte mai: qui
+      // gliela rifiutiamo dicendogli chi si prende quel tasto.
+      if (rawShortcut && TASTI && TASTI.riservato(rawShortcut)) {
+        cfgShortcut.classList.add('ed-field-invalid');
+        cfgShortcutTaken.textContent =
+          `${TASTI.etichetta(rawShortcut)} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo: scegline un'altra, per esempio ${tasto('Ctrl+Shift+1')}.`;
+        cfgShortcutTaken.hidden = false;
         cfgShortcut.focus();
         return;
       }
@@ -3890,7 +3927,7 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  const SHORTCUT_MODIFIERS = ['ctrl', 'cmd', 'meta', 'alt', 'shift'];
+  const SHORTCUT_MODIFIERS = ['ctrl', 'control', 'cmd', 'command', 'meta', 'alt', 'option', 'shift'];
   function shortcutParts(sc) {
     return String(sc || '').toLowerCase().split('+').map((s) => s.trim()).filter(Boolean);
   }
@@ -3898,7 +3935,7 @@
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
     const parts = shortcutParts(sc);
-    return parts.includes('ctrl') || parts.includes('cmd') || parts.includes('meta') || parts.includes('alt');
+    return SHORTCUT_MODIFIERS.some((m) => m !== 'shift' && parts.includes(m));
   }
   // Una scorciatoia è valida solo se ha un modificatore reale + un tasto finale:
   // così non può coincidere con la normale digitazione di una lettera.
@@ -3934,7 +3971,14 @@
   function matchShortcut(e, sc) {
     if (!sc) return false;
     const parts = sc.toLowerCase().split('+').map((s) => s.trim());
-    const need = { ctrl: parts.includes('ctrl'), shift: parts.includes('shift'), alt: parts.includes('alt') };
+    // Cmd vale quanto Ctrl: su Mac l'utente scrive la scorciatoia con il tasto
+    // che ha davvero sotto le dita, e il campo gli propone "Cmd+…". Senza
+    // questa riga la scorciatoia si salva, sembra valida e poi non parte mai.
+    const need = {
+      ctrl: parts.includes('ctrl') || parts.includes('cmd') || parts.includes('command') || parts.includes('meta'),
+      shift: parts.includes('shift'),
+      alt: parts.includes('alt') || parts.includes('option'),
+    };
     const key = parts[parts.length - 1];
     return (e.ctrlKey || e.metaKey) === need.ctrl && e.shiftKey === need.shift && e.altKey === need.alt && eventKeyCandidates(e).has(key);
   }
@@ -4167,6 +4211,10 @@
   function toggleSidebar() { root.classList.toggle('sidebar-hidden'); }
 
   sidebarToggle.addEventListener('click', toggleSidebar);
+
+  // Il suggerimento nomina un tasto, e su Mac quel tasto è Cmd: l'HTML non può
+  // saperlo (è un file solo per tutti i sistemi), quindi lo scriviamo qui.
+  sidebarToggle.title = conTasto('Mostra/nascondi sidebar', 'Ctrl+\\');
 
   if (ICONS.apps) sidebarToggle.innerHTML = ICONS.apps(16);
 

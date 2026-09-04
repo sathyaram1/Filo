@@ -217,3 +217,36 @@ test('lo switch non è aggiungibile una seconda volta (resta unico)', async ({ o
   // Resta un solo switch: nessun doppione è stato creato.
   await expect(page.locator('.ed-module[data-type="switch"]')).toHaveCount(1);
 });
+
+// Una scorciatoia che Filo si prende PRIMA della pagina (chiudi scheda,
+// ricarica, salto di scheda… e su Mac tutta la barra dei menu in cima allo
+// schermo) non arriverebbe mai al modulo: si salvava, sembrava valida e non
+// partiva mai. Ora il salvataggio la rifiuta dicendo chi si prende quel tasto.
+test('una scorciatoia modulo che Filo si prende prima viene rifiutata', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  await expect(page.locator('#cfgShortcut')).toBeVisible();
+
+  // Ctrl+W chiude la scheda: il main la intercetta prima di qualunque pagina,
+  // su ogni sistema. (Su Mac la lista è più lunga: ci sono anche i tasti della
+  // barra dei menu — vedi tests/unit/macSupport.test.mjs.)
+  await page.fill('#cfgShortcut', 'Ctrl+W');
+  await page.click('#cfgSave');
+
+  // Il pannello resta aperto, il campo è marcato e l'avviso dice perché.
+  await expect(page.locator('#cfgShortcutTaken')).toBeVisible();
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('già di Filo');
+  await expect(page.locator('#cfgShortcut')).toHaveClass(/ed-field-invalid/);
+
+  // Correggendola con una combinazione libera il salvataggio passa: il pannello
+  // si chiude. (Senza questo pezzo il test passerebbe anche se il campo
+  // rifiutasse TUTTO.)
+  await page.fill('#cfgShortcut', 'Ctrl+Shift+7');
+  await expect(page.locator('#cfgShortcutTaken')).toBeHidden();
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+});

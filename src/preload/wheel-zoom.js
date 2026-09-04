@@ -269,7 +269,21 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     // delle pagine che zoomano da sé vale anche per questa strada.
     if (ipc && typeof ipc.on === 'function') {
       ipc.on('filo:zoom-key', (_e, dir) => {
-        if (pageHandlesZoom()) return;
+        // La pagina che zooma da sé (l'editor scala il foglio) non deve essere
+        // zoomata da qui — ma il tasto va comunque CONSEGNATO, altrimenti su
+        // Mac il suo zoom muore in silenzio: là questa è l'unica strada, perché
+        // il tasto se lo prende la barra dei menu prima che arrivi alla pagina.
+        // Su Windows e Linux il keydown della pagina arriva e basta a sé.
+        //
+        // Il verso sta nel NOME dell'evento, non in `detail`: fra il mondo
+        // isolato del preload e quello della pagina un `detail` non passa.
+        if (pageHandlesZoom()) {
+          try {
+            const nomi = { in: 'filo:zoom-in', out: 'filo:zoom-out', reset: 'filo:zoom-reset' };
+            if (nomi[dir]) document.dispatchEvent(new Event(nomi[dir]));
+          } catch (_) {}
+          return;
+        }
         try {
           if (dir === 'reset') setLevel(0);
           else if (dir === 'in') setLevel(webFrame.getZoomLevel() + ZOOM_STEP);

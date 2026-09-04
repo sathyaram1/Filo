@@ -60,6 +60,7 @@ const { createMainWindow } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
 const { registerShortcuts } = require('./shortcuts');
+const { installaMenuApplicazione } = require('./menu');
 const { initAutoUpdater } = require('./updater');
 
 // Permette al protocollo filo:// di caricarsi con privilegi standard (CORS
@@ -97,6 +98,10 @@ app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
   configureSpellchecker();
+  // La barra dei menu di Filo, al posto di quella di serie di Electron. Su Mac
+  // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
+  // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
+  installaMenuApplicazione();
 
   const Storage = globalThis.SN_STORAGE;
   try {

@@ -58,7 +58,13 @@
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
       desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda.',
-      invoke: 'Menu del tasto destro → "Indietro" / "Avanti" (dentro "Altro…"). Ctrl+Z torna alla pagina precedente (quando non stai scrivendo in un campo di testo).',
+      invoke: 'Menu del tasto destro → "Indietro" / "Avanti" (dentro "Altro…"). Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente (quando non stai scrivendo in un campo di testo).',
+    },
+    {
+      id: 'switch-tab-by-number', title: 'Salta a una scheda col numero', category: 'navigation',
+      desc: 'Porta in primo piano la scheda in quella posizione: la prima, la seconda, e così via fino alla decima.',
+      invoke: 'Alt+1…9 per le prime nove, Alt+0 per la decima. Su Mac si usa Cmd al posto di Alt, e la decima diventa Cmd+9 (“l’ultima scheda”), perché lì Cmd+0 riporta la pagina al 100%. Funziona anche mentre stai guardando un sito.',
+      doesNot: 'Se in quella posizione non c’è nessuna scheda non succede niente.',
     },
     {
       id: 'reload', title: 'Ricarica la pagina', category: 'navigation',
@@ -89,7 +95,7 @@
     {
       id: 'page-zoom', title: 'Ingrandisci o rimpicciolisci la pagina', category: 'navigation',
       desc: 'Cambia la dimensione di tutta la pagina — testo e immagini — sia sui siti sia sulle pagine di Filo (home, impostazioni, cronologia…). Lo zoom resta com’è finché non lo riporti al 100%.',
-      invoke: 'Ctrl + per ingrandire, Ctrl - per rimpicciolire, Ctrl 0 per tornare al 100%; oppure tieni Ctrl e usa la rotella, o pizzica sul trackpad. In alternativa un clic sulla rotella entra in modalità zoom: la rotella da sola ingrandisce e rimpicciolisce, e un badge in alto mostra la percentuale, che puoi anche scrivere a mano.',
+      invoke: 'Ctrl + per ingrandire, Ctrl - per rimpicciolire, Ctrl 0 per tornare al 100% (su Mac Cmd al posto di Ctrl); oppure tieni Ctrl (Cmd su Mac) e usa la rotella, o pizzica sul trackpad. In alternativa un clic sulla rotella entra in modalità zoom: la rotella da sola ingrandisce e rimpicciolisce, e un badge in alto mostra la percentuale, che puoi anche scrivere a mano.',
       doesNot: 'Non cambia la dimensione della barra delle schede di Filo: per quella c’è la dimensione del testo nelle impostazioni. Nell’editor di testo lo zoom scala il foglio del documento, non la finestra.',
     },
     {
@@ -121,12 +127,12 @@
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione.',
-      invoke: 'Seleziona il testo e usa Alt+E, oppure menu del tasto destro → "Spiegazione". "Approfondisci" apre una spiegazione più estesa.',
+      invoke: 'Seleziona il testo e usa Alt+E (Ctrl+Alt+E su Mac), oppure menu del tasto destro → "Spiegazione". "Approfondisci" apre una spiegazione più estesa.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
       desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro.',
-      invoke: 'Seleziona il testo e usa Alt+T, oppure menu del tasto destro → "Traduci".',
+      invoke: 'Seleziona il testo e usa Alt+T (Ctrl+Alt+T su Mac), oppure menu del tasto destro → "Traduci".',
     },
     {
       id: 'edit-selection', title: 'Riscrivi il testo selezionato', category: 'writing',
@@ -275,7 +281,7 @@
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
-      invoke: 'Alt+S, oppure menu del tasto destro → "Salva per dopo".',
+      invoke: 'Alt+S (Ctrl+Alt+S su Mac), oppure menu del tasto destro → "Salva per dopo".',
       doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla.',
     },
     {
@@ -305,7 +311,7 @@
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu).',
-      invoke: 'Alt+H.',
+      invoke: 'Alt+H (Ctrl+Alt+H su Mac).',
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma.',
     },
     {
@@ -328,7 +334,7 @@
       id: 'filo-assistant', title: 'Chiedi a Filo (assistente)', category: 'assistant',
       desc: 'L’assistente conversazionale di Filo: gli scrivi a parole cosa ti serve e ti risponde, tenendo conto di ciò che gli hai detto in passato. Conosce anche i tuoi documenti dell’editor (appunti inclusi) tramite un breve riassunto di ciascuno, sempre aggiornato: così sa di cosa parlano senza doverli tenere tutti aperti, e quando per risponderti gli serve un documento per intero lo legge al momento. Oltre a rispondere può fare cose per te — aprire pagine, cercare sul web, impostare timer, prendere appunti, regolare preferenze — chiedendoti conferma per le azioni delicate.',
       invoke: 'Apri una nuova scheda (la sua pagina iniziale è l’assistente) e scrivi nel campo "Chiedi qualsiasi cosa"; in alternativa filo://dashboard/dashboard.html.',
-      doesNot: 'Non interviene sulla pagina web che stai guardando: per farti assistere SU una pagina aperta usa l’assistente laterale (Alt+H). Le risposte si basano sui tuoi dati locali, non condivide nulla all’esterno senza chiedertelo.',
+      doesNot: 'Non interviene sulla pagina web che stai guardando: per farti assistere SU una pagina aperta usa l’assistente laterale (Alt+H, Ctrl+Alt+H su Mac). Le risposte si basano sui tuoi dati locali, non condivide nulla all’esterno senza chiedertelo.',
     },
     {
       id: 'read-user-documents', title: 'Filo legge i tuoi documenti, anche PDF', category: 'assistant',
@@ -345,7 +351,7 @@
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
       desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
-      invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H).',
+      invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
       doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto.',
     },
     {

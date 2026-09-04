@@ -639,9 +639,25 @@
 
     const terminal = settings.terminal || {};
     $('terminalEnabled').checked = terminal.enabled === true;
-    const shell = terminal.shell || 'powershell';
-    const shellOpt = [...$('terminalShell').options].find((o) => o.value === shell);
-    $('terminalShell').value = shellOpt ? shell : 'powershell';
+    // PowerShell e cmd esistono solo su Windows. Fuori da lì il comando parte
+    // comunque (il main ricade su /bin/sh — vedi src/main/services/terminal.js),
+    // ma offrire tre shell di Windows a chi sta su un Mac è un menu che mente:
+    // qui si mostrano quelle vere. Il valore salvato di una macchina Windows
+    // (es. "powershell") si legge come "la shell di sistema".
+    const suWindows = (() => { try { return (window.filo?.sistema || 'win32') === 'win32'; } catch (_) { return true; } })();
+    const sel = $('terminalShell');
+    if (!suWindows) {
+      sel.innerHTML = '';
+      for (const [value, label] of [['sh', 'Shell di sistema (sh)'], ['bash', 'Bash']]) {
+        const o = document.createElement('option');
+        o.value = value; o.textContent = label;
+        sel.appendChild(o);
+      }
+    }
+    const salvata = terminal.shell || (suWindows ? 'powershell' : 'sh');
+    const predefinita = suWindows ? 'powershell' : 'sh';
+    const shellOpt = [...sel.options].find((o) => o.value === salvata);
+    sel.value = shellOpt ? salvata : predefinita;
 
     // Notifiche (durata + suono)
     populateNotifSounds();

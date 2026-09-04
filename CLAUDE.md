@@ -45,6 +45,91 @@ ruolo che ti viene consegnato.
   `tests/agent/.out/`, ecc.: output rigenerato, gitignorato). Se un PNG risulta
   tracciato: `git rm --cached <file>`.
 
+## Filo gira anche su Mac
+
+Filo si scrive e si prova su Windows, e si scarica anche su Mac
+(`Filo-Mac.dmg`, allegato alla stessa release dall'altra metà di
+`.github/workflows/release.yml`). Nessuno di noi ha un Mac sotto mano: un Mac
+si rompe in silenzio e la notizia arriva settimane dopo, da un utente. Quindi
+le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
+
+- **Cmd vale quanto Ctrl.** Una scorciatoia si legge `e.ctrlKey || e.metaKey`,
+  mai `ctrlKey` da solo. Su Mac il tasto delle scorciatoie è Cmd, e un
+  controllo che guarda solo Ctrl tace. Gli acceleratori di Electron si
+  dichiarano `CommandOrControl+X`, non `Ctrl+X`.
+- **Alt su Mac scrive.** Opzione+E compone `é`, Opzione+cifra fa `¡™£¢`. Una
+  scorciatoia GLOBALE con Alt+lettera se lo prende in tutto il sistema, in ogni
+  programma; una con Alt+cifra impedisce di digitare quei simboli in qualunque
+  pagina. Su Mac Alt+lettera prende un Ctrl davanti
+  (`src/main/shortcuts.js`) e Alt+cifra diventa Cmd+cifra (i salti fra schede,
+  come in ogni browser su Mac) — tranne lo zero, che su Mac è già lo zoom al
+  100%: lì la scheda in fondo si raggiunge con Cmd+9, «l'ultima».
+- **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
+  rispondevano già a Cmd — a mentire erano le SCRITTE, e mentivano una alla
+  volta. `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')`
+  dà `Ctrl+B` su Windows e `Cmd+B` su Mac. Vale ovunque compaia un tasto
+  (menu del tasto destro, suggerimenti, elenchi). Nell'HTML non si può
+  chiedere, quindi lì una scorciatoia non ci va: la compone il JS della pagina.
+  Le eccezioni sono tre e sono dichiarate nella sentinella: la tabella degli
+  acceleratori, il manifesto delle capacità (che cita entrambe le forme) e il
+  diario delle versioni. `SN_TASTI` tiene anche il COMPORTAMENTO del salto fra
+  schede (`indiceSaltoScheda`), perché nome e tasto devono cambiare insieme.
+- **Niente percorsi di Windows scritti a mano**, né `C:\...`, né `%APPDATA%`,
+  né `process.env.APPDATA`. Le cartelle di sistema le dà Electron
+  (`app.getPath`), la home la dà `os.homedir()`, i pezzi si uniscono con
+  `path.join`. Vale anche dentro i prompt, dove un esempio è un'istruzione: un
+  `C:\Users\...` fa proporre percorsi di Windows a chi sta su un Mac.
+- **Un ramo di piattaforma si scrive intero.** `if (process.platform ===
+  'win32')` senza l'altro lato è un buco: o l'altro ramo c'è, o il ramo
+  Windows è una scorciatoia in più su un comportamento che vale ovunque.
+- **Su Mac la barra dei menu esiste sempre, ed è la prima a vedere i tasti.**
+  Su Windows la finestra è senza cornice e la barra non si aggancia a niente:
+  è per questo che per mesi nessuno si è accorto che era quella di serie di
+  Electron, in inglese, e che si prendeva Cmd+W, Cmd+R, Cmd+Z e Cmd +/-/0
+  prima delle pagine. La barra di Filo è `src/main/menu.js`: i `role` di
+  Electron solo dove il tasto non è di Filo (taglia, copia, incolla, seleziona
+  tutto, esci), un `click` che chiama la funzione di Filo dove il tasto è suo,
+  e nessun acceleratore inventato — un tasto che vale solo su Mac è la stessa
+  asimmetria. Toglierla e basta non è un'uscita: su Mac spegne copia e incolla
+  in ogni campo di testo. Il pattern completo sta in PATTERNS.md.
+- **Un tasto della barra è tolto a tutto il resto.** Su Mac la barra arriva
+  prima: promettere quel tasto a un'altra cosa è promettere una cosa che non
+  succede mai (Cmd+0 era insieme «zoom al 100%» e «decima scheda», e la scheda
+  non arrivava mai). Chi assegna un tasto — Filo o l'utente, come le
+  scorciatoie dei moduli nell'Editor — chiede prima `SN_TASTI.riservato()`, che
+  tiene la lista dei tasti già presi; una sentinella la confronta con la barra
+  vera e diventa rossa se divergono.
+- **La ricetta del pacchetto si tocca con cautela**: `build.mac` in
+  `package.json`, `scripts/after-pack-mac.js` (la firma locale, senza la quale
+  sui Mac con chip Apple l'app non si apre) e il lavoro `release-mac`. Il
+  pacchetto è **universale**: nasce da due copie, Intel e Apple Silicon, che
+  poi vengono fuse. La fusione pretende che i file non eseguibili delle due
+  copie siano identici, quindi le copie NON vanno firmate: si firma solo il
+  risultato.
+- **Senza certificato Apple, il primo avvio va spiegato dove l'utente è
+  bloccato.** macOS rifiuta di aprire Filo la prima volta, e a quel punto
+  l'utente non ha ancora visto niente dell'app: un'istruzione che vive solo
+  dentro Filo non la leggerà mai. Sta nel disco che ha appena aperto
+  (`build/Se Filo non si apre.txt`, allegato dal `build.dmg` del
+  `package.json`). E dev'essere **quella giusta**: da macOS Sequoia (2024) il
+  clic destro → «Apri» non sblocca più niente, l'unica strada è Impostazioni di
+  sistema → Privacy e sicurezza → «Apri comunque», dopo un tentativo fallito.
+
+Come si verifica, dato che un Mac non ce l'abbiamo:
+
+- `tests/unit/macSupport.test.mjs` è la sentinella sempre accesa. Diventa rossa
+  su tutto quanto sopra, in millisecondi, sulla macchina di chi ha scritto la
+  modifica. Se stabilisci una regola nuova per il Mac, aggiungila lì.
+- Il lavoro **«Verifica build Mac»** (`.github/workflows/verifica-mac.yml`)
+  costruisce davvero il `.dmg` su una macchina Apple e non pubblica niente.
+  Parte da solo quando cambi la ricetta, e si lancia a mano da Actions → Run
+  workflow (su qualunque ramo, una volta che il file è su `main`). È il modo
+  di rispondere a «il pacchetto si costruisce ancora?» senza bruciare un
+  numero di versione.
+- Quello che **nessuno dei due prova** è che l'app si apra e funzioni su un
+  Mac. Quello lo dice solo un Mac vero: dichiaralo nel report invece di darlo
+  per fatto.
+
 ## Sintomo vs causa
 
 Una lamentela descrive il sintomo come lo vede l'utente. La prima domanda non è

@@ -168,11 +168,20 @@
     {
       keys: ['shell_terminale', 'shell terminale', 'shell'],
       level: 2,
-      risk: 'Sceglie quale shell usa Filo per eseguire i comandi del terminale (PowerShell, '
-        + 'Prompt dei comandi o Bash). Cambia come vengono interpretati i comandi che Filo lancia.',
+      risk: 'Sceglie quale shell usa Filo per eseguire i comandi del terminale (su Windows '
+        + 'PowerShell, Prompt dei comandi o Bash; su Mac e Linux sh o Bash). Cambia come '
+        + 'vengono interpretati i comandi che Filo lancia.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        const map = { powershell: 'powershell', ps: 'powershell', cmd: 'cmd', 'prompt dei comandi': 'cmd', prompt: 'cmd', bash: 'bash', wsl: 'bash' };
+        // 'sh' e 'zsh' sono i nomi che ha senso pronunciare su Mac e Linux: là
+        // powershell/cmd non esistono e il main ricade comunque su /bin/sh —
+        // ma se l'utente li chiede per nome, la richiesta deve arrivare.
+        const map = {
+          powershell: 'powershell', ps: 'powershell',
+          cmd: 'cmd', 'prompt dei comandi': 'cmd', prompt: 'cmd',
+          bash: 'bash', wsl: 'bash',
+          sh: 'sh', zsh: 'sh', 'shell di sistema': 'sh',
+        };
         const shell = map[s];
         if (!shell) return null;
         return { partial: { terminal: { shell } }, label: `Shell del terminale → ${shell}` };

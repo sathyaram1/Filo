@@ -1,0 +1,149 @@
+# Prova che il pacchetto per Mac si costruisca ancora — senza pubblicare niente.
+#
+# PERCHE' ESISTE
+#   Filo si sviluppa e si testa su Windows: nessuno di noi ha un Mac sotto mano.
+#   La ricetta del pacchetto Mac (package.json → build.mac, la firma locale in
+#   scripts/after-pack-mac.js) puo' rompersi senza che nessuno se ne accorga,
+#   perche' l'unico momento in cui viene eseguita e' DENTRO la pubblicazione
+#   vera — dove un errore arriva quando ormai la release e' fuori, e dove
+#   provare a mano costa un numero di versione bruciato.
+#
+#   Questo lavoro fa girare la costruzione su una macchina Apple e si ferma
+#   prima di pubblicare: e' il modo per rispondere a "il .dmg si costruisce?"
+#   senza toccare niente di vivo.
+#
+# QUANDO GIRA
+#   · a mano, dalla tab "Actions" → "Run workflow" (su qualunque ramo);
+#   · da solo, quando si tocca uno dei file che DEFINISCONO il pacchetto Mac —
+#     cosi' chi lo cambia scopre subito se l'ha rotto, invece di scoprirlo alla
+#     prossima pubblicazione.
+#
+# COSA NON PROVA
+#   Che l'app PARTA su un Mac. Quello lo puo' dire solo un Mac vero con dentro
+#   una persona: qui si controlla che il pacchetto esista, che contenga i file
+#   che il sito e l'aggiornamento automatico si aspettano, e che la firma locale
+#   ci sia (senza, sui Mac con chip Apple l'app non si apre).
+
+name: Verifica build Mac
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/verifica-mac.yml'
+      - 'scripts/after-pack-mac.js'
+      - 'assets/icons/icon-1024.png'
+      # Il primo passo di questo lavoro E' la sentinella: se cambia lei, cambia
+      # cosa questo lavoro controlla, e va rifatto girare.
+      - 'tests/unit/macSupport.test.mjs'
+      # Il foglio che finisce dentro al disco per Mac: se sparisce o cambia
+      # nome, la costruzione del .dmg si ferma qui invece che in pubblicazione.
+      - 'build/**'
+      # La ricetta del pacchetto sta qui dentro (build.mac). Il commit che alza
+      # il numero di versione porta `[skip ci]` e non fa scattare niente: qui
+      # arrivano solo le modifiche vere alla ricetta o alle dipendenze, che
+      # sono esattamente quelle che possono rompere la costruzione su Mac.
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  verifica:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        run: npm ci
+
+      # La sentinella guarda la CONFIGURAZIONE (che il pacchetto Mac sia ancora
+      # previsto, coi nomi giusti). Gira prima della costruzione: se la ricetta
+      # e' gia' sbagliata sulla carta, si scopre in dieci secondi invece che in
+      # dieci minuti.
+      #
+      # Solo questo file, non l'intera suite: la suite completa la fa girare il
+      # cancello prima della pubblicazione, su Windows, dov'e' il suo posto.
+      # Qui dentro finirebbero anche i test degli STRUMENTI delle routine, che
+      # su Mac non girano mai e infatti falliscono — un rosso che non dice
+      # niente sul pacchetto e coprirebbe quello che invece conta.
+      - name: Sentinella Mac
+        run: node --test tests/unit/macSupport.test.mjs
+
+      # Niente `--publish`: si costruisce e basta. Il file delle chiavi di
+      # default non serve (qui non si consegna niente a nessuno) e cosi' questo
+      # lavoro non ha bisogno di vedere nessun segreto.
+      - name: Costruisci il pacchetto per Mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run build:mac
+
+      - name: I file attesi ci sono?
+        shell: bash
+        run: |
+          set -e
+          ls -la dist
+          for ATTESO in Filo-Mac.dmg Filo-Mac.zip latest-mac.yml; do
+            test -f "dist/$ATTESO" || {
+              echo "::error::manca dist/$ATTESO"
+              exit 1
+            }
+          done
+          # latest-mac.yml e' il file che l'aggiornamento automatico legge su
+          # Mac: deve nominare lo zip, altrimenti l'app trova l'aggiornamento e
+          # non sa da dove scaricarlo.
+          grep -q 'Filo-Mac.zip' dist/latest-mac.yml || {
+            echo "::error::latest-mac.yml non nomina Filo-Mac.zip"
+            cat dist/latest-mac.yml
+            exit 1
+          }
+          cat dist/latest-mac.yml
+
+      # Chi scarica Filo su un Mac si vede rifiutare l'apertura PRIMA di aver
+      # visto qualunque cosa di Filo: senza certificato Apple, macOS blocca il
+      # primo avvio. L'istruzione per sbloccarlo deve quindi stare nel disco che
+      # ha appena aperto, non solo dentro l'app (dove non arrivera' mai).
+      - name: Nel disco c'e' l'istruzione del primo avvio
+        shell: bash
+        run: |
+          set -e
+          PUNTO=$(mktemp -d)
+          hdiutil attach dist/Filo-Mac.dmg -mountpoint "$PUNTO" -nobrowse -readonly
+          ls -la "$PUNTO"
+          FOGLIO=$(find "$PUNTO" -maxdepth 1 -name '*.txt' -print -quit)
+          if [ -z "$FOGLIO" ]; then
+            hdiutil detach "$PUNTO" >/dev/null || true
+            echo "::error::nel disco per Mac manca il foglio con le istruzioni del primo avvio"
+            exit 1
+          fi
+          cat "$FOGLIO"
+          # Da macOS Sequoia il clic destro non sblocca piu' niente: l'unica
+          # strada e' il pulsante nelle Impostazioni di sistema.
+          if ! grep -q 'Apri comunque' "$FOGLIO"; then
+            hdiutil detach "$PUNTO" >/dev/null || true
+            echo "::error::il foglio non dice come si sblocca Filo"
+            exit 1
+          fi
+          hdiutil detach "$PUNTO"
+
+      # Il pacchetto deve valere su ENTRAMBI i processori (Intel e Apple
+      # Silicon) e portare la firma locale: sono le due cose senza le quali,
+      # su meta' dei Mac, l'app non si apre proprio.
+      - name: Un solo pacchetto per entrambi i processori, e firmato
+        shell: bash
+        run: |
+          set -e
+          APP="dist/mac-universal/Filo.app"
+          test -d "$APP" || APP=$(find dist -maxdepth 2 -name 'Filo.app' -print -quit)
+          echo "app: $APP"
+          lipo -info "$APP/Contents/MacOS/Filo"
+          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'x86_64' || {
+            echo "::error::il pacchetto non contiene la parte Intel"; exit 1; }
+          lipo -info "$APP/Contents/MacOS/Filo" | grep -q 'arm64' || {
+            echo "::error::il pacchetto non contiene la parte Apple Silicon"; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$APP"

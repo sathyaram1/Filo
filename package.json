@@ -24,8 +24,10 @@
     "feedback:backfill": "node scripts/backfill-feedback-numbers.mjs",
     "feedback:auto-archive": "node scripts/auto-archive.mjs",
     "feedback:login": "node scripts/admin-login.mjs",
-    "build": "electron-builder --win",
+    "build": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always",
+    "build:mac": "electron-builder --mac --publish never",
+    "release:mac": "electron-builder --mac --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
     "feedback:apri": "node scripts/claude-feedback.mjs"
   },
@@ -58,8 +60,58 @@
       "uninstallerIcon": "assets/icons/icon.ico"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "assets/icons/icon-256.png"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "artifactName": "Filo-Mac.${ext}",
+      "icon": "assets/icons/icon-1024.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "darkModeSupport": true,
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "sathyaram1",
+          "repo": "Filo",
+          "releaseType": "release"
+        }
+      ]
+    },
+    "dmg": {
+      "window": {
+        "width": 540,
+        "height": 420
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 160,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 160,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 270,
+          "y": 320,
+          "type": "file",
+          "path": "build/Se Filo non si apre.txt"
+        }
+      ]
     },
     "linux": {
       "target": "AppImage",
@@ -71,7 +123,8 @@
         "owner": "sathyaram1",
         "repo": "Filo"
       }
-    ]
+    ],
+    "afterPack": "scripts/after-pack-mac.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
