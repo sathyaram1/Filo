@@ -33,6 +33,12 @@ let streamCounter = 0;
 const filoApi = {
   message: (msg) => ipcRenderer.invoke('filo:message', msg),
   getURL: (rel) => 'filo://' + String(rel || '').replace(/^\/+/, ''),
+  // Su quale sistema gira Filo: 'darwin' (Mac), 'win32' (Windows), 'linux'.
+  // Le pagine interne ne hanno bisogno per non MENTIRE all'utente — le
+  // scorciatoie hanno una forma diversa su Mac, e le shell fra cui scegliere
+  // nella modalità terminale non sono le stesse. È un dato pubblico del
+  // sistema, non un'informazione dell'utente: nessuna superficie in più.
+  sistema: process.platform,
   onBroadcast: (fn) => {
     const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
     ipcRenderer.on('filo:broadcast', wrapped);

@@ -121,12 +121,12 @@
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione.',
-      invoke: 'Seleziona il testo e usa Alt+E, oppure menu del tasto destro → "Spiegazione". "Approfondisci" apre una spiegazione più estesa.',
+      invoke: 'Seleziona il testo e usa Alt+E (Ctrl+Alt+E su Mac), oppure menu del tasto destro → "Spiegazione". "Approfondisci" apre una spiegazione più estesa.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
       desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro.',
-      invoke: 'Seleziona il testo e usa Alt+T, oppure menu del tasto destro → "Traduci".',
+      invoke: 'Seleziona il testo e usa Alt+T (Ctrl+Alt+T su Mac), oppure menu del tasto destro → "Traduci".',
     },
     {
       id: 'edit-selection', title: 'Riscrivi il testo selezionato', category: 'writing',
@@ -275,7 +275,7 @@
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
-      invoke: 'Alt+S, oppure menu del tasto destro → "Salva per dopo".',
+      invoke: 'Alt+S (Ctrl+Alt+S su Mac), oppure menu del tasto destro → "Salva per dopo".',
       doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla.',
     },
     {
@@ -305,7 +305,7 @@
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu).',
-      invoke: 'Alt+H.',
+      invoke: 'Alt+H (Ctrl+Alt+H su Mac).',
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma.',
     },
     {
