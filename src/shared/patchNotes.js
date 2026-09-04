@@ -20,6 +20,7 @@
       features: [
         'Filo si scarica anche per Mac: un solo file, buono sia sui Mac Intel sia su quelli con chip Apple. La prima volta macOS rifiuta di aprirlo, perché Filo non è ancora registrato presso Apple: dopo il rifiuto apri Impostazioni di sistema → Privacy e sicurezza, scorri in fondo e premi «Apri comunque». Da lì in poi Filo parte come qualsiasi altra app.',
         'Su Mac le scorciatoie si leggono come si premono: Cmd al posto di Ctrl nel menu del tasto destro, sui pulsanti dell\'Editor e nell\'elenco di cosa sa fare Filo. Per saltare da una scheda all\'altra tieni Cmd e premi il numero, così Opzione più il numero continua a scrivere i suoi simboli.',
+        'Su Mac, in cima allo schermo, ora c\'è il menu di Filo, in italiano. E le scorciatoie fanno quello che promettono: Cmd+W chiude la scheda e non la finestra con dentro tutte le altre, Cmd+R ricarica il sito che stai guardando, Cmd + e Cmd - ingrandiscono la pagina, Cmd+Z torna indietro (e annulla, se stai scrivendo).',
       ],
     },
     {
