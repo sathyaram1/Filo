@@ -112,7 +112,8 @@ test('una critica di lunghezza reale si legge INTERA nella conversazione del fee
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(app, page, feedbackCon(nota));
 
-  const bolla = page.locator('.fb-bubble--model .fb-bubble-body, .fb-bubble .fb-bubble-body').last();
+  await page.locator('[data-tab="resolved"]').click();
+  const bolla = page.locator('.fb-bubble--model .fb-bubble-body').last();
   await expect(bolla).toBeVisible({ timeout: 15_000 });
 
   // SUCCESSO dal punto di vista di chi legge: l'ULTIMO rilievo c'è. È il pezzo
