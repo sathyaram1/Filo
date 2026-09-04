@@ -1416,19 +1416,15 @@ class TabManager {
         this.setContentFullscreen(false);
         return;
       }
-      // Alt+1…9 → vai alla N-esima tab, Alt+0 → la decima. Alt (non Ctrl) per
-      // non rubare il classico Ctrl/Cmd+numero del browser, e perché funziona
-      // anche mentre si scrive in una pagina (Alt+cifra non produce testo).
+      // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
+      // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
+      // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
+      // scorciatoie, lo decide un posto solo: src/shared/tasti.js.
       // Intercettiamo qui (per-webContents) invece che con un globalShortcut
       // OS-wide, così la combinazione resta disponibile alle altre app.
-      if (input.type === 'keyDown' && input.alt && !input.control && !input.meta && !input.shift) {
-        // Riconosci la cifra dal codice fisico (Digit0–9, robusto al layout) o,
-        // in mancanza, dal key (0–9): copre sia la tastiera reale sia gli input
-        // sintetici.
-        const codeM = /^Digit([0-9])$/.exec(input.code || '');
-        const digit = codeM ? codeM[1] : (/^[0-9]$/.test(input.key || '') ? input.key : null);
-        if (digit != null) {
-          const idx = digit === '0' ? 9 : Number(digit) - 1;
+      if (input.type === 'keyDown') {
+        const idx = indiceSaltoScheda(input);
+        if (idx != null) {
           const target = this.tabs[idx];
           if (target) {
             event.preventDefault();
