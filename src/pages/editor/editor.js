@@ -2379,12 +2379,28 @@
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(zoomLevel * 100) / 100));
     docEl.style.zoom = zoomLevel === 1 ? '' : String(zoomLevel);
   }
+  function zoomVerso(dir) {
+    if (dir === 'in') zoomLevel += 0.1;
+    else if (dir === 'out') zoomLevel -= 0.1;
+    else if (dir === 'reset') zoomLevel = 1;
+    else return;
+    applyZoom();
+  }
   function handleZoomKey(e) {
     const k = e.key;
-    if (k === '+' || k === '=') { e.preventDefault(); zoomLevel += 0.1; applyZoom(); return true; }
-    if (k === '-' || k === '_') { e.preventDefault(); zoomLevel -= 0.1; applyZoom(); return true; }
-    if (k === '0') { e.preventDefault(); zoomLevel = 1; applyZoom(); return true; }
+    if (k === '+' || k === '=') { e.preventDefault(); zoomVerso('in'); return true; }
+    if (k === '-' || k === '_') { e.preventDefault(); zoomVerso('out'); return true; }
+    if (k === '0') { e.preventDefault(); zoomVerso('reset'); return true; }
     return false;
+  }
+  // Su Mac il tasto dello zoom non arriva mai a questa pagina: se lo prende la
+  // barra dei menu in cima allo schermo, che lo gira alla scheda attiva. Il
+  // preload lo consegna qui perché l'editor scala il FOGLIO, non la finestra —
+  // senza questa strada, su Mac lo zoom dell'editor non succedeva affatto.
+  // (Su Windows e Linux il tasto arriva al keydown qui sopra e questa strada
+  // non viene mai percorsa: nessun doppio zoom.)
+  for (const [evento, dir] of [['filo:zoom-in', 'in'], ['filo:zoom-out', 'out'], ['filo:zoom-reset', 'reset']]) {
+    document.addEventListener(evento, () => zoomVerso(dir));
   }
   docWrap.addEventListener('wheel', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
