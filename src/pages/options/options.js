@@ -468,6 +468,9 @@
     // Etichetta descrittiva preservata "in silenzio" (non ha più una colonna
     // dedicata, ma serve come hint nella datalist dei nickname per-azione).
     row.dataset.label = (entry && entry.label) || '';
+    // La voce intera resta appesa alla riga: ciò che la riga non modifica
+    // (pesi aperti, cosa sa masticare, esito della prova) sopravvive al salvataggio.
+    row._entry = { ...(entry || {}) };
     // Risultato di test persistito (flat): { ttftMs, tokensPerSec, at }.
     row._test = normalizeTest(entry, single);
 
