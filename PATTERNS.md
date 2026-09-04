@@ -2588,3 +2588,26 @@ smette di guardarli.
   tetto, il processo si ammazza.
 - **Dove:** `playwright.config.js`, `tests/fixtures/electron.mjs`,
   `.github/workflows/suite.yml`.
+
+## Un automatismo che non parte non è rosso: è assente, e l'assenza non urla
+
+Un test rotto lo si vede. Un **workflow** rotto no: GitHub rifiuta il file
+intero, la corsa nasce e muore nello stesso secondo senza un solo job, e a
+valle si legge "nessun verdetto per questo commit" — indistinguibile da "la
+suite non ha ancora finito". La suite completa è rimasta spenta per due commit
+(corse 107 e 108 del 2026-09-04) perché `branches-ignore` era stato messo
+accanto a `branches`, che GitHub non accetta: l'esclusione si scrive dentro la
+lista positiva, come motivo negativo (`- '!prova-fusione/**'`).
+
+- **Il posto dove si scopre è la macchina di chi scrive la modifica**, non il
+  servizio che dovrebbe eseguirla: quello, per definizione, quando è rotto tace.
+  Quindi la ricetta di un automatismo si sorveglia con una sentinella negli unit
+  test, come già si fa per la barra dei menu del Mac e per il manifesto delle
+  capacità.
+- **La sentinella deve riconoscere la forma sbagliata**, non solo approvare
+  quella giusta: un test che passa perché non guarda niente è il difetto in
+  persona. Qui il caso rotto è scritto nel test.
+- **A valle, "non lo so" resta diverso da "a posto".** Il verdetto assente non
+  vale come verde (`scripts/suite-verdict.mjs`, uscita 3): è quello che ha
+  impedito che i due commit spenti passassero per buoni.
+- **Dove:** `tests/unit/workflowSintassi.test.mjs`, `.github/workflows/*.yml`.
