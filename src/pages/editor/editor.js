@@ -3870,9 +3870,11 @@
     });
     const cfgShortcut = $('cfgShortcut');
     const cfgShortcutHint = $('cfgShortcutHint');
+    const cfgShortcutTaken = $('cfgShortcutTaken');
     cfgShortcut.addEventListener('input', () => {
       cfgShortcut.classList.remove('ed-field-invalid');
       cfgShortcutHint.hidden = true;
+      cfgShortcutTaken.hidden = true;
     });
     $('cfgSave').addEventListener('click', () => {
       const rawShortcut = cfgShortcut.value.trim();
@@ -3882,6 +3884,19 @@
       if (rawShortcut && !isValidShortcut(rawShortcut)) {
         cfgShortcut.classList.add('ed-field-invalid');
         cfgShortcutHint.hidden = false;
+        cfgShortcut.focus();
+        return;
+      }
+      // Certe combinazioni non arrivano MAI a questa pagina: Filo se le prende
+      // prima (chiudi scheda, ricarica, salto di scheda…) e su Mac ci sono anche
+      // quelle della barra dei menu in cima allo schermo. Salvarle significava
+      // dare all'utente una scorciatoia che sembra valida e non parte mai: qui
+      // gliela rifiutiamo dicendogli chi si prende quel tasto.
+      if (rawShortcut && TASTI && TASTI.riservato(rawShortcut)) {
+        cfgShortcut.classList.add('ed-field-invalid');
+        cfgShortcutTaken.textContent =
+          `${TASTI.etichetta(rawShortcut)} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo: scegline un'altra, per esempio ${tasto('Ctrl+Shift+1')}.`;
+        cfgShortcutTaken.hidden = false;
         cfgShortcut.focus();
         return;
       }
