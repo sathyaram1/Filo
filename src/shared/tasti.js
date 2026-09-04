@@ -127,8 +127,9 @@
     // quello del main. Nessuno dei due è presente in entrambe le forme, quindi
     // basta chiedere tutti e due.
     const NOMI = {
-      alt: ['altKey', 'alt'], ctrl: ['ctrlKey', 'control'],
-      meta: ['metaKey', 'meta'], shift: ['shiftKey', 'shift'],
+      alt: ['altKey', 'alt'],
+      ctrl: ['ctrlKey', 'control'], meta: ['metaKey', 'meta'],
+      shift: ['shiftKey', 'shift'],
     };
     const premuto = (quale) => NOMI[quale].some((nome) => !!ev[nome]);
     const alt = premuto('alt');
