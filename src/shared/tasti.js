@@ -67,6 +67,9 @@
     return String(accel || '').split('+').map((p) => p.trim()).filter(Boolean);
   }
 
+  const CTRL = /^(ctrl|control|cmd|command|meta)$/;
+  const ALT = /^(alt|option|opt)$/;
+
   // L'etichetta da MOSTRARE per un acceleratore scritto in forma Windows.
   // Su Windows e Linux torna identica: la forma canonica è quella.
   function etichetta(accel, esplicita) {
@@ -74,33 +77,27 @@
     if (!testo || !suMac(esplicita)) return testo;
 
     const parti = pezzi(testo);
-    if (!parti.length) return testo;
+    if (parti.length < 2) return testo; // un tasto solo (Esc, F5): uguale ovunque
 
     const tastoFinale = parti[parti.length - 1];
-    const modificatori = parti.slice(0, -1).map((m) => m.toLowerCase());
+    const modificatori = parti.slice(0, -1);
+    const haCtrl = modificatori.some((m) => CTRL.test(m.toLowerCase()));
+    const haAlt = modificatori.some((m) => ALT.test(m.toLowerCase()));
+    const altri = modificatori.filter((m) => !CTRL.test(m.toLowerCase()) && !ALT.test(m.toLowerCase()));
 
-    // Alt da solo davanti a una cifra: è un salto di scheda → su Mac Cmd+cifra.
-    if (modificatori.length === 1 && modificatori[0] === 'alt' && /^[0-9]$/.test(tastoFinale)) {
-      return `Cmd+${tastoFinale}`;
-    }
+    // Alt+cifra: salto di scheda. Su Mac Opzione+cifra scrive un simbolo, quindi
+    // la forma è Cmd+cifra — quella di ogni browser su Mac.
+    if (haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) return `Cmd+${tastoFinale}`;
 
-    const fuori = [];
-    let haCtrl = false;
-    let haAlt = false;
-    for (const m of modificatori) {
-      if (m === 'ctrl' || m === 'control' || m === 'cmd' || m === 'command' || m === 'meta') { haCtrl = true; continue; }
-      if (m === 'alt' || m === 'option' || m === 'opt') { haAlt = true; continue; }
-      fuori.push(m === 'shift' ? 'Shift' : parti[modificatori.indexOf(m)]);
-    }
+    // Alt+lettera: scorciatoia GLOBALE. Su Mac prende un Control davanti (e qui
+    // "Ctrl" è davvero il tasto Control del Mac, non Cmd): vedi shortcuts.js.
+    if (haAlt && !haCtrl) return ['Ctrl', 'Alt', ...altri, tastoFinale].join('+');
 
-    // Alt+lettera senza Ctrl: scorciatoia globale → su Mac prende un Ctrl in più.
-    if (haAlt && !haCtrl) haCtrl = true;
-
+    // Tutto il resto passa da Ctrl, e su Mac Ctrl si preme Cmd.
     const out = [];
     if (haCtrl) out.push('Cmd');
     if (haAlt) out.push('Alt');
-    out.push(...fuori);
-    out.push(tastoFinale);
+    out.push(...altri, tastoFinale);
     return out.join('+');
   }
 
