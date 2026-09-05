@@ -348,7 +348,7 @@
 
   global.SN_VERIFIER_ROUND = {
     LEVELS, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
-    capKeyOf, countKeyOf, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel,
+    capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel,
     normalizeCaps, normalizeCounts, decideRound,
     formatFinding, formatFindings, hasDecision, roundNote,
   };
