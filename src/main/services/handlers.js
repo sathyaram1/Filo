@@ -686,9 +686,12 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // ai ritentativi sul JSON illeggibile: la chiave della cache e' identica fra
   // i tentativi, e senza questo salto il retry rileggerebbe all'infinito la
   // stessa risposta rotta appena salvata (trovato dalla verifica indipendente).
-  const cached = noCache ? null : await AICache.get({ provider: settings.provider, model, messages });
+  // Con gli strumenti in richiesta la cache si salta: conserva solo il testo, e
+  // una risposta fatta di chiamate rientrerebbe come una risposta muta.
+  const hasTools = Array.isArray(tools) && tools.length > 0;
+  const cached = (noCache || hasTools) ? null : await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
-    return { text: cached.text, model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
+    return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
   const attemptsRaw = buildAttemptChain(settings, model, action);
