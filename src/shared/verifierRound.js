@@ -32,7 +32,11 @@
   // Tetto ai rilievi di una critica: oltre non è una critica, è un elenco
   // generato. E tetto al testo di ciascuno: finiscono nel feedback derivato.
   const MAX_FINDINGS = 40;
-  const MAX_FINDING_TEXT = 2000;
+  // Il tetto di un singolo rilievo è lo stesso della critica intera (12000):
+  // un rilievo con i suoi passi sta comunque dentro la critica, che oltre il
+  // tetto viene RESPINTA col numero, non tagliata. A 2000 i passi in coda
+  // sparivano in silenzio (verifica del giro 11 su #561; CLAUDE.md § Limiti).
+  const MAX_FINDING_TEXT = 12000;
 
   /**
    * A quale bilancio appartiene un livello. I livelli 3 e 2 condividono lo
