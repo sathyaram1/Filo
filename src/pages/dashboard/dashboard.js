@@ -1371,10 +1371,11 @@
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';
-      btn.href = a.path || '#';
+      const filePath = a.percorso || a.path || '';
+      btn.href = filePath || '#';
       btn.target = '_blank';
       btn.rel = 'noopener';
-      btn.textContent = a.label || (a.path || 'File');
+      btn.textContent = a.etichetta || a.label || (filePath || 'File');
       return btn;
     }
     if (type === 'TIMER') {
