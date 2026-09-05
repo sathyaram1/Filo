@@ -2427,6 +2427,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // ripresa va rilasciata subito, altrimenti nessuna scheda potrebbe
     // riprendere il turno rimasto a metà finché non scade.
     if (onbActive && !internal) releaseOnboardingResume();
+    // Le azioni già eseguite prima del guasto sono SUCCESSE davvero (il timer
+    // c'è). Viaggiano con l'errore, così un «Riprova» riparte sapendo cosa era
+    // già stato fatto invece di rifarlo.
+    try { e.filoActions = renderedActions; } catch (_) {}
     throw e;
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
