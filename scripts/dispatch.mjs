@@ -827,7 +827,11 @@ async function recordVerifier(id, critiqueText) {
   const sent = await deliverToChannel('verdict', {
     findings: parsed.findings,
     summary: parsed.summary,
-    critique: critiqueNorm.trim().slice(0, 4000),
+    // Intero, non tosato: il server legge i rilievi dal TESTO e li confronta
+    // con l'elenco (verifica del giro 6 su #561); un testo mozzato a 4000
+    // caratteri perdeva i rilievi in coda e la consegna veniva respinta come
+    // «elenco che non combacia». Tosa lui, per la storia, dopo aver letto.
+    critique: critiqueNorm.trim(),
     branch: base.branch || '',
     sha: headSha(ROOT) || '',
   });
