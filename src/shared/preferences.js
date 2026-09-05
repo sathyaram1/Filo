@@ -230,8 +230,11 @@
         }
         const Voices = global.SN_TTS_VOICES;
         if (Voices) {
-          const hit = Voices.VOICES.find((x) => x.id === low || x.label.toLowerCase() === low
-            || x.label.toLowerCase().split(' ')[0] === low);
+          // Si cerca fra TUTTI i cataloghi: quale modello legge non lo sa
+          // questa pagina, e una voce di un altro modello viene comunque
+          // ignorata al momento della lettura (resolveVoice).
+          const hit = Voices.allVoices().find((x) => x.id === low || x.id.toLowerCase() === low
+            || x.label.toLowerCase() === low || x.label.toLowerCase().split(' ')[0] === low);
           if (!hit) return null;
           return { partial: { tts: { modelVoice: hit.id } }, label: `Voce naturale → ${hit.label} (${Voices.LANG_LABELS[hit.lang] || hit.lang})` };
         }
