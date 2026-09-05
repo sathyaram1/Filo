@@ -455,8 +455,8 @@ test('l\'interruttore master spegne le routine e rende inerti le impostazioni ch
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await expect(page.locator('#mgProberIdle')).toBeEnabled();
-  await expect(page.locator('#mgFailCap')).toBeEnabled();
-  await expect(page.locator('#mgImprovableCap')).toBeEnabled();
+  await expect(page.locator('#mgCap2')).toBeEnabled();
+  await expect(page.locator('#mgFixInstructions')).toBeEnabled();
 });
 
 test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano spente', async ({ openTab }) => {
