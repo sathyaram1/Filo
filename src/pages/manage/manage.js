@@ -327,10 +327,10 @@
     if (mgRoutinesToggle) mgRoutinesToggle.checked = routinesOn;
     if (mgRoutinesState)  mgRoutinesState.textContent = routinesOn ? 'On' : 'Off';
     if (mgProberIdleBlock) mgProberIdleBlock.classList.toggle('mg-auto-block--off', !routinesOn);
-    const mgFailCapBlock = document.getElementById('mgFailCapBlock');
-    const mgImprovableCapBlock = document.getElementById('mgImprovableCapBlock');
-    if (mgFailCapBlock)       mgFailCapBlock.classList.toggle('mg-auto-block--off', !routinesOn);
-    if (mgImprovableCapBlock) mgImprovableCapBlock.classList.toggle('mg-auto-block--off', !routinesOn);
+    for (const id of ['mgCap2Block', 'mgCap1Block', 'mgCap0Block', 'mgFixInstructionsBlock']) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('mg-auto-block--off', !routinesOn);
+    }
     applyAutoModeGate();
   }
 
