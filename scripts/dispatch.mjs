@@ -105,18 +105,17 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
 
-// Quante bocciature del verifier prima di bloccare con motivo `loop` (failCap,
-// SPEC-RIDISEGNO-MAX.md §13). Precedenza: override d'ambiente FILO_LOOP_CAP >
-// valore scelto dall'owner nella tab Automazioni (doc Firestore config/routines,
-// campo `failCap`; il legacy `loopCap` è un alias) > default dalla fonte unica.
-// Range [1, 10], allineato a SN_CONST.AUTOMATION. Il tetto EFFETTIVO lo applica
-// il SERVER quando registra i verdetti: qui resta solo resolveLoopCap, la
-// regola di precedenza pura, per gli strumenti e per i test.
+// I tre bilanci del verificatore che corregge (feedback #561: cap2 per i
+// rilievi di livello 3/2, cap1 per gli 1, cap0 per gli 0). Li CONSUMA il
+// SERVER quando registra la critica; qui servono solo come dato di riferimento
+// per gli strumenti. I DEFAULT vivono con le transizioni promosse a dati
+// (src/shared/feedbackTransitions.js): una sorgente sola, incorporata anche dal
+// server al deploy. Se il checkout non ce l'ha ancora (clone vecchio), i
+// letterali qui sotto sono il paracadute.
 //
-// I DEFAULT dei contatori (failCap/improvableCap) vivono con le transizioni
-// promosse a dati (src/shared/feedbackTransitions.js): una sorgente sola,
-// incorporata anche dal server al deploy. Se il checkout non ce l'ha ancora
-// (clone vecchio), i letterali qui sotto sono il paracadute.
+// `resolveLoopCap` (override d'ambiente FILO_LOOP_CAP > valore remoto > default,
+// range [1, 10]) è la regola di precedenza del tetto delle bocciature del giro
+// VECCHIO: resta per gli strumenti e per i test che la usano ancora.
 const LOOP_CAP_MIN = 1;
 const LOOP_CAP_MAX = 10;
 export const VERIFIER_CAPS = (() => {
