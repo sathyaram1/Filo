@@ -780,9 +780,9 @@ test('anche i DATI che governano il giro vengono dalla copia', async () => {
   const casa = progettoFinto();
   const dove = resolve(tmpdir(), `filo-strumenti-dati-${process.pid}`);
 
-  const tabella = (fail) => `(function (global) {
+  const tabella = (cap2) => `(function (global) {
   'use strict';
-  global.SN_FB_TRANSITIONS = { VERIFIER_CAPS: { improvableCap: 3, failCap: ${fail} } };
+  global.SN_FB_TRANSITIONS = { VERIFIER_CAPS: { cap2: ${cap2}, cap1: 2, cap0: 0 } };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 `;
 
