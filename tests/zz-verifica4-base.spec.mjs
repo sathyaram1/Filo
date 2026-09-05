@@ -141,7 +141,7 @@ test('cammino principale: cerca, legge le capacità, sveglia+timer, poi risponde
   expect(asst.tool_calls[0].id).toBe('c1');
   expect(asst.reasoning_details).toBeTruthy();
   const round3 = calls[2].messages;
-  expect(round3.filter((m) => m.role === 'tool').map((m) => m.tool_call_id).sort()).toEqual(['c2', 'c3', 'c4']);
+  expect(round3.filter((m) => m.role === 'tool').map((m) => m.tool_call_id).sort()).toEqual(['c1', 'c2', 'c3', 'c4']);
 
   // Sveglia e timer esistono davvero
   const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
