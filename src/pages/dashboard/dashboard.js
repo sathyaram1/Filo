@@ -1223,6 +1223,11 @@
         const row = activityRowFor(a);
         if (row) { wrap.appendChild(makeActivityRow(row.icon, row.text)); continue; }
       }
+      // Un'azione senza niente da cliccare (`_traccia`) o non riuscita non
+      // diventa MAI un bottone: un chip che al click non fa niente è un vicolo
+      // cieco (era il caso di un link con un indirizzo non ammesso). La sua
+      // riga sta già nel diario.
+      if (a._traccia || a._executed === false) continue;
       const btn = renderActionButton(a, { onAck });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
