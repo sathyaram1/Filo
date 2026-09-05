@@ -1393,7 +1393,7 @@
     return el;
   }
 
-  function renderActionButton(a, { onAck } = {}) {
+  function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
     // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
