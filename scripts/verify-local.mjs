@@ -294,7 +294,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
   const base = {
     ...prev,
     pending: null,
-    fixedReport: String(report || '').slice(0, 4000),
+    fixedReport: String(report || '').slice(0, MAX_CRITIQUE_CHARS),
     fixedSha: sha || '',
     fixedAt: when,
   };

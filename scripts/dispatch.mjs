@@ -305,7 +305,7 @@ export function applyVerifierVerdict(state, outcome, critique = '') {
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'blocked';
   else s.verifierVerdict = String(outcome || '') || null;
-  if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
+  if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, MAX_CRITIQUE_CHARS);
   else if (outcome === 'pass') s.verifierCritique = '';
   return s;
 }
@@ -744,7 +744,7 @@ async function deliverToChannel(intent, data) {
 export function verifierNoteText(verdict, critique = '') {
   // Il ruolo scrive la critica come "PASS — …"/"MIGLIORABILE — …"/"FAIL — …":
   // il prefisso è ridondante col nostro incipit, toglilo (resta la sostanza).
-  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, 4000);
+  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, MAX_CRITIQUE_CHARS);
   if (verdict === 'pass') {
     return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
   }
