@@ -2266,8 +2266,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     let content = String(m.text || '');
     const msg = { role, content };
     if (role === 'assistant') {
+      const parts = [];
+      // Turno interrotto da un guasto: quello che era già stato fatto è stato
+      // fatto davvero. Senza questa riga, al «Riprova» il modello rifaceva il
+      // timer che aveva appena messo.
+      if (m.interrotto) {
+        const fatte = interruptedActionsForPrompt(m.actions);
+        if (fatte) parts.push(fatte);
+      }
       const obs = observationsForPrompt(m.actions);
-      if (obs) msg.content = content ? `${content}\n\n${obs}` : obs;
+      if (obs) parts.push(obs);
+      const extra = parts.join('\n\n');
+      if (extra) msg.content = content ? `${content}\n\n${extra}` : extra;
       // Il ragionamento del turno passato torna al modello così com'era
       // arrivato (blocchi strutturati del fornitore): riprende da dove aveva
       // lasciato invece di ripensare tutto. Il fornitore lo reinserisce per i
