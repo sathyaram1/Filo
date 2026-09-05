@@ -76,6 +76,23 @@ export function stateFile(root = ROOT) {
   return resolve(root, '.claude', 'verify-local.json');
 }
 
+// Tetto di una critica: lo stesso del server (12000 caratteri). Oltre, la
+// registrazione è respinta con la spiegazione, mai tagliata in silenzio
+// (CLAUDE.md § Limiti).
+export const MAX_CRITIQUE_CHARS = 12000;
+
+// Le istruzioni della fase 2 in locale vivono FUORI dal repo, nella cartella
+// sopra (accanto a LOCAL.md): il verificatore, che legge il repo, non deve
+// trovarle prima di aver registrato la critica. Le stampa questo strumento,
+// solo dopo la critica, senza passare da nessun altro agente.
+export function phase2InstructionsFile(root = ROOT) {
+  return resolve(root, '..', 'FASE2-LOCALE.md');
+}
+export function readPhase2Instructions(root = ROOT) {
+  const f = phase2InstructionsFile(root);
+  try { return existsSync(f) ? readFileSync(f, 'utf8').trim() : ''; } catch (_) { return ''; }
+}
+
 // ─── Logica pura (testata in tests/unit/verifyLocal.test.mjs) ────────────────
 
 /**
