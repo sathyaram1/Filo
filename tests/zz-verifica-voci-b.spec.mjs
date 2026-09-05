@@ -10,7 +10,7 @@ const REG = {
 };
 
 async function setTts(app, nick, ttsPrefs = {}) {
-  await app.evaluate(async ({ nick, ttsPrefs, REG }) => {
+  await app.evaluate(async (_e, { nick, ttsPrefs, REG }) => {
     const base = globalThis.SN_TEST_MODELS;
     const models = { ...base.models };
     if (nick) models.tts = nick; else delete models.tts;
