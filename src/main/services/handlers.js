@@ -2150,12 +2150,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
+    const msg = { role, content };
     if (role === 'assistant') {
-      const obs = [commandOutputsForPrompt(m.actions), capabilityDetailsForPrompt(m.actions), webSearchResultsForPrompt(m.actions), fileReadsForPrompt(m.actions), documentReadsForPrompt(m.actions), transparencyDocsForPrompt(m.actions)]
-        .filter(Boolean).join('\n\n');
-      if (obs) content = content ? `${content}\n\n${obs}` : obs;
+      const obs = observationsForPrompt(m.actions);
+      if (obs) msg.content = content ? `${content}\n\n${obs}` : obs;
+      // Il ragionamento del turno passato torna al modello così com'era
+      // arrivato (blocchi strutturati del fornitore): riprende da dove aveva
+      // lasciato invece di ripensare tutto. Il fornitore lo reinserisce per i
+      // modelli che lo sanno usare e lo ignora per gli altri.
+      if (Array.isArray(m.reasoningDetails) && m.reasoningDetails.length) msg.reasoning_details = m.reasoningDetails;
     }
-    threadMessages.push({ role, content });
+    threadMessages.push(msg);
   }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
   if (imageList.length) {
