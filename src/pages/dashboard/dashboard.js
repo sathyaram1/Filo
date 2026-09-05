@@ -1099,12 +1099,88 @@
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
+    // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
+    // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
+    SALVA_APPUNTO: (a) => {
+      const dove = String(a.contesto || a.context || a.argomento || '').trim();
+      return { icon: '📝', text: `Appunto salvato${dove ? ` · ${dove}` : ''}` };
+    },
+    SALVA_LEZIONE: (a) => {
+      const t = String(a.testo || a.text || a.lezione || '').trim();
+      return { icon: '🧠', text: `Memorizzato · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` };
+    },
+    ONBOARDING: (a) => {
+      if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
+      const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
+      return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
+    },
+    IMPOSTA_ESTETICA: (a) => {
+      const tok = a.token || a.nome || a.name || a.chiave || a.elemento || '';
+      const val = a.valore ?? a.value ?? a.val ?? a.colore;
+      return { icon: '🎨', text: `Aspetto · ${tok}${val ? ` = ${val}` : ''}` };
+    },
+    PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
+    RIMUOVI_PROXY: () => ({ icon: '🌍', text: 'Scheda riportata in Italia' }),
+    RIMUOVI_PROXY_TUTTE: () => ({ icon: '🌍', text: 'Tutte le schede riportate in Italia' }),
+    REGOLA_PROXY_DOMINIO: (a) => ({ icon: '🌍', text: `Regola · ${a.dominio || a.domain || a.sito || 'questo sito'} sempre da ${String(a.country || a.paese || '').toUpperCase()}` }),
+    RIMUOVI_REGOLA_PROXY: (a) => ({ icon: '🌍', text: `Regola tolta · ${a.dominio || a.domain || a.sito || 'questo sito'}` }),
+    STILE_PAGINA: (a) => {
+      const d = String(a.descrizione || a.description || '').trim();
+      return { icon: '🖌', text: `Aspetto della pagina · ${d || 'modificato'}` };
+    },
+    RIPRISTINA_STILE_PAGINA: () => ({ icon: '🖌', text: 'Aspetto della pagina ripristinato' }),
+    COMANDO_FINESTRA: (a) => {
+      const labels = {
+        fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
+        settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
+      };
+      const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
+      return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
+    },
+  };
+  // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
+  // del diario resta (è successo qualcosa), ma non promette il contrario.
+  const FAILED_LABELS = {
+    TIMER: 'Timer non avviato', SVEGLIA: 'Sveglia non impostata',
+    CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
+    SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
+    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
+    LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non letto',
+    CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
+    IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
+    STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
+    PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
+    RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
+    RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
+    EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {
     // Un'azione sospesa in attesa di conferma è un bottone, qualunque sia il tipo.
     if (!a || a._confirm) return null;
-    const fn = ACTIVITY_ROWS[String(a.type || '').toUpperCase()];
-    return fn ? fn(a) : null;
+    const type = String(a.type || '').toUpperCase();
+    // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
+    // c'è stato (un documento inesistente diceva «Leggo il documento…»).
+    if (a._executed === false) {
+      const perche = motivoFallimento(a);
+      return { icon: '⚠', text: `${FAILED_LABELS[type] || 'Azione non riuscita'}${perche ? ` · ${perche}` : ''}`, failed: true };
+    }
+    const fn = ACTIVITY_ROWS[type];
+    if (fn) return fn(a);
+    // Azione eseguita di cui la tabella non sa niente: meglio una riga generica
+    // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
+    if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
+    return null;
+  }
+  // La ragione del fallimento, quando il main la conosce.
+  function motivoFallimento(a) {
+    const o = a && a._output;
+    if (!o) return '';
+    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
+    if (o.found === false) return 'non trovato';
+    if (o.ok === false && o.detail) return String(o.detail);
+    if (o.error) return String(o.error);
+    return '';
   }
 
   // Una riga o un esito di comando nel blocco di attività, per un'azione già
