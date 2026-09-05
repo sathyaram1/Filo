@@ -1319,9 +1319,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const r = await FiloMem.removeTimersByRef(ids ? { ids } : timerRefOf(action));
         const removed = r.removed || [];
         if (removed.length) broadcastLiveUpdate();
+        // `kept`: la chat la racconta come riga nel blocco di attività
+        // («Cancellata · …»): se si può mettere una sveglia dalla chat, si
+        // deve vedere anche quando la si toglie.
         return {
           executed: removed.length > 0,
-          kept: false,
+          kept: removed.length > 0,
           output: { removed: removed.map(describeTimerEntry) },
         };
       }
