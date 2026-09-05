@@ -1292,7 +1292,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       }
       case 'TIMER': {
         const seconds = Number(action.seconds || action.secondi || 0);
-        const label = String(action.label || action.etichetta || 'Timer');
+        // Niente caratteri di controllo (byte nullo compreso) in un'etichetta
+        // che poi va nel diario e nella colonna dei timer.
+        const label = cleanLabel(action.label || action.etichetta) || 'Timer';
         const entry = await FiloMem.addTimer({ label, seconds });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
