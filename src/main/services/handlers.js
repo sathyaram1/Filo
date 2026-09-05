@@ -2352,7 +2352,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // Formato vecchio: si prosegue solo se un esito deve tornare al modello
         // e niente è in attesa di conferma, come faceva prima la scheda.
         const obs = observationsForPrompt(roundRendered);
-        if (!obs || roundRendered.some((x) => x._confirm)) break;
+        if (!obs || roundRendered.some((x) => x._confirm)) { exhausted = false; break; }
         threadMessages.push({ role: 'assistant', content: r.text });
         threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}` });
         continue;
