@@ -146,4 +146,26 @@ test('Lettura: un modello ignoto impara le voci dall\'errore del router, o dice 
   expect(muta.errorCode).toBe('TTS_VOICE_REQUIRED');
   expect(muta.error).toContain('acme/voce-muta');
   expect(muta.error).toContain('Preferenze');
+
+  // Un nome scritto a mano che il modello rifiuta: è un errore di battitura,
+  // e l'avviso lo dice (non «voce non disponibile ora»).
+  await app.evaluate(async () => {
+    globalThis.__ttsMode = 'rifiuta';
+    const C = globalThis.SN_CONST;
+    const T = globalThis.SN_TEST_MODELS;
+    const nick = C.parseModelRefs(T.models[C.ACTIONS.TTS])[0];
+    await globalThis.SN_STORAGE.updateSettings({
+      modelRegistry: { ...T.registry, [nick]: { provider: 'openrouter', model: 'microsoft/mai-voice-2' } },
+      tts: { modelVoice: 'it-IT-ElsaNeurall' },
+    });
+    globalThis.SN_PROVIDER_OPENROUTER.synthesizeSpeech = async () => {
+      const e = new Error('OpenRouter 400: {"error":{"message":"Provider returned 400","code":400}}');
+      e.status = 400; throw e;
+    };
+  });
+  const battuta = await synth('Quarta lettura.', 'it');
+  expect(battuta.ok).toBe(false);
+  expect(battuta.errorCode).toBe('TTS_VOICE_UNKNOWN');
+  expect(battuta.error).toContain('it-IT-ElsaNeurall');
+  expect(battuta.error).toContain('Preferenze');
 });
