@@ -344,6 +344,296 @@
     `<circle cx="11" cy="11" r="6"/>` +
     `<path d="M20 20l-4.3-4.3"/>`;
 
+  // ======================================================================
+  // Icone delle AZIONI dell'agente Filo (righe del blocco di attività in
+  // chat, #521). La corrispondenza azione → icona sta in
+  // src/shared/actionIcons.js: qui c'è solo il disegno. Stessa famiglia
+  // delle altre: outline, 24×24, tratto 1.75. Le PREVISTE (posta, pagina,
+  // voce…) sono già disegnate perché l'agente le avrà a breve.
+  // ======================================================================
+
+  // --- Apri una scheda: finestra con freccia che esce dall'angolo in alto a destra.
+  const openTab =
+    `<path d="M13 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-7"/>` +
+    `<path d="M14 4h6v6"/>` +
+    `<path d="M20 4l-9 9"/>`;
+
+  // --- Apri un file: cartella con la linguetta.
+  const folder =
+    `<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>`;
+
+  // --- Timer: cronometro (quadrante, pulsante in alto, lancetta).
+  const timer =
+    `<circle cx="12" cy="13.5" r="7"/>` +
+    `<path d="M12 10v3.5l2.5 1.5"/>` +
+    `<path d="M10 3.5h4"/>` +
+    `<path d="M12 3.5v3"/>` +
+    `<path d="M18 7l1.5-1.5"/>`;
+
+  // --- Sveglia: orologio con le due campanelle e i piedini.
+  const alarm =
+    `<circle cx="12" cy="13" r="7"/>` +
+    `<path d="M12 9v4l2.5 1.5"/>` +
+    `<path d="M4 7l3-3"/>` +
+    `<path d="M20 7l-3-3"/>` +
+    `<path d="M7.5 19l-1.5 2"/>` +
+    `<path d="M16.5 19l1.5 2"/>`;
+
+  // --- Sveglia tolta: la stessa sveglia, barrata.
+  const alarmOff =
+    alarm +
+    `<path d="M4 4l16 16"/>`;
+
+  // --- Sveglia spostata: orologio con una freccia ad arco sopra (riprogramma).
+  const alarmShift =
+    `<circle cx="12" cy="14" r="6.5"/>` +
+    `<path d="M12 10.5V14l2.5 1.5"/>` +
+    `<path d="M6 6.5a8 8 0 0 1 12 0"/>` +
+    `<path d="M18 3v3.5h-3.5"/>`;
+
+  // --- Lezione fissata nella memoria: puntina da disegno.
+  const pin =
+    `<path d="M9 4h6l-1 5 3 3v1.5H7V12l3-3z"/>` +
+    `<path d="M12 13.5V21"/>`;
+
+  // --- Cerca sul web: lente con un globo dentro (meridiano ed equatore).
+  const searchWeb =
+    `<circle cx="10.5" cy="10.5" r="6.5"/>` +
+    `<path d="M4 10.5h13"/>` +
+    `<path d="M10.5 4c-3 3-3 10 0 13"/>` +
+    `<path d="M10.5 4c3 3 3 10 0 13"/>` +
+    `<path d="M20.5 20.5l-5.3-5.3"/>`;
+
+  // --- Intervista di benvenuto: lista di spunte.
+  const checklist =
+    `<path d="M4.5 6.5l1.5 1.5 3-3"/>` +
+    `<path d="M12 7h8"/>` +
+    `<path d="M4.5 12.5l1.5 1.5 3-3"/>` +
+    `<path d="M12 13h8"/>` +
+    `<path d="M4.5 18.5l1.5 1.5 3-3"/>` +
+    `<path d="M12 19h8"/>`;
+
+  // --- Manifesto delle capacità: cartellina con la molletta e le righe.
+  const clipboard =
+    `<rect x="5" y="5" width="14" height="16" rx="2"/>` +
+    `<path d="M9 3.5h6v3H9z"/>` +
+    `<path d="M9 12h6"/>` +
+    `<path d="M9 15.5h4"/>`;
+
+  // --- Leggi un documento: foglio con l'angolo piegato e una lente in basso a destra.
+  const readDocument =
+    `<path d="M14 3.5H6v17h6"/>` +
+    `<path d="M14 3.5v4h4v4.5"/>` +
+    `<path d="M9 11h5"/>` +
+    `<path d="M9 14.5h3"/>` +
+    `<circle cx="16.5" cy="16.5" r="3"/>` +
+    `<path d="M18.7 18.7L21 21"/>`;
+
+  // --- Evento in calendario: calendario con i due anelli e un "+" nel foglio.
+  const calendar =
+    `<rect x="4" y="5" width="16" height="15" rx="2"/>` +
+    `<path d="M4 10h16"/>` +
+    `<path d="M8 3v4"/>` +
+    `<path d="M16 3v4"/>` +
+    `<path d="M12 13v4"/>` +
+    `<path d="M10 15h4"/>`;
+
+  // --- Pulisci le schede: scopa (manico diagonale + blocco di setole).
+  const broom =
+    `<path d="M20 4l-8.5 8.5"/>` +
+    `<path d="M9.7 10.7l3.6 3.6-3.8 6.2L3.5 14.5z"/>` +
+    `<path d="M7.5 12.9l2.4 2.4"/>` +
+    `<path d="M5.5 14.9l2.4 2.4"/>`;
+
+  // --- Elimina definitivamente: cestino con coperchio.
+  const trash =
+    `<path d="M4 7h16"/>` +
+    `<path d="M9 7V4.5h6V7"/>` +
+    `<path d="M6 7l1 13h10l1-13"/>` +
+    `<path d="M10 11v6"/>` +
+    `<path d="M14 11v6"/>`;
+
+  // --- Cancella la memoria: gomma da cancellare.
+  const eraser =
+    `<path d="M4.5 15l9.5-9.5a2 2 0 0 1 2.8 0l3.7 3.7a2 2 0 0 1 0 2.8L13.5 19H8.5z"/>` +
+    `<path d="M9.5 10l5.5 5.5"/>` +
+    `<path d="M13.5 19H20"/>`;
+
+  // --- Estetica: tavolozza del pittore con tre pozzetti.
+  const palette =
+    `<path d="M12 3.5a8.5 8.5 0 1 0 6 14.5c-1.5 0-2.5-1-2.5-2.5s1.3-2.5 3-2.5h.7A8.5 8.5 0 0 0 12 3.5z"/>` +
+    `<path d="M8 9.5h.01"/>` +
+    `<path d="M12 7.5h.01"/>` +
+    `<path d="M7.5 14h.01"/>`;
+
+  // --- Comando nel terminale: finestra con il prompt ">_".
+  const terminal =
+    `<rect x="3" y="4.5" width="18" height="15" rx="2"/>` +
+    `<path d="M7 9.5l3 2.5-3 2.5"/>` +
+    `<path d="M12.5 15h5"/>`;
+
+  // --- Da un altro paese: globo (equatore + meridiano).
+  const globe =
+    `<circle cx="12" cy="12" r="8.5"/>` +
+    `<path d="M3.5 12h17"/>` +
+    `<path d="M12 3.5c-3.5 3-3.5 14 0 17"/>` +
+    `<path d="M12 3.5c3.5 3 3.5 14 0 17"/>`;
+
+  // --- Connessione diretta: globo barrato.
+  const globeOff =
+    globe +
+    `<path d="M4 4l16 16"/>`;
+
+  // --- Regola "sempre da un altro paese": globo con un segnalibro nell'angolo.
+  const globePinned =
+    `<circle cx="11" cy="13" r="7.5"/>` +
+    `<path d="M3.5 13h15"/>` +
+    `<path d="M11 5.5c-3 2.7-3 12.3 0 15"/>` +
+    `<path d="M11 5.5c3 2.7 3 12.3 0 15"/>` +
+    `<path d="M15.5 3h5v7l-2.5-2-2.5 2z"/>`;
+
+  // --- Comando della finestra: cornice con barra del titolo e due pallini.
+  const windowFrame =
+    `<rect x="3" y="4.5" width="18" height="15" rx="2"/>` +
+    `<path d="M3 9h18"/>` +
+    `<path d="M6 6.75h.01"/>` +
+    `<path d="M8.5 6.75h.01"/>`;
+
+  // --- Stile della pagina: pennello (manico diagonale + ciuffo).
+  const brush =
+    `<path d="M20 4c-3.5 1-8 5.5-10 9l1.5 1.5c3.5-2 8-7 8.5-10.5z"/>` +
+    `<path d="M9.5 13.5c-1.5 0-2.8.6-3.3 2S5.2 19 3.5 20c2.5.6 5 .4 6.5-1.1s1.5-3 1-4z"/>`;
+
+  // --- Ripristina: freccia che torna indietro.
+  const undo =
+    `<path d="M4 10h11a5 5 0 0 1 0 10h-4"/>` +
+    `<path d="M8 6l-4 4 4 4"/>`;
+
+  // --- PREVISTE: posta letta (busta aperta) e posta inviata (busta + freccia).
+  const mailOpen =
+    `<path d="M4 9.5l8-5.5 8 5.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/>` +
+    `<path d="M4 9.5l8 5.5 8-5.5"/>`;
+  const mailSend =
+    `<rect x="3" y="5.5" width="15" height="11" rx="1.5"/>` +
+    `<path d="M3 7l7.5 5 7.5-5"/>` +
+    `<path d="M15 19.5h6"/>` +
+    `<path d="M18.5 17l2.5 2.5-2.5 2.5"/>`;
+
+  // --- PREVISTE: leggi la pagina aperta (finestra con righe di testo).
+  const readPage =
+    `<rect x="3" y="4.5" width="18" height="15" rx="2"/>` +
+    `<path d="M3 8.5h18"/>` +
+    `<path d="M7 12.5h10"/>` +
+    `<path d="M7 16h6"/>`;
+
+  // --- PREVISTE: clicca nella pagina (freccia del puntatore).
+  const click =
+    `<path d="M5 3.5l6 14.5 2-6 6-2z"/>` +
+    `<path d="M13 13l6 6"/>`;
+
+  // --- PREVISTE: scrivi in un campo (casella con il cursore).
+  const typeText =
+    `<rect x="3" y="7.5" width="18" height="9" rx="2"/>` +
+    `<path d="M7 10.5v3"/>`;
+
+  // --- PREVISTE: modifica un file (matita).
+  const pencil =
+    `<path d="M4 20l4.5-1L19 8.5a2 2 0 0 0-3-3L5.5 15.5z"/>` +
+    `<path d="M14 7.5l3 3"/>`;
+
+  // --- PREVISTE: crea un file (foglio con "+").
+  const fileNew =
+    `<path d="M14 3.5H6v17h12V7.5z"/>` +
+    `<path d="M14 3.5v4h4"/>` +
+    `<path d="M12 11v6"/>` +
+    `<path d="M9 14h6"/>`;
+
+  // --- PREVISTE: allega (graffetta).
+  const attach =
+    `<path d="M20.5 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/>`;
+
+  // --- PREVISTE: foto / telecamera (corpo con obiettivo).
+  const camera =
+    `<rect x="3" y="8" width="18" height="12" rx="2"/>` +
+    `<path d="M8 8l1.5-2.5h5L16 8"/>` +
+    `<circle cx="12" cy="14" r="3.2"/>`;
+
+  // --- PREVISTE: ascolta (microfono).
+  const mic =
+    `<rect x="9" y="3.5" width="6" height="10" rx="3"/>` +
+    `<path d="M6 11.5a6 6 0 0 0 12 0"/>` +
+    `<path d="M12 17.5v3"/>` +
+    `<path d="M9 20.5h6"/>`;
+
+  // --- PREVISTE: memoria di Filo (cervello a due lobi).
+  const memory =
+    `<path d="M9.5 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1.5 5A3 3 0 0 0 9.5 20c1.3 0 2.5-.8 2.5-2V6a2.5 2.5 0 0 0-2.5-2z"/>` +
+    `<path d="M14.5 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1.5 5A3 3 0 0 1 14.5 20c-1.3 0-2.5-.8-2.5-2V6a2.5 2.5 0 0 1 2.5-2z"/>`;
+
+  // --- PREVISTE: copia (due fogli sovrapposti).
+  const copy =
+    `<rect x="9" y="9" width="11" height="11" rx="2"/>` +
+    `<path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/>`;
+
+  // --- PREVISTE: promemoria / notifica (campanella).
+  const bell =
+    `<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/>` +
+    `<path d="M10 20.5a2 2 0 0 0 4 0"/>`;
+
+  // --- PREVISTE: automazione ricorrente (due frecce a ciclo).
+  const repeat =
+    `<path d="M17 3l3 3-3 3"/>` +
+    `<path d="M20 6H8a4 4 0 0 0-4 4v1"/>` +
+    `<path d="M7 21l-3-3 3-3"/>` +
+    `<path d="M4 18h12a4 4 0 0 0 4-4v-1"/>`;
+
+  // --- PREVISTE: chiede all'utente (cerchio con "?").
+  const question =
+    `<circle cx="12" cy="12" r="8.5"/>` +
+    `<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7"/>` +
+    `<path d="M12 17h.01"/>`;
+
+  // --- PREVISTE: schede aperte (finestra con due linguette).
+  const tabs =
+    `<rect x="3" y="7" width="18" height="13" rx="2"/>` +
+    `<path d="M3 11h18"/>` +
+    `<path d="M7 7V4.5h4.5V7"/>` +
+    `<path d="M11.5 7V4.5H16V7"/>`;
+
+  // --- PREVISTE: posizione (goccia del segnaposto).
+  const location =
+    `<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/>` +
+    `<circle cx="12" cy="10" r="2.5"/>`;
+
+  // --- PREVISTE: piano di lavoro (elenco puntato).
+  const list =
+    `<path d="M5 6.5h.01"/>` +
+    `<path d="M9 6.5h11"/>` +
+    `<path d="M5 12h.01"/>` +
+    `<path d="M9 12h11"/>` +
+    `<path d="M5 17.5h.01"/>` +
+    `<path d="M9 17.5h11"/>`;
+
+  // --- PREVISTE: genera (immagine, testo…): due scintille.
+  const sparkles =
+    `<path d="M11 3.5l1.8 5.2 5.2 1.8-5.2 1.8L11 17.5l-1.8-5.2L4 10.5l5.2-1.8z"/>` +
+    `<path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>`;
+
+  // --- STATI del lavoro: ragionamento (nuvola di pensiero), fatto, avviso, bloccato.
+  const reasoning =
+    `<path d="M8 15.5a3.5 3.5 0 0 1-1-6.8A4.5 4.5 0 0 1 15.5 7a4 4 0 0 1 2 7.5 3 3 0 0 1-2 1z"/>` +
+    `<path d="M6 18.5h.01"/>` +
+    `<path d="M3.5 21h.01"/>`;
+  const check =
+    `<path d="M4.5 12.5l5 5 10-11"/>`;
+  const warning =
+    `<path d="M12 3.5l9 16h-18z"/>` +
+    `<path d="M12 10v4"/>` +
+    `<path d="M12 17h.01"/>`;
+  const blocked =
+    `<circle cx="12" cy="12" r="8.5"/>` +
+    `<path d="M6 6l12 12"/>`;
+
   // Esposizione: ciascuna icona è una FUNZIONE (size) => stringa SVG.
   // Permette ai consumer di chiedere taglie diverse (es. 16 per la riga,
   // 20 per la griglia overflow) senza ricreare manualmente il wrapper.
@@ -397,6 +687,53 @@
     decks:        (size) => wrap(decks, { size }),
     note:         (size) => wrap(note, { size }),
     search:       (size) => wrap(search, { size }),
+    // --- Azioni dell'agente (la tabella azione → icona è in actionIcons.js)
+    openTab:      (size) => wrap(openTab, { size }),
+    folder:       (size) => wrap(folder, { size }),
+    timer:        (size) => wrap(timer, { size }),
+    alarm:        (size) => wrap(alarm, { size }),
+    alarmOff:     (size) => wrap(alarmOff, { size }),
+    alarmShift:   (size) => wrap(alarmShift, { size }),
+    pin:          (size) => wrap(pin, { size }),
+    searchWeb:    (size) => wrap(searchWeb, { size }),
+    checklist:    (size) => wrap(checklist, { size }),
+    clipboard:    (size) => wrap(clipboard, { size }),
+    readDocument: (size) => wrap(readDocument, { size }),
+    calendar:     (size) => wrap(calendar, { size }),
+    broom:        (size) => wrap(broom, { size }),
+    trash:        (size) => wrap(trash, { size }),
+    eraser:       (size) => wrap(eraser, { size }),
+    palette:      (size) => wrap(palette, { size }),
+    terminal:     (size) => wrap(terminal, { size }),
+    globe:        (size) => wrap(globe, { size }),
+    globeOff:     (size) => wrap(globeOff, { size }),
+    globePinned:  (size) => wrap(globePinned, { size }),
+    windowFrame:  (size) => wrap(windowFrame, { size }),
+    brush:        (size) => wrap(brush, { size }),
+    undo:         (size) => wrap(undo, { size }),
+    mailOpen:     (size) => wrap(mailOpen, { size }),
+    mailSend:     (size) => wrap(mailSend, { size }),
+    readPage:     (size) => wrap(readPage, { size }),
+    click:        (size) => wrap(click, { size }),
+    typeText:     (size) => wrap(typeText, { size }),
+    pencil:       (size) => wrap(pencil, { size }),
+    fileNew:      (size) => wrap(fileNew, { size }),
+    attach:       (size) => wrap(attach, { size }),
+    camera:       (size) => wrap(camera, { size }),
+    mic:          (size) => wrap(mic, { size }),
+    memory:       (size) => wrap(memory, { size }),
+    copy:         (size) => wrap(copy, { size }),
+    bell:         (size) => wrap(bell, { size }),
+    repeat:       (size) => wrap(repeat, { size }),
+    question:     (size) => wrap(question, { size }),
+    tabs:         (size) => wrap(tabs, { size }),
+    location:     (size) => wrap(location, { size }),
+    list:         (size) => wrap(list, { size }),
+    sparkles:     (size) => wrap(sparkles, { size }),
+    reasoning:    (size) => wrap(reasoning, { size }),
+    check:        (size) => wrap(check, { size }),
+    warning:      (size) => wrap(warning, { size }),
+    blocked:      (size) => wrap(blocked, { size }),
   };
 
   // Heuristica che il menu usa per capire se una stringa di "icona" è SVG
