@@ -2286,6 +2286,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let textReply = '';
   let reasoningDetails = [];
   let costEur = 0;
+  // Resta vero solo se il modello ha chiamato azioni fino al tetto senza mai
+  // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
+  // lavoro spacciata per risposta.
+  let exhausted = true;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       r = await handleAIRequest({
