@@ -1122,7 +1122,7 @@ function describeTimerEntry(t) {
 // Un'etichetta scritta dal modello, ripulita dai caratteri di controllo (byte
 // nullo compreso): finisce nel diario del lavoro e nella colonna dei timer.
 function cleanLabel(v) {
-  return String(v == null ? '' : v).replace(/[ -]/g, '').trim();
+  return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
 }
 
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
@@ -2043,6 +2043,15 @@ function toolResultText({ action, res, rendered }) {
   // Non eseguita e senza niente da mostrare: mancava qualcosa (nessuna scheda
   // web attiva, un riferimento che non trova niente, un dato vuoto).
   const detail = res.output ? ` (${JSON.stringify(res.output).slice(0, 200)})` : '';
+  // Le azioni sulla scheda web (proxy, stile della pagina) falliscono quasi
+  // sempre per lo stesso motivo: non c'è una scheda web attiva.
+  const PAGE_ACTIONS = ['PROXY_TAB', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_REGOLA_PROXY', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'];
+  if (PAGE_ACTIONS.includes(type) && !(res.output && res.output.restyle === 'no-page' ? false : true)) {
+    return `Azione ${type} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
+  }
+  if (PAGE_ACTIONS.includes(type) && !res.output) {
+    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva (o il proxy non è configurato): dillo all'utente.`;
+  }
   return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
 
