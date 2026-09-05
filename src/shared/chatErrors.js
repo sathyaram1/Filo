@@ -87,6 +87,12 @@
     const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
+      // Il router non ha trovato un host che accetti gli strumenti (tool
+      // calling) per il modello scelto: la chat della home non funziona senza.
+      // Non è un guasto passeggero, è una scelta di modello da cambiare.
+      if (/tool/i.test(raw) && (st === 404 || st === 400)) {
+        return 'il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+      }
       if (st === 401 || st === 403) {
         return 'il servizio AI ha rifiutato la chiave API: controlla che sia giusta (e ancora valida) nelle Impostazioni.';
       }
