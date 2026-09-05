@@ -2365,7 +2365,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;
         if (res.kept) { renderedActions.push(rendered); roundRendered.push(rendered); }
-        push('filo:action', { kind: 'done', action: rendered, kept: !!res.kept });
+        push('filo:action', { kind: 'done', action: rendered, kept: !!res.kept, executed: !!res.executed });
         results.push({ action: a, res, rendered });
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
