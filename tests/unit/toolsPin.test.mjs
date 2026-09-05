@@ -800,7 +800,7 @@ test('anche i DATI che governano il giro vengono dalla copia', async () => {
       const p = spawn(process.execPath, [
         '--input-type=module', '-e',
         `import { VERIFIER_CAPS } from ${JSON.stringify(`file:///${resolve(dove, 'scripts', 'dispatch.mjs').split('\\').join('/')}`)};
-         console.log('failCap=' + VERIFIER_CAPS.failCap);`,
+         console.log('cap2=' + VERIFIER_CAPS.cap2);`,
       ], {
         cwd: casa,
         env: { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1' },
