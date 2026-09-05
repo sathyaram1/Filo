@@ -267,7 +267,9 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
     entry.counts = {};
   } else if (outcome === 'fix') {
     entry.verdict = 'fix-pending';
-    entry.pending = { findings: decision.fix, sha: sha || '', at: when };
+    // Anche i rilievi messi da parte e i bilanci del giro: servono a
+    // ristampare la fase 2 tale e quale se la risposta si è persa.
+    entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, budgets: decision.budgets };
     entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
   } else {
     entry.verdict = 'pass';
