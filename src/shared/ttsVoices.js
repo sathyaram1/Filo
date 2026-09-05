@@ -240,9 +240,11 @@
   // Voci ammesse elencate dal router in un errore ("Unknown voice "x".
   // Supported voices: a, b, c."). [] se il messaggio non le elenca. PURA.
   function voicesFromError(message) {
-    const m = /supported voices?\s*:\s*([^\n]+)/i.exec(String(message == null ? '' : message));
+    // L'elenco finisce alla prima virgoletta (il messaggio arriva dentro un
+    // JSON) o a capo; un punto in coda non è parte dell'ultimo nome.
+    const m = /supported voices?\s*:\s*([^"\n]+)/i.exec(String(message == null ? '' : message));
     if (!m) return [];
-    return m[1].split(',').map((s) => s.trim().replace(/[.\s"']+$/g, '')).filter(Boolean);
+    return m[1].split(',').map((s) => s.trim().replace(/[.\s'\\]+$/g, '')).filter(Boolean);
   }
 
   // Il modello pretende una voce e non gliene abbiamo mandata nessuna. PURA.
