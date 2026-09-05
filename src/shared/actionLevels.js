@@ -302,6 +302,11 @@
         const base = `Filo vuole impostare: ${built.label}.`;
         return built.risk ? `${base}\n\n${built.risk}` : base;
       },
+      // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
+      describeDone: (a) => {
+        const built = prefBuilt(a);
+        return built ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
+      },
     },
     IMPOSTA_ESTETICA: {
       // Cambio di un token estetico (colore, font, raggio, opacità) su richiesta
