@@ -424,7 +424,11 @@ module.exports = function register(on, ctx) {
     });
     if (kind === 'tts') {
       if (typeof P.synthesizeSpeech !== 'function') return { ok: false, error: 'Questo fornitore non sa leggere ad alta voce' };
-      const r = await P.synthesizeSpeech({ apiKey, model, text: 'Uno, due, tre: prova della voce.', voice: '', providerRouting: routing });
+      // La frase di prova è italiana: la voce è quella di partenza per
+      // l'italiano nel catalogo del modello (o nessuna, se sceglie da sé).
+      const Voices = globalThis.SN_TTS_VOICES;
+      const voice = Voices ? Voices.resolveVoice({ chosen: '', lang: 'it', modelId: model, learned: learnedVoices.get(model) }) : '';
+      const r = await synthesizeWithVoiceRecovery(P, { apiKey, model, text: 'Uno, due, tre: prova della voce.', voice, lang: 'it', speed: 1, routing });
       if (!r || !r.audioBase64) return { ok: false, error: 'Il modello ha risposto senza audio' };
       return done({ audioBytes: Math.round(r.audioBase64.length * 3 / 4) });
     }
