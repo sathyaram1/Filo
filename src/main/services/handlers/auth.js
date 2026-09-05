@@ -442,11 +442,11 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Contatori del verificatore a tre esiti (config/routines, campi `failCap` e
-  // `improvableCap` — SPEC-RIDISEGNO-MAX.md §13). Owner-only. È la fonte di
-  // verità che il server applica quando registra i verdetti: cambiarli qui ha
-  // effetto sul prossimo giro. `failCap` viene specchiato anche sul campo
-  // legacy `loopCap` (alias, per i lettori non ancora aggiornati).
+  // I tre bilanci del verificatore che corregge e il testo della fase 2
+  // (config/routines, campi `cap2`, `cap1`, `cap0`, `fixInstructions` —
+  // feedback #561). Owner-only. È la fonte di verità che il server applica
+  // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
+  const capsReply = (caps) => ({ ok: true, cap2: caps.cap2, cap1: caps.cap1, cap0: caps.cap0, fixInstructions: caps.fixInstructions });
   on(MSG.AUTOMATION_CAPS_GET, async () => {
     try {
       if (!auth.isAdmin()) {
@@ -454,15 +454,14 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const caps = await Defaults.getRoutineCaps(idToken);
-      return { ok: true, failCap: caps.failCap, improvableCap: caps.improvableCap };
+      return capsReply(await Defaults.getRoutineCaps(idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   });
 
-  // Tocca SOLO i campi che riceve (come AUTOMATION_SET): salvare un contatore
-  // non deve riscrivere l'altro.
+  // Tocca SOLO i campi che riceve (come AUTOMATION_SET): salvare un bilancio
+  // non deve riscrivere gli altri.
   on(MSG.AUTOMATION_CAPS_SET, async (msg) => {
     try {
       if (!auth.isAdmin()) {
@@ -470,8 +469,9 @@ module.exports = function register(on, ctx) {
       }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const caps = await Defaults.setRoutineCaps({ failCap: msg.failCap, improvableCap: msg.improvableCap }, idToken);
-      return { ok: true, failCap: caps.failCap, improvableCap: caps.improvableCap };
+      return capsReply(await Defaults.setRoutineCaps({
+        cap2: msg.cap2, cap1: msg.cap1, cap0: msg.cap0, fixInstructions: msg.fixInstructions,
+      }, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
