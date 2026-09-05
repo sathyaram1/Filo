@@ -277,7 +277,9 @@ module.exports = function register(on, ctx) {
       const attempts = buildAttemptChain(settings, ref, SN_CONST.ACTIONS.TTS);
       model = (attempts[0] && attempts[0].model) || '';
     } catch (e) {
-      return { ok: true, model: '', catalog: '', required: false, groups: [], error: e?.message || String(e) };
+      // Nessun modello di lettura (o catena non risolvibile): la pagina lo
+      // dice, invece di fingere che un modello scelga da sé.
+      return { ok: true, model: '', catalog: '', required: true, groups: [], error: e?.message || String(e) };
     }
     const cat = Voices ? Voices.catalogFor(model) : null;
     let groups = cat ? Voices.groupedByLang(model) : [];
