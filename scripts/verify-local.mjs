@@ -328,32 +328,29 @@ export function withVerdict(state, branch, { verdict, critique, sha, at }) {
 }
 
 /** Il testo della fase 2 in locale: stampato SOLO dopo la critica. PURA. */
-export function phase2Text({ findings, derived, budgets, branch }) {
+export function phase2Text({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
   const b = budgets && typeof budgets === 'object'
     ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
+  // Il testo delle istruzioni NON sta qui: arriva dal file fuori dal repo. Se
+  // manca, si dice dove doveva essere e come si consegna, e basta.
+  const testo = String(instructions || '').trim() || [
+    'Istruzioni della fase 2 non trovate (file FASE2-LOCALE.md nella cartella sopra il repo):',
+    'chiedile a chi guida. In ogni caso correggi SOLO i rilievi dell\'elenco qui sopra e consegna con',
+    '  node scripts/verify-local.mjs corretto "<report della correzione>"',
+  ].join('\n');
   return [
-    '══ ESITO: c\'è da correggere — FASE 2, adesso correggi tu ══',
+    '══ ESITO: c\'è da correggere ══',
+    `Sei sul ramo ${branch}.`,
     'Rilievi da correggere ADESSO (solo questi):',
     fmt(findings),
     'Rilievi messi da parte (NON li correggi: finiscono nel report per l\'owner):',
     fmt(derived),
     b ? `Bilanci: ${b}` : '',
     '',
-    'La critica registrata non si modifica più. Correggi SOLO i rilievi dell\'elenco: niente gusto,',
-    'niente aggiunte fuori elenco, niente rilievi nuovi. Correggi la causa, non il sintomo; se lo',
-    'stesso danno rientra da più porte, chiudile tutte.',
-    `Sei già sul ramo ${branch}: non cambiarlo. Valgono i minimi di verifica del repo (unit test per`,
-    'la logica pura, spec Playwright mirato per UI e flussi); niente suite completa.',
-    'Aggiorna nello stesso commit le fonti di verità che tocchi. Scrivi la tua riga di report per',
-    'l\'owner (una riga di conferma, le scelte diverse dal chiesto col perché) e, se serve, la riga di',
-    'changelog. Poi consegna:',
-    '  node scripts/verify-local.mjs corretto "<report della correzione>"',
-    'Dopo la consegna serve un\'ALTRA verifica, di un\'altra istanza: chi guida rilancia',
-    '  node scripts/verify-local.mjs start',
-    'Se un rilievo non riesci a correggerlo, consegna comunque ciò che hai corretto e dillo nel report.',
-  ].filter((l, i) => l !== '' || i === 6).join('\n');
+    testo,
+  ].filter((l, i) => l !== '' || i === 7).join('\n');
 }
 
 // ─── Riallineamento alla linea principale (caso #500) ───────────────────────
