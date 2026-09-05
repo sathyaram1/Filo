@@ -1660,6 +1660,31 @@
         followBottomIfNear();
       });
     }
+    // Le AZIONI in diretta (tool calling nativo): il modello ne nomina una →
+    // la riga in testa lo dice subito; il main la esegue → la riga vera entra
+    // nel blocco con l'esito; un giro con azioni si chiude → il testo scritto
+    // in quel giro era una nota di lavoro, non la risposta: finisce nel blocco
+    // e la bolla riparte vuota per il giro dopo. Gli id delle chiamate già
+    // raccontate qui non si ripetono a fine turno (renderActions).
+    const shown = new Set();
+    let offAction = null;
+    if (window.filo?.onAction) {
+      offAction = window.filo.onAction((data) => {
+        if (!data || data.reqId !== reasoningReqId) return;
+        if (data.kind === 'start') {
+          pending.working(startLabelFor(data.type));
+        } else if (data.kind === 'done') {
+          const a = data.action;
+          if (a && data.kept !== false && tellActionInActivity(pending, a) && a._callId) shown.add(a._callId);
+        } else if (data.kind === 'round') {
+          if (streamBubble) {
+            if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
+            streamBubble = null;
+          }
+          streamedText = '';
+        }
+      });
+    }
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
