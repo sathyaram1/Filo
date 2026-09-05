@@ -188,7 +188,7 @@ module.exports = function register(on, ctx) {
       const chosen = String(msg.voice || ttsPrefs.modelVoice || '').trim();
       let locale = '';
       try { locale = require('electron').app.getLocale(); } catch (_) { locale = ''; }
-      const voice = chosen || (Voices ? Voices.defaultVoiceFor(msg.lang || locale) : '');
+      const lang = msg.lang || locale;
       // La velocità delle Preferenze vale anche per la voce del modello.
       const rate = Number(ttsPrefs.rate);
       const speed = rate >= 0.5 && rate <= 2 ? rate : 1;
@@ -198,6 +198,12 @@ module.exports = function register(on, ctx) {
       for (const a of attempts) {
         const P = Providers.getProvider(a.provider);
         if (!P || typeof P.synthesizeSpeech !== 'function') continue;
+        // La voce dipende dal MODELLO: ogni modello ha i suoi nomi, e una voce
+        // scelta per un altro modello va ignorata, non spedita (sarebbe un 400
+        // e la lettura ripiegherebbe sul browser senza spiegazioni).
+        const voice = Voices
+          ? Voices.resolveVoice({ chosen, lang, modelId: a.model, learned: learnedVoices.get(a.model) })
+          : chosen;
         // Cache hit: stesso testo+voce+velocità+modello già sintetizzato in
         // questa sessione → ritorno immediato, niente chiamata al modello.
         const key = ttsCache ? ttsKey(a.model, `${voice}@${speed}`, text) : null;
