@@ -1218,22 +1218,26 @@
     let hasAck = false;
     for (const a of actions) {
       const told = a && a._callId && shown && shown.has(a._callId);
+      const anche = ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false;
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
-          if (activityRowFor(a) || (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked)) continue;
-        } else if (tellActionInActivity(activity, a)) {
+          if (!anche && (activityRowFor(a) || (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked))) continue;
+        } else if (tellActionInActivity(activity, a) && !anche) {
           continue;
         }
       } else {
         const row = activityRowFor(a);
-        if (row) { wrap.appendChild(makeActivityRow(row.icon, row.text)); continue; }
+        if (row) {
+          wrap.appendChild(makeActivityRow(row.icon, row.text));
+          if (!anche) continue;
+        }
       }
       // Un'azione senza niente da cliccare (`_traccia`) o non riuscita non
       // diventa MAI un bottone: un chip che al click non fa niente è un vicolo
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario.
-      if (a._traccia || a._executed === false) continue;
+      if ((a._traccia && !anche) || a._executed === false) continue;
       const btn = renderActionButton(a, { onAck });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
