@@ -12,13 +12,18 @@ quale dei due casi sei (`case`):
   (con `feedback.documents`, `[{ name, text }]`, se porta documenti allegati:
   una spec allegata sta lì, già aperta, non nel testo)
   (testo + immagini, già decifrati) è la richiesta dell'owner o di un utente;
-- **`correzione`** — il lavoro di un'istanza precedente ha collezionato un
-  FAIL dal verifier: oltre al feedback trovi `payload.verifierCritique`, la
-  critica con i passi che si rompono, e `payload.history`, TUTTE le critiche
-  dei giri passati (dalla più vecchia). NON vedi il report di chi ha lavorato
-  prima, ed è voluto: leggi il codice com'è, non la storia di come ci è
-  arrivato. Parti dalla critica: capisci cosa si rompe e perché, non solo il
-  messaggio.
+- **`correzione`** — dal 2026-09-05 (feedback #561) questo caso arriva quasi
+  solo per il **riallineamento dopo un conflitto di fusione**: la linea
+  principale è andata avanti e il ramo va ribasato, non corretto nel
+  comportamento (`payload.verifierCritique` lo dice esplicitamente). Le
+  correzioni dei rilievi della verifica non passano più di qui: le fa il
+  verificatore stesso, nel suo giro. Se invece la critica descrive un
+  difetto (stati vecchi), vale quanto segue: oltre al feedback trovi
+  `payload.verifierCritique`, la critica con i passi che si rompono, e
+  `payload.history`, TUTTE le critiche dei giri passati (dalla più vecchia).
+  NON vedi il report di chi ha lavorato prima, ed è voluto: leggi il codice
+  com'è, non la storia di come ci è arrivato. Parti dalla critica: capisci
+  cosa si rompe e perché, non solo il messaggio.
 
   **Leggi la serie, non solo l'ultimo verbale.** Se lo storico racconta lo
   stesso danno che rientra da porte diverse (prima lo zoom, poi il
