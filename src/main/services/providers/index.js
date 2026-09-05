@@ -127,9 +127,10 @@
         const r = await withNetworkRetry(
           () => getProvider(a.provider).streamComplete({
             apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
-            providerRouting: a.providerRouting, messages, signal,
+            providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
+            onToolCall: onToolCall ? (c) => { emitted = true; onToolCall(c); } : onToolCall,
           }),
           () => {
             if (!emitted) return true;
