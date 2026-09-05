@@ -1825,7 +1825,11 @@
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
-      threadHistory: threadHistory.slice(0, -1),
+      // Tutta la conversazione TRANNE il messaggio che stiamo mandando adesso
+      // (viaggia a parte, in `userMessage`). Non «l'ultima voce e basta»: dopo
+      // un turno interrotto in fondo c'è quello che Filo aveva già fatto, e
+      // buttarlo via faceva ripartire il «Riprova» senza saperlo.
+      threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
     };
