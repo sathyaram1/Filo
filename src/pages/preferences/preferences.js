@@ -595,8 +595,8 @@
     const btn = $('ttsModelPreview');
     const status = $('ttsModelPreviewStatus');
     const V = window.SN_TTS_VOICES;
-    const voice = $('ttsModelVoice').value || '';
-    const lang = (voice && V) ? V.langOfVoice(voice) : ((navigator.language || 'it').split('-')[0]);
+    const voice = currentModelVoice();
+    const lang = ((voice && V) ? V.langOfVoice(voice) : '') || (navigator.language || 'it').split('-')[0];
     const text = MODEL_VOICE_SAMPLES[lang] || MODEL_VOICE_SAMPLES.en;
     if (modelPreviewAudio) { try { modelPreviewAudio.pause(); } catch (_) {} modelPreviewAudio = null; }
     btn.disabled = true;
