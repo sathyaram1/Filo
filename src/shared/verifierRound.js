@@ -134,7 +134,7 @@
         current = { line: raw.trim(), text: m[3].trim() };
         continue;
       }
-      if (LEVEL_LINE.test(raw)) {
+      if (LEVEL_START.test(raw) || (!current && LEVEL_LABEL.test(raw))) {
         flush();
         out.push(raw.trim());
         continue;
