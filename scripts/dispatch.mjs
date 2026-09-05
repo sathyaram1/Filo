@@ -1513,6 +1513,9 @@ if (isMainModule) {
   // Quattro testi diversi perché quattro rimedi diversi.
   const esciRespinto = (s) => {
     if (s.ticketMissing) { console.error(ticketMissingText(s.message)); process.exit(1); }
+    // Critica scritta male: si sistema la riga e si rilancia (esci 1, come un
+    // errore d'uso). Il server non è stato chiamato e niente è stato scritto.
+    if (s.formatRejected) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: sistema le righe e rilancia lo stesso comando.`); process.exit(1); }
     if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
     console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
     process.exit(s.fromChannel ? 4 : 3);
