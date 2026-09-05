@@ -76,10 +76,16 @@
   // silenzio (verifica del giro 3 su #561). In MEZZO a una frase invece le
   // parentesi sono testo: «ho ri-provato la porta [2] del giro scorso» è il
   // modo naturale di scrivere il riassunto (verifica del giro 4).
-  const LEVEL_TOKEN_SRC = '\\[\\s*\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*\\??\\s*\\]';
-  const LEVEL_LINE = new RegExp(
-    `^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?(?:${LEVEL_TOKEN_SRC}|[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—])`
-  );
+  // Anche un livello scritto con una parola davanti («[livello 2]», «[L2]»,
+  // «[P2]») è un livello messo male, non riassunto: finiva nel riassunto in
+  // silenzio e il lavoro passava (verifica del giro 6).
+  const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.]{1,10}\\s*)?\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*\\??\\s*\\]';
+  const LEVEL_START = new RegExp(`^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
+  // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
+  // riassunto: dentro la continuazione di un rilievo («Passi: critica con
+  // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
+  // giusta (verifica del giro 6).
+  const LEVEL_LABEL = new RegExp(`^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—]`);
 
   // Un a capo scritto coi due caratteri barra e n: è come esce il comando
   // d'esempio («<riassunto>\n[livello] …») copiato dentro virgolette doppie, in
