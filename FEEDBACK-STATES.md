@@ -69,8 +69,14 @@ vero su "qualcuno ci sta lavorando ORA").
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
-- `revision_capability` —routine PASS verifier→ `revision_security`; —FAIL×3→ `design`
-  (`statusReason: loop`).
+- `revision_capability` —routine, critica del verificatore senza rilievi da correggere→
+  `revision_security` (i rilievi rimasti, se ci sono, diventano UN feedback derivato
+  figlio `#N.k`, aperto dal server); —critica con rilievi da correggere→ resta
+  `revision_capability`: il verificatore STESSO corregge e consegna `fixed`
+  (`revision_capability → revision_capability`), poi un altro verificatore riprova
+  (feedback #561, dal 2026-09-05); —rilievo di livello 3/2 non correggibile (bilancio
+  esaurito)→ `design` (`statusReason: loop`); —rilievo di livello 3/2 che chiede una
+  decisione→ `design` (`statusReason: decisione`).
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
   (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
   (riallineamento: main è avanzato e il merge non passa più da solo — non è una
