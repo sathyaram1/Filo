@@ -574,6 +574,7 @@ export function buildPayload(bucket, ctx = {}) {
         branch: bucket.branch, id: bucket.id, num: bucket.num,
         feedback: ctx.feedback || null,
         history: Array.isArray(ctx.history) ? ctx.history : [],
+        historyDropped: Number(ctx.historyDropped) || 0,
         loopCount: bucket.loopCount || 0,
       };
     case 'fixer':
