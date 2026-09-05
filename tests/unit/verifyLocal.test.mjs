@@ -535,3 +535,62 @@ test('phase2Text: le istruzioni arrivano da fuori (file sopra il repo), non dal 
   assert.match(senza, /verify-local\.mjs corretto/, 'e come si consegna comunque');
   assert.ok(!/adesso correggi tu/.test(senza), 'il testo delle istruzioni non vive nello strumento');
 });
+
+// ─── Giro 10 su #561: la fase 2 persa si rilegge; il pass dice se si può pubblicare davvero ───
+
+test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la fase 2 senza scrivere né ripagare; un\'altra è respinta', () => {
+  let s = withRequest({}, 'b', { request: 'X', sha: SHA });
+  const testo = 'Provato.\n[2] rotto\n[0] raro';
+  const prima = withCritique(s, 'b', { critique: testo, sha: SHA });
+  assert.equal(prima.outcome, 'fix');
+  s = prima.state;
+  const snap = JSON.stringify(s);
+  const ridata = withCritique(s, 'b', { critique: testo, sha: SHA });
+  assert.equal(ridata.ok, true);
+  assert.equal(ridata.replayed, true);
+  assert.equal(ridata.outcome, 'fix');
+  assert.deepEqual(ridata.decision.fix.map((f) => f.level), [2, 0]);
+  assert.equal(ridata.decision.budgets.cap2.left, 4, 'i bilanci della fase 2 sono quelli del giro');
+  assert.equal(JSON.stringify(ridata.state), snap, 'niente scritto');
+  // La barra-n letterale è la stessa critica.
+  assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2] rotto\n[0] raro', sha: SHA }).replayed, true);
+  // Un testo diverso, o un altro commit, non è un replay.
+  assert.equal(withCritique(s, 'b', { critique: 'Provato.\n[2] rotto in un altro modo', sha: SHA }).ok, false);
+  assert.equal(withCritique(s, 'b', { critique: testo, sha: ALTRO_SHA }).ok, false);
+  // Consegnata la correzione, la stessa critica non si ridà più.
+  const dopo = withFixed(s, 'b', { report: 'ok', sha: ALTRO_SHA }).state;
+  assert.equal(withCritique(dopo, 'b', { critique: testo, sha: SHA }).ok, false);
+  // E una seconda consegna dice che è già stata consegnata, non «prima la critica».
+  const bis = withFixed(dopo, 'b', { report: 'ancora', sha: ALTRO_SHA });
+  assert.equal(bis.ok, false);
+  assert.match(bis.reason, /già stata consegnata/);
+  assert.doesNotMatch(bis.reason, /prima la critica/);
+});
+
+test('CLI giro 10: la fase 2 persa si rilegge (stessa critica, o status); un pass con modifiche non salvate non dice «Si può pubblicare»', () => {
+  const casa = depositoUsaEGetta();
+  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
+  const testo = 'Provato.\n[2] rotto';
+  assert.match(vl(casa, 'critica', testo).out, /c'è da correggere/);
+  const st = vl(casa, 'status');
+  assert.match(st.out, /sta correggendo/);
+  assert.match(st.out, /\[2\] rotto/, 'status elenca i rilievi in sospeso');
+  const ridata = vl(casa, 'critica', testo);
+  assert.equal(ridata.code, 0, ridata.out);
+  assert.match(ridata.out, /ristampo la fase 2/);
+  assert.match(ridata.out, /Rilievi da correggere ADESSO[\s\S]*\[2\] rotto/);
+  assert.match(ridata.out, /cap2: 4 giri residui su 5/, 'il giro non si ripaga');
+  const altra = vl(casa, 'critica', 'Provato.\n[2] rotto diversamente');
+  assert.equal(altra.code, 1);
+  assert.match(altra.out, /già registrata/);
+  // Pass su un albero sporco: registrato, ma senza promettere la pubblicazione.
+  _exec('git', ['checkout', '-q', '-b', 'claude/sporco'], { cwd: casa });
+  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
+  _write(resolve(casa, 'a.txt'), 'modifica non salvata', 'utf8');
+  const p = vl(casa, 'critica', 'Provato: regge.');
+  assert.equal(p.code, 0, p.out);
+  assert.match(p.out, /verifica superata/);
+  assert.doesNotMatch(p.out, /Si può pubblicare/);
+  assert.match(p.out, /modifiche non salvate/);
+  assert.match(vl(casa, 'status').out, /modifiche non salvate/);
+});
