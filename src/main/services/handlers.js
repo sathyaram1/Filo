@@ -2372,6 +2372,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // placeholder confuso ("hai scritto tu vuoto o è stato prodotto da filo?").
   // Il fallback "(vuoto)" resta SOLO per la risposta davvero vuota (niente
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
+  if (exhausted) {
+    const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
+    const last = String(textReply || '').trim();
+    textReply = last ? `${last}\n\n${stop}` : stop;
+  }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
