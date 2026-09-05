@@ -371,3 +371,32 @@ test('#561 verifica: «corretto» senza un commit nuovo non chiede un\'altra ver
   const c3 = withFixed(due.state, 'r', { report: 'x', sha: ALTRO_SHA, dirty: true });
   assert.equal(c3.ok, false);
 });
+
+// ── Verifica del giro 2 (2026-09-05) su #561 ─────────────────────────────────
+
+test('#561 giro 2: dopo «corretto» la stessa istanza non registra la critica: serve un nuovo start', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'ok\n[1] bordo', sha: SHA });
+  const c = withFixed(r.state, 'r', { report: 'corretto', sha: ALTRO_SHA });
+  assert.equal(c.outcome, 'fixed');
+  const auto = withCritique(c.state, 'r', { critique: 'Provato tutto: regge.', sha: ALTRO_SHA });
+  assert.equal(auto.ok, false);
+  assert.match(auto.reason, /start/);
+  assert.equal(checkVerdict(auto.state.r, ALTRO_SHA).ok, false, 'niente pass: chi corregge non si approva da solo');
+  // Dopo start, la critica di un'altra istanza passa.
+  const di_nuovo = withCritique(withRequest(auto.state, 'r', { request: 'fai X', sha: ALTRO_SHA }), 'r', { critique: 'Provato tutto: regge.', sha: ALTRO_SHA });
+  assert.equal(di_nuovo.ok, true);
+  assert.equal(checkVerdict(di_nuovo.state.r, ALTRO_SHA).ok, true);
+});
+
+test('#561 giro 2: un livello scritto fuori posto non è un pass silenzioso; l\'elenco numerato vale', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const inline = withCritique(s, 'r', { critique: 'Provato. Rilievo [2]: il pulsante non salva.', sha: SHA });
+  assert.equal(inline.ok, false);
+  assert.match(inline.reason, /Rilievo \[2\]/);
+  assert.equal(checkVerdict(inline.state.r, SHA).ok, false);
+  const numerato = withCritique(s, 'r', { critique: 'Provato.\n1. [2] il pulsante non salva\n2. [1] bordo', sha: SHA });
+  assert.equal(numerato.ok, true);
+  assert.equal(numerato.outcome, 'fix');
+  assert.deepEqual(numerato.decision.fix.map((f) => f.level), [2, 1]);
+});

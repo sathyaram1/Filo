@@ -161,13 +161,19 @@ Punti non negoziabili del flusso:
    solo dopo averla registrata nello stesso giro, consegna la sua correzione
    (`fixed`); consegnata la correzione, quel biglietto non registra più
    verdetti (la sua correzione la prova un ALTRO verificatore: rifiuto
-   `self_review`, a registro), e una seconda critica dallo stesso giro è
-   rifiutata (la critica registrata non si modifica più, e un giro non si
-   paga due volte); non chiude feedback e non ne apre (dal 2026-09-05,
+   `self_review`, a registro), e una seconda critica dallo stesso biglietto è
+   rifiutata qualunque esito abbia avuto la prima (la critica registrata non
+   si modifica più, e un giro non si paga due volte). L'identità del giro è
+   il BIGLIETTO (la sua impronta), non il semaforo del feedback, che è lo
+   stesso per tutti i biglietti emessi su quel feedback: un biglietto nuovo
+   giudica sempre. Non chiude feedback e non ne apre (dal 2026-09-05,
    feedback #561: i rilievi che non corregge li raccoglie il server in UN
-   feedback derivato per lavoro). Una critica vuota (nessun rilievo e nessun
-   riassunto) e un verdetto senza lo sha del commit provato sono respinti. Un
-   risolutore consegna, non si auto-approva.
+   feedback derivato per lavoro). Sono respinti, prima di scrivere qualsiasi
+   cosa: una critica vuota (nessun rilievo e nessun riassunto), un verdetto
+   senza lo sha del commit provato (in ogni forma), una critica coi livelli
+   scritti fuori posto (`Rilievo [2]: …` non è un rilievo), e una critica su
+   un feedback che non è in verifica (già a decidere). Un risolutore
+   consegna, non si auto-approva.
 4. **Il ramo combacia** con quello legato al biglietto.
 5. **La macchina a stati** autorizza il passaggio, letto dallo stato **vero**
    (il server la chiave ce l'ha: è il controllo che oggi non gira mai).
