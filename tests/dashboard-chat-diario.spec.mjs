@@ -21,6 +21,7 @@
 //      successivo, che non le rifà.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;

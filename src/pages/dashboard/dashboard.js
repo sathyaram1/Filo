@@ -1177,8 +1177,15 @@
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {
-    // Un'azione sospesa in attesa di conferma è un bottone, qualunque sia il tipo.
-    if (!a || a._confirm) return null;
+    if (!a) return null;
+    // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
+    // la traccia che Filo l'ha CHIESTO — se no un turno fatto di sola richiesta
+    // di conferma non lascia nessun blocco, e alla conferma non c'è più dove
+    // scrivere che è stata data.
+    if (a._confirm) {
+      const prima = String(a._confirm.text || '').split('\n')[0].replace(/\s*:\s*$/, '');
+      return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
+    }
     const type = String(a.type || '').toUpperCase();
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
