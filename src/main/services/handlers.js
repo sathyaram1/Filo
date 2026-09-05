@@ -2291,7 +2291,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const legacy = (!actions.length && Tools) ? Tools.legacyEnvelope(text) : null;
       if (legacy) {
         text = legacy.text;
-        actions = legacy.actions.map((a) => ({ ...a, type: String(a.type || '').toUpperCase() }));
+        // Un id anche a queste: la scheda racconta l'azione in diretta (evento
+        // `done`) e a fine turno la riconosce dall'id, senza ripetere la riga.
+        actions = legacy.actions.map((a, i) => ({
+          ...a, type: String(a.type || '').toUpperCase(), _callId: a._callId || `json_${round}_${i}`,
+        }));
       }
       if (!actions.length) {
         textReply = text;
