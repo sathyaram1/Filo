@@ -778,37 +778,95 @@ function sealTransition(state, by) {
   return sealed;
 }
 
-async function recordVerifier(id, verdict, critique) {
+/**
+ * La critica del verificatore, registrata sul server (feedback #561).
+ *
+ * Il testo si legge col formato dei livelli (`[2] …`, una riga per rilievo,
+ * `[1?]` = chiede una decisione dell'owner; le righe prima del primo rilievo
+ * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
+ * la critica intera e il commit su cui è stata fatta la prova: il pass vale
+ * per quel commit. L'ESITO lo calcola il server e torna nella risposta: con
+ * qualcosa da correggere porta la fase 2 (rilievi da correggere e istruzioni),
+ * che non sta da nessun'altra parte.
+ */
+async function recordVerifier(id, critiqueText) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
-  const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(guard.state || {}), id }, verdict, critique);
-  next.id = id;
+  const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
+  const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
   // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
-  // locale finisce su git, e se lo si scrivesse prima, un verdetto RIFIUTATO
+  // locale finisce su git, e se lo si scrivesse prima, una critica RIFIUTATA
   // lascerebbe scritto "verificato" da una parte e niente dall'altra — con i
   // due cammini che divergono nella direzione più permissiva, che è
   // esattamente quella da cui questa spec viene a togliere l'autorità.
   const sent = await deliverToChannel('verdict', {
-    verdict, critique: verifierNoteText(verdict, critique), branch: next.branch || '',
+    findings: parsed.findings,
+    summary: parsed.summary,
+    critique: String(critiqueText || '').trim().slice(0, 4000),
+    branch: base.branch || '',
+    sha: headSha(ROOT) || '',
   });
   if (sent.outcome === 'refused') {
-    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+    return { rejected: true, fromChannel: true, message: `critica non accettata (${sent.reason})` };
   }
   if (sent.outcome === 'absent') {
     // Biglietto introvabile ≠ server giù: sono due frasi diverse perché sono
     // due rimedi diversi (ripassare il biglietto vs fermarsi).
-    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+    return { rejected: true, ticketMissing: true, message: 'critica non registrata: nessun biglietto trovato' };
   }
 
   if (sent.outcome !== 'ok') {
-    // Il server non risponde. Non c'è più una seconda strada su cui posare il
-    // verdetto: dirlo è l'unica cosa onesta, perché un verdetto che nessuno ha
-    // registrato ma che il ramo dà per dato è peggio di un verdetto mancante.
-    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+    // Il server non risponde. Non c'è più una seconda strada su cui posare la
+    // critica: dirlo è l'unica cosa onesta, perché una critica che nessuno ha
+    // registrato ma che il ramo dà per data è peggio di una mancante.
+    return { rejected: true, serverDown: true, message: `critica non registrata: il server non risponde (${sent.reason})` };
   }
-  sealTransition(next, `verifier:${verdict}`);
+  const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
+  const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'pass';
+  const next = applyVerifierVerdict(base, outcome, critiqueText);
+  next.id = id;
+  sealTransition(next, `verifier:${outcome}`);
+  next.reply = reply;
   return next;
+}
+
+/**
+ * La risposta del server alla critica, per chi la legge a schermo. PURA.
+ * Con la fase 2 stampa i rilievi da correggere, quelli messi da parte, i
+ * bilanci residui e le istruzioni; senza, l'esito e basta.
+ */
+export function verifierReplyText(reply) {
+  const r = reply && typeof reply === 'object' ? reply : {};
+  const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
+  const budgets = r.budgets && typeof r.budgets === 'object'
+    ? ['cap2', 'cap1', 'cap0'].map((k) => (r.budgets[k] ? `${k}: ${r.budgets[k].left} giri residui su ${r.budgets[k].cap}` : null)).filter(Boolean).join(' · ')
+    : '';
+  if (r.outcome === 'fix' && r.phase2) {
+    return [
+      '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
+      'Rilievi da correggere ADESSO (solo questi):',
+      fmt(r.phase2.findings),
+      'Rilievi messi da parte (li apre il server come feedback derivato, NON li correggi):',
+      fmt(r.phase2.derived),
+      budgets ? `Bilanci: ${budgets}` : '',
+      '',
+      String(r.phase2.instructions || ''),
+    ].filter((l, i) => l !== '' || i === 6).join('\n');
+  }
+  if (r.outcome === 'stop') {
+    return [
+      '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
+      'Rilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
+      fmt(r.blocking),
+      'Non c\'è niente da correggere: rilascia il biglietto.',
+    ].join('\n');
+  }
+  return [
+    '══ RISPOSTA DEL SERVER: verifica superata ══',
+    r.derived && r.derived.num ? `I rilievi non corretti sono diventati il feedback ${r.derived.num}.` : 'Nessun rilievo da mettere da parte.',
+    'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
+  ].join('\n');
 }
 async function recordFixed(id, report = '', frase = '') {
   const guard = guardIdentity(id);
