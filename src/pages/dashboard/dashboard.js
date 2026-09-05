@@ -1013,6 +1013,20 @@
     EVENTO_CALENDARIO: (n) => (n > 1 ? `creato ${n} eventi` : 'creato un evento'),
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
     IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
+    IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
+    SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
+    SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
+    NAVIGA: (n) => (n > 1 ? `aperto ${n} pagine` : 'aperto una pagina'),
+    ONBOARDING: () => 'proseguito con l\'accoglienza',
+    PROXY_TAB: () => 'aperto la scheda da un altro paese',
+    RIMUOVI_PROXY: () => 'riportato la scheda in Italia',
+    RIMUOVI_PROXY_TUTTE: () => 'riportato le schede in Italia',
+    REGOLA_PROXY_DOMINIO: () => 'salvato una regola sul paese',
+    RIMUOVI_REGOLA_PROXY: () => 'tolto una regola sul paese',
+    STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
+    RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
+    COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    INVIA_FEEDBACK: () => 'preparato una segnalazione',
   };
   function summarizeActivity(types) {
     const counts = new Map();
