@@ -82,7 +82,7 @@ async function installSearch(app, results) {
   }, results);
 }
 
-const calls = (app) => app.evaluate(() => globalThis.__calls);
+const calls = (app) => app.evaluate(() => globalThis.__calls.filter((c) => c.hasTools));
 const timers = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
 const history = (app) => app.evaluate(async () => (await globalThis.SN_HISTORY.list()).filter((h) => h.action === 'filo_chat'));
 
@@ -274,8 +274,13 @@ test('azione con conferma (impostazione sensibile) dentro il giro: popup e esito
   const host = page.locator('.sn-confirm-host');
   await expect(host).toHaveCount(1, { timeout: 5_000 });
   const okBtn = page.locator('.sn-confirm-btn-ok');
+  console.log('OK BTN COUNT:', await okBtn.count(), 'TESTO POPUP:', await page.locator('.sn-confirm-text').allTextContents());
+  await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-popup.png' });
   if (await okBtn.count()) await okBtn.click();
   else await page.evaluate(() => { const h = document.querySelector('.sn-confirm-host'); const b = h && h.shadowRoot && h.shadowRoot.querySelector('.sn-confirm-btn-ok'); b && b.click(); });
+  await page.waitForTimeout(1500);
+  console.log('BOTTONI DOPO OK:', await page.locator('.dash-action-btn').allTextContents());
+  console.log('SETTINGS:', JSON.stringify(await app.evaluate(async () => { const s = await globalThis.SN_STORAGE.getSettings(); return s.terminal; })));
   await expect.poll(async () => app.evaluate(async () => { const s = await globalThis.SN_STORAGE.getSettings(); return !!(s.terminal && s.terminal.enabled); }), { timeout: 5_000 }).toBe(true);
   await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-conferma.png' });
 });
