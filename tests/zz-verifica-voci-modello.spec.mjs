@@ -305,3 +305,25 @@ test('preferenze: la tendina mostra le voci del modello in uso', async ({ app, o
   await p.locator('#ttsModelVoice').scrollIntoViewIfNeeded().catch(() => {});
   await p.screenshot({ path: 'tests/.shots/zz-verifica-voci-prefs.png' }).catch(() => {});
 });
+
+test('rilievo b: voce scritta a mano sbagliata per mai-voice-2 → cosa dice l\'avviso', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await installFakeRouter(app);
+  await app.evaluate(() => {
+    globalThis.__vMode['microsoft/mai-voice-2'] = { accept: ['it-IT-ElsaNeural'], msg: 'Provider returned 400' };
+  });
+  await setModel(app, 'microsoft/mai-voice-2', 'nome-inventato');
+  const page = await newtabPage(app);
+  await page.waitForFunction(() => typeof window.SN_TTS?.readAloud === 'function', null, { timeout: 8000 });
+  await page.evaluate(() => { document.documentElement.lang = 'it'; window.SN_TTS.readAloud('Prova con una voce sbagliata.'); });
+  await page.waitForSelector('.sn-toast', { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(800);
+  const toasts = await page.evaluate(() => [...document.querySelectorAll('.sn-toast')].map((t) => t.textContent.trim()));
+  console.log('TOAST voce sbagliata →', JSON.stringify(toasts));
+  console.log('CHIAMATE →', JSON.stringify(await calls(app)));
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.waitForTimeout(1500);
+  const r = await prefs.evaluate(() => chrome.runtime.sendMessage({ type: 'tts_synth', text: 'seconda prova voce sbagliata', lang: 'it' }));
+  console.log('RISPOSTA main →', JSON.stringify(r));
+  expect(toasts.length).toBeGreaterThan(0);
+});
