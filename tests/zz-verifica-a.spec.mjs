@@ -1,104 +1,12 @@
 // Verifica avversariale (temporaneo): cammino principale degli strumenti nativi.
 import { test, expect } from './fixtures/electron.mjs';
-
-async function newtabPage(app) {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-    if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('newtab non trovata');
-}
-
-async function configureModel(app) {
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
-  });
-}
-
-// Copione: un array di giri. Ogni giro: { text, toolCalls, reasoningDetails, fail, delayMs }.
-// Registra in globalThis.__verCalls cosa ha ricevuto il provider a ogni chiamata.
-async function installScript(app, script) {
-  await app.evaluate(async (script) => {
-    globalThis.__verScript = script;
-    globalThis.__verCalls = [];
-    globalThis.__verIdx = 0;
-    if (!globalThis.__verOrig) globalThis.__verOrig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools, toolChoice, onDelta, onReasoning, onToolCall }) => {
-      const i = globalThis.__verIdx++;
-      const step = globalThis.__verScript[Math.min(i, globalThis.__verScript.length - 1)] || {};
-      globalThis.__verCalls.push({
-        i,
-        toolsNames: Array.isArray(tools) ? tools.map((t) => t.function && t.function.name) : null,
-        toolChoice,
-        messages: JSON.parse(JSON.stringify(messages)),
-      });
-      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-      if (step.reasoningDetails) {
-        for (const d of step.reasoningDetails) { try { onReasoning && onReasoning(d.text || ''); } catch (_) {} }
-      }
-      if (step.toolCalls) {
-        for (const c of step.toolCalls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
-      }
-      if (step.text) {
-        const parts = step.text.match(/.{1,12}/gs) || [];
-        for (const p of parts) { try { onDelta && onDelta(p); } catch (_) {} await wait(5); }
-      }
-      if (step.delayMs) await wait(step.delayMs);
-      if (step.fail) throw new Error(step.fail);
-      return {
-        text: step.text || '',
-        toolCalls: step.toolCalls || [],
-        reasoningDetails: step.reasoningDetails || [],
-        finishReason: step.toolCalls && step.toolCalls.length ? 'tool_calls' : 'stop',
-        model: attempts[0].model, provider: attempts[0].provider, servedBy: 'test-host',
-        usage: { promptTokens: 100, completionTokens: 20 },
-      };
-    };
-    globalThis.SN_WEB_SEARCH.search = async ({ query }) => ({
-      ok: true, provider: 'test', results: [
-        { title: 'Risultato uno per ' + query, url: 'https://example.com/uno', snippet: 'Snippet UNO-MARK' },
-        { title: 'Risultato due', url: 'https://example.com/due', snippet: 'Snippet DUE-MARK' },
-      ],
-    });
-  }, script);
-}
-
-async function dumpChat(page) {
-  return page.evaluate(() => {
-    const q = (s, r = document) => Array.from(r.querySelectorAll(s));
-    const txt = (el) => (el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : null);
-    return {
-      bubbles: q('.dash-bubble-filo').map((b) => {
-        const c = b.cloneNode(true);
-        c.querySelectorAll('.dash-bubble-actions,.dash-activity').forEach((n) => n.remove());
-        return txt(c);
-      }),
-      streaming: q('.dash-bubble-streaming').length,
-      activities: q('.dash-activity').map((a) => ({
-        cls: a.className,
-        open: a.open, // se è un <details>
-        head: txt(a.querySelector('.dash-activity-head')),
-        rows: q('.dash-activity-row', a).map(txt),
-        notes: q('.dash-activity-note', a).map(txt),
-        reasoning: q('.dash-activity-reasoning', a).map(txt),
-        cmds: q('.dash-activity-cmd', a).map(txt),
-        html: a.outerHTML.slice(0, 1500),
-      })),
-      actions: q('.dash-bubble-actions .dash-action-btn').map(txt),
-    };
-  });
-}
+import { newtabPage, configureModel, installScript, dumpChat } from './zz-verifica-helpers.mjs';
 
 test('un turno: cerca, legge capacità, sveglia+timer, poi risponde — in diretta', async ({ app, shell }) => {
   test.setTimeout(90_000);
+  const logs = [];
+  try { app.process().stdout.on('data', (d) => logs.push('[out] ' + d)); } catch (_) {}
+  try { app.process().stderr.on('data', (d) => logs.push('[err] ' + d)); } catch (_) {}
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
@@ -119,6 +27,8 @@ test('un turno: cerca, legge capacità, sveglia+timer, poi risponde — in diret
     { text: 'RISPOSTA-FINALE: domani a Roma sole (UNO-MARK), sveglia alle 7 e timer di 10 minuti messi.' },
   ]);
 
+  const plog = [];
+  page.on('console', (m) => plog.push(m.type() + ': ' + m.text()));
   await page.locator('#input').fill('cerca il meteo di Roma domani, dimmi come si traduce una pagina e mettimi la sveglia alle 7 e un timer di 10 minuti');
   await page.locator('#sendBtn').click();
 
@@ -127,11 +37,17 @@ test('un turno: cerca, legge capacità, sveglia+timer, poi risponde — in diret
   const t0 = Date.now();
   while (Date.now() - t0 < 3500) {
     const d = await dumpChat(page);
+    d.idx = await app.evaluate(() => globalThis.__verIdx);
+    d.t = Date.now() - t0;
     live.push(d);
     await new Promise((r) => setTimeout(r, 250));
   }
-  console.log('LIVE-SAMPLES', JSON.stringify(live.map((d) => ({ heads: d.activities.map((a) => a.head), rows: d.activities.map((a) => a.rows), notes: d.activities.map((a) => a.notes), bubbles: d.bubbles })), null, 1));
+  console.log('PAGELOG', JSON.stringify(plog.slice(-30), null, 1));
+  console.log('CONTAINER', await page.evaluate(() => { const b = document.querySelector('.dash-bubble-filo'); return b ? b.parentElement.parentElement.outerHTML.slice(0, 4000) : 'nessuna bolla'; }));
+  console.log('LIVE-SAMPLES', JSON.stringify(live.map((d) => ({ t: d.t, idx: d.idx, heads: d.activities.map((a) => a.head), rows: d.activities.map((a) => a.rows), notes: d.activities.map((a) => a.notes), bubbles: d.bubbles })), null, 1));
 
+  console.log('PRE', JSON.stringify(await app.evaluate(() => ({ err: globalThis.__verErr, idx: globalThis.__verIdx, n: globalThis.__verCalls.length, tools: globalThis.__verCalls[0] && globalThis.__verCalls[0].toolsNames, last: globalThis.__verCalls[0] && globalThis.__verCalls[0].messages.slice(-1) }))));
+  console.log('LOGS', logs.join('').slice(-3000));
   await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA-FINALE' })).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.dash-bubble-streaming')).toHaveCount(0, { timeout: 3_000 });
   const finalDump = await dumpChat(page);
