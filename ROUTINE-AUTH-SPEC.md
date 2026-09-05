@@ -157,8 +157,11 @@ Punti non negoziabili del flusso:
 2. **Il feedback è il suo.** Il numero del feedback non viene dal messaggio: il
    server lo legge dal biglietto. Chiedere qualcosa su un altro feedback non è
    "rifiutato", è **impossibile da esprimere**.
-3. **Il ruolo permette quell'azione.** Un verificatore scrive verdetti, non
-   chiude feedback; un risolutore consegna, non si auto-approva.
+3. **Il ruolo permette quell'azione.** Un verificatore registra la critica e,
+   solo dopo averla registrata nello stesso giro, consegna la sua correzione
+   (`fixed`); non chiude feedback e non ne apre (dal 2026-09-05, feedback
+   #561: i rilievi che non corregge li raccoglie il server in UN feedback
+   derivato per lavoro). Un risolutore consegna, non si auto-approva.
 4. **Il ramo combacia** con quello legato al biglietto.
 5. **La macchina a stati** autorizza il passaggio, letto dallo stato **vero**
    (il server la chiave ce l'ha: è il controllo che oggi non gira mai).
