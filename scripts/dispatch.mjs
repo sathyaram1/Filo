@@ -1405,6 +1405,9 @@ export function serverCtx(bucket, fromServer, diff = '') {
     return {
       feedback: (payload && payload.feedback) || null,
       history: Array.isArray(payload && payload.history) ? payload.history : [],
+      // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
+      // nell'avvertenza, così i giri mancanti non passano per inesistenti.
+      historyDropped: Number(payload && payload.historyDropped) || 0,
     };
   }
   return {};
