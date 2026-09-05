@@ -127,11 +127,37 @@ export const VERIFIER_CAPS = (() => {
     // versione di giorni fa.
     req(resolve(TOOLS_ROOT, 'src', 'shared', 'feedbackTransitions.js'));
     const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
-    if (caps && Number.isFinite(caps.failCap) && Number.isFinite(caps.improvableCap)) return caps;
+    if (caps && Number.isFinite(caps.cap2) && Number.isFinite(caps.cap1) && Number.isFinite(caps.cap0)) return caps;
   } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
-  return { improvableCap: 0, failCap: 10 };
+  return { cap2: 5, cap1: 2, cap0: 0 };
 })();
-const LOOP_CAP_DEFAULT = VERIFIER_CAPS.failCap;
+// Il tetto delle bocciature del giro VECCHIO (verdetto a tre valori): resta
+// solo per resolveLoopCap, che gli strumenti e i test usano ancora.
+const LOOP_CAP_DEFAULT = 10;
+
+// Le regole del giro del verificatore che corregge (feedback #561): il parser
+// della critica coi livelli e la decisione su cosa si corregge. Dagli
+// STRUMENTI, per la stessa ragione dei dati qui sopra. Il paracadute è un
+// parser minimo: senza il modulo la critica arriva comunque al server, che ha
+// la sua copia delle regole e decide lui.
+export const VERIFIER_ROUND = (() => {
+  try {
+    const req = createRequire(import.meta.url);
+    req(resolve(TOOLS_ROOT, 'src', 'shared', 'verifierRound.js'));
+    if (globalThis.SN_VERIFIER_ROUND && typeof globalThis.SN_VERIFIER_ROUND.parseFindings === 'function') return globalThis.SN_VERIFIER_ROUND;
+  } catch (_) { /* checkout senza il modulo: paracadute */ }
+  return {
+    parseFindings(text) {
+      const findings = [];
+      for (const line of String(text || '').split('\n')) {
+        const m = /^\s*\[\s*([0-3])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
+        if (m) findings.push({ level: Number(m[1]), text: m[3].trim(), decision: m[2] === '?' });
+      }
+      return { summary: '', findings };
+    },
+    formatFindings(list) { return (list || []).map((f) => `- [${f.level}${f.decision ? '?' : ''}] ${f.text}`).join('\n'); },
+  };
+})();
 
 /**
  * Risolve il cap EFFETTIVO data la precedenza env > remoto > default, con clamp
