@@ -2364,8 +2364,20 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;
-        if (res.kept) { renderedActions.push(rendered); roundRendered.push(rendered); }
-        push('filo:action', { kind: 'done', action: rendered, kept: !!res.kept, executed: !!res.executed });
+        // L'esito viaggia con l'azione: il diario del lavoro deve poter dire
+        // «fatto» o «non riuscito», non solo «l'ha chiamata».
+        rendered._executed = !!res.executed;
+        // `kept: false` non vuol dire invisibile: vuol dire che in chat non c'è
+        // niente da CLICCARE (un appunto scritto, una lezione fissata, il
+        // proxy tolto). Nel diario ci va lo stesso, come riga: se Filo fa una
+        // cosa, l'utente deve poter vedere che l'ha fatta. Un'azione rifiutata
+        // dal registro invece non è successa: quella non entra.
+        if (!res.rejected) {
+          if (!res.kept) rendered._traccia = true;
+          renderedActions.push(rendered);
+          roundRendered.push(rendered);
+        }
+        push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         results.push({ action: a, res, rendered });
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
