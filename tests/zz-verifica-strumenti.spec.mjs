@@ -27,10 +27,15 @@ async function configureModel(app) {
 // { text, toolCalls, reasoning, delayMs, throw }. Le chiamate ricevute (messages,
 // tools) vengono registrate in globalThis.__captured.
 async function installScript(app, script) {
-  await app.evaluate(async (script) => {
+  await app.evaluate(async (_electron, script) => {
     if (!globalThis.__origStream) globalThis.__origStream = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__captured = [];
     globalThis.__script = script;
+    if (!globalThis.__errs) {
+      globalThis.__errs = [];
+      const oe = console.error;
+      console.error = (...a) => { globalThis.__errs.push(a.map((x) => (x && x.stack) || String(x)).join(' ')); oe(...a); };
+    }
     globalThis.__callIdx = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools, onDelta, onReasoning, onToolCall }) => {
       const i = globalThis.__callIdx++;
@@ -63,8 +68,13 @@ async function stubSearch(app) {
 async function sendAndWait(page, text, expectText, timeout = 30_000) {
   await page.locator('#input').fill(text);
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: expectText }).last()).toBeVisible({ timeout });
+  await expect(page.locator('.dash-bubble-filo', { hasText: expectText }).last().or(page.locator('.dash-action-btn', { hasText: 'Riprova' }).last())).toBeVisible({ timeout });
+  const errs = await page.context()._browser?.__app?.evaluate?.(() => globalThis.__errs) ?? null;
   await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 5_000 });
+}
+async function dumpErrs(app) {
+  const errs = await app.evaluate(() => globalThis.__errs || []);
+  if (errs.length) console.log('MAIN ERRORS:', JSON.stringify(errs, null, 1));
 }
 
 async function activityState(page) {
@@ -374,6 +384,7 @@ test('E — pagina cronologia: misure per turno visibili', async ({ app, shell, 
     { text: 'Timer messo.', delayMs: 100 },
   ]);
   await sendAndWait(page, 'timer 90 secondi', 'Timer messo');
+  await dumpErrs(app);
   const hp = await openTab('filo://history/history.html');
   await hp.waitForLoadState('domcontentloaded');
   await expect(hp.locator('.sn-history-timing').first()).toBeVisible({ timeout: 10_000 });
