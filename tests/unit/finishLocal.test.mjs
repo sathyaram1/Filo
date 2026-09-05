@@ -341,3 +341,23 @@ describe('quale ramo NON si spedisce mai', () => {
     }
   });
 });
+
+// ── Rossi noti: si vedono, non fermano ──────────────────────────────────────
+// Un rosso d'ambiente (rosso anche su main su questa macchina) spacciato per
+// regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
+// dice quali sono, e il cancello li separa da quelli che devono essere verdi.
+import { splitKnownRed } from '../../scripts/finish-local.mjs';
+
+test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
+  const r = splitKnownRed(['tests/a', 'tests/decks-chat-stress', 'tests/b'], ['tests/decks-chat-stress', 'tests/altro.spec.mjs']);
+  assert.deepEqual(r.blocking, ['tests/a', 'tests/b']);
+  assert.deepEqual(r.informative, ['tests/decks-chat-stress']);
+  assert.deepEqual(splitKnownRed(['tests/a'], null), { blocking: ['tests/a'], informative: [] });
+});
+
+test('l\'elenco dei rossi noti è tracciato e ogni voce è uno spec che esiste', () => {
+  const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
+  assert.ok(Array.isArray(j.specs) && j.specs.length > 0);
+  assert.match(j.nota, /#\d+/, 'l\'elenco cita il feedback che lo svuoterà');
+  for (const s of j.specs) assert.ok(existsSync(resolve(ROOT, `${s}.spec.mjs`)), `${s} non esiste più: toglilo dall'elenco`);
+});

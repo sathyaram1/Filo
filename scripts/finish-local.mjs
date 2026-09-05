@@ -224,6 +224,29 @@ export function specsForChangedFiles(changed) {
   return [...specs];
 }
 
+/**
+ * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
+ * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
+ * #563): questi ultimi si lanciano e si mostrano, ma non fermano la
+ * pubblicazione. Un rosso d'ambiente spacciato per regressione costa un giro
+ * intero; l'elenco è tracciato nel repo, così ogni eccezione ha un nome e una
+ * ragione, e svuotarlo è un lavoro con un numero. PURA.
+ */
+export function splitKnownRed(specs, known) {
+  const set = new Set((Array.isArray(known) ? known : []).map((s) => String(s).replace(/\.spec\.mjs$/, '')));
+  const blocking = [];
+  const informative = [];
+  for (const s of specs || []) (set.has(s) ? informative : blocking).push(s);
+  return { blocking, informative };
+}
+
+function readKnownRed(root) {
+  try {
+    const j = JSON.parse(readFileSync(resolve(root, 'tests', 'rossi-noti.json'), 'utf8'));
+    return Array.isArray(j.specs) ? j.specs : [];
+  } catch (_) { return []; }
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const checkOnly = argv.includes('--check');
@@ -280,13 +303,24 @@ async function main() {
     // l'elenco degli spec tracciati e filtriamo in memoria.
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
     const specs = specsForChangedFiles(changed).filter((s) => tracked.has(`${s}.spec.mjs`));
-    if (specs.length) {
-      const args = ['playwright', 'test', ...specs.map((s) => `${s}.spec.mjs`)];
-      if (!run('npx', args, `Spec delle aree toccate (${specs.length})`)) {
+    const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
+    if (blocking.length) {
+      const args = ['playwright', 'test', ...blocking.map((s) => `${s}.spec.mjs`)];
+      if (!run('npx', args, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
         process.exit(1);
       }
-    } else {
+    }
+    if (informative.length) {
+      // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
+      // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
+      const args = ['playwright', 'test', ...informative.map((s) => `${s}.spec.mjs`)];
+      const ok = run('npx', args, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`);
+      console.log(ok
+        ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
+        : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
+    }
+    if (!specs.length) {
       console.log('\n(nessuno spec mirato per le aree toccate: il lavoro verrà comunque ricontrollato prima della pubblicazione agli utenti)');
     }
   }
