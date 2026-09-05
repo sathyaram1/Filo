@@ -580,7 +580,11 @@
   async function saveCap(field) {
     const f = CAP_FIELDS[field];
     if (!f.input) return;
-    const val = clampCap(f.input.value, f.def, f.min);
+    // Un campo vuoto non è uno zero: per i difetti gravi lo 0 ferma il lavoro
+    // al primo rilievo, il contrario di «torno al default» che chi svuota il
+    // campo intende. Vuoto = il default, e la scritta lo dice.
+    const vuoto = String(f.input.value == null ? '' : f.input.value).trim() === '';
+    const val = vuoto ? f.def : clampCap(f.input.value, f.def, f.min);
     f.input.value = String(val); // normalizza eventuali fuori-range
     try {
       // Scrive su Firestore (la config che il server della critica legge); il
