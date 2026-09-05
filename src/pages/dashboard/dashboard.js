@@ -1846,7 +1846,7 @@
       // storico, così un «Riprova» riparte sapendo che quel timer c'è già
       // invece di avviarne un secondo.
       if (Array.isArray(r?.actions) && r.actions.length) {
-        threadHistory.push({ role: 'filo', text: '', actions: r.actions });
+        threadHistory.push({ role: 'filo', text: '', actions: r.actions, interrotto: true });
       }
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
