@@ -379,10 +379,17 @@
     `<path d="M7.5 19l-1.5 2"/>` +
     `<path d="M16.5 19l1.5 2"/>`;
 
-  // --- Sveglia tolta: la stessa sveglia, barrata.
+  // --- Sveglia tolta: la stessa sveglia, ma al posto delle lancette una X.
+  //     La sbarra universale qui si intrecciava con lancette, campanelle e
+  //     piedini (parere dell'owner): il quadrante vuoto con la X è pulito.
   const alarmOff =
-    alarm +
-    `<path d="M4 4l16 16"/>`;
+    `<circle cx="12" cy="13" r="7"/>` +
+    `<path d="M9.5 10.5l5 5"/>` +
+    `<path d="M14.5 10.5l-5 5"/>` +
+    `<path d="M4 7l3-3"/>` +
+    `<path d="M20 7l-3-3"/>` +
+    `<path d="M7.5 19l-1.5 2"/>` +
+    `<path d="M16.5 19l1.5 2"/>`;
 
   // --- Sveglia spostata: orologio con una freccia ad arco sopra (riprogramma).
   const alarmShift =
@@ -459,12 +466,14 @@
     `<path d="M9.5 10l5.5 5.5"/>` +
     `<path d="M13.5 19H20"/>`;
 
-  // --- Estetica: tavolozza del pittore con tre pozzetti.
+  // --- Estetica: tavolozza del pittore. Forma a fagiolo con l'incavo del
+  //     pollice in basso a destra e tre pozzetti ad anello: il cerchio coi
+  //     puntini sembrava un biscotto (parere dell'owner).
   const palette =
-    `<path d="M12 3.5a8.5 8.5 0 1 0 6 14.5c-1.5 0-2.5-1-2.5-2.5s1.3-2.5 3-2.5h.7A8.5 8.5 0 0 0 12 3.5z"/>` +
-    `<path d="M8 9.5h.01"/>` +
-    `<path d="M12 7.5h.01"/>` +
-    `<path d="M7.5 14h.01"/>`;
+    `<path d="M12 3.5c-4.7 0-8.5 3.6-8.5 8s3.8 8 8.5 8c1.2 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h1.8c2.5 0 4.5-1.8 4.5-4.2C21 6.5 17 3.5 12 3.5z"/>` +
+    `<circle cx="7.5" cy="12" r="1.2"/>` +
+    `<circle cx="9.8" cy="7.8" r="1.2"/>` +
+    `<circle cx="14.5" cy="7" r="1.2"/>`;
 
   // --- Comando nel terminale: finestra con il prompt ">_".
   const terminal =
@@ -529,7 +538,7 @@
   // --- PREVISTE: clicca nella pagina (freccia del puntatore).
   const click =
     `<path d="M5 3.5l6 14.5 2-6 6-2z"/>` +
-    `<path d="M13 13l6 6"/>`;
+    `<path d="M13.5 12.5l5.5 5.5"/>`;
 
   // --- PREVISTE: scrivi in un campo (casella con il cursore).
   const typeText =

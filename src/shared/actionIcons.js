@@ -75,6 +75,7 @@
     TRADUCI: 'translate',
     SCARICA: 'download',
     CONDIVIDI: 'share',
+    // APRI_APP: l'icona è quella dell'app aperta (vedi APP), non la griglia.
     APRI_APP: 'apps',
     CHIUDI_SCHEDA: 'close',
     CERCA_SCHEDE: 'tabs',
@@ -91,20 +92,42 @@
     BLOCCATO: 'blocked',
   };
 
+  // Aprire un'app di Filo mostra l'icona di QUELL'app (parere dell'owner):
+  // la griglia del menu App resta solo per un'app che qui non è censita.
+  // Chiavi: come l'azione nomina l'app (`app`, `id` o `nome`), in minuscolo.
+  // Un'app nuova aggiunge una riga.
+  const APP = {
+    mazzi: 'decks', deck: 'decks', decks: 'decks', board: 'decks',
+    editor: 'editor', appunti: 'note', note: 'note',
+    cronologia: 'history', history: 'history',
+    crediti: 'credits', credits: 'credits',
+    trasparenza: 'transparency', transparency: 'transparency',
+    download: 'download', downloads: 'download', scaricati: 'download',
+    feedback: 'feedback', segnalazioni: 'feedback',
+    opzioni: 'options', options: 'options', preferenze: 'options', preferences: 'options',
+    home: 'home', redteam: 'redteam',
+  };
+
   const RIPIEGO = 'filoLogo';
 
-  function nome(type) {
+  // `azione` è facoltativo: serve alle azioni la cui icona dipende dai
+  // parametri (oggi solo APRI_APP).
+  function nome(type, azione) {
     const k = String(type || '').toUpperCase();
+    if (k === 'APRI_APP' && azione && typeof azione === 'object') {
+      const app = String(azione.app ?? azione.id ?? azione.nome ?? azione.name ?? '').trim().toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(APP, app)) return APP[app];
+    }
     return AZIONI[k] || PREVISTE[k] || STATI[k] || RIPIEGO;
   }
 
   // La stringa SVG pronta per innerHTML (mai input utente: sicuro), oppure ''
   // se la libreria delle icone non è caricata su questa pagina.
-  function svg(type, size) {
+  function svg(type, size, azione) {
     const I = global.SN_ICONS;
-    const fn = I && I[nome(type)];
+    const fn = I && I[nome(type, azione)];
     return typeof fn === 'function' ? fn(size || 14) : '';
   }
 
-  global.SN_ACTION_ICONS = { AZIONI, PREVISTE, STATI, RIPIEGO, nome, svg };
+  global.SN_ACTION_ICONS = { AZIONI, PREVISTE, STATI, APP, RIPIEGO, nome, svg };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
