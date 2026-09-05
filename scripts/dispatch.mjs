@@ -288,6 +288,9 @@ export function defaultState(id, branch) {
 // `pass|migliorabile|fail` restano accettati SOLO come parola opzionale sulla
 // riga di comando, per le ricette non ancora aggiornate (vengono ignorati).
 export const VERIFIER_OUTCOMES = ['pass', 'fix', 'stop'];
+// Tetto di una critica, lo stesso del server. Oltre: rifiuto con la
+// spiegazione, non un taglio.
+export const MAX_CRITIQUE_CHARS = 12000;
 export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
 
 /**
