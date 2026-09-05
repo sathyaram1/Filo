@@ -817,7 +817,7 @@ async function recordVerifier(id, critiqueText) {
     sha: headSha(ROOT) || '',
   });
   if (sent.outcome === 'refused') {
-    return { rejected: true, fromChannel: true, message: `critica non accettata (${sent.reason})` };
+    return { rejected: true, fromChannel: true, message: `critica non accettata (${motivoRifiuto(sent)})` };
   }
   if (sent.outcome === 'absent') {
     // Biglietto introvabile ≠ server giù: sono due frasi diverse perché sono
@@ -889,7 +889,7 @@ async function recordFixed(id, report = '', frase = '') {
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   const sent = await deliverToChannel('fixed', { report: String(report || ''), userNote: String(frase || ''), branch: next.branch || '' });
   if (sent.outcome === 'refused') {
-    return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
+    return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
   if (sent.outcome === 'absent') {
     return { rejected: true, ticketMissing: true, message: 'consegna non registrata: nessun biglietto trovato' };
