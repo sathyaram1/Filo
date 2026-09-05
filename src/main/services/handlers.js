@@ -603,7 +603,60 @@ async function handleTranscription({ settings, payload, origin, signal }) {
   throw lastErr || new Error('Nessun modello di dettatura disponibile');
 }
 
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null, noCache = false }) {
+// Il testo della risposta in diretta. Il campo "text" dentro il JSON di
+// risposta era il formato vecchio della chat: un modello che ancora lo scrive
+// (o il doppione di un test) va letto allo stesso modo, ma un modello che
+// risponde in prosa — il caso normale con gli strumenti nativi — va passato
+// così com'è, senza aspettare un JSON che non arriverà. Si decide alla prima
+// riga: se comincia con `{` (o con un recinto ```), è JSON.
+function createAnswerStreamer(onText) {
+  const StreamJson = globalThis.SN_STREAM_JSON;
+  let mode = null; // null = indeciso, 'json' | 'plain'
+  let held = '';
+  let jsonStreamer = null;
+  const decide = (force) => {
+    const t = held.replace(/^\s+/, '');
+    if (!t && !force) return;
+    if (/^(```(?:json)?\s*)?\{/.test(t)) {
+      mode = 'json';
+      jsonStreamer = StreamJson ? StreamJson.createTextStreamer('text') : null;
+    } else if (t.length >= 8 || force || !/^(`{1,3}(j(s(o(n)?)?)?)?\s*)?$/.test(t)) {
+      mode = 'plain';
+    } else {
+      return; // potrebbe essere l'inizio di un recinto: aspetta
+    }
+    const buf = held;
+    held = '';
+    emit(buf);
+  };
+  const emit = (chunk) => {
+    if (!chunk) return;
+    if (mode === 'json') {
+      if (!jsonStreamer) return;
+      try {
+        const { delta } = jsonStreamer.push(chunk);
+        if (delta) onText({ delta });
+      } catch (_) {}
+    } else {
+      onText({ delta: chunk });
+    }
+  };
+  return {
+    push(chunk) {
+      if (mode) { emit(chunk); return; }
+      held += chunk;
+      decide(false);
+    },
+    // Fine dello stream: quello che era rimasto in attesa esce comunque.
+    flush() { if (!mode) decide(true); },
+    reset() { mode = null; held = ''; jsonStreamer = null; },
+  };
+}
+
+// Gli strumenti si passano all'istante e i tempi si MISURANO (idee «Latenza
+// della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
+// occhio. `timing` finisce nella cronologia AI accanto al costo.
+async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false }) {
   const settings = await getEffectiveSettings();
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
