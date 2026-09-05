@@ -160,8 +160,13 @@ Punti non negoziabili del flusso:
 3. **Il ruolo permette quell'azione.** Un verificatore registra la critica e,
    solo dopo averla registrata nello stesso giro, consegna la sua correzione
    (`fixed`); consegnata la correzione, quel biglietto non registra più
-   verdetti (la sua correzione la prova un ALTRO verificatore: rifiuto
-   `self_review`, a registro), e una seconda critica dallo stesso biglietto è
+   verdetti su quel lavoro, qualunque cosa succeda dopo — anche dopo la
+   critica di un altro biglietto, o dopo uno stop e la rimessa in coda (la
+   sua correzione la prova un ALTRO verificatore: rifiuto `self_review`, a
+   registro; il server ricorda TUTTI i biglietti che hanno corretto, non
+   l'ultimo). Un lavoro già passato, in attesa del controllo di sicurezza,
+   non ha un giro aperto: una critica lì è respinta senza scrivere niente
+   (`illegal_transition`). Una seconda critica dallo stesso biglietto è
    rifiutata qualunque esito abbia avuto la prima (la critica registrata non
    si modifica più, e un giro non si paga due volte). L'identità del giro è
    il BIGLIETTO (la sua impronta), non il semaforo del feedback, che è lo
