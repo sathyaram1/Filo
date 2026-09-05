@@ -91,6 +91,8 @@
     // %s = id del modello di lettura. Il modello pretende il nome di una voce
     // e Filo non ha un catalogo per lui: l'unica strada è scriverlo a mano.
     err_tts_voice_required: 'Il modello di lettura «%s» vuole il nome di una voce, e Filo non ne conosce nessuna per questo modello: scrivilo in Preferenze → Lettura ad alta voce.',
+    // %s = id del modello, %s = nome scritto a mano che il modello ha rifiutato.
+    err_tts_voice_unknown: 'Il modello di lettura «%s» non conosce la voce «%s»: controlla il nome in Preferenze → Lettura ad alta voce.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
