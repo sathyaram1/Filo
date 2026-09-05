@@ -125,10 +125,20 @@ module.exports = function register(on, ctx) {
           return r;
         }
       }
+      const I18n = globalThis.SN_I18N;
       if (Voices && Voices.isVoiceRequiredError(msg)) {
-        const I18n = globalThis.SN_I18N;
         const err = new Error(I18n ? I18n.t('err_tts_voice_required', model) : msg);
         err.code = 'TTS_VOICE_REQUIRED';
+        throw err;
+      }
+      // Un nome scritto a mano (non è in nessun catalogo) che il modello
+      // rifiuta con un 400: è un errore di battitura, non un guasto. Dirlo
+      // evita di far cercare un problema di rete.
+      const handWritten = voice && Voices && !Voices.isKnownVoice(voice, model)
+        && !(learnedVoices.get(model) || []).includes(voice);
+      if (handWritten && e && e.status === 400) {
+        const err = new Error(I18n ? I18n.t('err_tts_voice_unknown', model, voice) : msg);
+        err.code = 'TTS_VOICE_UNKNOWN';
         throw err;
       }
       throw e;
