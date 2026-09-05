@@ -207,7 +207,7 @@ test('preferenze: la tendina mostra le voci del modello in uso', async ({ app, o
   async function readSel(p) {
     return p.evaluate(() => {
       const sel = document.getElementById('ttsModelVoice');
-      const groups = [...sel.querySelectorAll('optgroup')].map((g) => ({ label: g.label, ids: [...g.options].map((o) => o.value) }));
+      const groups = [...sel.querySelectorAll('optgroup')].map((g) => ({ label: g.label, ids: [...g.querySelectorAll('option')].map((o) => o.value) }));
       const opts = [...sel.options].map((o) => ({ v: o.value, t: o.textContent }));
       const input = document.getElementById('ttsModelVoiceCustom');
       return {
