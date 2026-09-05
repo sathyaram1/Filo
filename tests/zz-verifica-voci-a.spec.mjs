@@ -74,7 +74,20 @@ async function leggi(page) {
   await expect(page.locator('.sn-menu').first()).toBeVisible();
   await page.locator('.sn-menu-item', { hasText: 'Leggi' }).first().click();
 }
-const toasts = (page) => page.evaluate(() => [...document.querySelectorAll('.sn-toasts *')].map((e) => e.textContent.trim()).filter(Boolean));
+const toasts = (page) => page.evaluate(() => [...document.querySelectorAll('.sn-toasts > *')].map((e) => e.textContent.trim()).filter(Boolean));
+async function waitToast(page, ms = 8000) {
+  const t0 = Date.now(); let last = [];
+  while (Date.now() - t0 < ms) { last = await toasts(page); if (last.length) return last; await page.waitForTimeout(200); }
+  return last;
+}
+async function stopReading(page) {
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+  await page.locator('body').click({ button: 'right', position: { x: 5, y: 5 } });
+  await expect(page.locator('.sn-menu').first()).toBeVisible();
+  const stop = page.locator('.sn-menu-item', { hasText: 'Interrompi lettura' });
+  if (await stop.count()) await stop.first().click(); else await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+}
 
 test.describe('voce per modello (main)', () => {
   test('ogni modello riceve una voce sua, in base alla lingua', async ({ app, openTab }) => {
@@ -116,6 +129,7 @@ test.describe('voce per modello (main)', () => {
     expect(c.length).toBeGreaterThan(0);
     for (const x of c) expect(x.voice).toMatch(/^en-/);
 
+    await stopReading(en);
     await setTts(app, 'aura');
     const it = await testServer.openReady(openTab, PAGE('it', 'Buongiorno, questa è una pagina in italiano da leggere ad alta voce.'));
     await resetCalls(app);
@@ -126,6 +140,7 @@ test.describe('voce per modello (main)', () => {
     expect(c.length).toBeGreaterThan(0);
     for (const x of c) expect(x.voice).toMatch(/^aura-2-.*-it$/);
 
+    await stopReading(it);
     // pagina senza lang
     await setTts(app, 'mai');
     const nolang = await testServer.openReady(openTab, '<html><body><p id="target">Senza lingua dichiarata, un testo qualunque.</p></body></html>');
@@ -239,10 +254,10 @@ test.describe('voce per modello (main)', () => {
     await synth(page, 'riarmo', 'it');
     await setTts(app, 'mai', { modelVoice: 'Elsa' });
     const it = await testServer.openReady(openTab, PAGE('it', 'Testo da leggere con la voce sbagliata.'));
+    await resetCalls(app);
     await leggi(it);
-    await it.waitForTimeout(2500);
-    const t = await toasts(it);
-    console.log('[verifica] toast voce sbagliata →', JSON.stringify(t));
+    const t = await waitToast(it);
+    console.log('[verifica] toast voce sbagliata →', JSON.stringify(t), 'calls:', JSON.stringify(await calls(app)));
     expect(t.join(' ')).toMatch(/Elsa/);
     expect(t.join(' ')).toMatch(/Preferenze/);
 
@@ -313,7 +328,6 @@ test.describe('voce per modello (main)', () => {
     await setTts(app, '');
     const it = await testServer.openReady(openTab, PAGE('it', 'Testo senza modello.'));
     await leggi(it);
-    await it.waitForTimeout(2500);
-    console.log('[verifica] toast senza modello →', JSON.stringify(await toasts(it)));
+    console.log('[verifica] toast senza modello →', JSON.stringify(await waitToast(it)));
   });
 });
