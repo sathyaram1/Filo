@@ -959,6 +959,16 @@
         followBody();
         followThread();
       },
+      // La nota che il main ha promosso a risposta (ultimo giro muto: la frase
+      // scritta insieme alle azioni era la risposta) non resta anche qui: una
+      // frase sola, nella bolla, non due.
+      dropNote(text) {
+        const t = String(text || '').trim();
+        if (!t) return;
+        const notes = body.querySelectorAll('.dash-activity-note');
+        const last = notes[notes.length - 1];
+        if (last && (last.textContent || '').trim() === t) { last.remove(); items -= 1; }
+      },
       // Fine di un turno: chiude il ragionamento del turno e lo restituisce
       // (per lo storico del thread).
       endTurn() {
