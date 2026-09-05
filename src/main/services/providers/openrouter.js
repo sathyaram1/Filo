@@ -306,11 +306,15 @@
           // l'ultimo): teniamo l'ultimo valore visto.
           const sb = extractServedBy(obj);
           if (sb) servedBy = sb;
-          const choiceDelta = obj.choices?.[0]?.delta || {};
+          const choice = obj.choices?.[0] || {};
+          const choiceDelta = choice.delta || {};
+          if (choice.finish_reason) finishReason = choice.finish_reason;
           const reasoning = choiceDelta.reasoning;
           if (reasoning) {
             try { onReasoning && onReasoning(reasoning); } catch (_) {}
           }
+          if (choiceDelta.reasoning_details) details.push(choiceDelta.reasoning_details);
+          if (choiceDelta.tool_calls) calls.push(choiceDelta.tool_calls);
           const delta = choiceDelta.content;
           if (delta) {
             fullText += delta;
