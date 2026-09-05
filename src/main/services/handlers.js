@@ -1984,7 +1984,31 @@ function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
+    confirmedActionsForPrompt(actions),
   ].filter(Boolean).join('\n\n');
+}
+
+// Le azioni che l'utente ha CONFERMATO nel popup dopo che il turno era già
+// finito (livello 2 e 3). Il modello non le vede in nessun altro modo: quando
+// ha emesso l'azione era «in attesa di conferma», e il sì è arrivato dopo. Se
+// al turno dopo l'utente chiede «l'hai attivato?», senza questa riga può solo
+// tirare a indovinare. Dato di sistema, non istruzione.
+function confirmedActionsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const righe = [];
+  for (const a of actions) {
+    if (!a || !a._confirmed) continue;
+    let cosa = String(a.type || '').toUpperCase();
+    try {
+      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      if (d) cosa = d.replace(/\.+\s*$/, '');
+    } catch (_) {}
+    righe.push(`- ${cosa}`);
+  }
+  return righe.length
+    ? `[L'utente ha CONFERMATO e il sistema ha eseguito, dopo la tua risposta:\n${righe.join('\n')}\nÈ già fatto: non riproporlo e non dire che è ancora da fare.]`
+    : '';
 }
 
 // Spinta per il formato vecchio (JSON nel testo), quando un esito deve
