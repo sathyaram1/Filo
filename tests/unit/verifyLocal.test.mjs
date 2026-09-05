@@ -400,3 +400,52 @@ test('#561 giro 2: un livello scritto fuori posto non è un pass silenzioso; l\'
   assert.equal(numerato.outcome, 'fix');
   assert.deepEqual(numerato.decision.fix.map((f) => f.level), [2, 1]);
 });
+
+// ── Verifica del giro 3 (2026-09-05) su #561 ─────────────────────────────────
+
+test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo start è rifiutata', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const ok = withCritique(s, 'r', { critique: 'Regge tutto.', sha: SHA });
+  assert.equal(ok.outcome, 'pass');
+  const ripensa = withCritique(ok.state, 'r', { critique: 'Ripensandoci.\n[2] ora lo vedo', sha: SHA });
+  assert.equal(ripensa.ok, false);
+  assert.match(ripensa.reason, /start/);
+  assert.equal(ripensa.state.r.verdict, 'pass', 'il pass registrato resta quello');
+  assert.equal(ripensa.state.r.counts.count2 || 0, 0, 'nessun giro pagato');
+  const fermo = withCritique(s, 'r', { critique: 'P.\n[2?] scelta', sha: SHA });
+  assert.equal(fermo.outcome, 'stop');
+  assert.equal(withCritique(fermo.state, 'r', { critique: 'Regge.', sha: SHA }).ok, false);
+  // Dopo start la critica di un'altra istanza passa.
+  const dopo = withCritique(withRequest(ok.state, 'r', { request: 'fai X', sha: ALTRO_SHA }), 'r', { critique: 'P.\n[2] ora lo vedo', sha: ALTRO_SHA });
+  assert.equal(dopo.ok, true);
+  assert.equal(dopo.outcome, 'fix');
+});
+
+test('#561 giro 3: quando il lavoro si ferma i bilanci si azzerano (come sul server), la storia resta', () => {
+  let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  for (let i = 0; i < 5; i++) {
+    const r = withCritique(s, 'r', { critique: `P.\n[2] rotto ${i}`, sha: SHA });
+    assert.equal(r.outcome, 'fix', `giro ${i}`);
+    s = withRequest(withFixed(r.state, 'r', { report: 'ok', sha: ALTRO_SHA }).state, 'r', { request: 'fai X', sha: ALTRO_SHA });
+  }
+  const sesto = withCritique(s, 'r', { critique: 'P.\n[2] rotto 6', sha: ALTRO_SHA });
+  assert.equal(sesto.outcome, 'stop');
+  assert.deepEqual(sesto.state.r.counts, {});
+  assert.equal(sesto.state.r.rounds.length, 6, 'la storia dei giri resta');
+  // L'owner decide, il lavoro si rifà: il primo [2] si corregge, non ferma.
+  const rifatto = withCritique(withRequest(sesto.state, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'P.\n[2] rotto 7', sha: SHA });
+  assert.equal(rifatto.outcome, 'fix');
+  assert.equal(historyFromRounds(rifatto.state.r.rounds).length, 7);
+  // Anche lo stop da «corretto» senza commit nuovo azzera.
+  const c = withFixed(rifatto.state, 'r', { report: 'non ci riesco', sha: SHA });
+  assert.equal(c.outcome, 'stop');
+  assert.deepEqual(c.state.r.counts, {});
+});
+
+test('#561 giro 3: «[4] gravissimo» a inizio riga non è un pass silenzioso', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'Provato.\n[4] gravissimo', sha: SHA });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /\[4\] gravissimo/);
+  assert.equal(checkVerdict(r.state.r, SHA).ok, false);
+});

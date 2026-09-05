@@ -181,3 +181,10 @@ test('#561 giro 2: unparsedLevelLines segnala i livelli fuori posto; «1. [2]» 
   assert.deepEqual(R.parseFindings('1. [2] non salva\n2) [1?] gusto').findings.map((f) => [f.level, f.decision]), [[2, false], [1, true]]);
   assert.deepEqual(R.unparsedLevelLines(''), []);
 });
+
+test('#561 giro 3: un livello fuori scala o a intervallo a inizio riga non è un pass silenzioso', () => {
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[4] gravissimo'), ['[4] gravissimo']);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2-3] grave\n[2/3] grave'), ['[2-3] grave', '[2/3] grave']);
+  assert.deepEqual(R.parseFindings('Provato.\n[4] gravissimo').findings, [], 'non è un rilievo: è un errore da segnalare');
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[3] grave\n[0?] raro'), []);
+});
