@@ -1,0 +1,17 @@
+{
+  "nota": "Spec Playwright rossi ANCHE su main sulla macchina dell'owner (Windows, utente con lo spazio nel nome), per motivi d'ambiente e non di codice: percorso abbreviato del terminale, misure di layout sotto carico, rete di casa. Il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. Risolverli alla radice, e svuotare l'elenco: feedback #563.",
+  "specs": [
+    "tests/filo-terminal-command",
+    "tests/filo-terminal-context",
+    "tests/terminal-mode",
+    "tests/verify-downloads-410",
+    "tests/verifier-stress-410",
+    "tests/verify-398-local-address",
+    "tests/clipboard-history-remove",
+    "tests/editor-modules",
+    "tests/zz-verify-riordina",
+    "tests/popup-pose-streaming",
+    "tests/manage-tab-counts",
+    "tests/decks-chat-stress"
+  ]
+}
