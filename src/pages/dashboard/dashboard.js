@@ -1700,6 +1700,7 @@
 
     if (offReasoning) { try { offReasoning(); } catch (_) {} }
     if (offAnswer) { try { offAnswer(); } catch (_) {} }
+    if (offAction) { try { offAction(); } catch (_) {} }
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
