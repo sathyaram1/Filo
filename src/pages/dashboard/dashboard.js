@@ -1755,14 +1755,22 @@
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
-      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending });
+      renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending, shown });
+      // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
+      // niente da dire) non lascia una bolla vuota sotto.
+      if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
+        filoBubble.remove();
+      }
       // Il ragionamento del turno entra nello storico del thread insieme al
-      // messaggio: non torna al modello (non è nel prompt), resta con la
-      // conversazione.
+      // messaggio. Il testo resta con la conversazione; i blocchi strutturati
+      // del fornitore (reasoningDetails) tornano al modello al turno dopo,
+      // così riprende da dove aveva lasciato.
       const turn = pending.endTurn();
       if (ownsActivity) pending.finish();
       const entry = { role: 'filo', text: r.text || '', actions: r.actions || [] };
       if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
+      if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
+      if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       threadHistory.push(entry);
       applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
