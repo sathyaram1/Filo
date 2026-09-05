@@ -167,3 +167,16 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
     assert.match(vuota.se, /malformed: critica vuota/, 'la frase del server arriva a chi ha consegnato');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
+
+test('#561 giro 6: una critica lunga parte INTERA, coi rilievi in coda oltre i 4000 caratteri, così il server la legge come lo strumento', async () => {
+  const { casa } = casaSulRamo();
+  const { srv, ricevuti, port } = await fintoServer(() => ({ reply: { outcome: 'pass', derived: null } }));
+  try {
+    const riassunto = `Provato ${'x'.repeat(4500)}.`;
+    const r = await esegui(['--record-verifier', 'fid-901', `${riassunto}\n[2] in fondo\n[0] raro`], ENV(casa, port));
+    assert.equal(r.code, 0, r.se);
+    const inviato = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
+    assert.ok(inviato.critique.endsWith('[2] in fondo\n[0] raro'), 'il testo arriva intero');
+    assert.deepEqual(inviato.findings.map((f) => f.level), [2, 0]);
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
