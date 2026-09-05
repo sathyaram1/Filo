@@ -60,7 +60,104 @@
       p.sort = routing.sort;
     }
     if (routing.allowFallbacks === false) p.allow_fallbacks = false;
+    // Con gli strumenti (tool calling) in richiesta, solo gli host che li
+    // supportano davvero: senza questo il router può passare a un host che
+    // ignora `tools` in silenzio, e il modello risponde a parole invece di agire.
+    if (routing.requireParameters === true) p.require_parameters = true;
     return Object.keys(p).length ? p : null;
+  }
+
+  // Le definizioni degli strumenti nel corpo della richiesta, se ci sono.
+  // `toolChoice` ('auto' | 'none' | 'required') è facoltativo.
+  function toolsFields(tools, toolChoice) {
+    const out = {};
+    if (Array.isArray(tools) && tools.length) {
+      out.tools = tools;
+      if (toolChoice) out.tool_choice = toolChoice;
+    }
+    return out;
+  }
+
+  // Le chiamate agli strumenti di una risposta NON in streaming, nella forma
+  // piatta che usa il resto di Filo: { id, name, arguments (stringa JSON) }.
+  function flatToolCalls(list) {
+    const out = [];
+    for (const c of Array.isArray(list) ? list : []) {
+      if (!c || !c.function) continue;
+      out.push({
+        id: String(c.id || ''),
+        name: String(c.function.name || ''),
+        arguments: typeof c.function.arguments === 'string' ? c.function.arguments : JSON.stringify(c.function.arguments || {}),
+      });
+    }
+    return out;
+  }
+
+  // In streaming le chiamate arrivano a pezzi: un delta porta l'indice, i
+  // primi anche id e nome, gli altri frammenti degli argomenti da accodare.
+  // `onStart(call)` avvisa appena si conosce il NOME di una chiamata nuova: la
+  // chat lo usa per dire subito «Cerco sul web…», prima che gli argomenti
+  // siano finiti di arrivare.
+  function createToolCallAccumulator(onStart) {
+    const calls = [];
+    const byIndex = new Map();
+    return {
+      push(deltas) {
+        for (const d of Array.isArray(deltas) ? deltas : []) {
+          if (!d) continue;
+          const idx = Number.isInteger(d.index) ? d.index : calls.length;
+          let call = byIndex.get(idx);
+          if (!call) {
+            call = { id: '', name: '', arguments: '', _started: false };
+            byIndex.set(idx, call);
+            calls.push(call);
+          }
+          if (d.id) call.id = String(d.id);
+          const fn = d.function || {};
+          if (fn.name) call.name += String(fn.name);
+          if (typeof fn.arguments === 'string') call.arguments += fn.arguments;
+          if (call.name && !call._started) {
+            call._started = true;
+            try { onStart && onStart({ id: call.id, name: call.name }); } catch (_) {}
+          }
+        }
+      },
+      list() {
+        return calls.filter((c) => c.name).map(({ id, name, arguments: args }) => ({ id, name, arguments: args }));
+      },
+    };
+  }
+
+  // Il ragionamento arriva anche come blocchi strutturati (`reasoning_details`:
+  // testo, riassunto o blocchi cifrati con firma), a frammenti indicizzati. Li
+  // ricomponiamo per indice concatenando i campi testuali, così da poterli
+  // RIMANDARE tali e quali nel messaggio dell'assistente al giro dopo: il
+  // fornitore li reinserisce e il modello riprende da dove aveva lasciato
+  // invece di ripensare tutto.
+  function createReasoningDetailsAccumulator() {
+    const items = [];
+    const byIndex = new Map();
+    const TEXT_FIELDS = ['text', 'summary', 'data'];
+    return {
+      push(deltas) {
+        for (const d of Array.isArray(deltas) ? deltas : []) {
+          if (!d || typeof d !== 'object') continue;
+          const idx = Number.isInteger(d.index) ? d.index : items.length;
+          let it = byIndex.get(idx);
+          if (!it) {
+            it = { ...d };
+            byIndex.set(idx, it);
+            items.push(it);
+            continue;
+          }
+          for (const k of Object.keys(d)) {
+            if (TEXT_FIELDS.includes(k) && typeof d[k] === 'string') it[k] = (typeof it[k] === 'string' ? it[k] : '') + d[k];
+            else if (d[k] != null && k !== 'index') it[k] = d[k];
+          }
+        }
+      },
+      list() { return items.slice(); },
+    };
   }
 
   // Marcatura esplicita della parte riusabile: NON serve per i modelli che Filo
