@@ -896,6 +896,7 @@
       // Un pezzo di ragionamento vero dal modello.
       pushReasoning(text) {
         if (phase === 'done' || !text) return;
+        sawReasoning = true;
         if (!reasoningEl) {
           reasoningEl = document.createElement('div');
           reasoningEl.className = 'dash-activity-reasoning';
