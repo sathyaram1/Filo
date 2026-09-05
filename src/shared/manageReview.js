@@ -483,7 +483,8 @@
   const REASON_TEXTS = {
     secaudit: 'bloccato dalla sicurezza',
     clarify: 'domande per te',
-    loop: 'fix bocciato troppe volte',
+    loop: 'difetto non più correggibile da soli',
+    decisione: 'la verifica chiede una tua decisione',
     arenato: 'lavorazione arenata',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
