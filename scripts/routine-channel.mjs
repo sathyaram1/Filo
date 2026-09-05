@@ -277,6 +277,9 @@ export async function deliver(t, intent, data, opts) {
   return {
     outcome,
     reason: String((body && body.reason) || (outcome === 'ok' ? '' : `http_${status}`)),
+    // La frase del rifiuto, quando il server la dà: senza, «malformed» non dice
+    // se manca il riassunto, il commit o il testo di un rilievo.
+    detail: String((body && body.detail) || ''),
     id: body && body.id,
     num: body && body.num,
     reply: body && typeof body.reply === 'object' ? body.reply : undefined,
