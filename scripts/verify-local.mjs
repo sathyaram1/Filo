@@ -555,8 +555,15 @@ if (isMain) {
       console.error(`Nessuna verifica avviata per '${branch}': prima serve "verify-local.mjs start".`);
       process.exit(1);
     }
-    if (cmd === 'fail' && !text) {
-      console.error('Una bocciatura senza motivo non è utile a nessuno: scrivi cosa non funziona.');
+    if (!text) {
+      console.error(cmd === 'fail'
+        ? 'Una bocciatura senza motivo non è utile a nessuno: scrivi cosa non funziona.'
+        : 'Una verifica senza riassunto non dice cosa hai provato: scrivi cosa funziona, e i rilievi se ci sono.');
+      process.exit(1);
+    }
+    if (prev.verdict === 'fix-pending' && prev.pending) {
+      console.error('Critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte.');
+      console.error('Prima chi corregge consegna (node scripts/verify-local.mjs corretto "<report>"), poi si riparte con start.');
       process.exit(1);
     }
     if (cmd !== 'critica') {
@@ -568,6 +575,7 @@ if (isMain) {
       process.exit(0);
     }
     const r = withCritique(readState(), branch, { critique: text, sha });
+    if (r.ok === false) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
     const e = r.state[branch];
     if (r.outcome === 'fix') {
