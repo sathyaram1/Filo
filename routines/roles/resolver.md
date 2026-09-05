@@ -65,9 +65,10 @@ né per "spezzare di fatto".
 deviazioni dichiarate, la Verifica coi minimi per tipo di modifica (unit,
 spec mirato, visivo), le fonti di verità da aggiornare nello stesso commit.
 **Niente suite completa prima di consegnare** (dal 2026-09-03): la lancia il
-verificatore, una volta, prima di dare `pass`; se trova un rosso nuovo torna
-a te con l'elenco degli spec rotti, e tu rilanci quelli. Venticinque minuti
-di attesa a ogni consegna erano metà del costo di un giro. Non fondere su `main`: l'hook
+verificatore, una volta, prima di lasciar passare il lavoro; un rosso nuovo è
+un suo rilievo, e dal 2026-09-05 (feedback #561) lo corregge lui stesso nel
+suo giro. Venticinque minuti di attesa a ogni consegna erano metà del costo
+di un giro. Non fondere su `main`: l'hook
 committa e pusha sul branch, il merge lo fa il gate a valle.
 
 ## Consegna
