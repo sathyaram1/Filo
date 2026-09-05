@@ -27,6 +27,9 @@ test('checkVerdict: senza verifica non si pubblica', () => {
   assert.equal(checkVerdict(null, SHA).ok, false);
   // Verifica avviata ma mai conclusa: vale come non fatta.
   assert.equal(checkVerdict({ request: 'fai X', requestedSha: SHA }, SHA).ok, false);
+  // Correzione in sospeso, o consegnata senza un'altra verifica: non si pubblica.
+  assert.equal(checkVerdict({ verdict: 'fix-pending', sha: SHA }, SHA).ok, false);
+  assert.equal(checkVerdict({ verdict: 'fixed', sha: SHA }, SHA).ok, false);
 });
 
 test('checkVerdict: una bocciatura blocca, e dice perché', () => {
