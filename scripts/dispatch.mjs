@@ -813,6 +813,11 @@ async function recordVerifier(id, critiqueText) {
     // controllare ramo e cartella invece della riga (verifica del giro 4).
     return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»); in mezzo a una frase del riassunto le parentesi quadre sono testo e vanno bene. Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
+  // Stesso tetto del server (12000 caratteri), detto QUI prima del viaggio e
+  // col numero: mai un taglio silenzioso (CLAUDE.md § Limiti).
+  if (String(critiqueText || '').length > MAX_CRITIQUE_CHARS) {
+    return { rejected: true, formatRejected: true, message: `critica non registrata: troppo lunga (${String(critiqueText).length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}). Accorcia il riassunto, non i rilievi.` };
+  }
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
