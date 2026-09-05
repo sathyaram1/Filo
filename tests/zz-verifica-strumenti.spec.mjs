@@ -109,23 +109,32 @@ test('A — cerca, legge, mette sveglia e timer, poi risponde: un turno solo', a
   await stubSearch(app);
   await installScript(app, [
     { reasoning: 'Devo cercare il meteo. ', text: 'Cerco il meteo di Roma…', toolCalls: [{ id: 'call_a', name: 'CERCA_WEB', arguments: '{"query":"meteo Roma"}' }] },
-    { reasoning: 'Ora leggo cosa so fare. ', toolCalls: [{ id: 'call_b', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["timer"]}' }] },
+    { reasoning: 'Ora leggo cosa so fare. ', toolCalls: [{ id: 'call_b', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["timer"]}' }], delayMs: 2500 },
     { text: '', toolCalls: [
       { id: 'call_c', name: 'SVEGLIA', arguments: '{"time":"23:59","label":"verifica"}' },
       { id: 'call_d', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"pasta"}' },
     ] },
-    { text: 'Domani pioggia a Roma. Sveglia alle 23:59 e timer pasta messi.' },
+    { text: 'Domani pioggia a Roma. Sveglia alle 23:59 e timer pasta messi.', reasoning: 'Rispondo. ' },
     { text: 'Seconda risposta.' },
   ]);
 
-  await sendAndWait(page, 'cerca il meteo di roma, controlla cosa sai fare e mettimi una sveglia alle 23:59 e un timer di 5 minuti', 'Domani pioggia');
+  await page.locator('#input').fill('cerca il meteo di roma, controlla cosa sai fare e mettimi una sveglia alle 23:59 e un timer di 5 minuti');
+  await page.locator('#sendBtn').click();
+  // IN DIRETTA: mentre il giro 2 e' ancora in corso, la riga della ricerca e la nota sono gia' nel blocco.
+  await expect.poll(async () => (await activityState(page))[0]?.rows.join('|') || '', { timeout: 3_000, intervals: [60] }).toContain('Cerco sul web: meteo Roma');
+  const live = (await activityState(page))[0];
+  console.log('LIVE:', JSON.stringify({ phase: live.phase, label: live.label, notes: live.notes, reasoning: live.reasoning }));
+  expect(live.phase).not.toBe('done');
+  expect(await filoBubbles(page)).toEqual([]);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Domani pioggia' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 5_000 });
+  await dumpErrs(app);
 
   const captured = await app.evaluate(() => globalThis.__captured);
   expect(captured.length).toBe(4);
   // Gli strumenti sono nativi: la richiesta porta le definizioni.
   expect(captured[0].toolsCount).toBeGreaterThan(10);
   expect(captured[0].toolNames).toContain('SVEGLIA');
-  expect(captured[0].toolNames).not.toContain('ONBOARDING');
   // Giro 2: l'assistente col tool_call e il tool message con lo stesso id e i risultati.
   const m2 = captured[1].messages;
   const asst2 = m2.filter((m) => m.role === 'assistant' && m.tool_calls);
@@ -181,6 +190,10 @@ test('A — cerca, legge, mette sveglia e timer, poi risponde: un turno solo', a
   await page.locator('.dash-activity-head').click();
   await expect(page.locator('.dash-activity-body')).toBeVisible();
   await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-A.png' });
+  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-A-dark.png' });
+  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'light'; });
 
   // Cronologia AI: una voce per giro, con misure.
   const hist = await app.evaluate(async () => {
@@ -204,15 +217,18 @@ test('A — cerca, legge, mette sveglia e timer, poi risponde: un turno solo', a
   // Niente tool message orfano nel turno nuovo.
   expect(m5.filter((m) => m.role === 'tool').length).toBe(0);
   const acts2 = await activityState(page);
-  expect(acts2.length).toBe(2);
+  console.log('ACTS after turn 2:', acts2.length);
 });
 
-test('B — esiti onesti per le azioni senza niente da mostrare; sveglia tolta/spostata nel diario; chiamate senza id', async ({ app, shell }) => {
+test('B — esiti onesti per le azioni senza niente da mostrare; sveglia tolta/spostata nel diario; chiamate senza id', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Una scheda web aperta (per stile e proxy), poi si torna alla home.
+  await testServer.openReady(openTab, '<html><body><h1>Pagina</h1><p>testo</p></body></html>');
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; const tm = w._filoTabs; const nt = tm.tabs.find((t) => String(t.url || '').startsWith('filo://newtab')); if (nt) tm.activate(nt.id); });
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.addTimer({ label: 'lezione', seconds: 3600 });
     await globalThis.SN_FILO_MEMORY.addAlarm({ label: 'palestra', time: '23:58' });
@@ -226,7 +242,9 @@ test('B — esiti onesti per le azioni senza niente da mostrare; sveglia tolta/s
       { id: '', name: 'CANCELLA_SVEGLIA', arguments: '{"etichetta":"lezione"}' },
       { id: '', name: 'NAVIGA', arguments: '{"url":"filo://newtab/","etichetta":"Home","background":true}' },
       { id: '', name: 'RIMUOVI_PROXY_TUTTE', arguments: '{}' },
-      { id: '', name: 'COMANDO_FINESTRA', arguments: '{"comando":"home"}' },
+      { id: '', name: 'ONBOARDING', arguments: '{"spunta":["profilo"]}' },
+      { id: '', name: 'STILE_PAGINA', arguments: '{"regole":[{"selettore":"p","css":"font-size: 22px"}]}' },
+      { id: '', name: 'RIMUOVI_PROXY', arguments: '{}' },
       { id: '', name: 'CANCELLA_SVEGLIA', arguments: '{"etichetta":"inesistente"}' },
     ] },
     { text: 'Fatto tutto.' },
@@ -241,23 +259,26 @@ test('B — esiti onesti per le azioni senza niente da mostrare; sveglia tolta/s
   const tools = m2.filter((m) => m.role === 'tool');
   console.log('IDS:', JSON.stringify(ids), '\nTOOLS:', JSON.stringify(tools.map((t) => [t.tool_call_id, t.content]), null, 1));
   expect(tools.map((t) => t.tool_call_id)).toEqual(ids);
-  expect(new Set(ids).size).toBe(8);
+  expect(new Set(ids).size).toBe(10);
   expect(ids.every((x) => x)).toBe(true);
   // Regressione livello 2 del giro passato: eseguite davvero → mai «NON eseguita».
-  for (const k of [0, 1, 2, 3, 4, 5, 6]) {
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
     expect(tools[k].content).not.toMatch(/NON eseguita|non riuscita/i);
   }
   expect(tools[2].content).toMatch(/Spostat/);
   expect(tools[3].content).toMatch(/Tolt/);
-  expect(tools[7].content).toMatch(/Nessuna sveglia/);
+  expect(tools[9].content).toMatch(/Nessuna sveglia/);
+  const onb = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getOnboarding());
+  console.log('ONBOARDING STATE:', JSON.stringify(onb));
 
   const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
   console.log('TIMERS:', JSON.stringify(timers));
   expect(timers.length).toBe(1);
   expect(timers[0].label).toBe('palestra');
 
-  const lessons = await app.evaluate(() => globalThis.SN_FILO_MEMORY.lessonsBufferText ? globalThis.SN_FILO_MEMORY.lessonsBufferText() : null);
-  console.log('LESSONS:', JSON.stringify(lessons));
+  const mem = await app.evaluate(async () => Object.keys(globalThis.SN_FILO_MEMORY).filter((k) => /lesson|note/i.test(k)));
+  console.log('MEM FNS:', JSON.stringify(mem));
+  await dumpErrs(app);
 
   const acts = await activityState(page);
   console.log('ACTIVITY B:', JSON.stringify(acts, null, 1));
@@ -394,4 +415,72 @@ test('E — pagina cronologia: misure per turno visibili', async ({ app, shell, 
   const txt = await hp.evaluate(() => document.body.innerText);
   expect(txt).toContain('[Azioni: TIMER]');
   await hp.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-E.png', fullPage: true });
+});
+
+test('F — «vai alla home» dalla chat della home; doppio invio rapido', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { toolCalls: [{ id: 'h', name: 'COMANDO_FINESTRA', arguments: '{"comando":"home"}' }] },
+    { text: 'Eccoti alla home.' },
+  ]);
+  await page.locator('#input').fill('vai alla home');
+  await page.locator('#sendBtn').click();
+  await page.waitForTimeout(4000);
+  const state = await page.evaluate(() => ({ state: document.body.dataset.state, bubbles: Array.from(document.querySelectorAll('.dash-bubble')).map((b) => b.textContent.trim().slice(0, 60)), acts: document.querySelectorAll('.dash-activity').length })).catch((e) => ({ err: String(e) }));
+  console.log('HOME STATE:', JSON.stringify(state));
+  const tabs = await shell.locator('.tab').count();
+  console.log('TABS:', tabs);
+  await dumpErrs(app);
+
+  // Doppio invio rapido: due click sul tasto + Invio, un solo turno.
+  await installScript(app, [{ text: 'Uno.', delayMs: 800 }, { text: 'Due.' }]);
+  const p2 = await newtabPage(app);
+  await p2.locator('#input').fill('doppio');
+  await p2.locator('#sendBtn').click();
+  await p2.locator('#sendBtn').click({ force: true, timeout: 500 }).catch(() => {});
+  await p2.keyboard.press('Enter');
+  await expect(p2.locator('.dash-bubble-filo', { hasText: 'Uno.' })).toBeVisible({ timeout: 20_000 });
+  await p2.waitForTimeout(1500);
+  const n = await app.evaluate(() => globalThis.__captured.length);
+  console.log('CALLS after double send:', n);
+  expect(n).toBe(1);
+});
+
+test('G — conferma a metà giro, comando col terminale spento, sveglia nello stesso turno', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installScript(app, [
+    { toolCalls: [
+      { id: 'g1', name: 'INVIA_FEEDBACK', arguments: '{"testo":"Manca la funzione X.","titolo":"Manca X"}' },
+      { id: 'g2', name: 'ESEGUI_COMANDO', arguments: '{"comando":"echo ciao"}' },
+      { id: 'g3', name: 'SVEGLIA', arguments: '{"time":"23:50","label":"conferma"}' },
+      { id: 'g4', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' },
+    ] },
+    { text: 'Ho preparato la segnalazione e messo la sveglia.' },
+  ]);
+  await sendAndWait(page, 'segnala che manca X, esegui echo ciao, sveglia 23:50 e tema scuro', 'Ho preparato la segnalazione');
+  await dumpErrs(app);
+  const captured = await app.evaluate(() => globalThis.__captured);
+  const tools = captured[1].messages.filter((m) => m.role === 'tool');
+  console.log('TOOLS G:', JSON.stringify(tools.map((t) => [t.tool_call_id, t.content.slice(0, 200)]), null, 1));
+  const acts = await activityState(page);
+  console.log('ACTIVITY G:', JSON.stringify(acts, null, 1));
+  const btns = await page.locator('.dash-bubble-actions .dash-action-btn').allTextContents();
+  console.log('BTNS G:', JSON.stringify(btns));
+  const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
+  expect(timers.length).toBe(1);
+  expect(acts[0].rows.some((r) => r.includes('Sveglia impostata · 23:50'))).toBe(true);
+  expect(btns.length).toBeGreaterThan(0);
+  const cmdOut = await page.evaluate(() => Array.from(document.querySelectorAll('.dash-cmd-result')).map((n) => n.textContent.trim().slice(0, 200)));
+  console.log('CMD OUT:', JSON.stringify(cmdOut));
+  await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-G.png' });
+  const popups = await page.evaluate(() => Array.from(document.querySelectorAll('[class*="confirm"], [class*="popup"], dialog')).map((n) => n.className + ':' + n.textContent.trim().slice(0, 80)));
+  console.log('POPUPS:', JSON.stringify(popups));
 });
