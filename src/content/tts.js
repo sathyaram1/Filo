@@ -337,7 +337,8 @@
     // imposta — mostrarlo com'è vale molto più di una frase generica.
     // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
     // che Filo non conosce: il messaggio dice dove scriverlo.
-    if ((res.errorCode === 'NO_MODEL_FOR_ACTION' || res.errorCode === 'TTS_VOICE_REQUIRED') && res.error) {
+    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
+    if (spiegato.includes(res.errorCode) && res.error) {
       try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error))); } catch (_) {}
       return;
     }
