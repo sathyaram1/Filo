@@ -791,6 +791,13 @@ function sealTransition(state, by) {
 async function recordVerifier(id, critiqueText) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
+  // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
+  // non è un rilievo, e mandarlo così faceva passare un [2] in silenzio: si
+  // ferma qui, prima del server, con la riga da sistemare.
+  const brutte = typeof VERIFIER_ROUND.unparsedLevelLines === 'function' ? VERIFIER_ROUND.unparsedLevelLines(critiqueText) : [];
+  if (brutte.length) {
+    return { rejected: true, message: `critica non registrata: rilievi non riconosciuti. Il livello va a inizio riga, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+  }
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
