@@ -812,7 +812,7 @@ test('anche i DATI che governano il giro vengono dalla copia', async () => {
       p.on('close', () => fine({ so, se }));
     });
 
-    assert.match(out.so, /failCap=7/,
+    assert.match(out.so, /cap2=7/,
       `ha letto il dato dal ramo invece che dalla copia: ${out.so.trim()} ${out.se.slice(-200)}`);
   } finally {
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
