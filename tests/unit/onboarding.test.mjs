@@ -374,7 +374,9 @@ test('il prompt della chat riceve l’elenco di cosa resta da scoprire e da dire
 
   const conOnb = C.PROMPTS.filoChat({ capacita: 'x', onboarding: checklist, onboardingTurns: 1, onboardingMax: 5 });
   assert.match(conOnb, /STAI ACCOGLIENDO QUESTO UTENTE/);
-  assert.match(conOnb, /ONBOARDING: \{spunta/, 'senza l’azione non può spuntare niente');
+  // L'azione è uno strumento nativo (actionTools.js) che entra solo durante
+  // l'intervista: il prompt deve dirlo, altrimenti il modello non sa che ce l'ha.
+  assert.match(conOnb, /strumento in più[^\n]*ONBOARDING/, 'senza l’azione non può spuntare niente');
   assert.match(conOnb, /basta così/, 'deve saper chiudere quando glielo si chiede');
   // …e altrettanto esplicitamente NON deve chiudere per un rifiuto: la
   // distinzione la fa anche l'app, ma il modello è l'altra porta da cui lo
