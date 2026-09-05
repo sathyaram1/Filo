@@ -113,25 +113,29 @@
     // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).
     // Booleano persistito; default false (spento).
     AUTO_MODE: 'filo_auto_mode',
-    // Cache locali dei contatori del verificatore (tab Automazioni). La FONTE
-    // DI VERITÀ è il doc Firestore config/routines (campi `failCap` e
-    // `improvableCap`; li applica il server dei verdetti): queste chiavi
-    // servono solo a mostrare subito un valore all'avvio / come ripiego
-    // offline. La prima tiene il nome storico (ci vive il valore che l'owner
-    // aveva già scelto come "loop cap": stessa cosa col nome nuovo).
-    AUTOMATION_LOOP_CAP: 'filo_automation_loop_cap',            // failCap (M)
-    AUTOMATION_IMPROVABLE_CAP: 'filo_automation_improvable_cap', // improvableCap (N)
+    // Cache locali dei tre bilanci del verificatore che corregge (tab
+    // Automazioni, feedback #561). La FONTE DI VERITÀ è il doc Firestore
+    // config/routines (campi `cap2`, `cap1`, `cap0`; li applica il server
+    // quando registra la critica): queste chiavi servono solo a mostrare
+    // subito un valore all'avvio / come ripiego offline.
+    AUTOMATION_CAP2: 'filo_automation_cap2', // giri per i rilievi di livello 3/2
+    AUTOMATION_CAP1: 'filo_automation_cap1', // giri per i rilievi di livello 1
+    AUTOMATION_CAP0: 'filo_automation_cap0', // giri per i soli rilievi di livello 0
   };
 
   // Parametri delle automazioni configurabili dall'owner (tab Automazioni della
-  // dashboard Gestione). Il RANGE dei due contatori del verificatore vive qui;
-  // i DEFAULT (failCap 10, improvableCap 0) vivono con le transizioni promosse
+  // dashboard Gestione). Il RANGE dei tre bilanci del verificatore vive qui;
+  // i DEFAULT (cap2 5, cap1 2, cap0 0) vivono con le transizioni promosse
   // a dati (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS): una sola
   // sorgente, letta dalla dashboard e incorporata dal server al deploy.
   const AUTOMATION = {
+    // Lo 0 è un valore valido per tutti e tre (per cap0 è il default: i casi
+    // rari da soli non si correggono mai); con cap2 a 0 il primo difetto grave
+    // ferma subito la pratica.
+    CAP_MIN: 0,
+    CAP_MAX: 10,
+    // Nomi storici del giro a tre esiti, letti ancora da qualche strumento.
     LOOP_CAP_MIN: 1,
-    // Il tetto dei «migliorabile» può essere 0 (dal 2026-09-03: un migliorabile
-    // passa subito); quello dei «fail» no, o la pratica non si fermerebbe mai.
     IMPROVABLE_CAP_MIN: 0,
     LOOP_CAP_MAX: 10,
     // Timeout di ogni giudice di sicurezza (secondi). I modelli "thinking"
