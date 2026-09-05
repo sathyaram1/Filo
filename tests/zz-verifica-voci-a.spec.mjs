@@ -131,7 +131,9 @@ test.describe('voce per modello (main)', () => {
 
     await stopReading(en);
     await setTts(app, 'aura');
-    const it = await testServer.openReady(openTab, PAGE('it', 'Buongiorno, questa è una pagina in italiano da leggere ad alta voce.'));
+    const it = en;
+    await it.goto(testServer.html(PAGE('it', 'Buongiorno, questa è una pagina in italiano da leggere ad alta voce.')));
+    await it.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
     await resetCalls(app);
     await leggi(it);
     await it.waitForTimeout(1500);
@@ -143,7 +145,9 @@ test.describe('voce per modello (main)', () => {
     await stopReading(it);
     // pagina senza lang
     await setTts(app, 'mai');
-    const nolang = await testServer.openReady(openTab, '<html><body><p id="target">Senza lingua dichiarata, un testo qualunque.</p></body></html>');
+    const nolang = en;
+    await nolang.goto(testServer.html('<html><body><p id="target">Senza lingua dichiarata, un testo qualunque.</p></body></html>'));
+    await nolang.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
     await resetCalls(app);
     await leggi(nolang);
     await nolang.waitForTimeout(1500);
