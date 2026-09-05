@@ -154,25 +154,26 @@
   // e spazio per stati futuri. Cambiarla NON rompe i documenti già scritti.
   const CIPHER_PAD = 32;
 
-  // ── Contatori del verificatore a tre esiti (SPEC-RIDISEGNO-MAX.md §13) ─────
+  // ── I tre bilanci del verificatore che corregge (feedback #561, §4) ────────
   // DEFAULT quando la config non dice niente. I valori EFFETTIVI li detta
-  // l'owner dalla dashboard (doc Firestore `config/routines`, campi `failCap`
-  // e `improvableCap`; il campo legacy `loopCap` vale come alias di `failCap`)
-  // e li applica il SERVER quando registra i verdetti — mai il prompt, mai un
-  // conteggio dichiarato dal client.
-  //   improvableCap (N): quanti verdetti «migliorabile» tornano in correzione;
-  //                      al giro N+1 il lavoro passa e i rilievi non risolti
-  //                      diventano un feedback nuovo (`routine:residuo`).
-  //   failCap (M):       quante bocciature «fail» prima di fermare la pratica
-  //                      e chiamare l'owner (statusReason `loop`).
-  // improvableCap = 0 dal 2026-09-03 (decisione owner): un «migliorabile» passa
-  // subito e i rilievi diventano un feedback residuo a priorità minima. La coda
-  // va spesa sul cammino principale, non sui casi rari (vedi
-  // routines/roles/verifier.md § Che esito dare).
-  // failCap = 10 è una scelta di misura per la prima settimana sul piano Max
-  // (osservazione del processo), non una stima di quanto serve: si abbassa
-  // dalla dashboard senza toccare il codice.
-  const VERIFIER_CAPS = { improvableCap: 0, failCap: 10 };
+  // l'owner dalla dashboard (doc Firestore `config/routines`, campi `cap2`,
+  // `cap1`, `cap0`) e li applica il SERVER quando registra la critica — mai il
+  // prompt, mai un conteggio dichiarato dal client. Le regole che li consumano
+  // stanno in `verifierRound.js` (decideRound), incorporato anch'esso dal
+  // server al deploy.
+  //   cap2 (x): giri di correzione per i rilievi di livello 3 e 2 (la cosa
+  //             chiesta non si ottiene, cammino principale). A bilancio finito
+  //             un 3/2 ferma la pratica e chiama l'owner (statusReason `loop`).
+  //   cap1 (y): giri di correzione per i rilievi di livello 1 (cosmetica,
+  //             attrito fuori cammino). A bilancio finito un 1 va nel feedback
+  //             derivato invece di essere corretto.
+  //   cap0 (z): giri per i soli rilievi di livello 0 (casi rari). Con z = 0 gli
+  //             0 da soli non si correggono mai: si correggono solo insieme ad
+  //             altro (un altro verificatore arriva comunque).
+  // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
+  // I vecchi nomi (`failCap`/`improvableCap`, i tre esiti pass/migliorabile/
+  // fail) sono aboliti: l'esito lo calcola il server dai livelli e dai bilanci.
+  const VERIFIER_CAPS = { cap2: 5, cap1: 2, cap0: 0 };
 
   global.SN_FB_TRANSITIONS = {
     STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAPS,
