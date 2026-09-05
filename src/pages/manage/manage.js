@@ -598,7 +598,7 @@
       const saved = clampCap(r[field] != null ? r[field] : val, f.def, f.min);
       f.input.value = String(saved);
       chrome.storage.local.set({ [f.cacheKey]: saved }).catch(() => {});
-      setCapMsg(field, 'Salvato.', 'ok');
+      setCapMsg(field, vuoto ? `Salvato: vale il default (${saved}).` : 'Salvato.', 'ok');
     } catch (err) {
       setCapMsg(field, 'Salvataggio fallito.', 'err');
       console.error(`[manage] salvataggio ${field} fallito:`, err);
