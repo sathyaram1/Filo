@@ -546,7 +546,7 @@
     sel.appendChild(custom);
     if (where) {
       const model = info && info.model ? info.model : '';
-      where.textContent = model ? `Modello: ${model}` : '';
+      where.textContent = model ? `Modello: ${model}` : (info && info.error ? 'Nessun modello di lettura impostato' : '');
       where.title = info && info.catalogName ? `Voci di ${info.catalogName}` : '';
     }
     const V = window.SN_TTS_VOICES;
