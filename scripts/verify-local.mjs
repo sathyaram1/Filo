@@ -174,9 +174,13 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
     sha: sha || '',
     at: when,
     counts: decision.counts,
+    // Ogni giro tiene anche il TESTO della critica: è la storia che il
+    // verificatore dopo riceve (le porte già trovate vanno ri-provate, e coi
+    // soli livelli non saprebbe quali sono). Il report di chi corregge invece
+    // non ci entra: quello il verificatore dopo non deve vederlo.
     rounds: (Array.isArray(prev.rounds) ? prev.rounds : []).concat([{
       at: when, found: parsed.findings.map((f) => f.level), fixed: decision.fix.map((f) => f.level),
-      consumed: decision.consume, outcome,
+      consumed: decision.consume, outcome, critique: String(critique || '').slice(0, 4000),
     }]),
   };
   if (outcome === 'stop') {
