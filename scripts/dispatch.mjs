@@ -76,7 +76,7 @@ import {
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
-import { writeRole, clearRole } from './lib/routine-role.mjs';
+import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
