@@ -214,13 +214,9 @@ export function withVerdict(state, branch, { verdict, critique, sha, at }) {
   // Un fail secco deve FERMARE, qualunque sia il bilancio: è la bocciatura
   // senza appello di chi non entra nel giro delle correzioni.
   const caps = verdict === 'pass' ? CAPS : { cap2: 0, cap1: 0, cap0: 0 };
-  const r = withCritique(state, branch, { critique: text, sha, at, caps });
-  if (verdict === 'pass' && r.outcome !== 'pass') {
-    // Un "pass" con dentro rilievi di livello alto non è un pass: si rispetta il
-    // testo, non la parola.
-    return r.state;
-  }
-  return r.state;
+  // Un "pass" con dentro rilievi di livello alto non è un pass: vale il testo,
+  // non la parola — è withCritique a decidere.
+  return withCritique(state, branch, { critique: text, sha, at, caps }).state;
 }
 
 /** Il testo della fase 2 in locale: stampato SOLO dopo la critica. PURA. */
