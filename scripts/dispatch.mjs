@@ -821,10 +821,13 @@ async function recordVerifier(id, critiqueText) {
   // lascerebbe scritto "verificato" da una parte e niente dall'altra — con i
   // due cammini che divergono nella direzione più permissiva, che è
   // esattamente quella da cui questa spec viene a togliere l'autorità.
+  // Il testo parte con gli a capo veri (una barra-n scritta come a capo vale
+  // come a capo): è quello che il server conserva per il verificatore dopo.
+  const critiqueNorm = typeof VERIFIER_ROUND.normalizeCritique === 'function' ? VERIFIER_ROUND.normalizeCritique(critiqueText) : String(critiqueText || '');
   const sent = await deliverToChannel('verdict', {
     findings: parsed.findings,
     summary: parsed.summary,
-    critique: String(critiqueText || '').trim().slice(0, 4000),
+    critique: critiqueNorm.trim().slice(0, 4000),
     branch: base.branch || '',
     sha: headSha(ROOT) || '',
   });
