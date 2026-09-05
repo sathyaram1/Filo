@@ -235,10 +235,14 @@
       throw err;
     }
     const data = await res.json();
-    const text = data.choices?.[0]?.message?.content || '';
+    const message = data.choices?.[0]?.message || {};
+    const text = message.content || '';
     const usage = data.usage || {};
     return {
       text,
+      toolCalls: flatToolCalls(message.tool_calls),
+      reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
+      finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
