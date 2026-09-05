@@ -841,6 +841,9 @@
     // Ragionamento del turno in corso (un blocco per turno nella cronologia).
     let reasoningEl = null;
     let turnReasoning = '';
+    // Il modello ha ragionato almeno una volta in questo lavoro: senza, il
+    // riassunto non può chiamarsi «Ragionamento».
+    let sawReasoning = false;
     let turnStartedAt = 0;
     let lastTurn = { text: '', ms: 0 };
     // Quante voci c'erano quando è partito il testo del turno (vedi answerStarted).
