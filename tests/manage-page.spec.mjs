@@ -2199,3 +2199,28 @@ test('il testo della fase 2 oltre il tetto non viene salvato mozzato: lo dice e 
   await page.locator('#mgFixInstructionsSave').click();
   await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato.');
 });
+
+test('un bilancio salvato col campo vuoto torna al default (non a 0) e lo dice; Invio salva come il pulsante', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubCaps(page, { cap2: 3, cap1: 2, cap0: 0, fixInstructions: '' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  const cap2 = page.locator('#mgCap2');
+  await expect(cap2).toHaveValue('3');
+
+  // Campo vuoto → il default della fonte unica (5), non 0.
+  await cap2.fill('');
+  await page.locator('#mgCap2Save').click();
+  await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato: vale il default (5).');
+  await expect(cap2).toHaveValue('5');
+  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(5);
+
+  // Invio nel campo salva quanto il pulsante.
+  await cap2.fill('4');
+  await cap2.press('Enter');
+  await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato.');
+  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(4);
+});

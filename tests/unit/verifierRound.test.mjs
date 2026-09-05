@@ -237,3 +237,25 @@ test('una barra-n in mezzo a una frase, senza una parentesi dopo, resta testo', 
   assert.equal(R.parseFindings(testo).findings.length, 0);
   assert.deepEqual(R.unparsedLevelLines(testo), []);
 });
+
+// ── Bordi del lettore trovati dalla verifica del giro 6 su #561 ──────────────
+
+test('un livello scritto con una parola davanti («[livello 2]») è respinto, non riassunto silenzioso', () => {
+  for (const riga of ['[livello 2] rotto', '[L2] rotto', '[P2] rotto', '- [liv. 2] rotto']) {
+    const brutte = R.unparsedLevelLines(`Provato.\n${riga}`);
+    assert.equal(brutte.length, 1, riga);
+    assert.equal(brutte[0], riga.trim());
+  }
+});
+
+test('una riga di continuazione di un rilievo con «[2] -» in mezzo è testo, non un livello scritto male', () => {
+  const testo = 'Provato.\n[2] rotto\nPassi: critica con [2] - poi start\n[1] bordo';
+  assert.deepEqual(R.unparsedLevelLines(testo), []);
+  const p = R.parseFindings(testo);
+  assert.equal(p.findings.length, 2);
+  assert.equal(p.findings[0].text, 'rotto\nPassi: critica con [2] - poi start');
+});
+
+test('nel riassunto l\'etichetta breve col separatore («Porta [2]: chiusa») resta respinta', () => {
+  assert.deepEqual(R.unparsedLevelLines('Porta [2]: chiusa. Regge tutto.'), ['Porta [2]: chiusa. Regge tutto.']);
+});
