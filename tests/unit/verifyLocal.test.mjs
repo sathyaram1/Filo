@@ -78,6 +78,75 @@ test('withVerdict: qualunque cosa diversa da "pass" è una bocciatura', () => {
   assert.equal(checkVerdict(s.r, SHA).ok, false);
 });
 
+// ─── Il verificatore che corregge, in locale (feedback #561) ─────────────────
+//
+// Stessa struttura del giro in cloud: critica coi livelli → l'esito lo
+// calcolano le regole condivise → se c'è da correggere, la fase 2 (stampata
+// SOLO adesso) → consegna → un'altra verifica.
+
+test('critica senza rilievi: verifica superata sul contenuto', () => {
+  const r = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: 'Provato tutto, regge.', sha: SHA });
+  assert.equal(r.outcome, 'pass');
+  assert.equal(checkVerdict(r.state.r, SHA).ok, true);
+});
+
+test('critica con un 2: fase 2, il verificatore corregge; finché non consegna non si pubblica, e dopo serve un\'altra verifica', () => {
+  let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'funziona Y\n[2] il pulsante non salva\n[0] caso raro', sha: SHA });
+  assert.equal(r.outcome, 'fix');
+  assert.deepEqual(r.decision.fix.map((f) => f.level), [2, 0], 'gli 0 si correggono insieme ad altro');
+  assert.equal(r.state.r.verdict, 'fix-pending');
+  assert.equal(r.state.r.counts.count2, 1, 'il giro si paga da cap2');
+  const bloccato = checkVerdict(r.state.r, SHA);
+  assert.equal(bloccato.ok, false);
+  assert.match(bloccato.reason, /sta correggendo/);
+  // La fase 2 si vede solo adesso, e dice cosa correggere e come consegnare.
+  const testo = phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch: 'r' });
+  assert.match(testo, /\[2\] il pulsante non salva/);
+  assert.match(testo, /verify-local\.mjs corretto/);
+  // Consegna: chiude la fase 2, ma NON approva: serve un'altra verifica.
+  const c = withFixed(r.state, 'r', { report: 'corretto', sha: ALTRO_SHA });
+  assert.equal(c.ok, true);
+  assert.equal(c.state.r.verdict, 'fixed');
+  const dopo = checkVerdict(c.state.r, ALTRO_SHA);
+  assert.equal(dopo.ok, false);
+  assert.match(dopo.reason, /un'altra verifica/);
+  // La richiesta e i bilanci sopravvivono al nuovo `start`.
+  s = withRequest(c.state, 'r', { request: 'fai X', sha: ALTRO_SHA });
+  assert.equal(s.r.counts.count2, 1, 'i bilanci sono del lavoro, non della singola verifica');
+  assert.equal(s.r.verdict, undefined, 'la verifica nuova parte senza esito');
+});
+
+test('withFixed senza una correzione in sospeso: rifiutata', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  assert.equal(withFixed(s, 'r', { report: 'x', sha: SHA }).ok, false);
+});
+
+test('un 2 a bilancio esaurito, o che chiede una decisione: il lavoro si ferma (fail), niente da correggere', () => {
+  let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  s.r.counts = { count2: 5 };
+  const r = withCritique(s, 'r', { critique: '[2] ancora rotto', sha: SHA });
+  assert.equal(r.outcome, 'stop');
+  assert.equal(r.state.r.verdict, 'fail');
+  assert.match(checkVerdict(r.state.r, SHA).reason, /bocciato/);
+  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2?] quale strada?', sha: SHA });
+  assert.equal(d.outcome, 'stop');
+});
+
+test('i rilievi non corretti (0 da soli, 1 a bilancio finito) restano in `derived` per il report', () => {
+  const r = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[0] caso raro', sha: SHA });
+  assert.equal(r.outcome, 'pass');
+  assert.equal(r.state.r.derived.length, 1);
+  assert.equal(checkVerdict(r.state.r, SHA).ok, true, 'uno 0 da solo non ferma la pubblicazione');
+});
+
+test('il brief non contiene la fase 2: chi verifica deve cercare come se il suo lavoro finisse con la critica', () => {
+  const brief = buildVerifierBrief({ request: 'x', branch: 'r', recipe: 'RECIPE' });
+  assert.match(brief, /verify-local\.mjs critica/);
+  assert.ok(!/corretto "/.test(brief), 'il comando della correzione non si annuncia prima');
+  assert.ok(!/FASE 2/.test(brief));
+});
+
 // L'isolamento è il motivo per cui questa verifica vale qualcosa: se al
 // verificatore arriva il diff, sta rileggendo il lavoro di un altro invece di
 // provare la cosa chiesta.
