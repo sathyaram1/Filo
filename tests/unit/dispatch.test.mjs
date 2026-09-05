@@ -194,12 +194,11 @@ test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e c
 // ─── Stato su disco ───────────────────────────────────────────────────────────
 
 test('writeState/readState/clearState: round-trip su STATE_DIR temporanea', () => {
-  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fail', 'boom');
+  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fix', '[2] boom');
   writeState(s);
   const back = readState('DISK1');
-  assert.equal(back.verifierVerdict, 'fail');
-  assert.equal(back.loopCount, 1);
-  assert.equal(back.verifierCritique, 'boom');
+  assert.equal(back.verifierVerdict, 'fix-pending');
+  assert.equal(back.verifierCritique, '[2] boom');
   clearState('DISK1');
   assert.equal(readState('DISK1'), null);
 });
