@@ -1028,7 +1028,9 @@
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
   };
-  function summarizeActivity(types) {
+  // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
+  // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
+  function summarizeActivity(types, hasReasoning = true) {
     const counts = new Map();
     for (const t of types) counts.set(t, (counts.get(t) || 0) + 1);
     const parts = [];
@@ -1036,7 +1038,7 @@
       const fn = ACTIVITY_VERBS[t];
       if (fn) parts.push(fn(n));
     }
-    if (!parts.length) return 'Ragionamento';
+    if (!parts.length) return hasReasoning ? 'Ragionamento' : 'Come ha lavorato';
     const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : parts[0];
     return `Ha ${list}`;
   }
