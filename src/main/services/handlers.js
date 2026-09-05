@@ -1993,7 +1993,11 @@ function toolResultText({ action, res, rendered }) {
   const Levels = globalThis.SN_ACTION_LEVELS;
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return (Levels && Levels.describe(action)) || type; } catch (_) { return type; } };
-  if (!res || res.rejected || !res.kept) {
+  // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
+  // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
+  // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
+  // una spunta dell'accoglienza): l'esito lo dice `executed`.
+  if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
@@ -2007,15 +2011,19 @@ function toolResultText({ action, res, rendered }) {
       + 'NON richiamare questa azione: la conferma è già in corso. Se hai altro da fare prosegui; altrimenti rispondi in una riga, senza dire di aver già fatto.';
   }
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
-    return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere.';
+    return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
-    return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare.';
+    return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if (res.executed) return `Eseguita: ${describe()}.`;
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
-  return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
+  if (res.kept) return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
+  // Non eseguita e senza niente da mostrare: mancava qualcosa (nessuna scheda
+  // web attiva, un riferimento che non trova niente, un dato vuoto).
+  const detail = res.output ? ` (${JSON.stringify(res.output).slice(0, 200)})` : '';
+  return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
 }
 
 // #360 — Filo propone LUI la segnalazione quando ammette una mancanza.
