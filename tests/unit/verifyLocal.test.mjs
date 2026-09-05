@@ -591,6 +591,6 @@ test('CLI giro 10: la fase 2 persa si rilegge (stessa critica, o status); un pas
   assert.equal(p.code, 0, p.out);
   assert.match(p.out, /verifica superata/);
   assert.doesNotMatch(p.out, /Si può pubblicare/);
-  assert.match(p.out, /modifiche non salvate/);
+  assert.match(p.out, /[Mm]odifiche non salvate/);
   assert.match(vl(casa, 'status').out, /modifiche non salvate/);
 });
