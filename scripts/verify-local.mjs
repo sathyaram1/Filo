@@ -307,6 +307,11 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
+    // Una consegna ripetuta dopo una consegna riuscita non è «senza critica»:
+    // dirlo mandava a cercare una critica che c'era (verifica del giro 10).
+    if (prev.verdict === 'fixed') {
+      return { ok: false, reason: `la correzione è già stata consegnata su questo ramo (${String(prev.fixedSha || '').slice(0, 8) || 'commit non registrato'}): non c'è altro da consegnare. Serve un'altra verifica, di un'altra istanza (verify-local.mjs start, lo rilancia chi guida).` };
+    }
     return { ok: false, reason: 'nessuna correzione in sospeso su questo ramo: prima la critica (verify-local.mjs critica)' };
   }
   if (dirty) {
