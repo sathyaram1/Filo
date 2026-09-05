@@ -187,8 +187,9 @@ giudici (nessun reason o `judges`); (2) domande della routine (appende le domand
 alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
 3/2 che non si può più correggere da soli — bilancio delle correzioni esaurito
 (`statusReason: loop`, con la critica coi livelli in chat) — oppure che chiede una
-decisione dell'owner (`statusReason: decisione`); in entrambi i casi lo stato del
-giro (bilanci compresi) si azzera, così dopo la decisione dell'owner il lavoro
+decisione dell'owner (`statusReason: decisione`); in entrambi i casi bilanci e
+verdetti del giro si azzerano — la storia delle critiche resta, per il
+verificatore del lavoro rifatto — così dopo la decisione dell'owner il lavoro
 rifatto riparte da un verificatore invece di rimbalzare a `design`; (4) fix bocciato
 dal **controllo di sicurezza** o dal cancello di fusione (`statusReason: secaudit`);
 (5) lavorazione arenata ripetutamente (`statusReason: arenato`). La risposta

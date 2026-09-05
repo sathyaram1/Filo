@@ -176,6 +176,13 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   if (prev.verdict === 'pass' || prev.verdict === 'fail') {
     return { ok: false, state: s, reason: `la critica di questo giro è già registrata (esito: ${prev.verdict === 'pass' ? 'superata' : 'fermato'}) e non si modifica più. La verifica dopo la fa un'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida).` };
   }
+  // Dopo un pass o uno stop la critica del giro è registrata: una seconda,
+  // senza un nuovo `start`, è la stessa istanza che ci ripensa — e con un [2]
+  // dentro trasformava un pass in «sta correggendo», pagando un giro (verifica
+  // del giro 3 su #561; sul server la porta era già chiusa).
+  if (prev.verdict === 'pass' || prev.verdict === 'fail') {
+    return { ok: false, state: s, reason: `la critica di questo giro è già registrata (esito: ${prev.verdict === 'pass' ? 'superata' : 'fermato'}) e non si modifica più. La verifica dopo la fa un'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida).` };
+  }
   // Un livello fra parentesi quadre che non apre una riga non è un rilievo, e
   // farlo finire nel riassunto trasformava un [2] in un pass silenzioso.
   const brutte = ROUND.unparsedLevelLines(critique);
