@@ -1097,24 +1097,43 @@
     return fn ? fn(a) : null;
   }
 
-  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null } = {}) {
+  // Una riga o un esito di comando nel blocco di attività, per un'azione già
+  // eseguita dal main. Ritorna true se l'azione è stata raccontata così (e
+  // quindi non è un bottone). Serve sia in diretta (evento 'done' mentre il
+  // turno lavora) sia a fine turno per le azioni arrivate senza evento.
+  function tellActionInActivity(activity, a) {
+    if (!activity || !a) return false;
+    // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
+    // va nella cronologia del blocco, non sotto la risposta. Se è stato
+    // bloccato (terminale spento) resta in vista: è un problema da leggere.
+    if (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
+      activity.addCommand(a._output);
+      return true;
+    }
+    const row = activityRowFor(a);
+    if (row) { activity.addRow(a.type, row.icon, row.text); return true; }
+    return false;
+  }
+
+  // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
+  // attività (evento 'done'): a fine turno non si ripetono.
+  function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
     if (!actions || !actions.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
     let hasAck = false;
     for (const a of actions) {
-      // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
-      // va nella cronologia del blocco, non sotto la risposta. Se è stato
-      // bloccato (terminale spento) resta in vista: è un problema da leggere.
-      if (activity && isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
-        activity.addCommand(a._output);
-        continue;
-      }
-      const row = activityRowFor(a);
-      if (row) {
-        if (activity) activity.addRow(a.type, row.icon, row.text);
-        else wrap.appendChild(makeActivityRow(row.icon, row.text));
-        continue;
+      const told = a && a._callId && shown && shown.has(a._callId);
+      if (activity) {
+        if (told) {
+          // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
+          if (activityRowFor(a) || (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked)) continue;
+        } else if (tellActionInActivity(activity, a)) {
+          continue;
+        }
+      } else {
+        const row = activityRowFor(a);
+        if (row) { wrap.appendChild(makeActivityRow(row.icon, row.text)); continue; }
       }
       const btn = renderActionButton(a, { onAck });
       if (btn) wrap.appendChild(btn);
