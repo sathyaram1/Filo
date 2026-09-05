@@ -704,6 +704,12 @@ if (isMain) {
   if (cmd === 'status' || !cmd) {
     const r = verdictForCurrentBranch();
     console.log(`${r.branch}: ${r.reason}`);
+    // A correzione in sospeso si dice anche COSA c'è da correggere, e come
+    // rileggere la fase 2 intera: senza, un'uscita persa non si recuperava.
+    if (r.entry && r.entry.verdict === 'fix-pending' && r.entry.pending && Array.isArray(r.entry.pending.findings)) {
+      console.log(`Rilievi da correggere:\n${ROUND.formatFindings(r.entry.pending.findings)}`);
+      console.log('Per rileggere la fase 2 intera (istruzioni comprese) rimanda la stessa identica critica: viene ristampata senza pagare un altro giro.');
+    }
     process.exit(r.ok ? 0 : 1);
   }
 
