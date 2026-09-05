@@ -711,7 +711,7 @@ async function deliverToChannel(intent, data) {
     if (r.outcome === 'fault') {
       process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): la decisione NON è stata registrata\n`);
     } else if (r.outcome === 'refused') {
-      process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${r.reason}): non ripiego, la decisione non viene registrata\n`);
+      process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${motivoRifiuto(r)}): non ripiego, la decisione non viene registrata\n`);
     }
     return r;
   } catch (e) {
