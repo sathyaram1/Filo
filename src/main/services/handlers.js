@@ -1339,7 +1339,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (updated.length) broadcastLiveUpdate();
         return {
           executed: updated.length > 0,
-          kept: false,
+          kept: updated.length > 0,
           output: { updated: updated.map(describeTimerEntry) },
         };
       }
