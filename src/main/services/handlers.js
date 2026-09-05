@@ -2019,7 +2019,16 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
-  if (res.executed) return `Eseguita: ${describe()}.`;
+  if (res.executed) {
+    // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
+    // applicata: Tema → Scuro»), non quella del popup di conferma («Filo vuole
+    // impostare…»): un «vuole» dopo «Eseguita» faceva dire al modello che era
+    // ancora da fare. Senza il punto finale: lo mette la riga.
+    let done = '';
+    try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
+    done = String(done || describe()).replace(/\.+\s*$/, '');
+    return `Eseguita: ${done}.`;
+  }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
   if (res.kept) return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
