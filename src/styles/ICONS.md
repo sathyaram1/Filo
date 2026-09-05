@@ -90,6 +90,61 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `restore` | Due quadrati sovrapposti (ripristina da massimizzata) |
 | `home` | Tetto a triangolo sopra corpo casa |
 | `openForLater` | Alias di `filoLogo` — "Salvati per dopo" mostra il logo |
+| `openTab` | Finestra con freccia che esce dall'angolo: Filo apre una scheda |
+| `folder` | Cartella con linguetta: apre un file |
+| `timer` | Cronometro con pulsante in alto e lancetta |
+| `alarm` | Sveglia con due campanelle e piedini |
+| `alarmOff` | La stessa sveglia, barrata (tolta) |
+| `alarmShift` | Orologio con freccia ad arco sopra (spostata) |
+| `pin` | Puntina da disegno: una lezione fissata nella memoria |
+| `searchWeb` | Lente con un globo dentro: cerca sul web |
+| `checklist` | Tre righe con spunte: l'intervista di benvenuto |
+| `clipboard` | Cartellina con molletta e righe: il manifesto delle capacità |
+| `readDocument` | Foglio con angolo piegato e lente in basso a destra: legge un documento |
+| `calendar` | Calendario con anelli e "+" nel foglio: evento creato |
+| `broom` | Scopa: pulisce le schede |
+| `trash` | Cestino con coperchio: elimina definitivamente |
+| `eraser` | Gomma da cancellare: cancella la memoria |
+| `palette` | Tavolozza con tre pozzetti: estetica |
+| `terminal` | Finestra con ">_": comando nel terminale |
+| `globe` | Globo con equatore e meridiano: scheda da un altro paese |
+| `globeOff` | Globo barrato: connessione diretta |
+| `globePinned` | Globo con segnalibro nell'angolo: regola "sempre da un altro paese" |
+| `windowFrame` | Cornice con barra del titolo e due pallini: comando della finestra |
+| `brush` | Pennello: stile della pagina |
+| `undo` | Freccia che torna indietro: ripristina |
+| `mailOpen` | Busta aperta: posta letta (prevista) |
+| `mailSend` | Busta con freccia: posta inviata (prevista) |
+| `readPage` | Finestra con righe di testo: legge la pagina aperta (prevista) |
+| `click` | Freccia del puntatore: clicca nella pagina (prevista) |
+| `typeText` | Casella con cursore: scrive in un campo (prevista) |
+| `pencil` | Matita: modifica un file (prevista) |
+| `fileNew` | Foglio con "+": crea un file (prevista) |
+| `attach` | Graffetta: allega (prevista) |
+| `camera` | Macchina fotografica: foto/telecamera (prevista) |
+| `mic` | Microfono: ascolta (prevista) |
+| `memory` | Cervello a due lobi: la memoria di Filo (prevista) |
+| `copy` | Due fogli sovrapposti: copia (prevista) |
+| `bell` | Campanella: promemoria/notifica (prevista) |
+| `repeat` | Due frecce a ciclo: automazione ricorrente (prevista) |
+| `question` | Cerchio con "?": Filo chiede all'utente (prevista) |
+| `tabs` | Finestra con due linguette: le schede aperte (prevista) |
+| `location` | Goccia del segnaposto: posizione (prevista) |
+| `list` | Elenco puntato: piano di lavoro (prevista) |
+| `sparkles` | Due scintille: genera (prevista) |
+| `reasoning` | Nuvola di pensiero: sta ragionando (stato) |
+| `check` | Spunta: fatto (stato) |
+| `warning` | Triangolo con "!": avviso (stato) |
+| `blocked` | Cerchio barrato: bloccato (stato) |
+
+### Icone delle azioni dell'agente
+
+La corrispondenza azione → icona (`NAVIGA` → `openTab`, …) vive in
+`src/shared/actionIcons.js` (`SN_ACTION_ICONS.svg(type, size)`): l'icona di
+un'azione sta in un posto solo, e una sentinella (`tests/unit/actionIcons.test.mjs`)
+diventa rossa se un'azione registrata in `actionLevels.js` resta senza icona.
+Le icone marcate "prevista" sono disegnate per poteri che l'agente non ha
+ancora: quando l'azione nasce, si sposta da `PREVISTE` ad `AZIONI` col nome vero.
 
 ## Note operative
 

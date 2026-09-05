@@ -2551,8 +2551,11 @@ la sequenza dei turni; stili `.dash-activity*` in `dashboard.css`).
   teatro, non stato: l'utente le leggeva come ragionamento del modello.
 - **Un click apre la cronologia completa**, nell'ordine in cui è avvenuta:
   ragionamento di ogni turno (tutto, non le ultime tre righe), righe delle
-  azioni «icona + due parole» (`ACTIVITY_ROWS`, tabella unica: l'icona di
-  un'azione sta in un posto solo), esiti dei comandi eseguiti subito, e le
+  azioni «icona + due parole» (`ACTIVITY_ROWS` dà il testo; l'icona la dà
+  `src/shared/actionIcons.js`, `SN_ACTION_ICONS.svg(type, size)`: SVG della
+  famiglia di Filo, mai emoji — l'icona di un'azione sta in un posto solo, e
+  la sentinella `tests/unit/actionIcons.test.mjs` pretende che ogni azione
+  registrata in `actionLevels.js` ne abbia una), esiti dei comandi eseguiti subito, e le
   **note**: il testo di un turno che non era l'ultimo («Provo subito tutti e
   tre…») era una bolla e diventa una nota dentro il blocco. Per l'utente conta
   la risposta, non il commento a metà lavoro. Il prompt chiede al modello di
