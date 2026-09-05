@@ -134,6 +134,10 @@
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,
+    // Il testo della fase 2 (istruzioni per chi corregge): stesso tetto del
+    // server, che oltre taglia. La dashboard rifiuta il testo più lungo invece
+    // di salvarlo mozzato in silenzio.
+    FIX_INSTRUCTIONS_MAX: 8000,
     // Nomi storici del giro a tre esiti, letti ancora da qualche strumento.
     LOOP_CAP_MIN: 1,
     IMPROVABLE_CAP_MIN: 0,
