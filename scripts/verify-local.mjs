@@ -674,7 +674,7 @@ if (isMain) {
       // dicono di no. Dirlo qui evita di scoprirlo alla chiusura (verifica
       // del giro 10 su #561).
       if (isDirty()) {
-        console.log(`Attenzione: ci sono modifiche non salvate. Il pass vale per ${sha.slice(0, 8)}, non per com'è l'albero adesso: finché restano, non si pubblica (lo dice anche "status"). Salvale in un commit — e allora serve un'altra verifica — oppure scartale.`);
+        console.log(`Modifiche non salvate: il pass vale per ${sha.slice(0, 8)}, non per l'albero com'è adesso, e finché restano non si pubblica ("status" lo ripete). Se le salvi in un commit serve un'altra verifica; altrimenti scartale.`);
       } else {
         console.log('Si può pubblicare.');
       }
