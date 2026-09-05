@@ -383,6 +383,18 @@ html, body {
   color: var(--sn-fg);
 }
 
+/* Tempi del turno (ragiona · scrive · fine): stesso trattamento del riuso,
+   dato di servizio che si spiega al passaggio del mouse. */
+.sn-history-timing {
+  white-space: nowrap;
+  cursor: help;
+  border-bottom: 1px dotted var(--sn-border);
+}
+
+.sn-history-timing:hover {
+  color: var(--sn-fg);
+}
+
 .sn-history-remove {
   border: none;
   background: none;
