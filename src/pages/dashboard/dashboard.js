@@ -1256,8 +1256,9 @@
       // Un'azione senza niente da cliccare (`_traccia`) o non riuscita non
       // diventa MAI un bottone: un chip che al click non fa niente è un vicolo
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
-      // riga sta già nel diario.
-      if ((a._traccia && !anche) || a._executed === false) continue;
+      // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
+      // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
+      if (!a._confirm && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
