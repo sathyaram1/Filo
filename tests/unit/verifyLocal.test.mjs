@@ -319,6 +319,7 @@ test('start col riallineamento in conflitto: abort, ramo intatto, niente rebase 
 });
 
 // ── Verifica del 2026-09-05 su #561: le porte trovate dal verificatore ──────
+// (i rilievi registrati con `verify-local.mjs critica`, corretti nello stesso giro)
 
 test('#561 verifica: una critica vuota non è un pass', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
