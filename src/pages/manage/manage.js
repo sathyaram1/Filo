@@ -603,7 +603,14 @@
 
   async function saveFixInstructions() {
     if (!mgFixInstructions) return;
-    const text = String(mgFixInstructions.value || '').slice(0, 8000);
+    const text = String(mgFixInstructions.value || '');
+    // Oltre il tetto il server taglia: meglio dirlo che salvare un testo
+    // mozzato con un «Salvato.» sopra.
+    const max = Number(AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
+    if (text.length > max) {
+      setCapMsg('fixInstructions', `Troppo lungo: ${text.length} caratteri, il massimo è ${max}. Non salvato.`, 'err');
+      return;
+    }
     try {
       const r = await sendToMain({ type: CAPS_SET, fixInstructions: text });
       if (!r || !r.ok) {
