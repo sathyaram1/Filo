@@ -189,6 +189,105 @@ test('B — un\'azione di livello 2 chiamata come strumento apre la conferma, e 
   await app.evaluate(() => { try { globalThis.__restoreProvider2?.(); } catch (_) {} });
 });
 
+test('D — un\'azione eseguita senza bottone in chat torna al modello come eseguita; la sveglia tolta ha la sua riga; chiamate senza id', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(async () => { await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Uovo', seconds: 600 }); });
+
+  await app.evaluate(async () => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__restoreProvider4 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.__calls4 = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
+      const n = globalThis.__calls4.push({ messages: JSON.parse(JSON.stringify(messages)) });
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      if (n === 1) {
+        // Il fornitore non manda gli id delle chiamate.
+        try { onToolCall && onToolCall({ id: '', name: 'SALVA_LEZIONE' }); } catch (_) {}
+        try { onToolCall && onToolCall({ id: '', name: 'CANCELLA_SVEGLIA' }); } catch (_) {}
+        return {
+          ...base, text: '',
+          toolCalls: [
+            { id: '', name: 'SALVA_LEZIONE', arguments: '{"testo":"L\'utente non beve caffè."}' },
+            { id: '', name: 'CANCELLA_SVEGLIA', arguments: '{"etichetta":"Uovo"}' },
+          ],
+          reasoningDetails: [], finishReason: 'tool_calls',
+        };
+      }
+      const finale = 'Segnato, e ho tolto il timer dell\'uovo.';
+      try { onDelta && onDelta(finale); } catch (_) {}
+      return { ...base, text: finale, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+
+  await page.locator('#input').fill('ricordati che non bevo caffè e togli il timer dell\'uovo');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato, e ho tolto' })).toBeVisible({ timeout: 10_000 });
+
+  // Al modello: la lezione risulta ESEGUITA (non c'è niente da mostrare in
+  // chat, ma è andata a buon fine), la sveglia risulta TOLTA, e le risposte
+  // agli strumenti citano gli stessi id delle chiamate.
+  const calls = await app.evaluate(() => globalThis.__calls4);
+  expect(calls.length).toBe(2);
+  const m = calls[1].messages;
+  const assistant = m[m.length - 3];
+  const ids = assistant.tool_calls.map((c) => c.id);
+  expect(ids.every((id) => id)).toBe(true);
+  expect(m[m.length - 2].tool_call_id).toBe(ids[0]);
+  expect(m[m.length - 1].tool_call_id).toBe(ids[1]);
+  expect(m[m.length - 2].content).toMatch(/^Eseguita/);
+  expect(m[m.length - 2].content).not.toMatch(/NON eseguita/);
+  expect(m[m.length - 1].content).toMatch(/^Tolte: .*Uovo/);
+
+  // La riga della sveglia tolta c'è, una volta sola; il timer non c'è più.
+  const activity = page.locator('.dash-activity');
+  await expect(activity).toHaveAttribute('data-phase', 'done');
+  await expect(activity.locator('.dash-activity-label')).toContainText('cancellato una sveglia');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-row', { hasText: 'Cancellata' })).toHaveCount(1);
+  await expect(activity.locator('.dash-activity-row', { hasText: 'Uovo' })).toHaveCount(1);
+  const timers = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.listTimers()).map((t) => t.label));
+  expect(timers).not.toContain('Uovo');
+
+  await app.evaluate(() => { try { globalThis.__restoreProvider4?.(); } catch (_) {} });
+});
+
+test('E — un modello che chiama azioni senza mai rispondere viene fermato, e la chat lo dice', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  await app.evaluate(async () => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__restoreProvider5 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.__calls5 = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      globalThis.__calls5 += 1;
+      try { onDelta && onDelta('ancora…'); } catch (_) {}
+      return {
+        model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: 'ancora…',
+        toolCalls: [{ id: `k${globalThis.__calls5}`, name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' }],
+        reasoningDetails: [], finishReason: 'tool_calls',
+      };
+    };
+  });
+
+  await page.locator('#input').fill('non finire mai');
+  await page.locator('#sendBtn').click();
+  const bubble = page.locator('.dash-bubble-filo', { hasText: 'Mi sono fermato' });
+  await expect(bubble).toBeVisible({ timeout: 30_000 });
+  await expect(bubble).toContainText('Dimmi se devo continuare');
+  const n = await app.evaluate(() => globalThis.__calls5);
+  expect(n).toBe(12);
+
+  await app.evaluate(() => { try { globalThis.__restoreProvider5?.(); } catch (_) {} });
+});
+
 test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima degli argomenti', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
