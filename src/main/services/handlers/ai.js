@@ -245,10 +245,53 @@ module.exports = function register(on, ctx) {
           console.warn('[SN] TTS fallito:', e.message || e);
         }
       }
-      return ttsFallback((lastErr && lastErr.message) || 'tts_failed');
+      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code);
     } catch (e) {
       return ttsFallback(e?.message || String(e));
     }
+  });
+
+  // Le voci del modello di lettura IN USO, per la tendina delle Preferenze:
+  // quale modello legge (il primo della catena), il suo catalogo raggruppato
+  // per lingua (vuoto se non lo conosciamo o sceglie da sé), e la voce scelta
+  // finora. `chosen` torna anche se non è nel catalogo: è un nome scritto a
+  // mano, e la pagina lo mostra nel campo di testo.
+  on(MSG.TTS_VOICES, async () => {
+    const Voices = globalThis.SN_TTS_VOICES;
+    let model = '';
+    try {
+      const settings = await getEffectiveSettings();
+      const ref = modelForAction(settings, SN_CONST.ACTIONS.TTS);
+      const attempts = buildAttemptChain(settings, ref, SN_CONST.ACTIONS.TTS);
+      model = (attempts[0] && attempts[0].model) || '';
+    } catch (e) {
+      return { ok: true, model: '', catalog: '', required: false, groups: [], error: e?.message || String(e) };
+    }
+    const cat = Voices ? Voices.catalogFor(model) : null;
+    let groups = cat ? Voices.groupedByLang(model) : [];
+    if (!cat && learnedVoices.has(model)) {
+      // Catalogo imparato dal router in questa sessione: nomi nudi, una lingua
+      // se il nome la dichiara ("-it"), altrimenti tutte insieme.
+      const list = learnedVoices.get(model);
+      const byLang = new Map();
+      for (const id of list) {
+        const m = /(?:^|-)([a-z]{2})(?:-|$)/i.exec(id);
+        const l = m ? m[1].toLowerCase() : '';
+        if (!byLang.has(l)) byLang.set(l, []);
+        byLang.get(l).push({ id, lang: l, label: id });
+      }
+      groups = [...byLang.entries()].map(([lang, voices]) => ({
+        lang, label: (Voices.LANG_LABELS[lang] || lang || 'voci'), voices,
+      }));
+    }
+    return {
+      ok: true,
+      model,
+      catalog: cat ? cat.id : '',
+      catalogName: cat ? cat.name : '',
+      required: cat ? cat.required !== false : !learnedVoices.has(model),
+      groups,
+    };
   });
 
   // Modello con cui provare un fornitore quando la prova non ne indica uno
