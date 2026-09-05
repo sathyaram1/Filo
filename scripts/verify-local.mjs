@@ -188,7 +188,19 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   // per un comando ripetuto: finché la correzione è in sospeso, prima si
   // consegna.
   if (prev.verdict === 'fix-pending' && prev.pending) {
-    return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start.' };
+    // La STESSA critica (stesso testo, stesso commit) rimandata dalla stessa
+    // istanza: è la risposta persa (uscita troncata, terminale chiuso), e si
+    // ridà la stessa fase 2 senza scrivere niente e senza ripagare il giro,
+    // come già sul server (verifica del giro 10 su #561). Un testo diverso
+    // resta una seconda critica, e viene respinto.
+    if (ROUND.normalizeCritique(critique) === String(prev.critique || '') && String(sha || '') === String(prev.sha || '')) {
+      const p = prev.pending;
+      return {
+        ok: true, state: s, replayed: true, outcome: 'fix',
+        decision: { fix: p.findings || [], derived: Array.isArray(p.derived) ? p.derived : [], budgets: p.budgets || null, blocking: [] },
+      };
+    }
+    return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start. (Se ti serve rileggere la fase 2, rimanda la stessa identica critica: viene ristampata senza pagare.)' };
   }
   // Consegnata la correzione, la verifica dopo la fa un'ALTRA istanza, e parte
   // da `start`: una critica registrata qui in mezzo sarebbe chi ha corretto che
