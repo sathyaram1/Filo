@@ -78,6 +78,35 @@ test('Lettura: cambiato il modello, la voce è del suo catalogo (e una voce del 
   expect(info.groups[0].voices.map((v) => v.id)).toContain('it-IT-ElsaNeural');
 });
 
+test('Preferenze: la tendina mostra le voci del modello in uso; una voce di un altro modello si legge come automatica', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const T = globalThis.SN_TEST_MODELS;
+    const nick = C.parseModelRefs(T.models[C.ACTIONS.TTS])[0];
+    await globalThis.SN_STORAGE.setSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      modelRegistry: { ...T.registry, [nick]: { provider: 'openrouter', model: 'microsoft/mai-voice-2' } },
+      models: { ...T.models },
+      tts: { voice: '', rate: 1, pitch: 1, modelVoice: 'im_nicola' }, // voce di Kokoro, modello MAI
+    });
+  });
+  const page = await openTab('filo://preferences/preferences.html');
+  const sel = page.locator('#ttsModelVoice');
+  await expect.poll(() => sel.evaluate((s) => s.options.length), { timeout: 10_000 }).toBeGreaterThan(3);
+  // La lettura ignora la voce di Kokoro: la pagina dice «automatica», non «altra voce».
+  expect(await sel.inputValue()).toBe('');
+  await expect(page.locator('#ttsModelVoiceCustom')).toBeHidden();
+  expect(await sel.evaluate((s) => [...s.options].map((o) => o.value))).toContain('it-IT-ElsaNeural');
+  expect(await page.locator('#ttsModelVoiceModel').textContent()).toContain('microsoft/mai-voice-2');
+  // Un nome scritto a mano resta visibile nel campo di testo.
+  await sel.selectOption('__custom__');
+  await page.locator('#ttsModelVoiceCustom').fill('la-mia-voce');
+  await expect.poll(async () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).tts.modelVoice),
+    { timeout: 10_000 }).toBe('la-mia-voce');
+});
+
 test('Lettura: un modello ignoto impara le voci dall\'errore del router, o dice che serve un nome', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await app.evaluate(async () => {
