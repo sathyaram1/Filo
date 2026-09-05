@@ -538,7 +538,7 @@
   // --- PREVISTE: clicca nella pagina (freccia del puntatore).
   const click =
     `<path d="M5 3.5l6 14.5 2-6 6-2z"/>` +
-    `<path d="M13 13l6 6"/>`;
+    `<path d="M13.5 12.5l5.5 5.5"/>`;
 
   // --- PREVISTE: scrivi in un campo (casella con il cursore).
   const typeText =
