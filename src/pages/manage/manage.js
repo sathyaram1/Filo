@@ -632,8 +632,16 @@
 
   for (const [field, f] of Object.entries(CAP_FIELDS)) {
     if (f.save) f.save.addEventListener('click', () => saveCap(field));
-    // Digitando si azzera il messaggio di esito precedente.
-    if (f.input) f.input.addEventListener('input', () => setCapMsg(field, '', null));
+    // Digitando si azzera il messaggio di esito precedente; Invio salva, come
+    // il pulsante (due strade, una cosa sola).
+    if (f.input) {
+      f.input.addEventListener('input', () => setCapMsg(field, '', null));
+      f.input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || f.input.disabled) return;
+        e.preventDefault();
+        saveCap(field);
+      });
+    }
   }
   if (mgFixInstructionsSave) mgFixInstructionsSave.addEventListener('click', saveFixInstructions);
   if (mgFixInstructions) mgFixInstructions.addEventListener('input', () => setCapMsg('fixInstructions', '', null));
