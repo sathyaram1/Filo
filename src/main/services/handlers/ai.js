@@ -136,7 +136,9 @@ module.exports = function register(on, ctx) {
       // evita di far cercare un problema di rete.
       const handWritten = voice && Voices && !Voices.isKnownVoice(voice, model)
         && !(learnedVoices.get(model) || []).includes(voice);
-      if (handWritten && e && e.status === 400) {
+      // Il 400 si legge dallo status o, se manca, dal testo dell'errore.
+      const rifiutata = (e && e.status === 400) || /\b400\b/.test(msg);
+      if (handWritten && rifiutata) {
         const err = new Error(I18n ? I18n.t('err_tts_voice_unknown', model, voice) : msg);
         err.code = 'TTS_VOICE_UNKNOWN';
         throw err;
