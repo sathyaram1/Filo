@@ -65,7 +65,23 @@
   // riprodurlo); le righe PRIMA del primo rilievo sono il riassunto («cosa
   // funziona»). Una critica senza nessuna riga con livello ha zero rilievi:
   // è il pass.
-  const FINDING_LINE = /^\s*(?:[-*•]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
+  // Il livello può stare dopo un punto elenco («- [2]») o un numero («1. [2]»):
+  // un elenco numerato è il modo più naturale di scrivere tre rilievi.
+  const FINDING_LINE = /^\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
+  const LEVEL_TOKEN = /\[\s*[0-3]\s*\??\s*\]/;
+
+  /**
+   * Le righe che portano un livello fra parentesi quadre ma NON aprono un
+   * rilievo («Rilievo [2]: il pulsante non salva»). Senza questo controllo
+   * finivano nel riassunto, e un lavoro con un [2] scritto così passava in
+   * silenzio (verifica del giro 2 su #561): chi registra la critica le
+   * rifiuta chiedendo il formato giusto. PURA.
+   */
+  function unparsedLevelLines(text) {
+    return String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')
+      .filter((l) => LEVEL_TOKEN.test(l) && !FINDING_LINE.test(l))
+      .map((l) => l.trim());
+  }
 
   /**
    * Legge la critica scritta dal verificatore. PURA.
