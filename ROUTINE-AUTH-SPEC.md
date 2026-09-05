@@ -171,7 +171,10 @@ Punti non negoziabili del flusso:
    feedback derivato per lavoro). Sono respinti, prima di scrivere qualsiasi
    cosa: una critica vuota (nessun rilievo e nessun riassunto), un verdetto
    senza lo sha del commit provato (in ogni forma), una critica coi livelli
-   scritti fuori posto (`Rilievo [2]: …` non è un rilievo), e una critica su
+   scritti fuori posto (`Rilievo [2]: …` non è un rilievo), una consegna il
+   cui elenco strutturato dei rilievi non combacia col testo della critica
+   (l'esito si calcola dal TESTO registrato, letto dal server con lo stesso
+   lettore dello strumento; l'elenco può solo confermarlo), e una critica su
    un feedback che non è in verifica (già a decidere). Un risolutore
    consegna, non si auto-approva.
 4. **Il ramo combacia** con quello legato al biglietto.
