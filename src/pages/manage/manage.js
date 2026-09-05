@@ -201,9 +201,11 @@
     prober:   { icon: '🔍', label: 'Claude (esplorazione)' },
     worker:   { icon: '🔧', label: 'Claude (sviluppo)' },
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
-    // Rilievi rimasti aperti quando un lavoro «migliorabile» viene promosso
-    // (SPEC-RIDISEGNO-MAX.md §13): categoria propria, così leggendo la coda si
-    // vede che nasce dal declassamento di una verifica, non da un'esplorazione.
+    // I rilievi che la verifica ha trovato e non ha corretto (feedback #561:
+    // livello 0, bilancio esaurito, o che chiedono una decisione), raccolti dal
+    // server in UN feedback derivato per lavoro, figlio #N.k: categoria
+    // propria, così leggendo la coda si vede che nasce da una verifica, non da
+    // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi residui)' },
     // Sessione locale: Claude in chat con l'owner, sulla sua macchina. Icona
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
