@@ -1509,7 +1509,7 @@ export function emit(bucket, ctx) {
   const payload = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
-  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history);
+  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role);
   const out = {
     role: bucket.role,
