@@ -594,9 +594,18 @@ if (isMain) {
 
   if (cmd === 'corretto') {
     const report = rest.join(' ').trim();
-    const r = withFixed(readState(), branch, { report, sha });
+    const r = withFixed(readState(), branch, { report, sha, dirty: isDirty() });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
+    if (r.outcome === 'stop') {
+      console.log(`Nessun commit nuovo dopo la critica: i rilievi di livello 3/2 restano aperti e non si correggono da soli. Il lavoro si ferma: decide l'owner.\n${ROUND.formatFindings(r.blocking)}`);
+      process.exit(0);
+    }
+    if (r.outcome === 'pass') {
+      console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
+      console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(r.derived)}`);
+      process.exit(0);
+    }
     console.log(`Correzione consegnata su '${branch}' (${sha.slice(0, 8)}). Serve un'altra verifica, di un'altra istanza:`);
     console.log('  node scripts/verify-local.mjs start');
     process.exit(0);
