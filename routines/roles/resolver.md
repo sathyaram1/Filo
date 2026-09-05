@@ -42,8 +42,9 @@ basta** (tool Agent, `general-purpose`), fin dalla ricognizione: se la spec è
 troppo grande per leggerla tutta senza intasarti, delega la lettura a un
 sotto-agente e fatti tornare un sommario con i punti fermi. Tu tieni il
 disegno complessivo; il sotto-agente riceve un compito autoconsistente e ti
-torna il risultato. **SEMPRE uno alla volta, mai in parallelo** (l'hook di
-salvataggio si pesta sui lock). Vale anche per le correzioni grosse.
+torna il risultato. **Chi scrive, uno alla volta, mai in parallelo** (l'hook
+di salvataggio si pesta sui lock); più sotto-agenti insieme solo se leggono
+soltanto. Vale anche per le correzioni grosse.
 
 La verifica (un'istanza chiamata dopo, automaticamente), il secaudit e il
 cancello di merge giudicheranno l'INTERO feedback: o è risolto, o non lo è.
