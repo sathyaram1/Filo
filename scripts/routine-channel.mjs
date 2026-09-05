@@ -266,7 +266,10 @@ export function classifyReply(status, body) {
 /**
  * Consegna un intento al server. `data` NON contiene mai il feedback su cui si
  * agisce: quello il server lo legge dal biglietto.
- * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num? }}
+ * `reply` è ciò che il server ha da dire a chi ha consegnato: per la critica
+ * del verificatore (feedback #561) porta l'esito calcolato e, se c'è da
+ * correggere, la fase 2. Per le altre consegne non c'è.
+ * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num?, reply? }}
  */
 export async function deliver(t, intent, data, opts) {
   const { status, body } = await call('routineDeliver', { ticket: t, intent, data: data || {} }, opts);
@@ -276,6 +279,7 @@ export async function deliver(t, intent, data, opts) {
     reason: String((body && body.reason) || (outcome === 'ok' ? '' : `http_${status}`)),
     id: body && body.id,
     num: body && body.num,
+    reply: body && typeof body.reply === 'object' ? body.reply : undefined,
   };
 }
 
