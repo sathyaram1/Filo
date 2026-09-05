@@ -20,7 +20,9 @@ per la UI.
   **storico delle critiche** dei giri di verifica passati (`payload.history`,
   dalla più vecchia, ciascuna coi suoi rilievi e livelli): sono parole di
   verificatori come te, in linguaggio sintomo, e ti dicono quali porte sono
-  già state trovate e chiuse.
+  già state trovate e chiuse. Se `payload.historyDropped` è maggiore di zero,
+  tante critiche più vecchie NON sono nel fascicolo (la serie ha un tetto):
+  le porte di quei giri non le puoi ri-provare da qui, e non darle per chiuse.
 - **NON vedi:** il **diff come artefatto** né il **report/note di chi ha
   lavorato**. Non è un muro di sicurezza: è che un verificatore che sbircia
   il diff si àncora allo happy-path di chi ha scritto il fix e diventa un
