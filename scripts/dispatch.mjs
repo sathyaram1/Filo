@@ -839,8 +839,9 @@ async function recordVerifier(id, critiqueText) {
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
-  const budgets = r.budgets && typeof r.budgets === 'object'
-    ? ['cap2', 'cap1', 'cap0'].map((k) => (r.budgets[k] ? `${k}: ${r.budgets[k].left} giri residui su ${r.budgets[k].cap}` : null)).filter(Boolean).join(' · ')
+  const b = (r.phase2 && r.phase2.budgets) || r.budgets;
+  const budgets = b && typeof b === 'object'
+    ? ['cap2', 'cap1', 'cap0'].map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
   if (r.outcome === 'fix' && r.phase2) {
     return [
