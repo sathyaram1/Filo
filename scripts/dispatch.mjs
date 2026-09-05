@@ -596,6 +596,7 @@ export function buildPayload(bucket, ctx = {}) {
         // critica dice cosa correggere, la serie dice se stai tappando porte
         // una alla volta invece di chiudere la causa.
         history: Array.isArray(ctx.history) ? ctx.history : [],
+        historyDropped: Number(ctx.historyDropped) || 0,
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
