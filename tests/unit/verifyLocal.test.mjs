@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const {
-  checkVerdict, withRequest, withVerdict, withCritique, withFixed, buildVerifierBrief, phase2Text,
+  checkVerdict, withRequest, withVerdict, withCritique, withFixed, buildVerifierBrief, phase2Text, historyFromRounds,
   realignPlan, afterRebase,
 } = await import('../../scripts/verify-local.mjs');
 
@@ -316,4 +316,57 @@ test('start col riallineamento in conflitto: abort, ramo intatto, niente rebase 
   assert.equal(g(work, ['status', '--porcelain']), '', 'niente repo lasciato a metà rebase');
   assert.ok(!existsSync(resolve(work, '.git', 'rebase-merge')) && !existsSync(resolve(work, '.git', 'rebase-apply')),
     'nessun rebase in corso dopo l\'abort');
+});
+
+// ── Verifica del 2026-09-05 su #561: le porte trovate dal verificatore ──────
+
+test('#561 verifica: una critica vuota non è un pass', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const r = withCritique(s, 'r', { critique: '   ', sha: SHA });
+  assert.equal(r.ok, false);
+  assert.equal(checkVerdict(r.state.r, SHA).ok, false, 'niente pass registrato');
+});
+
+test('#561 verifica: una seconda critica sullo stesso giro è rifiutata e non paga un altro giro', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const uno = withCritique(s, 'r', { critique: '[2] rotto', sha: SHA });
+  const due = withCritique(uno.state, 'r', { critique: '[2] rotto ancora', sha: SHA });
+  assert.equal(due.ok, false);
+  assert.equal(due.state.r.counts.count2, 1, 'un giro solo');
+  assert.equal(due.state.r.verdict, 'fix-pending');
+  assert.match(due.state.r.pending.findings[0].text, /^rotto$/, 'la critica registrata è ancora quella');
+});
+
+test('#561 verifica: il giro dopo vede il TESTO della critica precedente, mai il report di chi ha corretto', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'ok\n[2] il pulsante non salva col titolo vuoto', sha: SHA });
+  const c = withFixed(r.state, 'r', { report: 'REPORT SEGRETO del correttore', sha: ALTRO_SHA });
+  assert.equal(c.outcome, 'fixed');
+  const h = historyFromRounds(c.state.r.rounds);
+  assert.equal(h.length, 1);
+  assert.match(h[0].critique, /il pulsante non salva col titolo vuoto/);
+  assert.ok(!/REPORT SEGRETO/.test(h[0].critique));
+  const brief = buildVerifierBrief({ request: 'x', branch: 'r', recipe: 'R', history: h });
+  assert.match(brief, /il pulsante non salva col titolo vuoto/);
+  assert.ok(!/REPORT SEGRETO/.test(brief));
+});
+
+test('#561 verifica: «corretto» senza un commit nuovo non chiede un\'altra verifica', () => {
+  // Con solo un 1 in sospeso: il lavoro passa e il rilievo va nel report.
+  const uno = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[1] bordo grigio', sha: SHA });
+  const c1 = withFixed(uno.state, 'r', { report: 'non ci sono riuscito', sha: SHA });
+  assert.equal(c1.ok, true);
+  assert.equal(c1.outcome, 'pass');
+  assert.equal(checkVerdict(c1.state.r, SHA).ok, true);
+  assert.equal(c1.state.r.derived.length, 1);
+  assert.equal(c1.state.r.rounds.at(-1).outcome, 'non corretto');
+  // Con un 2 in sospeso: non correggibile, il lavoro si ferma.
+  const due = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2] rotto', sha: SHA });
+  const c2 = withFixed(due.state, 'r', { report: 'non ci sono riuscito', sha: SHA });
+  assert.equal(c2.outcome, 'stop');
+  assert.equal(c2.state.r.verdict, 'fail');
+  assert.match(checkVerdict(c2.state.r, SHA).reason, /rotto/);
+  // Con modifiche non salvate: rifiutata, la consegna vale per un commit.
+  const c3 = withFixed(due.state, 'r', { report: 'x', sha: ALTRO_SHA, dirty: true });
+  assert.equal(c3.ok, false);
 });
