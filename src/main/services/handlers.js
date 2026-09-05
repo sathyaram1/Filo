@@ -2337,7 +2337,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // quella anonima non parte: una sola segnalazione per lo stesso buco.
   maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
   return {
-    text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur,
+    text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
+    // Le note scritte a metà lavoro e il ragionamento strutturato dell'ultimo
+    // giro: la scheda li tiene con la conversazione, e il ragionamento torna
+    // al modello al turno dopo.
+    notes, reasoningDetails,
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),
