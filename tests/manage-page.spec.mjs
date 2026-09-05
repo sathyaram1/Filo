@@ -492,7 +492,7 @@ test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano sp
 // config/routines senza rete/main. Cattura ogni `set` per provare che il valore
 // LASCIA il client (è la config che il server dei verdetti legge → "il
 // cambiamento ha effetto").
-async function stubCaps(page, initial = { failCap: 10, improvableCap: 3 }) {
+async function stubCaps(page, initial = { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' }) {
   await page.evaluate((init) => {
     window.__capsValue = { ...init };
     window.__capsSets = [];
@@ -502,12 +502,16 @@ async function stubCaps(page, initial = { failCap: 10, improvableCap: 3 }) {
         return { ok: true, ...window.__capsValue };
       }
       if (msg && msg.type === 'automation_caps_set') {
-        const clamp = (n) => Math.min(10, Math.max(1, Math.round(Number(n))));
-        for (const field of ['failCap', 'improvableCap']) {
+        const clamp = (n) => Math.min(10, Math.max(0, Math.round(Number(n))));
+        for (const field of ['cap2', 'cap1', 'cap0']) {
           if (msg[field] != null) {
             window.__capsValue[field] = clamp(msg[field]);
             window.__capsSets.push({ [field]: window.__capsValue[field] });
           }
+        }
+        if (typeof msg.fixInstructions === 'string') {
+          window.__capsValue.fixInstructions = msg.fixInstructions;
+          window.__capsSets.push({ fixInstructions: msg.fixInstructions });
         }
         return { ok: true, ...window.__capsValue };
       }
