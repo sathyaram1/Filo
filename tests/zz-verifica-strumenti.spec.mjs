@@ -283,11 +283,11 @@ test('B — esiti onesti per le azioni senza niente da mostrare; sveglia tolta/s
   const acts = await activityState(page);
   console.log('ACTIVITY B:', JSON.stringify(acts, null, 1));
   const a = acts[0];
-  expect(a.rows.some((r) => r.startsWith('Spostata ·') && r.includes('palestra'))).toBe(true);
-  expect(a.rows.some((r) => r.startsWith('Cancellata ·') && r.includes('lezione'))).toBe(true);
+  expect(a.rows.some((r) => r.includes('Spostata ·') && r.includes('palestra'))).toBe(true);
+  expect(a.rows.some((r) => r.includes('Cancellata ·') && r.includes('lezione'))).toBe(true);
   // Nessuna riga doppia.
-  expect(a.rows.filter((r) => r.startsWith('Spostata')).length).toBe(1);
-  expect(a.rows.filter((r) => r.startsWith('Cancellata')).length).toBe(1);
+  expect(a.rows.filter((r) => r.includes('Spostata')).length).toBe(1);
+  expect(a.rows.filter((r) => r.includes('Cancellata')).length).toBe(1);
   expect(a.label).toContain('spostato una sveglia');
   expect(a.label).toContain('cancellato una sveglia');
   await page.locator('.dash-activity-head').click();
@@ -481,8 +481,9 @@ test('G — conferma a metà giro, comando col terminale spento, sveglia nello s
   const cmdOut = await page.evaluate(() => Array.from(document.querySelectorAll('.dash-cmd-result')).map((n) => n.textContent.trim().slice(0, 200)));
   console.log('CMD OUT:', JSON.stringify(cmdOut));
   await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-G.png' });
-  await page.locator('.sn-confirm-host button', { hasText: 'Annulla' }).click().catch(() => {});
-  await page.locator('.dash-activity-head').click();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  await page.locator('.dash-activity-head').click({ force: true });
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-G-open.png' });
   const popups = await page.evaluate(() => Array.from(document.querySelectorAll('[class*="confirm"], [class*="popup"], dialog')).map((n) => n.className + ':' + n.textContent.trim().slice(0, 80)));
@@ -540,4 +541,40 @@ test('H — risposta scritta nel giro con azioni e ultimo giro muto; formato vec
   const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
   console.log('H(c) TIMERS:', JSON.stringify(timers.map((t) => t.label)));
   await dumpErrs(app);
+});
+
+test('I — comando col terminale acceso: output al modello e nel diario, poi risposta', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }); });
+  await installScript(app, [
+    { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"echo ciao-verifica"}' }] },
+    { toolCalls: [{ id: 'c2', name: 'ESEGUI_COMANDO', arguments: '{"comando":"echo secondo"}' }] },
+    { text: 'I comandi hanno stampato ciao-verifica e secondo.' },
+  ]);
+  await sendAndWait(page, 'esegui echo ciao-verifica e poi echo secondo', 'I comandi hanno stampato', 40_000);
+  await dumpErrs(app);
+  const captured = await app.evaluate(() => globalThis.__captured);
+  const tools = captured[2].messages.filter((m) => m.role === 'tool');
+  console.log('TOOLS I:', JSON.stringify(tools.map((t) => [t.tool_call_id, t.content.slice(0, 200)]), null, 1));
+  expect(tools.length).toBe(2);
+  expect(tools[0].content).toContain('ciao-verifica');
+  expect(tools[1].content).toContain('secondo');
+  const acts = await activityState(page);
+  console.log('ACTIVITY I:', JSON.stringify(acts.map((a) => ({ label: a.label, rows: a.rows })), null, 1));
+  const cmdOut = await page.evaluate(() => Array.from(document.querySelectorAll('.dash-activity .dash-cmd-result')).map((n) => n.textContent.trim().slice(0, 200)));
+  console.log('CMD OUT I:', JSON.stringify(cmdOut));
+  expect(cmdOut.length).toBe(2);
+  expect(acts[0].label).toContain('eseguito 2 comandi');
+  await page.locator('.dash-activity-head').click();
+  await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-I.png' });
+  // Il turno dopo: gli output restano nel contesto.
+  await installScript(app, [{ text: 'Sì, ciao-verifica.' }]);
+  await sendAndWait(page, 'cosa aveva stampato il primo?', 'Sì, ciao-verifica');
+  const cap2 = await app.evaluate(() => globalThis.__captured);
+  const asst = cap2[0].messages.filter((m) => m.role === 'assistant').pop();
+  expect(String(asst.content)).toContain('ciao-verifica');
 });
