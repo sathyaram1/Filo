@@ -642,8 +642,8 @@
   }
   for (const f of Object.values(CAP_FIELDS)) {
     if (!f.input) continue;
-    f.input.min = String(Number.isFinite(f.min) ? f.min : AUTOMATION.LOOP_CAP_MIN);
-    f.input.max = String(AUTOMATION.LOOP_CAP_MAX);
+    f.input.min = String(Number.isFinite(f.min) ? f.min : AUTOMATION.CAP_MIN);
+    f.input.max = String(AUTOMATION.CAP_MAX);
   }
   function clampJudgeTimeoutS(n) {
     const v = Math.round(Number(n));
