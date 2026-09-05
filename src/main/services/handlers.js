@@ -1965,6 +1965,59 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
+// output dei comandi, dettagli delle capacità, risultati di ricerca, file e
+// documenti letti, documenti di trasparenza. Sono DATI di sistema (o, per i
+// documenti, materiale da leggere): mai istruzioni.
+function observationsForPrompt(actions) {
+  return [
+    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
+  ].filter(Boolean).join('\n\n');
+}
+
+// Spinta per il formato vecchio (JSON nel testo), quando un esito deve
+// tornare al modello: prima la mandava la scheda come turno «utente» interno.
+const LEGACY_CONTINUE_NUDGE =
+  'Prosegui: qui sopra ci sono gli esiti delle azioni appena eseguite. Rispondi all’utente '
+  + 'usando questi dati (link ESATTI presi dai risultati, numeri presi dal testo), senza ripetere '
+  + 'le stesse azioni. Se il compito è finito, rispondi senza eseguire altro.';
+
+// L'esito di UNA azione, come risposta allo strumento che il modello ha
+// chiamato. Chi ha un esito da leggere (ricerca, documento, comando) lo
+// riceve per intero; chi non ce l'ha riceve una riga: fatto, in attesa di
+// conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
+// esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
+// e un modello che la ritenta lo farebbe comparire due volte.
+function toolResultText({ action, res, rendered }) {
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const type = String(action.type || '').toUpperCase();
+  const describe = () => { try { return (Levels && Levels.describe(action)) || type; } catch (_) { return type; } };
+  if (!res || res.rejected || !res.kept) {
+    const why = (res && res.error) || 'azione non registrata o parametri non validi';
+    return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
+  }
+  const obs = observationsForPrompt([rendered]);
+  if (obs) return obs;
+  if (res.output && res.output.blocked === 'disabled') {
+    return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
+  }
+  if (res.needsConfirm) {
+    return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
+      + 'NON richiamare questa azione: la conferma è già in corso. Se hai altro da fare prosegui; altrimenti rispondi in una riga, senza dire di aver già fatto.';
+  }
+  if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
+    return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere.';
+  }
+  if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
+    return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare.';
+  }
+  if (res.executed) return `Eseguita: ${describe()}.`;
+  // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
+  // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
+  return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
+}
+
 // #360 — Filo propone LUI la segnalazione quando ammette una mancanza.
 // Prima toccava all'utente accorgersene e chiedere ("mandane una segnalazione"):
 // se non lo faceva, il buco non arrivava a nessuno. Ora, quando la risposta dice
