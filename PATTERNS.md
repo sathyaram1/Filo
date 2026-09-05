@@ -160,14 +160,31 @@ il livello non viene eseguito.
   chiamare. Le descrizioni che dipendono dal sistema (shell, percorsi) sono
   funzioni di `{ sistema }`, mai testo fisso con un esempio di Windows.
 - **L'esito di un'azione ha due assi, non uno.** `executed` dice se è andata
-  a buon fine; `kept` dice se in chat c'è qualcosa da mostrare (una riga nel
-  blocco di attività, un bottone). Un appunto scritto o una lezione fissata
-  sono `executed: true, kept: false`: fatte, ma senza niente da mostrare. Chi
-  costruisce l'esito per il modello legge `executed` (e `rejected` per «non è
-  un'azione»), mai `kept`: leggere `kept` come «fallita» faceva ritentare al
-  modello appunti e lezioni già salvati, duplicandoli. Una sveglia tolta o
-  spostata è `kept` perché ha la sua riga: se si può mettere dalla chat, si
-  deve vedere anche quando si toglie. Per le preferenze il livello è per-setter in `preferences.js`
+  a buon fine; `kept` dice se in chat c'è qualcosa da CLICCARE (un bottone).
+  Un appunto scritto o una lezione fissata sono `executed: true, kept: false`.
+  Chi costruisce l'esito per il modello legge `executed` (e `rejected` per
+  «non è un'azione»), mai `kept`: leggere `kept` come «fallita» faceva
+  ritentare al modello appunti e lezioni già salvati, duplicandoli.
+- **Il diario racconta TUTTO quello che Filo fa, e non promette il
+  contrario.** `kept: false` non vuol dire invisibile: l'azione torna comunque
+  alla chat marcata `_traccia` e diventa una riga. Prima sparivano appunto,
+  lezione, spunta dell'accoglienza, proxy e stile della pagina: un turno di
+  sole azioni «silenziose» non lasciava nemmeno il blocco, e l'utente non
+  sapeva dove fosse finito il suo appunto. Ogni azione porta anche `_executed`:
+  a `false` la riga dice cosa NON è riuscito e il riassunto non la conta —
+  un documento inesistente diceva «Leggo il documento…» e si riassumeva in
+  «letto un documento». Riga e bottone non si escludono: l'appunto ha la riga
+  che racconta e il bottone che porta all'editor; un'azione in attesa di
+  conferma ha la riga «Conferma chiesta …» e il bottone per rispondere (senza
+  quella riga un turno di sola richiesta non lasciava blocco, e alla conferma
+  non c'era più dove scrivere che era stata data).
+- **Quello che succede DOPO la risposta deve arrivare al modello.** Una
+  conferma data nel popup (livello 2 e 3) e le azioni già eseguite in un
+  tentativo interrotto da un guasto non stanno in nessun messaggio: rientrano
+  nel contesto del turno successivo come righe di sistema
+  (`confirmedActionsForPrompt`, `interruptedActionsForPrompt`). Senza, a «l'hai
+  attivato?» il modello tirava a indovinare, e un «Riprova» rifaceva il timer
+  che aveva appena messo. Per le preferenze il livello è per-setter in `preferences.js`
   (`level: 2` su ciò che tocca sicurezza/shell). La sospensione e la conferma
   passano da `needsConfirm` → bottone in chat → `MSG.FILO_CONFIRM_ACTION`; il
   main **riclassifica** alla conferma, non si fida del client.
