@@ -284,6 +284,9 @@
     let buffer = '';
     let fullText = '';
     let servedBy = null;
+    let finishReason = null;
+    const calls = createToolCallAccumulator(onToolCall);
+    const details = createReasoningDetailsAccumulator();
     let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
 
     while (true) {
