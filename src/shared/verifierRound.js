@@ -89,12 +89,12 @@
   // questo un «[2]» dopo una barra-n finiva nel riassunto e il lavoro passava
   // in silenzio, in tutti e tre i posti (porta chiusa al giro 3 su #561 e
   // riaperta al giro 5).
-  const ESCAPED_BREAK_BEFORE_BRACKET = /\\r?\\n\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[/;
+  const ESCAPED_BREAK_BEFORE_BRACKET = /(?:\\r)?\\n\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[/;
 
   /** La critica con gli a capo veri: `\r\n` → `\n`, e la barra-n letterale usata come a capo. PURA. */
   function normalizeCritique(text) {
     const s = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
-    return ESCAPED_BREAK_BEFORE_BRACKET.test(s) ? s.replace(/\\r?\\n/g, '\n') : s;
+    return ESCAPED_BREAK_BEFORE_BRACKET.test(s) ? s.replace(/(?:\\r)?\\n/g, '\n') : s;
   }
 
   /**

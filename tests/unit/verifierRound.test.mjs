@@ -212,3 +212,28 @@ test('#561 giro 4: un livello senza testo non sparisce; nel riassunto le parente
   assert.match(brutte[0], /troppi rilievi: 41/);
   assert.deepEqual(R.unparsedLevelLines('Provato.\n' + Array.from({ length: R.MAX_FINDINGS }, (_, i) => `[1] r${i}`).join('\n')), []);
 });
+
+// ── L'a capo scritto come barra-n (verifica del giro 5 su #561) ─────────────
+
+const BSN = String.fromCharCode(92) + 'n';
+
+test('una barra-n letterale davanti a un rilievo vale come a capo: il [2] non sparisce nel riassunto', () => {
+  const testo = `Provato.${BSN}[2] rotto${BSN}    passi: x${BSN}[1] bordo`;
+  assert.deepEqual(R.unparsedLevelLines(testo), []);
+  const p = R.parseFindings(testo);
+  assert.equal(p.summary, 'Provato.');
+  assert.deepEqual(p.findings.map((x) => [x.level, x.text]), [[2, 'rotto\npassi: x'], [1, 'bordo']]);
+  assert.equal(R.normalizeCritique(testo), 'Provato.\n[2] rotto\n    passi: x\n[1] bordo');
+});
+
+test('con la barra-n anche un livello scritto male viene respinto, non ignorato', () => {
+  assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[4] gravissimo`), ['[4] gravissimo']);
+  assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[2]`), ['[2] (rilievo senza testo)']);
+});
+
+test('una barra-n in mezzo a una frase, senza una parentesi dopo, resta testo', () => {
+  const testo = `Provato: il campo mostra ${BSN} grezzo. Regge.`;
+  assert.equal(R.normalizeCritique(testo), testo);
+  assert.equal(R.parseFindings(testo).findings.length, 0);
+  assert.deepEqual(R.unparsedLevelLines(testo), []);
+});
