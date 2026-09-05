@@ -173,9 +173,10 @@ test('B — un\'azione di livello 2 chiamata come strumento apre la conferma, e 
   await page.locator('#sendBtn').click();
 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti ho preparato la segnalazione' })).toBeVisible({ timeout: 10_000 });
-  // Il popup di conferma si apre da sé, con l'anteprima del testo.
-  await expect(page.getByText('Filo chiede conferma')).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText('Il timer non suona.')).toBeVisible();
+  // Il popup di conferma si apre da sé (vive in uno shadow root chiuso: si
+  // vede l'host), e il bottone di ripiego sotto la risposta dice cosa parte.
+  await expect(page.locator('.sn-confirm-host')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('.dash-action-btn', { hasText: 'Inviare questo feedback' })).toBeVisible();
   await page.screenshot({ path: 'tests/agent/.out/strumenti-conferma.png' });
 
   const calls = await app.evaluate(() => globalThis.__calls2);
