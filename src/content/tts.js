@@ -335,7 +335,10 @@
     // Nessun modello impostato per la lettura (o la scorciatoia citata non
     // esiste): il messaggio arriva già scritto per l'utente e dice dove si
     // imposta — mostrarlo com'è vale molto più di una frase generica.
-    if (res.errorCode === 'NO_MODEL_FOR_ACTION' && res.error) {
+    // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
+    // che Filo non conosce: il messaggio dice dove scriverlo.
+    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
+    if (spiegato.includes(res.errorCode) && res.error) {
       try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error))); } catch (_) {}
       return;
     }

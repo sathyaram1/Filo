@@ -494,13 +494,42 @@
 
   // Tendina della voce NATURALE (del modello): una voce per riga, raggruppate
   // per lingua; la prima scelta è "automatica" (segue la lingua del testo).
-  function populateModelVoices(selected) {
+  // Le voci sono quelle del MODELLO di lettura in uso (le dice il main: ogni
+  // modello ha i suoi nomi). L'ultima riga, «Altra voce», apre un campo di
+  // testo: è la strada per un modello che Filo non conosce, o per una voce
+  // che non è nell'elenco. Una voce salvata che non è fra le opzioni finisce
+  // lì dentro, così non sparisce.
+  const CUSTOM_VOICE = '__custom__';
+  function currentModelVoice() {
     const sel = $('ttsModelVoice');
-    const V = window.SN_TTS_VOICES;
-    if (!sel || !V) return;
-    const want = selected !== undefined ? selected : sel.value;
-    sel.innerHTML = '<option value="">Automatica: segue la lingua del testo</option>';
-    for (const g of V.groupedByLang()) {
+    if (!sel) return '';
+    if (sel.value === CUSTOM_VOICE) return ($('ttsModelVoiceCustom').value || '').trim();
+    return sel.value || '';
+  }
+  function syncCustomVoiceField() {
+    const sel = $('ttsModelVoice');
+    const input = $('ttsModelVoiceCustom');
+    if (!sel || !input) return;
+    input.hidden = sel.value !== CUSTOM_VOICE;
+  }
+  async function populateModelVoices(selected) {
+    const sel = $('ttsModelVoice');
+    const input = $('ttsModelVoiceCustom');
+    const where = $('ttsModelVoiceModel');
+    if (!sel) return;
+    const want = selected !== undefined ? selected : currentModelVoice();
+    let info = null;
+    try { info = await chrome.runtime.sendMessage({ type: MSG.TTS_VOICES }); } catch (_) { info = null; }
+    const groups = (info && info.ok && Array.isArray(info.groups)) ? info.groups : [];
+    const required = info && info.ok ? info.required !== false : true;
+    sel.innerHTML = '';
+    const auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = groups.length
+      ? 'Automatica: segue la lingua del testo'
+      : (required ? 'Automatica' : 'Automatica: la sceglie il modello');
+    sel.appendChild(auto);
+    for (const g of groups) {
       const og = document.createElement('optgroup');
       og.label = g.label.charAt(0).toUpperCase() + g.label.slice(1);
       for (const v of g.voices) {
@@ -511,7 +540,33 @@
       }
       sel.appendChild(og);
     }
-    if (want && [...sel.options].some((o) => o.value === want)) sel.value = want;
+    const custom = document.createElement('option');
+    custom.value = CUSTOM_VOICE;
+    custom.textContent = 'Altra voce: scrivi il nome…';
+    sel.appendChild(custom);
+    if (where) {
+      const model = info && info.model ? info.model : '';
+      where.textContent = model ? `Modello: ${model}` : (info && info.error ? 'Nessun modello di lettura impostato' : '');
+      where.title = info && info.catalogName ? `Voci di ${info.catalogName}` : '';
+    }
+    const V = window.SN_TTS_VOICES;
+    if (want && [...sel.options].some((o) => o.value === want && o.value !== CUSTOM_VOICE)) {
+      sel.value = want;
+      if (input) input.value = '';
+    } else if (want && V && V.catalogOfVoice(want)) {
+      // Voce di un ALTRO modello, rimasta da prima che il modello cambiasse:
+      // la lettura la ignora e va con la lingua del testo, quindi la pagina
+      // dice la stessa cosa (mostrarla come «altra voce» sarebbe una bugia).
+      sel.value = '';
+      if (input) input.value = '';
+    } else if (want) {
+      sel.value = CUSTOM_VOICE;
+      if (input) input.value = want;
+    } else {
+      sel.value = '';
+      if (input) input.value = '';
+    }
+    syncCustomVoiceField();
   }
 
   const MODEL_VOICE_SAMPLES = {
@@ -547,8 +602,8 @@
     const btn = $('ttsModelPreview');
     const status = $('ttsModelPreviewStatus');
     const V = window.SN_TTS_VOICES;
-    const voice = $('ttsModelVoice').value || '';
-    const lang = (voice && V) ? V.langOfVoice(voice) : ((navigator.language || 'it').split('-')[0]);
+    const voice = currentModelVoice();
+    const lang = ((voice && V) ? V.langOfVoice(voice) : '') || (navigator.language || 'it').split('-')[0];
     const text = MODEL_VOICE_SAMPLES[lang] || MODEL_VOICE_SAMPLES.en;
     if (modelPreviewAudio) { try { modelPreviewAudio.pause(); } catch (_) {} modelPreviewAudio = null; }
     btn.disabled = true;
@@ -657,7 +712,7 @@
       voice: $('ttsVoice').value || '',
       rate: parseFloat($('ttsRate').value) || 1,
       pitch: parseFloat($('ttsPitch').value) || 1,
-      modelVoice: $('ttsModelVoice').value || '',
+      modelVoice: currentModelVoice(),
     };
     const autoArchive = {
       enabled: $('autoArchiveEnabled').checked,
@@ -832,6 +887,12 @@
     });
     $('ttsPreview').addEventListener('click', previewTts);
     $('ttsModelPreview').addEventListener('click', previewModelVoice);
+    $('ttsModelVoice').addEventListener('change', () => {
+      syncCustomVoiceField();
+      if ($('ttsModelVoice').value === CUSTOM_VOICE) $('ttsModelVoiceCustom').focus();
+      else persist();
+    });
+    $('ttsModelVoiceCustom').addEventListener('input', persistDebounced);
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);

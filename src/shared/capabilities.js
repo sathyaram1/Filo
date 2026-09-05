@@ -141,7 +141,7 @@
     },
     {
       id: 'read-aloud', title: 'Leggi ad alta voce', category: 'reading',
-      desc: 'Legge ad alta voce il testo selezionato con una voce naturale (un modello a pesi aperti, nella lingua del testo), evidenziando le parole mentre le pronuncia. Se la voce naturale non è raggiungibile, legge con quella del sistema.',
+      desc: 'Legge ad alta voce il testo selezionato con una voce naturale (un modello di sintesi vocale, con una voce della lingua del testo), evidenziando le parole mentre le pronuncia. Se la voce naturale non è raggiungibile, legge con quella del sistema.',
       invoke: 'Seleziona il testo e dal menu del tasto destro scegli "Leggi". Per fermare: "Interrompi lettura" (anche da un’altra scheda).',
       doesNot: 'La voce naturale, quella di riserva del sistema, la velocità e il tono si regolano in Preferenze.',
     },

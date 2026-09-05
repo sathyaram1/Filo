@@ -97,6 +97,56 @@ module.exports = function register(on, ctx) {
   // ripieghiamo in una sessione dell'app. Torna false appena una sintesi riesce,
   // così se il modello torna a funzionare e poi ricasca l'utente è di nuovo avvisato.
   let ttsFallbackAnnounced = false;
+
+  // Voci che il router ha DICHIARATO per un modello che non è nei cataloghi
+  // ("Unknown voice … Supported voices: a, b, c"): dalla seconda richiesta in
+  // poi valgono come catalogo, senza pagare un altro 400. Per sessione.
+  const learnedVoices = new Map(); // modelId → [voce, …]
+
+  // Sintesi con recupero della voce: se il router rifiuta la voce elencando
+  // quelle ammesse, si riprova UNA volta con una della lingua del testo (e la
+  // lista si ricorda). Se invece pretende una voce e non ne abbiamo nessuna da
+  // dargli, l'errore diventa una frase per l'utente (codice TTS_VOICE_REQUIRED)
+  // che dice dove scriverla.
+  async function synthesizeWithVoiceRecovery(P, { apiKey, model, text, voice, lang, speed, routing }) {
+    const Voices = globalThis.SN_TTS_VOICES;
+    try {
+      return await P.synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting: routing });
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      const listed = Voices ? Voices.voicesFromError(msg) : [];
+      if (listed.length) {
+        learnedVoices.set(model, listed);
+        const retry = Voices.pickFromList(listed, lang);
+        if (retry && retry !== voice) {
+          console.warn(`[SN] TTS: voce "${voice || '(nessuna)'}" rifiutata da ${model}, riprovo con "${retry}"`);
+          const r = await P.synthesizeSpeech({ apiKey, model, text, voice: retry, speed, providerRouting: routing });
+          r.voice = retry;
+          return r;
+        }
+      }
+      const I18n = globalThis.SN_I18N;
+      if (Voices && Voices.isVoiceRequiredError(msg)) {
+        const err = new Error(I18n ? I18n.t('err_tts_voice_required', model) : msg);
+        err.code = 'TTS_VOICE_REQUIRED';
+        throw err;
+      }
+      // Un nome scritto a mano (non è in nessun catalogo) che il modello
+      // rifiuta con un 400: è un errore di battitura, non un guasto. Dirlo
+      // evita di far cercare un problema di rete.
+      const handWritten = voice && Voices && !Voices.isKnownVoice(voice, model)
+        && !(learnedVoices.get(model) || []).includes(voice);
+      // Il 400 si legge dallo status o, se manca, dal testo dell'errore.
+      const rifiutata = (e && e.status === 400) || /\b400\b/.test(msg);
+      if (handWritten && rifiutata) {
+        const err = new Error(I18n ? I18n.t('err_tts_voice_unknown', model, voice) : msg);
+        err.code = 'TTS_VOICE_UNKNOWN';
+        throw err;
+      }
+      throw e;
+    }
+  }
+
   const ttsFallback = (error, errorCode) => {
     const firstFallback = !ttsFallbackAnnounced;
     ttsFallbackAnnounced = true;
@@ -150,7 +200,7 @@ module.exports = function register(on, ctx) {
       const chosen = String(msg.voice || ttsPrefs.modelVoice || '').trim();
       let locale = '';
       try { locale = require('electron').app.getLocale(); } catch (_) { locale = ''; }
-      const voice = chosen || (Voices ? Voices.defaultVoiceFor(msg.lang || locale) : '');
+      const lang = msg.lang || locale;
       // La velocità delle Preferenze vale anche per la voce del modello.
       const rate = Number(ttsPrefs.rate);
       const speed = rate >= 0.5 && rate <= 2 ? rate : 1;
@@ -160,6 +210,12 @@ module.exports = function register(on, ctx) {
       for (const a of attempts) {
         const P = Providers.getProvider(a.provider);
         if (!P || typeof P.synthesizeSpeech !== 'function') continue;
+        // La voce dipende dal MODELLO: ogni modello ha i suoi nomi, e una voce
+        // scelta per un altro modello va ignorata, non spedita (sarebbe un 400
+        // e la lettura ripiegherebbe sul browser senza spiegazioni).
+        const voice = Voices
+          ? Voices.resolveVoice({ chosen, lang, modelId: a.model, learned: learnedVoices.get(a.model) })
+          : chosen;
         // Cache hit: stesso testo+voce+velocità+modello già sintetizzato in
         // questa sessione → ritorno immediato, niente chiamata al modello.
         const key = ttsCache ? ttsKey(a.model, `${voice}@${speed}`, text) : null;
@@ -178,8 +234,8 @@ module.exports = function register(on, ctx) {
           }
         }
         try {
-          const r = await P.synthesizeSpeech({
-            apiKey: a.apiKey, model: a.model, text, voice, speed, providerRouting: routing,
+          const r = await synthesizeWithVoiceRecovery(P, {
+            apiKey: a.apiKey, model: a.model, text, voice, lang, speed, routing,
           });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
           ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
@@ -201,10 +257,55 @@ module.exports = function register(on, ctx) {
           console.warn('[SN] TTS fallito:', e.message || e);
         }
       }
-      return ttsFallback((lastErr && lastErr.message) || 'tts_failed');
+      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code);
     } catch (e) {
       return ttsFallback(e?.message || String(e));
     }
+  });
+
+  // Le voci del modello di lettura IN USO, per la tendina delle Preferenze:
+  // quale modello legge (il primo della catena), il suo catalogo raggruppato
+  // per lingua (vuoto se non lo conosciamo o sceglie da sé), e la voce scelta
+  // finora. `chosen` torna anche se non è nel catalogo: è un nome scritto a
+  // mano, e la pagina lo mostra nel campo di testo.
+  on(MSG.TTS_VOICES, async () => {
+    const Voices = globalThis.SN_TTS_VOICES;
+    let model = '';
+    try {
+      const settings = await getEffectiveSettings();
+      const ref = modelForAction(settings, SN_CONST.ACTIONS.TTS);
+      const attempts = buildAttemptChain(settings, ref, SN_CONST.ACTIONS.TTS);
+      model = (attempts[0] && attempts[0].model) || '';
+    } catch (e) {
+      // Nessun modello di lettura (o catena non risolvibile): la pagina lo
+      // dice, invece di fingere che un modello scelga da sé.
+      return { ok: true, model: '', catalog: '', required: true, groups: [], error: e?.message || String(e) };
+    }
+    const cat = Voices ? Voices.catalogFor(model) : null;
+    let groups = cat ? Voices.groupedByLang(model) : [];
+    if (!cat && learnedVoices.has(model)) {
+      // Catalogo imparato dal router in questa sessione: nomi nudi, una lingua
+      // se il nome la dichiara ("-it"), altrimenti tutte insieme.
+      const list = learnedVoices.get(model);
+      const byLang = new Map();
+      for (const id of list) {
+        const m = /(?:^|-)([a-z]{2})(?:-|$)/i.exec(id);
+        const l = m ? m[1].toLowerCase() : '';
+        if (!byLang.has(l)) byLang.set(l, []);
+        byLang.get(l).push({ id, lang: l, label: id });
+      }
+      groups = [...byLang.entries()].map(([lang, voices]) => ({
+        lang, label: (Voices.LANG_LABELS[lang] || lang || 'voci'), voices,
+      }));
+    }
+    return {
+      ok: true,
+      model,
+      catalog: cat ? cat.id : '',
+      catalogName: cat ? cat.name : '',
+      required: cat ? cat.required !== false : !learnedVoices.has(model),
+      groups,
+    };
   });
 
   // Modello con cui provare un fornitore quando la prova non ne indica uno
@@ -337,7 +438,11 @@ module.exports = function register(on, ctx) {
     });
     if (kind === 'tts') {
       if (typeof P.synthesizeSpeech !== 'function') return { ok: false, error: 'Questo fornitore non sa leggere ad alta voce' };
-      const r = await P.synthesizeSpeech({ apiKey, model, text: 'Uno, due, tre: prova della voce.', voice: '', providerRouting: routing });
+      // La frase di prova è italiana: la voce è quella di partenza per
+      // l'italiano nel catalogo del modello (o nessuna, se sceglie da sé).
+      const Voices = globalThis.SN_TTS_VOICES;
+      const voice = Voices ? Voices.resolveVoice({ chosen: '', lang: 'it', modelId: model, learned: learnedVoices.get(model) }) : '';
+      const r = await synthesizeWithVoiceRecovery(P, { apiKey, model, text: 'Uno, due, tre: prova della voce.', voice, lang: 'it', speed: 1, routing });
       if (!r || !r.audioBase64) return { ok: false, error: 'Il modello ha risposto senza audio' };
       return done({ audioBytes: Math.round(r.audioBase64.length * 3 / 4) });
     }

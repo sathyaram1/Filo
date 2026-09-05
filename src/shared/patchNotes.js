@@ -16,6 +16,15 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.218', date: '2026-09-05',
+      features: [
+        'La voce naturale della lettura ad alta voce segue il modello scelto: cambiando modello di lettura, in Preferenze trovi le sue voci (per MAI-Voice di Microsoft, per esempio, Elsa, Isabella e Diego in italiano) e la lettura parte con quella della lingua del testo. Per un modello che Filo non conosce puoi scrivere a mano il nome della voce, e se il modello risponde elencando le sue, Filo le impara da solo.',
+      ],
+      fixes: [
+        'Con un modello di lettura diverso da quello iniziale, la lettura ripiegava sempre sulla voce del browser: Filo gli mandava i nomi delle voci del modello vecchio, che quello rifiutava.',
+      ],
+    },
+    {
       version: '0.2.217', date: '2026-09-04',
       features: [
         'La lettura ad alta voce ha una voce naturale nuova, a pesi aperti. Sceglie da sola la voce in base alla lingua del testo (italiano, inglese, spagnolo, francese, portoghese, hindi, giapponese, cinese). In Preferenze puoi fissarne una e ascoltarla prima di scegliere.',
