@@ -213,8 +213,8 @@
     }));
   }
 
-  async function complete({ apiKey, model, messages, reasoning, providerRouting, signal }) {
-    const body = { model, messages, stream: false };
+  async function complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
+    const body = { model, messages, stream: false, ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting);
