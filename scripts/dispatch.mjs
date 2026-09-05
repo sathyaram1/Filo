@@ -696,6 +696,18 @@ export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDe
  *                voce è l'unica cosa onesta;
  *   'absent'   → nessun biglietto: non c'è un lavoro a cui riferire la consegna.
  */
+/**
+ * Il motivo di un rifiuto del server, per chi lo legge a schermo: il codice e,
+ * se il server l'ha detta, la frase («malformed: critica vuota …»). Prima
+ * arrivava il solo codice e «leggi il motivo» era un invito a leggere niente
+ * (verifica del giro 4 su #561). PURA.
+ */
+export function motivoRifiuto(r) {
+  const reason = String((r && r.reason) || '');
+  const detail = String((r && r.detail) || '').trim();
+  return detail ? `${reason}: ${detail}` : reason;
+}
+
 async function deliverToChannel(intent, data) {
   const ticket = readRoutineTicket(ROOT);
   // Senza biglietto il server non viene nemmeno chiamato: dirlo con le parole
