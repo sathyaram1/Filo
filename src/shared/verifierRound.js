@@ -112,7 +112,7 @@
    * Chi registra la critica le rifiuta chiedendo il formato giusto.
    */
   function unparsedLevelLines(text) {
-    const lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    const lines = normalizeCritique(text).split('\n');
     const out = [];
     let current = null;
     let count = 0;
@@ -147,7 +147,7 @@
    * @returns {{ summary: string, findings: Array<{level:number, text:string, decision:boolean}> }}
    */
   function parseFindings(text) {
-    const lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    const lines = normalizeCritique(text).split('\n');
     const summary = [];
     const findings = [];
     let current = null;
