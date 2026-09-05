@@ -222,8 +222,8 @@ module.exports = function register(on, ctx) {
           }
         }
         try {
-          const r = await P.synthesizeSpeech({
-            apiKey: a.apiKey, model: a.model, text, voice, speed, providerRouting: routing,
+          const r = await synthesizeWithVoiceRecovery(P, {
+            apiKey: a.apiKey, model: a.model, text, voice, lang, speed, routing,
           });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
           ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
