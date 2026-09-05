@@ -2320,6 +2320,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       if (!actions.length) {
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
+        exhausted = false;
         break;
       }
       const roundRendered = [];
