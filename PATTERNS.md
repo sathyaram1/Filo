@@ -2535,10 +2535,24 @@ valutare dentro la pagina. Due copie sarebbero divergute al primo ritocco.
 
 Sopra la risposta finale di Filo nella chat della home c'è un blocco smorzato
 che raccoglie tutto ciò che Filo fa **prima di rispondere** (#521). Filo non
-«ragiona e basta»: agisce, spesso su più turni automatici (ragiona, cerca,
+«ragiona e basta»: agisce, in più giri dentro lo stesso turno (ragiona, cerca,
 legge, ragiona ancora). Per l'utente è un lavoro solo, e il blocco è uno solo
-(`createActivity()` in `src/pages/dashboard/dashboard.js`, creato da chi guida
-la sequenza dei turni; stili `.dash-activity*` in `dashboard.css`).
+(`createActivity()` in `src/pages/dashboard/dashboard.js`; stili
+`.dash-activity*` in `dashboard.css`).
+
+**Chi guida i giri è il main, non la scheda.** Le azioni sono strumenti nativi
+del modello (tool calling: `src/shared/actionTools.js`, il ciclo in
+`handleFiloChat`): il modello chiama un'azione, il main la esegue, gli rimanda
+l'esito come messaggio `tool` e lo richiama, finché risponde senza chiamare
+niente. La scheda riceve tre canali e li mette nel blocco nell'ordine in cui
+arrivano: `filo:reasoning` (ragionamento), `filo:answer` (testo) e
+`filo:action` — `start` appena il modello NOMINA un'azione (la riga in testa
+dice subito «Cerco sul web…», prima degli argomenti), `done` a esecuzione
+avvenuta (la riga vera, con l'esito), `round` a fine di un giro con azioni (il
+testo scritto in quel giro era una nota di lavoro: entra nel blocco e la bolla
+riparte). Non esistono più messaggi di spinta mandati dalla scheda come turni
+«utente» interni. Il modello che ignora gli strumenti e scrive il vecchio JSON
+nel testo viene ancora letto (`legacyEnvelope`), senza ritentativi.
 
 - **Chiuso di default, sempre.** Il 90 % delle volte l'utente vuole che il
   lavoro sia invisibile. La riga in testa dice cosa succede ADESSO: rotella e
