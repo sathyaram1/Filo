@@ -184,8 +184,10 @@ sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiu
 
 Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
-alla chat + `statusReason: clarify`); (3) fix bocciato troppe volte dalla verifica
-(`statusReason: loop`, con l'ultima critica del verifier in chat); (4) fix bocciato
+alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
+3/2 che non si può più correggere da soli — bilancio delle correzioni esaurito
+(`statusReason: loop`, con la critica coi livelli in chat) — oppure che chiede una
+decisione dell'owner (`statusReason: decisione`); (4) fix bocciato
 dal **controllo di sicurezza** o dal cancello di fusione (`statusReason: secaudit`);
 (5) lavorazione arenata ripetutamente (`statusReason: arenato`). La risposta
 dell'owner appende alla chat e (se decide) muove a `todo`.
