@@ -593,12 +593,11 @@
     `<path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7"/>` +
     `<path d="M12 17h.01"/>`;
 
-  // --- PREVISTE: schede aperte (finestra con due linguette).
+  // --- PREVISTE: schede aperte (finestra con la linguetta di una scheda).
   const tabs =
     `<rect x="3" y="7" width="18" height="13" rx="2"/>` +
     `<path d="M3 11h18"/>` +
-    `<path d="M7 7V4.5h4.5V7"/>` +
-    `<path d="M11.5 7V4.5H16V7"/>`;
+    `<path d="M6.5 7V5a1.5 1.5 0 0 1 1.5-1.5h4A1.5 1.5 0 0 1 13.5 5v2"/>`;
 
   // --- PREVISTE: posizione (goccia del segnaposto).
   const location =
@@ -621,7 +620,7 @@
 
   // --- STATI del lavoro: ragionamento (nuvola di pensiero), fatto, avviso, bloccato.
   const reasoning =
-    `<path d="M8 15.5a3.5 3.5 0 0 1-1-6.8A4.5 4.5 0 0 1 15.5 7a4 4 0 0 1 2 7.5 3 3 0 0 1-2 1z"/>` +
+    `<path d="M7.5 16.5h9a3.5 3.5 0 0 0 .5-7A5 5 0 0 0 7.3 8.6 4 4 0 0 0 7.5 16.5z"/>` +
     `<path d="M6 18.5h.01"/>` +
     `<path d="M3.5 21h.01"/>`;
   const check =
