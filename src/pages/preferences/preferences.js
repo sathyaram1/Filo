@@ -549,8 +549,15 @@
       where.textContent = model ? `Modello: ${model}` : '';
       where.title = info && info.catalogName ? `Voci di ${info.catalogName}` : '';
     }
+    const V = window.SN_TTS_VOICES;
     if (want && [...sel.options].some((o) => o.value === want && o.value !== CUSTOM_VOICE)) {
       sel.value = want;
+      if (input) input.value = '';
+    } else if (want && V && V.catalogOfVoice(want)) {
+      // Voce di un ALTRO modello, rimasta da prima che il modello cambiasse:
+      // la lettura la ignora e va con la lingua del testo, quindi la pagina
+      // dice la stessa cosa (mostrarla come «altra voce» sarebbe una bugia).
+      sel.value = '';
       if (input) input.value = '';
     } else if (want) {
       sel.value = CUSTOM_VOICE;
