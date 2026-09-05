@@ -68,7 +68,12 @@
   // Il livello può stare dopo un punto elenco («- [2]») o un numero («1. [2]»):
   // un elenco numerato è il modo più naturale di scrivere tre rilievi.
   const FINDING_LINE = /^\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
-  const LEVEL_TOKEN = /\[\s*[0-3]\s*\??\s*\]/;
+  // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
+  // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»): una riga che
+  // comincia così non è un rilievo, ma non è nemmeno riassunto. Con la sola
+  // scala 0-3 un «[4] gravissimo» passava in silenzio (verifica del giro 3 su
+  // #561).
+  const LEVEL_TOKEN = /\[\s*\d+(?:\s*[-–/]\s*\d+)?\s*\??\s*\]/;
 
   /**
    * Le righe che portano un livello fra parentesi quadre ma NON aprono un

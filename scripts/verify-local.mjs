@@ -169,11 +169,18 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   if (prev.verdict === 'fixed') {
     return { ok: false, state: s, reason: 'la correzione è stata consegnata: la verifica sul contenuto nuovo la fa un\'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida). Una critica adesso sarebbe chi ha corretto che si approva da solo.' };
   }
+  // Dopo un pass o uno stop la critica del giro è registrata: una seconda,
+  // senza un nuovo `start`, è la stessa istanza che ci ripensa — e con un [2]
+  // dentro trasformava un pass in «sta correggendo», pagando un giro (verifica
+  // del giro 3 su #561; sul server la porta era già chiusa).
+  if (prev.verdict === 'pass' || prev.verdict === 'fail') {
+    return { ok: false, state: s, reason: `la critica di questo giro è già registrata (esito: ${prev.verdict === 'pass' ? 'superata' : 'fermato'}) e non si modifica più. La verifica dopo la fa un'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida).` };
+  }
   // Un livello fra parentesi quadre che non apre una riga non è un rilievo, e
   // farlo finire nel riassunto trasformava un [2] in un pass silenzioso.
   const brutte = ROUND.unparsedLevelLines(critique);
   if (brutte.length) {
-    return { ok: false, state: s, reason: `rilievi non riconosciuti: il livello va a inizio riga, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { ok: false, state: s, reason: `rilievi non riconosciuti: il livello, fra 0 e 3, va a inizio riga, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
@@ -199,6 +206,11 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
     entry.verdict = 'fail';
     entry.critique = ROUND.formatFindings(decision.blocking);
     entry.pending = null;
+    // Il lavoro si ferma e decide l'owner: i bilanci si azzerano, come sul
+    // server. Lasciarli consumati faceva fermare di nuovo, al primo [2], il
+    // lavoro rifatto dopo la decisione, senza nessun giro di correzione
+    // possibile (verifica del giro 3 su #561). La storia dei giri resta.
+    entry.counts = {};
   } else if (outcome === 'fix') {
     entry.verdict = 'fix-pending';
     entry.pending = { findings: decision.fix, sha: sha || '', at: when };
@@ -260,7 +272,8 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
     const gravi = pending.filter((f) => Number(f.level) >= 2);
     if (gravi.length) {
-      s[branch] = { ...base, verdict: 'fail', critique: ROUND.formatFindings(gravi), rounds };
+      // Anche qui il lavoro si ferma e decide l'owner: bilanci azzerati.
+      s[branch] = { ...base, verdict: 'fail', critique: ROUND.formatFindings(gravi), rounds, counts: {} };
       return { ok: true, state: s, outcome: 'stop', blocking: gravi };
     }
     s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(pending), rounds };
