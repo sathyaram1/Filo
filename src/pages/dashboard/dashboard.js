@@ -916,6 +916,13 @@
         turnMark = body.childElementCount;
         if (phase !== 'done') setPhase('act', 'Scrivo la risposta…');
       },
+      // Il modello ha appena nominato un'azione: la riga in testa lo dice
+      // subito («Cerco sul web…»), la riga vera arriva con l'esito.
+      working(text) {
+        if (phase === 'done' || !text) return;
+        closeTurnReasoning();
+        setPhase('act', text);
+      },
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
       addRow(type, rowIcon, text) {
         closeTurnReasoning();
