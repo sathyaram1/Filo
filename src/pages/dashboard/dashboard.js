@@ -924,9 +924,11 @@
         setPhase('act', text);
       },
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
-      addRow(type, rowIcon, text) {
+      // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
+      // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
+      addRow(type, rowIcon, text, failed = false) {
         closeTurnReasoning();
-        doneTypes.push(String(type || '').toUpperCase());
+        if (!failed) doneTypes.push(String(type || '').toUpperCase());
         append(makeActivityRow(rowIcon, text));
         if (phase !== 'done') setPhase('act', text);
       },
