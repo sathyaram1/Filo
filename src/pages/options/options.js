@@ -16,13 +16,13 @@
   // modello" di ogni riga del registry. Riempite on-demand: al focus del campo,
   // al cambio provider, o col pulsante "Aggiorna lista modelli". `null` = non
   // ancora caricata (provo a caricarla); `[]` = caricata ma vuota/errore.
-  const providerModelCache = { gemini: null, openrouter: null };
+  const providerModelCache = { openrouter: null };
 
   function $(id) { return document.getElementById(id); }
 
   // Id della datalist (combobox) associata a un provider.
   function datalistIdFor(provider) {
-    return provider === 'gemini' ? 'models-list-gemini' : 'models-list-openrouter';
+    return `models-list-${provider}`;
   }
 
   // Sorgente delle opzioni per il dropdown custom del campo "stringa modello":
@@ -56,7 +56,6 @@
     $('savedHint').textContent = I18n.t('options_saved');
 
     $('testOpenrouter').textContent = I18n.t('options_test_provider');
-    $('testGemini').textContent = I18n.t('options_test_provider');
 
     $('h-model-registry').textContent = I18n.t('options_h_model_registry');
     $('model-registry-desc').textContent = I18n.t('options_model_registry_desc');
@@ -186,10 +185,7 @@
 
   function applyOpenWeightsTestGates() {
     const on = $('openWeightsOnly').checked;
-    // Prova della chiave: il fornitore diretto del produttore è spento in blocco;
-    // quello che smista le richieste prova un modello ammesso, quindi resta vivo.
-    markTestBlocked($('testGemini'), on);
-
+    // Prova della chiave: il router prova un modello ammesso, quindi resta vivo.
     for (const row of $('defaultModelsList').querySelectorAll('.sn-default-model-row')) {
       const btn = row.querySelector('.sn-model-test');
       if (!btn) continue;
@@ -210,7 +206,7 @@
     // pagina, e un catalogo che non risponde verrebbe richiesto all'infinito.
     const eraAcceso = openWeightsWasOn;
     openWeightsWasOn = on;
-    if (eraAcceso === true && !on) ensureProviderModels('gemini');
+    if (eraAcceso === true && !on) ensureProviderModels('openrouter');
   }
 
   function renderOpenWeightsImpact() {
@@ -309,7 +305,7 @@
 
     const provEl = document.createElement('div');
     provEl.className = 'sn-default-model-cell sn-muted';
-    provEl.textContent = single.provider === 'gemini' ? 'Gemini API' : 'OpenRouter';
+    provEl.textContent = 'OpenRouter';
 
     const modelEl = document.createElement('div');
     modelEl.className = 'sn-default-model-cell sn-muted';
@@ -373,7 +369,6 @@
     applyDefaultModelsVisibility();
     loadDefaultModels();
     $('apiKey').value = settings.apiKeys?.openrouter || '';
-    $('apiKeyGemini').value = settings.apiKeys?.gemini || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
 
@@ -404,7 +399,6 @@
     // corrente compare subito), poi prova a caricare il catalogo completo di
     // ciascun provider in background (non blocca il render).
     seedDatalistsFromRegistry(settings.modelRegistry || {});
-    ensureProviderModels('gemini');
     ensureProviderModels('openrouter');
 
     // Con la config personale l'effetto è calcolabile subito (griglia e registry
@@ -415,13 +409,12 @@
 
   // Normalizza una entry del registry (nuovo schema o vecchio duale) in
   // { provider, model }. Per le vecchie entry duali sceglie un solo provider
-  // (preferendo Gemini, poi OpenRouter): al primo salvataggio diventerà
+  // (OpenRouter): al primo salvataggio diventerà
   // single-provider e l'utente potrà aggiungere il gemello sull'altro provider
   // come riga separata se vuole il fallback.
   function entryToSingle(entry) {
     const e = entry || {};
     if (e.provider && e.model) return { provider: e.provider, model: e.model };
-    if (e.gemini) return { provider: 'gemini', model: e.gemini };
     if (e.openrouter) return { provider: 'openrouter', model: e.openrouter };
     return { provider: 'openrouter', model: '' };
   }
@@ -475,6 +468,9 @@
     // Etichetta descrittiva preservata "in silenzio" (non ha più una colonna
     // dedicata, ma serve come hint nella datalist dei nickname per-azione).
     row.dataset.label = (entry && entry.label) || '';
+    // La voce intera resta appesa alla riga: ciò che la riga non modifica
+    // (pesi aperti, cosa sa masticare, esito della prova) sopravvive al salvataggio.
+    row._entry = { ...(entry || {}) };
     // Risultato di test persistito (flat): { ttftMs, tokensPerSec, at }.
     row._test = normalizeTest(entry, single);
 
@@ -487,7 +483,7 @@
     // Un solo provider per modello.
     const provSel = document.createElement('select');
     provSel.className = 'sn-model-provider';
-    [['openrouter', 'OpenRouter'], ['gemini', 'Gemini API']].forEach(([val, label]) => {
+    [['openrouter', 'OpenRouter']].forEach(([val, label]) => {
       const opt = document.createElement('option');
       opt.value = val; opt.textContent = label;
       provSel.appendChild(opt);
@@ -607,6 +603,11 @@
       if (label) entry.label = label;
       // Preserva il risultato di test misurato (latenza/token-sec) tra i salvataggi.
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
+      // E ciò che la riga non modifica ma la voce dichiara (pesi aperti,
+      // cosa sa masticare): senza, un salvataggio dalle Opzioni lo perderebbe.
+      for (const k of ['weights', 'inputs', 'outputs']) {
+        if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
+      }
       out[nick] = entry;
     }
     return { registry: out, dups, missingNick, missingNickRows, dupRows };
@@ -642,15 +643,12 @@
       statusEl.textContent = I18n.t('options_model_no_id');
       return;
     }
-    const keyEl = providerId === 'gemini' ? $('apiKeyGemini') : $('apiKey');
-    const apiKey = keyEl.value.trim();
+    const apiKey = providerKey(providerId);
     if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     try {
-      // Il provider Gemini accetta i nomi nativi (es. gemini-3.1-flash-lite),
-      // quindi l'id del registry va passato così com'è — stesso percorso
-      // dell'uso reale.
+      // L'id del registry va passato così com'è: stesso percorso dell'uso reale.
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_PROVIDER,
         provider: providerId,
@@ -709,41 +707,53 @@
   // compare nella tendina. L'eventuale fetch successivo lo rimpiazza col catalogo
   // completo del provider.
   function seedDatalistsFromRegistry(registry) {
-    const byProv = { gemini: [], openrouter: [] };
+    const byProv = { openrouter: [] };
     for (const nick of Object.keys(registry || {})) {
       const s = entryToSingle(registry[nick]);
       if (s.model && byProv[s.provider]) byProv[s.provider].push(s.model);
     }
-    populateDatalist('gemini', byProv.gemini);
     populateDatalist('openrouter', byProv.openrouter);
-  }
-
-  // Interroga l'API Gemini e ritorna TUTTI i modelli (testo, sintesi vocale,
-  // immagini, embedding…) col NOME NATIVO (es. gemini-3.1-flash-lite), niente
-  // prefisso "google/". meta = oggetto grezzo (serve per categoria/data).
-  async function fetchGeminiModels(key) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return (data.models || [])
-      .map((m) => ({ id: (m.name || '').replace(/^models\//, ''), meta: m }))
-      .filter((it) => it.id);
   }
 
   // Il catalogo OpenRouter è PUBBLICO: la chiave non serve per elencarlo (è
   // solo metadati, niente inferenza → gratis). La passiamo se c'è, ma funziona
   // anche senza, così le categorie sono precise da subito.
+  // Il catalogo "semplice" del router elenca solo i modelli di testo: voce,
+  // dettatura e indicizzazione stanno in liste a parte, per modalità. Si
+  // chiedono tutte, così la tendina ha anche quei mestieri con le etichette giuste.
+  const OR_CATALOG_QUERIES = ['', '?output_modalities=speech', '?output_modalities=transcription', '?output_modalities=embeddings'];
   async function fetchOpenRouterModels(key) {
-    const res = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: key ? { Authorization: `Bearer ${key}` } : {},
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
+    const headers = key ? { Authorization: `Bearer ${key}` } : {};
+    const lists = await Promise.all(OR_CATALOG_QUERIES.map(async (q) => {
+      const res = await fetch('https://openrouter.ai/api/v1/models' + q, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return (data.data || []).map((m) => ({ id: m.id, meta: m })).filter((it) => it.id);
+    }));
+    return lists.flat();
+  }
+
+  // Gli id del registro che il catalogo non conosce (modelli nuovi, o scritti a
+  // mano) restano nella tendina: toglierli farebbe sparire dalla lista proprio
+  // il modello che la riga usa.
+  function withRegistryIds(provider, catalog) {
+    const known = new Set(catalog.map((it) => it.id));
+    const extra = [];
+    try {
+      const reg = collectModelRegistry().registry || {};
+      for (const nick of Object.keys(reg)) {
+        const s = entryToSingle(reg[nick]);
+        if (s.provider === provider && s.model && !known.has(s.model)) {
+          known.add(s.model);
+          extra.push(s.model);
+        }
+      }
+    } catch (_) {}
+    return catalog.concat(extra);
   }
 
   function providerKey(provider) {
-    return (provider === 'gemini' ? $('apiKeyGemini') : $('apiKey')).value.trim();
+    return provider === 'openrouter' ? $('apiKey').value.trim() : '';
   }
 
   // Il catalogo è "solo metadati", ma resta una richiesta MANDATA al fornitore
@@ -755,55 +765,37 @@
   function catalogBlocked(provider) {
     if (!$('openWeightsOnly').checked) return false;
     const C = window.SN_CONST;
-    const diretti = (C && C.PRODUCER_DIRECT_PROVIDERS) || ['gemini'];
+    const diretti = (C && C.PRODUCER_DIRECT_PROVIDERS) || [];
     return diretti.includes(provider);
   }
 
   // Carica (una sola volta) il catalogo di un provider nel suo combobox, così
   // ogni modello è subito etichettato per categoria. È solo metadati (gratis):
   //  - OpenRouter: catalogo pubblico → si carica SEMPRE, anche senza chiave.
-  //  - Gemini: il catalogo richiede la chiave (gratuita); senza, il campo resta
-  //    libero e le categorie si deducono dal nome del modello.
   // Silenzioso: in caso di errore il campo resta un input libero.
   async function ensureProviderModels(provider) {
     if (providerModelCache[provider]) return;
     if (catalogBlocked(provider)) return;
+    if (provider !== 'openrouter') return;
     const key = providerKey(provider);
-    if (provider === 'gemini' && !key) return;
     try {
-      const ids = provider === 'gemini'
-        ? await fetchGeminiModels(key)
-        : await fetchOpenRouterModels(key);
+      const ids = await fetchOpenRouterModels(key);
       providerModelCache[provider] = ids;
-      populateDatalist(provider, ids);
+      populateDatalist(provider, withRegistryIds(provider, ids));
     } catch (_) { /* lista non disponibile: il campo resta libero */ }
   }
 
-  // Ricarica (forzando) i cataloghi dei modelli. OpenRouter è pubblico → si
-  // ricarica sempre; Gemini solo se c'è la chiave (gratuita). Ogni provider ha
-  // la sua datalist; la riga sceglie quale usare col menu a tendina del provider.
+  // Ricarica (forzando) il catalogo dei modelli. È pubblico → si ricarica sempre.
   async function loadModelsFromProvider() {
     $('modelsStatus').textContent = '…';
     const orKey = $('apiKey').value.trim();
-    const gemKey = $('apiKeyGemini').value.trim();
     const errors = [];
     let total = 0;
-    if (catalogBlocked('gemini')) {
-      // Chiesto a mano: il silenzio sembrerebbe un guasto. Dice perché non parte.
-      errors.push(`Gemini: ${I18n.t('options_open_weights_catalog_blocked')}`);
-    } else if (gemKey) {
-      try {
-        const ids = await fetchGeminiModels(gemKey);
-        providerModelCache.gemini = ids;
-        populateDatalist('gemini', ids);
-        total += ids.length;
-      } catch (e) { errors.push(`Gemini: ${e.message || e}`); }
-    }
     {
       try {
         const ids = await fetchOpenRouterModels(orKey);
         providerModelCache.openrouter = ids;
-        populateDatalist('openrouter', ids);
+        populateDatalist('openrouter', withRegistryIds('openrouter', ids));
         total += ids.length;
       } catch (e) { errors.push(`OpenRouter: ${e.message || e}`); }
     }
@@ -812,7 +804,6 @@
 
   async function save() {
     const apiKey = $('apiKey').value.trim();
-    const apiKeyGemini = $('apiKeyGemini').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
     // Auto-save: persistiamo solo le righe valide. Le righe incomplete
@@ -827,7 +818,7 @@
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
       openWeightsOnly: $('openWeightsOnly').checked,
-      apiKeys: { openrouter: apiKey, gemini: apiKeyGemini, tavily: apiKeyTavily },
+      apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
       monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
@@ -848,8 +839,7 @@
   }
 
   async function testProvider(providerId, statusEl, btn) {
-    const keyEl = providerId === 'gemini' ? $('apiKeyGemini') : $('apiKey');
-    const apiKey = keyEl.value.trim();
+    const apiKey = providerKey(providerId);
     if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = I18n.t('options_test_running');
     btn.disabled = true;
@@ -892,7 +882,6 @@
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
     $('loadModels').addEventListener('click', loadModelsFromProvider);
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
-    $('testGemini').addEventListener('click', () => testProvider('gemini', $('testGeminiStatus'), $('testGemini')));
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));
       // Riga nuova = "Prova" nuovo: passa dallo stesso cancello degli altri.

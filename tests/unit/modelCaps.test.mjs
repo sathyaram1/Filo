@@ -37,37 +37,53 @@ test('capabilitiesFor: i metadati OpenRouter (modalità esplicite) hanno priorit
   assert.deepEqual(caps.outputs, [M.TEXT]);
 });
 
-test('capabilitiesFor: euristiche sul nome (Gemini senza metadati di modalità)', () => {
-  // Sintesi vocale → audio in output.
-  assert.deepEqual(CAPS.capabilitiesFor('gemini', 'gemini-2.5-flash-tts').outputs, [M.AUDIO]);
+test('capabilitiesFor: euristiche sul nome (righe senza metadati di modalità)', () => {
+  // Sintesi vocale → audio in output (per nome generico e per i modelli noti).
+  assert.deepEqual(CAPS.capabilitiesFor('openrouter', 'acme/voce-tts').outputs, [M.AUDIO]);
+  assert.deepEqual(CAPS.capabilitiesFor('openrouter', 'hexgrad/kokoro-82m').outputs, [M.AUDIO]);
+  assert.deepEqual(CAPS.capabilitiesFor('openrouter', 'canopylabs/orpheus-3b-0.1-ft').outputs, [M.AUDIO]);
   // Embedding.
-  assert.deepEqual(CAPS.capabilitiesFor('gemini', 'text-embedding-004').outputs, [M.EMBED]);
+  assert.deepEqual(CAPS.capabilitiesFor('openrouter', 'qwen/qwen3-embedding-8b').outputs, [M.EMBED]);
   // Generazione immagini → immagine in output e in input.
-  const img = CAPS.capabilitiesFor('gemini', 'imagen-3.0');
+  const img = CAPS.capabilitiesFor('openrouter', 'google/imagen-3.0');
   assert.ok(img.outputs.includes(M.IMAGE));
   assert.ok(img.inputs.includes(M.IMAGE));
   // Video.
-  assert.deepEqual(CAPS.capabilitiesFor('gemini', 'veo-2').outputs, [M.VIDEO]);
+  assert.deepEqual(CAPS.capabilitiesFor('openrouter', 'google/veo-2').outputs, [M.VIDEO]);
 });
 
-test('capabilitiesFor: asimmetria gemini-* (multimodale in input) vs gemma-* (solo testo)', () => {
-  const gemini = CAPS.capabilitiesFor('gemini', 'gemini-2.0-flash');
-  assert.ok(gemini.inputs.includes(M.IMAGE), 'gemini-* accetta immagini in input');
-  assert.ok(gemini.inputs.includes(M.AUDIO), 'gemini-* accetta audio in input');
-  assert.deepEqual(gemini.outputs, [M.TEXT]);
-
-  const gemma = CAPS.capabilitiesFor('gemini', 'gemma-3-27b-it');
-  assert.deepEqual(gemma.inputs, [M.TEXT], 'gemma-* è solo testo in input');
-  assert.deepEqual(gemma.outputs, [M.TEXT]);
+test('capabilitiesFor: i modelli di dettatura ascoltano e rispondono col testo (capacità NOTA, non incerta)', () => {
+  for (const id of [
+    'openai/whisper-large-v3-turbo',
+    'nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b',
+    'nvidia/parakeet-tdt-0.6b-v3',
+  ]) {
+    const c = CAPS.capabilitiesFor('openrouter', id);
+    assert.deepEqual(c.inputs, [M.AUDIO], `${id} ascolta un audio`);
+    assert.deepEqual(c.outputs, [M.TEXT], `${id} risponde col testo`);
+    assert.ok(!c.uncertain, `${id}: capacità nota, non incerta`);
+  }
+  // Le modalità dichiarate (dalla voce del registro o dal catalogo) vincono
+  // sul nome: un modello dal nome muto ma dichiarato "ascolta" ascolta.
+  const declared = CAPS.capabilitiesFor('openrouter', 'acme/orecchio', {
+    input_modalities: ['audio'], output_modalities: ['text'],
+  });
+  assert.deepEqual(declared.inputs, [M.AUDIO]);
+  assert.ok(!declared.uncertain);
+  // Un modello di testo senza metadati resta incerto (non si blocca).
+  assert.ok(CAPS.capabilitiesFor('openrouter', 'acme/ignoto').uncertain);
 });
 
 test('categoryKey: mappa le capacità sulla categoria giusta del picker', () => {
-  assert.equal(CAPS.categoryKey('gemini', 'gemini-2.5-flash-tts'), 'tts');
-  assert.equal(CAPS.categoryKey('gemini', 'text-embedding-004'), 'embedding');
-  assert.equal(CAPS.categoryKey('gemini', 'veo-2'), 'video');
-  assert.equal(CAPS.categoryKey('gemini', 'imagen-3.0'), 'image');
-  assert.equal(CAPS.categoryKey('gemini', 'gemini-2.0-flash'), 'multimodal');
-  assert.equal(CAPS.categoryKey('gemini', 'gemma-3-27b-it'), 'text');
+  assert.equal(CAPS.categoryKey('openrouter', 'hexgrad/kokoro-82m'), 'tts');
+  assert.equal(CAPS.categoryKey('openrouter', 'qwen/qwen3-embedding-8b'), 'embedding');
+  assert.equal(CAPS.categoryKey('openrouter', 'google/veo-2'), 'video');
+  assert.equal(CAPS.categoryKey('openrouter', 'google/imagen-3.0'), 'image');
+  assert.equal(CAPS.categoryKey('openrouter', 'openai/whisper-large-v3-turbo'), 'stt');
+  assert.equal(CAPS.categoryKey('openrouter', 'moonshotai/kimi-k2.6', {
+    input_modalities: ['text', 'image'], output_modalities: ['text'],
+  }), 'multimodal');
+  assert.equal(CAPS.categoryKey('openrouter', 'acme/ignoto'), 'text');
 });
 
 test('recencyKey: per Gemini la versione nel nome ordina dal più recente', () => {

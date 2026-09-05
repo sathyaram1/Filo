@@ -123,7 +123,12 @@
       const reg = (getRegistry && getRegistry()) || {};
       const entry = reg[nick];
       if (!entry || !entry.provider || !entry.model) return { ok: true };
-      return Caps.modelMatchesAction(entry.provider, entry.model, action);
+      // Le modalità dichiarate dalla voce (o note per il nickname) valgono
+      // più del nome: così un modello di testo dal nome muto resta fuori
+      // dalla lettura ad alta voce, e uno che ascolta va sulla dettatura.
+      const C = global.SN_CONST;
+      const meta = (C && C.entryModalities) ? C.entryModalities(entry, nick) : null;
+      return Caps.modelMatchesAction(entry.provider, entry.model, action, meta || undefined);
     };
   }
 

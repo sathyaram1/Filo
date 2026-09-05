@@ -84,7 +84,7 @@
     menu_stop_reading: 'Interrompi lettura',
     tts_not_supported: 'Lettura ad alta voce non supportata in questo browser',
     tts_model_fallback: 'Voce del modello non disponibile ora: leggo con la voce del browser.',
-    tts_model_fallback_nokey: 'La lettura a voce naturale richiede una chiave Gemini abilitata alla sintesi vocale. Per ora leggo con la voce del browser.',
+    tts_model_fallback_nokey: 'La voce naturale non è raggiungibile in questo momento. Per ora leggo con la voce del browser.',
     // %s = il motivo vero (nessun modello impostato per la lettura, o modello
     // inesistente). Dice cosa manca E che intanto la lettura non si ferma.
     tts_model_fallback_reason: '%s Per ora leggo con la voce del browser.',
@@ -117,7 +117,8 @@
     toast_color_copied: 'Colore copiato: ',
     err_color_picker_unsupported: 'Color picker non supportato in questo browser',
     menu_global_translate: 'Traduci',
-    menu_dictate_listening: '🔴 Registrazione in corso… clicca per fermare',
+    menu_dictate_listening: '🔴 Ti ascolto… clicca per fermare',
+    menu_dictate_partial: 'Ti ascolto…',
     menu_dictate_model_select: 'Modello per dettatura',
     menu_dictate_not_supported: 'Dettatura non supportata in questo browser',
     menu_dictate_no_mic: 'Microfono non disponibile o negato',
@@ -292,6 +293,7 @@
     caps_cat_text: 'Testo',
     caps_cat_multimodal: 'Testo + visione/audio',
     caps_cat_tts: 'Sintesi vocale',
+    caps_cat_stt: 'Dettatura (ascolta)',
     caps_cat_image: 'Generazione immagini',
     caps_cat_video: 'Generazione video',
     caps_cat_embedding: 'Embedding',

@@ -300,6 +300,11 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'pageColor.js'));
   safe(path.join(CONTENT, 'translatePage.js'));
   safe(path.join(SHARED, 'ttsChunk.js'));
+  safe(path.join(SHARED, 'modelCaps.js'));
+  safe(path.join(SHARED, 'ttsVoices.js'));
+  safe(path.join(SHARED, 'dictationSegmenter.js'));
+  // Solo nei test: modelli di prova (vedi loader.js).
+  if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));
   safe(path.join(CONTENT, 'editBox.js'));
   safe(path.join(CONTENT, 'actions.js'));

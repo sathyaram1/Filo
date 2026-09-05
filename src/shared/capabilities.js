@@ -141,9 +141,15 @@
     },
     {
       id: 'read-aloud', title: 'Leggi ad alta voce', category: 'reading',
-      desc: 'Legge ad alta voce il testo selezionato, evidenziando le parole mentre le pronuncia.',
+      desc: 'Legge ad alta voce il testo selezionato con una voce naturale (un modello a pesi aperti, nella lingua del testo), evidenziando le parole mentre le pronuncia. Se la voce naturale non è raggiungibile, legge con quella del sistema.',
       invoke: 'Seleziona il testo e dal menu del tasto destro scegli "Leggi". Per fermare: "Interrompi lettura" (anche da un’altra scheda).',
-      doesNot: 'La voce, la velocità e il tono si regolano in Preferenze.',
+      doesNot: 'La voce naturale, quella di riserva del sistema, la velocità e il tono si regolano in Preferenze.',
+    },
+    {
+      id: 'dictate', title: 'Detta', category: 'writing',
+      desc: 'Detta in un campo di testo: il testo compare mentre parli, frase dopo frase, nel punto dove sta il cursore. Trascrive con un modello a pesi aperti, nella lingua che parli.',
+      invoke: 'In un campo modificabile, dal menu del tasto destro scegli "Detta"; clicca il riquadro rosso per fermare. La freccetta accanto sceglie il modello.',
+      doesNot: 'Si ferma da sola dopo cinque minuti. Le frasi provvisorie si vedono nel riquadro, nel campo entrano solo quelle chiuse da una pausa.',
     },
     {
       id: 'search-web', title: 'Cerca sul web', category: 'selection',
@@ -412,7 +418,7 @@
     // ───────────────────────────── Impostazioni ──────────────────────────────
     {
       id: 'options-models', title: 'Modelli e chiavi AI', category: 'settings',
-      desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Google Gemini, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile. Puoi anche affidarti ai modelli predefiniti di Filo.',
+      desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile. Puoi anche affidarti ai modelli predefiniti di Filo.',
       invoke: 'Menu del tasto destro → "Opzioni Filo", oppure filo://options/options.html.',
       doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo.',
     },
@@ -420,7 +426,7 @@
       id: 'open-weights-only', title: 'Solo modelli a pesi aperti', category: 'settings',
       desc: 'Un interruttore spegne tutti i modelli proprietari — Anthropic compresa, cioè anche quelli scelti da chi fa Filo — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche quando usi i crediti di Filo. Le funzioni che partivano da un modello proprietario passano da sole al suo equivalente aperto, e le Opzioni dicono subito quante cambiano e quali si fermano.',
       invoke: 'Opzioni → «Solo modelli a pesi aperti», oppure chiedendolo a Filo ("usa solo modelli a pesi aperti").',
-      doesNot: 'Le poche funzioni senza equivalente aperto (lettura ad alta voce, dettatura, indicizzazione dell’archivio) si fermano e lo dicono: non tornano di nascosto su un modello proprietario, nemmeno se il sostituto non risponde. Non governa i modelli che girano sui server di Filo, come i giudici dei feedback.',
+      doesNot: 'Una funzione senza equivalente aperto si ferma e lo dice: non torna di nascosto su un modello proprietario, nemmeno se il sostituto non risponde (lettura ad alta voce, dettatura e indicizzazione partono già da modelli a pesi aperti). Non governa i modelli che girano sui server di Filo, come i giudici dei feedback.',
     },
     {
       id: 'model-usage-census', title: 'Dove Filo usa un modello', category: 'settings',

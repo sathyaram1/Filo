@@ -47,7 +47,7 @@ test('la pagina Options si apre via tab navigate', async ({ openTab }) => {
   // ancora dentro la viewport). Verifichiamo l'attached al DOM degli elementi
   // chiave + il title della pagina.
   await expect(page.locator('#apiKey')).toBeAttached({ timeout: 8_000 });
-  await expect(page.locator('#apiKeyGemini')).toBeAttached();
+  await expect(page.locator('#apiKeyTavily')).toBeAttached();
   await expect(page).toHaveTitle(/Opzioni|Filo/);
 });
 

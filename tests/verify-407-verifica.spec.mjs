@@ -24,9 +24,9 @@ async function stubModel(app) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__vChunks = [];
     globalThis.__vCalls = 0;
@@ -36,7 +36,7 @@ async function stubModel(app) {
       const raw = messages[messages.length - 1]?.content;
       const content = typeof raw === 'string' ? raw : JSON.stringify(raw);
       if (content.indexOf('Traduci il seguente testo in italiano mantenendo struttura') !== 0) {
-        return { text: '{}', model: 'm', provider: 'gemini', usage: {} };
+        return { text: '{}', model: 'm', provider: 'openrouter', usage: {} };
       }
       const i = content.indexOf('Testo:\n\n');
       const chunk = i >= 0 ? content.slice(i + 'Testo:\n\n'.length) : content;
@@ -46,7 +46,7 @@ async function stubModel(app) {
       const segs = chunk.split(/\n?@@@\s*SN_SEP\s*@@@\n?/);
       const S = '\n@@@SN_SEP@@@\n';
       if (globalThis.__vMode === 'zulu-empty' && chunk.indexOf('ZULU') >= 0) {
-        return { text: '', model: 'm', provider: 'gemini', usage: {} };
+        return { text: '', model: 'm', provider: 'openrouter', usage: {} };
       }
       if (globalThis.__vMode === 'attr-injection') {
         // Modello ostile: prova a chiudere l'attributo e ad aprirne un altro.
@@ -54,10 +54,10 @@ async function stubModel(app) {
           text: segs
             .map(() => '‹IT› " onmouseover="window.__pwned=1" x="javascript:alert(1)')
             .join(S),
-          model: 'm', provider: 'gemini', usage: {},
+          model: 'm', provider: 'openrouter', usage: {},
         };
       }
-      return { text: segs.map((s) => '‹IT› ' + s).join(S), model: 'm', provider: 'gemini', usage: {} };
+      return { text: segs.map((s) => '‹IT› ' + s).join(S), model: 'm', provider: 'openrouter', usage: {} };
     };
   });
 }

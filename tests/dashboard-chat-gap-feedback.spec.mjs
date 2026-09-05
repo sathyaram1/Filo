@@ -37,9 +37,9 @@ async function useFakeKey(app) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'flash-lite-3' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
   });
 }

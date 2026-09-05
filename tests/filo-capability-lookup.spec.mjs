@@ -25,9 +25,9 @@ async function stubSequence(app, turns) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'flash-lite-3' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__filoTurnCount = 0;
     globalThis.__filoTurns = turns;

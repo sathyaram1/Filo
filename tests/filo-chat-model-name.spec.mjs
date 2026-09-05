@@ -2,7 +2,7 @@
 // codice per chiamare il modello." Quando l'utente scrive nella home, il system
 // prompt dell'assistente (FILO_CHAT) deve contenere l'ID CONCRETO del modello
 // primario (es. 'gemini-3.1-flash-lite'), non la chiave-nickname del registry
-// (es. 'flash-lite-3') né la sua label.
+// (es. 'deepseek-flash') né la sua label.
 //
 // Test end-to-end nel processo reale dell'app: stubbiamo il provider per
 // catturare i `messages` realmente costruiti da handleAIRequest, mandiamo una
@@ -36,14 +36,14 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
   const out = await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
 
-    // Config esplicita e deterministica: il chat punta al nickname 'flash-lite-3'
+    // Config esplicita e deterministica: il chat punta al nickname 'deepseek-flash'
     // (id concreto 'gemini-3.1-flash-lite'), provider Gemini con chiave presente.
     // useDefaultModels:false → niente dipendenza dai default bakati.
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'flash-lite-3' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
 
     // Stub del provider: cattura i messages e ritorna un JSON valido (niente rete).
@@ -71,7 +71,7 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
 
     // Risolvi quale chiave-nickname del registry corrisponde a quell'id concreto.
     const eff = await globalThis.SN_STORAGE.getSettings();
-    const registry = (eff && eff.modelRegistry) || C.DEFAULT_MODEL_REGISTRY;
+    const registry = (eff && eff.modelRegistry) || globalThis.SN_TEST_MODELS.registry;
     const nicknameKey = Object.keys(registry).find((k) => registry[k].model === primaryModel) || null;
 
     return { sysContent, primaryModel, nicknameKey };

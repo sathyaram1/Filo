@@ -34,12 +34,12 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
   const aiHistory = [
     // Chiamata con riuso: 6400 token su 8000 letti dalla cache = 80%.
     { id: 'h-reuse', timestamp: new Date(now).toISOString(), action: 'filo_chat',
-      provider: 'gemini', model: 'gemini-3.1-flash-lite', input: { userMessage: 'messaggio con riuso' },
+      provider: 'openrouter', model: 'gemini-3.1-flash-lite', input: { userMessage: 'messaggio con riuso' },
       output: 'risposta A', origin: 'filo://dashboard', costEur: 0.0002,
       usage: { promptTokens: 8000, completionTokens: 40, cachedPromptTokens: 6400 } },
     // Chiamata senza riuso: deve dire ZERO, non sparire.
     { id: 'h-no-reuse', timestamp: new Date(now - 1000).toISOString(), action: 'filo_chat',
-      provider: 'gemini', model: 'gemini-3.1-flash-lite', input: { userMessage: 'messaggio senza riuso' },
+      provider: 'openrouter', model: 'gemini-3.1-flash-lite', input: { userMessage: 'messaggio senza riuso' },
       output: 'risposta B', origin: 'filo://dashboard', costEur: 0.0002,
       usage: { promptTokens: 8000, completionTokens: 40, cachedPromptTokens: 0 } },
   ];

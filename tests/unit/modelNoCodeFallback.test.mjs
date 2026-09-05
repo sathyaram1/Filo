@@ -20,6 +20,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+// Modelli di prova: l'app non ha più modelli scritti nel codice.
+require(join(ROOT, 'tests', 'fixtures', 'testModels.js'));
 const C = globalThis.SN_CONST;
 
 // Registry "configurato" realistico: nickname curati, nessuno di quelli
@@ -51,23 +53,24 @@ test('una catena fatta di soli fantasmi non produce nessun tentativo', () => {
   const refs = C.parseModelRefs('flash, flash-or');
   assert.deepEqual(C.usableModelRefs(refs, REGISTRY), []);
   const attempts = C.buildModelAttempts(
-    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['gemini', 'openrouter'], { gemini: 'k', openrouter: 'k' },
+    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['openrouter'], { openrouter: 'k' },
   );
   assert.equal(attempts.length, 0,
     'una catena di scorciatoie inesistenti non deve produrre nessun modello da chiamare');
 });
 
 test('il registry scritto nel codice non risolve nulla se non è quello configurato', () => {
-  // 'flash' esiste fra i nickname integrati: è proprio quello su cui si ripiegava
-  // in silenzio. Con il registry configurato dell'utente deve risultare assente.
-  assert.ok(C.DEFAULT_MODEL_REGISTRY.flash, 'presupposto del test: "flash" è un nickname integrato');
-  assert.deepEqual(C.missingModelRefs(['flash'], REGISTRY), ['flash']);
+  // 'deepseek' esiste fra i nickname integrati: è il genere di scorciatoia su
+  // cui si ripiegava in silenzio. Con il registry configurato dell'utente deve
+  // risultare assente.
+  assert.ok(globalThis.SN_TEST_MODELS.registry.deepseek, 'presupposto del test: "deepseek" è un nickname integrato');
+  assert.deepEqual(C.missingModelRefs(['deepseek'], REGISTRY), ['deepseek']);
 });
 
 test('la catena di ripiego fra modelli configurati produce i tentativi in ordine', () => {
   const refs = C.parseModelRefs('text, immagine');
   const attempts = C.buildModelAttempts(
-    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['gemini', 'openrouter'], { openrouter: 'k' },
+    C.usableModelRefs(refs, REGISTRY), REGISTRY, ['openrouter'], { openrouter: 'k' },
   );
   assert.deepEqual(attempts.map((a) => a.model), [
     'deepseek/deepseek-v4-flash-0731',
@@ -98,7 +101,7 @@ test('ogni funzione che consuma un modello si può impostare dall\'editor', asyn
   // Se una funzione ha un modello di default deve anche essere impostabile:
   // altrimenti, quando la sua catena non risolve, l'errore direbbe "impostalo"
   // indicando un posto dove la funzione non compare.
-  for (const action of Object.keys(C.DEFAULT_MODELS)) {
+  for (const action of Object.keys(globalThis.SN_TEST_MODELS.models)) {
     assert.ok(editable.has(action),
       `la funzione "${action}" usa un modello ma non compare nell'editor dei modelli per azione`);
   }
@@ -111,4 +114,24 @@ test('ogni funzione impostabile ha un\'etichetta leggibile per i messaggi d\'err
     assert.ok(label && label !== action,
       `la funzione "${action}" non ha un nome leggibile: l'errore mostrerebbe il codice interno`);
   }
+});
+
+// ── Nessun modello scritto nel codice ────────────────────────────────────────
+// I modelli veri stanno nella configurazione condivisa o in quella personale.
+// Se il codice ne portasse uno di suo, una funzione lasciata senza modello
+// partirebbe lo stesso su un modello vecchio scelto da nessuno: costi e
+// prestazioni peggiori, in silenzio. Meglio l'errore rumoroso.
+test('il registro di build è vuoto e nessuna funzione ha una catena scritta nel codice', () => {
+  assert.deepEqual(Object.keys(C.DEFAULT_MODEL_REGISTRY), [], 'il registro scritto nel codice deve restare vuoto');
+  const piene = Object.entries(C.DEFAULT_MODELS).filter(([, v]) => String(v || '').trim());
+  assert.deepEqual(piene, [], 'nessuna funzione deve partire da un modello scritto nel codice');
+  // Le chiavi restano: il censimento le confronta con le funzioni.
+  assert.ok(Object.keys(C.DEFAULT_MODELS).length > 10);
+});
+
+test('senza configurazione una funzione non produce nessun tentativo (errore, non ripiego)', () => {
+  const refs = C.parseModelRefs(C.DEFAULT_MODELS[C.ACTIONS.EXPLAIN]);
+  assert.deepEqual(refs, []);
+  const attempts = C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, ['openrouter'], { openrouter: 'k' });
+  assert.equal(attempts.length, 0);
 });

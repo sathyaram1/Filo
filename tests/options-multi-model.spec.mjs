@@ -21,19 +21,18 @@ test('Modelli: la catena di fallback per azione ordina primario poi secondari', 
 
   const chain = await page.evaluate(() => {
     const C = window.SN_CONST;
-    const refs = C.parseModelRefs('flash, flash-or, claude-haiku');
-    const order = ['gemini', 'openrouter'];
-    const keys = { gemini: 'gm', openrouter: 'or' };
-    return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, order, keys);
+    const refs = C.parseModelRefs('deepseek-flash, gemma-lite, claude');
+    const order = ['openrouter'];
+    const keys = { openrouter: 'or' };
+    return C.buildModelAttempts(refs, globalThis.SN_TEST_MODELS.registry, order, keys);
   });
 
-  // Nuovo schema: ogni nickname ha UN solo provider. Il fallback cross-provider
-  // si ottiene elencando i gemelli ('flash' su Gemini, 'flash-or' su OpenRouter)
-  // → catena attesa: gemini(flash) → openrouter(flash-or) → openrouter(claude-haiku).
+  // Ogni nickname ha UN solo provider; la catena segue l'ordine scritto:
+  // primario, poi i ripieghi.
   expect(chain.map((a) => `${a.provider}:${a.model}`)).toEqual([
-    'gemini:gemini-2.0-flash',
-    'openrouter:google/gemini-2.0-flash-001',
-    'openrouter:anthropic/claude-3.5-haiku',
+    'openrouter:deepseek/deepseek-v4-flash',
+    'openrouter:google/gemma-4-26b-a4b-it',
+    'openrouter:anthropic/claude-haiku-4.5',
   ]);
 });
 
@@ -43,12 +42,13 @@ test('Modelli: un singolo nickname risolve solo sul suo provider', async ({ open
 
   const chain = await page.evaluate(() => {
     const C = window.SN_CONST;
-    const refs = C.parseModelRefs('flash');
-    return C.buildModelAttempts(refs, C.DEFAULT_MODEL_REGISTRY, ['gemini', 'openrouter'], { gemini: 'gm', openrouter: 'or' });
+    const refs = C.parseModelRefs('deepseek-flash');
+    // Un secondo fornitore (immaginario) con la sua chiave: il nickname non
+    // deve produrre un tentativo anche lì.
+    return C.buildModelAttempts(refs, globalThis.SN_TEST_MODELS.registry, ['openrouter', 'altro'], { openrouter: 'or', altro: 'x' });
   });
-  // 'flash' è un modello Gemini: non deve comparire alcun tentativo OpenRouter.
   expect(chain.map((a) => `${a.provider}:${a.model}`)).toEqual([
-    'gemini:gemini-2.0-flash',
+    'openrouter:deepseek/deepseek-v4-flash',
   ]);
 });
 

@@ -23,18 +23,18 @@ test('fallback a metà streaming: il popup mostra solo la risposta pulita del se
 
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    // Due nickname → catena reale di 2 attempt (gemini poi openrouter).
+    // Due nickname → catena reale di 2 attempt (entrambi sul router).
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test', openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN]: 'flash-lite-3,flash-lite-or' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash,gemma-lite' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     // Provider finti: NON stubbiamo il router (streamCompleteWithFallback), che
     // resta quello vero — è proprio la sua logica di reset sotto test.
-    globalThis.__origGem = globalThis.SN_PROVIDER_GEMINI;
+    globalThis.__origGem = globalThis.SN_PROVIDER_OPENROUTER;
     globalThis.__origOr = globalThis.SN_PROVIDER_OPENROUTER;
-    globalThis.SN_PROVIDER_GEMINI = {
+    globalThis.SN_PROVIDER_OPENROUTER = {
       ...globalThis.__origGem,
       streamComplete: async ({ onDelta }) => {
         onDelta('TESTO-SPORCO del primo tentativo che si interr');
@@ -79,7 +79,7 @@ test('fallback a metà streaming: il popup mostra solo la risposta pulita del se
   try { await page.screenshot({ path: 'tests/.shots/stream-fallback-reset.png' }); } catch (_) {}
 
   await app.evaluate(() => {
-    globalThis.SN_PROVIDER_GEMINI = globalThis.__origGem;
+    globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origGem;
     globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origOr;
   });
 });
@@ -96,13 +96,13 @@ test('errore immediato del primo provider (nessun delta): fallback pulito come p
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test', openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN]: 'flash-lite-3,flash-lite-or' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash,gemma-lite' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
-    globalThis.__origGem2 = globalThis.SN_PROVIDER_GEMINI;
+    globalThis.__origGem2 = globalThis.SN_PROVIDER_OPENROUTER;
     globalThis.__origOr2 = globalThis.SN_PROVIDER_OPENROUTER;
-    globalThis.SN_PROVIDER_GEMINI = {
+    globalThis.SN_PROVIDER_OPENROUTER = {
       ...globalThis.__origGem2,
       streamComplete: async () => { throw new Error('401 unauthorized'); },
     };
@@ -131,7 +131,7 @@ test('errore immediato del primo provider (nessun delta): fallback pulito come p
   expect(finale.trim()).toBe('Risposta diretta del fallback.');
 
   await app.evaluate(() => {
-    globalThis.SN_PROVIDER_GEMINI = globalThis.__origGem2;
+    globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origGem2;
     globalThis.SN_PROVIDER_OPENROUTER = globalThis.__origOr2;
   });
 });

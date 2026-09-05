@@ -36,22 +36,22 @@ test('Modelli per azione: dropdown custom Filo al posto della datalist nativa', 
   await input.focus();
   const pop = chain.locator('.sn-chain-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
-  const flashOpt = pop.locator('.sn-select-option', { hasText: 'flash' }).first();
+  const flashOpt = pop.locator('.sn-select-option', { hasText: 'deepseek-flash' }).first();
   await expect(flashOpt).toBeVisible();
 
   // (3) Cliccando un'opzione l'input si compila e il valore persiste.
-  await input.fill('flash');
+  await input.fill('deepseek-flash');
   await expect(pop).toBeVisible();
-  const exact = pop.locator('.sn-select-option').filter({ has: page.locator('.sn-chain-opt-nick', { hasText: /^flash$/ }) }).first();
+  const exact = pop.locator('.sn-select-option').filter({ has: page.locator('.sn-chain-opt-nick', { hasText: /^deepseek-flash$/ }) }).first();
   await exact.click();
-  await expect(input).toHaveValue('flash');
+  await expect(input).toHaveValue('deepseek-flash');
 
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
   const saved = await page.evaluate(async () => {
     const s = await window.SN_STORAGE.getSettings();
     return s.models[window.SN_CONST.ACTIONS.EXPLAIN_DEEP];
   });
-  expect(saved).toBe('flash');
+  expect(saved).toBe('deepseek-flash');
 });
 
 test('Modelli per azione: digitando si filtra la tendina custom', async ({ openTab }) => {
@@ -69,8 +69,8 @@ test('Modelli per azione: digitando si filtra la tendina custom', async ({ openT
   const total = await pop.locator('.sn-select-option').count();
   expect(total).toBeGreaterThan(1);
 
-  // Filtra per "haiku": resta solo claude-haiku.
-  await input.fill('haiku');
+  // Filtra per "whisper": resta solo whisper.
+  await input.fill('whisper');
   await expect(pop.locator('.sn-select-option')).toHaveCount(1);
-  await expect(pop.locator('.sn-select-option').first()).toContainText('claude-haiku');
+  await expect(pop.locator('.sn-select-option').first()).toContainText('whisper');
 });

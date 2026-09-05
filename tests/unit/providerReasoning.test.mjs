@@ -18,10 +18,8 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-require(join(__dirname, '..', '..', 'src', 'main', 'services', 'providers', 'gemini.js'));
 require(join(__dirname, '..', '..', 'src', 'main', 'services', 'providers', 'openrouter.js'));
 
-const Gemini = globalThis.SN_PROVIDER_GEMINI;
 const OpenRouter = globalThis.SN_PROVIDER_OPENROUTER;
 
 // Costruisce un Response con un body SSE leggibile a chunk (come quello reale).
@@ -47,42 +45,7 @@ function withFetch(fn, run) {
   return Promise.resolve(run()).finally(() => { global.fetch = orig; });
 }
 
-test('Gemini: i thought summary vanno su onReasoning, la risposta su onDelta', async () => {
-  const chunks = [
-    'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: 'Sto valutando le opzioni.' }] } }] }) + '\n\n',
-    'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: ' Scelgo la prima.' }] } }] }) + '\n\n',
-    'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Ciao!' }] } }] }) + '\n\n',
-  ];
-  const reasoning = [];
-  const answer = [];
-  const sentBody = {};
-  const res = await withFetch(
-    (url, opts) => { Object.assign(sentBody, JSON.parse(opts.body)); return Promise.resolve(sseResponse(chunks)); },
-    () => Gemini.streamComplete({
-      apiKey: 'k', model: 'gemini-3.1-flash-lite', messages: [{ role: 'user', content: 'ciao' }],
-      onReasoning: (t) => reasoning.push(t),
-      onDelta: (t) => answer.push(t),
-    }),
-  );
-  // Il reasoning è stato chiesto → includeThoughts attivo
-  assert.equal(sentBody.generationConfig?.thinkingConfig?.includeThoughts, true);
-  // I pensieri sono arrivati su onReasoning, NON nella risposta
-  assert.equal(reasoning.join(''), 'Sto valutando le opzioni. Scelgo la prima.');
-  // La risposta finale contiene SOLO il testo non-thought
-  assert.equal(res.text, 'Ciao!');
-  assert.equal(answer.join(''), 'Ciao!');
-});
 
-test('Gemini: senza onReasoning lo stream resta come prima (nessun thinkingConfig)', async () => {
-  const chunks = ['data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Risposta.' }] } }] }) + '\n\n'];
-  const sentBody = {};
-  const res = await withFetch(
-    (url, opts) => { Object.assign(sentBody, JSON.parse(opts.body)); return Promise.resolve(sseResponse(chunks)); },
-    () => Gemini.streamComplete({ apiKey: 'k', model: 'gemini-3.1-flash-lite', messages: [{ role: 'user', content: 'x' }], onDelta: () => {} }),
-  );
-  assert.equal(sentBody.generationConfig?.thinkingConfig?.includeThoughts, undefined);
-  assert.equal(res.text, 'Risposta.');
-});
 
 test('OpenRouter: delta.reasoning va su onReasoning, delta.content su onDelta', async () => {
   const chunks = [
@@ -146,23 +109,4 @@ test('OpenRouter: livello "off" chiede di non ragionare (non-streaming)', async 
   assert.deepEqual(sentBody.reasoning, { enabled: false });
 });
 
-test('Gemini: mapping puro livello → thinkingConfig', () => {
-  const t = Gemini.thinkingConfigFor;
-  assert.equal(t(undefined, false), null);
-  assert.deepEqual(t('off', false), { thinkingBudget: 0 });
-  assert.deepEqual(t('low', false), { thinkingBudget: 1024 });
-  assert.deepEqual(t('medium', false), { thinkingBudget: 8192 });
-  assert.deepEqual(t('high', false), { thinkingBudget: 24576 });
-  // livello + streaming → budget E includeThoughts.
-  assert.deepEqual(t('high', true), { thinkingBudget: 24576, includeThoughts: true });
-});
 
-test('Gemini: il livello arriva nel body come thinkingBudget', async () => {
-  const chunks = ['data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }) + '\n\n'];
-  const sentBody = {};
-  await withFetch(
-    (url, opts) => { Object.assign(sentBody, JSON.parse(opts.body)); return Promise.resolve(sseResponse(chunks)); },
-    () => Gemini.streamComplete({ apiKey: 'k', model: 'gemini-3.1-flash-lite', reasoning: 'low', messages: [{ role: 'user', content: 'x' }], onDelta: () => {} }),
-  );
-  assert.equal(sentBody.generationConfig?.thinkingConfig?.thinkingBudget, 1024);
-});

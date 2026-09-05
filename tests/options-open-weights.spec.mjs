@@ -33,8 +33,8 @@ test('Opzioni: acceso, dichiara quali funzioni cambiano modello e quali si ferma
   const page = await openTab(OPTIONS_URL);
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
 
-  // Configurazione personale nota: una funzione con equivalente aperto e una
-  // (la sintesi vocale) che un equivalente non ce l'ha.
+  // Configurazione personale nota: le funzioni predefinite partono quasi tutte
+  // da pesi aperti; quelle su Anthropic hanno un equivalente aperto.
   await page.uncheck('#useDefaultModels');
   await expect(page.locator('#sec-models')).toBeVisible();
 
@@ -44,13 +44,12 @@ test('Opzioni: acceso, dichiara quali funzioni cambiano modello e quali si ferma
   const impact = page.locator('#openWeightsImpact');
   await expect(impact).toBeVisible();
   // Chi cambia modello: il nome del modello aperto che prenderà il posto.
-  await expect(impact).toContainText('gemma');
-  // Chi si ferma: la funzione è nominata, non lasciata scoprire all'uso.
-  await expect(impact).toContainText(/Lettura ad alta voce/i);
-  // La dettatura ha bisogno di ASCOLTARE: nessun sostituto a pesi aperti lo fa,
-  // quindi va annunciata fra quelle che si fermano — non fra quelle che
-  // "cambiano modello", che sarebbe una bugia scoperta al primo tentativo.
-  await expect(impact).toContainText(/Dettatura/i);
+  await expect(impact).toContainText('deepseek');
+  // Nessuna funzione si ferma: lettura ad alta voce, dettatura e indicizzazione
+  // partono già da modelli a pesi aperti, quindi non vanno annunciate come
+  // ferme (sarebbe un allarme per uno stato che non c'è).
+  await expect(impact).not.toContainText(/Si fermano/i);
+  await expect(impact).not.toContainText(/Dettatura/i);
 
   // Spegnendolo l'avviso sparisce: non resta un allarme per uno stato che non c'è.
   await page.uncheck('#openWeightsOnly');
@@ -84,9 +83,7 @@ test('Opzioni: acceso, i «Prova» dei modelli proprietari non sono premibili', 
     .locator('.sn-model-test');
   if (await ammessi.count()) await expect(ammessi.first()).toBeEnabled();
 
-  // ── Chiavi: l'API diretta del produttore resta spenta, lo smistatore no
-  // (prova un modello ammesso).
-  await expect(page.locator('#testGemini')).toBeDisabled();
+  // ── Chiavi: lo smistatore prova un modello ammesso, quindi resta vivo.
   await expect(page.locator('#testOpenrouter')).toBeEnabled();
 
   // ── Registry personale: stessa regola per le righe scritte dall'utente.
@@ -104,18 +101,17 @@ test('Opzioni: acceso, i «Prova» dei modelli proprietari non sono premibili', 
   // Spento, tutto torna premibile: la differenza la fa l'interruttore.
   await page.uncheck('#openWeightsOnly');
   await expect(riga.locator('.sn-model-test')).toBeEnabled();
-  await expect(page.locator('#testGemini')).toBeEnabled();
 });
 
-test('Opzioni: acceso, la pagina non interroga più i server di chi produce i modelli', async ({ app, openTab }) => {
+test('Opzioni: la pagina non interroga i server di chi produce i modelli, acceso o spento', async ({ app, openTab }) => {
   // L'ultima cosa che questa pagina mandava a un fornitore escluso non era un
   // pulsante: era il caricamento del catalogo modelli, che parte DA SOLO
-  // all'apertura se una chiave del produttore è salvata. Il criterio dichiarato
-  // ("nessuna chiamata a un fornitore escluso") non distingue fra una richiesta
-  // partita da un click e una partita da sola.
+  // all'apertura. Oggi l'API diretta di Google non è più in Filo: il catalogo
+  // arriva dal router (pubblico, ammesso), e verso i produttori esclusi non
+  // parte niente, con l'interruttore spento come acceso.
   const chiaveSalvata = (openWeightsOnly) => app.evaluate(async (_, on) => {
     await globalThis.SN_STORAGE.setSettings({
-      apiKeys: { gemini: 'AIza-finta-per-il-test' },
+      apiKeys: { openrouter: 'sk-or-finta-per-il-test' },
       openWeightsOnly: on,
     });
   }, openWeightsOnly);
@@ -125,17 +121,21 @@ test('Opzioni: acceso, la pagina non interroga più i server di chi produce i mo
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
 
   const versoIlProduttore = [];
+  const versoIlRouter = [];
+  const PRODUTTORI = /generativelanguage\.googleapis\.com|api\.openai\.com|api\.mistral\.ai|api\.x\.ai|dashscope/i;
   page.on('request', (r) => {
-    if (r.url().includes('generativelanguage.googleapis.com')) versoIlProduttore.push(r.url());
+    if (PRODUTTORI.test(r.url())) versoIlProduttore.push(r.url());
+    if (r.url().includes('openrouter.ai/api/v1/models')) versoIlRouter.push(r.url());
   });
 
-  // Pre-condizione: a interruttore SPENTO la richiesta parte davvero. Senza
-  // questa metà, il test passerebbe anche se il catalogo non partisse mai.
+  // Pre-condizione: a interruttore SPENTO il catalogo parte davvero, dal
+  // router. Senza questa metà il test passerebbe anche a pagina muta.
   await page.reload();
   await page.waitForSelector('#openWeightsOnly', { timeout: 8_000 });
-  await expect.poll(() => versoIlProduttore.length, { timeout: 8_000 }).toBeGreaterThan(0);
+  await expect.poll(() => versoIlRouter.length, { timeout: 8_000 }).toBeGreaterThan(0);
+  expect(versoIlProduttore, `partita una richiesta verso un produttore: ${versoIlProduttore[0]}`).toEqual([]);
 
-  // Acceso: la stessa pagina, con la stessa chiave, non ci parla più.
+  // Acceso: idem, niente verso i produttori.
   await chiaveSalvata(true);
   versoIlProduttore.length = 0;
   await page.reload();

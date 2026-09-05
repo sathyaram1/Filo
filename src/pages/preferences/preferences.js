@@ -492,6 +492,87 @@
     if (want && [...sel.options].some((o) => o.value === want)) sel.value = want;
   }
 
+  // Tendina della voce NATURALE (del modello): una voce per riga, raggruppate
+  // per lingua; la prima scelta è "automatica" (segue la lingua del testo).
+  function populateModelVoices(selected) {
+    const sel = $('ttsModelVoice');
+    const V = window.SN_TTS_VOICES;
+    if (!sel || !V) return;
+    const want = selected !== undefined ? selected : sel.value;
+    sel.innerHTML = '<option value="">Automatica: segue la lingua del testo</option>';
+    for (const g of V.groupedByLang()) {
+      const og = document.createElement('optgroup');
+      og.label = g.label.charAt(0).toUpperCase() + g.label.slice(1);
+      for (const v of g.voices) {
+        const o = document.createElement('option');
+        o.value = v.id;
+        o.textContent = v.label;
+        og.appendChild(o);
+      }
+      sel.appendChild(og);
+    }
+    if (want && [...sel.options].some((o) => o.value === want)) sel.value = want;
+  }
+
+  const MODEL_VOICE_SAMPLES = {
+    it: 'Ciao, sono Filo. Questa è la voce naturale scelta per la lettura ad alta voce.',
+    en: 'Hi, I am Filo. This is the natural voice chosen for reading aloud.',
+    es: 'Hola, soy Filo. Esta es la voz natural elegida para la lectura en voz alta.',
+    fr: 'Bonjour, je suis Filo. Voici la voix naturelle choisie pour la lecture à voix haute.',
+    pt: 'Olá, eu sou o Filo. Esta é a voz natural escolhida para a leitura em voz alta.',
+  };
+
+  // PCM 16 bit mono → WAV in un blob URL (stesso incapsulamento del content script).
+  function pcmBase64ToWavUrl(base64, sampleRate) {
+    const bin = atob(base64);
+    const n = bin.length;
+    const buffer = new ArrayBuffer(44 + n);
+    const view = new DataView(buffer);
+    let off = 0;
+    const writeStr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(off++, s.charCodeAt(i)); };
+    const writeU32 = (v) => { view.setUint32(off, v, true); off += 4; };
+    const writeU16 = (v) => { view.setUint16(off, v, true); off += 2; };
+    writeStr('RIFF'); writeU32(36 + n); writeStr('WAVE');
+    writeStr('fmt '); writeU32(16); writeU16(1); writeU16(1);
+    writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+    writeStr('data'); writeU32(n);
+    for (let i = 0; i < n; i++) view.setUint8(off++, bin.charCodeAt(i) & 0xff);
+    return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+  }
+
+  let modelPreviewAudio = null;
+  // Ascolta la voce naturale scelta: una frase nella sua lingua, sintetizzata
+  // dal modello (passa dal main come una lettura vera).
+  async function previewModelVoice() {
+    const btn = $('ttsModelPreview');
+    const status = $('ttsModelPreviewStatus');
+    const V = window.SN_TTS_VOICES;
+    const voice = $('ttsModelVoice').value || '';
+    const lang = (voice && V) ? V.langOfVoice(voice) : ((navigator.language || 'it').split('-')[0]);
+    const text = MODEL_VOICE_SAMPLES[lang] || MODEL_VOICE_SAMPLES.en;
+    if (modelPreviewAudio) { try { modelPreviewAudio.pause(); } catch (_) {} modelPreviewAudio = null; }
+    btn.disabled = true;
+    status.textContent = '…';
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text, lang, voice });
+      if (!res || !res.ok) {
+        status.textContent = (res && res.error) || 'Voce naturale non disponibile in questo momento';
+        return;
+      }
+      const m = /rate=(\d+)/.exec(String(res.mimeType || ''));
+      const url = pcmBase64ToWavUrl(res.audioBase64, m ? parseInt(m[1], 10) : 24000);
+      const audio = new Audio(url);
+      modelPreviewAudio = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); if (modelPreviewAudio === audio) modelPreviewAudio = null; };
+      await audio.play();
+      status.textContent = '';
+    } catch (e) {
+      status.textContent = (e && e.message) || 'Errore';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   function previewTts() {
     if (!ttsSupported()) return;
     const synth = window.speechSynthesis;
@@ -576,6 +657,7 @@
       voice: $('ttsVoice').value || '',
       rate: parseFloat($('ttsRate').value) || 1,
       pitch: parseFloat($('ttsPitch').value) || 1,
+      modelVoice: $('ttsModelVoice').value || '',
     };
     const autoArchive = {
       enabled: $('autoArchiveEnabled').checked,
@@ -675,6 +757,7 @@
     $('timerRingtone').value = ringOpt ? ringtone : 'default';
 
     const tts = settings.tts || {};
+    populateModelVoices(tts.modelVoice || '');
     if (ttsSupported()) {
       const rate = Number(tts.rate) || 1;
       const pitch = Number(tts.pitch) || 1;
@@ -748,6 +831,7 @@
       persistDebounced();
     });
     $('ttsPreview').addEventListener('click', previewTts);
+    $('ttsModelPreview').addEventListener('click', previewModelVoice);
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);

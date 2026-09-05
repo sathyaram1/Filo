@@ -50,22 +50,24 @@ test('sicurezza/privacy → livello 2, partial annidato corretto', () => {
 });
 
 test('modelli / provider / chiavi / costi → livello 2', () => {
-  const prov = build('provider', 'gemini');
+  const prov = build('provider', 'openrouter');
   assert.equal(prov.level, 2);
-  assert.equal(prov.label, 'Provider → Google Gemini');
-  assert.deepEqual(prov.partial, { provider: 'gemini' });
-  assert.deepEqual(build('provider', 'openrouter').partial, { provider: 'openrouter' });
+  assert.equal(prov.label, 'Provider → OpenRouter');
+  assert.deepEqual(prov.partial, { provider: 'openrouter' });
+  // Google non è più un fornitore di Filo: chiederlo a parole non deve
+  // scrivere niente.
+  assert.equal(build('provider', 'gemini'), null);
+  assert.equal(build('chiave_gemini', 'AIzaSEGRETO1234'), null);
   assert.equal(build('modelli_predefiniti', 'off').level, 2);
   assert.deepEqual(build('modelli_predefiniti', 'off').partial, { useDefaultModels: false });
 
-  const k = build('chiave_gemini', 'AIzaSEGRETO1234');
+  const k = build('chiave_openrouter', 'sk-or-v1-SEGRETO1234');
   assert.equal(k.level, 2);
-  assert.deepEqual(k.partial, { apiKeys: { gemini: 'AIzaSEGRETO1234' } });
+  assert.deepEqual(k.partial, { apiKeys: { openrouter: 'sk-or-v1-SEGRETO1234' } });
   // L'etichetta NON stampa l'intera chiave (solo testa/coda).
-  assert.doesNotMatch(k.label, /AIzaSEGRETO1234/);
-  assert.match(k.label, /AIza/);
+  assert.doesNotMatch(k.label, /SEGRETO1234/);
+  assert.match(k.label, /sk-o/);
 
-  assert.deepEqual(build('chiave_openrouter', 'sk-or-v1-abcdEFGH').partial, { apiKeys: { openrouter: 'sk-or-v1-abcdEFGH' } });
   assert.deepEqual(build('chiave_tavily', 'tvly-abcd1234').partial, { apiKeys: { tavily: 'tvly-abcd1234' } });
 
   const limit = build('limite_spesa', '12 euro');
@@ -113,7 +115,7 @@ test('parseItalianNumber: disambigua migliaia vs decimale', () => {
 test('valori non validi → null (niente scrittura accidentale)', () => {
   assert.equal(build('provider', 'inesistente'), null);
   assert.equal(build('gestione_cookie', 'boh'), null);
-  assert.equal(build('chiave_gemini', ''), null);       // chiave vuota: non azzera per sbaglio
+  assert.equal(build('chiave_openrouter', ''), null);   // chiave vuota: non azzera per sbaglio
   assert.equal(build('limite_spesa', 'tanto'), null);
   assert.equal(build('correttore', 'forse'), null);
   // 'apiKey' generico è ambiguo (quale provider?) → non mappato.
@@ -142,10 +144,10 @@ test('#183: il messaggio di rischio è esposto da buildPreferencePartial e parla
   assert.equal(term.level, 2);
   assert.match(term.risk, /shell/i, 'la modalità terminale spiega l’accesso alla shell');
 
-  const key = build('chiave_gemini', 'AIzaSEGRETO1234');
+  const key = build('chiave_openrouter', 'sk-or-v1-SEGRETO1234');
   assert.match(key.risk, /credenzial|spes/i, 'la chiave API avvisa che autorizza spese');
   // Il rischio NON deve stampare il segreto.
-  assert.doesNotMatch(key.risk, /AIzaSEGRETO1234/);
+  assert.doesNotMatch(key.risk, /SEGRETO1234/);
 
   // Livello 1 → nessun rischio (si applica subito, senza popup).
   assert.equal(build('tema', 'scuro').risk, '');

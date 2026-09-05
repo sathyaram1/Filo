@@ -46,9 +46,9 @@ async function balance() {
   return (await Credits.getPublic()).balanceExact;
 }
 
-test('notionalPricingFor: prezzo di listino per i modelli Gemini diretti', () => {
-  const p = globalThis.SN_CONST.notionalPricingFor('gemini-2.0-flash');
-  assert.ok(p && p.input > 0 && p.output > 0, 'gemini-2.0-flash deve avere un prezzo nozionale');
+test('notionalPricingFor: prezzo di listino per i modelli predefiniti', () => {
+  const p = globalThis.SN_CONST.notionalPricingFor('deepseek/deepseek-v4-flash');
+  assert.ok(p && p.input > 0 && p.output > 0, 'deepseek/deepseek-v4-flash deve avere un prezzo nozionale');
   assert.equal(globalThis.SN_CONST.notionalPricingFor('modello-sconosciuto'), null);
 });
 

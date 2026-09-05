@@ -353,6 +353,17 @@
   animation: sn-dictate-pulse 1.2s ease-in-out infinite;
 }
 .sn-dictate-pill:hover { border-color: var(--sn-accent); }
+/* Frase in corso (trascrizione provvisoria), accanto all'etichetta. */
+.sn-dictate-pill-live {
+  opacity: 0.75;
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.sn-dictate-pill-live::before { content: '·'; margin-right: 6px; opacity: 0.6; }
 @keyframes sn-dictate-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.35; transform: scale(0.85); }

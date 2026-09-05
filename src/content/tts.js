@@ -1,11 +1,18 @@
 // Audio del content script: lettura ad alta voce (text-to-speech) e dettatura
 // (registrazione microfono + trascrizione via modello).
 //
-// TTS — strategia: prima si tenta la sintesi vocale via MODELLO (Gemini TTS,
-// voce di qualità) tramite il main process; se non c'è un modello/chiave o la
-// chiamata fallisce, si ripiega sulla voce del browser (Web Speech: gratuita,
-// offline, voci del sistema operativo). La voce/velocità/tono del fallback
-// arrivano da settings.tts (Preferenze).
+// TTS — strategia: prima si tenta la sintesi vocale via MODELLO (voce
+// naturale di un modello a pesi aperti, scelta in base alla lingua del testo)
+// tramite il main process; se non c'è un modello/chiave o la chiamata
+// fallisce, si ripiega sulla voce del browser (Web Speech: gratuita, offline,
+// voci del sistema operativo). La voce/velocità/tono del fallback arrivano da
+// settings.tts (Preferenze).
+//
+// Dettatura — il microfono viene ascoltato a blocchi e spezzato in frasi
+// (SN_DICTATION_SEGMENTER): ogni frase chiusa da una pausa va al modello di
+// trascrizione e il testo entra nel campo; nel frattempo la frase in corso si
+// vede, provvisoria, nel riquadro rosso. Nessuna registrazione da fermare e
+// aspettare: si parla, e il testo arriva.
 //
 // Estratto da content.js — viene caricato prima di lui dai preload. content.js
 // chiama init() passando le dipendenze che restano sue (settings correnti,
@@ -219,8 +226,9 @@
     reportReadingState(false);
   }
 
-  // Incapsula PCM 16-bit little-endian mono (quello che torna Gemini TTS,
-  // audio/L16;rate=24000) in un WAV riproducibile da <audio>. Ritorna un blob URL.
+  // Incapsula PCM 16-bit little-endian mono (quello che torna il modello di
+  // lettura, audio/pcm;rate=24000) in un WAV riproducibile da <audio>. Ritorna
+  // un blob URL.
   function pcmBase64ToWavUrl(base64, sampleRate) {
     const bin = atob(base64);
     const n = bin.length;
@@ -374,7 +382,7 @@
       // Teniamo l'intero esito (non solo null): quando il modello non è
       // disponibile ci serve `error`/`firstFallback` per spiegare all'utente
       // perché la lettura passa alla voce del browser (vedi notifyModelFallback).
-      fetches[ci] = chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: ctext })
+      fetches[ci] = chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: ctext, lang: pageLang() })
         .then((res) => res || null)
         .catch(() => null);
     };
@@ -433,66 +441,28 @@
     return { type: 'item', icon: Icons.stopReading(18), label: I18n.t('menu_stop_reading'), onClick: () => requestStopReading() };
   }
 
-  // Decodifica un blob audio (qualunque formato che il browser sappia leggere
-  // — tipicamente webm/opus prodotto da MediaRecorder) e lo ri-encoda come WAV
-  // mono al sampleRate richiesto. Necessario perché la Gemini API accetta
-  // wav/mp3/ogg/flac/aac/aiff ma NON webm. WAV PCM 16-bit mono a 16kHz è
-  // abbondante per la voce e tiene il file piccolo (~32KB/s).
-  async function audioBlobToWav(blob, targetSampleRate = 16000) {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) throw new Error('AudioContext non disponibile');
-    const arrayBuffer = await blob.arrayBuffer();
-    const decoderCtx = new Ctx();
-    let decoded;
+  // Lingua del testo che si legge: quella dichiarata dalla pagina, altrimenti
+  // quella dell'app. Sceglie la voce del modello (salvo una voce fissata in
+  // Preferenze).
+  function pageLang() {
     try {
-      decoded = await decoderCtx.decodeAudioData(arrayBuffer.slice(0));
-    } finally {
-      try { decoderCtx.close(); } catch (_) {}
-    }
-    const frameCount = Math.max(1, Math.ceil(decoded.duration * targetSampleRate));
-    const offline = new OfflineAudioContext(1, frameCount, targetSampleRate);
-    const src = offline.createBufferSource();
-    src.buffer = decoded;
-    src.connect(offline.destination);
-    src.start();
-    const rendered = await offline.startRendering();
-    const samples = rendered.getChannelData(0);
-    const buffer = new ArrayBuffer(44 + samples.length * 2);
-    const view = new DataView(buffer);
-    let off = 0;
-    const writeStr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(off++, s.charCodeAt(i)); };
-    const writeU32 = (v) => { view.setUint32(off, v, true); off += 4; };
-    const writeU16 = (v) => { view.setUint16(off, v, true); off += 2; };
-    writeStr('RIFF');
-    writeU32(36 + samples.length * 2);
-    writeStr('WAVE');
-    writeStr('fmt ');
-    writeU32(16);
-    writeU16(1);                     // PCM
-    writeU16(1);                     // mono
-    writeU32(targetSampleRate);
-    writeU32(targetSampleRate * 2);  // byte rate (sampleRate * channels * 2)
-    writeU16(2);                     // block align
-    writeU16(16);                    // bits per sample
-    writeStr('data');
-    writeU32(samples.length * 2);
-    for (let i = 0; i < samples.length; i++) {
-      const s = Math.max(-1, Math.min(1, samples[i]));
-      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-      off += 2;
-    }
-    return new Blob([buffer], { type: 'audio/wav' });
+      const l = document.documentElement && document.documentElement.lang;
+      return (l && String(l).trim()) || navigator.language || '';
+    } catch (_) { return ''; }
   }
 
-  // Item "Detta": registrazione audio via MediaRecorder + trascrizione con un
-  // modello multimodale (default Gemini Flash). La freccetta apre la scelta
-  // modello, popolata dinamicamente dai modelli del registry che supportano
-  // input audio (per ora solo Gemini — Claude/OpenRouter chat non accettano
-  // audio inline).
+  function dictationSupported() {
+    return typeof window !== 'undefined'
+      && Boolean(navigator?.mediaDevices?.getUserMedia)
+      && Boolean(window.AudioContext || window.webkitAudioContext)
+      && Boolean(global.SN_DICTATION_SEGMENTER);
+  }
+
+  // Item "Detta": ascolto del microfono + trascrizione in diretta con un
+  // modello di dettatura. La freccetta apre la scelta modello, popolata dai
+  // modelli del registro che dichiarano di ascoltare un audio.
   function buildDictateItem() {
-    const supported = typeof window !== 'undefined'
-      && typeof window.MediaRecorder !== 'undefined'
-      && navigator?.mediaDevices?.getUserMedia;
+    const supported = dictationSupported();
     return {
       type: 'split',
       icon: '🎤',
@@ -522,15 +492,24 @@
     // Il campo può contenere più nickname (fallback): il "corrente" mostrato
     // come selezionato è il primario (il primo della lista).
     const current = C.parseModelRefs ? (C.parseModelRefs(currentRaw)[0] || currentRaw) : currentRaw;
+    const Caps = global.SN_MODEL_CAPS;
     const items = [];
     for (const [nickname, entry] of Object.entries(registry)) {
-      // Solo modelli serviti da Gemini: per ora è l'unico provider che accetta
-      // audio inline tramite la stessa chat completion che usiamo. `entry.gemini`
-      // è la forma vecchia del registry (un nickname per due provider), tenuta
-      // per le configurazioni salvate prima del passaggio a { provider, model }.
       if (!entry) continue;
-      if (entry.provider ? entry.provider !== 'gemini' : !entry.gemini) continue;
       const checked = nickname === current;
+      // Solo i modelli che dichiarano di ascoltare un audio (la voce del
+      // registro lo dice, o il nome lo lascia capire: whisper, asr…). Un
+      // modello di chat qui non funzionerebbe. Quello scelto resta in lista
+      // comunque, così si vede cos'è impostato.
+      if (!checked) {
+        const provider = entry.provider || 'openrouter';
+        const model = entry.model || entry.openrouter || '';
+        const meta = (C.entryModalities && C.entryModalities(entry, nickname)) || undefined;
+        const caps = Caps && Caps.capabilitiesFor ? Caps.capabilitiesFor(provider, model, meta) : null;
+        const listens = caps && !caps.uncertain && caps.inputs.includes('audio')
+          && Caps.modelMatchesAction(provider, model, C.ACTIONS.TRANSCRIBE_AUDIO, meta).ok;
+        if (!listens) continue;
+      }
       items.push({
         label: (checked ? '✓ ' : '   ') + (entry.label || nickname),
         onClick: () => pickDictateModel(nickname),
@@ -554,12 +533,31 @@
     }
   }
 
-  // Stato modulo per la registrazione in corso (al più una alla volta).
+  // Stato modulo per la dettatura in corso (al più una alla volta).
   let _dictateState = null;
+  // Sicurezza: il microfono non resta aperto oltre questo tempo.
+  const DICTATE_MAX_MS = 5 * 60 * 1000;
+  // Frequenza a cui si manda l'audio al modello: per la voce basta e tiene
+  // gli spezzoni piccoli (~32 KB al secondo).
+  const DICTATE_RATE = 16000;
+  // Quanti caratteri della frase provvisoria si vedono nel riquadro (la coda:
+  // è quella che cambia mentre si parla).
+  const DICTATE_LIVE_CHARS = 140;
+
+  // Perché la dettatura non è partita, detto all'utente. Un errore di
+  // CONFIGURAZIONE dei modelli (nessun modello per questa funzione, o «solo
+  // pesi aperti» senza un modello che ascolti) arriva già spiegato e va
+  // mostrato com'è: dice cosa fare per rimetterla in piedi.
+  function explainDictationFailure(res) {
+    const spiegato = (res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_OPEN_WEIGHTS_MODEL')
+      && res.error;
+    if (spiegato) Popup.showToast(res.error, { duration: 9000 });
+    else Popup.showToast(I18n.t('err_provider_failed'));
+  }
 
   async function startDictation() {
     if (_dictateState) { stopDictation(); return; }
-    if (typeof window.MediaRecorder === 'undefined' || !navigator?.mediaDevices?.getUserMedia) {
+    if (!dictationSupported()) {
       Popup.showToast(I18n.t('menu_dictate_not_supported'));
       return;
     }
@@ -574,25 +572,39 @@
       Popup.showToast(I18n.t('menu_dictate_no_mic'));
       return;
     }
-    let mimeType = 'audio/webm;codecs=opus';
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/webm';
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
-    let rec;
+    const Seg = global.SN_DICTATION_SEGMENTER;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    let ctx; let source; let proc;
     try {
-      rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      ctx = new Ctx();
+      source = ctx.createMediaStreamSource(stream);
+      // ScriptProcessor: deprecato ma disponibile ovunque e senza file esterni
+      // (un AudioWorklet vorrebbe un modulo caricato da un URL, che un content
+      // script non ha). 4096 campioni ≈ 85 ms a 48 kHz: latenza trascurabile.
+      proc = ctx.createScriptProcessor(4096, 1, 1);
+      // Un contesto audio può nascere "sospeso" (politica di autoplay): senza
+      // resume non arriverebbe nessun campione.
+      try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (_) {}
     } catch (_) {
       try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      try { if (ctx) ctx.close(); } catch (_) {}
       Popup.showToast(I18n.t('err_provider_failed'));
       return;
     }
-    const chunks = [];
-    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const lang = navigator.language || 'it-IT';
 
-    // Pill cliccabile per fermare la registrazione (il toast non è cliccabile).
+    // Riquadro cliccabile: dice che ascolta, mostra la frase in corso, e al
+    // click ferma (il toast non è cliccabile).
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'sn-dictate-pill';
-    pill.textContent = I18n.t('menu_dictate_listening');
+    const label = document.createElement('span');
+    label.className = 'sn-dictate-pill-label';
+    label.textContent = I18n.t('menu_dictate_listening');
+    const live = document.createElement('span');
+    live.className = 'sn-dictate-pill-live';
+    live.hidden = true;
+    pill.append(label, live);
     // Non rubare il focus/caret al campo quando l'utente clicca la pill per
     // fermare: così il cursore resta dove l'utente stava scrivendo e il testo
     // dettato ci atterra sopra (vale soprattutto per gli editor contenteditable,
@@ -600,69 +612,103 @@
     pill.addEventListener('mousedown', (e) => e.preventDefault());
     // Nello stack degli avvisi in pagina (#409), così non finisce sotto o sopra
     // un toast che arriva nel frattempo. `sticky`: è l'unico comando per
-    // fermare la registrazione, il tetto dello stack non deve poterlo sfrattare.
+    // fermare la dettatura, il tetto dello stack non deve poterlo sfrattare.
     Popup.mountToast(pill, { sticky: true });
 
-    const cleanup = () => {
-      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
-      if (pill.parentNode) Popup.unmountToast(pill);
-      _dictateState = null;
+    const state = {
+      stream, ctx, pill, stopped: false, interimBusy: false, finals: 0, failed: false,
+      queue: Promise.resolve(),
+    };
+    _dictateState = state;
+
+    const showLive = (text) => {
+      const t = String(text || '').trim();
+      if (!t) { live.hidden = true; live.textContent = ''; return; }
+      live.textContent = t.length > DICTATE_LIVE_CHARS ? '…' + t.slice(-DICTATE_LIVE_CHARS) : t;
+      live.hidden = false;
     };
 
-    rec.onstop = async () => {
-      try {
-        const raw = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-        if (!raw.size) { Popup.showToast(I18n.t('menu_dictate_empty')); cleanup(); return; }
-        if (pill.parentNode) Popup.unmountToast(pill);
-        Popup.showToast(I18n.t('menu_dictate_transcribing'), { duration: 2500 });
-        // Gemini accetta wav/mp3/ogg/flac/aac/aiff ma non webm: riencodiamo in
-        // WAV mono 16kHz (più che sufficiente per voce, file piccolo).
-        const wav = await audioBlobToWav(raw, 16000).catch(() => null);
-        if (!wav) { Popup.showToast(I18n.t('err_provider_failed')); cleanup(); return; }
-        const dataUrl = await deps.blobToDataUrl(wav);
-        const res = await chrome.runtime.sendMessage({
-          type: MSG.AI_REQUEST,
-          action: ACTIONS.TRANSCRIBE_AUDIO,
-          payload: { dataUrl, lang: navigator.language || 'it-IT' },
+    const toWavBase64 = (seg) =>
+      Seg.bytesToBase64(Seg.pcm16ToWav(Seg.floatToInt16(seg.samples), seg.sampleRate));
+
+    const transcribe = (seg, interim) => chrome.runtime.sendMessage({
+      type: MSG.AI_REQUEST,
+      action: ACTIONS.TRANSCRIBE_AUDIO,
+      payload: { audioBase64: toWavBase64(seg), format: 'wav', lang, interim },
+    });
+
+    const segmenter = Seg.createSegmenter({
+      sampleRate: DICTATE_RATE,
+      // Frase in corso: trascrizione provvisoria, solo nel riquadro. Una alla
+      // volta: se la precedente è ancora in volo, si salta questo giro.
+      onInterim: (seg) => {
+        if (state.interimBusy || state.stopped || state.failed) return;
+        state.interimBusy = true;
+        transcribe(seg, true)
+          .then((res) => { if (res?.ok && !state.stopped) showLive(res.text); })
+          .catch(() => {})
+          .finally(() => { state.interimBusy = false; });
+      },
+      // Frase chiusa da una pausa: trascrizione definitiva, nel campo. In
+      // coda, una alla volta, così il testo entra nell'ordine in cui è stato
+      // detto anche se una risposta è più lenta dell'altra.
+      onFinal: (seg) => {
+        state.queue = state.queue.then(async () => {
+          if (state.failed) return;
+          let res = null;
+          try { res = await transcribe(seg, false); } catch (_) { res = null; }
+          if (!res?.ok) {
+            state.failed = true;
+            explainDictationFailure(res);
+            stopDictation();
+            return;
+          }
+          const text = (res.text || '').trim();
+          if (!text) return;
+          state.finals++;
+          showLive('');
+          // Inserisci dove il cursore si trova ADESSO, non dove era all'apertura
+          // del menu: mentre si detta l'utente può aver continuato a scrivere
+          // o spostato il cursore nello stesso campo.
+          deps.insertDictatedText(text + ' ');
         });
-        cleanup();
-        if (!res?.ok) {
-          // Se la dettatura non parte per come sono configurati i modelli
-          // (nessun modello per questa funzione, oppure «solo modelli a pesi
-          // aperti» acceso e nessuno di quelli ammessi sa ascoltare un audio),
-          // il motivo VERO vale più di un "il fornitore non risponde": dice cosa
-          // fare per rimetterla in piedi. La lettura ad alta voce e
-          // l'indicizzazione lo fanno già; qui mancava.
-          const spiegato = (res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_OPEN_WEIGHTS_MODEL')
-            && res.error;
-          if (spiegato) Popup.showToast(res.error, { duration: 9000 });
-          else Popup.showToast(I18n.t('err_provider_failed'));
-          return;
-        }
-        const text = (res.text || '').trim();
-        if (!text) { Popup.showToast(I18n.t('menu_dictate_empty')); return; }
-        // Inserisci dove il cursore si trova ADESSO, non dove era all'apertura
-        // del menu: durante la registrazione (fino a ~60s) l'utente può aver
-        // continuato a scrivere o spostato il cursore nello stesso campo.
-        deps.insertDictatedText(text + ' ');
-      } catch (_) {
-        Popup.showToast(I18n.t('err_provider_failed'));
-        cleanup();
-      }
+      },
+    });
+
+    proc.onaudioprocess = (e) => {
+      if (state.stopped) return;
+      try {
+        const input = e.inputBuffer.getChannelData(0);
+        segmenter.push(Seg.downsample(input, ctx.sampleRate, DICTATE_RATE));
+      } catch (_) {}
+    };
+    source.connect(proc);
+    // Lo ScriptProcessor lavora solo se è collegato all'uscita; non scrivendo
+    // nulla nel buffer di uscita, dalle casse non esce niente.
+    proc.connect(ctx.destination);
+
+    state.stop = async () => {
+      if (state.stopped) return;
+      state.stopped = true;
+      try { proc.disconnect(); source.disconnect(); } catch (_) {}
+      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      try { await ctx.close(); } catch (_) {}
+      // L'ultima frase, se c'è, è definitiva anche senza pausa.
+      try { segmenter.flush(); } catch (_) {}
+      label.textContent = I18n.t('menu_dictate_transcribing');
+      await state.queue;
+      if (pill.parentNode) Popup.unmountToast(pill);
+      if (!state.finals && !state.failed) Popup.showToast(I18n.t('menu_dictate_empty'));
+      if (_dictateState === state) _dictateState = null;
     };
 
     pill.addEventListener('click', () => stopDictation());
-
-    _dictateState = { rec, stream, pill };
-    try { rec.start(); } catch (_) { cleanup(); Popup.showToast(I18n.t('err_provider_failed')); return; }
-    // Safety: stop forzato dopo 60s per non lasciare il mic aperto.
-    const t = rec;
-    setTimeout(() => { if (_dictateState && _dictateState.rec === t) stopDictation(); }, 60_000);
+    setTimeout(() => { if (_dictateState === state) stopDictation(); }, DICTATE_MAX_MS);
   }
 
   function stopDictation() {
-    if (!_dictateState) return;
-    try { _dictateState.rec.stop(); } catch (_) {}
+    if (!_dictateState || typeof _dictateState.stop !== 'function') return;
+    _dictateState.stop().catch(() => {});
   }
 
   function init(d) {

@@ -216,6 +216,28 @@
         return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"` };
       },
     },
+    {
+      // Voce del MODELLO di lettura (quella naturale): si indica per nome
+      // ("Sara", "Nicola") o per id ("if_sara"); "automatica" torna a seguire
+      // la lingua del testo. Reversibile → livello 1.
+      keys: ['voce_modello', 'voce del modello', 'voce naturale', 'voce modello', 'ttsmodelvoice'],
+      build(v) {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return null;
+        const low = s.toLowerCase();
+        if (['auto', 'automatica', 'automatico', 'lingua', 'nessuna', 'default'].includes(low)) {
+          return { partial: { tts: { modelVoice: '' } }, label: 'Voce naturale → automatica (segue la lingua del testo)' };
+        }
+        const Voices = global.SN_TTS_VOICES;
+        if (Voices) {
+          const hit = Voices.VOICES.find((x) => x.id === low || x.label.toLowerCase() === low
+            || x.label.toLowerCase().split(' ')[0] === low);
+          if (!hit) return null;
+          return { partial: { tts: { modelVoice: hit.id } }, label: `Voce naturale → ${hit.label} (${Voices.LANG_LABELS[hit.lang] || hit.lang})` };
+        }
+        return { partial: { tts: { modelVoice: s } }, label: `Voce naturale → "${s}"` };
+      },
+    },
 
     // ── Funzionalità (interruttori) — reversibili, nessun rischio → livello 1 ──
     {
@@ -354,14 +376,14 @@
     {
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
       level: 2,
-      risk: 'Cambia il fornitore AI che elabora le tue richieste (OpenRouter o Google Gemini). '
+      risk: 'Cambia il fornitore AI che elabora le tue richieste. '
         + 'Le richieste e i relativi costi passeranno dal nuovo provider, con la sua chiave API.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        const map = { openrouter: 'openrouter', 'open router': 'openrouter', or: 'openrouter', gemini: 'gemini', google: 'gemini' };
+        const map = { openrouter: 'openrouter', 'open router': 'openrouter', or: 'openrouter' };
         const provider = map[s];
         if (!provider) return null;
-        return { partial: { provider }, label: `Provider → ${provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'}` };
+        return { partial: { provider }, label: 'Provider → OpenRouter' };
       },
     },
     {
@@ -375,17 +397,7 @@
         return { partial: { apiKeys: { openrouter: s } }, label: `Chiave OpenRouter → ${maskKey(s)}` };
       },
     },
-    {
-      keys: ['chiave_gemini', 'chiave gemini', 'chiave google', 'api key gemini', 'chiave api gemini', 'gemini key'],
-      level: 2,
-      risk: 'Imposta la chiave API di Google Gemini. È una credenziale che autorizza spese sul tuo '
-        + 'account: confermala solo se questa chiave arriva davvero da te.',
-      build(v) {
-        const s = String(v == null ? '' : v).trim();
-        if (!s) return null;
-        return { partial: { apiKeys: { gemini: s } }, label: `Chiave Google Gemini → ${maskKey(s)}` };
-      },
-    },
+
     {
       keys: ['chiave_tavily', 'chiave tavily', 'api key tavily', 'chiave ricerca', 'chiave api tavily', 'tavily key'],
       level: 2,

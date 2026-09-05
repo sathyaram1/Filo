@@ -35,13 +35,13 @@ test('Cronologia AI: dopo "Cancella tutto" il menu filtro torna alla sola "Tutte
   // Tre tipi d'azione diversi, tutti con etichetta leggibile reale.
   const aiHistory = [
     { id: 'h-1', timestamp: new Date(now).toISOString(), action: 'translate_selection',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: 'hello world' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: 'hello world' },
       output: 'ciao mondo', origin: 'https://example.com', costEur: 0.0001 },
     { id: 'h-2', timestamp: new Date(now - 1000).toISOString(), action: 'explain',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: 'entropia' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: 'entropia' },
       output: 'spiegazione', origin: 'https://example.com', costEur: 0.0001 },
     { id: 'h-3', timestamp: new Date(now - 2000).toISOString(), action: 'edit_text',
-      provider: 'gemini', model: 'gemini-2.0-flash', input: { selection: 'testo da rivedere' },
+      provider: 'openrouter', model: 'gemini-2.0-flash', input: { selection: 'testo da rivedere' },
       output: 'testo rivisto', origin: 'https://example.com', costEur: 0.0001 },
   ];
 

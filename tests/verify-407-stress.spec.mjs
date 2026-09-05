@@ -22,9 +22,9 @@ async function stubModel(app) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
-      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'flash-lite-3' },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__trChunks = [];
     globalThis.__trMode = 'ok';
@@ -35,7 +35,7 @@ async function stubModel(app) {
       // Solo le richieste di "traduci pagina" ci interessano: le altre funzioni
       // di Filo (categorizzazione, ecc.) passano di qui e falserebbero i conteggi.
       if (content.indexOf('Traduci il seguente testo in italiano mantenendo struttura') !== 0) {
-        return { text: '{}', model: 'm', provider: 'gemini', usage: {} };
+        return { text: '{}', model: 'm', provider: 'openrouter', usage: {} };
       }
       const i = content.indexOf('Testo:\n\n');
       const chunk = i >= 0 ? content.slice(i + 'Testo:\n\n'.length) : content;
@@ -46,31 +46,31 @@ async function stubModel(app) {
       const mode = globalThis.__trMode;
       const ok = () => segs.map((s) => '‹IT› ' + s).join(S);
       if (mode === 'fail') { const e = new Error('provider giù'); throw e; }
-      if (mode === 'empty') return { text: '', model: 'm', provider: 'gemini', usage: {} };
+      if (mode === 'empty') return { text: '', model: 'm', provider: 'openrouter', usage: {} };
       if (mode === 'html') {
         return {
           text: segs
             .map(() => '<img src=x onerror="window.__pwned=1"><script>window.__pwned=2<\/script>OK')
             .join(S),
-          model: 'm', provider: 'gemini', usage: {},
+          model: 'm', provider: 'openrouter', usage: {},
         };
       }
       if (mode === 'merge') {
         // Il modello "dimentica" i separatori e restituisce un blocco unico.
-        return { text: '‹IT› ' + segs.join(' '), model: 'm', provider: 'gemini', usage: {} };
+        return { text: '‹IT› ' + segs.join(' '), model: 'm', provider: 'openrouter', usage: {} };
       }
       if (mode === 'halfempty') {
         // Il modello risponde a vuoto SOLO sul pezzo che contiene ZULU: una
         // parte della pagina resta non tradotta e l'avviso deve dirlo.
-        if (chunk.indexOf('ZULU') >= 0) return { text: '', model: 'm', provider: 'gemini', usage: {} };
-        return { text: ok(), model: 'm', provider: 'gemini', usage: {} };
+        if (chunk.indexOf('ZULU') >= 0) return { text: '', model: 'm', provider: 'openrouter', usage: {} };
+        return { text: ok(), model: 'm', provider: 'openrouter', usage: {} };
       }
       if (mode === 'flaky') {
         // Prima richiesta KO, poi ok: il ritentativo deve salvare la pagina.
         if (globalThis.__trCalls === 1) throw new Error('rete');
-        return { text: ok(), model: 'm', provider: 'gemini', usage: {} };
+        return { text: ok(), model: 'm', provider: 'openrouter', usage: {} };
       }
-      return { text: ok(), model: 'm', provider: 'gemini', usage: {} };
+      return { text: ok(), model: 'm', provider: 'openrouter', usage: {} };
     };
   });
 }

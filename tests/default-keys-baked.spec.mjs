@@ -40,19 +40,17 @@ test.afterEach(() => {
 test('default-keys: il file generato ha la precedenza su env', () => {
   writeFileSync(
     GEN_PATH,
-    JSON.stringify({ apiKeys: { openrouter: 'or-baked', gemini: 'gem-baked', tavily: '' } }),
+    JSON.stringify({ apiKeys: { openrouter: 'or-baked', tavily: '' } }),
     'utf8'
   );
 
   const keys = loadKeys({
     FILO_DEFAULT_OPENROUTER_KEY: 'or-env',
-    FILO_DEFAULT_GEMINI_KEY: 'gem-env',
     FILO_DEFAULT_TAVILY_KEY: 'tav-env',
   });
 
   // File generato vince dove ha un valore...
   expect(keys.openrouter).toBe('or-baked');
-  expect(keys.gemini).toBe('gem-baked');
   // ...ma per la chiave vuota nel file si ricade sull'env.
   expect(keys.tavily).toBe('tav-env');
 });
@@ -61,19 +59,16 @@ test('default-keys: senza file generato usa le env (dev locale)', () => {
   // (afterEach garantisce che il file non esista)
   const keys = loadKeys({
     FILO_DEFAULT_OPENROUTER_KEY: 'or-env',
-    FILO_DEFAULT_GEMINI_KEY: '',
     FILO_DEFAULT_TAVILY_KEY: '  tav-env  ',
   });
   expect(keys.openrouter).toBe('or-env');
-  expect(keys.gemini).toBe('');
   expect(keys.tavily).toBe('tav-env'); // trim applicato
 });
 
 test('default-keys: senza file e senza env, tutte vuote', () => {
   const keys = loadKeys({
     FILO_DEFAULT_OPENROUTER_KEY: '',
-    FILO_DEFAULT_GEMINI_KEY: '',
     FILO_DEFAULT_TAVILY_KEY: '',
   });
-  expect(keys).toEqual({ openrouter: '', gemini: '', tavily: '' });
+  expect(keys).toEqual({ openrouter: '', tavily: '' });
 });

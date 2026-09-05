@@ -3,17 +3,12 @@
 // scrivere per cercare".
 //
 // Implementazione: il campo "stringa modello" di ogni riga del registry è un
-// combobox (input + <datalist> nativa) legato al PROVIDER della riga. Ci sono
-// due liste separate (Gemini / OpenRouter); la riga punta a quella del provider
-// scelto e cambiando provider la tendina cambia. La lista è seminata con i
-// modelli già nel registry (nomi nativi per Gemini) e poi completata via API.
+// combobox (input + <datalist>) legato al PROVIDER della riga; la lista è
+// seminata con i modelli già nel registry e poi completata via API.
 //
 // Questi test asseriscono il COMPORTAMENTO, senza dipendere dalla rete:
-//   1. Il campo è legato alla datalist del provider e segue il cambio provider.
-//   2. Un modello Gemini salvato compare nella tendina di Gemini col NOME NATIVO
-//      (niente "google/"), e non in quella di OpenRouter.
-// Pre-condizione che senza il fix fallirebbe: prima esisteva una sola datalist
-// condivisa "models-list" e i modelli Gemini erano elencati come "google/...".
+//   1. Il campo è legato alla datalist del provider (niente popup nativo).
+//   2. Un modello salvato compare nella tendina alla riapertura.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -35,11 +30,11 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
   const page = await openTab(OPTIONS_URL);
   await revealAdvanced(page);
 
-  // Le due datalist per-provider esistono (sorgente dati del combobox); la
-  // vecchia "models-list" condivisa no.
-  expect(await page.locator('#models-list-gemini').count()).toBe(1);
+  // La datalist del provider esiste (sorgente dati del combobox); la vecchia
+  // "models-list" condivisa no, e non c'è più quella di un'API diretta di Google.
   expect(await page.locator('#models-list-openrouter').count()).toBe(1);
   expect(await page.locator('#models-list').count()).toBe(0);
+  expect(await page.locator('#models-list-gemini').count()).toBe(0);
 
   const row = page.locator(ROW).first();
   const idInput = row.locator('.sn-model-id');
@@ -48,64 +43,48 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
   // (senza il fix questo è rosso). Il dropdown ora è quello custom .sn-select-*.
   await expect(idInput).not.toHaveAttribute('list', /.*/);
 
-  // Semina la lista Gemini con un id riconoscibile (gemini non fa fetch senza
-  // chiave, quindi la seed resta stabile).
+  // Semina la lista con un id riconoscibile.
   await page.evaluate(() => {
-    const dl = document.getElementById('models-list-gemini');
-    const o = document.createElement('option'); o.value = 'gemini-test-model';
+    const dl = document.getElementById('models-list-openrouter');
+    const o = document.createElement('option'); o.value = 'vendor/modello-di-prova';
     dl.appendChild(o);
   });
 
-  // Provider Gemini → mettendo a fuoco il campo, il dropdown custom mostra il
-  // modello Gemini seminato.
-  await row.locator('.sn-model-provider').selectOption('gemini');
+  // Mettendo a fuoco il campo, il dropdown custom mostra il modello seminato.
+  await row.locator('.sn-model-provider').selectOption('openrouter');
   await idInput.focus();
   // Scope al wrapper del campo: anche il <select> del provider è un menu custom
   // di Filo con il suo .sn-select-pop, quindi nella riga ce n'è più d'uno.
   const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
-  await expect(pop.locator('.sn-select-option', { hasText: 'gemini-test-model' })).toBeVisible();
-
-  // Cambiando provider su OpenRouter, il dropdown legge l'ALTRA lista: il
-  // modello Gemini non compare più (la tendina segue il provider della riga).
-  // Attendi la chiusura del popup (come quando l'utente clicca via dal campo)
-  // così la riapertura ricostruisce la lista col nuovo provider.
-  await idInput.blur();
-  await expect(pop).toBeHidden();
-  await row.locator('.sn-model-provider').selectOption('openrouter');
-  await idInput.focus();
-  await expect(pop.locator('.sn-select-option', { hasText: 'gemini-test-model' })).toHaveCount(0);
+  await expect(pop.locator('.sn-select-option', { hasText: 'vendor/modello-di-prova' })).toBeVisible();
 });
 
-test('Modelli: un modello Gemini salvato compare nella tendina Gemini col nome nativo', async ({ openTab }) => {
+test('Modelli: un modello salvato compare nella tendina alla riapertura', async ({ openTab }) => {
   const page = await openTab(OPTIONS_URL);
   await revealAdvanced(page);
 
-  // Compila la prima riga con un modello Gemini nativo e salva.
+  // Compila la prima riga con un modello e salva.
   await page.evaluate(() => {
     const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
-    row.querySelector('.sn-model-nick').value = 'miogem';
-    row.querySelector('.sn-model-provider').value = 'gemini';
-    row.querySelector('.sn-model-id').value = 'gemini-3.1-flash-lite';
+    row.querySelector('.sn-model-nick').value = 'miomodello';
+    row.querySelector('.sn-model-provider').value = 'openrouter';
+    row.querySelector('.sn-model-id').value = 'vendor/modello-salvato';
     row.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  // Il salvataggio è differito: si aspetta che il registro salvato contenga la riga.
+  await expect.poll(() => page.evaluate(async () => {
+    const s = await window.SN_STORAGE.getSettings();
+    return (s.modelRegistry && s.modelRegistry.miomodello && s.modelRegistry.miomodello.model) || '';
+  }), { timeout: 5_000 }).toBe('vendor/modello-salvato');
 
   // Ricarica: il seeding della tendina parte dal registry salvato.
   await page.reload();
   await revealAdvanced(page);
 
   await page.waitForFunction(() => {
-    const dl = document.getElementById('models-list-gemini');
-    return !!dl && [...dl.options].some((o) => o.value === 'gemini-3.1-flash-lite');
+    const dl = document.getElementById('models-list-openrouter');
+    return !!dl && [...dl.options].some((o) => o.value === 'vendor/modello-salvato');
   }, null, { timeout: 6_000 });
-
-  const inGemini = await page.$$eval('#models-list-gemini option', (opts) => opts.map((o) => o.value));
-  const inOr = await page.$$eval('#models-list-openrouter option', (opts) => opts.map((o) => o.value));
-
-  expect(inGemini).toContain('gemini-3.1-flash-lite');
-  // Nome NATIVO: niente prefisso google/ nella lista Gemini.
-  expect(inGemini.some((v) => v.startsWith('google/'))).toBe(false);
-  // E non finisce nella lista OpenRouter.
-  expect(inOr).not.toContain('gemini-3.1-flash-lite');
 });

@@ -11,9 +11,10 @@
 // disponibili — i metadati dell'API:
 //   - OpenRouter espone architecture.input_modalities/output_modalities e
 //     `created` (timestamp): precisi, li usiamo direttamente.
-//   - Gemini NON espone le modalità: TTS e testo hanno gli stessi
-//     supportedGenerationMethods. Le deduciamo dal nome (-tts, -image, embedding)
-//     e dal fatto che i gemini-* sono multimodali in input mentre i gemma-* no.
+//   - Senza metadati (una riga del registro personale scritta a mano) si
+//     deduce dal nome (-tts, kokoro, whisper, embedding…); una voce del
+//     registro può anche dichiarare le proprie modalità (inputs/outputs), e
+//     allora vale quello.
 //
 // Convenzione IIFE su globalThis come gli altri moduli shared/*.
 
@@ -54,10 +55,15 @@
       };
     }
 
-    // Euristiche sul nome (valgono soprattutto per Gemini).
+    // Euristiche sul nome (righe senza metadati).
     if (/embedding|embed/.test(id)) return { inputs: [M.TEXT], outputs: [M.EMBED] };
+    // Trascrizione (dettatura): ascolta un audio, risponde col testo. Prima
+    // della sintesi vocale, perché "speech-to-text" contiene "speech".
+    if (/whisper|parakeet|voxtral|canary|(^|[-_/])asr([-_]|$)|transcri|speech-to-text/.test(id)) {
+      return { inputs: [M.AUDIO], outputs: [M.TEXT] };
+    }
     // Sintesi vocale o musica → audio in output. (lyria = musica)
-    if (/(^|[-_/])tts([-_]|$)|-tts|\btts\b|speech|lyria/.test(id)) {
+    if (/(^|[-_/])tts([-_]|$)|-tts|\btts\b|speech|lyria|kokoro|orpheus|(^|[-_/])csm-/.test(id)) {
       return { inputs: [M.TEXT], outputs: [M.AUDIO] };
     }
     // Generazione immagini.
@@ -69,18 +75,14 @@
       return { inputs: [M.TEXT, M.IMAGE], outputs: [M.VIDEO] };
     }
 
-    // Modello di testo. Input multimodale per i gemini-* (accettano immagini e
-    // audio); i gemma-* sono solo testo (capacità NOTA, niente `uncertain`).
-    // Per un modello OpenRouter di cui non abbiamo i metadati di modalità le
-    // capacità reali sono IGNOTE: tanti modelli OpenRouter accettano immagini
-    // (es. vision) ma il nome non lo rivela. Lo marchiamo `uncertain` così il
-    // gate di compatibilità NON blocca l'utente che lo sceglie (vedi
-    // modelMatchesAction): a runtime, se davvero non legge le immagini, scatta
-    // il fallback. Default categoria resta "testo" (cosmetico).
+    // Modello di testo. Per un modello OpenRouter di cui non abbiamo i
+    // metadati di modalità le capacità reali sono IGNOTE: tanti modelli
+    // accettano immagini (es. vision) ma il nome non lo rivela. Lo marchiamo
+    // `uncertain` così il gate di compatibilità NON blocca l'utente che lo
+    // sceglie (vedi modelMatchesAction): a runtime, se davvero non legge le
+    // immagini, scatta il fallback. Default categoria resta "testo" (cosmetico).
     const inputs = [M.TEXT];
-    let uncertain = false;
-    if (provider === 'gemini' && /^gemini/.test(id)) inputs.push(M.IMAGE, M.AUDIO);
-    else if (provider === 'openrouter') uncertain = true;
+    const uncertain = provider === 'openrouter';
     return { inputs, outputs: [M.TEXT], uncertain };
   }
 
@@ -91,6 +93,8 @@
     if (caps.outputs.includes(M.AUDIO)) return 'tts';
     if (caps.outputs.includes(M.VIDEO)) return 'video';
     if (caps.outputs.includes(M.IMAGE) && !caps.outputs.includes(M.TEXT)) return 'image';
+    // Ascolta e basta (niente immagini): è un modello di dettatura.
+    if (caps.inputs.includes(M.AUDIO) && !caps.inputs.includes(M.IMAGE) && !caps.uncertain) return 'stt';
     if (caps.inputs.includes(M.IMAGE) || caps.inputs.includes(M.AUDIO)) return 'multimodal';
     return 'text';
   }
@@ -156,8 +160,8 @@
   // SEMPRE dentro lo stesso provider (liste separate), quindi le scale diverse
   // tra provider non si mischiano.
   //   - OpenRouter: `created` (unix).
-  //   - Gemini: numero di versione dall'id (3.5 > 3.1 > 3 > 2.5 > 2.0), con la
-  //     data eventualmente presente in `version` come spareggio fine.
+  //   - Altri fornitori: numero di versione dall'id (3.5 > 3.1 > 3 > 2.5), con
+  //     la data eventualmente presente in `version` come spareggio fine.
   function recencyKey(provider, modelId, meta) {
     if (provider === 'openrouter') {
       const c = meta && meta.created;

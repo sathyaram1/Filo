@@ -13,7 +13,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
   const page = await openTab(ADMIN_URL);
   await page.addInitScript((over) => {
     const fakeConfig = {
-      apiKeysPresent: { openrouter: true, gemini: false, tavily: false },
+      apiKeysPresent: { openrouter: true, tavily: false },
       safeBrowsingKeyPresent: false,
       modelRegistry: { esistente: { provider: 'openrouter', model: 'vendor/gia-salvato', reasoning: 'medium' } },
       models: {},

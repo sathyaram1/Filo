@@ -25,19 +25,19 @@ require(join(__dirname, '..', '..', 'src', 'main', 'services', 'providers', 'ind
 const Providers = globalThis.SN_PROVIDERS;
 
 // Installa provider finti su globalThis (il router li risolve per nome).
-function withFakeProviders({ gemini, openrouter }, run) {
-  const origG = globalThis.SN_PROVIDER_GEMINI;
+function withFakeProviders({ fake, openrouter }, run) {
+  const origG = globalThis.SN_PROVIDER_FAKE;
   const origO = globalThis.SN_PROVIDER_OPENROUTER;
-  globalThis.SN_PROVIDER_GEMINI = gemini;
+  globalThis.SN_PROVIDER_FAKE = fake;
   globalThis.SN_PROVIDER_OPENROUTER = openrouter;
   return Promise.resolve(run()).finally(() => {
-    globalThis.SN_PROVIDER_GEMINI = origG;
+    globalThis.SN_PROVIDER_FAKE = origG;
     globalThis.SN_PROVIDER_OPENROUTER = origO;
   });
 }
 
 const ATTEMPTS = [
-  { provider: 'gemini', apiKey: 'k1', model: 'g-model' },
+  { provider: 'fake', apiKey: 'k1', model: 'g-model' },
   { provider: 'openrouter', apiKey: 'k2', model: 'o-model' },
 ];
 
@@ -45,7 +45,7 @@ test('fallback a metà stream: onReset viene emesso e il buffer del consumer res
   const events = [];
   let buf = '';
   const res = await withFakeProviders({
-    gemini: {
+    fake: {
       async streamComplete({ onDelta }) {
         onDelta('Questa risposta si interr');
         onDelta('ompe a met');
@@ -70,7 +70,7 @@ test('fallback a metà stream: onReset viene emesso e il buffer del consumer res
   const resetIdx = events.findIndex(([t]) => t === 'reset');
   assert.equal(events.filter(([t]) => t === 'reset').length, 1);
   assert.equal(resetIdx, 2, 'il reset deve arrivare dopo i 2 delta del provider fallito');
-  assert.deepEqual(events[resetIdx][1], { failed: 'gemini', next: 'openrouter' });
+  assert.deepEqual(events[resetIdx][1], { failed: 'fake', next: 'openrouter' });
 
   // SUCCESSO: il buffer del consumer è ESATTAMENTE la risposta del fallback,
   // identica al result.text del router (niente testo incollato/rotto).
@@ -83,7 +83,7 @@ test('errore immediato (nessun delta emesso): NESSUN reset, il flusso resta come
   let resets = 0;
   let buf = '';
   const res = await withFakeProviders({
-    gemini: {
+    fake: {
       async streamComplete() { throw new Error('401 unauthorized'); },
     },
     openrouter: {
@@ -106,7 +106,7 @@ test('errore immediato (nessun delta emesso): NESSUN reset, il flusso resta come
 test('anche il solo reasoning già emesso conta come "sporco" e provoca il reset', async () => {
   let resets = 0;
   const res = await withFakeProviders({
-    gemini: {
+    fake: {
       async streamComplete({ onReasoning }) {
         onReasoning('Sto pensando…');
         throw new Error('stream troncato');
@@ -132,7 +132,7 @@ test('anche il solo reasoning già emesso conta come "sporco" e provoca il reset
 test('ultimo attempt che fallisce a metà: nessun reset (non c\'è un fallback dopo)', async () => {
   let resets = 0;
   await withFakeProviders({
-    gemini: {
+    fake: {
       async streamComplete({ onDelta }) {
         onDelta('parziale');
         throw new Error('boom 1');
@@ -159,7 +159,7 @@ test('ultimo attempt che fallisce a metà: nessun reset (non c\'è un fallback d
 
 test('retro-compatibilità: consumer senza onReset continua a funzionare', async () => {
   const res = await withFakeProviders({
-    gemini: {
+    fake: {
       async streamComplete({ onDelta }) {
         onDelta('x');
         throw new Error('stream troncato');

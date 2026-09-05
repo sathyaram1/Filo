@@ -21,14 +21,14 @@ async function useFakeKey(app) {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
-      apiKeys: { gemini: 'k-test' },
+      apiKeys: { openrouter: 'k-test' },
       models: {
-        [C.ACTIONS.FILO_CHAT]: 'flash-lite-3',
-        [C.ACTIONS.FILO_LESSON]: 'flash-lite-3',
-        [C.ACTIONS.FILO_COMPACT]: 'flash-lite-3',
-        [C.ACTIONS.FILO_DASHBOARD]: 'flash-lite-3',
+        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_LESSON]: 'deepseek-flash',
+        [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
+        [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
       },
-      modelRegistry: C.DEFAULT_MODEL_REGISTRY,
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
   });
 }

@@ -16,7 +16,7 @@ require('../../src/shared/chatErrors.js');
 // Provider finti registrati PRIMA di caricare il router: getProvider li legge
 // da globalThis al momento della chiamata.
 function installProvider(name, impl) {
-  const key = name === 'gemini' ? 'SN_PROVIDER_GEMINI' : 'SN_PROVIDER_OPENROUTER';
+  const key = name === 'fake' ? 'SN_PROVIDER_FAKE' : 'SN_PROVIDER_OPENROUTER';
   globalThis[key] = impl;
 }
 
@@ -27,28 +27,28 @@ const attempt = (provider) => ({ provider, apiKey: 'k', model: 'm' });
 
 test('guasto di rete passeggero: la stessa chiamata viene ritentata e riesce', async () => {
   let calls = 0;
-  installProvider('gemini', {
+  installProvider('fake', {
     complete: async () => {
       calls += 1;
       if (calls === 1) throw new TypeError('fetch failed');
       return { text: 'ok', usage: {} };
     },
   });
-  const r = await P.completeWithFallback({ attempts: [attempt('gemini')], messages: [] });
+  const r = await P.completeWithFallback({ attempts: [attempt('fake')], messages: [] });
   assert.equal(r.text, 'ok');
   assert.equal(calls, 2, 'il tentativo doveva essere ripetuto una volta');
 });
 
 test('rete giù per davvero: dopo il ritentativo si passa al provider successivo', async () => {
   let gem = 0; let or = 0;
-  installProvider('gemini', {
+  installProvider('fake', {
     complete: async () => { gem += 1; throw new TypeError('fetch failed'); },
   });
   installProvider('openrouter', {
     complete: async () => { or += 1; return { text: 'riserva', usage: {} }; },
   });
   const r = await P.completeWithFallback({
-    attempts: [attempt('gemini'), attempt('openrouter')], messages: [],
+    attempts: [attempt('fake'), attempt('openrouter')], messages: [],
   });
   assert.equal(r.text, 'riserva');
   assert.equal(gem, 2, 'il primo provider va ritentato una volta prima del ripiego');
@@ -57,14 +57,14 @@ test('rete giù per davvero: dopo il ritentativo si passa al provider successivo
 
 test('errore HTTP (400): nessun ritentativo, ritornerebbe identico', async () => {
   let calls = 0;
-  installProvider('gemini', {
+  installProvider('fake', {
     complete: async () => {
       calls += 1;
-      throw Object.assign(new Error('Gemini 400: Bad Request'), { status: 400, provider: 'gemini' });
+      throw Object.assign(new Error('Gemini 400: Bad Request'), { status: 400, provider: 'fake' });
     },
   });
   await assert.rejects(
-    P.completeWithFallback({ attempts: [attempt('gemini')], messages: [] }),
+    P.completeWithFallback({ attempts: [attempt('fake')], messages: [] }),
     /400/,
   );
   assert.equal(calls, 1, 'un 400 non va ritentato');
@@ -72,7 +72,7 @@ test('errore HTTP (400): nessun ritentativo, ritornerebbe identico', async () =>
 
 test('streaming: guasto di rete prima di qualsiasi delta → ritentato', async () => {
   let calls = 0;
-  installProvider('gemini', {
+  installProvider('fake', {
     streamComplete: async ({ onDelta }) => {
       calls += 1;
       if (calls === 1) throw Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
@@ -82,7 +82,7 @@ test('streaming: guasto di rete prima di qualsiasi delta → ritentato', async (
   });
   let acc = '';
   const r = await P.streamCompleteWithFallback({
-    attempts: [attempt('gemini')], messages: [], onDelta: (d) => { acc += d; },
+    attempts: [attempt('fake')], messages: [], onDelta: (d) => { acc += d; },
   });
   assert.equal(r.text, 'ciao');
   assert.equal(acc, 'ciao');
@@ -91,7 +91,7 @@ test('streaming: guasto di rete prima di qualsiasi delta → ritentato', async (
 
 test('streaming caduto a metà: il buffer parziale viene azzerato prima di ritentare', async () => {
   let calls = 0; let resets = 0;
-  installProvider('gemini', {
+  installProvider('fake', {
     streamComplete: async ({ onDelta }) => {
       calls += 1;
       onDelta && onDelta(calls === 1 ? 'mezza ri' : 'risposta intera');
@@ -101,7 +101,7 @@ test('streaming caduto a metà: il buffer parziale viene azzerato prima di riten
   });
   let acc = '';
   const r = await P.streamCompleteWithFallback({
-    attempts: [attempt('gemini')],
+    attempts: [attempt('fake')],
     messages: [],
     onDelta: (d) => { acc += d; },
     onReset: () => { resets += 1; acc = ''; },
@@ -113,7 +113,7 @@ test('streaming caduto a metà: il buffer parziale viene azzerato prima di riten
 
 test('streaming caduto a metà senza onReset: non si ritenta (meglio il ripiego)', async () => {
   let calls = 0;
-  installProvider('gemini', {
+  installProvider('fake', {
     streamComplete: async ({ onDelta }) => {
       calls += 1;
       onDelta && onDelta('parziale');
@@ -121,7 +121,7 @@ test('streaming caduto a metà senza onReset: non si ritenta (meglio il ripiego)
     },
   });
   await assert.rejects(P.streamCompleteWithFallback({
-    attempts: [attempt('gemini')], messages: [], onDelta: () => {},
+    attempts: [attempt('fake')], messages: [], onDelta: () => {},
   }));
   assert.equal(calls, 1);
 });

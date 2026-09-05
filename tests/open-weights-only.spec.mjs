@@ -115,9 +115,16 @@ test('solo modelli a pesi aperti: sostituisce, non ripiega, e lo dimostra', asyn
     const usaConfigPersonale = (openWeightsOnly) => Storage.setSettings({
       useDefaultModels: false,
       openWeightsOnly,
-      apiKeys: { openrouter: 'k-test', gemini: 'k-test' },
+      apiKeys: { openrouter: 'k-test' },
       modelRegistry: {
-        ...C.DEFAULT_MODEL_REGISTRY,
+        ...globalThis.SN_TEST_MODELS.registry,
+        // Voci proprietarie come quelle dei registri personali salvati prima
+        // (i predefiniti oggi non passano più da Google): hanno un sostituto.
+        flash: { provider: 'openrouter', model: 'google/gemini-2.0-flash-001' },
+        'flash-or': { provider: 'openrouter', model: 'google/gemini-2.0-flash-001' },
+        'flash-lite-3': { provider: 'openrouter', model: 'google/gemini-3.1-flash-lite-preview' },
+        'flash-lite-3-or': { provider: 'openrouter', model: 'google/gemini-3.1-flash-lite-preview' },
+        'claude-haiku': { provider: 'openrouter', model: 'anthropic/claude-3.5-haiku' },
         // Modello proprietario scelto a mano: nessun sostituto previsto per lui.
         'mio-claude': { provider: 'openrouter', model: 'anthropic/claude-3.7-sonnet' },
       },

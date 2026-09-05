@@ -64,14 +64,14 @@ test('livello 2: impostazione di sicurezza — non cambia senza conferma, cambia
 
 test('livello 2: cambio provider — confermato, persiste sullo storage', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
-  const action = setPref('provider', 'gemini');
+  const action = setPref('provider', 'openrouter');
 
   const r = await execAction(app, action);
   expect(r.needsConfirm).toBe(2);
   const c = await page.evaluate(async (a) =>
     chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), action);
   expect(c.executed).toBe(true);
-  expect((await getSettings(page)).provider).toBe('gemini');
+  expect((await getSettings(page)).provider).toBe('openrouter');
 });
 
 test('INVIA_FEEDBACK è gated a livello 2: senza conferma non invia nulla', async ({ app, openTab }) => {

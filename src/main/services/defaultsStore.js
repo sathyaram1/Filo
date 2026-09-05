@@ -127,12 +127,21 @@ async function refreshIfStale(maxAgeMs = 5 * 60 * 1000) {
 }
 
 // Config predefinita effettiva = costanti/build  <  override remoti.
+// Registro e catene "di build": nell'app sono VUOTI (nessun modello scritto
+// nel codice); nei test è il registro di prova, così i test hanno una
+// configurazione nota senza che l'app ne abbia una.
+function buildModels() {
+  const C = globalThis.SN_CONST || {};
+  const T = globalThis.SN_TEST_MODELS; // presente solo nei test (loader.js)
+  return T ? { registry: T.registry, models: T.models } : { registry: C.DEFAULT_MODEL_REGISTRY || {}, models: C.DEFAULT_MODELS || {} };
+}
+
 function get() {
   const C = globalThis.SN_CONST || {};
   const out = {
     provider: C.DEFAULT_PROVIDER || 'openrouter',
-    models: { ...(C.DEFAULT_MODELS || {}) },
-    modelRegistry: { ...(C.DEFAULT_MODEL_REGISTRY || {}) },
+    models: { ...buildModels().models },
+    modelRegistry: { ...buildModels().registry },
     // Politica sui fornitori (#421): lista di esclusione (forme base dei
     // produttori di modelli) e ordinamento fra gli host ammessi. Curabili senza
     // codice dal doc Firestore config/models: la lista remota SOSTITUISCE quella
@@ -191,7 +200,7 @@ function get() {
   if (remoteSecrets) {
     if (remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
       // Solo i valori non vuoti sovrascrivono le chiavi di build.
-      for (const k of ['openrouter', 'gemini', 'tavily']) {
+      for (const k of ['openrouter', 'tavily']) {
         const v = remoteSecrets.apiKeys[k];
         if (typeof v === 'string' && v.trim()) out.apiKeys[k] = v.trim();
       }
@@ -216,7 +225,6 @@ function getPublicForAdmin() {
     providerSort: eff.providerSort,
     apiKeysPresent: {
       openrouter: Boolean(eff.apiKeys.openrouter),
-      gemini: Boolean(eff.apiKeys.gemini),
       tavily: Boolean(eff.apiKeys.tavily),
     },
     safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
@@ -264,7 +272,7 @@ async function update(partial, idToken) {
     // mostra build+remoto fusi), quindi ri-aggiungere un modello lo toglie dai
     // tombstone → auto-guarigione. Solo i nickname di BUILD possono finire qui:
     // quelli custom, se rimossi, sono già assenti dal doc e non serve marcarli.
-    const buildReg = (globalThis.SN_CONST && globalThis.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
+    const buildReg = buildModels().registry;
     const deleted = Object.keys(buildReg).filter((k) => !(k in partial.modelRegistry));
     modelFields.modelRegistryDeleted = toFsValue(deleted);
     modelMask.push('modelRegistryDeleted');
@@ -287,9 +295,9 @@ async function update(partial, idToken) {
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
   //
   // IMPORTANTE — merge, non replace: la maschera DEVE puntare ai singoli leaf
-  // (`apiKeys.gemini`, `apiKeys.openrouter`, …) e NON al map intero `apiKeys`.
+  // (`apiKeys.tavily`, `apiKeys.openrouter`, …) e NON al map intero `apiKeys`.
   // Con `updateMask=apiKeys` Firestore SOSTITUISCE l'intera mappa col valore
-  // inviato: salvando solo la chiave Gemini cancellavi l'override OpenRouter già
+  // inviato: salvando solo la chiave Tavily cancellavi l'override OpenRouter già
   // presente, che poi risultava «non configurata» (feedback alpha). Con la
   // maschera per-leaf Firestore fonde: tocca solo le chiavi digitate e lascia
   // intatte le altre.
@@ -297,7 +305,7 @@ async function update(partial, idToken) {
   const secretMask = [];
   const akFields = {};
   if (partial.apiKeys && typeof partial.apiKeys === 'object') {
-    for (const k of ['openrouter', 'gemini', 'tavily']) {
+    for (const k of ['openrouter', 'tavily']) {
       const v = partial.apiKeys[k];
       if (typeof v === 'string' && v.trim()) {
         akFields[k] = toFsValue(v.trim());

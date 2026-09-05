@@ -20,7 +20,7 @@ async function openStubbedEditor(openTab, overrides = {}) {
   const page = await openTab(ADMIN_URL);
   await page.addInitScript((over) => {
     const fakeConfig = {
-      apiKeysPresent: { openrouter: true, gemini: false, tavily: false },
+      apiKeysPresent: { openrouter: true, tavily: false },
       safeBrowsingKeyPresent: false,
       modelRegistry: { esistente: { provider: 'openrouter', model: 'vendor/gia-salvato', reasoning: 'medium' } },
       models: {},
@@ -132,14 +132,6 @@ test('la stringa modello è un combobox: datalist per provider popolata dal cata
   const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'nvidia/nemotron-3-ultra-550b-a55b:free' })).toBeVisible();
-
-  // Cambiando provider su Gemini, il dropdown legge l'altra lista: il modello
-  // OpenRouter non compare più.
-  await idInput.blur();
-  await expect(pop).toBeHidden();
-  await row.locator('.sn-model-provider').selectOption('gemini');
-  await idInput.focus();
-  await expect(pop.locator('.sn-select-option', { hasText: 'nvidia/nemotron-3-ultra-550b-a55b:free' })).toHaveCount(0);
 });
 
 test('livello di reasoning per-modello: mostra il valore salvato e lo ripropaga al salvataggio (#369)', async ({ openTab }) => {

@@ -48,7 +48,7 @@ function fromGeneratedFile() {
       ? j.apiKeys
       : j;
     const pick = (k) => (typeof keys[k] === 'string' ? keys[k].trim() : '');
-    return { openrouter: pick('openrouter'), gemini: pick('gemini'), tavily: pick('tavily') };
+    return { openrouter: pick('openrouter'), tavily: pick('tavily') };
   } catch (_) {
     return null; // file assente o malformato → nessun contributo
   }
@@ -59,7 +59,6 @@ function readSnapshot() {
   const gen = fromGeneratedFile() || {};
   return {
     openrouter: gen.openrouter || fromEnv('FILO_DEFAULT_OPENROUTER_KEY'),
-    gemini: gen.gemini || fromEnv('FILO_DEFAULT_GEMINI_KEY'),
     tavily: gen.tavily || fromEnv('FILO_DEFAULT_TAVILY_KEY'),
   };
 }
@@ -72,7 +71,7 @@ function getBuildKeys() {
 
 // True se almeno una chiave di default è disponibile (file generato o env).
 function hasAnyBuildKey() {
-  return Boolean(DEFAULT_KEYS.openrouter || DEFAULT_KEYS.gemini || DEFAULT_KEYS.tavily);
+  return Boolean(DEFAULT_KEYS.openrouter || DEFAULT_KEYS.tavily);
 }
 
 module.exports = { getBuildKeys, hasAnyBuildKey };

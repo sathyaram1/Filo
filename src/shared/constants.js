@@ -167,12 +167,12 @@
     CATEGORIZE: 'categorize',
     DESCRIBE_IMAGE: 'describe_image',
     TRANSCRIBE_IMAGE: 'transcribe_image',
-    // Trascrizione audio dal microfono (dettatura). L'input è un data URL
-    // audio (es. audio/webm;base64,...) mandato a un modello multimodale.
+    // Trascrizione audio dal microfono (dettatura). L'audio (WAV, base64) va a
+    // un modello di TRASCRIZIONE (ascolta, risponde col testo), non a una chat.
     TRANSCRIBE_AUDIO: 'transcribe_audio',
     // Lettura ad alta voce (text-to-speech) via modello: produce AUDIO da TESTO.
-    // Richiede un modello TTS (es. gemini-2.5-flash-preview-tts). Se non
-    // disponibile, la lettura ripiega sulla voce del browser (Web Speech).
+    // Richiede un modello di sintesi vocale. Se non disponibile, la lettura
+    // ripiega sulla voce del browser (Web Speech).
     TTS: 'tts',
     SPELLCHECK_SEMANTIC: 'spellcheck_semantic',
     SPELLCHECK_WORD: 'spellcheck_word',
@@ -281,21 +281,18 @@
   // budget in euro. I crediti però devono calare anche quando la chiamata è
   // gratis — altrimenti col setup di default (quasi tutto su Gemini) il saldo non
   // si muoverebbe mai e la pagina Crediti sembrerebbe rotta. Qui ogni modello di
-  // default ha un prezzo di listino, sia nella forma "diretta" Gemini sia nel
-  // gemello OpenRouter, così `estimateCostEur` produce un costo > 0 su cui il
+  // default ha un prezzo di listino, così `estimateCostEur` produce un costo > 0 su cui il
   // motore crediti scala il saldo. I valori sono indicativi (allineati a
   // DEFAULT_SETTINGS.pricing dove esiste il gemello).
   const NOTIONAL_PRICING = {
-    // Gemini serviti diretti (provider 'gemini').
-    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
-    'gemini-2.0-flash-lite': { input: 0.075, output: 0.30 },
-    'gemini-3.1-flash-lite': { input: 0.25, output: 1.50 },
-    'gemini-2.5-flash-preview-tts': { input: 0.50, output: 2.00 },
-    // Gemelli OpenRouter (stesso listino).
-    'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 },
-    'google/gemini-2.0-flash-lite-001': { input: 0.075, output: 0.30 },
-    'google/gemini-3.1-flash-lite-preview': { input: 0.25, output: 1.50 },
-    'anthropic/claude-3.5-haiku': { input: 0.80, output: 4.00 },
+    // Anthropic, via il router.
+    'anthropic/claude-haiku-4.5': { input: 1.00, output: 5.00 },
+    // Modelli a pesi aperti dei default (fornitori indipendenti). Voce,
+    // dettatura e indicizzazione non si contano a token: il loro costo arriva
+    // già calcolato dal router (usage.costUsd) e non passa da questo listino.
+    'deepseek/deepseek-v4-flash': { input: 0.09, output: 0.18 },
+    'moonshotai/kimi-k2.6': { input: 0.95, output: 4.00 },
+    'z-ai/glm-5.3-flash': { input: 0.075, output: 0.25 },
     // Sostituti a pesi aperti (fornitori indipendenti): costano meno dei
     // proprietari che sostituiscono, quindi accendere l'interruttore non fa mai
     // salire la spesa.
@@ -399,168 +396,68 @@
 
   // Registry di modelli "logici" indicizzati per nickname.
   // Ogni modello ha UN SOLO provider e il nome concreto da usare per chiamarlo
-  // (campo `model`). Per avere un fallback su un altro provider basta creare un
-  // secondo modello (es. 'flash' su Gemini + 'flash-or' su OpenRouter) e
+  // (campo `model`). Per avere un fallback basta creare un secondo modello e
   // indicarli entrambi nella lista di un'azione (vedi DEFAULT_MODELS).
   // I nickname sono case-sensitive e devono essere dei semplici slug (es.
-  // 'flash', 'claude-haiku') così l'utente li riconosce.
+  // 'deepseek', 'claude') così l'utente li riconosce.
   //
   // Retro-compatibilità: vecchie config potevano avere entry "duali"
   // { openrouter, gemini } (un nickname per due provider). resolveModel le
   // gestisce ancora, così i settings salvati prima del refactor continuano a
   // funzionare finché l'utente non li ri-salva dalla pagina Opzioni.
-  const DEFAULT_MODEL_REGISTRY = {
-    flash: {
-      label: 'Gemini 2.0 Flash',
-      provider: 'gemini',
-      model: 'gemini-2.0-flash',
-    },
-    'flash-or': {
-      label: 'Gemini 2.0 Flash (OpenRouter)',
-      provider: 'openrouter',
-      model: 'google/gemini-2.0-flash-001',
-    },
-    'flash-lite': {
-      label: 'Gemini 2.0 Flash Lite',
-      provider: 'gemini',
-      model: 'gemini-2.0-flash-lite',
-    },
-    'flash-lite-or': {
-      label: 'Gemini 2.0 Flash Lite (OpenRouter)',
-      provider: 'openrouter',
-      model: 'google/gemini-2.0-flash-lite-001',
-    },
-    'flash-lite-3': {
-      label: 'Gemini 3.1 Flash Lite',
-      provider: 'gemini',
-      model: 'gemini-3.1-flash-lite',
-    },
-    'flash-lite-3-or': {
-      label: 'Gemini 3.1 Flash Lite (OpenRouter)',
-      provider: 'openrouter',
-      model: 'google/gemini-3.1-flash-lite-preview',
-    },
-    'claude-haiku': {
-      label: 'Claude 3.5 Haiku',
-      provider: 'openrouter',
-      model: 'anthropic/claude-3.5-haiku',
-    },
-    // Indicizzazione (embedding): produce VETTORI da testo, non parole. Usato
-    // SOLO dall'indicizzazione dell'archivio schede (la validazione
-    // modello↔funzione impedisce di assegnarlo a una funzione di testo, e
-    // viceversa). Il provider è Gemini: è l'unico che Filo sa chiamare per
-    // questo tipo di modello.
-    'embed-004': {
-      label: 'Google text-embedding-004',
-      provider: 'gemini',
-      model: 'text-embedding-004',
-    },
-    // Sintesi vocale (TTS): producono AUDIO da testo. Usati SOLO dall'azione TTS
-    // (la validazione modello↔azione impedisce di assegnarli a funzioni di testo).
-    tts: {
-      label: 'Gemini 2.5 Flash TTS',
-      provider: 'gemini',
-      model: 'gemini-2.5-flash-preview-tts',
-    },
-    // ── Modelli a PESI APERTI, serviti da fornitori indipendenti ─────────────
-    // Sono i sostituti usati quando chi usa Filo accende "solo modelli a pesi
-    // aperti" (vedi OPEN_WEIGHTS_SUBSTITUTES). Stanno nel registry come tutti
-    // gli altri: si possono scegliere anche a interruttore spento.
-    // Provider 'openrouter' = smistatore, non il produttore dei pesi: l'host
-    // concreto lo sceglie lui, e la lista di esclusione tiene fuori i produttori.
-    // Cosa ciascuno sa masticare (testo? immagini? audio?) sta in
-    // OPEN_WEIGHTS_SUBSTITUTE_MODALITIES, accanto alla tabella delle
-    // sostituzioni: serve solo lì, e scriverlo una volta sola evita che le due
-    // liste divergano. Una voce può comunque dichiararlo da sé (`inputs`/
-    // `outputs`), così l'owner corregge dalla config condivisa senza rilasciare
-    // codice.
-    gemma: {
-      label: 'Gemma 4 31B (pesi aperti)',
-      provider: 'openrouter',
-      model: 'google/gemma-4-31b-it',
-      weights: 'open',
-    },
-    'gemma-lite': {
-      label: 'Gemma 4 26B A4B (pesi aperti)',
-      provider: 'openrouter',
-      model: 'google/gemma-4-26b-a4b-it',
-      weights: 'open',
-    },
-    deepseek: {
-      label: 'DeepSeek V4 Pro (pesi aperti)',
-      provider: 'openrouter',
-      model: 'deepseek/deepseek-v4-pro',
-      weights: 'open',
-    },
-  };
+  // VUOTO di proposito: nessun modello scritto nel codice. I modelli veri
+  // stanno nella configurazione condivisa (Gestione → Modelli predefiniti) o
+  // nelle Opzioni di chi usa Filo. Una funzione senza modello si ferma e lo
+  // dice: meglio un errore rumoroso di una chiamata silenziosa a un modello
+  // vecchio scelto da nessuno. (Per i test: tests/fixtures/testModels.js.)
+  const DEFAULT_MODEL_REGISTRY = {};
 
   // Modello di default per ogni azione. I valori sono liste di NICKNAME dal
   // registry separate da virgola: il primo è il primario, gli altri sono
-  // fallback in ordine. Di default mettiamo il modello su Gemini (quota free,
-  // diretto) col gemello su OpenRouter come fallback, così se la Gemini API
-  // fallisce/è satura la richiesta passa da OpenRouter senza intervento.
+  // fallback in ordine. I predefiniti seguono la politica sui modelli: pesi
+  // aperti serviti da fornitori indipendenti (DeepSeek per il testo, Gemma e
+  // Kimi dove servono gli occhi, Whisper per l'orecchio, Kokoro per la voce,
+  // Qwen per l'indicizzazione) e Anthropic dove serve più testa.
+  // Una chiave per funzione, tutte VUOTE: le catene vere vengono dalla
+  // configurazione (vedi DEFAULT_MODEL_REGISTRY). Le chiavi restano perché il
+  // censimento dei modelli (modelUsage.js) le confronta con le funzioni.
   const DEFAULT_MODELS = {
-    [ACTIONS.EXPLAIN]: 'flash, flash-or',
-    [ACTIONS.EXPLAIN_DEEP]: 'claude-haiku',
-    [ACTIONS.TRANSLATE_SELECTION]: 'flash, flash-or',
-    [ACTIONS.TRANSLATE_PAGE]: 'flash, flash-or',
-    [ACTIONS.HELP]: 'flash, flash-or',
-    [ACTIONS.CATEGORIZE]: 'flash, flash-or',
-    [ACTIONS.DESCRIBE_IMAGE]: 'flash-lite-3, flash-lite-3-or',
-    // OCR: serve un modello vision capace di leggere testo anche piccolo.
-    // Flash è ok; con la chiave Gemini la richiesta è gratis e veloce.
-    [ACTIONS.TRANSCRIBE_IMAGE]: 'flash, flash-or',
-    // Dettatura: serve un modello che capisca audio. Gemini 2.0 Flash è
-    // multimodale (audio/video/immagini) e gratis con la chiave Gemini.
-    [ACTIONS.TRANSCRIBE_AUDIO]: 'flash, flash-or',
-    [ACTIONS.SPELLCHECK_SEMANTIC]: 'flash, flash-or',
-    [ACTIONS.SPELLCHECK_WORD]: 'flash, flash-or',
-    [ACTIONS.EDIT_TEXT]: 'claude-haiku',
-    [ACTIONS.EXPLAIN_LINK]: 'flash, flash-or',
-    // Modelli "stupidi" per la pipeline di raccolta path: deve essere economico
-    // e deterministico, non creativo. Lite va benissimo.
-    [ACTIONS.HELP_INTENT_GUESS]: 'flash-lite-3, flash-lite-3-or',
-    [ACTIONS.HELP_INTENT_JUDGE]: 'flash-lite-3, flash-lite-3-or',
-    // Filo agenti: chat = modello principale; gli altri (background) usano lite.
-    [ACTIONS.FILO_CHAT]: 'flash, flash-or',
-    [ACTIONS.FILO_DASHBOARD]: 'flash, flash-or',
-    [ACTIONS.FILO_LESSON]: 'flash-lite-3, flash-lite-3-or',
-    [ACTIONS.FILO_COMPACT]: 'flash, flash-or',
-    // Chat del deck builder: traduzione NL→query Scryfall + risposte brevi.
-    [ACTIONS.DECKS_CHAT]: 'flash, flash-or',
-    // Parere carta-vs-mazzo (§6): giudizio breve ma sensato → flash.
-    [ACTIONS.DECKS_OPINION]: 'flash, flash-or',
-    // Auto-tag (§7): giudizio booleano carta-per-tag → modello economico.
-    [ACTIONS.DECKS_AUTOTAG]: 'flash-lite-3, flash-lite-3-or',
-    // Filtro ricerca (§4.1): giudizio booleano carta-vs-criterio in batch →
-    // modello piccolo ed economico (gira su molte carte, con cache).
-    [ACTIONS.DECKS_SEARCH_FILTER]: 'flash-lite-3, flash-lite-3-or',
-    // Triage tab: decisione economica e frequente → lite va bene.
-    [ACTIONS.FILO_TAB_TRIAGE]: 'flash-lite-3, flash-lite-3-or',
-    // Riassunto pagina alla chiusura: economico (gira spesso).
-    [ACTIONS.FILO_TAB_SUMMARY]: 'flash-lite-3, flash-lite-3-or',
-    // Re-rank ricerca semantica: legge i top-K riassunti → lite va bene.
-    [ACTIONS.FILO_TAB_SEARCH]: 'flash-lite-3, flash-lite-3-or',
-    // Lettura ad alta voce: modello TTS Gemini. Se fallisce/è assente, la voce
-    // del browser (Web Speech) fa da fallback finale lato content script.
-    [ACTIONS.TTS]: 'tts',
-    // Funzioni di supporto: giudizi corti e frequenti → modello economico.
-    [ACTIONS.SAFEBROWSE_JUDGE]: 'flash-lite',
-    [ACTIONS.GEOBLOCK_CLASSIFY]: 'flash-lite',
-    [ACTIONS.FEEDBACK_TITLE]: 'flash-lite',
-    // Editor: titolo e riassunto sono automatici e frequenti (girano dopo ogni
-    // pausa nella scrittura) → modello economico. La chat col documento è
-    // conversazionale come le altre chat → stesso modello delle chat.
-    [ACTIONS.EDITOR_TITLE]: 'flash-lite-3, flash-lite-3-or',
-    [ACTIONS.EDITOR_SUMMARY]: 'flash-lite-3, flash-lite-3-or',
-    [ACTIONS.EDITOR_CHAT]: 'flash, flash-or',
-    // Ricerca fra i feedback: classifica una lista corta → modello economico.
-    [ACTIONS.MANAGE_SEARCH]: 'flash-lite-3, flash-lite-3-or',
-    // Indicizzazione dell'archivio: modello di embedding, non di testo.
-    [ACTIONS.ARCHIVE_EMBED]: 'embed-004',
-    // Prova di un fornitore: la catena copre entrambi i fornitori così il
-    // pulsante "Prova" trova un modello sia per Gemini sia per OpenRouter.
-    [ACTIONS.PROVIDER_TEST]: 'flash-lite-3, flash-lite-3-or',
+    [ACTIONS.EXPLAIN]: '',
+    [ACTIONS.EXPLAIN_DEEP]: '',
+    [ACTIONS.TRANSLATE_SELECTION]: '',
+    [ACTIONS.TRANSLATE_PAGE]: '',
+    [ACTIONS.HELP]: '',
+    [ACTIONS.CATEGORIZE]: '',
+    [ACTIONS.DESCRIBE_IMAGE]: '',
+    [ACTIONS.TRANSCRIBE_IMAGE]: '',
+    [ACTIONS.TRANSCRIBE_AUDIO]: '',
+    [ACTIONS.SPELLCHECK_SEMANTIC]: '',
+    [ACTIONS.SPELLCHECK_WORD]: '',
+    [ACTIONS.EDIT_TEXT]: '',
+    [ACTIONS.EXPLAIN_LINK]: '',
+    [ACTIONS.HELP_INTENT_GUESS]: '',
+    [ACTIONS.HELP_INTENT_JUDGE]: '',
+    [ACTIONS.FILO_CHAT]: '',
+    [ACTIONS.FILO_DASHBOARD]: '',
+    [ACTIONS.FILO_LESSON]: '',
+    [ACTIONS.FILO_COMPACT]: '',
+    [ACTIONS.DECKS_CHAT]: '',
+    [ACTIONS.DECKS_OPINION]: '',
+    [ACTIONS.DECKS_AUTOTAG]: '',
+    [ACTIONS.DECKS_SEARCH_FILTER]: '',
+    [ACTIONS.FILO_TAB_TRIAGE]: '',
+    [ACTIONS.FILO_TAB_SUMMARY]: '',
+    [ACTIONS.FILO_TAB_SEARCH]: '',
+    [ACTIONS.TTS]: '',
+    [ACTIONS.SAFEBROWSE_JUDGE]: '',
+    [ACTIONS.GEOBLOCK_CLASSIFY]: '',
+    [ACTIONS.FEEDBACK_TITLE]: '',
+    [ACTIONS.EDITOR_TITLE]: '',
+    [ACTIONS.EDITOR_SUMMARY]: '',
+    [ACTIONS.EDITOR_CHAT]: '',
+    [ACTIONS.MANAGE_SEARCH]: '',
+    [ACTIONS.ARCHIVE_EMBED]: '',
+    [ACTIONS.PROVIDER_TEST]: '',
   };
 
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────
@@ -696,7 +593,10 @@
   // Provider che sono l'API del PRODUTTORE dei modelli: qualunque cosa servano,
   // i soldi vanno a chi i modelli li fa. 'openrouter' non è qui perché è uno
   // smistatore: chi ospita davvero si sceglie con la lista di esclusione.
-  const PRODUCER_DIRECT_PROVIDERS = ['gemini'];
+  // Oggi la lista è VUOTA: l'API diretta di Google, che era l'unica voce, è
+  // stata tolta da Filo. Il meccanismo resta per il giorno in cui si aggiunge
+  // un fornitore che sia anche produttore.
+  const PRODUCER_DIRECT_PROVIDERS = [];
 
   // Famiglie di modelli a PESI APERTI (nome base, minuscolo). È una lista
   // curabile: un id che non ricade qui è trattato come proprietario. Il
@@ -706,7 +606,7 @@
   const OPEN_WEIGHT_MODEL_FAMILIES = [
     'gemma', 'llama', 'qwen', 'deepseek', 'mistral', 'mixtral', 'kimi', 'glm',
     'minimax', 'olmo', 'phi', 'granite', 'nemotron', 'falcon', 'yi', 'command-r',
-    'stablelm', 'smollm', 'whisper', 'step',
+    'stablelm', 'smollm', 'whisper', 'step', 'kokoro', 'parakeet', 'bge',
   ];
 
   // Il modello concreto ha i pesi aperti? Guarda l'ULTIMO segmento dell'id (il
@@ -716,10 +616,14 @@
     const raw = String(modelId == null ? '' : modelId).toLowerCase().trim();
     if (!raw) return false;
     const name = raw.split('/').pop();
+    // Il nome può portare la versione attaccata alla famiglia ('qwen3-embedding',
+    // 'llama4-…', 'gemma3-…'): conta ciò che segue la famiglia, non un
+    // separatore fisso.
     return OPEN_WEIGHT_MODEL_FAMILIES.some((fam) => {
       const f = String(fam).toLowerCase();
-      return name === f || name.startsWith(f + '-') || name.startsWith(f + '.')
-        || name.startsWith(f + '_') || name.startsWith(f + ':');
+      if (!name.startsWith(f)) return false;
+      const rest = name.slice(f.length);
+      return rest === '' || /^[\d\-._:]/.test(rest);
     });
   }
 
@@ -755,11 +659,15 @@
   // nickname. Serve perché quasi tutte le funzioni nascono con un modello
   // proprietario: senza sostituzione, accendere l'interruttore spegnerebbe
   // mezza app invece di cambiarle modello.
-  // Le funzioni il cui modello NON ha un sostituto (sintesi vocale,
-  // indicizzazione, dettatura: nessun modello a pesi aperti che Filo sappia
-  // chiamare fa quel mestiere) si fermano e lo dicono. Mai un ripiego silenzioso
-  // su un modello proprietario: sarebbe l'interruttore che mente.
+  // I nickname 'flash*' e 'claude-haiku' non sono più fra i predefiniti (erano
+  // modelli Google e un Anthropic ritirato dal catalogo) ma possono vivere
+  // ancora nei registri personali salvati prima: la sostituzione vale anche per
+  // loro. Una funzione il cui modello NON ha un sostituto si ferma e lo dice.
+  // Mai un ripiego silenzioso su un modello proprietario: sarebbe l'interruttore
+  // che mente. (Lettura ad alta voce, dettatura e indicizzazione partono ormai
+  // da modelli a pesi aperti: non hanno bisogno di sostituti.)
   const OPEN_WEIGHTS_SUBSTITUTES = {
+    claude: 'deepseek',
     flash: 'gemma',
     'flash-or': 'gemma',
     'flash-lite': 'gemma-lite',
@@ -803,11 +711,17 @@
   // PURA.
   function entryModalities(entry, nickname) {
     const e = entry || {};
+    // Le righe delle Opzioni portano solo fornitore e stringa del modello: se
+    // il nickname è uno di quelli integrati, le modalità dichiarate nel
+    // registro di build valgono anche per la riga personale.
+    const builtin = (nickname && DEFAULT_MODEL_REGISTRY[nickname]) || {};
     const known = OPEN_WEIGHTS_SUBSTITUTE_MODALITIES[nickname] || {};
     const inputs = Array.isArray(e.inputs) ? e.inputs.filter(Boolean)
-      : (Array.isArray(known.inputs) ? known.inputs : null);
+      : (Array.isArray(known.inputs) ? known.inputs
+        : (Array.isArray(builtin.inputs) ? builtin.inputs : null));
     const outputs = Array.isArray(e.outputs) ? e.outputs.filter(Boolean)
-      : (Array.isArray(known.outputs) ? known.outputs : null);
+      : (Array.isArray(known.outputs) ? known.outputs
+        : (Array.isArray(builtin.outputs) ? builtin.outputs : null));
     if (!inputs && !outputs) return null;
     return {
       input_modalities: inputs && inputs.length ? inputs : ['text'],
@@ -907,12 +821,11 @@
 
   // Risolve un riferimento a un modello (nickname OPPURE id raw legacy stile
   // OpenRouter) nel nome concreto da inviare al provider indicato.
-  // Ritorna null se il provider non ha quel modello (es. nickname 'claude-haiku'
-  // → gemini: stringa vuota → caller deve saltare il provider).
+  // Ritorna null se il provider non ha quel modello (il caller salta il
+  // provider).
   //
   // Backwards compat: se il riferimento non è un nickname noto, lo trattiamo
-  // come id raw stile OpenRouter e applichiamo la stessa logica di prima
-  // (toGeminiModelId per gemini). Così settings pre-refactor continuano a
+  // come id raw stile OpenRouter. Così settings pre-refactor continuano a
   // funzionare anche se la migrazione non parte.
   function resolveModel(ref, providerName, registry) {
     if (!ref) return null;
@@ -930,10 +843,6 @@
       return id || null;
     }
     if (providerName === 'openrouter') return ref;
-    if (providerName === 'gemini') {
-      const g = (typeof globalThis !== 'undefined' ? globalThis : self).SN_PROVIDER_GEMINI;
-      return g?.toGeminiModelId?.(ref) || null;
-    }
     return null;
   }
 
@@ -942,13 +851,15 @@
   // (o un id sbagliato che abbiamo introdotto noi per errore), lo
   // sostituiamo al volo senza che debba reimpostare a mano nelle opzioni.
   const DEPRECATED_MODELS = {
-    // Bonifica di una nostra svista (non esistono su OpenRouter senza tilde):
-    'google/gemini-flash-latest': 'google/gemini-2.0-flash-001',
-    'google/gemini-pro-latest': 'anthropic/claude-3.5-haiku',
-    // NB: `gemini-3.1-flash-lite` ora ESISTE sulla Gemini API ufficiale (sia il
-    // nome stabile sia il `-preview`), quindi qui NON va più rimappato/declassato.
-    // Il vecchio downgrade su flash-lite 2.0 è stato rimosso: declassava un
-    // modello valido.
+    // Id grezzi salvati da configurazioni vecchie che puntavano a Google (oggi
+    // escluso dalla politica) o a un Anthropic ritirato dal catalogo: vanno
+    // sull'equivalente ammesso più vicino.
+    'google/gemini-flash-latest': 'deepseek/deepseek-v4-flash',
+    'google/gemini-pro-latest': 'deepseek/deepseek-v4-pro',
+    'google/gemini-2.0-flash-001': 'deepseek/deepseek-v4-flash',
+    'google/gemini-2.0-flash-lite-001': 'deepseek/deepseek-v4-flash',
+    'google/gemini-3.1-flash-lite-preview': 'deepseek/deepseek-v4-flash',
+    'anthropic/claude-3.5-haiku': 'anthropic/claude-haiku-4.5',
   };
 
   // Un'azione può ora puntare a PIÙ modelli: il valore del campo è una lista di
@@ -1495,7 +1406,7 @@
       `PULIZIA TAB ("riordina le schede", "fai pulizia delle tab", "chiudi le tab che non servono", "archivia le schede vecchie") → proponi l'azione PULISCI_TAB. NON archiviare nulla da solo: l'azione mostra un bottone che l'utente deve confermare, e tu spieghi in una frase cosa farà (valuterà tutte le schede e archivierà quelle non più utili, ritrovabili in cronologia).\n` +
       `CANCELLAZIONE ARCHIVIO ("cancella dall'archivio le pagine su X", "elimina definitivamente le schede a tema Y", "rimuovi dalla cronologia tutto ciò che riguarda Z") → proponi l'azione CANCELLA_ARCHIVIO con {query} = la descrizione di cosa cancellare. È DISTRUTTIVA e PERMANENTE: NON cancellare nulla da solo. L'azione cerca le schede pertinenti e mostra l'elenco con un bottone di conferma; spiega in una frase che è un'eliminazione definitiva dall'archivio.\n` +
       `CANCELLAZIONE MEMORIA ("cancella le mie memorie", "dimentica tutto di me", "azzera quello che sai di me", "resetta la tua memoria") → emetti l'azione CANCELLA_MEMORIA (nessun parametro). È IRREVERSIBILE: cancella profilo, preferenze apprese e lezioni. NON cancellare nulla da solo e NON dichiarare di averlo già fatto: è il SISTEMA a mostrare un box in cui l'utente deve scrivere "conferma" prima di procedere. Tu emetti l'azione e basta; conferma a parole solo DOPO che è stata eseguita, in una frase.\n` +
-      `MODIFICA IMPOSTAZIONI ("metti il tema scuro", "ingrandisci il testo", "attiva la modalità terminale", "imposta i cookie su privacy", "cambia provider in gemini", "metti la chiave gemini AIza...", "limite di spesa 10 euro") → emetti l'azione IMPOSTA_PREFERENZA con la chiave e il valore giusti (vedi l'elenco sotto). Puoi modificare QUALSIASI impostazione elencata. Per le impostazioni semplici (estetica, testo, archiviazione…) si applica subito: conferma in una frase ("Fatto, ora il tema è scuro."). Per le impostazioni sensibili (sicurezza, modelli, provider, chiavi API, limite di spesa) è il SISTEMA ad aprire da sé un popup di conferma all'utente prima di applicarle: tu emetti comunque l'azione e basta — NON chiedere conferma a parole, NON dire "vai nelle Opzioni". Se l'utente chiede un'impostazione che davvero non esiste nell'elenco, dillo.\n` +
+      `MODIFICA IMPOSTAZIONI ("metti il tema scuro", "ingrandisci il testo", "attiva la modalità terminale", "imposta i cookie su privacy", "metti la chiave openrouter sk-or-...", "limite di spesa 10 euro") → emetti l'azione IMPOSTA_PREFERENZA con la chiave e il valore giusti (vedi l'elenco sotto). Puoi modificare QUALSIASI impostazione elencata. Per le impostazioni semplici (estetica, testo, archiviazione…) si applica subito: conferma in una frase ("Fatto, ora il tema è scuro."). Per le impostazioni sensibili (sicurezza, modelli, provider, chiavi API, limite di spesa) è il SISTEMA ad aprire da sé un popup di conferma all'utente prima di applicarle: tu emetti comunque l'azione e basta — NON chiedere conferma a parole, NON dire "vai nelle Opzioni". Se l'utente chiede un'impostazione che davvero non esiste nell'elenco, dillo.\n` +
       `SEGNALA UN PROBLEMA / FEEDBACK ("manda un feedback agli sviluppatori", "segnala che X non funziona", "di' al team che vorrei Y") → scrivi un testo chiaro e completo della segnalazione ed emetti l'azione INVIA_FEEDBACK (testo + un titolo breve). È il sistema a chiedere conferma all'utente, con l'anteprima del testo, prima di inviare. Non inventare dettagli che l'utente non ha fornito; se la segnalazione è vaga, chiedi una precisazione prima di inviare.\n` +
       `QUANDO AMMETTI UNA MANCANZA (obbligatorio) → ogni volta che stai per dire che Filo non sa fare una cosa, che non hai accesso a un dato, che una funzione non esiste o che qualcosa non ha funzionato, emetti NELLO STESSO TURNO anche INVIA_FEEDBACK, con il testo già scritto: cosa aveva chiesto l'utente e cosa non è stato possibile. NON chiedere il permesso a parole ("vuoi che lo segnali?") e NON aspettare che te lo chieda: la conferma la chiede il sistema da sé mostrando l'anteprima, quindi il tuo compito è preparare la segnalazione, non domandare. L'unica eccezione è se una segnalazione sullo stesso punto è già stata proposta in questa conversazione.\n` +
       `PERSONALIZZAZIONE ESTETICA ("rendi i bottoni verdi", "cambia il colore d'accento", "voglio gli angoli più arrotondati", "usa un font serif", "i link in blu") → scegli SUBITO un valore ragionevole ed esegui l'azione IMPOSTA_ESTETICA col token giusto (vedi sotto). NON chiedere all'utente il valore esatto: applica una scelta sensata e basta — l'interfaccia mostrerà da sola un controllo (color picker / slider) per raffinarla. Conferma in una frase ("Fatto, ho reso i bottoni verdi — usa il controllo qui sotto per scegliere la tonatura esatta."). Una richiesta vaga ("rendi tutto più allegro") → scegli i token più pertinenti e cambiali.\n` +
@@ -1550,9 +1461,9 @@
       `  • navigazione_sicura: true | false [conferma]  (rilevamento siti pericolosi)\n` +
       `  • gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n` +
       `  • fingerprint: "off" | "default" | "privacy" [conferma]  (anti-fingerprinting)\n` +
-      `  • provider: "openrouter" | "gemini" [conferma] ; modelli_predefiniti: true | false [conferma]\n` +
+      `  • provider: "openrouter" [conferma] ; modelli_predefiniti: true | false [conferma]\n` +
       `  • solo_pesi_aperti: true | false [conferma]  (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)\n` +
-      `  • chiave_openrouter / chiave_gemini / chiave_tavily: la chiave API come testo [conferma]\n` +
+      `  • chiave_openrouter / chiave_tavily: la chiave API come testo [conferma]\n` +
       `  • limite_spesa: numero in euro (limite di spesa mensile) [conferma]\n` +
       `  • colore_tab: "più vivaci" | "più neutre" | "nessuno" | "più preciso" | "predefinito"  (colore identità delle tab: "vivaci"=tinte accese, "neutre"=tinte spente, "nessuno"=tab senza colore, "più preciso"=estrai meglio quando la tab prende il colore sbagliato es. "Poste è verde non gialla", "predefinito"=ripristina). I singoli parametri numerici si regolano dalle Preferenze avanzate.\n` +
       `IMPOSTA_ESTETICA: {token, valore}  — cambia un singolo token estetico dell'app, applicato live a tutte le superfici. `
@@ -1846,7 +1757,6 @@
     openWeightsOnly: false,
     apiKeys: {
       openrouter: '',
-      gemini: '',
       // Tavily: provider di web search "LLM-friendly" usato dalla sidebar
       // Aiuto come provider primario. Senza chiave si ricade su DuckDuckGo.
       tavily: '',
@@ -1860,9 +1770,9 @@
     // l'aggiornamento senza codice. Vedi DEFAULT_EXCLUDED_PROVIDERS.
     // Costi stimati per 1M token (input/output) in USD. Valori indicativi.
     pricing: {
-      'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 },
-      'google/gemini-3.1-flash-lite-preview': { input: 0.25, output: 1.50 },
-      'anthropic/claude-3.5-haiku': { input: 0.80, output: 4.00 },
+      'anthropic/claude-haiku-4.5': { input: 1.00, output: 5.00 },
+      'deepseek/deepseek-v4-flash': { input: 0.09, output: 0.18 },
+      'moonshotai/kimi-k2.6': { input: 0.95, output: 4.00 },
       'google/gemma-4-31b-it': { input: 0.10, output: 0.30 },
       'google/gemma-4-26b-a4b-it': { input: 0.04, output: 0.12 },
       'deepseek/deepseek-v4-pro': { input: 0.40, output: 0.80 },
@@ -1920,9 +1830,13 @@
     // - rate: velocità di lettura (0.5–2, 1 = normale)
     // - pitch: tono (0–2, 1 = normale)
     tts: {
+      // Voce del sistema (ripiego offline), velocità e tono.
       voice: '',
       rate: 1,
       pitch: 1,
+      // Voce del MODELLO di lettura ('' = automatica: segue la lingua del
+      // testo). Gli id stanno in ttsVoices.js.
+      modelVoice: '',
     },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
