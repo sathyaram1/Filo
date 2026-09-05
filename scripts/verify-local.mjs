@@ -163,6 +163,18 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   if (prev.verdict === 'fix-pending' && prev.pending) {
     return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start.' };
   }
+  // Consegnata la correzione, la verifica dopo la fa un'ALTRA istanza, e parte
+  // da `start`: una critica registrata qui in mezzo sarebbe chi ha corretto che
+  // si approva da solo (la porta del giro 1, vista dal lato locale).
+  if (prev.verdict === 'fixed') {
+    return { ok: false, state: s, reason: 'la correzione è stata consegnata: la verifica sul contenuto nuovo la fa un\'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida). Una critica adesso sarebbe chi ha corretto che si approva da solo.' };
+  }
+  // Un livello fra parentesi quadre che non apre una riga non è un rilievo, e
+  // farlo finire nel riassunto trasformava un [2] in un pass silenzioso.
+  const brutte = ROUND.unparsedLevelLines(critique);
+  if (brutte.length) {
+    return { ok: false, state: s, reason: `rilievi non riconosciuti: il livello va a inizio riga, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+  }
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
   const outcome = decision.stop ? 'stop' : decision.fix.length ? 'fix' : 'pass';
