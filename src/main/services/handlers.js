@@ -1988,6 +1988,27 @@ function observationsForPrompt(actions) {
   ].filter(Boolean).join('\n\n');
 }
 
+// Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
+// sono state eseguite PRIMA che tutto si fermasse, e ripeterle vuol dire un
+// secondo timer, un secondo appunto. Dato di sistema, non istruzione.
+function interruptedActionsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const righe = [];
+  for (const a of actions) {
+    if (!a || a._executed === false || a._confirm) continue;
+    let cosa = String(a.type || '').toUpperCase();
+    try {
+      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      if (d) cosa = d.replace(/\.+\s*$/, '');
+    } catch (_) {}
+    righe.push(`- ${cosa}`);
+  }
+  return righe.length
+    ? `[Il tentativo si è interrotto per un guasto, ma queste cose ERANO GIÀ STATE FATTE:\n${righe.join('\n')}\nNon rifarle: riprendi da qui.]`
+    : '';
+}
+
 // Le azioni che l'utente ha CONFERMATO nel popup dopo che il turno era già
 // finito (livello 2 e 3). Il modello non le vede in nessun altro modo: quando
 // ha emesso l'azione era «in attesa di conferma», e il sì è arrivato dopo. Se
