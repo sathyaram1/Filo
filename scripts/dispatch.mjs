@@ -521,8 +521,9 @@ export function serialAwarenessNote(role, history, dropped = 0) {
   }
   if (role === 'verifier') {
     return [
-      `## ⚠️ Avvertenza di serie: sei al giro ${n + 1} di verifica su questo lavoro`,
+      `## ⚠️ Avvertenza di serie: sei al giro ${n + d + 1} di verifica su questo lavoro`,
       '',
+      ...tolte,
       'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
       'Se raccontano lo stesso danno da porte diverse, non limitarti a cercare la',
       'porta successiva: elenca nella STESSA critica tutte quelle che trovi, così',
