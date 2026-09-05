@@ -81,6 +81,22 @@
     `^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?(?:${LEVEL_TOKEN_SRC}|[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—])`
   );
 
+  // Un a capo scritto coi due caratteri barra e n: è come esce il comando
+  // d'esempio («<riassunto>\n[livello] …») copiato dentro virgolette doppie, in
+  // bash come in PowerShell. Se davanti a una parentesi quadra c'è quella
+  // coppia, chi scrive la usava come a capo, e vale come a capo in tutto il
+  // testo; in mezzo a una frase, senza una parentesi dopo, resta testo. Senza
+  // questo un «[2]» dopo una barra-n finiva nel riassunto e il lavoro passava
+  // in silenzio, in tutti e tre i posti (porta chiusa al giro 3 su #561 e
+  // riaperta al giro 5).
+  const ESCAPED_BREAK_BEFORE_BRACKET = /\\r?\\n\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[/;
+
+  /** La critica con gli a capo veri: `\r\n` → `\n`, e la barra-n letterale usata come a capo. PURA. */
+  function normalizeCritique(text) {
+    const s = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+    return ESCAPED_BREAK_BEFORE_BRACKET.test(s) ? s.replace(/\\r?\\n/g, '\n') : s;
+  }
+
   /**
    * Le righe della critica che NON si possono registrare così come sono. PURA.
    *
