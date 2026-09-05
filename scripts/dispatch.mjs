@@ -914,7 +914,7 @@ async function recordSecaudit(id, verdict) {
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
   const sent = await deliverToChannel('secaudit', { verdict, branch: next.branch || '' });
   if (sent.outcome === 'refused') {
-    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${motivoRifiuto(sent)})` };
   }
   if (sent.outcome === 'absent') {
     return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
