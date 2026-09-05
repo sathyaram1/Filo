@@ -601,23 +601,16 @@ if (isMain) {
       console.error('Prima chi corregge consegna (node scripts/verify-local.mjs corretto "<report>"), poi si riparte con start.');
       process.exit(1);
     }
-    if (cmd !== 'critica') {
-      // Le scorciatoie passano dagli stessi controlli della critica (correzione
-      // consegnata senza un nuovo start, rilievi scritti male): un rifiuto va
-      // detto, non scritto come se fosse un esito.
-      const r0 = withCritique(readState(), branch, {
-        critique: cmd === 'pass' ? text : `[2] ${text}`, sha,
-        caps: cmd === 'pass' ? CAPS : { cap2: 0, cap1: 0, cap0: 0 },
-      });
-      if (r0.ok === false) { console.error(r0.reason); process.exit(1); }
-      writeState(r0.state);
-      const e = readState()[branch];
-      console.log(e.verdict === 'pass'
-        ? `Verifica superata per '${branch}' su ${sha.slice(0, 8)}. Si può pubblicare.`
-        : `Verifica NON superata per '${branch}'. Il lavoro torna a chi l'ha fatto.`);
-      process.exit(0);
-    }
-    const r = withCritique(readState(), branch, { critique: text, sha });
+    // Le scorciatoie passano dagli stessi controlli della critica (correzione
+    // consegnata senza un nuovo start, rilievi scritti male) e stampano lo
+    // STESSO esito: un «pass» con dentro un [2] vale il testo, e prima diceva
+    // «il lavoro torna a chi l'ha fatto» mentre lo stato era «sta correggendo»
+    // e la fase 2 non veniva stampata (verifica del giro 7 su #561). Un «fail»
+    // secco ferma sempre: bilanci a zero.
+    const r = withCritique(readState(), branch, {
+      critique: cmd === 'fail' ? `[2] ${text}` : text, sha,
+      caps: cmd === 'fail' ? { cap2: 0, cap1: 0, cap0: 0 } : CAPS,
+    });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
     const e = r.state[branch];

@@ -78,8 +78,10 @@
   // modo naturale di scrivere il riassunto (verifica del giro 4).
   // Anche un livello scritto con una parola davanti («[livello 2]», «[L2]»,
   // «[P2]») è un livello messo male, non riassunto: finiva nel riassunto in
-  // silenzio e il lavoro passava (verifica del giro 6).
-  const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.]{1,10}\\s*)?\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*\\??\\s*\\]';
+  // silenzio e il lavoro passava (verifica del giro 6). Lo stesso per il segno
+  // messo prima della cifra («[?2]») o un segno diverso dopo («[2!]»): non
+  // erano né rilievi né errori (verifica del giro 7).
+  const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*[?!]*\\s*\\]';
   const LEVEL_START = new RegExp(`^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
   // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
