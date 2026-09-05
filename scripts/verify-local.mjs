@@ -579,7 +579,15 @@ if (isMain) {
       process.exit(1);
     }
     if (cmd !== 'critica') {
-      writeState(withVerdict(readState(), branch, { verdict: cmd, critique: text, sha }));
+      // Le scorciatoie passano dagli stessi controlli della critica (correzione
+      // consegnata senza un nuovo start, rilievi scritti male): un rifiuto va
+      // detto, non scritto come se fosse un esito.
+      const r0 = withCritique(readState(), branch, {
+        critique: cmd === 'pass' ? text : `[2] ${text}`, sha,
+        caps: cmd === 'pass' ? CAPS : { cap2: 0, cap1: 0, cap0: 0 },
+      });
+      if (r0.ok === false) { console.error(r0.reason); process.exit(1); }
+      writeState(r0.state);
       const e = readState()[branch];
       console.log(e.verdict === 'pass'
         ? `Verifica superata per '${branch}' su ${sha.slice(0, 8)}. Si può pubblicare.`
