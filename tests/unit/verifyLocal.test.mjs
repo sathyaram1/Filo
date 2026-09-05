@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const {
-  checkVerdict, withRequest, withVerdict, buildVerifierBrief,
+  checkVerdict, withRequest, withVerdict, withCritique, withFixed, buildVerifierBrief, phase2Text,
   realignPlan, afterRebase,
 } = await import('../../scripts/verify-local.mjs');
 
