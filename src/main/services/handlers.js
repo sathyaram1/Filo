@@ -759,15 +759,23 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     // resta fuori dalla cronologia.
     && action !== ACTIONS.MANAGE_SEARCH
   ) {
+    // Le azioni chiamate in questo giro stanno nell'output della voce: un giro
+    // fatto solo di chiamate non è una risposta vuota.
+    const calledOut = toolCalls.length
+      ? `${result.text ? `${result.text}\n\n` : ''}[Azioni: ${toolCalls.map((c) => c.name).join(', ')}]`
+      : result.text;
     await History.append({
       action, provider: usedProvider, model: concreteModel, servedBy,
       policyViolation: violation,
-      input: payload, output: result.text, origin, costEur, usage: result.usage,
+      input: payload, output: calledOut, origin, costEur, usage: result.usage, timing,
     });
   }
 
-  AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
-  return { text: result.text, model: concreteModel, provider: usedProvider, costEur, usage: result.usage };
+  if (!hasTools) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+  return {
+    text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
+    model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
+  };
 }
 
 // ─── Streaming via Electron IPC ─────────────────────────────────────────────
