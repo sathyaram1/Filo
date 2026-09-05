@@ -9,7 +9,6 @@
     "tests/verify-398-local-address",
     "tests/clipboard-history-remove",
     "tests/editor-modules",
-    "tests/zz-verify-riordina",
     "tests/popup-pose-streaming",
     "tests/manage-tab-counts",
     "tests/decks-chat-stress"
