@@ -189,13 +189,18 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   if (brutte.length) {
     return { ok: false, state: s, reason: `rilievi non riconosciuti: il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»); in mezzo a una frase del riassunto le parentesi quadre sono testo e vanno bene. Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
+  // Il testo si conserva con gli a capo veri (una barra-n scritta come a capo
+  // vale come a capo): è quello che il verificatore dopo rilegge nel brief.
+  // Tetto abbondante e niente taglio silenzioso: tagliata, una critica perdeva
+  // proprio i rilievi, che stanno in coda (giro 8 su #561).
+  const testo = ROUND.normalizeCritique(critique);
+  if (testo.length > MAX_CRITIQUE_CHARS) {
+    return { ok: false, state: s, reason: `critica troppo lunga: ${testo.length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}. Accorcia il riassunto, non i rilievi.` };
+  }
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
   const outcome = decision.stop ? 'stop' : decision.fix.length ? 'fix' : 'pass';
   const when = at || new Date().toISOString();
-  // Il testo si conserva con gli a capo veri (una barra-n scritta come a capo
-  // vale come a capo): è quello che il verificatore dopo rilegge nel brief.
-  const testo = ROUND.normalizeCritique(critique).slice(0, 4000);
   const entry = {
     ...prev,
     critique: testo,
