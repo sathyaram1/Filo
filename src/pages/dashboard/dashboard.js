@@ -1746,6 +1746,17 @@
   // utente" è un nudge scritto da noi, non una richiesta reale. Il main lo usa
   // per non trattarlo come parole dell'utente (#360: una segnalazione proposta
   // da Filo non deve citare un nudge interno).
+  // La conversazione da mandare al modello, senza il messaggio che parte ora.
+  // Toglie l'ultima voce SOLO se è davvero quel messaggio: dopo un tentativo
+  // interrotto in fondo c'è la traccia di cosa Filo aveva già fatto, e quella
+  // deve arrivare al modello.
+  function historyWithout(userMessage) {
+    const h = threadHistory.slice();
+    const last = h[h.length - 1];
+    if (last && last.role === 'user' && last.text === userMessage) h.pop();
+    return h;
+  }
+
   async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
