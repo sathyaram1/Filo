@@ -705,7 +705,7 @@
       voice: $('ttsVoice').value || '',
       rate: parseFloat($('ttsRate').value) || 1,
       pitch: parseFloat($('ttsPitch').value) || 1,
-      modelVoice: $('ttsModelVoice').value || '',
+      modelVoice: currentModelVoice(),
     };
     const autoArchive = {
       enabled: $('autoArchiveEnabled').checked,
