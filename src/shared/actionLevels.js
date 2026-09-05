@@ -112,7 +112,7 @@
     },
     APRI_FILE: {
       level: 1,
-      describe: (a) => `Aprire il file ${a.path || ''}`.trim(),
+      describe: (a) => `Aprire il file ${a.percorso || a.path || ''}`.trim(),
     },
     TIMER: {
       level: 1,
