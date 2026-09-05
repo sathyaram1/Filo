@@ -71,7 +71,10 @@
   // è il pass.
   // Il livello può stare dopo un punto elenco («- [2]») o un numero («1. [2]»):
   // un elenco numerato è il modo più naturale di scrivere tre rilievi.
-  const FINDING_LINE = /^\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
+  // Davanti al livello valgono anche un titolo Markdown («### [2]»), una
+  // citazione («> [2]») e un elenco con le lettere («a) [2]»): chi scrive in
+  // Markdown se le aspetta come «- [2]» e «1. [2]» (verifica del giro 11).
+  const FINDING_LINE = /^\s*(?:#{1,6}\s*|>\s*|[-*•]\s*|\d{1,2}[.)]\s*|[A-Za-z][.)]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
   // COMINCIA così, o che lo porta dopo una breve etichetta e prima di un
