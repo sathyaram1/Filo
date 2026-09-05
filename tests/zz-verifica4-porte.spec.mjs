@@ -85,11 +85,20 @@ test('byte nullo ed emoji nell\'etichetta del timer', async ({ app, shell }) => 
   await ask(page, 'timer uova');
   await expect(page.locator('.dash-bubble-filo').last()).toContainText('Timer messo', { timeout: 20_000 });
   const act = await activityRows(page);
-  expect(act.rows.join(' ')).not.toContain('\u0000');
   const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
-  expect(timers[0].label).not.toContain('\u0000');
-  const col = await page.locator('#timers, .dash-timers').first().textContent().catch(() => '');
-  expect(String(col)).not.toContain('\u0000');
+  const testo = await page.evaluate(() => document.body.innerText);
+  const NUL = String.fromCharCode(0);
+  const dump = {
+    riga: JSON.stringify(act.rows.join(' ')),
+    rigaHaNull: act.rows.join(' ').includes(NUL),
+    labelSalvata: JSON.stringify(timers[0] && timers[0].label),
+    labelHaNull: !!(timers[0] && String(timers[0].label).includes(NUL)),
+    paginaHaNull: testo.includes(NUL),
+  };
+  console.log('BYTE-NULLO', JSON.stringify(dump));
+  expect(dump.rigaHaNull, 'riga del diario senza byte nullo').toBe(false);
+  expect(dump.labelHaNull, 'etichetta salvata senza byte nullo').toBe(false);
+  expect(dump.paginaHaNull, 'testo della home senza byte nullo').toBe(false);
 });
 
 test('NAVIGA con javascript: non lascia bottoni ciechi', async ({ app, shell }) => {
