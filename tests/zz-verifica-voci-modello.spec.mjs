@@ -18,7 +18,7 @@ async function installFakeRouter(app) {
 }
 
 async function setModel(app, modelId, modelVoice) {
-  await app.evaluate(async ({ modelId, modelVoice }) => {
+  await app.evaluate(async (_e, { modelId, modelVoice }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.setSettings({
       useDefaultModels: false,
@@ -36,6 +36,18 @@ async function setModel(app, modelId, modelVoice) {
 async function synth(page, text, lang) {
   return page.evaluate(({ text, lang }) => chrome.runtime.sendMessage({ type: 'tts_synth', text, lang }), { text, lang });
 }
+async function newtabPage(app) {
+  const deadline = Date.now() + 10_000;
+  let win = null;
+  while (Date.now() < deadline) {
+    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (win) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  await win.waitForLoadState('domcontentloaded');
+  await win.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8000 });
+  return win;
+}
 async function calls(app) { return app.evaluate(() => globalThis.__vCalls); }
 async function lastCall(app) { const c = await calls(app); return c[c.length - 1]; }
 
@@ -45,7 +57,7 @@ const uniq = (s) => `${s} (${++n})`;
 test('main: la voce mandata segue il modello e la lingua', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   await installFakeRouter(app);
-  const page = await testServer.openReady(openTab, '<html lang="it"><body><p id="t">Ciao mondo</p></body></html>');
+  const page = await openTab('filo://preferences/preferences.html');
 
   const cases = [
     ['microsoft/mai-voice-2', '', 'it', 'it-IT-ElsaNeural'],
@@ -103,7 +115,7 @@ test('main: la voce mandata segue il modello e la lingua', async ({ app, shell, 
 test('main: modello sconosciuto, il router elenca le voci → si riprova e si impara', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   await installFakeRouter(app);
-  const page = await testServer.openReady(openTab, '<html lang="it"><body><p>x</p></body></html>');
+  const page = await openTab('filo://preferences/preferences.html');
   await app.evaluate(() => {
     globalThis.__vMode['acme/tts-x'] = {
       accept: ['acme-en-anna', 'acme-it-luca'],
@@ -153,9 +165,9 @@ test('pagina reale: Leggi manda la lingua della pagina e la voce del modello', a
   test.setTimeout(90_000);
   await installFakeRouter(app);
   await setModel(app, 'microsoft/mai-voice-2', '');
-  const page = await testServer.openReady(openTab, '<html lang="en"><body><p id="t">Hello world. This is a test.</p></body></html>');
+  const page = await newtabPage(app);
   await page.waitForFunction(() => typeof window.SN_TTS?.readAloud === 'function', null, { timeout: 8000 });
-  await page.evaluate(() => window.SN_TTS.readAloud('Hello world. This is a test.'));
+  await page.evaluate(() => { document.documentElement.lang = 'en'; window.SN_TTS.readAloud('Hello world. This is a test.'); });
   await page.waitForFunction(() => false, null, { timeout: 2500 }).catch(() => {});
   const c = await calls(app);
   console.log('PAGINA en →', JSON.stringify(c));
@@ -164,9 +176,8 @@ test('pagina reale: Leggi manda la lingua della pagina e la voce del modello', a
 
   await app.evaluate(() => { globalThis.__vCalls = []; });
   await setModel(app, 'deepgram/aura-2', '');
-  const page2 = await testServer.openReady(openTab, '<html lang="it-IT"><body><p id="t">Ciao mondo. Questa è una prova.</p></body></html>');
-  await page2.waitForFunction(() => typeof window.SN_TTS?.readAloud === 'function', null, { timeout: 8000 });
-  await page2.evaluate(() => window.SN_TTS.readAloud('Ciao mondo. Questa è una prova.'));
+  const page2 = page;
+  await page2.evaluate(() => { window.SN_TTS.stopReading(); document.documentElement.lang = 'it-IT'; window.SN_TTS.readAloud('Ciao mondo. Questa è una prova.'); });
   await page2.waitForFunction(() => false, null, { timeout: 2500 }).catch(() => {});
   const c2 = await calls(app);
   console.log('PAGINA it →', JSON.stringify(c2));
@@ -175,9 +186,8 @@ test('pagina reale: Leggi manda la lingua della pagina e la voce del modello', a
 
   // pagina senza lang
   await app.evaluate(() => { globalThis.__vCalls = []; });
-  const page3 = await testServer.openReady(openTab, '<html><body><p id="t">Senza lingua dichiarata.</p></body></html>');
-  await page3.waitForFunction(() => typeof window.SN_TTS?.readAloud === 'function', null, { timeout: 8000 });
-  await page3.evaluate(() => window.SN_TTS.readAloud('Senza lingua dichiarata.'));
+  const page3 = page;
+  await page3.evaluate(() => { window.SN_TTS.stopReading(); document.documentElement.removeAttribute('lang'); window.SN_TTS.readAloud('Senza lingua dichiarata.'); });
   await page3.waitForFunction(() => false, null, { timeout: 2500 }).catch(() => {});
   console.log('PAGINA senza lang →', JSON.stringify(await calls(app)));
 });
