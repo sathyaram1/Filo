@@ -281,31 +281,30 @@ export function defaultState(id, branch) {
 
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
 
-// I tre esiti della verifica (SPEC-RIDISEGNO-MAX.md §13): fail = la cosa
-// chiesta non si ottiene; migliorabile = funziona, ma pattern/estetica/
-// completezza. I contatori EFFETTIVI (e la promozione del migliorabile al giro
-// N+1) li applica il SERVER quando registra il verdetto: questo stato locale è
-// solo lo specchio di ripiego.
-export const VERIFIER_VERDICTS = ['pass', 'migliorabile', 'fail'];
+// Gli esiti che il SERVER può dare a una critica (feedback #561): `pass` (nessun
+// rilievo da correggere: si prosegue), `fix` (il verificatore corregge, fase
+// 2), `stop` (un rilievo di livello 3/2 non correggibile: decide l'owner). Non
+// esiste più il verdetto a tre valori scelto dal verificatore: lui registra i
+// rilievi coi livelli, l'esito lo calcola il server dai bilanci. I vecchi
+// `pass|migliorabile|fail` restano accettati SOLO come parola opzionale sulla
+// riga di comando, per le ricette non ancora aggiornate (vengono ignorati).
+export const VERIFIER_OUTCOMES = ['pass', 'fix', 'stop'];
+export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
 
 /**
- * Il verifier ha prodotto un verdetto. FAIL incrementa il contatore delle
- * bocciature; MIGLIORABILE il suo contatore separato (e instrada una correzione
- * come un fail, finché il server non lo promuove).
+ * Lo specchio locale dell'esito che il server ha calcolato sulla critica.
+ * `pass` → verificato; `fix` → il verificatore sta correggendo (la consegna
+ * `fixed` arriverà da lui, stesso biglietto); `stop` → fermato. La critica si
+ * conserva com'è stata scritta (coi livelli), per il fogliettino locale.
  */
-export function applyVerifierVerdict(state, verdict, critique = '') {
+export function applyVerifierVerdict(state, outcome, critique = '') {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
-  if (verdict === 'pass') {
-    s.verifierVerdict = 'pass';
-  } else if (verdict === 'migliorabile') {
-    s.verifierVerdict = 'migliorabile';
-    s.improvableCount = (Number(s.improvableCount) || 0) + 1;
-    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
-  } else {
-    s.verifierVerdict = 'fail';
-    s.loopCount = (Number(s.loopCount) || 0) + 1;
-    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
-  }
+  if (outcome === 'pass') s.verifierVerdict = 'pass';
+  else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
+  else if (outcome === 'stop') s.verifierVerdict = 'blocked';
+  else s.verifierVerdict = String(outcome || '') || null;
+  if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
+  else if (outcome === 'pass') s.verifierCritique = '';
   return s;
 }
 
