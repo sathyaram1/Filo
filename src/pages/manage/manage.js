@@ -280,12 +280,13 @@
     }
     return arr;
   }
-  const FAIL_CAP_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_LOOP_CAP) || 'filo_automation_loop_cap';
-  const IMPROVABLE_CAP_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_IMPROVABLE_CAP) || 'filo_automation_improvable_cap';
-  const AUTOMATION = window.SN_CONST?.AUTOMATION || { LOOP_CAP_MIN: 1, LOOP_CAP_MAX: 10 };
-  // Default dei contatori dalla fonte unica (feedbackTransitions.js): la stessa
+  const CAP2_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP2) || 'filo_automation_cap2';
+  const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
+  const CAP0_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP0) || 'filo_automation_cap0';
+  const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
+  // Default dei bilanci dalla fonte unica (feedbackTransitions.js): la stessa
   // che il server incorpora al deploy. Mai due copie a mano.
-  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { improvableCap: 0, failCap: 10 };
+  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { cap2: 5, cap1: 2, cap0: 0 };
 
   // ── Canale main process ───────────────────────────────────────────────────
   function sendToMain(msg) {
