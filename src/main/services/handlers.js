@@ -2385,6 +2385,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
     const last = String(textReply || '').trim();
     textReply = last ? `${last}\n\n${stop}` : stop;
+  } else if (!String(textReply || '').trim() && notes.length) {
+    // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
+    // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
+    // una nota di lavoro. Lasciarla nel blocco chiuso voleva dire un turno
+    // senza nessuna bolla. Torna alla scheda come testo, e non più come nota.
+    textReply = notes.pop();
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
