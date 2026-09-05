@@ -449,3 +449,13 @@ test('#561 giro 3: «[4] gravissimo» a inizio riga non è un pass silenzioso', 
   assert.match(r.reason, /\[4\] gravissimo/);
   assert.equal(checkVerdict(r.state.r, SHA).ok, false);
 });
+
+test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto può citare un livello in mezzo alla frase', () => {
+  const s = withRequest({}, 'r', { request: 'x', sha: SHA });
+  const vuoto = withCritique(s, 'r', { critique: 'Provato: regge quasi tutto.\n[2]', sha: SHA });
+  assert.equal(vuoto.ok, false);
+  assert.match(vuoto.reason, /rilievo senza testo/);
+  const inMezzo = withCritique(s, 'r', { critique: 'Provato il caso [2?] del giro prima: chiuso, e testi di [10000] caratteri.', sha: SHA });
+  assert.equal(inMezzo.ok, true);
+  assert.equal(inMezzo.outcome, 'pass');
+});

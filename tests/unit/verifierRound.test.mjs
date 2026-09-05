@@ -188,3 +188,27 @@ test('#561 giro 3: un livello fuori scala o a intervallo a inizio riga non è un
   assert.deepEqual(R.parseFindings('Provato.\n[4] gravissimo').findings, [], 'non è un rilievo: è un errore da segnalare');
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[3] grave\n[0?] raro'), []);
 });
+
+test('#561 giro 4: un livello senza testo non sparisce; nel riassunto le parentesi in mezzo alla frase sono testo; oltre il tetto si dice', () => {
+  // «[2]» da solo (riga vuota o fine critica dopo): prima il lettore lo
+  // scartava in silenzio e un 2 diventava un pass.
+  assert.deepEqual(R.unparsedLevelLines('Provato: regge quasi tutto.\n[2]'), ['[2] (rilievo senza testo)']);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2]\n\n[1] bordo grigio'), ['[2] (rilievo senza testo)']);
+  // Col testo sulla riga dopo è un rilievo intero.
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2]\nil pulsante non salva'), []);
+  assert.equal(R.parseFindings('Provato.\n[2]\nil pulsante non salva').findings[0].text, 'il pulsante non salva');
+  // Il riassunto può nominare un livello in mezzo a una frase.
+  assert.deepEqual(R.unparsedLevelLines('Provato il caso [2?] del giro prima: chiuso. Anche il [4] e testi di [10000] caratteri.\n[1] bordo'), []);
+  assert.equal(R.parseFindings('Provato il caso [2?] del giro prima: chiuso.\n[1] bordo').summary, 'Provato il caso [2?] del giro prima: chiuso.');
+  // Le forme sbagliate di prima restano respinte: livello a inizio riga fuori scala, o dopo un'etichetta breve e prima di un separatore.
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[4] gravissimo'), ['[4] gravissimo']);
+  assert.deepEqual(R.unparsedLevelLines('Provato. Rilievo [2]: non salva.'), ['Provato. Rilievo [2]: non salva.']);
+  assert.deepEqual(R.unparsedLevelLines('Rilievo di livello [2] - non salva'), ['Rilievo di livello [2] - non salva']);
+  assert.deepEqual(R.unparsedLevelLines('- Livello [3]: chiavi SSH'), ['- Livello [3]: chiavi SSH']);
+  // Oltre il tetto non si taglia in silenzio.
+  const troppi = 'Provato.\n' + Array.from({ length: R.MAX_FINDINGS + 1 }, (_, i) => `[1] rilievo ${i + 1}`).join('\n');
+  const brutte = R.unparsedLevelLines(troppi);
+  assert.equal(brutte.length, 1);
+  assert.match(brutte[0], /troppi rilievi: 41/);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n' + Array.from({ length: R.MAX_FINDINGS }, (_, i) => `[1] r${i}`).join('\n')), []);
+});

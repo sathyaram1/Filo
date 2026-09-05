@@ -139,3 +139,31 @@ test('la parola del vecchio verdetto è ignorata; senza rilievi la risposta "pas
     assert.equal(stato.verifierVerdict, 'pass');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
+
+test('#561 giro 4: una critica scritta male è respinta col messaggio del formato, non con quello della guardia d\'identità; il motivo del server arriva a schermo', async () => {
+  const { casa } = casaSulRamo();
+  const { srv, ricevuti, port } = await fintoServer(() => ({ __status: 403 }));
+  // Il server finto risponde 403 con la frase del rifiuto, come fa quello vero.
+  srv.removeAllListeners('request');
+  srv.on('request', (req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      ricevuti.push({ url: req.url, body: body ? JSON.parse(body) : {} });
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.includes('routineDeliver')) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'malformed', detail: 'critica vuota: un pass senza riassunto non è una verifica' })); return; }
+      res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  try {
+    const male = await esegui(['--record-verifier', 'fid-901', 'Provato.\n[4] gravissimo'], ENV(casa, port));
+    assert.equal(male.code, 1, 'si sistema la riga e si rilancia: errore d\'uso');
+    assert.match(male.se, /\[4\] gravissimo/);
+    assert.doesNotMatch(male.se, /identit|directory non corrisponde/, 'non è un guasto d\'identità');
+    assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
+
+    const vuota = await esegui(['--record-verifier', 'fid-901', ''], ENV(casa, port));
+    assert.equal(vuota.code, 4);
+    assert.match(vuota.se, /malformed: critica vuota/, 'la frase del server arriva a chi ha consegnato');
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});

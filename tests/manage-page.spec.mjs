@@ -2177,3 +2177,25 @@ test('un lavoro senza nessuno al lavoro dice che rientra in coda, non che aspett
   // E quante volte è già successo si legge senza aprire niente.
   await expect(card).toHaveAttribute('title', /rientrato in coda 2 volte/);
 });
+
+test('il testo della fase 2 oltre il tetto non viene salvato mozzato: lo dice e non salva', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: 'PRIMA' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  const fix = page.locator('#mgFixInstructions');
+  await expect(fix).toHaveValue('PRIMA');
+  const max = await page.evaluate(() => window.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX);
+  await fix.fill('x'.repeat(max + 1));
+  await page.locator('#mgFixInstructionsSave').click();
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText(new RegExp(`Troppo lungo: ${max + 1} caratteri, il massimo è ${max}`));
+  expect(await page.evaluate(() => window.__capsSets)).toEqual([]);
+  expect(await page.evaluate(() => window.__capsValue.fixInstructions)).toBe('PRIMA');
+  // Al tetto esatto si salva.
+  await fix.fill('y'.repeat(max));
+  await page.locator('#mgFixInstructionsSave').click();
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato.');
+});
