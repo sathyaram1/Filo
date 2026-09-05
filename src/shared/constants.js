@@ -1573,11 +1573,11 @@
       `FILE DELL'EDITOR (riassunti — gli appunti sono file come gli altri):\n${files || '(nessuno)'}\n` +
       `Ogni riga è \`[id] Titolo: riassunto\`. Vedi solo i RIASSUNTI, non il testo intero. Se per rispondere ti serve DAVVERO il contenuto completo di un file, emetti l'azione LEGGI_FILE con il suo id PRIMA di rispondere: il testo integrale ti rientra nel contesto e SOLO ALLORA rispondi. Non chiedere un file se il riassunto basta.\n\n` +
       (history ? `CONVERSAZIONE:\n${history}\n\n` : '') +
-      // Richiamo finale al formato: le istruzioni ora stanno in testa (lontano
-      // dal punto in cui il modello scrive), e una riga di promemoria costa
-      // pochissimo rispetto al blocco che si risparmia. Sta nella parte
-      // variabile di proposito: deve restare l'ULTIMA cosa letta.
-      `Rispondi SOLO con il JSON descritto sopra: "text" per primo, poi "actions".`,
+      // Richiamo finale: le istruzioni stanno in testa (lontano dal punto in
+      // cui il modello scrive), e una riga di promemoria costa pochissimo
+      // rispetto al blocco che si risparmia. Sta nella parte variabile di
+      // proposito: deve restare l'ULTIMA cosa letta.
+      `Ricorda: le azioni sono gli strumenti che hai a disposizione. Prima agisci (gli esiti ti tornano subito), poi scrivi la risposta in prosa, senza JSON.`,
 
     filoChat: (payload) => PROMPTS.filoChatStatic(payload || {}) + PROMPTS.filoChatContext(payload || {}),
 
