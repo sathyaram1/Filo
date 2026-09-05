@@ -70,7 +70,7 @@ async function fakeProvider(app, giri, slot = '__fake') {
   }, { giri, slot });
 }
 
-const restore = (app, slot = '__fake') => app.evaluate((s) => {
+const restore = (app, slot = '__fake') => app.evaluate((_electron, s) => {
   try { globalThis[`${s}_restore`]?.(); } catch (_) {}
 }, slot);
 
