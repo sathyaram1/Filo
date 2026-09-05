@@ -657,9 +657,10 @@ if (isMain) {
       caps: cmd === 'fail' ? { cap2: 0, cap1: 0, cap0: 0 } : CAPS,
     });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
-    writeState(r.state);
+    if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
     if (r.outcome === 'fix') {
+      if (r.replayed) console.log('(critica già registrata su questo giro: ristampo la fase 2, il giro non si ripaga)');
       console.log(phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: readPhase2Instructions() }));
     } else if (r.outcome === 'stop') {
       console.log(`══ ESITO: il lavoro si ferma ══\nRilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
@@ -668,7 +669,15 @@ if (isMain) {
       if (e.derived && e.derived.length) {
         console.log(`Rilievi non corretti, da riportare nel report per l'owner:\n${ROUND.formatFindings(e.derived)}`);
       }
-      console.log('Si può pubblicare.');
+      // «Si può pubblicare» solo se è vero adesso: il pass vale per l'ultimo
+      // salvataggio, e con modifiche non salvate `status` (e la chiusura)
+      // dicono di no. Dirlo qui evita di scoprirlo alla chiusura (verifica
+      // del giro 10 su #561).
+      if (isDirty()) {
+        console.log(`Attenzione: ci sono modifiche non salvate. Il pass vale per ${sha.slice(0, 8)}, non per com'è l'albero adesso: finché restano, non si pubblica (lo dice anche "status"). Salvale in un commit — e allora serve un'altra verifica — oppure scartale.`);
+      } else {
+        console.log('Si può pubblicare.');
+      }
     }
     process.exit(0);
   }
