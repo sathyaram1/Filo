@@ -1305,7 +1305,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // nella lista dei timer con scadenza assoluta e riusa lo stesso flusso
         // ringing/suoneria dei timer (+ notifica di sistema dal watcher main).
         const entry = await FiloMem.addAlarm({
-          label: String(action.label ?? action.etichetta ?? '').trim(),
+          label: cleanLabel(action.label ?? action.etichetta),
           time: action.time ?? action.orario ?? action.at ?? '',
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
         });
