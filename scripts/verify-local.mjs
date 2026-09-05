@@ -193,9 +193,12 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
   const outcome = decision.stop ? 'stop' : decision.fix.length ? 'fix' : 'pass';
   const when = at || new Date().toISOString();
+  // Il testo si conserva con gli a capo veri (una barra-n scritta come a capo
+  // vale come a capo): è quello che il verificatore dopo rilegge nel brief.
+  const testo = ROUND.normalizeCritique(critique).slice(0, 4000);
   const entry = {
     ...prev,
-    critique: String(critique || '').slice(0, 4000),
+    critique: testo,
     findings: parsed.findings,
     sha: sha || '',
     at: when,
