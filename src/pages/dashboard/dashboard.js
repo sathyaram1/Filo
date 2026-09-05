@@ -1258,7 +1258,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario.
       if ((a._traccia && !anche) || a._executed === false) continue;
-      const btn = renderActionButton(a, { onAck });
+      const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
     }
