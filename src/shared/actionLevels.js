@@ -443,5 +443,14 @@
     try { return entry.describe(action) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe };
+  // La stessa cosa a fatto compiuto, per l'esito che torna al modello: dove
+  // il registro non distingue («Avviare il timer “pasta”») vale `describe`.
+  function describeDone(action) {
+    if (!action || typeof action !== 'object') return '';
+    const entry = REGISTRY[String(action.type || '').toUpperCase()];
+    if (!entry) return '';
+    try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
