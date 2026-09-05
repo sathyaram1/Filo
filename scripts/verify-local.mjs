@@ -197,31 +197,66 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
     entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
   }
   s[branch] = entry;
-  return { state: s, decision, outcome };
+  return { ok: true, state: s, decision, outcome };
 }
 
 /**
- * Chi ha corretto ha consegnato: la fase 2 è chiusa, serve un'altra verifica.
- * PURA. Rifiuta se non c'era niente in sospeso.
+ * La storia delle critiche per il verificatore dopo: il testo di ogni giro con
+ * rilievi (mai il report di chi ha corretto), e come è andato. PURA.
  */
-export function withFixed(state, branch, { report, sha, at }) {
+export function historyFromRounds(rounds) {
+  return (Array.isArray(rounds) ? rounds : [])
+    .filter((r) => r && Array.isArray(r.found) && r.found.length)
+    .map((r) => ({
+      critique: `${String(r.critique || '').trim() || `livelli ${r.found.join(', ')}`}\n(esito del giro: ${r.outcome || '?'})`,
+    }));
+}
+
+/**
+ * Chi ha corretto ha consegnato: la fase 2 è chiusa. PURA. Ritorna
+ * { ok, state, outcome }:
+ *   outcome 'fixed' → c'è un commit nuovo: serve un'altra verifica;
+ *   outcome 'pass'  → nessun commit nuovo e in sospeso solo rilievi 1/0: niente
+ *                     da riverificare, i rilievi vanno nel report per l'owner;
+ *   outcome 'stop'  → nessun commit nuovo e un 3/2 in sospeso: non correggibile,
+ *                     decide l'owner (spec §4).
+ * Rifiuta se non c'era niente in sospeso, o con modifiche non salvate: la
+ * consegna vale per un commit, e la verifica dopo deve provare quello.
+ */
+export function withFixed(state, branch, { report, sha, at, dirty = false }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
     return { ok: false, reason: 'nessuna correzione in sospeso su questo ramo: prima la critica (verify-local.mjs critica)' };
   }
+  if (dirty) {
+    return { ok: false, reason: 'ci sono modifiche non salvate: la consegna vale per un commit, e la verifica dopo deve provare quello. Salva e rilancia.' };
+  }
+  const when = at || new Date().toISOString();
   const rounds = Array.isArray(prev.rounds) ? prev.rounds.slice() : [];
-  if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
-  s[branch] = {
+  const pending = Array.isArray(prev.pending.findings) ? prev.pending.findings : [];
+  const base = {
     ...prev,
-    verdict: 'fixed',
     pending: null,
     fixedReport: String(report || '').slice(0, 4000),
     fixedSha: sha || '',
-    fixedAt: at || new Date().toISOString(),
-    rounds,
+    fixedAt: when,
   };
-  return { ok: true, state: s };
+  // Nessun commit nuovo dopo la critica: niente è stato corretto, e non c'è
+  // niente da riverificare. Conta una cosa sola, se c'è un commit nuovo o no.
+  if (sha && prev.pending.sha && sha === prev.pending.sha) {
+    if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
+    const gravi = pending.filter((f) => Number(f.level) >= 2);
+    if (gravi.length) {
+      s[branch] = { ...base, verdict: 'fail', critique: ROUND.formatFindings(gravi), rounds };
+      return { ok: true, state: s, outcome: 'stop', blocking: gravi };
+    }
+    s[branch] = { ...base, verdict: 'pass', derived: (Array.isArray(prev.derived) ? prev.derived : []).concat(pending), rounds };
+    return { ok: true, state: s, outcome: 'pass', derived: pending };
+  }
+  if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
+  s[branch] = { ...base, verdict: 'fixed', rounds };
+  return { ok: true, state: s, outcome: 'fixed' };
 }
 
 /** Registra un verdetto secco sul contenuto `sha` (scorciatoie pass/fail). PURA. */
