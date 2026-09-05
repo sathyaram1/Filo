@@ -644,11 +644,8 @@ if (isMain) {
         : 'Una verifica senza riassunto non dice cosa hai provato: scrivi cosa funziona, e i rilievi se ci sono.');
       process.exit(1);
     }
-    if (prev.verdict === 'fix-pending' && prev.pending) {
-      console.error('Critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte.');
-      console.error('Prima chi corregge consegna (node scripts/verify-local.mjs corretto "<report>"), poi si riparte con start.');
-      process.exit(1);
-    }
+    // Con una correzione in sospeso decide withCritique: la stessa identica
+    // critica ristampa la fase 2 (risposta persa), un'altra è respinta.
     // Le scorciatoie passano dagli stessi controlli della critica (correzione
     // consegnata senza un nuovo start, rilievi scritti male) e stampano lo
     // STESSO esito: un «pass» con dentro un [2] vale il testo, e prima diceva
