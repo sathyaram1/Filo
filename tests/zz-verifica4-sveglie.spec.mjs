@@ -7,13 +7,13 @@ test('sveglia cancellata e spostata: riga nel diario, voce nel riassunto, esito 
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await app.evaluate(async () => {
-    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'palestra', time: '07:00', kind: 'alarm' });
-    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'lezione', time: '08:30', kind: 'alarm' });
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'palestra', seconds: 3600 });
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'lezione', seconds: 7200 });
   });
   await setup(app, [
     {
       toolCalls: [
-        { id: 'm1', name: 'MODIFICA_SVEGLIA', arguments: JSON.stringify({ etichetta: 'lezione', orario: '09:15' }) },
+        { id: 'm1', name: 'MODIFICA_SVEGLIA', arguments: JSON.stringify({ etichetta: 'lezione', orario: '5400' }) },
         { id: 'm2', name: 'CANCELLA_SVEGLIA', arguments: JSON.stringify({ etichetta: 'palestra' }) },
       ],
     },
