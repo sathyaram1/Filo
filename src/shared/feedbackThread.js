@@ -155,11 +155,12 @@
   //                                      saprebbe più da dove viene un
   //                                      ritrovamento — ed è l'unica cosa che il
   //                                      mittente serve a dire
-  //   routine:residuo       → 'residuo'  i rilievi RESIDUI di una verifica: un
-  //                                      lavoro promosso dopo N giri «migliorabile»
-  //                                      (SPEC-RIDISEGNO-MAX.md §13) lascia i
-  //                                      rilievi non risolti in un feedback nuovo,
-  //                                      aperto dal SERVER. Categoria propria, NON
+  //   routine:residuo       → 'residuo'  i rilievi RESIDUI di una verifica: quelli
+  //                                      che il verificatore ha trovato e non ha
+  //                                      corretto (feedback #561: livello 0,
+  //                                      bilancio esaurito, o da decidere), raccolti
+  //                                      dal SERVER in un feedback derivato figlio
+  //                                      del lavoro (#N.k). Categoria propria, NON
   //                                      prober e NON verifier: spacciarlo per uno
   //                                      dei due falserebbe la lettura di dove
   //                                      nascono i ritrovamenti

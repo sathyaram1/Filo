@@ -64,39 +64,46 @@ const { readRole } = await import('../../scripts/lib/routine-role.mjs');
 
 // ─── Transizioni di stato ─────────────────────────────────────────────────────
 
-test('applyVerifierVerdict pass: imposta pass, loop invariato', () => {
+test('applyVerifierVerdict pass: imposta pass e svuota la critica', () => {
   const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'pass');
   assert.equal(s.verifierVerdict, 'pass');
-  assert.equal(s.loopCount, 0);
+  assert.equal(s.verifierCritique, '');
 });
 
-test('applyVerifierVerdict fail: incrementa il loop e salva la critica', () => {
-  let s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fail', 'rotto qui');
-  assert.equal(s.verifierVerdict, 'fail');
-  assert.equal(s.loopCount, 1);
-  assert.equal(s.verifierCritique, 'rotto qui');
-  // secondo fail
-  s = applyVerifierVerdict(s, 'fail', 'ancora rotto');
-  assert.equal(s.loopCount, 2);
-  assert.equal(s.verifierCritique, 'ancora rotto');
+test('applyVerifierVerdict fix: lo specchio locale dice "il verificatore sta correggendo", con la critica coi livelli', () => {
+  const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] rotto qui');
+  assert.equal(s.verifierVerdict, 'fix-pending');
+  assert.equal(s.verifierCritique, '[2] rotto qui');
+  assert.equal(applyVerifierVerdict(s, 'stop', '[2] ancora').verifierVerdict, 'blocked');
 });
 
-test('applyFixed: ri-mette in coda verifier ma conserva il loop', () => {
-  const failed = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fail', 'x');
-  const fixed = applyFixed(failed);
+test('applyFixed: ri-mette in coda verifier e azzera la critica (i bilanci li tiene il server)', () => {
+  const fixed = applyFixed(applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] x'));
   assert.equal(fixed.verifierVerdict, null);
   assert.equal(fixed.verifierCritique, '');
-  assert.equal(fixed.loopCount, 1, 'il contatore loop NON si azzera col fix');
 });
 
-test('ciclo completo: fail→fix→fail→fix→fail = il contatore arriva a 3', () => {
-  let s = defaultState('A', 'worker/A');
-  s = applyVerifierVerdict(s, 'fail', '1');
-  s = applyFixed(s);
-  s = applyVerifierVerdict(s, 'fail', '2');
-  s = applyFixed(s);
-  s = applyVerifierVerdict(s, 'fail', '3');
-  assert.equal(s.loopCount, 3, 'è il numero che il server confronta col tetto');
+test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti (fonte unica)', async () => {
+  const { VERIFIER_ROUND, VERIFIER_OUTCOMES } = await import('../../scripts/dispatch.mjs');
+  const p = VERIFIER_ROUND.parseFindings('funziona\n[2] rotto\n[1?] gusto');
+  assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, true]]);
+  assert.deepEqual(VERIFIER_OUTCOMES, ['pass', 'fix', 'stop']);
+});
+
+test('verifierReplyText: la fase 2 del server si stampa intera; pass e stop dicono cosa fare', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  const fix = verifierReplyText({
+    outcome: 'fix',
+    phase2: { findings: [{ level: 2, text: 'rotto' }], derived: [{ level: 0, text: 'raro' }], budgets: { cap2: { cap: 5, used: 1, left: 4 } }, instructions: 'FASE 2 — correggi' },
+  });
+  assert.match(fix, /c'è da correggere/);
+  assert.match(fix, /\[2\] rotto/);
+  assert.match(fix, /\[0\] raro/);
+  assert.match(fix, /cap2: 4 giri residui su 5/);
+  assert.match(fix, /FASE 2 — correggi/);
+  assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
+  assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3\] grave/);
+  assert.match(verifierReplyText(undefined), /verifica superata/);
 });
 
 test('applySecaudit: marca secauditDone e il verdetto', () => {
@@ -108,27 +115,9 @@ test('applySecaudit: marca secauditDone e il verdetto', () => {
 
 // ─── Il terzo esito: migliorabile (SPEC-RIDISEGNO-MAX.md §13) ────────────────
 
-test('VERIFIER_VERDICTS: i tre esiti accettati da --record-verifier', async () => {
-  const { VERIFIER_VERDICTS } = await import('../../scripts/dispatch.mjs');
-  assert.deepEqual(VERIFIER_VERDICTS, ['pass', 'migliorabile', 'fail']);
-});
-
-test('applyVerifierVerdict migliorabile: contatore SEPARATO dal loop, critica salvata', () => {
-  let s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'migliorabile', 'manca la parità col menu');
-  assert.equal(s.verifierVerdict, 'migliorabile');
-  assert.equal(s.improvableCount, 1);
-  assert.equal(s.loopCount, 0, 'un migliorabile NON è una bocciatura: il loop non si muove');
-  assert.equal(s.verifierCritique, 'manca la parità col menu');
-  // fail successivo: ciascun contatore conta il suo
-  s = applyVerifierVerdict(s, 'fail', 'rotto');
-  assert.equal(s.loopCount, 1);
-  assert.equal(s.improvableCount, 1);
-});
-
-test('applyFixed conserva anche il contatore dei migliorabile', () => {
-  const s = applyFixed(applyVerifierVerdict(defaultState('A', 'worker/A'), 'migliorabile', 'x'));
-  assert.equal(s.improvableCount, 1, 'il server confronta questo numero con N: il fix non lo azzera');
-  assert.equal(s.verifierVerdict, null);
+test('la parola del vecchio verdetto è tollerata sulla riga di comando, ma non decide niente', async () => {
+  const { LEGACY_VERDICT_WORDS } = await import('../../scripts/dispatch.mjs');
+  assert.deepEqual(LEGACY_VERDICT_WORDS, ['pass', 'migliorabile', 'fail']);
 });
 
 // ─── buildPayload: ISOLAMENTO ─────────────────────────────────────────────────
@@ -205,12 +194,11 @@ test('serialAwarenessNote: scatta dalla SECONDA bocciatura, per chi corregge e c
 // ─── Stato su disco ───────────────────────────────────────────────────────────
 
 test('writeState/readState/clearState: round-trip su STATE_DIR temporanea', () => {
-  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fail', 'boom');
+  const s = applyVerifierVerdict(defaultState('DISK1', 'worker/DISK1'), 'fix', '[2] boom');
   writeState(s);
   const back = readState('DISK1');
-  assert.equal(back.verifierVerdict, 'fail');
-  assert.equal(back.loopCount, 1);
-  assert.equal(back.verifierCritique, 'boom');
+  assert.equal(back.verifierVerdict, 'fix-pending');
+  assert.equal(back.verifierCritique, '[2] boom');
   clearState('DISK1');
   assert.equal(readState('DISK1'), null);
 });

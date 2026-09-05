@@ -58,12 +58,12 @@ test('riallineamento: dopo un conflitto di fusione la routine può riportare il 
     'il rientro è un passo dell\'iter: appartiene alle routine, non alla dashboard');
 });
 
-test('VERIFIER_CAPS: i default di N (improvableCap) e M (failCap) — SPEC §13', () => {
-  // N = 0 (dal 2026-09-03): un «migliorabile» passa subito e i rilievi diventano
-  // un feedback residuo a priorità minima; prima era 3.
-  // M = 10: scelta di misura dell'owner per la prima settimana sul piano Max
-  // (osservazione del processo), poi si abbassa dalla DASHBOARD, non da qui.
-  assert.deepEqual(DATA.VERIFIER_CAPS, { improvableCap: 0, failCap: 10 });
+test('VERIFIER_CAPS: i tre bilanci del verificatore che corregge (feedback #561, §4)', () => {
+  // x = 5 giri per i rilievi di livello 3 e 2, y = 2 per gli 1, z = 0 per gli 0
+  // (gli 0 da soli non si correggono mai). Decisi con l'owner il 2026-09-04;
+  // si cambiano dalla DASHBOARD, non da qui. I vecchi failCap/improvableCap e
+  // il verdetto a tre valori sono aboliti.
+  assert.deepEqual(DATA.VERIFIER_CAPS, { cap2: 5, cap1: 2, cap0: 0 });
 });
 
 test('PUBLIC_MAP: i confermati restano "open" (#476 — mai premiare un attacco)', () => {

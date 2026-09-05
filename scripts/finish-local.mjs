@@ -339,7 +339,8 @@ async function main() {
       console.error('    node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"');
       console.error('  poi consegna il testo stampato a un\'ISTANZA NUOVA (non a te stesso:');
       console.error('  chi ha scritto il codice non può verificarlo), e lascia che registri');
-      console.error('  l\'esito.');
+      console.error('  la critica. Se corregge qualcosa, dopo la sua consegna serve un\'altra');
+      console.error('  verifica (rilancia `start`, senza argomenti).');
       process.exit(1);
     }
     console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);

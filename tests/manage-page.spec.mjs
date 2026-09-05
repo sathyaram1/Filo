@@ -441,11 +441,10 @@ test('l\'interruttore master spegne le routine e rende inerti le impostazioni ch
   // 2. Le impostazioni che senza routine non decidono niente diventano
   //    inerti — e si vede, invece di restare lì a promettere un effetto.
   await expect(page.locator('#mgProberIdle')).toBeDisabled();
-  await expect(page.locator('#mgFailCap')).toBeDisabled();
-  await expect(page.locator('#mgImprovableCap')).toBeDisabled();
-  await expect(page.locator('#mgProberIdleBlock')).toHaveClass(/mg-auto-block--off/);
-  await expect(page.locator('#mgFailCapBlock')).toHaveClass(/mg-auto-block--off/);
-  await expect(page.locator('#mgImprovableCapBlock')).toHaveClass(/mg-auto-block--off/);
+  for (const id of ['#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions']) await expect(page.locator(id)).toBeDisabled();
+  for (const id of ['#mgProberIdleBlock', '#mgCap2Block', '#mgCap1Block', '#mgCap0Block', '#mgFixInstructionsBlock']) {
+    await expect(page.locator(id)).toHaveClass(/mg-auto-block--off/);
+  }
   // Il timeout dei giudici NON dipende dalle routine: resta usabile.
   await expect(page.locator('#mgJudgeTimeout')).toBeEnabled();
 
@@ -456,8 +455,8 @@ test('l\'interruttore master spegne le routine e rende inerti le impostazioni ch
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await expect(page.locator('#mgProberIdle')).toBeEnabled();
-  await expect(page.locator('#mgFailCap')).toBeEnabled();
-  await expect(page.locator('#mgImprovableCap')).toBeEnabled();
+  await expect(page.locator('#mgCap2')).toBeEnabled();
+  await expect(page.locator('#mgFixInstructions')).toBeEnabled();
 });
 
 test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano spente', async ({ openTab }) => {
@@ -492,7 +491,7 @@ test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano sp
 // config/routines senza rete/main. Cattura ogni `set` per provare che il valore
 // LASCIA il client (è la config che il server dei verdetti legge → "il
 // cambiamento ha effetto").
-async function stubCaps(page, initial = { failCap: 10, improvableCap: 3 }) {
+async function stubCaps(page, initial = { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' }) {
   await page.evaluate((init) => {
     window.__capsValue = { ...init };
     window.__capsSets = [];
@@ -502,12 +501,16 @@ async function stubCaps(page, initial = { failCap: 10, improvableCap: 3 }) {
         return { ok: true, ...window.__capsValue };
       }
       if (msg && msg.type === 'automation_caps_set') {
-        const clamp = (n) => Math.min(10, Math.max(1, Math.round(Number(n))));
-        for (const field of ['failCap', 'improvableCap']) {
+        const clamp = (n) => Math.min(10, Math.max(0, Math.round(Number(n))));
+        for (const field of ['cap2', 'cap1', 'cap0']) {
           if (msg[field] != null) {
             window.__capsValue[field] = clamp(msg[field]);
             window.__capsSets.push({ [field]: window.__capsValue[field] });
           }
+        }
+        if (typeof msg.fixInstructions === 'string') {
+          window.__capsValue.fixInstructions = msg.fixInstructions;
+          window.__capsSets.push({ fixInstructions: msg.fixInstructions });
         }
         return { ok: true, ...window.__capsValue };
       }
@@ -593,59 +596,65 @@ test('il timeout dei giudici viene clampato nel range consentito', async ({ open
   expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(10000);
 });
 
-test('i due contatori del verificatore sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
+test('i tre bilanci del verificatore e il testo della fase 2 sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
   await page.locator('.mg-tab[data-tab="automation"]').click();
-  const fail = page.locator('#mgFailCap');
-  const impr = page.locator('#mgImprovableCap');
-  await expect(fail).toBeVisible();
-  await expect(impr).toBeVisible();
+  const cap2 = page.locator('#mgCap2');
+  const cap1 = page.locator('#mgCap1');
+  const cap0 = page.locator('#mgCap0');
+  const fix = page.locator('#mgFixInstructions');
+  for (const el of [cap2, cap1, cap0, fix]) await expect(el).toBeVisible();
 
   // Da non-admin i campi sono in sola lettura (stesso contratto dello switch).
-  await expect(fail).toBeDisabled();
-  await expect(page.locator('#mgFailCapSave')).toBeDisabled();
-  await expect(impr).toBeDisabled();
-  await expect(page.locator('#mgImprovableCapSave')).toBeDisabled();
+  for (const el of [cap2, cap1, cap0, fix]) await expect(el).toBeDisabled();
+  await expect(page.locator('#mgCap2Save')).toBeDisabled();
+  await expect(page.locator('#mgFixInstructionsSave')).toBeDisabled();
 
   // Simula l'owner: stub della config + abilita i controlli.
-  await stubCaps(page, { failCap: 7, improvableCap: 2 });
+  await stubCaps(page, { cap2: 7, cap1: 1, cap0: 0, fixInstructions: 'TESTO OWNER' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps()); // rilegge dalla config stubbata
-  await expect(fail).toBeEnabled();
-  await expect(impr).toBeEnabled();
+  for (const el of [cap2, cap1, cap0, fix]) await expect(el).toBeEnabled();
   // I campi riflettono il valore della config, non un default locale.
-  await expect(fail).toHaveValue('7');
-  await expect(impr).toHaveValue('2');
+  await expect(cap2).toHaveValue('7');
+  await expect(cap1).toHaveValue('1');
+  await expect(cap0).toHaveValue('0');
+  await expect(fix).toHaveValue('TESTO OWNER');
 
   // Cambia i valori e salva (ogni campo col suo bottone).
-  await fail.fill('5');
-  await page.locator('#mgFailCapSave').click();
-  await expect(page.locator('#mgFailCapMsg')).toHaveText('Salvato.');
-  await impr.fill('4');
-  await page.locator('#mgImprovableCapSave').click();
-  await expect(page.locator('#mgImprovableCapMsg')).toHaveText('Salvato.');
+  await cap2.fill('5');
+  await page.locator('#mgCap2Save').click();
+  await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato.');
+  await cap1.fill('3');
+  await page.locator('#mgCap1Save').click();
+  await expect(page.locator('#mgCap1Msg')).toHaveText('Salvato.');
+  await cap0.fill('1');
+  await page.locator('#mgCap0Save').click();
+  await expect(page.locator('#mgCap0Msg')).toHaveText('Salvato.');
+  await fix.fill('');
+  await page.locator('#mgFixInstructionsSave').click();
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato: vale il testo del server.');
 
-  // I valori sono stati SCRITTI nella config (l'IPC che il server dei verdetti
-  // legge): è qui che "hanno effetto", non solo in una cache locale. Ogni
-  // salvataggio tocca SOLO il suo campo.
+  // I valori sono stati SCRITTI nella config (l'IPC che il server della
+  // critica legge): è qui che "hanno effetto", non solo in una cache locale.
+  // Ogni salvataggio tocca SOLO il suo campo.
   await expect.poll(() => page.evaluate(() => window.__capsSets))
-    .toEqual([{ failCap: 5 }, { improvableCap: 4 }]);
-  expect(await page.evaluate(() => window.__capsValue)).toEqual({ failCap: 5, improvableCap: 4 });
+    .toEqual([{ cap2: 5 }, { cap1: 3 }, { cap0: 1 }, { fixInstructions: '' }]);
+  expect(await page.evaluate(() => window.__capsValue)).toEqual({ cap2: 5, cap1: 3, cap0: 1, fixInstructions: '' });
 
   // Sono anche specchiati nella cache locale (display istantaneo all'avvio).
   const cached = await page.evaluate(async () => {
-    const kFail = window.SN_CONST.STORAGE_KEYS.AUTOMATION_LOOP_CAP;
-    const kImpr = window.SN_CONST.STORAGE_KEYS.AUTOMATION_IMPROVABLE_CAP;
-    const d = await window.chrome.storage.local.get([kFail, kImpr]);
-    return [d[kFail], d[kImpr]];
+    const K = window.SN_CONST.STORAGE_KEYS;
+    const d = await window.chrome.storage.local.get([K.AUTOMATION_CAP2, K.AUTOMATION_CAP1, K.AUTOMATION_CAP0]);
+    return [d[K.AUTOMATION_CAP2], d[K.AUTOMATION_CAP1], d[K.AUTOMATION_CAP0]];
   });
-  expect(cached).toEqual([5, 4]);
+  expect(cached).toEqual([5, 3, 1]);
 });
 
-test('i contatori del verificatore vengono clampati nel range [1, 10] al salvataggio', async ({ openTab }) => {
+test('i bilanci del verificatore vengono clampati nel range [0, 10] al salvataggio', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -654,19 +663,20 @@ test('i contatori del verificatore vengono clampati nel range [1, 10] al salvata
   await stubCaps(page);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
 
-  const fail = page.locator('#mgFailCap');
+  const cap2 = page.locator('#mgCap2');
 
   // Sopra il massimo → riportato a 10 (e 10 è ciò che viene scritto).
-  await fail.fill('99');
-  await page.locator('#mgFailCapSave').click();
-  await expect(fail).toHaveValue('10');
-  expect(await page.evaluate(() => window.__capsValue.failCap)).toBe(10);
+  await cap2.fill('99');
+  await page.locator('#mgCap2Save').click();
+  await expect(cap2).toHaveValue('10');
+  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(10);
 
-  // Sotto il minimo → riportato a 1.
-  await fail.fill('0');
-  await page.locator('#mgFailCapSave').click();
-  await expect(fail).toHaveValue('1');
-  expect(await page.evaluate(() => window.__capsValue.failCap)).toBe(1);
+  // Sotto il minimo → riportato a 0 (lo 0 è valido: il primo difetto grave
+  // ferma subito la pratica).
+  await cap2.fill('-3');
+  await page.locator('#mgCap2Save').click();
+  await expect(cap2).toHaveValue('0');
+  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(0);
 });
 
 test('con dati finti: un elemento su UNA riga (#N + titolo, niente label motivo) — DA2', async ({ openTab }) => {
@@ -2166,4 +2176,51 @@ test('un lavoro senza nessuno al lavoro dice che rientra in coda, non che aspett
   await expect(state).not.toContainText('in attesa di ripresa');
   // E quante volte è già successo si legge senza aprire niente.
   await expect(card).toHaveAttribute('title', /rientrato in coda 2 volte/);
+});
+
+test('il testo della fase 2 oltre il tetto non viene salvato mozzato: lo dice e non salva', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: 'PRIMA' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  const fix = page.locator('#mgFixInstructions');
+  await expect(fix).toHaveValue('PRIMA');
+  const max = await page.evaluate(() => window.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX);
+  await fix.fill('x'.repeat(max + 1));
+  await page.locator('#mgFixInstructionsSave').click();
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText(new RegExp(`Troppo lungo: ${max + 1} caratteri, il massimo è ${max}`));
+  expect(await page.evaluate(() => window.__capsSets)).toEqual([]);
+  expect(await page.evaluate(() => window.__capsValue.fixInstructions)).toBe('PRIMA');
+  // Al tetto esatto si salva.
+  await fix.fill('y'.repeat(max));
+  await page.locator('#mgFixInstructionsSave').click();
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato.');
+});
+
+test('un bilancio salvato col campo vuoto torna al default (non a 0) e lo dice; Invio salva come il pulsante', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await stubCaps(page, { cap2: 3, cap1: 2, cap0: 0, fixInstructions: '' });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  const cap2 = page.locator('#mgCap2');
+  await expect(cap2).toHaveValue('3');
+
+  // Campo vuoto → il default della fonte unica (5), non 0.
+  await cap2.fill('');
+  await page.locator('#mgCap2Save').click();
+  await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato: vale il default (5).');
+  await expect(cap2).toHaveValue('5');
+  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(5);
+
+  // Invio nel campo salva quanto il pulsante.
+  await cap2.fill('4');
+  await cap2.press('Enter');
+  await expect(page.locator('#mgCap2Msg')).toHaveText('Salvato.');
+  expect(await page.evaluate(() => window.__capsValue.cap2)).toBe(4);
 });

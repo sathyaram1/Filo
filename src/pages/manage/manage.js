@@ -43,15 +43,21 @@
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
-  // I due contatori del verificatore (SPEC-RIDISEGNO-MAX.md §13):
-  // failCap (M) = bocciature prima di fermarsi; improvableCap (N) = giri
-  // «migliorabile» prima di promuovere e aprire il rilievo residuo.
-  const mgFailCap     = document.getElementById('mgFailCap');
-  const mgFailCapSave = document.getElementById('mgFailCapSave');
-  const mgFailCapMsg  = document.getElementById('mgFailCapMsg');
-  const mgImprovableCap     = document.getElementById('mgImprovableCap');
-  const mgImprovableCapSave = document.getElementById('mgImprovableCapSave');
-  const mgImprovableCapMsg  = document.getElementById('mgImprovableCapMsg');
+  // I tre bilanci del verificatore che corregge (feedback #561): cap2 = giri
+  // per i rilievi di livello 3/2, cap1 = per gli 1, cap0 = per i soli 0; più il
+  // testo della fase 2 (fixInstructions).
+  const mgCap2     = document.getElementById('mgCap2');
+  const mgCap2Save = document.getElementById('mgCap2Save');
+  const mgCap2Msg  = document.getElementById('mgCap2Msg');
+  const mgCap1     = document.getElementById('mgCap1');
+  const mgCap1Save = document.getElementById('mgCap1Save');
+  const mgCap1Msg  = document.getElementById('mgCap1Msg');
+  const mgCap0     = document.getElementById('mgCap0');
+  const mgCap0Save = document.getElementById('mgCap0Save');
+  const mgCap0Msg  = document.getElementById('mgCap0Msg');
+  const mgFixInstructions     = document.getElementById('mgFixInstructions');
+  const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
+  const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
@@ -195,9 +201,11 @@
     prober:   { icon: '🔍', label: 'Claude (esplorazione)' },
     worker:   { icon: '🔧', label: 'Claude (sviluppo)' },
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
-    // Rilievi rimasti aperti quando un lavoro «migliorabile» viene promosso
-    // (SPEC-RIDISEGNO-MAX.md §13): categoria propria, così leggendo la coda si
-    // vede che nasce dal declassamento di una verifica, non da un'esplorazione.
+    // I rilievi che la verifica ha trovato e non ha corretto (feedback #561:
+    // livello 0, bilancio esaurito, o che chiedono una decisione), raccolti dal
+    // server in UN feedback derivato per lavoro, figlio #N.k: categoria
+    // propria, così leggendo la coda si vede che nasce da una verifica, non da
+    // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi residui)' },
     // Sessione locale: Claude in chat con l'owner, sulla sua macchina. Icona
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
@@ -274,12 +282,13 @@
     }
     return arr;
   }
-  const FAIL_CAP_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_LOOP_CAP) || 'filo_automation_loop_cap';
-  const IMPROVABLE_CAP_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_IMPROVABLE_CAP) || 'filo_automation_improvable_cap';
-  const AUTOMATION = window.SN_CONST?.AUTOMATION || { LOOP_CAP_MIN: 1, LOOP_CAP_MAX: 10 };
-  // Default dei contatori dalla fonte unica (feedbackTransitions.js): la stessa
+  const CAP2_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP2) || 'filo_automation_cap2';
+  const CAP1_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP1) || 'filo_automation_cap1';
+  const CAP0_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTOMATION_CAP0) || 'filo_automation_cap0';
+  const AUTOMATION = window.SN_CONST?.AUTOMATION || { CAP_MIN: 0, CAP_MAX: 10 };
+  // Default dei bilanci dalla fonte unica (feedbackTransitions.js): la stessa
   // che il server incorpora al deploy. Mai due copie a mano.
-  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { improvableCap: 0, failCap: 10 };
+  const VERIFIER_CAPS = window.SN_FB_TRANSITIONS?.VERIFIER_CAPS || { cap2: 5, cap1: 2, cap0: 0 };
 
   // ── Canale main process ───────────────────────────────────────────────────
   function sendToMain(msg) {
@@ -318,10 +327,10 @@
     if (mgRoutinesToggle) mgRoutinesToggle.checked = routinesOn;
     if (mgRoutinesState)  mgRoutinesState.textContent = routinesOn ? 'On' : 'Off';
     if (mgProberIdleBlock) mgProberIdleBlock.classList.toggle('mg-auto-block--off', !routinesOn);
-    const mgFailCapBlock = document.getElementById('mgFailCapBlock');
-    const mgImprovableCapBlock = document.getElementById('mgImprovableCapBlock');
-    if (mgFailCapBlock)       mgFailCapBlock.classList.toggle('mg-auto-block--off', !routinesOn);
-    if (mgImprovableCapBlock) mgImprovableCapBlock.classList.toggle('mg-auto-block--off', !routinesOn);
+    for (const id of ['mgCap2Block', 'mgCap1Block', 'mgCap0Block', 'mgFixInstructionsBlock']) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('mg-auto-block--off', !routinesOn);
+    }
     applyAutoModeGate();
   }
 
@@ -496,47 +505,44 @@
     // Le due impostazioni che valgono solo per le routine: senza routine non
     // decidono niente, quindi non si toccano (come i mittenti con l'automatica
     // spenta). Restano visibili: sono una scelta dell'owner, non un segreto.
-    if (mgFailCap)     mgFailCap.disabled = !isAdmin || !routinesOn;
-    if (mgFailCapSave) mgFailCapSave.disabled = !isAdmin || !routinesOn;
-    if (mgImprovableCap)     mgImprovableCap.disabled = !isAdmin || !routinesOn;
-    if (mgImprovableCapSave) mgImprovableCapSave.disabled = !isAdmin || !routinesOn;
+    for (const el of [mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save, mgFixInstructions, mgFixInstructionsSave]) {
+      if (el) el.disabled = !isAdmin || !routinesOn;
+    }
     if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
     if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
     if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
     applyAutoApproveGate();
   }
 
-  // ── Contatori del verificatore a tre esiti (tab Automazioni) ──────────────
-  // Due campi sul doc Firestore config/routines (SPEC-RIDISEGNO-MAX.md §13):
-  //   failCap (M)       bocciature «fail» prima di fermarsi e chiamare l'owner;
-  //   improvableCap (N) giri «migliorabile» prima di promuovere il lavoro e
-  //                     aprire il feedback dei rilievi residui.
-  // Li applica il SERVER quando registra i verdetti; chrome.storage.local è
+  // ── I tre bilanci del verificatore che corregge (tab Automazioni) ────────
+  // Quattro campi sul doc Firestore config/routines (feedback #561, §4):
+  //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
+  //         finito un 3/2 ferma la pratica e chiama l'owner);
+  //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
+  //         feedback derivato);
+  //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);
+  //   fixInstructions  il testo della fase 2 che il server manda al
+  //         verificatore dopo la critica (vuoto = il testo del server).
+  // Li applica il SERVER quando registra la critica; chrome.storage.local è
   // solo una CACHE per mostrare subito un valore (e un ripiego offline).
-  function clampCap(n, def, min = AUTOMATION.LOOP_CAP_MIN) {
+  function clampCap(n, def, min = AUTOMATION.CAP_MIN) {
     n = Math.round(Number(n));
     if (!Number.isFinite(n)) return def;
-    return Math.min(AUTOMATION.LOOP_CAP_MAX, Math.max(min, n));
+    return Math.min(AUTOMATION.CAP_MAX, Math.max(min, n));
   }
 
   const CAPS_GET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_GET) || 'automation_caps_get';
   const CAPS_SET = (window.SN_MSG?.MSG?.AUTOMATION_CAPS_SET) || 'automation_caps_set';
 
-  // I due campi condividono il meccanismo: descrizione una volta sola.
+  // I tre bilanci condividono il meccanismo: descrizione una volta sola.
   const CAP_FIELDS = {
-    failCap: {
-      input: mgFailCap, save: mgFailCapSave, msg: mgFailCapMsg,
-      def: VERIFIER_CAPS.failCap, cacheKey: FAIL_CAP_KEY, min: AUTOMATION.LOOP_CAP_MIN,
-    },
-    improvableCap: {
-      input: mgImprovableCap, save: mgImprovableCapSave, msg: mgImprovableCapMsg,
-      def: VERIFIER_CAPS.improvableCap, cacheKey: IMPROVABLE_CAP_KEY,
-      min: Number.isFinite(AUTOMATION.IMPROVABLE_CAP_MIN) ? AUTOMATION.IMPROVABLE_CAP_MIN : 0,
-    },
+    cap2: { input: mgCap2, save: mgCap2Save, msg: mgCap2Msg, def: VERIFIER_CAPS.cap2, cacheKey: CAP2_KEY, min: AUTOMATION.CAP_MIN },
+    cap1: { input: mgCap1, save: mgCap1Save, msg: mgCap1Msg, def: VERIFIER_CAPS.cap1, cacheKey: CAP1_KEY, min: AUTOMATION.CAP_MIN },
+    cap0: { input: mgCap0, save: mgCap0Save, msg: mgCap0Msg, def: VERIFIER_CAPS.cap0, cacheKey: CAP0_KEY, min: AUTOMATION.CAP_MIN },
   };
 
   function setCapMsg(field, text, kind) {
-    const el = CAP_FIELDS[field].msg;
+    const el = field === 'fixInstructions' ? mgFixInstructionsMsg : CAP_FIELDS[field]?.msg;
     if (!el) return;
     el.textContent = text || '';
     el.classList.toggle('mg-ok', kind === 'ok');
@@ -549,8 +555,8 @@
     try {
       const r = await sendToMain({ type: CAPS_GET });
       if (r && r.ok) {
-        if (r.failCap != null) remote.failCap = r.failCap;
-        if (r.improvableCap != null) remote.improvableCap = r.improvableCap;
+        for (const k of Object.keys(CAP_FIELDS)) if (r[k] != null) remote[k] = r[k];
+        if (typeof r.fixInstructions === 'string') remote.fixInstructions = r.fixInstructions;
       }
     } catch (_) {}
     for (const [field, f] of Object.entries(CAP_FIELDS)) {
@@ -568,15 +574,20 @@
       }
       f.input.value = String(val);
     }
+    if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
   }
 
   async function saveCap(field) {
     const f = CAP_FIELDS[field];
     if (!f.input) return;
-    const val = clampCap(f.input.value, f.def, f.min);
+    // Un campo vuoto non è uno zero: per i difetti gravi lo 0 ferma il lavoro
+    // al primo rilievo, il contrario di «torno al default» che chi svuota il
+    // campo intende. Vuoto = il default, e la scritta lo dice.
+    const vuoto = String(f.input.value == null ? '' : f.input.value).trim() === '';
+    const val = vuoto ? f.def : clampCap(f.input.value, f.def, f.min);
     f.input.value = String(val); // normalizza eventuali fuori-range
     try {
-      // Scrive su Firestore (la config che il server dei verdetti legge); il
+      // Scrive su Firestore (la config che il server della critica legge); il
       // main applica il gate admin e ri-clampa. Usa il valore confermato.
       const r = await sendToMain({ type: CAPS_SET, [field]: val });
       if (!r || !r.ok) {
@@ -587,18 +598,54 @@
       const saved = clampCap(r[field] != null ? r[field] : val, f.def, f.min);
       f.input.value = String(saved);
       chrome.storage.local.set({ [f.cacheKey]: saved }).catch(() => {});
-      setCapMsg(field, 'Salvato.', 'ok');
+      setCapMsg(field, vuoto ? `Salvato: vale il default (${saved}).` : 'Salvato.', 'ok');
     } catch (err) {
       setCapMsg(field, 'Salvataggio fallito.', 'err');
       console.error(`[manage] salvataggio ${field} fallito:`, err);
     }
   }
 
+  async function saveFixInstructions() {
+    if (!mgFixInstructions) return;
+    const text = String(mgFixInstructions.value || '');
+    // Oltre il tetto il server taglia: meglio dirlo che salvare un testo
+    // mozzato con un «Salvato.» sopra.
+    const max = Number(AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
+    if (text.length > max) {
+      setCapMsg('fixInstructions', `Troppo lungo: ${text.length} caratteri, il massimo è ${max}. Non salvato.`, 'err');
+      return;
+    }
+    try {
+      const r = await sendToMain({ type: CAPS_SET, fixInstructions: text });
+      if (!r || !r.ok) {
+        setCapMsg('fixInstructions', 'Salvataggio fallito.', 'err');
+        if (r?.error) console.error('[manage] salvataggio fixInstructions:', r.error);
+        return;
+      }
+      if (typeof r.fixInstructions === 'string') mgFixInstructions.value = r.fixInstructions;
+      setCapMsg('fixInstructions', text.trim() ? 'Salvato.' : 'Salvato: vale il testo del server.', 'ok');
+    } catch (err) {
+      setCapMsg('fixInstructions', 'Salvataggio fallito.', 'err');
+      console.error('[manage] salvataggio fixInstructions fallito:', err);
+    }
+  }
+
   for (const [field, f] of Object.entries(CAP_FIELDS)) {
     if (f.save) f.save.addEventListener('click', () => saveCap(field));
-    // Digitando si azzera il messaggio di esito precedente.
-    if (f.input) f.input.addEventListener('input', () => setCapMsg(field, '', null));
+    // Digitando si azzera il messaggio di esito precedente; Invio salva, come
+    // il pulsante (due strade, una cosa sola).
+    if (f.input) {
+      f.input.addEventListener('input', () => setCapMsg(field, '', null));
+      f.input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || f.input.disabled) return;
+        e.preventDefault();
+        saveCap(field);
+      });
+    }
   }
+  if (mgFixInstructionsSave) mgFixInstructionsSave.addEventListener('click', saveFixInstructions);
+  if (mgFixInstructions) mgFixInstructions.addEventListener('input', () => setCapMsg('fixInstructions', '', null));
+
 
   // ── Timeout dei giudici ────────────────────────────────────────────────────
   // Fonte di verità: config/supportModels (campo `judgeTimeoutMs`, in MS), che il
@@ -616,8 +663,8 @@
   }
   for (const f of Object.values(CAP_FIELDS)) {
     if (!f.input) continue;
-    f.input.min = String(Number.isFinite(f.min) ? f.min : AUTOMATION.LOOP_CAP_MIN);
-    f.input.max = String(AUTOMATION.LOOP_CAP_MAX);
+    f.input.min = String(Number.isFinite(f.min) ? f.min : AUTOMATION.CAP_MIN);
+    f.input.max = String(AUTOMATION.CAP_MAX);
   }
   function clampJudgeTimeoutS(n) {
     const v = Math.round(Number(n));

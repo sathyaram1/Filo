@@ -169,6 +169,21 @@ Come si verifica, dato che un Mac non ce l'abbiamo:
   Mac. Quello lo dice solo un Mac vero: dichiaralo nel report invece di darlo
   per fatto.
 
+## Limiti: abbondanti, e mai un taglio silenzioso
+
+Un tetto troppo stretto è già costato due volte (i feedback inviati dallo
+script rifiutati sopra poche migliaia di caratteri; le critiche del
+verificatore tagliate a 4000, coi rilievi in coda che sparivano). Prima di
+scrivere un tetto rispondi a due domande: **qual è il problema di un tetto
+ampio?** e **quanto spesso ci si avvicinerebbe?** Se serve una volta su cento e
+il costo è solo qualche credito, il tetto ampio vince: gestire l'eccezione
+costa di più. Dimensiona sul caso peggiore realistico, con margine.
+
+Un **troncamento silenzioso e irreversibile è quasi sempre l'idea sbagliata**:
+chi manda deve saperlo (rifiuto con la spiegazione e il numero, o un avviso),
+così accorcia lui e sceglie cosa tenere. Uno `slice()` muto sul testo di
+qualcuno mangia proprio la parte che contava, e lo si scopre settimane dopo.
+
 ## Sintomo vs causa
 
 Una lamentela descrive il sintomo come lo vede l'utente. La prima domanda non è

@@ -780,9 +780,9 @@ test('anche i DATI che governano il giro vengono dalla copia', async () => {
   const casa = progettoFinto();
   const dove = resolve(tmpdir(), `filo-strumenti-dati-${process.pid}`);
 
-  const tabella = (fail) => `(function (global) {
+  const tabella = (cap2) => `(function (global) {
   'use strict';
-  global.SN_FB_TRANSITIONS = { VERIFIER_CAPS: { improvableCap: 3, failCap: ${fail} } };
+  global.SN_FB_TRANSITIONS = { VERIFIER_CAPS: { cap2: ${cap2}, cap1: 2, cap0: 0 } };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 `;
 
@@ -800,7 +800,7 @@ test('anche i DATI che governano il giro vengono dalla copia', async () => {
       const p = spawn(process.execPath, [
         '--input-type=module', '-e',
         `import { VERIFIER_CAPS } from ${JSON.stringify(`file:///${resolve(dove, 'scripts', 'dispatch.mjs').split('\\').join('/')}`)};
-         console.log('failCap=' + VERIFIER_CAPS.failCap);`,
+         console.log('cap2=' + VERIFIER_CAPS.cap2);`,
       ], {
         cwd: casa,
         env: { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1' },
@@ -812,7 +812,7 @@ test('anche i DATI che governano il giro vengono dalla copia', async () => {
       p.on('close', () => fine({ so, se }));
     });
 
-    assert.match(out.so, /failCap=7/,
+    assert.match(out.so, /cap2=7/,
       `ha letto il dato dal ramo invece che dalla copia: ${out.so.trim()} ${out.se.slice(-200)}`);
   } finally {
     rmSync(dove, { recursive: true, force: true, maxRetries: 5 });

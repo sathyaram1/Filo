@@ -363,16 +363,17 @@
     // Insieme viaggiano `autoApprove` e `proberWhenIdle`.
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled } | { ok:false, error }
     AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled? } → { ok, … } | { ok:false, error }
-    // Contatori del verificatore a tre esiti (doc config/routines, campi
-    // `failCap` e `improvableCap` — SPEC-RIDISEGNO-MAX.md §13):
-    //   failCap (M)       quante bocciature «fail» prima di fermare la pratica
-    //                     e chiamare l'owner (il campo legacy `loopCap` resta
-    //                     scritto come alias, per i lettori non ancora aggiornati);
-    //   improvableCap (N) quanti giri «migliorabile» prima di promuovere il
-    //                     lavoro e aprire il feedback dei rilievi residui.
-    // Li applica il SERVER quando registra i verdetti. Owner-only.
-    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, failCap, improvableCap } | { ok:false, error }
-    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { failCap?, improvableCap? } → { ok, failCap, improvableCap } | { ok:false, error }
+    // I tre bilanci del verificatore che corregge (doc config/routines, campi
+    // `cap2`, `cap1`, `cap0` — feedback #561) e il testo della fase 2
+    // (`fixInstructions`, vuoto = quello del server):
+    //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
+    //         finito la pratica si ferma e chiama l'owner);
+    //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
+    //         feedback derivato);
+    //   cap0  giri per i soli rilievi di livello 0.
+    // Li applica il SERVER quando registra la critica. Owner-only.
+    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap2, cap1, cap0, fixInstructions } | { ok:false, error }
+    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap2?, cap1?, cap0?, fixInstructions? } → { ok, cap2, cap1, cap0, fixInstructions } | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della

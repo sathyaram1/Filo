@@ -157,8 +157,31 @@ Punti non negoziabili del flusso:
 2. **Il feedback è il suo.** Il numero del feedback non viene dal messaggio: il
    server lo legge dal biglietto. Chiedere qualcosa su un altro feedback non è
    "rifiutato", è **impossibile da esprimere**.
-3. **Il ruolo permette quell'azione.** Un verificatore scrive verdetti, non
-   chiude feedback; un risolutore consegna, non si auto-approva.
+3. **Il ruolo permette quell'azione.** Un verificatore registra la critica e,
+   solo dopo averla registrata nello stesso giro, consegna la sua correzione
+   (`fixed`); consegnata la correzione, quel biglietto non registra più
+   verdetti su quel lavoro, qualunque cosa succeda dopo — anche dopo la
+   critica di un altro biglietto, o dopo uno stop e la rimessa in coda (la
+   sua correzione la prova un ALTRO verificatore: rifiuto `self_review`, a
+   registro; il server ricorda TUTTI i biglietti che hanno corretto, non
+   l'ultimo). Un lavoro già passato, in attesa del controllo di sicurezza,
+   non ha un giro aperto: una critica lì è respinta senza scrivere niente
+   (`illegal_transition`). Una seconda critica dallo stesso biglietto è
+   rifiutata qualunque esito abbia avuto la prima (la critica registrata non
+   si modifica più, e un giro non si paga due volte). L'identità del giro è
+   il BIGLIETTO (la sua impronta), non il semaforo del feedback, che è lo
+   stesso per tutti i biglietti emessi su quel feedback: un biglietto nuovo
+   giudica sempre. Non chiude feedback e non ne apre (dal 2026-09-05,
+   feedback #561: i rilievi che non corregge li raccoglie il server in UN
+   feedback derivato per lavoro). Sono respinti, prima di scrivere qualsiasi
+   cosa: una critica vuota (nessun rilievo e nessun riassunto), un verdetto
+   senza lo sha del commit provato (in ogni forma), una critica coi livelli
+   scritti fuori posto (`Rilievo [2]: …` non è un rilievo), una consegna il
+   cui elenco strutturato dei rilievi non combacia col testo della critica
+   (l'esito si calcola dal TESTO registrato, letto dal server con lo stesso
+   lettore dello strumento; l'elenco può solo confermarlo), e una critica su
+   un feedback che non è in verifica (già a decidere). Un risolutore
+   consegna, non si auto-approva.
 4. **Il ramo combacia** con quello legato al biglietto.
 5. **La macchina a stati** autorizza il passaggio, letto dallo stato **vero**
    (il server la chiave ce l'ha: è il controllo che oggi non gira mai).
@@ -181,8 +204,8 @@ diventa un **muro**.
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
 | `new-work` | il testo del suo feedback | — |
-| `fixer` | il feedback + la critica della verifica | — |
-| `verifier` | il **sintomo** (il feedback), il ramo | il diff, il report di chi ha risolto |
+| `fixer` | il feedback + la critica della verifica (dal 2026-09-05 solo per il riallineamento dopo un conflitto) | — |
+| `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, nella risposta del server: i rilievi da correggere e le istruzioni della fase 2 (feedback #561) | il diff, il report di chi ha risolto, le istruzioni della fase 2 prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 | `prober` | niente | la coda |
 

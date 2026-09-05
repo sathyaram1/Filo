@@ -441,7 +441,10 @@
         return { text: 'La routine ha domande: rispondi qui sotto.', color: S.design.color };
       }
       if (statusReason === 'loop') {
-        return { text: 'La verifica ha bocciato il fix troppe volte: decidi tu.', color: S.design.color };
+        return { text: 'La verifica ha trovato un difetto che non si può più correggere da soli: decidi tu.', color: S.design.color };
+      }
+      if (statusReason === 'decisione') {
+        return { text: 'La verifica ha trovato un difetto che chiede una tua decisione.', color: S.design.color };
       }
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
@@ -480,7 +483,8 @@
   const REASON_TEXTS = {
     secaudit: 'bloccato dalla sicurezza',
     clarify: 'domande per te',
-    loop: 'fix bocciato troppe volte',
+    loop: 'difetto non più correggibile da soli',
+    decisione: 'la verifica chiede una tua decisione',
     arenato: 'lavorazione arenata',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',

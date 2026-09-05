@@ -266,7 +266,10 @@ export function classifyReply(status, body) {
 /**
  * Consegna un intento al server. `data` NON contiene mai il feedback su cui si
  * agisce: quello il server lo legge dal biglietto.
- * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num? }}
+ * `reply` è ciò che il server ha da dire a chi ha consegnato: per la critica
+ * del verificatore (feedback #561) porta l'esito calcolato e, se c'è da
+ * correggere, la fase 2. Per le altre consegne non c'è.
+ * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num?, reply? }}
  */
 export async function deliver(t, intent, data, opts) {
   const { status, body } = await call('routineDeliver', { ticket: t, intent, data: data || {} }, opts);
@@ -274,8 +277,12 @@ export async function deliver(t, intent, data, opts) {
   return {
     outcome,
     reason: String((body && body.reason) || (outcome === 'ok' ? '' : `http_${status}`)),
+    // La frase del rifiuto, quando il server la dà: senza, «malformed» non dice
+    // se manca il riassunto, il commit o il testo di un rilievo.
+    detail: String((body && body.detail) || ''),
     id: body && body.id,
     num: body && body.num,
+    reply: body && typeof body.reply === 'object' ? body.reply : undefined,
   };
 }
 
@@ -498,7 +505,7 @@ if (isMain) {
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
     if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
-    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
+    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
     const r = await compare(args[0], { role: args[1] || '', num: args[2] || '' });

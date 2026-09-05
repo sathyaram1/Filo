@@ -46,7 +46,7 @@
 // USO (la stessa lista, per chi la chiede dal terminale: `--help`)
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
-//   node scripts/dispatch.mjs --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--ticket <b>]
 //   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
@@ -76,7 +76,7 @@ import {
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
 } from './lib/branch-integrity.mjs';
-import { writeRole, clearRole } from './lib/routine-role.mjs';
+import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
@@ -105,18 +105,17 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
 
-// Quante bocciature del verifier prima di bloccare con motivo `loop` (failCap,
-// SPEC-RIDISEGNO-MAX.md §13). Precedenza: override d'ambiente FILO_LOOP_CAP >
-// valore scelto dall'owner nella tab Automazioni (doc Firestore config/routines,
-// campo `failCap`; il legacy `loopCap` è un alias) > default dalla fonte unica.
-// Range [1, 10], allineato a SN_CONST.AUTOMATION. Il tetto EFFETTIVO lo applica
-// il SERVER quando registra i verdetti: qui resta solo resolveLoopCap, la
-// regola di precedenza pura, per gli strumenti e per i test.
+// I tre bilanci del verificatore che corregge (feedback #561: cap2 per i
+// rilievi di livello 3/2, cap1 per gli 1, cap0 per gli 0). Li CONSUMA il
+// SERVER quando registra la critica; qui servono solo come dato di riferimento
+// per gli strumenti. I DEFAULT vivono con le transizioni promosse a dati
+// (src/shared/feedbackTransitions.js): una sorgente sola, incorporata anche dal
+// server al deploy. Se il checkout non ce l'ha ancora (clone vecchio), i
+// letterali qui sotto sono il paracadute.
 //
-// I DEFAULT dei contatori (failCap/improvableCap) vivono con le transizioni
-// promosse a dati (src/shared/feedbackTransitions.js): una sorgente sola,
-// incorporata anche dal server al deploy. Se il checkout non ce l'ha ancora
-// (clone vecchio), i letterali qui sotto sono il paracadute.
+// `resolveLoopCap` (override d'ambiente FILO_LOOP_CAP > valore remoto > default,
+// range [1, 10]) è la regola di precedenza del tetto delle bocciature del giro
+// VECCHIO: resta per gli strumenti e per i test che la usano ancora.
 const LOOP_CAP_MIN = 1;
 const LOOP_CAP_MAX = 10;
 export const VERIFIER_CAPS = (() => {
@@ -127,11 +126,37 @@ export const VERIFIER_CAPS = (() => {
     // versione di giorni fa.
     req(resolve(TOOLS_ROOT, 'src', 'shared', 'feedbackTransitions.js'));
     const caps = globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS;
-    if (caps && Number.isFinite(caps.failCap) && Number.isFinite(caps.improvableCap)) return caps;
+    if (caps && Number.isFinite(caps.cap2) && Number.isFinite(caps.cap1) && Number.isFinite(caps.cap0)) return caps;
   } catch (_) { /* checkout senza il file dei dati: si usa il paracadute */ }
-  return { improvableCap: 0, failCap: 10 };
+  return { cap2: 5, cap1: 2, cap0: 0 };
 })();
-const LOOP_CAP_DEFAULT = VERIFIER_CAPS.failCap;
+// Il tetto delle bocciature del giro VECCHIO (verdetto a tre valori): resta
+// solo per resolveLoopCap, che gli strumenti e i test usano ancora.
+const LOOP_CAP_DEFAULT = 10;
+
+// Le regole del giro del verificatore che corregge (feedback #561): il parser
+// della critica coi livelli e la decisione su cosa si corregge. Dagli
+// STRUMENTI, per la stessa ragione dei dati qui sopra. Il paracadute è un
+// parser minimo: senza il modulo la critica arriva comunque al server, che ha
+// la sua copia delle regole e decide lui.
+export const VERIFIER_ROUND = (() => {
+  try {
+    const req = createRequire(import.meta.url);
+    req(resolve(TOOLS_ROOT, 'src', 'shared', 'verifierRound.js'));
+    if (globalThis.SN_VERIFIER_ROUND && typeof globalThis.SN_VERIFIER_ROUND.parseFindings === 'function') return globalThis.SN_VERIFIER_ROUND;
+  } catch (_) { /* checkout senza il modulo: paracadute */ }
+  return {
+    parseFindings(text) {
+      const findings = [];
+      for (const line of String(text || '').split('\n')) {
+        const m = /^\s*\[\s*([0-3])\s*(\?)?\s*\]\s*(.+)$/.exec(line);
+        if (m) findings.push({ level: Number(m[1]), text: m[3].trim(), decision: m[2] === '?' });
+      }
+      return { summary: '', findings };
+    },
+    formatFindings(list) { return (list || []).map((f) => `- [${f.level}${f.decision ? '?' : ''}] ${f.text}`).join('\n'); },
+  };
+})();
 
 /**
  * Risolve il cap EFFETTIVO data la precedenza env > remoto > default, con clamp
@@ -255,31 +280,33 @@ export function defaultState(id, branch) {
 
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
 
-// I tre esiti della verifica (SPEC-RIDISEGNO-MAX.md §13): fail = la cosa
-// chiesta non si ottiene; migliorabile = funziona, ma pattern/estetica/
-// completezza. I contatori EFFETTIVI (e la promozione del migliorabile al giro
-// N+1) li applica il SERVER quando registra il verdetto: questo stato locale è
-// solo lo specchio di ripiego.
-export const VERIFIER_VERDICTS = ['pass', 'migliorabile', 'fail'];
+// Gli esiti che il SERVER può dare a una critica (feedback #561): `pass` (nessun
+// rilievo da correggere: si prosegue), `fix` (il verificatore corregge, fase
+// 2), `stop` (un rilievo di livello 3/2 non correggibile: decide l'owner). Non
+// esiste più il verdetto a tre valori scelto dal verificatore: lui registra i
+// rilievi coi livelli, l'esito lo calcola il server dai bilanci. I vecchi
+// `pass|migliorabile|fail` restano accettati SOLO come parola opzionale sulla
+// riga di comando, per le ricette non ancora aggiornate (vengono ignorati).
+export const VERIFIER_OUTCOMES = ['pass', 'fix', 'stop'];
+// Tetto di una critica, lo stesso del server. Oltre: rifiuto con la
+// spiegazione, non un taglio.
+export const MAX_CRITIQUE_CHARS = 12000;
+export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
 
 /**
- * Il verifier ha prodotto un verdetto. FAIL incrementa il contatore delle
- * bocciature; MIGLIORABILE il suo contatore separato (e instrada una correzione
- * come un fail, finché il server non lo promuove).
+ * Lo specchio locale dell'esito che il server ha calcolato sulla critica.
+ * `pass` → verificato; `fix` → il verificatore sta correggendo (la consegna
+ * `fixed` arriverà da lui, stesso biglietto); `stop` → fermato. La critica si
+ * conserva com'è stata scritta (coi livelli), per il fogliettino locale.
  */
-export function applyVerifierVerdict(state, verdict, critique = '') {
+export function applyVerifierVerdict(state, outcome, critique = '') {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
-  if (verdict === 'pass') {
-    s.verifierVerdict = 'pass';
-  } else if (verdict === 'migliorabile') {
-    s.verifierVerdict = 'migliorabile';
-    s.improvableCount = (Number(s.improvableCount) || 0) + 1;
-    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
-  } else {
-    s.verifierVerdict = 'fail';
-    s.loopCount = (Number(s.loopCount) || 0) + 1;
-    if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, 4000);
-  }
+  if (outcome === 'pass') s.verifierVerdict = 'pass';
+  else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
+  else if (outcome === 'stop') s.verifierVerdict = 'blocked';
+  else s.verifierVerdict = String(outcome || '') || null;
+  if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, MAX_CRITIQUE_CHARS);
+  else if (outcome === 'pass') s.verifierCritique = '';
   return s;
 }
 
@@ -468,13 +495,21 @@ function origineDelCheckout() {
  * @param {Array}  history  critiche dei giri passati (dal server)
  * @returns {string} '' se non c'è niente da dire
  */
-export function serialAwarenessNote(role, history) {
+export function serialAwarenessNote(role, history, dropped = 0) {
   const n = Array.isArray(history) ? history.length : 0;
   if (n < 2) return '';
+  // Le critiche più vecchie tolte dalla serie (tetto del server): dirlo, o chi
+  // legge crede che i giri mancanti non siano mai esistiti e non può
+  // ri-provarne le porte (verifica del giro 9 su #561).
+  const d = Number(dropped) || 0;
+  const tolte = d > 0
+    ? [`${d === 1 ? 'Una critica più vecchia NON è' : `${d} critiche più vecchie NON sono`} nel fascicolo (la serie tiene solo le ultime): le porte di quei giri non si possono ri-provare da qui, e non vanno date per chiuse.`, '']
+    : [];
   if (role === 'fixer' || role === 'resolver') {
     return [
-      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n} volte`,
+      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n + d} volte`,
       '',
+      ...tolte,
       'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
       'Leggile TUTTE prima di toccare codice. Se raccontano lo stesso danno che',
       'rientra da porte diverse, il rimedio giusto non è chiudere l\'ultima porta',
@@ -486,8 +521,9 @@ export function serialAwarenessNote(role, history) {
   }
   if (role === 'verifier') {
     return [
-      `## ⚠️ Avvertenza di serie: sei al giro ${n + 1} di verifica su questo lavoro`,
+      `## ⚠️ Avvertenza di serie: sei al giro ${n + d + 1} di verifica su questo lavoro`,
       '',
+      ...tolte,
       'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
       'Se raccontano lo stesso danno da porte diverse, non limitarti a cercare la',
       'porta successiva: elenca nella STESSA critica tutte quelle che trovi, così',
@@ -538,6 +574,7 @@ export function buildPayload(bucket, ctx = {}) {
         branch: bucket.branch, id: bucket.id, num: bucket.num,
         feedback: ctx.feedback || null,
         history: Array.isArray(ctx.history) ? ctx.history : [],
+        historyDropped: Number(ctx.historyDropped) || 0,
         loopCount: bucket.loopCount || 0,
       };
     case 'fixer':
@@ -559,6 +596,7 @@ export function buildPayload(bucket, ctx = {}) {
         // critica dice cosa correggere, la serie dice se stai tappando porte
         // una alla volta invece di chiudere la causa.
         history: Array.isArray(ctx.history) ? ctx.history : [],
+        historyDropped: Number(ctx.historyDropped) || 0,
         loopCount: bucket.loopCount || 0,
       };
     case 'new-work':
@@ -672,6 +710,18 @@ export async function withRetry(fn, label = 'operazione', { attempts = 3, baseDe
  *                voce è l'unica cosa onesta;
  *   'absent'   → nessun biglietto: non c'è un lavoro a cui riferire la consegna.
  */
+/**
+ * Il motivo di un rifiuto del server, per chi lo legge a schermo: il codice e,
+ * se il server l'ha detta, la frase («malformed: critica vuota …»). Prima
+ * arrivava il solo codice e «leggi il motivo» era un invito a leggere niente
+ * (verifica del giro 4 su #561). PURA.
+ */
+export function motivoRifiuto(r) {
+  const reason = String((r && r.reason) || '');
+  const detail = String((r && r.detail) || '').trim();
+  return detail ? `${reason}: ${detail}` : reason;
+}
+
 async function deliverToChannel(intent, data) {
   const ticket = readRoutineTicket(ROOT);
   // Senza biglietto il server non viene nemmeno chiamato: dirlo con le parole
@@ -687,7 +737,7 @@ async function deliverToChannel(intent, data) {
     if (r.outcome === 'fault') {
       process.stderr.write(`[dispatch] canale non raggiungibile (${r.reason}): la decisione NON è stata registrata\n`);
     } else if (r.outcome === 'refused') {
-      process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${r.reason}): non ripiego, la decisione non viene registrata\n`);
+      process.stderr.write(`[dispatch] consegna RIFIUTATA dal server (${motivoRifiuto(r)}): non ripiego, la decisione non viene registrata\n`);
     }
     return r;
   } catch (e) {
@@ -705,7 +755,7 @@ async function deliverToChannel(intent, data) {
 export function verifierNoteText(verdict, critique = '') {
   // Il ruolo scrive la critica come "PASS — …"/"MIGLIORABILE — …"/"FAIL — …":
   // il prefisso è ridondante col nostro incipit, toglilo (resta la sostanza).
-  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, 4000);
+  const c = String(critique || '').trim().replace(/^(PASS|MIGLIORABILE|FAIL)\s*[—–:\-]\s*/i, '').slice(0, MAX_CRITIQUE_CHARS);
   if (verdict === 'pass') {
     return c ? `Controllo funzionalità superato. ${c}` : 'Controllo funzionalità superato.';
   }
@@ -753,37 +803,118 @@ function sealTransition(state, by) {
   return sealed;
 }
 
-async function recordVerifier(id, verdict, critique) {
+/**
+ * La critica del verificatore, registrata sul server (feedback #561).
+ *
+ * Il testo si legge col formato dei livelli (`[2] …`, una riga per rilievo,
+ * `[1?]` = chiede una decisione dell'owner; le righe prima del primo rilievo
+ * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
+ * la critica intera e il commit su cui è stata fatta la prova: il pass vale
+ * per quel commit. L'ESITO lo calcola il server e torna nella risposta: con
+ * qualcosa da correggere porta la fase 2 (rilievi da correggere e istruzioni),
+ * che non sta da nessun'altra parte.
+ */
+async function recordVerifier(id, critiqueText) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
-  const next = applyVerifierVerdict({ ...defaultState(id, ''), ...(guard.state || {}), id }, verdict, critique);
-  next.id = id;
+  // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
+  // non è un rilievo, e mandarlo così faceva passare un [2] in silenzio: si
+  // ferma qui, prima del server, con la riga da sistemare.
+  const brutte = typeof VERIFIER_ROUND.unparsedLevelLines === 'function' ? VERIFIER_ROUND.unparsedLevelLines(critiqueText) : [];
+  if (brutte.length) {
+    // Un rifiuto di FORMATO, non della guardia d'identità: il testo di quella
+    // («la directory non corrisponde al branch») mandava il verificatore a
+    // controllare ramo e cartella invece della riga (verifica del giro 4).
+    return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»); in mezzo a una frase del riassunto le parentesi quadre sono testo e vanno bene. Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+  }
+  // Stesso tetto del server (12000 caratteri), detto QUI prima del viaggio e
+  // col numero: mai un taglio silenzioso (CLAUDE.md § Limiti).
+  if (String(critiqueText || '').length > MAX_CRITIQUE_CHARS) {
+    return { rejected: true, formatRejected: true, message: `critica non registrata: troppo lunga (${String(critiqueText).length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}). Accorcia il riassunto, non i rilievi.` };
+  }
+  const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
+  const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
   // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato
-  // locale finisce su git, e se lo si scrivesse prima, un verdetto RIFIUTATO
+  // locale finisce su git, e se lo si scrivesse prima, una critica RIFIUTATA
   // lascerebbe scritto "verificato" da una parte e niente dall'altra — con i
   // due cammini che divergono nella direzione più permissiva, che è
   // esattamente quella da cui questa spec viene a togliere l'autorità.
+  // Il testo parte con gli a capo veri (una barra-n scritta come a capo vale
+  // come a capo): è quello che il server conserva per il verificatore dopo.
+  const critiqueNorm = typeof VERIFIER_ROUND.normalizeCritique === 'function' ? VERIFIER_ROUND.normalizeCritique(critiqueText) : String(critiqueText || '');
   const sent = await deliverToChannel('verdict', {
-    verdict, critique: verifierNoteText(verdict, critique), branch: next.branch || '',
+    findings: parsed.findings,
+    summary: parsed.summary,
+    // Intero, non tosato: il server legge i rilievi dal TESTO e li confronta
+    // con l'elenco (verifica del giro 6 su #561); un testo mozzato a 4000
+    // caratteri perdeva i rilievi in coda e la consegna veniva respinta come
+    // «elenco che non combacia». Tosa lui, per la storia, dopo aver letto.
+    critique: critiqueNorm.trim(),
+    branch: base.branch || '',
+    sha: headSha(ROOT) || '',
   });
   if (sent.outcome === 'refused') {
-    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+    return { rejected: true, fromChannel: true, message: `critica non accettata (${motivoRifiuto(sent)})` };
   }
   if (sent.outcome === 'absent') {
     // Biglietto introvabile ≠ server giù: sono due frasi diverse perché sono
     // due rimedi diversi (ripassare il biglietto vs fermarsi).
-    return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
+    return { rejected: true, ticketMissing: true, message: 'critica non registrata: nessun biglietto trovato' };
   }
 
   if (sent.outcome !== 'ok') {
-    // Il server non risponde. Non c'è più una seconda strada su cui posare il
-    // verdetto: dirlo è l'unica cosa onesta, perché un verdetto che nessuno ha
-    // registrato ma che il ramo dà per dato è peggio di un verdetto mancante.
-    return { rejected: true, serverDown: true, message: `verdetto non registrato: il server non risponde (${sent.reason})` };
+    // Il server non risponde. Non c'è più una seconda strada su cui posare la
+    // critica: dirlo è l'unica cosa onesta, perché una critica che nessuno ha
+    // registrato ma che il ramo dà per data è peggio di una mancante.
+    return { rejected: true, serverDown: true, message: `critica non registrata: il server non risponde (${sent.reason})` };
   }
-  sealTransition(next, `verifier:${verdict}`);
+  const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
+  const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'pass';
+  const next = applyVerifierVerdict(base, outcome, critiqueText);
+  next.id = id;
+  sealTransition(next, `verifier:${outcome}`);
+  next.reply = reply;
   return next;
+}
+
+/**
+ * La risposta del server alla critica, per chi la legge a schermo. PURA.
+ * Con la fase 2 stampa i rilievi da correggere, quelli messi da parte, i
+ * bilanci residui e le istruzioni; senza, l'esito e basta.
+ */
+export function verifierReplyText(reply) {
+  const r = reply && typeof reply === 'object' ? reply : {};
+  const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
+  const b = (r.phase2 && r.phase2.budgets) || r.budgets;
+  const budgets = b && typeof b === 'object'
+    ? ['cap2', 'cap1', 'cap0'].map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
+    : '';
+  if (r.outcome === 'fix' && r.phase2) {
+    return [
+      '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
+      'Rilievi da correggere ADESSO (solo questi):',
+      fmt(r.phase2.findings),
+      'Rilievi messi da parte (li apre il server come feedback derivato, NON li correggi):',
+      fmt(r.phase2.derived),
+      budgets ? `Bilanci: ${budgets}` : '',
+      '',
+      String(r.phase2.instructions || ''),
+    ].filter((l, i) => l !== '' || i === 6).join('\n');
+  }
+  if (r.outcome === 'stop') {
+    return [
+      '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
+      'Rilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l\'owner.',
+      fmt(r.blocking),
+      'Non c\'è niente da correggere: rilascia il biglietto.',
+    ].join('\n');
+  }
+  return [
+    '══ RISPOSTA DEL SERVER: verifica superata ══',
+    r.derived && r.derived.num ? `I rilievi non corretti sono diventati il feedback ${r.derived.num}.` : 'Nessun rilievo da mettere da parte.',
+    'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
+  ].join('\n');
 }
 async function recordFixed(id, report = '', frase = '') {
   const guard = guardIdentity(id);
@@ -796,7 +927,7 @@ async function recordFixed(id, report = '', frase = '') {
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   const sent = await deliverToChannel('fixed', { report: String(report || ''), userNote: String(frase || ''), branch: next.branch || '' });
   if (sent.outcome === 'refused') {
-    return { rejected: true, fromChannel: true, message: `consegna non accettata (${sent.reason})` };
+    return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
   if (sent.outcome === 'absent') {
     return { rejected: true, ticketMissing: true, message: 'consegna non registrata: nessun biglietto trovato' };
@@ -805,7 +936,11 @@ async function recordFixed(id, report = '', frase = '') {
   if (sent.outcome !== 'ok') {
     return { rejected: true, serverDown: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
   }
-  sealTransition(next, 'fixer:consegna');
+  // Chi consegna: il verificatore che corregge (#561) o il correttore separato
+  // del riallineamento. Il marcatore locale del ruolo lo sa; il server lo sa
+  // dal biglietto, ed è lui che ha accettato o rifiutato.
+  const chi = readRole(ROOT) === 'verifier' ? 'verifier' : 'fixer';
+  sealTransition(next, `${chi}:consegna`);
   return next;
 }
 async function recordSecaudit(id, verdict) {
@@ -817,7 +952,7 @@ async function recordSecaudit(id, verdict) {
   // Il server prima dello stato locale: vedi il commento in recordVerifier.
   const sent = await deliverToChannel('secaudit', { verdict, branch: next.branch || '' });
   if (sent.outcome === 'refused') {
-    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${sent.reason})` };
+    return { rejected: true, fromChannel: true, message: `verdetto non accettato (${motivoRifiuto(sent)})` };
   }
   if (sent.outcome === 'absent') {
     return { rejected: true, ticketMissing: true, message: 'verdetto non registrato: nessun biglietto trovato' };
@@ -1027,7 +1162,9 @@ export function usageText() {
     '                         promemoria del biglietto e avvia il battito',
     '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
-    '  --record-verifier <id> <pass|migliorabile|fail> ["critica"] [--ticket <b>]',
+    '  --record-verifier <id> "<critica>" [--ticket <b>]   una riga per rilievo,',
+    '                         col livello davanti ([2] …; [1?] = chiede una decisione);',
+    '                         l\'esito lo calcola il server e lo stampa qui (fase 2 inclusa)',
     '  --record-fixed    <id> ["report"] [--frase "…"] [--ticket <b>]',
     '  --record-secaudit <id> <pass|fail> [--ticket <b>]',
     '  --clear-state     <id> rimuove la copia locale dello stato',
@@ -1268,6 +1405,9 @@ export function serverCtx(bucket, fromServer, diff = '') {
     return {
       feedback: (payload && payload.feedback) || null,
       history: Array.isArray(payload && payload.history) ? payload.history : [],
+      // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
+      // nell'avvertenza, così i giri mancanti non passano per inesistenti.
+      historyDropped: Number(payload && payload.historyDropped) || 0,
     };
   }
   return {};
@@ -1369,7 +1509,7 @@ export function emit(bucket, ctx) {
   const payload = buildPayload(bucket, ctx);
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
-  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history);
+  const serial = serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role);
   const out = {
     role: bucket.role,
@@ -1414,6 +1554,9 @@ if (isMainModule) {
   // Quattro testi diversi perché quattro rimedi diversi.
   const esciRespinto = (s) => {
     if (s.ticketMissing) { console.error(ticketMissingText(s.message)); process.exit(1); }
+    // Critica scritta male: si sistema la riga e si rilancia (esci 1, come un
+    // errore d'uso). Il server non è stato chiamato e niente è stato scritto.
+    if (s.formatRejected) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: sistema le righe e rilancia lo stesso comando.`); process.exit(1); }
     if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
     console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
     process.exit(s.fromChannel ? 4 : 3);
@@ -1421,11 +1564,15 @@ if (isMainModule) {
 
   try {
     if (flag === '--record-verifier') {
-      const [, id, verdict, ...rest] = conBiglietto(argv);
-      if (!id || !VERIFIER_VERDICTS.includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|migliorabile|fail> ["critica"]'); process.exit(1); }
-      const s = await recordVerifier(id, verdict, rest.join(' '));
+      const [, id, ...rest] = conBiglietto(argv);
+      // La parola del vecchio verdetto (pass|migliorabile|fail) è tollerata e
+      // ignorata: l'esito lo calcola il server dai livelli della critica.
+      if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) rest.shift();
+      if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, col livello davanti: [2] …>"'); process.exit(1); }
+      const s = await recordVerifier(id, rest.join(' '));
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount} migliorabile=${Number(s.improvableCount) || 0}`);
+      console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);
+      console.log(verifierReplyText(s.reply));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = conBiglietto(argv);

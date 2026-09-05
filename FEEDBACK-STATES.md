@@ -69,8 +69,14 @@ vero su "qualcuno ci sta lavorando ORA").
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
-- `revision_capability` —routine PASS verifier→ `revision_security`; —FAIL×3→ `design`
-  (`statusReason: loop`).
+- `revision_capability` —routine, critica del verificatore senza rilievi da correggere→
+  `revision_security` (i rilievi rimasti, se ci sono, diventano UN feedback derivato
+  figlio `#N.k`, aperto dal server); —critica con rilievi da correggere→ resta
+  `revision_capability`: il verificatore STESSO corregge e consegna `fixed`
+  (`revision_capability → revision_capability`), poi un altro verificatore riprova
+  (feedback #561, dal 2026-09-05); —rilievo di livello 3/2 non correggibile (bilancio
+  esaurito)→ `design` (`statusReason: loop`); —rilievo di livello 3/2 che chiede una
+  decisione→ `design` (`statusReason: decisione`).
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
   (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
   (riallineamento: main è avanzato e il merge non passa più da solo — non è una
@@ -178,8 +184,13 @@ sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiu
 
 Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
-alla chat + `statusReason: clarify`); (3) fix bocciato troppe volte dalla verifica
-(`statusReason: loop`, con l'ultima critica del verifier in chat); (4) fix bocciato
+alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
+3/2 che non si può più correggere da soli — bilancio delle correzioni esaurito
+(`statusReason: loop`, con la critica coi livelli in chat) — oppure che chiede una
+decisione dell'owner (`statusReason: decisione`); in entrambi i casi bilanci e
+verdetti del giro si azzerano — la storia delle critiche resta, per il
+verificatore del lavoro rifatto — così dopo la decisione dell'owner il lavoro
+rifatto riparte da un verificatore invece di rimbalzare a `design`; (4) fix bocciato
 dal **controllo di sicurezza** o dal cancello di fusione (`statusReason: secaudit`);
 (5) lavorazione arenata ripetutamente (`statusReason: arenato`). La risposta
 dell'owner appende alla chat e (se decide) muove a `todo`.
@@ -295,7 +306,11 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   *(Ritirato il 2026-08-19: la selezione vive solo nel server,
   `filo-security/functions/src/routine/select.js`.)*
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
-  loop 3× → `design`+`statusReason: loop`.
+  loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: il
+  verificatore registra la critica coi livelli e corregge lui stesso; i tre
+  bilanci `cap2/cap1/cap0` e le regole stanno in `src/shared/feedbackTransitions.js`
+  e `src/shared/verifierRound.js`, incorporati dal server; il correttore separato
+  resta solo per il riallineamento dopo un conflitto.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`firebase deploy --only firestore:rules`).
