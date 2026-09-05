@@ -883,7 +883,9 @@
     $('ttsModelVoice').addEventListener('change', () => {
       syncCustomVoiceField();
       if ($('ttsModelVoice').value === CUSTOM_VOICE) $('ttsModelVoiceCustom').focus();
+      else persist();
     });
+    $('ttsModelVoiceCustom').addEventListener('input', persistDebounced);
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
