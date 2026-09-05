@@ -459,3 +459,48 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
   assert.equal(inMezzo.ok, true);
   assert.equal(inMezzo.outcome, 'pass');
 });
+
+// ── Le scorciatoie dal CLI (#561 giro 7) ─────────────────────────────────────
+//
+// Un «pass» con dentro una riga di livello 2 vale il testo: lo stato diventa
+// «sta correggendo» e la risposta deve dirlo, con la fase 2, come farebbe
+// `critica`. Prima stampava «il lavoro torna a chi l'ha fatto» e la fase 2
+// non usciva mai: start e critica respinti, e l'unica uscita era «corretto».
+import { execFileSync as _exec } from 'node:child_process';
+import { mkdtempSync as _mkdtemp, writeFileSync as _write } from 'node:fs';
+import { tmpdir as _tmp } from 'node:os';
+const _ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+
+function depositoUsaEGetta() {
+  const casa = _mkdtemp(resolve(_tmp(), 'filo-vl-cli-'));
+  const g = (...a) => _exec('git', a, { cwd: casa, encoding: 'utf8' });
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  _write(resolve(casa, '.gitignore'), '.claude/\n', 'utf8');
+  _write(resolve(casa, 'a.txt'), 'x', 'utf8');
+  g('add', '-A'); g('commit', '-qm', 'init'); g('checkout', '-q', '-b', 'claude/prova');
+  return casa;
+}
+function vl(casa, ...args) {
+  try {
+    return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
+  } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
+}
+
+test('CLI: «pass» con dentro un [2] risponde con la fase 2 (stato «sta correggendo»), «fail» ferma', () => {
+  const casa = depositoUsaEGetta();
+  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
+  const p = vl(casa, 'pass', 'Provato tutto.\n[2] però questo è rotto');
+  assert.equal(p.code, 0, p.out);
+  assert.match(p.out, /FASE 2, adesso correggi tu/);
+  assert.match(p.out, /\[2\] però questo è rotto/);
+  assert.doesNotMatch(p.out, /torna a chi l'ha fatto/);
+  assert.match(vl(casa, 'status').out, /sta correggendo/);
+  // Un pass pulito resta un pass; un fail secco ferma, qualunque sia il bilancio.
+  _exec('git', ['checkout', '-q', '-b', 'claude/due'], { cwd: casa });
+  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
+  assert.match(vl(casa, 'pass', 'Regge tutto.').out, /verifica superata/);
+  _exec('git', ['checkout', '-q', '-b', 'claude/tre'], { cwd: casa });
+  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
+  assert.match(vl(casa, 'fail', 'non salva').out, /il lavoro si ferma/);
+  assert.match(vl(casa, 'status').out, /bocciato/);
+});

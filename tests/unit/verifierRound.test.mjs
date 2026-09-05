@@ -259,3 +259,14 @@ test('una riga di continuazione di un rilievo con «[2] -» in mezzo è testo, n
 test('nel riassunto l\'etichetta breve col separatore («Porta [2]: chiusa») resta respinta', () => {
   assert.deepEqual(R.unparsedLevelLines('Porta [2]: chiusa. Regge tutto.'), ['Porta [2]: chiusa. Regge tutto.']);
 });
+
+
+test('#561 giro 7: il segno prima della cifra («[?2]») o un segno diverso dopo («[2!]») è un livello messo male, non riassunto', () => {
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[?2] rotto'), ['[?2] rotto']);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2!] rotto'), ['[2!] rotto']);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n- [2?!] rotto'), ['- [2?!] rotto']);
+  // Il formato giusto resta un rilievo, e in mezzo a una frase le parentesi restano testo.
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2?] decidi tu'), []);
+  assert.deepEqual(R.unparsedLevelLines('Provato il caso [?2] del giro prima: chiuso.\n[1] bordo'), []);
+  assert.equal(R.parseFindings('Provato.\n[2?] decidi tu').findings[0].decision, true);
+});
