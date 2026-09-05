@@ -94,7 +94,7 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `folder` | Cartella con linguetta: apre un file |
 | `timer` | Cronometro con pulsante in alto e lancetta |
 | `alarm` | Sveglia con due campanelle e piedini |
-| `alarmOff` | La stessa sveglia, barrata (tolta) |
+| `alarmOff` | La stessa sveglia con una X al posto delle lancette (tolta) |
 | `alarmShift` | Orologio con freccia ad arco sopra (spostata) |
 | `pin` | Puntina da disegno: una lezione fissata nella memoria |
 | `searchWeb` | Lente con un globo dentro: cerca sul web |
@@ -105,7 +105,7 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `broom` | Scopa: pulisce le schede |
 | `trash` | Cestino con coperchio: elimina definitivamente |
 | `eraser` | Gomma da cancellare: cancella la memoria |
-| `palette` | Tavolozza con tre pozzetti: estetica |
+| `palette` | Tavolozza a fagiolo con l'incavo del pollice e tre pozzetti: estetica |
 | `terminal` | Finestra con ">_": comando nel terminale |
 | `globe` | Globo con equatore e meridiano: scheda da un altro paese |
 | `globeOff` | Globo barrato: connessione diretta |

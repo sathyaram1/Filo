@@ -49,6 +49,16 @@ test('nome() è insensibile alle maiuscole e ripiega sul logo per i tipi ignoti'
   assert.equal(AI.nome(null), 'filoLogo');
 });
 
+test('APRI_APP mostra l\x27icona dell\x27app aperta, la griglia solo per un\x27app ignota', () => {
+  assert.equal(AI.nome('APRI_APP', { app: 'Mazzi' }), 'decks');
+  assert.equal(AI.nome('APRI_APP', { id: 'editor' }), 'editor');
+  assert.equal(AI.nome('APRI_APP', { app: 'boh' }), 'apps');
+  assert.equal(AI.nome('APRI_APP'), 'apps');
+  assert.equal(AI.nome('APRI_APP', { app: '__proto__' }), 'apps');
+  for (const n of Object.values(AI.APP)) assert.equal(typeof ICONS[n], 'function', n);
+  assert.equal(AI.svg('APRI_APP', 14, { app: 'mazzi' }), ICONS.decks(14));
+});
+
 test('svg() restituisce un SVG della taglia chiesta (14 di default)', () => {
   const s = AI.svg('TIMER', 16);
   assert.ok(s.startsWith('<svg'));
