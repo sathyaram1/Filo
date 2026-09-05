@@ -503,10 +503,9 @@
     // Le due impostazioni che valgono solo per le routine: senza routine non
     // decidono niente, quindi non si toccano (come i mittenti con l'automatica
     // spenta). Restano visibili: sono una scelta dell'owner, non un segreto.
-    if (mgFailCap)     mgFailCap.disabled = !isAdmin || !routinesOn;
-    if (mgFailCapSave) mgFailCapSave.disabled = !isAdmin || !routinesOn;
-    if (mgImprovableCap)     mgImprovableCap.disabled = !isAdmin || !routinesOn;
-    if (mgImprovableCapSave) mgImprovableCapSave.disabled = !isAdmin || !routinesOn;
+    for (const el of [mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save, mgFixInstructions, mgFixInstructionsSave]) {
+      if (el) el.disabled = !isAdmin || !routinesOn;
+    }
     if (mgProberIdle)  mgProberIdle.disabled = !isAdmin || !routinesOn;
     if (mgJudgeTimeout)     mgJudgeTimeout.disabled = !isAdmin;
     if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.disabled = !isAdmin;
