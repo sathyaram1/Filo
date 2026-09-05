@@ -2296,7 +2296,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       });
       costEur += Number(r.costEur) || 0;
       let text = String(r.text || '');
-      let actions = Tools ? Tools.toolCallsToActions(r.toolCalls) : [];
+      // Un id a ogni chiamata, anche se il fornitore non lo manda: la risposta
+      // allo strumento deve citare LO STESSO id della chiamata, e la scheda
+      // riconosce dall'id l'azione già raccontata in diretta.
+      const toolCalls = (Array.isArray(r.toolCalls) ? r.toolCalls : [])
+        .map((c, i) => ({ ...c, id: String(c.id || '') || `call_${round}_${i}` }));
+      let actions = Tools ? Tools.toolCallsToActions(toolCalls) : [];
       // Tolleranza per il formato vecchio (JSON nel testo): le azioni passano
       // comunque dal registro invece di finire in chat come JSON grezzo.
       const legacy = (!actions.length && Tools) ? Tools.legacyEnvelope(text) : null;
