@@ -495,13 +495,21 @@ function origineDelCheckout() {
  * @param {Array}  history  critiche dei giri passati (dal server)
  * @returns {string} '' se non c'è niente da dire
  */
-export function serialAwarenessNote(role, history) {
+export function serialAwarenessNote(role, history, dropped = 0) {
   const n = Array.isArray(history) ? history.length : 0;
   if (n < 2) return '';
+  // Le critiche più vecchie tolte dalla serie (tetto del server): dirlo, o chi
+  // legge crede che i giri mancanti non siano mai esistiti e non può
+  // ri-provarne le porte (verifica del giro 9 su #561).
+  const d = Number(dropped) || 0;
+  const tolte = d > 0
+    ? [`${d === 1 ? 'Una critica più vecchia NON è' : `${d} critiche più vecchie NON sono`} nel fascicolo (la serie tiene solo le ultime): le porte di quei giri non si possono ri-provare da qui, e non vanno date per chiuse.`, '']
+    : [];
   if (role === 'fixer' || role === 'resolver') {
     return [
-      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n} volte`,
+      `## ⚠️ Avvertenza di serie: questo lavoro è già stato rimandato indietro ${n + d} volte`,
       '',
+      ...tolte,
       'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
       'Leggile TUTTE prima di toccare codice. Se raccontano lo stesso danno che',
       'rientra da porte diverse, il rimedio giusto non è chiudere l\'ultima porta',
