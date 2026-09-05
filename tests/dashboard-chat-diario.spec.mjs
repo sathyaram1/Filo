@@ -175,14 +175,9 @@ test('C — un\'impostazione confermata entra nel diario e il modello lo sa al t
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
 
   // Il popup si apre da sé: si conferma.
-  const host = page.locator('.sn-confirm-host');
+  const host = page.locator(CONFIRM_HOST);
   await expect(host).toBeVisible({ timeout: 5_000 });
-  await page.evaluate(() => {
-    const h = document.querySelector('.sn-confirm-host');
-    const root = h && h.shadowRoot;
-    const ok = root && root.querySelector('.sn-confirm-btn-ok');
-    if (ok) ok.click();
-  });
+  await clickConfirm(page, 'ok');
   await expect(host).toHaveCount(0, { timeout: 5_000 });
 
   // La conferma lascia la sua riga nel diario (prima: niente).
