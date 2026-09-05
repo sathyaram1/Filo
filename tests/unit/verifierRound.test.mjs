@@ -50,9 +50,13 @@ test('parseFindings: senza righe col livello → zero rilievi (è il pass), qual
 test('normalizeFindings: tetti su numero e lunghezza, decision solo se true', () => {
   const tanti = Array.from({ length: 60 }, (_, i) => ({ level: 1, text: `r${i}` }));
   assert.equal(R.normalizeFindings(tanti).length, R.MAX_FINDINGS);
-  const lungo = R.normalizeFindings([{ level: 0, text: 'x'.repeat(5000), decision: 'sì' }])[0];
+  const lungo = R.normalizeFindings([{ level: 0, text: 'x'.repeat(R.MAX_FINDING_TEXT + 1000), decision: 'sì' }])[0];
   assert.equal(lungo.text.length, R.MAX_FINDING_TEXT);
   assert.equal(lungo.decision, false);
+  // Un rilievo coi suoi passi (5000 caratteri) resta INTERO: il tetto del
+  // singolo rilievo è quello della critica (12000), non 2000.
+  assert.equal(R.normalizeFindings([{ level: 1, text: 'abc '.repeat(1250) }])[0].text.length, 5000 - 1);
+  assert.equal(R.MAX_FINDING_TEXT, 12000);
 });
 
 // ── I bilanci (spec §4) ──────────────────────────────────────────────────────
