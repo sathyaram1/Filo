@@ -86,6 +86,16 @@ export const MAX_CRITIQUE_CHARS = 12000;
 // trovarle prima di aver registrato la critica. Le stampa questo strumento,
 // solo dopo la critica, senza passare da nessun altro agente.
 export function phase2InstructionsFile(root = ROOT) {
+  // «Sopra il repo» vuol dire sopra il checkout PRINCIPALE: un lavoro che sta
+  // in una cartella di lavoro separata (`.claude/worktrees/<nome>`) ha come
+  // cartella sopra quella dei worktree, e lì il file non c'è (verifica del
+  // giro 9 su #561). La radice vera la dice git, come per il marcatore del
+  // ruolo; senza git si ripiega sulla cartella sopra `root`.
+  try {
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (common) return resolve(common, '..', '..', 'FASE2-LOCALE.md');
+  } catch (_) { /* niente git: ripiego */ }
   return resolve(root, '..', 'FASE2-LOCALE.md');
 }
 export function readPhase2Instructions(root = ROOT) {
