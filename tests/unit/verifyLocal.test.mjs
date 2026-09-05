@@ -491,7 +491,7 @@ test('CLI: «pass» con dentro un [2] risponde con la fase 2 (stato «sta correg
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   const p = vl(casa, 'pass', 'Provato tutto.\n[2] però questo è rotto');
   assert.equal(p.code, 0, p.out);
-  assert.match(p.out, /FASE 2, adesso correggi tu/);
+  assert.match(p.out, /c'è da correggere[\s\S]*Rilievi da correggere ADESSO/);
   assert.match(p.out, /\[2\] però questo è rotto/);
   assert.doesNotMatch(p.out, /torna a chi l'ha fatto/);
   assert.match(vl(casa, 'status').out, /sta correggendo/);
@@ -503,4 +503,35 @@ test('CLI: «pass» con dentro un [2] risponde con la fase 2 (stato «sta correg
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   assert.match(vl(casa, 'fail', 'non salva').out, /il lavoro si ferma/);
   assert.match(vl(casa, 'status').out, /bocciato/);
+});
+
+// ─── Tetto abbondante, niente taglio silenzioso (CLAUDE.md § Limiti) ────────
+//
+// Al giro 8 su #561 le critiche dei giri passati arrivavano mozzate a 4000
+// caratteri, e i rilievi (in coda) sparivano dal brief del verificatore dopo.
+
+test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta col numero, non tagliata', async () => {
+  const { MAX_CRITIQUE_CHARS, readPhase2Instructions } = await import('../../scripts/verify-local.mjs');
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const riassunto = 'provato '.repeat(700); // ~5600 caratteri: sopra il vecchio taglio a 4000
+  const lunga = withCritique(s, 'r', { critique: `${riassunto}\n[2] LA PORTA ROSSA: il salvataggio non salva col titolo vuoto`, sha: SHA });
+  assert.equal(lunga.outcome, 'fix');
+  assert.match(lunga.state.r.critique, /LA PORTA ROSSA/, 'il rilievo in coda sopravvive: non si taglia');
+  const troppa = withCritique(s, 'r', { critique: `${'x'.repeat(MAX_CRITIQUE_CHARS + 1)}\n[2] rotto`, sha: SHA });
+  assert.equal(troppa.ok, false);
+  assert.match(troppa.reason, /troppo lunga/);
+  assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_CHARS)), 'il rifiuto dice il tetto');
+  assert.equal(troppa.state.r.verdict, undefined, 'respinta: niente scritto');
+  assert.equal(typeof readPhase2Instructions, 'function');
+});
+
+test('phase2Text: le istruzioni arrivano da fuori (file sopra il repo), non dal codice; senza file si dice dove chiederle', () => {
+  const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
+  const conFile = phase2Text({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
+  assert.match(conFile, /ISTRUZIONI SEGRETE DELL'OWNER/);
+  assert.match(conFile, /\[2\] rotto/);
+  const senza = phase2Text(base);
+  assert.match(senza, /FASE2-LOCALE\.md/, 'dice dove doveva essere il file');
+  assert.match(senza, /verify-local\.mjs corretto/, 'e come si consegna comunque');
+  assert.ok(!/adesso correggi tu/.test(senza), 'il testo delle istruzioni non vive nello strumento');
 });
