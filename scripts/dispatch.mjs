@@ -1508,11 +1508,15 @@ if (isMainModule) {
 
   try {
     if (flag === '--record-verifier') {
-      const [, id, verdict, ...rest] = conBiglietto(argv);
-      if (!id || !VERIFIER_VERDICTS.includes(verdict)) { console.error('Uso: --record-verifier <id> <pass|migliorabile|fail> ["critica"]'); process.exit(1); }
-      const s = await recordVerifier(id, verdict, rest.join(' '));
+      const [, id, ...rest] = conBiglietto(argv);
+      // La parola del vecchio verdetto (pass|migliorabile|fail) è tollerata e
+      // ignorata: l'esito lo calcola il server dai livelli della critica.
+      if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) rest.shift();
+      if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, col livello davanti: [2] …>"'); process.exit(1); }
+      const s = await recordVerifier(id, rest.join(' '));
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: verifier=${s.verifierVerdict} loop=${s.loopCount} migliorabile=${Number(s.improvableCount) || 0}`);
+      console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);
+      console.log(verifierReplyText(s.reply));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const [, id, ...rest] = conBiglietto(argv);
