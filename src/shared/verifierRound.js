@@ -69,23 +69,61 @@
   // un elenco numerato è il modo più naturale di scrivere tre rilievi.
   const FINDING_LINE = /^\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
-  // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»): una riga che
-  // comincia così non è un rilievo, ma non è nemmeno riassunto. Con la sola
-  // scala 0-3 un «[4] gravissimo» passava in silenzio (verifica del giro 3 su
-  // #561).
-  const LEVEL_TOKEN = /\[\s*\d+(?:\s*[-–/]\s*\d+)?\s*\??\s*\]/;
+  // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
+  // COMINCIA così, o che lo porta dopo una breve etichetta e prima di un
+  // separatore («Rilievo [2]: …», «Livello [2] - …»), non è un rilievo ma non
+  // è nemmeno riassunto. Con la sola scala 0-3 un «[4] gravissimo» passava in
+  // silenzio (verifica del giro 3 su #561). In MEZZO a una frase invece le
+  // parentesi sono testo: «ho ri-provato la porta [2] del giro scorso» è il
+  // modo naturale di scrivere il riassunto (verifica del giro 4).
+  const LEVEL_TOKEN_SRC = '\\[\\s*\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*\\??\\s*\\]';
+  const LEVEL_LINE = new RegExp(
+    `^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?(?:${LEVEL_TOKEN_SRC}|[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—])`
+  );
 
   /**
-   * Le righe che portano un livello fra parentesi quadre ma NON aprono un
-   * rilievo («Rilievo [2]: il pulsante non salva»). Senza questo controllo
-   * finivano nel riassunto, e un lavoro con un [2] scritto così passava in
-   * silenzio (verifica del giro 2 su #561): chi registra la critica le
-   * rifiuta chiedendo il formato giusto. PURA.
+   * Le righe della critica che NON si possono registrare così come sono. PURA.
+   *
+   *   - un livello fuori posto o fuori scala («Rilievo [2]: …», «[4] …»,
+   *     «[2-3] …»): senza questo controllo finivano nel riassunto, e un lavoro
+   *     con un [2] scritto così passava in silenzio (verifiche dei giri 2 e 3
+   *     su #561);
+   *   - un livello SENZA testo (una riga «[2]» e basta, senza continuazione):
+   *     il lettore lo scartava e il rilievo spariva — un [2] diventava un pass
+   *     (verifica del giro 4);
+   *   - più rilievi del tetto: il quarantunesimo veniva tagliato senza dirlo.
+   *
+   * Chi registra la critica le rifiuta chiedendo il formato giusto.
    */
   function unparsedLevelLines(text) {
-    return String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')
-      .filter((l) => LEVEL_TOKEN.test(l) && !FINDING_LINE.test(l))
-      .map((l) => l.trim());
+    const lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    const out = [];
+    let current = null;
+    let count = 0;
+    const flush = () => {
+      if (current && !current.text) out.push(`${current.line} (rilievo senza testo)`);
+      current = null;
+    };
+    for (const raw of lines) {
+      const m = FINDING_LINE.exec(raw);
+      if (m) {
+        flush();
+        count += 1;
+        current = { line: raw.trim(), text: m[3].trim() };
+        continue;
+      }
+      if (LEVEL_LINE.test(raw)) {
+        flush();
+        out.push(raw.trim());
+        continue;
+      }
+      if (current && raw.trim()) current.text += raw.trim();
+    }
+    flush();
+    if (count > MAX_FINDINGS) {
+      out.push(`troppi rilievi: ${count}, il massimo è ${MAX_FINDINGS} (raggruppa per causa: un rilievo per porta, non per sintomo)`);
+    }
+    return out;
   }
 
   /**
