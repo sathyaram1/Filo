@@ -544,8 +544,7 @@ if (isMain) {
     const b = currentBranch();
     const state = withRequest(readState(), b, { request, sha: headSha() });
     writeState(state);
-    const history = (state[b].rounds || []).filter((r) => r.found && r.found.length).map((r, i) => ({ critique: `giro ${i + 1}: livelli ${r.found.join(', ')} — esito ${r.outcome}` }));
-    console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe(), history }));
+    console.log(buildVerifierBrief({ request, branch: b, recipe: readRecipe(), history: historyFromRounds(state[b].rounds) }));
     process.exit(0);
   }
 
