@@ -332,7 +332,9 @@
         }
       }
     }
-    return { text: fullText, servedBy, usage };
+    return {
+      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy, usage,
+    };
   }
 
   // Errore HTTP con status e provider strutturati (come per le chat, #331).
