@@ -168,7 +168,6 @@ test('cerca → legge → sveglia → risposta in UN turno, con diario in dirett
   expect(c.length).toBe(3);
   expect(c[0].hasTools).toBe(true);
   expect(c[0].toolNames).toEqual(expect.arrayContaining(['CERCA_WEB', 'SVEGLIA', 'NAVIGA', 'LEGGI_DOCUMENTO']));
-  expect(c[0].toolNames).not.toContain('ONBOARDING');
   const m2 = c[1].messages;
   const asst2 = m2[m2.length - 2];
   const tool2 = m2[m2.length - 1];
@@ -276,8 +275,8 @@ test('azione con conferma (impostazione sensibile) dentro il giro: popup e esito
   const okBtn = page.locator('.sn-confirm-btn-ok');
   console.log('OK BTN COUNT:', await okBtn.count(), 'TESTO POPUP:', await page.locator('.sn-confirm-text').allTextContents());
   await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-popup.png' });
-  if (await okBtn.count()) await okBtn.click();
-  else await page.evaluate(() => { const h = document.querySelector('.sn-confirm-host'); const b = h && h.shadowRoot && h.shadowRoot.querySelector('.sn-confirm-btn-ok'); b && b.click(); });
+  // Il popup vive in uno shadow root chiuso: il tasto OK ha il fuoco, Invio lo preme.
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(1500);
   console.log('BOTTONI DOPO OK:', await page.locator('.dash-action-btn').allTextContents());
   console.log('SETTINGS:', JSON.stringify(await app.evaluate(async () => { const s = await globalThis.SN_STORAGE.getSettings(); return s.terminal; })));
@@ -364,6 +363,7 @@ test('stress: messaggio lunghissimo, emoji, HTML nei risultati; cronologia mostr
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  await app.evaluate(async () => { const M = globalThis.SN_FILO_MEMORY; const O = globalThis.SN_ONBOARDING; await M.setOnboarding(O.close(await M.getOnboarding())); });
   await installSearch(app, SEARCH_RESULTS);
   await installProvider(app, [
     { reasoning: '🤔 penso', text: '<b>nota</b> 🍝', toolCalls: [{ id: 's1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: '<script>alert(1)</script> 🍕' }) }] },
@@ -379,6 +379,7 @@ test('stress: messaggio lunghissimo, emoji, HTML nei risultati; cronologia mostr
   expect(await page.locator('.dash-activity-body script, .dash-activity-body b, .dash-bubble-filo script').count()).toBe(0);
   const c = await calls(app);
   expect(c[0].messages[c[0].messages.length - 1].content.length).toBeGreaterThan(9_000);
+  expect(c[0].toolNames).not.toContain('ONBOARDING');
   await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-stress.png' });
 
   // Cronologia AI: la voce del giro con azioni ha le misure e le azioni.
@@ -391,4 +392,92 @@ test('stress: messaggio lunghissimo, emoji, HTML nei risultati; cronologia mostr
   const outs = await hp.locator('.sn-history-output').allTextContents();
   expect(outs.some((t) => t.includes('[Azioni: CERCA_WEB]'))).toBe(true);
   await hp.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-history.png' });
+});
+
+test('appunto, lezione e spunta dell’accoglienza come strumenti: esito al modello', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await installProvider(app, [
+    { toolCalls: [{ id: 'n1', name: 'SALVA_APPUNTO', arguments: JSON.stringify({ testo: 'comprare il latte', contesto: 'spesa' }) }] },
+    { toolCalls: [{ id: 'n2', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: 'L\'utente beve latte.' }) }] },
+    { toolCalls: [{ id: 'n3', name: 'ONBOARDING', arguments: JSON.stringify({ spunta: ['profilo'] }) }] },
+    { text: 'Segnato.' },
+  ]);
+  await sendChat(page, 'ricordami di comprare il latte');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 15_000 });
+  const c = await calls(app);
+  const toolMsgs = c[3].messages.filter((m) => m.role === 'tool');
+  console.log('ESITI APPUNTO/LEZIONE/ONBOARDING:', JSON.stringify(toolMsgs));
+  const lessons = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
+  expect(lessons.some((l) => /beve latte/.test(l.text))).toBe(true);
+  const onb = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getOnboarding());
+  console.log('ONBOARDING:', JSON.stringify(onb.ticked));
+  for (const m of toolMsgs) expect(m.content).not.toMatch(/NON eseguita/);
+});
+
+test('più strumenti in un giro, link aperto una volta sola, chiamate senza id, tema scuro', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(async () => { const M = globalThis.SN_FILO_MEMORY; const O = globalThis.SN_ONBOARDING; await M.setOnboarding(O.close(await M.getOnboarding())); });
+  await installSearch(app, SEARCH_RESULTS);
+  await installProvider(app, [
+    // due strumenti nello stesso giro, senza id (come fanno alcuni fornitori)
+    { reasoning: 'Faccio due cose insieme.', toolCalls: [
+      { id: 'd1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: 'doppio' }) },
+      { id: 'd2', name: 'TIMER', arguments: JSON.stringify({ secondi: 120, etichetta: 'tè' }) },
+    ] },
+    { toolCalls: [
+      { id: 'k1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'tema', valore: 'scuro' }) },
+      { id: 'k2', name: 'NAVIGA', arguments: JSON.stringify({ url: 'filo://newtab/', etichetta: 'Home', background: true }) },
+    ] },
+    { text: 'Fatto tutto.' },
+  ]);
+  await sendChat(page, 'cerca doppio, timer tè 2 minuti, tema scuro e apri la home dietro');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto tutto.' })).toBeVisible({ timeout: 15_000 });
+  const c = await calls(app);
+  const m2 = c[1].messages;
+  const asst = m2.filter((m) => m.role === 'assistant').pop();
+  const tools2 = m2.filter((m) => m.role === 'tool');
+  console.log('ASSISTANT TOOL_CALLS:', JSON.stringify(asst.tool_calls.map((t) => t.id)), 'TOOL IDS:', JSON.stringify(tools2.map((t) => t.tool_call_id)));
+  expect(tools2.length).toBe(2);
+  // Gli id delle risposte devono combaciare con quelli delle chiamate.
+  console.log('ID COMBACIANO:', JSON.stringify(tools2.map((t) => t.tool_call_id)) === JSON.stringify(asst.tool_calls.map((t) => t.id)));
+  await expect(page.locator('.dash-activity[data-phase="done"]')).toHaveCount(1, { timeout: 5_000 });
+  await page.locator('.dash-activity-head').click();
+  const bodyText = await page.locator('.dash-activity-body').textContent();
+  console.log('DIARIO 2:', bodyText);
+  expect((bodyText.match(/Cerco sul web: doppio/g) || []).length).toBe(1);
+  expect((bodyText.match(/Timer avviato/g) || []).length).toBe(1);
+  expect((bodyText.match(/Impostato · tema = scuro/g) || []).length).toBe(1);
+  // Il link è un bottone sotto la risposta (una volta sola) e la scheda si è aperta una volta.
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn', { hasText: 'Home' })).toHaveCount(1);
+  await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 5_000 });
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).theme)).toBe('dark');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-dark.png' });
+});
+
+test('comando della finestra come strumento: esito al modello', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(async () => { const M = globalThis.SN_FILO_MEMORY; const O = globalThis.SN_ONBOARDING; await M.setOnboarding(O.close(await M.getOnboarding())); });
+  await installProvider(app, [
+    { toolCalls: [{ id: 'w1', name: 'COMANDO_FINESTRA', arguments: JSON.stringify({ comando: 'home' }) }] },
+    { text: 'Eccoti alla home.' },
+  ]);
+  await sendChat(page, 'vai alla home');
+  await expect.poll(async () => (await calls(app)).length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2);
+  const c = await calls(app);
+  const toolMsgs = c[1].messages.filter((m) => m.role === 'tool');
+  console.log('ESITO FINESTRA:', JSON.stringify(toolMsgs), 'TAB:', await shell.locator('.tab').count());
+  for (const m of toolMsgs) expect(m.content).not.toMatch(/NON eseguita/);
 });
