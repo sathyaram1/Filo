@@ -63,7 +63,7 @@
       return { inputs: [M.AUDIO], outputs: [M.TEXT] };
     }
     // Sintesi vocale o musica → audio in output. (lyria = musica)
-    if (/(^|[-_/])tts([-_]|$)|-tts|\btts\b|speech|lyria|kokoro|orpheus|(^|[-_/])csm-/.test(id)) {
+    if (/(^|[-_/])tts([-_]|$)|-tts|\btts\b|speech|lyria|kokoro|orpheus|(^|[-_/])csm-|mai-voice|aura-2|fish-audio/.test(id)) {
       return { inputs: [M.TEXT], outputs: [M.AUDIO] };
     }
     // Generazione immagini.
