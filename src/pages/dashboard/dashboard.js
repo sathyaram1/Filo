@@ -1842,6 +1842,12 @@
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
       pending.endTurn();
       if (ownsActivity) pending.finish();
+      // Le azioni fatte PRIMA del guasto sono successe davvero: restano nello
+      // storico, così un «Riprova» riparte sapendo che quel timer c'è già
+      // invece di avviarne un secondo.
+      if (Array.isArray(r?.actions) && r.actions.length) {
+        threadHistory.push({ role: 'filo', text: '', actions: r.actions });
+      }
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
