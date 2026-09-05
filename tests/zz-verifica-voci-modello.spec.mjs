@@ -204,6 +204,14 @@ test('preferenze: la tendina mostra le voci del modello in uso', async ({ app, o
     }, null, { timeout: 8000 }).catch(() => {});
     return p;
   }
+  async function reloadPrefs(p) {
+    await p.reload();
+    await p.waitForFunction(() => {
+      const s = document.getElementById('ttsModelVoiceModel');
+      return s && /Modello:/.test(s.textContent);
+    }, null, { timeout: 8000 }).catch(() => {});
+    await p.waitForTimeout(500);
+  }
   async function readSel(p) {
     return p.evaluate(() => {
       const sel = document.getElementById('ttsModelVoice');
@@ -241,8 +249,7 @@ test('preferenze: la tendina mostra le voci del modello in uso', async ({ app, o
 
   // Cambio modello → aura-2: la voce salvata (Diego) è di un altro modello.
   await setModel(app, 'deepgram/aura-2', 'it-IT-DiegoNeural');
-  await p.close().catch(() => {});
-  p = await openPrefs();
+  await reloadPrefs(p);
   s = await readSel(p);
   console.log('PREF aura-2 con voce stantia →', JSON.stringify({ ...s, opts: s.opts.length }));
   expect(s.model).toContain('deepgram/aura-2');
@@ -254,8 +261,7 @@ test('preferenze: la tendina mostra le voci del modello in uso', async ({ app, o
 
   // Fish: sceglie da sé
   await setModel(app, 'fish-audio/s2-pro', '');
-  await p.close().catch(() => {});
-  p = await openPrefs();
+  await reloadPrefs(p);
   s = await readSel(p);
   console.log('PREF fish →', JSON.stringify({ ...s, opts: s.opts.length }));
   expect(s.groups).toEqual([]);
@@ -263,8 +269,7 @@ test('preferenze: la tendina mostra le voci del modello in uso', async ({ app, o
 
   // Modello inventato: nessuna voce nota, il campo a mano dev'essere raggiungibile
   await setModel(app, 'acme/tts-x', '');
-  await p.close().catch(() => {});
-  p = await openPrefs();
+  await reloadPrefs(p);
   s = await readSel(p);
   console.log('PREF inventato →', JSON.stringify({ ...s, opts: s.opts.length }));
   expect(s.opts.some((o) => o.v === '__custom__')).toBeTruthy();
@@ -283,9 +288,8 @@ test('preferenze: la tendina mostra le voci del modello in uso', async ({ app, o
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.setSettings({ models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.TTS]: '' } });
   });
-  await p.close().catch(() => {});
-  p = await openTab('filo://preferences/preferences.html');
-  await p.waitForTimeout(1500);
+  await p.reload();
+  await p.waitForTimeout(2000);
   s = await readSel(p);
   console.log('PREF senza modello →', JSON.stringify({ ...s, opts: s.opts.length }));
 
