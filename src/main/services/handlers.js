@@ -707,23 +707,24 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // suo valore mano a mano dal buffer grezzo (streamingJson) ed emettiamo solo i
   // caratteri già sicuri, così la bolla si riempie mentre il modello scrive senza
   // aspettare le "actions" in coda.
-  const StreamJson = globalThis.SN_STREAM_JSON;
-  const textStreamer = (onText && StreamJson) ? StreamJson.createTextStreamer('text') : null;
-  const result = (onReasoning || onText)
+  // Tempi del turno, dal momento in cui la richiesta parte: primo pezzo di
+  // ragionamento, prima parola (o prima azione nominata), fine. In millisecondi.
+  const t0 = Date.now();
+  const timing = { firstReasoningMs: null, firstTextMs: null, firstToolMs: null, totalMs: 0 };
+  const mark = (k) => { if (timing[k] == null) timing[k] = Date.now() - t0; };
+  const textStreamer = onText ? createAnswerStreamer(onText) : null;
+  const result = (onReasoning || onText || onToolCall)
     ? await (async () => {
         let acc = '';
         const r = await Providers.streamCompleteWithFallback({
-          attempts, messages, signal,
+          attempts, messages, tools, toolChoice, signal,
           onDelta: (d) => {
             acc += d;
-            if (textStreamer) {
-              try {
-                const { delta } = textStreamer.push(d);
-                if (delta) onText({ delta });
-              } catch (_) {}
-            }
+            mark('firstTextMs');
+            if (textStreamer) textStreamer.push(d);
           },
-          onReasoning: (t) => { try { onReasoning && onReasoning(t); } catch (_) {} },
+          onReasoning: (t) => { mark('firstReasoningMs'); try { onReasoning && onReasoning(t); } catch (_) {} },
+          onToolCall: (c) => { mark('firstToolMs'); try { onToolCall && onToolCall(c); } catch (_) {} },
           // Provider caduto a metà stream → il buffer contiene testo parziale
           // del tentativo fallito: azzeralo prima del tentativo successivo (#273).
           // Anche il testo già mostrato in chat va buttato e riscritto dal
@@ -733,9 +734,13 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
             if (textStreamer) { textStreamer.reset(); try { onText({ reset: true }); } catch (_) {} }
           },
         });
+        if (textStreamer) textStreamer.flush();
         return { ...r, text: r.text != null ? r.text : acc };
       })()
-    : await Providers.completeWithFallback({ attempts, messages, signal });
+    : await Providers.completeWithFallback({ attempts, messages, tools, toolChoice, signal });
+  timing.totalMs = Date.now() - t0;
+  const toolCalls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
+  const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
   const { servedBy, violation } = noteServedProvider(settings, action, result);
