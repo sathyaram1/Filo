@@ -36,9 +36,17 @@ costano dieci riletture, in un turno solo una. Quindi:
 - **Chiamate indipendenti nello stesso turno.** Letture, ricerche, controlli
   che non dipendono l'uno dall'esito dell'altro partono insieme. Una chiamata
   che dipende da un esito va DOPO l'esito, oppure nella stessa riga di shell
-  legata al passo prima (`&&` in Bash; in PowerShell 5.1 non esiste, si usa
-  `if ($?)`), mai in un batch che va avanti anche se il passo prima è fallito:
-  un test rosso deve fermare, non finire in coda a un commit.
+  legata al passo prima, mai in un batch che va avanti anche se il passo prima
+  è fallito: un test rosso deve fermare, non finire in coda a un commit. La
+  forma giusta, per shell:
+  - Bash: `npm run test:unit && git commit …`. Attenzione al tubo: in
+    `npm run test:unit | tail -40 && git commit` l'esito che conta è quello di
+    `tail`, e il commit parte anche coi test rossi. O non si filtra il comando
+    di cui conta l'esito, o si mette `set -o pipefail` prima.
+  - PowerShell 5.1: `&&` è un errore di sintassi; si scrive
+    `npm run test:unit; if ($?) { git commit … }`, e regge anche attraverso un
+    tubo. Non aggiungere `2>&1` a un eseguibile: rende `$?` falso anche a
+    esito 0, e la catena si ferma su un successo.
 - **Le esplorazioni si delegano.** Se rispondere vuol dire leggere più di
   qualche file, lo fa un sotto-agente e qui resta la conclusione, non i file.
   Tieni in contesto solo ciò che ti servirà davvero nei turni dopo. Più
