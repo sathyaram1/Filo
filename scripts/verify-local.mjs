@@ -151,6 +151,18 @@ export function withRequest(state, branch, { request, sha, at }) {
 export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
+  // Una critica vuota non è un pass: un pass senza una riga di riassunto non
+  // dice cosa è stato provato, ed è più spesso un comando lanciato male che
+  // una verifica (una bocciatura senza motivo è già rifiutata).
+  if (!String(critique || '').trim()) {
+    return { ok: false, state: s, reason: 'critica vuota: un pass senza una riga di riassunto non è una verifica. Scrivi cosa hai provato e cosa funziona, e i rilievi se ci sono.' };
+  }
+  // La critica registrata non si modifica più, e un giro non si paga due volte
+  // per un comando ripetuto: finché la correzione è in sospeso, prima si
+  // consegna.
+  if (prev.verdict === 'fix-pending' && prev.pending) {
+    return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start.' };
+  }
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
   const outcome = decision.stop ? 'stop' : decision.fix.length ? 'fix' : 'pass';
