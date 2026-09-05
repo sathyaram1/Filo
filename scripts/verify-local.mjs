@@ -634,7 +634,7 @@ if (isMain) {
     writeState(r.state);
     const e = r.state[branch];
     if (r.outcome === 'fix') {
-      console.log(phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch }));
+      console.log(phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: readPhase2Instructions() }));
     } else if (r.outcome === 'stop') {
       console.log(`══ ESITO: il lavoro si ferma ══\nRilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
     } else {
