@@ -303,7 +303,11 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   *(Ritirato il 2026-08-19: la selezione vive solo nel server,
   `filo-security/functions/src/routine/select.js`.)*
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
-  loop 3× → `design`+`statusReason: loop`.
+  loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: il
+  verificatore registra la critica coi livelli e corregge lui stesso; i tre
+  bilanci `cap2/cap1/cap0` e le regole stanno in `src/shared/feedbackTransitions.js`
+  e `src/shared/verifierRound.js`, incorporati dal server; il correttore separato
+  resta solo per il riallineamento dopo un conflitto.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`firebase deploy --only firestore:rules`).
