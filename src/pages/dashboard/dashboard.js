@@ -1444,6 +1444,19 @@
         if (!ok) return;
         btn.disabled = true;
         const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a });
+        // L'utente ha detto sì: da qui in poi l'azione è FATTA. Lo deve sapere
+        // il diario (una riga come per le azioni di livello 1) e lo deve sapere
+        // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
+        // storico della conversazione, quindi basta segnarlo qui. Senza,
+        // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
+        if (r && r.executed) {
+          a._confirmed = true;
+          a._executed = true;
+          delete a._confirm;
+          if (r.output) a._output = r.output;
+          const row = activityRowFor(a);
+          if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+        }
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;
