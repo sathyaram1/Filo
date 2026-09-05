@@ -2582,9 +2582,11 @@ nel testo viene ancora letto (`legacyEnvelope`), senza ritentativi.
 - Perché una riga compaia il main deve RESTITUIRE l'azione (`kept: true`):
   timer e sveglie prima venivano scartati dopo l'esecuzione e non arrivavano
   mai alla chat.
-- Il ragionamento di ogni turno entra nello storico del thread (`reasoning`,
-  `reasoningMs`) ma NON torna nel prompt (vedi idee: con gli strumenti nativi
-  ha un posto suo).
+- Il ragionamento di ogni turno entra nello storico del thread come testo
+  (`reasoning`, `reasoningMs`, per la lettura) e come blocchi strutturati del
+  fornitore (`reasoningDetails`): questi ultimi tornano al modello nel
+  messaggio dell'assistente (`reasoning_details`), dentro il giro e al turno
+  dopo, così riprende da dove aveva lasciato invece di ripensare tutto.
 - Senza niente da raccontare il blocco si toglie da solo: nessun residuo.
 - Test: `tests/dashboard-chat-attivita.spec.mjs` (con screenshot in
   `tests/agent/.out/attivita-*.png`). Gli spec che asseriscono una traccia
