@@ -152,7 +152,13 @@ il livello non viene eseguito.
 
 - **Regola operativa:** quando aggiungi un'azione Filo, registrala in
   `actionLevels.js` con livello + `describe()` (la spiegazione in chiaro per il
-  popup). Per le preferenze il livello è per-setter in `preferences.js`
+  popup) E in `actionTools.js` con descrizione + parametri: è lì che il modello
+  la vede, come strumento nativo (tool calling), non più in un elenco nel
+  prompt. Il nome dello strumento È il tipo dell'azione. La sentinella
+  `tests/unit/actionTools.test.mjs` pretende che i due elenchi combacino: uno
+  strumento senza livello non si esegue, un livello senza strumento non si può
+  chiamare. Le descrizioni che dipendono dal sistema (shell, percorsi) sono
+  funzioni di `{ sistema }`, mai testo fisso con un esempio di Windows. Per le preferenze il livello è per-setter in `preferences.js`
   (`level: 2` su ciò che tocca sicurezza/shell). La sospensione e la conferma
   passano da `needsConfirm` → bottone in chat → `MSG.FILO_CONFIRM_ACTION`; il
   main **riclassifica** alla conferma, non si fida del client.
