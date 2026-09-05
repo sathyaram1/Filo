@@ -97,6 +97,44 @@ module.exports = function register(on, ctx) {
   // ripieghiamo in una sessione dell'app. Torna false appena una sintesi riesce,
   // così se il modello torna a funzionare e poi ricasca l'utente è di nuovo avvisato.
   let ttsFallbackAnnounced = false;
+
+  // Voci che il router ha DICHIARATO per un modello che non è nei cataloghi
+  // ("Unknown voice … Supported voices: a, b, c"): dalla seconda richiesta in
+  // poi valgono come catalogo, senza pagare un altro 400. Per sessione.
+  const learnedVoices = new Map(); // modelId → [voce, …]
+
+  // Sintesi con recupero della voce: se il router rifiuta la voce elencando
+  // quelle ammesse, si riprova UNA volta con una della lingua del testo (e la
+  // lista si ricorda). Se invece pretende una voce e non ne abbiamo nessuna da
+  // dargli, l'errore diventa una frase per l'utente (codice TTS_VOICE_REQUIRED)
+  // che dice dove scriverla.
+  async function synthesizeWithVoiceRecovery(P, { apiKey, model, text, voice, lang, speed, routing }) {
+    const Voices = globalThis.SN_TTS_VOICES;
+    try {
+      return await P.synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting: routing });
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      const listed = Voices ? Voices.voicesFromError(msg) : [];
+      if (listed.length) {
+        learnedVoices.set(model, listed);
+        const retry = Voices.pickFromList(listed, lang);
+        if (retry && retry !== voice) {
+          console.warn(`[SN] TTS: voce "${voice || '(nessuna)'}" rifiutata da ${model}, riprovo con "${retry}"`);
+          const r = await P.synthesizeSpeech({ apiKey, model, text, voice: retry, speed, providerRouting: routing });
+          r.voice = retry;
+          return r;
+        }
+      }
+      if (Voices && Voices.isVoiceRequiredError(msg)) {
+        const I18n = globalThis.SN_I18N;
+        const err = new Error(I18n ? I18n.t('err_tts_voice_required', model) : msg);
+        err.code = 'TTS_VOICE_REQUIRED';
+        throw err;
+      }
+      throw e;
+    }
+  }
+
   const ttsFallback = (error, errorCode) => {
     const firstFallback = !ttsFallbackAnnounced;
     ttsFallbackAnnounced = true;
