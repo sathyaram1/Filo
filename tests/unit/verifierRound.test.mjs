@@ -274,3 +274,9 @@ test('#561 giro 7: il segno prima della cifra («[?2]») o un segno diverso dopo
   assert.deepEqual(R.unparsedLevelLines('Provato il caso [?2] del giro prima: chiuso.\n[1] bordo'), []);
   assert.equal(R.parseFindings('Provato.\n[2?] decidi tu').findings[0].decision, true);
 });
+
+test('parseFindings: titolo Markdown, citazione ed elenco con le lettere davanti al livello sono rilievi (giro 11 su #561)', () => {
+  const p = R.parseFindings('Provato.\n### [2] rotto uno\n> [1] rotto due\na) [0] rotto tre\nb) [1?] gusto');
+  assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, false], [0, false], [1, true]]);
+  assert.equal(R.unparsedLevelLines('Provato.\n### [2] rotto').length, 0, 'non è una riga da sistemare: è un rilievo');
+});
