@@ -46,6 +46,7 @@ export async function setup(app, script, opts = {}) {
       });
       const step = V.script[V.i] || V.script[V.script.length - 1];
       V.i += 1;
+      if (step.delay) await new Promise((r) => setTimeout(r, step.delay));
       if (step.throw) { const e = new Error(step.throw); throw e; }
       if (step.reasoning && onReasoning) { for (const t of step.reasoning) onReasoning(t); }
       if (step.text && onDelta) {
