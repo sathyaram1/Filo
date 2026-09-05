@@ -1199,7 +1199,7 @@
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(a.type, row.icon, row.text); return true; }
+    if (row) { activity.addRow(a.type, row.icon, row.text, !!row.failed); return true; }
     return false;
   }
 
