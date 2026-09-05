@@ -447,68 +447,70 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
-// Contatori del verificatore a tre esiti (config/routines, campi `failCap` e
-// `improvableCap` — SPEC-RIDISEGNO-MAX.md §13). Li applica il SERVER quando
-// registra i verdetti; qui la dashboard li legge e li scrive. I DEFAULT vengono
-// dalla fonte unica (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS: la
-// stessa che il server incorpora al deploy); il range da SN_CONST.AUTOMATION.
-// Clamp prudente sia in lettura sia in scrittura.
+// I tre bilanci del verificatore che corregge (config/routines, campi `cap2`,
+// `cap1`, `cap0` — feedback #561) e il testo della fase 2 (`fixInstructions`).
+// Li applica il SERVER quando registra la critica; qui la dashboard li legge e
+// li scrive. I DEFAULT vengono dalla fonte unica
+// (`src/shared/feedbackTransitions.js`, VERIFIER_CAPS: la stessa che il server
+// incorpora al deploy); il range da SN_CONST.AUTOMATION. Clamp prudente sia in
+// lettura sia in scrittura. Lo 0 è un valore valido per tutti e tre.
+const CAP_KEYS = ['cap2', 'cap1', 'cap0'];
+const FIX_INSTRUCTIONS_MAX = 8000;
+
 function automationDefaults() {
   const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
   const CAPS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS) || {};
   return {
-    failDef: Number.isFinite(CAPS.failCap) ? CAPS.failCap : 10,
-    improvableDef: Number.isFinite(CAPS.improvableCap) ? CAPS.improvableCap : 0,
-    min: Number.isFinite(A.LOOP_CAP_MIN) ? A.LOOP_CAP_MIN : 1,
-    improvableMin: Number.isFinite(A.IMPROVABLE_CAP_MIN) ? A.IMPROVABLE_CAP_MIN : 0,
-    max: Number.isFinite(A.LOOP_CAP_MAX) ? A.LOOP_CAP_MAX : 10,
+    defs: {
+      cap2: Number.isFinite(CAPS.cap2) ? CAPS.cap2 : 5,
+      cap1: Number.isFinite(CAPS.cap1) ? CAPS.cap1 : 2,
+      cap0: Number.isFinite(CAPS.cap0) ? CAPS.cap0 : 0,
+    },
+    min: Number.isFinite(A.CAP_MIN) ? A.CAP_MIN : 0,
+    max: Number.isFinite(A.CAP_MAX) ? A.CAP_MAX : 10,
   };
 }
 
-function clampCap(n, def, minOverride) {
+function clampCap(n, def) {
   const { min, max } = automationDefaults();
   const v = Math.round(Number(n));
   if (!Number.isFinite(v)) return def;
-  return Math.min(max, Math.max(Number.isFinite(minOverride) ? minOverride : min, v));
+  return Math.min(max, Math.max(min, v));
 }
 
 async function getRoutineCaps(idToken) {
-  const { failDef, improvableDef, improvableMin } = automationDefaults();
+  const { defs } = automationDefaults();
+  // SOLO config/routines: è il documento che il server legge davvero, e
+  // mostrare un valore pescato altrove significa mostrare una regola che
+  // nessuno applica (vedi il commento in getAutomationProberIdle).
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  const out = { failCap: failDef, improvableCap: improvableDef };
-  // `loopCap` è il nome VECCHIO di failCap: il valore che l'owner aveva già
-  // scelto resta valido sotto il nome nuovo. SOLO config/routines: è il
-  // documento che il server legge davvero, e mostrare un valore pescato
-  // altrove significa mostrare una regola che nessuno applica (vedi il
-  // commento in getAutomationProberIdle).
-  if (doc && doc.failCap != null) out.failCap = clampCap(doc.failCap, failDef);
-  else if (doc && doc.loopCap != null) out.failCap = clampCap(doc.loopCap, failDef);
-  if (doc && doc.improvableCap != null) out.improvableCap = clampCap(doc.improvableCap, improvableDef, improvableMin);
+  const out = Object.assign({}, defs, { fixInstructions: '' });
+  for (const k of CAP_KEYS) {
+    if (doc && doc[k] != null) out[k] = clampCap(doc[k], defs[k]);
+  }
+  if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
   return out;
 }
 
 async function setRoutineCaps(patch, idToken) {
-  if (!idToken) throw new Error('Serve un ID token admin per cambiare i contatori del verificatore.');
-  const { failDef, improvableDef, improvableMin } = automationDefaults();
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare i bilanci del verificatore.');
+  const { defs } = automationDefaults();
   const p = patch && typeof patch === 'object' ? patch : {};
   const fields = {};
   const mask = [];
-  if (p.failCap != null) {
-    const v = clampCap(p.failCap, failDef);
-    fields.failCap = toFsValue(v);
-    // Alias legacy: chi legge ancora `loopCap` (server non ancora rideployato)
-    // deve vedere lo stesso valore, o la dashboard mostrerebbe una regola e il
-    // server ne applicherebbe un'altra.
-    fields.loopCap = toFsValue(v);
-    mask.push('failCap', 'loopCap');
+  for (const k of CAP_KEYS) {
+    if (p[k] == null) continue;
+    fields[k] = toFsValue(clampCap(p[k], defs[k]));
+    mask.push(k);
   }
-  if (p.improvableCap != null) {
-    fields.improvableCap = toFsValue(clampCap(p.improvableCap, improvableDef, improvableMin));
-    mask.push('improvableCap');
+  if (typeof p.fixInstructions === 'string') {
+    fields.fixInstructions = toFsValue(p.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX));
+    mask.push('fixInstructions');
   }
   if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
   return getRoutineCaps(idToken);
 }
+
 
 // Log dei worker delle routine (config/automation, campo `workerLog`): elenco
 // delle ultime esecuzioni di scripts/dispatch.mjs, ciascuna { role, startedAt,
