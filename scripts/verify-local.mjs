@@ -209,7 +209,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
     // non ci entra: quello il verificatore dopo non deve vederlo.
     rounds: (Array.isArray(prev.rounds) ? prev.rounds : []).concat([{
       at: when, found: parsed.findings.map((f) => f.level), fixed: decision.fix.map((f) => f.level),
-      consumed: decision.consume, outcome, critique: String(critique || '').slice(0, 4000),
+      consumed: decision.consume, outcome, critique: testo,
     }]),
   };
   if (outcome === 'stop') {
