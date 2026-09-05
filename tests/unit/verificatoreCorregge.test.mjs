@@ -111,7 +111,9 @@ test('la critica parte strutturata e la fase 2 del server viene stampata; poi la
     const stato = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(stato.verifierVerdict, 'fix-pending');
 
-    // Poi la consegna della correzione, dallo STESSO verificatore.
+    // Poi la correzione (un commit nuovo) e la consegna, dallo STESSO verificatore.
+    writeFileSync(resolve(casa, 'segnaposto.txt'), 'corretto', 'utf8');
+    execFileSync('git', ['commit', '-qam', 'correzione'], { cwd: casa });
     const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto.'], ENV(casa, port));
     assert.equal(c.code, 0, `la consegna doveva riuscire (stderr: ${c.se})`);
     const fixed = ricevuti.filter((x) => x.url.includes('routineDeliver')).at(-1);
