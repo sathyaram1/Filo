@@ -880,6 +880,10 @@
     });
     $('ttsPreview').addEventListener('click', previewTts);
     $('ttsModelPreview').addEventListener('click', previewModelVoice);
+    $('ttsModelVoice').addEventListener('change', () => {
+      syncCustomVoiceField();
+      if ($('ttsModelVoice').value === CUSTOM_VOICE) $('ttsModelVoiceCustom').focus();
+    });
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
