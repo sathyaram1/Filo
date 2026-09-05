@@ -481,6 +481,63 @@ test('G — conferma a metà giro, comando col terminale spento, sveglia nello s
   const cmdOut = await page.evaluate(() => Array.from(document.querySelectorAll('.dash-cmd-result')).map((n) => n.textContent.trim().slice(0, 200)));
   console.log('CMD OUT:', JSON.stringify(cmdOut));
   await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-G.png' });
+  await page.locator('.sn-confirm-host button', { hasText: 'Annulla' }).click().catch(() => {});
+  await page.locator('.dash-activity-head').click();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-G-open.png' });
   const popups = await page.evaluate(() => Array.from(document.querySelectorAll('[class*="confirm"], [class*="popup"], dialog')).map((n) => n.className + ':' + n.textContent.trim().slice(0, 80)));
   console.log('POPUPS:', JSON.stringify(popups));
+});
+
+test('H — risposta scritta nel giro con azioni e ultimo giro muto; formato vecchio con ricerca; emoji e null; 10k caratteri', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await stubSearch(app);
+  // (a) il modello scrive la risposta vera INSIEME alla chiamata, poi al giro dopo tace.
+  await installScript(app, [
+    { text: 'Ti metto la sveglia alle 7, buonanotte!', toolCalls: [{ id: 'm1', name: 'SVEGLIA', arguments: '{"time":"07:00","label":"mattina"}' }] },
+    { text: '' },
+  ]);
+  await page.locator('#input').fill('sveglia alle 7');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+  await page.waitForTimeout(500);
+  const bubblesA = await filoBubbles(page);
+  const actsA = await activityState(page);
+  console.log('H(a) BUBBLES:', JSON.stringify(bubblesA), 'ACTIVITY:', JSON.stringify(actsA.map((a) => ({ label: a.label, rows: a.rows, notes: a.notes }))));
+  await page.screenshot({ path: 'tests/.shots/zz-verifica-strumenti-Ha.png' });
+
+  // (b) formato vecchio con ricerca: gli esiti tornano e la risposta arriva.
+  await installScript(app, [
+    { text: JSON.stringify({ text: 'Cerco…', actions: [{ type: 'CERCA_WEB', query: 'pasta al pomodoro' }] }) },
+    { text: 'Ecco la ricetta: https://esempio.test/meteo' },
+  ]);
+  await sendAndWait(page, 'ricetta pasta', 'Ecco la ricetta');
+  const capB = await app.evaluate(() => globalThis.__captured);
+  console.log('H(b) round2 last msgs:', JSON.stringify(capB[1].messages.slice(-2).map((m) => [m.role, String(m.content).slice(0, 160)])));
+  expect(capB.length).toBe(2);
+  expect(JSON.stringify(capB[1].messages)).toContain('esempio.test/meteo');
+  const bubblesB = await filoBubbles(page);
+  expect(bubblesB.some((b) => b.includes('{"text"'))).toBe(false);
+  expect(bubblesB.some((b) => b.startsWith('Cerco…'))).toBe(false);
+  const actsB = await activityState(page);
+  console.log('H(b) ACTIVITY:', JSON.stringify(actsB[actsB.length - 1].rows), JSON.stringify(actsB[actsB.length - 1].notes));
+
+  // (c) emoji e null byte nell'etichetta; (d) messaggio da 10k caratteri.
+  await installScript(app, [
+    { toolCalls: [{ id: 'z1', name: 'TIMER', arguments: JSON.stringify({ secondi: 45, etichetta: 'caff\u00e8 \u2615\ud83d\udd25 \u0000fine' }) }] },
+    { text: 'Timer strano messo.' },
+  ]);
+  await sendAndWait(page, 'x'.repeat(10_000), 'Timer strano messo');
+  const capC = await app.evaluate(() => globalThis.__captured);
+  const um = capC[0].messages.filter((m) => m.role === 'user').pop();
+  expect(String(um.content).length).toBeGreaterThanOrEqual(10_000);
+  const actsC = await activityState(page);
+  console.log('H(c) ACTIVITY:', JSON.stringify(actsC[actsC.length - 1].rows));
+  const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
+  console.log('H(c) TIMERS:', JSON.stringify(timers.map((t) => t.label)));
+  await dumpErrs(app);
 });
