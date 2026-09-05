@@ -736,6 +736,17 @@
       color: var(--sn-fg); text-align: center;
     }
     .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Il testo della fase 2 (istruzioni per chi corregge): stessa pelle del
+       campo numerico, ma largo e a più righe. */
+    .mg-auto-field-row--stack { flex-direction: column; align-items: stretch; gap: 8px; }
+    .mg-auto-textarea {
+      width: 100%; max-width: 720px; min-height: 120px; resize: vertical;
+      font: inherit; font-size: 13px; line-height: 1.4;
+      padding: 8px 10px; border-radius: 8px;
+      border: 1px solid var(--sn-border, rgba(0,0,0,.18));
+      background: var(--sn-bg-input, var(--sn-bg, #fff)); color: inherit;
+    }
+    .mg-auto-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css. Qui solo
        la spaziatura nella pagina. */
