@@ -2352,7 +2352,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}` });
         continue;
       }
-      threadMessages.push(Tools.assistantMessage({ text, toolCalls: r.toolCalls, reasoningDetails: r.reasoningDetails }));
+      threadMessages.push(Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }));
       for (const x of results) threadMessages.push(Tools.toolMessage(x.action._callId, toolResultText(x)));
     }
   } catch (e) {
