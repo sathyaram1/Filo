@@ -1203,6 +1203,12 @@
     return false;
   }
 
+  // Le azioni che hanno SIA una riga nel diario SIA un bottone che porta
+  // altrove: l'appunto salvato dice cosa ha scritto Filo (riga) e apre il
+  // posto dove l'ha scritto (bottone). Per tutte le altre vale l'aut-aut: o si
+  // racconta o si clicca.
+  const ROW_AND_BUTTON = ['SALVA_APPUNTO'];
+
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
   function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
