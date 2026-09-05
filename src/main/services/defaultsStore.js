@@ -455,7 +455,7 @@ async function setAutomationProberIdle(on, idToken) {
 // incorpora al deploy); il range da SN_CONST.AUTOMATION. Clamp prudente sia in
 // lettura sia in scrittura. Lo 0 è un valore valido per tutti e tre.
 const CAP_KEYS = ['cap2', 'cap1', 'cap0'];
-const FIX_INSTRUCTIONS_MAX = 8000;
+const FIX_INSTRUCTIONS_MAX = Number(globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION && globalThis.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
 
 function automationDefaults() {
   const A = (globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION) || {};
