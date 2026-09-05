@@ -12,6 +12,7 @@
     // ripiega sulla voce del browser (Web Speech). { text, lang? } — la lingua
     // del testo sceglie la voce (salvo una voce fissata in Preferenze).
     TTS_SYNTH: 'tts_synth',                        // → { ok, audioBase64, mimeType } | { ok:false, error }
+    TTS_VOICES: 'tts_voices',                      // → { ok, model, catalog, required, groups, chosen } (voci del modello di lettura in uso)
     // Stato lettura ad alta voce condiviso tra le schede. Il content script che
     // legge segnala l'avvio/arresto al main ({ reading: bool }); il main tiene il
     // conteggio globale e ribroadcast TTS_GLOBAL_READING a TUTTE le schede, così
