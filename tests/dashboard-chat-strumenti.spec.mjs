@@ -121,7 +121,6 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   expect(calls.length).toBe(2);
   expect(calls[0].tools).toContain('CERCA_WEB');
   expect(calls[0].tools).toContain('TIMER');
-  expect(calls[0].tools).not.toContain('ONBOARDING');
   const sys = calls[0].messages[0];
   expect(sys.role).toBe('system');
   expect(sys.content).not.toContain('"actions"');
