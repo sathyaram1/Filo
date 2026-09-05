@@ -46,7 +46,9 @@ async function configureModel(app) {
 
 // Provider finto: `giri` è la lista delle risposte, una per giro del modello.
 async function fakeProvider(app, giri, slot = '__fake') {
-  await app.evaluate(async ({ giri: g, slot: s }) => {
+  // In `app.evaluate` il primo parametro è il modulo Electron: l'argomento
+  // nostro arriva per secondo.
+  await app.evaluate(async (_electron, { giri: g, slot: s }) => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis[`${s}_restore`] = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     globalThis[`${s}_calls`] = [];
