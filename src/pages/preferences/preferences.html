@@ -123,7 +123,9 @@
         <select id="ttsModelVoice">
           <option value="">Automatica: segue la lingua del testo</option>
         </select>
+        <input type="text" id="ttsModelVoiceCustom" placeholder="nome della voce, come lo chiama il modello" style="min-width:260px;" hidden>
         <button type="button" class="sn-btn sn-btn-secondary" id="ttsModelPreview">Ascolta</button>
+        <span id="ttsModelVoiceModel" class="sn-muted"></span>
         <span id="ttsModelPreviewStatus" class="sn-muted"></span>
       </div>
       <label for="ttsRate" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Velocità: <span id="ttsRateVal">1.0×</span></label>
