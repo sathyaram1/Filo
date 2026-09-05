@@ -891,7 +891,7 @@ async function recordFixed(id, report = '', frase = '') {
   // Chi consegna: il verificatore che corregge (#561) o il correttore separato
   // del riallineamento. Il marcatore locale del ruolo lo sa; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
-  const chi = readRole(ROOT)?.role === 'verifier' ? 'verifier' : 'fixer';
+  const chi = readRole(ROOT) === 'verifier' ? 'verifier' : 'fixer';
   sealTransition(next, `${chi}:consegna`);
   return next;
 }
