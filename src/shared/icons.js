@@ -595,9 +595,9 @@
 
   // --- PREVISTE: schede aperte (finestra con la linguetta di una scheda).
   const tabs =
-    `<rect x="3" y="7" width="18" height="13" rx="2"/>` +
-    `<path d="M3 11h18"/>` +
-    `<path d="M6.5 7V5a1.5 1.5 0 0 1 1.5-1.5h4A1.5 1.5 0 0 1 13.5 5v2"/>`;
+    `<path d="M3 7.5h18v10.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>` +
+    `<path d="M3 7.5V5.5A1.5 1.5 0 0 1 4.5 4h5A1.5 1.5 0 0 1 11 5.5v2"/>` +
+    `<path d="M3 11.5h18"/>`;
 
   // --- PREVISTE: posizione (goccia del segnaposto).
   const location =
