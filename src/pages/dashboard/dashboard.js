@@ -988,7 +988,7 @@
       finish({ failed = false } = {}) {
         closeTurnReasoning();
         if (!items) { wrap.remove(); setPhase('done', ''); return; }
-        const summary = `${summarizeActivity(doneTypes)} · ${fmtActivityDuration(Date.now() - startedAt)}`;
+        const summary = `${summarizeActivity(doneTypes, sawReasoning)} · ${fmtActivityDuration(Date.now() - startedAt)}`;
         setPhase('done', failed ? `Tentativo non riuscito · ${summary}` : summary);
         if (failed) wrap.dataset.failed = '1';
         head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
