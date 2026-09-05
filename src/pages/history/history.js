@@ -143,6 +143,19 @@
         : I18n.t('history_reuse_none_title', formatTokens(inTok));
       right.appendChild(chip);
     }
+    // Tempi del turno: quando ha cominciato a ragionare, quando ha scritto la
+    // prima parola (o nominato la prima azione), quando ha finito. Solo per le
+    // richieste in diretta che li hanno misurati.
+    const tm = it.timing;
+    if (tm && Number(tm.totalMs) > 0) {
+      const fmt = (ms) => (ms == null ? '—' : `${(Number(ms) / 1000).toFixed(1)} s`);
+      const first = tm.firstTextMs != null ? tm.firstTextMs : tm.firstToolMs;
+      const chip = document.createElement('span');
+      chip.className = 'sn-history-timing';
+      chip.textContent = I18n.t('history_timing', fmt(tm.firstReasoningMs), fmt(first), fmt(tm.totalMs));
+      chip.title = I18n.t('history_timing_title');
+      right.appendChild(chip);
+    }
 
     const cost = document.createElement('span');
     cost.textContent = it.costEur ? `€${it.costEur.toFixed(4)}` : '—';
