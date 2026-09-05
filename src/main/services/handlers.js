@@ -1119,6 +1119,12 @@ function describeTimerEntry(t) {
   return `Sveglia ${label} ${hhmm}${rep ? ` (${rep})` : ''}`;
 }
 
+// Un'etichetta scritta dal modello, ripulita dai caratteri di controllo (byte
+// nullo compreso): finisce nel diario del lavoro e nella colonna dei timer.
+function cleanLabel(v) {
+  return String(v == null ? '' : v).replace(/[ -]/g, '').trim();
+}
+
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
