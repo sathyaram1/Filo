@@ -35,7 +35,10 @@ export const argomentiScala = SCALA ? [`--force-device-scale-factor=${SCALA}`] :
 
 export const test = base.extend({
   app: async ({}, use) => {
-    const userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
+    // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
+    // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
+    // il percorso che l'app riporta.
+    const userData = cartellaTemporanea('filo-test-');
     const app = await electron.launch({
       // host-resolver-rules: fa risolvere il dominio finto "blocked.test" al
       // loopback, così l'e2e del blocco siti (siteBlock.spec.mjs) può mettere in
