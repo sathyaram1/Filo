@@ -532,7 +532,7 @@ test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta co
   assert.equal(typeof readPhase2Instructions, 'function');
 });
 
-test('la coda della risposta arriva da un file, non dal codice; se manca, il messaggio dice dove chiederla', () => {
+test('phase2Text: quando il testo in coda manca, il messaggio non tace', () => {
   const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
   const conFile = phase2Text({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
   assert.match(conFile, /ISTRUZIONI SEGRETE DELL'OWNER/);

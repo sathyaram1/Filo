@@ -232,6 +232,14 @@ if (isMain) {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
   };
+  // Come nello strumento gemello (#565): un'opzione scritta male non deve
+  // scalare sui posizionali e far partire lo stesso il cambio di stato.
+  const OPZIONI = ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'];
+  const ignote = argv.filter((a) => a.startsWith('--') && !OPZIONI.includes(a));
+  if (ignote.length) {
+    console.error(`RIFIUTATO: opzione sconosciuta ${ignote.join(' ')} — non ho toccato niente.`);
+    process.exit(1);
+  }
   const branch = flag('branch');
   const reason = flag('reason');
   const frase = flag('frase');
