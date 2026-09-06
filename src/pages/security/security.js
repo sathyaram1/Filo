@@ -342,6 +342,7 @@
       const row = document.createElement('div');
       row.className = 'sn-clip-item';
       row.dataset.snSearch = clipLabel(entry).toLowerCase();
+      row.dataset.snKey = clipKey(entry);
 
       // Un'immagine si riconosce guardandola, non leggendo "Immagine": senza
       // miniatura, con due schermate copiate in fila, l'utente non sa quale
