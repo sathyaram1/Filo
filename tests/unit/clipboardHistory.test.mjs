@@ -73,3 +73,19 @@ test('con una ricerca attiva la conferma dichiara che sparisce anche il nascosto
   // Numeri assurdi non inventano la frase in più.
   assert.doesNotMatch(Clip.testoConferma(3, 9), /ricerca/i);
 });
+
+test('senza nessuna ricerca scritta la conferma non parla di ricerca', () => {
+  // Chi chiama passa null quando il campo di ricerca è vuoto. Prima bastava un
+  // numero mancante per far uscire «La ricerca che hai scritto ne mostra 0» a
+  // chi non aveva scritto niente — e con una voce sola la conferma si
+  // contraddiceva («sparisce l'unica voce… spariscono anche le altre»).
+  // Attenzione al tranello: Number(null) è 0, non NaN.
+  for (const niente of [null, undefined, '']) {
+    assert.doesNotMatch(Clip.testoConferma(5, niente), /ricerca/i, `visibili=${String(niente)}`);
+    assert.doesNotMatch(Clip.testoConferma(1, niente), /altre/i, `visibili=${String(niente)}`);
+  }
+  assert.doesNotMatch(Clip.testoConferma(5), /ricerca/i);
+  // Con una ricerca che non trova niente la frase invece ci vuole: è l'unica
+  // cosa che distingue "filtro attivo a vuoto" da "nessun filtro".
+  assert.match(Clip.testoConferma(5, 0), /ricerca/i);
+});
