@@ -196,7 +196,18 @@
   function clipLabel(entry) {
     if (!entry) return '';
     if (entry.type === 'image') return entry.description || I18n.t('security_clipboard_image');
-    return (entry.text || '').replace(/\s+/g, ' ').trim();
+    const testo = (entry.text || '').replace(/\s+/g, ' ').trim();
+    // Una selezione di soli spazi (o di a capo, o di tabulazioni) si copia per
+    // sbaglio più spesso di quanto sembri, e disegnata così com'è diventa una
+    // riga vuota col solo tasto "Rimuovi": chi la guarda non sa cosa sia né
+    // perché sia lì. Diciamo cosa contiene, e quanto è lunga.
+    if (!testo) {
+      const n = (entry.text || '').length;
+      return n
+        ? I18n.t('clipboard_only_spaces').replace('%d', String(n))
+        : I18n.t('clipboard_empty_entry');
+    }
+    return testo;
   }
 
   function showClipHint(text, isError) {
