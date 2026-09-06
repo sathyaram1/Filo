@@ -779,6 +779,26 @@
         noResults.style.display = visible === 0 ? '' : 'none';
       };
 
+      // Dove va il fuoco dopo aver tolto una voce col tasto Invio: sulla "×"
+      // della prima voce ancora viva DOPO quella tolta (a scorrere in giù, poi
+      // in su), e se non ne resta nessuna sul campo di ricerca. Le righe tolte
+      // e quelle nascoste dal filtro si saltano: non sono cose che si possono
+      // premere.
+      const fuocoDopoRimozione = (rowTolta) => {
+        const righe = [...list.querySelectorAll('.sn-menu-history-item')];
+        const i = righe.indexOf(rowTolta);
+        const utile = (r) => r
+          && r.style.display !== 'none'
+          && !r.classList.contains('sn-menu-history-gone')
+          && r.querySelector('.sn-menu-history-remove');
+        const candidate = [...righe.slice(i + 1), ...righe.slice(0, Math.max(i, 0)).reverse()];
+        const prossima = candidate.find(utile);
+        const target = prossima
+          ? prossima.querySelector('.sn-menu-history-remove')
+          : input;
+        try { target.focus({ preventScroll: true }); } catch (_) { try { target.focus(); } catch (__) {} }
+      };
+
       entries.forEach((entry) => {
         // Riga = zona "incolla" (a sinistra) + "×" rimuovi (a destra). Sono due
         // bottoni fratelli, non annidati: il "×" non fa scattare l'incolla.
