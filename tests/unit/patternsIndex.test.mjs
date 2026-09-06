@@ -113,9 +113,19 @@ describe('PATTERNS.md ↔ patterns/', () => {
   });
 
   test('ogni racconto ha del contenuto sotto il titolo', () => {
+    // Il corpo si misura SENZA il titolo e SENZA la riga che riporta
+    // all'indice: quella riga la pretende il controllo qui sotto, quindi c'è
+    // sempre, e contarla come contenuto rendeva questa verifica incapace di
+    // diventare rossa — un racconto svuotato di tutto tranne titolo e ritorno
+    // passava. Un controllo che non può fallire non è un controllo.
     const vuoti = fileDellaCartella.filter((slug) => {
       const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
-      return contenuto.split('\n').slice(1).join('\n').trim().length === 0;
+      const corpo = contenuto
+        .split('\n')
+        .slice(1)
+        .filter((riga) => !riga.includes('](../PATTERNS.md)'))
+        .join('\n');
+      return corpo.trim().length === 0;
     });
     assert.deepEqual(vuoti, [], 'file in patterns/ con il solo titolo');
   });
