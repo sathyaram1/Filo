@@ -899,7 +899,7 @@
             // ne mostrava una e lo svuotamento le portava via tutte.
             const testo = Clip.testoConferma(
               Array.isArray(entries) ? entries.length : 0,
-              visibiliVive,
+              visibiliVive(),
             );
             ok = Ui
               ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: testo })
