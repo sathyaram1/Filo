@@ -21,6 +21,15 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBKEY_FILE = join(__dirname, '..', 'src', 'shared', 'feedbackPublicKey.js');
 
+// Qui l'azione di serie RIGENERA la chiave, e i feedback cifrati con la
+// vecchia non si leggono più: un'opzione scritta male non deve arrivarci
+// (feedback #565).
+const { controllaArgomenti } = await import('./lib/argomenti.mjs');
+const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--print'] });
+if (argomentiSbagliati) {
+  console.error(`RIFIUTATO: ${argomentiSbagliati}`);
+  process.exit(1);
+}
 const printOnly = process.argv.includes('--print');
 
 function bytesToB64url(buf) {

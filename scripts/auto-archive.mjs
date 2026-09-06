@@ -78,11 +78,12 @@ export async function runAutoArchive({ dryRun = false, now = Date.now(), release
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   // Un'opzione che non riconosciamo non deve far partire il giro VERO: basta
-  // una lettera sbagliata in «--dry-run» perché quello che doveva essere un
-  // giro a vuoto scriva davvero (feedback #565).
-  const ignote = process.argv.slice(2).filter((a) => a.startsWith('--') && a !== '--dry-run');
-  if (ignote.length) {
-    console.error(`RIFIUTATO: opzione sconosciuta ${ignote.join(' ')} — non ho toccato niente. L'unica opzione è --dry-run.`);
+  // un trattino o una lettera sbagliati in «--dry-run» perché quello che
+  // doveva essere un giro a vuoto scriva davvero (feedback #565).
+  const { controllaArgomenti } = await import('./lib/argomenti.mjs');
+  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'] });
+  if (male) {
+    console.error(`RIFIUTATO: ${male}`);
     process.exit(1);
   }
   const dryRun = process.argv.includes('--dry-run');
