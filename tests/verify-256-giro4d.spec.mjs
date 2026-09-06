@@ -53,6 +53,8 @@ test('F1 — doppio clic vero (stesse coordinate) sul «Rimuovi»: una voce sola
     await expect(page.locator('#sec-clip-list .sn-clip-item')).toHaveCount(8);
 
     const bersaglio = page.locator('#sec-clip-list .sn-clip-item').nth(2).locator('.sn-clip-remove');
+    await bersaglio.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
     const box = await bersaglio.boundingBox();
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
