@@ -41,27 +41,45 @@ export function normalizza(arg) {
 }
 
 /**
- * Le opzioni che npm si è MANGIATO. PURA.
+ * Le opzioni che npm si è MANGIATO, riprese dall'ambiente. PURA.
  *
  * `npm run feedback:apri --allega spec.md` non passa `--allega` allo
- * strumento: npm se lo prende come roba sua e allo strumento arrivano le sole
- * parole libere. Il risultato è quello che il controllo qui sopra esiste per
- * impedire — l'allegato non parte, il nome del file finisce nel testo, e il
- * feedback viene aperto lo stesso — ma senza che lo strumento veda niente da
- * rifiutare. L'opzione però non sparisce del tutto: npm la lascia scritta
- * nell'ambiente, e da lì ce ne accorgiamo. La forma giusta è
- * `npm run <scorciatoia> -- --allega spec.md` (feedback #565).
+ * strumento: npm se lo prende come roba sua, e allo strumento arrivano le sole
+ * parole libere — l'allegato non parte, il nome del file finisce nel testo, e
+ * il feedback viene aperto lo stesso. Su PowerShell succede anche con la forma
+ * «giusta» (`-- --dry-run`), perché lì i due trattini se li mangia la conchiglia.
+ * L'opzione però non sparisce: npm la lascia scritta nell'ambiente. Invece di
+ * rifiutare una riga che chi la scrive considera giusta, la RACCOGLIAMO — è
+ * quello che voleva — e lo diciamo (feedback #565).
+ *
+ * @returns {{args: string[], nota: string|null}} i pezzi da aggiungere alla riga
  */
-export function opzioniMangiate(env = {}, opzioni = []) {
+export function argomentiDaNpm(env = {}, { opzioni = [], conValore = [] } = {}) {
+  const args = [];
   const prese = [];
+  const vuole = new Set(conValore);
   for (const opzione of opzioni) {
     const nome = String(opzione).replace(/^--/, '');
-    for (const chiave of [`npm_config_${nome}`, `npm_config_${nome.replace(/-/g, '_')}`]) {
-      if (env[chiave] !== undefined && !prese.includes(opzione)) prese.push(opzione);
+    const chiave = [`npm_config_${nome}`, `npm_config_${nome.replace(/-/g, '_')}`]
+      .find((k) => env[k] !== undefined && env[k] !== '');
+    if (!chiave) continue;
+    const valore = String(env[chiave]);
+    if (vuole.has(opzione)) {
+      // «true» è quello che npm scrive per un'opzione senza valore: lì il
+      // valore vero non c'è, e indovinarlo sarebbe peggio che dirlo.
+      if (valore === 'true') continue;
+      args.push(opzione, valore);
+    } else {
+      if (valore !== 'true' && valore !== '') continue;
+      args.push(opzione);
     }
+    prese.push(opzione);
   }
-  if (!prese.length) return null;
-  return `${prese.join(' ')} ${prese.length === 1 ? 'è finita' : 'sono finite'} a npm invece che a me — non ho toccato niente. Con npm le opzioni vanno dopo due trattini da soli: npm run <scorciatoia> -- ${prese.map((o) => `${o} …`).join(' ')}`;
+  if (!prese.length) return { args: [], nota: null };
+  return {
+    args,
+    nota: `(${prese.join(' ')} ${prese.length === 1 ? 'era finita' : 'erano finite'} a npm invece che a me: ${prese.length === 1 ? "l'ho ripresa" : 'le ho riprese'} dall'ambiente)`,
+  };
 }
 
 /**
@@ -72,9 +90,7 @@ export function opzioniMangiate(env = {}, opzioni = []) {
  * @param {string[]} conValore   quelle che pretendono un valore dopo di sé
  * @returns {string|null} il messaggio da stampare, o null se è tutto a posto
  */
-export function controllaArgomenti(argv, { opzioni = [], conValore = [], env = null } = {}) {
-  const mangiate = env ? opzioniMangiate(env, opzioni) : null;
-  if (mangiate) return mangiate;
+export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) {
   const lista = Array.isArray(argv) ? argv.map((a) => String(a ?? '')) : [];
   const ammesse = new Set(opzioni);
   const vuole = new Set(conValore);

@@ -225,20 +225,25 @@ function uso() {
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
 }
 
-export async function main(argv) {
+export async function main(argvIn) {
+  let argv = Array.isArray(argvIn) ? [...argvIn] : [];
   const flag = (nome) => {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); return EXIT.FATTO; }
   // Quello che non capisco lo dico, e non apro niente (feedback #565): il
-  // controllo sta in un posto solo, scripts/lib/argomenti.mjs.
-  const { controllaArgomenti } = await import('./lib/argomenti.mjs');
-  const male = controllaArgomenti(argv, {
+  // controllo sta in un posto solo, scripts/lib/argomenti.mjs. Le opzioni che
+  // npm si è mangiato le riprendiamo dall'ambiente invece di rifiutare una
+  // riga che chi l'ha scritta considera giusta.
+  const { controllaArgomenti, argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const OPZ = {
     opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega'],
-    env: process.env,
-  });
+  };
+  const daNpm = argomentiDaNpm(process.env, OPZ);
+  if (daNpm.nota) { console.error(daNpm.nota); argv = [...argv, ...daNpm.args]; }
+  const male = controllaArgomenti(argv, OPZ);
   if (male) {
     console.error(`RIFIUTATO: ${male}`);
     uso();
