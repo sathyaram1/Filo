@@ -15,6 +15,7 @@
 // da Firestore né dallo stato admin.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { righeDiTesto } from './helpers/righe.mjs';
 
 const FEEDBACK_URL = 'filo://feedback/feedback.html';
 
