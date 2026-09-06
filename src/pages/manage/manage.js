@@ -43,7 +43,7 @@
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
-  // I tre bilanci del verificatore che corregge (feedback #561): cap2 = giri
+  // I tre bilanci dei giri di correzione (feedback #561): cap2 = giri
   // per i rilievi di livello 3/2, cap1 = per gli 1, cap0 = per i soli 0; più il
   // testo della fase 2 (fixInstructions).
   const mgCap2     = document.getElementById('mgCap2');
@@ -514,7 +514,7 @@
     applyAutoApproveGate();
   }
 
-  // ── I tre bilanci del verificatore che corregge (tab Automazioni) ────────
+  // ── I tre bilanci dei giri di correzione (tab Automazioni) ────────
   // Quattro campi sul doc Firestore config/routines (feedback #561, §4):
   //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
   //         finito un 3/2 ferma la pratica e chiama l'owner);

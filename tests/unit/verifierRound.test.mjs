@@ -172,7 +172,7 @@ test('formatFindings e roundNote: livelli davanti, il segno ? conservato, esito 
   const fix = R.roundNote({ summary: 'il resto regge', findings: list, decision: decide(list) });
   assert.match(fix, /^Verifica: 2 rilievi\./);
   assert.match(fix, /il resto regge/);
-  assert.match(fix, /Il verificatore corregge 1 su 2/);
+  assert.match(fix, /La correzione riguarda 1 su 2/);
   assert.match(fix, /\[2\] rotto/);
   assert.match(R.roundNote({ findings: [] }), /^Verifica superata\.$/);
   assert.match(R.roundNote({ findings: [f(2, 'x')], decision: { stop: true } }), /Il lavoro si ferma/);

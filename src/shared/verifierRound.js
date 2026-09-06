@@ -1,5 +1,4 @@
-// Il giro del verificatore che corregge — la parte PURA (spec «Il verificatore
-// corregge: un agente per giro», feedback #561, decisa con l'owner il
+// Il giro di verifica — la parte PURA (feedback #561, deciso con l'owner il
 // 2026-09-04/05).
 //
 // COSA C'È QUI
@@ -353,7 +352,7 @@
     if (d.stop) {
       parts.push('Il lavoro si ferma: c\'è un rilievo di livello 2 o 3 che non si può correggere da soli (bilancio esaurito, o chiede una tua decisione).');
     } else if (Array.isArray(d.fix) && d.fix.length) {
-      parts.push(`Il verificatore corregge ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un altro verificatore ricontrolla.`);
+      parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
     } else {
       parts.push('Nessun rilievo da correggere adesso: il lavoro prosegue e i rilievi vanno in un feedback derivato.');
     }

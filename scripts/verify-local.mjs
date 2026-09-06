@@ -19,9 +19,6 @@
 //   (le stesse regole del server, src/shared/verifierRound.js) e stampa SOLO
 //   ALLORA cosa comporta. Chiuso il giro serve un'altra verifica, fatta da
 //   un'altra istanza.
-//   Il seguito di una critica non è scritto qui, ed è voluto: chi verifica
-//   legge questo file per usare il comando, e saperlo prima gli direbbe
-//   quanto gli costa ogni rilievo che scrive (feedback #565).
 //
 // COME SI USA
 //
@@ -115,7 +112,7 @@ export function readPhase2Instructions(root = ROOT) {
  * Casi di NO, tutti reali:
  *   - nessuno ha mai verificato questo ramo;
  *   - la verifica è avviata ma senza esito;
- *   - il verificatore sta correggendo (fase 2) e non ha ancora consegnato;
+ *   - c'è un giro di correzione aperto, non ancora consegnato;
  *   - ha corretto: serve un'altra verifica sul commit nuovo;
  *   - qualcuno ha verificato e si è fermato (un 3/2 non correggibile);
  *   - qualcuno ha verificato e ha approvato, ma POI il codice è cambiato → il
@@ -131,7 +128,7 @@ export function checkVerdict(entry, headSha, dirty = false) {
     return { ok: false, reason: 'verifica avviata ma senza esito: chi doveva verificare non ha ancora registrato la critica' };
   }
   if (entry.verdict === 'fix-pending') {
-    return { ok: false, reason: 'il verificatore sta correggendo i suoi rilievi e non ha ancora consegnato (verify-local.mjs corretto)' };
+    return { ok: false, reason: 'c\'è un giro di correzione aperto su questo ramo: i rilievi non sono ancora stati consegnati (verify-local.mjs corretto)' };
   }
   if (entry.verdict === 'fixed') {
     return { ok: false, reason: 'il verificatore ha corretto: serve un\'altra verifica sul contenuto nuovo (verify-local.mjs start)' };

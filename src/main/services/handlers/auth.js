@@ -442,7 +442,7 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // I tre bilanci del verificatore che corregge e il testo della fase 2
+  // I tre bilanci dei giri di correzione e il testo della fase 2
   // (config/routines, campi `cap2`, `cap1`, `cap0`, `fixInstructions` —
   // feedback #561). Owner-only. È la fonte di verità che il server applica
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.

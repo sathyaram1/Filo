@@ -102,7 +102,7 @@ test('critica con un 2: finché il giro non è chiuso non si pubblica, e dopo se
   assert.equal(r.state.r.counts.count2, 1, 'il giro si paga da cap2');
   const bloccato = checkVerdict(r.state.r, SHA);
   assert.equal(bloccato.ok, false);
-  assert.match(bloccato.reason, /sta correggendo/);
+  assert.match(bloccato.reason, /giro di correzione aperto/);
   // La fase 2 si vede solo adesso, e dice cosa correggere e come consegnare.
   const testo = phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch: 'r' });
   assert.match(testo, /\[2\] il pulsante non salva/);
@@ -494,7 +494,7 @@ test('CLI: «pass» con dentro un [2] non è un pass: risponde che c\'è da corr
   assert.match(p.out, /c'è da correggere[\s\S]*Rilievi da correggere ADESSO/);
   assert.match(p.out, /\[2\] però questo è rotto/);
   assert.doesNotMatch(p.out, /torna a chi l'ha fatto/);
-  assert.match(vl(casa, 'status').out, /sta correggendo/);
+  assert.match(vl(casa, 'status').out, /giro di correzione aperto/);
   // Un pass pulito resta un pass; un fail secco ferma, qualunque sia il bilancio.
   _exec('git', ['checkout', '-q', '-b', 'claude/due'], { cwd: casa });
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
@@ -573,7 +573,7 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   const testo = 'Provato.\n[2] rotto';
   assert.match(vl(casa, 'critica', testo).out, /c'è da correggere/);
   const st = vl(casa, 'status');
-  assert.match(st.out, /sta correggendo/);
+  assert.match(st.out, /giro di correzione aperto/);
   assert.match(st.out, /\[2\] rotto/, 'status elenca i rilievi in sospeso');
   const ridata = vl(casa, 'critica', testo);
   assert.equal(ridata.code, 0, ridata.out);
