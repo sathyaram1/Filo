@@ -119,13 +119,12 @@ test('esiti al modello: le azioni senza bottone risultano ESEGUITE', async ({ ap
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible({ timeout: 10_000 });
   await configureModel(app);
-  // Una sveglia da spostare/cancellare deve esistere.
-  await app.evaluate(async () => {
-    await globalThis.SN_FILO_MEM.addTimer({ kind: 'alarm', label: 'palestra', at: Date.now() + 3600_000 });
-    await globalThis.SN_FILO_MEM.addTimer({ kind: 'alarm', label: 'lezione', at: Date.now() + 7200_000 });
-  }).catch(() => {});
-
   await scriptProvider(app, [
+    // Prima le sveglie da spostare/cancellare, nello stesso turno.
+    { text: 'Preparo.', toolCalls: [
+      { id: 'p1', name: 'SVEGLIA', arguments: { time: '08:00', label: 'palestra' } },
+      { id: 'p2', name: 'SVEGLIA', arguments: { time: '09:00', label: 'lezione' } },
+    ] },
     { text: 'Faccio.', toolCalls: [
       { id: 't1', name: 'SALVA_APPUNTO', arguments: { testo: 'x', contesto: 'y' } },
       { id: 't2', name: 'SALVA_LEZIONE', arguments: { testo: "L'utente non beve caffè" } },
