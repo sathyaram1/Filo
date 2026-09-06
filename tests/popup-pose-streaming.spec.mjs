@@ -951,7 +951,7 @@ test('finestra ristretta col riquadro aperto: si stringe per starci, e riallarga
   test.setTimeout(90_000);
   const page = await openTab('filo://newtab/');
   const prima = await riquadroPosato(app, page);
-  const largo = prima.right - prima.left;
+  const largo = prima.larghezzaDiLayout;
   expect(largo, 'in una finestra larga il riquadro deve avere la sua larghezza piena').toBeGreaterThan(300);
 
   const alta = prima.vh;
