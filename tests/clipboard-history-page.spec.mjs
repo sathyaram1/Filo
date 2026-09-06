@@ -123,6 +123,8 @@ test('Sicurezza: un\'immagine copiata si riconosce (miniatura + descrizione) e s
   const imgRow = list.locator('.sn-clip-item', { hasText: 'Scontrino della farmacia' });
   await expect(imgRow).toHaveCount(1);
   await expect(imgRow.locator('.sn-clip-thumb')).toHaveAttribute('src', /^data:image\//);
+  await page.locator('#sec-clipboard').scrollIntoViewIfNeeded();
+  await page.locator('#sec-clipboard').screenshot({ path: 'tests/.shots/clipboard-history-page-image.png' });
 
   await imgRow.locator('.sn-clip-remove').click();
   await expect(list.locator('.sn-clip-item')).toHaveCount(1);
