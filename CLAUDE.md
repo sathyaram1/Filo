@@ -134,7 +134,8 @@ le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
   tutto, esci), un `click` che chiama la funzione di Filo dove il tasto è suo,
   e nessun acceleratore inventato — un tasto che vale solo su Mac è la stessa
   asimmetria. Toglierla e basta non è un'uscita: su Mac spegne copia e incolla
-  in ogni campo di testo. Il pattern completo sta in PATTERNS.md.
+  in ogni campo di testo. Il pattern completo sta in
+  `patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato-o-resta.md`.
 - **Un tasto della barra è tolto a tutto il resto.** Su Mac la barra arriva
   prima: promettere quel tasto a un'altra cosa è promettere una cosa che non
   succede mai (Cmd+0 era insieme «zoom al 100%» e «decima scheda», e la scheda
