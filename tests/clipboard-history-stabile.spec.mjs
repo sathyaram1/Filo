@@ -25,10 +25,10 @@ import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SEC_URL = 'filo://security/security.html';
 const PAGE = '<!doctype html><html><body style="padding:40px"><textarea id="ta" rows="4" cols="40"></textarea></body></html>';
-// Due PNG 32x32 diversi (uno rosso, uno blu): servono a vedere che nel menu due
+// Due PNG 16x16 diversi (uno rosso, uno blu): servono a vedere che nel menu due
 // immagini copiate NON si leggono uguali.
-const ROSSO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAJ0lEQVR42u3NMQEAAAgDoC251a3gLwSgcqfTaDQajUaj0Wg0Go3mYQGvxAV/1jRlpQAAAABJRU5ErkJggg==';
-const BLU = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAKUlEQVR42u3NMQEAAAgDoJvc6BpjDwSgcqfTaDQajUaj0Wg0Go1G8/ABsdwFf6Vd7ncAAAAASUVORK5CYII=';
+const ROSSO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mO4Y2NEEmIY1TCqYfhqAAAatkoQSZYreAAAAABJRU5ErkJggg==';
+const BLU = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR42mMwirpDEmIY1TCqYfhqAAC5SmgQQ+PpJwAAAABJRU5ErkJggg==';
 
 async function findTabPage(app, hostname, timeout = 15000) {
   const deadline = Date.now() + timeout;
