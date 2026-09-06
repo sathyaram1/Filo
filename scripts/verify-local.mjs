@@ -668,6 +668,15 @@ if (isMain) {
 
   if (cmd === 'corretto') {
     const report = rest.join(' ').trim();
+    // Anche di qui si esce con un verdetto (a rilievi minori, il lavoro
+    // diventa pubblicabile): il motivo si scrive, con lo stesso minimo della
+    // critica. Senza, promuovere costava una parola da questa porta e ottanta
+    // caratteri dall'altra (feedback #565).
+    if (report.length < MIN_CRITIQUE_CHARS) {
+      console.error(`Report della correzione troppo corto (${report.length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho toccato niente.`);
+      console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: da qui esce un esito, e un esito senza motivo non vale.');
+      process.exit(1);
+    }
     const r = withFixed(readState(), branch, { report, sha, dirty: isDirty() });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);

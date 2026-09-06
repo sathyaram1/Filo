@@ -47,6 +47,11 @@ require(resolve(ROOT, 'src', 'shared', 'feedbackStatus.js'));
 
 const C = globalThis.SN_FEEDBACK_CRYPTO;
 const FS = globalThis.SN_FB_STATUS;
+if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
+  console.log('Uso: node scripts/migrate-status-padding.mjs [--dry-run]
+  rifà l'imbottitura degli stati dei feedback; --dry-run mostra solo cosa farebbe');
+  process.exit(0);
+}
 const { controllaArgomenti } = await import('./lib/argomenti.mjs');
 const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'] });
 if (argomentiSbagliati) {
