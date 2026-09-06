@@ -100,8 +100,11 @@ test('stress: strumento sconosciuto, argomenti rotti e HTML nella query non romp
   // Niente script eseguito: l'HTML resta testo.
   const pwn = await page.evaluate(() => window.__pwn || null);
   expect(pwn).toBe(null);
-  const html = await page.evaluate(() => document.body.innerHTML);
-  expect(html).not.toContain('onerror="window.__pwn');
+  // Nessun elemento vero: l'HTML è rimasto testo.
+  const injected = await page.evaluate(() => document.querySelectorAll('img[onerror], [onerror]').length);
+  expect(injected).toBe(0);
+  const shown = (await rows(page)).join(' | ');
+  expect(shown, shown).toContain('<img src=x');
   // Gli esiti d'errore sono tornati al modello.
   const second = await app.evaluate(() => globalThis.__rounds[1]);
   const tool = second.filter((m) => m.role === 'tool').map((m) => m.content).join(' || ');
