@@ -1369,7 +1369,7 @@
   }
 
   // ── Menu contestuale sul titolo (tasto destro) ────────────────────────
-  // Coerente con PATTERNS.md § "Menu contestuale proprio nelle pagine filo://":
+  // Coerente con patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md:
   // preventDefault + popup con le classi .sn-select-pop/.sn-select-option.
   let titleMenuEl = null;
   function closeTitleMenu() {
@@ -4015,8 +4015,9 @@
   // al suo bottone — quindi un "Annulla" poteva sparire prima che l'utente
   // riuscisse a premerlo, anche a causa di un avviso che arrivava da solo.
   // Impilandoli l'azione resta raggiungibile finché non scade il SUO tempo.
-  // Come ogni stack nell'angolo (vedi PATTERNS.md § "Stack di overlay
-  // impilati") ha due argini: un tetto al numero di card vive e un tetto
+  // Come ogni stack nell'angolo (vedi
+  // patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md)
+  // ha due argini: un tetto al numero di card vive e un tetto
   // all'altezza col contenitore che scorre.
   const ED_TOAST_MAX = 4;
   let edToastHost = null;

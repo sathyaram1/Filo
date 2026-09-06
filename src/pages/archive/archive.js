@@ -231,7 +231,8 @@
   // Menu contestuale (tasto destro) con "Riapri"/"Elimina": sostituisce i
   // bottoni sempre visibili, coerente con le chip orizzontali compatte.
   // Riusa le classi .sn-select-pop/.sn-select-option (stesso look degli altri
-  // menu di Filo, vedi PATTERNS.md § "Controlli UI custom").
+  // menu di Filo, vedi
+  // patterns/controlli-ui-custom-tema-di-filo-non-default-del-browser.md).
   let openMenu = null;
   function closeCtxMenu() {
     if (!openMenu) return;

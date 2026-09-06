@@ -20,8 +20,12 @@ ruolo che ti viene consegnato.
   proposito: quel prefisso è identico per ogni agente che lavora su Filo e la
   cache dei prompt lo serve a un decimo del prezzo, mentre una lettura si paga
   piena e poi si ripaga a ogni turno per il resto della sessione.
-- **`PATTERNS.md`** prima di toccare la UI o prendere decisioni di design.
-  Se stabilisci un pattern nuovo, aggiornalo.
+- **`PATTERNS.md`** prima di toccare la UI o prendere decisioni di design. È
+  un **indice**: una riga per pattern, titolo e regola. Il racconto di ogni
+  pattern sta in `patterns/<slug>.md`, linkato dalla riga: il caso che l'ha
+  fatto nascere, i tentativi sbagliati, i riferimenti al codice. Aprilo solo
+  per il pattern che stai per toccare. Se stabilisci un pattern nuovo, scrivi
+  il file e aggiungi la riga nell'indice.
 
 @filo_filosofia.txt
 @filo_design.txt
@@ -130,7 +134,8 @@ le regole valgono **mentre scrivi**, non a un controllo finale che non esiste.
   tutto, esci), un `click` che chiama la funzione di Filo dove il tasto è suo,
   e nessun acceleratore inventato — un tasto che vale solo su Mac è la stessa
   asimmetria. Toglierla e basta non è un'uscita: su Mac spegne copia e incolla
-  in ogni campo di testo. Il pattern completo sta in PATTERNS.md.
+  in ogni campo di testo. Il pattern completo sta in
+  `patterns/quello-che-il-sistema-aggancia-da-se-va-dichiarato.md`.
 - **Un tasto della barra è tolto a tutto il resto.** Su Mac la barra arriva
   prima: promettere quel tasto a un'altra cosa è promettere una cosa che non
   succede mai (Cmd+0 era insieme «zoom al 100%» e «decima scheda», e la scheda

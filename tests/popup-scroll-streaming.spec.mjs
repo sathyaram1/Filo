@@ -7,8 +7,9 @@
 // tornava su a rileggere veniva sbalzato giù di nuovo — e a ogni pezzo, cioè
 // non poteva rileggere finché il modello non aveva finito.
 //
-// La regola di Filo è già scritta (PATTERNS.md § "Liste/chat che si
-// ricostruiscono in streaming"): si segue il fondo solo se l'utente ci era
+// La regola di Filo è già scritta
+// (patterns/liste-chat-che-si-ricostruiscono-in-streaming-auto-follow.md):
+// si segue il fondo solo se l'utente ci era
 // rimasto, altrimenti la lettura si lascia dov'è.
 //
 // SUCCESSO che si asserisce: scrollato su durante la generazione, a risposta

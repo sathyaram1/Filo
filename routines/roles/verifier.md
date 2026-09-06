@@ -11,7 +11,8 @@
 Un feedback è in revisione con un branch pronto e nessuna verifica ancora
 fatta: il tuo compito è provare a romperlo. Bussola: filosofia e design di Filo
 (già nel tuo prompt, importati da CLAUDE.md: non rileggerli), e `PATTERNS.md`
-per la UI.
+per la UI — l'indice delle regole; il racconto di una regola sta in
+`patterns/<slug>.md` e si apre solo se ti serve quella.
 
 ## Isolamento — COMPORTAMENTALE (qualità, non sicurezza)
 
@@ -79,8 +80,9 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
      manca senza una ragione, è un'invariante di parità → rientra nel punto 7;
    - c'è qualcosa di **adiacente** che ora si aspetterebbe di poter fare e non
      può? Questo non è un difetto → è un suggerimento (punto 10).
-9. **Design pattern.** Confronta la UI toccata con `PATTERNS.md`: una
-   violazione dei pattern di Filo è un rilievo, citando il pattern violato.
+9. **Design pattern.** Confronta la UI toccata con l'indice di `PATTERNS.md`:
+   una violazione dei pattern di Filo è un rilievo, citando il pattern violato
+   (per i dettagli apri il suo `patterns/<slug>.md`).
 10. **Miglioramenti.** Distingui dal trade-off:
     - un miglioramento **senza trade-off** che manca — l'utente ne avrebbe
       chiaramente beneficiato e non costava niente (non complica l'uso, niente
