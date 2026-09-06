@@ -219,6 +219,23 @@
     showClipHint._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
   }
 
+  // Filtro di ricerca: la cronologia tiene fino a cinquanta voci e nel riquadro
+  // se ne vedono sette per volta. Cercare "la password copiata stamattina"
+  // scorrendo a mano è lo stesso attrito che nel menu "Incolla" era già stato
+  // tolto con un campo di ricerca: qui è la stessa lista, quindi lo stesso campo.
+  function applyClipFilter() {
+    const q = ($('sec-clip-search').value || '').trim().toLowerCase();
+    const righe = $('sec-clip-list').querySelectorAll('.sn-clip-item');
+    let visibili = 0;
+    for (const r of righe) {
+      const match = !q || (r.dataset.snSearch || '').includes(q);
+      r.style.display = match ? '' : 'none';
+      if (match) visibili++;
+    }
+    const nessuno = righe.length > 0 && visibili === 0;
+    $('sec-clip-noresults').style.display = nessuno ? '' : 'none';
+  }
+
   function renderClipboard(items) {
     const list = $('sec-clip-list');
     const entries = Array.isArray(items) ? items : [];
@@ -229,6 +246,8 @@
     $('sec-clip-empty').style.display = empty ? '' : 'none';
     list.style.display = empty ? 'none' : '';
     $('sec-clip-clear').style.display = empty ? 'none' : '';
+    $('sec-clip-search-row').style.display = empty ? 'none' : '';
+    if (empty) $('sec-clip-noresults').style.display = 'none';
 
     // Se in lista c'è almeno un'immagine, anche le righe di testo tengono il
     // posto della miniatura: altrimenti il bordo sinistro va a zig-zag.
