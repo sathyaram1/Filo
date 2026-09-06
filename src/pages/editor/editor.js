@@ -2098,6 +2098,16 @@
         pop.style.bottom = 'auto';
         pop.style.top = `${r.bottom + 4}px`;
       }
+      // …e dentro la finestra. La tendina è larga almeno 180px (min-width) anche
+      // quando il modulo è più stretto, e i moduli stanno nella colonna di
+      // destra: allineata al bordo sinistro del bottone, la parte che sporge
+      // finisce fuori dallo schermo e i nomi dei font si leggono a metà. Si
+      // misura la larghezza VERA (quella calcolata, non quella chiesta) e la si
+      // riporta dentro, con un filo di margine.
+      const MARGINE = 8;
+      const largh = pop.getBoundingClientRect().width || r.width;
+      const massimo = window.innerWidth - largh - MARGINE;
+      pop.style.left = `${Math.max(MARGINE, Math.min(r.left, massimo))}px`;
     }
     function open() {
       if (!pop.hidden) return;
