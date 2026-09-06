@@ -110,3 +110,107 @@ test('"/riordina" riordina le schede per colore senza chiuderne nessuna', async 
     return s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || '')).map((t) => t.title);
   }), { timeout: 15_000 }).toEqual(expectedOrder);
 });
+
+// L'ultima riga che Filo ha scritto in chat.
+async function ultimaRigaFilo(page) {
+  return page.evaluate(() => {
+    const bolle = [...document.querySelectorAll('.dash-bubble-filo')];
+    const ultima = bolle[bolle.length - 1];
+    return ultima ? ultima.textContent.trim() : '';
+  });
+}
+
+// Aspetta che le tre schede web abbiano preso il loro colore identità: prima di
+// quel momento il riordino non ha su cosa lavorare.
+async function coloriPronti(shell) {
+  await expect.poll(async () => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const web = s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || ''));
+    return web.length === 3 && web.every((t) => !!t.identityColor);
+  }), { timeout: 12_000 }).toBe(true);
+}
+
+// I colori non solo ci sono: hanno anche SMESSO di cambiare. Una pagina appena
+// aperta può correggere il proprio colore identità un istante dopo averlo dato
+// (il content script lo ricalcola quando la pagina ha finito di caricare), e un
+// colore che cambia dopo un riordino rende il riordino successivo un lavoro
+// vero invece che un non-fare. Chi vuole verificare che riordinare due volte
+// non muova niente deve prima aspettare che non ci sia più niente da muovere:
+// due letture uguali a distanza di mezzo secondo.
+async function coloriFermi(shell) {
+  const leggi = () => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    return JSON.stringify(s.tabs
+      .filter((t) => /127\.0\.0\.1/.test(t.url || ''))
+      .map((t) => [t.id, t.identityColor]));
+  });
+  await coloriPronti(shell);
+  await expect.poll(async () => {
+    const prima = await leggi();
+    await new Promise((r) => setTimeout(r, 500));
+    return (await leggi()) === prima;
+  }, { timeout: 15_000, message: 'i colori identità continuano a cambiare' }).toBe(true);
+}
+
+test('"/riordina" con una scheda sola risponde "già in ordine", e la dashboard resta viva', async ({ openTab }) => {
+  const dash = await openTab(NEWTAB);
+  await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
+
+  await submit(dash, '/riordina');
+
+  // Ogni azione ha un esito: anche il non-fare si dice, altrimenti l'utente non
+  // sa se il comando è arrivato.
+  await expect.poll(() => ultimaRigaFilo(dash), { timeout: 8_000 }).toContain('già in ordine');
+  await expect(dash.locator('#input')).toBeVisible();
+});
+
+test('dopo "/riordina" resti sulla scheda su cui eri', async ({ shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, mk('Blu', 'rgb(40,80,200)'));
+  await testServer.openReady(openTab, mk('Verde', 'rgb(40,200,80)'));
+  await testServer.openReady(openTab, mk('Rosso', 'rgb(200,40,40)'));
+  const dash = await openTab(NEWTAB);
+  await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await coloriPronti(shell);
+
+  // Torna su "Rosso" e ricorda su quale scheda sei: riordinare cambia il posto
+  // delle schede, non quella che stai guardando.
+  const attivaPrima = await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const rossa = s.tabs.find((t) => t.title === 'Rosso');
+    if (rossa) await window.filoShell.tabs.activate(rossa.id);
+    return rossa ? rossa.id : null;
+  });
+  expect(attivaPrima).toBeTruthy();
+
+  await submit(dash, '/riordina');
+
+  await expect.poll(async () => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    return s.activeId;
+  }), { timeout: 10_000 }).toBe(attivaPrima);
+});
+
+test('"/riordina" due volte di fila: la seconda non muove niente e lo dice', async ({ shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, mk('Blu', 'rgb(40,80,200)'));
+  await testServer.openReady(openTab, mk('Verde', 'rgb(40,200,80)'));
+  await testServer.openReady(openTab, mk('Rosso', 'rgb(200,40,40)'));
+  const dash = await openTab(NEWTAB);
+  await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
+  await coloriPronti(shell);
+
+  await submit(dash, '/riordina');
+  await expect.poll(() => ultimaRigaFilo(dash), { timeout: 8_000 }).toContain('riordinate per colore');
+
+  await submit(dash, '/riordina');
+  await expect.poll(() => ultimaRigaFilo(dash), { timeout: 8_000 }).toContain('già in ordine');
+});
+
+test('"/riordina" con parole in più resta un comando riconosciuto', async ({ openTab }) => {
+  const dash = await openTab(NEWTAB);
+  const input = dash.locator('#input');
+  await expect(input).toBeVisible({ timeout: 8_000 });
+
+  await input.fill('/riordina adesso per favore');
+  await expect(input).toHaveClass(/is-cmd-filo/);
+  await expect(input).not.toHaveClass(/is-cmd-unknown/);
+});
