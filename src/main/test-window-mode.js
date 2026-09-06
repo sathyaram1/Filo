@@ -68,11 +68,12 @@ function hideForTests(win, { main = false } = {}) {
   try {
     win.setOpacity(0);
     if (!main) return true;
-    win.setPosition(OFFSCREEN.x, OFFSCREEN.y);
+    const via = posizioneFuoriSchermo();
+    win.setPosition(via.x, via.y);
     // Uscendo dal tutto schermo il sistema rimette la finestra dov'era prima di
-    // entrarci — cioè potenzialmente sullo schermo: riportiamola via.
+    // entrarci, cioè potenzialmente sullo schermo: riportiamola via.
     win.on('leave-full-screen', () => {
-      try { win.setPosition(OFFSCREEN.x, OFFSCREEN.y); win.setOpacity(0); } catch (_) {}
+      try { const p = posizioneFuoriSchermo(); win.setPosition(p.x, p.y); win.setOpacity(0); } catch (_) {}
     });
     // Alcune superfici rimettono l'opacità (animazioni, ripristini): il giro a
     // tutto schermo è il caso noto, quindi la riaffermiamo anche lì.
