@@ -265,6 +265,17 @@ async function main() {
   // girare tutto — controlli, verifica e, con la verifica già a posto, il
   // ramo spedito e la fusione chiesta — per un errore di battitura
   // (feedback #565).
+  // `npm run finish --check` non arriva qui: npm si prende `--check` come roba
+  // sua e lo strumento parte SENZA, cioè spedisce il ramo e chiede la fusione
+  // a chi voleva solo i controlli. L'opzione resta scritta nell'ambiente: da
+  // lì ce ne accorgiamo e ci fermiamo (feedback #565).
+  const { opzioniMangiate } = await import('./lib/argomenti.mjs');
+  const mangiata = opzioniMangiate(process.env, ['--check']);
+  if (mangiata) {
+    console.error(`${mangiata}\n`);
+    console.error(AIUTO);
+    process.exit(1);
+  }
   const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
   if (ignoti.length) {
     console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
