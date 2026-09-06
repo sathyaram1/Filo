@@ -242,6 +242,10 @@
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
+    // Una selezione di soli spazi (o a capo, o tabulazioni) si copia per
+    // sbaglio: senza un'etichetta diventa una riga vuota che non si capisce.
+    clipboard_only_spaces: 'Spazi vuoti (%d caratteri)',
+    clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
 
     // Categorie default
@@ -554,6 +558,8 @@
       'quando incolli. Se ci è finita una password o un testo privato, toglilo da qui.',
     security_clipboard_empty: 'Non c\'è niente: nessun testo o immagine copiato di recente.',
     security_clipboard_image: 'Immagine',
+    security_clipboard_search: 'Cerca fra le voci copiate…',
+    security_clipboard_no_results: 'Nessuna voce copiata corrisponde.',
     security_clipboard_remove: 'Rimuovi',
     security_clipboard_remove_title: 'Rimuovi questa voce dalla cronologia',
     security_clipboard_removed: 'Voce rimossa',

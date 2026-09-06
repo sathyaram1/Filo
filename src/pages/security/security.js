@@ -75,6 +75,9 @@
     $('sec-clip-title').textContent = I18n.t('security_clipboard_title');
     $('sec-clip-desc').textContent = I18n.t('security_clipboard_desc');
     $('sec-clip-empty').textContent = I18n.t('security_clipboard_empty');
+    $('sec-clip-noresults').textContent = I18n.t('security_clipboard_no_results');
+    $('sec-clip-search').placeholder = I18n.t('security_clipboard_search');
+    $('sec-clip-search').setAttribute('aria-label', I18n.t('security_clipboard_search'));
     $('sec-clip-clear').textContent = I18n.t('menu_paste_clear');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
