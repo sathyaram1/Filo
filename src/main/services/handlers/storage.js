@@ -259,8 +259,10 @@ module.exports = function register(on, ctx) {
   // appunti ovunque tranne le pagine interne: sarebbe una regressione, non una
   // difesa. La barriera contro le pagine ostili resta l'isolamento di contesto
   // (il main world delle pagine esterne non vede chrome.runtime — confermato dai
-  // test di audit). Le operazioni "tutto o niente" o riservate (svuota
-  // cronologia, cronologia AI, costi) sì che sono guardate: vedi sotto.
+  // test di audit). Restano guardate le sole cose davvero riservate, che nessun
+  // content script di pagina web usa: cronologia AI e costi (vedi sotto). Anche
+  // rimuovere una voce e svuotare la cronologia appunti passano da origine web,
+  // perché si fanno dal menu "Incolla" che gira ovunque (#256).
   on(MSG.GET_CLIPBOARD_HISTORY, async () => {
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true, items: Array.isArray(list) ? list : [] };
