@@ -16,9 +16,8 @@
 // IL GIRO (feedback #561)
 //   Stessa struttura del giro in cloud. Chi verifica registra la CRITICA coi
 //   livelli; questo strumento calcola l'esito dai livelli e dai tre bilanci
-//   (le stesse regole del server, src/shared/verifierRound.js) e stampa SOLO
-//   ALLORA cosa comporta. Chiuso il giro serve un'altra verifica, fatta da
-//   un'altra istanza.
+//   (le stesse regole del server, src/shared/verifierRound.js) e lo stampa.
+//   Chiuso il giro serve un'altra verifica, fatta da un'altra istanza.
 //
 // COME SI USA
 //
@@ -80,9 +79,8 @@ export function stateFile(root = ROOT) {
 // (CLAUDE.md § Limiti).
 export const MAX_CRITIQUE_CHARS = 12000;
 
-// Il testo che questo strumento stampa in coda alla risposta vive FUORI dal
-// repo, nella cartella sopra (accanto a LOCAL.md), e si legge al momento di
-// stamparlo.
+// La coda della risposta vive fuori dal repo, accanto a LOCAL.md: è roba di
+// questa macchina, non del progetto.
 export function phase2InstructionsFile(root = ROOT) {
   // «Sopra il repo» vuol dire sopra il checkout PRINCIPALE: un lavoro che sta
   // in una cartella di lavoro separata (`.claude/worktrees/<nome>`) ha come
@@ -92,9 +90,9 @@ export function phase2InstructionsFile(root = ROOT) {
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    if (common) return resolve(common, '..', '..', 'FASE2-LOCALE.md');
+    if (common) return resolve(common, '..', '..', 'CODA-GIRO-LOCALE.md');
   } catch (_) { /* niente git: ripiego */ }
-  return resolve(root, '..', 'FASE2-LOCALE.md');
+  return resolve(root, '..', 'CODA-GIRO-LOCALE.md');
 }
 export function readPhase2Instructions(root = ROOT) {
   const f = phase2InstructionsFile(root);
@@ -360,19 +358,19 @@ export function phase2Text({ findings, derived, budgets, branch, instructions })
   const b = budgets && typeof budgets === 'object'
     ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
-  // Il testo delle istruzioni NON sta qui: arriva dal file fuori dal repo. Se
-  // manca, si dice dove doveva essere e come si consegna, e basta.
+  // La coda non sta qui: arriva da quel file. Se manca, si dice dove doveva
+  // essere e come si consegna, e basta.
   const testo = String(instructions || '').trim() || [
-    'Istruzioni non trovate (file FASE2-LOCALE.md nella cartella sopra il repo):',
-    'chiedile a chi guida. In ogni caso correggi SOLO i rilievi dell\'elenco qui sopra e consegna con',
+    'Coda non trovata (file CODA-GIRO-LOCALE.md nella cartella sopra il repo):',
+    'chiedila a chi guida. In ogni caso si correggono SOLO i rilievi dell\'elenco qui sopra, e si consegna con',
     '  node scripts/verify-local.mjs corretto "<report della correzione>"',
   ].join('\n');
   return [
     '══ ESITO: c\'è da correggere ══',
-    `Sei sul ramo ${branch}.`,
-    'Rilievi da correggere ADESSO (solo questi):',
+    `Ramo: ${branch}.`,
+    'Rilievi da correggere in questo giro (solo questi):',
     fmt(findings),
-    'Rilievi messi da parte (NON li correggi: finiscono nel report per l\'owner):',
+    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     fmt(derived),
     b ? `Bilanci: ${b}` : '',
     '',
