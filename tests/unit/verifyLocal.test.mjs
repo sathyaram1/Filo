@@ -587,7 +587,7 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   assert.match(ridata.out, /ristampo la fase 2/);
   assert.match(ridata.out, /Rilievi da correggere in questo giro[\s\S]*\[2\] rotto/);
   assert.match(ridata.out, /cap2: 4 giri residui su 5/, 'il giro non si ripaga');
-  const altra = vl(casa, 'critica', 'Provato.\n[2] rotto diversamente');
+  const altra = vl(casa, 'critica', LUNGA_FIX.replace('rotto', 'rotto diversamente'));
   assert.equal(altra.code, 1);
   assert.match(altra.out, /già registrata/);
   // Pass su un albero sporco: registrato, ma senza promettere la pubblicazione.
