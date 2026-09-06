@@ -13,7 +13,8 @@ module.exports = function register(on, ctx) {
 
   // I messaggi che leggono o riscrivono la memoria dell'utente non sono roba da
   // pagine web: il canale `filo:message` è uno solo e ci arrivano anche i
-  // content script dei siti visitati (PATTERNS.md → "Nuovo tipo di messaggio").
+  // content script dei siti visitati (vedi
+  // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
   on(MSG.FILO_CHAT, async (msg, sender) => {
