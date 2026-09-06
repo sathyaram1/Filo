@@ -445,7 +445,9 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.CLEAR_CLIPBOARD_HISTORY });
       if (res && res.ok) {
-        renderClipboard([]);
+        // Qui il ridisegno non aspetta il puntatore: l'utente ha appena chiesto
+        // lui di far sparire tutto, e la lista svuotata è la risposta.
+        renderClipboard([], { forza: true });
         showClipHint(I18n.t('security_clipboard_cleared'), false);
       } else {
         showClipHint(I18n.t('security_clipboard_fail'), true);
