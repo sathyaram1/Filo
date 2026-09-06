@@ -426,7 +426,11 @@
   // stessa azione, deve suonare uguale da dove la si faccia.
   async function clearClipboard() {
     const btn = $('sec-clip-clear');
-    const text = I18n.t('menu_paste_clear_confirm');
+    // La conferma dice QUANTE voci spariscono, e se una ricerca ne sta
+    // nascondendo una parte lo dichiara: con un filtro attivo la lista mostrava
+    // una riga sola e lo svuotamento le portava via tutte.
+    const visibili = $('sec-clip-list').querySelectorAll('.sn-clip-item:not([style*="display: none"])').length;
+    const text = Clip.testoConferma(vociCorrenti.length, visibili);
     const ok = window.SN_CONFIRM_UI
       ? await window.SN_CONFIRM_UI.confirm({
         title: I18n.t('menu_paste_clear'),
