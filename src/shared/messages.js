@@ -460,6 +460,13 @@
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
+    // Broadcast alle sole pagine filo:// quando la cronologia appunti cambia
+    // (copia nuova, voce tolta, svuotamento, descrizione di un'immagine
+    // arrivata). Non porta le voci con sé: chi lo riceve rilegge la cronologia
+    // con GET_CLIPBOARD_HISTORY. Così una scheda ferma sulla pagina della
+    // sicurezza non mostra più una lista vecchia, e nessun elenco di ciò che
+    // l'utente ha copiato viaggia verso schede che non l'hanno chiesto.
+    CLIPBOARD_HISTORY_UPDATED: 'clipboard_history_updated',
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',
