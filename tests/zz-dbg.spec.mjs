@@ -12,16 +12,10 @@ test('errori', async () => {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), 'filo://security/security.html');
   let page = null;
   for (let i=0;i<100 && !page;i++){ page = app.windows().find((p)=>{try{return new URL(p.url()).hostname==='security'}catch(_){return false}}); await new Promise(r=>setTimeout(r,100)); }
-  await page.waitForTimeout(1500);
-  const out = await page.evaluate(() => {
-    try {
-      const e = { type: 'text', text: 'ciao' };
-      const k = window.SN_CLIPBOARD.chiave(e);
-      const l = window.SN_CLIPBOARD.etichetta(e);
-      const c = window.SN_CLIPBOARD.testoConferma(3, 3);
-      return { k, l, c };
-    } catch (err) { return { errore: String(err && err.stack || err) }; }
-  });
-  console.log('OUT', JSON.stringify(out));
+  page.on('console', (m) => console.log('CONSOLE', m.type(), m.text()));
+  page.on('pageerror', (e) => console.log('PAGEERROR', e.stack || e.message));
+  await page.reload();
+  await page.waitForTimeout(2000);
+  console.log('righe', await page.locator('#sec-clip-list .sn-clip-item').count());
   await app.close(); rmSync(userData,{recursive:true,force:true});
 });
