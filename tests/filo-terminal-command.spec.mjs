@@ -52,7 +52,7 @@ test('livello 1 (sola lettura) esegue subito e cattura l’output', async ({ app
 test('livello 2 (mkdir) non esegue senza conferma; la conferma crea la cartella', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
-  const dir = path.join(os.tmpdir(), `filo-cmd-${Date.now()}`);
+  const dir = path.join(tempCanonico(), `filo-cmd-${Date.now()}`);
   const action = { type: 'ESEGUI_COMANDO', comando: `mkdir "${dir}"` };
 
   // Senza conferma: livello 2, non esegue, la cartella non esiste.
