@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { controllaArgomenti, sembraOpzione, normalizza } = await import('../../scripts/lib/argomenti.mjs');
+const { controllaArgomenti, sembraOpzione, normalizza, argomentiDaNpm } = await import('../../scripts/lib/argomenti.mjs');
 
 const FEEDBACK = {
   opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
@@ -76,4 +76,28 @@ test("la forma di Windows vale come un'opzione, ma solo se il nome e' di una che
   // Un percorso che comincia per barra resta un percorso: non lo si prende
   // per un'opzione scritta male.
   assert.equal(controllaArgomenti(['t', '/tmp/appunti.md'], FEEDBACK), null);
+});
+
+// ── Le opzioni che npm si mangia ─────────────────────────────────────────────
+//
+// `npm run feedback:apri --allega spec.md` non le passa allo strumento: se le
+// prende npm. Su PowerShell succede anche con la forma «giusta», dopo i due
+// trattini. Rifiutare una riga che chi la scrive considera giusta sarebbe
+// attrito: si riprende dall'ambiente, e lo si dice.
+
+test("le opzioni finite a npm si riprendono dall'ambiente, con la nota", () => {
+  const r = argomentiDaNpm({ npm_config_dry_run: 'true' }, { opzioni: ['--dry-run'] });
+  assert.deepEqual(r.args, ['--dry-run']);
+  assert.match(r.nota, /--dry-run/);
+  const c = argomentiDaNpm({ npm_config_allega: 'spec.md' }, FEEDBACK);
+  assert.deepEqual(c.args, ['--allega', 'spec.md']);
+});
+
+test("senza niente nell'ambiente non si inventa niente", () => {
+  const r = argomentiDaNpm({}, FEEDBACK);
+  assert.deepEqual(r.args, []);
+  assert.equal(r.nota, null);
+  // Un'opzione che vuole un valore, ma di cui npm ha registrato solo «true»,
+  // non si indovina: meglio il rifiuto del controllo normale.
+  assert.deepEqual(argomentiDaNpm({ npm_config_allega: 'true' }, FEEDBACK).args, []);
 });
