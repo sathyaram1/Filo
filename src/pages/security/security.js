@@ -344,6 +344,16 @@
       row.dataset.snSearch = clipLabel(entry).toLowerCase();
       row.dataset.snKey = clipKey(entry);
 
+      // La riga si illuminava al passaggio del mouse ma cliccarla non faceva
+      // niente: una promessa che non veniva mantenuta. Nel menu "Incolla" la
+      // riga cliccata incolla; qui non c'è un campo dove incollare, quindi la
+      // cosa equivalente è rimettere la voce negli appunti, pronta da incollare
+      // dove serve.
+      const copia = document.createElement('button');
+      copia.type = 'button';
+      copia.className = 'sn-clip-copy';
+      copia.title = I18n.t('security_clipboard_copy_title');
+
       // Un'immagine si riconosce guardandola, non leggendo "Immagine": senza
       // miniatura, con due schermate copiate in fila, l'utente non sa quale
       // delle due sta togliendo. Il dato ce l'abbiamo già in mano.
@@ -352,11 +362,11 @@
         thumb.className = 'sn-clip-thumb';
         thumb.src = entry.dataUrl;
         thumb.alt = '';
-        row.appendChild(thumb);
+        copia.appendChild(thumb);
       } else if (conMiniature) {
         const spacer = document.createElement('span');
         spacer.className = 'sn-clip-spacer';
-        row.appendChild(spacer);
+        copia.appendChild(spacer);
       }
 
       const label = clipLabel(entry);
@@ -364,7 +374,9 @@
       text.className = 'sn-clip-text';
       text.textContent = label;
       text.title = label;
-      row.appendChild(text);
+      copia.appendChild(text);
+      copia.addEventListener('click', () => copiaVoce(entry, row));
+      row.appendChild(copia);
 
       const rm = document.createElement('button');
       rm.type = 'button';
