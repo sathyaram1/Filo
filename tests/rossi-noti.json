@@ -1,16 +1,4 @@
 {
-  "nota": "Spec Playwright rossi ANCHE su main sulla macchina dell'owner (Windows, utente con lo spazio nel nome), per motivi d'ambiente e non di codice: percorso abbreviato del terminale, misure di layout sotto carico, rete di casa. Il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. Risolverli alla radice, e svuotare l'elenco: feedback #563.",
-  "specs": [
-    "tests/filo-terminal-command",
-    "tests/filo-terminal-context",
-    "tests/terminal-mode",
-    "tests/verify-downloads-410",
-    "tests/verifier-stress-410",
-    "tests/verify-398-local-address",
-    "tests/clipboard-history-remove",
-    "tests/editor-modules",
-    "tests/popup-pose-streaming",
-    "tests/manage-tab-counts",
-    "tests/decks-chat-stress"
-  ]
+  "nota": "Spec Playwright che sono rossi ANCHE su main su una macchina precisa, per motivi d'ambiente e non di codice. Il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. L'elenco VUOTO è lo stato normale, ed è lo stato in cui deve tornare: ogni voce è un controllo spento, e un controllo spento non protegge nessuno. Il primo elenco (feedback #563) conteneva undici spec ed è stato svuotato risolvendo caso per caso — quasi sempre era il test a dare per scontato qualcosa dell'ambiente (il percorso abbreviato 8.3 di %TEMP% quando il nome utente ha uno spazio, lo zoom di sistema al 125%, la rete di casa raggiungibile, un provider finto che risponde più in fretta di quanto il test riesca a digitare). Se devi rimetterci qualcosa, scrivi QUI perché e apri un feedback per toglierlo: un'eccezione senza una data di scadenza diventa permanente.",
+  "specs": []
 }
