@@ -250,6 +250,19 @@ function readKnownRed(root) {
 
 async function main() {
   const argv = process.argv.slice(2);
+  // Un aiuto vero: senza, QUALUNQUE argomento (`--help` compreso) faceva
+  // partire l'intera chiusura, e chi voleva solo sapere cosa fa lo strumento
+  // si ritrovava dentro la procedura (feedback #565).
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log([
+      'Uso: npm run finish [-- --check]',
+      '',
+      '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
+      '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
+      '  --help               questa schermata',
+    ].join('\n'));
+    return;
+  }
   const checkOnly = argv.includes('--check');
   if (argv.includes('--no-verify')) {
     console.error('La scorciatoia --no-verify non esiste più: i controlli e la verifica');
