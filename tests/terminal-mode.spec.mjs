@@ -13,10 +13,8 @@
 // attivano), non solo l'assenza di errori. shell.js fuori da Windows usa
 // /bin/sh, quindi `/echo …` è eseguibile anche nel cloud Linux headless.
 
-import os from 'node:os';
-import fs from 'node:fs';
-import path from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
