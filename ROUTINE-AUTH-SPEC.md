@@ -204,7 +204,7 @@ diventa un **muro**.
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
 | `new-work` | il testo del suo feedback | — |
-| `fixer` | il feedback + la critica della verifica (dal 2026-09-05 solo per il riallineamento dopo un conflitto) | — |
+| `fixer` | il feedback + la critica della verifica | — |
 | `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 | `prober` | niente | la coda |

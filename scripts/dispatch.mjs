@@ -879,8 +879,8 @@ async function recordVerifier(id, critiqueText) {
 
 /**
  * La risposta del server alla critica, per chi la legge a schermo. PURA.
- * Con la fase 2 stampa i rilievi da correggere, quelli messi da parte, i
- * bilanci residui e le istruzioni; senza, l'esito e basta.
+ * Quando c'è da correggere stampa i rilievi, quelli messi da parte, i bilanci
+ * residui e la coda che arriva dal server; senza, l'esito e basta.
  */
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
@@ -894,7 +894,7 @@ export function verifierReplyText(reply) {
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
       'Rilievi da correggere ADESSO (solo questi):',
       fmt(r.phase2.findings),
-      'Rilievi messi da parte (li apre il server come feedback derivato, NON li correggi):',
+      'Rilievi messi da parte (fuori da questo giro: li apre il server come feedback derivato):',
       fmt(r.phase2.derived),
       budgets ? `Bilanci: ${budgets}` : '',
       '',
@@ -1162,8 +1162,7 @@ export function usageText() {
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
     '  --record-verifier <id> "<critica>" [--ticket <b>]   una riga per rilievo,',
     '                         col livello davanti ([2] …; [1?] = chiede una decisione);',
-    '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO,',
-    '                         dice cosa fare dopo',
+    '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
     '  --record-fixed    <id> ["report"] [--frase "…"] [--ticket <b>]',
     '  --record-secaudit <id> <pass|fail> [--ticket <b>]',
     '  --clear-state     <id> rimuove la copia locale dello stato',
