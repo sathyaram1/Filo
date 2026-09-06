@@ -105,8 +105,8 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
 
-// I tre bilanci del verificatore che corregge (feedback #561: cap2 per i
-// rilievi di livello 3/2, cap1 per gli 1, cap0 per gli 0). Li CONSUMA il
+// I tre bilanci dei giri di correzione (feedback #561: cap2 per i rilievi
+// di livello 3/2, cap1 per gli 1, cap0 per gli 0). Li CONSUMA il
 // SERVER quando registra la critica; qui servono solo come dato di riferimento
 // per gli strumenti. I DEFAULT vivono con le transizioni promosse a dati
 // (src/shared/feedbackTransitions.js): una sorgente sola, incorporata anche dal
@@ -134,8 +134,8 @@ export const VERIFIER_CAPS = (() => {
 // solo per resolveLoopCap, che gli strumenti e i test usano ancora.
 const LOOP_CAP_DEFAULT = 10;
 
-// Le regole del giro del verificatore che corregge (feedback #561): il parser
-// della critica coi livelli e la decisione su cosa si corregge. Dagli
+// Le regole del giro (feedback #561): il parser della critica coi livelli e
+// la decisione su cosa si corregge. Dagli
 // STRUMENTI, per la stessa ragione dei dati qui sopra. Il paracadute è un
 // parser minimo: senza il modulo la critica arriva comunque al server, che ha
 // la sua copia delle regole e decide lui.
@@ -281,8 +281,8 @@ export function defaultState(id, branch) {
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
 
 // Gli esiti che il SERVER può dare a una critica (feedback #561): `pass` (nessun
-// rilievo da correggere: si prosegue), `fix` (il verificatore corregge, fase
-// 2), `stop` (un rilievo di livello 3/2 non correggibile: decide l'owner). Non
+// rilievo da correggere: si prosegue), `fix` (c'è da correggere), `stop` (un
+// rilievo di livello 3/2 non correggibile: decide l'owner). Non
 // esiste più il verdetto a tre valori scelto dal verificatore: lui registra i
 // rilievi coi livelli, l'esito lo calcola il server dai bilanci. I vecchi
 // `pass|migliorabile|fail` restano accettati SOLO come parola opzionale sulla
@@ -295,8 +295,8 @@ export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
 
 /**
  * Lo specchio locale dell'esito che il server ha calcolato sulla critica.
- * `pass` → verificato; `fix` → il verificatore sta correggendo (la consegna
- * `fixed` arriverà da lui, stesso biglietto); `stop` → fermato. La critica si
+ * `pass` → verificato; `fix` → giro di correzione aperto (la consegna `fixed`
+ * arriverà sullo stesso biglietto); `stop` → fermato. La critica si
  * conserva com'è stata scritta (coi livelli), per il fogliettino locale.
  */
 export function applyVerifierVerdict(state, outcome, critique = '') {
