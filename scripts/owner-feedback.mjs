@@ -227,7 +227,7 @@ export async function scrivi(id, to, nota, opts = {}) {
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
-  const argv = process.argv.slice(2);
+  let argv = process.argv.slice(2);
   const flag = (nome) => {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
