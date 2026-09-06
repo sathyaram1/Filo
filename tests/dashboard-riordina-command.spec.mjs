@@ -3,11 +3,19 @@
 // dashboard che riordina la striscia per colore (§1.3, lo stesso riordino della
 // riapertura di Filo) SENZA archiviare/chiudere nulla — a differenza di /pulisci.
 //
-// Due garanzie, entrambe ASSERISCONO il successo:
+// Sei garanzie, tutte ASSERISCONO il successo:
 //   1) "/riordina" è classificato come comando Filo (arancione), non
 //      shell/sconosciuto;
 //   2) inviato dalla nuova scheda, riordina davvero le tab web per tinta
-//      lasciandole TUTTE aperte (nessuna archiviazione).
+//      lasciandole TUTTE aperte (nessuna archiviazione);
+//   3) con una scheda sola risponde "già in ordine" invece di tacere;
+//   4) la scheda su cui eri resta quella attiva anche dopo il riordino;
+//   5) riordinare due volte di fila: la seconda è un non-fare, e lo dice;
+//   6) "/riordina" con parole in più resta un comando riconosciuto.
+//
+// I casi 3-6 stavano in uno spec a parte, nato per una verifica e finito nel
+// repo per sbaglio: cancellandolo sono spariti quattro controlli che nessun
+// altro test rifà. Stanno qui perché è qui che si va a cercarli.
 
 import { test, expect } from './fixtures/electron.mjs';
 
