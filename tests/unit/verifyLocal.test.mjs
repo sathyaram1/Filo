@@ -93,7 +93,7 @@ test('critica senza rilievi: verifica superata sul contenuto', () => {
   assert.equal(checkVerdict(r.state.r, SHA).ok, true);
 });
 
-test('critica con un 2: finché la correzione non è consegnata non si pubblica, e dopo serve un\'altra verifica', () => {
+test('critica con un 2: finché il giro non è chiuso non si pubblica, e dopo serve un\'altra verifica', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const r = withCritique(s, 'r', { critique: 'funziona Y\n[2] il pulsante non salva\n[0] caso raro', sha: SHA });
   assert.equal(r.outcome, 'fix');
@@ -120,12 +120,12 @@ test('critica con un 2: finché la correzione non è consegnata non si pubblica,
   assert.equal(s.r.verdict, undefined, 'la verifica nuova parte senza esito');
 });
 
-test('withFixed senza una correzione in sospeso: rifiutata', () => {
+test('withFixed senza un giro aperto: rifiutata', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   assert.equal(withFixed(s, 'r', { report: 'x', sha: SHA }).ok, false);
 });
 
-test('un 2 a bilancio esaurito, o che chiede una decisione: il lavoro si ferma (fail), niente da correggere', () => {
+test('un 2 a bilancio esaurito, o col segno ?: esito stop', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   s.r.counts = { count2: 5 };
   const r = withCritique(s, 'r', { critique: '[2] ancora rotto', sha: SHA });
@@ -136,14 +136,14 @@ test('un 2 a bilancio esaurito, o che chiede una decisione: il lavoro si ferma (
   assert.equal(d.outcome, 'stop');
 });
 
-test('i rilievi non corretti (0 da soli, 1 a bilancio finito) restano in `derived` per il report', () => {
+test('i rilievi fuori dal giro restano in `derived` per il report', () => {
   const r = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[0] caso raro', sha: SHA });
   assert.equal(r.outcome, 'pass');
   assert.equal(r.state.r.derived.length, 1);
   assert.equal(checkVerdict(r.state.r, SHA).ok, true, 'uno 0 da solo non ferma la pubblicazione');
 });
 
-test('il brief di chi verifica non anticipa la risposta del server', () => {
+test('buildVerifierBrief: niente che non serva a criticare', () => {
   const brief = buildVerifierBrief({ request: 'x', branch: 'r', recipe: 'RECIPE' });
   assert.match(brief, /verify-local\.mjs critica/);
   assert.ok(!/corretto "/.test(brief), 'il comando della correzione non si annuncia prima');
@@ -338,7 +338,7 @@ test('#561 verifica: una seconda critica sullo stesso giro è rifiutata e non pa
   assert.match(due.state.r.pending.findings[0].text, /^rotto$/, 'la critica registrata è ancora quella');
 });
 
-test('#561 verifica: il giro dopo vede il TESTO della critica precedente, mai il report di chi ha corretto', () => {
+test('#561 verifica: il giro dopo vede il TESTO della critica precedente, mai il report di chi ha lavorato', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const r = withCritique(s, 'r', { critique: 'ok\n[2] il pulsante non salva col titolo vuoto', sha: SHA });
   const c = withFixed(r.state, 'r', { report: 'REPORT SEGRETO del correttore', sha: ALTRO_SHA });
@@ -374,7 +374,7 @@ test('#561 verifica: «corretto» senza un commit nuovo non chiede un\'altra ver
 
 // ── Verifica del giro 2 (2026-09-05) su #561 ─────────────────────────────────
 
-test('#561 giro 2: dopo «corretto» la stessa istanza non registra la critica: serve un nuovo start', () => {
+test('#561 giro 2: chiuso un giro, la critica non si registra di nuovo: serve un nuovo start', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const r = withCritique(s, 'r', { critique: 'ok\n[1] bordo', sha: SHA });
   const c = withFixed(r.state, 'r', { report: 'corretto', sha: ALTRO_SHA });
@@ -525,7 +525,7 @@ test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta co
   assert.equal(typeof readPhase2Instructions, 'function');
 });
 
-test('phase2Text: le istruzioni arrivano da fuori (file sopra il repo), non dal codice; senza file si dice dove chiederle', () => {
+test('il testo che il comando stampa arriva da fuori (file sopra il repo), non dal codice; senza file si dice dove chiederlo', () => {
   const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
   const conFile = phase2Text({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
   assert.match(conFile, /ISTRUZIONI SEGRETE DELL'OWNER/);
