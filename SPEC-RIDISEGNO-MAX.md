@@ -337,12 +337,10 @@ collegate:
 > l'esito lo calcola il server da tre bilanci per feedback — `cap2` (giri di
 > correzione per i livelli 3/2, default 5), `cap1` (livello 1, default 2),
 > `cap0` (livello 0, default 0) — e poi si corregge ciò che il server dice di
-> correggere, con istruzioni che arrivano solo nella risposta alla
-> registrazione (mai nel prompt). Ogni correzione porta a
-> un altro verificatore. I rilievi non corretti finiscono in UN feedback
-> derivato per lavoro, figlio `#N.k`, aperto dal server (categoria
-> `routine:residuo`); il verificatore non apre più feedback. Il correttore
-> separato resta solo per il riallineamento dopo un conflitto. Regole in
+> correggere. Ogni correzione porta a un altro verificatore. I rilievi non
+> corretti finiscono in UN feedback derivato per lavoro, figlio `#N.k`, aperto
+> dal server (categoria `routine:residuo`); il verificatore non apre più
+> feedback. Regole in
 > `src/shared/verifierRound.js` (incorporato dal server al deploy), bilanci in
 > `src/shared/feedbackTransitions.js`, dashboard in Gestione → Automazioni.
 > Quello che segue resta come storia della decisione precedente.

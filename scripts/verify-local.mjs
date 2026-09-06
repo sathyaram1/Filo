@@ -32,8 +32,7 @@
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
 //     Lo lancia l'istanza che ha verificato. Formato: `[2] testo`, `[1?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
-//     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito e,
-//     quando c'è da correggere, cosa fare.
+//     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
@@ -82,8 +81,8 @@ export function stateFile(root = ROOT) {
 export const MAX_CRITIQUE_CHARS = 12000;
 
 // Il testo che questo strumento stampa in coda alla risposta vive FUORI dal
-// repo, nella cartella sopra (accanto a LOCAL.md). Si legge qui, al momento
-// di stamparlo, e da nessun'altra parte.
+// repo, nella cartella sopra (accanto a LOCAL.md), e si legge al momento di
+// stamparlo.
 export function phase2InstructionsFile(root = ROOT) {
   // «Sopra il repo» vuol dire sopra il checkout PRINCIPALE: un lavoro che sta
   // in una cartella di lavoro separata (`.claude/worktrees/<nome>`) ha come
@@ -189,7 +188,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   if (prev.verdict === 'fix-pending' && prev.pending) {
     // La STESSA critica (stesso testo, stesso commit) rimandata dalla stessa
     // istanza: è la risposta persa (uscita troncata, terminale chiuso), e si
-    // ridà la stessa fase 2 senza scrivere niente e senza ripagare il giro,
+    // ridà la stessa risposta senza scrivere niente e senza ripagare il giro,
     // come già sul server (verifica del giro 10 su #561). Un testo diverso
     // resta una seconda critica, e viene respinto.
     if (ROUND.normalizeCritique(critique) === String(prev.critique || '') && String(sha || '') === String(prev.sha || '')) {
@@ -199,7 +198,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
         decision: { fix: p.findings || [], derived: Array.isArray(p.derived) ? p.derived : [], budgets: p.budgets || null, blocking: [] },
       };
     }
-    return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start. (Se ti serve rileggere la fase 2, rimanda la stessa identica critica: viene ristampata senza pagare.)' };
+    return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start. (Se ti serve rileggere la risposta, rimanda la stessa identica critica: viene ristampata senza pagare.)' };
   }
   // Consegnata la correzione, la verifica dopo la fa un'ALTRA istanza, e parte
   // da `start`: una critica registrata qui in mezzo sarebbe chi ha corretto che
@@ -267,7 +266,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   } else if (outcome === 'fix') {
     entry.verdict = 'fix-pending';
     // Anche i rilievi messi da parte e i bilanci del giro: servono a
-    // ristampare la fase 2 tale e quale se la risposta si è persa.
+    // ristampare la risposta tale e quale se si è persa.
     entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, budgets: decision.budgets };
     entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
   } else {
@@ -292,7 +291,7 @@ export function historyFromRounds(rounds) {
 }
 
 /**
- * Chi ha corretto ha consegnato: la fase 2 è chiusa. PURA. Ritorna
+ * Chi ha corretto ha consegnato: il giro è chiuso. PURA. Ritorna
  * { ok, state, outcome }:
  *   outcome 'fixed' → c'è un commit nuovo: serve un'altra verifica;
  *   outcome 'pass'  → nessun commit nuovo e in sospeso solo rilievi 1/0: niente
@@ -355,7 +354,7 @@ export function withVerdict(state, branch, { verdict, critique, sha, at }) {
   return withCritique(state, branch, { critique: text, sha, at, caps }).state;
 }
 
-/** Il testo della fase 2 in locale: stampato SOLO dopo la critica. PURA. */
+/** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function phase2Text({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
   const b = budgets && typeof budgets === 'object'
@@ -364,7 +363,7 @@ export function phase2Text({ findings, derived, budgets, branch, instructions })
   // Il testo delle istruzioni NON sta qui: arriva dal file fuori dal repo. Se
   // manca, si dice dove doveva essere e come si consegna, e basta.
   const testo = String(instructions || '').trim() || [
-    'Istruzioni della fase 2 non trovate (file FASE2-LOCALE.md nella cartella sopra il repo):',
+    'Istruzioni non trovate (file FASE2-LOCALE.md nella cartella sopra il repo):',
     'chiedile a chi guida. In ogni caso correggi SOLO i rilievi dell\'elenco qui sopra e consegna con',
     '  node scripts/verify-local.mjs corretto "<report della correzione>"',
   ].join('\n');
@@ -533,12 +532,9 @@ export function verdictForCurrentBranch(root = ROOT) {
 
 /**
  * Costruisce il compito per l'istanza che verifica. Contiene la RICHIESTA e il
- * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato.
+ * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato, e
+ * niente della risposta che arriverà dopo la critica.
  * PURA (testata): è il punto in cui l'isolamento o c'è o non c'è.
- *
- * Non contiene nemmeno la fase 2: chi verifica deve cercare come se il suo
- * lavoro finisse con la critica. Le istruzioni della correzione arrivano dopo,
- * dalla risposta a `critica`, e solo se c'è da correggere.
  */
 export function buildVerifierBrief({ request, branch, recipe, history }) {
   const past = Array.isArray(history) && history.length
