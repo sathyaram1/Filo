@@ -180,8 +180,132 @@
     }
   }
 
+  // ─── cronologia appunti (#256) ────────────────────────────────────────────
+  //
+  // Le stesse due azioni del menu "Incolla" (togli una voce, svuota tutto), ma
+  // raggiungibili SEMPRE. Nel menu del tasto destro la cronologia compare solo
+  // dentro un campo di testo: chi ha copiato una password mentre leggeva un
+  // articolo non ha nessun campo da cliccare, e finiva per non poterla togliere
+  // proprio quando gli premeva di più. Questa pagina è l'ingresso che mancava.
+  //
+  // La lista viene sempre da quella che risponde il main (che è anche quella su
+  // disco): dopo ogni rimozione riprendiamo `items` dalla risposta invece di
+  // togliere il nodo e sperare — così la pagina non può raccontare una
+  // cronologia diversa da quella che c'è davvero.
+
+  function clipLabel(entry) {
+    if (!entry) return '';
+    if (entry.type === 'image') return entry.description || I18n.t('security_clipboard_image');
+    return (entry.text || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function showClipHint(text, isError) {
+    const hint = $('sec-clip-hint');
+    hint.textContent = text;
+    hint.classList.toggle('sn-error', !!isError);
+    hint.classList.add('sn-show');
+    clearTimeout(showClipHint._t);
+    showClipHint._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
+  }
+
+  function renderClipboard(items) {
+    const list = $('sec-clip-list');
+    const entries = Array.isArray(items) ? items : [];
+    list.textContent = '';
+    // Vuota: niente lista e niente "Svuota cronologia" (non c'è nulla da
+    // svuotare), solo la riga che lo dice.
+    const empty = entries.length === 0;
+    $('sec-clip-empty').style.display = empty ? '' : 'none';
+    list.style.display = empty ? 'none' : '';
+    $('sec-clip-clear').style.display = empty ? 'none' : '';
+
+    for (const entry of entries) {
+      const row = document.createElement('div');
+      row.className = 'sn-clip-item';
+
+      const label = clipLabel(entry);
+      const text = document.createElement('span');
+      text.className = 'sn-clip-text';
+      text.textContent = label;
+      text.title = label;
+      row.appendChild(text);
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'sn-clip-remove';
+      rm.textContent = I18n.t('security_clipboard_remove');
+      rm.title = I18n.t('security_clipboard_remove_title');
+      rm.addEventListener('click', () => removeClipEntry(entry, rm));
+      row.appendChild(rm);
+
+      list.appendChild(row);
+    }
+  }
+
+  async function loadClipboard() {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
+      renderClipboard(res && res.ok ? res.items : []);
+    } catch (_) {
+      renderClipboard([]);
+    }
+  }
+
+  // Rimozione di UNA voce: puntuale di proposito. Chi ha copiato una password
+  // per sbaglio non deve pagare con tutto il resto della cronologia.
+  async function removeClipEntry(entry, btn) {
+    btn.disabled = true;
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.REMOVE_CLIPBOARD_ENTRY,
+        entry,
+      });
+      if (res && res.ok) {
+        renderClipboard(res.items);
+        showClipHint(I18n.t('security_clipboard_removed'), false);
+      } else {
+        btn.disabled = false;
+        showClipHint(I18n.t('security_clipboard_fail'), true);
+      }
+    } catch (_) {
+      btn.disabled = false;
+      showClipHint(I18n.t('security_clipboard_fail'), true);
+    }
+  }
+
+  // Svuotamento: distruttivo e non annullabile → conferma prima, col popup di
+  // Filo (mai il confirm nativo). Stesso testo del menu del tasto destro: è la
+  // stessa azione, deve suonare uguale da dove la si faccia.
+  async function clearClipboard() {
+    const btn = $('sec-clip-clear');
+    const text = I18n.t('menu_paste_clear_confirm');
+    const ok = window.SN_CONFIRM_UI
+      ? await window.SN_CONFIRM_UI.confirm({
+        title: I18n.t('menu_paste_clear'),
+        text,
+        okLabel: I18n.t('menu_paste_clear'),
+      })
+      : window.confirm(text);
+    if (!ok) return;
+    btn.disabled = true;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.CLEAR_CLIPBOARD_HISTORY });
+      if (res && res.ok) {
+        renderClipboard([]);
+        showClipHint(I18n.t('security_clipboard_cleared'), false);
+      } else {
+        showClipHint(I18n.t('security_clipboard_fail'), true);
+      }
+    } catch (_) {
+      showClipHint(I18n.t('security_clipboard_fail'), true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function load() {
     fillStaticText();
+    loadClipboard();
     const settings = await Storage.getSettings();
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
