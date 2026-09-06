@@ -166,11 +166,20 @@ test('input vuoto/spazi non parte; 10k caratteri e doppio invio rapido non rompo
   expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(0);
 
   // Doppio invio rapido mentre il provider "pensa": parte UN solo scambio.
+  // Il provider viene TRATTENUTO, così la seconda invio cade con certezza
+  // mentre il primo è ancora in volo (vedi `trattieni`).
   await setReply(app, JSON.stringify({ reply: 'prima risposta' }));
+  await trattieni(app);
   await page.fill('#chatInput', 'primo');
   await page.press('#chatInput', 'Enter');
+  await expect.poll(() => app.evaluate(() => globalThis.__chatCalls.length)).toBe(1);
+
   await page.fill('#chatInput', 'secondo (mentre pensa)');
   await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-user')).toHaveCount(1);
+  expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(1);
+
+  await libera(app);
   await expect(page.locator('.dk-msg-bot').last()).toContainText('prima risposta');
   await expect(page.locator('.dk-msg-user')).toHaveCount(1);
   expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(1);
