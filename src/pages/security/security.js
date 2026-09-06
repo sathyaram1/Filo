@@ -215,6 +215,8 @@
   // se ne vedono sette per volta. Cercare "la password copiata stamattina"
   // scorrendo a mano è lo stesso attrito che nel menu "Incolla" era già stato
   // tolto con un campo di ricerca: qui è la stessa lista, quindi lo stesso campo.
+  let clipVisibili = 0;
+
   function applyClipFilter() {
     const q = ($('sec-clip-search').value || '').trim().toLowerCase();
     const righe = $('sec-clip-list').querySelectorAll('.sn-clip-item');
@@ -224,6 +226,7 @@
       r.style.display = match ? '' : 'none';
       if (match) visibili++;
     }
+    clipVisibili = visibili;
     const nessuno = righe.length > 0 && visibili === 0;
     $('sec-clip-noresults').style.display = nessuno ? '' : 'none';
   }
