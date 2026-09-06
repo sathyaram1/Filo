@@ -360,9 +360,9 @@ async function main() {
       console.error('    node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"');
       console.error('  poi consegna il testo stampato a un\'ISTANZA NUOVA (non a te stesso:');
       console.error('  chi ha scritto il codice non può verificarlo), e lascia che registri');
-      console.error('  la critica: la risposta che riceve dice come si prosegue. Se dopo');
-      console.error('  quel giro il ramo cambia ancora, serve un\'altra verifica (rilancia');
-      console.error('  `start`, senza argomenti).');
+      console.error('  la critica. Un esito vale per il commit su cui è stato dato: se il');
+      console.error('  ramo cambia, serve un\'altra verifica (rilancia `start`, senza');
+      console.error('  argomenti).');
       process.exit(1);
     }
     console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
