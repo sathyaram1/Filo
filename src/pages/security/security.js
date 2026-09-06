@@ -447,7 +447,7 @@
 
   // Rimozione di UNA voce: puntuale di proposito. Chi ha copiato una password
   // per sbaglio non deve pagare con tutto il resto della cronologia.
-  async function removeClipEntry(entry, btn) {
+  async function removeClipEntry(entry, btn, daTastiera) {
     // Chi usa la tastiera non deve ripartire dall'inizio della pagina a ogni
     // voce tolta. Col mouse la lista sta ferma finché ci tieni sopra il
     // puntatore e il bottone premuto resta dov'è; da tastiera invece la lista
