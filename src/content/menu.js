@@ -848,6 +848,13 @@
             // salire di una posizione tutte quelle sotto, così il secondo clic
             // di un doppio clic colpiva la voce vicina e la cancellava anche
             // lei, per sempre e senza dirlo.
+            // Chi ha premuto col TASTO INVIO non deve restare senza niente
+            // sotto le dita: disabilitare il bottone che ha il fuoco lo
+            // rimanda al corpo della pagina, e per togliere la voce dopo
+            // toccherebbe ricominciare il giro col tabulatore. Il fuoco passa
+            // alla "×" della prima voce ancora viva dopo questa, o al campo di
+            // ricerca se non ne resta nessuna.
+            const avevaFuoco = document.activeElement === rm;
             row.classList.add('sn-menu-history-gone');
             rm.disabled = true;
             rm.title = I18n.t('menu_paste_removed');
@@ -855,6 +862,7 @@
             b.disabled = true;
             applyFilter();
             refreshEmptyState();
+            if (avevaFuoco) fuocoDopoRimozione(row);
           });
           row.appendChild(rm);
         }
