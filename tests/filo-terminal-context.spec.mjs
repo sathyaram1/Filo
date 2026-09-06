@@ -10,9 +10,9 @@
 // Entrambe asseriscono il SUCCESSO della feature, non l'assenza di un errore.
 
 import { test, expect } from './fixtures/electron.mjs';
-import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import { percorsoCanonico, cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
