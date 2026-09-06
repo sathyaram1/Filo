@@ -41,6 +41,30 @@ export function normalizza(arg) {
 }
 
 /**
+ * Le opzioni che npm si è MANGIATO. PURA.
+ *
+ * `npm run feedback:apri --allega spec.md` non passa `--allega` allo
+ * strumento: npm se lo prende come roba sua e allo strumento arrivano le sole
+ * parole libere. Il risultato è quello che il controllo qui sopra esiste per
+ * impedire — l'allegato non parte, il nome del file finisce nel testo, e il
+ * feedback viene aperto lo stesso — ma senza che lo strumento veda niente da
+ * rifiutare. L'opzione però non sparisce del tutto: npm la lascia scritta
+ * nell'ambiente, e da lì ce ne accorgiamo. La forma giusta è
+ * `npm run <scorciatoia> -- --allega spec.md` (feedback #565).
+ */
+export function opzioniMangiate(env = {}, opzioni = []) {
+  const prese = [];
+  for (const opzione of opzioni) {
+    const nome = String(opzione).replace(/^--/, '');
+    for (const chiave of [`npm_config_${nome}`, `npm_config_${nome.replace(/-/g, '_')}`]) {
+      if (env[chiave] !== undefined && !prese.includes(opzione)) prese.push(opzione);
+    }
+  }
+  if (!prese.length) return null;
+  return `${prese.join(' ')} ${prese.length === 1 ? 'è finita' : 'sono finite'} a npm invece che a me — non ho toccato niente. Con npm le opzioni vanno dopo due trattini da soli: npm run <scorciatoia> -- ${prese.map((o) => `${o} …`).join(' ')}`;
+}
+
+/**
  * Controlla gli argomenti contro le opzioni ammesse.
  *
  * @param {string[]} argv        gli argomenti, senza node e senza lo script
@@ -48,7 +72,9 @@ export function normalizza(arg) {
  * @param {string[]} conValore   quelle che pretendono un valore dopo di sé
  * @returns {string|null} il messaggio da stampare, o null se è tutto a posto
  */
-export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) {
+export function controllaArgomenti(argv, { opzioni = [], conValore = [], env = null } = {}) {
+  const mangiate = env ? opzioniMangiate(env, opzioni) : null;
+  if (mangiate) return mangiate;
   const lista = Array.isArray(argv) ? argv.map((a) => String(a ?? '')) : [];
   const ammesse = new Set(opzioni);
   const vuole = new Set(conValore);

@@ -244,6 +244,7 @@ if (isMain) {
   const male = controllaArgomenti(argv, {
     opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'],
     conValore: ['--branch', '--reason', '--frase'],
+    env: process.env,
   });
   if (male) {
     console.error(`RIFIUTATO: ${male}`);

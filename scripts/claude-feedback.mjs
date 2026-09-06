@@ -237,6 +237,7 @@ export async function main(argv) {
   const male = controllaArgomenti(argv, {
     opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega'],
+    env: process.env,
   });
   if (male) {
     console.error(`RIFIUTATO: ${male}`);
