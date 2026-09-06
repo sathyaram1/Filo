@@ -70,10 +70,17 @@ async function mockProvider(app) {
     globalThis.__chatCalls = [];
     globalThis.__nextReply = JSON.stringify({ reply: 'ok' });
     globalThis.__failNext = false;
+    globalThis.__trattieni = null;   // se armata, il provider resta "a pensare"
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       globalThis.__chatCalls.push(messages);
       if (globalThis.__failNext) { globalThis.__failNext = false; throw new Error('provider giù'); }
-      await new Promise((r) => setTimeout(r, 50));
+      // "Mentre il provider pensa" dev'essere un FATTO, non una speranza: con
+      // una semplice attesa di 50ms, su una macchina in cui i comandi del test
+      // viaggiano più lenti di così la prima risposta era già arrivata quando
+      // partiva il secondo invio — e il secondo scambio, legittimamente, partiva
+      // davvero. Il test si tiene in mano il momento in cui la risposta esce.
+      if (globalThis.__trattieni) await globalThis.__trattieni;
+      else await new Promise((r) => setTimeout(r, 50));
       return { text: String(globalThis.__nextReply), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
     // La chat dei mazzi chiede il reasoning → cammino streaming: delega al
