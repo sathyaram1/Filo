@@ -1369,7 +1369,7 @@
   }
 
   // ── Menu contestuale sul titolo (tasto destro) ────────────────────────
-  // Coerente con PATTERNS.md § "Menu contestuale proprio nelle pagine filo://":
+  // Coerente con patterns/menu-contestuale-proprio-nelle-pagine-filo-preventdefault-e.md:
   // preventDefault + popup con le classi .sn-select-pop/.sn-select-option.
   let titleMenuEl = null;
   function closeTitleMenu() {
