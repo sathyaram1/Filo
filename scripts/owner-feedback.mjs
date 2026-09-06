@@ -232,14 +232,16 @@ if (isMain) {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
   };
-  // Come nello strumento gemello (#565): un'opzione scritta male non deve
-  // scalare sui posizionali e far partire lo stesso il cambio di stato.
-  const OPZIONI = ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'];
-  // `--help` non è un'opzione sconosciuta: chiedere aiuto è il modo più
-  // naturale di cominciare, e rispondere «non la conosco» non aiuta nessuno.
-  const ignote = argv.filter((a) => a.startsWith('--') && !OPZIONI.includes(a) && a !== '--help' && a !== '-h');
-  if (ignote.length) {
-    console.error(`RIFIUTATO: opzione sconosciuta ${ignote.join(' ')} — non ho toccato niente.`);
+  // Come nello strumento gemello (#565), con lo stesso controllo: un'opzione
+  // scritta male non deve scalare sui posizionali e far partire lo stesso il
+  // cambio di stato. `--help` è legittima: chiedere aiuto non è un errore.
+  const { controllaArgomenti } = await import('./lib/argomenti.mjs');
+  const male = controllaArgomenti(argv, {
+    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--help', '-h'],
+    conValore: ['--branch', '--reason', '--frase'],
+  });
+  if (male) {
+    console.error(`RIFIUTATO: ${male}`);
     process.exit(1);
   }
   const branch = flag('branch');
