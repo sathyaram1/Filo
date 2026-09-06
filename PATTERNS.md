@@ -23,8 +23,10 @@ poi la riga `[← Tutti i pattern](../PATTERNS.md)`, poi il racconto (la regola 
 frase → il perché → il riferimento al codice dove vive il pattern); più una riga qui
 con lo stesso titolo, il link e la regola in una frase. Lo `<slug>` è il titolo in
 minuscolo con i trattini, tagliato a 60 caratteri **all'ultima parola intera** e mai
-lasciato appeso su una parolina (`…-mai`, `…-non`, `…-che`): quel nome è tutto ciò
-che si legge nei commenti del codice prima di aprire il file. Un racconto che ne cita
+lasciato appeso su una parola che regge quella dopo: né una parolina (`…-mai`,
+`…-non`, `…-che`, `…-solo`) né un verbo senza il suo complemento (`…-deve`,
+`…-puo`, `…-dire`). Se il taglio cade lì, si arretra ancora di una parola: quel
+nome è tutto ciò che si legge nei commenti del codice prima di aprire il file. Un racconto che ne cita
 un altro lo linka come vicino, `[Titolo](altro-slug.md)`.
 
 La sentinella `tests/unit/patternsIndex.test.mjs` diventa rossa se manca uno dei due,
