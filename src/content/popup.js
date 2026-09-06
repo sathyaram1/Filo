@@ -1094,7 +1094,7 @@
   }
 
   // Aggiorna il corpo della risposta senza STRAPPARE la lettura —
-  // vedi PATTERNS.md § "Liste/chat che si ricostruiscono in streaming".
+  // vedi patterns/liste-chat-che-si-ricostruiscono-in-streaming-auto-follow.md
   //
   // Il corpo del riquadro è una finestrella che scorre, e quando lo spazio è
   // poco si accorcia parecchio: leggere scorrendo mentre la risposta arriva è
