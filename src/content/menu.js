@@ -721,9 +721,10 @@
       let clearWrap = null;
 
       // Quando l'utente rimuove l'ultima voce: mostra lo stato vuoto e nascondi
-      // ricerca/svuota (non c'è più nulla da cercare o svuotare).
+      // ricerca/svuota (non c'è più nulla da cercare o svuotare). Le righe già
+      // tolte restano a schermo barrate, quindi non contano.
       const refreshEmptyState = () => {
-        if (list.querySelector('.sn-menu-history-item')) return;
+        if (list.querySelector('.sn-menu-history-item:not(.sn-menu-history-gone)')) return;
         noResults.style.display = 'none';
         emptyMsg.style.display = '';
         searchWrap.style.display = 'none';
