@@ -85,8 +85,8 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
 - **Superfici gemelle si allineano.** La pagina dei feedback e la dashboard di
   gestione sono la stessa barra vista da due ruoli: la seconda era rimasta
   senza numeri per anni proprio perché nessuno le guardava affiancate. E
-  allineare i numeri non basta se le sezioni non sono le stesse: vedi il
-  pattern qui sotto.
+  allineare i numeri non basta se le sezioni non sono le stesse: vedi
+  [Sezioni con lo stesso nome, una regola sola (e la regola è codice condiviso)](sezioni-con-lo-stesso-nome-una-regola-sola-e-la-regola.md).
 - **Il numero fa corpo unico col nome, a qualsiasi larghezza.** Una barra di
   schede a `display:flex` senza `flex-wrap` stringe i bottoni finché le parole
   si spezzano: alla larghezza minima della finestra (720) si leggeva "In" /
