@@ -141,8 +141,8 @@ test('conferma nel popup: riga nel diario e il modello la vede al turno dopo', a
   await clickConfirm(page, 'ok');
   // Riga nel diario dopo l'OK.
   await expect.poll(async () => (await rows(page)).join(' | '), { timeout: 10_000 }).toMatch(/Impostato/);
-  const applied = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).terminalMode);
-  expect(applied).toBe(true);
+  const applied = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).terminal);
+  expect(applied && applied.enabled).toBe(true);
 
   // Turno dopo: il modello deve vedere la conferma nel contesto.
   await scriptProvider(app, [{ text: 'Sì, è attivo.' }]);
