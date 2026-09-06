@@ -45,7 +45,8 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   scatta solo quando NON si legge nessuno stato, che è il caso vero — o hai la
   chiave e li leggi tutti, o non ce l'hai e non ne leggi uno. Togliere le
   sezioni a tutti per un documento storto sarebbe sproporzionato, e farebbe
-  divergere la pagina dalla sua gemella: la divergenza che il pattern qui sopra
+  divergere la pagina dalla sua gemella: la divergenza che
+  [Sezioni con lo stesso nome, una regola sola (e la regola è codice condiviso)](sezioni-con-lo-stesso-nome-una-regola-sola-e-la-regola.md)
   esiste per togliere.
 - **La regola sta nel modulo, non nella pagina — o la gemella resta indietro.**
   Scritta dentro `feedback.js`, questa regola è valsa per una pagina sola: la
