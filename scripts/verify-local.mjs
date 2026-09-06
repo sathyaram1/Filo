@@ -205,7 +205,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   // da `start`: una critica registrata qui in mezzo sarebbe chi ha corretto che
   // si approva da solo (la porta del giro 1, vista dal lato locale).
   if (prev.verdict === 'fixed') {
-    return { ok: false, state: s, reason: 'la correzione è stata consegnata: la verifica sul contenuto nuovo la fa un\'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida). Una critica adesso sarebbe chi ha corretto che si approva da solo.' };
+    return { ok: false, state: s, reason: 'la correzione è stata consegnata: la verifica sul contenuto nuovo la fa un\'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida).' };
   }
   // Dopo un pass o uno stop la critica del giro è registrata: una seconda,
   // senza un nuovo `start`, è la stessa istanza che ci ripensa — e con un [2]
@@ -522,8 +522,7 @@ export function verdictForCurrentBranch(root = ROOT) {
 
 /**
  * Costruisce il compito per l'istanza che verifica. Contiene la RICHIESTA e il
- * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato, e
- * niente della risposta che arriverà dopo la critica.
+ * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato.
  * PURA (testata): è il punto in cui l'isolamento o c'è o non c'è.
  */
 export function buildVerifierBrief({ request, branch, recipe, history }) {
@@ -706,6 +705,6 @@ if (isMain) {
     process.exit(r.ok ? 0 : 1);
   }
 
-  console.error('Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | pass "<testo>" | fail "<testo>" | status');
+  console.error('Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | status');
   process.exit(1);
 }
