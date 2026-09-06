@@ -432,8 +432,7 @@
     // La conferma dice QUANTE voci spariscono, e se una ricerca ne sta
     // nascondendo una parte lo dichiara: con un filtro attivo la lista mostrava
     // una riga sola e lo svuotamento le portava via tutte.
-    const visibili = $('sec-clip-list').querySelectorAll('.sn-clip-item:not([style*="display: none"])').length;
-    const text = Clip.testoConferma(vociCorrenti.length, visibili);
+    const text = Clip.testoConferma(vociCorrenti.length, clipVisibili);
     const ok = window.SN_CONFIRM_UI
       ? await window.SN_CONFIRM_UI.confirm({
         title: I18n.t('menu_paste_clear'),
