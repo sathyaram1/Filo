@@ -19,6 +19,11 @@
       version: '0.2.222', date: '2026-09-06',
       features: [
         'In Impostazioni → Sicurezza c\'è "Cronologia appunti": vedi tutto quello che hai copiato di recente, togli una voce sola o svuoti tutto. Prima ci si arrivava solo dal menu del tasto destro dentro un campo di testo, quindi una password copiata mentre leggevi una pagina non si riusciva a togliere.',
+        'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
+      ],
+      fixes: [
+        'La cronologia appunti in Impostazioni → Sicurezza si aggiorna da sola: quello che copi mentre la pagina è aperta compare subito, e una voce tolta dal menu "Incolla" sparisce anche lì. Prima la pagina restava ferma a com\'era quando l\'avevi aperta, e sembrava che una password copiata poco prima non ci fosse.',
+        'Una voce copiata fatta di soli spazi non è più una riga vuota senza spiegazione: adesso dice che sono spazi e quanti.',
       ],
     },
     {

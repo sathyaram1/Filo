@@ -40,6 +40,20 @@ faccia «raggiungibilità» di
 [Se Filo sa CREARE una cosa, deve saperla anche togliere e cambiare](se-filo-sa-creare-una-cosa-deve-saperla-anche-togliere.md):
 lì la domanda è se l'azione inversa esiste, qui se si riesce ad arrivarci.
 
+**La porta fissa deve stare al passo, e in Filo «quando la scheda torna
+davanti» non esiste.** La lista si ridisegnava dalla risposta del main dopo ogni
+rimozione, e per il resto contava su `visibilitychange`. Quell'evento non arriva
+mai: cambiando scheda Filo lascia le pagine in secondo piano "visibili" (larghe
+zero, così un brano aperto in sottofondo continua a suonare), quindi la pagina
+non si spegne e non si riaccende. Una scheda lasciata aperta sulla sicurezza
+restava ferma a com'era all'apertura: copiavi una password in un'altra scheda,
+tornavi lì e non c'era, cioè la pagina della privacy diceva meno del vero. La
+cura è l'avviso dal main: ogni scrittura della cronologia appunti manda
+`CLIPBOARD_HISTORY_UPDATED` alle sole pagine `filo://` (senza le voci dentro:
+chi lo riceve rilegge), e la pagina si ridisegna. Vale per qualunque pagina
+fissa che mostri dati che cambiano altrove: si aggiorna su un avviso, non su un
+evento di visibilità che qui non scatta.
+
 **Dove vive.** La sezione sta in `src/pages/security/security.html` +
 `security.js` (`loadClipboard`/`renderClipboard`/`clearClipboard`); il sotto-menu
 gemello in `src/content/menu.js` (`openSubmenu`). La lista viene sempre da quella
