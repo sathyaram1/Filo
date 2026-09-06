@@ -138,10 +138,10 @@ test('esiti al modello: le azioni senza bottone risultano ESEGUITE', async ({ ap
   ]);
   await ask(page, 'fai tutto');
 
-  await expect.poll(async () => (await app.evaluate(() => (globalThis.__rounds || []).length)), { timeout: 30_000 }).toBeGreaterThan(1);
-  const second = await app.evaluate(() => globalThis.__rounds[1]);
+  await expect.poll(async () => (await app.evaluate(() => (globalThis.__rounds || []).length)), { timeout: 40_000 }).toBeGreaterThan(2);
+  const third = await app.evaluate(() => globalThis.__rounds[2]);
   const byId = {};
-  for (const m of second) if (m.role === 'tool') byId[m.tool_call_id] = m.content;
+  for (const m of third) if (m.role === 'tool') byId[m.tool_call_id] = m.content;
 
   for (const id of ['t1', 't2', 't3', 't4', 't6', 't7']) {
     expect(byId[id], `esito di ${id}`).toBeTruthy();
