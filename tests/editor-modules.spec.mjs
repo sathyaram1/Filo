@@ -392,6 +392,42 @@ test.describe('font picker e drag dei moduli', () => {
     await expect(pop).toBeHidden();
   });
 
+  // La tendina è larga almeno 180px anche quando il modulo che la apre è più
+  // stretto, e i moduli stanno nella colonna di destra: allineata al bordo
+  // sinistro del suo bottone, in una finestra stretta la metà destra finisce
+  // fuori dallo schermo e i nomi dei font si leggono a metà. Senza il rientro
+  // il primo assert è rosso: il bordo destro della tendina supera la finestra.
+  test('la tendina del font resta dentro la finestra anche quando è stretta', async () => {
+    const page = await openTab(EDITOR);
+    await page.waitForSelector('.ed-grid');
+    await page.setViewportSize({ width: 520, height: 800 });
+    await addFontModule(page);
+
+    const mod = page.locator('.ed-module[data-type="font"]');
+    await mod.locator('.ed-font-button').click();
+    await expect(mod.locator('.ed-font-pop')).toBeVisible();
+
+    const m = await page.evaluate(() => {
+      const pop = document.querySelector('.ed-font-pop');
+      const btn = document.querySelector('.ed-font-button');
+      const p = pop.getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      return {
+        vw: window.innerWidth, left: p.left, right: p.right,
+        // Se allineata al bottone la tendina non sarebbe uscita, questo caso non
+        // prova niente: meglio saperlo subito che avere un verde vuoto.
+        sarebbeUscita: b.left + p.width > window.innerWidth,
+      };
+    });
+    expect(m.sarebbeUscita, 'a questa larghezza la tendina non sborderebbe comunque: il caso non prova niente').toBe(true);
+    expect(m.right, 'la tendina esce dal bordo destro').toBeLessThanOrEqual(m.vw);
+    expect(m.left, 'la tendina esce dal bordo sinistro').toBeGreaterThanOrEqual(0);
+
+    // E si legge davvero: i nomi dei font sono cliccabili, non tagliati fuori.
+    await expect(mod.locator('.ed-font-pop .ed-font-opt').first()).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
   test('un modulo si può afferrare da qualsiasi punto tenendo premuto (non solo dalla maniglia)', async () => {
     const page = await openTab(EDITOR);
     await page.waitForSelector('.ed-grid');

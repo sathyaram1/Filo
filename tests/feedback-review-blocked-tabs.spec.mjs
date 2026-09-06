@@ -3,7 +3,10 @@
 // sicurezza) — vivono in "In coda" sulla pagina dei feedback, esattamente come
 // nella dashboard di gestione; un fix bocciato troppe volte (`design` con motivo
 // `loop`) torna nei "Ricevuti", perché aspetta una decisione dell'owner. Su
-// tutti si vede il branch del fix e l'etichetta dello stato.
+// tutti si vede il branch del fix e l'etichetta dello stato, col motivo scritto
+// in italiano: le PAROLE del motivo si chiedono al vocabolario condiviso, non si
+// ricopiano qui (una frase ricopiata è già rimasta indietro una volta, e il
+// controllo è stato rosso per tutti finché nessuno l'ha guardato).
 //
 // Prima del #509 questa pagina aveva due sezioni sue ("In revisione",
 // "Bloccati") costruite sui vecchi status `review`/`blocked`, che la gemella non
