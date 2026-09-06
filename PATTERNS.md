@@ -5,8 +5,8 @@ convenzioni di design, decisioni ricorrenti. Vale per le sessioni locali **e** p
 routine cloud.
 
 Qui sotto c'è una riga per pattern: il titolo e la regola. Il **racconto** di ogni
-pattern — il caso che l'ha fatto nascere, i tentativi sbagliati, i riferimenti al
-codice — sta nel file linkato, dentro `patterns/`.
+pattern sta nel file linkato, dentro `patterns/`: il caso che l'ha fatto nascere,
+i tentativi sbagliati, i riferimenti al codice.
 
 **Quando leggerlo:** l'indice, per intero, prima di toccare la UI o di prendere una
 decisione di design. Il racconto di una sezione si apre quando stai per toccare
