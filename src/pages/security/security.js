@@ -349,8 +349,19 @@
       if (entry.type === 'image' && entry.dataUrl) {
         const thumb = document.createElement('img');
         thumb.className = 'sn-clip-thumb';
-        thumb.src = entry.dataUrl;
         thumb.alt = '';
+        // Un'immagine che non si riesce a disegnare lasciava l'iconcina rotta
+        // del browser: nel menu "Incolla" lo stesso caso rimette l'iconcina di
+        // Filo, ed è la stessa lista vista da due parti.
+        thumb.addEventListener('error', () => {
+          const icona = document.createElement('span');
+          icona.className = 'sn-clip-thumb sn-clip-thumb-fallback';
+          const svg = window.SN_ICONS && window.SN_ICONS.image;
+          if (svg) icona.innerHTML = svg(16);
+          else icona.textContent = '🖼';
+          thumb.replaceWith(icona);
+        });
+        thumb.src = entry.dataUrl;
         copia.appendChild(thumb);
       } else if (conMiniature) {
         const spacer = document.createElement('span');
