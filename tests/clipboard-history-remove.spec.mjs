@@ -48,7 +48,7 @@ const PAGE_HTML = `<!doctype html><html><body style="padding:40px"><textarea id=
 
 async function launchWithHistory(userData) {
   return electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -61,7 +61,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     { type: 'text', text: 'secondo testo generico', ts: Date.now() - 2000 },
     { type: 'text', text: 'terzo testo normale', ts: Date.now() - 1000 },
   ];
-  const userData = mkdtempSync(join(tmpdir(), 'filo-clip-rm-'));
+  const userData = cartellaTemporanea('filo-clip-rm-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: history }), 'utf8');
 
   const url = testServer.html(
@@ -70,7 +70,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
   const host = new URL(url).hostname;
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -137,7 +137,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     { type: 'text', text: 'secondo testo generico', ts: Date.now() - 2000 },
     { type: 'text', text: 'terzo testo normale', ts: Date.now() - 1000 },
   ];
-  const userData = mkdtempSync(join(tmpdir(), 'filo-clip-rm2-'));
+  const userData = cartellaTemporanea('filo-clip-rm2-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: history }), 'utf8');
 
   const url = testServer.html(PAGE_HTML);
