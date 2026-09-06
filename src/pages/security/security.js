@@ -383,7 +383,9 @@
       rm.className = 'sn-clip-remove';
       rm.textContent = I18n.t('security_clipboard_remove');
       rm.title = I18n.t('security_clipboard_remove_title');
-      rm.addEventListener('click', () => removeClipEntry(entry, rm));
+      // `detail === 0` = premuto con Invio o barra, non col mouse: solo in quel
+      // caso il fuoco va rimesso da qualche parte dopo la rimozione.
+      rm.addEventListener('click', (ev) => removeClipEntry(entry, rm, ev.detail === 0));
       row.appendChild(rm);
 
       list.appendChild(row);
