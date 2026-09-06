@@ -97,6 +97,21 @@ async function setReply(app, value) {
   await app.evaluate((_electron, v) => { globalThis.__nextReply = v; }, value);
 }
 
+// Blocca il provider sul "sto pensando" finché non lo si libera.
+async function trattieni(app) {
+  await app.evaluate(() => {
+    globalThis.__trattieni = new Promise((r) => { globalThis.__liberaProvider = r; });
+  });
+}
+async function libera(app) {
+  await app.evaluate(() => {
+    const r = globalThis.__liberaProvider;
+    globalThis.__trattieni = null;
+    globalThis.__liberaProvider = null;
+    if (r) r();
+  });
+}
+
 async function deckWithCommander(page) {
   await page.click('#newDeck');
   await expect(page.locator('#screenBuilder')).toBeVisible();
