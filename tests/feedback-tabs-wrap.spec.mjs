@@ -54,14 +54,9 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
       clientWidth: document.documentElement.clientWidth,
       schede: list.map((el) => {
         const r = el.getBoundingClientRect();
-        // Quante RIGHE DI TESTO occupa l'etichetta: un Range sul contenuto
-        // torna un rettangolo per riga. 1 = il numero è ancora accanto al nome.
-        const range = document.createRange();
-        range.selectNodeContents(el);
         return {
           testo: el.textContent.trim(),
           top: r.top, right: r.right,
-          righe: range.getClientRects().length,
           wrap: getComputedStyle(el).whiteSpace,
         };
       }),
