@@ -40,11 +40,23 @@ export const test = base.extend({
     // il percorso che l'app riporta.
     const userData = cartellaTemporanea('filo-test-');
     const app = await electron.launch({
-      // host-resolver-rules: fa risolvere il dominio finto "blocked.test" al
-      // loopback, così l'e2e del blocco siti (siteBlock.spec.mjs) può mettere in
-      // blacklist un DOMINIO REALE (con estensione valida) — non un IP, che l'app
-      // scarta di proposito — e comunque farlo servire dal testServer locale.
-      args: [...argomentiScala, '--host-resolver-rules=MAP blocked.test 127.0.0.1', '.'],
+      // host-resolver-rules:
+      //  • "blocked.test" al loopback, così l'e2e del blocco siti
+      //    (siteBlock.spec.mjs) può mettere in blacklist un DOMINIO REALE (con
+      //    estensione valida) — non un IP, che l'app scarta di proposito — e
+      //    comunque farlo servire dal testServer locale;
+      //  • 192.168.1.1 su una porta CHIUSA del loopback: è l'indirizzo del
+      //    router di casa di mezzo mondo, e dove risponde davvero la pagina
+      //    rimbalza altrove (https, o un nome tipo `fritz.box`) e gli spec che
+      //    guardano l'indirizzo della scheda diventano rossi per colpa della
+      //    rete di chi li lancia. Nessun test deve parlare con un apparecchio
+      //    vero della LAN di qualcuno: la connessione viene rifiutata e la
+      //    scheda resta sull'indirizzo chiesto, uguale ovunque.
+      args: [
+        ...argomentiScala,
+        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9',
+        '.',
+      ],
       cwd: APP_ROOT,
       env: {
         ...process.env,
