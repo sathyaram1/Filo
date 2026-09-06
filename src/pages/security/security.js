@@ -384,6 +384,29 @@
     applyClipFilter();
   }
 
+  // Dopo una rimozione fatta da tastiera, il fuoco va sul "Rimuovi" della voce
+  // che ha preso quel posto in lista (o dell'ultima, se hai tolto quella in
+  // fondo). Se non resta niente da togliere va sul tasto per svuotare, e se
+  // nemmeno quello c'è più sul campo di ricerca: qualcosa sotto le dita resta
+  // sempre.
+  function fuocoDopoRimozione(indice) {
+    const righe = [...$('sec-clip-list').querySelectorAll('.sn-clip-item')]
+      .filter((r) => r.style.display !== 'none' && !r.classList.contains('sn-clip-gone'));
+    if (righe.length) {
+      const i = Math.min(Math.max(indice, 0), righe.length - 1);
+      const b = righe[i].querySelector('.sn-clip-remove');
+      if (b && !b.disabled) { metti(b); return; }
+    }
+    const svuota = $('sec-clip-clear');
+    if (svuota && svuota.style.display !== 'none') { metti(svuota); return; }
+    const cerca = $('sec-clip-search');
+    if (cerca && $('sec-clip-search-row').style.display !== 'none') metti(cerca);
+
+    function metti(el) {
+      try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (__) {} }
+    }
+  }
+
   // Rimette una voce negli appunti di sistema, pronta da incollare.
   async function copiaVoce(entry, row) {
     if (row && row.classList.contains('sn-clip-gone')) return;
