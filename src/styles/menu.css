@@ -413,9 +413,32 @@
   font-size: 16px;
   line-height: 1;
 }
-.sn-menu-history-remove:hover {
+.sn-menu-history-remove:hover:not(:disabled) {
   color: var(--sn-fg);
   background: rgba(var(--sn-accent-rgb), 0.35);
+}
+/* Voce già tolta: resta al suo posto barrata finché il sotto-menu è aperto,
+   così le righe sotto non salgono di una posizione sotto la mano. */
+.sn-menu-history-gone {
+  opacity: 0.45;
+}
+.sn-menu-history-gone .sn-menu-label {
+  text-decoration: line-through;
+}
+.sn-menu-history-gone .sn-menu-history-paste,
+.sn-menu-history-gone .sn-menu-history-remove {
+  cursor: default;
+  pointer-events: none;
+}
+/* Miniatura di un'immagine copiata: due schermate copiate in fila si
+   distinguono guardandole, non leggendo due volte "Immagine". */
+.sn-menu-history-thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--sn-border);
 }
 /* Footer "Svuota cronologia": azione distruttiva, separata da un bordo. */
 .sn-menu-history-clear {
