@@ -2,7 +2,7 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-[«Vai a guardare in quell'altro posto»: quel posto deve accorgersene DA APERTO](vai-a-guardare-in-quellaltro-posto-quel-posto-deve.md)
+[«Vai a guardare in quell'altro posto»: quel posto deve accorgersene DA APERTO](vai-a-guardare-in-quellaltro-posto-quel-posto.md)
 vale quando chi produce l'evento sta sulla stessa macchina e può suonare un
 campanello. La dashboard di gestione legge i feedback da
 Firestore, dove scrivono le routine in cloud e il server: nessun campanello
