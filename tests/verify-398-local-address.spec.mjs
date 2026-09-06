@@ -63,22 +63,29 @@ test('#398 /localhost:porta è riconosciuto e apre su schema http', async ({ app
 // (3) IP privato senza porta (router di casa): riconoscimento + la scheda parte
 //     su http://192.168.1.1 (schema giusto) e nulla va in chat.
 //
-//     192.168.1.1 È il router di casa di qualcuno: dove risponde davvero, la
-//     pagina rimbalza (spesso su https, o su un nome tipo `fritz.box`) e la
-//     scheda non si chiama più come l'indirizzo digitato — rosso che parla
-//     della rete di chi lancia il test, non di Filo. La fixture manda
-//     quell'indirizzo su una porta chiusa del loopback (vedi
-//     tests/fixtures/electron.mjs): la scheda resta ferma sull'indirizzo
-//     chiesto, che è ciò che questo caso vuole leggere, e l'esito è lo stesso
-//     in casa, in ufficio e nel cloud.
+//     Due cose rendevano questo caso dipendente da CHI lo lancia. 192.168.1.1 è
+//     il router di casa di mezzo mondo: dove risponde davvero, la pagina
+//     rimbalza (su https, o su un nome tipo `fritz.box`). E dove non risponde,
+//     l'esito dipende comunque da come non risponde — rifiuto secco o attesa
+//     infinita. Quindi: la fixture manda quell'indirizzo su una porta chiusa
+//     del loopback (vedi tests/fixtures/electron.mjs), così la risposta è
+//     sempre la stessa; e la scheda la si chiede a FILO, non alla finestra.
+//     Sono due cose diverse: la finestra, davanti a una connessione rifiutata,
+//     mostra la pagina d'errore di Filo — giusto così — mentre la SCHEDA resta
+//     l'indirizzo che l'utente ha chiesto, ed è quello che questo caso vuole
+//     leggere (l'indirizzo è stato aperto, non mandato in chat).
 test('#398 /192.168.1.1 è riconosciuto e apre una scheda http (non va in chat)', async ({ app, openTab }) => {
   const { dash, input } = await openDash(openTab);
   await input.fill('/192.168.1.1');
   await expect(input).toHaveClass(/is-cmd-filo/);
   await expect(input).not.toHaveClass(/is-cmd-unknown/);
   await input.press('Enter');
-  const page = await findWindow(app, (u) => u.startsWith('http://192.168.1.1'));
-  expect(page, 'scheda su http://192.168.1.1 attesa').toBeTruthy();
+  const schede = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    return w ? w._filoTabs.snapshot().tabs.map((t) => t.url) : [];
+  });
+  await expect.poll(schede, { timeout: 10_000, message: 'scheda su http://192.168.1.1 attesa' })
+    .toContain('http://192.168.1.1/');
   await expect(input).toHaveValue('');
   const inChat = await dash.evaluate(() => {
     const root = document.querySelector('#chat, #messages, main') || document.body;
