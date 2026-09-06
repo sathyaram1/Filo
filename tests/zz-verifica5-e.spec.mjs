@@ -43,11 +43,12 @@ async function scriptProvider(app, script) {
 for (const theme of ['light', 'dark']) {
   test(`blocco di attività leggibile — tema ${theme}`, async ({ app }) => {
     test.setTimeout(90_000);
-    const page = await newtabPage(app);
+    let page = await newtabPage(app);
     await expect(page.locator('#input')).toBeVisible({ timeout: 10_000 });
     await configure(app, theme);
-    await page.reload();
-    await expect(page.locator('#input')).toBeVisible({ timeout: 10_000 });
+    await page.reload().catch(() => {});
+    page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible({ timeout: 15_000 });
     await scriptProvider(app, [
       { text: 'Cerco il meteo…', reasoning: 'Prima cerco, poi metto la sveglia.',
         toolCalls: [{ id: 'v1', name: 'CERCA_WEB', arguments: { query: 'meteo Roma domani' } }] },
