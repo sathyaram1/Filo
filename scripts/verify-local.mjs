@@ -40,8 +40,8 @@
 //   node scripts/verify-local.mjs status
 //     Esito per il ramo corrente. Exit 0 = si può pubblicare.
 //
-//   (`pass "<testo>"` e `fail "<testo>"` restano come scorciatoie: nessun
-//   rilievo, oppure un solo rilievo di livello 2.)
+//   Non ci sono scorciatoie: si promuove e si boccia dallo stesso comando, e
+//   in tutti e due i casi il motivo si scrive (feedback #565).
 //
 // L'ESITO È LEGATO AL CONTENUTO, NON AL RAMO
 //   Il verdetto vale per il commit su cui è stato dato. Se dopo il PASS si
@@ -78,6 +78,9 @@ export function stateFile(root = ROOT) {
 // registrazione è respinta con la spiegazione, mai tagliata in silenzio
 // (CLAUDE.md § Limiti).
 export const MAX_CRITIQUE_CHARS = 12000;
+// E un pavimento: una verifica di due parole non è una verifica. Vale anche
+// per il pass, che è la promozione (feedback #565).
+export const MIN_CRITIQUE_CHARS = 80;
 
 // La coda della risposta vive fuori dal repo, accanto a LOCAL.md: è roba di
 // questa macchina, non del progetto.
@@ -339,17 +342,6 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
   s[branch] = { ...base, verdict: 'fixed', rounds };
   return { ok: true, state: s, outcome: 'fixed' };
-}
-
-/** Registra un verdetto secco sul contenuto `sha` (scorciatoie pass/fail). PURA. */
-export function withVerdict(state, branch, { verdict, critique, sha, at }) {
-  const text = verdict === 'pass' ? String(critique || '') : `[2] ${String(critique || 'la cosa chiesta non si ottiene')}`;
-  // Un fail secco deve FERMARE, qualunque sia il bilancio: è la bocciatura
-  // senza appello di chi non entra nel giro delle correzioni.
-  const caps = verdict === 'pass' ? CAPS : { cap2: 0, cap1: 0, cap0: 0 };
-  // Un "pass" con dentro rilievi di livello alto non è un pass: vale il testo,
-  // non la parola — è withCritique a decidere.
-  return withCritique(state, branch, { critique: text, sha, at, caps }).state;
 }
 
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
@@ -624,7 +616,20 @@ if (isMain) {
     process.exit(0);
   }
 
-  if (cmd === 'critica' || cmd === 'pass' || cmd === 'fail') {
+  // Le vecchie scorciatoie non esistono più (feedback #565): `pass "prova"`
+  // registrava un'approvazione vera con una parola, e chi verifica prova i
+  // sottocomandi per capire lo strumento — una volta è successo davvero.
+  // Promuovere e bocciare passano dallo stesso comando, e il motivo si scrive.
+  if (cmd === 'pass' || cmd === 'fail') {
+    console.error('«pass» e «fail» non esistono più: non ho toccato niente.');
+    console.error('Si registra sempre una critica, e il motivo si scrive in tutti e due i casi:');
+    console.error('  node scripts/verify-local.mjs critica "<cosa hai provato e cosa funziona>"');
+    console.error('Nessun rilievo = verifica superata. Per bocciare, una riga col livello davanti:');
+    console.error('  «[2] il pulsante Salva non salva col titolo vuoto» (e i passi per rifarlo).');
+    process.exit(1);
+  }
+
+  if (cmd === 'critica') {
     const text = rest.join(' ').trim();
     const prev = readState()[branch];
     if (!prev || !prev.request) {
@@ -632,23 +637,18 @@ if (isMain) {
       process.exit(1);
     }
     if (!text) {
-      console.error(cmd === 'fail'
-        ? 'Una bocciatura senza motivo non è utile a nessuno: scrivi cosa non funziona.'
-        : 'Una verifica senza riassunto non dice cosa hai provato: scrivi cosa funziona, e i rilievi se ci sono.');
+      console.error('Una verifica senza riassunto non dice cosa hai provato: scrivi cosa funziona, e i rilievi se ci sono.');
+      process.exit(1);
+    }
+    // Anche un'approvazione va motivata: senza, «ok» varrebbe come verifica.
+    if (text.length < MIN_CRITIQUE_CHARS) {
+      console.error(`Motivazione troppo corta (${text.length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho toccato niente.`);
+      console.error('Scrivi cosa hai provato e cosa hai visto — vale sia quando promuovi sia quando bocci.');
       process.exit(1);
     }
     // Con una correzione in sospeso decide withCritique: la stessa identica
-    // critica ristampa la fase 2 (risposta persa), un'altra è respinta.
-    // Le scorciatoie passano dagli stessi controlli della critica (correzione
-    // consegnata senza un nuovo start, rilievi scritti male) e stampano lo
-    // STESSO esito: un «pass» con dentro un [2] vale il testo, e prima diceva
-    // «il lavoro torna a chi l'ha fatto» mentre lo stato era «sta correggendo»
-    // e la fase 2 non veniva stampata (verifica del giro 7 su #561). Un «fail»
-    // secco ferma sempre: bilanci a zero.
-    const r = withCritique(readState(), branch, {
-      critique: cmd === 'fail' ? `[2] ${text}` : text, sha,
-      caps: cmd === 'fail' ? { cap2: 0, cap1: 0, cap0: 0 } : CAPS,
-    });
+    // critica ristampa la risposta (persa), un'altra è respinta.
+    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
