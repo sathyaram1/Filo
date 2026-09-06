@@ -835,13 +835,39 @@ section:has(#dictList) .sn-spell-add-row {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Il tasto per voce prende il tema come ogni altro controllo di Filo: lasciato
+   al bottone di serie del browser restava bianco su una pagina scura. */
 .sn-page .sn-clip-remove {
   flex: none;
   font-size: 12px;
-  padding: 2px 8px;
+  padding: 3px 9px;
+  background: transparent;
   color: var(--sn-muted);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.sn-page .sn-clip-remove:hover { color: var(--sn-fg); }
+.sn-page .sn-clip-remove:hover:not(:disabled) {
+  color: var(--sn-fg);
+  background: var(--sn-hover);
+}
+.sn-page .sn-clip-remove:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Ricerca fra le voci copiate: la cronologia arriva a cinquanta voci e nel
+   riquadro se ne vedono sette per volta. */
+.sn-page .sn-clip-search { margin: 8px 0; }
+.sn-page .sn-clip-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+}
+.sn-page .sn-clip-noresults { margin-top: 8px; font-size: 13px; }
 .sn-page .sn-clip-actions {
   display: flex;
   align-items: center;
