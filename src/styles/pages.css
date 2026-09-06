@@ -826,7 +826,26 @@ section:has(#dictList) .sn-spell-add-row {
   transition: background 0.12s ease;
 }
 .sn-page .sn-clip-item + .sn-clip-item { border-top: 1px solid var(--sn-border); }
-.sn-page .sn-clip-item:hover { background: var(--sn-hover); }
+/* La zona cliccabile della riga: rimette la voce negli appunti. Prima la riga
+   si illuminava intera ma cliccarla non faceva niente, cioè prometteva
+   un'azione che non esisteva. */
+.sn-page .sn-clip-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--sn-radius);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sn-page .sn-clip-copy:hover { background: var(--sn-hover); }
 .sn-page .sn-clip-text {
   flex: 1;
   min-width: 0;
@@ -835,6 +854,14 @@ section:has(#dictList) .sn-spell-add-row {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Voce tolta mentre il puntatore è ancora sulla lista: resta al suo posto,
+   barrata, finché il puntatore non esce. Se sparisse subito, le righe sotto
+   salirebbero di una posizione e il clic dopo colpirebbe la voce sbagliata. */
+.sn-page .sn-clip-gone { opacity: 0.5; }
+.sn-page .sn-clip-gone .sn-clip-text { text-decoration: line-through; }
+.sn-page .sn-clip-gone .sn-clip-copy { cursor: default; }
+.sn-page .sn-clip-gone .sn-clip-copy:hover { background: transparent; }
+.sn-page .sn-clip-pending { margin-top: 8px; font-size: 13px; }
 /* Il tasto per voce prende il tema come ogni altro controllo di Filo: lasciato
    al bottone di serie del browser restava bianco su una pagina scura. */
 .sn-page .sn-clip-remove {
