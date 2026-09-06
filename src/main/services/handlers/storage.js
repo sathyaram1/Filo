@@ -268,6 +268,19 @@ module.exports = function register(on, ctx) {
     return { ok: true, items: Array.isArray(list) ? list : [] };
   });
 
+  // La cronologia appunti cambia da dovunque: una copia in una scheda qualsiasi,
+  // il "×" del menu "Incolla", lo svuotamento dalla pagina della sicurezza. Chi
+  // la sta GUARDANDO in quel momento sta guardando un'altra scheda, e senza
+  // questo avviso resterebbe fermo a com'era quando l'ha aperta: su una pagina
+  // che si apre per controllare cosa Filo tiene da parte, mostrare meno del vero
+  // fa concludere che una password non c'è mentre c'è (#256).
+  // L'avviso NON porta con sé le voci — chi lo riceve rilegge la cronologia — e
+  // va alle sole pagine filo://: ciò che l'utente ha copiato non deve arrivare
+  // da solo a una scheda aperta su un sito qualunque.
+  const clipboardChanged = () => {
+    try { ctx.broadcastToFiloPages?.({ type: MSG.CLIPBOARD_HISTORY_UPDATED }); } catch (_) {}
+  };
+
   on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg) => {
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
