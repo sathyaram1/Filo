@@ -230,6 +230,16 @@ export async function main(argv) {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
   };
+  // Un'opzione scritta male non deve diventare il titolo del feedback: prima
+  // di qui `--allgea` spariva in silenzio, il suo valore scalava al posto del
+  // titolo e il feedback partiva lo stesso (feedback #565).
+  const OPZIONI = ['--priorita', '--url', '--allega', '--dry-run'];
+  const ignote = argv.filter((a) => a.startsWith('--') && !OPZIONI.includes(a));
+  if (ignote.length) {
+    console.error(`RIFIUTATO: opzione sconosciuta ${ignote.join(' ')} — non ho aperto niente.`);
+    uso();
+    return EXIT.USO;
+  }
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
