@@ -47,6 +47,12 @@ require(resolve(ROOT, 'src', 'shared', 'feedbackStatus.js'));
 
 const C = globalThis.SN_FEEDBACK_CRYPTO;
 const FS = globalThis.SN_FB_STATUS;
+const { controllaArgomenti } = await import('./lib/argomenti.mjs');
+const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'] });
+if (argomentiSbagliati) {
+  console.error(`RIFIUTATO: ${argomentiSbagliati}`);
+  process.exit(1);
+}
 const DRY = process.argv.includes('--dry-run');
 
 const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
