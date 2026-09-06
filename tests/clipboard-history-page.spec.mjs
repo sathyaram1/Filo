@@ -57,7 +57,8 @@ test('Sicurezza: la cronologia appunti si vede e una singola voce si rimuove', a
   await expect(page.locator('#sec-clip-title')).toHaveText(/Cronologia appunti/i, { timeout: 8_000 });
   await expect(list.locator('.sn-clip-item')).toHaveCount(3);
   await expect(list).toContainText(SENSITIVE);
-  await page.screenshot({ path: 'tests/.shots/clipboard-history-page-list.png' });
+  await page.locator('#sec-clipboard').scrollIntoViewIfNeeded();
+  await page.locator('#sec-clipboard').screenshot({ path: 'tests/.shots/clipboard-history-page-list.png' });
 
   // Togli SOLO la voce sensibile.
   const row = list.locator('.sn-clip-item', { hasText: SENSITIVE });
