@@ -124,7 +124,10 @@ test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si 
   // Cartella temporanea reale, distinta dalla home, in cui spostarsi con `cd`.
   // Il processo di test gira sulla stessa macchina della shell: ne prendiamo il
   // path canonico, quello che la shell riporterà come $PWD / %cd% dopo il cd.
-  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'filo-cwd-')));
+  // (Su Windows con un nome utente che contiene uno spazio, `os.tmpdir()` dà la
+  // forma abbreviata 8.3 e la shell risponde con quella lunga: vedi
+  // tests/helpers/percorsi.mjs.)
+  const dir = cartellaTemporanea('filo-cwd-');
   const home = await page.evaluate(async () => {
     const r = await window.filo?.shellHome?.();
     return r?.cwd || '';
