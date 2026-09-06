@@ -174,6 +174,11 @@ test('input vuoto/spazi non parte; 10k caratteri e doppio invio rapido non rompo
   await page.press('#chatInput', 'Enter');
   await expect.poll(() => app.evaluate(() => globalThis.__chatCalls.length)).toBe(1);
 
+  // Il provider è DAVVERO ancora al lavoro: se questa riga fosse verde perché
+  // la risposta è già arrivata, lo scenario "mentre pensa" non ci sarebbe e il
+  // resto del test non proverebbe niente.
+  await expect(page.locator('#chatLog')).not.toContainText('prima risposta');
+
   await page.fill('#chatInput', 'secondo (mentre pensa)');
   await page.press('#chatInput', 'Enter');
   await expect(page.locator('.dk-msg-user')).toHaveCount(1);
