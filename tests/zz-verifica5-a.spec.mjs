@@ -179,7 +179,7 @@ test('due timer senza id: due esiti distinti, due righe, due timer', async ({ ap
   const timerRows = r.filter((t) => /Timer avviato/.test(t));
   expect(timerRows.length).toBe(2);
 
-  const timers = await app.evaluate(async () => globalThis.SN_FILO_MEM.listTimers());
+  const timers = await app.evaluate(async () => globalThis.SN_FILO_MEMORY.listTimers());
   expect(timers.filter((t) => /uova|pasta/.test(t.label || '')).length).toBe(2);
 });
 
