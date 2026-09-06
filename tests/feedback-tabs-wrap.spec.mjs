@@ -63,14 +63,19 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
     };
   });
 
+  // Il nome e il suo numero restano sulla stessa riga: mai "In coda" / "(0)"
+  // spezzati. Le righe si contano per sovrapposizione verticale, non contando i
+  // rettangoli né i loro bordi alti: nome e numero hanno corpi diversi e fanno
+  // due rettangoli anche quando sono affiancati (tests/helpers/righe.mjs).
+  const righe = await righeDiTesto(page, '.fb-tab');
+  expect(righe.length).toBe(geo.schede.length);
+  for (const t of righe) expect(t, `scheda "${t.testo}" spezzata su più righe`).toMatchObject({ righe: 1 });
+
   // Nessuna scheda finisce oltre il bordo destro visibile: se non ci stanno
   // tutte su una riga, la barra manda a capo le schede INTERE.
   for (const s of geo.schede) {
     expect(s.right, `scheda "${s.testo}" oltre il bordo`).toBeLessThanOrEqual(geo.clientWidth + 1);
-    // Il nome e il suo numero restano sulla stessa riga (una riga di testo,
-    // più il padding verticale): mai "In coda" / "(0)" spezzati.
     expect(s.wrap, `scheda "${s.testo}"`).toBe('nowrap');
-    expect(s.righe, `scheda "${s.testo}" spezzata su più righe`).toBe(1);
   }
   // A questa larghezza almeno una scheda è andata a capo.
   expect(Math.max(...geo.schede.map((s) => s.top))).toBeGreaterThan(geo.firstTop);
