@@ -81,10 +81,9 @@ export function stateFile(root = ROOT) {
 // (CLAUDE.md § Limiti).
 export const MAX_CRITIQUE_CHARS = 12000;
 
-// Le istruzioni della fase 2 in locale vivono FUORI dal repo, nella cartella
-// sopra (accanto a LOCAL.md): il verificatore, che legge il repo, non deve
-// trovarle prima di aver registrato la critica. Le stampa questo strumento,
-// solo dopo la critica, senza passare da nessun altro agente.
+// Il testo che questo strumento stampa in coda alla risposta vive FUORI dal
+// repo, nella cartella sopra (accanto a LOCAL.md). Si legge qui, al momento
+// di stamparlo, e da nessun'altra parte.
 export function phase2InstructionsFile(root = ROOT) {
   // «Sopra il repo» vuol dire sopra il checkout PRINCIPALE: un lavoro che sta
   // in una cartella di lavoro separata (`.claude/worktrees/<nome>`) ha come
@@ -131,7 +130,7 @@ export function checkVerdict(entry, headSha, dirty = false) {
     return { ok: false, reason: 'c\'è un giro di correzione aperto su questo ramo: i rilievi non sono ancora stati consegnati (verify-local.mjs corretto)' };
   }
   if (entry.verdict === 'fixed') {
-    return { ok: false, reason: 'il verificatore ha corretto: serve un\'altra verifica sul contenuto nuovo (verify-local.mjs start)' };
+    return { ok: false, reason: 'la correzione è stata consegnata: serve un\'altra verifica sul contenuto nuovo (verify-local.mjs start)' };
   }
   if (entry.verdict !== 'pass') {
     return { ok: false, reason: `la verifica ha bocciato il lavoro: ${entry.critique || '(nessuna critica registrata)'}` };
@@ -312,7 +311,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
     if (prev.verdict === 'fixed') {
       return { ok: false, reason: `la correzione è già stata consegnata su questo ramo (${String(prev.fixedSha || '').slice(0, 8) || 'commit non registrato'}): non c'è altro da consegnare. Serve un'altra verifica, di un'altra istanza (verify-local.mjs start, lo rilancia chi guida).` };
     }
-    return { ok: false, reason: 'nessun giro aperto su questo ramo: prima la critica (verify-local.mjs critica)' };
+    return { ok: false, reason: 'nessun giro aperto su questo ramo' };
   }
   if (dirty) {
     return { ok: false, reason: 'ci sono modifiche non salvate: la consegna vale per un commit, e la verifica dopo deve provare quello. Salva e rilancia.' };
