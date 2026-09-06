@@ -93,9 +93,11 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     await expect(sensitiveRow).toHaveCount(1);
     await sensitiveRow.locator('.sn-menu-history-remove').click();
 
-    // Sparisce subito dalla lista, le altre restano.
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
-    await expect(sub).not.toContainText(SENSITIVE);
+    // La riga resta al suo posto barrata (le righe sotto non devono salire di
+    // una posizione sotto la mano di chi clicca, #256 giro 4): le voci VIVE
+    // scendono a due.
+    await expect(sensitiveRow).toHaveClass(/sn-menu-history-gone/);
+    await expect(sub.locator('.sn-menu-history-item:not(.sn-menu-history-gone)')).toHaveCount(2);
 
     // (3) Persistenza: chiudi il menu e riaprilo — la cronologia riletta dallo
     // storage NON contiene più la voce sensibile (la rimozione è stata salvata).
@@ -165,7 +167,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     // Rimuovi la voce sensibile.
     await sub.locator('.sn-menu-history-item', { hasText: SENSITIVE })
       .locator('.sn-menu-history-remove').click();
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
+    await expect(sub.locator('.sn-menu-history-item:not(.sn-menu-history-gone)')).toHaveCount(2);
 
     // Porta il mouse lontano: il sotto-menu si richiude da solo, il menu del
     // tasto destro resta aperto (si chiude solo con un click o Esc).

@@ -65,6 +65,13 @@ test('Sicurezza: la cronologia appunti si vede e una singola voce si rimuove', a
   await expect(row).toHaveCount(1);
   await row.locator('.sn-clip-remove').click();
 
+  // La riga tolta resta al suo posto barrata finché il puntatore è sulla lista:
+  // è così che le righe sotto non salgono di una posizione sotto la mano di chi
+  // sta cliccando (#256 giro 4). Le voci vive sono due.
+  await expect(row).toHaveClass(/sn-clip-gone/);
+  await expect(list.locator('.sn-clip-item:not(.sn-clip-gone)')).toHaveCount(2);
+  // Portato via il puntatore, la lista si ricompone e la voce sparisce.
+  await page.mouse.move(5, 5);
   await expect(list.locator('.sn-clip-item')).toHaveCount(2);
   await expect(list).not.toContainText(SENSITIVE);
 
@@ -127,6 +134,8 @@ test('Sicurezza: un\'immagine copiata si riconosce (miniatura + descrizione) e s
   await page.locator('#sec-clipboard').screenshot({ path: 'tests/.shots/clipboard-history-page-image.png' });
 
   await imgRow.locator('.sn-clip-remove').click();
+  await expect(imgRow).toHaveClass(/sn-clip-gone/);
+  await page.mouse.move(5, 5);
   await expect(list.locator('.sn-clip-item')).toHaveCount(1);
   await expect.poll(() => stored(app)).toEqual(['un testo qualunque']);
 });

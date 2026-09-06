@@ -93,6 +93,10 @@ test('#256 pagina Sicurezza: input limite (10k, HTML, emoji, immagine) senza rom
   // (3) Rimuovere la voce da 10k toglie SOLO quella.
   const rowLungo = list.locator('.sn-clip-item', { hasText: 'Lungoungo' });
   await rowLungo.first().locator('.sn-clip-remove').click();
+  // La riga tolta resta al suo posto barrata finché il puntatore è sulla lista
+  // (#256 giro 4): la lista si ricompone quando il puntatore se ne va.
+  await expect(rowLungo.first()).toHaveClass(/sn-clip-gone/);
+  await page.mouse.move(5, 5);
   await expect(list.locator('.sn-clip-item')).toHaveCount(4);
   await expect.poll(() => stored(app)).toHaveLength(4);
   expect((await stored(app)).some((t) => typeof t === 'string' && t.startsWith('Lungo'))).toBe(false);
@@ -100,6 +104,8 @@ test('#256 pagina Sicurezza: input limite (10k, HTML, emoji, immagine) senza rom
   // (4) La voce immagine si rimuove come le altre.
   const rowImg = list.locator('.sn-clip-item', { hasText: 'schermata di prova' });
   await rowImg.locator('.sn-clip-remove').click();
+  await expect(rowImg).toHaveClass(/sn-clip-gone/);
+  await page.mouse.move(5, 5);
   await expect(list.locator('.sn-clip-item')).toHaveCount(3);
   expect((await stored(app)).some((t) => String(t).startsWith('img:'))).toBe(false);
 });
@@ -195,7 +201,7 @@ test('#256 menu Incolla: rimuovi e svuota anche dal tasto destro, con annulla ch
   let sub = await apriSub();
   await expect(sub.locator('.sn-menu-history-item')).toHaveCount(3);
   await sub.locator('.sn-menu-history-item', { hasText: 'segreto-nel-menu' }).locator('.sn-menu-history-remove').click();
-  await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
+  await expect(sub.locator('.sn-menu-history-item:not(.sn-menu-history-gone)')).toHaveCount(2);
   await expect.poll(() => stored(app)).not.toContain('segreto-nel-menu');
 
   // Annulla lo svuotamento: la cronologia resta.

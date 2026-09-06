@@ -94,10 +94,13 @@ test('Sicurezza: la ricerca trova la voce fra le tante, e dice quando non c\'è'
   await expect(righe.locator('visible=true')).toHaveCount(1);
   await expect(pagina.locator('#sec-clip-list .sn-clip-item:visible')).toContainText('la-password-della-banca');
 
-  // Si toglie proprio quella, mentre il filtro è acceso.
+  // Si toglie proprio quella, mentre il filtro è acceso. La riga resta al suo
+  // posto barrata finché il puntatore è sulla lista (#256 giro 4).
   await pagina.locator('#sec-clip-list .sn-clip-item:visible .sn-clip-remove').click();
-  await expect(pagina.locator('#sec-clip-noresults')).toBeVisible();
+  await expect(pagina.locator('#sec-clip-list .sn-clip-item.sn-clip-gone')).toHaveCount(1);
   await expect.poll(() => stored(app)).not.toContain('la-password-della-banca');
+  await pagina.mouse.move(5, 5);
+  await expect(pagina.locator('#sec-clip-noresults')).toBeVisible();
 
   // Svuotato il campo, tornano tutte le altre.
   await cerca.fill('');

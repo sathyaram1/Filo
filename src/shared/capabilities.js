@@ -441,7 +441,7 @@
     },
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
-      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti fidati e la cronologia degli appunti: vedi tutto quello che hai copiato di recente, cerchi fra le voci, togli una singola voce o svuoti tutto. L\'elenco si aggiorna da solo mentre la pagina è aperta.',
+      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti fidati e la cronologia degli appunti: vedi tutto quello che hai copiato di recente, cerchi fra le voci, clicchi una voce per rimetterla negli appunti, togli una singola voce o svuoti tutto. L\'elenco si aggiorna da solo mentre la pagina è aperta, ma non si muove finché ci tieni sopra il puntatore, così non cancelli la voce sbagliata.',
       invoke: 'Pagina filo://security/security.html.',
     },
     {

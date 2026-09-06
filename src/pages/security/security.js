@@ -397,8 +397,7 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       renderClipboard(res && res.ok ? res.items : []);
-    } catch (e) {
-      console.error('[clip]', e);
+    } catch (_) {
       renderClipboard([]);
     }
   }
