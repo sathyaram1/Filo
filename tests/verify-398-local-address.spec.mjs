@@ -60,10 +60,23 @@ test('#398 /localhost:porta è riconosciuto e apre su schema http', async ({ app
   expect(page, 'scheda su http://localhost:PORT attesa (http, non https)').toBeTruthy();
 });
 
-// (3) IP privato senza porta (router di casa). Non è raggiungibile nel sandbox:
-//     verifichiamo il riconoscimento + che la scheda parta su http://192.168.1.1
-//     (schema giusto) e che nulla vada in chat.
+// (3) IP privato senza porta (router di casa): riconoscimento + la scheda parte
+//     su http://192.168.1.1 (schema giusto) e nulla va in chat.
+//
+//     192.168.1.1 È il router di casa di qualcuno: dove risponde davvero, la
+//     pagina rimbalza (spesso su https, o su un nome tipo `fritz.box`) e la
+//     scheda non si chiama più come l'indirizzo digitato — rosso che parla
+//     della rete di chi lancia il test, non di Filo. Quindi la richiesta la
+//     fermiamo NOI prima che parta: la scheda resta ferma sull'indirizzo
+//     chiesto, che è esattamente ciò che questo caso vuole leggere, e l'esito è
+//     lo stesso in casa, in ufficio e nel cloud.
 test('#398 /192.168.1.1 è riconosciuto e apre una scheda http (non va in chat)', async ({ app, openTab }) => {
+  await app.evaluate(({ session }) => {
+    session.defaultSession.webRequest.onBeforeRequest(
+      { urls: ['*://192.168.1.1/*'] },
+      (_d, callback) => callback({ cancel: true }),
+    );
+  });
   const { dash, input } = await openDash(openTab);
   await input.fill('/192.168.1.1');
   await expect(input).toHaveClass(/is-cmd-filo/);
