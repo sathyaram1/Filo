@@ -419,7 +419,8 @@ ma complica il loop; prima va misurato quanto serve davvero.
 
 ## 10. UI
 
-Rimandi a `PATTERNS.md` per lo stile; qui solo i pezzi nuovi.
+Rimandi a `PATTERNS.md` (e ai racconti in `patterns/`) per lo stile; qui solo i
+pezzi nuovi.
 
 - **La scheda del piano** (§6.1): non un popup di conferma generico. Un box con
   obiettivo, applicazioni come chip, i passi irreversibili evidenziati **con
