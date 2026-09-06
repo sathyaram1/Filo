@@ -456,7 +456,7 @@
     // riattraversare col tabulatore tutta la pagina delle impostazioni.
     const righePrima = [...$('sec-clip-list').querySelectorAll('.sn-clip-item')];
     const indice = righePrima.findIndex((r) => r.contains(btn));
-    const avevaFuoco = document.activeElement === btn;
+    const avevaFuoco = !!daTastiera && document.activeElement === btn;
     btn.disabled = true;
     try {
       const res = await chrome.runtime.sendMessage({
