@@ -496,6 +496,17 @@ test('CLI: «pass» e «fail» non registrano più niente, e dicono cosa usare',
   }
 });
 
+test('CLI: anche la consegna della correzione vuole il suo motivo', () => {
+  const casa = depositoUsaEGetta();
+  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
+  assert.equal(vl(casa, 'critica', LUNGA_FIX).code, 0);
+  // Da questa porta esce un esito come dall'altra: senza motivo, niente.
+  const corto = vl(casa, 'corretto', 'fatto');
+  assert.equal(corto.code, 1, corto.out);
+  assert.match(corto.out, /troppo corto \(5 caratteri/);
+  assert.match(vl(casa, 'status').out, /giro di correzione aperto/, 'niente scritto');
+});
+
 test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per bocciare', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
