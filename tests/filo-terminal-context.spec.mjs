@@ -27,9 +27,11 @@ const confirmAction = (page, action) =>
 const enableTerminal = (page) =>
   confirmAction(page, { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' });
 
-// Realpath: su alcuni sistemi os.tmpdir() è un symlink (es. /tmp → /private/tmp
-// su macOS) e `pwd`/cd risolvono al path reale. Confrontiamo i path reali.
-const real = (p) => { try { return fs.realpathSync(p); } catch (_) { return p; } };
+// Percorso canonico: su alcuni sistemi os.tmpdir() è un symlink (es. /tmp →
+// /private/tmp su macOS) e su Windows con un nome utente che contiene uno
+// spazio è la forma abbreviata 8.3 (AGENTI~1). La shell riporta comunque il
+// percorso vero, quindi si confrontano le forme canoniche di entrambi i lati.
+const real = percorsoCanonico;
 
 test('#1 cwd dell’assistente: un cd persiste, il pwd successivo lo riflette', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
