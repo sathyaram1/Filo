@@ -89,6 +89,9 @@ while (Date.now() - startedAt < TIMEOUT) {
 }
 
 try { proc.kill('SIGTERM'); } catch (_) {}
+// Un attimo prima di cancellare: su Windows una cartella con un file ancora
+// aperto dal processo che sta chiudendo non si rimuove.
+await new Promise((r) => setTimeout(r, 800));
 try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
 
 if (!result) {
