@@ -309,8 +309,7 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
   critica si registra coi livelli e l'esito lo calcola il server; i tre
   bilanci `cap2/cap1/cap0` e le regole stanno in `src/shared/feedbackTransitions.js`
-  e `src/shared/verifierRound.js`, incorporati dal server; il correttore separato
-  resta solo per il riallineamento dopo un conflitto.)*
+  e `src/shared/verifierRound.js`, incorporati dal server.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`firebase deploy --only firestore:rules`).

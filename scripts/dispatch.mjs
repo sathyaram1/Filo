@@ -810,9 +810,8 @@ function sealTransition(state, by) {
  * `[1?]` = chiede una decisione dell'owner; le righe prima del primo rilievo
  * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
  * la critica intera e il commit su cui è stata fatta la prova: il pass vale
- * per quel commit. L'ESITO lo calcola il server e torna nella risposta: con
- * qualcosa da correggere porta la fase 2 (rilievi da correggere e istruzioni),
- * che non sta da nessun'altra parte.
+ * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
+ * si stampa intera: non sta da nessun'altra parte.
  */
 async function recordVerifier(id, critiqueText) {
   const guard = guardIdentity(id);
@@ -936,8 +935,7 @@ async function recordFixed(id, report = '', frase = '') {
   if (sent.outcome !== 'ok') {
     return { rejected: true, serverDown: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
   }
-  // Chi consegna: chi ha corretto dentro il giro (#561) o il correttore separato
-  // del riallineamento. Il marcatore locale del ruolo lo sa; il server lo sa
+  // Il marcatore locale del ruolo dice chi sta consegnando; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
   const chi = readRole(ROOT) === 'verifier' ? 'verifier' : 'fixer';
   sealTransition(next, `${chi}:consegna`);

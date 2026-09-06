@@ -157,14 +157,14 @@ Punti non negoziabili del flusso:
 2. **Il feedback è il suo.** Il numero del feedback non viene dal messaggio: il
    server lo legge dal biglietto. Chiedere qualcosa su un altro feedback non è
    "rifiutato", è **impossibile da esprimere**.
-3. **Il ruolo permette quell'azione.** Un verificatore registra la critica e,
-   solo dopo averla registrata nello stesso giro, consegna la sua correzione
-   (`fixed`); consegnata la correzione, quel biglietto non registra più
-   verdetti su quel lavoro, qualunque cosa succeda dopo — anche dopo la
-   critica di un altro biglietto, o dopo uno stop e la rimessa in coda (la
-   sua correzione la prova un ALTRO verificatore: rifiuto `self_review`, a
-   registro; il server ricorda TUTTI i biglietti che hanno corretto, non
-   l'ultimo). Un lavoro già passato, in attesa del controllo di sicurezza,
+3. **Il ruolo permette quell'azione.** Quali azioni tocchino a chi, e in
+   quale ordine, sta nella spec del giro fuori dal repo pubblico; qui stanno
+   le regole che il server applica sul BIGLIETTO. Un biglietto che ha
+   consegnato una correzione (`fixed`) non registra più verdetti su quel
+   lavoro, qualunque cosa succeda dopo — anche dopo la critica di un altro
+   biglietto, o dopo uno stop e la rimessa in coda (una correzione la prova
+   sempre un ALTRO biglietto: rifiuto `self_review`, a registro; il server
+   ricorda TUTTI i biglietti che hanno corretto, non l'ultimo). Un lavoro già passato, in attesa del controllo di sicurezza,
    non ha un giro aperto: una critica lì è respinta senza scrivere niente
    (`illegal_transition`). Una seconda critica dallo stesso biglietto è
    rifiutata qualunque esito abbia avuto la prima (la critica registrata non
@@ -205,7 +205,7 @@ diventa un **muro**.
 |---|---|---|
 | `new-work` | il testo del suo feedback | — |
 | `fixer` | il feedback + la critica della verifica (dal 2026-09-05 solo per il riallineamento dopo un conflitto) | — |
-| `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, nella risposta del server: i rilievi da correggere e le istruzioni della fase 2 (feedback #561) | il diff, il report di chi ha risolto, le istruzioni della fase 2 prima della critica |
+| `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 | `prober` | niente | la coda |
 
