@@ -230,13 +230,16 @@ export async function main(argv) {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
   };
-  // Un'opzione scritta male non deve diventare il titolo del feedback: prima
-  // di qui `--allgea` spariva in silenzio, il suo valore scalava al posto del
-  // titolo e il feedback partiva lo stesso (feedback #565).
-  const OPZIONI = ['--priorita', '--url', '--allega', '--dry-run'];
-  const ignote = argv.filter((a) => a.startsWith('--') && !OPZIONI.includes(a));
-  if (ignote.length) {
-    console.error(`RIFIUTATO: opzione sconosciuta ${ignote.join(' ')} — non ho aperto niente.`);
+  if (argv.includes('--help') || argv.includes('-h')) { uso(); return EXIT.FATTO; }
+  // Quello che non capisco lo dico, e non apro niente (feedback #565): il
+  // controllo sta in un posto solo, scripts/lib/argomenti.mjs.
+  const { controllaArgomenti } = await import('./lib/argomenti.mjs');
+  const male = controllaArgomenti(argv, {
+    opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
+    conValore: ['--priorita', '--url', '--allega'],
+  });
+  if (male) {
+    console.error(`RIFIUTATO: ${male}`);
     uso();
     return EXIT.USO;
   }
