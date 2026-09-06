@@ -40,6 +40,22 @@ silenzio, su una segnalazione che nessuno aveva scelto (#509).
   le voci nuove aspettano fuori (con una riga che lo dice, messa SOTTO la lista
   e mai sopra) e quelle tolte restano al loro posto barrate. Appena il
   puntatore esce, la lista si ricompone.
+- **Una lista identica non si ridisegna.** Chi tiene un dato condiviso avvisa
+  tutte le pagine quando cambia, e l'avviso torna anche a chi ha appena chiesto
+  la modifica: la stessa lista arriva due volte, la seconda uguale alla prima.
+  Ricostruirla per nulla azzera lo scorrimento e butta fuori il fuoco della
+  tastiera. Prima di svuotare il contenitore, confronta le chiavi già disegnate
+  con quelle in arrivo: se coincidono, aggiorna i contorni (avvisi, filtro) e
+  fermati lì.
+- **La protezione del puntatore non copre la tastiera: serve la sua.** Tenere
+  ferma la lista finché il mouse ci sta sopra non aiuta chi preme Invio: lì il
+  bottone si disabilita, il fuoco torna al corpo della pagina e per l'azione
+  successiva tocca riattraversare col tabulatore tutta la pagina. Dopo
+  un'azione presa da tastiera il fuoco va rimesso su qualcosa di premibile —
+  lo stesso posto in lista (l'elemento che ha preso quel posto), altrimenti il
+  vicino, altrimenti il controllo che resta. `event.detail === 0` distingue
+  Invio/Barra dal clic: col mouse il fuoco non si sposta, o comparirebbe un
+  anello di fuoco sulla riga vicina a ogni clic.
 - **L'aggiornamento ottimistico non è il colpevole; il ridisegno sì.** Scrivere
   subito nel modello va benissimo: quello che non si può fare è ricostruire
   l'elenco mentre la mano dell'utente è ancora lì. Serve anche nel ramo
