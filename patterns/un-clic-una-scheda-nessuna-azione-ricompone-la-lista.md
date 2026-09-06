@@ -31,6 +31,15 @@ silenzio, su una segnalazione che nessuno aveva scelto (#509).
 - **Vale anche dentro la scheda.** La × che toglie un allegato ridisegnava la
   scheda e faceva scorrere le miniature: la seconda × cadeva su un allegato
   diverso. Stesso rimedio, stesso motivo.
+- **Non è solo il clic a muovere la lista: anche i dati che arrivano da soli.**
+  Una lista che si aggiorna dal vivo si ricompone senza che l'utente tocchi
+  niente. Nella cronologia degli appunti bastava copiare qualcosa in un'altra
+  scheda: la voce nuova entrava in cima, spingeva giù tutte le altre e il clic
+  che stavi per dare su «Rimuovi» cancellava la voce di sopra, per sempre
+  (#256). Quindi: finché il puntatore è DENTRO la lista non si muove niente —
+  le voci nuove aspettano fuori (con una riga che lo dice, messa SOTTO la lista
+  e mai sopra) e quelle tolte restano al loro posto barrate. Appena il
+  puntatore esce, la lista si ricompone.
 - **L'aggiornamento ottimistico non è il colpevole; il ridisegno sì.** Scrivere
   subito nel modello va benissimo: quello che non si può fare è ricostruire
   l'elenco mentre la mano dell'utente è ancora lì. Serve anche nel ramo
