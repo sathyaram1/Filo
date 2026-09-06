@@ -1290,7 +1290,7 @@
   // `position: fixed` sullo stesso angolo: due ravvicinati — anche solo
   // "sto lavorando" seguito dall'esito — finivano uno sopra l'altro e non si
   // leggeva nessuno dei due. Stesso pattern della shell (NOTIFS) e dell'editor
-  // (.ed-toasts), vedi PATTERNS.md § "Stack di overlay impilati".
+  // (.ed-toasts), vedi patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
   let toastHostEl = null;
 
   // Tetto al numero di avvisi vivi insieme: senza, una raffica (una pagina che
