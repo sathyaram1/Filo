@@ -105,6 +105,30 @@ test('Sicurezza: "Svuota cronologia" chiede conferma e azzera gli appunti', asyn
   await page.screenshot({ path: 'tests/.shots/clipboard-history-page.png' });
 });
 
+// Nella cronologia finiscono anche le immagini copiate. Una riga che dice solo
+// "Immagine" non basta a scegliere quale togliere quando ce ne sono due: la
+// pagina mostra la miniatura e la descrizione che Filo le ha dato.
+test('Sicurezza: un\'immagine copiata si riconosce (miniatura + descrizione) e si toglie', async ({ app, shell, openTab }) => {
+  void shell;
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  await seed(app, [
+    'un testo qualunque',
+    { type: 'image', dataUrl: PNG, description: 'Scontrino della farmacia' },
+  ]);
+
+  const page = await openTab('filo://security/');
+  const list = page.locator('#sec-clip-list');
+  await expect(list.locator('.sn-clip-item')).toHaveCount(2, { timeout: 8_000 });
+
+  const imgRow = list.locator('.sn-clip-item', { hasText: 'Scontrino della farmacia' });
+  await expect(imgRow).toHaveCount(1);
+  await expect(imgRow.locator('.sn-clip-thumb')).toHaveAttribute('src', /^data:image\//);
+
+  await imgRow.locator('.sn-clip-remove').click();
+  await expect(list.locator('.sn-clip-item')).toHaveCount(1);
+  await expect.poll(() => stored(app)).toEqual(['un testo qualunque']);
+});
+
 test('Sicurezza: senza niente copiato la sezione lo dice invece di restare muta', async ({ shell, openTab }) => {
   void shell;
   const page = await openTab('filo://security/');
