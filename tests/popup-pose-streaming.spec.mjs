@@ -84,6 +84,14 @@ const misura = () => {
   return {
     vh: window.innerHeight,
     vw: window.innerWidth,
+    // `larghezzaDiLayout` è la larghezza del riquadro SENZA la trasformazione:
+    // il rettangolo qui sopra la include, e la compensazione zoom ne mette una
+    // (`scale()`) ogni volta che `devicePixelRatio` cambia. Su uno schermo di
+    // sistema al 125% quel fattore parte da 1.25, e `setViewportSize` lo
+    // riporta a 1: il riquadro resta largo 380 di layout ma ne misura 475 sullo
+    // schermo. Chi vuole sapere se il riquadro "è tornato largo com'era" deve
+    // guardare la sua larghezza, non quanto lo ingrandisce lo zoom.
+    larghezzaDiLayout: root.offsetWidth,
     top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height,
     inputTop: i.top, inputBottom: i.bottom, inputLeft: i.left, inputRight: i.right,
     sendRight: s ? s.right : 0,
