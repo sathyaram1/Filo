@@ -567,6 +567,17 @@ test('usageText: elenca tutti i comandi, compresa la scorta --ticket', () => {
   }
 });
 
+// La seconda fase (chi ha criticato corregge) arriva dal server DOPO la
+// critica: se l'aiuto la anticipasse, chi verifica saprebbe prima di scrivere
+// i rilievi che ogni rilievo è lavoro suo — e ne scriverebbe meno. `--help` lo
+// legge chiunque, in qualsiasi momento: qui dentro non ci va (feedback #565).
+test('usageText: non anticipa la seconda fase', () => {
+  const u = usageText().toLowerCase();
+  for (const parola of ['fase 2', 'correggi', 'correzion', 'correttore']) {
+    assert.ok(!u.includes(parola), `la schermata di aiuto non deve nominare "${parola}"`);
+  }
+});
+
 // I tre casi CLI che prima cancellavano il promemoria, eseguiti per davvero:
 // senza il fix questi assert sono rossi (il file sparisce).
 test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il promemoria', async () => {
