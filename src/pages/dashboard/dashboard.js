@@ -1234,7 +1234,11 @@
   // altrove: l'appunto salvato dice cosa ha scritto Filo (riga) e apre il
   // posto dove l'ha scritto (bottone). Per tutte le altre vale l'aut-aut: o si
   // racconta o si clicca.
-  const ROW_AND_BUTTON = ['SALVA_APPUNTO'];
+  // Sono le sole due che hanno un bottone che PORTA DA QUALCHE PARTE: l'editor
+  // dove l'appunto è finito, e il controllo per scegliere la tinta esatta.
+  // Aggiungerne una qui è obbligatorio quando le si dà una riga: senza, la riga
+  // si mangia il bottone e la funzione sparisce dalla chat.
+  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
 
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
