@@ -166,21 +166,13 @@ test('#495 — a finestra stretta il nome e il suo numero restano sulla stessa r
   ]);
   await expect(tab(page, 'queue')).toHaveText('In coda (1)');
 
-  // Ogni scheda visibile sta su UNA riga sola: tutti i pezzi del suo contenuto
-  // (nome e numero) hanno lo stesso bordo superiore.
-  const righe = await page.evaluate(() => {
-    const out = [];
-    for (const btn of document.querySelectorAll('.mg-tab')) {
-      if (btn.hidden) continue;
-      const range = document.createRange();
-      range.selectNodeContents(btn);
-      const tops = [...range.getClientRects()].map((r) => Math.round(r.top));
-      out.push({ txt: btn.textContent, righe: new Set(tops).size });
-    }
-    return out;
-  });
+  // Ogni scheda visibile sta su UNA riga sola: nome e numero si sovrappongono
+  // in verticale invece di stare uno sotto l'altro (tests/helpers/righe.mjs:
+  // confrontare i bordi alti arrotondati diceva "due righe" per una scheda
+  // intera su uno schermo al 125%, perché il numero è di un corpo più piccolo).
+  const righe = await righeDiTesto(page, '.mg-tab');
   expect(righe.length).toBeGreaterThan(0);
-  for (const t of righe) expect(t, `"${t.txt}" spezzata su più righe`).toMatchObject({ righe: 1 });
+  for (const t of righe) expect(t, `"${t.testo}" spezzata su più righe`).toMatchObject({ righe: 1 });
 
   // Vanno a capo le schede intere: l'ultima sta più in basso della prima e
   // resta dentro il bordo destro, senza scorrimento laterale della pagina.
