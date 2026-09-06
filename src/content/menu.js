@@ -835,7 +835,6 @@
             // di un doppio clic colpiva la voce vicina e la cancellava anche
             // lei, per sempre e senza dirlo.
             row.classList.add('sn-menu-history-gone');
-            rm.textContent = '';
             rm.disabled = true;
             rm.title = I18n.t('menu_paste_removed');
             rm.setAttribute('aria-label', I18n.t('menu_paste_removed'));
