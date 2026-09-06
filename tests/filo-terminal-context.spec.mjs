@@ -37,7 +37,7 @@ test('#1 cwd dell’assistente: un cd persiste, il pwd successivo lo riflette', 
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
 
-  const base = real(fs.mkdtempSync(path.join(os.tmpdir(), 'filo-ctx-')));
+  const base = cartellaTemporanea('filo-ctx-');
   fs.mkdirSync(path.join(base, 'sub'));
 
   // Entra nella cartella base (path assoluto): il main cattura la cwd risultante.
