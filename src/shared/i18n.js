@@ -27,7 +27,10 @@
     menu_paste_no_results: 'Nessun risultato',
     menu_paste_remove: 'Rimuovi dalla cronologia',
     menu_paste_clear: 'Svuota cronologia',
-    menu_paste_clear_confirm: 'Vuoi svuotare tutta la cronologia degli appunti? Le voci copiate finora verranno eliminate.',
+    menu_paste_clear_confirm_one: 'Vuoi svuotare la cronologia degli appunti? Sparisce l\'unica voce copiata finora, e non si può riavere.',
+    menu_paste_clear_confirm_n: 'Vuoi svuotare la cronologia degli appunti? Spariscono tutte e %d le voci copiate finora, e non si possono riavere.',
+    menu_paste_clear_confirm_hidden: 'La ricerca che hai scritto ne mostra %d: spariscono anche le altre.',
+    menu_paste_removed: 'Rimossa',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina

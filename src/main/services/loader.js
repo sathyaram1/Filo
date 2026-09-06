@@ -17,6 +17,9 @@ require(path.join(SHARED, 'constants.js'));
 require(path.join(SHARED, 'filoUi.js'));
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
+// Cronologia appunti: la chiave di una voce e i testi delle sue azioni, uguali
+// per il menu "Incolla", la pagina della Sicurezza e chi la tiene su disco (#256).
+require(path.join(SHARED, 'clipboardHistory.js'));
 // Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
 // serve a chiunque disegni un'etichetta, quindi sta in alto.
 require(path.join(SHARED, 'tasti.js'));
