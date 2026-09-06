@@ -13,7 +13,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
-import os from 'node:os';
+import { tempCanonico } from './helpers/percorsi.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 
