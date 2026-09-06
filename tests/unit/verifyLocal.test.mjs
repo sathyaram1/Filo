@@ -594,7 +594,7 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   _exec('git', ['checkout', '-q', '-b', 'claude/sporco'], { cwd: casa });
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   _write(resolve(casa, 'a.txt'), 'modifica non salvata', 'utf8');
-  const p = vl(casa, 'critica', 'Provato inserimento, tasto destro, tema scuro e finestra stretta: regge tutto.');
+  const p = vl(casa, 'critica', 'Provato inserimento, tasto destro, tema scuro e finestra stretta: regge tutto quanto.');
   assert.equal(p.code, 0, p.out);
   assert.match(p.out, /verifica superata/);
   assert.doesNotMatch(p.out, /Si può pubblicare/);
