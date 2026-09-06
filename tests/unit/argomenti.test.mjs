@@ -69,3 +69,11 @@ test('lo strumento con una sola opzione: tutto il resto è respinto', () => {
   assert.match(controllaArgomenti(['-dry-run'], SOLO_DRY), /va scritta --dry-run/);
   assert.match(controllaArgomenti(['--print'], SOLO_DRY), /opzione sconosciuta/);
 });
+
+test("la forma di Windows vale come un'opzione, ma solo se il nome e' di una che conosco", () => {
+  assert.match(controllaArgomenti(['/dry-run'], { opzioni: ['--dry-run'] }), /va scritta --dry-run/);
+  assert.match(controllaArgomenti(['t', 'x', '/allega', 'spec.md'], FEEDBACK), /va scritta --allega/);
+  // Un percorso che comincia per barra resta un percorso: non lo si prende
+  // per un'opzione scritta male.
+  assert.equal(controllaArgomenti(['t', '/tmp/appunti.md'], FEEDBACK), null);
+});
