@@ -270,13 +270,9 @@ async function main() {
   // sua e lo strumento parte SENZA, cioè spedisce il ramo e chiede la fusione
   // a chi voleva solo i controlli. L'opzione resta scritta nell'ambiente: da
   // lì ce ne accorgiamo e ci fermiamo (feedback #565).
-  const { opzioniMangiate } = await import('./lib/argomenti.mjs');
-  const mangiata = opzioniMangiate(process.env, ['--check']);
-  if (mangiata) {
-    console.error(`${mangiata}\n`);
-    console.error(AIUTO);
-    process.exit(1);
-  }
+  const { argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check'] });
+  if (daNpm.nota) { console.error(daNpm.nota); argv.push(...daNpm.args); }
   const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
   if (ignoti.length) {
     console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
