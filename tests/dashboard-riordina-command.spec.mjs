@@ -125,15 +125,24 @@ async function ultimaRigaFilo(page) {
 // scheda appena aperta si chiama ancora "Nuova scheda" (il suo <title> arriva
 // alla striscia un istante dopo). Chi cerca la scheda "Rosso" troppo presto non
 // la trova, e il rosso parla dell'attesa invece che del riordino.
+// I tre colori devono anche essere TRE, cioè diversi fra loro. Filo tiene il
+// colore identità in una cache per dominio, e qui le tre pagine stanno sullo
+// stesso dominio (il mini server dei test): una scheda appena aperta parte con
+// il colore in cache, cioè con quello della pagina aperta prima, e lo corregge
+// quando il suo content script ha finito. In quella finestra le tre schede
+// hanno un colore (la riga sopra è verde) ma è lo STESSO, l'ordine cromatico
+// coincide con quello di apertura, e il riordino sembra non aver fatto niente.
 async function schedePronte(shell) {
   await expect.poll(async () => shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();
     const web = s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || ''));
     const titoli = web.map((t) => t.title).sort();
+    const colori = new Set(web.map((t) => t.identityColor));
     return web.length === 3
       && web.every((t) => !!t.identityColor)
+      && colori.size === 3
       && JSON.stringify(titoli) === JSON.stringify(['Blu', 'Rosso', 'Verde']);
-  }), { timeout: 12_000 }).toBe(true);
+  }), { timeout: 12_000, message: 'le tre schede non hanno ancora tre colori distinti' }).toBe(true);
 }
 
 // I colori non solo ci sono: hanno anche SMESSO di cambiare. Una pagina appena
@@ -150,7 +159,7 @@ async function coloriFermi(shell) {
       .filter((t) => /127\.0\.0\.1/.test(t.url || ''))
       .map((t) => [t.id, t.identityColor]));
   });
-  await coloriPronti(shell);
+  await schedePronte(shell);
   await expect.poll(async () => {
     const prima = await leggi();
     await new Promise((r) => setTimeout(r, 500));
@@ -176,7 +185,7 @@ test('dopo "/riordina" resti sulla scheda su cui eri', async ({ shell, openTab, 
   await testServer.openReady(openTab, mk('Rosso', 'rgb(200,40,40)'));
   const dash = await openTab(NEWTAB);
   await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
-  await coloriPronti(shell);
+  await schedePronte(shell);
 
   // Torna su "Rosso" e ricorda su quale scheda sei: riordinare cambia il posto
   // delle schede, non quella che stai guardando.
