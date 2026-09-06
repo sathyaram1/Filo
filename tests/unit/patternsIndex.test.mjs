@@ -181,10 +181,17 @@ describe('PATTERNS.md ↔ patterns/', () => {
     // CLAUDE.md prima di aprirlo: è l'unica descrizione che arriva a chi passa
     // di lì. Tagliato a metà parola, o finito su «mai»/«non»/«che», si legge
     // come una regola rovesciata o monca.
+    // La lista tiene dentro anche i verbi che da soli non dicono niente
+    // ("deve", "puo", "vuole", "dire"…) e gli avverbi che reggono ciò che
+    // segue ("solo", "sotto"): fermarsi ai soli articoli e congiunzioni
+    // lasciava passare nomi come «…-il-menu-nativo-deve» o
+    // «…-riportano-indietro-solo-cio», che sono frasi tagliate a metà.
     const APPESE = new Set(('e ed o od ma mai non che chi di da dal dallo dalla dai dagli dalle '
       + 'del dello della dei degli delle il lo la i gli le un uno una in con su per tra fra se si '
       + 'ci ne come quando dove al allo alla ai agli alle nel nello nella nei negli nelle sul '
-      + 'sullo sulla sui sugli sulle a ad anche piu meno te ha va sta sono era').split(' '));
+      + 'sullo sulla sui sugli sulle a ad anche piu meno te ha va sta sono era '
+      + 'deve devono puo possono vuole vogliono viene vengono resta restano stanno cio dire '
+      + 'solo soltanto sotto sopra').split(' '));
     const male = [];
     for (const slug of fileDellaCartella) {
       const ultima = slug.split('-').pop();
