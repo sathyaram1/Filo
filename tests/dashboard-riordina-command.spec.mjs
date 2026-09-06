@@ -75,18 +75,11 @@ test('"/riordina" riordina le schede per colore senza chiuderne nessuna', async 
   const dash = await openTab(NEWTAB);
   await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
 
-  // Attendi che tutte e tre le web tab abbiano colore identità E titolo reale:
-  // un tab appena creato riporta per un attimo "Nuova scheda" prima che il suo
-  // <title> raggiunga la barra — aspettarlo evita che lo snapshot catturi un
-  // titolo transitorio.
-  await expect.poll(async () => shell.evaluate(async () => {
-    const s = await window.filoShell.tabs.snapshot();
-    const web = s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || ''));
-    const titles = web.map((t) => t.title).sort();
-    return web.length === 3
-      && web.every((t) => !!t.identityColor)
-      && JSON.stringify(titles) === JSON.stringify(['Blu', 'Rosso', 'Verde']);
-  }), { timeout: 12_000 }).toBe(true);
+  // Attendi che tutte e tre le web tab abbiano titolo reale e tre colori
+  // identità distinti: vedi schedePronte. Un tab appena creato riporta per un
+  // attimo "Nuova scheda" prima che il suo <title> raggiunga la barra, e parte
+  // col colore in cache del dominio, cioè con quello della scheda aperta prima.
+  await schedePronte(shell);
 
   const before = await shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();
