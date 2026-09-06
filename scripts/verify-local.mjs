@@ -84,7 +84,7 @@ export const MIN_CRITIQUE_CHARS = 80;
 
 // La coda della risposta vive fuori dal repo, accanto a LOCAL.md: è roba di
 // questa macchina, non del progetto.
-export function phase2InstructionsFile(root = ROOT) {
+export function codaFile(root = ROOT) {
   // «Sopra il repo» vuol dire sopra il checkout PRINCIPALE: un lavoro che sta
   // in una cartella di lavoro separata (`.claude/worktrees/<nome>`) ha come
   // cartella sopra quella dei worktree, e lì il file non c'è (verifica del
@@ -97,8 +97,8 @@ export function phase2InstructionsFile(root = ROOT) {
   } catch (_) { /* niente git: ripiego */ }
   return resolve(root, '..', 'CODA-GIRO-LOCALE.md');
 }
-export function readPhase2Instructions(root = ROOT) {
-  const f = phase2InstructionsFile(root);
+export function leggiCoda(root = ROOT) {
+  const f = codaFile(root);
   try { return existsSync(f) ? readFileSync(f, 'utf8').trim() : ''; } catch (_) { return ''; }
 }
 
@@ -203,7 +203,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   }
   // Consegnata la correzione, la verifica dopo la fa un'ALTRA istanza, e parte
   // da `start`: una critica registrata qui in mezzo sarebbe chi ha corretto che
-  // si approva da solo (la porta del giro 1, vista dal lato locale).
+  // (la porta del giro 1, vista dal lato locale).
   if (prev.verdict === 'fixed') {
     return { ok: false, state: s, reason: 'la correzione è stata consegnata: la verifica sul contenuto nuovo la fa un\'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida).' };
   }
@@ -345,7 +345,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
 }
 
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
-export function phase2Text({ findings, derived, budgets, branch, instructions }) {
+export function codaText({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
   const b = budgets && typeof budgets === 'object'
     ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
@@ -653,7 +653,7 @@ if (isMain) {
     const e = r.state[branch];
     if (r.outcome === 'fix') {
       if (r.replayed) console.log('(critica già registrata su questo giro: ristampo la fase 2, il giro non si ripaga)');
-      console.log(phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: readPhase2Instructions() }));
+      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: leggiCoda() }));
     } else if (r.outcome === 'stop') {
       console.log(`══ ESITO: il lavoro si ferma ══\nRilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
     } else {

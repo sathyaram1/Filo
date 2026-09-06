@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const {
-  checkVerdict, withRequest, withCritique, withFixed, buildVerifierBrief, phase2Text, historyFromRounds,
+  checkVerdict, withRequest, withCritique, withFixed, buildVerifierBrief, codaText, historyFromRounds,
   realignPlan, afterRebase,
 } = await import('../../scripts/verify-local.mjs');
 
@@ -98,7 +98,7 @@ test('critica con un 2: finché il giro non è chiuso non si pubblica, e dopo se
   assert.equal(bloccato.ok, false);
   assert.match(bloccato.reason, /giro di correzione aperto/);
   // La fase 2 si vede solo adesso, e dice cosa correggere e come consegnare.
-  const testo = phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch: 'r' });
+  const testo = codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch: 'r' });
   assert.match(testo, /\[2\] il pulsante non salva/);
   assert.match(testo, /verify-local\.mjs corretto/);
   // Consegna: chiude la fase 2, ma NON approva: serve un'altra verifica.
@@ -518,7 +518,7 @@ test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per
 // caratteri, e i rilievi (in coda) sparivano dal brief del verificatore dopo.
 
 test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta col numero, non tagliata', async () => {
-  const { MAX_CRITIQUE_CHARS, readPhase2Instructions } = await import('../../scripts/verify-local.mjs');
+  const { MAX_CRITIQUE_CHARS, leggiCoda } = await import('../../scripts/verify-local.mjs');
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const riassunto = 'provato '.repeat(700); // ~5600 caratteri: sopra il vecchio taglio a 4000
   const lunga = withCritique(s, 'r', { critique: `${riassunto}\n[2] LA PORTA ROSSA: il salvataggio non salva col titolo vuoto`, sha: SHA });
@@ -529,15 +529,15 @@ test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta co
   assert.match(troppa.reason, /troppo lunga/);
   assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_CHARS)), 'il rifiuto dice il tetto');
   assert.equal(troppa.state.r.verdict, undefined, 'respinta: niente scritto');
-  assert.equal(typeof readPhase2Instructions, 'function');
+  assert.equal(typeof leggiCoda, 'function');
 });
 
-test('phase2Text: quando il testo in coda manca, il messaggio non tace', () => {
+test('quando il testo in coda manca, il messaggio non tace', () => {
   const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
-  const conFile = phase2Text({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
+  const conFile = codaText({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
   assert.match(conFile, /ISTRUZIONI SEGRETE DELL'OWNER/);
   assert.match(conFile, /\[2\] rotto/);
-  const senza = phase2Text(base);
+  const senza = codaText(base);
   assert.match(senza, /CODA-GIRO-LOCALE\.md/, 'dice dove doveva essere il file');
   assert.match(senza, /verify-local\.mjs corretto/, 'e come si consegna comunque');
   assert.ok(!/adesso correggi tu/.test(senza), 'il testo delle istruzioni non vive nello strumento');

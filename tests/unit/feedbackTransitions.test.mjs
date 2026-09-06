@@ -58,7 +58,7 @@ test('riallineamento: dopo un conflitto di fusione la routine può riportare il 
     'il rientro è un passo dell\'iter: appartiene alle routine, non alla dashboard');
 });
 
-test('VERIFIER_CAPS: i tre bilanci dei giri di correzione (feedback #561, §4)', () => {
+test('i tre bilanci dei giri di correzione (feedback #561, §4)', () => {
   // x = 5 giri per i rilievi di livello 3 e 2, y = 2 per gli 1, z = 0 per gli 0
   // (gli 0 da soli non si correggono mai). Decisi con l'owner il 2026-09-04;
   // si cambiano dalla DASHBOARD, non da qui. I vecchi failCap/improvableCap e
