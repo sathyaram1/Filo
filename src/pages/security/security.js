@@ -219,6 +219,10 @@
     list.style.display = empty ? 'none' : '';
     $('sec-clip-clear').style.display = empty ? 'none' : '';
 
+    // Se in lista c'è almeno un'immagine, anche le righe di testo tengono il
+    // posto della miniatura: altrimenti il bordo sinistro va a zig-zag.
+    const conMiniature = entries.some((e) => e && e.type === 'image' && e.dataUrl);
+
     for (const entry of entries) {
       const row = document.createElement('div');
       row.className = 'sn-clip-item';
@@ -232,6 +236,10 @@
         thumb.src = entry.dataUrl;
         thumb.alt = '';
         row.appendChild(thumb);
+      } else if (conMiniature) {
+        const spacer = document.createElement('span');
+        spacer.className = 'sn-clip-spacer';
+        row.appendChild(spacer);
       }
 
       const label = clipLabel(entry);
