@@ -1079,7 +1079,7 @@
   // Il testo scritto dal modello prima di finire in una riga: senza caratteri
   // di controllo (un byte nullo nell'etichetta finiva tale e quale nel diario).
   function pulito(v) {
-    return String(v == null ? '' : v).replace(/[ -]/g, '').trim();
+    return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
