@@ -596,7 +596,7 @@ test('il timeout dei giudici viene clampato nel range consentito', async ({ open
   expect(await page.evaluate(() => window.__judgeTimeoutMs)).toBe(10000);
 });
 
-test('i tre bilanci del verificatore e il testo della fase 2 sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
+test('i tre bilanci dei giri di correzione e le loro istruzioni sono editabili e il salvataggio li scrive nella config delle routine', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -654,7 +654,7 @@ test('i tre bilanci del verificatore e il testo della fase 2 sono editabili e il
   expect(cached).toEqual([5, 3, 1]);
 });
 
-test('i bilanci del verificatore vengono clampati nel range [0, 10] al salvataggio', async ({ openTab }) => {
+test('i bilanci dei giri di correzione vengono clampati nel range [0, 10] al salvataggio', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
@@ -2178,7 +2178,7 @@ test('un lavoro senza nessuno al lavoro dice che rientra in coda, non che aspett
   await expect(card).toHaveAttribute('title', /rientrato in coda 2 volte/);
 });
 
-test('il testo della fase 2 oltre il tetto non viene salvato mozzato: lo dice e non salva', async ({ openTab }) => {
+test('il testo delle istruzioni di correzione oltre il tetto non viene salvato mozzato: lo dice e non salva', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);

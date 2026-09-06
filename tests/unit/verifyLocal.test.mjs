@@ -93,7 +93,7 @@ test('critica senza rilievi: verifica superata sul contenuto', () => {
   assert.equal(checkVerdict(r.state.r, SHA).ok, true);
 });
 
-test('critica con un 2: fase 2, il verificatore corregge; finché non consegna non si pubblica, e dopo serve un\'altra verifica', () => {
+test('critica con un 2: finché la correzione non è consegnata non si pubblica, e dopo serve un\'altra verifica', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const r = withCritique(s, 'r', { critique: 'funziona Y\n[2] il pulsante non salva\n[0] caso raro', sha: SHA });
   assert.equal(r.outcome, 'fix');
@@ -143,7 +143,7 @@ test('i rilievi non corretti (0 da soli, 1 a bilancio finito) restano in `derive
   assert.equal(checkVerdict(r.state.r, SHA).ok, true, 'uno 0 da solo non ferma la pubblicazione');
 });
 
-test('il brief non contiene la fase 2: chi verifica deve cercare come se il suo lavoro finisse con la critica', () => {
+test('il brief di chi verifica non anticipa la risposta del server', () => {
   const brief = buildVerifierBrief({ request: 'x', branch: 'r', recipe: 'RECIPE' });
   assert.match(brief, /verify-local\.mjs critica/);
   assert.ok(!/corretto "/.test(brief), 'il comando della correzione non si annuncia prima');
@@ -486,7 +486,7 @@ function vl(casa, ...args) {
   } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
 }
 
-test('CLI: «pass» con dentro un [2] risponde con la fase 2 (stato «sta correggendo»), «fail» ferma', () => {
+test('CLI: «pass» con dentro un [2] non è un pass: risponde che c\'è da correggere; «fail» ferma', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   const p = vl(casa, 'pass', 'Provato tutto.\n[2] però questo è rotto');
@@ -538,7 +538,7 @@ test('phase2Text: le istruzioni arrivano da fuori (file sopra il repo), non dal 
 
 // ─── Giro 10 su #561: la fase 2 persa si rilegge; il pass dice se si può pubblicare davvero ───
 
-test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la fase 2 senza scrivere né ripagare; un\'altra è respinta', () => {
+test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la stessa risposta senza scrivere né ripagare; un\'altra è respinta', () => {
   let s = withRequest({}, 'b', { request: 'X', sha: SHA });
   const testo = 'Provato.\n[2] rotto\n[0] raro';
   const prima = withCritique(s, 'b', { critique: testo, sha: SHA });
@@ -567,7 +567,7 @@ test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la
   assert.doesNotMatch(bis.reason, /prima la critica/);
 });
 
-test('CLI giro 10: la fase 2 persa si rilegge (stessa critica, o status); un pass con modifiche non salvate non dice «Si può pubblicare»', () => {
+test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un pass con modifiche non salvate non dice «Si può pubblicare»', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   const testo = 'Provato.\n[2] rotto';
