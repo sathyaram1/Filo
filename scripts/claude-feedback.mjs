@@ -250,8 +250,17 @@ export async function main(argv) {
   // `--allega` è ripetibile: si raccolgono tutti i valori.
   const percorsiAllegati = argv.flatMap((a, i) => (a === '--allega' && argv[i + 1] !== undefined ? [argv[i + 1]] : []));
 
-  const valoriDiFlag = new Set([prioritaRaw, url, ...percorsiAllegati].filter((v) => v !== undefined));
-  const posizionali = argv.filter((a) => !a.startsWith('--') && !valoriDiFlag.has(a));
+  // I posizionali si contano per POSTO, non per valore: prima si toglievano le
+  // parole «uguali al valore di un'opzione», e una parola del testo scritta
+  // identica all'indirizzo passato spariva dal corpo senza dire niente — un
+  // taglio muto sul testo di chi segnala (feedback #565).
+  const CON_VALORE = new Set(['--priorita', '--url', '--allega']);
+  const posizionali = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    posizionali.push(a);
+  }
   const titolo = posizionali[0];
   let testo = posizionali.slice(1).join(' ');
   // Solo su "-" esplicito: leggere stdin "quando non è un terminale" fa
