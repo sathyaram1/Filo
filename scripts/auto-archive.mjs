@@ -80,6 +80,10 @@ if (isMain) {
   // Un'opzione che non riconosciamo non deve far partire il giro VERO: basta
   // un trattino o una lettera sbagliati in «--dry-run» perché quello che
   // doveva essere un giro a vuoto scriva davvero (feedback #565).
+  if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
+    console.log('Uso: node scripts/auto-archive.mjs [--dry-run]\n  archivia i feedback risolti oltre la soglia; --dry-run mostra solo cosa farebbe');
+    process.exit(0);
+  }
   const { controllaArgomenti } = await import('./lib/argomenti.mjs');
   const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'] });
   if (male) {

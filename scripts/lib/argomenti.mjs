@@ -55,6 +55,12 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) 
 
   for (let i = 0; i < lista.length; i += 1) {
     const arg = lista[i];
+    // La forma di Windows (`/dry-run`): la riconosciamo solo quando il nome è
+    // di un'opzione che conosciamo, per non prendere per un'opzione un
+    // percorso che comincia per barra.
+    if (arg.startsWith('/') && ammesse.has(`--${arg.slice(1).toLowerCase()}`)) {
+      return `l'opzione ${arg} va scritta --${arg.slice(1).toLowerCase()} — non ho toccato niente.`;
+    }
     if (!sembraOpzione(arg)) continue;
     const forma = normalizza(arg);
     if (!ammesse.has(forma)) {

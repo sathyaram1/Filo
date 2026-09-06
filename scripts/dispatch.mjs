@@ -295,8 +295,8 @@ export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
 
 /**
  * Lo specchio locale dell'esito che il server ha calcolato sulla critica.
- * `pass` → verificato; `fix` → giro di correzione aperto (la consegna `fixed`
- * arriverà sullo stesso biglietto); `stop` → fermato. La critica si
+ * `pass` → verificato; `fix` → giro di correzione aperto; `stop` → fermato.
+ * La critica si
  * conserva com'è stata scritta (coi livelli), per il fogliettino locale.
  */
 export function applyVerifierVerdict(state, outcome, critique = '') {
@@ -939,8 +939,7 @@ async function recordFixed(id, report = '', frase = '') {
   }
   // Il marcatore locale del ruolo dice chi sta consegnando; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
-  const chi = readRole(ROOT) === 'verifier' ? 'verifier' : 'fixer';
-  sealTransition(next, `${chi}:consegna`);
+  sealTransition(next, `${readRole(ROOT) || 'fixer'}:consegna`);
   return next;
 }
 async function recordSecaudit(id, verdict) {

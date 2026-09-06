@@ -24,6 +24,14 @@ const PUBKEY_FILE = join(__dirname, '..', 'src', 'shared', 'feedbackPublicKey.js
 // Qui l'azione di serie RIGENERA la chiave, e i feedback cifrati con la
 // vecchia non si leggono più: un'opzione scritta male non deve arrivarci
 // (feedback #565).
+if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
+  console.log([
+    'Uso: node scripts/gen-feedback-keys.mjs [--print]',
+    '  ATTENZIONE: senza --print RIGENERA la chiave, e i feedback cifrati con la',
+    '  vecchia non si leggono più. --print stampa soltanto la chiave attuale.',
+  ].join('\n'));
+  process.exit(0);
+}
 const { controllaArgomenti } = await import('./lib/argomenti.mjs');
 const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--print'] });
 if (argomentiSbagliati) {
