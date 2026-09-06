@@ -235,7 +235,9 @@ if (isMain) {
   // Come nello strumento gemello (#565): un'opzione scritta male non deve
   // scalare sui posizionali e far partire lo stesso il cambio di stato.
   const OPZIONI = ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'];
-  const ignote = argv.filter((a) => a.startsWith('--') && !OPZIONI.includes(a));
+  // `--help` non è un'opzione sconosciuta: chiedere aiuto è il modo più
+  // naturale di cominciare, e rispondere «non la conosco» non aiuta nessuno.
+  const ignote = argv.filter((a) => a.startsWith('--') && !OPZIONI.includes(a) && a !== '--help' && a !== '-h');
   if (ignote.length) {
     console.error(`RIFIUTATO: opzione sconosciuta ${ignote.join(' ')} — non ho toccato niente.`);
     process.exit(1);

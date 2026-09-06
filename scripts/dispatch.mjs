@@ -899,6 +899,8 @@ export function verifierReplyText(reply) {
       budgets ? `Bilanci: ${budgets}` : '',
       '',
       String(r.phase2.instructions || ''),
+      '',
+      'A giro chiuso, rilascia il biglietto.',
     ].filter((l, i) => l !== '' || i === 6).join('\n');
   }
   if (r.outcome === 'stop') {
