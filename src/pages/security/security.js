@@ -764,6 +764,16 @@
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('sec-clip-clear').addEventListener('click', clearClipboard);
     $('sec-clip-search').addEventListener('input', applyClipFilter);
+    // Finché il puntatore è dentro la lista, nessuna riga cambia posto: una
+    // riga tolta resta al suo posto barrata e le voci nuove aspettano. Appena
+    // esce, la lista si ricompone. Vedi il commento lungo su renderClipboard.
+    const lista = $('sec-clip-list');
+    lista.addEventListener('mouseenter', () => { puntatoreDentro = true; });
+    lista.addEventListener('mouseleave', () => {
+      puntatoreDentro = false;
+      if (inAttesa) renderClipboard(inAttesa, { forza: true });
+      else if (lista.querySelector('.sn-clip-gone')) renderClipboard(vociCorrenti, { forza: true });
+    });
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
     // La cronologia appunti cresce ALTROVE (ogni copia, in qualunque scheda) e
