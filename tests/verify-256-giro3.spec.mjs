@@ -65,7 +65,7 @@ test('#256 giro completo: copio dalla pagina web col menu, la voce compare in Si
   await web.locator('#ta').click({ button: 'right' });
   await expect(web.locator('.sn-menu')).toBeVisible();
   await web.locator('.sn-menu-paste-arrow').click();
-  const sub = web.locator('.sn-menu-history-sub');
+  const sub = web.locator('.sn-menu-sub');
   await expect(sub).toBeVisible();
   await expect(sub).not.toContainText(SEGRETO);
 });
