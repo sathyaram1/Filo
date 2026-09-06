@@ -258,6 +258,7 @@ async function main() {
     '',
     '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
     '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
+    '                       (con npm: `npm run finish -- --check`, oppure `npm run finish:check`)',
     '  --help               questa schermata',
   ].join('\n');
   if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
