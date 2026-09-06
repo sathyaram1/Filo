@@ -9,6 +9,7 @@
 // "Ricevuti", "In coda", … e basta.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { righeDiTesto } from './helpers/righe.mjs';
 
 const URL = 'filo://manage/manage.html';
 
