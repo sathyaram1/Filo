@@ -271,18 +271,18 @@ app.whenReady().then(async () => {
       const csWin = await captureUrl('test-page', testPageUrl, 'page-preload.js');
       if (csWin) {
         try {
-          const csDiag = await csWin.webContents.executeJavaScript(
+          const csDiag = await entro(csWin.webContents.executeJavaScript(
             "({ href: location.href," +
             " filoReady: document.documentElement.dataset.filoReady," +
             " filoModules: document.documentElement.dataset.filoModules," +
             " filoTheme: document.documentElement.dataset.snTheme," +
             " filoStyleInjected: !!document.querySelector('link[href*=\"filo://style/\"]')," +
             " linkCount: document.querySelectorAll('link[rel=stylesheet]').length })"
-          );
+          ), 10_000, 'diagnostica content-script');
           console.log('[smoke] content-script diag:', JSON.stringify(csDiag, null, 2));
 
           // Simula selezione + right-click per verificare che il menu compaia.
-          await csWin.webContents.executeJavaScript(`(() => {
+          await entro(csWin.webContents.executeJavaScript(`(() => {
             const span = document.querySelector('.selectable');
             if (!span) return false;
             const range = document.createRange();
@@ -298,13 +298,13 @@ app.whenReady().then(async () => {
               button: 2,
             });
             return span.dispatchEvent(evt);
-          })()`);
+          })()`), 10_000, 'tasto destro simulato');
           await new Promise((r) => setTimeout(r, 500));
-          const menuDiag = await csWin.webContents.executeJavaScript(
+          const menuDiag = await entro(csWin.webContents.executeJavaScript(
             "({ menu: !!document.querySelector('.sn-menu')," +
             " menuItems: document.querySelectorAll('.sn-menu .sn-menu-item, .sn-menu button').length," +
             " menuHtml: (document.querySelector('.sn-menu')?.outerHTML || '').slice(0,300) })"
-          );
+          ), 10_000, 'diagnostica menu');
           console.log('[smoke] right-click menu diag:', JSON.stringify(menuDiag, null, 2));
           await dump('menu', csWin.webContents);
         } catch (e) { console.log('[smoke] content-script diag failed', e.message); }

@@ -88,6 +88,16 @@ while (Date.now() - startedAt < TIMEOUT) {
   await new Promise((r) => setTimeout(r, POLL));
 }
 
+// Il sentinel è il verdetto, ma gli screenshot arrivano DOPO (vedi il blocco
+// FILO_SMOKE in src/main/main.js): l'app li scrive e poi si chiude da sé.
+// Ucciderla appena letto il sentinel li porterebbe via tutti, e sono la sola
+// diagnostica che questo test lascia. Quindi le si dà tempo di finire — con un
+// tetto, che è il punto di tutto il resto di questo file.
+if (result) {
+  const graziaFinoA = Date.now() + 60_000;
+  while (!uscito && Date.now() < graziaFinoA) await new Promise((r) => setTimeout(r, POLL));
+}
+
 try { proc.kill('SIGTERM'); } catch (_) {}
 // Un attimo prima di cancellare: su Windows una cartella con un file ancora
 // aperto dal processo che sta chiudendo non si rimuove.
