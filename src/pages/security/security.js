@@ -196,32 +196,11 @@
   // togliere il nodo e sperare — così la pagina non può raccontare una
   // cronologia diversa da quella che c'è davvero.
 
-  // Chiave di una voce: la STESSA normalizzazione che usa il main per
-  // riconoscere una voce (testo con gli spazi compattati, immagini per dato).
-  // Serve a capire quali righe già disegnate corrispondono ancora a una voce
-  // viva quando arriva una lista nuova.
-  function clipKey(entry) {
-    if (!entry) return '';
-    if (entry.type === 'image') return 'i:' + (entry.dataUrl || '');
-    return 't:' + (entry.text || '').replace(/\s+/g, ' ').trim();
-  }
-
-  function clipLabel(entry) {
-    if (!entry) return '';
-    if (entry.type === 'image') return entry.description || I18n.t('security_clipboard_image');
-    const testo = (entry.text || '').replace(/\s+/g, ' ').trim();
-    // Una selezione di soli spazi (o di a capo, o di tabulazioni) si copia per
-    // sbaglio più spesso di quanto sembri, e disegnata così com'è diventa una
-    // riga vuota col solo tasto "Rimuovi": chi la guarda non sa cosa sia né
-    // perché sia lì. Diciamo cosa contiene, e quanto è lunga.
-    if (!testo) {
-      const n = (entry.text || '').length;
-      return n
-        ? I18n.t('clipboard_only_spaces').replace('%d', String(n))
-        : I18n.t('clipboard_empty_entry');
-    }
-    return testo;
-  }
+  // Chiave ed etichetta di una voce le decide il modulo condiviso: la stessa
+  // regola vale nel menu "Incolla" e in chi tiene la cronologia su disco.
+  const Clip = window.SN_CLIPBOARD;
+  const clipKey = (entry) => Clip.chiave(entry);
+  const clipLabel = (entry) => Clip.etichetta(entry);
 
   function showClipHint(text, isError) {
     const hint = $('sec-clip-hint');
