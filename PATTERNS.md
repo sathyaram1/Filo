@@ -18,11 +18,19 @@ nuovo, o che ne scopri uno implicito nel codice che vale la pena rendere esplici
 Una voce qui dovrebbe **guadagnarsi il suo posto**: è una regola riusabile, non un
 appunto monouso.
 
-**Come si aggiunge:** un file `patterns/<slug>.md` che comincia con `# <Titolo>`
-(titolo breve → la regola in una frase → il perché → il riferimento al codice dove
-vive il pattern), più una riga qui con lo stesso titolo, il link e la regola in una
-frase. La sentinella `tests/unit/patternsIndex.test.mjs` diventa rossa se manca uno
-dei due, se i titoli divergono o se una riga dell'indice resta senza regola.
+**Come si aggiunge:** un file `patterns/<slug>.md` che comincia con `# <Titolo>`,
+poi la riga `[← Tutti i pattern](../PATTERNS.md)`, poi il racconto (la regola in una
+frase → il perché → il riferimento al codice dove vive il pattern); più una riga qui
+con lo stesso titolo, il link e la regola in una frase. Lo `<slug>` è il titolo in
+minuscolo con i trattini, tagliato a 60 caratteri **all'ultima parola intera** e mai
+lasciato appeso su una parolina (`…-mai`, `…-non`, `…-che`): quel nome è tutto ciò
+che si legge nei commenti del codice prima di aprire il file. Un racconto che ne cita
+un altro lo linka come vicino, `[Titolo](altro-slug.md)`.
+
+La sentinella `tests/unit/patternsIndex.test.mjs` diventa rossa se manca uno dei due,
+se i titoli divergono, se una riga dell'indice resta senza regola, se un racconto non
+riporta all'indice, se un nome di file resta appeso, o se un rimando — di qui, dal
+codice o da un racconto vicino — punta a un file che non c'è.
 
 I principi a monte di questi pattern stanno in **`filo_filosofia.txt`** (filosofia
 generale) e **`filo_design.txt`** (principi di design concreti). Sono già nel tuo
