@@ -119,6 +119,29 @@ describe('PATTERNS.md ↔ patterns/', () => {
     assert.deepEqual(vuoti, [], 'file in patterns/ con il solo titolo');
   });
 
+  test('nessun rimando a un racconto che non esiste', () => {
+    // Codice, spec e ruoli citano i pattern per percorso: un file rinominato
+    // lascerebbe rimandi morti, e un rimando morto lo scopre solo chi lo segue.
+    const esistenti = new Set(fileDellaCartella);
+    const salta = new Set(['node_modules', '.git', '.claude', 'dist', 'release', 'patterns']);
+    const rimandi = [];
+    const RIMANDO = /patterns\/([a-z0-9-]+)\.md/g;
+    const estensioni = ['.md', '.js', '.mjs', '.cjs', '.html', '.css', '.json', '.yml'];
+    (function scendi(dir) {
+      for (const voce of readdirSync(dir, { withFileTypes: true })) {
+        if (voce.name.startsWith('.') || salta.has(voce.name)) continue;
+        const percorso = join(dir, voce.name);
+        if (voce.isDirectory()) { scendi(percorso); continue; }
+        if (!estensioni.some((e) => voce.name.endsWith(e))) continue;
+        const contenuto = readFileSync(percorso, 'utf8');
+        for (const m of contenuto.matchAll(RIMANDO)) {
+          if (!esistenti.has(m[1])) rimandi.push(`${percorso.slice(ROOT.length + 1)} → ${m[0]}`);
+        }
+      }
+    })(ROOT);
+    assert.deepEqual(rimandi, [], 'rimandi a file di patterns/ che non esistono');
+  });
+
   test('l\'indice resta un indice', () => {
     const byte = statSync(INDICE).size;
     assert.ok(
