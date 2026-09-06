@@ -388,10 +388,27 @@
 
       list.appendChild(row);
     }
+    aggiornaAvvisoInAttesa();
     // Il filtro in corso vale anche per la lista appena ridisegnata: se stavi
     // cercando "pass" e nel frattempo hai tolto l'unica voce che corrispondeva,
     // la lista deve dire che quella ricerca non ha risultati, non restare muta.
     applyClipFilter();
+  }
+
+  // Rimette una voce negli appunti di sistema, pronta da incollare.
+  async function copiaVoce(entry, row) {
+    if (row && row.classList.contains('sn-clip-gone')) return;
+    try {
+      if (entry.type === 'image' && entry.dataUrl) {
+        const blob = await (await fetch(entry.dataUrl)).blob();
+        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      } else {
+        await navigator.clipboard.writeText(entry.text || '');
+      }
+      showClipHint(I18n.t('security_clipboard_copied'), false);
+    } catch (_) {
+      showClipHint(I18n.t('security_clipboard_fail'), true);
+    }
   }
 
   async function loadClipboard() {
