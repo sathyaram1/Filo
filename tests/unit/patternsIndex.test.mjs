@@ -63,7 +63,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     assert.deepEqual(
       sospette.map((v) => `riga ${v.n}: ${v.riga.slice(0, 80)}`),
       [],
-      'righe che sembrano voci ma non rispettano il formato "- **[Titolo](patterns/slug.md)** — regola"'
+      'righe che sembrano voci ma non rispettano il formato "- **[Titolo](patterns/<slug>.md)** — regola"'
     );
   });
 
