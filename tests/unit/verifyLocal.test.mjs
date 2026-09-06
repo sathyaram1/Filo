@@ -525,13 +525,13 @@ test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta co
   assert.equal(typeof readPhase2Instructions, 'function');
 });
 
-test('il testo che il comando stampa arriva da fuori (file sopra il repo), non dal codice; senza file si dice dove chiederlo', () => {
+test('la coda della risposta arriva da un file, non dal codice; se manca, il messaggio dice dove chiederla', () => {
   const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
   const conFile = phase2Text({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
   assert.match(conFile, /ISTRUZIONI SEGRETE DELL'OWNER/);
   assert.match(conFile, /\[2\] rotto/);
   const senza = phase2Text(base);
-  assert.match(senza, /FASE2-LOCALE\.md/, 'dice dove doveva essere il file');
+  assert.match(senza, /CODA-GIRO-LOCALE\.md/, 'dice dove doveva essere il file');
   assert.match(senza, /verify-local\.mjs corretto/, 'e come si consegna comunque');
   assert.ok(!/adesso correggi tu/.test(senza), 'il testo delle istruzioni non vive nello strumento');
 });

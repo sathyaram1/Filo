@@ -253,15 +253,23 @@ async function main() {
   // Un aiuto vero: senza, QUALUNQUE argomento (`--help` compreso) faceva
   // partire l'intera chiusura, e chi voleva solo sapere cosa fa lo strumento
   // si ritrovava dentro la procedura (feedback #565).
-  if (argv.includes('--help') || argv.includes('-h')) {
-    console.log([
-      'Uso: npm run finish [-- --check]',
-      '',
-      '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
-      '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
-      '  --help               questa schermata',
-    ].join('\n'));
-    return;
+  const AIUTO = [
+    'Uso: npm run finish [-- --check]',
+    '',
+    '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
+    '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
+    '  --help               questa schermata',
+  ].join('\n');
+  if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
+  // Un argomento che non conosciamo NON fa partire la chiusura: prima faceva
+  // girare tutto — controlli, verifica e, con la verifica già a posto, il
+  // ramo spedito e la fusione chiesta — per un errore di battitura
+  // (feedback #565).
+  const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
+  if (ignoti.length) {
+    console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
+    console.error(AIUTO);
+    process.exit(1);
   }
   const checkOnly = argv.includes('--check');
   if (argv.includes('--no-verify')) {

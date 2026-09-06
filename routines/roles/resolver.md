@@ -16,8 +16,8 @@ quale dei due casi sei (`case`):
   solo per il **riallineamento dopo un conflitto di fusione**: la linea
   principale è andata avanti e il ramo va ribasato, non corretto nel
   comportamento (`payload.verifierCritique` lo dice esplicitamente). Le
-  correzioni dei rilievi della verifica non passano più di qui: le chiude il
-  giro della verifica. Se invece la critica descrive un
+  correzioni dei rilievi della verifica non passano più di qui. Se invece la
+  critica descrive un
   difetto (stati vecchi), vale quanto segue: oltre al feedback trovi
   `payload.verifierCritique`, la critica con i passi che si rompono, e
   `payload.history`, TUTTE le critiche dei giri passati (dalla più vecchia).
@@ -66,8 +66,8 @@ deviazioni dichiarate, la Verifica coi minimi per tipo di modifica (unit,
 spec mirato, visivo), le fonti di verità da aggiornare nello stesso commit.
 **Niente suite completa prima di consegnare** (dal 2026-09-03): la lancia il
 verificatore, una volta, prima di lasciar passare il lavoro; un rosso nuovo è
-un suo rilievo, e dal 2026-09-05 (feedback #561) si corregge dentro il giro
-della verifica. Venticinque minuti di attesa a ogni consegna erano metà del costo
+un suo rilievo, e dal 2026-09-05 (feedback #561) si corregge nello stesso
+giro. Venticinque minuti di attesa a ogni consegna erano metà del costo
 di un giro. Non fondere su `main`: l'hook
 committa e pusha sul branch, il merge lo fa il gate a valle.
 
