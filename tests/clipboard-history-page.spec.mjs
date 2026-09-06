@@ -22,16 +22,16 @@ import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 const SENSITIVE = 'password-super-segreta-9F3';
 
 // Semina la cronologia dal main, come fa un content script quando l'utente copia.
-async function seed(app, texts) {
+async function seed(app, entries) {
   await app.evaluate(async (_electron, list) => {
     const MSG = globalThis.SN_MSG.MSG;
-    for (const text of list) {
+    for (const entry of list) {
       await globalThis.SN_HANDLE_MESSAGE(
-        { type: MSG.PUSH_CLIPBOARD_ENTRY, entry: { type: 'text', text } },
+        { type: MSG.PUSH_CLIPBOARD_ENTRY, entry },
         { url: 'https://example.com/page' },
       );
     }
-  }, texts);
+  }, entries.map((e) => (typeof e === 'string' ? { type: 'text', text: e } : e)));
 }
 
 // Cronologia com'è DAVVERO (letta dal main, non dalla pagina).
