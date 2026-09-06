@@ -973,7 +973,7 @@ test('finestra ristretta col riquadro aperto: si stringe per starci, e riallarga
   await expect.poll(
     async () => {
       const m = await page.evaluate(misura);
-      return Math.round(m.right - m.left);
+      return Math.round(m.larghezzaDiLayout);
     },
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
   ).toBe(Math.round(largo));
