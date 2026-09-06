@@ -307,6 +307,24 @@
       return;
     }
     inAttesa = null;
+
+    // Se la lista che arriva è IDENTICA a quella già a schermo non si tocca
+    // niente. Ricostruirla per nulla azzererebbe lo scorrimento e butterebbe
+    // fuori il fuoco della tastiera — e succede a ogni rimozione, perché chi
+    // tiene la cronologia avvisa tutte le pagine quando cambia e l'avviso
+    // torna anche alla pagina che ha appena chiesto la modifica: la lista
+    // arriva due volte, la seconda uguale alla prima.
+    const disegnateOra = [...list.querySelectorAll('.sn-clip-item')];
+    const identica = disegnateOra.length > 0
+      && disegnateOra.length === entries.length
+      && !list.querySelector('.sn-clip-gone')
+      && disegnateOra.every((r, i) => r.dataset.snKey === clipKey(entries[i]));
+    if (identica) {
+      aggiornaAvvisoInAttesa();
+      applyClipFilter();
+      return;
+    }
+
     list.textContent = '';
     // Vuota: niente lista e niente "Svuota cronologia" (non c'è nulla da
     // svuotare), solo la riga che lo dice.
