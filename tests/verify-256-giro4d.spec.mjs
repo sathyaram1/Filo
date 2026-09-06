@@ -73,6 +73,8 @@ test('F1 — doppio clic vero (stesse coordinate) sul «Rimuovi»: una voce sola
 
     // Stessa prova a tre decimi di secondo, su un'altra voce.
     const b2 = page.locator('#sec-clip-list .sn-clip-item').nth(4).locator('.sn-clip-remove');
+    await b2.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
     const box2 = await b2.boundingBox();
     await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2);
     await page.mouse.down(); await page.mouse.up();
