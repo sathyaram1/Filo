@@ -881,8 +881,15 @@
           const Ui = global.SN_CONFIRM_UI;
           let ok = true;
           try {
+            // La conferma dice QUANTE voci spariscono, e se la ricerca ne sta
+            // nascondendo una parte lo dichiara: con un filtro attivo la lista
+            // ne mostrava una e lo svuotamento le portava via tutte.
+            const testo = Clip.testoConferma(
+              Array.isArray(entries) ? entries.length : 0,
+              visibiliVive,
+            );
             ok = Ui
-              ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: I18n.t('menu_paste_clear_confirm') })
+              ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: testo })
               : true;
           } catch (_) { ok = false; }
           if (activeMenu) activeMenu.subLocked = false;
