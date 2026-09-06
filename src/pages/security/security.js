@@ -196,6 +196,16 @@
   // togliere il nodo e sperare — così la pagina non può raccontare una
   // cronologia diversa da quella che c'è davvero.
 
+  // Chiave di una voce: la STESSA normalizzazione che usa il main per
+  // riconoscere una voce (testo con gli spazi compattati, immagini per dato).
+  // Serve a capire quali righe già disegnate corrispondono ancora a una voce
+  // viva quando arriva una lista nuova.
+  function clipKey(entry) {
+    if (!entry) return '';
+    if (entry.type === 'image') return 'i:' + (entry.dataUrl || '');
+    return 't:' + (entry.text || '').replace(/\s+/g, ' ').trim();
+  }
+
   function clipLabel(entry) {
     if (!entry) return '';
     if (entry.type === 'image') return entry.description || I18n.t('security_clipboard_image');
