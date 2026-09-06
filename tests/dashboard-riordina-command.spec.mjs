@@ -120,13 +120,19 @@ async function ultimaRigaFilo(page) {
   });
 }
 
-// Aspetta che le tre schede web abbiano preso il loro colore identità: prima di
-// quel momento il riordino non ha su cosa lavorare.
-async function coloriPronti(shell) {
+// Aspetta che le tre schede web abbiano preso il loro colore identità E il loro
+// titolo vero: prima di quel momento il riordino non ha su cosa lavorare, e una
+// scheda appena aperta si chiama ancora "Nuova scheda" (il suo <title> arriva
+// alla striscia un istante dopo). Chi cerca la scheda "Rosso" troppo presto non
+// la trova, e il rosso parla dell'attesa invece che del riordino.
+async function schedePronte(shell) {
   await expect.poll(async () => shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();
     const web = s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || ''));
-    return web.length === 3 && web.every((t) => !!t.identityColor);
+    const titoli = web.map((t) => t.title).sort();
+    return web.length === 3
+      && web.every((t) => !!t.identityColor)
+      && JSON.stringify(titoli) === JSON.stringify(['Blu', 'Rosso', 'Verde']);
   }), { timeout: 12_000 }).toBe(true);
 }
 
