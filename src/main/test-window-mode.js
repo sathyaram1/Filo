@@ -84,4 +84,4 @@ function hideForTests(win, { main = false } = {}) {
   return true;
 }
 
-module.exports = { HIDDEN, OFFSCREEN, hideForTests };
+module.exports = { HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests };
