@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.222', date: '2026-09-06',
+      features: [
+        'In Impostazioni → Sicurezza c\'è "Cronologia appunti": vedi tutto quello che hai copiato di recente, togli una voce sola o svuoti tutto. Prima ci si arrivava solo dal menu del tasto destro dentro un campo di testo, quindi una password copiata mentre leggevi una pagina non si riusciva a togliere.',
+      ],
+    },
+    {
       version: '0.2.219', date: '2026-09-05',
       features: [
         'Nella chat della nuova scheda Filo fa tutto in un turno solo: cerca, legge il risultato, mette la sveglia e poi risponde, senza chiudere il messaggio a metà per dirti cosa farà dopo. Nel blocco sopra la risposta vedi ogni passo mentre succede: il ragionamento, ogni azione appena la decide («Cerco sul web…»), l\'esito, le due parole che scrive a metà lavoro.',
