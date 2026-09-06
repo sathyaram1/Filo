@@ -749,14 +749,19 @@
       // Applica il filtro di ricerca corrente. Serve anche DOPO una rimozione:
       // se stavi cercando "pass" e togli l'unica voce trovata, la lista resta
       // muta senza dire che ora quella ricerca non ha risultati.
+      // Quante voci VIVE la ricerca sta mostrando: le righe già tolte restano a
+      // schermo barrate ma non contano più, né per "nessun risultato" né per il
+      // numero che la conferma dello svuotamento dichiara.
+      let visibiliVive = 0;
       const applyFilter = () => {
         const q = input.value.trim().toLowerCase();
         let visible = 0;
         for (const b of list.querySelectorAll('.sn-menu-history-item')) {
           const match = !q || (b.dataset.snSearch || '').includes(q);
           b.style.display = match ? '' : 'none';
-          if (match) visible++;
+          if (match && !b.classList.contains('sn-menu-history-gone')) visible++;
         }
+        visibiliVive = visible;
         noResults.style.display = visible === 0 ? '' : 'none';
       };
 
