@@ -235,9 +235,14 @@ if (isMain) {
   // Come nello strumento gemello (#565), con lo stesso controllo: un'opzione
   // scritta male non deve scalare sui posizionali e far partire lo stesso il
   // cambio di stato. `--help` è legittima: chiedere aiuto non è un errore.
+  const uso = () => {
+    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
+    console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
+  };
+  if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
   const { controllaArgomenti } = await import('./lib/argomenti.mjs');
   const male = controllaArgomenti(argv, {
-    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--help', '-h'],
+    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'],
     conValore: ['--branch', '--reason', '--frase'],
   });
   if (male) {
