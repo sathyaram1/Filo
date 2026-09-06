@@ -355,9 +355,15 @@ test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano
   assert.deepEqual(splitKnownRed(['tests/a'], null), { blocking: ['tests/a'], informative: [] });
 });
 
-test('l\'elenco dei rossi noti è tracciato e ogni voce è uno spec che esiste', () => {
+// L'elenco dei rossi noti è un elenco di controlli SPENTI: vuoto è lo stato
+// giusto, e ci è tornato col feedback #563 risolvendo i rossi d'ambiente uno per
+// uno. Quello che questa sentinella difende non è "che sia vuoto" — un'eccezione
+// motivata può servire di nuovo — ma che non marcisca: niente voci fantasma per
+// spec che non esistono più (starebbero lì a spegnere un controllo che nessuno
+// ricorda) e una nota che dice sempre perché e con che numero si toglie.
+test('l\'elenco dei rossi noti non marcisce: ogni voce è uno spec che esiste', () => {
   const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
-  assert.ok(Array.isArray(j.specs) && j.specs.length > 0);
-  assert.match(j.nota, /#\d+/, 'l\'elenco cita il feedback che lo svuoterà');
+  assert.ok(Array.isArray(j.specs), 'rossi-noti.json deve avere un elenco `specs` (anche vuoto)');
+  assert.match(j.nota, /#\d+/, 'la nota cita il feedback da cui l\'elenco dipende');
   for (const s of j.specs) assert.ok(existsSync(resolve(ROOT, `${s}.spec.mjs`)), `${s} non esiste più: toglilo dall'elenco`);
 });
