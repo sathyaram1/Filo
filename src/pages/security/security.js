@@ -249,9 +249,75 @@
     $('sec-clip-noresults').style.display = nessuno ? '' : 'none';
   }
 
-  function renderClipboard(items) {
+  // ── la lista non si muove sotto la mano ───────────────────────────────────
+  //
+  // Togliere una riga e ricompattare subito la lista sposta di una posizione
+  // tutte quelle sotto, e il clic successivo colpisce la voce sbagliata: un
+  // doppio clic sul "Rimuovi" ne portava via due (quella mirata e la vicina), e
+  // bastava che una copia fatta in un'altra scheda entrasse in cima mentre stavi
+  // mirando per cancellare il vicino di sopra. Su voci che spariscono per sempre
+  // è il danno peggiore possibile.
+  //
+  // Quindi: finché il puntatore è dentro la lista, NESSUNA riga cambia posto.
+  // La voce tolta resta al suo posto barrata, e le liste nuove aspettano. Appena
+  // il puntatore esce, la lista si ricompone.
+  let vociCorrenti = [];      // l'ultima lista vera arrivata dal main
+  let inAttesa = null;        // lista da disegnare appena il puntatore esce
+  let puntatoreDentro = false;
+
+  function segnaSparite(entries) {
+    const vive = new Set(entries.map(clipKey));
+    for (const row of $('sec-clip-list').querySelectorAll('.sn-clip-item')) {
+      if (row.classList.contains('sn-clip-gone')) continue;
+      if (vive.has(row.dataset.snKey)) continue;
+      row.classList.add('sn-clip-gone');
+      const btn = row.querySelector('.sn-clip-remove');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = I18n.t('security_clipboard_gone');
+        btn.title = '';
+      }
+    }
+  }
+
+  // Avviso sotto la lista (mai sopra: una riga in più in cima sposterebbe di
+  // nuovo tutto) quando ci sono voci nuove che aspettano.
+  function aggiornaAvvisoInAttesa() {
+    const el = $('sec-clip-pending');
+    if (!el) return;
+    const nuove = inAttesa
+      ? inAttesa.filter((e) => !disegnate().has(clipKey(e))).length
+      : 0;
+    if (nuove > 0) {
+      el.textContent = nuove === 1
+        ? I18n.t('security_clipboard_pending_one')
+        : I18n.t('security_clipboard_pending').replace('%d', String(nuove));
+      el.style.display = '';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+  }
+
+  function disegnate() {
+    const s = new Set();
+    for (const row of $('sec-clip-list').querySelectorAll('.sn-clip-item')) s.add(row.dataset.snKey);
+    return s;
+  }
+
+  function renderClipboard(items, opts) {
     const list = $('sec-clip-list');
     const entries = Array.isArray(items) ? items : [];
+    vociCorrenti = entries;
+    const giaDisegnata = !!list.querySelector('.sn-clip-item');
+    if (puntatoreDentro && giaDisegnata && !(opts && opts.forza)) {
+      inAttesa = entries;
+      segnaSparite(entries);
+      aggiornaAvvisoInAttesa();
+      applyClipFilter();
+      return;
+    }
+    inAttesa = null;
     list.textContent = '';
     // Vuota: niente lista e niente "Svuota cronologia" (non c'è nulla da
     // svuotare), solo la riga che lo dice.
