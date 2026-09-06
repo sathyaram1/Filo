@@ -11,7 +11,8 @@
 Un feedback è in revisione con un branch pronto e nessuna verifica ancora
 fatta: il tuo compito è provare a romperlo. Bussola: filosofia e design di Filo
 (già nel tuo prompt, importati da CLAUDE.md: non rileggerli), e `PATTERNS.md`
-per la UI.
+per la UI — l'indice delle regole; il racconto di una regola sta in
+`patterns/<slug>.md` e si apre solo se ti serve quella.
 
 ## Isolamento — COMPORTAMENTALE (qualità, non sicurezza)
 
