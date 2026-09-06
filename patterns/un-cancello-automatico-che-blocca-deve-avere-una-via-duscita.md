@@ -1,5 +1,7 @@
 # Un cancello automatico che blocca deve avere una via d'uscita, e la via d'uscita è una PERSONA
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un controllo deterministico che dice di no a un caso legittimo — e lo dice
 spesso — non è una difesa stabile: è una difesa che prima o poi qualcuno
 smonta, perché il lavoro deve pur passare. Il controllo di sicurezza sulle

@@ -1,5 +1,7 @@
 # Menu contestuale: se Filo sostituisce il menu nativo, deve coprire OGNI tipo di elemento
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Sulle pagine esterne il menu di Filo **rimpiazza** quello di Chromium. Ogni tipo
 di contenuto per cui il menu nativo avrebbe delle voci (testo, immagine, link,
 campo di testo, **video, audio**) deve avere il suo ramo nella matrice

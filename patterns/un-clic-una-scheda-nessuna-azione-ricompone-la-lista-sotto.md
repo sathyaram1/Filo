@@ -1,5 +1,7 @@
 # Un clic, una scheda: nessuna azione ricompone la lista sotto il cursore
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un pulsante che sta DENTRO una riga di una lista che si riordina da sé è una
 trappola: al clic la riga esce dalla sezione, le altre risalgono e sotto il
 puntatore FERMO arriva il pulsante della riga successiva. Il secondo clic cade

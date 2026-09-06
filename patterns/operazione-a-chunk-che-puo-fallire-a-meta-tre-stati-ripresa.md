@@ -1,5 +1,7 @@
 # Operazione a chunk che può fallire a metà: tre stati, ripresa, avviso onesto
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un lavoro spezzato in N richieste al modello (traduzione di pagina, e in futuro
 qualsiasi elaborazione lunga applicata al DOM) **fallisce quasi sempre a metà**,
 non del tutto: la rete cade al terzo pezzo, il credito finisce a metà strada. Il

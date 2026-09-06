@@ -1,5 +1,7 @@
 # Un riquadro che si riempie dopo va rimisurato dopo: la posa non è un fatto solo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Menu, popup e tooltip di Filo contengono roba che arriva **più tardi**: la
 spiegazione AI di una selezione o di un link, il suggerimento del correttore, i
 metadati di una pagina. Misurare l'altezza al momento dell'apertura e non

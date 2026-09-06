@@ -1,5 +1,7 @@
 # Sezioni con lo stesso nome, una regola sola (e la regola è codice condiviso)
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Due pagine che elencano la stessa cosa possono avere due liste diverse, ma non
 due sezioni che si chiamano allo stesso modo e si riempiono in modo diverso. La
 pagina dei feedback e la dashboard di gestione avevano entrambe una sezione

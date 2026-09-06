@@ -1,5 +1,7 @@
 # Sintesi vocale/operazioni a modello lente: spezza in chunk + cache, non un colpo solo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Il modello di sintesi vocale sintetizza TUTTO l'audio prima di rispondere: su testo
 lungo l'attesa iniziale è di parecchi secondi. Il pattern per le operazioni a
 modello con latenza che cresce con l'output è **spezzare in pezzi piccoli e fare

@@ -1,5 +1,7 @@
 # Le cose che aspettano una decisione dell'owner stanno in UN posto: i Ricevuti
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Le fusioni bloccate in attesa del via libera vivevano su DUE superfici — la
 prima schermata del browser e la pagina di gestione — con l'idea che "così
 l'owner le trova senza cercarle". La scelta dell'owner (2026-08-26) è stata

@@ -1,5 +1,7 @@
 # Quello che il sistema aggancia da sé va DICHIARATO, o resta quello di Electron
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un'app Electron non parte nuda: dove il sistema si aspetta qualcosa e l'app non lo
 dichiara, il motore ci mette il SUO. È un difetto invisibile a chi sviluppa su Windows,
 perché lì quel qualcosa spesso non si vede.

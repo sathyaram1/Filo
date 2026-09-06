@@ -122,10 +122,16 @@ describe('PATTERNS.md ↔ patterns/', () => {
   test('nessun rimando a un racconto che non esiste', () => {
     // Codice, spec e ruoli citano i pattern per percorso: un file rinominato
     // lascerebbe rimandi morti, e un rimando morto lo scopre solo chi lo segue.
+    // La cartella dei racconti è dentro la battuta, non fuori: collegare il
+    // racconto vicino è il modo naturale di legare due regole che si toccano,
+    // e lì il rimando è relativo — `(<slug>.md)`, senza il prefisso — quindi va
+    // cercato in tutte e due le forme o metà dei rimandi sfuggirebbe al
+    // controllo proprio dove è più facile scriverne.
     const esistenti = new Set(fileDellaCartella);
-    const salta = new Set(['node_modules', '.git', '.claude', 'dist', 'release', 'patterns']);
+    const salta = new Set(['node_modules', '.git', '.claude', 'dist', 'release']);
     const rimandi = [];
     const RIMANDO = /patterns\/([a-z0-9-]+)\.md/g;
+    const RIMANDO_VICINO = /\]\(([a-z0-9-]+)\.md\)/g;
     const estensioni = ['.md', '.js', '.mjs', '.cjs', '.html', '.css', '.json', '.yml'];
     (function scendi(dir) {
       for (const voce of readdirSync(dir, { withFileTypes: true })) {
@@ -134,12 +140,47 @@ describe('PATTERNS.md ↔ patterns/', () => {
         if (voce.isDirectory()) { scendi(percorso); continue; }
         if (!estensioni.some((e) => voce.name.endsWith(e))) continue;
         const contenuto = readFileSync(percorso, 'utf8');
+        const nome = percorso.slice(ROOT.length + 1);
         for (const m of contenuto.matchAll(RIMANDO)) {
-          if (!esistenti.has(m[1])) rimandi.push(`${percorso.slice(ROOT.length + 1)} → ${m[0]}`);
+          if (!esistenti.has(m[1])) rimandi.push(`${nome} → ${m[0]}`);
+        }
+        if (dir === CARTELLA) {
+          for (const m of contenuto.matchAll(RIMANDO_VICINO)) {
+            if (!esistenti.has(m[1])) rimandi.push(`${nome} → ${m[1]}.md (racconto vicino)`);
+          }
         }
       }
     })(ROOT);
     assert.deepEqual(rimandi, [], 'rimandi a file di patterns/ che non esistono');
+  });
+
+  test('ogni racconto riporta all\'indice', () => {
+    // Ai racconti si arriva anche di lato — da un commento nel codice, da una
+    // ricerca — non solo dall'indice. Chi ci atterra così deve poter tornare
+    // all'elenco delle altre regole senza sapere che esiste.
+    const senzaRitorno = fileDellaCartella.filter((slug) => {
+      const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
+      return !contenuto.includes('](../PATTERNS.md)');
+    });
+    assert.deepEqual(senzaRitorno, [], 'racconti senza il rimando all\'indice');
+  });
+
+  test('i nomi dei file non tagliano una frase a metà', () => {
+    // Il nome del file è quello che si legge nei commenti del codice e in
+    // CLAUDE.md prima di aprirlo: è l'unica descrizione che arriva a chi passa
+    // di lì. Tagliato a metà parola, o finito su «mai»/«non»/«che», si legge
+    // come una regola rovesciata o monca.
+    const APPESE = new Set(('e ed o od ma mai non che chi di da dal dallo dalla dai dagli dalle '
+      + 'del dello della dei degli delle il lo la i gli le un uno una in con su per tra fra se si '
+      + 'ci ne come quando dove al allo alla ai agli alle nel nello nella nei negli nelle sul '
+      + 'sullo sulla sui sugli sulle a ad anche piu meno te ha va sta sono era').split(' '));
+    const male = [];
+    for (const slug of fileDellaCartella) {
+      const ultima = slug.split('-').pop();
+      if (APPESE.has(ultima)) male.push(`${slug} (finisce su «${ultima}»)`);
+      else if (ultima.length < 2) male.push(`${slug} (finisce su una lettera sola)`);
+    }
+    assert.deepEqual(male, [], 'nomi di file che lasciano la frase appesa');
   });
 
   test('l\'indice resta un indice', () => {

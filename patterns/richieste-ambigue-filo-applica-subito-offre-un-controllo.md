@@ -1,5 +1,7 @@
 # Richieste ambigue: Filo applica subito + offre un controllo per raffinare
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Quando l'utente chiede in chat una modifica con un valore "giusto" non univoco
 ("rendi i bottoni verdi", "angoli più arrotondati"), Filo **non chiede** il
 valore esatto: applica **subito** una scelta ragionevole (azione di livello 1,

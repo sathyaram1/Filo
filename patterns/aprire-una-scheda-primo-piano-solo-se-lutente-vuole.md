@@ -1,5 +1,7 @@
 # Aprire una scheda: primo piano solo se l'utente vuole ARRIVARCI
 
+[← Tutti i pattern](../PATTERNS.md)
+
 `TabManager.openTab(url, { activate })` decide se la nuova scheda passa davanti.
 Attivarla è il default (chi chiede "apri X" vuole vedere X), ma **non è sempre
 giusto**: la musica che Filo mette per te, il Ctrl+click su un link mentre stai

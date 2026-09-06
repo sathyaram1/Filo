@@ -1,5 +1,7 @@
 # "Vai a guardare in quell'altro posto": quel posto deve accorgersene DA APERTO
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Quando una superficie manda l'utente su un'altra (il terminale che dice
 "approvala dalla dashboard di gestione"), la seconda è quasi sempre **già
 aperta** — la pagina di gestione lasciata lì in una scheda. Se carica

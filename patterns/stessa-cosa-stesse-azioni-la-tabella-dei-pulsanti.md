@@ -1,5 +1,7 @@
 # Stessa cosa, stesse AZIONI: la tabella dei pulsanti sta nel modulo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Mettere lo stesso elemento nella stessa sezione non basta. Sulla STESSA
 segnalazione le due pagine offrivano pulsanti diversi, perché ognuna se li
 costruiva a mano dai propri `if`: negli Archiviati la pagina dei feedback

@@ -1,5 +1,7 @@
 # Un interruttore che promette una garanzia non ha ripieghi silenziosi
 
+[← Tutti i pattern](../PATTERNS.md)
+
 "Solo modelli a pesi aperti" (#461) spegne tutti i modelli proprietari. Un
 interruttore così non è una preferenza estetica: è una **garanzia**, e una
 garanzia vale solo se regge anche quando le cose vanno male. Il pattern, valido

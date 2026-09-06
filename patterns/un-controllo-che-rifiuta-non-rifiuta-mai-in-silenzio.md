@@ -1,5 +1,7 @@
 # Un controllo che RIFIUTA non rifiuta mai in silenzio (e si può scavalcare)
 
+[← Tutti i pattern](../PATTERNS.md)
+
 I controlli di plausibilità ("questo indirizzo esiste?", "questo file è troppo
 grande?") esistono per risparmiare all'utente un vicolo cieco. Ma quando
 scattano diventano loro il vicolo cieco, se l'unica cosa che succede è **niente**:

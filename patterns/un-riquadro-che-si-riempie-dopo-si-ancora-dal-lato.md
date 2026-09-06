@@ -1,5 +1,7 @@
 # Un riquadro che si riempie dopo si ancora dal lato che non si muove
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un riquadro ancorato a un punto della pagina — la spiegazione su una selezione,
 un menu con una sezione che arriva da un modello, un'anteprima che carica
 un'immagine — **nasce vuoto e si riempie dopo**. La posa calcolata subito dopo

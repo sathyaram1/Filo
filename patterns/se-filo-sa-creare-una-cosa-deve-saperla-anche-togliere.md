@@ -1,5 +1,7 @@
 # Se Filo sa CREARE una cosa, deve saperla anche togliere e cambiare
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Ogni azione che mette al mondo qualcosa (una sveglia, un timer, una regola, un
 file) ne implica altre due: toglierla e modificarla. Senza, l'utente resta con
 un elenco che sa solo allungarsi, e il modello davanti a "cancella la sveglia

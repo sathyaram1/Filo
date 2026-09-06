@@ -1,5 +1,7 @@
 # Errori in chat: mai il messaggio grezzo, sempre una frase + un modo di riprovare
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Una bolla di chat non è un log. Il messaggio di un'eccezione (`fetch failed`,
 `OpenRouter 400: …`, `ETIMEDOUT`, uno stack) non dice niente all'utente e lo
 lascia bloccato: il dettaglio tecnico va nei log del main, in chat va **cosa non

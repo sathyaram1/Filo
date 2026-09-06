@@ -1,5 +1,7 @@
 # Un mittente nuovo si classifica su DUE assi: da dove viene, e quanto ci si fida
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Quando nasce una provenienza nuova di feedback (un prefisso di `clientId`: l'agente
 esploratore, i ruoli delle routine, i rilievi residui, la sessione locale di Claude),
 ci sono **due domande diverse** e vanno risposte separatamente:

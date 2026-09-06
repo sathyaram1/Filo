@@ -1,5 +1,7 @@
 # In chat: il blocco di attività della domanda (chiuso di default, uno per messaggio)
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Sopra la risposta finale di Filo nella chat della home c'è un blocco smorzato
 che raccoglie tutto ciò che Filo fa **prima di rispondere** (#521). Filo non
 «ragiona e basta»: agisce, in più giri dentro lo stesso turno (ragiona, cerca,

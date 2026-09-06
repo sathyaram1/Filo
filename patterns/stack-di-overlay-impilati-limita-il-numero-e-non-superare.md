@@ -1,5 +1,7 @@
 # Stack di overlay impilati: limita il numero e non superare mai il viewport
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Qualsiasi contenitore che **impila elementi nell'angolo** (toast/notifiche in
 basso a destra, e in futuro simili) deve avere **due argini**, altrimenti una
 raffica di eventi (es. una tempesta di popup bloccati, o il ripristino con molte

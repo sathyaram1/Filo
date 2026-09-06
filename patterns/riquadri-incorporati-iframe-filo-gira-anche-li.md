@@ -1,5 +1,7 @@
 # Riquadri incorporati (iframe): Filo gira anche lì, ma un riquadro non è la pagina
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Le pagine vere sono piene di riquadri di altri siti: un video dentro un articolo,
 una mappa, un blocco commenti, un modulo. Sono `iframe`, e i preload girano nei
 sottoframe **solo** con `nodeIntegrationInSubFrames` (attivo per le schede

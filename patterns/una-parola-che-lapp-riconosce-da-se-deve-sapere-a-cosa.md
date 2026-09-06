@@ -1,5 +1,7 @@
 # Una parola che l'app riconosce da sé deve sapere A COSA l'utente sta rispondendo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 La rete di sicurezza qui sopra ha un costo: l'app decide **senza capire**, e in
 una conversazione lo stesso pugno di parole vuol dire cose diverse a seconda di
 cosa è stato appena chiesto. Nell'accoglienza (#524) l'elenco delle uscite

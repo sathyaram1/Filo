@@ -1,5 +1,7 @@
 # Uno stesso messaggio, di fila a sé stesso, è lo stesso turno
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un turno di chat che si interrompe riparte per tre strade diverse: la finestra
 chiusa mentre l'assistente scriveva e riaperta, il «Riprova» dopo un errore, una
 seconda scheda aperta durante l'attesa. Tutte e tre rispediscono lo STESSO

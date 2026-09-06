@@ -1,5 +1,7 @@
 # Filo ammette una mancanza → propone lui la segnalazione, non la chiede
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Quando l'agente risponde "non lo so fare / non ho accesso a quel dato", il buco
 non deve morire lì: nella **stessa risposta** compare una segnalazione **già
 scritta**, e il popup di conferma si apre **da solo** con il testo per intero

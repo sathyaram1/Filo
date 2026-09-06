@@ -1,5 +1,7 @@
 # Colonne ridimensionabili: divisore trascinabile, misura persistita, mai auto-resize
 
+[← Tutti i pattern](../PATTERNS.md)
+
 I layout a pannelli affiancati (banco di lavoro dei Mazzi, dashboard di
 gestione) si ridimensionano **solo** trascinando i divisori: le due colonne
 esterne hanno larghezza fissa decisa dall'utente, quella centrale assorbe il

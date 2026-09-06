@@ -1,5 +1,7 @@
 # Controllo custom dentro una `<label>`: `.sn-page label` te lo appiattisce
 
+[← Tutti i pattern](../PATTERNS.md)
+
 `pages.css` ha `.sn-page label { display: block; margin: …; color: var(--sn-muted) }`
 per TUTTE le pagine `filo://`. Specificità **0-1-1**: una classe sola (`.mio-switch`,
 `.mia-scelta`) non basta a batterla, e non conta che il tuo `<style>` venga dopo.

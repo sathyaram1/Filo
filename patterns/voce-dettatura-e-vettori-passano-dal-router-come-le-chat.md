@@ -1,5 +1,7 @@
 # Voce, dettatura e vettori passano dal router come le chat (niente API del produttore)
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Lettura ad alta voce, dettatura e indicizzazione dell'archivio erano le tre
 funzioni rimaste sull'API diretta di Google: la politica sui modelli non la
 ammette, e finché esisteva un cammino "speciale" la politica valeva a metà.

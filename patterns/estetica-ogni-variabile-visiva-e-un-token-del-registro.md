@@ -1,5 +1,7 @@
 # Estetica: ogni variabile visiva è un token del registro, mai un valore sparso
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Ogni variabile estetica (colori, font, raggio angoli, opacità…) deve passare dal
 **registro dei token** in `src/shared/themeTokens.js` (#146.1): nome stabile →
 tipo → default → eventuale categoria da cui eredita. Gli override dell'utente

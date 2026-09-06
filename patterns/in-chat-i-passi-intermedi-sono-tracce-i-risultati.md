@@ -1,5 +1,7 @@
 # In chat: i passi intermedi sono TRACCE, i risultati sono bottoni
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Nella conversazione di Filo ha la forma di bottone (pill `.dash-action-btn`)
 **solo ciò su cui l'utente può agire**: il link aperto, la conferma, il pannello.
 I passi che Filo compie per arrivarci — la ricerca sul web, la lettura di un

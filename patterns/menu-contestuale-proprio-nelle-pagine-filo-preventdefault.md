@@ -1,5 +1,7 @@
 # Menu contestuale proprio nelle pagine filo://: `preventDefault` e il menu di Filo si fa da parte
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Una pagina interna può avere un **menu contestuale proprio** su certi elementi
 (chip dell'archivio, card dei mazzi): l'handler `contextmenu` dell'elemento
 chiama `e.preventDefault()` e apre il suo popup (classi `.sn-select-pop`/

@@ -1,5 +1,7 @@
 # Liste/chat che si ricostruiscono in streaming: auto-follow SOLO se sei in fondo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Una lista che si **rirenderizza di continuo** mentre arriva contenuto (una chat
 con risposta in streaming, un log dal vivo) non deve **strappare lo scroll**
 all'utente. Il pattern anti-attrito:

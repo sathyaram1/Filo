@@ -1,5 +1,7 @@
 # Riscrivere il testo di una pagina esterna: niente whitelist di tag, e si spostano i NODI
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Quando Filo sostituisce del testo su una pagina che non è sua (oggi: "Traduci la
 pagina") valgono due regole imparate a caro prezzo con #407.
 

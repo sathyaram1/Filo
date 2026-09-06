@@ -1,5 +1,7 @@
 # Evidenziare testo sulla pagina: CSS Custom Highlight API, mai wrappare in `<span>`
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Per evidenziare testo su una pagina ESTERNA (es. la parola letta dalla lettura
 ad alta voce) si usa la **CSS Custom Highlight API** (`CSS.highlights` + `Highlight`
 + Range, stilati via `::highlight(nome)`), **non** si avvolgono le parole in

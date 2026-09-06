@@ -1,5 +1,7 @@
 # Colore identità delle tab: brand del sito, mai chrome neutra
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Il colore con cui si tingono le tab (attiva = "vetro smerigliato" §1.1; inattive
 = tinta identità attenuata §1.2) deve rappresentare il **brand del sito**, non la
 sua chrome neutra. Un `theme-color`/sfondo bianco, nero o grigio **non è

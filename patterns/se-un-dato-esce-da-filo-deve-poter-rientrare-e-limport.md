@@ -1,5 +1,7 @@
 # Se un dato ESCE da Filo, deve poter RIENTRARE (e l'import mostra prima cosa scrive)
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un "esporta" senza il gemello "importa" non è una mezza feature: è una promessa
 falsa. Il bottone "Esporta dati (.zip)" dichiarava di servire "come backup o per
 trasferire i dati su un altro computer", ma sull'altro computer non c'era nulla

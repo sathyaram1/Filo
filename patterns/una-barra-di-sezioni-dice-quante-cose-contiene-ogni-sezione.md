@@ -1,5 +1,7 @@
 # Una barra di sezioni dice quante cose contiene ogni sezione
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Una fila di schede che dividono una stessa lista (Ricevuti / In coda / Risolti /
 Archiviati) senza numeri costringe ad aprirle una per una solo per sapere dove
 c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).

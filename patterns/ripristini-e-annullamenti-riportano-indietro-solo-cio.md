@@ -1,5 +1,7 @@
 # Ripristini e annullamenti: riportano indietro SOLO ciò che il pannello mostra
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un "ripristina"/"annulla" che rimette in piedi uno **snapshot intero** riporta
 indietro anche cose che l'utente non stava chiedendo di annullare e che non ha
 modo di vedere prima di premere (nell'editor: il nome del documento, la

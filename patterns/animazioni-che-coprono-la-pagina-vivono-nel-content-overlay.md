@@ -1,5 +1,7 @@
 # Animazioni che coprono la pagina: vivono nel content overlay, non nella shell
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Le animazioni celebrative o gli overlay che devono coprire **l'area pagina**
 (es. le monete che "volano" dopo una ricompensa) si disegnano nel **content
 script / overlay della pagina**, non nella shell.

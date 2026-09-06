@@ -1,5 +1,7 @@
 # Popup d'avvio della home: incatenali, non sovrapporli
 
+[← Tutti i pattern](../PATTERNS.md)
+
 La dashboard può avere **più popup all'avvio** (recap aggiornamento C4,
 ringraziamento feedback risolto C5). Mostrarli insieme li impila e confonde.
 

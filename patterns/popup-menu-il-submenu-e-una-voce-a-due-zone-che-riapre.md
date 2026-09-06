@@ -1,5 +1,7 @@
 # Popup menu: il "submenu" è una voce a due zone che riapre il menu
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Il popup menu custom (`src/main/popup-menu.js`, una BrowserWindow frameless)
 non ha submenu a comparsa: quando una voce ha bisogno di un secondo livello
 (es. la lista paesi di "Apri da un altro paese"), la voce dichiara `subAction`

@@ -1,5 +1,7 @@
 # Nuovo tipo di messaggio: decidi SUBITO se le pagine web possono chiamarlo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Il canale `filo:message` è **uno solo** e ci arrivano sia le pagine interne
 (shell, `filo://`) sia i content script delle pagine web esterne. Registrare un
 handler senza dire nulla significa **aprirlo a qualunque sito visitato**: è il

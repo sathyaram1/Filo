@@ -1,5 +1,7 @@
 # Controlli UI custom: tema di Filo, non default del browser
 
+[← Tutti i pattern](../PATTERNS.md)
+
 I controlli dell'interfaccia (menu a tendina, select, ecc.) devono usare la
 **palette e il comportamento del tema di Filo**, non i default del browser/OS (es. il
 blu di selezione nativo). Devono essere **coerenti tra loro**: un menu a tendina nuovo

@@ -1,5 +1,7 @@
 # Un modello si prende SEMPRE dalla configurazione, e il punto va censito
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Filo usa modelli ovunque, spesso in modo invisibile (riordino schede, riassunti,
 memoria, giudici, indicizzazione dell'archivio). Il rischio non è scegliere male
 un modello: è **non sapere quanti sono e dove sono**. Una politica sui modelli

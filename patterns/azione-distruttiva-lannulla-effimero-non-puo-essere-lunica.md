@@ -1,5 +1,7 @@
 # Azione distruttiva: l'"Annulla" effimero non può essere l'UNICA rete
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Rendere un'eliminazione **immediata e reversibile** (niente conferma, un avviso
 con "Annulla" subito dopo) è la scelta giusta per l'attrito — ma l'undo nel
 toast è una **scorciatoia**, non la rete di sicurezza: dura pochi secondi, muore

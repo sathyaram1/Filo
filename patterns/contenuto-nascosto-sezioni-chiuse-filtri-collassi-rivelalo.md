@@ -1,5 +1,7 @@
 # Contenuto nascosto (sezioni chiuse, filtri, collassi): rivelalo, non toccarlo di nascosto
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Se una parte del documento/lista è nascosta da un collasso o da un filtro, ogni
 funzione che ci lavora sopra ha solo due comportamenti onesti: **includerlo E
 rivelarlo**, oppure **escluderlo del tutto** (e non contarlo). La terza via —

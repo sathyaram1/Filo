@@ -1,5 +1,7 @@
 # Accogliere un utente nuovo è una CONVERSAZIONE, e il segno "già accolto" si scrive alla fine
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Un'accoglienza fatta di schermate a passi contraddice tutto Filo: qui si fa
 parlando, dentro la chat che l'utente userà comunque. Il modello riceve
 l'**elenco** di cosa Filo vuole scoprire e cosa vuole dire, con la regola "una

@@ -1,5 +1,7 @@
 # Icone: il popup della shell ha un registro SUO, cambiare `icons.js` non basta
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Le icone di Filo vivono in **`src/shared/icons.js`** (`SN_ICONS`), ma il popup
 menu della shell (menu App, menu tab, `src/main/popup-menu.js`) è una
 BrowserWindow separata che **non carica quel file**: tiene una **copia** dei path

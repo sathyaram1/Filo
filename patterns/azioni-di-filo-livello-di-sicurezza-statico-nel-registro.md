@@ -1,5 +1,7 @@
 # Azioni di Filo: livello di sicurezza statico nel registro, mai deciso dall'LLM
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Ogni azione che Filo (l'AI) può intraprendere dichiara il proprio livello nel
 **registro** `src/shared/actionLevels.js` (#146.2): 1 = reversibile, esegue
 subito; 2 = popup di conferma con spiegazione (OK/Annulla); 3 = irreversibile,

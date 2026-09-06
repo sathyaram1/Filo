@@ -1,5 +1,7 @@
 # Il colore di una card dice che DECISIONE serve, non lo stato interno
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Nella dashboard di gestione lo stesso stato può avere origini diverse (un `design`
 può venire dai giudici, da domande della routine, o da un fix bocciato dalla
 sicurezza), e un dato mostrato può risalire a PRIMA dello stato attuale (i pallini

@@ -1,5 +1,7 @@
 # Una lista remota che SOSTITUISCE quella del codice deve dire cosa sta scoprendo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Il doc `config/models` riscrive per intero certe liste che nel codice hanno un
 valore di partenza: quella dei fornitori esclusi (#421) è la prima. La
 sostituzione è voluta, l'owner deve poterla svuotare o riscrivere. Il prezzo è

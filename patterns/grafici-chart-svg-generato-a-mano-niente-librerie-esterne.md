@@ -1,5 +1,7 @@
 # Grafici/chart: SVG generato a mano, niente librerie esterne
 
+[← Tutti i pattern](../PATTERNS.md)
+
 I grafici (es. la torta del consumo nella pagina Crediti) si disegnano come
 **SVG costruito a mano nel DOM**, una `<path>`/`<circle>` per fetta — niente
 librerie di charting.

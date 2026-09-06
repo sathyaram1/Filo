@@ -1,5 +1,7 @@
 # Dati che cambiano ALTROVE (cloud): si chiede la VERSIONE, non il dato
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Il pattern qui sopra vale quando chi produce l'evento sta sulla stessa macchina
 e può suonare un campanello. La dashboard di gestione legge i feedback da
 Firestore, dove scrivono le routine in cloud e il server: nessun campanello

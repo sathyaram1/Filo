@@ -1,5 +1,7 @@
 # Una promessa fatta all'utente non può dipendere dal modello
 
+[← Tutti i pattern](../PATTERNS.md)
+
 Il benvenuto scrive «se non ti va, scrivi "basta così" e chiudiamo». Quella
 frase è un **contratto**, e affidarne l'esecuzione al modello significa non
 averlo firmato: un modello piccolo si dimentica l'istruzione (è una fra molte) e
