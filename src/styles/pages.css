@@ -909,6 +909,16 @@ section:has(#dictList) .sn-spell-add-row {
   border-radius: 4px;
   border: 1px solid var(--sn-border);
 }
+/* Ripiego per un'immagine copiata che non si riesce a disegnare: l'iconcina di
+   Filo al posto di quella rotta del browser, com'è già nel menu "Incolla". */
+.sn-page .sn-clip-thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sn-muted);
+  background: var(--sn-hover);
+}
+.sn-page .sn-clip-thumb-fallback svg { display: block; }
 /* Righe di testo in una lista che contiene anche immagini: tengono il posto
    della miniatura, così il bordo sinistro resta dritto. */
 .sn-page .sn-clip-spacer { flex: none; width: 28px; }
