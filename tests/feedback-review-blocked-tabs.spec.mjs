@@ -70,7 +70,16 @@ test('gli stati dell\'iter stanno "In coda", il fix bocciato torna nei "Ricevuti
   const blkCard = page.locator('.fb-card', { hasText: 'bloccato' });
   await expect(blkCard).toHaveCount(1);
   await expect(blkCard.locator('.fb-branch')).toHaveText(/worker\/41\.2/);
-  await expect(blkCard.locator('.fb-state')).toContainText('fix bocciato troppe volte');
+  // Il motivo dev'essere scritto in PAROLE accanto allo stato, non lasciato al
+  // codice grezzo. La frase la chiediamo alla tabella condivisa invece di
+  // ricopiarla qui: una copia a mano si scolla appena qualcuno riscrive
+  // l'etichetta, e allora questo controllo diventa rosso senza che sia rotto
+  // niente — è già successo, con la vecchia dicitura «fix bocciato troppe
+  // volte». Il confronto con il codice grezzo tiene comunque in piedi l'assert:
+  // se la tabella smettesse di tradurre `loop`, questo diventa rosso davvero.
+  const motivo = await page.evaluate(() => SN_MANAGE_REVIEW.reasonText('loop'));
+  expect(motivo).not.toBe('loop');
+  await expect(blkCard.locator('.fb-state')).toContainText(motivo);
 
   // Gli stati dell'iter NON inquinano i "Ricevuti".
   await expect(page.locator('.fb-card', { hasText: 'in revisione' })).toHaveCount(0);
