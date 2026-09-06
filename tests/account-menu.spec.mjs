@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildHTML, computeMenuWidth } from '../src/main/popup-menu.js';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -29,7 +30,7 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
   app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

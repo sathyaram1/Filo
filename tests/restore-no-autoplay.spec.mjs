@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -31,7 +32,7 @@ const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>autop
 
 function launch(userData) {
   return electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

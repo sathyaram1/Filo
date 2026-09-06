@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 // Feedback: alla riapertura di Filo devono essere riaperte tutte le tab
 // presenti al momento della chiusura.
@@ -33,7 +34,7 @@ test('reopens previous session tabs after restart', async ({ testServer }) => {
   const host = new URL(url).hostname;
   const userData = mkdtempSync(join(tmpdir(), 'filo-session-'));
   const launch = () => electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

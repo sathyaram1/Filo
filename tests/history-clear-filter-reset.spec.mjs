@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 // Feedback #392: nella Cronologia AI il pulsante "Cancella tutto" svuotava la
 // lista ma NON aggiornava il menu "filtra per tipo", che continuava a elencare i
@@ -49,7 +50,7 @@ test('Cronologia AI: dopo "Cancella tutto" il menu filtro torna alla sola "Tutte
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ aiHistory }), 'utf8');
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

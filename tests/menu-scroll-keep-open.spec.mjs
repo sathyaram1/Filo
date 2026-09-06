@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 // Feedback alpha: "lo scroll non funziona — quando uso la rotella si chiude il
 // box invece di mostrare gli appunti più vecchi". La cronologia incolla è
@@ -41,7 +42,7 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
   const host = new URL(url).hostname;
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

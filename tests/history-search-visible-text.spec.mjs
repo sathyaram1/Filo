@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 // Feedback #321: nella Cronologia AI la casella "Cerca" restituiva risultati
 // anche per parole che non compaiono da nessuna parte nelle voci mostrate.
@@ -56,7 +57,7 @@ test('history search: ignora le chiavi interne del payload, cerca solo i testi v
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ aiHistory }), 'utf8');
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

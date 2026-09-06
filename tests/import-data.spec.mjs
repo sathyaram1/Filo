@@ -18,6 +18,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -63,7 +64,7 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
   writeFileSync(zipPath, buildExportZip(backup));
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -153,7 +154,7 @@ test('"trasferire i dati su un altro computer": esporto da un profilo, importo i
   writeFileSync(join(profiloA, 'storage.json'), JSON.stringify(miei), 'utf8');
 
   const launch = (userData) => electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

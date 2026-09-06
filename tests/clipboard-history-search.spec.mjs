@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 // Feedback: poter scorrere fra tutto ciò che è stato incollato e, in basso, una
 // barra "Cerca…" (grigia) per cercare fra le cose incollate.
@@ -45,7 +46,7 @@ test('paste history submenu is scrollable and has a working search bar', async (
   const host = new URL(url).hostname;
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

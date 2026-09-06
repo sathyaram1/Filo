@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
 
 // Feedback #272: nella pagina Cronologia AI alcune azioni (descrivi immagine,
 // trascrizione vocale/OCR, modifica testo, spiega link) comparivano col loro
@@ -50,7 +51,7 @@ test('history page shows readable labels and filter options for all action types
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ aiHistory }), 'utf8');
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
