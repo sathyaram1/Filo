@@ -306,7 +306,18 @@ npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
 npm test                   # SUITE COMPLETA (~100 spec, ~25 min)
 npm run test:shoot         # cattura visiva della finestra reale
+
+FILO_TEST_SCALE=1.25 npx playwright test tests/<spec>.spec.mjs   # schermo al 125%
 ```
+
+**Lo schermo dell'owner sta al 125%**, quello delle routine in cloud al 100%, e
+qualche spec di layout diverge solo per quello: la stessa riga di testo cade su
+misure diverse, e un rosso che in cloud non esiste diventa un rosso fisso su una
+macchina sola. `FILO_TEST_SCALE=1.25` rimette quel fattore ovunque, ed è l'unico
+modo di rivedere quei rossi senza avere lo stesso schermo sotto mano. Vale per
+gli spec che partono dalla fixture; quelli che si aprono Filo da soli devono
+passarlo a mano (`args: [...argomentiScala, '.']`, da `tests/fixtures/electron.mjs`)
+e una sentinella negli unit test diventa rossa se qualcuno se lo dimentica.
 
 Modelli per gli strumenti di test (`test:explore`): open via OpenRouter, chiave
 in `tests/agent/.env` — MAI chiavi del produttore dei pesi (politica modelli).
