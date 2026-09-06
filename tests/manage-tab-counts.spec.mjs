@@ -364,8 +364,13 @@ test('#495 — caricamento fallito: nessun numero e nessun "vuoto" inventato', a
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
-  // In questo ambiente non c'è Firestore: il caricamento fallisce da solo.
+  // Il guasto si CHIEDE, non si spera: aspettando che Firestore sia
+  // irraggiungibile, questo spec era verde nel sandbox delle routine e rosso
+  // sulla macchina di chi sviluppa Filo, dove la rete c'è e il caricamento
+  // riesce. Prima si lascia finire il caricamento vero, poi si impone il
+  // fallimento — così lo stato in prova è quello, ovunque.
   await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.simulaCaricamentoFallito());
 
   const vuoto = page.locator('#mgListEmpty');
   await expect(vuoto).toContainText('Errore');
