@@ -821,9 +821,20 @@
           rm.setAttribute('aria-label', I18n.t('menu_paste_remove'));
           rm.addEventListener('click', (ev) => {
             ev.stopPropagation();
+            if (row.classList.contains('sn-menu-history-gone')) return;
             try { onRemove(entry); } catch (e) { console.error(e); }
             forgetEntry(entry);
-            row.remove();
+            // La riga NON sparisce: resta al suo posto barrata finché il
+            // sotto-menu è aperto. Toglierla ricompattava la lista e faceva
+            // salire di una posizione tutte quelle sotto, così il secondo clic
+            // di un doppio clic colpiva la voce vicina e la cancellava anche
+            // lei, per sempre e senza dirlo.
+            row.classList.add('sn-menu-history-gone');
+            rm.textContent = '';
+            rm.disabled = true;
+            rm.title = I18n.t('menu_paste_removed');
+            rm.setAttribute('aria-label', I18n.t('menu_paste_removed'));
+            b.disabled = true;
             applyFilter();
             refreshEmptyState();
           });
