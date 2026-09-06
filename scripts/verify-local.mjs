@@ -13,12 +13,15 @@
 //   condividono i suoi punti ciechi. Da qui in poi anche in locale si passa di
 //   qui, e `npm run finish` non pubblica senza un esito positivo.
 //
-// IL GIRO (feedback #561: «il verificatore corregge, un agente per giro»)
+// IL GIRO (feedback #561)
 //   Stessa struttura del giro in cloud. Chi verifica registra la CRITICA coi
 //   livelli; questo strumento calcola l'esito dai livelli e dai tre bilanci
-//   (le stesse regole del server, src/shared/verifierRound.js) e, se c'è da
-//   correggere, stampa SOLO ALLORA le istruzioni della fase 2. Chi ha
-//   corretto consegna; poi serve un'altra verifica, di un'altra istanza.
+//   (le stesse regole del server, src/shared/verifierRound.js) e stampa SOLO
+//   ALLORA cosa comporta. Chiuso il giro serve un'altra verifica, fatta da
+//   un'altra istanza.
+//   Il seguito di una critica non è scritto qui, ed è voluto: chi verifica
+//   legge questo file per usare il comando, e saperlo prima gli direbbe
+//   quanto gli costa ogni rilievo che scrive (feedback #565).
 //
 // COME SI USA
 //
@@ -32,12 +35,12 @@
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
 //     Lo lancia l'istanza che ha verificato. Formato: `[2] testo`, `[1?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
-//     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito e, se
-//     c'è da correggere, le istruzioni della fase 2.
+//     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito e,
+//     quando c'è da correggere, cosa fare.
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
-//     Lo lancia chi ha corretto (lo stesso verificatore): chiude la fase 2 e
-//     chiede un'altra verifica sul commit nuovo.
+//     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
+//     sul commit nuovo.
 //
 //   node scripts/verify-local.mjs status
 //     Esito per il ramo corrente. Exit 0 = si può pubblicare.
@@ -312,7 +315,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
     if (prev.verdict === 'fixed') {
       return { ok: false, reason: `la correzione è già stata consegnata su questo ramo (${String(prev.fixedSha || '').slice(0, 8) || 'commit non registrato'}): non c'è altro da consegnare. Serve un'altra verifica, di un'altra istanza (verify-local.mjs start, lo rilancia chi guida).` };
     }
-    return { ok: false, reason: 'nessuna correzione in sospeso su questo ramo: prima la critica (verify-local.mjs critica)' };
+    return { ok: false, reason: 'nessun giro aperto su questo ramo: prima la critica (verify-local.mjs critica)' };
   }
   if (dirty) {
     return { ok: false, reason: 'ci sono modifiche non salvate: la consegna vale per un commit, e la verifica dopo deve provare quello. Salva e rilancia.' };
