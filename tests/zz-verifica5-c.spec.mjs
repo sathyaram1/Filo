@@ -165,9 +165,7 @@ test('spunta dell’accoglienza: riga nel diario ed esito eseguito', async ({ ap
   await configureModel(app);
   // Accoglienza attiva.
   await app.evaluate(async () => {
-    const O = globalThis.SN_ONBOARDING;
-    const st = O.start ? O.start() : { done: false, turns: [], checked: [] };
-    await globalThis.SN_FILO_MEMORY.setOnboarding(st);
+    await globalThis.SN_FILO_MEMORY.setOnboarding(globalThis.SN_ONBOARDING.emptyState());
   });
   await scriptProvider(app, [
     { text: 'Piacere!', toolCalls: [{ id: 'o1', name: 'ONBOARDING', arguments: { spunta: ['profilo'] } }] },
