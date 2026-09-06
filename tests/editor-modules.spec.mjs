@@ -319,6 +319,33 @@ test.describe('font picker e drag dei moduli', () => {
     expect(spurious).toBe('');
   });
 
+  // Un punto della pagina che è DAVVERO su `dentro` e non su qualcos'altro:
+  // lo si chiede al browser (`elementFromPoint`) invece di fidarsi di una
+  // coordinata scritta a mano. La tendina del font è `position: fixed` e nasce
+  // dove capita il modulo: un angolo che su una macchina è vuoto, su un'altra —
+  // altri font di sistema, altre altezze di riga, quindi un'altra griglia — sta
+  // sotto la tendina, e il click che doveva chiuderla non la raggiunge nemmeno.
+  // È la stessa causa del flake già annotato qui sotto per la topbar.
+  async function puntoSu(page, selettore) {
+    const p = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      // Si prova a scendere lungo la diagonale: il primo punto che appartiene
+      // davvero all'elemento (o a un suo discendente) è quello buono.
+      for (let f = 0.05; f < 0.95; f += 0.05) {
+        const x = Math.round(r.left + r.width * f);
+        const y = Math.round(r.top + r.height * f);
+        if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) continue;
+        const sotto = document.elementFromPoint(x, y);
+        if (sotto && (sotto === el || el.contains(sotto))) return { x, y };
+      }
+      return null;
+    }, selettore);
+    expect(p, `nessun punto cliccabile di ${selettore}: è tutto coperto`).toBeTruthy();
+    return p;
+  }
+
   test('il dropdown del font si chiude con un click fuori da esso', async () => {
     const page = await openTab(EDITOR);
     await page.waitForSelector('.ed-grid');
@@ -331,13 +358,24 @@ test.describe('font picker e drag dei moduli', () => {
     // Click sul documento → si chiude.
     await button.click();
     await expect(pop).toBeVisible();
-    await page.locator('#doc').click({ position: { x: 5, y: 5 } });
+    const nelDoc = await puntoSu(page, '#doc');
+    await page.mouse.click(nelDoc.x, nelDoc.y);
     await expect(pop).toBeHidden();
 
-    // Click in un angolo lontano della pagina → si chiude.
+    // Click lontano dalla tendina → si chiude. L'angolo si sceglie DOPO aver
+    // guardato dove sta la tendina: quello opposto, così è lontano davvero.
     await button.click();
     await expect(pop).toBeVisible();
-    await page.mouse.click(2, 2);
+    const angolo = await page.evaluate(() => {
+      const r = document.querySelector('.ed-font-pop').getBoundingClientRect();
+      const centroX = (r.left + r.right) / 2;
+      const centroY = (r.top + r.bottom) / 2;
+      return {
+        x: centroX > window.innerWidth / 2 ? 2 : window.innerWidth - 3,
+        y: centroY > window.innerHeight / 2 ? 2 : window.innerHeight - 3,
+      };
+    });
+    await page.mouse.click(angolo.x, angolo.y);
     await expect(pop).toBeHidden();
 
     // Click su un controllo della topbar → si chiude. NB: la .ed-topbar è un
