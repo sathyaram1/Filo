@@ -2,10 +2,11 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
+Il pattern
 [«Vai a guardare in quell'altro posto»: quel posto deve accorgersene DA APERTO](vai-a-guardare-in-quellaltro-posto-quel-posto.md)
 vale quando chi produce l'evento sta sulla stessa macchina e può suonare un
-campanello. La dashboard di gestione legge i feedback da
-Firestore, dove scrivono le routine in cloud e il server: nessun campanello
+campanello. La dashboard di gestione legge i feedback da Firestore, dove
+scrivono le routine in cloud e il server: nessun campanello
 arriva fin qui, e senza SDK (che non usiamo) non c'è un canale in ascolto.
 Quindi la pagina DEVE chiedere — ma chiedere costa, e ricaricare tutto
 (5 MB, poi la decifratura) era il motivo per cui la pagina si apriva in dieci
