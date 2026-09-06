@@ -22,10 +22,10 @@ ruolo che ti viene consegnato.
   piena e poi si ripaga a ogni turno per il resto della sessione.
 - **`PATTERNS.md`** prima di toccare la UI o prendere decisioni di design. È
   un **indice**: una riga per pattern, titolo e regola. Il racconto di ogni
-  pattern — il caso che l'ha fatto nascere, i tentativi sbagliati, i
-  riferimenti al codice — sta in `patterns/<slug>.md`, linkato dalla riga:
-  aprilo solo per il pattern che stai per toccare. Se stabilisci un pattern
-  nuovo, scrivi il file e aggiungi la riga nell'indice.
+  pattern sta in `patterns/<slug>.md`, linkato dalla riga: il caso che l'ha
+  fatto nascere, i tentativi sbagliati, i riferimenti al codice. Aprilo solo
+  per il pattern che stai per toccare. Se stabilisci un pattern nuovo, scrivi
+  il file e aggiungi la riga nell'indice.
 
 @filo_filosofia.txt
 @filo_design.txt
