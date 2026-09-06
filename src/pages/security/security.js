@@ -290,6 +290,10 @@
 
       list.appendChild(row);
     }
+    // Il filtro in corso vale anche per la lista appena ridisegnata: se stavi
+    // cercando "pass" e nel frattempo hai tolto l'unica voce che corrispondeva,
+    // la lista deve dire che quella ricerca non ha risultati, non restare muta.
+    applyClipFilter();
   }
 
   async function loadClipboard() {
@@ -657,12 +661,23 @@
     // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('sec-clip-clear').addEventListener('click', clearClipboard);
+    $('sec-clip-search').addEventListener('input', applyClipFilter);
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
-    // La cronologia appunti cresce ALTROVE (ogni copia, in qualunque scheda):
-    // una pagina lasciata aperta mostrerebbe una lista vecchia, e su un dato
-    // che si va a controllare per privacy è la bugia peggiore. Quando la scheda
-    // torna in primo piano la rileggiamo.
+    // La cronologia appunti cresce ALTROVE (ogni copia, in qualunque scheda) e
+    // si accorcia altrove (il "×" del menu "Incolla"): una pagina lasciata
+    // aperta mostrerebbe una lista vecchia, e su un dato che si va a
+    // controllare per privacy è la bugia peggiore. Ogni volta che la cronologia
+    // cambia, il main avvisa le pagine interne e qui la rileggiamo.
+    //
+    // Non poggiamo su "la scheda torna in primo piano": cambiare scheda in Filo
+    // NON spegne la pagina di prima (le schede in secondo piano restano
+    // "visibili" per Chromium, larghe zero), quindi quel momento non arriva mai
+    // e la lista restava ferma a com'era all'apertura. Il visibilitychange resta
+    // come rete di sicurezza per la finestra ridotta a icona, non come unica via.
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.CLIPBOARD_HISTORY_UPDATED) loadClipboard();
+    });
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) loadClipboard();
     });
