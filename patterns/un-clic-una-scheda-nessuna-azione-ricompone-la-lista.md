@@ -67,8 +67,9 @@ silenzio, su una segnalazione che nessuno aveva scelto (#509).
   `tests/feedback-doppio-clic.spec.mjs` (clicca due volte alle STESSE
   coordinate con `page.mouse.click`, non sul locator: un locator seguirebbe il
   pulsante ovunque vada e il difetto non si vedrebbe).
-- **Dove (cronologia appunti):** `renderClipboard`/`segnaSparite` in
-  `src/pages/security/security.js` e il ramo della `×` in `openSubmenu` di
-  `src/content/menu.js`; classi `sn-clip-gone` / `sn-menu-history-gone`. Test:
-  `tests/clipboard-history-stabile.spec.mjs` (stessa tecnica: `hover()` una
-  volta sola, poi due `mouse.down()/up()`).
+- **Dove (cronologia appunti):** `renderClipboard`/`segnaSparite`/
+  `fuocoDopoRimozione` in `src/pages/security/security.js` e il ramo della `×`
+  in `openSubmenu` di `src/content/menu.js`; classi `sn-clip-gone` /
+  `sn-menu-history-gone`. Test: `tests/clipboard-history-stabile.spec.mjs`
+  (stessa tecnica: `hover()` una volta sola, poi due `mouse.down()/up()`) e
+  `tests/clipboard-history-conferma-fuoco.spec.mjs` per il fuoco da tastiera.
