@@ -72,6 +72,10 @@
     $('fp-mode-privacy-desc').textContent = I18n.t('options_fp_mode_privacy_desc');
     $('sec-auto-feedback-label').textContent = I18n.t('options_security_auto_feedback');
     $('sec-auto-feedback-desc').textContent = I18n.t('options_security_auto_feedback_desc');
+    $('sec-clip-title').textContent = I18n.t('security_clipboard_title');
+    $('sec-clip-desc').textContent = I18n.t('security_clipboard_desc');
+    $('sec-clip-empty').textContent = I18n.t('security_clipboard_empty');
+    $('sec-clip-clear').textContent = I18n.t('menu_paste_clear');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('sec-import-btn').textContent = I18n.t('security_import_btn');

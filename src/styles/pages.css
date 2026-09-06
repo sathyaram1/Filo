@@ -805,3 +805,46 @@ section:has(#dictList) .sn-spell-add-row {
   font-size: 12px;
   padding: 2px 8px;
 }
+
+/* Cronologia appunti nella pagina Sicurezza (#256).
+   Il "Rimuovi" qui NON si nasconde fino all'hover come nella cronologia AI:
+   quella è una lista che si legge, questa è una lista che si POTA — chi ci
+   arriva ci arriva apposta per togliere qualcosa (una password copiata per
+   sbaglio), e un bottone invisibile finché non ci passi sopra era esattamente
+   il problema segnalato. Resta discreto nel colore, non nella presenza. */
+.sn-page .sn-clip-list {
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.sn-page .sn-clip-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  transition: background 0.12s ease;
+}
+.sn-page .sn-clip-item + .sn-clip-item { border-top: 1px solid var(--sn-border); }
+.sn-page .sn-clip-item:hover { background: var(--sn-hover); }
+.sn-page .sn-clip-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sn-page .sn-clip-remove {
+  flex: none;
+  font-size: 12px;
+  padding: 2px 8px;
+  color: var(--sn-muted);
+}
+.sn-page .sn-clip-remove:hover { color: var(--sn-fg); }
+.sn-page .sn-clip-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
