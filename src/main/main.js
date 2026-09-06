@@ -163,9 +163,24 @@ app.whenReady().then(async () => {
   // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
   // verifica che i content script si caricano in quest'ultima, cattura
   // screenshot di entrambe, scrive un report e si chiude.
+  //
+  // ORDINE: il sentinel — l'unica cosa che lo script fuori sta aspettando — si
+  // scrive appena lo stato delle schede è quello da riportare, PRIMA delle
+  // catture. Le catture sono diagnostica: aprono altre finestre e aspettano che
+  // finiscano di caricare, cioè dipendono dalla rete e da quanto è carica la
+  // macchina. Scrivendo il sentinel dopo, una cattura lenta diventava
+  // indistinguibile da un'app che non parte — «sentinel non scritto entro 20 s»
+  // su un avvio andato benissimo. Adesso l'esito è deciso dal boot, e il resto
+  // può prendersi il suo tempo (o fallire) senza cambiarlo.
   if (process.env.FILO_SMOKE) {
     const fs = require('node:fs');
     const path = require('node:path');
+    // Aspetta una promessa fino a un tetto: nessuna attesa dello smoke può
+    // durare per sempre, o l'app resta appesa senza dire niente.
+    const entro = (promessa, ms, cosa) => Promise.race([
+      promessa,
+      new Promise((r) => setTimeout(() => { console.log(`[smoke] ${cosa}: scaduti ${ms}ms, proseguo`); r(null); }, ms)),
+    ]);
     const checkReady = async () => {
       const tabs = mainWindow?._filoTabs;
       const ready = tabs && tabs.tabs.length > 0 && tabs.tabs.some((t) => !t.loading);
@@ -173,6 +188,14 @@ app.whenReady().then(async () => {
       // Diamo un attimo al renderer per dipingere dopo did-stop-loading.
       await new Promise((r) => setTimeout(r, 800));
       const outDir = path.dirname(process.env.FILO_SMOKE);
+      // Il verdetto, subito: da qui in poi è tutta diagnostica.
+      try {
+        fs.writeFileSync(process.env.FILO_SMOKE, JSON.stringify({
+          ts: new Date().toISOString(),
+          tabs: tabs.snapshot(),
+        }));
+        console.log('[smoke] sentinel scritto:', process.env.FILO_SMOKE);
+      } catch (e) { console.log('[smoke] sentinel non scritto:', e?.message || String(e)); }
       // Forza la finestra in primo piano. Quando spawn-ata da Node non
       // sempre Windows la mostra automaticamente; senza una composizione
       // visibile, capturePage delle child WebContentsView fallisce con
