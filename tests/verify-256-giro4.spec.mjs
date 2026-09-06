@@ -105,10 +105,16 @@ test('A1 — tolte tutte le voci col mouse fermo sulla lista, «Svuota cronologi
     const clearVisibile = await page.locator('#sec-clip-clear').isVisible();
     console.log('[A1] «Svuota cronologia» ancora visibile a cronologia vuota:', clearVisibile);
     if (clearVisibile) {
-      await page.click('#sec-clip-clear');
+      // Il puntatore NON si muove (muoverlo fa ricomporre la lista e il tasto
+      // sparisce): si arriva al tasto con la tastiera, come farebbe chi ha la
+      // mano ferma sul mouse.
+      await page.evaluate(() => document.getElementById('sec-clip-clear').focus());
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(400);
+      const aperto = await page.locator(CONFIRM_HOST).count();
       const testo = await confirmText(page);
-      console.log('[A1] testo della conferma:', JSON.stringify(testo));
-      await clickConfirm(page, 'cancel');
+      console.log('[A1] dialogo aperto:', aperto, '| testo della conferma:', JSON.stringify(testo));
+      if (aperto) await clickConfirm(page, 'cancel');
       expect(testo, 'la conferma non deve offrire di far sparire 0 voci').not.toMatch(/\b0\b/);
     }
   } finally {
