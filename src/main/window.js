@@ -12,7 +12,7 @@ const SHELL_HEIGHT = 88;
 
 // Finestre invisibili durante i test automatici: perché e come, in
 // `test-window-mode.js` (vale anche per menu e tooltip, che sono finestre a sé).
-const { HIDDEN, OFFSCREEN, hideForTests } = require('./test-window-mode');
+const { HIDDEN, posizioneFuoriSchermo, hideForTests } = require('./test-window-mode');
 
 // Porta la finestra davanti a tutto: serve al primo disegno, perché in alcune
 // configurazioni la WebContentsView appena creata non ha un display surface
@@ -67,7 +67,7 @@ function createMainWindow() {
     backgroundColor: '#222222',
     title: 'Filo',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
-    ...(HIDDEN ? { x: OFFSCREEN.x, y: OFFSCREEN.y, show: false, skipTaskbar: true } : {}),
+    ...(HIDDEN ? { ...posizioneFuoriSchermo(), show: false, skipTaskbar: true } : {}),
     // Chrome-like: la title bar nativa è rimossa, i controlli minimize/maximize/
     // close vivono nella tab-row della shell (vedi src/renderer/shell.html).
     frame: false,
@@ -125,7 +125,7 @@ function createIncognitoWindow() {
     backgroundColor: '#1f1b2e',
     title: 'Filo — Incognito',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
-    ...(HIDDEN ? { x: OFFSCREEN.x, y: OFFSCREEN.y, show: false, skipTaskbar: true } : {}),
+    ...(HIDDEN ? { ...posizioneFuoriSchermo(), show: false, skipTaskbar: true } : {}),
     frame: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
