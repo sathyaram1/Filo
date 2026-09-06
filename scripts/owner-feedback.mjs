@@ -240,12 +240,14 @@ if (isMain) {
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
-  const { controllaArgomenti } = await import('./lib/argomenti.mjs');
-  const male = controllaArgomenti(argv, {
+  const { controllaArgomenti, argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'],
     conValore: ['--branch', '--reason', '--frase'],
-    env: process.env,
-  });
+  };
+  const daNpm = argomentiDaNpm(process.env, OPZ);
+  if (daNpm.nota) { console.error(daNpm.nota); argv = [...argv, ...daNpm.args]; }
+  const male = controllaArgomenti(argv, OPZ);
   if (male) {
     console.error(`RIFIUTATO: ${male}`);
     process.exit(1);
