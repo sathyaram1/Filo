@@ -306,6 +306,7 @@ module.exports = function register(on, ctx) {
     filtered.unshift({ ...e, ts: Date.now() });
     const trimmed = filtered.slice(0, cap);
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, trimmed);
+    clipboardChanged();
     return { ok: true, items: trimmed };
   });
 
@@ -320,7 +321,10 @@ module.exports = function register(on, ctx) {
         break;
       }
     }
-    if (updated) await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, arr);
+    if (updated) {
+      await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, arr);
+      clipboardChanged();
+    }
     return { ok: true, items: arr };
   });
 
@@ -348,6 +352,7 @@ module.exports = function register(on, ctx) {
     const next = arr.filter((x) => keyOf(x) !== target);
     if (next.length !== arr.length) {
       await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, next);
+      clipboardChanged();
     }
     return { ok: true, items: next };
   });
@@ -366,7 +371,8 @@ module.exports = function register(on, ctx) {
   // nessun content script web usa: cronologia AI e costi (vedi sotto).
   on(MSG.CLEAR_CLIPBOARD_HISTORY, async () => {
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
-    return { ok: true };
+    clipboardChanged();
+    return { ok: true, items: [] };
   });
 
   // ── Cronologia interazioni AI + costi ─────────────────────────────────
