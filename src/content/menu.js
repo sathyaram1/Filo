@@ -773,27 +773,36 @@
         if (entry.type === 'image') {
           const icon = document.createElement('span');
           icon.className = 'sn-menu-history-icon';
-          const img = global.SN_ICONS?.image;
-          if (img) icon.innerHTML = img(16);
-          else icon.textContent = '🖼';
+          const iconaGenerica = () => {
+            const img = global.SN_ICONS?.image;
+            if (img) icon.innerHTML = img(16);
+            else icon.textContent = '🖼';
+          };
+          // Due immagini copiate diverse con la stessa iconcina e la stessa
+          // parola "Immagine" si leggono uguali: con la "×" accanto, che
+          // cancella per sempre, non si sa quale delle due si sta buttando. La
+          // miniatura c'è già nella pagina della Sicurezza ed è quella che
+          // toglie il dubbio. Se la pagina ospite vieta le immagini `data:`
+          // (CSP), l'`onerror` rimette l'iconcina di prima.
+          if (entry.dataUrl) {
+            const thumb = document.createElement('img');
+            thumb.className = 'sn-menu-history-thumb';
+            thumb.alt = '';
+            thumb.addEventListener('error', () => { thumb.remove(); iconaGenerica(); });
+            thumb.src = entry.dataUrl;
+            icon.appendChild(thumb);
+          } else {
+            iconaGenerica();
+          }
           const desc = document.createElement('span');
           desc.className = 'sn-menu-label';
-          desc.textContent = entry.description || 'Immagine';
+          desc.textContent = Clip.etichetta(entry);
           b.appendChild(icon);
           b.appendChild(desc);
         } else {
           const lbl = document.createElement('span');
           lbl.className = 'sn-menu-label';
-          const text = (entry.text || '').replace(/\s+/g, ' ').trim();
-          // Una voce di soli spazi disegnata com'è diventa una riga vuota:
-          // stessa etichetta della pagina della sicurezza, così una voce copiata
-          // per sbaglio si riconosce da dovunque la si guardi.
-          const vuota = !text
-            ? ((entry.text || '').length
-              ? I18n.t('clipboard_only_spaces').replace('%d', String((entry.text || '').length))
-              : I18n.t('clipboard_empty_entry'))
-            : '';
-          const mostrato = vuota || text;
+          const mostrato = Clip.etichetta(entry);
           lbl.textContent = mostrato.length > 40 ? mostrato.slice(0, 40) + '…' : mostrato;
           b.appendChild(lbl);
         }
