@@ -1,10 +1,10 @@
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIRM_HOST } from './helpers/confirm.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #256: nella cronologia degli appunti (freccia accanto a "Incolla")
 // l'utente poteva solo incollare le voci, non rimuoverne una singola né svuotare
