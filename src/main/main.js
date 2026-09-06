@@ -310,10 +310,6 @@ app.whenReady().then(async () => {
         } catch (e) { console.log('[smoke] content-script diag failed', e.message); }
         csWin.close();
       }
-      fs.writeFileSync(process.env.FILO_SMOKE, JSON.stringify({
-        ts: new Date().toISOString(),
-        tabs: tabs.snapshot(),
-      }));
       setTimeout(() => app.quit(), 200);
     };
     setTimeout(checkReady, 500);
