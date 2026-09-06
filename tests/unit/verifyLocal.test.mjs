@@ -476,7 +476,7 @@ function depositoUsaEGetta() {
 }
 // Una motivazione vera: sotto gli 80 caratteri il CLI la respinge, e con
 // ragione (una verifica di due parole non è una verifica).
-const LUNGA_FIX = 'Provato inserimento, tasto destro e tema scuro: il resto regge.\n[2] rotto';
+const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2] rotto';
 function vl(casa, ...args) {
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
