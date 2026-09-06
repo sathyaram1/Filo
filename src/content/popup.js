@@ -372,8 +372,8 @@
   }
 
   // ----------------------------------------------------------------
-  // Posa del riquadro — vedi PATTERNS.md § "Un riquadro che si riempie dopo si
-  // ancora dal lato che non si muove"
+  // Posa del riquadro — un riquadro che si riempie dopo si ancora dal lato che
+  // non si muove: patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato-che-non.md
   // ----------------------------------------------------------------
   // Il riquadro nasce VUOTO (circa 300px) e si riempie dopo, mentre la risposta
   // arriva, fino al tetto d'altezza del foglio di stile. Una posa calcolata una
