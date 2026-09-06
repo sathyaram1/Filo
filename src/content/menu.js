@@ -874,7 +874,10 @@
             // toccherebbe ricominciare il giro col tabulatore. Il fuoco passa
             // alla "×" della prima voce ancora viva dopo questa, o al campo di
             // ricerca se non ne resta nessuna.
-            const avevaFuoco = document.activeElement === rm;
+            // `detail === 0` distingue Invio/Barra dal clic del mouse: col
+            // mouse il fuoco non si sposta, o comparirebbe un anello di fuoco
+            // sulla riga vicina a ogni clic.
+            const avevaFuoco = ev.detail === 0 && document.activeElement === rm;
             row.classList.add('sn-menu-history-gone');
             rm.disabled = true;
             rm.title = I18n.t('menu_paste_removed');
