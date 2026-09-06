@@ -169,7 +169,27 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
 
     // Porta il mouse lontano: il sotto-menu si richiude da solo, il menu del
     // tasto destro resta aperto (si chiude solo con un click o Esc).
-    await page.mouse.move(4, 4);
+    //
+    // Il punto "lontano" si CHIEDE alla pagina invece di scriverlo a mano: menu
+    // e sotto-menu nascono dove capita il click e sono grandi quanto li fa il
+    // testo, che cambia coi font di sistema. Un angolo fisso che su una macchina
+    // è vuoto, su un'altra sta ancora dentro il sotto-menu — e allora il mouse
+    // non ne è mai uscito, il timer di chiusura non parte, e il rosso dice
+    // "non si chiude" parlando del test, non di Filo. E ci si arriva muovendosi,
+    // non teletrasportandosi: è quello che fa una mano.
+    const lontano = await page.evaluate(() => {
+      const rects = Array.from(document.querySelectorAll('.sn-menu'))
+        .map((el) => el.getBoundingClientRect());
+      const dentro = (x, y) => rects.some((r) => x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4);
+      const candidati = [
+        [4, 4], [window.innerWidth - 4, 4],
+        [4, window.innerHeight - 4], [window.innerWidth - 4, window.innerHeight - 4],
+      ];
+      const buono = candidati.find(([x, y]) => !dentro(x, y));
+      return buono ? { x: buono[0], y: buono[1] } : null;
+    });
+    expect(lontano, 'nessun angolo della pagina è fuori dal menu').toBeTruthy();
+    await page.mouse.move(lontano.x, lontano.y, { steps: 12 });
     await expect(page.locator('.sn-menu-history-sub')).toHaveCount(0, { timeout: 5000 });
     await expect(page.locator('.sn-menu')).toBeVisible();
 
