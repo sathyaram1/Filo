@@ -72,7 +72,7 @@ const ENV = (casa, port) => ({
   FILO_NO_BEAT: '1',
 });
 
-test('la critica parte strutturata e la fase 2 del server viene stampata; poi la consegna del verificatore', async () => {
+test('la critica parte strutturata, la risposta del server viene stampata intera, poi la consegna', async () => {
   const { casa, sha } = casaSulRamo();
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict'
     ? { reply: { outcome: 'fix', phase2: {

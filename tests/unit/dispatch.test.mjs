@@ -70,7 +70,7 @@ test('applyVerifierVerdict pass: imposta pass e svuota la critica', () => {
   assert.equal(s.verifierCritique, '');
 });
 
-test('applyVerifierVerdict fix: lo specchio locale dice "il verificatore sta correggendo", con la critica coi livelli', () => {
+test('applyVerifierVerdict fix: lo specchio locale registra la critica coi livelli e il seguito del giro', () => {
   const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] rotto qui');
   assert.equal(s.verifierVerdict, 'fix-pending');
   assert.equal(s.verifierCritique, '[2] rotto qui');
@@ -90,7 +90,7 @@ test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti
   assert.deepEqual(VERIFIER_OUTCOMES, ['pass', 'fix', 'stop']);
 });
 
-test('verifierReplyText: la fase 2 del server si stampa intera; pass e stop dicono cosa fare', async () => {
+test('verifierReplyText: la risposta del server si stampa intera; pass e stop dicono cosa fare', async () => {
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
   const fix = verifierReplyText({
     outcome: 'fix',
@@ -565,6 +565,32 @@ test('usageText: elenca tutti i comandi, compresa la scorta --ticket', () => {
   for (const c of ['--ticket', '--preflight', '--record-verifier', '--record-fixed', '--record-secaudit', '--clear-state', '--help']) {
     assert.ok(u.includes(c), `la schermata di aiuto deve nominare ${c}`);
   }
+});
+
+// Stessa ragione, altra superficie: i titoli dei test si stampano a schermo a
+// OGNI esecuzione della suite, e la suite chi verifica la lancia per mestiere,
+// prima di dare il pass. Un titolo che racconta il copione glielo mette davanti
+// senza che lo cerchi. Dentro i file la spiegazione resta: quelli li apre solo
+// chi ci lavora (feedback #565).
+test('i titoli dei test non raccontano il seguito del giro', async () => {
+  const { readdirSync, readFileSync: read } = await import('node:fs');
+  const { join } = await import('node:path');
+  const TESTS = fileURLToPath(new URL('..', import.meta.url));
+  const vietati = [/fase 2/i, /verificatore[^'"]{0,30}corregg/i];
+  const colpevoli = [];
+  const cammina = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { if (!e.name.startsWith('.') && e.name !== 'node_modules') cammina(p); continue; }
+      if (!/\.(test|spec)\.mjs$/.test(e.name)) continue;
+      for (const riga of read(p, 'utf8').split('\n')) {
+        if (!/^\s*(test|it)\(/.test(riga)) continue;
+        if (vietati.some((r) => r.test(riga))) colpevoli.push(`${e.name}: ${riga.trim().slice(0, 90)}`);
+      }
+    }
+  };
+  cammina(TESTS);
+  assert.deepEqual(colpevoli, [], `titoli da riscrivere (il seguito del giro non si anticipa):\n  ${colpevoli.join('\n  ')}`);
 });
 
 // La seconda fase (chi ha criticato corregge) arriva dal server DOPO la
