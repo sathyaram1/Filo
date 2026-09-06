@@ -24,6 +24,15 @@ import { createServer } from 'node:http';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
 
+// Zoom di sistema simulato. Lo schermo di chi sviluppa Filo sta al 125%, quindi
+// `devicePixelRatio` parte da 1.25 e non da 1: bastava quello a far divergere
+// una manciata di spec fra la sua macchina e le routine cloud, dove ogni schermo
+// è al 100%. `FILO_TEST_SCALE=1.25 npx playwright test …` rimette quel fattore
+// anche su Linux, che è l'unico modo di RIVEDERE quei rossi senza avere lo
+// stesso schermo sotto mano.
+const SCALA = Number(process.env.FILO_TEST_SCALE) > 0 ? Number(process.env.FILO_TEST_SCALE) : 0;
+export const argomentiScala = SCALA ? [`--force-device-scale-factor=${SCALA}`] : [];
+
 export const test = base.extend({
   app: async ({}, use) => {
     const userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
@@ -32,7 +41,7 @@ export const test = base.extend({
       // loopback, così l'e2e del blocco siti (siteBlock.spec.mjs) può mettere in
       // blacklist un DOMINIO REALE (con estensione valida) — non un IP, che l'app
       // scarta di proposito — e comunque farlo servire dal testServer locale.
-      args: ['--host-resolver-rules=MAP blocked.test 127.0.0.1', '.'],
+      args: [...argomentiScala, '--host-resolver-rules=MAP blocked.test 127.0.0.1', '.'],
       cwd: APP_ROOT,
       env: {
         ...process.env,
