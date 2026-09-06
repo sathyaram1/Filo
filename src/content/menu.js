@@ -783,7 +783,16 @@
           const lbl = document.createElement('span');
           lbl.className = 'sn-menu-label';
           const text = (entry.text || '').replace(/\s+/g, ' ').trim();
-          lbl.textContent = text.length > 40 ? text.slice(0, 40) + '…' : text;
+          // Una voce di soli spazi disegnata com'è diventa una riga vuota:
+          // stessa etichetta della pagina della sicurezza, così una voce copiata
+          // per sbaglio si riconosce da dovunque la si guardi.
+          const vuota = !text
+            ? ((entry.text || '').length
+              ? I18n.t('clipboard_only_spaces').replace('%d', String((entry.text || '').length))
+              : I18n.t('clipboard_empty_entry'))
+            : '';
+          const mostrato = vuota || text;
+          lbl.textContent = mostrato.length > 40 ? mostrato.slice(0, 40) + '…' : mostrato;
           b.appendChild(lbl);
         }
         b.addEventListener('click', () => {
