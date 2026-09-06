@@ -606,7 +606,15 @@
     });
     // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
+    $('sec-clip-clear').addEventListener('click', clearClipboard);
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
+    // La cronologia appunti cresce ALTROVE (ogni copia, in qualunque scheda):
+    // una pagina lasciata aperta mostrerebbe una lista vecchia, e su un dato
+    // che si va a controllare per privacy è la bugia peggiore. Quando la scheda
+    // torna in primo piano la rileggiamo.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) loadClipboard();
+    });
   });
 })();
