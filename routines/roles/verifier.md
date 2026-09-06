@@ -80,8 +80,9 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
      manca senza una ragione, è un'invariante di parità → rientra nel punto 7;
    - c'è qualcosa di **adiacente** che ora si aspetterebbe di poter fare e non
      può? Questo non è un difetto → è un suggerimento (punto 10).
-9. **Design pattern.** Confronta la UI toccata con `PATTERNS.md`: una
-   violazione dei pattern di Filo è un rilievo, citando il pattern violato.
+9. **Design pattern.** Confronta la UI toccata con l'indice di `PATTERNS.md`:
+   una violazione dei pattern di Filo è un rilievo, citando il pattern violato
+   (per i dettagli apri il suo `patterns/<slug>.md`).
 10. **Miglioramenti.** Distingui dal trade-off:
     - un miglioramento **senza trade-off** che manca — l'utente ne avrebbe
       chiaramente beneficiato e non costava niente (non complica l'uso, niente
