@@ -936,7 +936,7 @@ async function recordFixed(id, report = '', frase = '') {
   if (sent.outcome !== 'ok') {
     return { rejected: true, serverDown: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
   }
-  // Chi consegna: il verificatore che corregge (#561) o il correttore separato
+  // Chi consegna: chi ha corretto dentro il giro (#561) o il correttore separato
   // del riallineamento. Il marcatore locale del ruolo lo sa; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
   const chi = readRole(ROOT) === 'verifier' ? 'verifier' : 'fixer';

@@ -113,7 +113,7 @@
     // che attiva/disattiva l'operatività automatica di Filo (routine/red-team).
     // Booleano persistito; default false (spento).
     AUTO_MODE: 'filo_auto_mode',
-    // Cache locali dei tre bilanci del verificatore che corregge (tab
+    // Cache locali dei tre bilanci dei giri di correzione (tab
     // Automazioni, feedback #561). La FONTE DI VERITÀ è il doc Firestore
     // config/routines (campi `cap2`, `cap1`, `cap0`; li applica il server
     // quando registra la critica): queste chiavi servono solo a mostrare

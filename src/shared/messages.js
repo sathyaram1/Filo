@@ -363,7 +363,7 @@
     // Insieme viaggiano `autoApprove` e `proberWhenIdle`.
     AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled } | { ok:false, error }
     AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled? } → { ok, … } | { ok:false, error }
-    // I tre bilanci del verificatore che corregge (doc config/routines, campi
+    // I tre bilanci dei giri di correzione (doc config/routines, campi
     // `cap2`, `cap1`, `cap0` — feedback #561) e il testo della fase 2
     // (`fixInstructions`, vuoto = quello del server):
     //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
