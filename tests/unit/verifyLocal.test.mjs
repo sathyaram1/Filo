@@ -577,7 +577,7 @@ test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la
 test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un pass con modifiche non salvate non dice «Si può pubblicare»', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  const testo = 'Provato.\n[2] rotto';
+  const testo = LUNGA_FIX;
   assert.match(vl(casa, 'critica', testo).out, /c'è da correggere/);
   const st = vl(casa, 'status');
   assert.match(st.out, /giro di correzione aperto/);
