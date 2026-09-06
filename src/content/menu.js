@@ -692,9 +692,10 @@
       const list = document.createElement('div');
       list.className = 'sn-menu-history-list';
 
-      const searchTextOf = (entry) =>
-        (entry.type === 'image' ? (entry.description || 'Immagine') : (entry.text || ''))
-          .replace(/\s+/g, ' ').trim();
+      // Come si legge una voce: la decide il modulo condiviso della cronologia
+      // appunti, così menu e pagina della Sicurezza non divergono.
+      const Clip = global.SN_CLIPBOARD;
+      const searchTextOf = (entry) => Clip.etichetta(entry).replace(/\s+/g, ' ').trim();
 
       // Messaggi di stato (creati prima così i gestori possono riferirli):
       // - noResults: nessuna corrispondenza nella ricerca;
