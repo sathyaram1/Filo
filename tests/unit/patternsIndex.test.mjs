@@ -30,7 +30,7 @@ const TETTO_INDICE = 60 * 1024;
 
 const testo = readFileSync(INDICE, 'utf8');
 
-// Una riga dell'indice: - **[Titolo](patterns/slug.md)** — regola
+// Una riga dell'indice: - **[Titolo](patterns/<slug>.md)** — regola
 const RIGA = /^- \*\*\[(.+)\]\(patterns\/([a-z0-9-]+)\.md\)\*\*\s+—\s+(.*)$/;
 
 const voci = testo
