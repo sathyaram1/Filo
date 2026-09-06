@@ -152,7 +152,39 @@ il livello non viene eseguito.
 
 - **Regola operativa:** quando aggiungi un'azione Filo, registrala in
   `actionLevels.js` con livello + `describe()` (la spiegazione in chiaro per il
-  popup). Per le preferenze il livello è per-setter in `preferences.js`
+  popup) E in `actionTools.js` con descrizione + parametri: è lì che il modello
+  la vede, come strumento nativo (tool calling), non più in un elenco nel
+  prompt. Il nome dello strumento È il tipo dell'azione. La sentinella
+  `tests/unit/actionTools.test.mjs` pretende che i due elenchi combacino: uno
+  strumento senza livello non si esegue, un livello senza strumento non si può
+  chiamare. Le descrizioni che dipendono dal sistema (shell, percorsi) sono
+  funzioni di `{ sistema }`, mai testo fisso con un esempio di Windows.
+- **L'esito di un'azione ha due assi, non uno.** `executed` dice se è andata
+  a buon fine; `kept` dice se in chat c'è qualcosa da CLICCARE (un bottone).
+  Un appunto scritto o una lezione fissata sono `executed: true, kept: false`.
+  Chi costruisce l'esito per il modello legge `executed` (e `rejected` per
+  «non è un'azione»), mai `kept`: leggere `kept` come «fallita» faceva
+  ritentare al modello appunti e lezioni già salvati, duplicandoli.
+- **Il diario racconta TUTTO quello che Filo fa, e non promette il
+  contrario.** `kept: false` non vuol dire invisibile: l'azione torna comunque
+  alla chat marcata `_traccia` e diventa una riga. Prima sparivano appunto,
+  lezione, spunta dell'accoglienza, proxy e stile della pagina: un turno di
+  sole azioni «silenziose» non lasciava nemmeno il blocco, e l'utente non
+  sapeva dove fosse finito il suo appunto. Ogni azione porta anche `_executed`:
+  a `false` la riga dice cosa NON è riuscito e il riassunto non la conta —
+  un documento inesistente diceva «Leggo il documento…» e si riassumeva in
+  «letto un documento». Riga e bottone non si escludono: l'appunto ha la riga
+  che racconta e il bottone che porta all'editor; un'azione in attesa di
+  conferma ha la riga «Conferma chiesta …» e il bottone per rispondere (senza
+  quella riga un turno di sola richiesta non lasciava blocco, e alla conferma
+  non c'era più dove scrivere che era stata data).
+- **Quello che succede DOPO la risposta deve arrivare al modello.** Una
+  conferma data nel popup (livello 2 e 3) e le azioni già eseguite in un
+  tentativo interrotto da un guasto non stanno in nessun messaggio: rientrano
+  nel contesto del turno successivo come righe di sistema
+  (`confirmedActionsForPrompt`, `interruptedActionsForPrompt`). Senza, a «l'hai
+  attivato?» il modello tirava a indovinare, e un «Riprova» rifaceva il timer
+  che aveva appena messo. Per le preferenze il livello è per-setter in `preferences.js`
   (`level: 2` su ciò che tocca sicurezza/shell). La sospensione e la conferma
   passano da `needsConfirm` → bottone in chat → `MSG.FILO_CONFIRM_ACTION`; il
   main **riclassifica** alla conferma, non si fida del client.
@@ -2535,10 +2567,24 @@ valutare dentro la pagina. Due copie sarebbero divergute al primo ritocco.
 
 Sopra la risposta finale di Filo nella chat della home c'è un blocco smorzato
 che raccoglie tutto ciò che Filo fa **prima di rispondere** (#521). Filo non
-«ragiona e basta»: agisce, spesso su più turni automatici (ragiona, cerca,
+«ragiona e basta»: agisce, in più giri dentro lo stesso turno (ragiona, cerca,
 legge, ragiona ancora). Per l'utente è un lavoro solo, e il blocco è uno solo
-(`createActivity()` in `src/pages/dashboard/dashboard.js`, creato da chi guida
-la sequenza dei turni; stili `.dash-activity*` in `dashboard.css`).
+(`createActivity()` in `src/pages/dashboard/dashboard.js`; stili
+`.dash-activity*` in `dashboard.css`).
+
+**Chi guida i giri è il main, non la scheda.** Le azioni sono strumenti nativi
+del modello (tool calling: `src/shared/actionTools.js`, il ciclo in
+`handleFiloChat`): il modello chiama un'azione, il main la esegue, gli rimanda
+l'esito come messaggio `tool` e lo richiama, finché risponde senza chiamare
+niente. La scheda riceve tre canali e li mette nel blocco nell'ordine in cui
+arrivano: `filo:reasoning` (ragionamento), `filo:answer` (testo) e
+`filo:action` — `start` appena il modello NOMINA un'azione (la riga in testa
+dice subito «Cerco sul web…», prima degli argomenti), `done` a esecuzione
+avvenuta (la riga vera, con l'esito), `round` a fine di un giro con azioni (il
+testo scritto in quel giro era una nota di lavoro: entra nel blocco e la bolla
+riparte). Non esistono più messaggi di spinta mandati dalla scheda come turni
+«utente» interni. Il modello che ignora gli strumenti e scrive il vecchio JSON
+nel testo viene ancora letto (`legacyEnvelope`), senza ritentativi.
 
 - **Chiuso di default, sempre.** Il 90 % delle volte l'utente vuole che il
   lavoro sia invisibile. La riga in testa dice cosa succede ADESSO: rotella e
@@ -2568,9 +2614,11 @@ la sequenza dei turni; stili `.dash-activity*` in `dashboard.css`).
 - Perché una riga compaia il main deve RESTITUIRE l'azione (`kept: true`):
   timer e sveglie prima venivano scartati dopo l'esecuzione e non arrivavano
   mai alla chat.
-- Il ragionamento di ogni turno entra nello storico del thread (`reasoning`,
-  `reasoningMs`) ma NON torna nel prompt (vedi idee: con gli strumenti nativi
-  ha un posto suo).
+- Il ragionamento di ogni turno entra nello storico del thread come testo
+  (`reasoning`, `reasoningMs`, per la lettura) e come blocchi strutturati del
+  fornitore (`reasoningDetails`): questi ultimi tornano al modello nel
+  messaggio dell'assistente (`reasoning_details`), dentro il giro e al turno
+  dopo, così riprende da dove aveva lasciato invece di ripensare tutto.
 - Senza niente da raccontare il blocco si toglie da solo: nessun residuo.
 - Test: `tests/dashboard-chat-attivita.spec.mjs` (con screenshot in
   `tests/agent/.out/attivita-*.png`). Gli spec che asseriscono una traccia

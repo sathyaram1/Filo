@@ -52,6 +52,10 @@
       origin: entry.origin || '',
       costEur: entry.costEur || 0,
       usage: entry.usage || null,
+      // Tempi del turno (ms dalla partenza della richiesta): primo pezzo di
+      // ragionamento, prima parola, prima azione, fine. Senza questi numeri
+      // ogni scelta sui modelli è a occhio.
+      timing: (entry.timing && typeof entry.timing === 'object') ? entry.timing : null,
     };
     items.unshift(full);
     // Hard cap items

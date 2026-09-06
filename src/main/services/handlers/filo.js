@@ -29,7 +29,10 @@ module.exports = function register(on, ctx) {
       console.error('[Filo] turno di chat fallito', e);
       const CE = globalThis.SN_CHAT_ERRORS;
       const error = CE ? CE.sentence(e) : 'Qualcosa è andato storto. Riprova.';
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN' };
+      // Le azioni già eseguite prima del guasto: la chat le tiene nello
+      // storico, così il tentativo successivo sa cosa era già stato fatto.
+      const actions = Array.isArray(e && e.filoActions) ? e.filoActions : [];
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', actions };
     }
   });
 

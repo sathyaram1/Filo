@@ -112,7 +112,7 @@
     },
     APRI_FILE: {
       level: 1,
-      describe: (a) => `Aprire il file ${a.path || ''}`.trim(),
+      describe: (a) => `Aprire il file ${a.percorso || a.path || ''}`.trim(),
     },
     TIMER: {
       level: 1,
@@ -302,6 +302,11 @@
         const base = `Filo vuole impostare: ${built.label}.`;
         return built.risk ? `${base}\n\n${built.risk}` : base;
       },
+      // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
+      describeDone: (a) => {
+        const built = prefBuilt(a);
+        return built ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
+      },
     },
     IMPOSTA_ESTETICA: {
       // Cambio di un token estetico (colore, font, raggio, opacità) su richiesta
@@ -438,5 +443,14 @@
     try { return entry.describe(action) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe };
+  // La stessa cosa a fatto compiuto, per l'esito che torna al modello: dove
+  // il registro non distingue («Avviare il timer “pasta”») vale `describe`.
+  function describeDone(action) {
+    if (!action || typeof action !== 'object') return '';
+    const entry = REGISTRY[String(action.type || '').toUpperCase()];
+    if (!entry) return '';
+    try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

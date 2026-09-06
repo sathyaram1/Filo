@@ -135,6 +135,16 @@ test('un errore tecnico qualunque diventa una frase generica, non lo stack', () 
   assert.match(out, /riprova/i);
 });
 
+test('nessun host con gli strumenti per il modello scelto: dice di cambiare modello, non «riprova»', () => {
+  const e = new Error('OpenRouter 404: {"error":{"message":"No endpoints found that support tool use","code":404}}');
+  e.status = 404;
+  e.provider = 'openrouter';
+  const out = CE.friendly(e);
+  assert.match(out, /strumenti/);
+  assert.match(out, /Modelli predefiniti/);
+  assert.ok(!/riprova tra qualche minuto/i.test(out), out);
+});
+
 test('sentence(): stessa frase con l\'iniziale maiuscola, per la bolla da sola', () => {
   const clause = CE.friendly(new TypeError('fetch failed'));
   const sentence = CE.sentence(new TypeError('fetch failed'));

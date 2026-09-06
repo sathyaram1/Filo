@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.219', date: '2026-09-05',
+      features: [
+        'Nella chat della nuova scheda Filo fa tutto in un turno solo: cerca, legge il risultato, mette la sveglia e poi risponde, senza chiudere il messaggio a metà per dirti cosa farà dopo. Nel blocco sopra la risposta vedi ogni passo mentre succede: il ragionamento, ogni azione appena la decide («Cerco sul web…»), l\'esito, le due parole che scrive a metà lavoro.',
+        'Nella cronologia AI ogni richiesta dice quanto ha aspettato: quando ha cominciato a ragionare, quando ha scritto la prima parola, quando ha finito. Così si vede quale modello è davvero veloce.',
+      ],
+    },
+    {
       version: '0.2.218', date: '2026-09-05',
       features: [
         'La voce naturale della lettura ad alta voce segue il modello scelto: cambiando modello di lettura, in Preferenze trovi le sue voci (per MAI-Voice di Microsoft, per esempio, Elsa, Isabella e Diego in italiano) e la lettura parte con quella della lingua del testo. Per un modello che Filo non conosce puoi scrivere a mano il nome della voce, e se il modello risponde elencando le sue, Filo le impara da solo.',

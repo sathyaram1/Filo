@@ -64,12 +64,15 @@
     throw lastErr;
   }
 
-  async function complete({ provider, apiKey, model, messages, reasoning, providerRouting, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, reasoning, providerRouting, signal });
+  // `tools` / `toolChoice` (tool calling nativo, vedi src/shared/actionTools.js)
+  // e `onToolCall` (una chiamata appena il modello ne pronuncia il nome, in
+  // streaming) passano tali e quali al provider.
+  async function complete({ provider, apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal });
+  async function streamComplete({ provider, apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
   }
 
   async function listModels({ provider, apiKey }) {
@@ -80,7 +83,7 @@
   // usato) al risultato. Ogni attempt può portare il proprio `model` (id
   // provider-specifico risolto dal nickname): se assente si usa il `model`
   // globale per retro-compatibilità.
-  async function completeWithFallback({ attempts, model, messages, signal, onFallback }) {
+  async function completeWithFallback({ attempts, model, messages, tools, toolChoice, signal, onFallback }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
@@ -88,7 +91,7 @@
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
           apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
-          providerRouting: a.providerRouting, messages, signal,
+          providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
         }));
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
@@ -110,7 +113,7 @@
   // provider successivo emettiamo `onReset` così il chiamante butta il buffer
   // parziale e riparte pulito (#273). onReset viene chiamato SOLO se l'attempt
   // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
-  async function streamCompleteWithFallback({ attempts, model, messages, signal, onDelta, onReasoning, onFallback, onReset }) {
+  async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
@@ -124,9 +127,10 @@
         const r = await withNetworkRetry(
           () => getProvider(a.provider).streamComplete({
             apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
-            providerRouting: a.providerRouting, messages, signal,
+            providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
+            onToolCall: onToolCall ? (c) => { emitted = true; onToolCall(c); } : onToolCall,
           }),
           () => {
             if (!emitted) return true;

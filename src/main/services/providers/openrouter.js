@@ -60,7 +60,104 @@
       p.sort = routing.sort;
     }
     if (routing.allowFallbacks === false) p.allow_fallbacks = false;
+    // Con gli strumenti (tool calling) in richiesta, solo gli host che li
+    // supportano davvero: senza questo il router può passare a un host che
+    // ignora `tools` in silenzio, e il modello risponde a parole invece di agire.
+    if (routing.requireParameters === true) p.require_parameters = true;
     return Object.keys(p).length ? p : null;
+  }
+
+  // Le definizioni degli strumenti nel corpo della richiesta, se ci sono.
+  // `toolChoice` ('auto' | 'none' | 'required') è facoltativo.
+  function toolsFields(tools, toolChoice) {
+    const out = {};
+    if (Array.isArray(tools) && tools.length) {
+      out.tools = tools;
+      if (toolChoice) out.tool_choice = toolChoice;
+    }
+    return out;
+  }
+
+  // Le chiamate agli strumenti di una risposta NON in streaming, nella forma
+  // piatta che usa il resto di Filo: { id, name, arguments (stringa JSON) }.
+  function flatToolCalls(list) {
+    const out = [];
+    for (const c of Array.isArray(list) ? list : []) {
+      if (!c || !c.function) continue;
+      out.push({
+        id: String(c.id || ''),
+        name: String(c.function.name || ''),
+        arguments: typeof c.function.arguments === 'string' ? c.function.arguments : JSON.stringify(c.function.arguments || {}),
+      });
+    }
+    return out;
+  }
+
+  // In streaming le chiamate arrivano a pezzi: un delta porta l'indice, i
+  // primi anche id e nome, gli altri frammenti degli argomenti da accodare.
+  // `onStart(call)` avvisa appena si conosce il NOME di una chiamata nuova: la
+  // chat lo usa per dire subito «Cerco sul web…», prima che gli argomenti
+  // siano finiti di arrivare.
+  function createToolCallAccumulator(onStart) {
+    const calls = [];
+    const byIndex = new Map();
+    return {
+      push(deltas) {
+        for (const d of Array.isArray(deltas) ? deltas : []) {
+          if (!d) continue;
+          const idx = Number.isInteger(d.index) ? d.index : calls.length;
+          let call = byIndex.get(idx);
+          if (!call) {
+            call = { id: '', name: '', arguments: '', _started: false };
+            byIndex.set(idx, call);
+            calls.push(call);
+          }
+          if (d.id) call.id = String(d.id);
+          const fn = d.function || {};
+          if (fn.name) call.name += String(fn.name);
+          if (typeof fn.arguments === 'string') call.arguments += fn.arguments;
+          if (call.name && !call._started) {
+            call._started = true;
+            try { onStart && onStart({ id: call.id, name: call.name }); } catch (_) {}
+          }
+        }
+      },
+      list() {
+        return calls.filter((c) => c.name).map(({ id, name, arguments: args }) => ({ id, name, arguments: args }));
+      },
+    };
+  }
+
+  // Il ragionamento arriva anche come blocchi strutturati (`reasoning_details`:
+  // testo, riassunto o blocchi cifrati con firma), a frammenti indicizzati. Li
+  // ricomponiamo per indice concatenando i campi testuali, così da poterli
+  // RIMANDARE tali e quali nel messaggio dell'assistente al giro dopo: il
+  // fornitore li reinserisce e il modello riprende da dove aveva lasciato
+  // invece di ripensare tutto.
+  function createReasoningDetailsAccumulator() {
+    const items = [];
+    const byIndex = new Map();
+    const TEXT_FIELDS = ['text', 'summary', 'data'];
+    return {
+      push(deltas) {
+        for (const d of Array.isArray(deltas) ? deltas : []) {
+          if (!d || typeof d !== 'object') continue;
+          const idx = Number.isInteger(d.index) ? d.index : items.length;
+          let it = byIndex.get(idx);
+          if (!it) {
+            it = { ...d };
+            byIndex.set(idx, it);
+            items.push(it);
+            continue;
+          }
+          for (const k of Object.keys(d)) {
+            if (TEXT_FIELDS.includes(k) && typeof d[k] === 'string') it[k] = (typeof it[k] === 'string' ? it[k] : '') + d[k];
+            else if (d[k] != null && k !== 'index') it[k] = d[k];
+          }
+        }
+      },
+      list() { return items.slice(); },
+    };
   }
 
   // Marcatura esplicita della parte riusabile: NON serve per i modelli che Filo
@@ -116,8 +213,8 @@
     }));
   }
 
-  async function complete({ apiKey, model, messages, reasoning, providerRouting, signal }) {
-    const body = { model, messages, stream: false };
+  async function complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
+    const body = { model, messages, stream: false, ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting);
@@ -138,10 +235,14 @@
       throw err;
     }
     const data = await res.json();
-    const text = data.choices?.[0]?.message?.content || '';
+    const message = data.choices?.[0]?.message || {};
+    const text = message.content || '';
     const usage = data.usage || {};
     return {
       text,
+      toolCalls: flatToolCalls(message.tool_calls),
+      reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
+      finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
@@ -151,9 +252,12 @@
     };
   }
 
-  // Streaming SSE — onDelta(textChunk) chiamato per ogni delta. Ritorna { text, usage } finale.
-  async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, onDelta, onReasoning, signal }) {
-    const reqBody = { model, messages, stream: true };
+  // Streaming SSE — onDelta(textChunk) chiamato per ogni delta di testo,
+  // onReasoning(chunk) per il ragionamento, onToolCall({ id, name }) appena si
+  // conosce il nome di una chiamata a uno strumento. Ritorna
+  // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
+  async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    const reqBody = { model, messages, stream: true, ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
@@ -180,6 +284,9 @@
     let buffer = '';
     let fullText = '';
     let servedBy = null;
+    let finishReason = null;
+    const calls = createToolCallAccumulator(onToolCall);
+    const details = createReasoningDetailsAccumulator();
     let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
 
     while (true) {
@@ -199,11 +306,15 @@
           // l'ultimo): teniamo l'ultimo valore visto.
           const sb = extractServedBy(obj);
           if (sb) servedBy = sb;
-          const choiceDelta = obj.choices?.[0]?.delta || {};
+          const choice = obj.choices?.[0] || {};
+          const choiceDelta = choice.delta || {};
+          if (choice.finish_reason) finishReason = choice.finish_reason;
           const reasoning = choiceDelta.reasoning;
           if (reasoning) {
             try { onReasoning && onReasoning(reasoning); } catch (_) {}
           }
+          if (choiceDelta.reasoning_details) details.push(choiceDelta.reasoning_details);
+          if (choiceDelta.tool_calls) calls.push(choiceDelta.tool_calls);
           const delta = choiceDelta.content;
           if (delta) {
             fullText += delta;
@@ -221,7 +332,9 @@
         }
       }
     }
-    return { text: fullText, servedBy, usage };
+    return {
+      text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy, usage,
+    };
   }
 
   // Errore HTTP con status e provider strutturati (come per le chat, #331).
@@ -364,6 +477,7 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy,
+    createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
     ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

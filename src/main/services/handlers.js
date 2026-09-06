@@ -603,7 +603,60 @@ async function handleTranscription({ settings, payload, origin, signal }) {
   throw lastErr || new Error('Nessun modello di dettatura disponibile');
 }
 
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, signal = null, noCache = false }) {
+// Il testo della risposta in diretta. Il campo "text" dentro il JSON di
+// risposta era il formato vecchio della chat: un modello che ancora lo scrive
+// (o il doppione di un test) va letto allo stesso modo, ma un modello che
+// risponde in prosa — il caso normale con gli strumenti nativi — va passato
+// così com'è, senza aspettare un JSON che non arriverà. Si decide alla prima
+// riga: se comincia con `{` (o con un recinto ```), è JSON.
+function createAnswerStreamer(onText) {
+  const StreamJson = globalThis.SN_STREAM_JSON;
+  let mode = null; // null = indeciso, 'json' | 'plain'
+  let held = '';
+  let jsonStreamer = null;
+  const decide = (force) => {
+    const t = held.replace(/^\s+/, '');
+    if (!t && !force) return;
+    if (/^(```(?:json)?\s*)?\{/.test(t)) {
+      mode = 'json';
+      jsonStreamer = StreamJson ? StreamJson.createTextStreamer('text') : null;
+    } else if (t.length >= 8 || force || !/^(`{1,3}(j(s(o(n)?)?)?)?\s*)?$/.test(t)) {
+      mode = 'plain';
+    } else {
+      return; // potrebbe essere l'inizio di un recinto: aspetta
+    }
+    const buf = held;
+    held = '';
+    emit(buf);
+  };
+  const emit = (chunk) => {
+    if (!chunk) return;
+    if (mode === 'json') {
+      if (!jsonStreamer) return;
+      try {
+        const { delta } = jsonStreamer.push(chunk);
+        if (delta) onText({ delta });
+      } catch (_) {}
+    } else {
+      onText({ delta: chunk });
+    }
+  };
+  return {
+    push(chunk) {
+      if (mode) { emit(chunk); return; }
+      held += chunk;
+      decide(false);
+    },
+    // Fine dello stream: quello che era rimasto in attesa esce comunque.
+    flush() { if (!mode) decide(true); },
+    reset() { mode = null; held = ''; jsonStreamer = null; },
+  };
+}
+
+// Gli strumenti si passano all'istante e i tempi si MISURANO (idee «Latenza
+// della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
+// occhio. `timing` finisce nella cronologia AI accanto al costo.
+async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false }) {
   const settings = await getEffectiveSettings();
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
@@ -633,9 +686,12 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // ai ritentativi sul JSON illeggibile: la chiave della cache e' identica fra
   // i tentativi, e senza questo salto il retry rileggerebbe all'infinito la
   // stessa risposta rotta appena salvata (trovato dalla verifica indipendente).
-  const cached = noCache ? null : await AICache.get({ provider: settings.provider, model, messages });
+  // Con gli strumenti in richiesta la cache si salta: conserva solo il testo, e
+  // una risposta fatta di chiamate rientrerebbe come una risposta muta.
+  const hasTools = Array.isArray(tools) && tools.length > 0;
+  const cached = (noCache || hasTools) ? null : await AICache.get({ provider: settings.provider, model, messages });
   if (cached) {
-    return { text: cached.text, model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
+    return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
   const attemptsRaw = buildAttemptChain(settings, model, action);
@@ -651,23 +707,24 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // suo valore mano a mano dal buffer grezzo (streamingJson) ed emettiamo solo i
   // caratteri già sicuri, così la bolla si riempie mentre il modello scrive senza
   // aspettare le "actions" in coda.
-  const StreamJson = globalThis.SN_STREAM_JSON;
-  const textStreamer = (onText && StreamJson) ? StreamJson.createTextStreamer('text') : null;
-  const result = (onReasoning || onText)
+  // Tempi del turno, dal momento in cui la richiesta parte: primo pezzo di
+  // ragionamento, prima parola (o prima azione nominata), fine. In millisecondi.
+  const t0 = Date.now();
+  const timing = { firstReasoningMs: null, firstTextMs: null, firstToolMs: null, totalMs: 0 };
+  const mark = (k) => { if (timing[k] == null) timing[k] = Date.now() - t0; };
+  const textStreamer = onText ? createAnswerStreamer(onText) : null;
+  const result = (onReasoning || onText || onToolCall)
     ? await (async () => {
         let acc = '';
         const r = await Providers.streamCompleteWithFallback({
-          attempts, messages, signal,
+          attempts, messages, tools, toolChoice, signal,
           onDelta: (d) => {
             acc += d;
-            if (textStreamer) {
-              try {
-                const { delta } = textStreamer.push(d);
-                if (delta) onText({ delta });
-              } catch (_) {}
-            }
+            mark('firstTextMs');
+            if (textStreamer) textStreamer.push(d);
           },
-          onReasoning: (t) => { try { onReasoning && onReasoning(t); } catch (_) {} },
+          onReasoning: (t) => { mark('firstReasoningMs'); try { onReasoning && onReasoning(t); } catch (_) {} },
+          onToolCall: (c) => { mark('firstToolMs'); try { onToolCall && onToolCall(c); } catch (_) {} },
           // Provider caduto a metà stream → il buffer contiene testo parziale
           // del tentativo fallito: azzeralo prima del tentativo successivo (#273).
           // Anche il testo già mostrato in chat va buttato e riscritto dal
@@ -677,9 +734,13 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
             if (textStreamer) { textStreamer.reset(); try { onText({ reset: true }); } catch (_) {} }
           },
         });
+        if (textStreamer) textStreamer.flush();
         return { ...r, text: r.text != null ? r.text : acc };
       })()
-    : await Providers.completeWithFallback({ attempts, messages, signal });
+    : await Providers.completeWithFallback({ attempts, messages, tools, toolChoice, signal });
+  timing.totalMs = Date.now() - t0;
+  const toolCalls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
+  const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
   const usedProvider = result.provider || attempts[0].provider;
   const concreteModel = result.model || attempts[0].model;
   const { servedBy, violation } = noteServedProvider(settings, action, result);
@@ -698,15 +759,23 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     // resta fuori dalla cronologia.
     && action !== ACTIONS.MANAGE_SEARCH
   ) {
+    // Le azioni chiamate in questo giro stanno nell'output della voce: un giro
+    // fatto solo di chiamate non è una risposta vuota.
+    const calledOut = toolCalls.length
+      ? `${result.text ? `${result.text}\n\n` : ''}[Azioni: ${toolCalls.map((c) => c.name).join(', ')}]`
+      : result.text;
     await History.append({
       action, provider: usedProvider, model: concreteModel, servedBy,
       policyViolation: violation,
-      input: payload, output: result.text, origin, costEur, usage: result.usage,
+      input: payload, output: calledOut, origin, costEur, usage: result.usage, timing,
     });
   }
 
-  AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
-  return { text: result.text, model: concreteModel, provider: usedProvider, costEur, usage: result.usage };
+  if (!hasTools) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+  return {
+    text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
+    model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
+  };
 }
 
 // ─── Streaming via Electron IPC ─────────────────────────────────────────────
@@ -1050,6 +1119,12 @@ function describeTimerEntry(t) {
   return `Sveglia ${label} ${hhmm}${rep ? ` (${rep})` : ''}`;
 }
 
+// Un'etichetta scritta dal modello, ripulita dai caratteri di controllo (byte
+// nullo compreso): finisce nel diario del lavoro e nella colonna dei timer.
+function cleanLabel(v) {
+  return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+}
+
 async function executeFiloAction(action, { confirmed = false, sender = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -1223,7 +1298,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       }
       case 'TIMER': {
         const seconds = Number(action.seconds || action.secondi || 0);
-        const label = String(action.label || action.etichetta || 'Timer');
+        // Niente caratteri di controllo (byte nullo compreso) in un'etichetta
+        // che poi va nel diario e nella colonna dei timer.
+        const label = cleanLabel(action.label || action.etichetta) || 'Timer';
         const entry = await FiloMem.addTimer({ label, seconds });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
@@ -1234,7 +1311,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // nella lista dei timer con scadenza assoluta e riusa lo stesso flusso
         // ringing/suoneria dei timer (+ notifica di sistema dal watcher main).
         const entry = await FiloMem.addAlarm({
-          label: String(action.label ?? action.etichetta ?? '').trim(),
+          label: cleanLabel(action.label ?? action.etichetta),
           time: action.time ?? action.orario ?? action.at ?? '',
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
         });
@@ -1250,9 +1327,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const r = await FiloMem.removeTimersByRef(ids ? { ids } : timerRefOf(action));
         const removed = r.removed || [];
         if (removed.length) broadcastLiveUpdate();
+        // `kept`: la chat la racconta come riga nel blocco di attività
+        // («Cancellata · …»): se si può mettere una sveglia dalla chat, si
+        // deve vedere anche quando la si toglie.
         return {
           executed: removed.length > 0,
-          kept: false,
+          kept: removed.length > 0,
           output: { removed: removed.map(describeTimerEntry) },
         };
       }
@@ -1267,7 +1347,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         if (updated.length) broadcastLiveUpdate();
         return {
           executed: updated.length > 0,
-          kept: false,
+          kept: updated.length > 0,
           output: { updated: updated.map(describeTimerEntry) },
         };
       }
@@ -1896,6 +1976,130 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
+// output dei comandi, dettagli delle capacità, risultati di ricerca, file e
+// documenti letti, documenti di trasparenza. Sono DATI di sistema (o, per i
+// documenti, materiale da leggere): mai istruzioni.
+function observationsForPrompt(actions) {
+  return [
+    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
+    confirmedActionsForPrompt(actions),
+  ].filter(Boolean).join('\n\n');
+}
+
+// Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
+// sono state eseguite PRIMA che tutto si fermasse, e ripeterle vuol dire un
+// secondo timer, un secondo appunto. Dato di sistema, non istruzione.
+function interruptedActionsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const righe = [];
+  for (const a of actions) {
+    if (!a || a._executed === false || a._confirm) continue;
+    let cosa = String(a.type || '').toUpperCase();
+    try {
+      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      if (d) cosa = d.replace(/\.+\s*$/, '');
+    } catch (_) {}
+    righe.push(`- ${cosa}`);
+  }
+  return righe.length
+    ? `[Il tentativo si è interrotto per un guasto, ma queste cose ERANO GIÀ STATE FATTE:\n${righe.join('\n')}\nNon rifarle: riprendi da qui.]`
+    : '';
+}
+
+// Le azioni che l'utente ha CONFERMATO nel popup dopo che il turno era già
+// finito (livello 2 e 3). Il modello non le vede in nessun altro modo: quando
+// ha emesso l'azione era «in attesa di conferma», e il sì è arrivato dopo. Se
+// al turno dopo l'utente chiede «l'hai attivato?», senza questa riga può solo
+// tirare a indovinare. Dato di sistema, non istruzione.
+function confirmedActionsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const righe = [];
+  for (const a of actions) {
+    if (!a || !a._confirmed) continue;
+    let cosa = String(a.type || '').toUpperCase();
+    try {
+      const d = (Levels && (Levels.describeDone ? Levels.describeDone(a) : Levels.describe(a))) || '';
+      if (d) cosa = d.replace(/\.+\s*$/, '');
+    } catch (_) {}
+    righe.push(`- ${cosa}`);
+  }
+  return righe.length
+    ? `[L'utente ha CONFERMATO e il sistema ha eseguito, dopo la tua risposta:\n${righe.join('\n')}\nÈ già fatto: non riproporlo e non dire che è ancora da fare.]`
+    : '';
+}
+
+// Spinta per il formato vecchio (JSON nel testo), quando un esito deve
+// tornare al modello: prima la mandava la scheda come turno «utente» interno.
+const LEGACY_CONTINUE_NUDGE =
+  'Prosegui: qui sopra ci sono gli esiti delle azioni appena eseguite. Rispondi all’utente '
+  + 'usando questi dati (link ESATTI presi dai risultati, numeri presi dal testo), senza ripetere '
+  + 'le stesse azioni. Se il compito è finito, rispondi senza eseguire altro.';
+
+// L'esito di UNA azione, come risposta allo strumento che il modello ha
+// chiamato. Chi ha un esito da leggere (ricerca, documento, comando) lo
+// riceve per intero; chi non ce l'ha riceve una riga: fatto, in attesa di
+// conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
+// esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
+// e un modello che la ritenta lo farebbe comparire due volte.
+function toolResultText({ action, res, rendered }) {
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const type = String(action.type || '').toUpperCase();
+  const describe = () => { try { return (Levels && Levels.describe(action)) || type; } catch (_) { return type; } };
+  // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
+  // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
+  // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
+  // una spunta dell'accoglienza): l'esito lo dice `executed`.
+  if (!res || res.rejected) {
+    const why = (res && res.error) || 'azione non registrata o parametri non validi';
+    return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
+  }
+  const obs = observationsForPrompt([rendered]);
+  if (obs) return obs;
+  if (res.output && res.output.blocked === 'disabled') {
+    return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
+  }
+  if (res.needsConfirm) {
+    return `In attesa della conferma dell'utente: il sistema gli sta mostrando cosa stai per fare («${describe()}»). `
+      + 'NON richiamare questa azione: la conferma è già in corso. Se hai altro da fare prosegui; altrimenti rispondi in una riga, senza dire di aver già fatto.';
+  }
+  if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
+    return res.output.removed.length ? `Tolte: ${res.output.removed.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
+  }
+  if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
+    return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
+  }
+  if (res.executed) {
+    // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
+    // applicata: Tema → Scuro»), non quella del popup di conferma («Filo vuole
+    // impostare…»): un «vuole» dopo «Eseguita» faceva dire al modello che era
+    // ancora da fare. Senza il punto finale: lo mette la riga.
+    let done = '';
+    try { done = (Levels && Levels.describeDone && Levels.describeDone(action)) || ''; } catch (_) {}
+    done = String(done || describe()).replace(/\.+\s*$/, '');
+    return `Eseguita: ${done}.`;
+  }
+  // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
+  // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
+  if (res.kept) return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
+  // Non eseguita e senza niente da mostrare: mancava qualcosa (nessuna scheda
+  // web attiva, un riferimento che non trova niente, un dato vuoto).
+  const detail = res.output ? ` (${JSON.stringify(res.output).slice(0, 200)})` : '';
+  // Le azioni sulla scheda web (proxy, stile della pagina) falliscono quasi
+  // sempre per lo stesso motivo: non c'è una scheda web attiva.
+  const PAGE_ACTIONS = ['PROXY_TAB', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_REGOLA_PROXY', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'];
+  if (PAGE_ACTIONS.includes(type) && res.output && res.output.restyle === 'no-page') {
+    return `Azione ${type} non riuscita: non c'è una scheda web attiva su cui agire. Dillo all'utente: deve aprire (o mettere davanti) la pagina.`;
+  }
+  if (PAGE_ACTIONS.includes(type) && !res.output) {
+    return `Azione ${type} non riuscita: ${describe()}. Probabilmente non c'è una scheda web attiva (o il proxy non è configurato): dillo all'utente.`;
+  }
+  return `Azione ${type} non riuscita: ${describe()}${detail}. Non ripeterla uguale: se manca un dato chiedilo all'utente, altrimenti diglielo.`;
+}
+
 // #360 — Filo propone LUI la segnalazione quando ammette una mancanza.
 // Prima toccava all'utente accorgersene e chiedere ("mandane una segnalazione"):
 // se non lo faceva, il buco non arrivava a nessuno. Ora, quando la risposta dice
@@ -2081,12 +2285,27 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
+    const msg = { role, content };
     if (role === 'assistant') {
-      const obs = [commandOutputsForPrompt(m.actions), capabilityDetailsForPrompt(m.actions), webSearchResultsForPrompt(m.actions), fileReadsForPrompt(m.actions), documentReadsForPrompt(m.actions), transparencyDocsForPrompt(m.actions)]
-        .filter(Boolean).join('\n\n');
-      if (obs) content = content ? `${content}\n\n${obs}` : obs;
+      const parts = [];
+      // Turno interrotto da un guasto: quello che era già stato fatto è stato
+      // fatto davvero. Senza questa riga, al «Riprova» il modello rifaceva il
+      // timer che aveva appena messo.
+      if (m.interrotto) {
+        const fatte = interruptedActionsForPrompt(m.actions);
+        if (fatte) parts.push(fatte);
+      }
+      const obs = observationsForPrompt(m.actions);
+      if (obs) parts.push(obs);
+      const extra = parts.join('\n\n');
+      if (extra) msg.content = content ? `${content}\n\n${extra}` : extra;
+      // Il ragionamento del turno passato torna al modello così com'era
+      // arrivato (blocchi strutturati del fornitore): riprende da dove aveva
+      // lasciato invece di ripensare tutto. Il fornitore lo reinserisce per i
+      // modelli che lo sanno usare e lo ignora per gli altri.
+      if (Array.isArray(m.reasoningDetails) && m.reasoningDetails.length) msg.reasoning_details = m.reasoningDetails;
     }
-    threadMessages.push({ role, content });
+    threadMessages.push(msg);
   }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
   if (imageList.length) {
@@ -2105,87 +2324,180 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // restituisce ragionamento, semplicemente non arriva nulla e restano le frasi.
   const wc = sender?.wc || null;
   const canPush = reasoningReqId && wc && !wc.isDestroyed?.();
-  const onReasoning = canPush
-    ? (text) => { try { wc.send('filo:reasoning', { reqId: reasoningReqId, text }); } catch (_) {} }
-    : null;
+  const push = (channel, payload) => {
+    if (!canPush) return;
+    try { wc.send(channel, { reqId: reasoningReqId, ...payload }); } catch (_) {}
+  };
+  const onReasoning = canPush ? (text) => push('filo:reasoning', { text }) : null;
   // #420 — la risposta scorre in diretta: inoltriamo alla scheda i delta del
-  // campo "text" (o il segnale di reset dopo un fallback provider). Il client li
-  // mostra nella bolla mano a mano; le azioni restano in coda, invariate.
-  const onText = canPush
-    ? (payload) => { try { wc.send('filo:answer', { reqId: reasoningReqId, ...payload }); } catch (_) {} }
+  // testo (o il segnale di reset dopo un fallback provider).
+  const onText = canPush ? (payload) => push('filo:answer', payload) : null;
+  // Un'azione appena il modello ne pronuncia il nome, prima ancora degli
+  // argomenti: la scheda dice subito «Cerco sul web…».
+  const onToolCall = canPush
+    ? (c) => push('filo:action', { kind: 'start', type: String(c.name || '').toUpperCase(), callId: c.id || '' })
     : null;
 
   // Indice COMPATTO delle capacità di Filo, sempre in contesto: l'agente sa SE
   // Filo fa una cosa e chiede il dettaglio on-demand con CAPACITA_DETTAGLIO (F2).
   const Caps = globalThis.SN_CAPABILITIES;
   const capacita = Caps ? Caps.renderIndexForPrompt() : '';
+  const Tools = globalThis.SN_ACTION_TOOLS;
+  const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
+  const payloadBase = {
+    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita,
+    files: fileSummaries,
+    onboarding: onboardingText,
+    onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
+    onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
+  };
 
-  // Un JSON rotto non si consegna al primo colpo: si RITENTA, fino a 3
-  // tentativi in tutto (decisione owner 2026-08-29). Dopo il terzo, amen: il
-  // testo grezzo diventa la bolla come prima — meglio una risposta strana che
-  // nessuna. Solo il PRIMO tentativo streamma il testo live: i ritentativi
-  // sono silenziosi e la risposta finale sostituisce comunque la bolla, così
-  // l'utente non vede il testo ripartire da capo a ogni giro.
+  // IL GIRO. Il modello chiama le azioni come strumenti; il main le esegue,
+  // gli rimanda gli esiti, e lo richiama — nello stesso turno, finché risponde
+  // senza chiamare più niente: quello è il testo per l'utente. «Cerco, leggo,
+  // poi metto la sveglia, poi rispondo» è un turno solo, e l'utente lo vede
+  // scorrere (ragionamento, azioni, note) nel blocco di attività. Il tetto ai
+  // giri è la rete contro i loop: raggiunto, l'ultimo testo scritto vale come
+  // risposta.
+  const MAX_ROUNDS = 12;
+  const rawActions = [];
+  const renderedActions = [];
+  const notes = [];
   let r = null;
-  let parsed = null;
+  let textReply = '';
+  let reasoningDetails = [];
+  let costEur = 0;
+  // Resta vero solo se il modello ha chiamato azioni fino al tetto senza mai
+  // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
+  // lavoro spacciata per risposta.
+  let exhausted = true;
   try {
-    for (let tentativo = 1; tentativo <= 3; tentativo++) {
+    for (let round = 1; round <= MAX_ROUNDS; round++) {
       r = await handleAIRequest({
         action: ACTIONS.FILO_CHAT,
-        payload: {
-          profilo, preferenze, espansioni, lezioni, stato: stateText, threadMessages, capacita,
-          files: fileSummaries,
-          onboarding: onboardingText,
-          onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
-          onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
-        },
+        payload: { ...payloadBase, threadMessages },
         origin: 'filo:chat',
-        onReasoning: tentativo === 1 ? onReasoning : null,
-        onText: tentativo === 1 ? onText : null,
-        // Dal secondo tentativo si salta la cache: la chiave e' la stessa e
-        // riconsegnerebbe la risposta rotta appena messa via.
-        noCache: tentativo > 1,
+        onReasoning, onText, onToolCall, tools,
       });
-      parsed = extractJson(r.text);
-      if (parsed) break;
-      console.warn(`[Filo] risposta chat non-JSON (tentativo ${tentativo}/3)`);
+      costEur += Number(r.costEur) || 0;
+      let text = String(r.text || '');
+      // Un id a ogni chiamata, anche se il fornitore non lo manda: la risposta
+      // allo strumento deve citare LO STESSO id della chiamata, e la scheda
+      // riconosce dall'id l'azione già raccontata in diretta.
+      const toolCalls = (Array.isArray(r.toolCalls) ? r.toolCalls : [])
+        .map((c, i) => ({ ...c, id: String(c.id || '') || `call_${round}_${i}` }));
+      let actions = Tools ? Tools.toolCallsToActions(toolCalls) : [];
+      // Tolleranza per il formato vecchio (JSON nel testo): le azioni passano
+      // comunque dal registro invece di finire in chat come JSON grezzo.
+      const legacy = (!actions.length && Tools) ? Tools.legacyEnvelope(text) : null;
+      if (legacy) {
+        text = legacy.text;
+        // Un id anche a queste: la scheda racconta l'azione in diretta (evento
+        // `done`) e a fine turno la riconosce dall'id, senza ripetere la riga.
+        actions = legacy.actions.map((a, i) => ({
+          ...a, type: String(a.type || '').toUpperCase(), _callId: a._callId || `json_${round}_${i}`,
+        }));
+      }
+      if (!actions.length) {
+        textReply = text;
+        reasoningDetails = r.reasoningDetails || [];
+        exhausted = false;
+        break;
+      }
+      const roundRendered = [];
+      const results = [];
+      for (const a of actions) {
+        rawActions.push(a);
+        const res = a._argsError
+          ? { executed: false, kept: false, rejected: true, error: a._argsError }
+          : await executeFiloAction(a, { sender });
+        const rendered = { ...a };
+        delete rendered._argsError;
+        // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
+        // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
+        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '' };
+        // Output di un comando eseguito subito (livello 1) o esito bloccato
+        // (terminale spento): il client lo mostra in chat (#146.6).
+        if (res.output) rendered._output = res.output;
+        // L'esito viaggia con l'azione: il diario del lavoro deve poter dire
+        // «fatto» o «non riuscito», non solo «l'ha chiamata».
+        rendered._executed = !!res.executed;
+        // `kept: false` non vuol dire invisibile: vuol dire che in chat non c'è
+        // niente da CLICCARE (un appunto scritto, una lezione fissata, il
+        // proxy tolto). Nel diario ci va lo stesso, come riga: se Filo fa una
+        // cosa, l'utente deve poter vedere che l'ha fatta. Un'azione rifiutata
+        // dal registro invece non è successa: quella non entra.
+        if (!res.rejected) {
+          if (!res.kept) rendered._traccia = true;
+          renderedActions.push(rendered);
+          roundRendered.push(rendered);
+        }
+        push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        results.push({ action: a, res, rendered });
+      }
+      // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
+      // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
+      if (text.trim()) notes.push(text.trim());
+      push('filo:action', { kind: 'round', text });
+      textReply = text;
+      reasoningDetails = r.reasoningDetails || [];
+      if (legacy) {
+        // Formato vecchio: si prosegue solo se un esito deve tornare al modello
+        // e niente è in attesa di conferma, come faceva prima la scheda.
+        const obs = observationsForPrompt(roundRendered);
+        if (!obs || roundRendered.some((x) => x._confirm)) { exhausted = false; break; }
+        threadMessages.push({ role: 'assistant', content: r.text });
+        threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}` });
+        continue;
+      }
+      threadMessages.push(Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }));
+      for (const x of results) threadMessages.push(Tools.toolMessage(x.action._callId, toolResultText(x)));
     }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
     // ripresa va rilasciata subito, altrimenti nessuna scheda potrebbe
     // riprendere il turno rimasto a metà finché non scade.
     if (onbActive && !internal) releaseOnboardingResume();
+    // Le azioni già eseguite prima del guasto sono SUCCESSE davvero (il timer
+    // c'è). Viaggiano con l'errore, così un «Riprova» riparte sapendo cosa era
+    // già stato fatto invece di rifarlo.
+    try { e.filoActions = renderedActions; } catch (_) {}
     throw e;
   }
-  parsed = parsed || { text: r.text || '', actions: [] };
-  const rawActions = Array.isArray(parsed.actions) ? parsed.actions : [];
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
   // deve scrivere testo di riempimento: il "(vuoto)" che compariva era un
   // placeholder confuso ("hai scritto tu vuoto o è stato prodotto da filo?").
   // Il fallback "(vuoto)" resta SOLO per la risposta davvero vuota (niente
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
-  const textReply = String(parsed.text || '').trim() || (rawActions.length ? '' : '(vuoto)');
+  if (exhausted) {
+    const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
+    const last = String(textReply || '').trim();
+    textReply = last ? `${last}\n\n${stop}` : stop;
+  } else if (!String(textReply || '').trim() && notes.length) {
+    // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
+    // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
+    // una nota di lavoro. Lasciarla nel blocco chiuso voleva dire un turno
+    // senza nessuna bolla. Torna alla scheda come testo, e non più come nota.
+    textReply = notes.pop();
+  }
+  textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
   const proposal = internal
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
-  const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
-  const renderedActions = [];
-  for (const a of actionsToRun) {
-    const res = await executeFiloAction(a, { sender });
-    if (!res.kept) continue;
-    // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
-    // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-    const rendered = res.needsConfirm
-      ? { ...a, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
-      : { ...a };
-    // Output di un comando eseguito subito (livello 1) o esito bloccato
-    // (terminale spento): il client lo mostra in chat (#146.6).
-    if (res.output) rendered._output = res.output;
-    renderedActions.push(rendered);
+  if (proposal) {
+    const res = await executeFiloAction(proposal, { sender });
+    if (res.kept) {
+      const rendered = res.needsConfirm
+        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
+        : { ...proposal };
+      if (res.output) rendered._output = res.output;
+      renderedActions.push(rendered);
+    }
   }
+  const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
   // #524 — chiusura dell'intervista di benvenuto: la sequenza sta in
   // `finishOnboarding`. Se invece l'intervista prosegue, il turno di Filo viene
@@ -2211,7 +2523,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // quella anonima non parte: una sola segnalazione per lo stesso buco.
   maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
   return {
-    text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur: r.costEur,
+    text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
+    // Le note scritte a metà lavoro e il ragionamento strutturato dell'ultimo
+    // giro: la scheda li tiene con la conversazione, e il ragionamento torna
+    // al modello al turno dopo.
+    notes, reasoningDetails,
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),
