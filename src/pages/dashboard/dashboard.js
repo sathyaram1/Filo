@@ -1076,17 +1076,22 @@
   // un'azione sta in un posto solo. Ciò che è cliccabile — un link da aprire,
   // una conferma da dare, l'esito di un comando — resta un bottone sotto la
   // risposta e NON passa di qui.
+  // Il testo scritto dal modello prima di finire in una riga: senza caratteri
+  // di controllo (un byte nullo nell'etichetta finiva tale e quale nel diario).
+  function pulito(v) {
+    return String(v == null ? '' : v).replace(/[ -]/g, '').trim();
+  }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
       const sec = Number(a.seconds || a.secondi || 0);
       // #323 — durata umana fedele all'intento: "30 sec", "2 h", "1 h 30 min".
       const dur = (self.SN_TIME ? self.SN_TIME.fmtDurationLabel(sec) : `${Math.round(sec / 60)} min`);
-      const name = a.label || a.etichetta || '';
+      const name = pulito(a.label || a.etichetta);
       return { icon: '⏱', text: `Timer avviato · ${name ? `${name} · ` : ''}${dur}` };
     },
     SVEGLIA: (a) => {
-      const when = a.time || a.orario || '';
-      const name = a.label || a.etichetta || '';
+      const when = pulito(a.time || a.orario);
+      const name = pulito(a.label || a.etichetta);
       return { icon: '⏰', text: `Sveglia impostata${when ? ` · ${when}` : ''}${name ? ` · ${name}` : ''}` };
     },
     // Il main descrive cosa ha tolto o spostato («Sveglia “lezione” 07:55»):
