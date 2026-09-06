@@ -217,14 +217,8 @@ test('menu Incolla: da tastiera, tolta una voce il fuoco passa alla "x" successi
     await expect(righe.nth(2)).toHaveClass(/sn-menu-history-gone/);
     await expect(sub.locator('.sn-menu-history-item:not(.sn-menu-history-gone)')).toHaveCount(2);
 
-    // E sul disco sono sparite proprio quelle due.
-    const rimaste = await shell.evaluate(async () => {
-      const r = await window.filoShell.debugSend
-        ? null
-        : null;
-      return r;
-    });
-    void rimaste;
+    // E sul disco sono sparite proprio quelle due: riaperto il menu ne restano
+    // due, la prima e l'ultima.
     await web.keyboard.press('Escape');
     await web.locator('#ta').click({ button: 'right' });
     await web.locator('.sn-menu-paste-arrow').click();
