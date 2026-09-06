@@ -11,7 +11,8 @@
 // file manda chi la segue contro un link morto. Diventa rossa se:
 // una riga punta a un file che non c'è; un file non è citato dall'indice; il
 // titolo dell'indice e l'`# H1` del file divergono; una riga resta senza
-// regola; l'indice ricomincia a ingrassare fino a tornare il file di prima.
+// regola; l'indice ricomincia a ingrassare fino a tornare il file di prima; un
+// racconto non riporta all'indice; il nome di un file taglia la frase a metà.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
