@@ -572,11 +572,11 @@ test('usageText: elenca tutti i comandi, compresa la scorta --ticket', () => {
 // prima di dare il pass. Un titolo che racconta il copione glielo mette davanti
 // senza che lo cerchi. Dentro i file la spiegazione resta: quelli li apre solo
 // chi ci lavora (feedback #565).
-test('i titoli dei test non raccontano il seguito del giro', async () => {
+test('i titoli dei test restano nel vocabolario del codice', async () => {
   const { readdirSync, readFileSync: read } = await import('node:fs');
   const { join } = await import('node:path');
   const TESTS = fileURLToPath(new URL('..', import.meta.url));
-  const vietati = [/fase 2/i, /verificatore[^'"]{0,30}corregg/i];
+  const vietati = [/fase 2/i, /verificatore[^'"]{0,30}corregg/i, /stessa istanza/i, /si corregge/i, /si paga da cap/i, /da soli si ignorano/i];
   const colpevoli = [];
   const cammina = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -597,7 +597,7 @@ test('i titoli dei test non raccontano il seguito del giro', async () => {
 // critica: se l'aiuto la anticipasse, chi verifica saprebbe prima di scrivere
 // i rilievi che ogni rilievo è lavoro suo — e ne scriverebbe meno. `--help` lo
 // legge chiunque, in qualsiasi momento: qui dentro non ci va (feedback #565).
-test('usageText: non anticipa la seconda fase', () => {
+test('usageText: elenca i comandi e nient\'altro', () => {
   const u = usageText().toLowerCase();
   for (const parola of ['fase 2', 'correggi', 'correzion', 'correttore']) {
     assert.ok(!u.includes(parola), `la schermata di aiuto non deve nominare "${parola}"`);

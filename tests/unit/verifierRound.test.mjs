@@ -69,7 +69,7 @@ test('default: cap2 5, cap1 2, cap0 0 (fonte unica, feedbackTransitions.js)', ()
   assert.equal(R.capKeyOf(0), 'cap0');
 });
 
-test('nessun rilievo: passa, niente da correggere, niente consumato', () => {
+test('nessun rilievo → pass, nessun bilancio consumato', () => {
   const d = decide([]);
   assert.equal(d.stop, false);
   assert.deepEqual(d.fix, []);
@@ -77,7 +77,7 @@ test('nessun rilievo: passa, niente da correggere, niente consumato', () => {
   assert.equal(d.consume, null);
 });
 
-test('un 2 con bilancio: si corregge, e il giro si paga da cap2', () => {
+test('livello 2 con bilancio → fix, il giro si conta su cap2', () => {
   const d = decide([f(2, 'rotto')]);
   assert.equal(d.stop, false);
   assert.equal(d.fix.length, 1);
@@ -86,7 +86,7 @@ test('un 2 con bilancio: si corregge, e il giro si paga da cap2', () => {
   assert.equal(d.budgets.cap2.left, 4);
 });
 
-test('un giro consuma dal livello PIÙ ALTO corretto: un 2 e tre 1 pagano da cap2, non da cap1', () => {
+test('un giro si conta sul livello PIÙ ALTO in elenco: un 2 e tre 1 → cap2, non cap1', () => {
   const d = decide([f(1, 'a'), f(2, 'b'), f(1, 'c'), f(1, 'd')]);
   assert.equal(d.fix.length, 4);
   assert.equal(d.consume, 'cap2');
@@ -94,7 +94,7 @@ test('un giro consuma dal livello PIÙ ALTO corretto: un 2 e tre 1 pagano da cap
   assert.equal(d.counts.count2, 1);
 });
 
-test('gli 0 da soli si ignorano (cap0 = 0): vanno nel derivato; con altro da correggere si correggono pure loro', () => {
+test('cap0 a zero: soli 0 → derivato; in elenco con livelli più alti rientrano nel giro', () => {
   const soli = decide([f(0, 'raro'), f(0, 'rarissimo')]);
   assert.deepEqual(soli.fix, []);
   assert.equal(soli.derived.length, 2);
@@ -105,7 +105,7 @@ test('gli 0 da soli si ignorano (cap0 = 0): vanno nel derivato; con altro da cor
   assert.equal(insieme.counts.count0, 0, 'gli 0 corretti insieme ad altro non pagano da cap0');
 });
 
-test('cap0 alzato dall\'owner: anche gli 0 da soli si correggono, pagando da cap0', () => {
+test('cap0 alzato dall\'owner: soli 0 → fix, il giro si conta su cap0', () => {
   const d = decide([f(0, 'raro')], {}, { cap2: 5, cap1: 2, cap0: 1 });
   assert.equal(d.fix.length, 1);
   assert.equal(d.consume, 'cap0');
@@ -113,14 +113,14 @@ test('cap0 alzato dall\'owner: anche gli 0 da soli si correggono, pagando da cap
   assert.deepEqual(dopo.fix, [], 'al secondo giro il bilancio è finito');
 });
 
-test('a bilancio finito su quel livello non si corregge: un 1 con cap1 esaurito va nel derivato', () => {
+test('bilancio esaurito su quel livello: un 1 con cap1 a zero → derivato', () => {
   const d = decide([f(1, 'bordo')], { count1: 2 });
   assert.deepEqual(d.fix, []);
   assert.equal(d.derived.length, 1);
   assert.equal(d.stop, false, 'un 1 non ferma mai il lavoro');
 });
 
-test('un 2 o 3 a bilancio cap2 finito FERMA il lavoro: niente si corregge, decide l\'owner', () => {
+test('livello 2 o 3 con cap2 esaurito → stop, decide l\'owner', () => {
   const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count2: 5 });
   assert.equal(d.stop, true);
   assert.equal(d.blocking.length, 1);
@@ -130,7 +130,7 @@ test('un 2 o 3 a bilancio cap2 finito FERMA il lavoro: niente si corregge, decid
   assert.equal(d.counts.count2, 5, 'fermarsi non paga un giro');
 });
 
-test('rilievi che chiedono una decisione: a livello 3/2 fermano, a livello 1 vanno nel derivato, a livello 0 idem', () => {
+test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
   assert.equal(decide([f(3, 'chiavi SSH?', true)]).stop, true);
   assert.equal(decide([f(2, 'quale strada?', true)]).stop, true, 'anche a bilancio pieno');
   const uno = decide([f(1, 'gusto?', true)]);
@@ -148,11 +148,11 @@ test('i bilanci si normalizzano: fuori scala si stringe, assenti → default, co
   assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count2: 0, count1: 2, count0: 0 });
 });
 
-test('cap2 a 0: il primo 2 ferma subito (scelta possibile dell\'owner)', () => {
+test('cap2 a zero: il primo 2 → stop subito (scelta possibile dell\'owner)', () => {
   assert.equal(decide([f(2, 'rotto')], {}, { cap2: 0, cap1: 2, cap0: 0 }).stop, true);
 });
 
-test('la sequenza intera: cinque correzioni di livello 2, poi la sesta ferma', () => {
+test('la sequenza intera: cinque giri di livello 2, il sesto → stop', () => {
   let counts = {};
   for (let i = 0; i < 5; i++) {
     const d = decide([f(2, `giro ${i}`)], counts);
