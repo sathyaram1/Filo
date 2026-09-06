@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const {
-  checkVerdict, withRequest, withVerdict, withCritique, withFixed, buildVerifierBrief, phase2Text, historyFromRounds,
+  checkVerdict, withRequest, withCritique, withFixed, buildVerifierBrief, phase2Text, historyFromRounds,
   realignPlan, afterRebase,
 } = await import('../../scripts/verify-local.mjs');
 
@@ -64,21 +64,15 @@ test('checkVerdict: modifiche non salvate invalidano l’approvazione', () => {
   assert.match(sporco.reason, /modifiche non salvate/);
 });
 
-test('withRequest / withVerdict: lo stato è per ramo e non si calpesta', () => {
+test('lo stato è per ramo e non si calpesta', () => {
   let s = withRequest({}, 'claude/uno', { request: 'fai X', sha: SHA, at: 't0' });
   s = withRequest(s, 'claude/due', { request: 'fai Y', sha: ALTRO_SHA, at: 't0' });
-  s = withVerdict(s, 'claude/uno', { verdict: 'pass', critique: 'ok', sha: SHA, at: 't1' });
+  s = withCritique(s, 'claude/uno', { critique: 'Provato tutto, regge.', sha: SHA, at: 't1' }).state;
 
   assert.equal(s['claude/uno'].verdict, 'pass');
   assert.equal(s['claude/uno'].request, 'fai X');   // la richiesta non si perde
   assert.equal(s['claude/due'].verdict, undefined); // l'altro ramo resta com'era
   assert.equal(checkVerdict(s['claude/due'], ALTRO_SHA).ok, false);
-});
-
-test('withVerdict: qualunque cosa diversa da "pass" è una bocciatura', () => {
-  const s = withVerdict({}, 'r', { verdict: 'boh', sha: SHA });
-  assert.equal(s.r.verdict, 'fail');
-  assert.equal(checkVerdict(s.r, SHA).ok, false);
 });
 
 // ─── Il verificatore che corregge, in locale (feedback #561) ─────────────────
@@ -460,7 +454,7 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
   assert.equal(inMezzo.outcome, 'pass');
 });
 
-// ── Le scorciatoie dal CLI (#561 giro 7) ─────────────────────────────────────
+// ── Un modo solo per promuovere, uno solo per bocciare (#565) ────────────────────
 //
 // Un «pass» con dentro una riga di livello 2 vale il testo: lo stato diventa
 // «sta correggendo» e la risposta deve dirlo, con la fase 2, come farebbe
@@ -480,29 +474,42 @@ function depositoUsaEGetta() {
   g('add', '-A'); g('commit', '-qm', 'init'); g('checkout', '-q', '-b', 'claude/prova');
   return casa;
 }
+// Una motivazione vera: sotto gli 80 caratteri il CLI la respinge, e con
+// ragione (una verifica di due parole non è una verifica).
+const LUNGA_FIX = 'Provato inserimento, tasto destro e tema scuro: il resto regge.\n[2] rotto';
 function vl(casa, ...args) {
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
 }
 
-test('CLI: «pass» con dentro un [2] non è un pass: risponde che c\'è da correggere; «fail» ferma', () => {
+test('CLI: «pass» e «fail» non registrano più niente, e dicono cosa usare', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  const p = vl(casa, 'pass', 'Provato tutto.\n[2] però questo è rotto');
-  assert.equal(p.code, 0, p.out);
-  assert.match(p.out, /c'è da correggere[\s\S]*Rilievi da correggere in questo giro/);
-  assert.match(p.out, /\[2\] però questo è rotto/);
-  assert.doesNotMatch(p.out, /torna a chi l'ha fatto/);
-  assert.match(vl(casa, 'status').out, /giro di correzione aperto/);
-  // Un pass pulito resta un pass; un fail secco ferma, qualunque sia il bilancio.
-  _exec('git', ['checkout', '-q', '-b', 'claude/due'], { cwd: casa });
+  for (const parola of ['pass', 'fail']) {
+    const r = vl(casa, parola, 'prova');
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /non ho toccato niente/);
+    assert.match(r.out, /verify-local\.mjs critica/);
+    // E soprattutto: niente verdetto scritto da una sonda.
+    assert.match(vl(casa, 'status').out, /senza esito/, `«${parola}» non deve registrare niente`);
+  }
+});
+
+test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per bocciare', () => {
+  const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  assert.match(vl(casa, 'pass', 'Regge tutto.').out, /verifica superata/);
-  _exec('git', ['checkout', '-q', '-b', 'claude/tre'], { cwd: casa });
-  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  assert.match(vl(casa, 'fail', 'non salva').out, /il lavoro si ferma/);
-  assert.match(vl(casa, 'status').out, /bocciato/);
+  const corta = vl(casa, 'critica', 'ok');
+  assert.equal(corta.code, 1, corta.out);
+  assert.match(corta.out, /troppo corta \(2 caratteri/, 'il rifiuto dice il numero');
+  assert.match(vl(casa, 'status').out, /senza esito/, 'niente scritto');
+  const cortaBoccia = vl(casa, 'critica', '[2] rotto');
+  assert.equal(cortaBoccia.code, 1, cortaBoccia.out);
+  assert.match(vl(casa, 'status').out, /senza esito/);
+  // Con la motivazione vera passa, e l'esito è quello del testo.
+  const buona = vl(casa, 'critica', LUNGA_FIX);
+  assert.equal(buona.code, 0, buona.out);
+  assert.match(buona.out, /c'è da correggere/);
 });
 
 // ─── Tetto abbondante, niente taglio silenzioso (CLAUDE.md § Limiti) ────────
@@ -587,7 +594,7 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   _exec('git', ['checkout', '-q', '-b', 'claude/sporco'], { cwd: casa });
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   _write(resolve(casa, 'a.txt'), 'modifica non salvata', 'utf8');
-  const p = vl(casa, 'critica', 'Provato: regge.');
+  const p = vl(casa, 'critica', 'Provato l'inserimento, il tasto destro, il tema scuro e la finestra stretta: regge tutto.');
   assert.equal(p.code, 0, p.out);
   assert.match(p.out, /verifica superata/);
   assert.doesNotMatch(p.out, /Si può pubblicare/);
