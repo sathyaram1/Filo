@@ -250,7 +250,13 @@
     list.style.display = empty ? 'none' : '';
     $('sec-clip-clear').style.display = empty ? 'none' : '';
     $('sec-clip-search-row').style.display = empty ? 'none' : '';
-    if (empty) $('sec-clip-noresults').style.display = 'none';
+    if (empty) {
+      $('sec-clip-noresults').style.display = 'none';
+      // Cronologia svuotata: anche la ricerca riparte da zero. Altrimenti il
+      // campo resterebbe pieno di una parola che nessuno vede più, e la prima
+      // cosa copiata dopo comparirebbe già filtrata via.
+      $('sec-clip-search').value = '';
+    }
 
     // Se in lista c'è almeno un'immagine, anche le righe di testo tengono il
     // posto della miniatura: altrimenti il bordo sinistro va a zig-zag.
