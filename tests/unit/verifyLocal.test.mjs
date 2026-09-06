@@ -491,7 +491,7 @@ test('CLI: «pass» con dentro un [2] non è un pass: risponde che c\'è da corr
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   const p = vl(casa, 'pass', 'Provato tutto.\n[2] però questo è rotto');
   assert.equal(p.code, 0, p.out);
-  assert.match(p.out, /c'è da correggere[\s\S]*Rilievi da correggere ADESSO/);
+  assert.match(p.out, /c'è da correggere[\s\S]*Rilievi da correggere in questo giro/);
   assert.match(p.out, /\[2\] però questo è rotto/);
   assert.doesNotMatch(p.out, /torna a chi l'ha fatto/);
   assert.match(vl(casa, 'status').out, /giro di correzione aperto/);
@@ -578,7 +578,7 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   const ridata = vl(casa, 'critica', testo);
   assert.equal(ridata.code, 0, ridata.out);
   assert.match(ridata.out, /ristampo la fase 2/);
-  assert.match(ridata.out, /Rilievi da correggere ADESSO[\s\S]*\[2\] rotto/);
+  assert.match(ridata.out, /Rilievi da correggere in questo giro[\s\S]*\[2\] rotto/);
   assert.match(ridata.out, /cap2: 4 giri residui su 5/, 'il giro non si ripaga');
   const altra = vl(casa, 'critica', 'Provato.\n[2] rotto diversamente');
   assert.equal(altra.code, 1);
