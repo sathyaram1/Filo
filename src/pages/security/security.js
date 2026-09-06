@@ -215,19 +215,26 @@
   // se ne vedono sette per volta. Cercare "la password copiata stamattina"
   // scorrendo a mano è lo stesso attrito che nel menu "Incolla" era già stato
   // tolto con un campo di ricerca: qui è la stessa lista, quindi lo stesso campo.
-  let clipVisibili = 0;
+  // Quante voci VIVE la ricerca sta mostrando, oppure null quando nessuna
+  // ricerca è in corso: la conferma dello svuotamento parla del filtro solo se
+  // il filtro c'è davvero (vedi il commento su testoConferma nel modulo
+  // condiviso della cronologia).
+  let clipVisibili = null;
 
   function applyClipFilter() {
     const q = ($('sec-clip-search').value || '').trim().toLowerCase();
     const righe = $('sec-clip-list').querySelectorAll('.sn-clip-item');
-    let visibili = 0;
+    let aSchermo = 0;   // righe che il filtro lascia vedere, barrate comprese
+    let vive = 0;       // di quelle, le voci che ci sono ancora davvero
     for (const r of righe) {
       const match = !q || (r.dataset.snSearch || '').includes(q);
       r.style.display = match ? '' : 'none';
-      if (match) visibili++;
+      if (!match) continue;
+      aSchermo++;
+      if (!r.classList.contains('sn-clip-gone')) vive++;
     }
-    clipVisibili = visibili;
-    const nessuno = righe.length > 0 && visibili === 0;
+    clipVisibili = q ? vive : null;
+    const nessuno = righe.length > 0 && aSchermo === 0;
     $('sec-clip-noresults').style.display = nessuno ? '' : 'none';
   }
 
