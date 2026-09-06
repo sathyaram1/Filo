@@ -746,13 +746,28 @@
         if (i >= 0) entries.splice(i, 1);
       };
 
+      // Quante voci VIVE la ricerca sta mostrando IN QUESTO MOMENTO: le righe
+      // già tolte restano a schermo barrate ma non contano più. Si conta
+      // guardando la lista invece di tenere un numero a parte che qualcuno deve
+      // ricordarsi di aggiornare: quel numero partiva da zero e nessuno lo
+      // toccava finché non scrivevi nel campo di ricerca, così la conferma
+      // dello svuotamento parlava di una ricerca mai scritta (#256).
+      // Ritorna null quando NON c'è nessuna ricerca in corso: è il modo di dire
+      // "della ricerca non parlarne".
+      const visibiliVive = () => {
+        if (!input.value.trim()) return null;
+        let n = 0;
+        for (const b of list.querySelectorAll('.sn-menu-history-item')) {
+          if (b.style.display === 'none') continue;
+          if (b.classList.contains('sn-menu-history-gone')) continue;
+          n++;
+        }
+        return n;
+      };
+
       // Applica il filtro di ricerca corrente. Serve anche DOPO una rimozione:
       // se stavi cercando "pass" e togli l'unica voce trovata, la lista resta
       // muta senza dire che ora quella ricerca non ha risultati.
-      // Quante voci VIVE la ricerca sta mostrando: le righe già tolte restano a
-      // schermo barrate ma non contano più, né per "nessun risultato" né per il
-      // numero che la conferma dello svuotamento dichiara.
-      let visibiliVive = 0;
       const applyFilter = () => {
         const q = input.value.trim().toLowerCase();
         let visible = 0;
@@ -761,7 +776,6 @@
           b.style.display = match ? '' : 'none';
           if (match && !b.classList.contains('sn-menu-history-gone')) visible++;
         }
-        visibiliVive = visible;
         noResults.style.display = visible === 0 ? '' : 'none';
       };
 
