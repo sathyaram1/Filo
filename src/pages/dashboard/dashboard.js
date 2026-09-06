@@ -1183,7 +1183,10 @@
     // di conferma non lascia nessun blocco, e alla conferma non c'è più dove
     // scrivere che è stata data.
     if (a._confirm) {
-      const prima = String(a._confirm.text || '').split('\n')[0].replace(/\s*:\s*$/, '');
+      // Due parole, non l'intera spiegazione: quella sta nel popup, che è
+      // aperto davanti all'utente proprio in quel momento.
+      let prima = String(a._confirm.text || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
+      if (prima.length > 60) prima = `${prima.slice(0, 57)}…`;
       return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
     }
     const type = String(a.type || '').toUpperCase();
