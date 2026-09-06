@@ -223,6 +223,17 @@
       const row = document.createElement('div');
       row.className = 'sn-clip-item';
 
+      // Un'immagine si riconosce guardandola, non leggendo "Immagine": senza
+      // miniatura, con due schermate copiate in fila, l'utente non sa quale
+      // delle due sta togliendo. Il dato ce l'abbiamo già in mano.
+      if (entry.type === 'image' && entry.dataUrl) {
+        const thumb = document.createElement('img');
+        thumb.className = 'sn-clip-thumb';
+        thumb.src = entry.dataUrl;
+        thumb.alt = '';
+        row.appendChild(thumb);
+      }
+
       const label = clipLabel(entry);
       const text = document.createElement('span');
       text.className = 'sn-clip-text';
