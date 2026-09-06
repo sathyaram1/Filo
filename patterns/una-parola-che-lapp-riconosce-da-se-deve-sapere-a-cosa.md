@@ -4,8 +4,8 @@
 
 La rete di sicurezza di
 [Una promessa fatta all'utente non può dipendere dal modello](una-promessa-fatta-allutente-non-puo-dipendere-dal-modello.md)
-ha un costo: l'app decide **senza capire**, e in
-una conversazione lo stesso pugno di parole vuol dire cose diverse a seconda di
+ha un costo: l'app decide **senza capire**, e in una
+conversazione lo stesso pugno di parole vuol dire cose diverse a seconda di
 cosa è stato appena chiesto. Nell'accoglienza (#524) l'elenco delle uscite
 conteneva «no grazie», «magari dopo», «non ora», «lascia stare», «passo» — cioè
 esattamente i modi in cui in italiano si **declina una proposta**. E Filo, in
