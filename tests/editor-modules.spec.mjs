@@ -424,7 +424,7 @@ test.describe('font picker e drag dei moduli', () => {
     expect(m.left, 'la tendina esce dal bordo sinistro').toBeGreaterThanOrEqual(0);
 
     // E si legge davvero: i nomi dei font sono cliccabili, non tagliati fuori.
-    await expect(mod.locator('.ed-font-pop .ed-font-opt').first()).toBeVisible();
+    await expect(mod.locator('.ed-font-pop .sn-select-option').first()).toBeVisible();
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
