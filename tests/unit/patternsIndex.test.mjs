@@ -176,6 +176,38 @@ describe('PATTERNS.md ↔ patterns/', () => {
     assert.deepEqual(senzaRitorno, [], 'racconti senza il rimando all\'indice');
   });
 
+  test('nessun racconto rimanda a un altro per posizione', () => {
+    // Finché i pattern stavano in un foglio solo, «il pattern qui sopra» si
+    // seguiva scorrendo. Adesso ogni racconto è un file per conto suo: sopra e
+    // sotto non c'è niente, e chi legge resta con un rimando che non può
+    // seguire. Un pattern vicino si nomina e si linka.
+    const POSIZIONALE = /(?:pattern|regola|sezione|racconto|rete di sicurezza)[^.]{0,60}?qui (?:sopra|sotto)|qui (?:sopra|sotto)[^.]{0,60}?(?:pattern|regola|sezione|racconto)/i;
+    const colpevoli = [];
+    for (const slug of fileDellaCartella) {
+      const testoPiatto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8').replace(/\s+/g, ' ');
+      const m = testoPiatto.match(POSIZIONALE);
+      if (m) colpevoli.push(`${slug}: «${m[0].trim()}»`);
+    }
+    assert.deepEqual(colpevoli, [], 'rimandi per posizione fra racconti: nominali e linkali');
+  });
+
+  test('un racconto che nomina un altro pattern lo linka', () => {
+    // Citare il titolo di un'altra regola senza il collegamento lascia il
+    // lettore a cercarlo a mano nell'indice: il rimando c'è ma non si segue.
+    const titoli = fileDellaCartella.map((slug) => ({ slug, titolo: titoloDelFile(slug) }));
+    const scollegati = [];
+    for (const { slug } of titoli) {
+      const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
+      for (const altro of titoli) {
+        if (altro.slug === slug || !altro.titolo) continue;
+        if (contenuto.includes(altro.titolo) && !contenuto.includes(`(${altro.slug}.md)`)) {
+          scollegati.push(`${slug} nomina «${altro.titolo}» senza linkarlo`);
+        }
+      }
+    }
+    assert.deepEqual(scollegati, [], 'titoli di altri pattern citati senza collegamento');
+  });
+
   test('i nomi dei file non tagliano una frase a metà', () => {
     // Il nome del file è quello che si legge nei commenti del codice e in
     // CLAUDE.md prima di aprirlo: è l'unica descrizione che arriva a chi passa
