@@ -54,7 +54,11 @@ if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
   ].join('\n'));
   process.exit(0);
 }
-const { controllaArgomenti } = await import('./lib/argomenti.mjs');
+const { controllaArgomenti, argomentiDaNpm } = await import('./lib/argomenti.mjs');
+// Vedi auto-archive: le opzioni mangiate da npm si riprendono dall'ambiente
+// (feedback #565).
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
 const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'] });
 if (argomentiSbagliati) {
   console.error(`RIFIUTATO: ${argomentiSbagliati}`);
