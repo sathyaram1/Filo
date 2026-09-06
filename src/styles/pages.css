@@ -856,3 +856,6 @@ section:has(#dictList) .sn-spell-add-row {
   border-radius: 4px;
   border: 1px solid var(--sn-border);
 }
+/* Righe di testo in una lista che contiene anche immagini: tengono il posto
+   della miniatura, così il bordo sinistro resta dritto. */
+.sn-page .sn-clip-spacer { flex: none; width: 28px; }
