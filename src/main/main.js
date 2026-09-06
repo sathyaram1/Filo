@@ -216,7 +216,7 @@ app.whenReady().then(async () => {
       const dump = async (label, wc) => {
         console.log(`[smoke] dump:${label} start`);
         try {
-          const img = await wc.capturePage();
+          const img = await entro(wc.capturePage(), 15_000, `cattura ${label}`);
           console.log(`[smoke] dump:${label} capturePage resolved, img=`, !!img, 'empty=', img?.isEmpty?.());
           if (!img) { console.log(`[smoke] dump:${label} no img`); return; }
           const png = img.toPNG();
