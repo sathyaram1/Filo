@@ -196,7 +196,7 @@ test('"/riordina" due volte di fila: la seconda non muove niente e lo dice', asy
   await testServer.openReady(openTab, mk('Rosso', 'rgb(200,40,40)'));
   const dash = await openTab(NEWTAB);
   await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
-  await coloriPronti(shell);
+  await coloriFermi(shell);
 
   await submit(dash, '/riordina');
   await expect.poll(() => ultimaRigaFilo(dash), { timeout: 8_000 }).toContain('riordinate per colore');
