@@ -544,6 +544,21 @@
     options_fp_mode_privacy_desc:
       'Come l\'Automatico, ma cambi "impronta" a ogni avvio di Filo: i siti non possono riconoscerti ' +
       'nemmeno fra una sessione e l\'altra. In rari casi qualche CAPTCHA in più.',
+    // Cronologia appunti nella pagina Sicurezza (#256). Il menu del tasto destro
+    // la mostra solo dentro un campo di testo: chi ha appena copiato una password
+    // leggendo un articolo non ha nessun campo da cliccare. Qui è sempre
+    // raggiungibile, con le stesse due azioni del menu (togli una voce, svuota).
+    security_clipboard_title: 'Cronologia appunti',
+    security_clipboard_desc:
+      'Quello che hai copiato di recente: Filo lo tiene da parte per riproportelo ' +
+      'quando incolli. Se ci è finita una password o un testo privato, toglilo da qui.',
+    security_clipboard_empty: 'Non c\'è niente: nessun testo o immagine copiato di recente.',
+    security_clipboard_image: 'Immagine',
+    security_clipboard_remove: 'Rimuovi',
+    security_clipboard_remove_title: 'Rimuovi questa voce dalla cronologia',
+    security_clipboard_removed: 'Voce rimossa',
+    security_clipboard_cleared: 'Cronologia svuotata',
+    security_clipboard_fail: 'Non è riuscito',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
