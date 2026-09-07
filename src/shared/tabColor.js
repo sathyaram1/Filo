@@ -237,7 +237,7 @@
   }
 
   global.SN_TAB_COLOR = {
-    IDENTITY_CHROMA_MIN, parseRgb, chroma, hasIdentity,
+    IDENTITY_CHROMA_MIN, parseRgb, chroma, hasIdentity, pickActiveTint, pickGlowTint,
     IDENTITY_PARAMS, IDENTITY_PARAM_META, defaultParams, clampParams,
     rgbToHsl, hslToRgb, extractIdentityFromPixels,
   };
