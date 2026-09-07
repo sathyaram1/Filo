@@ -3877,10 +3877,12 @@
 
   function stRender() {
     if (!ST) return;
-    stRenderWindowChips();
-    stRenderCreatorChips();
-
+    // I conti PRIMA dei pulsanti: l'eco accanto ai due campi data racconta la
+    // finestra vera (quella raddrizzata), non le due caselle come sono state
+    // riempite, quindi ha bisogno del range già calcolato.
     const { range, data } = stStats();
+    stRenderWindowChips(range);
+    stRenderCreatorChips();
 
     const warn = $st('mgStWarn');
     if (warn) {
