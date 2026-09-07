@@ -2510,13 +2510,18 @@
 
   // Salva SOLO la frase: non tocca la conversazione, quindi si può scrivere
   // anche quando il report non è leggibile su questo computer.
-  async function saveUserNote() {
-    if (!selectedId) return;
+  // Ritorna true quando a destinazione c'è quello che l'owner ha scritto: sia
+  // che l'abbia appena spedito, sia che non ci fosse niente da spedire. False
+  // solo se la scrittura è fallita. Il valore lo guarda chi deve decidere se
+  // proseguire (un'azione di stato non parte se la frase non si è salvata).
+  async function saveUserNote(opts) {
+    const muto = !!(opts && opts.muto);
+    if (!selectedId) return true;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
     const frase = (mgUserNoteText.value || '').trim().slice(0, 500);
     const gia = userNoteSpedito.has(id) ? userNoteSpedito.get(id) : String((fb && fb.userNote) || '');
-    if (gia === frase) { setUserNoteMsg('Nessuna modifica', ''); return; }
+    if (gia === frase) { if (!muto) setUserNoteMsg('Nessuna modifica', ''); return true; }
 
     // Da qui in poi quello che c'è nella casella è "partito": se l'owner ci
     // rimette mano, quello che scrive lui vince sulla risposta che arriverà.
