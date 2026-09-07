@@ -246,6 +246,11 @@ if (isMain) {
     conValore: ['--branch', '--reason', '--frase'],
   };
   const daNpm = argomentiDaNpm(process.env, OPZ);
+  if (daNpm.errore) {
+    console.error(`RIFIUTATO: ${daNpm.errore}`);
+    uso();
+    process.exit(1);
+  }
   if (daNpm.nota) { console.error(daNpm.nota); argv = [...argv, ...daNpm.args]; }
   const male = controllaArgomenti(argv, OPZ);
   if (male) {
