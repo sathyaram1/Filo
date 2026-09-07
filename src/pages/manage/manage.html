@@ -1256,6 +1256,15 @@
         </div>
         <div class="mg-st-drawer" id="mgStDrawer" hidden></div>
 
+        <!-- Quando i feedback non sono arrivati (caricamento in corso o
+             fallito) qui NON si scrivono zeri: uno zero è una risposta, e la
+             risposta non c'è. Stessa regola dei numeri sulle schede in cima. -->
+        <p class="mg-st-nodata" id="mgStNoData" hidden></p>
+
+        <!-- Tutto quello che si conta sui feedback. Sparisce finché i feedback
+             non ci sono; le esecuzioni, che vengono da un'altra fonte, no. -->
+        <div id="mgStBody">
+
         <!-- La torta dei giri di verifica + l'esito delle critiche. -->
         <section class="mg-st-section" id="mgStLoopSection">
           <h3>Giri di verifica prima del pass</h3>
@@ -1263,22 +1272,28 @@
             Quante critiche ha ricevuto un lavoro prima di passare la verifica.
             I lavori fermati non hanno un numero di giri: stanno a parte.
           </p>
-          <div class="mg-st-pies">
+          <div class="mg-st-pies" id="mgStPies">
             <div class="mg-st-pie">
               <svg id="mgStLoopChart" width="180" height="180" viewBox="0 0 180 180" role="img"
                 aria-label="Giri di verifica prima del pass"></svg>
               <ul class="mg-st-legend" id="mgStLoopLegend"></ul>
             </div>
-            <div class="mg-st-pie">
+            <div class="mg-st-pie" id="mgStOutcomePie">
               <svg id="mgStOutcomeChart" width="180" height="180" viewBox="0 0 180 180" role="img"
                 aria-label="Esito delle critiche"></svg>
               <ul class="mg-st-legend" id="mgStOutcomeLegend"></ul>
+              <!-- Nessuna critica non è «nessun dato»: senza questa riga la
+                   seconda torta resterebbe un quadrato muto accanto alla prima. -->
+              <p class="mg-st-empty mg-st-pie-empty" id="mgStOutcomeEmpty" hidden>
+                Nessuna critica in questa finestra: tutti i lavori sono passati al primo giro.
+              </p>
             </div>
           </div>
           <p class="mg-st-avg" id="mgStLoopAvg"></p>
           <p class="mg-st-empty" id="mgStLoopEmpty" hidden>
             Nessun lavoro verificato fra i feedback di questa finestra.
           </p>
+          <p class="mg-st-note" id="mgStLoopUnreadable" hidden></p>
         </section>
 
         <!-- Chi le manda. -->
