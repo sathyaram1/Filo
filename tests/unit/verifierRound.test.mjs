@@ -441,3 +441,18 @@ test('le quadre col livello si guardano tutte, e il contenuto può essere lungo'
 ${riga}`).length, 1, `«${riga}» non è riassunto`);
   }
 });
+
+test('una quadra spaiata, o lunghissima, non fa sparire il rilievo', () => {
+  const riassunto = 'Provato tutto per bene, il resto regge.';
+  for (const riga of [
+    '[3 lo strumento scrive nelle chiavi SSH senza chiedere',
+    '3] rotto e basta',
+    `[3 ${'x'.repeat(210)}] rotto`,
+  ]) {
+    assert.equal(R.unparsedLevelLines(`${riassunto}
+${riga}`).length, 1, 'una parentesi dimenticata non deve costare una bocciatura');
+  }
+  // Il testo normale non ne risente.
+  assert.equal(R.unparsedLevelLines('Passi: apri il menu, salva, guarda').length, 0);
+  assert.equal(R.unparsedLevelLines('Ho letto [la nota] e va bene').length, 0);
+});
