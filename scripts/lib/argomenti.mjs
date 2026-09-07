@@ -88,6 +88,30 @@ function distanza(a, b) {
  *
  * @returns {string|null} il messaggio da stampare, o null
  */
+// I nomi che npm mette nell'ambiente per conto suo. Tutto il resto, sotto una
+// scorciatoia, è roba che qualcuno ha scritto sulla riga di comando e che a
+// noi non è arrivata.
+const CONFIG_DI_NPM = new Set([
+  'access', 'all', 'audit', 'audit-level', 'auth-type', 'before', 'bin-links', 'browser', 'ca', 'cache',
+  'cache-max', 'cache-min', 'cafile', 'call', 'cert', 'ci', 'cidr', 'color', 'commit-hooks', 'cpu', 'depth',
+  'description', 'diff', 'editor', 'engine-strict', 'fetch-retries', 'fetch-timeout', 'force',
+  'foreground-scripts', 'format-package-lock', 'fund', 'git', 'git-tag-version', 'global', 'globalconfig',
+  'global-style', 'heading', 'https-proxy', 'if-present', 'ignore-scripts', 'include', 'include-staged',
+  'include-workspace-root', 'init-author-email', 'init-author-name', 'init-author-url', 'init-license',
+  'init-module', 'init-version', 'install-links', 'install-strategy', 'json', 'key', 'legacy-bundling',
+  'legacy-peer-deps', 'libc', 'link', 'local-address', 'local-prefix', 'location', 'lockfile-version',
+  'loglevel', 'logs-dir', 'logs-max', 'long', 'maxsockets', 'message', 'metrics-registry', 'node-gyp',
+  'node-options', 'node-version', 'noproxy', 'npm-version', 'offline', 'omit', 'only', 'optional', 'os',
+  'otp', 'pack-destination', 'package', 'package-lock', 'package-lock-only', 'parseable', 'prefer-dedupe',
+  'prefer-offline', 'prefer-online', 'prefix', 'preid', 'progress', 'provenance', 'proxy', 'read-only',
+  'rebuild-bundle', 'registry', 'replace-registry-host', 'save', 'save-bundle', 'save-dev', 'save-exact',
+  'save-optional', 'save-peer', 'save-prefix', 'save-prod', 'sbom-format', 'sbom-type', 'scope',
+  'script-shell', 'searchexclude', 'searchlimit', 'searchopts', 'searchstaleness', 'shell', 'shrinkwrap',
+  'sign-git-commit', 'sign-git-tag', 'strict-peer-deps', 'strict-ssl', 'tag', 'tag-version-prefix', 'timing',
+  'umask', 'unicode', 'update-notifier', 'usage', 'user', 'user-agent', 'userconfig', 'version', 'versions',
+  'viewer', 'which', 'workspace', 'workspaces', 'workspaces-update', 'yes',
+]);
+
 export function opzioneStorpiata(env = {}, opzioni = []) {
   const nomi = opzioni.map((o) => String(o).replace(/^--/, ''));
   for (const chiave of Object.keys(env)) {
