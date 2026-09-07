@@ -650,6 +650,26 @@
     });
   }
 
+  // Schede strette: sotto una certa larghezza ogni pixel serve al NOME, e la
+  // crocetta di chiusura ne teneva occupati ~24 senza essere nemmeno disegnata
+  // (sulle schede in secondo piano compare solo al passaggio del mouse). Con 11
+  // schede su 1280 px al nome restavano 32 px: "Me…" (#429). Qui marchiamo le
+  // schede sotto soglia e il CSS restituisce quello spazio al nome; la crocetta
+  // torna appena ci passi sopra col mouse, così chiudere resta un clic solo.
+  // La misura si prende dopo il layout (le larghezze le decide il flex), quindi
+  // vive qui e non in CSS: nessun contenitore conosce la propria larghezza.
+  const SOGLIA_SCHEDA_STRETTA = 160;
+  function marcaSchedeStrette() {
+    for (const el of tabsEl.querySelectorAll('.tab')) {
+      const stretta = el.getBoundingClientRect().width < SOGLIA_SCHEDA_STRETTA;
+      el.classList.toggle('stretta', stretta);
+    }
+  }
+  // La larghezza delle schede cambia anche senza un render (ridimensionamento
+  // della finestra): senza questo, allargando la finestra le schede restavano
+  // marchiate strette e la crocetta non tornava.
+  window.addEventListener('resize', () => { if (!drag) marcaSchedeStrette(); });
+
   function render() {
     // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
     // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
