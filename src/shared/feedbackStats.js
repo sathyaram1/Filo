@@ -456,15 +456,21 @@
         if (st.status === 'done' || st.status === 'archived') risolti += 1;
       }
       const pr = Math.round(Number(it.fb && it.fb.priority) || 0);
-      perPriorita[pr >= 1 && pr <= 3 ? pr : 0] += 1;
-      riaperture += Math.max(0, Number(it.fb && it.fb.reopenRequests) || 0);
+      const secchio = pr >= 1 && pr <= 3 ? pr : 0;
+      perPriorita[secchio] += 1;
+      pushId(idsPriorita, String(secchio), fbId);
+      const riap = Math.max(0, Number(it.fb && it.fb.reopenRequests) || 0);
+      riaperture += riap;
+      if (riap && fbId != null && fbId !== '') idsRiaperti.push(fbId);
       // Stessa regola della lista: `stalls` è il totale che non si azzera mai,
       // `workingResets` il contatore operativo che una consegna riporta a zero.
-      // Si legge il primo che c'è — SOMMARLI conterebbe due volte lo stesso
-      // arenamento.
-      stalli += Math.max(0, Math.round(
+      // Si legge il primo che c'è, perché sommarli conterebbe due volte lo
+      // stesso arenamento.
+      const are = Math.max(0, Math.round(
         Number(it.fb && it.fb.stalls) || Number(it.fb && it.fb.workingResets) || 0
       ));
+      stalli += are;
+      if (are && fbId != null && fbId !== '') idsArenati.push(fbId);
     }
 
     // ── I giri di verifica ───────────────────────────────────────────────────
