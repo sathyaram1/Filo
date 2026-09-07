@@ -168,3 +168,14 @@ test('le impostazioni di npm non vengono scambiate per nostri errori', () => {
   // caro di uno strumento che rifiuta tutto.
   assert.equal(opzioneStorpiata({ npm_config_attach: 'spec.md' }, ['--allega']), null);
 });
+
+test("l'opzione con la barra trasformata in percorso dalla conchiglia viene riconosciuta", () => {
+  // Su Windows la conchiglia di Git riscrive `/dry-run` come percorso prima di
+  // consegnarlo: lì la barra davanti non si vede più, e la modalità che non
+  // spedisce non si accendeva mentre il feedback partiva davvero.
+  const m = controllaArgomenti(['t', 'x', 'C:/Program Files/Git/dry-run'], FEEDBACK);
+  assert.match(m, /--dry-run/);
+  assert.match(m, /non ho toccato niente/);
+  // Un percorso vero non viene scambiato per un'opzione.
+  assert.equal(controllaArgomenti(['t', 'C:/Users/x/appunti.md'], FEEDBACK), null);
+});
