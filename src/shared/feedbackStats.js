@@ -357,12 +357,22 @@
    * il tetto finirebbe schiacciato nell'ultima barretta, che conterebbe roba
    * che l'etichetta sotto non nomina — un grafico che dice il falso proprio
    * dove nessuno va a controllare.
+   *
+   * E neanche l'anno basta: con due date scelte a mano si arriva a intervalli
+   * di secoli (basta sbagliare a digitare l'anno di partenza), e lì sessanta
+   * barrette annuali coprono sessant'anni su centoventi. Sopra quella soglia
+   * la barretta si allarga a QUANTI anni servono perché l'ultima cada dove
+   * finisce davvero la finestra. Verificato: dal 1900 a oggi le barrette
+   * dicevano che i feedback di quest'anno erano arrivati nel 1959.
    */
   function bucketSizeFor(spanMs) {
     if (spanMs <= 31 * DAY) return { key: 'day', ms: DAY, label: 'al giorno' };
     if (spanMs <= 200 * DAY) return { key: 'week', ms: 7 * DAY, label: 'a settimana' };
     if (spanMs <= MAX_BARRE * 30 * DAY) return { key: 'month', ms: 30 * DAY, label: 'al mese' };
-    return { key: 'year', ms: 365 * DAY, label: 'all\'anno' };
+    const YEAR = 365 * DAY;
+    if (spanMs <= MAX_BARRE * YEAR) return { key: 'year', ms: YEAR, label: 'all\'anno' };
+    const anni = Math.ceil(spanMs / MAX_BARRE / YEAR);
+    return { key: 'years', ms: anni * YEAR, label: `ogni ${anni} anni`, anni };
   }
 
   /**
