@@ -956,21 +956,64 @@
                  passaggi dell'iter + se un'istanza ci lavora in questo momento. -->
             <div class="mg-work-state" id="mgWorkState" hidden></div>
             <div class="mg-thread" id="mgThread"></div>
-            <!-- Azioni di stato (owner-only): quali siano lo dice la tabella
-                 condivisa (MR.ownerActions), non questa pagina. Il commento di
-                 revisione accompagna le decisioni sui Ricevuti. Il blocco
-                 sparisce quando lo stato non si legge: i pulsanti nascono dallo
-                 stato, e su una segnalazione cifrata la macchina se lo inventa. -->
-            <div class="mg-actions" id="mgActions" hidden>
-              <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
-                placeholder="Commento (opzionale): perché lo sblocchi…"></textarea>
-              <!-- I pulsanti li GENERA la pagina leggendo MR.ownerActions: la
-                   stessa tabella che disegna quelli della pagina dei feedback,
-                   così sulla stessa segnalazione le due superfici offrono le
-                   stesse azioni. Il messaggio d'esito resta in fondo alla riga. -->
-              <div class="mg-actions-row" id="mgActionsRow">
-                <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
+            <!-- Risposta ai chiarimenti (owner-only): per i feedback in stato
+                 `clarify`, l'owner risponde alle domande di Filo; la risposta
+                 si aggiunge alle note e il feedback rientra in coda (todo).
+                 Sta sopra la barra perché risponde alla conversazione. -->
+            <div class="mg-actions" id="mgClarify" hidden>
+              <textarea id="mgClarifyText" class="mg-accept-comment" rows="3"
+                placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
+              <div class="mg-actions-row">
+                <button type="button" class="sn-btn" id="mgClarifyBtn">Invia risposta</button>
+                <span class="mg-action-msg" id="mgClarifyMsg" role="status"></span>
               </div>
+            </div>
+
+            <!-- ── La barra dell'owner: UNA riga per tutti i tasti ───────────
+                 Prima erano tre blocchi impilati (azioni di stato, frase per
+                 chi ha segnalato, preferito) e il dettaglio ci finiva sotto:
+                 la conversazione — la cosa che si legge — restava schiacciata
+                 in alto. Ora i tasti stanno tutti sulla stessa riga e i moduli
+                 che ne dipendono (riapertura, frase) si aprono sotto solo
+                 quando li si chiede. -->
+            <div class="mg-owner" id="mgOwnerBar" hidden>
+              <!-- Il commento di revisione accompagna le decisioni sui
+                   Ricevuti: sta SOPRA la riga, perché è ciò che il tasto
+                   spedisce. Altrove è nascosto. -->
+              <textarea id="mgAcceptComment" class="mg-accept-comment" rows="2"
+                placeholder="Commento (opzionale): perché lo sblocchi…" hidden></textarea>
+
+              <div class="mg-owner-row">
+                <!-- Azioni di stato (owner-only): quali siano lo dice la
+                     tabella condivisa (MR.ownerActions), non questa pagina. Il
+                     gruppo sparisce quando lo stato non si legge: i pulsanti
+                     nascono dallo stato, e su una segnalazione cifrata la
+                     macchina se lo inventa. I pulsanti li GENERA la pagina
+                     dentro mgActionsRow; il messaggio d'esito resta in coda. -->
+                <div class="mg-actions-group" id="mgActions" hidden>
+                  <div class="mg-actions-row" id="mgActionsRow">
+                    <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
+                  </div>
+                </div>
+
+                <!-- Preferito ⭐ e frase: flag e testo in CHIARO, indipendenti
+                     dallo stato — per questo restano anche quando le azioni di
+                     stato spariscono. Archivia/Ripristina invece è un'azione di
+                     stato e vive nella riga generata qui accanto. -->
+                <div class="mg-actions-group" id="mgManage" hidden>
+                  <div class="mg-actions-row">
+                    <button type="button" class="mg-star-btn" id="mgStarBtn"
+                      aria-pressed="false" title="Aggiungi ai preferiti">☆ Preferito</button>
+                    <!-- Apre/chiude la frase per chi ha segnalato. Di base è
+                         chiusa: si scrive una volta sola, e da aperta occupava
+                         una fetta di dettaglio su ogni segnalazione aperta. -->
+                    <button type="button" class="mg-star-btn mg-usernote-toggle" id="mgUserNoteToggle"
+                      aria-expanded="false" aria-controls="mgUserNote">Frase per chi ha segnalato</button>
+                    <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
+                  </div>
+                </div>
+              </div>
+
               <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo
                    appende alla conversazione, come la gemella. -->
               <div class="mg-reopen" id="mgReopen" hidden>
@@ -982,47 +1025,23 @@
                   <button type="button" class="sn-btn" id="mgReopenConfirmBtn">Conferma riapertura</button>
                 </div>
               </div>
-            </div>
 
-            <!-- Risposta ai chiarimenti (owner-only): per i feedback in stato
-                 `clarify`, l'owner risponde alle domande di Filo; la risposta
-                 si aggiunge alle note e il feedback rientra in coda (todo). -->
-            <div class="mg-actions" id="mgClarify" hidden>
-              <textarea id="mgClarifyText" class="mg-accept-comment" rows="3"
-                placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
-              <div class="mg-actions-row">
-                <button type="button" class="sn-btn" id="mgClarifyBtn">Invia risposta</button>
-                <span class="mg-action-msg" id="mgClarifyMsg" role="status"></span>
-              </div>
-            </div>
-
-            <!-- La frase per chi ha mandato il feedback (owner-only). È l'unico
-                 testo che il mittente legge quando il suo feedback viene
-                 risolto: il resto della conversazione è cifrato e la chiave ce
-                 l'ha solo l'owner. Sta qui, accanto alla gestione, perché deve
-                 essere scrivibile su QUALUNQUE feedback selezionato — anche su
-                 uno già chiuso, per correggerla dopo. -->
-            <div class="mg-actions mg-usernote" id="mgUserNote" hidden>
-              <label class="mg-usernote-label" for="mgUserNoteText">Frase per chi ha segnalato
-                <span class="mg-usernote-hint">— è quello che legge lui quando il feedback si chiude</span>
-              </label>
-              <input type="text" id="mgUserNoteText" class="mg-accept-comment" maxlength="500"
-                placeholder="Una riga: cosa può fare adesso.">
-              <div class="mg-actions-row">
-                <button type="button" class="sn-btn" id="mgUserNoteBtn">Salva la frase</button>
-                <span class="mg-action-msg" id="mgUserNoteMsg" role="status"></span>
-              </div>
-            </div>
-
-            <!-- Preferito ⭐ (owner-only): un flag in chiaro, indipendente dallo
-                 stato — per questo NON sta con le azioni di stato, che invece
-                 spariscono quando lo stato non si legge. Archivia/Ripristina
-                 è un'azione di stato e vive nella riga generata qui sopra. -->
-            <div class="mg-actions mg-manage" id="mgManage" hidden>
-              <div class="mg-actions-row">
-                <button type="button" class="mg-star-btn" id="mgStarBtn"
-                  aria-pressed="false" title="Aggiungi ai preferiti">☆ Preferito</button>
-                <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
+              <!-- La frase per chi ha mandato il feedback (owner-only). È
+                   l'unico testo che il mittente legge quando il suo feedback
+                   viene risolto: il resto della conversazione è cifrato e la
+                   chiave ce l'ha solo l'owner. Si può scrivere su QUALUNQUE
+                   segnalazione — anche su una già chiusa, per correggerla
+                   dopo. Il tasto qui sopra la apre. -->
+              <div class="mg-usernote" id="mgUserNote" hidden>
+                <label class="mg-usernote-label" for="mgUserNoteText">Frase per chi ha segnalato
+                  <span class="mg-usernote-hint">— è quello che legge lui quando il feedback si chiude</span>
+                </label>
+                <input type="text" id="mgUserNoteText" class="mg-accept-comment" maxlength="500"
+                  placeholder="Una riga: cosa può fare adesso.">
+                <div class="mg-actions-row">
+                  <button type="button" class="sn-btn" id="mgUserNoteBtn">Salva la frase</button>
+                  <span class="mg-action-msg" id="mgUserNoteMsg" role="status"></span>
+                </div>
               </div>
             </div>
           </div>
