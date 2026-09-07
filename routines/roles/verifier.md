@@ -103,11 +103,17 @@ primo.
 
 - Rossi **fuori dalla lista dei rossi noti** → rilievo di livello **2**, con
   l'elenco esatto degli spec rotti nella critica.
-- Rossi noti (schermo intero, cattura dello schermo, finestra nascosta, un
-  sito esterno, il percorso abbreviato di Windows: quelli che sono rossi anche
-  su `main` in quell'ambiente) non contano. In dubbio, confronta con `main`
-  sullo stesso spec prima di bocciare: un rosso d'ambiente spacciato per
+- I rossi d'ambiente sono **scritti**, non a memoria: stanno in
+  `tests/rossi-noti.json`, con il caso preciso, il motivo e il feedback che li
+  toglierà. `contenitore.specs` sono quelli dei contenitori senza schermo delle
+  routine (tutto schermo, cattura dello schermo, un sito esterno); `specs` sono
+  quelli della macchina di chi sviluppa Filo. Confronta la tua corsa con quel
+  file: quello che non è lì dentro è una regressione. In dubbio, confronta con
+  `main` sullo stesso spec prima di bocciare — un rosso d'ambiente spacciato per
   regressione costa un giro intero.
+- Se trovi un rosso d'ambiente che nel file non c'è, **non aggiungerlo tu**:
+  scrivilo nella critica come rilievo, con il caso e il motivo. Un elenco che
+  cresce da solo torna a essere folklore.
 - Se hai già trovato rilievi di livello 3 o 2, la suite completa non serve
   adesso: la farà il giro in cui il lavoro passa.
 
