@@ -577,10 +577,16 @@
       idsNonLavorati,
       creatori: sortedEntries(perCreatore, CREATOR_KINDS, idsCreatore),
       priorita: perPriorita,
+      idsPriorita,
       lavorati,
       risolti,
       riaperture,
+      // Le riaperture e gli arenamenti sono EVENTI: il numero li conta tutti
+      // (una segnalazione può essersi arenata due volte), l'elenco porta alle
+      // segnalazioni su cui sono successi, che sono quello che si vuole aprire.
+      idsRiaperti,
       stalli,
+      idsArenati,
       loop,
       esecuzioni,
       prober: perRuolo.prober || 0,
