@@ -285,8 +285,9 @@ export function defaultState(id, branch) {
 // rilievo di livello 3/2 non correggibile: decide l'owner). Non
 // esiste più il verdetto a tre valori scelto dal verificatore: lui registra i
 // rilievi coi livelli, l'esito lo calcola il server dai bilanci. I vecchi
-// `pass|migliorabile|fail` restano accettati SOLO come parola opzionale sulla
-// riga di comando, per le ricette non ancora aggiornate (vengono ignorati).
+// `pass|migliorabile|fail` sulla riga di comando vengono RIFIUTATI: ignorarli
+// in silenzio faceva registrare una promozione a chi credeva di bocciare
+// (feedback #565), e una ricetta non aggiornata è meglio che si fermi.
 export const VERIFIER_OUTCOMES = ['pass', 'fix', 'stop'];
 // Tetto di una critica, lo stesso del server. Oltre: rifiuto con la
 // spiegazione, non un taglio.
