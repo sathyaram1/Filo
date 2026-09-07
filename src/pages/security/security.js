@@ -490,14 +490,21 @@
   // per sbaglio non deve pagare con tutto il resto della cronologia.
   async function removeClipEntry(entry, btn, daTastiera) {
     // Chi usa la tastiera non deve ripartire dall'inizio della pagina a ogni
-    // voce tolta. Col mouse la lista sta ferma finché ci tieni sopra il
-    // puntatore e il bottone premuto resta dov'è; da tastiera invece la lista
-    // si ricompone subito, il bottone che aveva il fuoco sparisce e il fuoco
-    // torna al corpo della pagina — per togliere la voce dopo toccherebbe
-    // riattraversare col tabulatore tutta la pagina delle impostazioni.
-    const righePrima = [...$('sec-clip-list').querySelectorAll('.sn-clip-item')];
-    const indice = righePrima.findIndex((r) => r.contains(btn));
+    // voce tolta. Disabilitare il bottone premuto butta il fuoco sul corpo
+    // della pagina, e per la voce dopo toccherebbe riattraversare col tabulatore
+    // tutta la pagina delle impostazioni.
+    //
+    // Il fuoco va rimesso in TUTTI e due i casi, e per un po' ne copriva uno
+    // solo: quando la lista si ricompone il bottone premuto sparisce, ma se il
+    // puntatore del mouse è fermo sulla lista la lista sta ferma e quel bottone
+    // resta a schermo disabilitato. Il vecchio controllo guardava solo se il
+    // bottone fosse ancora nella pagina, quindi con la mano ferma sul mouse il
+    // fuoco restava caduto. Adesso conta se il bottone è ancora PREMIBILE.
+    const indice = righeVive().findIndex((r) => r.contains(btn));
     const avevaFuoco = !!daTastiera && document.activeElement === btn;
+    const rimettiFuoco = () => {
+      try { btn.focus({ preventScroll: true }); } catch (_) { try { btn.focus(); } catch (__) {} }
+    };
     btn.disabled = true;
     try {
       const res = await chrome.runtime.sendMessage({
@@ -506,16 +513,18 @@
       });
       if (res && res.ok) {
         renderClipboard(res.items);
-        // Solo se la lista è stata davvero ricomposta: se il bottone è ancora
-        // lì (puntatore dentro la lista) il fuoco non si tocca.
-        if (avevaFuoco && !document.contains(btn)) fuocoDopoRimozione(indice);
+        if (avevaFuoco && (!document.contains(btn) || btn.disabled)) fuocoDopoRimozione(indice);
         showClipHint(I18n.t('security_clipboard_removed'), false);
       } else {
         btn.disabled = false;
+        // La voce è ancora lì: il fuoco torna sul suo stesso "Rimuovi", così
+        // riprovare è un altro Invio e non un altro giro col tabulatore.
+        if (avevaFuoco) rimettiFuoco();
         showClipHint(I18n.t('security_clipboard_fail'), true);
       }
     } catch (_) {
       btn.disabled = false;
+      if (avevaFuoco) rimettiFuoco();
       showClipHint(I18n.t('security_clipboard_fail'), true);
     }
   }
