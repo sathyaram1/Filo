@@ -2577,7 +2577,9 @@
     } catch (e) {
       // Superata da un invio più recente: comanda quello, qui non si tocca
       // niente.
-      if (mio !== userNoteInvii.get(id)) return false;
+      // Superata da un invio piu' recente: a decidere se a destinazione c'e'
+      // quello che l'owner ha scritto e' quello, non questo.
+      if (mio !== userNoteInvii.get(id)) return true;
       // Non è arrivato a destinazione, e una scrittura precedente potrebbe
       // esserci arrivata: da qui in poi non sappiamo cosa ci sia. Va marcato
       // SEMPRE, anche se intanto si sta guardando un altro feedback, o il
