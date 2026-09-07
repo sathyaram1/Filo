@@ -191,6 +191,20 @@ test('la frase già scritta si legge nella conversazione, senza aprire niente', 
   await expect(bolla).toContainText('per chi ha segnalato');
 });
 
+test('anche con quattro azioni i tasti restano su una riga sola', async ({ openTab }) => {
+  // Un file sospetto offre il massimo dei pulsanti: "In coda", "Conferma
+  // attacco", "Conferma spam", "Archivia" — più preferito e frase. Prima gli
+  // ultimi due finivano su una seconda riga.
+  const page = await openTab(URL);
+  await prepara(page, [{ ...BASE, _id: 'fb-sosp', seq: 912, status: 'suspicious_file', statusPublic: 'open' }], 'inbox', 'fb-sosp');
+  const misure = await page.evaluate(() => {
+    const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
+    return { quanti: bs.length, righe: [...new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top / 8)))].length };
+  });
+  expect(misure.quanti).toBe(6);
+  expect(misure.righe).toBe(1);
+});
+
 test('un messaggio d esito lungo non manda i tasti a capo', async ({ openTab }) => {
   const page = await openTab(URL);
   await prepara(page, [IN_CODA], 'queue', 'fb-coda');
