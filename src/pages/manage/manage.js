@@ -3246,15 +3246,22 @@
       box.appendChild(b);
     }
 
-    // …e le singole, per chi vuole la combinazione precisa.
+    // …e le singole, per chi vuole la combinazione precisa. Quando non c'è
+    // nessun filtro, acceso resta il solo «Tutti»: nove caselle accese sono la
+    // stessa informazione detta nove volte, e nascondono quale sia lo stato
+    // vero. È anche coerente col clic — da qui il primo clic dice «solo
+    // questo», non «togli questo».
+    const nessunFiltro = stCreators.size === ST.CREATOR_KINDS.length;
     for (const k of ST.CREATOR_KINDS) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'mg-st-chip';
       b.dataset.creator = k;
       b.textContent = stCreatorLabel(k);
-      b.title = `Aggiungi o togli: ${stCreatorLabel(k)}`;
-      b.setAttribute('aria-pressed', stCreators.has(k) ? 'true' : 'false');
+      b.title = nessunFiltro
+        ? `Mostra solo: ${stCreatorLabel(k)}`
+        : `Aggiungi o togli: ${stCreatorLabel(k)}`;
+      b.setAttribute('aria-pressed', (!nessunFiltro && stCreators.has(k)) ? 'true' : 'false');
       b.addEventListener('click', () => stToggleCreator(k));
       box.appendChild(b);
     }
