@@ -198,19 +198,48 @@ test.describe('colore identità tab inattiva', () => {
     });
     expect(id).not.toBeNull();
 
-    const bgEff = await shell.evaluate((tid) => {
+    const scheda = await shell.evaluate((tid) => {
       const el = document.querySelector(`.tab[data-id="${tid}"]`);
       if (!el) return null;
+      const titolo = el.querySelector('.title');
+      const barra = getComputedStyle(document.documentElement).getPropertyValue('--tab-bg').trim();
       return {
-        bgEff: el.style.getPropertyValue('--tab-bg-eff'),
         isActive: el.classList.contains('active'),
+        fondo: getComputedStyle(el).backgroundColor,
+        testo: getComputedStyle(titolo || el).color,
+        neutroBarra: barra,
       };
     }, id);
 
-    expect(bgEff).not.toBeNull();
-    // È una tab inattiva e ha la tinta identità (color-mix col neutro del tab bar).
-    expect(bgEff.isActive).toBe(false);
-    expect(bgEff.bgEff).toContain('color-mix');
+    expect(scheda).not.toBeNull();
+    expect(scheda.isActive).toBe(false);
+
+    // Il fondo della scheda inattiva è la tinta del sito smorzata verso il
+    // neutro della barra: sta FRA i due, non è né il neutro né il rosa pieno.
+    const rgb = (s) => {
+      const m = /rgba?\(([^)]+)\)/.exec(s || '');
+      if (m) return m[1].split(/[,\s/]+/).filter(Boolean).slice(0, 3).map(Number);
+      const c = /color\(\s*srgb\s+([^)]+)\)/.exec(s || '');
+      if (c) return c[1].trim().split(/[\s/]+/).slice(0, 3).map((v) => Math.round(parseFloat(v) * 255));
+      return null;
+    };
+    const fondo = rgb(scheda.fondo);
+    expect(fondo, `fondo illeggibile: ${scheda.fondo}`).not.toBeNull();
+    // Ha preso una tinta: il rosso resta sopra gli altri due canali, come nel
+    // marchio del sito, ma smorzato (non è rgb(220, 30, 90)).
+    expect(fondo[0]).toBeGreaterThan(fondo[2]);
+    expect(fondo[0] - fondo[1]).toBeLessThan(60);
+
+    // E il NOME si legge su quella tinta: è il difetto #429 (al buio la scheda
+    // di un sito dal marchio chiaro diventava un rettangolo con dentro un testo
+    // dello stesso colore, 1,08 a 1). Qui pretendiamo almeno 4 a 1.
+    const testo = rgb(scheda.testo);
+    const lum = ([r, g, b]) => {
+      const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const contrasto = (Math.max(lum(fondo), lum(testo)) + 0.05) / (Math.min(lum(fondo), lum(testo)) + 0.05);
+    expect(contrasto, `nome poco leggibile sulla tinta: ${scheda.testo} su ${scheda.fondo}`).toBeGreaterThanOrEqual(4);
   });
 });
 
