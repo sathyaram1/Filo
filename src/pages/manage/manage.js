@@ -3575,22 +3575,30 @@
 
   function stRenderHealth(d) {
     const box = $st('mgStHealthRows');
-    if (!box) return;
+    const signals = $st('mgStSignalRows');
     const p = d.priorita || {};
-    box.innerHTML = stRowsHtml([
-      { key: 'p3', label: 'Priorità alta (3)', count: p[3] || 0 },
-      { key: 'p2', label: 'Priorità media (2)', count: p[2] || 0 },
-      { key: 'p1', label: 'Priorità bassa (1)', count: p[1] || 0 },
-      { key: 'p0', label: 'Senza priorità', count: p[0] || 0 },
-      {
-        key: 'riaperture', label: 'Riaperture chieste', count: d.riaperture,
-        title: 'Quante volte chi aveva segnalato ha detto «è ancora rotto» su un feedback di questa finestra.',
-      },
-      {
-        key: 'stalli', label: 'Lavori rientrati in coda', count: d.stalli,
-        title: 'Quante volte una lavorazione si è arenata (il ramo fermo troppo a lungo) ed è rientrata in coda da sola.',
-      },
-    ], { total: d.ricevuti, percent: false });
+    if (box) {
+      box.innerHTML = stRowsHtml([
+        { key: 'p3', label: 'Priorità alta (3)', count: p[3] || 0 },
+        { key: 'p2', label: 'Priorità media (2)', count: p[2] || 0 },
+        { key: 'p1', label: 'Priorità bassa (1)', count: p[1] || 0 },
+        { key: 'p0', label: 'Senza priorità', count: p[0] || 0 },
+      ], { total: d.ricevuti });
+    }
+    if (signals) {
+      // Eventi, non segnalazioni: niente barre e niente percentuali sul totale
+      // dei ricevuti, che sarebbe un rapporto fra due cose diverse.
+      signals.innerHTML = stRowsHtml([
+        {
+          key: 'riaperture', label: 'Riaperture chieste', count: d.riaperture,
+          title: 'Quante volte chi aveva segnalato ha detto «è ancora rotto» su un feedback di questa finestra.',
+        },
+        {
+          key: 'stalli', label: 'Lavori rientrati in coda', count: d.stalli,
+          title: 'Quante volte una lavorazione si è arenata (il ramo fermo troppo a lungo) ed è rientrata in coda da sola.',
+        },
+      ], { percent: false, bars: false });
+    }
   }
 
   function stRender() {
