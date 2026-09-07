@@ -428,3 +428,16 @@ ${riga}`).length, 1, `«${riga}» non è riassunto`);
   // Una quadra che non dice un livello resta testo.
   assert.equal(R.unparsedLevelLines('Ho letto [la nota] e va bene').length, 0);
 });
+
+test('le quadre col livello si guardano tutte, e il contenuto può essere lungo', () => {
+  const riassunto = 'Provato tutto per bene, il resto regge.';
+  for (const riga of [
+    "[3 dati dell'utente a rischio] rotto",
+    '[2 la cosa chiesta non si ottiene] rotto',
+    '[ho ri-provato le porte tutte chiuse] e poi [3 grave] rotto',
+    'Nota: [livello 3 e dati a rischio] rotto',
+  ]) {
+    assert.equal(R.unparsedLevelLines(`${riassunto}
+${riga}`).length, 1, `«${riga}» non è riassunto`);
+  }
+});
