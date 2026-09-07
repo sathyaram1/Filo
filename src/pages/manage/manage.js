@@ -4093,7 +4093,7 @@
   // creatore, fetta di torta): aprire l'elenco di cosa ha contato, o andare
   // dove quelle cose si leggono, più il numero da incollare.
   function stVociGruppo(riga) {
-    const etichetta = ((riga.querySelector('.mg-st-row-label') || riga).textContent || '').replace(/\s+/g, ' ').trim();
+    const etichetta = ((riga.querySelector('.mg-st-row-label, .mg-st-legend-label') || riga).textContent || '').replace(/\s+/g, ' ').trim();
     const numero = ((riga.querySelector('.mg-st-row-num, .mg-st-legend-val') || {}).textContent || '').replace(/\s+/g, ' ').trim();
     const voci = [];
     if (riga.dataset.open) {
