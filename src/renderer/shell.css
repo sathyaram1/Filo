@@ -189,10 +189,15 @@ html[data-chrome-compact="1"] .addr {
   align-items: center;
   gap: 6px;
   height: 32px;
-  flex: 1 1 0;
+  /* Larghezza in stile Chrome: ogni scheda PARTE dalla sua larghezza piena
+     (260px, la base) e si stringe solo quando la striscia non ci sta più,
+     fino a min-width; poi la striscia scrolla (vedi .tabs).
+     Prima la base era 0 e lo spazio veniva spartito a proporzione fissa
+     (1 contro 1.8 dell'attiva) senza mai guardare il titolo: con la barra
+     mezza vuota una scheda restava tagliata a "Cro…" mentre a destra
+     avanzavano centinaia di pixel (#429). */
+  flex: 0 1 260px;
   min-width: 40px;
-  /* Tab leggermente più larghe rispetto a prima: dà spazio al titolo e
-     all'icona audio a fine riga senza stringere troppo. */
   max-width: 260px;
   padding: 0 8px 0 10px;
   /* --tab-bg-eff = sfondo effettivo della tab. Di default il neutro del tab bar;
