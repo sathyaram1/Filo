@@ -1607,7 +1607,15 @@ if (isMainModule) {
         console.error(`Primo pezzo: "${String(rest[0]).slice(0, 60)}…" · secondo: "${String(rest[1]).slice(0, 60)}…"`);
         process.exit(1);
       }
-      const s = await recordVerifier(id, rest.join(' '));
+      // Il pavimento al motivo, uguale nei due sensi: copre insieme la critica
+      // vuota (l'identificativo e basta) e quella di due parole.
+      const critica = rest.join(' ').trim();
+      if (critica.length < MIN_CRITIQUE_CHARS) {
+        console.error(`Critica troppo corta (${critica.length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho registrato niente.`);
+        console.error('Vale anche quando promuovi: senza rilievi la verifica risulta superata, e una promozione senza motivo non dice a nessuno cosa hai provato.');
+        process.exit(1);
+      }
+      const s = await recordVerifier(id, critica);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);
       console.log(verifierReplyText(s.reply));
