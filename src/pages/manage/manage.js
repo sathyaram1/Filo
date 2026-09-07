@@ -3655,7 +3655,7 @@
     // La frase del vuoto la dice il paragrafo qui sotto, non anche una riga
     // dell'elenco: scritta lì finiva nella colonna stretta delle etichette e si
     // leggeva «Nessun feedback in questa finest…», due volte di fila.
-    box.innerHTML = rows.length ? stRowsHtml(rows, { total: d.ricevuti }) : '';
+    box.innerHTML = rows.length ? stRowsHtml(rows, { total: d.ricevuti, scope: 'creatore' }) : '';
     if (empty) empty.hidden = rows.length > 0;
   }
 
