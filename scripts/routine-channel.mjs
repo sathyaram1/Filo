@@ -453,7 +453,7 @@ if (isMain) {
     const r = await ticket(args[0]);
     // `--json`: biglietto E ruolo, per chi deve scegliere il worker prima di
     // lanciarlo. Senza flag resta la sola stringa, come sempre.
-    if (r.outcome === 'work') { console.log(args.includes('--json') ? JSON.stringify({ ticket: r.ticket, role: r.role || '' }) : r.ticket); process.exit(0); }
+    if (r.outcome === 'work') { console.log(data.json === true ? JSON.stringify({ ticket: r.ticket, role: r.role || '' }) : r.ticket); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'work') {
