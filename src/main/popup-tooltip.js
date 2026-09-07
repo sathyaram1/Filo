@@ -102,7 +102,12 @@ function ensureWin(parentWin) {
     if (channel === 'size' && tipWin && !tipWin.isDestroyed()) {
       const w = Math.max(20, payload.w + 4);
       const h = Math.max(16, payload.h + 4);
-      tipWin.setBounds({ x: tipWin.getBounds().x, y: tipWin.getBounds().y, width: w, height: h });
+      const b = tipWin.getBounds();
+      // La posizione provvisoria era centrata sotto l'elemento, misurata prima
+      // di sapere quanto è largo il riquadro: una volta nota la larghezza va
+      // riportato dentro lo schermo, o la fine del testo resta fuori.
+      const { x, y } = dentroLoSchermo(b.x, b.y, w, h);
+      tipWin.setBounds({ x, y, width: w, height: h });
       // Nei test resta invisibile: è una finestra a sé (vedi test-window-mode.js).
       hideForTests(tipWin);
       if (!tipWin.isVisible()) tipWin.showInactive();
