@@ -3964,9 +3964,19 @@
     stSetTile('mgStTileRicevuti', datiPronti ? stFmtInt(data.ricevuti) : '—',
       !datiPronti ? 'dati non arrivati'
         : data.ricevuti ? `${stFmtInt(data.categorie.length)} categorie` : 'niente in questa finestra');
-    stSetTile('mgStTileLavorati', datiPronti ? stFmtInt(data.lavorati) : '—',
+    // «Lavorati» si misura sullo stato. Uno stato cifrato che questo computer
+    // non sa leggere non vale «non è stato lavorato»: quando NESSUNO stato si
+    // legge quel numero non si conosce, e va scritto come si scrive un numero
+    // che non si conosce. Quando se ne legge una parte il numero è un minimo, e
+    // il sottotitolo dice quante ne restano fuori.
+    const lavoratiIgnoto = datiPronti && data.lavoratiSconosciuto;
+    stSetTile('mgStTileLavorati', (!datiPronti || lavoratiIgnoto) ? '—' : stFmtInt(data.lavorati),
       !datiPronti ? 'dati non arrivati'
-        : data.ricevuti ? `${stPct(data.lavorati, data.ricevuti)} dei ricevuti · ${stFmtInt(data.risolti)} risolti` : '');
+        : lavoratiIgnoto ? 'stato non leggibile su questo computer'
+          : data.ricevuti
+            ? `${stPct(data.lavorati, data.ricevuti)} dei ricevuti · ${stFmtInt(data.risolti)} risolti`
+              + (data.lavoratiIgnoti ? ` · ${stFmtInt(data.lavoratiIgnoti)} di stato non leggibile` : '')
+            : '');
     // Il registro delle esecuzioni non è mai arrivato? Allora questo numero non
     // è zero: non si conosce. Uno zero grande in mezzo alla pagina si legge
     // come «non è partito niente», che è il contrario di «non lo so», e le due
