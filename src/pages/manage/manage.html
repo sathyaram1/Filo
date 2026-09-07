@@ -288,7 +288,9 @@
       display: grid;
       grid-template-columns: 220px 12px minmax(0, 1fr) 12px 280px;
       gap: 0;
-      height: calc(100vh - 180px);
+      /* L'altezza la decide la colonna della pagina (#panel-list): qui si dice
+         solo "prendi quello che avanza", mai una misura in pixel. */
+      flex: 1 1 auto;
       min-height: 300px;
     }
     .mg-col {
