@@ -88,7 +88,7 @@
   // messo prima della cifra («[?2]») o un segno diverso dopo («[2!]»): non
   // erano né rilievi né errori (verifica del giro 7).
   const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*[?!]*\\s*\\]';
-  const LEVEL_START = new RegExp(`^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
+  const LEVEL_START = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
   // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
