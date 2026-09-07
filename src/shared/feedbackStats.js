@@ -274,10 +274,10 @@
       const m = RE_GIRO_OGGI.exec(b);
       if (m) {
         const findings = Math.max(1, Number(m[2]) || 1);
-        const outcome = RE_STOP.test(b) ? 'fail'
-          : (RE_FIX.test(b) || RE_DERIVATO.test(b)) ? 'migliorabile'
-            : 'migliorabile';
-        giri.push({ outcome, findings });
+        // Con rilievi il giro non è un pass. «Si ferma» = serve l'owner (fail);
+        // tutto il resto — corretti dal verificatore o passati al feedback
+        // derivato — è lavoro che PROSEGUE, cioè «migliorabile».
+        giri.push({ outcome: RE_STOP.test(b) ? 'fail' : 'migliorabile', findings });
       }
     }
     return giri;
