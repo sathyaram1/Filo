@@ -115,3 +115,41 @@ test('larghezze salvate più grandi della finestra non fanno sparire il dettagli
   expect(geom.list + geom.detail + geom.side).toBeLessThanOrEqual(geom.grid + 4);
   expect(geom.list).toBeLessThan(geom.grid);
 });
+
+// #498: «espandi le aree, fai partire le sezioni un poco più in alto». La barra
+// delle schede partiva a 40px dal bordo e le tre aree finivano con un'altezza
+// scritta a mano (`calc(100vh - 180px)`): senza il banner di sola lettura
+// restavano quasi cento pixel vuoti in fondo, col banner la pagina scrollava
+// di altrettanto. La misura ora la fa il layout, quindi vale in tutti e due i
+// casi — ed è questo che il test guarda.
+test('le sezioni partono in alto e le aree arrivano in fondo alla finestra', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#mgReviewGrid')).toBeVisible();
+
+  // Il banner c'è solo per chi non è l'owner: la dashboard deve riempire la
+  // finestra in entrambi i casi (con il banner, e come lo vede l'owner).
+  for (const conBanner of [true, false]) {
+    await page.evaluate((v) => { document.getElementById('mgBanner').hidden = !v; }, conBanner);
+
+    const geom = await page.evaluate(() => {
+      const doc = document.documentElement;
+      return {
+        tabsTop: document.getElementById('mgTabs').getBoundingClientRect().top,
+        gridBottom: document.getElementById('mgReviewGrid').getBoundingClientRect().bottom,
+        viewport: doc.clientHeight,
+        scrollH: doc.scrollHeight,
+      };
+    });
+
+    // Le aree arrivano fino in fondo (un filo di margine, non un vuoto).
+    expect(geom.viewport - geom.gridBottom).toBeLessThanOrEqual(28);
+    expect(geom.gridBottom).toBeLessThanOrEqual(geom.viewport + 1);
+    // E la pagina non scrolla per colpa di un'altezza scritta a mano.
+    expect(geom.scrollH).toBeLessThanOrEqual(geom.viewport + 1);
+
+    // Senza banner (la vista dell'owner) le schede sono la prima cosa e stanno
+    // vicine al bordo.
+    if (!conBanner) expect(geom.tabsTop).toBeLessThanOrEqual(20);
+  }
+});
