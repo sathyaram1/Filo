@@ -996,6 +996,9 @@
     });
     if (isList) {
       currentTab = tab;
+      // La frase scritta e non ancora partita se ne va con la selezione: si
+      // salva finché `selectedId` dice ancora a chi appartiene.
+      salvaFraseSubito({ muto: true });
       // Cambiando tab si azzera la selezione: il feedback aperto potrebbe non
       // appartenere alla nuova lista.
       selectedId = null;
