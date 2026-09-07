@@ -745,9 +745,26 @@
       idsIlleggibili,
       idsNonLavorati,
       creatori: sortedEntries(perCreatore, CREATOR_KINDS, idsCreatore),
+      // Mittente e priorità che non si leggono: contati a parte, mai travestiti
+      // da «Utente» e da «Senza priorità».
+      mittenteIgnoto,
+      idsMittenteIgnoto,
+      mittenteFuoriFiltro,
+      prioritaIgnota,
+      idsPrioritaIgnota,
+      // Le segnalazioni senza una data d'arrivo leggibile, e se la finestra le
+      // sta contando (solo quella senza limiti lo fa).
+      senzaData,
+      idsSenzaData,
+      senzaDataDentro: (range.from == null && range.to == null) ? senzaData : 0,
       priorita: perPriorita,
       idsPriorita,
       lavorati,
+      // «Lavorati» si misura sullo stato, e lo stato di una segnalazione
+      // illeggibile non lo sa nessuno: il numero è un MINIMO, e quando NESSUNO
+      // stato si legge non è nemmeno un minimo, è un dato che manca.
+      lavoratiIgnoti: illeggibili,
+      lavoratiSconosciuto: selezionati.length > 0 && illeggibili === selezionati.length,
       risolti,
       riaperture,
       // Le riaperture e gli arenamenti sono EVENTI: il numero li conta tutti
