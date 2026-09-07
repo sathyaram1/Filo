@@ -158,3 +158,39 @@ test('i piedini della scheda in primo piano stanno dentro la striscia', async ({
   expect(m.scorsa, 'la rotella non deve poter far scivolare la fila').toBe(0);
   expect(m.spazioDestra, 'il piedino destro non ci sta').toBeGreaterThanOrEqual(8);
 });
+
+test('il suggerimento di una scheda dal nome lunghissimo non diventa una striscia', async ({ shell, app, testServer }) => {
+  // Il riquadro che compare fermandosi col mouse su una scheda è l'unico modo
+  // di leggere un nome tagliato. Era una riga sola senza tetto: 887px per il
+  // titolo di un articolo, 22.000px per uno lunghissimo, cioè fuori schermo.
+  const titolo = 'Come scegliere la bicicletta giusta: guida completa alle misure, ai materiali '
+    + 'del telaio e ai rapporti, con le prove su strada di dodici modelli e i prezzi aggiornati '
+    + 'Rivista del Ciclismo, edizione di settembre';
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), testServer.html(`<title>${titolo}</title><body style="margin:0;background:#fff">x</body>`));
+  await expect.poll(async () => shell.evaluate(() => {
+    const el = document.querySelector('.tab.active .title');
+    return el ? el.textContent.length : 0;
+  }), { timeout: 10_000 }).toBeGreaterThan(100);
+
+  const pos = await shell.evaluate(() => {
+    const r = document.querySelector('.tab.active').getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  });
+  await shell.mouse.move(5, 5);
+  await shell.mouse.move(pos.x, pos.y);
+
+  // Il riquadro compare dopo ~350ms e si ridimensiona quando ha misurato il
+  // testo: aspettiamo che abbia finito, poi leggiamo i suoi bordi veri.
+  await shell.waitForTimeout(2000);
+  const b = await app.evaluate(({ BrowserWindow }) => {
+    const wins = BrowserWindow.getAllWindows();
+    const main = wins.find((w) => w._filoTabs && !w._filoIncognito);
+    const tip = wins.find((w) => w !== main && !w._filoTabs);
+    return tip ? tip.getBounds() : null;
+  });
+  expect(b, 'il riquadro di suggerimento non è comparso').not.toBeNull();
+
+  expect(b.width, `riquadro largo ${b.width}px`).toBeLessThanOrEqual(480);
+  // È andato a capo invece di allungarsi: più righe, non una sola.
+  expect(b.height, `riquadro alto ${b.height}px: non è andato a capo`).toBeGreaterThan(40);
+});
