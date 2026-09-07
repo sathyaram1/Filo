@@ -4062,6 +4062,21 @@
       ];
     }
 
+    // Dentro il riquadro di una torta ma non su una fetta: gli angoli del
+    // quadrato restano fuori dal cerchio, e lì prima non usciva niente
+    // (nemmeno il menu generale di Filo, che sugli elementi di un disegno non
+    // arriva). La torta intera ha comunque una risposta da dare.
+    const torta = target.closest('.mg-st-pie');
+    if (torta) {
+      const righe = [...torta.querySelectorAll('.mg-st-legend li[data-group]')].map((li) => {
+        const l = (li.querySelector('.mg-st-legend-label') || {}).textContent || '';
+        const v = (li.querySelector('.mg-st-legend-val') || {}).textContent || '';
+        return `${l}: ${v}`.trim();
+      }).filter((t) => t.length > 1);
+      if (!righe.length) return [];
+      return [{ label: 'Copia la ripartizione', onPick: () => stCopia(righe.join(' · ')) }];
+    }
+
     // Un pulsante della finestra o del creatore.
     const chip = target.closest('.mg-st-chip');
     if (chip) {
