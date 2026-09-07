@@ -44,6 +44,18 @@ scrive «—» e accanto si dice perché.
   solo quella che era andata male. Una lettura riuscita e poi persa lascia
   l'ultimo numero letto, come fa la lista quando un giro va male: «—» è per il
   numero che non si è mai conosciuto.
+- **Il quarto zero falso: il campo letto nella forma sbagliata.** Non nasce da
+  un dato che manca, ma da un dato che c'è e che chi conta non riconosce, e non
+  ha nessuno dei segnali degli altri tre: nessun guasto, nessun caricamento in
+  corso, nessuna chiave mancante. Le riaperture chieste dalla board sono una
+  VOCE per ogni persona che le ha chieste, non un contatore che avanza:
+  `Number({…})` è NaN, il ripiego `|| 0` lo trasforma in uno zero perfettamente
+  credibile, e la riga accanto (i lavori arenati, che invece è un numero) fa da
+  garante. Prima di scrivere `Number(fb.campo) || 0`, guarda chi quel campo lo
+  SCRIVE. E lo unit test usa la forma che il produttore scrive davvero: quello
+  di questa riga passava con `reopenRequests: 2`, un numero che in Firestore non
+  esiste. Il ripiego che regge più forme (mappa, lista, numero) sta in
+  `reopenCount`.
 - **Un numero parziale lo dichiara accanto a sé.** Se la fonte tiene solo le
   voci recenti (un registro cappato, una lista che si ferma ai primi N), il
   numero è un MINIMO: la frase che lo dice va scritta anche, e soprattutto,
