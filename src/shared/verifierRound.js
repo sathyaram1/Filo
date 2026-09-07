@@ -128,6 +128,11 @@
   // che quelle parentesi in mezzo a una frase le lasciava passare
   // (feedback #565).
   const QUADRA_OVUNQUE = new RegExp(`(${LEVEL_TOKEN_SRC})`);
+  // E, dovunque nella riga, una parentesi di QUALUNQUE forma che contenga SOLO
+  // un livello: «(3)», «{2}», «[2)», «(due)». Il contenuto è stretto apposta —
+  // «(3 volte)» in mezzo a una frase resta testo normale (feedback #565).
+  const SOLO_UN_LIVELLO = '\\s*(?:(?:livello|level|priorit[àa]|liv|L|P)\\s*)?(?:\\d+(?:\\s*[.,\\-–/]\\s*\\d+)?|zero|uno|due|tre)\\s*[?!]*\\s*';
+  const PARENTESI_LIVELLO = new RegExp(`(?:\\[{1,2}|\\(|\\{)${SOLO_UN_LIVELLO}(?:\\]{1,2}|\\)|\\})`);
   // Dentro la CONTINUAZIONE di un rilievo, invece, un livello citato in mezzo
   // a una frase resta testo («Passi: critica con [2] - poi start», verifica
   // del giro 6): lì il danno è minore — il rilievo sopra è comunque
