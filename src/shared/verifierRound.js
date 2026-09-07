@@ -95,6 +95,15 @@
   // erano né rilievi né errori (verifica del giro 7).
   const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*[?!]*\\s*\\]';
   const LEVEL_START = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
+  // Un livello scritto in una parentesi qualunque — tonda, graffa, doppia,
+  // spaiata — o con la cifra a parole. Il lettore riconosce solo la quadra con
+  // la cifra: tutto il resto finiva nel riassunto in silenzio, e una
+  // bocciatura diventava una promozione (feedback #565). Qui si guarda come
+  // APRE la riga, e basta che dentro ci sia una cifra o una parola che dice un
+  // livello.
+  const PARENTESI_QUALUNQUE = '(?:\\[{1,2}|\\(|\\{)\\s*[^\\]\\)\\}\\n]{0,20}(?:\\]{1,2}|\\)|\\})';
+  const APERTURA_PARENTESI = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?(${PARENTESI_QUALUNQUE})`);
+  const DENTRO_SEMBRA_LIVELLO = /\d|zero|uno|due|tre|livello|level|priorit/i;
   // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
