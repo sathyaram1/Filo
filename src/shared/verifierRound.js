@@ -135,7 +135,11 @@
   // questo un «[2]» dopo una barra-n finiva nel riassunto e il lavoro passava
   // in silenzio, in tutti e tre i posti (porta chiusa al giro 3 su #561 e
   // riaperta al giro 5).
-  const ESCAPED_BREAK_BEFORE_BRACKET = /(?:\\r)?\\n\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[/;
+  // Gli stessi modi di elencare del lettore, non cinque su nove: con un titolo
+  // Markdown o una citazione dopo la barra-n l'a capo non veniva riconosciuto,
+  // la riga non diventava mai una riga e il rilievo finiva nel riassunto —
+  // un'altra bocciatura letta come promozione (feedback #565).
+  const ESCAPED_BREAK_BEFORE_BRACKET = new RegExp(`(?:\\\\r)?\\\\n\\s*${PREFISSO_ELENCO}(?:\\*\\*)?\\[`);
 
   /** La critica con gli a capo veri: `\r\n` → `\n`, e la barra-n letterale usata come a capo. PURA. */
   function normalizeCritique(text) {
