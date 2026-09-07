@@ -339,6 +339,12 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
   ]);
+  // Quelli che senza il loro testo non hanno senso: un «sì» al loro posto
+  // vuol dire consegnare a vuoto.
+  const CAMPI_TESTO = new Set([
+    'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status',
+  ]);
   const args = [];
   const flags = [];
   const data = {};
