@@ -72,6 +72,68 @@
   }
 
   // ------------------------------------------------------------
+  // Testo leggibile sopra la tinta della scheda
+  // ------------------------------------------------------------
+  // La scheda prende il colore della pagina (attiva) o del marchio del sito
+  // (inattiva): il colore del testo NON può quindi essere un valore fisso del
+  // tema. Al buio la scheda di un sito dal marchio chiaro (Wikipedia, GitHub,
+  // le pagine di Filo) diventava un rettangolo chiaro col nome scritto nel
+  // grigio caldo del tema scuro: 1,08 a 1 di contrasto, cioè illeggibile (#429).
+  //
+  // La regola è: scegli fra chiaro e scuro quello che contrasta di PIÙ, misurato
+  // davvero. Una soglia di luminanza secca sbagliava proprio le tinte di mezzo,
+  // dove i due candidati sono vicini ed è lì che si perde il testo.
+
+  const TESTO_SCURO = 'rgb(26, 25, 24)';   // #1a1918
+  const TESTO_CHIARO = 'rgb(248, 246, 240)'; // #f8f6f0
+
+  function relLum(rgb) {
+    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  }
+
+  // Rapporto di contrasto WCAG fra due colori "rgb(...)". null se non parsabili.
+  function contrastRatio(a, b) {
+    const pa = parseRgb(a); const pb = parseRgb(b);
+    if (!pa || !pb) return null;
+    const la = relLum(pa); const lb = relLum(pb);
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+
+  // Testo pieno (scheda attiva): il più leggibile fra chiaro e scuro.
+  function readableOn(bg) {
+    if (!parseRgb(bg)) return null;
+    const cScuro = contrastRatio(bg, TESTO_SCURO);
+    const cChiaro = contrastRatio(bg, TESTO_CHIARO);
+    return cScuro >= cChiaro ? TESTO_SCURO : TESTO_CHIARO;
+  }
+
+  // Mescola due colori in sRGB come fa `color-mix(in srgb, a p%, b)`.
+  // Serve alla shell per SAPERE che colore avrà davvero la scheda inattiva: il
+  // mix lo fa il CSS, ma il colore del testo va deciso su quel risultato.
+  function mixSrgb(a, b, ratio) {
+    const pa = parseRgb(a); const pb = parseRgb(b);
+    if (!pa || !pb) return null;
+    const r = Math.max(0, Math.min(1, ratio));
+    const c = [0, 1, 2].map((i) => Math.round(pa[i] * r + pb[i] * (1 - r)));
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+  }
+
+  // Testo attenuato (scheda inattiva): parte dal colore leggibile e lo avvicina
+  // al fondo, così resta "spento" rispetto alla scheda in primo piano senza mai
+  // scendere sotto una soglia di leggibilità. `forza` = quanto del colore pieno
+  // resta (0.72 ≈ 6-8 a 1 di contrasto sui fondi tipici).
+  function softOn(bg, forza) {
+    const pieno = readableOn(bg);
+    if (!pieno) return null;
+    const f = (typeof forza === 'number' && forza > 0 && forza <= 1) ? forza : 0.72;
+    const soft = mixSrgb(pieno, bg, f);
+    // Cintura: se l'attenuazione porta sotto 4,5 a 1 si torna al colore pieno.
+    if (soft && contrastRatio(bg, soft) >= 4.5) return soft;
+    return pieno;
+  }
+
+  // ------------------------------------------------------------
   // Estrazione colore identità dal favicon (spec "Colore identità delle tab")
   // ------------------------------------------------------------
   // Pipeline a due path sui pixel del favicon (scalato es. 64×64):
