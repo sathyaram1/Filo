@@ -47,6 +47,9 @@ test('#498 caso base owner: schede in alto, aree fino in fondo, niente scroll', 
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('#mgReviewGrid')).toBeVisible();
+  // Il banner di sola lettura è la vista di chi NON è l'owner; qui misuriamo
+  // quella dell'owner, che è chi usa questa pagina.
+  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
   const g = await geom(page);
   console.log('BASE', JSON.stringify(g));
   expect(g.tabs.top).toBeLessThanOrEqual(20);
