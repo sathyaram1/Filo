@@ -559,7 +559,13 @@ function creaBlocco(host) {
     for (var k2 = 0; k2 < nodi.length; k2++) {
       var nd2 = nodi[k2];
       if (!nd2.congelata) { nd2.y = nd2.seg.el.offsetTop + 15; nd2.s = nd2.y; }
-      if (nd2.stretta < 1) {
+      if (nd2.riaperto) {
+        // Un passo fallito: il cappio si stringe e poi si RIAPRE. Un nodo
+        // che non tiene si vede da lontano, e non mente sull'esito.
+        var pr = Math.min(1, (Date.now() - nd2.riaperto) / 340);
+        nd2.stretta = 1 - 0.62 * facile(pr);
+        nd2.svanito = pr;
+      } else if (nd2.stretta < 1) {
         nd2.stretta = Math.min(1, (Date.now() - nd2.nato) / (opt.annodo === 'punto' ? 200 : 460));
       }
       var cx = 13, cy = nd2.y;
@@ -571,6 +577,7 @@ function creaBlocco(host) {
       nd2.c.setAttribute('cx', cx); nd2.c.setAttribute('cy', cy);
       // col cappio il punto compare solo mentre il giro si chiude
       var q2 = opt.annodo === 'cappio' ? Math.max(0, (nd2.stretta - 0.55) / 0.45) : nd2.stretta;
+      if (nd2.riaperto) q2 = Math.max(0, 1 - nd2.svanito * 1.6);
       nd2.c.setAttribute('r', (nd2.raggio * Math.min(1, q2)) * (1 - avv.m * 0.5));
       if (nd2.alone) {
         nd2.alone.setAttribute('cx', cx); nd2.alone.setAttribute('cy', cy);
@@ -777,6 +784,12 @@ function creaBlocco(host) {
         riga.append(el('span', 'att-riga-ico', a.icona), el('span', null, a.fatto + ' · ' + a.breve + ' — ' + a.esito));
         seg.corpo.append(riga);
       });
+      // Se il passo è fallito il nodo si scioglie invece di stringersi.
+      if (seg.nodo && seg.desc.azioni.some(function (a) { return a.fallita; })) {
+        seg.nodo.riaperto = Date.now();
+        onda.ampObiettivo = 3.2; onda.velObiettivo = 0.065;
+        return;
+      }
       // il nodo dà un ultimo strappo quando l'esito arriva
       if (seg.nodo) {
         var r0 = seg.nodo.raggio;
