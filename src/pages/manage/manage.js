@@ -3822,7 +3822,32 @@
       const tile = e.target.closest('.mg-st-tile');
       if (!tile) return;
       stOpenTile = stOpenTile === tile.dataset.stat ? null : tile.dataset.stat;
+      // Cambiando numero il gruppo aperto sotto non c'entra più niente.
+      stOpenGroup = null;
       stRender();
+    });
+  }
+
+  // Un solo ascoltatore per tutta la scheda: le righe si ridisegnano a ogni
+  // giro, e agganciarle una a una vorrebbe dire riagganciarle ogni volta.
+  const stPanel = document.getElementById('panel-fbstats');
+  if (stPanel) {
+    const stAzione = (e) => {
+      const item = e.target.closest('.mg-st-item[data-id]');
+      if (item) { e.preventDefault(); stApriFeedback(item.dataset.id); return; }
+      const goto = e.target.closest('[data-goto]');
+      if (goto) { e.preventDefault(); selectTab(goto.dataset.goto); return; }
+      const riga = e.target.closest('[data-open]');
+      if (!riga) return;
+      e.preventDefault();
+      stOpenGroup = stOpenGroup === riga.dataset.open ? null : riga.dataset.open;
+      stRender();
+    };
+    stPanel.addEventListener('click', stAzione);
+    stPanel.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (!e.target.closest('.mg-st-item[data-id], [data-goto], [data-open]')) return;
+      stAzione(e);
     });
   }
 
