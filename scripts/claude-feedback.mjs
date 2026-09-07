@@ -242,6 +242,11 @@ export async function main(argvIn) {
     conValore: ['--priorita', '--url', '--allega'],
   };
   const daNpm = argomentiDaNpm(process.env, OPZ);
+  if (daNpm.errore) {
+    console.error(`RIFIUTATO: ${daNpm.errore}`);
+    uso();
+    return EXIT.USO;
+  }
   if (daNpm.nota) { console.error(daNpm.nota); argv = [...argv, ...daNpm.args]; }
   const male = controllaArgomenti(argv, OPZ);
   if (male) {
