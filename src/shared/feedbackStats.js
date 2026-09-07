@@ -570,7 +570,9 @@
       media: passati ? sommaLoop / passati : null,
       critiche: critFail + critMigliorabile,
       fail: critFail,
+      failIds: idsFail,
       migliorabile: critMigliorabile,
+      migliorabileIds: idsMigliorabile,
     };
 
     // ── Le esecuzioni delle routine ─────────────────────────────────────────
