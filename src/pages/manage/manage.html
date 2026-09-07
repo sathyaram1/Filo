@@ -653,6 +653,38 @@
     }
     .mg-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .mg-action-msg { font-size: 12px; color: var(--sn-muted); }
+
+    /* ── La barra dell'owner: tutti i tasti su una riga ───────────────────── */
+    /* Un contenitore solo per i tre gruppi che prima erano tre blocchi
+       impilati. I gruppi restano DIVISI (ognuno compare e sparisce per conto
+       suo: le azioni di stato spariscono su una segnalazione illeggibile, il
+       preferito no) ma stanno sulla stessa riga. */
+    .mg-owner {
+      flex: 0 0 auto; border-top: 1px solid var(--sn-border);
+      padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .mg-owner[hidden] { display: none; }
+    .mg-owner-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    /* Gruppo di tasti dentro la riga: niente bordo né padding suoi, li dà la
+       barra. `[hidden]` va riaffermato o `display:flex` se lo mangia. */
+    .mg-actions-group { display: flex; align-items: center; min-width: 0; }
+    .mg-actions-group[hidden] { display: none; }
+    /* Il tasto della frase: stesso vestito del preferito, con la freccia che
+       dice da che parte va. Acceso quando una frase c'è già — altrimenti, da
+       chiusa, la sezione non direbbe da nessuna parte che è stata scritta. */
+    .mg-usernote-toggle::after {
+      content: '▾'; display: inline-block; margin-left: 6px;
+      font-size: 11px; color: var(--sn-muted);
+      transition: transform 0.12s;
+    }
+    .mg-usernote-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
+    .mg-usernote-toggle.mg-usernote-piena {
+      border-color: var(--sn-accent, #c8763c);
+      color: var(--sn-accent, #c8763c);
+    }
+    .mg-usernote-toggle.mg-usernote-piena::before {
+      content: '●'; margin-right: 6px; font-size: 9px; vertical-align: middle;
+    }
     /* Modulo di riapertura: chiuso finché non lo si chiede. */
     .mg-reopen { display: flex; flex-direction: column; gap: 8px; }
     .mg-reopen[hidden] { display: none; }
