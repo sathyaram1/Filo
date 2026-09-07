@@ -3228,6 +3228,10 @@
   // Gli esiti riprendono i colori che già dicono «grave» e «da guardare» nel
   // resto della dashboard (attacco rosso, spam ambra).
   const ST_OUTCOME_COLORS = { fail: '#c0392b', migliorabile: '#e08e0b' };
+  // Una voce che conta EVENTI apre i lavori su cui sono successi: il numero e
+  // la lunghezza dell'elenco non combaciano di proposito, e il suggerimento lo
+  // dice invece di lasciar credere a un elenco troncato.
+  const ST_NOTA_EVENTI = ' Apri per vedere su quali lavori: un lavoro può averne prese più d\'una, quindi l\'elenco è più corto del numero.';
 
   let stWindow = ST ? ST.DEFAULT_WINDOW : '30d';
   let stFromISO = '';
