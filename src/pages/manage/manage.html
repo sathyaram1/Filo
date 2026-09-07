@@ -405,8 +405,29 @@
       margin-left: auto; color: var(--sn-muted);
       font-variant-numeric: tabular-nums; padding-left: 14px;
     }
+    .mg-st-legend--apribile { cursor: pointer; border-radius: 7px; padding-inline: 4px; margin-inline: -4px; }
+    .mg-st-legend--apribile:hover,
+    .mg-st-legend--apribile:focus-visible { background: var(--sn-hover); }
+    .mg-st-legend--apribile:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-st-legend-items { display: block; padding: 0; }
+    .mg-st-legend-items .mg-st-items-list { max-height: 200px; }
+    /* Torta senza fette: si toglie il quadrato vuoto e resta la spiegazione. */
+    .mg-st-pie--vuota svg { display: none; }
+    .mg-st-pie-empty { padding: 0; max-width: 320px; }
+    .mg-st-pies[hidden] { display: none; }
     .mg-st-avg { font-size: 13px; color: var(--sn-fg); margin: 14px 0 0; }
     .mg-st-avg strong { font-size: 17px; }
+    /* «I dati non sono arrivati» non è «zero»: la frase sta dove starebbero i
+       numeri, e i numeri spariscono. */
+    .mg-st-nodata {
+      font-size: 13px; color: var(--sn-muted); margin: 18px 0 0;
+      padding: 12px 14px; border: 1px dashed var(--sn-border); border-radius: 10px;
+      max-width: 760px;
+    }
+    .mg-st-nodata[hidden] { display: none; }
+    #mgStBody[hidden] { display: none; }
+    .mg-st-tile[disabled] { cursor: default; opacity: 0.75; }
+    .mg-st-tile[disabled] .mg-st-tile-more { visibility: hidden; }
 
     /* L'andamento: una barretta per giorno/settimana/mese. */
     .mg-st-spark { display: flex; align-items: flex-end; gap: 3px; height: 76px; margin-top: 4px; max-width: 760px; }
