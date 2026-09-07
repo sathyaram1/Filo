@@ -51,6 +51,9 @@ test('scheda statistiche: chiaro e scuro, coi campi data aperti', async ({ openT
 
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'light'; });
   await page.locator('#mgStTileRicevuti').click();
+  // Con un gruppo aperto sull'elenco delle sue segnalazioni: è lo stato in cui
+  // la scheda ha più roba addosso, ed è quello che vale la pena guardare.
+  await page.locator('#mgStDrawer .mg-st-row[data-open]').first().click();
   await page.screenshot({ path: 'tests/.shots/496-chiaro.png', fullPage: true });
 
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
