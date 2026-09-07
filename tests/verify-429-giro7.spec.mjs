@@ -17,7 +17,13 @@ function contrasto(a, b) {
   const la = lum(a), lb = lum(b);
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
-const rgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s); return m ? m[1].split(',').map(Number) : null; };
+const rgb = (s) => {
+  const m = /rgba?\(([^)]+)\)/.exec(s);
+  if (m) return m[1].split(/[,\s/]+/).filter(Boolean).slice(0, 3).map(Number);
+  const c = /color\(\s*srgb\s+([^)]+)\)/.exec(s);
+  if (c) return c[1].trim().split(/[\s/]+/).slice(0, 3).map((v) => Math.round(parseFloat(v) * 255));
+  return null;
+};
 
 const SCHEDE = () => [...document.querySelectorAll('.tab')].map((el) => {
   const t = el.querySelector('.title');
