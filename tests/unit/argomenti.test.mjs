@@ -153,10 +153,18 @@ test('la roba di npm non viene scambiata per un nostro errore', () => {
   assert.equal(opzioneStorpiata({ npm_config_dry_run: 'true' }, ['--dry-run']), null);
 });
 
-test('un nome che non somiglia a niente, sotto npm, viene detto lo stesso', () => {
-  // La versione inglese di un'opzione, o un nome preso da un altro strumento:
-  // npm se lo porta via e allo strumento non arriva niente da rifiutare.
-  assert.match(opzioneStorpiata({ npm_config_attach: 'spec.md' }, ['--allega']), /--attach non la conosco/);
-  // Ma le configurazioni DI npm non sono nostri errori.
-  assert.equal(opzioneStorpiata({ npm_config_loglevel: 'error', npm_config_init_module: 'x' }, ['--allega']), null);
+// Il rovescio della medaglia, e va tenuto: si guardano SOLO i nomi vicini ai
+// nostri. Segnalare tutto ciò che non stesse in un elenco di configurazioni di
+// npm ha spento ogni scorciatoia del progetto, perché npm nell'ambiente mette
+// roba sua che nessun elenco scritto a mano contiene tutta.
+test('le impostazioni di npm non vengono scambiate per nostri errori', () => {
+  const AMBIENTE_VERO = {
+    npm_config_global_prefix: 'C:/npm', npm_config_local_prefix: '.', npm_config_registry: 'r',
+    npm_config_loglevel: 'error', npm_config_init_module: 'x', npm_config_user_agent: 'npm/10',
+  };
+  const NOSTRE = ['--allega', '--dry-run', '--check', '--print', '--url', '--priorita'];
+  assert.equal(opzioneStorpiata(AMBIENTE_VERO, NOSTRE), null);
+  // Un nome lontano dai nostri resta fuori portata: è il prezzo, ed è meno
+  // caro di uno strumento che rifiuta tutto.
+  assert.equal(opzioneStorpiata({ npm_config_attach: 'spec.md' }, ['--allega']), null);
 });
