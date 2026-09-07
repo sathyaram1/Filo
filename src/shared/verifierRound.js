@@ -73,7 +73,13 @@
   // Davanti al livello valgono anche un titolo Markdown («### [2]»), una
   // citazione («> [2]») e un elenco con le lettere («a) [2]»): chi scrive in
   // Markdown se le aspetta come «- [2]» e «1. [2]» (verifica del giro 11).
-  const FINDING_LINE = /^\s*(?:#{1,6}\s*|>\s*|[-*•]\s*|\d{1,2}[.)]\s*|[A-Za-z][.)]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
+  // I modi di elencare ammessi davanti al livello stanno in UN posto solo: il
+  // controllo che respinge un livello scritto male deve guardarne esattamente
+  // quanti ne accetta il lettore. Quando ne guardava meno, un «[4] gravissimo»
+  // scritto dopo un `>` o dei cancelletti finiva nel riassunto — cioè una
+  // bocciatura diventava una promozione, in silenzio (feedback #565).
+  const PREFISSO_ELENCO = '(?:#{1,6}\\s*|>\\s*|[-*•]\\s*|\\d{1,2}[.)]\\s*|[A-Za-z][.)]\\s*)?';
+  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?\\[\\s*([0-3])\\s*(\\?)?\\s*\\](?:\\*\\*)?\\s*(.*)$`);
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
   // COMINCIA così, o che lo porta dopo una breve etichetta e prima di un
