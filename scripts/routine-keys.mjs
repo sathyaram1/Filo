@@ -61,11 +61,15 @@ async function main() {
   // sembra un'opzione — «--dry-run», che ogni strumento vicino accetta —
   // veniva ignorata in silenzio e la parola d'ordine revocata davvero
   // (feedback #565).
+  const USO = 'Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome>]';
+  // Chiedere aiuto non è un errore, e questo è lo strumento dove sbagliare
+  // costa di più: l'aiuto si stampa e basta (feedback #565).
+  if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) { console.log(USO); return; }
   const { controllaArgomenti } = await import('./lib/argomenti.mjs');
   const male = controllaArgomenti(process.argv.slice(2), { opzioni: [] });
   if (male) {
-    console.error(`RIFIUTATO: ${male.replace(' Ammesse: ', ' Qui non ci sono opzioni: ')}`);
-    console.error('Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome>]');
+    console.error(`RIFIUTATO: ${male.replace(/ Ammesse:.*$/, ' Qui non ci sono opzioni.')}`);
+    console.error(USO);
     process.exit(1);
   }
   const [cmd, nome, potere, ...resto] = process.argv.slice(2);
