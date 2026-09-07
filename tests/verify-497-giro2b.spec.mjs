@@ -147,7 +147,7 @@ test('la larghezza a cui i tasti vanno a capo', async ({ app, openTab }) => {
     await page.setViewportSize({ width: w, height: 800 });
     await page.waitForTimeout(120);
     const m = await misura();
-    soglie.push(`${w}px → ${m.righe} riga/e (${m.quanti} tasti)`);
+    soglie.push(`${w}px → ${m.righe} riga/e (${m.quanti} tasti)${m.overflow ? ' SCORRE' : ''}`);
   }
   console.log('LARGHEZZE:', soglie.join(' | '));
 });
