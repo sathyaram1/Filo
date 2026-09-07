@@ -384,7 +384,7 @@ ${riga}`;
 // parentesi, dovunque stia nella riga e dietro qualunque etichetta, non passa
 // per riassunto. Prima ogni giro trovava un'etichetta o una parentesi in più
 // con cui far sparire un rilievo — anche di sicurezza (feedback #565).
-test('un livello dietro un'etichetta, in qualunque parentesi, non passa per riassunto', () => {
+test("un livello dietro un'etichetta, in qualunque parentesi, non passa per riassunto", () => {
   const riassunto = 'Provato tutto per bene, il resto regge.';
   for (const riga of [
     'Primo rilievo: (3) si scrive nelle chiavi SSH',
