@@ -142,7 +142,11 @@ function doShow(parentWin, text, x, y) {
   // riporta la dimensione del testo (handler 'size' più sopra).
   const px = cb.x + Math.round(x);
   const py = cb.y + Math.round(y);
-  tipWin.setBounds({ x: px, y: py, width: 200, height: 30 });
+  // Finestra di misura larga quanto il tetto (più un margine): il riquadro va a
+  // capo, e con una finestra da 200px si sarebbe misurato dentro 200px invece
+  // che dentro il tetto vero. È trasparente, quindi grande non si vede: il
+  // testo viene disegnato solo dopo, quando la finestra è già stata rimpicciolita.
+  tipWin.setBounds({ x: px, y: py, width: MAX_LARGHEZZA_TIP + 40, height: 260 });
   tipWin.webContents.send('set', { text, dark: nativeTheme.shouldUseDarkColors });
 }
 
