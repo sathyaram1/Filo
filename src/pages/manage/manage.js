@@ -3173,6 +3173,7 @@
   let stOpenTile = null;      // quale numero è aperto sul suo dettaglio
   let stWorkerLog = null;     // null = non ancora letto; [] = letto e vuoto
   let stWorkerLogError = '';  // perché non si è potuto leggere
+  let stWorkerLogFinto = false; // registro consegnato da uno spec: non si rilegge
   let stPrefsLoaded = false;
 
   const $st = (id) => document.getElementById(id);
