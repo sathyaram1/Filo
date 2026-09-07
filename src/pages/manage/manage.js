@@ -3250,6 +3250,14 @@
     }
     const custom = $st('mgStCustom');
     if (custom) custom.hidden = stWindow !== 'custom';
+    const echo = $st('mgStDateEcho');
+    if (echo) {
+      const da = stDataParlata(stFromISO);
+      const a = stDataParlata(stToISO);
+      echo.textContent = (da && a) ? `dal ${da} al ${a}`
+        : da ? `dal ${da} in poi`
+          : a ? `fino al ${a}` : '';
+    }
   }
 
   function stRenderCreatorChips() {
