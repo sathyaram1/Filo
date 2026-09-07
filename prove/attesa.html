@@ -351,15 +351,27 @@ function creaBlocco(host) {
     requestAnimationFrame(disegna);
   }
 
+  // Il nodo. Un passo con uno strumento lascia un nodo più grosso, con
+  // l'alone: si distingue da un nodo di solo pensiero senza doverlo leggere.
   function piazzaNodo(seg) {
     if (!rail) return;
     var y = seg.testa.offsetTop + seg.testa.offsetHeight / 2;
+    var azione = seg.dati.tipo === 'azione';
+    if (azione) {
+      var alone = svgNS('circle');
+      alone.setAttribute('cx', 13); alone.setAttribute('cy', y); alone.setAttribute('r', 6);
+      alone.setAttribute('fill', 'none');
+      alone.setAttribute('stroke', 'var(--dash-accent)');
+      alone.setAttribute('stroke-width', 1);
+      alone.setAttribute('opacity', 0.35);
+      rail.append(alone);
+    }
     var c = svgNS('circle');
     c.setAttribute('cx', 13); c.setAttribute('cy', y); c.setAttribute('r', 0);
     c.style.transition = 'r 340ms cubic-bezier(.3,1.8,.5,1)';
     rail.append(c);
-    requestAnimationFrame(function () { c.setAttribute('r', 3.4); });
-    legaHint(c, seg.dati.titolo);
+    requestAnimationFrame(function () { c.setAttribute('r', azione ? 3.6 : 2.7); });
+    legaHint(c, (seg.dati.icona ? seg.dati.icona + '  ' : '') + seg.dati.titolo + ' · ' + seg.dati.dettaglio);
     nodi.push(c);
     onda.ultimoNodoY = y;
   }
