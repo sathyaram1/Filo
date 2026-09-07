@@ -92,6 +92,37 @@ test('A) finestra BASSA con la tendina aperta: resta dentro anche in verticale?'
   await page.setViewportSize({ width: 1280, height: 800 });
 });
 
+test('A2) APERTURA normale a varie altezze di finestra: la tendina sta dentro?', async () => {
+  const page = await openTab(EDITOR);
+  await page.waitForSelector('.ed-grid');
+  await addFontModule(page);
+  const mod = page.locator('.ed-module[data-type="font"]');
+  const btn = mod.locator('.ed-font-button');
+  const pop = mod.locator('.ed-font-pop');
+  const fuori = [];
+  for (const h of [1000, 900, 800, 760, 720, 680, 640, 600, 560, 520, 480, 440, 400]) {
+    await page.setViewportSize({ width: 1280, height: h });
+    await page.waitForTimeout(150);
+    await btn.click();
+    await expect(pop).toBeVisible();
+    const m = await page.evaluate(() => {
+      const p = document.querySelector('.ed-font-pop').getBoundingClientRect();
+      const b = document.querySelector('.ed-font-button').getBoundingClientRect();
+      return {
+        vh: window.innerHeight,
+        sotto: Math.round(window.innerHeight - b.bottom),
+        top: Math.round(p.top), bottom: Math.round(p.bottom), alt: Math.round(p.height),
+      };
+    });
+    const sfora = Math.max(0, m.bottom - m.vh) + Math.max(0, -m.top);
+    console.log(`[sonda A2] finestra ${h}px →`, JSON.stringify(m), 'FUORI:', sfora);
+    if (sfora > 0) fuori.push(`${h}px: ${sfora}px fuori (tendina ${m.top}–${m.bottom}, finestra 0–${m.vh})`);
+    await btn.click();
+  }
+  await page.setViewportSize({ width: 1280, height: 800 });
+  expect(fuori, 'la tendina esce dalla finestra ad altezze normali, aprendola e basta').toEqual([]);
+});
+
 test('B) finestra che si RIALLARGA: la tendina torna sotto il suo bottone', async () => {
   const page = await openTab(EDITOR);
   await page.waitForSelector('.ed-grid');
