@@ -32,8 +32,10 @@
 //       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
 //         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
 //
-//   node scripts/routine-channel.mjs ticket <parola-d-ordine>
+//   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json]
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
+//         Con `--json` stampa biglietto E ruolo insieme: serve a chi guida per
+//         scegliere il tipo di worker PRIMA di lanciarlo.
 //         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
 //
 //   node scripts/routine-channel.mjs work <biglietto>
