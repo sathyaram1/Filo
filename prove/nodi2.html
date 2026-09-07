@@ -209,36 +209,48 @@ var t0Cuoci = performance.now();
 var CORDA = cuociCorda();
 var msCuoci = Math.round(performance.now() - t0Cuoci);
 
-/* Disegno di una corda 3D: si spezza dove la profondità cambia segno e si
-   dipinge dal fondo verso l'alto, ognuno con la sua guaina. È il modo in cui
-   si disegnano i nodi a mano: chi sta davanti copre chi sta dietro. */
+/* Disegno di una corda 3D. Prima la si traccia tutta intera, poi si
+   ridipingono sopra soltanto i tratti che stanno davanti, ognuno con la sua
+   guaina del colore della carta: e cosi che negli incroci si vede chi passa
+   sopra. Spezzarla a ogni oscillazione di profondita, invece, la fa a
+   trattini — provato, e sembrava una linea tratteggiata. */
 function tracciaCorda(pts3, scala, cx, cy, giro, spess) {
-  var pr = [];
+  var pr = [], zmax = 0;
   for (var i = 0; i < pts3.length; i++) {
     var x = pts3[i][0], y = pts3[i][1], z = pts3[i][2];
     var rx = x * Math.cos(giro) + z * Math.sin(giro);
     var rz = -x * Math.sin(giro) + z * Math.cos(giro);
-    var persp = 1 + rz * 0.012;
-    pr.push([cx + rx * scala * persp, cy + y * scala * persp, rz]);
+    pr.push([rx, y, rz]);
+    if (Math.abs(rz) > zmax) zmax = Math.abs(rz);
   }
-  // corse separate ai cambi di profondità
-  var corse = [], inizio = 0;
-  for (var j = 1; j < pr.length; j++) {
-    if ((pr[j][2] >= 0) !== (pr[j-1][2] >= 0)) { corse.push([inizio, j]); inizio = j - 1; }
+  // si centra sul nodo, non sulla corda: il nodo e la cosa da guardare
+  var mid = pts3[Math.floor(pts3.length / 2)];
+  var oy = mid[1];
+  var d = '';
+  for (var j = 0; j < pr.length; j++) {
+    var persp = 1 + pr[j][2] * 0.012;
+    var px = cx + pr[j][0] * scala * persp;
+    var py = cy + (pr[j][1] - oy) * scala * persp;
+    pr[j][3] = px; pr[j][4] = py;
+    d += (j ? 'L' : 'M') + px.toFixed(2) + ',' + py.toFixed(2);
   }
-  corse.push([inizio, pr.length - 1]);
+  var out = '<path class="guaina" stroke-width="' + (spess * 1.9) + '" d="' + d + '"/>' +
+            '<path class="filo" stroke-width="' + spess + '" d="' + d + '"/>';
+
+  // i tratti davanti, ridipinti sopra
+  var soglia = zmax * 0.18;
+  var corse = [], dentro = false, da = 0;
+  for (var k = 0; k < pr.length; k++) {
+    var avanti = pr[k][2] > soglia;
+    if (avanti && !dentro) { da = Math.max(0, k - 1); dentro = true; }
+    if (!avanti && dentro) { if (k - da > 2) corse.push([da, k]); dentro = false; }
+  }
+  if (dentro && pr.length - da > 2) corse.push([da, pr.length - 1]);
   corse.forEach(function (c) {
-    var somma = 0;
-    for (var k = c[0]; k <= c[1]; k++) somma += pr[k][2];
-    c.push(somma / (c[1] - c[0] + 1));
-  });
-  corse.sort(function (a, b) { return a[2] - b[2]; });
-  var out = '';
-  corse.forEach(function (c) {
-    var d = '';
-    for (var k = c[0]; k <= c[1]; k++) d += (k === c[0] ? 'M' : 'L') + pr[k][0].toFixed(2) + ',' + pr[k][1].toFixed(2);
-    out += '<path class="guaina" stroke-width="' + (spess * 2.1) + '" d="' + d + '"/>';
-    out += '<path class="filo" stroke-width="' + spess + '" d="' + d + '"/>';
+    var dd = '';
+    for (var m = c[0]; m <= c[1]; m++) dd += (m === c[0] ? 'M' : 'L') + pr[m][3].toFixed(2) + ',' + pr[m][4].toFixed(2);
+    out += '<path class="guaina" stroke-width="' + (spess * 1.9) + '" d="' + dd + '"/>';
+    out += '<path class="filo" stroke-width="' + spess + '" d="' + dd + '"/>';
   });
   return out;
 }
