@@ -21,12 +21,21 @@ function buildHTML() {
 html,body{background:transparent;overflow:hidden;height:100%;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
 #tip{
-  display:inline-block;
+  /* -webkit-box + line-clamp: il riquadro va a capo e si ferma a 6 righe con i
+     puntini. Prima era una riga sola senza larghezza massima: il nome di una
+     scheda lungo come il titolo di un articolo (148 caratteri) lo faceva largo
+     887px, e uno davvero lungo 22.000px, cioè oltre lo schermo — proprio quando
+     il nome è lungo, cioè quando il riquadro serve, non si leggeva (#429). */
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:6;
+  overflow:hidden;
+  max-width:${MAX_LARGHEZZA_TIP}px;
+  overflow-wrap:anywhere;
   padding:4px 8px;
   border-radius:6px;
   font-size:12px;
-  line-height:1.2;
-  white-space:nowrap;
+  line-height:1.35;
   border:1px solid var(--border);
   background:var(--bg);
   color:var(--fg);
