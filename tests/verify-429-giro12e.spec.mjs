@@ -17,14 +17,10 @@ test('con il colore delle tab spento, la scheda in primo piano resta tinta di ma
   const prima = await shell.evaluate(() => getComputedStyle(document.querySelector('.tab.active')).backgroundColor);
 
   // "niente colore sulle tab" (preset del setter a voce): opacita_tab = 0
-  await shell.evaluate(async () => {
-    await window.filoShell.settings.update({ tabColor: { opacita_tab: 0 } });
-  }).catch(async () => {
-    await shell.evaluate(async () => {
-      const api = window.filoShell;
-      if (api && api.updateSettings) await api.updateSettings({ tabColor: { opacita_tab: 0 } });
-    });
-  });
+  const esito = await shell.evaluate(async () => window.filoShell.message({
+    type: 'update_settings', settings: { tabColor: { opacita_tab: 0 } },
+  }));
+  console.log('update_settings →', JSON.stringify(esito).slice(0, 300));
   await shell.waitForTimeout(3000);
   const dopo = await shell.evaluate(() => ({
     attiva: getComputedStyle(document.querySelector('.tab.active')).backgroundColor,
