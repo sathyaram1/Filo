@@ -1003,8 +1003,9 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
+      collassaFrase();
       mgManage.hidden = true;
+      if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
       renderList();
       // L'avviso delle fusioni appartiene ai soli Ricevuti: il pannello è lo
@@ -2053,9 +2054,18 @@
     // La frase per chi ha segnalato: su qualunque feedback, anche già chiuso.
     // E' in chiaro, quindi si legge e si scrive anche su una macchina senza
     // la chiave privata — al contrario del resto della conversazione.
+    // La barra sta in piedi per l'owner e per nessun altro: dentro ci sono
+    // solo cose sue. Le azioni di stato che ci vivono spariscono da sole
+    // quando lo stato non si legge (renderActions); preferito e frase no.
+    if (mgOwnerBar) mgOwnerBar.hidden = !isAdmin;
+
+    // La frase parte CHIUSA su ogni segnalazione (#497): si scrive una volta
+    // sola, e da aperta si mangiava una fetta di dettaglio a ogni feedback
+    // aperto. Il tasto della barra la apre, e dice se una frase c'è già.
     if (mgUserNote) {
-      mgUserNote.hidden = !isAdmin;
+      collassaFrase();
       mgUserNoteText.value = String(fb.userNote || '');
+      riflettiFrase(mgUserNoteText.value);
       // Il valore con cui la riga è stata riempita: una bozza è ciò che differisce.
       mgUserNoteText.dataset.saved = mgUserNoteText.value;
       userNoteToccata = false;
@@ -2244,8 +2254,9 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
+      collassaFrase();
       mgManage.hidden = true;
+      if (mgOwnerBar) mgOwnerBar.hidden = true;
       if (mgDetailState) mgDetailState.hidden = true;
       chiudiRiapertura();
       closeSidebar();
@@ -2422,7 +2433,8 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
+      collassaFrase();
+      if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
       renderList();
     } catch (e) {
