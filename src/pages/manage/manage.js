@@ -3769,8 +3769,13 @@
       const quando = d.andamento.bucket.key === 'day'
         ? formatDate(b.from)
         : `${formatDate(b.from)} – ${formatDate(b.to - 1)}`;
+      // Le due date servono al tasto destro («restringi la finestra a questo
+      // periodo»): senza, il menu dovrebbe rifare i conti delle barrette per
+      // conto suo, cioè tenere una seconda copia della stessa regola.
       return `<span class="mg-st-spark-bar${b.count ? '' : ' mg-st-spark-bar--zero'}"`
-        + ` style="height:${h}%" title="${esc(quando)}: ${stFmtInt(b.count)}"></span>`;
+        + ` style="height:${h}%" title="${esc(quando)}: ${stFmtInt(b.count)}"`
+        + ` data-from="${esc(stIsoGiorno(b.from))}" data-to="${esc(stIsoGiorno(b.to - 1))}"`
+        + ` data-quando="${esc(quando)}" data-count="${b.count}"></span>`;
     }).join('');
     if (axis) {
       axis.innerHTML = barre.length
