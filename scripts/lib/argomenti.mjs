@@ -78,6 +78,15 @@ export function argomentiDaNpm(env = {}, { opzioni = [], conValore = [] } = {}) 
     }
     prese.push(opzione);
   }
+  if (senzaValore.length) {
+    // Qui non si prosegue: proseguire vuol dire aprire un feedback col nome
+    // del file per titolo, e il testo vero da un'altra parte.
+    return {
+      args: [],
+      nota: null,
+      errore: `${senzaValore.join(' ')} ${senzaValore.length === 1 ? 'è finita' : 'sono finite'} a npm senza il suo valore, e il valore è scivolato sugli altri argomenti — non ho toccato niente. Con npm si scrivono opzione e valore attaccati: ${senzaValore.map((o) => `${o}=<valore>`).join(' ')}`,
+    };
+  }
   if (!prese.length) return { args: [], nota: null };
   return {
     args,
