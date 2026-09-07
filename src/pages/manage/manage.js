@@ -2204,7 +2204,7 @@
         if (a.kind === 'reopen') { apriRiapertura(); return; }
         applyAction(a, null);
       });
-      mgActionsRow.insertBefore(b, mgActionMsg);
+      mgActionsRow.appendChild(b);
     }
   }
 
