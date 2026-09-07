@@ -132,10 +132,28 @@ var MOZZO  = 'M30,-4 L30,46 C30,52 30,54 30,56';
 
 // Il nodo semplice nei suoi momenti: capo libero, giro largo gia incrociato,
 // nodo tirato. Stesso spazio per tutti, cosi si possono interpolare.
-var NODO_LARGO   = 'M30,-4 L30,26 C30,38 10,38 10,52 C10,66 34,68 36,52 C38,38 22,36 21,50 C20,62 27,64 33,66';
-var NODO_ENORME  = 'M30,-4 L30,16 C30,32 -2,32 -2,54 C-2,76 38,80 41,52 C44,30 18,26 16,50 C14,70 25,74 35,76';
-var NODO_STRETTO = 'M30,-4 L30,38 C30,44 19,42 19,50 C19,59 33,61 35,51 C37,42 25,40 24,50 C23,57 28,58 32,60';
-var NODO_PASSA   = 'M30,-4 L30,38 C30,44 19,42 19,50 C19,59 33,61 35,51 C37,42 25,40 24,50 C23,57 30,58 30,62 L30,94';
+// Il nodo semplice non si disegna a occhio: viene un cerchietto. E la curva
+// del nodo a trifoglio, aperta ai due capi — quella vera, con i suoi incroci.
+// Stringere il nodo qui e solo ridurne la scala: e anche quello che succede
+// tirando uno spago.
+function nodoVero(k, coda) {
+  var n = 90, t0 = 0.95, t1 = Math.PI * 2 - 0.95, giro = Math.PI / 2;
+  var d = 'M30,-4';
+  for (var i = 0; i <= n; i++) {
+    var t = t0 + (t1 - t0) * (i / n);
+    var x = Math.sin(t) + 2 * Math.sin(2 * t);
+    var y = Math.cos(t) - 2 * Math.cos(2 * t);
+    var rx = x * Math.cos(giro) - y * Math.sin(giro);
+    var ry = x * Math.sin(giro) + y * Math.cos(giro);
+    d += 'L' + (30 + rx * k).toFixed(2) + ',' + (50 + ry * k).toFixed(2);
+  }
+  d += 'L30,' + (coda ? 94 : 62 + k * 2);
+  return d;
+}
+var NODO_ENORME  = nodoVero(6.2, false);
+var NODO_LARGO   = nodoVero(4.2, false);
+var NODO_STRETTO = nodoVero(2.2, false);
+var NODO_PASSA   = nodoVero(2.2, true);
 var RICCIOLO     = 'M30,-4 L30,36 C30,44 14,43 14,51 C14,59 30,59 30,50 C30,43 30,45 30,42 L30,94';
 var PIEGA        = 'M30,-4 L30,42 C30,47 26,48 26,51 C26,55 34,54 34,51 C34,47 30,47 30,52 L30,94';
 var FIOCCO       = 'M30,-4 L30,38 C30,44 17,42 16,50 C15,58 28,60 30,50 C32,41 28,42 30,50 C32,58 45,57 46,49 C47,41 30,42 30,50 L30,94 M27,53 C22,56 18,58 13,60 M33,53 C38,56 42,58 47,60';
@@ -151,11 +169,11 @@ var SEZIONI = [
         fasi: [MOZZO,
                'M30,-4 L30,28 C30,40 14,40 14,50 C14,61 30,61 30,50 C30,43 30,50 30,58',
                'M30,-4 L30,44 C30,48 25,48 25,51 C25,55 31,55 31,51 C31,48 30,49 30,52 C30,55 30,55 30,57'] },
-      { nome: 'nodo vero', tagli: [0.40, 0.70], z: [0, 2, 1],
+      { nome: 'nodo vero', tagli: [0.33, 0.66], z: [0, 2, 1],
         fasi: [MOZZO, NODO_LARGO, NODO_STRETTO] },
-      { nome: 'nodo enorme, poi stretto', tagli: [0.40, 0.70], z: [0, 2, 1],
+      { nome: 'nodo enorme, poi stretto', tagli: [0.33, 0.66], z: [0, 2, 1],
         fasi: [MOZZO, NODO_ENORME, NODO_ENORME, NODO_STRETTO] },
-      { nome: 'nodo vero, e il filo prosegue', tagli: [0.40, 0.70], z: [0, 2, 1],
+      { nome: 'nodo vero, e il filo prosegue', tagli: [0.33, 0.66], z: [0, 2, 1],
         fasi: [MOZZO, NODO_LARGO, NODO_PASSA] },
     ],
   },
@@ -194,14 +212,14 @@ var SEZIONI = [
     titolo: 'Ha prodotto qualcosa \u2014 un nodo con un capo che pende',
     desc: 'Un file scritto, un\u2019immagine generata. Non ha senso disfarlo: e venuto fuori qualcosa, ed e ancora attaccato a te. Quel capo e anche la maniglia per portartelo via.',
     varianti: [
-      { nome: 'capo corto', tagli: [0.42, 0.68], z: [0, 2, 1],
+      { nome: 'capo corto', tagli: [0.30, 0.62], z: [0, 2, 1],
         fasi: [DRITTO, NODO_PASSA + ' M33,55 C38,60 42,64 45,70'] },
-      { nome: 'capo con una goccia in fondo', tagli: [0.42, 0.68], z: [0, 2, 1],
+      { nome: 'capo con una goccia in fondo', tagli: [0.30, 0.62], z: [0, 2, 1],
         fasi: [DRITTO, NODO_PASSA + ' M33,55 C38,60 42,64 45,70'],
         goccia: [45, 70] },
-      { nome: 'un\u2019ansa che resta aperta', tagli: [0.42, 0.68], z: [0, 2, 1],
+      { nome: 'un\u2019ansa che resta aperta', tagli: [0.30, 0.62], z: [0, 2, 1],
         fasi: [DRITTO, NODO_PASSA + ' M33,54 C42,56 49,64 45,71 C41,78 32,74 32,64'] },
-      { nome: 'capo lungo, verso il basso', tagli: [0.42, 0.68], z: [0, 2, 1],
+      { nome: 'capo lungo, verso il basso', tagli: [0.30, 0.62], z: [0, 2, 1],
         fasi: [DRITTO, NODO_PASSA + ' M32,56 C34,64 36,72 37,82'] },
     ],
   },
@@ -235,10 +253,10 @@ var SEZIONI = [
     titolo: 'Azione verso l\u2019esterno \u2014 due fili annodati',
     desc: 'Una mail spedita, un acquisto. Il filo estraneo non passa e basta: si lega. E non si separano piu.',
     varianti: [
-      { nome: 'nodo con l\u2019altro filo', tagli: [0.42, 0.68], z: [0, 2, 1],
+      { nome: 'nodo con l\u2019altro filo', tagli: [0.30, 0.62], z: [0, 2, 1],
         fasi: [DRITTO, NODO_PASSA],
         altro: { tagli: [], z: [0], fasi: ['M60,44 L60,44', 'M60,42 C50,46 40,48 30,50'] } },
-      { nome: 'l\u2019altro filo se ne va lontano', tagli: [0.42, 0.68], z: [0, 2, 1],
+      { nome: 'l\u2019altro filo se ne va lontano', tagli: [0.30, 0.62], z: [0, 2, 1],
         fasi: [DRITTO, NODO_PASSA],
         altro: { tagli: [], z: [0], fasi: ['M62,22 L62,22', 'M62,20 C52,30 40,44 30,50'] } },
       { nome: 'due giri, non si sfila', tagli: [0.42, 0.74], z: [0, 2, 1],
@@ -257,7 +275,7 @@ var SEZIONI = [
         fasi: [RICCIOLO,
                'M30,-4 L30,43 C30,47 25,47 25,51 C25,55 31,55 31,51 C31,48 30,49 30,48 L30,94',
                'M30,-4 L30,38 C30,44 20,44 20,50 C20,56 30,56 30,50 C30,45 30,47 30,44 L30,94'] },
-      { nome: 'il nodo vero che si scioglie', tagli: [0.40, 0.70], z: [0, 2, 1],
+      { nome: 'il nodo vero che si scioglie', tagli: [0.33, 0.66], z: [0, 2, 1],
         fasi: [MOZZO, NODO_LARGO, NODO_STRETTO, NODO_LARGO, MOZZO] },
     ],
   },
