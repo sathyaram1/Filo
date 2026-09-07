@@ -132,7 +132,7 @@
   // forma per volta è la rincorsa che questo feedback ha perso sei volte: la
   // regola dell'owner è che le quadre col livello dentro sono sempre un
   // rilievo, e questa è quella regola scritta per intero (feedback #565).
-  const QUADRA_OVUNQUE = /\[{1,2}[^\]\n]{0,25}\]{1,2}/;
+  const QUADRA_OVUNQUE = /\[{1,2}[^\]\n]{0,200}\]{1,2}/g;
   // E, dovunque nella riga, una parentesi di QUALUNQUE forma che contenga SOLO
   // un livello: «(3)», «{2}», «[2)», «(due)». Il contenuto è stretto apposta —
   // «(3 volte)» in mezzo a una frase resta testo normale (feedback #565).
