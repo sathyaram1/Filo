@@ -657,6 +657,61 @@ test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il 
   }
 });
 
+// Verifica del 2026-09-08 su #565: registrare un esito senza motivo.
+// Senza il fix questi assert sono rossi, e il peggiore è il primo: la parola
+// con cui si BOCCIAVA veniva buttata via come vecchio verdetto, la critica
+// arrivava vuota, e zero rilievi vale «verifica superata» — cioè una
+// promozione, scritta da chi voleva bocciare.
+test('CLI #565: un esito senza motivo non si registra (e «fail» da sola non promuove)', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
+  const sandbox = cartellaTemporanea('filo-motivo-');
+  const statoDir = resolve(sandbox, 'stato');
+  try {
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: sandbox,
+      FILO_TOOLS_ROOT: sandbox,
+      FILO_DISPATCH_STATE_DIR: statoDir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+    };
+    const lancia = (args) => spawnSync(process.execPath, [DISPATCH, ...args], { env, encoding: 'utf8' });
+    const nienteScritto = (che) => assert.ok(!existsSync(statoDir) || !existsSync(resolve(statoDir, 'ID1.json')),
+      `${che}: non deve restare niente registrato`);
+
+    for (const parola of ['fail', 'pass', 'migliorabile']) {
+      const r = lancia(['--record-verifier', 'ID1', parola]);
+      assert.equal(r.status, 1, `«${parola}» da sola deve fermare`);
+      assert.match(String(r.stderr), /non è una critica/, `«${parola}»: va detto perché`);
+      nienteScritto(parola);
+    }
+    // L'identificativo e basta: la critica è vuota, e vuota vuol dire pass.
+    const nudo = lancia(['--record-verifier', 'ID1']);
+    assert.equal(nudo.status, 1, 'senza critica non si registra un esito');
+    nienteScritto('identificativo nudo');
+    // Due parole non sono una verifica: stesso pavimento dello strumento locale.
+    const corta = lancia(['--record-verifier', 'ID1', 'va bene']);
+    assert.equal(corta.status, 1, 'una critica di due parole deve fermare');
+    assert.match(String(corta.stderr), /troppo corta/);
+    nienteScritto('critica corta');
+    // Anche dalla consegna della correzione esce un esito: il report non è
+    // facoltativo.
+    const senzaReport = lancia(['--record-fixed', 'ID1']);
+    assert.equal(senzaReport.status, 1, 'una correzione senza report deve fermare');
+    assert.match(String(senzaReport.stderr), /troppo corto/);
+    nienteScritto('correzione senza report');
+    // Una critica vera passa i controlli e arriva al server (che qui non c'è:
+    // l'esito non è più 1, ed è l'unico modo di dire che il pavimento non
+    // sbarra anche la strada buona).
+    const vera = lancia(['--record-verifier', 'ID1',
+      'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.']);
+    assert.notEqual(vera.status, 1, `una critica vera non è un errore d'uso: ${vera.stderr}`);
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
 test('#507: il ramo lo dice il biglietto, e le fini di giro sigillano', () => {
   const qui = fileURLToPath(new URL('.', import.meta.url));
   const dispatchSrc = readFileSync(resolve(qui, '..', '..', 'scripts', 'dispatch.mjs'), 'utf8');
