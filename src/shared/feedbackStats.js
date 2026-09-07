@@ -68,6 +68,25 @@
 
   const DAY = 86400000;
 
+  /**
+   * Quante riaperture porta un feedback. PURA.
+   *
+   * Chi riapre un fix dalla board NON fa avanzare un contatore: Filo scrive una
+   * VOCE per ogni persona che l'ha chiesta (`reopenRequests[uid] = { at }`,
+   * SN_FEEDBACK.castReopenRequest), ed è quella forma che il resto della
+   * dashboard legge (SN_MANAGE_REVIEW.hasReopenRequest). Letta come se fosse un
+   * numero, quella mappa dava NaN e la riga «Riaperture chieste» scriveva zero
+   * per sempre: non uno zero «non lo so», proprio un numero sbagliato.
+   * Si accettano anche numero e lista, per non dipendere dalla forma di domani.
+   */
+  function reopenCount(v) {
+    if (v == null) return 0;
+    if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
+    if (Array.isArray(v)) return v.length;
+    if (typeof v === 'object') return Object.keys(v).length;
+    return 0;
+  }
+
   /** Mezzanotte locale del giorno che contiene `ms`. PURA. */
   function startOfDay(ms) {
     const d = new Date(ms);
