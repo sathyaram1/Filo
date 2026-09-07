@@ -456,3 +456,19 @@ ${riga}`).length, 1, 'una parentesi dimenticata non deve costare una bocciatura'
   assert.equal(R.unparsedLevelLines('Passi: apri il menu, salva, guarda').length, 0);
   assert.equal(R.unparsedLevelLines('Ho letto [la nota] e va bene').length, 0);
 });
+
+test('due livelli sulla stessa riga: il secondo non sparisce dentro al primo', () => {
+  const riassunto = 'Provato tutto per bene, il resto regge.';
+  for (const riga of [
+    '[0] con la finestra stretta il menu esce [3] scrive nelle chiavi SSH',
+    '[1] bordo freddo [3] chiavi SSH',
+  ]) {
+    assert.equal(R.unparsedLevelLines(`${riassunto}
+${riga}`).length, 1, 'un a capo dimenticato non deve costare una bocciatura');
+    assert.equal(R.parseFindings(`${riassunto}
+${riga}`).findings.length, 1, 'il lettore ne vede uno solo: per questo la riga va respinta');
+  }
+  // Un rilievo con una parentesi tonda dentro al testo resta un rilievo.
+  assert.equal(R.unparsedLevelLines(`${riassunto}
+[2] il pulsante (3 volte) non salva`).length, 0);
+});
