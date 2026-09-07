@@ -167,7 +167,7 @@ body {
     <div class="tit">Il filo</div>
     <div class="opz">
       <label><input type="radio" name="filo" value="verticale" checked><span>verticale, coi nodi</span></label>
-      <label><input type="radio" name="filo" value="orizzontale"><span>orizzontale, sotto la riga</span></label>
+      <label><input type="radio" name="filo" value="orizzontale"><span>orizzontale, accanto alla riga</span></label>
       <label><input type="radio" name="filo" value="rotella"><span>una rotella</span></label>
     </div>
   </div>
@@ -315,7 +315,7 @@ function creaBlocco(host) {
   host.append(blocco);
 
   var segmenti = [], apertoIdx = -1, arrotolato = false;
-  var rail = null, railPath = null, nodi = [];
+  var rail = null, railPath = null, nodi = [], filiOrizz = [];
   var onda = { fase: 0, amp: 2.4, ampObiettivo: 2.4, vel: 0.06, ultimoNodoY: 0, fine: 0 };
   var vivo = true;
 
@@ -327,15 +327,36 @@ function creaBlocco(host) {
     railPath = svgNS('path');
     rail.append(railPath);
     blocco.append(rail);
-    requestAnimationFrame(disegna);
   }
+  requestAnimationFrame(disegna);
 
   // Il filo: dritto sopra l'ultimo nodo (quello è già fatto), vivo sotto.
   function disegna() {
     if (!vivo) return;
+    // Il filo corto accanto alla riga viva: stessa onda, in orizzontale.
+    for (var q = 0; q < filiOrizz.length; q++) {
+      var f = filiOrizz[q];
+      if (!opt.calmo) f.fase += onda.vel;
+      var dd = '', m = 10;
+      for (var j = 0; j <= m; j++) {
+        var fx = (j / m) * f.L;
+        var bordo = Math.sin((j / m) * Math.PI);
+        dd += (j ? 'L' : 'M') + fx.toFixed(1) + ',' + (6 + Math.sin((fx / f.L) * Math.PI * 2 + f.fase) * onda.amp * bordo).toFixed(2);
+      }
+      f.p.setAttribute('d', dd);
+    }
+    if (!rail) { requestAnimationFrame(disegna); return; }
     var H = Math.max(18, righe.offsetHeight);
     rail.setAttribute('height', H + 10);
     rail.style.height = (H + 10) + 'px';
+    // I nodi stanno sulla LORO riga: se una sezione si apre, tutto quello che
+    // sta sotto scende, e il nodo deve scendere con la riga.
+    for (var k = 0; k < nodi.length; k++) {
+      var ny = nodi[k].seg.testa.offsetTop + nodi[k].seg.testa.offsetHeight / 2;
+      nodi[k].c.setAttribute('cy', ny);
+      if (nodi[k].alone) nodi[k].alone.setAttribute('cy', ny);
+      if (k === nodi.length - 1) onda.ultimoNodoY = ny;
+    }
     if (!arrotolato) {
       onda.amp += (onda.ampObiettivo - onda.amp) * 0.07;
       if (!opt.calmo) onda.fase += onda.vel;
@@ -358,8 +379,9 @@ function creaBlocco(host) {
     if (!rail) return;
     var y = seg.testa.offsetTop + seg.testa.offsetHeight / 2;
     var azione = seg.dati.tipo === 'azione';
+    var alone = null;
     if (azione) {
-      var alone = svgNS('circle');
+      alone = svgNS('circle');
       alone.setAttribute('cx', 13); alone.setAttribute('cy', y); alone.setAttribute('r', 6);
       alone.setAttribute('fill', 'none');
       alone.setAttribute('stroke', 'var(--dash-accent)');
@@ -373,11 +395,14 @@ function creaBlocco(host) {
     rail.append(c);
     requestAnimationFrame(function () { c.setAttribute('r', azione ? 3.6 : 2.7); });
     legaHint(c, (seg.dati.icona ? seg.dati.icona + '  ' : '') + seg.dati.titolo + ' · ' + seg.dati.dettaglio);
-    nodi.push(c);
+    nodi.push({ c: c, alone: alone, seg: seg });
     onda.ultimoNodoY = y;
   }
 
   function apri(i) {
+    if (righe.style.maxHeight && righe.style.maxHeight !== 'none' && righe.style.maxHeight !== '0px') {
+      righe.style.maxHeight = 'none';
+    }
     apertoIdx = (apertoIdx === i) ? -1 : i;
     segmenti.forEach(function (s, k) { s.el.classList.toggle('aperto', k === apertoIdx); });
   }
@@ -392,6 +417,7 @@ function creaBlocco(host) {
     blocco: blocco,
     // Apre un segmento: da qui in poi è "quello vivo".
     apriSegmento: function (dati) {
+      var seg_filo = null;
       var wrap = el('div', 'seg vivo');
       var testa = el('div', 'seg-testa');
       var ico = el('span', 'seg-ico');
@@ -407,10 +433,23 @@ function creaBlocco(host) {
       // L'icona del segmento vivo: rotella o niente (col filo verticale il
       // movimento ce l'ha già il filo, una rotella in più è rumore).
       if (opt.filo === 'rotella') { ico.className = 'rotella'; ico.textContent = ''; }
-      else if (opt.filo === 'orizzontale') { ico.textContent = ''; ico.style.display = 'none'; }
+      else if (opt.filo === 'orizzontale') {
+        ico.textContent = ''; ico.style.width = '26px';
+        var fsvg = svgNS('svg');
+        fsvg.setAttribute('class', 'orizz');
+        fsvg.setAttribute('width', 24); fsvg.setAttribute('height', 12);
+        fsvg.setAttribute('viewBox', '0 0 24 12');
+        var fp = svgNS('path');
+        fsvg.append(fp);
+        ico.append(fsvg);
+        var rec = { p: fp, L: 24, fase: 0 };
+        filiOrizz.push(rec);
+        seg_filo = rec;
+      }
       else { ico.textContent = ''; ico.style.display = 'none'; }
 
-      var seg = { el: wrap, testa: testa, eti: eti, corpo: corpo, trama: trama, dati: dati, acc: '', viste: 0 };
+      var seg = { el: wrap, testa: testa, eti: eti, corpo: corpo, trama: trama, dati: dati, acc: '', viste: 0, filo: seg_filo, ico: ico };
+      seg_filo = null;
       segmenti.push(seg);
       if (dati.tipo === 'azione') {
         onda.ampObiettivo = 1.6; onda.vel = 0.13;
@@ -449,7 +488,13 @@ function creaBlocco(host) {
       seg.trama.remove();
       // Col filo verticale l'icona non serve: il nodo È il segno, e il titolo
       // dice già cos'era. Due marcatori sulla stessa riga sono uno di troppo.
-      var ico = seg.testa.querySelector('.seg-ico');
+      var ico = seg.ico;
+      if (seg.filo) {
+        var w = filiOrizz.indexOf(seg.filo);
+        if (w >= 0) filiOrizz.splice(w, 1);
+        ico.textContent = '';
+        ico.style.width = '';
+      }
       if (opt.filo === 'verticale') { ico.className = 'seg-ico'; ico.textContent = ''; ico.style.display = 'none'; }
       else {
         ico.className = 'seg-ico'; ico.style.display = '';
@@ -503,6 +548,9 @@ function creaBlocco(host) {
         requestAnimationFrame(function () {
           righe.style.maxHeight = v ? righe.scrollHeight + 'px' : '0px';
         });
+        // Finita l'animazione il tetto si toglie, se no aprire una sezione
+        // dopo aver srotolato la taglia a metà.
+        if (v) setTimeout(function () { if (!chiuso) righe.style.maxHeight = 'none'; }, 460);
       }
       mostra(false);
       capo.addEventListener('click', function () { mostra(chiuso); });
