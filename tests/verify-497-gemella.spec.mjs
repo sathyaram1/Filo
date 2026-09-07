@@ -20,6 +20,7 @@ test('gemella — dove sta la frase per chi ha segnalato e come sono disposti i 
     fb({ _id: 'g1', status: 'todo', userNote: '' }),
     fb({ _id: 'g2', status: 'todo', seq: 701, name: 'Secondo', userNote: 'già scritta' }),
   ]);
+  await page.evaluate(() => window.__fbTest.setTab('queue'));
   await page.waitForTimeout(400);
   const info = await page.evaluate(() => {
     const c = document.querySelectorAll('.fb-usernote');
