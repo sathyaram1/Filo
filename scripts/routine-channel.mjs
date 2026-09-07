@@ -373,7 +373,7 @@ if (isMain) {
     // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
     // che diceva «OK» (feedback #565).
     if (!a.startsWith('--')) {
-      if (SEMBRA_OPZIONE_STORTA(a, new Set([...CAMPI, ...CAMPI_TESTO]))) {
+      if (SEMBRA_OPZIONE_STORTA(a)) {
         const nome = String(a).replace(/^[-‐‑‒–—−]+/, '').split('/').pop().split('=')[0];
         console.error(`Argomento non capito: "${a}" — non ho fatto niente. Le opzioni si scrivono con due trattini: --${nome} …`);
         process.exit(1);
