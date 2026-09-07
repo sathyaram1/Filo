@@ -185,6 +185,14 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) 
     if (arg.startsWith('/') && ammesse.has(`--${arg.slice(1).toLowerCase()}`)) {
       return `l'opzione ${arg} va scritta --${arg.slice(1).toLowerCase()} — non ho toccato niente.`;
     }
+    // La conchiglia di Git su Windows trasforma `/dry-run` in un PERCORSO
+    // («C:/Program Files/Git/dry-run») prima di consegnarlo: lì la barra non
+    // si vede più, e la modalità che non spedisce non si accendeva mentre il
+    // feedback partiva davvero (feedback #565). Si guarda l'ultimo pezzo.
+    if (arg.includes('/') && ammesse.has(`--${arg.split('/').pop().toLowerCase()}`)) {
+      const nome = arg.split('/').pop().toLowerCase();
+      return `«${arg}» è la tua opzione /${nome} trasformata in percorso dalla conchiglia — non ho toccato niente. Scrivila --${nome}.`;
+    }
     if (!sembraOpzione(arg)) continue;
     // `--opzione=valore` è la forma che regge quando la riga passa da npm:
     // qui vale come opzione col suo valore, non come un nome sconosciuto.
