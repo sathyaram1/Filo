@@ -8,8 +8,24 @@
 // riposiziona e ricarica il testo, hideTooltip() la nasconde con hide() (non
 // close, per evitare il costo di reload ad ogni hover).
 
-const { BrowserWindow, nativeTheme } = require('electron');
+const { BrowserWindow, nativeTheme, screen } = require('electron');
 const { hideForTests } = require('./test-window-mode');
+
+// Riporta un rettangolo dentro l'area utile dello schermo che lo contiene.
+// Se non ci sta proprio (riquadro più grande dello schermo) lo appoggia al
+// bordo iniziale: meglio l'inizio del testo visibile che la fine.
+function dentroLoSchermo(x, y, w, h) {
+  try {
+    const d = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) });
+    const a = d.workArea;
+    return {
+      x: Math.round(Math.max(a.x, Math.min(x, a.x + a.width - w))),
+      y: Math.round(Math.max(a.y, Math.min(y, a.y + a.height - h))),
+    };
+  } catch (_) {
+    return { x: Math.round(x), y: Math.round(y) };
+  }
+}
 
 // Larghezza massima del riquadro. Abbondante di proposito: un titolo normale ci
 // sta su una riga sola e il riquadro resta piccolo; oltre, va a capo invece di
