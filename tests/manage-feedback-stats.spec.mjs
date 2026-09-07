@@ -235,6 +235,26 @@ test('senza lavori verificati la torta non finge: lo dice', async ({ openTab }) 
   await expect(page.locator('#mgStLoopAvg')).toBeHidden();
 });
 
+test('la scheda lasciata aperta segue i feedback che cambiano, non resta la fotografia di quando l\'hai aperta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page, { dati: [fb({ id: 'a', seq: 1, at: iso(1), status: 'todo' })], log: [] });
+  await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
+  await expect(numero(page, 'mgStTileRicevuti')).toHaveText('1');
+
+  // Firestore finto: arriva un feedback nuovo mentre la scheda è aperta.
+  await page.evaluate((nuovo) => {
+    window.__mgTest.setLiveSources({
+      listVersions: async () => [{ _id: 'a', _updateTime: 't1' }, { _id: 'b', _updateTime: 't1' }],
+      getMany: async (ids) => ids.filter((i) => i === 'b').map(() => nuovo),
+    });
+  }, fb({ id: 'b', seq: 2, at: iso(1), status: 'done' }));
+  await page.evaluate(() => window.__mgTest.pollNow());
+
+  // Il numero segue senza che l'owner debba cambiare scheda e tornare.
+  await expect(numero(page, 'mgStTileRicevuti')).toHaveText('2');
+  await expect(numero(page, 'mgStTileLavorati')).toHaveText('1');
+});
+
 test('uno stato che questo computer non sa leggere si dichiara, non finisce in una categoria a caso', async ({ openTab }) => {
   const page = await openTab(URL);
   await apriStatistiche(page, {
