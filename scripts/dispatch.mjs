@@ -291,6 +291,12 @@ export const VERIFIER_OUTCOMES = ['pass', 'fix', 'stop'];
 // Tetto di una critica, lo stesso del server. Oltre: rifiuto con la
 // spiegazione, non un taglio.
 export const MAX_CRITIQUE_CHARS = 12000;
+// E un pavimento, lo stesso dello strumento locale: una verifica di due parole
+// non è una verifica, e vale in tutti e due i sensi. Senza rilievi l'esito
+// calcolato è «superata», quindi una critica vuota è una PROMOZIONE, non una
+// bocciatura: il pavimento è l'unica cosa che impedisce di promuovere senza
+// aver scritto niente (feedback #565).
+export const MIN_CRITIQUE_CHARS = 80;
 export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
 
 /**
