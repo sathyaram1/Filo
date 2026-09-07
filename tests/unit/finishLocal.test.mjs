@@ -367,3 +367,23 @@ test('l\'elenco dei rossi noti non marcisce: ogni voce è uno spec che esiste', 
   assert.match(j.nota, /#\d+/, 'la nota cita il feedback da cui l\'elenco dipende');
   for (const s of j.specs) assert.ok(existsSync(resolve(ROOT, `${s}.spec.mjs`)), `${s} non esiste più: toglilo dall'elenco`);
 });
+
+// I rossi dei contenitori senza schermo delle routine. Vivevano nella memoria di
+// chi verificava, elencati a voce nelle sue istruzioni: nessun nome preciso,
+// nessun motivo scritto, nessuna scadenza. Da lì a lasciar passare una
+// regressione vera perché "assomiglia" a un rosso d'ambiente c'è un passo. Qui
+// hanno un nome, un caso, un perché e un numero di feedback, e questa sentinella
+// li tiene onesti.
+test('i rossi del contenitore hanno nome, caso, motivo e un feedback', () => {
+  const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
+  const c = j.contenitore;
+  assert.ok(c && Array.isArray(c.specs), 'rossi-noti.json deve avere `contenitore.specs` (anche vuoto)');
+  const bloccanti = new Set(j.specs.map(String));
+  for (const v of c.specs) {
+    assert.ok(existsSync(resolve(ROOT, `${v.spec}.spec.mjs`)), `${v.spec} non esiste più: toglilo dall'elenco`);
+    assert.ok(v.caso && v.caso.length > 3, `${v.spec}: manca il caso preciso che è rosso`);
+    assert.ok(v.perche && v.perche.length > 20, `${v.spec}: manca il motivo, e senza motivo non si toglierà mai`);
+    assert.match(String(v.feedback || ''), /#\d+/, `${v.spec}: manca il feedback che lo farà togliere`);
+    assert.ok(!bloccanti.has(v.spec), `${v.spec} sta in tutti e due gli elenchi: decidi quale`);
+  }
+});
