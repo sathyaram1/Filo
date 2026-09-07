@@ -3952,6 +3952,7 @@
       loadFailed = true;
       reindexByClient();
       renderList();
+      dataChanged();
     },
     // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
     // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
