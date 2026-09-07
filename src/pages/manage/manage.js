@@ -2685,7 +2685,18 @@
     // perso il fuoco e ha già spedito: l'esito lo scrive quel salvataggio lì,
     // e dirgli sopra "Nessuna modifica" sarebbe una bugia.
     if (userNoteInVolo && userNoteInVoloTesto === fraseInCasella()) return;
-    if (!bozzaFrase()) { saveUserNote(); return; }
+    if (!bozzaFrase()) {
+      // Niente di nuovo da spedire, quasi sempre perché il salvataggio
+      // automatico l'ha già portato via. Quello che l'owner vuole sapere
+      // premendo il tasto è se a destinazione c'è la sua riga: glielo si dice,
+      // invece di un "Nessuna modifica" che sembra un rifiuto.
+      const testo = fraseInCasella();
+      const fb = allFeedbacks.find((f) => f._id === selectedId);
+      const aDestinazione = String((fb && fb.userNote) || '');
+      if (aDestinazione === testo) { setUserNoteMsg(testo ? 'Salvata' : 'Nessuna frase', 'ok'); return; }
+      saveUserNote();
+      return;
+    }
     salvaFraseSubito();
   }
   if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', salvaFraseAMano);
