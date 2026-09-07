@@ -125,11 +125,22 @@ test('la larghezza a cui i tasti vanno a capo', async ({ app, openTab }) => {
   const page = await openTab(URL);
   await pronta(page);
   await apri(page, { ...BASE, _id: 'v497b-larghezza', status: 'suspicious_file' }, 'inbox');
+  // Le righe si contano per SOVRAPPOSIZIONE verticale: il tasto primario è alto
+  // qualche decimo più dei secondari, e confrontare i bordi alti direbbe "due
+  // righe" di una riga sola.
   const misura = async () => page.evaluate(() => {
     const els = [...document.querySelectorAll('#mgActionsRow button, #mgStarBtn, #mgUserNoteToggle')]
       .filter((el) => el.getClientRects().length);
-    const tops = els.map((el) => Math.round(el.getBoundingClientRect().top));
-    return { righe: new Set(tops).size, quanti: els.length };
+    const righe = [];
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      const l = righe.find((x) => (Math.min(x.bottom, r.bottom) - Math.max(x.top, r.top))
+        > Math.min(x.bottom - x.top, r.height) / 2);
+      if (l) { l.top = Math.min(l.top, r.top); l.bottom = Math.max(l.bottom, r.bottom); }
+      else righe.push({ top: r.top, bottom: r.bottom });
+    }
+    const doc = document.documentElement;
+    return { righe: righe.length, quanti: els.length, overflow: doc.scrollWidth > doc.clientWidth + 1 };
   });
   const soglie = [];
   for (const w of [1600, 1400, 1280, 1200, 1100, 1000, 900, 800, 700, 600, 500]) {
