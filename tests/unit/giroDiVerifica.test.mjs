@@ -157,7 +157,7 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
   });
   try {
     const male = await esegui(['--record-verifier', 'fid-901',
-      'Provato ad aprire la pagina e a salvare col titolo vuoto.\n[4] gravissimo'], ENV(casa, port));
+      'Provato ad aprire la pagina, a salvare col titolo vuoto e a trascinare.\n[4] gravissimo'], ENV(casa, port));
     assert.equal(male.code, 1, 'si sistema la riga e si rilancia: errore d\'uso');
     assert.match(male.se, /\[4\] gravissimo/);
     assert.doesNotMatch(male.se, /identit|directory non corrisponde/, 'non è un guasto d\'identità');
