@@ -1589,6 +1589,14 @@ if (isMainModule) {
       const fi = rest.indexOf('--frase');
       const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
       const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
+      // Qui l'unica opzione è `--frase`: qualunque altra cosa coi trattini
+      // davanti finirebbe sepolta dentro al report cifrato, e la frase per chi
+      // ha segnalato partirebbe vuota (#565).
+      const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => SEMBRA_OPZIONE(a));
+      if (altra) {
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui c'è solo --frase "…"; il resto è il report, un testo solo fra virgolette.`);
+        process.exit(1);
+      }
       const s = await recordFixed(id, report, frase);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
