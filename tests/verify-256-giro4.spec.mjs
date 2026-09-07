@@ -109,14 +109,15 @@ test('A1 — tolte tutte le voci col mouse fermo sulla lista, «Svuota cronologi
     expect(clearVisibile, 'niente da svuotare, niente tasto per svuotare').toBe(false);
     await expect(page.locator('#sec-clip-search-row')).toBeHidden();
 
-    // Anche premuto da tastiera (il puntatore non si muove, o la lista si
-    // ricomporrebbe) non deve aprirsi nessuna conferma per zero voci.
+    // E se anche il tasto venisse premuto lo stesso, nessuna conferma deve
+    // offrire di far sparire zero voci.
     await page.evaluate(() => document.getElementById('sec-clip-clear').click());
     await page.waitForTimeout(400);
     const aperto = await page.locator(CONFIRM_HOST).count();
     const testo = await confirmText(page);
     console.log('[A1] dialogo aperto:', aperto, '| testo della conferma:', JSON.stringify(testo));
     if (aperto) await clickConfirm(page, 'cancel');
+    expect(aperto, 'niente da svuotare, nessuna conferma').toBe(0);
     expect(testo, 'nessuna conferma che offra di far sparire 0 voci').not.toMatch(/\b0\b/);
 
     // Allontanato il puntatore la lista si ricompone e la pagina dice che non
