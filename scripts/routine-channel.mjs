@@ -339,6 +339,15 @@ if (isMain) {
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (!a.startsWith('--')) { args.push(a); continue; }
+    // Un nome sbagliato non deve passare in silenzio: `--noets "…"` faceva
+    // partire la consegna col report VUOTO e il server rispondeva OK — lo
+    // stesso danno che il controllo sui posizionali, qui sotto, esiste per
+    // impedire (feedback #565).
+    if (!CAMPI.has(a.slice(2).split('=')[0])) {
+      console.error(`Campo non capito: "${a}" — non ho consegnato niente.`);
+      console.error(`Campi ammessi: ${[...CAMPI].map((c) => `--${c}`).join(' ')}`);
+      process.exit(1);
+    }
     flags.push(a);
     const key = a.slice(2);
     const next = rest[i + 1];
