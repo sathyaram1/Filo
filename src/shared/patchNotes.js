@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.222', date: '2026-09-07',
+      fixes: [
+        'Il nome della scheda si legge per intero. Finché nella barra c\'è posto le schede restano larghe, invece di tagliare il titolo dopo tre lettere.',
+        'La scheda che stai guardando prende il colore della pagina che ha aperto, e fra le due non si vede più lo stacco. Sulle pagine di Filo restava grigia.',
+      ],
+    },
+    {
       version: '0.2.219', date: '2026-09-05',
       features: [
         'Nella chat della nuova scheda Filo fa tutto in un turno solo: cerca, legge il risultato, mette la sveglia e poi risponde, senza chiudere il messaggio a metà per dirti cosa farà dopo. Nel blocco sopra la risposta vedi ogni passo mentre succede: il ragionamento, ogni azione appena la decide («Cerco sul web…»), l\'esito, le due parole che scrive a metà lavoro.',
