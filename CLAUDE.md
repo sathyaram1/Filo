@@ -310,14 +310,32 @@ npm run test:shoot         # cattura visiva della finestra reale
 FILO_TEST_SCALE=1.25 npx playwright test tests/<spec>.spec.mjs   # schermo al 125%
 ```
 
-**Lo schermo dell'owner sta al 125%**, quello delle routine in cloud al 100%, e
-qualche spec di layout diverge solo per quello: la stessa riga di testo cade su
-misure diverse, e un rosso che in cloud non esiste diventa un rosso fisso su una
-macchina sola. `FILO_TEST_SCALE=1.25` rimette quel fattore ovunque, ed è l'unico
-modo di rivedere quei rossi senza avere lo stesso schermo sotto mano. Vale per
-gli spec che partono dalla fixture; quelli che si aprono Filo da soli devono
-passarlo a mano (`args: [...argomentiScala, '.']`, da `tests/fixtures/electron.mjs`)
-e una sentinella negli unit test diventa rossa se qualcuno se lo dimentica.
+**La macchina dell'owner ha due cose che le altre non hanno**, e ogni volta che
+un test le dà per scontate nasce un rosso che vede lui solo, per settimane
+(feedback #563: undici spec così).
+
+**Lo schermo sta al 125%**, quello delle routine in cloud al 100%: la stessa
+riga di testo cade su misure diverse. `FILO_TEST_SCALE=1.25` rimette quel
+fattore ovunque, ed è l'unico modo di rivedere quei rossi senza avere lo stesso
+schermo sotto mano. Un valore scritto male (`125` al posto di `1.25`, o una
+parola) ferma subito invece di girare al 100% facendoti credere il contrario.
+Chi apre Filo per conto suo passa la manopola a mano
+(`args: [...argomentiScala, '.']`, da `tests/helpers/scala.mjs` o dalla
+fixture): una sentinella negli unit test guarda OGNI `electron.launch` sotto
+`tests/` e diventa rossa se qualcuno se la dimentica.
+
+**L'utente si chiama «agenti AI»**, con lo spazio, e su Windows quel nome fa
+anche comparire la forma abbreviata `AGENTI~1` in `%TEMP%` mentre l'app riporta
+sempre quella lunga. Qui non c'è una manopola da accendere: la cartella
+temporanea di un test si chiede sempre a `cartellaTemporanea()`
+(`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per
+tutti. Costruirsela con `mkdtempSync` significa provare su un percorso che sulla
+macchina dell'owner non esiste, e una sentinella negli unit test lo impedisce.
+
+I rossi d'ambiente che restano sono **scritti** in `tests/rossi-noti.json`, col
+caso preciso, il motivo e il feedback che li toglierà: quelli del contenitore
+senza schermo delle routine e quelli della macchina dell'owner, in due elenchi
+separati. Un rosso che non è lì dentro è una regressione.
 
 Modelli per gli strumenti di test (`test:explore`): open via OpenRouter, chiave
 in `tests/agent/.env` — MAI chiavi del produttore dei pesi (politica modelli).
