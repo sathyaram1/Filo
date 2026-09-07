@@ -116,7 +116,11 @@
   // La stessa rete per il livello scritto BENE ma con davanti qualcosa che
   // il lettore non conosce («(a) [2] …»): lì la prima parentesi non è il
   // livello, e cercarla come prima cosa la mancava.
-  const QUADRA_VICINA = new RegExp(`^.{0,8}?(${LEVEL_TOKEN_SRC})`);
+  const QUADRA_VICINA = new RegExp(`^.{0,14}?(${LEVEL_TOKEN_SRC})`);
+  // «Difetto: [2] …», «rilievo grave [2] …»: l'etichetta sta PRIMA del livello,
+  // col separatore o senza. Il controllo guardava solo la forma opposta
+  // («Rilievo [2]: …»), e questa passava per riassunto (feedback #565).
+  const ETICHETTA_PRIMA = new RegExp(`^\\s*${PREFISSO_ELENCO}[^\\[\\]]{1,20}?[:\\-–—]\\s*${LEVEL_TOKEN_SRC}`);
   // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
