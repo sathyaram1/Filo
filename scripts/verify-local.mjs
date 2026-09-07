@@ -581,6 +581,59 @@ export function readRecipe(root = ROOT) {
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
+
+  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | status';
+  // L’aiuto si stampa e basta, DOVUNQUE stia nella riga. Chiedere aiuto a uno
+  // strumento è il primo gesto di chi verifica, e qui era l’unico posto dove
+  // al posto dell’aiuto partiva l’azione: `start --help` apriva il giro per
+  // davvero e la parola «--help» prendeva il posto della richiesta — l’unica
+  // cosa che chi verifica sa, e che non sta scritta da nessun’altra parte
+  // (feedback #565).
+  const chiedeAiuto = (a) => {
+    let s = String(a ?? '').toLowerCase();
+    while (s.length && '-‐‑‒–—−/'.includes(s[0])) s = s.slice(1);
+    return s === 'h' || s === 'help' || s === 'aiuto' || s === '?';
+  };
+  if ([cmd, ...rest].some(chiedeAiuto)) {
+    console.log(USO);
+    console.log('Non ho toccato niente. Nessun comando accetta opzioni: il testo va fra virgolette, tutto in un pezzo solo.');
+    process.exit(0);
+  }
+
+  // Qui nessun comando accetta opzioni: una parola con due trattini in coda
+  // finiva DENTRO al testo della critica (o del report) e l'esito veniva
+  // registrato lo stesso — un testo che non si modifica più, e che l'owner
+  // legge nella chat del feedback (feedback #565).
+  // STA PRIMA DI TUTTI E TRE I COMANDI, e non è un dettaglio: quando stava
+  // dopo, `start` aveva già aperto il giro e per lui non scattava mai.
+  if (['critica', 'corretto', 'start'].includes(cmd)) {
+    const { sembraOpzione } = await import('./lib/argomenti.mjs');
+    const opzione = rest.find((a) => sembraOpzione(a));
+    if (opzione) {
+      console.error(`Argomento non capito: ${opzione} — non ho toccato niente. Qui non ci sono opzioni: il testo va fra virgolette, tutto in un pezzo solo.`);
+      process.exit(1);
+    }
+    // La forma con la barra («/frase»): la conchiglia di Git la trasforma in un
+    // percorso vero prima di consegnarla, e la barra non si vede più. Qui il
+    // testo è sempre prosa, e una prosa non comincia per barra né per «C:/».
+    const percorso = rest.find((a) => /^(?:[A-Za-z]:)?[\/]/.test(String(a ?? '')));
+    if (percorso) {
+      console.error(`Argomento non capito: ${percorso} — non ho toccato niente. Se era un’opzione scritta con la barra, la conchiglia l’ha trasformata in un percorso: qui non ci sono opzioni, il testo va fra virgolette, tutto in un pezzo solo.`);
+      process.exit(1);
+    }
+    // IL TESTO IN UN PEZZO SOLO, e non per pignoleria: unendo i pezzi con uno
+    // spazio, un rilievo che sta nel secondo pezzo non apre più una riga —
+    // smette di essere un rilievo, e una BOCCIATURA diventa una promozione,
+    // col ramo che risulta pubblicabile. Basta una virgoletta dimenticata
+    // (feedback #565).
+    if (rest.length > 1) {
+      console.error(`Ho ricevuto ${rest.length} pezzi invece di uno: non ho toccato niente.`);
+      console.error('Il testo va fra virgolette, tutto in un pezzo solo — probabilmente ne manca una.');
+      console.error(`Primo pezzo: "${String(rest[0]).slice(0, 60)}…" · secondo: "${String(rest[1]).slice(0, 60)}…"`);
+      process.exit(1);
+    }
+  }
+
   const branch = currentBranch();
   const sha = headSha();
 
@@ -625,29 +678,6 @@ if (isMain) {
     process.exit(1);
   }
 
-  // Qui nessun comando accetta opzioni: una parola con due trattini in coda
-  // finiva DENTRO al testo della critica (o del report) e l'esito veniva
-  // registrato lo stesso — un testo che non si modifica più, e che l'owner
-  // legge nella chat del feedback (feedback #565).
-  if (['critica', 'corretto', 'start'].includes(cmd)) {
-    const { sembraOpzione } = await import('./lib/argomenti.mjs');
-    const opzione = rest.find((a) => sembraOpzione(a));
-    if (opzione) {
-      console.error(`Argomento non capito: ${opzione} — non ho toccato niente. Qui non ci sono opzioni: il testo va fra virgolette, tutto in un pezzo solo.`);
-      process.exit(1);
-    }
-    // IL TESTO IN UN PEZZO SOLO, e non per pignoleria: unendo i pezzi con uno
-    // spazio, un rilievo che sta nel secondo pezzo non apre più una riga —
-    // smette di essere un rilievo, e una BOCCIATURA diventa una promozione,
-    // col ramo che risulta pubblicabile. Basta una virgoletta dimenticata
-    // (feedback #565).
-    if (rest.length > 1) {
-      console.error(`Ho ricevuto ${rest.length} pezzi invece di uno: non ho toccato niente.`);
-      console.error('Il testo va fra virgolette, tutto in un pezzo solo — probabilmente ne manca una.');
-      console.error(`Primo pezzo: "${String(rest[0]).slice(0, 60)}…" · secondo: "${String(rest[1]).slice(0, 60)}…"`);
-      process.exit(1);
-    }
-  }
 
   if (cmd === 'critica') {
     const text = rest.join(' ').trim();
@@ -735,6 +765,6 @@ if (isMain) {
     process.exit(r.ok ? 0 : 1);
   }
 
-  console.error('Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | status');
+  console.error(USO);
   process.exit(1);
 }
