@@ -482,6 +482,11 @@
    *   now          istante di riferimento (per l'andamento)
    *   authorKindOf (fb) => categoria d'autore — SN_FEEDBACK_THREAD.authorKind
    *   statusOf     (fb) => { status, unreadable } — da SN_MANAGE_REVIEW
+   *   unreadable   (valore) => true se è arrivato cifrato — SN_MANAGE_REVIEW
+   *                .valueUnreadable. Serve al MITTENTE e alla PRIORITÀ, che
+   *                viaggiano cifrati come lo stato: senza questo la scheda li
+   *                leggeva come «Utente» e «Senza priorità», cioè scriveva
+   *                numeri misurati su dati che non aveva letto.
    */
   function compute(p) {
     const o = p || {};
@@ -492,16 +497,46 @@
     const now = toMillis(o.now) != null ? toMillis(o.now) : Date.now();
     const authorKindOf = typeof o.authorKindOf === 'function' ? o.authorKindOf : (() => 'user');
     const statusOf = typeof o.statusOf === 'function' ? o.statusOf : (() => ({ status: '', unreadable: true }));
+    const unreadable = typeof o.unreadable === 'function' ? o.unreadable : (() => false);
 
     const ammesso = (k) => creators.includes(k);
+    // Un filtro c'è solo se lascia fuori qualcuno: con tutte le categorie
+    // accese non si sta chiedendo niente.
+    const filtroCreatore = creators.length < CREATOR_KINDS.length;
 
     // ── I feedback della finestra ────────────────────────────────────────────
     const selezionati = [];
+    // Le segnalazioni senza una data d'arrivo leggibile: con «Sempre» stanno
+    // nei conti (una finestra senza limiti non lascia fuori niente) ma non nel
+    // grafico degli arrivi; con una finestra che ha dei limiti restano fuori
+    // da tutto. In tutti e due i casi il numero si dichiara.
+    const idsSenzaData = [];
+    let senzaData = 0;
+    // Il mittente cifrato non è «Utente»: è un mittente che non si conosce.
+    const idsMittenteIgnoto = [];
+    let mittenteIgnoto = 0;
+    let mittenteFuoriFiltro = 0;
     for (const fb of feedbacks) {
       const ms = toMillis(fb && fb.createdAt);
+      const fbId = fb && fb._id;
+      const ignoto = unreadable(fb && fb.clientId);
+      const kind = ignoto ? null : (authorKindOf(fb) || 'user');
+      // Chi non dice chi l'ha mandato non si può dichiarare né dentro né fuori
+      // da un filtro per creatore: resta fuori, e il numero lo dice.
+      if (kind != null && !ammesso(kind)) continue;
+      if (ignoto && filtroCreatore) {
+        if (inRange(ms, range)) { mittenteFuoriFiltro += 1; }
+        continue;
+      }
+      if (ms == null) {
+        senzaData += 1;
+        if (fbId != null && fbId !== '') idsSenzaData.push(fbId);
+      }
       if (!inRange(ms, range)) continue;
-      const kind = authorKindOf(fb) || 'user';
-      if (!ammesso(kind)) continue;
+      if (ignoto) {
+        mittenteIgnoto += 1;
+        if (fbId != null && fbId !== '') idsMittenteIgnoto.push(fbId);
+      }
       selezionati.push({ fb, ms, kind });
     }
 
