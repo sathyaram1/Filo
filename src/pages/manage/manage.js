@@ -2239,13 +2239,15 @@
     // modo più facile di perderla, e succedeva in silenzio.
     setActionsBusy(true);
     const fraseOk = await fraseAlSicuro();
-    setActionsBusy(false);
     if (!fraseOk) {
+      setActionsBusy(false);
       setActionMsg('La frase per chi ha segnalato non si è salvata: riprova prima di cambiare stato.', 'err');
       mostraFrase(true);
       return;
     }
-    if (selectedId !== id) return;
+    // Nell'attesa l'owner può essere passato a un'altra segnalazione: l'azione
+    // era per questa, e qui si ferma.
+    if (selectedId !== id) { setActionsBusy(false); return; }
     const payload = { type: 'feedback_update', id, status: action.to };
     const locale = { status: action.to };
     const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
