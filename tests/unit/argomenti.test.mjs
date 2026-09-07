@@ -152,3 +152,11 @@ test('la roba di npm non viene scambiata per un nostro errore', () => {
   // E un'opzione scritta GIUSTA non è un errore: la riprende chi di dovere.
   assert.equal(opzioneStorpiata({ npm_config_dry_run: 'true' }, ['--dry-run']), null);
 });
+
+test('un nome che non somiglia a niente, sotto npm, viene detto lo stesso', () => {
+  // La versione inglese di un'opzione, o un nome preso da un altro strumento:
+  // npm se lo porta via e allo strumento non arriva niente da rifiutare.
+  assert.match(opzioneStorpiata({ npm_config_attach: 'spec.md' }, ['--allega']), /--attach non la conosco/);
+  // Ma le configurazioni DI npm non sono nostri errori.
+  assert.equal(opzioneStorpiata({ npm_config_loglevel: 'error', npm_config_init_module: 'x' }, ['--allega']), null);
+});
