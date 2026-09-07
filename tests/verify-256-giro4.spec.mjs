@@ -102,21 +102,28 @@ test('A1 — tolte tutte le voci col mouse fermo sulla lista, «Svuota cronologi
     }
     await expect(page.locator('#sec-clip-list .sn-clip-gone')).toHaveCount(3);
 
+    // Ferma è la lista, non i controlli intorno: appena non resta niente da
+    // svuotare il tasto se ne va, e con lui il campo di ricerca.
     const clearVisibile = await page.locator('#sec-clip-clear').isVisible();
     console.log('[A1] «Svuota cronologia» ancora visibile a cronologia vuota:', clearVisibile);
-    if (clearVisibile) {
-      // Il puntatore NON si muove (muoverlo fa ricomporre la lista e il tasto
-      // sparisce): si arriva al tasto con la tastiera, come farebbe chi ha la
-      // mano ferma sul mouse.
-      await page.evaluate(() => document.getElementById('sec-clip-clear').focus());
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(400);
-      const aperto = await page.locator(CONFIRM_HOST).count();
-      const testo = await confirmText(page);
-      console.log('[A1] dialogo aperto:', aperto, '| testo della conferma:', JSON.stringify(testo));
-      if (aperto) await clickConfirm(page, 'cancel');
-      expect(testo, 'la conferma non deve offrire di far sparire 0 voci').not.toMatch(/\b0\b/);
-    }
+    expect(clearVisibile, 'niente da svuotare, niente tasto per svuotare').toBe(false);
+    await expect(page.locator('#sec-clip-search-row')).toBeHidden();
+
+    // Anche premuto da tastiera (il puntatore non si muove, o la lista si
+    // ricomporrebbe) non deve aprirsi nessuna conferma per zero voci.
+    await page.evaluate(() => document.getElementById('sec-clip-clear').click());
+    await page.waitForTimeout(400);
+    const aperto = await page.locator(CONFIRM_HOST).count();
+    const testo = await confirmText(page);
+    console.log('[A1] dialogo aperto:', aperto, '| testo della conferma:', JSON.stringify(testo));
+    if (aperto) await clickConfirm(page, 'cancel');
+    expect(testo, 'nessuna conferma che offra di far sparire 0 voci').not.toMatch(/\b0\b/);
+
+    // Allontanato il puntatore la lista si ricompone e la pagina dice che non
+    // c'è più niente.
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(800);
+    await expect(page.locator('#sec-clip-empty')).toBeVisible();
   } finally {
     try { await app.close(); } catch (_) {}
     rmSync(userData, { recursive: true, force: true });
