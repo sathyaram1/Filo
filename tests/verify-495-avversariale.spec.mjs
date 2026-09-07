@@ -240,7 +240,13 @@ test('#495 — numeri grandi: la barra delle schede non straborda né balla', as
     void cur;
   });
   await page.screenshot({ path: join(SHOTS, 'v495-numeri-grandi.png') });
-  expect(before.length).toBe(8);
+  // Le posizioni misurate devono essere una per scheda: il numero di schede
+  // NON si scrive a mano qui, o basta aggiungerne una alla barra per far
+  // diventare rosso un controllo che non parla di quello (è successo con
+  // «Statistiche feedback»).
+  const nSchede = await page.locator('.mg-tab').count();
+  expect(before.length).toBe(nSchede);
+  expect(nSchede).toBeGreaterThan(0);
 });
 
 test('#495 — durante la ricerca i numeri delle schede restano quelli veri', async ({ openTab }) => {
