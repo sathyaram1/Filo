@@ -32,8 +32,21 @@
   <style>
     /* La dashboard di gestione sfrutta tutta la larghezza: override locale del
        limite globale `.sn-page { max-width: 960px }` di pages.css (che serve alle
-       altre pagine, quindi NON si tocca lì). */
-    .sn-page { max-width: none; }
+       altre pagine, quindi NON si tocca lì).
+
+       E anche tutta l'ALTEZZA (#498): la pagina è una colonna alta quanto la
+       finestra, così le schede partono vicino al bordo e le tre aree del
+       pannello-lista si prendono ciò che avanza fino in fondo. Il margine sopra
+       è ridotto rispetto alle pagine di lettura: qui la prima cosa utile è la
+       barra delle sezioni, non un titolo da far respirare. */
+    .sn-page {
+      max-width: none;
+      box-sizing: border-box;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 14px 24px 18px;
+    }
 
     /* ── Switch "Modalità automatica" (tab Automazioni, owner-only) ─────── */
     /* `.sn-page label` (pages.css) impone `display: block` + colore smorzato a
