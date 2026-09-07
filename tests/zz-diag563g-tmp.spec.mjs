@@ -19,7 +19,7 @@ let app = null;
 let shell = null;
 let userData = null;
 
-test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'default' });
 
 test.beforeAll(async () => {
   userData = cartellaTemporanea('filo-test-');
