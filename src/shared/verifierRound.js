@@ -93,7 +93,7 @@
   // silenzio e il lavoro passava (verifica del giro 6). Lo stesso per il segno
   // messo prima della cifra («[?2]») o un segno diverso dopo («[2!]»): non
   // erano né rilievi né errori (verifica del giro 7).
-  const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*[?!]*\\s*\\]';
+  const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/.,]\\s*\\d+)?\\s*[?!]*\\s*(?:[A-Za-zÀ-ÿ]{1,10}\\s*)?\\]';
   const LEVEL_START = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
   // Un livello scritto in una parentesi qualunque — tonda, graffa, doppia,
   // spaiata — o con la cifra a parole. Il lettore riconosce solo la quadra con
