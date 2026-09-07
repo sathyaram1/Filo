@@ -1186,6 +1186,121 @@
     </section>
 
     <!-- ═══ TAB STATISTICHE RED TEAM ════════════════════════════════════ -->
+    <!-- ═══ TAB STATISTICHE FEEDBACK (#496) ══════════════════════════════ -->
+    <!-- Due orologi, una finestra sola: i FEEDBACK si scelgono per data
+         d'arrivo (createdAt), le ESECUZIONI delle routine per istante d'avvio
+         (il registro dei worker, la stessa fonte della scheda «Log»). I conti
+         stanno tutti in src/shared/feedbackStats.js: qui si disegna e basta. -->
+    <section class="mg-panel" id="panel-fbstats" data-panel="fbstats">
+      <div class="mg-st">
+        <h2>Statistiche feedback</h2>
+        <p class="mg-st-intro">
+          Cosa è arrivato, cosa è stato lavorato e quanti giri di verifica è
+          costato, nella finestra e per i creatori che scegli.
+        </p>
+
+        <div class="mg-st-bar">
+          <div class="mg-st-field">
+            <span class="mg-st-field-label" id="mgStWindowLabel">Finestra</span>
+            <div class="mg-st-chips" id="mgStWindows" role="group" aria-labelledby="mgStWindowLabel"></div>
+            <div class="mg-st-custom" id="mgStCustom" hidden>
+              <label class="mg-st-date">dal <input type="date" id="mgStFrom" /></label>
+              <label class="mg-st-date">al <input type="date" id="mgStTo" /></label>
+            </div>
+          </div>
+          <div class="mg-st-field">
+            <span class="mg-st-field-label" id="mgStCreatorLabel">Creatore</span>
+            <div class="mg-st-chips" id="mgStCreators" role="group" aria-labelledby="mgStCreatorLabel"></div>
+          </div>
+        </div>
+
+        <p class="mg-st-range" id="mgStRange"></p>
+        <p class="mg-st-warn" id="mgStWarn" hidden></p>
+
+        <!-- I tre numeri chiesti. Ognuno si apre sul suo dettaglio: se si può
+             espandere «ricevuti», si espandono anche gli altri due — cammini
+             equivalenti fanno la stessa cosa. -->
+        <div class="mg-st-tiles" id="mgStTiles">
+          <button type="button" class="mg-st-tile" id="mgStTileRicevuti"
+            data-stat="ricevuti" aria-expanded="false" aria-controls="mgStDrawer"
+            title="Le segnalazioni ARRIVATE nella finestra scelta, dai creatori scelti.">
+            <span class="mg-st-tile-num" data-num>—</span>
+            <span class="mg-st-tile-name">Feedback ricevuti</span>
+            <span class="mg-st-tile-sub" data-sub></span>
+            <span class="mg-st-tile-more">Apri per categoria</span>
+          </button>
+          <button type="button" class="mg-st-tile" id="mgStTileLavorati"
+            data-stat="lavorati" aria-expanded="false" aria-controls="mgStDrawer"
+            title="Di quelle arrivate nella finestra, quante sono entrate in lavorazione almeno una volta.">
+            <span class="mg-st-tile-num" data-num>—</span>
+            <span class="mg-st-tile-name">Feedback lavorati</span>
+            <span class="mg-st-tile-sub" data-sub></span>
+            <span class="mg-st-tile-more">Apri per fase</span>
+          </button>
+          <button type="button" class="mg-st-tile" id="mgStTileProber"
+            data-stat="prober" aria-expanded="false" aria-controls="mgStDrawer"
+            title="Le istanze di esplorazione partite nella finestra. Conta esecuzioni, non segnalazioni.">
+            <span class="mg-st-tile-num" data-num>—</span>
+            <span class="mg-st-tile-name">Prober lanciati</span>
+            <span class="mg-st-tile-sub" data-sub></span>
+            <span class="mg-st-tile-more">Apri per ruolo</span>
+          </button>
+        </div>
+        <div class="mg-st-drawer" id="mgStDrawer" hidden></div>
+
+        <!-- La torta dei giri di verifica + l'esito delle critiche. -->
+        <section class="mg-st-section" id="mgStLoopSection">
+          <h3>Giri di verifica prima del pass</h3>
+          <p class="mg-st-section-desc">
+            Quante critiche ha ricevuto un lavoro prima di passare la verifica.
+            I lavori fermati non hanno un numero di giri: stanno a parte.
+          </p>
+          <div class="mg-st-pies">
+            <div class="mg-st-pie">
+              <svg id="mgStLoopChart" width="180" height="180" viewBox="0 0 180 180" role="img"
+                aria-label="Giri di verifica prima del pass"></svg>
+              <ul class="mg-st-legend" id="mgStLoopLegend"></ul>
+            </div>
+            <div class="mg-st-pie">
+              <svg id="mgStOutcomeChart" width="180" height="180" viewBox="0 0 180 180" role="img"
+                aria-label="Esito delle critiche"></svg>
+              <ul class="mg-st-legend" id="mgStOutcomeLegend"></ul>
+            </div>
+          </div>
+          <p class="mg-st-avg" id="mgStLoopAvg"></p>
+          <p class="mg-st-empty" id="mgStLoopEmpty" hidden>
+            Nessun lavoro verificato fra i feedback di questa finestra.
+          </p>
+        </section>
+
+        <!-- Chi le manda. -->
+        <section class="mg-st-section">
+          <h3>Chi le manda</h3>
+          <p class="mg-st-section-desc">I feedback della finestra, per creatore.</p>
+          <ul class="mg-st-rows" id="mgStCreatorRows"></ul>
+          <p class="mg-st-empty" id="mgStCreatorEmpty" hidden>Nessun feedback in questa finestra.</p>
+        </section>
+
+        <!-- Quando arrivano. -->
+        <section class="mg-st-section">
+          <h3>Quando arrivano</h3>
+          <p class="mg-st-section-desc" id="mgStSparkDesc"></p>
+          <div class="mg-st-spark" id="mgStSpark"></div>
+          <div class="mg-st-spark-axis" id="mgStSparkAxis"></div>
+        </section>
+
+        <!-- Salute della coda. -->
+        <section class="mg-st-section">
+          <h3>Salute della coda</h3>
+          <p class="mg-st-section-desc">
+            Priorità assegnate, riaperture chieste e lavori che si sono arenati
+            e sono rientrati in coda da soli.
+          </p>
+          <ul class="mg-st-rows" id="mgStHealthRows"></ul>
+        </section>
+      </div>
+    </section>
+
     <section class="mg-panel" id="panel-stats" data-panel="stats">
       <div class="mg-coming">
         <div class="mg-coming-icon">📊</div>
