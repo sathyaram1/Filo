@@ -3681,6 +3681,11 @@
         p.setAttribute('d', `M${cx} ${cy} L${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${grande} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`);
         p.setAttribute('fill', f.color);
         p.dataset.group = f.key;
+        // Una fetta che ha qualcosa da aprire lo dice e lo fa, come la sua voce
+        // di legenda: prima il clic sinistro sulla fetta non faceva niente
+        // mentre il tasto destro sulla STESSA fetta offriva «Mostra le
+        // segnalazioni contate».
+        if (f.ids && f.ids.length) p.dataset.apribile = '1';
         const t = document.createElementNS(NS, 'title');
         t.textContent = `${f.label}: ${stFmtInt(f.count)} (${stPct(f.count, tot)})`;
         p.appendChild(t);
