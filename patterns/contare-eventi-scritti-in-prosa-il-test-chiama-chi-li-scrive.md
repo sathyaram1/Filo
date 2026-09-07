@@ -23,6 +23,14 @@ scrive** e le dà in pasto al parser.
 - **Meglio ancora sarebbe un campo**, ovviamente: quando il dato esiste come
   campo lo si legge da lì. Questo pattern vale dove il campo non c'è e la
   conversazione è l'unica traccia durevole.
+- **Si legge solo la prosa di chi produce l'evento.** La conversazione di un
+  feedback la scrivono anche le persone, e una persona può usare le stesse
+  identiche parole: «Verifica superata? non mi pare» diventava un lavoro passato
+  senza critiche, «Verifica: 2 rilievi ancora aperti» una critica, e finivano
+  tutti e due nella torta e nella media. Le note dicono già a chi appartiene ogni
+  turno (i marcatori di riapertura e di risposta aprono un turno dell'utente): il
+  conteggio salta quei turni e legge il resto. È l'unico modo di distinguerle,
+  perché sul testo sono indistinguibili.
 - **Un conteggio ricavato così dichiara la sua fonte.** Se la traccia è
   parziale — un registro che tiene solo le esecuzioni recenti, una lista che
   si ferma ai primi N — il numero è un MINIMO, e la superficie che lo mostra lo
