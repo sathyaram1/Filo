@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { controllaArgomenti, sembraOpzione, normalizza, argomentiDaNpm } = await import('../../scripts/lib/argomenti.mjs');
+const { controllaArgomenti, sembraOpzione, normalizza, argomentiDaNpm, espandiUguali } = await import('../../scripts/lib/argomenti.mjs');
 
 const FEEDBACK = {
   opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
@@ -111,4 +111,16 @@ test("un'opzione col valore mangiato da npm ferma tutto e dice come si scrive", 
   assert.match(r.errore, /senza il suo valore/);
   assert.match(r.errore, /--allega=<valore>/, 'dice la forma che regge');
   assert.match(r.errore, /non ho toccato niente/);
+});
+
+test("la forma con l'uguale, che consigliamo per npm, funziona anche quando arriva intera", () => {
+  // Consigliarla e poi rifiutarla è il modo migliore di far girare a vuoto chi
+  // segue il consiglio stampato.
+  assert.deepEqual(espandiUguali(['t', 'x', '--allega=spec.md'], FEEDBACK.conValore), ['t', 'x', '--allega', 'spec.md']);
+  assert.equal(controllaArgomenti(espandiUguali(['t', 'x', '--allega=spec.md'], FEEDBACK.conValore), FEEDBACK), null);
+  // Un'opzione senza valore non si tocca, e nemmeno un testo con un uguale.
+  assert.deepEqual(espandiUguali(['--dry-run', 'a=b'], FEEDBACK.conValore), ['--dry-run', 'a=b']);
+  // Scritta con l'uguale ma sconosciuta: rifiutata come le altre.
+  assert.match(controllaArgomenti(['--allgea=spec.md'], FEEDBACK), /opzione sconosciuta --allgea/);
+  assert.match(controllaArgomenti(['--dry-run=1'], FEEDBACK), /non vuole un valore/);
 });
