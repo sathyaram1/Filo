@@ -523,6 +523,13 @@
     // sullo stesso documento.
     let conVerifica = 0, passati = 0, nonPassati = 0, nonLeggibili = 0;
     let critFail = 0, critMigliorabile = 0, sommaLoop = 0;
+    // Le due fette dell'esito contano CRITICHE, cioè eventi, e un lavoro può
+    // averne prese più d'una: l'elenco che si apre porta ai lavori su cui sono
+    // successe, come la riga delle riaperture. Senza questi id le due voci
+    // erano le uniche della scheda che non si aprivano su niente, accanto a una
+    // torta gemella che si apriva.
+    const idsFail = [];
+    const idsMigliorabile = [];
     for (const it of selezionati) {
       const fbId = it.fb && it.fb._id;
       const st = statusOf(it.fb) || {};
@@ -532,6 +539,8 @@
       conVerifica += 1;
       critFail += v.fail;
       critMigliorabile += v.migliorabile;
+      if (v.fail && fbId != null && fbId !== '') idsFail.push(fbId);
+      if (v.migliorabile && fbId != null && fbId !== '') idsMigliorabile.push(fbId);
       if (v.passed) {
         passati += 1;
         sommaLoop += v.loopsBeforePass;
