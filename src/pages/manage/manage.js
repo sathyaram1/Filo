@@ -3963,6 +3963,181 @@
       if (!e.target.closest('.mg-st-item[data-id], [data-goto], [data-open]')) return;
       stAzione(e);
     });
+
+    // Tasto destro: «voglio fare qualcosa QUI». Ogni elemento della scheda è
+    // un numero, e un numero porta con sé le stesse domande — fammi vedere
+    // cosa c'è dentro, portami dove stanno, dammelo da incollare — che col
+    // solo clic sinistro sono o nascoste o assenti. Senza questo, sulle
+    // tessere e sulle righe usciva il menu generale della pagina (Aiuto,
+    // Invia feedback), lo stesso che esce su uno spazio bianco, e sulle fette
+    // delle torte e sulle barrette non usciva niente del tutto.
+    // Dove non abbiamo niente da offrire NON si chiama preventDefault, così
+    // resta il menu generale di Filo (PATTERNS.md, menu contestuale proprio
+    // nelle pagine filo://).
+    stPanel.addEventListener('contextmenu', (e) => {
+      const voci = stVociMenu(e.target);
+      if (!voci.length) return;
+      // Il menu si apre anche col tasto Menu della tastiera, e lì il puntatore
+      // non c'è: le coordinate valgono 0 o -1. In quel caso si ancora
+      // all'elemento che ha il fuoco, o il menu nascerebbe nell'angolo.
+      let x = e.clientX, y = e.clientY;
+      if (!(x > 0 && y > 0)) {
+        const r = (e.target.closest('[data-open], .mg-st-tile, .mg-st-item, .mg-st-chip, .mg-st-spark-bar')
+          || e.target).getBoundingClientRect();
+        x = r.left; y = r.bottom + 4;
+      }
+      if (openCtxMenu(x, y, voci)) e.preventDefault();
+    });
+  }
+
+  // Le voci del menu contestuale per il punto della scheda su cui si è
+  // premuto. Vuoto = niente di nostro da offrire qui.
+  function stVociMenu(target) {
+    if (!target || !target.closest) return [];
+
+    // Una segnalazione dell'elenco dietro un numero.
+    const item = target.closest('.mg-st-item[data-id]');
+    if (item) {
+      const fb = allFeedbacks.find((f) => f._id === item.dataset.id);
+      const num = fb ? FB.formatNum(fb.seq, fb.subSeq) : '';
+      return [
+        { label: num ? `Apri la segnalazione #${num}` : 'Apri la segnalazione', onPick: () => stApriFeedback(item.dataset.id) },
+        { label: 'Copia titolo e numero', onPick: () => stCopia(item.textContent.replace(/\s+/g, ' ').trim()) },
+      ];
+    }
+
+    // Una delle tre tessere.
+    const tile = target.closest('.mg-st-tile');
+    if (tile) {
+      const stat = tile.dataset.stat;
+      const aperto = stOpenTile === stat;
+      const che = { ricevuti: 'categoria', lavorati: 'fase', prober: 'ruolo' }[stat] || 'dettaglio';
+      const nome = (tile.querySelector('.mg-st-tile-name') || {}).textContent || '';
+      const num = (tile.querySelector('[data-num]') || {}).textContent || '';
+      return [
+        {
+          label: aperto ? 'Chiudi il dettaglio' : `Apri il dettaglio per ${che}`,
+          onPick: () => { stOpenTile = aperto ? null : stat; stOpenGroup = null; stRender(); },
+        },
+        { label: 'Copia il numero', onPick: () => stCopia(`${nome}: ${num}`) },
+      ];
+    }
+
+    // Una fetta di torta: le sue azioni sono quelle della voce di legenda
+    // gemella, che le ha già tutte. Due elenchi per la stessa fetta
+    // divergerebbero al primo ritocco.
+    const fetta = target.closest('svg [data-group]');
+    if (fetta) {
+      const legenda = stPanel.querySelector(`.mg-st-legend li[data-group="${CSS.escape(fetta.dataset.group)}"]`);
+      if (legenda) return stVociGruppo(legenda);
+      return [];
+    }
+
+    // Una riga di ripartizione o una voce di legenda.
+    const riga = target.closest('[data-open], [data-goto]');
+    if (riga) return stVociGruppo(riga);
+
+    // Una barretta di «Quando arrivano».
+    const barra = target.closest('.mg-st-spark-bar');
+    if (barra) {
+      const da = barra.dataset.from, a = barra.dataset.to;
+      return [
+        {
+          label: 'Restringi la finestra a questo periodo',
+          hint: barra.dataset.quando || '',
+          onPick: () => {
+            stWindow = 'custom'; stFromISO = da; stToISO = a;
+            if ($st('mgStFrom')) $st('mgStFrom').value = da;
+            if ($st('mgStTo')) $st('mgStTo').value = a;
+            stOpenGroup = null;
+            stSavePrefs();
+            stRender();
+          },
+        },
+        { label: 'Copia il periodo e il numero', onPick: () => stCopia(`${barra.dataset.quando}: ${barra.dataset.count}`) },
+      ];
+    }
+
+    // Un pulsante della finestra o del creatore.
+    const chip = target.closest('.mg-st-chip');
+    if (chip) {
+      if (chip.dataset.window) {
+        return [{
+          label: `Guarda: ${chip.textContent}`,
+          checked: chip.getAttribute('aria-pressed') === 'true',
+          onPick: () => stChooseWindow(chip.dataset.window),
+        }];
+      }
+      const tutti = () => { stCreators = new Set(ST.CREATOR_KINDS); stSavePrefs(); stRender(); };
+      if (chip.dataset.creator) {
+        const solo = stCreators.size === 1 && stCreators.has(chip.dataset.creator);
+        return [
+          { label: `Solo: ${chip.textContent}`, checked: solo, onPick: () => { stCreators = new Set([chip.dataset.creator]); stSavePrefs(); stRender(); } },
+          { label: stCreators.has(chip.dataset.creator) ? `Togli: ${chip.textContent}` : `Aggiungi: ${chip.textContent}`, onPick: () => stToggleCreator(chip.dataset.creator) },
+          null,
+          { label: 'Tutti i creatori', onPick: tutti },
+        ];
+      }
+      if (chip.dataset.group) {
+        return [
+          { label: `Solo: ${chip.textContent}`, checked: chip.getAttribute('aria-pressed') === 'true', onPick: () => chip.click() },
+          { label: 'Tutti i creatori', onPick: tutti },
+        ];
+      }
+    }
+    return [];
+  }
+
+  // Le voci di una riga che rappresenta un gruppo (categoria, fase, ruolo,
+  // creatore, fetta di torta): aprire l'elenco di cosa ha contato, o andare
+  // dove quelle cose si leggono, più il numero da incollare.
+  function stVociGruppo(riga) {
+    const etichetta = ((riga.querySelector('.mg-st-row-label') || riga).textContent || '').replace(/\s+/g, ' ').trim();
+    const numero = ((riga.querySelector('.mg-st-row-num, .mg-st-legend-val') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+    const voci = [];
+    if (riga.dataset.open) {
+      const aperta = stOpenGroup === riga.dataset.open;
+      voci.push({
+        label: aperta ? 'Nascondi le segnalazioni' : 'Mostra le segnalazioni contate',
+        onPick: () => { stOpenGroup = aperta ? null : riga.dataset.open; stRender(); },
+      });
+    }
+    if (riga.dataset.goto) {
+      voci.push({ label: 'Apri la scheda Log', onPick: () => selectTab(riga.dataset.goto) });
+    }
+    voci.push({ label: 'Copia riga e numero', onPick: () => stCopia(`${etichetta}: ${numero}`) });
+    return voci;
+  }
+
+  // Copia negli appunti, e lo dice: una copia muta è indistinguibile da un
+  // clic che non ha fatto niente.
+  async function stCopia(testo) {
+    const t = String(testo || '').trim();
+    if (!t) return;
+    let fatto = false;
+    try {
+      await navigator.clipboard.writeText(t);
+      fatto = true;
+    } catch (_) {
+      // Ripiego per i contesti senza appunti.
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        fatto = document.execCommand('copy'); ta.remove();
+      } catch (_e) { fatto = false; }
+    }
+    stFlash(fatto ? `Copiato: ${t}` : 'Non sono riuscito a copiare');
+  }
+
+  let stFlashTimer = null;
+  function stFlash(testo) {
+    const el = $st('mgStFlash');
+    if (!el) return;
+    el.textContent = testo;
+    el.hidden = false;
+    clearTimeout(stFlashTimer);
+    stFlashTimer = setTimeout(() => { el.hidden = true; el.textContent = ''; }, 3000);
   }
 
   // Apertura della scheda: preferenze (una volta), registro dei worker (a ogni
