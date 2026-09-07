@@ -103,9 +103,12 @@ test('i sottotitoli delle tessere si accordano al singolare', async ({ openTab }
     fb({ id: 'u1', seq: 1, at: iso(1), status: 'todo' }),
   ]);
   await apriStats(page);
-  await page.evaluate(() => window.__mgTest.setWorkerLog([
+  // Il registro si passa come ARGOMENTO: dentro la pagina `iso` non esiste, e
+  // scritto senza argomento questo controllo si fermava qui con «iso is not
+  // defined» senza guardare un solo sottotitolo.
+  await page.evaluate((l) => window.__mgTest.setWorkerLog(l), [
     { role: 'prober', startedAt: iso(0), num: '#1' },
-  ]));
+  ]);
   await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
   const subRic = (await page.locator('#mgStTileRicevuti [data-sub]').textContent()).trim();
   const subProb = (await page.locator('#mgStTileProber [data-sub]').textContent()).trim();
