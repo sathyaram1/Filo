@@ -194,9 +194,15 @@
         current = { line: raw.trim(), text: m[3].trim() };
         continue;
       }
+      // La regola, senza finestre e senza eccezioni (decisione dell'owner del
+      // 2026-09-07 su #565): le QUADRE con dentro un livello sono sempre un
+      // rilievo, dovunque stiano nella riga e anche dentro la continuazione di
+      // un altro rilievo. Le altre parentesi valgono all'inizio della riga, che
+      // è dove uno le userebbe per aprire un rilievo: in mezzo a una frase
+      // «(3 volte)» è testo normale.
       const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
       const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]))
-        || (current ? QUADRA_VICINA.test(raw.trim()) : QUADRA_OVUNQUE.test(raw))
+        || QUADRA_OVUNQUE.test(raw)
         || ETICHETTA_PRIMA.test(raw);
       if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
         flush();
