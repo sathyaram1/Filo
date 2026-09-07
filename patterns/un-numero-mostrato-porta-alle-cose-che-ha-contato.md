@@ -30,6 +30,13 @@ scendere è un vicolo cieco.
   delle priorità e i due contatori della coda restavano vicoli ciechi mentre
   ogni altra riga della stessa scheda si apriva, e proprio «priorità alta: 2» è
   il posto dove la domanda «quali due?» viene per prima.
+- **Due grafici gemelli si comportano uguale.** Disegnati identici e messi
+  fianco a fianco, promettono la stessa cosa: se le fette di uno si aprono e
+  quelle dell'altro no, la differenza si scopre solo cliccando e non ottenendo
+  niente. «Fermate (fail): 3» è la voce da cui la domanda «quali tre?» parte per
+  prima. Anche la frase che dice «si apre» va scritta in un posto solo, appesa
+  al suggerimento della fetta: ripetuta dentro ogni suggerimento su misura,
+  mancava proprio dove il suggerimento c'era.
 - **L'elenco ha un tetto, e il tetto si dichiara.** Oltre qualche centinaio di
   voci l'elenco dentro un pannello non si sfoglia più: si mostrano le prime e si
   scrive quante ne restano fuori, mai un taglio muto (CLAUDE.md § Limiti).
