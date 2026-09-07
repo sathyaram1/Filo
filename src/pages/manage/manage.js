@@ -3428,6 +3428,21 @@
   }
 
   // ── Il registro dei worker ──────────────────────────────────────────────
+  //
+  // Rilettura mentre la scheda è aperta: una alla volta, e solo se la scheda è
+  // davvero in vista (a scheda chiusa il numero non lo guarda nessuno e la
+  // lettura sarebbe spesa a vuoto). Quando arriva, la scheda si ridisegna.
+  let stLogTick = null;
+  function stRefreshWorkerLog() {
+    if (stWorkerLogFinto || !statsAperte()) return null;
+    if (stLogTick) return stLogTick;
+    stLogTick = stLoadWorkerLog()
+      .then(() => { if (statsAperte()) stRender(); })
+      .catch(() => {})
+      .finally(() => { stLogTick = null; });
+    return stLogTick;
+  }
+
   async function stLoadWorkerLog() {
     // Registro finto iniettato da uno spec: la lettura vera non lo sovrascrive,
     // o sarebbe una gara persa a caso a seconda di quanto ci mette l'IPC.
