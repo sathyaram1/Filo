@@ -305,7 +305,7 @@ function ondaFilo(p, L, H, onde) {
   ascoltatori.push({
     reset: function () { acc = ''; rag = null; s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…'; rot.style.display = ''; s.bolla.classList.remove('vis'); },
     nuovoTurno: function () { acc = ''; rag = el('div'); s.corpo.append(rag); },
-    ragiona: function (p) { acc += p; if (rag) rag.textContent = acc; eti.textContent = 'Sta ragionando · ' + ultimaFrase(acc); s.corpo.scrollTop = s.corpo.scrollHeight; },
+    ragiona: function (p) { acc += p; if (rag) rag.textContent = acc; eti.textContent = V() + ' · ' + ultimaFrase(acc); s.corpo.scrollTop = s.corpo.scrollHeight; },
     agisce: function (ev) { eti.textContent = ev.testo; },
     passo: function (ev) { rigaPasso(s.corpo, ev); },
     scrive: function (ev) { eti.textContent = ev.testo; },
@@ -327,8 +327,8 @@ function ondaFilo(p, L, H, onde) {
     ragiona: function (p) {
       acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
       var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia('Sta ragionando…');
+      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia(V() + '…');
     },
     agisce: function (ev) { cambia(ev.testo); },
     passo: function (ev) { rigaPasso(s.corpo, ev); },
@@ -355,8 +355,8 @@ function ondaFilo(p, L, H, onde) {
       acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
       onda.ampObiettivo = 2.7; onda.vel = 0.08;
       var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia('Sta ragionando…');
+      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia(V() + '…');
     },
     agisce: function (ev) { onda.ampObiettivo = 1.7; onda.vel = 0.15; cambia(ev.testo); },
     passo: function (ev) { rigaPasso(s.corpo, ev); },
@@ -402,8 +402,8 @@ function ondaFilo(p, L, H, onde) {
       acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
       onda.ampObiettivo = 3.6; onda.vel = 0.065;
       var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia('Sta ragionando…');
+      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia(V() + '…');
     },
     agisce: function (ev) { onda.ampObiettivo = 2.1; onda.vel = 0.14; cambia(ev.testo); },
     passo: function (ev) { aggiungiNodo(ev); rigaPasso(s.corpo, ev); },
@@ -436,7 +436,7 @@ function ondaFilo(p, L, H, onde) {
     ragiona: function (p) {
       acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
       onda.ampObiettivo = 2.7; onda.vel = 0.08;
-      cambia('Sta ragionando…');
+      cambia(V() + '…');
       tex.textContent = acc.replace(/\s+/g, ' ').slice(-70);
     },
     agisce: function (ev) { onda.ampObiettivo = 1.7; onda.vel = 0.15; cambia(ev.testo); tex.textContent = ''; },
@@ -452,17 +452,17 @@ function ondaFilo(p, L, H, onde) {
   var s = scheletro(palco);
   var ns = 'http://www.w3.org/2000/svg';
   var svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('class', 'filo'); svg.setAttribute('width', 16); svg.setAttribute('height', 16);
-  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('class', 'filo'); svg.setAttribute('width', 20); svg.setAttribute('height', 20);
+  svg.setAttribute('viewBox', '0 0 20 20');
   svg.style.flex = 'none'; svg.style.color = 'var(--dash-accent)';
   var d = '';
-  for (var a = 0; a < Math.PI * 6.5; a += 0.1) {
-    var r = 0.5 + a * 0.32;
-    var x = 8 + Math.cos(a) * r, y = 8 + Math.sin(a) * r * 0.85;
+  for (var a = 0; a < Math.PI * 4.6; a += 0.08) {
+    var r = 0.9 + a * 0.55;
+    var x = 10 + Math.cos(a) * r, y = 10 + Math.sin(a) * r * 0.86;
     d += (d ? 'L' : 'M') + x.toFixed(2) + ',' + y.toFixed(2);
   }
   var p = document.createElementNS(ns, 'path');
-  p.setAttribute('d', d); p.setAttribute('stroke-width', 1.15);
+  p.setAttribute('d', d); p.setAttribute('stroke-width', 1.25);
   svg.append(p);
   var eti = el('span', 'att-eti eti-fade'), tempo = el('span', 'tempo');
   s.testa.append(svg, eti, tempo);
@@ -490,8 +490,8 @@ function ondaFilo(p, L, H, onde) {
     ragiona: function (pz) {
       acc += pz; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
       var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia('Sta ragionando…');
+      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia(V() + '…');
     },
     agisce: function (ev) { cambia(ev.testo); },
     passo: function (ev) { rigaPasso(s.corpo, ev); },
