@@ -2682,11 +2682,19 @@
     });
     return mia;
   }
+  // Il salvataggio che parte DA SOLO tocca solo quello che l'owner ha scritto
+  // lui: senza questa guardia, aprire due segnalazioni di fila riscriverebbe
+  // una frase che nessuno ha toccato (ripulita degli spazi, tagliata a 500) e
+  // il mittente si vedrebbe cambiare la riga sotto il naso.
+  function salvaFraseAutomatico() {
+    if (!userNoteToccata) return userNoteInVolo || Promise.resolve(true);
+    return salvaFraseSubito({ muto: true });
+  }
   // Quello che l'owner ha scritto è a destinazione? Aspetta sia il salvataggio
   // già partito sia quello che parte adesso.
   async function fraseAlSicuro() {
     const giaPartito = userNoteInVolo;                 // preso PRIMA: salvaFraseSubito lo sostituisce
-    const nuovo = salvaFraseSubito({ muto: true });
+    const nuovo = salvaFraseAutomatico();
     const esiti = await Promise.all([giaPartito || true, nuovo]);
     return esiti.every(Boolean);
   }
