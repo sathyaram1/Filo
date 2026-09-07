@@ -311,6 +311,47 @@ test('start col riallineamento in conflitto: abort, ramo intatto, niente rebase 
     'nessun rebase in corso dopo l\'abort');
 });
 
+// ── Verifica del 2026-09-07 su #565: `start` era rimasto fuori dal controllo ──
+// degli argomenti. Il controllo c'era, nominava anche `start`, ma stava DOPO il
+// punto in cui `start` aveva già finito: per lui non scattava mai.
+
+function statoDi(work) {
+  const f = resolve(work, '.claude', 'verify-local.json');
+  return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
+}
+
+function lancia(work, args) {
+  return spawnSync(process.execPath, [VERIFY, ...args], {
+    env: { ...process.env, FILO_REPO_ROOT: work },
+    encoding: 'utf8',
+  });
+}
+
+test('#565 start --help stampa l\'aiuto e NON prende il posto della richiesta', () => {
+  const { work } = scenario({ conflitto: false });
+  assert.equal(lanciaStart(work).status, 0);
+  const prima = statoDi(work)['claude/prova'].request;
+  assert.equal(prima, 'richiesta di prova');
+  for (const aiuto of ['--help', '-h']) {
+    const r = lancia(work, ['start', aiuto]);
+    assert.equal(r.status, 0, `${aiuto}: chiedere aiuto non è un errore`);
+    assert.match(String(r.stdout), /Comandi: start/, `${aiuto}: deve stampare l'aiuto`);
+    // La richiesta è l'unica cosa che chi verifica sa, e non sta scritta da
+    // nessun'altra parte: sostituirla con «--help» azzera la verifica.
+    assert.equal(statoDi(work)['claude/prova'].request, prima, `${aiuto}: la richiesta resta quella vera`);
+  }
+});
+
+test('#565 start con un argomento non capito si ferma, e il giro non si apre', () => {
+  for (const arg of ['--frase', '-frase', 'C:/Program Files/Git/dry-run']) {
+    const { work } = scenario({ conflitto: false });
+    const r = lancia(work, ['start', 'la richiesta vera', arg]);
+    assert.equal(r.status, 1, `${arg}: deve fermare`);
+    assert.match(String(r.stderr), /non ho toccato niente/, `${arg}: e dirlo`);
+    assert.deepEqual(statoDi(work), {}, `${arg}: nessun giro aperto`);
+  }
+});
+
 // ── Verifica del 2026-09-05 su #561: le porte trovate dal verificatore ──────
 // (i rilievi registrati con `verify-local.mjs critica`, corretti nello stesso giro)
 
