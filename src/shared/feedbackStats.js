@@ -554,6 +554,10 @@
     const idsArenati = [];
     const idsIlleggibili = [];
     const idsNonLavorati = [];
+    // La priorità viaggia cifrata come lo stato: quella che non si legge non è
+    // «senza priorità», è una priorità che questo computer non conosce.
+    const idsPrioritaIgnota = [];
+    let prioritaIgnota = 0;
     let illeggibili = 0;
     let lavorati = 0;
     let risolti = 0;
@@ -562,8 +566,10 @@
 
     for (const it of selezionati) {
       const fbId = it.fb && it.fb._id;
-      perCreatore[it.kind] = (perCreatore[it.kind] || 0) + 1;
-      pushId(idsCreatore, it.kind, fbId);
+      if (it.kind != null) {
+        perCreatore[it.kind] = (perCreatore[it.kind] || 0) + 1;
+        pushId(idsCreatore, it.kind, fbId);
+      }
       const st = statusOf(it.fb) || {};
       if (st.unreadable || !st.status) {
         illeggibili += 1;
