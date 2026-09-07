@@ -62,6 +62,48 @@ export function espandiUguali(argv, conValore = []) {
   return fuori;
 }
 
+/** Distanza fra due parole: quante correzioni per passare dall'una all'altra. PURA. */
+function distanza(a, b) {
+  const m = a.length; const n = b.length;
+  let riga = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i += 1) {
+    const nuova = [i];
+    for (let j = 1; j <= n; j += 1) {
+      nuova[j] = Math.min(riga[j] + 1, nuova[j - 1] + 1, riga[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    riga = nuova;
+  }
+  return riga[n];
+}
+
+/**
+ * Un'opzione SCRITTA MALE che npm si è mangiato. PURA.
+ *
+ * Il recupero qui sotto conosce solo i nomi giusti: `--allgea spec.md` finisce
+ * a npm, allo strumento non arriva niente, e la cosa vera parte lo stesso —
+ * proprio il danno che questo controllo esiste per impedire, sulla strada che
+ * si usa davvero. Ma npm il nome sbagliato lo lascia scritto nell'ambiente, e
+ * un residuo che dista una o due lettere da un'opzione nostra è il segnale
+ * (feedback #565).
+ *
+ * @returns {string|null} il messaggio da stampare, o null
+ */
+export function opzioneStorpiata(env = {}, opzioni = []) {
+  const nomi = opzioni.map((o) => String(o).replace(/^--/, ''));
+  for (const chiave of Object.keys(env)) {
+    if (!chiave.startsWith('npm_config_')) continue;
+    const nome = chiave.slice('npm_config_'.length).replace(/_/g, '-');
+    if (nomi.includes(nome)) continue;                 // scritta giusta: la riprende chi di dovere
+    for (const buono of nomi) {
+      const tetto = buono.length >= 5 ? 2 : 1;
+      if (distanza(nome, buono) <= tetto) {
+        return `--${nome} non esiste (forse intendevi --${buono}?) — non ho toccato niente. Passando da npm l'opzione non arriva fin qui: me ne accorgo solo perché npm la lascia scritta nell'ambiente.`;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Le opzioni che npm si è MANGIATO, riprese dall'ambiente. PURA.
  *
