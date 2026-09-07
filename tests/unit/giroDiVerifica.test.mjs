@@ -114,7 +114,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     // Poi la correzione (un commit nuovo) e la consegna, dallo STESSO verificatore.
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'corretto', 'utf8');
     execFileSync('git', ['commit', '-qam', 'correzione'], { cwd: casa });
-    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto, e il caso raro l'ho lasciato stare perche' non era in elenco.'], ENV(casa, port));
+    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto. Il caso raro non l\'ho toccato: non era in elenco.'], ENV(casa, port));
     assert.equal(c.code, 0, `la consegna doveva riuscire (stderr: ${c.se})`);
     const fixed = ricevuti.filter((x) => x.url.includes('routineDeliver')).at(-1);
     assert.equal(fixed.body.intent, 'fixed');
