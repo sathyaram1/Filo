@@ -267,8 +267,16 @@ if (isMain) {
   if (argv.includes('--starred')) starred = true;
   else if (argv.includes('--unstar')) starred = false;
 
-  const valoriDiFlag = new Set([branch, reason, frase].filter((v) => v !== undefined));
-  const posizionali = argv.filter((a) => !a.startsWith('--') && !valoriDiFlag.has(a));
+  // Per POSTO, non per valore: come nello strumento gemello (#565). Prima si
+  // toglievano le parole «uguali al valore di un'opzione», e una nota scritta
+  // identica alla frase per chi ha segnalato spariva senza dire niente.
+  const CON_VALORE = new Set(['--branch', '--reason', '--frase']);
+  const posizionali = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    posizionali.push(a);
+  }
   const [id, status, ...nota] = posizionali;
 
   if (!id || !status) {
