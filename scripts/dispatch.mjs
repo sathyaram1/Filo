@@ -1582,6 +1582,14 @@ if (isMainModule) {
         console.error(`Argomento non capito: ${intrusa} — non ho registrato niente. Qui la critica è un testo solo, fra virgolette: opzioni non ce ne sono.`);
         process.exit(1);
       }
+      // In UN pezzo solo: unendo i pezzi con uno spazio, un rilievo che sta nel
+      // secondo non apre più una riga, smette di essere un rilievo, e la
+      // bocciatura diventa una promozione (feedback #565).
+      if (rest.length > 1) {
+        console.error(`Ho ricevuto ${rest.length} pezzi invece di uno: non ho registrato niente. La critica va fra virgolette, tutta in un pezzo solo — probabilmente ne manca una.`);
+        console.error(`Primo pezzo: "${String(rest[0]).slice(0, 60)}…" · secondo: "${String(rest[1]).slice(0, 60)}…"`);
+        process.exit(1);
+      }
       const s = await recordVerifier(id, rest.join(' '));
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);
