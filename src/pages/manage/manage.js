@@ -3584,8 +3584,13 @@
     const box = $st('mgStCreatorRows');
     const empty = $st('mgStCreatorEmpty');
     if (!box) return;
-    const rows = d.creatori.map((c) => ({ key: c.key, label: stCreatorLabel(c.key), count: c.count }));
-    box.innerHTML = stRowsHtml(rows, { total: d.ricevuti, empty: 'Nessun feedback in questa finestra.' });
+    const rows = d.creatori.map((c) => ({
+      key: c.key, label: stCreatorLabel(c.key), count: c.count, ids: c.ids,
+    }));
+    // La frase del vuoto la dice il paragrafo qui sotto, non anche una riga
+    // dell'elenco: scritta lì finiva nella colonna stretta delle etichette e si
+    // leggeva «Nessun feedback in questa finest…», due volte di fila.
+    box.innerHTML = rows.length ? stRowsHtml(rows, { total: d.ricevuti }) : '';
     if (empty) empty.hidden = rows.length > 0;
   }
 
