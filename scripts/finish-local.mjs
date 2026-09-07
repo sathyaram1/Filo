@@ -273,6 +273,13 @@ async function main() {
   const { argomentiDaNpm } = await import('./lib/argomenti.mjs');
   const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check'] });
   if (daNpm.nota) { console.error(daNpm.nota); argv.push(...daNpm.args); }
+  // Prima dell'elenco degli sconosciuti: a chi prova la vecchia scorciatoia
+  // serve il PERCHÉ, non «argomento sconosciuto» (feedback #565).
+  if (argv.includes('--no-verify')) {
+    console.error('La scorciatoia --no-verify non esiste più: i controlli e la verifica');
+    console.error('indipendente girano sempre (SPEC-RIDISEGNO-MAX.md §8).');
+    process.exit(1);
+  }
   const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
   if (ignoti.length) {
     console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
