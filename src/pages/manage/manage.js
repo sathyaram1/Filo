@@ -3927,15 +3927,24 @@
     stSetTile('mgStTileLavorati', datiPronti ? stFmtInt(data.lavorati) : '—',
       !datiPronti ? 'dati non arrivati'
         : data.ricevuti ? `${stPct(data.lavorati, data.ricevuti)} dei ricevuti · ${stFmtInt(data.risolti)} risolti` : '');
-    stSetTile('mgStTileProber', stFmtInt(data.prober),
-      `${stFmtInt(data.esecuzioni)} esecuzioni in tutto`);
-    // I due numeri che dipendono dai feedback non si aprono su niente finché i
-    // feedback non ci sono.
-    for (const id of ['mgStTileRicevuti', 'mgStTileLavorati']) {
+    // Il registro delle esecuzioni non è mai arrivato? Allora questo numero non
+    // è zero: non si conosce. Uno zero grande in mezzo alla pagina si legge
+    // come «non è partito niente», che è il contrario di «non lo so», e le due
+    // tessere accanto con lo stesso guasto scrivono un trattino. Una lettura
+    // riuscita e poi persa lascia invece l'ultimo numero letto, come fa la
+    // lista dei feedback quando un giro di aggiornamento va male.
+    const registroPronto = stWorkerLogVisto;
+    stSetTile('mgStTileProber', registroPronto ? stFmtInt(data.prober) : '—',
+      registroPronto ? `${stFmtInt(data.esecuzioni)} esecuzioni in tutto`
+        : stWorkerLogError ? `registro ${stWorkerLogError}` : 'sto leggendo il registro…');
+    // Un numero che non si conosce non si apre su niente: offrire il dettaglio
+    // prometterebbe una ripartizione che non c'è.
+    for (const [id, pronto] of [['mgStTileRicevuti', datiPronti], ['mgStTileLavorati', datiPronti], ['mgStTileProber', registroPronto]]) {
       const t = $st(id);
-      if (t) t.disabled = !datiPronti;
+      if (t) t.disabled = !pronto;
     }
     if (!datiPronti && (stOpenTile === 'ricevuti' || stOpenTile === 'lavorati')) stOpenTile = null;
+    if (!registroPronto && stOpenTile === 'prober') stOpenTile = null;
 
     for (const tile of document.querySelectorAll('.mg-st-tile')) {
       tile.setAttribute('aria-expanded', tile.dataset.stat === stOpenTile ? 'true' : 'false');
