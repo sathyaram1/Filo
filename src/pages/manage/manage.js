@@ -2997,7 +2997,22 @@
 
     reindexByClient();
     renderList();
+    dataChanged();
     liveLastAt = Date.now();
+  }
+
+  // I feedback (o il loro stato di caricamento) sono cambiati: si ridisegna
+  // TUTTO quello che li mostra, non solo la lista.
+  //
+  // La scheda delle statistiche è una seconda vista sugli stessi feedback, e
+  // finora si ridisegnava solo nel momento in cui la aprivi: aperta prima che
+  // la lista fosse arrivata restava per sempre sul suo «i dati non ci sono»
+  // anche dopo che i dati erano arrivati, e nel verso opposto continuava a
+  // mostrare i numeri di prima dopo un caricamento andato male. Chi cambia i
+  // feedback chiama QUESTA, non `renderList` da sola.
+  function dataChanged() {
+    const p = document.getElementById('panel-fbstats');
+    if (p && p.classList.contains('mg-panel--active')) stRender();
   }
 
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
