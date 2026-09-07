@@ -472,3 +472,30 @@ ${riga}`).findings.length, 1, 'il lettore ne vede uno solo: per questo la riga v
   assert.equal(R.unparsedLevelLines(`${riassunto}
 [2] il pulsante (3 volte) non salva`).length, 0);
 });
+
+test('quadra dimenticata E livello scritto a modo suo: la riga non passa muta', () => {
+  const riassunto = 'Provato tutto per bene e funziona.';
+  // Due sbagli insieme — la parentesi che manca e un livello che non è la
+  // cifra nuda — e prima la bocciatura finiva nel riassunto, con la verifica
+  // che risultava superata (#565).
+  for (const riga of [
+    '3-sicurezza] i dati dell utente finiscono in chiaro',
+    '3, sicurezza] i dati in chiaro',
+    '3.] i dati in chiaro',
+    '3%] i dati in chiaro',
+    'tre] i dati in chiaro',
+    '[#3 i dati in chiaro',
+    '[tre i dati in chiaro',
+  ]) {
+    assert.equal(R.unparsedLevelLines(`${riassunto}\n${riga}`).length, 1, `muta: ${riga}`);
+  }
+  // E la prosa normale resta prosa: le parole dei livelli si riconoscono
+  // intere, o «altre» conterrebbe «tre».
+  for (const riga of [
+    'Ho provato tre volte ad aprire la pagina, e le altre due volte ha retto.',
+    'Il tetto e il pavimento sono rispettati tutti e due.',
+    'Ho letto [la nota] e va bene.',
+  ]) {
+    assert.equal(R.unparsedLevelLines(`${riassunto}\n${riga}`).length, 0, `respinta a torto: ${riga}`);
+  }
+});
