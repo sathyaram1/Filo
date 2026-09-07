@@ -270,14 +270,47 @@
   //   «Controllo funzionalità superato.»                     → pass
   //   «Controllo funzionalità NON superato: …»               → fail
   //   «Verifica: funziona, ma migliorabile — …»              → migliorabile
-  const RE_PASS_OGGI    = /(^|\n)\s*Verifica superata\b/i;
-  const RE_PASS_STORICO = /(^|\n)\s*Controllo funzionalità superat/i;
-  const RE_FAIL_STORICO = /Controllo funzionalità NON superat/i;
-  const RE_MIGL_STORICO = /(^|\n)\s*Verifica:\s*funziona,\s*ma migliorabile/i;
-  const RE_GIRO_OGGI    = /(^|\n)\s*Verifica:\s*(\d+)\s+rilie/i;
-  const RE_STOP         = /Il lavoro si ferma\b/i;
-  const RE_FIX          = /Il verificatore corregge\b/i;
-  const RE_DERIVATO     = /Nessun rilievo da correggere adesso\b/i;
+  //
+  // LE FRASI SI CERCANO DOVE LA NOTA LE SCRIVE, NON IN TUTTA LA PROSA.
+  //   Una nota di verifica ha una forma fissa: la riga di APERTURA dice di che
+  //   nota si tratta, poi il riassunto (che può essere lungo), poi la riga
+  //   della DECISIONE, poi l'elenco dei rilievi. Cercare le frasi nel blocco
+  //   intero significava leggerle anche dentro i rilievi, cioè dentro la prosa
+  //   in cui un verificatore racconta cosa è successo — ed è proprio lì che le
+  //   scrive. Un rilievo che apriva una riga con «Verifica superata» faceva
+  //   diventare quel giro un pass senza critiche; uno che conteneva «il lavoro
+  //   si ferma» (una frase che in italiano si scrive senza pensarci) lo faceva
+  //   diventare una fermata; uno che citava «Controllo funzionalità NON
+  //   superato» gli faceva anche perdere il conto dei rilievi.
+  //   Quindi: apertura e decisione si leggono ANCORATE a inizio riga, e
+  //   l'elenco dei rilievi resta fuori da entrambe.
+  const RE_PASS_OGGI    = /^Verifica superata\b/i;
+  const RE_PASS_STORICO = /^Controllo funzionalità superat/i;
+  const RE_FAIL_STORICO = /^Controllo funzionalità NON superat/i;
+  const RE_MIGL_STORICO = /^Verifica:\s*funziona,\s*ma migliorabile/i;
+  const RE_GIRO_OGGI    = /^Verifica:\s*(\d+)\s+rilie/i;
+  const RE_STOP         = /^Il lavoro si ferma\b/i;
+  // Dove comincia l'elenco dei rilievi: «- [2] …» come lo scrive
+  // SN_VERIFIER_ROUND.formatFinding, o il «[2] …» secco delle critiche grezze.
+  const RE_RILIEVO      = /^\s*-?\s*\[\d+\??\]/;
+
+  /**
+   * L'apertura e la decisione di una nota, cioè le due righe che dicono com'è
+   * andato il giro. Tutto ciò che sta dall'elenco dei rilievi in giù resta
+   * fuori: è prosa scritta da un verificatore, non un verdetto. PURA.
+   */
+  function testaNota(blocco) {
+    const righe = String(blocco || '').split('\n');
+    const primoRilievo = righe.findIndex((r) => RE_RILIEVO.test(r));
+    const corpo = (primoRilievo >= 0 ? righe.slice(0, primoRilievo) : righe)
+      .map((r) => r.trim()).filter((r) => r);
+    return {
+      apertura: corpo[0] || '',
+      // La decisione è l'ULTIMA riga prima dei rilievi: in mezzo può esserci un
+      // riassunto lungo quanto vuole.
+      decisione: corpo.length > 1 ? corpo[corpo.length - 1] : '',
+    };
+  }
 
   // I marcatori che, dentro `notes`, aprono un turno nuovo. Copia MINIMA di
   // quelli di SN_FEEDBACK_THREAD (che è codice di pagina e qui non c'è): serve
