@@ -144,6 +144,11 @@
     // contenuto può essere lungo: «[3 dati dell'utente a rischio]» è come uno
     // scrive davvero (feedback #565).
     const testo = String(riga || '');
+    // La quadra SPAIATA — aperta e mai chiusa, o chiusa e mai aperta — e il
+    // contenuto lunghissimo: una parentesi dimenticata è lo stesso errore di
+    // battitura della virgoletta che manca, e non deve costare una bocciatura
+    // (feedback #565).
+    if (QUADRA_APERTA.test(testo) || QUADRA_CHIUSA.test(testo)) return true;
     QUADRA_OVUNQUE.lastIndex = 0;
     for (let m = QUADRA_OVUNQUE.exec(testo); m; m = QUADRA_OVUNQUE.exec(testo)) {
       if (DENTRO_SEMBRA_LIVELLO.test(m[0])) { QUADRA_OVUNQUE.lastIndex = 0; return true; }
