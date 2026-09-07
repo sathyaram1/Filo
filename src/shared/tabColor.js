@@ -302,5 +302,6 @@
     IDENTITY_CHROMA_MIN, parseRgb, chroma, hasIdentity, pickActiveTint, pickGlowTint,
     IDENTITY_PARAMS, IDENTITY_PARAM_META, defaultParams, clampParams,
     rgbToHsl, hslToRgb, extractIdentityFromPixels,
+    TESTO_SCURO, TESTO_CHIARO, contrastRatio, readableOn, mixSrgb, softOn,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
