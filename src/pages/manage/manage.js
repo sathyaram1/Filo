@@ -531,8 +531,8 @@
   //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
   //         feedback derivato);
   //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);
-  //   fixInstructions  il testo della fase 2 che il server manda al
-  //         verificatore dopo la critica (vuoto = il testo del server).
+  //   fixInstructions  il testo che il server aggiunge in coda alla risposta
+  //         a una critica (vuoto = il testo del server).
   // Li applica il SERVER quando registra la critica; chrome.storage.local è
   // solo una CACHE per mostrare subito un valore (e un ripiego offline).
   function clampCap(n, def, min = AUTOMATION.CAP_MIN) {
