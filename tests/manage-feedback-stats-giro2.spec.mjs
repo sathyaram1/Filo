@@ -97,9 +97,18 @@ test('il tasto destro offre le azioni del punto in cui hai premuto', async ({ op
   await expect(page.locator('#mgStDrawer .mg-st-item[data-id]').first()).toBeVisible();
 
   // Su una fetta della torta: le stesse azioni della sua voce di legenda.
-  await page.locator('#mgStLoopChart [data-group]').first().click({ button: 'right' });
+  // La posa è quella del centro del cerchio spostata in alto, perché il centro
+  // del rettangolo di una fetta può cadere fuori dalla fetta stessa.
+  await page.locator('#mgStLoopChart [data-group]').first()
+    .click({ button: 'right', position: { x: 90, y: 40 } });
   await expect(menu).toBeVisible();
-  await expect(menu).toContainText('segnalazioni');
+  await expect(menu).toContainText('Copia');
+  await page.keyboard.press('Escape');
+
+  // Nell'angolo del riquadro della torta, fuori dal cerchio: prima lì non
+  // usciva niente del tutto.
+  await page.locator('#mgStLoopChart').click({ button: 'right', position: { x: 4, y: 4 } });
+  await expect(menu).toContainText('Copia la ripartizione');
   await page.keyboard.press('Escape');
 
   // Su una barretta di «Quando arrivano»: restringere la finestra a quel giorno.
