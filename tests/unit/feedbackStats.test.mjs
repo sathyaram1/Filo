@@ -423,7 +423,11 @@ test('bucketSizeFor non restituisce mai una barretta che sfora il tetto', () => 
 test('anche priorità, riaperture e arenamenti portano gli id di ciò che hanno contato', () => {
   const list = [
     fbDi({ id: 'alta1', at: '2026-09-06T10:00:00', extra: { priority: 3 } }),
-    fbDi({ id: 'alta2', at: '2026-09-06T10:00:00', extra: { priority: 3, reopenRequests: 2 } }),
+    // La forma vera del campo: una voce per persona, non un numero.
+    fbDi({ id: 'alta2', at: '2026-09-06T10:00:00', extra: {
+      priority: 3,
+      reopenRequests: { 'uid-1': { at: '2026-09-06T11:00:00Z' }, 'uid-2': { at: '2026-09-06T12:00:00Z' } },
+    } }),
     fbDi({ id: 'media', at: '2026-09-06T10:00:00', extra: { priority: 2, stalls: 3 } }),
     fbDi({ id: 'senza', at: '2026-09-06T10:00:00', extra: { priority: 0 } }),
   ];
@@ -449,4 +453,105 @@ test('una priorità fuori scala finisce in «senza priorità», elenco compreso'
   ]);
   assert.equal(s.priorita[0], 2);
   assert.deepEqual(s.idsPriorita['0'], ['strana', 'negativa']);
+});
+
+// ── Le riaperture: la forma vera del campo ──────────────────────────────────
+//
+// Chi riapre un fix dalla board non fa avanzare un contatore: Filo scrive una
+// VOCE per persona (`reopenRequests[uid] = { at }`), ed è quella forma che il
+// resto della dashboard legge. Letta come numero dava NaN, e la riga
+// «Riaperture chieste» scriveva zero per sempre: non uno zero «non lo so», un
+// numero sbagliato. Il test usa la forma che scrive la board, non un numero
+// comodo.
+
+test('reopenCount legge la mappa scritta dalla board, e regge anche numero e lista', () => {
+  assert.equal(S.reopenCount({ 'uid-1': { at: '2026-09-06T10:00:00Z' } }), 1);
+  assert.equal(S.reopenCount({ 'uid-1': { at: 'x' }, 'uid-2': { at: 'y' } }), 2);
+  assert.equal(S.reopenCount({}), 0);
+  assert.equal(S.reopenCount(null), 0);
+  assert.equal(S.reopenCount(undefined), 0);
+  assert.equal(S.reopenCount(3), 3);
+  assert.equal(S.reopenCount(0), 0);
+  assert.equal(S.reopenCount(-2), 0);
+  assert.equal(S.reopenCount(Number.NaN), 0);
+  assert.equal(S.reopenCount(['uid-1', 'uid-2']), 2);
+  assert.equal(S.reopenCount('due'), 0);
+});
+
+test('le riaperture della board si contano, e portano alle segnalazioni su cui sono successe', () => {
+  const s = conta([
+    fbDi({ id: 'riaperto2', at: '2026-09-06T10:00:00', extra: {
+      reopenRequests: { 'uid-1': { at: '2026-09-06T11:00:00Z' }, 'uid-2': { at: '2026-09-06T12:00:00Z' } },
+    } }),
+    fbDi({ id: 'riaperto1', at: '2026-09-06T10:00:00', extra: {
+      reopenRequests: { 'uid-3': { at: '2026-09-06T11:00:00Z' } },
+    } }),
+    fbDi({ id: 'mai', at: '2026-09-06T10:00:00' }),
+  ]);
+  assert.equal(s.riaperture, 3, 'tre persone hanno chiesto la riapertura');
+  assert.deepEqual(s.idsRiaperti, ['riaperto2', 'riaperto1'],
+    'gli eventi sono 3 su 2 segnalazioni: l\'elenco è più corto del numero, di proposito');
+});
+
+// ── L'esito delle critiche porta ai lavori che le hanno prese ───────────────
+
+test('le due voci dell\'esito portano ai lavori su cui quelle critiche sono successe', () => {
+  const s = conta([
+    fbDi({ id: 'corretto', at: '2026-09-06T10:00:00', status: 'done', notes: note('R.', notaCorretti(), notaPass()) }),
+    fbDi({ id: 'fermato', at: '2026-09-06T10:00:00', status: 'design', notes: note('R.', notaFermata()) }),
+    fbDi({ id: 'entrambi', at: '2026-09-06T10:00:00', status: 'design', notes: note('R.', notaCorretti(), notaFermata()) }),
+    fbDi({ id: 'pulito', at: '2026-09-06T10:00:00', status: 'done', notes: note('R.', notaPass()) }),
+  ]);
+  assert.equal(s.loop.fail, 2);
+  assert.deepEqual(s.loop.failIds, ['fermato', 'entrambi']);
+  assert.equal(s.loop.migliorabile, 2);
+  assert.deepEqual(s.loop.migliorabileIds, ['corretto', 'entrambi']);
+  assert.ok(!s.loop.failIds.includes('pulito'), 'un lavoro passato al primo giro non ha critiche');
+});
+
+// ── Le note di una PERSONA non sono giri di verifica ────────────────────────
+
+test('quello che scrive una persona nel suo turno non diventa un giro di verifica', () => {
+  const risposta = (t) => `--- La tua risposta del 1/1/2026 ---\n${t}`;
+  const riaperto = (t) => `--- Riaperto il 2/1/2026 ---\n${t}`;
+
+  // Una persona può scrivere esattamente le parole che la verifica userebbe.
+  assert.deepEqual(S.parseVerifications(`R.\n\n${risposta('Verifica superata? non mi pare.')}`), [],
+    'il commento di una persona non è un pass');
+  assert.deepEqual(S.parseVerifications(`R.\n\n${riaperto('Verifica: 2 rilievi ancora aperti.')}`), [],
+    'la nota di riapertura non è una critica');
+
+  // …e le verifiche vere continuano a contarsi, anche in mezzo ai turni umani.
+  const misto = `R.\n\n${turno(notaCorretti())}\n\n${risposta('Verifica superata, grazie!')}\n\n${turno(notaPass())}`;
+  assert.deepEqual(S.parseVerifications(misto),
+    [{ outcome: 'migliorabile', findings: 1 }, { outcome: 'pass', findings: 0 }]);
+
+  // Il corpo iniziale delle note è il report di chi ha lavorato: lì la verifica
+  // storica ci sta, e va contata.
+  assert.deepEqual(S.parseVerifications(verifierNoteText('pass')), [{ outcome: 'pass', findings: 0 }]);
+});
+
+// ── Una data nel futuro non si traveste da oggi ─────────────────────────────
+
+test('con una finestra senza fine, un feedback datato nel futuro non finisce nella barretta di oggi', () => {
+  const futuro = new Date(NOW.getTime() + 400 * 86400000).toISOString();
+  const s = conta([
+    fbDi({ id: 'oggi', at: '2026-09-07T09:00:00' }),
+    fbDi({ id: 'futuro', at: futuro }),
+  ], { range: S.windowRange('all', { now: NOW }) });
+
+  assert.equal(s.ricevuti, 2);
+  const barre = s.andamento.barre;
+  const conDati = barre.filter((b) => b.count > 0);
+  assert.equal(conDati.length, 2, 'due date lontane, due barrette diverse');
+  const ultima = barre[barre.length - 1];
+  assert.ok(ultima.to > NOW.getTime(),
+    'il grafico arriva dove arriva ciò che sta contando, invece di schiacciare il futuro su oggi');
+  assert.equal(barre.reduce((n, b) => n + b.count, 0), s.ricevuti);
+
+  // Senza feedback futuri niente cambia: il grafico si ferma a oggi.
+  const normale = conta([fbDi({ id: 'oggi', at: '2026-09-07T09:00:00' })],
+    { range: S.windowRange('all', { now: NOW }) });
+  const fine = normale.andamento.barre[normale.andamento.barre.length - 1];
+  assert.ok(fine.to <= S.startOfDay(NOW.getTime()) + 86400000);
 });
