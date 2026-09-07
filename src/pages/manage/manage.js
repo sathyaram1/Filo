@@ -2559,12 +2559,21 @@
       // basta confrontare il testo con quello inviato: uscendo dal feedback e
       // rientrandoci il pannello lo ha già ridipinto col valore VECCHIO, e il
       // confronto lo scambierebbe per una correzione.
-      if (!userNoteToccata) mgUserNoteText.value = frase;
+      if (!userNoteToccata) {
+        mgUserNoteText.value = frase;
+        // Quello che c'è a destinazione È quello che si vede: senza questa
+        // riga la casella restava "in bozza" per sempre agli occhi del
+        // pannello (il confronto con dataset.saved), e ogni aggiornamento in
+        // arrivo su questa segnalazione veniva trattenuto per una bozza che
+        // non c'era più.
+        mgUserNoteText.dataset.saved = frase;
+      }
       // Il tasto della barra porta il segno di quello che c'è a destinazione:
       // da chiuso è l'unico posto dove si vede che una frase esiste.
       riflettiFrase(frase);
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
+      return true;
     } catch (e) {
       // Superata da un invio più recente: comanda quello, qui non si tocca
       // niente.
