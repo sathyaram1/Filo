@@ -138,8 +138,15 @@
   // «(3 volte)» in mezzo a una frase resta testo normale (feedback #565).
   const SOLO_UN_LIVELLO = '\\s*(?:(?:livello|level|priorit[àa]|liv|L|P)\\s*)?(?:\\d+(?:\\s*[.,\\-–/]\\s*\\d+)?|zero|uno|due|tre)\\s*[?!]*\\s*';
   /** Una quadra che contiene qualcosa che somiglia a un livello. PURA. */
-  const QUADRA_APERTA = /\[{1,2}\s*(?:[A-Za-zÀ-ÿ]{1,10}\s*)?[\d?!]/;
-  const QUADRA_CHIUSA = /[\d?!]\s*(?:[A-Za-zÀ-ÿ]{1,10}\s*)?\]{1,2}/;
+  // Dentro la quadra spaiata può esserci qualunque cosa fra il livello e la
+  // parentesi: guardare solo «cifra più lettere» lasciava passare «3 -
+  // sicurezza]», «3, grave]», «[#3», «[tre». Due sbagli insieme — la quadra
+  // dimenticata E il livello scritto in una forma sua — e la bocciatura
+  // spariva nel riassunto (feedback #565). Le parole si ancorano ai confini,
+  // o «altre» conterrebbe «tre».
+  const LIVELLO_NUDO = '(?:\\d|\\b(?:zero|uno|due|tre)\\b|[?!])';
+  const QUADRA_APERTA = new RegExp(`\\[{1,2}[^\\[\\]\\n]{0,12}?${LIVELLO_NUDO}`, 'i');
+  const QUADRA_CHIUSA = new RegExp(`${LIVELLO_NUDO}[^\\[\\]\\n]{0,12}?\\]{1,2}`, 'i');
 
   function quadraColLivello(riga) {
     // TUTTE le quadre della riga, non solo la prima: bastava una frase fra
