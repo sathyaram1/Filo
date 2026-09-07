@@ -1247,21 +1247,41 @@
       ? `Ordinamento: ${SORT_MODES[sortMode]} — clic o tasto destro per cambiare`
       : 'Riordina i feedback — clic o tasto destro';
   }
-  function openSortMenu(x, y) {
+  // Il popup del menu contestuale, uno per tutta la pagina: costruzione, posa
+  // dentro lo schermo e chiusura (clic fuori, Esc, scorrimento) stanno qui. Il
+  // menu di ordinamento e quelli della scheda delle statistiche sono lo STESSO
+  // popup: due copie della stessa apertura divergono al primo ritocco.
+  // `voci`: [{ label, hint, checked, onPick }]; una voce `null` è un filetto.
+  // `checked` assente = voce d'azione (niente segno di spunta davanti).
+  // Torna false se non c'era niente da mostrare, così chi chiama può lasciare
+  // il posto al menu generale di Filo invece di aprire un popup vuoto.
+  function openCtxMenu(x, y, voci) {
+    const utili = (voci || []).filter((v) => v !== undefined);
+    if (!utili.some(Boolean)) return false;
     closeSortMenu();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop mg-ctxmenu';
     menu.setAttribute('role', 'menu');
-    for (const mode of ['num', 'priority', 'creator', 'smart']) {
+    for (const v of utili) {
+      if (!v) {
+        const sep = document.createElement('div');
+        sep.className = 'mg-ctxmenu-sep';
+        menu.appendChild(sep);
+        continue;
+      }
       const opt = document.createElement('div');
       opt.className = 'sn-select-option';
-      opt.setAttribute('role', 'menuitemradio');
-      const on = mode === sortMode;
-      opt.setAttribute('aria-checked', on ? 'true' : 'false');
-      if (on) opt.classList.add('sn-selected');
-      // ✓ sull'ordinamento attivo; spazio allineato sugli altri.
-      opt.textContent = `${on ? '✓ ' : ' '}${SORT_MODES[mode]}`;
-      opt.addEventListener('click', () => chooseSort(mode));
+      const radio = v.checked !== undefined;
+      opt.setAttribute('role', radio ? 'menuitemradio' : 'menuitem');
+      if (radio) {
+        opt.setAttribute('aria-checked', v.checked ? 'true' : 'false');
+        if (v.checked) opt.classList.add('sn-selected');
+      }
+      // Segno di spunta sulla voce attiva, spazio allineato sulle altre dello
+      // stesso gruppo; le voci d'azione non hanno né l'uno né l'altro.
+      opt.textContent = radio ? `${v.checked ? '\u2713 ' : ' '}${v.label}` : v.label;
+      if (v.hint) opt.title = v.hint;
+      opt.addEventListener('click', () => { closeSortMenu(); v.onPick(); });
       menu.appendChild(opt);
     }
     document.body.appendChild(menu);
@@ -1276,6 +1296,14 @@
       window.addEventListener('scroll', closeSortMenu, true);
       window.addEventListener('resize', closeSortMenu);
     }, 0);
+    return true;
+  }
+  function openSortMenu(x, y) {
+    openCtxMenu(x, y, ['num', 'priority', 'creator', 'smart'].map((mode) => ({
+      label: SORT_MODES[mode],
+      checked: mode === sortMode,
+      onPick: () => chooseSort(mode),
+    })));
   }
   // Tasto destro ovunque sull'intestazione della lista → menu di ordinamento.
   if (mgListHeadRow) {
