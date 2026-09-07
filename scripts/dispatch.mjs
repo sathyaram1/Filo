@@ -1578,10 +1578,19 @@ if (isMainModule) {
   try {
     if (flag === '--record-verifier') {
       const [, id, ...rest] = conBiglietto(argv);
-      // La parola del vecchio verdetto (pass|migliorabile|fail) è tollerata e
-      // ignorata: l'esito lo calcola il server dai livelli della critica.
-      if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) rest.shift();
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, col livello davanti: [2] …>"'); process.exit(1); }
+      // La parola del vecchio verdetto (pass|migliorabile|fail) è tollerata e
+      // ignorata: l'esito lo calcola il server dai livelli della critica. Ma
+      // DA SOLA veniva buttata via in silenzio, la critica arrivava vuota,
+      // zero rilievi vale «verifica superata» — e chi scriveva `fail` per
+      // bocciare registrava una PROMOZIONE (feedback #565).
+      if (rest.length === 1 && LEGACY_VERDICT_WORDS.includes(rest[0])) {
+        console.error(`«${rest[0]}» da sola non è una critica: non ho registrato niente.`);
+        console.error('L\'esito non lo scegli tu, lo calcolano i livelli dei rilievi: senza rilievi la verifica risulta SUPERATA, quindi questa riga registrerebbe una promozione.');
+        console.error('Scrivi cosa hai provato, e i rilievi se ce ne sono: «[2] il pulsante Salva non salva col titolo vuoto», coi passi per rifarlo.');
+        process.exit(1);
+      }
+      if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) rest.shift();
       // Qui la critica è UN testo, e non ci sono opzioni: una parola con due
       // trattini finiva incollata dentro alla critica — che poi non si
       // modifica più, e che l'owner legge nella chat del feedback (#565).
