@@ -261,3 +261,22 @@ test('cambi di finestra a raffica e doppio clic sulle tessere non lasciano la sc
     || document.body.innerText.includes('undefined'));
   expect(errori).toBe(false);
 });
+
+test('il registro che torna raggiungibile si rilegge da solo, come fa la lista dei feedback', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await pronta(page);
+  await stubRegistro(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate((d) => window.__mgTest.setData(d), TRE);
+  await page.evaluate(() => { window.__reg.fail = 'non raggiungibile'; });
+  await apriStats(page);
+  await expect(page.locator('#mgStRange')).toContainText('non raggiungibile');
+
+  // La rete torna. La lista dei feedback si ritenta da sola; il registro?
+  await page.evaluate((r) => { window.__reg.fail = null; window.__reg.entries = r; },
+    [run('prober', 0), run('prober', 0)]);
+  await page.evaluate((d) => window.__mgTest.setData(d), [...TRE, fb({ id: 'e', seq: 5, at: iso(0) })]);
+  await expect(nRicevuti(page)).toHaveText('4');
+  await expect(page.locator('#mgStRange')).not.toContainText('non raggiungibile');
+  await expect(nProber(page)).toHaveText('2');
+});

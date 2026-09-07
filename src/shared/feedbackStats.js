@@ -424,6 +424,13 @@
     const perPriorita = { 0: 0, 1: 0, 2: 0, 3: 0 };
     const idsCategoria = {};
     const idsCreatore = {};
+    // Anche le priorità e i due segnali portano gli id di ciò che hanno
+    // contato: senza, «priorità alta: 2» resta un numero da cui non si scende,
+    // mentre ogni altra riga della stessa scheda si apre (pattern «Un numero
+    // mostrato porta alle cose che ha contato»).
+    const idsPriorita = {};
+    const idsRiaperti = [];
+    const idsArenati = [];
     const idsIlleggibili = [];
     const idsNonLavorati = [];
     let illeggibili = 0;
