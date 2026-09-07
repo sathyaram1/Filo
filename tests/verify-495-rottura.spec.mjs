@@ -85,10 +85,18 @@ test('rottura — click veloci fra le schede: i numeri restano coerenti', async 
   expect(t.queue).toBe('In coda (2)');
   expect(t.resolved).toBe('Risolti (0)');
   expect(t.archived).toBe('Archiviati (1)');
-  // Un solo badge per scheda (nessun accumulo di span a forza di ridisegni).
-  const badges = await page.evaluate(() => [...document.querySelectorAll('.mg-tab')]
-    .map((b) => b.querySelectorAll('.mg-tab-count').length));
-  expect(badges).toEqual([1, 1, 1, 1, 0, 0, 0, 0]);
+  // Un solo badge per scheda (nessun accumulo di span a forza di ridisegni), e
+  // il numero ce l'hanno SOLO le quattro schede che elencano feedback. Scritto
+  // per nome e non come sequenza di posizioni: una scheda nuova nella barra
+  // («Statistiche feedback») faceva diventare rosso questo controllo senza che
+  // niente di ciò che verifica fosse cambiato.
+  const badges = await page.evaluate(() => Object.fromEntries(
+    [...document.querySelectorAll('.mg-tab')]
+      .map((b) => [b.dataset.tab, b.querySelectorAll('.mg-tab-count').length])));
+  const conNumero = Object.keys(badges).filter((k) => badges[k] > 0).sort();
+  expect(conNumero).toEqual(['archived', 'inbox', 'queue', 'resolved']);
+  const doppi = Object.keys(badges).filter((k) => badges[k] > 1);
+  expect(doppi).toEqual([]);
 });
 
 test('rottura — riordinare la lista non cambia il numero', async ({ openTab }) => {
