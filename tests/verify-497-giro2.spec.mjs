@@ -107,9 +107,12 @@ test('#497 P — aggiornamento remoto mentre la frase è aperta con una bozza', 
   await apri(page, 'q1', 'queue');
   await page.locator('#mgUserNoteToggle').click();
   await page.locator('#mgUserNoteText').fill('bozza nuova');
-  await page.locator('#mgList').click();   // cursore fuori dalla casella
+  console.log('PRIMA DEL CLICK', await page.locator('#mgUserNoteText').inputValue());
+  await page.locator('#mgThread').click({ position: { x: 5, y: 5 } });   // cursore fuori dalla casella
+  console.log('DOPO IL CLICK', await page.locator('#mgUserNoteText').inputValue(),
+    'aperta:', await page.locator('#mgUserNote').isVisible());
   const ridisegnato = await page.evaluate(() => window.__mgTest.rerenderIfIdle('q1'));
-  console.log('RIDISEGNATO', ridisegnato);
+  console.log('RIDISEGNATO', ridisegnato, 'valore:', await page.locator('#mgUserNoteText').inputValue());
   await expect(page.locator('#mgUserNoteText')).toHaveValue('bozza nuova');
   await expect(page.locator('#mgUserNote')).toBeVisible();
 });
