@@ -298,7 +298,16 @@
       font: inherit; font-size: 12.5px; color: var(--sn-fg);
       background: var(--sn-bg); border: 1px solid var(--sn-border);
       border-radius: 6px; padding: 4px 7px;
+      /* Un campo data porta due pezzi che NON si stilano: l'icona del
+         calendario e il calendario che si apre cliccandola. Li disegna il
+         browser, e senza `color-scheme` li disegna sempre per uno sfondo
+         chiaro: sul tema scuro l'icona è nera su nero e il calendario si apre
+         bianco in mezzo alla pagina scura. `color-scheme` è l'unico
+         interruttore che li gira, e va detto in tutti e due i versi (il tema di
+         Filo si sceglie a mano e può non essere quello del sistema). */
+      color-scheme: light;
     }
+    [data-sn-theme="dark"] .mg-st-date input { color-scheme: dark; }
     .mg-st-date input:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
 
     .mg-st-range { font-size: 12.5px; color: var(--sn-muted); margin: 0 0 4px; }
