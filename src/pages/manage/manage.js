@@ -3313,8 +3313,14 @@
     }
     const echo = $st('mgStDateEcho');
     if (echo) {
-      const da = stDataParlata(stFromISO);
-      const a = stDataParlata(stToISO);
+      // L'eco descrive la finestra CHE SI STA GUARDANDO, non le due caselle
+      // così come sono state riempite. Con le date invertite la finestra si
+      // raddrizza da sola, e l'eco costruita sulle caselle diceva «dal 5
+      // settembre al 1 settembre» mentre la riga sotto i filtri diceva il
+      // contrario: due frasi vicine che si smentivano, proprio dove l'eco
+      // serve a togliere ogni dubbio sull'ordine.
+      const da = range && range.from != null ? stDataParlataMs(range.from) : '';
+      const a = range && range.to != null ? stDataParlataMs(range.to - 1) : '';
       echo.textContent = (da && a) ? `dal ${da} al ${a}`
         : da ? `dal ${da} in poi`
           : a ? `fino al ${a}` : '';
