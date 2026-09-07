@@ -2655,10 +2655,16 @@
   // Salva ORA quello che c'è nella casella, se differisce da quello salvato.
   // Ritorna la promessa dell'esito (true = a destinazione c'è quello che
   // l'owner ha scritto), così chi deve proseguire può aspettarla.
+  function fraseInCasella() {
+    return mgUserNoteText ? (mgUserNoteText.value || '').trim().slice(0, 500) : '';
+  }
   function salvaFraseSubito(opts) {
     annullaSalvataggioProgrammato();
+    // Già partito con ESATTAMENTE questo testo: si aspetta quello.
+    if (userNoteInVolo && userNoteInVoloTesto === fraseInCasella()) return userNoteInVolo;
     if (!bozzaFrase()) return userNoteInVolo || Promise.resolve(true);
-    userNoteInVolo = saveUserNote(opts).finally(() => { userNoteInVolo = null; });
+    userNoteInVoloTesto = fraseInCasella();
+    userNoteInVolo = saveUserNote(opts).finally(() => { userNoteInVolo = null; userNoteInVoloTesto = null; });
     return userNoteInVolo;
   }
   // Quello che l'owner ha scritto è a destinazione? Aspetta la bozza in corso e
