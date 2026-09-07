@@ -343,16 +343,18 @@ if (isMain) {
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
   // resta è uno dei nostri campi. La conchiglia di Git trasforma `/guasto` in
   // un percorso, quindi si guarda anche l'ultimo pezzo del percorso.
-  const SEMBRA_OPZIONE_STORTA = (arg, campi) => {
+  const SEMBRA_OPZIONE_STORTA = (arg) => {
     const t = String(arg ?? '');
     if (!t || t.startsWith('--')) return false;
     const TRATTINI = ['-', '‐', '‑', '‒', '–', '—', '−'];
-    if (TRATTINI.includes(t[0])) {
-      let i = 0;
-      while (i < t.length && TRATTINI.includes(t[i])) i += 1;
-      return campi.has(t.slice(i).split('=')[0]);
-    }
-    if (t.includes('/')) return campi.has(t.split('/').pop().split('=')[0]);
+    // QUALUNQUE nome, non solo i nostri: `-guast` scritto male veniva preso per
+    // una parola libera e buttato via, e il giro si chiudeva senza dichiarare
+    // il guasto, rispondendo «OK» (feedback #565). Un numero negativo resta un
+    // valore.
+    if (TRATTINI.includes(t[0])) return !/^[0-9]/.test(t.replace(/^[-‐‑‒–—−]+/, ''));
+    // La conchiglia di Git riscrive `/guasto` come percorso: si guarda l'ultimo
+    // pezzo, e solo per i nomi che conosciamo — un percorso vero è un valore.
+    if (t.includes('/')) return CAMPI.has(t.split('/').pop().split('=')[0]);
     return false;
   };
 
