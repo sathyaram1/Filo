@@ -493,6 +493,13 @@ if (isMain) {
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
     // parole nel testo di ritorno (che nessuna macchina legge).
+    // Una parola in più qui non è un posizionale: è un `--guasto` scritto
+    // senza trattini, e il giro si chiuderebbe senza dichiarare niente,
+    // rispondendo «OK» (feedback #565).
+    if (args.length > 1) {
+      console.error(`Argomento non capito: "${String(args[1]).slice(0, 40)}" — non ho rilasciato niente. Il motivo di un guasto si scrive così: --guasto "…"`);
+      process.exit(1);
+    }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
     const r = await release(args[0], guasto);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
