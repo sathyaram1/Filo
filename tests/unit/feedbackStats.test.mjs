@@ -417,3 +417,36 @@ test('bucketSizeFor non restituisce mai una barretta che sfora il tetto', () => 
     assert.ok(b.label, 'ogni scalino ha un nome da scrivere sotto il grafico');
   }
 });
+
+// ── Correzioni del giro 3 di verifica (#496) ─────────────────────────────────
+
+test('anche priorità, riaperture e arenamenti portano gli id di ciò che hanno contato', () => {
+  const list = [
+    fbDi({ id: 'alta1', at: '2026-09-06T10:00:00', extra: { priority: 3 } }),
+    fbDi({ id: 'alta2', at: '2026-09-06T10:00:00', extra: { priority: 3, reopenRequests: 2 } }),
+    fbDi({ id: 'media', at: '2026-09-06T10:00:00', extra: { priority: 2, stalls: 3 } }),
+    fbDi({ id: 'senza', at: '2026-09-06T10:00:00', extra: { priority: 0 } }),
+  ];
+  const s = conta(list);
+  assert.deepEqual(s.idsPriorita['3'], ['alta1', 'alta2']);
+  assert.deepEqual(s.idsPriorita['2'], ['media']);
+  assert.deepEqual(s.idsPriorita['0'], ['senza']);
+  assert.equal(s.priorita[3], 2, 'il numero e l\'elenco devono combaciare');
+  assert.equal(s.idsPriorita['3'].length, s.priorita[3]);
+
+  // Gli eventi si contano tutti, l'elenco porta alle segnalazioni su cui sono
+  // successi: due riaperture su una sola segnalazione fanno 2 e un id.
+  assert.equal(s.riaperture, 2);
+  assert.deepEqual(s.idsRiaperti, ['alta2']);
+  assert.equal(s.stalli, 3);
+  assert.deepEqual(s.idsArenati, ['media']);
+});
+
+test('una priorità fuori scala finisce in «senza priorità», elenco compreso', () => {
+  const s = conta([
+    fbDi({ id: 'strana', at: '2026-09-06T10:00:00', extra: { priority: 99 } }),
+    fbDi({ id: 'negativa', at: '2026-09-06T10:00:00', extra: { priority: -4 } }),
+  ]);
+  assert.equal(s.priorita[0], 2);
+  assert.deepEqual(s.idsPriorita['0'], ['strana', 'negativa']);
+});

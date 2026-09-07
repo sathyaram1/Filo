@@ -29,7 +29,21 @@ scrive «—» e accanto si dice perché.
   accorgersene DA APERTO](vai-a-guardare-in-quellaltro-posto-quel-posto.md).
 - **Le fonti diverse si trattano separatamente.** Se un numero viene da
   un'altra sorgente e QUELLA è arrivata, il suo numero resta: spegnere tutta la
-  pagina per un dato mancante ne butta via altri che si conoscono.
+  pagina per un dato mancante ne butta via altri che si conoscono. Vale anche
+  al contrario, ed è il verso che sfugge: la sorgente che non è arrivata scrive
+  «—» anche se tutte le altre ci sono. In una riga di tre numeri, due letti da
+  una lista e uno da un registro, il registro mancante faceva scrivere «0
+  prober lanciati» accanto a due numeri veri, e quello zero era l'unico dei tre
+  a mentire.
+- **Ogni sorgente ha il suo orologio, e si rilegge sul giro di tutte.** Fare
+  seguire i dati alla vista non basta a chiuderla se solo UNA sorgente segue:
+  quella che si legge ancora una volta sola, all'apertura, resta ferma mentre le
+  altre si muovono, senza dirlo. Un numero fermo che sembra fresco è peggio di
+  uno zero, perché nessuno lo mette in dubbio. Il giro di aggiornamento le
+  rilegge tutte, anche quando dalle altre non è cambiato niente, e ritenta da
+  solo quella che era andata male. Una lettura riuscita e poi persa lascia
+  l'ultimo numero letto, come fa la lista quando un giro va male: «—» è per il
+  numero che non si è mai conosciuto.
 - **Un numero parziale lo dichiara accanto a sé.** Se la fonte tiene solo le
   voci recenti (un registro cappato, una lista che si ferma ai primi N), il
   numero è un MINIMO: la frase che lo dice va scritta anche, e soprattutto,

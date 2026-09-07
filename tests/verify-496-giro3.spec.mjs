@@ -178,10 +178,22 @@ test('giro 1 e 2: da un numero si arriva alle segnalazioni, e il tasto destro ri
   await expect(page.locator('#mgStDrawer .mg-st-item').first()).toBeVisible();
 
   const menu = page.locator('.mg-ctxmenu');
-  await page.locator('#mgStLoopChart [data-group]').first().click({ button: 'right' });
+  // Il punto: 30 px sopra il centro della torta (raggio 78), cioè dentro la
+  // fetta che copre le ore 12 qualunque essa sia. Il centro del RETTANGOLO di
+  // una fetta sottile può cadere fuori dalla fetta.
+  await page.locator('#mgStLoopChart').click({ button: 'right', position: { x: 90, y: 60 } });
   await expect(menu).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.locator('.mg-st-spark-bar').first().click({ button: 'right' });
+  await expect(menu).toHaveCount(0);
+  // Non l'ULTIMA barretta: vicino al bordo destro il menu si apre e si richiude
+  // da solo (vedi il report della correzione), e qui si prova il menu, non la
+  // posa del popup.
+  // Prima si porta la barretta in vista e si aspetta che la pagina stia ferma:
+  // uno scorrimento subito dopo l'apertura richiude il menu (vedi il report).
+  const barra = page.locator('.mg-st-spark-bar').first();
+  await barra.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  await barra.click({ button: 'right' });
   await expect(menu).toContainText('Restringi la finestra a questo periodo');
   await page.keyboard.press('Escape');
 });
@@ -248,8 +260,12 @@ test('titoli con HTML e testo lunghissimo non vengono eseguiti né spezzano la s
 test('cambi di finestra a raffica e doppio clic sulle tessere non lasciano la scheda incoerente', async ({ openTab }) => {
   const page = await openTab(URL);
   await pronta(page);
+  await stubRegistro(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate((r) => { window.__reg.entries = r; }, [run('prober', 1)]);
   await page.evaluate((d) => window.__mgTest.setData(d), TRE);
   await apriStats(page);
+  await expect(nProber(page)).toHaveText('1');
   for (const w of ['1d', '7d', '30d', '90d', '365d', 'all', '30d', '7d', 'all', '30d']) {
     await page.evaluate((k) => window.__mgTest.setStatsWindow(k), w);
   }
@@ -279,4 +295,48 @@ test('il registro che torna raggiungibile si rilegge da solo, come fa la lista d
   await expect(nRicevuti(page)).toHaveText('4');
   await expect(page.locator('#mgStRange')).not.toContainText('non raggiungibile');
   await expect(nProber(page)).toHaveText('2');
+});
+
+// ══ Correzioni del giro 3 ═════════════════════════════════════════════════
+
+test('dalle righe di «Salute della coda» si arriva alle segnalazioni contate', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await pronta(page);
+  await page.evaluate((d) => window.__mgTest.setData(d), [
+    fb({ id: 'alta1', seq: 40, at: iso(1), priority: 3 }),
+    fb({ id: 'alta2', seq: 41, at: iso(1), priority: 3 }),
+    fb({ id: 'bassa', seq: 42, at: iso(1), priority: 1 }),
+  ]);
+  await apriStats(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
+
+  const alta = page.locator('#mgStHealthRows .mg-st-row').first();
+  await expect(alta).toContainText('Priorità alta');
+  await alta.click();
+  const voci = page.locator('#mgStHealthRows .mg-st-item');
+  await expect(voci).toHaveCount(2);
+  await expect(voci.first()).toContainText('#41');
+
+  // Il tasto destro offre le stesse azioni delle altre righe della scheda.
+  await alta.click({ button: 'right' });
+  const menu = page.locator('.mg-ctxmenu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Copia riga e numero');
+  await page.keyboard.press('Escape');
+
+  // E da una voce si arriva alla segnalazione vera.
+  await voci.first().click();
+  await expect(page.locator('#mgDetail')).toBeVisible();
+});
+
+test('le date invertite: l\'eco accanto ai campi dice la stessa finestra della riga sotto i filtri', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await pronta(page);
+  await page.evaluate((d) => window.__mgTest.setData(d), TRE);
+  await apriStats(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('custom', '2026-09-05', '2026-09-01'));
+  const eco = (await page.locator('#mgStDateEcho').textContent()).trim();
+  const riga = (await page.locator('#mgStRange').textContent()).trim();
+  expect(eco).toBe('dal 1 settembre 2026 al 5 settembre 2026');
+  expect(riga).toContain('dal 01/09/2026 al 05/09/2026');
 });
