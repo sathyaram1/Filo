@@ -103,12 +103,19 @@
   const mgSideClose  = document.getElementById('mgSideClose');
   const mgSideBody   = document.getElementById('mgSideBody');
 
+  // La barra dell'owner: contiene TUTTI i tasti su una riga sola (azioni di
+  // stato + preferito + frase per chi ha segnalato) e, sotto, i moduli che si
+  // aprono da quei tasti (riapertura, frase).
+  const mgOwnerBar      = document.getElementById('mgOwnerBar');
+
   // Azioni di stato (owner-only): i pulsanti li genera renderActions() leggendo
   // MR.ownerActions — la stessa tabella della pagina dei feedback.
   const mgActions       = document.getElementById('mgActions');
   const mgAcceptComment = document.getElementById('mgAcceptComment');
   const mgActionsRow    = document.getElementById('mgActionsRow');
   const mgActionMsg     = document.getElementById('mgActionMsg');
+  // La riga degli esiti (azione di stato + preferito), sotto i tasti.
+  const mgOwnerMsgs     = document.getElementById('mgOwnerMsgs');
   const mgReopen        = document.getElementById('mgReopen');
   const mgReopenText    = document.getElementById('mgReopenText');
   const mgReopenCancel  = document.getElementById('mgReopenCancelBtn');
@@ -119,10 +126,13 @@
   const mgClarifyText = document.getElementById('mgClarifyText');
   const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
   const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
-  const mgUserNote     = document.getElementById('mgUserNote');
-  const mgUserNoteText = document.getElementById('mgUserNoteText');
-  const mgUserNoteBtn  = document.getElementById('mgUserNoteBtn');
-  const mgUserNoteMsg  = document.getElementById('mgUserNoteMsg');
+  // Frase per chi ha segnalato: il modulo (`mgUserNote`) sta chiuso finché non
+  // lo si apre col tasto della barra (`mgUserNoteToggle`).
+  const mgUserNote       = document.getElementById('mgUserNote');
+  const mgUserNoteToggle = document.getElementById('mgUserNoteToggle');
+  const mgUserNoteText   = document.getElementById('mgUserNoteText');
+  const mgUserNoteBtn    = document.getElementById('mgUserNoteBtn');
+  const mgUserNoteMsg    = document.getElementById('mgUserNoteMsg');
 
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
@@ -988,6 +998,9 @@
     });
     if (isList) {
       currentTab = tab;
+      // La frase scritta e non ancora partita se ne va con la selezione: si
+      // salva finché `selectedId` dice ancora a chi appartiene.
+      salvaFraseAutomatico();
       // Cambiando tab si azzera la selezione: il feedback aperto potrebbe non
       // appartenere alla nuova lista.
       selectedId = null;
@@ -995,8 +1008,9 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
+      collassaFrase();
       mgManage.hidden = true;
+      if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
       renderList();
       // L'avviso delle fusioni appartiene ai soli Ricevuti: il pannello è lo
@@ -1972,7 +1986,16 @@
   });
 
   // ── Rendering pannello centrale ───────────────────────────────────────────
-  function openDetail(id) {
+  // `opts.ridisegno` = questo non è l'owner che apre una segnalazione, è il
+  // pannello che si ridipinge da solo (un aggiornamento arrivato da remoto).
+  // La differenza conta per la frase: una sezione che l'owner ha aperto non
+  // deve richiudersi da sé mentre lui la sta guardando.
+  function openDetail(id, opts) {
+    const ridisegno = !!(opts && opts.ridisegno && id === selectedId);
+    // Quello che c'è nella casella della frase e non è ancora partito parte
+    // ADESSO, finché `selectedId` è ancora quello di prima: un istante dopo
+    // andrebbe a finire sul feedback sbagliato, o in nessun posto.
+    if (!ridisegno) salvaFraseAutomatico();
     selectedId = id;
 
     // Aggiorna selezione visiva nella lista
@@ -2045,9 +2068,21 @@
     // La frase per chi ha segnalato: su qualunque feedback, anche già chiuso.
     // E' in chiaro, quindi si legge e si scrive anche su una macchina senza
     // la chiave privata — al contrario del resto della conversazione.
+    // La barra sta in piedi per l'owner e per nessun altro: dentro ci sono
+    // solo cose sue. Le azioni di stato che ci vivono spariscono da sole
+    // quando lo stato non si legge (renderActions); preferito e frase no.
+    if (mgOwnerBar) mgOwnerBar.hidden = !isAdmin;
+
+    // La frase parte CHIUSA su ogni segnalazione (#497): si scrive una volta
+    // sola, e da aperta si mangiava una fetta di dettaglio a ogni feedback
+    // aperto. Il tasto della barra la apre, e dice se una frase c'è già.
+    // Su un ridisegno però la sezione resta com'era: se l'owner l'aveva
+    // aperta, un aggiornamento arrivato da remoto non gliela chiude in faccia.
     if (mgUserNote) {
-      mgUserNote.hidden = !isAdmin;
+      const restaAperta = ridisegno && !mgUserNote.hidden;
+      if (!restaAperta) collassaFrase();
       mgUserNoteText.value = String(fb.userNote || '');
+      riflettiFrase(mgUserNoteText.value);
       // Il valore con cui la riga è stata riempita: una bozza è ciò che differisce.
       mgUserNoteText.dataset.saved = mgUserNoteText.value;
       userNoteToccata = false;
@@ -2171,7 +2206,7 @@
         if (a.kind === 'reopen') { apriRiapertura(); return; }
         applyAction(a, null);
       });
-      mgActionsRow.insertBefore(b, mgActionMsg);
+      mgActionsRow.appendChild(b);
     }
   }
 
@@ -2200,6 +2235,21 @@
       setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
       return;
     }
+    // La riga per chi ha segnalato parte PRIMA del cambio di stato, e il
+    // cambio di stato non parte se lei non è arrivata: chiudere una
+    // segnalazione buttando via l'unica frase che il mittente leggerà è il
+    // modo più facile di perderla, e succedeva in silenzio.
+    setActionsBusy(true);
+    const fraseOk = await fraseAlSicuro();
+    if (!fraseOk) {
+      setActionsBusy(false);
+      setActionMsg('La frase per chi ha segnalato non si è salvata: riprova prima di cambiare stato.', 'err');
+      mostraFrase(true);
+      return;
+    }
+    // Nell'attesa l'owner può essere passato a un'altra segnalazione: l'azione
+    // era per questa, e qui si ferma.
+    if (selectedId !== id) { setActionsBusy(false); return; }
     const payload = { type: 'feedback_update', id, status: action.to };
     const locale = { status: action.to };
     const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
@@ -2236,8 +2286,9 @@
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
       mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
+      collassaFrase();
       mgManage.hidden = true;
+      if (mgOwnerBar) mgOwnerBar.hidden = true;
       if (mgDetailState) mgDetailState.hidden = true;
       chiudiRiapertura();
       closeSidebar();
@@ -2322,6 +2373,7 @@
   function setManageMsg(text, kind) {
     mgManageMsg.textContent = text || '';
     mgManageMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    riflettiMessaggiOwner();
   }
 
   // ── Azione: preferito ⭐ (toggle) ───────────────────────────────────────────
@@ -2414,7 +2466,8 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgClarify.hidden = true;
-      if (mgUserNote) mgUserNote.hidden = true;
+      collassaFrase();
+      if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
       renderList();
     } catch (e) {
@@ -2448,21 +2501,60 @@
   // combacia con niente, così il salvataggio dopo riparte comunque.
   const FRASE_IGNOTA = Symbol('frase ignota');
 
+  // ── Aprire e chiudere la frase ────────────────────────────────────────────
+  // Il modulo della frase sta CHIUSO finché non lo si chiede: è un testo che si
+  // scrive una volta sola, mentre il dettaglio — la conversazione — si legge
+  // sempre. Aprendolo il cursore ci finisce dentro: chi ha premuto quel tasto
+  // vuole scrivere, non cercare la casella.
+  function mostraFrase(aperta) {
+    if (!mgUserNote) return;
+    mgUserNote.hidden = !aperta;
+    if (mgUserNoteToggle) mgUserNoteToggle.setAttribute('aria-expanded', aperta ? 'true' : 'false');
+    if (aperta && mgUserNoteText) mgUserNoteText.focus();
+  }
+  function collassaFrase() { mostraFrase(false); }
+
+  // Da chiusa, la sezione non direbbe da nessuna parte che una frase c'è già:
+  // il tasto se lo tiene addosso (pallino + bordo acceso) e la mostra intera
+  // nell'hover, così l'owner sa se sta scrivendo o riscrivendo.
+  function riflettiFrase(frase) {
+    if (!mgUserNoteToggle) return;
+    const testo = String(frase || '').trim();
+    mgUserNoteToggle.classList.toggle('mg-usernote-piena', !!testo);
+    mgUserNoteToggle.title = testo
+      ? `Frase già scritta: “${testo}”`
+      : 'Scrivi la riga che leggerà chi ha segnalato';
+  }
+
+  if (mgUserNoteToggle) {
+    mgUserNoteToggle.addEventListener('click', () => {
+      mostraFrase(!!(mgUserNote && mgUserNote.hidden));
+    });
+  }
+
   function setUserNoteMsg(text, kind) {
     if (!mgUserNoteMsg) return;
     mgUserNoteMsg.textContent = text || '';
     mgUserNoteMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    // Un errore dentro una sezione chiusa non lo legge nessuno: il salvataggio
+    // può fallire mentre la sezione è già stata richiusa. Si riapre da sola.
+    if (kind === 'err') mostraFrase(true);
   }
 
   // Salva SOLO la frase: non tocca la conversazione, quindi si può scrivere
   // anche quando il report non è leggibile su questo computer.
-  async function saveUserNote() {
-    if (!selectedId) return;
+  // Ritorna true quando a destinazione c'è quello che l'owner ha scritto: sia
+  // che l'abbia appena spedito, sia che non ci fosse niente da spedire. False
+  // solo se la scrittura è fallita. Il valore lo guarda chi deve decidere se
+  // proseguire (un'azione di stato non parte se la frase non si è salvata).
+  async function saveUserNote(opts) {
+    const muto = !!(opts && opts.muto);
+    if (!selectedId) return true;
     const id = selectedId;
     const fb = allFeedbacks.find((f) => f._id === id);
     const frase = (mgUserNoteText.value || '').trim().slice(0, 500);
     const gia = userNoteSpedito.has(id) ? userNoteSpedito.get(id) : String((fb && fb.userNote) || '');
-    if (gia === frase) { setUserNoteMsg('Nessuna modifica', ''); return; }
+    if (gia === frase) { if (!muto) setUserNoteMsg('Nessuna modifica', ''); return true; }
 
     // Da qui in poi quello che c'è nella casella è "partito": se l'owner ci
     // rimette mano, quello che scrive lui vince sulla risposta che arriverà.
@@ -2484,7 +2576,7 @@
       //    feedback, parole già sostituite — e da lì la pagina rispondeva
       //    "Nessuna modifica" su un testo che a destinazione non c'era mai
       //    arrivato.
-      if (mio !== userNoteInvii.get(id)) return;
+      if (mio !== userNoteInvii.get(id)) return true;
       // 2) Il dato si aggiorna SEMPRE, anche se intanto l’owner è passato a un
       //    altro feedback: la scrittura è andata a buon fine davvero, e
       //    rientrando deve trovare quello che ha salvato.
@@ -2494,36 +2586,146 @@
       //    feedback: altrimenti ci finirebbe dentro la frase di un altro, e il
       //    salvataggio dopo manderebbe il messaggio di uno al mittente
       //    dell’altro.
-      if (selectedId !== id) return;
+      if (selectedId !== id) return true;
       // La casella si riallinea solo se l’owner non ci ha messo mano dopo
       // l’invio, altrimenti gli cancellerebbe la correzione sotto le dita. Non
       // basta confrontare il testo con quello inviato: uscendo dal feedback e
       // rientrandoci il pannello lo ha già ridipinto col valore VECCHIO, e il
       // confronto lo scambierebbe per una correzione.
-      if (!userNoteToccata) mgUserNoteText.value = frase;
+      if (!userNoteToccata) {
+        mgUserNoteText.value = frase;
+        // Quello che c'è a destinazione È quello che si vede: senza questa
+        // riga la casella restava "in bozza" per sempre agli occhi del
+        // pannello (il confronto con dataset.saved), e ogni aggiornamento in
+        // arrivo su questa segnalazione veniva trattenuto per una bozza che
+        // non c'era più.
+        mgUserNoteText.dataset.saved = frase;
+      }
+      // Il tasto della barra porta il segno di quello che c'è a destinazione:
+      // da chiuso è l'unico posto dove si vede che una frase esiste.
+      riflettiFrase(frase);
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
+      return true;
     } catch (e) {
       // Superata da un invio più recente: comanda quello, qui non si tocca
       // niente.
-      if (mio !== userNoteInvii.get(id)) return;
+      // ed è quello a dire se a destinazione la frase è arrivata.
+      if (mio !== userNoteInvii.get(id)) return true;
       // Non è arrivato a destinazione, e una scrittura precedente potrebbe
       // esserci arrivata: da qui in poi non sappiamo cosa ci sia. Va marcato
       // SEMPRE, anche se intanto si sta guardando un altro feedback, o il
       // salvataggio successivo verrebbe di nuovo inghiottito.
       userNoteSpedito.set(id, FRASE_IGNOTA);
-      if (selectedId !== id) return;
-      setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
+      if (selectedId === id) setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
+      return false;
     } finally {
       mgUserNoteBtn.disabled = false;
     }
   }
 
-  if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', saveUserNote);
+  // ── La frase non si perde per strada ──────────────────────────────────────
+  // Il tasto "Salva la frase" era l'UNICA strada: tutto il resto (premere
+  // "Risolto", ricliccare la stessa segnalazione, cambiare sezione) ridipinge
+  // il pannello e riporta la casella al valore salvato, buttando via la riga
+  // appena scritta senza dire niente — e quella riga è l'unica cosa che chi ha
+  // segnalato leggerà. Adesso si salva da sola: mentre scrivi, dopo una pausa,
+  // e appena il cursore lascia la casella. È lo stesso comportamento della
+  // gemella, che così faceva già.
+  const FRASE_PAUSA_MS = 1500;
+  let userNoteTimer = null;
+  // L'ultimo salvataggio partito, e COSA portava: chi deve sapere se la frase è
+  // a destinazione (un'azione di stato, il tasto premuto un istante dopo che la
+  // casella ha perso il fuoco) aspetta questo invece di spedirlo una seconda
+  // volta.
+  let userNoteInVolo = null;
+  let userNoteInVoloTesto = null;
+
+  function fraseInCasella() {
+    return mgUserNoteText ? (mgUserNoteText.value || '').trim().slice(0, 500) : '';
+  }
+  // C'è qualcosa da spedire? La domanda si fa su quello che è PARTITO, non su
+  // quello che la pagina si ricorda: finché la risposta non torna, il valore
+  // memorizzato è ancora quello di prima, e un ripensamento scritto in quella
+  // finestra verrebbe inghiottito. È lo stesso confronto che fa il salvataggio.
+  function bozzaFrase() {
+    if (!mgUserNoteText || !selectedId) return false;
+    const fb = allFeedbacks.find((f) => f._id === selectedId);
+    const gia = userNoteSpedito.has(selectedId)
+      ? userNoteSpedito.get(selectedId)
+      : String((fb && fb.userNote) || '');
+    return gia !== fraseInCasella();
+  }
+  function annullaSalvataggioProgrammato() {
+    if (userNoteTimer) { clearTimeout(userNoteTimer); userNoteTimer = null; }
+  }
+  function programmaSalvataggioFrase() {
+    annullaSalvataggioProgrammato();
+    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseAutomatico(); }, FRASE_PAUSA_MS);
+  }
+  // Salva ORA quello che c'è nella casella, se non è già a destinazione.
+  // Ritorna la promessa dell'esito (true = a destinazione c'è quello che
+  // l'owner ha scritto), così chi deve proseguire può aspettarla.
+  function salvaFraseSubito(opts) {
+    annullaSalvataggioProgrammato();
+    const testo = fraseInCasella();
+    // Già partito con ESATTAMENTE questo testo: si aspetta quello, non se ne
+    // manda un altro uguale.
+    if (userNoteInVolo && userNoteInVoloTesto === testo) return userNoteInVolo;
+    if (!bozzaFrase()) return userNoteInVolo || Promise.resolve(true);
+    const mia = saveUserNote(opts);
+    userNoteInVolo = mia;
+    userNoteInVoloTesto = testo;
+    // Solo se è ancora la mia: un salvataggio più recente ha già preso il posto.
+    mia.finally(() => {
+      if (userNoteInVolo === mia) { userNoteInVolo = null; userNoteInVoloTesto = null; }
+    });
+    return mia;
+  }
+  // Il salvataggio che parte DA SOLO tocca solo quello che l'owner ha scritto
+  // lui: senza questa guardia, aprire due segnalazioni di fila riscriverebbe
+  // una frase che nessuno ha toccato (ripulita degli spazi, tagliata a 500) e
+  // il mittente si vedrebbe cambiare la riga sotto il naso.
+  function salvaFraseAutomatico() {
+    // Una scrittura fallita lascia la frase IGNOTA: lì si riprova comunque,
+    // anche se da allora nessuno ha più toccato la casella. Altrimenti "la
+    // frase è al sicuro?" risponderebbe di sì su una riga che non è mai
+    // arrivata.
+    const ignota = !!selectedId && userNoteSpedito.get(selectedId) === FRASE_IGNOTA;
+    if (!userNoteToccata && !ignota) return userNoteInVolo || Promise.resolve(true);
+    return salvaFraseSubito({ muto: true });
+  }
+  // Quello che l'owner ha scritto è a destinazione? Aspetta sia il salvataggio
+  // già partito sia quello che parte adesso.
+  async function fraseAlSicuro() {
+    const giaPartito = userNoteInVolo;                 // preso PRIMA: salvaFraseSubito lo sostituisce
+    const nuovo = salvaFraseAutomatico();
+    const esiti = await Promise.all([giaPartito || true, nuovo]);
+    return esiti.every(Boolean);
+  }
+
+  // Il tasto e Invio restano la strada esplicita, e rispondono sempre.
+  function salvaFraseAMano() {
+    annullaSalvataggioProgrammato();
+    // Premuto un istante dopo che la casella ha perso il fuoco: quel
+    // salvataggio è già in volo con questo stesso testo, e l'esito lo scrive lui.
+    if (userNoteInVolo && userNoteInVoloTesto === fraseInCasella()) return;
+    if (!bozzaFrase()) {
+      // Niente da spedire perché a destinazione c'è già questa riga (di solito
+      // ce l'ha portata il salvataggio automatico). È quello che l'owner vuole
+      // sapere premendo il tasto.
+      const testo = fraseInCasella();
+      setUserNoteMsg(testo ? 'Salvata' : 'Nessuna frase', 'ok');
+      return;
+    }
+    salvaFraseSubito();
+  }
+  if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', salvaFraseAMano);
   if (mgUserNoteText) {
-    mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; });
+    mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; programmaSalvataggioFrase(); });
+    mgUserNoteText.addEventListener('blur', () => { salvaFraseAutomatico(); });
     mgUserNoteText.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); saveUserNote(); }
+      if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
     });
   }
 
@@ -2531,6 +2733,16 @@
   function setActionMsg(text, kind) {
     mgActionMsg.textContent = text || '';
     mgActionMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    riflettiMessaggiOwner();
+  }
+
+  // La riga degli esiti esiste solo quando ha qualcosa da dire: vuota
+  // lascerebbe uno spazio sotto i tasti che non significa niente.
+  function riflettiMessaggiOwner() {
+    if (!mgOwnerMsgs) return;
+    const vuoto = !(mgActionMsg && mgActionMsg.textContent.trim())
+      && !(mgManageMsg && mgManageMsg.textContent.trim());
+    mgOwnerMsgs.hidden = vuoto;
   }
 
   function renderJudgesRow(fb) {
@@ -2776,17 +2988,16 @@
     // hanno implementato, gli esiti del controllo funzionalità e le risposte
     // dell'owner ai chiarimenti, in ordine. Il parser condiviso li separa.
     const notes = String(fb.notes || '');
-    // Report illeggibile su questo computer: al posto del blob si dice perché,
-    // e si mostra la frase scritta per chi ha segnalato, che è in chiaro.
+    // Report illeggibile su questo computer: al posto del blob si dice perché.
     if (TH && TH.reportUnreadable && TH.reportUnreadable(notes)) {
-      const frase = String(fb.userNote || '').trim();
-      if (frase) appendBubble('model', 'Filo (per chi ha segnalato)', esc(frase));
       appendBubble('model', 'Filo', esc('Il report della lavorazione è cifrato e questo computer non ha la chiave privata per leggerlo.'));
+      appendFraseBubble(fb);
       return;
     }
     if (!TH) {
       // Fallback senza parser: mostra il blob intero come un turno unico.
       if (notes.trim()) appendBubble('model', 'Filo (lavorazione)', esc(notes));
+      appendFraseBubble(fb);
       return;
     }
     for (const seg of TH.splitNotes(notes)) {
@@ -2794,6 +3005,19 @@
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       appendBubble(seg.role === 'user' ? 'user' : 'model', who, esc(seg.body), seg.attachments);
     }
+    appendFraseBubble(fb);
+  }
+
+  // La riga che leggerà chi ha segnalato è l'ULTIMO turno della conversazione:
+  // è l'unica cosa che il mittente vede quando la segnalazione si chiude, ed è
+  // in chiaro anche quando il resto non si legge. Prima compariva solo sul
+  // report cifrato: da quando la sezione parte chiusa, nel caso normale la
+  // frase non era scritta da nessuna parte e si scopriva solo passando col
+  // mouse sul tasto.
+  function appendFraseBubble(fb) {
+    const frase = String((fb && fb.userNote) || '').trim();
+    if (!frase) return;
+    appendBubble('model', 'Filo (per chi ha segnalato)', esc(frase));
   }
 
   // ── Pannello laterale ─────────────────────────────────────────────────────
@@ -3035,8 +3259,10 @@
       if (!box.hidden && box.offsetParent !== null && String(box.value || '').trim()) return true;
     }
     // La riga "frase per chi ha segnalato" parte già piena col valore salvato:
-    // è una bozza solo se differisce da quello.
-    if (mgUserNote && !mgUserNote.hidden && mgUserNoteText) {
+    // è una bozza solo se differisce da quello. Vale anche a sezione CHIUSA:
+    // richiuderla non butta via quello che l'owner ha scritto, e un ridisegno
+    // che passasse di qui glielo cancellerebbe senza che lui veda niente.
+    if (mgUserNote && mgUserNoteText) {
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
     return false;
@@ -3057,16 +3283,25 @@
   // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
   // ricerca la lista mostra i risultati: quelli restano, i dati sotto sono
   // comunque aggiornati (il dettaglio li legge da lì).
+  // Ritorna true se il DETTAGLIO è stato ridisegnato davvero: serve ai test per
+  // distinguere "trattenuto da una bozza in corso" da "non c'era niente da
+  // ridisegnare". I chiamanti veri il valore lo ignorano.
   function rerenderAfterLive(touched) {
-    if (!dataLoaded) return;
+    if (!dataLoaded) return false;
     if (!searchMode) {
       const scrollers = [mgList, mgList && mgList.parentElement].filter(Boolean);
       const tops = scrollers.map((el) => el.scrollTop);
       renderList();
       scrollers.forEach((el, i) => { el.scrollTop = tops[i]; });
     }
-    if (!selectedId || closeDetailIfGone()) return;
-    if (touched.has(selectedId) && !detailBeingEdited()) openDetail(selectedId);
+    if (!selectedId || closeDetailIfGone()) return false;
+    if (touched.has(selectedId) && !detailBeingEdited()) {
+      // Ridisegno, non una nuova apertura: la sezione della frase resta come
+      // l'owner l'ha lasciata.
+      openDetail(selectedId, { ridisegno: true });
+      return true;
+    }
+    return false;
   }
 
   // Un giro: versioni → differenze → documenti cambiati → decifratura → fusione.
@@ -3165,6 +3400,9 @@
     // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
     // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
     pollNow() { return refreshFromRemote(); },
+    // Un giro di ridisegno da aggiornamento remoto, su richiesta: i test lo
+    // usano per verificare che una bozza in corso lo trattenga (ritorna false).
+    rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
     setLiveSources(src) { Object.assign(liveSources, src || {}); },
     isLiveOn() { return liveEnabled; },
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },

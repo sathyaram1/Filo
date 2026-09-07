@@ -189,9 +189,13 @@ test('#509 — stato illeggibile: nessuna decisione offerta su ciò che non si l
   // anche su una già archiviata.
   await expect(mg.locator('#mgActionsRow button')).toHaveCount(0);
   await expect(mg.locator('#mgArchiveBtn')).toHaveCount(0);
-  // ⭐ e la frase per chi ha segnalato sono in chiaro: restano.
+  // ⭐ e la frase per chi ha segnalato sono in chiaro: restano. La frase sta
+  // dietro al suo tasto (parte chiusa, #497), quindi si guarda che il tasto ci
+  // sia e che apra davvero la casella.
   await expect(mg.locator('#mgStarBtn')).toBeVisible();
-  await expect(mg.locator('#mgUserNote')).toBeVisible();
+  await expect(mg.locator('#mgUserNoteToggle')).toBeVisible();
+  await mg.locator('#mgUserNoteToggle').click();
+  await expect(mg.locator('#mgUserNoteText')).toBeVisible();
 });
 
 // Il filtro "Solo automatici" ha preso il posto della vecchia sezione "Agente":

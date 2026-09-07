@@ -49,6 +49,17 @@ async function apri(page, fb, tab = 'inbox') {
     window.__mgTest.setTab(t);
     window.__mgTest.openDetail(f._id);
   }, { f: fb, t: tab });
+  await apriFrase(page);
+}
+
+// Dal #497 la sezione della frase parte CHIUSA su ogni segnalazione: chi vuole
+// scriverla apre col tasto della barra. Tutti i controlli qui sotto partono da
+// lì, quindi la aprono per prima cosa.
+async function apriFrase(page) {
+  if (await page.locator('#mgUserNote').isHidden()) {
+    await page.locator('#mgUserNoteToggle').click();
+  }
+  await expect(page.locator('#mgUserNoteText')).toBeVisible();
 }
 
 test('la frase si scrive dalla dashboard di gestione e parte da sola, senza toccare la conversazione', async ({ openTab }) => {
@@ -134,6 +145,7 @@ test('cambiando feedback durante il salvataggio, la frase non travasa sull\'altr
     window.__mgTest.setTab('resolved');
     window.__mgTest.openDetail('fb-a');
   }, { a: A, b: B });
+  await apriFrase(page);
 
   await page.locator('#mgUserNoteText').fill('Frase destinata ad A.');
   await page.locator('#mgUserNoteBtn').click();
@@ -143,6 +155,7 @@ test('cambiando feedback durante il salvataggio, la frase non travasa sull\'altr
 
   // Il pannello deve parlare di B, non di A.
   await expect(page.locator('#mgUserNoteText')).not.toHaveValue('Frase destinata ad A.');
+  await apriFrase(page);
   const visibile = await page.locator('#mgDetail').innerText();
   expect(visibile).toContain('testo del feedback B');
   expect(visibile).not.toContain('testo del feedback A');
@@ -181,6 +194,7 @@ test('correggere la frase mentre il salvataggio è in volo non cancella la corre
     window.__mgTest.setTab('resolved');
     window.__mgTest.openDetail(f._id);
   }, RISOLTO);
+  await apriFrase(page);
 
   await page.locator('#mgUserNoteText').fill('Ora puoi rimuovere un modelo.');
   await page.locator('#mgUserNoteBtn').click();
@@ -219,12 +233,14 @@ test('uscire e rientrare durante il salvataggio non fa tornare indietro la frase
     window.__mgTest.setTab('resolved');
     window.__mgTest.openDetail('fb-a');
   }, { a: A, b: B });
+  await apriFrase(page);
 
   await page.locator('#mgUserNoteText').fill('frase nuova');
   await page.locator('#mgUserNoteBtn').click();
   // Esci e rientra mentre la risposta è ancora in volo.
   await page.evaluate(() => window.__mgTest.openDetail('fb-b'));
   await page.evaluate(() => window.__mgTest.openDetail('fb-a'));
+  await apriFrase(page);
   await page.waitForTimeout(1000);
 
   await expect(page.locator('#mgUserNoteText')).toHaveValue('frase nuova');
@@ -267,6 +283,7 @@ test('due salvataggi in volo: comanda l\'ultimo spedito, non l\'ultimo che rispo
     window.__mgTest.setTab('resolved');
     window.__mgTest.openDetail('fb-conc');
   }, RISOLTO);
+  await apriFrase(page);
 
   await page.locator('#mgUserNoteText').fill('nuova');
   await page.locator('#mgUserNoteBtn').click();
@@ -310,6 +327,7 @@ test('ritirare la frase subito dopo averla salvata: il ripensamento parte davver
     window.__mgTest.setTab('resolved');
     window.__mgTest.openDetail('fb-ripensamento');
   }, RISOLTO);
+  await apriFrase(page);
 
   await page.locator('#mgUserNoteText').fill('Ci ho lavorato, riprova.');
   await page.locator('#mgUserNoteText').press('Enter');
@@ -354,6 +372,7 @@ test('il primo salvataggio riesce e il ripensamento fallisce: si può riprovare'
     window.__mgTest.setTab('resolved');
     window.__mgTest.openDetail('fb-meta');
   }, RISOLTO);
+  await apriFrase(page);
 
   await page.locator('#mgUserNoteText').fill('zeta');
   await page.locator('#mgUserNoteText').press('Enter');
@@ -380,4 +399,90 @@ test('senza admin la casella non compare', async ({ openTab }) => {
   }, RISOLTO);
 
   await expect(page.locator('#mgUserNote')).toBeHidden();
+  // E nemmeno il tasto che la aprirebbe: la barra intera è roba dell'owner.
+  await expect(page.locator('#mgUserNoteToggle')).toBeHidden();
+});
+
+// ── #497: la sezione parte chiusa ─────────────────────────────────────────
+// Si scrive una volta sola, e da aperta si prendeva una fetta del dettaglio su
+// OGNI segnalazione aperta — proprio quella dove sta la conversazione, che è
+// la cosa che si legge sempre.
+test('#497 — la frase parte chiusa, il tasto la apre, e cambiando feedback si richiude', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([
+      { ...f, _id: 'fb-uno', seq: 901 },
+      { ...f, _id: 'fb-due', seq: 902, userNote: 'Frase già scritta per il due.' },
+    ]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail('fb-uno');
+  }, RISOLTO);
+
+  const modulo = page.locator('#mgUserNote');
+  const tasto = page.locator('#mgUserNoteToggle');
+  await expect(tasto).toBeVisible();
+  await expect(modulo).toBeHidden();
+  await expect(tasto).toHaveAttribute('aria-expanded', 'false');
+
+  // Il tasto la apre: chi lo preme vuole scrivere, e il cursore ci finisce.
+  await tasto.click();
+  await expect(modulo).toBeVisible();
+  await expect(tasto).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#mgUserNoteText')).toBeFocused();
+
+  // E la richiude.
+  await tasto.click();
+  await expect(modulo).toBeHidden();
+
+  // Aperta su una segnalazione, resta chiusa sulla successiva.
+  await tasto.click();
+  await expect(modulo).toBeVisible();
+  await page.evaluate(() => window.__mgTest.openDetail('fb-due'));
+  await expect(modulo).toBeHidden();
+
+  // Da chiusa, il tasto è l'unico posto dove si vede che una frase c'è già.
+  await expect(tasto).toHaveClass(/mg-usernote-piena/);
+  await expect(tasto).toHaveAttribute('title', /Frase già scritta/);
+  await page.evaluate(() => window.__mgTest.openDetail('fb-uno'));
+  await expect(tasto).not.toHaveClass(/mg-usernote-piena/);
+});
+
+// Una frase scritta e poi lasciata lì non deve sparire. Adesso non resta
+// nemmeno una bozza: appena il cursore lascia la casella parte, quindi un
+// ridisegno può anche avvenire — quello che l'owner ha scritto è già a
+// destinazione e la casella lo rimostra.
+test('#497 — la frase scritta e non salvata a mano parte da sola, e sopravvive a un aggiornamento', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+  });
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([{ ...f, _id: 'fb-bozza' }]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail('fb-bozza');
+  }, RISOLTO);
+
+  await page.locator('#mgUserNoteToggle').click();
+  await page.locator('#mgUserNoteText').fill('Bozza da non perdere.');
+  // Richiudere la sezione toglie il fuoco dalla casella: da lì la frase parte.
+  await page.locator('#mgUserNoteToggle').click();
+  await expect(page.locator('#mgUserNote')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  expect(await page.evaluate(() => window.__updates[0].userNote)).toBe('Bozza da non perdere.');
+
+  // E un aggiornamento in arrivo non la fa tornare indietro.
+  await page.evaluate(() => window.__mgTest.rerenderIfIdle('fb-bozza'));
+  await page.locator('#mgUserNoteToggle').click();
+  await expect(page.locator('#mgUserNoteText')).toHaveValue('Bozza da non perdere.');
 });
