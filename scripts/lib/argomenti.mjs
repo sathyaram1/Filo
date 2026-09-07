@@ -66,9 +66,11 @@ export function argomentiDaNpm(env = {}, { opzioni = [], conValore = [] } = {}) 
     if (!chiave) continue;
     const valore = String(env[chiave]);
     if (vuole.has(opzione)) {
-      // «true» è quello che npm scrive per un'opzione senza valore: lì il
-      // valore vero non c'è, e indovinarlo sarebbe peggio che dirlo.
-      if (valore === 'true') continue;
+      // `--allega spec.md` npm lo spezza in due: si tiene il NOME (con «true»
+      // al posto del valore) e allo strumento passa il solo valore, che scala
+      // sui posizionali e finisce a fare da titolo. Il valore vero qui non
+      // c'è, e indovinarlo sarebbe peggio che fermarsi.
+      if (valore === 'true' || valore === '') { senzaValore.push(opzione); continue; }
       args.push(opzione, valore);
     } else {
       if (valore !== 'true' && valore !== '') continue;
