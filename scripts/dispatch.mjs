@@ -1642,6 +1642,14 @@ if (isMainModule) {
         console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui c'è solo --frase "…"; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
+      // Anche di qui esce un esito — il lavoro torna in coda a un'altra
+      // verifica — e un esito senza motivo non vale: stesso pavimento della
+      // critica, per la stessa ragione (feedback #565).
+      if (report.trim().length < MIN_CRITIQUE_CHARS) {
+        console.error(`Report della correzione troppo corto (${report.trim().length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho consegnato niente.`);
+        console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: è quello che l\'owner legge, e non si riscrive più.');
+        process.exit(1);
+      }
       const s = await recordFixed(id, report, frase);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
