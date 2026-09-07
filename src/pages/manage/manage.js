@@ -2577,7 +2577,7 @@
     } catch (e) {
       // Superata da un invio più recente: comanda quello, qui non si tocca
       // niente.
-      // ed e' quello a dire se a destinazione la frase e' arrivata.
+      // ed è quello a dire se a destinazione la frase è arrivata.
       if (mio !== userNoteInvii.get(id)) return true;
       // Non è arrivato a destinazione, e una scrittura precedente potrebbe
       // esserci arrivata: da qui in poi non sappiamo cosa ci sia. Va marcato
