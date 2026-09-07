@@ -449,3 +449,69 @@ test('i filtri scelti si ritrovano tornando sulla scheda', async ({ openTab }) =
   expect(s.finestra).toBe('7d');
   expect(s.gruppo).toBe('persone');
 });
+
+// ── 13. I dati che ARRIVANO mentre la scheda è già aperta ──────────────────
+//
+// Il primo giro aveva chiesto che la scheda non scrivesse zeri finti mentre i
+// feedback non ci sono. La frase c'è, ma è disegnata da `stRender`, e `stRender`
+// gira solo all'APERTURA della scheda: chi apre le statistiche mentre la lista
+// sta ancora arrivando resta con quella frase addosso anche dopo che i feedback
+// sono arrivati.
+test('i feedback arrivano mentre la scheda è già aperta: i numeri compaiono?', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+
+  // Si apre la scheda PRIMA che i feedback ci siano: è quello che succede a chi
+  // entra in gestione e clicca subito «Statistiche feedback».
+  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await expect(page.locator('#panel-fbstats')).toHaveClass(/mg-panel--active/);
+  const durante = await page.evaluate(() => ({
+    ricevuti: document.querySelector('#mgStTileRicevuti [data-num]').textContent,
+    avviso: (() => { const n = document.getElementById('mgStNoData'); return n && !n.hidden ? n.textContent.trim() : ''; })(),
+  }));
+  console.log('MENTRE CARICA:', JSON.stringify(durante));
+
+  // …e ora i feedback arrivano.
+  await page.evaluate((d) => window.__mgTest.setData(d), [
+    fb({ id: 'a', seq: 1, at: iso(1), status: 'done', notes: `R.${TURNO}${PASS}` }),
+    fb({ id: 'b', seq: 2, at: iso(1), status: 'todo' }),
+    fb({ id: 'c', seq: 3, at: iso(2), status: 'working' }),
+  ]);
+  await page.waitForTimeout(1500);
+
+  const dopo = await page.evaluate(() => ({
+    ricevuti: document.querySelector('#mgStTileRicevuti [data-num]').textContent,
+    lavorati: document.querySelector('#mgStTileLavorati [data-num]').textContent,
+    avviso: (() => { const n = document.getElementById('mgStNoData'); return n && !n.hidden ? n.textContent.trim() : ''; })(),
+    corpoNascosto: document.getElementById('mgStBody').hidden,
+  }));
+  console.log('DOPO L ARRIVO:', JSON.stringify(dopo));
+  shots();
+  await page.screenshot({ path: 'tests/.shots/496g2-dati-arrivati-dopo.png', fullPage: true });
+
+  expect(dopo.avviso, 'la frase «sto caricando» deve sparire quando i dati arrivano').toBe('');
+  expect(dopo.corpoNascosto, 'il corpo della scheda deve ricomparire').toBe(false);
+  expect(dopo.ricevuti).toBe('3');
+});
+
+// ── 14. Il guasto che si dichiara mentre la scheda è già aperta ────────────
+test('il caricamento fallisce mentre la scheda è aperta: lo dice, o resta «sto caricando»?', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await expect(page.locator('#panel-fbstats')).toHaveClass(/mg-panel--active/);
+
+  await page.evaluate(() => window.__mgTest.simulaCaricamentoFallito());
+  await page.waitForTimeout(1200);
+  const s = await page.evaluate(() => ({
+    avviso: (() => { const n = document.getElementById('mgStNoData'); return n && !n.hidden ? n.textContent.trim() : ''; })(),
+  }));
+  console.log('GUASTO A SCHEDA APERTA:', JSON.stringify(s));
+  // Il guasto non si legge come «sto ancora caricando»: uno dice «riprova fra
+  // poco», l'altro dice «questo numero non arriverà».
+  expect(s.avviso).toMatch(/non si sono caricati|dato che manca/i);
+});
