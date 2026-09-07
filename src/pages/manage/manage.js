@@ -3682,8 +3682,11 @@
       const li = document.createElement('li');
       li.dataset.group = f.key;
       const apribile = !!(f.ids && f.ids.length);
-      li.title = f.hint || `${f.label}: ${stFmtInt(f.count)} (${stPct(f.count, tot)})`
-        + (apribile ? '. Apri per vedere quali.' : '');
+      // «Si apre» si scrive in UN posto solo: appeso al suggerimento su misura
+      // della fetta quando c'è, altrimenti al testo di serie. Scritto dentro i
+      // singoli suggerimenti, mancava proprio dove il suggerimento c'era.
+      const base = f.hint || `${f.label}: ${stFmtInt(f.count)} (${stPct(f.count, tot)})`;
+      li.title = base + (apribile ? (f.apriNota || ' Apri per vedere quali.') : '');
       const sw = document.createElement('span');
       sw.className = 'mg-st-swatch';
       sw.style.background = f.color;
