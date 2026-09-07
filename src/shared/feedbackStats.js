@@ -665,6 +665,7 @@
     WINDOWS, DEFAULT_WINDOW, CREATOR_KINDS, CREATOR_GROUPS, CATEGORIES, RUN_ROLES,
     ROLE_TO_KIND, WORKED_STATUSES, LOOP_MAX_BUCKET,
     toMillis, startOfDay, windowRange, inRange, kindsOfGroup, normalizeCreators, sortedEntries,
+    reopenCount,
     parseVerifications, verificationSummary, loopBucketLabel, bucketSizeFor, MAX_BARRE, compute,
   };
 
