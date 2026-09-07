@@ -214,7 +214,7 @@ test('#497 J — screenshot chiaro e scuro della barra', async ({ openTab }) => 
   await prepara(page, CASI.map(([, f]) => f));
   await apri(page, 'c2', 'inbox');
   await page.screenshot({ path: 'tests/.shots/497-barra-chiaro.png' });
-  await page.evaluate(() => { document.documentElement.setAttribute('data-theme', 'dark'); document.body.classList.add('sn-dark'); });
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
   await page.waitForTimeout(200);
   await page.screenshot({ path: 'tests/.shots/497-barra-scuro.png' });
   await apri(page, 'c5', 'resolved');
