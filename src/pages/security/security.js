@@ -294,6 +294,18 @@
     return s;
   }
 
+  // I controlli intorno alla lista (svuota, ricerca) devono dire la verità sulle
+  // voci VERE, anche mentre la lista sta ferma sotto il puntatore e a schermo ci
+  // sono ancora righe barrate. Senza questo, tolte a mano tutte le voci senza
+  // uscire dalla lista, «Svuota cronologia» restava lì e, raggiunto col
+  // tabulatore, offriva di far sparire zero voci.
+  function sincronizzaControlli() {
+    const vuota = vociCorrenti.length === 0;
+    $('sec-clip-clear').style.display = vuota ? 'none' : '';
+    $('sec-clip-search-row').style.display = vuota ? 'none' : '';
+    if (vuota) $('sec-clip-noresults').style.display = 'none';
+  }
+
   function renderClipboard(items, opts) {
     const list = $('sec-clip-list');
     const entries = Array.isArray(items) ? items : [];
@@ -304,6 +316,7 @@
       segnaSparite(entries);
       aggiornaAvvisoInAttesa();
       applyClipFilter();
+      sincronizzaControlli();
       return;
     }
     inAttesa = null;
