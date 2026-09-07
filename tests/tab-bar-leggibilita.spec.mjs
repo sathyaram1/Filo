@@ -118,6 +118,11 @@ test('la scheda in primo piano segue la pagina che cambia colore da sola', async
     return el ? getComputedStyle(el).backgroundColor : null;
   }), { timeout: 10_000 }).toBe('rgb(255, 255, 255)');
 
+  // Oltre i campionamenti di cortesia del caricamento (l'ultimo a 1,2s): il
+  // cambio deve essere raccolto perché la pagina è cambiata, non perché è
+  // appena stata aperta. Senza questa attesa il test passerebbe anche col
+  // difetto.
+  await shell.waitForTimeout(2500);
   await pagina.evaluate(() => { document.getElementById('t').style.background = 'rgb(180, 20, 140)'; });
 
   await expect.poll(async () => shell.evaluate(() => {
