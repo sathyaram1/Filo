@@ -379,3 +379,35 @@ ${riga}`;
     assert.equal(R.parseFindings(unaRiga).findings.length, 1, `«\n${davanti}[2]» deve valere come rilievo`);
   }
 });
+
+// La regola dell'owner, portata fino in fondo: un livello in QUALUNQUE
+// parentesi, dovunque stia nella riga e dietro qualunque etichetta, non passa
+// per riassunto. Prima ogni giro trovava un'etichetta o una parentesi in più
+// con cui far sparire un rilievo — anche di sicurezza (feedback #565).
+test('un livello dietro un'etichetta, in qualunque parentesi, non passa per riassunto', () => {
+  const riassunto = 'Provato tutto per bene, il resto regge.';
+  for (const riga of [
+    'Primo rilievo: (3) si scrive nelle chiavi SSH',
+    'Secondo: {2} rotto',
+    'Grave: [due] rotto',
+    'Rilievo 1: [2 grave] rotto',
+    'Primo rilievo: [2,5] rotto',
+    'Grave: [2) rotto',
+    'Primo rilievo: [livello 3] rotto',
+  ]) {
+    assert.equal(R.unparsedLevelLines(`${riassunto}
+${riga}`).length, 1, `«${riga}» non è riassunto`);
+    assert.equal(R.parseFindings(`${riassunto}
+${riga}`).findings.length, 0);
+  }
+  // La prosa normale non ne risente: dentro la parentesi ci vuole SOLO un
+  // livello, non una frase che contiene un numero.
+  for (const buona of [
+    'Provato tutto (3 volte) e regge bene davvero',
+    'Passi: apri (poi salva) e guarda il risultato',
+    'Provato il caso di livello 2 e regge',
+    'Ho letto il punto (vedi sopra) e va bene',
+  ]) {
+    assert.equal(R.unparsedLevelLines(buona).length, 0, `«${buona}» è testo`);
+  }
+});
