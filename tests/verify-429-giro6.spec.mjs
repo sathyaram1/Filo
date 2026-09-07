@@ -57,9 +57,11 @@ test('#429/20 — il sito accende il suo tema scuro da un interruttore interno',
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   await shell.waitForTimeout(2500);
   console.log('prima:', JSON.stringify(await shell.evaluate(ATTIVA)));
-  const pagine = await shell.evaluate(() => 1);
-  // clic sull'interruttore del sito
-  const { chromium } = await import('@playwright/test');
-  // usa la finestra della pagina
-  return;
+  const pagina = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+  expect(pagina, 'pagina trovata').toBeTruthy();
+  await pagina.click('#b');
+  await shell.waitForTimeout(4000);
+  console.log('dopo il clic sull\'interruttore del sito:', JSON.stringify(await shell.evaluate(ATTIVA)));
+  console.log('cima pagina ora:', await pagina.evaluate(() => getComputedStyle(document.getElementById('top')).backgroundColor));
+  await shell.screenshot({ path: join(SHOTS, 'v429-interruttore-sito.png'), clip: { x: 0, y: 0, width: 700, height: 44 } });
 });
