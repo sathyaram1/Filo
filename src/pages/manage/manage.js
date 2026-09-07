@@ -3201,6 +3201,22 @@
   function stFmtInt(n) {
     return Number(n || 0).toLocaleString('it-IT');
   }
+
+  // Una data col mese scritto a parole («1 settembre 2026»). Serve accanto ai
+  // due campi data: quelli scrivono nell'ordine della lingua del SISTEMA, che
+  // su un computer non italiano è il contrario di tutte le altre date della
+  // scheda, e nessuno si accorge di aver scelto il nove gennaio invece del
+  // primo settembre. Col mese a parole un ordine da indovinare non c'è.
+  // La lingua è fissata a it-IT di proposito: è quella del resto della pagina.
+  function stDataParlata(iso) {
+    const ms = ST.toMillis(iso);
+    if (ms == null) return '';
+    try {
+      return new Date(ms).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (_) {
+      return '';
+    }
+  }
   function stPct(n, tot) {
     if (!tot) return '';
     return `${Math.round((n / tot) * 100)}%`;
