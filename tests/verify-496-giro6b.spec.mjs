@@ -46,6 +46,10 @@ test('senza chiave, il filtro per creatore: «Routine cloud» che risposta dà?'
   const testoPagina = await page.locator('#panel-fbstats').innerText();
   console.log('[giro6b] la scheda nomina la cifratura?',
     /cifrat|non le sa leggere|non leggibile/i.test(testoPagina));
+  // Tre zeri senza spiegazione erano la porta: il filtro non può includere né
+  // escludere chi non dice chi è, e deve dirlo.
+  await expect(page.locator('#mgStCreatorNote')).toBeVisible();
+  await expect(page.locator('#mgStCreatorNote')).toContainText('non dicono chi le ha mandate');
 });
 
 test('chiave presente, UN documento illeggibile: chi lo dice e chi lo perde', async ({ openTab }) => {
@@ -75,6 +79,13 @@ test('chiave presente, UN documento illeggibile: chi lo dice e chi lo perde', as
   const nota = page.locator('#mgStLoopUnreadable');
   console.log('[giro6b] nota delle torte visibile:', await nota.isVisible(), '·',
     (await nota.textContent()).replace(/\s+/g, ' ').trim());
+
+  // Il documento che non si decifra non si mescola agli altri: ha la sua riga
+  // fra le priorità e fra i mittenti, e «lavorati» dice di quanto è un minimo.
+  await expect(page.locator('#mgStHealthRows')).toContainText('Priorità non leggibile');
+  await expect(page.locator('#mgStCreatorRows')).toContainText('Mittente non leggibile');
+  await expect(page.locator('#mgStTileLavorati [data-sub]')).toContainText('di stato non leggibile');
+  await expect(page.locator('#mgStTileLavorati [data-num]')).toHaveText('1');
 });
 
 test('la seconda torta: il suo nome si legge sullo schermo?', async ({ openTab }) => {
@@ -182,8 +193,10 @@ test('«Sempre» vuol dire sempre? un feedback senza data, e uno con una data st
   });
   const testo = await page.locator('#panel-fbstats').innerText();
   console.log('[giro6b] «Sempre» ricevuti =', ric, '· in coda (barra) =', JSON.stringify(barra));
-  console.log('[giro6b] la scheda dice qualcosa sulle date mancanti?',
-    /senza data|data mancante|data non/i.test(testo));
+  await expect(page.locator('#mgStSparkNote')).toBeVisible();
+  await expect(page.locator('#mgStSparkNote')).toContainText('data d\'arrivo leggibile');
+  console.log('[giro6b] nota sulle date =', JSON.stringify(
+    (await page.locator('#mgStSparkNote').textContent()).trim()));
   // Quattro feedback esistono; «Sempre» non ha limiti: deve contarli tutti, o
   // dire quanti ne ha lasciati fuori.
   expect(ric).toBe('4');

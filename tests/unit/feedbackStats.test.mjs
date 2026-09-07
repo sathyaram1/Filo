@@ -168,6 +168,9 @@ const conta = (feedbacks, opts = {}) => S.compute({
   creators: opts.creators,
   authorKindOf: (fb) => TH.authorKind(fb && fb.clientId),
   statusOf,
+  // Mittente e priorità viaggiano cifrati come lo stato: chi conta lo deve
+  // sapere, o li legge come «Utente» e «Senza priorità».
+  unreadable: (v) => MR.valueUnreadable(v),
 });
 
 test('i feedback si scelgono per data d\'arrivo e per creatore', () => {
@@ -554,4 +557,131 @@ test('con una finestra senza fine, un feedback datato nel futuro non finisce nel
     { range: S.windowRange('all', { now: NOW }) });
   const fine = normale.andamento.barre[normale.andamento.barre.length - 1];
   assert.ok(fine.to <= S.startOfDay(NOW.getTime()) + 86400000);
+});
+
+// ── Le frasi di verifica citate DENTRO un rilievo ───────────────────────────
+//
+// Una critica è prosa scritta da un verificatore, e un verificatore parla
+// proprio di verifiche: cita «Verifica superata», scrive «quando il registro
+// non risponde il lavoro si ferma», nomina le frasi vecchie. Cercate nel blocco
+// intero, quelle frasi cambiavano l'esito del giro e gli facevano perdere il
+// conto dei rilievi. Si leggono solo dove la nota le SCRIVE: apertura e riga
+// della decisione, con l'elenco dei rilievi fuori da entrambe.
+
+test('le frasi di verifica dentro un rilievo non cambiano l\'esito del giro', () => {
+  const capo = 'Verifica: 2 rilievi.\nIl verificatore corregge tutti i rilievi; poi un altro verificatore ricontrolla.\n';
+  const due = [{ outcome: 'migliorabile', findings: 2 }];
+
+  assert.deepEqual(S.parseVerifications(`${capo}- [1] La riga non si apre.\n- [0] Bordo freddo.`), due);
+  assert.deepEqual(
+    S.parseVerifications(`${capo}- [1] Quando il registro non risponde il lavoro si ferma e la scheda tace.\n- [0] Bordo freddo.`),
+    due, 'la frase della fermata dentro un rilievo non ferma il lavoro');
+  assert.deepEqual(
+    S.parseVerifications(`${capo}- [1] La nota compare due volte.\nVerifica superata appare anche nel turno dell'utente.`),
+    due, 'la frase del pass dentro un rilievo non fa passare il giro');
+  assert.deepEqual(
+    S.parseVerifications('Verifica: 3 rilievi.\nIl verificatore corregge tutti i rilievi; poi un altro verificatore ricontrolla.\n'
+      + '- [1] Nelle note vecchie compare «Controllo funzionalità NON superato»: contato due volte.'),
+    [{ outcome: 'migliorabile', findings: 3 }],
+    'la frase storica dentro un rilievo non fa perdere né l\'esito né il conto');
+  assert.deepEqual(
+    S.parseVerifications(`${capo}- [1] Nelle note storiche\nVerifica: funziona, ma migliorabile: resta contata male.`),
+    due);
+
+  // …e le note vere continuano a leggersi, riassunto lungo compreso.
+  assert.deepEqual(S.parseVerifications(notaFermata()), [{ outcome: 'fail', findings: 1 }]);
+  assert.deepEqual(S.parseVerifications(notaCorretti()), [{ outcome: 'migliorabile', findings: 1 }]);
+  assert.deepEqual(S.parseVerifications(notaPass()), [{ outcome: 'pass', findings: 0 }]);
+  const conRiassunto = ROUND.roundNote({
+    summary: 'Provato: molte cose.\nAnche su più righe.\nE un\'altra ancora.',
+    findings: [{ level: 2, text: 'Rotto.' }, { level: 1, text: 'Freddo.' }],
+    decision: { stop: true, fix: [] },
+  });
+  assert.deepEqual(S.parseVerifications(conRiassunto), [{ outcome: 'fail', findings: 2 }],
+    'la riga della decisione si trova anche dopo un riassunto lungo');
+});
+
+// ── I campi cifrati non si leggono come dati veri ───────────────────────────
+
+const CIFRATO = '[cifrato — chiave privata non configurata]';
+
+test('senza la chiave, mittente e priorità non diventano «Utente» e «Senza priorità»', () => {
+  const list = [
+    fbDi({ id: 'a', at: '2026-09-06T10:00:00', clientId: CIFRATO, status: CIFRATO, extra: { priority: 'FENC1:blob' } }),
+    fbDi({ id: 'b', at: '2026-09-05T10:00:00', clientId: CIFRATO, status: CIFRATO, extra: { priority: 'FENC1:blob' } }),
+  ];
+  const s = conta(list);
+  assert.equal(s.ricevuti, 2);
+  assert.equal(s.mittenteIgnoto, 2, 'il mittente cifrato è un mittente che non si conosce');
+  assert.deepEqual(s.idsMittenteIgnoto, ['a', 'b']);
+  assert.deepEqual(s.creatori, [], 'nessuno finisce fra gli «Utente»');
+  assert.equal(s.prioritaIgnota, 2, 'la priorità cifrata non è «senza priorità»');
+  assert.equal(s.priorita[0], 0);
+  assert.ok(s.lavoratiSconosciuto, 'nessuno stato si legge: «lavorati» non è zero, è ignoto');
+  assert.equal(s.lavoratiIgnoti, 2);
+
+  // Un filtro per creatore non può includere né escludere chi non dice chi è:
+  // resta fuori, e il numero lo dice invece di sparire.
+  const filtrato = conta(list, { creators: ['prober'] });
+  assert.equal(filtrato.ricevuti, 0);
+  assert.equal(filtrato.mittenteFuoriFiltro, 2);
+});
+
+test('con la chiave, un solo documento illeggibile non si mescola agli altri', () => {
+  const s = conta([
+    fbDi({ id: 'ok1', at: '2026-09-06T10:00:00', clientId: 'owner:pino', status: 'done', priority: 3 }),
+    fbDi({ id: 'ok2', at: '2026-09-05T10:00:00', clientId: 'owner:pino', status: 'todo', priority: 3 }),
+    fbDi({ id: 'ko', at: '2026-09-04T10:00:00', clientId: CIFRATO, status: CIFRATO, extra: { priority: 'FENC1:blob' } }),
+  ]);
+  assert.equal(s.ricevuti, 3);
+  assert.equal(s.lavorati, 1);
+  assert.equal(s.lavoratiIgnoti, 1, 'il numero è un minimo, e si sa di quanto');
+  assert.ok(!s.lavoratiSconosciuto, 'due stati su tre si leggono: il numero c\'è');
+  assert.equal(s.priorita[3], 2);
+  assert.equal(s.prioritaIgnota, 1);
+  assert.equal(s.mittenteIgnoto, 1);
+  assert.equal(s.creatori.reduce((n, c) => n + c.count, 0), 2);
+});
+
+// ── Le segnalazioni senza data d'arrivo ─────────────────────────────────────
+
+test('«Sempre» non ha limiti, quindi non lascia fuori chi non ha una data', () => {
+  const list = [
+    fbDi({ id: 'a', at: '2026-09-06T10:00:00' }),
+    fbDi({ id: 'b', at: '2026-09-05T10:00:00' }),
+    Object.assign(fbDi({ id: 'senza', at: '2026-09-05T10:00:00' }), { createdAt: null }),
+    Object.assign(fbDi({ id: 'storta', at: '2026-09-05T10:00:00' }), { createdAt: 'non è una data' }),
+  ];
+  const sempre = conta(list, { range: S.windowRange('all', { now: NOW }) });
+  assert.equal(sempre.ricevuti, 4, '«Sempre» le conta tutte');
+  assert.equal(sempre.senzaData, 2);
+  assert.equal(sempre.senzaDataDentro, 2, 'sono nei numeri, e chi disegna lo dice per il grafico');
+  assert.equal(sempre.andamento.barre.reduce((n, b) => n + b.count, 0), 2,
+    'nel grafico ci vanno solo quelle che hanno un giorno dove stare');
+
+  const trenta = conta(list);
+  assert.equal(trenta.ricevuti, 2, 'una finestra con dei limiti non se le può prendere');
+  assert.equal(trenta.senzaData, 2);
+  assert.equal(trenta.senzaDataDentro, 0);
+});
+
+// ── Le barrette partono da mezzanotte anche senza un inizio di finestra ─────
+
+test('con «Sempre» le barrette giornaliere non scavalcano la mezzanotte', () => {
+  const s = conta([
+    fbDi({ id: 'sera', at: '2026-09-02T23:30:00' }),
+    fbDi({ id: 'notte', at: '2026-09-03T01:00:00' }),
+    fbDi({ id: 'dopo', at: '2026-09-06T12:00:00' }),
+  ], { range: S.windowRange('all', { now: NOW }) });
+
+  assert.equal(s.andamento.bucket.key, 'day');
+  const piene = s.andamento.barre.filter((b) => b.count > 0);
+  assert.deepEqual(piene.map((b) => b.count), [1, 1, 1],
+    'tre giorni di calendario diversi, tre barrette da uno');
+  // Ogni barretta comincia a mezzanotte: l'etichetta nomina il giorno che
+  // contiene davvero.
+  for (const b of s.andamento.barre) assert.equal(b.from, S.startOfDay(b.from));
+  const prima = piene[0];
+  assert.equal(new Date(prima.from).getDate(), 2);
+  assert.equal(new Date(piene[2].from).getDate(), 6);
 });

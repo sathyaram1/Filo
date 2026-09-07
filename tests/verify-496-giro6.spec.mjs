@@ -69,9 +69,12 @@ test('senza la chiave dell\'owner: «Feedback lavorati» dice 0 o dice che non l
   const barra = await page.evaluate(() => [...document.querySelectorAll('.mg-tab')]
     .map((t) => t.textContent.replace(/\s+/g, ' ').trim()));
   console.log('[giro6] barra schede =', JSON.stringify(barra));
-  // Asserzione dal punto di vista dell'owner: un numero che non si conosce non
-  // si scrive zero.
-  expect(lavorati.trim()).not.toBe('0');
+  // Un numero che non si conosce non si scrive zero: qui NESSUNO stato si
+  // legge, quindi «quanti ne sono stati lavorati» è un dato che manca.
+  expect(lavorati.trim()).toBe('—');
+  expect(sub).toContain('non leggibile');
+  // E le priorità non diventano tutte «Senza priorità».
+  await expect(page.locator('#mgStHealthRows')).toContainText('Priorità non leggibile');
 });
 
 // ── 2 e 3. Le barrette di «Quando arrivano» con «Sempre» ───────────────────

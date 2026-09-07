@@ -31,6 +31,19 @@ scrive** e le dà in pasto al parser.
   turno (i marcatori di riapertura e di risposta aprono un turno dell'utente): il
   conteggio salta quei turni e legge il resto. È l'unico modo di distinguerle,
   perché sul testo sono indistinguibili.
+- **Le frasi si cercano dove il produttore le SCRIVE, non in tutto il testo.**
+  Saltare i turni delle persone chiude metà della porta: l'altra metà è la prosa
+  dell'agente stesso, perché chi scrive una critica parla proprio di verifiche.
+  «Verifica superata» a inizio riga dentro un rilievo faceva diventare quel giro
+  un pass a zero critiche; «il lavoro si ferma», che in italiano si scrive senza
+  pensarci («quando il registro non risponde il lavoro si ferma»), lo faceva
+  diventare una fermata; una citazione della frase vecchia gli faceva perdere
+  anche il conto dei rilievi, da tre a uno. Il produttore scrive una forma
+  fissa: riga di apertura, riassunto, riga della decisione, elenco dei rilievi.
+  Il riconoscitore legge apertura e decisione ancorate a inizio riga, e taglia
+  via l'elenco dei rilievi (`testaNota`). Regola generale: se il produttore ha
+  una struttura, il parser la usa; cercare una sottostringa nel blocco intero
+  significa dare al testo libero il potere di cambiare i numeri.
 - **Un conteggio ricavato così dichiara la sua fonte.** Se la traccia è
   parziale — un registro che tiene solo le esecuzioni recenti, una lista che
   si ferma ai primi N — il numero è un MINIMO, e la superficie che lo mostra lo
