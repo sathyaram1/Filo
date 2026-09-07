@@ -2633,12 +2633,19 @@
     return bozzaFrase() || userNoteTimer ? salvaFraseSubito({ muto: true }) : inVolo;
   }
 
-  if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', () => salvaFraseSubito());
+  // Il tasto e Invio restano la strada esplicita, e rispondono sempre: se non
+  // c'è niente di nuovo lo dicono ("Nessuna modifica") invece di tacere.
+  function salvaFraseAMano() {
+    annullaSalvataggioProgrammato();
+    if (!bozzaFrase()) { saveUserNote(); return; }
+    salvaFraseSubito();
+  }
+  if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', salvaFraseAMano);
   if (mgUserNoteText) {
     mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; programmaSalvataggioFrase(); });
     mgUserNoteText.addEventListener('blur', () => { salvaFraseSubito({ muto: true }); });
     mgUserNoteText.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); salvaFraseSubito(); }
+      if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
     });
   }
 
