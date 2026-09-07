@@ -3642,6 +3642,7 @@
       sw.className = 'mg-st-swatch';
       sw.style.background = f.color;
       const lab = document.createElement('span');
+      lab.className = 'mg-st-legend-label';
       lab.textContent = f.label;
       const val = document.createElement('span');
       val.className = 'mg-st-legend-val';
