@@ -3236,6 +3236,14 @@
   // scheda, e nessuno si accorge di aver scelto il nove gennaio invece del
   // primo settembre. Col mese a parole un ordine da indovinare non c'è.
   // La lingua è fissata a it-IT di proposito: è quella del resto della pagina.
+  // Un giorno in «aaaa-mm-gg», che è la forma che i campi data accettano.
+  // Costruito sul fuso LOCALE: `toISOString` è in UTC e sposterebbe il giorno.
+  function stIsoGiorno(ms) {
+    const d = new Date(ms);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
   function stDataParlata(iso) {
     const ms = ST.toMillis(iso);
     if (ms == null) return '';
