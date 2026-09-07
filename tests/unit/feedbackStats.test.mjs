@@ -322,3 +322,69 @@ test('riaperture e arenamenti si sommano senza contare due volte lo stesso arena
   assert.equal(s.riaperture, 2);
   assert.equal(s.stalli, 5, '3 (totale che non si azzera) + 2, non 3+1+2');
 });
+
+// ── Correzioni del giro 1 di verifica (#496) ─────────────────────────────────
+
+test('ogni gruppo porta gli id delle segnalazioni che lo compongono', () => {
+  const list = [
+    fbDi({ id: 'a', at: '2026-09-06T10:00:00', status: 'done', clientId: 'owner:pino', notes: note('R.', notaPass()) }),
+    fbDi({ id: 'b', at: '2026-09-06T10:00:00', status: 'done', clientId: 'routine:prober', notes: note('R.', notaCorretti(), notaPass()) }),
+    fbDi({ id: 'c', at: '2026-09-05T10:00:00', status: 'todo', clientId: 'routine:prober' }),
+    fbDi({ id: 'd', at: '2026-09-05T10:00:00', status: 'working', clientId: 'utente-1', notes: note('R.', notaFermata()) }),
+  ];
+  const s = conta(list);
+  const cat = (k) => s.categorie.find((c) => c.key === k);
+  assert.deepEqual(cat('done').ids.sort(), ['a', 'b'],
+    'senza gli id, da «Risolto: 2» non si può arrivare ai due risolti');
+  assert.deepEqual(cat('todo').ids, ['c']);
+  assert.deepEqual(s.idsNonLavorati, ['c'], 'gli unici non lavorati sono i todo');
+  const creatore = (k) => s.creatori.find((c) => c.key === k);
+  assert.deepEqual(creatore('prober').ids.sort(), ['b', 'c']);
+  // Le fette della torta e i fermati portano i loro id come le righe.
+  assert.deepEqual(s.loop.slices.find((x) => x.loops === 0).ids, ['a']);
+  assert.deepEqual(s.loop.slices.find((x) => x.loops === 1).ids, ['b']);
+  assert.deepEqual(s.loop.nonPassatiIds, ['d']);
+  // La somma degli id per categoria non perde né duplica nessuna segnalazione.
+  const tutti = s.categorie.flatMap((c) => c.ids).concat(s.idsIlleggibili).sort();
+  assert.deepEqual(tutti, ['a', 'b', 'c', 'd']);
+});
+
+test('una segnalazione illeggibile non vale «zero giri»: si conta a parte e si dichiara', () => {
+  const list = [
+    fbDi({ id: 'ok', at: '2026-09-06T10:00:00', status: 'done', notes: note('R.', notaPass()) }),
+    fbDi({ id: 'cifrata', at: '2026-09-06T10:00:00', status: 'FENC1:abc', notes: 'FENC1:xyz' }),
+  ];
+  const s = conta(list);
+  assert.equal(s.illeggibili, 1);
+  assert.deepEqual(s.idsIlleggibili, ['cifrata']);
+  assert.equal(s.loop.nonLeggibili, 1,
+    'senza questo numero la cifrata sparisce dalla torta in silenzio, mentre per categoria viene dichiarata');
+  assert.equal(s.loop.conVerifica, 1, 'la cifrata non entra nei conti dei giri');
+  assert.equal(s.loop.passati, 1);
+});
+
+test('intervalli di secoli: le barrette coprono tutta la finestra invece di fermarsi a metà', () => {
+  const range = S.windowRange('custom', { now: NOW, fromISO: '1900-01-01', toISO: '2026-09-07' });
+  const s = conta([fbDi({ id: 'a', at: '2026-09-06T10:00:00', status: 'todo' })], { range });
+  const barre = s.andamento.barre;
+  assert.ok(barre.length <= S.MAX_BARRE);
+  const ultima = barre[barre.length - 1];
+  assert.ok(ultima.to >= range.to,
+    'l\'ultima barretta deve arrivare alla fine della finestra: fermandosi nel 1959 contava i feedback di oggi sotto un\'etichetta del 1959');
+  const piena = barre.find((b) => b.count > 0);
+  assert.ok(piena.from <= Date.parse('2026-09-06T10:00:00') && Date.parse('2026-09-06T10:00:00') < piena.to,
+    'il feedback sta nella barretta il cui intervallo lo contiene davvero');
+  assert.equal(s.andamento.bucket.key, 'years');
+  assert.ok(s.andamento.bucket.anni >= 2);
+});
+
+test('bucketSizeFor non restituisce mai una barretta che sfora il tetto', () => {
+  const DAY = 86400000;
+  for (const giorni of [1, 30, 31, 32, 200, 201, 1800, 1801, 20000, 46000, 400000]) {
+    const span = giorni * DAY;
+    const b = S.bucketSizeFor(span);
+    assert.ok(Math.ceil(span / b.ms) <= S.MAX_BARRE,
+      `${giorni} giorni: ${Math.ceil(span / b.ms)} barrette, oltre il tetto di ${S.MAX_BARRE}`);
+    assert.ok(b.label, 'ogni scalino ha un nome da scrivere sotto il grafico');
+  }
+});
