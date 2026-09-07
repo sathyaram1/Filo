@@ -17,12 +17,26 @@ ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
 - **Perché:** una tinta bianca/grigia è indistinguibile dal tab bar (tinta
   invisibile) o, per la tab attiva, dà un bianco senza significato. Il favicon
   porta quasi sempre il colore vero del sito.
+- **La regola vale anche sul RIPIEGO, non solo su ciò che si scarta (#429).**
+  Il ripiego della scheda attiva "cima pagina neutra → usa il brand" esiste per
+  il caso YouTube, e quindi scatta solo se quel brand un colore ce l'ha. Il path
+  acromatico di `extractIdentityFromPixels` ritorna apposta un GRIGIO per i siti
+  senza pixel saturi (Wikipedia, GitHub — e le pagine interne di Filo, che hanno
+  un favicon monocromatico): scambiarlo per un'identità metteva sulla scheda
+  attiva un grigio che non era né la pagina né il marchio, e la scheda smetteva
+  di sembrare la continuazione della pagina sotto. Chi sceglie non è chi
+  applica: la decisione sta in `SN_TAB_COLOR.pickActiveTint`/`pickGlowTint`, la
+  shell la applica e basta — non tiene una copia della soglia.
+- **La scheda attiva È la pagina.** Quando la cima pagina non nasconde nessun
+  marchio, la tinta giusta è il colore campionato, identico al fondo della
+  pagina: fra la scheda e la pagina non si vede cucitura.
 - **Limite noto:** se il favicon è cross-origin senza header CORS, il canvas si
   "taint-a" e il colore non è estraibile → la tab resta neutra (meglio che
   sbagliata). I favicon same-origin (come YouTube) funzionano.
 - **Dove:** campionamento in `src/content/pageColor.js` (catena `compute()`);
-  applicazione/ripiego nella shell in `src/renderer/shell.js` (`render`,
-  `hasColorIdentity`).
+  scelta della tinta in `src/shared/tabColor.js` (`pickActiveTint`,
+  `pickGlowTint`); applicazione nella shell in `src/renderer/shell.js`
+  (`render`). `shell.html` carica `tabColor.js` prima di `shell.js`.
 - **Parametri regolabili (6):** l'estrazione e il blend sono governati da sei
   parametri (`soglia_saturazione`, `peso_centralita`, `bucket_tinta`,
   `saturazione_tab`, `luminosita_tab`, `opacita_tab`). La **fonte di verità** di
