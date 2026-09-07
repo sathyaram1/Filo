@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prove — i nodi</title>
+<style>
+:root {
+  --dash-paper: #f2ece0;
+  --dash-card: #f7f2e8;
+  --dash-ink: #221e19;
+  --dash-ink-soft: #5b554b;
+  --dash-ink-mute: #8c8273;
+  --dash-line: rgba(34, 30, 25, 0.10);
+  --dash-line-strong: rgba(34, 30, 25, 0.18);
+  --dash-accent: #c0552b;
+  --dash-altro: #8c8273;
+}
+body.scuro {
+  --dash-paper: #1c1916;
+  --dash-card: #25211c;
+  --dash-ink: #ece6da;
+  --dash-ink-soft: #b8b0a1;
+  --dash-ink-mute: #7e7567;
+  --dash-line: rgba(236, 230, 218, 0.10);
+  --dash-line-strong: rgba(236, 230, 218, 0.20);
+  --dash-altro: #8a8072;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--dash-paper); color: var(--dash-ink);
+  font: 14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+  padding: 0 0 60px;
+}
+
+.barra {
+  position: sticky; top: 0; z-index: 10; background: var(--dash-paper);
+  border-bottom: 1px solid var(--dash-line);
+  padding: 12px 26px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+}
+.barra h1 { font-size: 15px; font-weight: 600; margin: 0 12px 0 0; }
+.cur { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dash-ink-soft); }
+.cur input[type=range] { width: 120px; accent-color: var(--dash-accent); }
+.cur output { font-variant-numeric: tabular-nums; min-width: 34px; color: var(--dash-ink-mute); }
+.barra button {
+  font: inherit; font-size: 12px; border: 1px solid var(--dash-line-strong);
+  background: transparent; color: var(--dash-ink); border-radius: 16px;
+  padding: 5px 12px; cursor: pointer;
+}
+.barra button:hover { background: var(--dash-ink); color: var(--dash-paper); }
+.barra button.acceso { background: var(--dash-accent); border-color: var(--dash-accent); color: #fff; }
+.barra label.spunta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dash-ink-soft); cursor: pointer; }
+.barra input[type=checkbox] { accent-color: var(--dash-accent); }
+
+main { padding: 22px 26px; }
+section { margin-bottom: 30px; }
+section > h2 {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--dash-ink-mute); margin: 0 0 2px;
+}
+section > p.desc { font-size: 12.5px; color: var(--dash-ink-mute); margin: 0 0 14px; max-width: 720px; }
+.fila { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.cella {
+  background: var(--dash-card); border: 1px solid var(--dash-line); border-radius: 14px;
+  padding: 10px 12px 8px; cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; gap: 6px; transition: border-color 160ms ease;
+}
+.cella:hover { border-color: var(--dash-line-strong); }
+.cella .nome { font-size: 11.5px; color: var(--dash-ink-mute); text-align: center; max-width: 150px; }
+.cella svg { display: block; overflow: visible; }
+.filo { fill: none; stroke: var(--dash-accent); stroke-linecap: round; }
+.guaina { fill: none; stroke: var(--dash-card); stroke-linecap: round; }
+.altro { stroke: var(--dash-altro); }
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <h1>I nodi</h1>
+  <div class="cur">grandezza <input type="range" id="zoom" min="0.4" max="2.6" step="0.05" value="1"><output id="ozoom"></output></div>
+  <div class="cur">lentezza <input type="range" id="lento" min="1" max="12" step="0.5" value="3"><output id="olento"></output></div>
+  <div class="cur">fotogramma <input type="range" id="scrub" min="0" max="1" step="0.005" value="1"><output id="oscrub"></output></div>
+  <button id="riparti">↺ rigioca tutte</button>
+  <button id="ferma">⏸ ferma sul fotogramma</button>
+  <label class="spunta"><input type="checkbox" id="riposo"><span>solo lo stato finale</span></label>
+  <label class="spunta"><input type="checkbox" id="tema"><span>scuro</span></label>
+</div>
+
+<main id="main"></main>
+
+<svg id="misura" width="0" height="0" style="position:absolute;visibility:hidden"><path id="misuraPath"></path></svg>
+
+<script>
+/* ————————————————————————————————————————————————————————
+   Ogni nodo è una sequenza di fotogrammi chiave: percorsi
+   disegnati nello stesso spazio (60 x 90, il filo a x=30).
+   Fra un fotogramma e l'altro si interpola punto per punto,
+   quindi la topologia diventa geometria e si può rallentare.
+
+   `tagli` spezza il percorso in pezzi; `z` dice in che ordine
+   disegnarli. Ogni pezzo ha sotto una guaina del colore della
+   carta: è così che si vede chi passa sopra e chi sotto.
+———————————————————————————————————————————————————————— */
+var N = 200;
+var mp = document.getElementById('misuraPath');
+var cache = {};
+function campiona(d) {
+  if (cache[d]) return cache[d];
+  mp.setAttribute('d', d);
+  var L = mp.getTotalLength(), pts = [];
+  for (var i = 0; i < N; i++) {
+    var p = mp.getPointAtLength((i / (N - 1)) * L);
+    pts.push([p.x, p.y]);
+  }
+  cache[d] = pts;
+  return pts;
+}
+function fondi(a, b, t) {
+  var out = [];
+  for (var i = 0; i < N; i++) out.push([a[i][0] + (b[i][0] - a[i][0]) * t, a[i][1] + (b[i][1] - a[i][1]) * t]);
+  return out;
+}
+function facile(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+function dOf(pts, da, a) {
+  var s = '';
+  for (var i = da; i <= a && i < pts.length; i++) s += (i === da ? 'M' : 'L') + pts[i][0].toFixed(2) + ',' + pts[i][1].toFixed(2);
+  return s;
+}
+
+var DRITTO = 'M30,-4 L30,94';
+var MOZZO  = 'M30,-4 L30,48 C30,54 30,56 30,58';
+
+/* ————————————— il repertorio ————————————— */
+var SEZIONI = [
+  {
+    titolo: 'Come si annoda',
+    desc: 'Il gesto. Il capo libero sale, incrocia il filo che scende, rientra nel giro e tira. Le prime due sono quello che c’è adesso; la terza fa il nodo grande e poi lo stringe, così l’occhio fa in tempo a leggere l’incrocio.',
+    varianti: [
+      { nome: 'cappio che si stringe (attuale)', tagli: [], z: [0],
+        fasi: [MOZZO,
+               'M30,-4 L30,30 C30,40 16,40 16,50 C16,60 30,60 30,50 C30,44 30,50 30,58',
+               'M30,-4 L30,44 C30,47 26,47 26,50 C26,53 30,53 30,50 C30,48 30,50 30,58'] },
+      { nome: 'nodo vero', tagli: [0.42, 0.72], z: [0, 1, 2],
+        fasi: [MOZZO,
+               'M30,-4 L30,28 C30,40 12,44 14,56 C16,68 40,68 38,52 C36,40 24,40 23,50 C22,58 27,60 31,62',
+               'M30,-4 L30,40 C30,45 22,46 22,50 C22,55 34,55 33,49 C32,44 26,44 26,49 C26,53 28,55 31,57'] },
+      { nome: 'nodo grande, poi stretto', tagli: [0.42, 0.72], z: [0, 1, 2],
+        fasi: [MOZZO,
+               'M30,-4 L30,20 C30,36 4,42 6,58 C8,76 48,76 45,52 C42,34 21,34 20,50 C19,62 26,64 32,66',
+               'M30,-4 L30,20 C30,36 4,42 6,58 C8,76 48,76 45,52 C42,34 21,34 20,50 C19,62 26,64 32,66',
+               'M30,-4 L30,40 C30,45 22,46 22,50 C22,55 34,55 33,49 C32,44 26,44 26,49 C26,53 28,55 31,57'] },
+    ],
+  },
+  {
+    titolo: 'Lettura interna — un ricciolo, non annodato',
+    desc: 'Ha letto qualcosa di tuo: memorie, impostazioni, un documento. Non lascia niente di legato, ma una piega sì.',
+    varianti: [
+      { nome: 'ansa semplice (la «e» corsiva)', tagli: [0.46], z: [0, 1],
+        fasi: [DRITTO, 'M30,-4 L30,36 C30,44 16,44 16,51 C16,58 30,58 30,50 C30,44 30,46 30,42 L30,94'] },
+      { nome: 'ricciolo stretto', tagli: [0.46], z: [0, 1],
+        fasi: [DRITTO, 'M30,-4 L30,40 C30,45 21,45 21,49 C21,53 30,53 30,48 C30,44 30,46 30,44 L30,94'] },
+      { nome: 'ansa larga e piatta', tagli: [0.46], z: [0, 1],
+        fasi: [DRITTO, 'M30,-4 L30,38 C30,48 12,46 13,52 C14,58 30,57 30,49 C30,43 30,46 30,43 L30,94'] },
+      { nome: 'due riccioli', tagli: [0.4, 0.6], z: [0, 1, 2],
+        fasi: [DRITTO, 'M30,-4 L30,32 C30,38 19,38 19,43 C19,48 30,48 30,42 C30,50 41,50 41,55 C41,60 30,60 30,54 L30,94'] },
+    ],
+  },
+  {
+    titolo: 'Lettura esterna — un altro filo, senza legarsi',
+    desc: 'Ha letto qualcosa che non è suo: il web, una mail in arrivo. Il filo estraneo è di un altro colore, e non si annoda — passa e basta.',
+    varianti: [
+      { nome: 'incrocio pieno', tagli: [], z: [0],
+        fasi: [DRITTO, DRITTO],
+        altro: { tagli: [], z: [0], fasi: ['M62,32 L62,32', 'M60,30 C44,38 16,52 2,60'] } },
+      { nome: 'incrocio corto', tagli: [], z: [0],
+        fasi: [DRITTO, DRITTO],
+        altro: { tagli: [], z: [0], fasi: ['M40,42 L40,42', 'M42,40 C38,42 22,50 18,52'] } },
+      { nome: 'sfiorata (arriva e riparte)', tagli: [], z: [0],
+        fasi: [DRITTO, DRITTO],
+        altro: { tagli: [], z: [0], fasi: ['M52,36 L52,36', 'M52,32 C38,40 34,50 48,58'] } },
+      { nome: 'l’altro passa dentro il ricciolo', tagli: [0.46], z: [0, 1],
+        fasi: [DRITTO, 'M30,-4 L30,36 C30,44 16,44 16,51 C16,58 30,58 30,50 C30,44 30,46 30,42 L30,94'],
+        altro: { tagli: [], z: [0], fasi: ['M44,40 L44,40', 'M46,38 C36,42 12,52 4,56'] } },
+    ],
+  },
+  {
+    titolo: 'Ha prodotto qualcosa — un nodo con un capo che pende',
+    desc: 'Un file scritto, un’immagine generata. Non ha senso «disfarlo»: è venuto fuori qualcosa, ed è ancora attaccato a te. Quel capo è anche la maniglia per portartelo via.',
+    varianti: [
+      { nome: 'capo corto', tagli: [0.5, 0.78], z: [0, 1, 2],
+        fasi: [DRITTO,
+               'M30,-4 L30,40 C30,45 22,46 22,50 C22,55 34,55 33,49 C32,44 26,44 26,49 C26,54 30,54 30,60 L30,94 M31,50 C36,53 40,57 42,62'] },
+      { nome: 'capo con una goccia in fondo', tagli: [0.5, 0.78], z: [0, 1, 2],
+        fasi: [DRITTO,
+               'M30,-4 L30,40 C30,45 22,46 22,50 C22,55 34,55 33,49 C32,44 26,44 26,49 C26,54 30,54 30,60 L30,94 M31,50 C36,53 40,57 42,62'],
+        goccia: [42, 62] },
+      { nome: 'un’ansa che resta aperta', tagli: [0.5, 0.78], z: [0, 1, 2],
+        fasi: [DRITTO,
+               'M30,-4 L30,40 C30,45 22,46 22,50 C22,55 34,55 33,49 C32,44 26,44 26,49 C26,54 30,54 30,60 L30,94 M31,49 C40,50 46,56 44,62 C42,68 34,66 33,58'] },
+    ],
+  },
+  {
+    titolo: 'Azione reversibile — il fiocco',
+    desc: 'Un’impostazione cambiata, una memoria aggiunta. Si tira e si scioglie. Al passaggio del mouse il capo si solleva: è così che si capisce che si può tirare.',
+    varianti: [
+      { nome: 'fiocco classico', tagli: [0.36, 0.68], z: [0, 1, 2], fiocco: true,
+        fasi: [DRITTO,
+               'M30,-4 L30,40 C30,45 22,45 20,49 C18,53 26,55 29,50 C31,46 29,46 30,50 C31,54 39,53 38,48 C37,44 30,45 30,50 L30,94 M29,52 C25,57 22,60 20,66 M31,52 C35,57 38,60 40,66'] },
+      { nome: 'mezzo fiocco (una sola asola)', tagli: [0.4, 0.72], z: [0, 1, 2], fiocco: true,
+        fasi: [DRITTO,
+               'M30,-4 L30,40 C30,45 21,45 20,49 C19,54 28,56 30,50 C32,45 26,44 26,49 C26,54 30,54 30,58 L30,94 M31,51 C35,56 38,60 40,66'] },
+      { nome: 'fiocco compatto, capi corti', tagli: [0.36, 0.68], z: [0, 1, 2], fiocco: true,
+        fasi: [DRITTO,
+               'M30,-4 L30,42 C30,46 23,46 22,49 C21,53 27,54 29,50 C31,47 29,47 30,50 C31,53 37,52 36,48 C35,45 30,46 30,50 L30,94 M29,52 C27,55 26,56 25,59 M31,52 C33,55 34,56 35,59'] },
+    ],
+  },
+  {
+    titolo: 'Il fiocco disfatto',
+    desc: 'Un nastro annodato e sciolto tiene la piega. Se i capi ci sono ancora, quello è il modo di rifarlo; se qualcun altro ha toccato quella cosa nel frattempo, restano solo la piega e niente da tirare.',
+    varianti: [
+      { nome: 'disfatto, si può rifare', tagli: [], z: [0],
+        fasi: ['M30,-4 L30,40 C30,45 22,45 20,49 C18,53 26,55 29,50 C31,46 29,46 30,50 C31,54 39,53 38,48 C37,44 30,45 30,50 L30,94 M29,52 C25,57 22,60 20,66 M31,52 C35,57 38,60 40,66',
+               'M30,-4 L30,42 C30,46 27,47 27,50 C27,53 33,53 33,50 C33,47 30,47 30,50 L30,94 M29,53 C26,57 24,60 22,65 M31,53 C34,57 36,60 38,65',
+               'M30,-4 L30,42 C30,47 26,48 26,51 C26,54 34,54 34,51 C34,48 30,47 30,52 L30,94 M28,54 C25,58 23,61 21,66 M32,54 C35,58 37,61 39,66'],
+        riposo: 2 },
+      { nome: 'disfatto e non più rifacibile', tagli: [], z: [0],
+        fasi: ['M30,-4 L30,42 C30,46 27,47 27,50 C27,53 33,53 33,50 C33,47 30,47 30,50 L30,94 M29,53 C26,57 24,60 22,65 M31,53 C34,57 36,60 38,65',
+               'M30,-4 L30,42 C30,47 27,48 27,51 C27,54 33,54 33,51 C33,48 30,47 30,52 L30,94'] },
+      { nome: 'solo la piega, senza memoria', tagli: [], z: [0],
+        fasi: [DRITTO, 'M30,-4 L30,44 C30,48 27,49 27,51 C27,53 33,53 33,51 C33,49 30,48 30,52 L30,94'] },
+    ],
+  },
+  {
+    titolo: 'Azione verso l’esterno — due fili annodati',
+    desc: 'Una mail spedita, un acquisto. Il filo estraneo non passa e basta: si lega. E non si separano più.',
+    varianti: [
+      { nome: 'nodo con l’altro filo', tagli: [0.5, 0.8], z: [0, 1, 2],
+        fasi: [DRITTO,
+               'M30,-4 L30,40 C30,45 22,46 22,50 C22,55 34,55 33,49 C32,44 26,44 26,49 C26,54 30,54 30,60 L30,94'],
+        altro: { tagli: [], z: [0], fasi: ['M56,44 L56,44', 'M58,42 C48,46 38,48 31,50'] } },
+      { nome: 'l’altro filo se ne va lontano', tagli: [0.5, 0.8], z: [0, 1, 2],
+        fasi: [DRITTO,
+               'M30,-4 L30,40 C30,45 22,46 22,50 C22,55 34,55 33,49 C32,44 26,44 26,49 C26,54 30,54 30,60 L30,94'],
+        altro: { tagli: [], z: [0], fasi: ['M60,30 L60,30', 'M62,26 C52,34 40,44 31,50'] } },
+      { nome: 'due giri, non si sfila', tagli: [0.5, 0.86], z: [0, 1, 2],
+        fasi: [DRITTO,
+               'M30,-4 L30,38 C30,43 20,44 20,49 C20,55 34,56 33,49 C32,43 24,43 24,50 C24,56 34,58 35,51 C36,46 30,46 30,52 L30,94'],
+        altro: { tagli: [], z: [0], fasi: ['M58,44 L58,44', 'M60,42 C50,46 38,48 31,50'] } },
+    ],
+  },
+  {
+    titolo: 'Il passo fallito — il nodo che non tiene',
+    desc: 'Il cappio si stringe e poi si riapre: non ha tenuto. Nessuna parola serve a dirlo.',
+    varianti: [
+      { nome: 'si scioglie del tutto', tagli: [], z: [0],
+        fasi: [DRITTO,
+               'M30,-4 L30,36 C30,44 16,44 16,51 C16,58 30,58 30,50 C30,44 30,46 30,42 L30,94',
+               DRITTO] },
+      { nome: 'si scioglie e resta la piega', tagli: [], z: [0],
+        fasi: [DRITTO,
+               'M30,-4 L30,36 C30,44 16,44 16,51 C16,58 30,58 30,50 C30,44 30,46 30,42 L30,94',
+               'M30,-4 L30,42 C30,47 26,48 26,51 C26,54 32,53 32,50 L30,94'] },
+      { nome: 'si stringe, poi si riapre a metà', tagli: [], z: [0],
+        fasi: ['M30,-4 L30,36 C30,44 16,44 16,51 C16,58 30,58 30,50 C30,44 30,46 30,42 L30,94',
+               'M30,-4 L30,42 C30,46 25,46 25,50 C25,54 31,54 31,50 C31,47 30,48 30,47 L30,94',
+               'M30,-4 L30,38 C30,44 20,44 20,50 C20,56 30,56 30,50 C30,45 30,47 30,44 L30,94'] },
+    ],
+  },
+];
+
+/* ————————————— il gomitolo ————————————— */
+var GOMITOLI = [
+  { nome: 'a spirale, verso il centro', modo: 'dentro' },
+  { nome: 'girando su sé stesso', modo: 'gira' },
+  { nome: 'che cresce verso fuori', modo: 'fuori' },
+  { nome: 'prima si affloscia, poi si raccoglie', modo: 'affloscia' },
+];
+
+var SPIRALE = (function () {
+  var pts = [], s = 0, prev = null;
+  for (var th = 0; th < Math.PI * 16; th += 0.03) {
+    var r = 0.8 + 0.42 * th;
+    var p = [Math.cos(th) * r, Math.sin(th) * r * 0.86];
+    if (prev) s += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+    pts.push({ s: s, p: p });
+    prev = p;
+  }
+  return pts;
+})();
+var SPIR_MAX = SPIRALE[SPIRALE.length - 1].s;
+function puntoSpirale(s) {
+  s = Math.max(0, Math.min(SPIR_MAX, s));
+  var lo = 0, hi = SPIRALE.length - 1;
+  while (lo < hi - 1) { var m = (lo + hi) >> 1; if (SPIRALE[m].s < s) lo = m; else hi = m; }
+  return SPIRALE[lo].p;
+}
+
+/* ————————————— disegno ————————————— */
+var SPESSORE = 4.2, GUAINA = 8.4;
+var celle = [];
+
+function nuovaCella(sezioneEl, v, alto) {
+  var box = document.createElement('div');
+  box.className = 'cella';
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 60 ' + (alto || 90));
+  var nome = document.createElement('div');
+  nome.className = 'nome';
+  nome.textContent = v.nome;
+  box.append(svg, nome);
+  sezioneEl.append(box);
+  var cella = { svg: svg, box: box, v: v, alto: alto || 90, t0: performance.now(), pezzi: [] };
+  box.addEventListener('click', function () { cella.t0 = performance.now(); });
+  celle.push(cella);
+  return cella;
+}
+
+function ridimensiona() {
+  var z = Number(document.getElementById('zoom').value);
+  celle.forEach(function (c) {
+    c.svg.setAttribute('width', (60 * z).toFixed(0));
+    c.svg.setAttribute('height', (c.alto * z).toFixed(0));
+  });
+  document.getElementById('ozoom').textContent = z < 0.5 ? 'vera' : z.toFixed(1) + '×';
+}
+
+function tracciaPezzi(svg, pts, tagli, z, classe) {
+  var conf = [];
+  var lim = [0];
+  (tagli || []).forEach(function (f) { lim.push(Math.round(f * (N - 1))); });
+  lim.push(N - 1);
+  for (var i = 0; i < lim.length - 1; i++) conf.push([lim[i], lim[i + 1]]);
+  var ordine = (z && z.length === conf.length) ? z : conf.map(function (_, i) { return i; });
+  var out = '';
+  ordine.forEach(function (idx) {
+    var seg = conf[idx];
+    if (!seg) return;
+    out += '<path class="guaina" stroke-width="' + GUAINA + '" d="' + dOf(pts, seg[0], seg[1]) + '"/>';
+    out += '<path class="filo ' + (classe || '') + '" stroke-width="' + SPESSORE + '" d="' + dOf(pts, seg[0], seg[1]) + '"/>';
+  });
+  return out;
+}
+
+function statoNodo(v, p) {
+  // p: 0..1 lungo tutta la sequenza di fotogrammi
+  var f = v.fasi, n = f.length - 1;
+  if (n <= 0) return campiona(f[0]);
+  var x = Math.min(0.9999, Math.max(0, p)) * n;
+  var i = Math.floor(x);
+  return fondi(campiona(f[i]), campiona(f[i + 1]), facile(x - i));
+}
+
+function disegnaNodo(c, p) {
+  var v = c.v;
+  var pts = statoNodo(v, p);
+  var html = tracciaPezzi(c.svg, pts, v.tagli, v.z, '');
+  if (v.altro) {
+    var ap = statoNodo(v.altro, p);
+    html = tracciaPezzi(c.svg, ap, v.altro.tagli, v.altro.z, 'altro') + html;
+  }
+  if (v.goccia && p > 0.75) {
+    var op = Math.min(1, (p - 0.75) * 4);
+    html += '<circle cx="' + v.goccia[0] + '" cy="' + v.goccia[1] + '" r="' + (3.4 * op) + '" fill="var(--dash-accent)"/>';
+  }
+  c.svg.innerHTML = html;
+}
+
+function disegnaGomitolo(c, p) {
+  // filo lungo dritto con tre nodi, che si avvolge
+  var H = 150, pts = [], lung = [0];
+  for (var i = 0; i < N; i++) {
+    var y = (i / (N - 1)) * H;
+    var vib = (1 - p) * Math.sin(y * 0.14 + performance.now() / 260) * 1.4;
+    pts.push([30 + vib, y]);
+  }
+  for (var j = 1; j < N; j++) lung.push(lung[j - 1] + Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]));
+  var totale = lung[N - 1];
+
+  var m = facile(Math.min(1, p));
+  var giro = 0, verso = 1, cx = 30, cy = 16;
+  if (c.v.modo === 'gira') giro = m * Math.PI * 3.2;
+  if (c.v.modo === 'fuori') verso = -1;
+  if (c.v.modo === 'affloscia') {
+    // prima metà: il filo si affloscia; seconda metà: si raccoglie
+    if (p < 0.4) { m = 0; } else { m = facile((p - 0.4) / 0.6); }
+  }
+  var slack = c.v.modo === 'affloscia' ? Math.max(0, 1 - Math.abs(p - 0.4) / 0.4) : 0;
+
+  var out = [];
+  for (var k = 0; k < N; k++) {
+    var s = verso > 0 ? lung[k] : (totale - lung[k]);
+    var sp = puntoSpirale(s);
+    var rx = sp[0] * Math.cos(giro) - sp[1] * Math.sin(giro);
+    var ry = sp[0] * Math.sin(giro) + sp[1] * Math.cos(giro);
+    var px = pts[k][0] + slack * Math.sin(lung[k] * 0.06) * 6;
+    var py = pts[k][1] + slack * 3;
+    out.push([px + (cx + rx - px) * m, py + (cy + ry - py) * m]);
+  }
+  var d = '';
+  for (var q = 0; q < N; q++) d += (q ? 'L' : 'M') + out[q][0].toFixed(2) + ',' + out[q][1].toFixed(2);
+  var html = '<path class="filo" stroke-width="' + SPESSORE * 0.62 + '" d="' + d + '"/>';
+  [0.28, 0.55, 0.82].forEach(function (f) {
+    var idx = Math.round(f * (N - 1));
+    html += '<circle cx="' + out[idx][0].toFixed(2) + '" cy="' + out[idx][1].toFixed(2) + '" r="' + (2.6 * (1 - m * 0.4)) + '" fill="var(--dash-accent)"/>';
+  });
+  c.svg.innerHTML = html;
+}
+
+/* ————————————— montaggio ————————————— */
+var main = document.getElementById('main');
+SEZIONI.forEach(function (s) {
+  var sec = document.createElement('section');
+  var h = document.createElement('h2'); h.textContent = s.titolo;
+  var p = document.createElement('p'); p.className = 'desc'; p.textContent = s.desc;
+  var fila = document.createElement('div'); fila.className = 'fila';
+  sec.append(h, p, fila);
+  main.append(sec);
+  s.varianti.forEach(function (v) { nuovaCella(fila, v); });
+});
+(function () {
+  var sec = document.createElement('section');
+  var h = document.createElement('h2'); h.textContent = 'Il gomitolo';
+  var p = document.createElement('p'); p.className = 'desc';
+  p.textContent = 'Il filo che si avvolge a fine risposta. Sono gli stessi punti del filo mandati sulla spirale: i nodi ci girano dentro, e un lavoro lungo lascia un gomitolo più grosso.';
+  var fila = document.createElement('div'); fila.className = 'fila';
+  sec.append(h, p, fila);
+  main.append(sec);
+  GOMITOLI.forEach(function (g) { nuovaCella(fila, g, 160).gomitolo = true; });
+})();
+
+/* ————————————— il tempo ————————————— */
+var fermo = false;
+function battito() {
+  var lento = Number(document.getElementById('lento').value);
+  var durata = 900 * lento;
+  var riposo = document.getElementById('riposo').checked;
+  var scrub = Number(document.getElementById('scrub').value);
+  var ora = performance.now();
+  celle.forEach(function (c) {
+    var p;
+    if (riposo) p = 1;
+    else if (fermo) p = scrub;
+    else {
+      var e = (ora - c.t0) % (durata + 900 * lento * 0.5);
+      p = Math.min(1, e / durata);
+    }
+    if (c.gomitolo) disegnaGomitolo(c, p);
+    else disegnaNodo(c, p);
+  });
+  requestAnimationFrame(battito);
+}
+
+document.getElementById('zoom').addEventListener('input', ridimensiona);
+document.getElementById('lento').addEventListener('input', function (e) {
+  document.getElementById('olento').textContent = '÷' + Number(e.target.value).toFixed(1);
+});
+document.getElementById('scrub').addEventListener('input', function (e) {
+  fermo = true;
+  document.getElementById('ferma').classList.add('acceso');
+  document.getElementById('oscrub').textContent = Number(e.target.value).toFixed(2);
+});
+document.getElementById('ferma').addEventListener('click', function (e) {
+  fermo = !fermo;
+  e.target.classList.toggle('acceso', fermo);
+});
+document.getElementById('riparti').addEventListener('click', function () {
+  fermo = false;
+  document.getElementById('ferma').classList.remove('acceso');
+  var ora = performance.now();
+  celle.forEach(function (c) { c.t0 = ora; });
+});
+document.getElementById('tema').addEventListener('change', function (e) {
+  document.body.classList.toggle('scuro', e.target.checked);
+});
+document.getElementById('riposo').addEventListener('change', function () {});
+
+ridimensiona();
+document.getElementById('olento').textContent = '÷3.0';
+document.getElementById('oscrub').textContent = '1.00';
+requestAnimationFrame(battito);
+</script>
+</body>
+</html>
