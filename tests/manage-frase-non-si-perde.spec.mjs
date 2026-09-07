@@ -125,6 +125,24 @@ test('passo a un altra segnalazione: la frase resta su quella giusta', async ({ 
   await expect(page.locator('#mgUserNoteText')).toHaveValue('');
 });
 
+test('girare fra le segnalazioni senza scrivere niente non riscrive nessuna frase', async ({ openTab }) => {
+  // Il salvataggio automatico tocca solo quello che l'owner ha scritto lui:
+  // una frase salvata da un'altra superficie (con uno spazio in coda, o più
+  // lunga del limite) non deve cambiare solo perché sono passato di lì.
+  const page = await openTab(URL);
+  await prepara(page, [
+    { ...IN_CODA, userNote: 'Frase con spazio in coda. ' },
+    { ...IN_CODA_2, userNote: 'x'.repeat(600) },
+  ], 'queue', 'fb-coda');
+
+  await page.evaluate(() => window.__mgTest.openDetail('fb-coda-2'));
+  await page.evaluate(() => window.__mgTest.openDetail('fb-coda'));
+  await page.evaluate(() => window.__mgTest.setTab('inbox'));
+  await page.waitForTimeout(1800);   // oltre la pausa del salvataggio automatico
+
+  expect(await page.evaluate(() => window.__updates.length)).toBe(0);
+});
+
 test('se la frase non si salva, lo stato non cambia e l errore si vede', async ({ openTab }) => {
   const page = await openTab(URL);
   await prepara(page, [IN_CODA], 'queue', 'fb-coda');
