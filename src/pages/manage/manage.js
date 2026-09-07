@@ -3092,8 +3092,10 @@
       if (!box.hidden && box.offsetParent !== null && String(box.value || '').trim()) return true;
     }
     // La riga "frase per chi ha segnalato" parte già piena col valore salvato:
-    // è una bozza solo se differisce da quello.
-    if (mgUserNote && !mgUserNote.hidden && mgUserNoteText) {
+    // è una bozza solo se differisce da quello. Vale anche a sezione CHIUSA:
+    // richiuderla non butta via quello che l'owner ha scritto, e un ridisegno
+    // che passasse di qui glielo cancellerebbe senza che lui veda niente.
+    if (mgUserNote && mgUserNoteText) {
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
     return false;
