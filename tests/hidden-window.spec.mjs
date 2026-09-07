@@ -54,9 +54,12 @@ async function windowState(app) {
 test('durante i test la finestra sta fuori dallo schermo, è trasparente e non ruba il fuoco', async ({ app, shell }) => {
   await shell.waitForLoadState('domcontentloaded');
   const s = await windowState(app);
-  expect(s.opacity).toBe(0);
-  expect(s.onScreen).toBe(false);
+  // Queste due valgono ovunque, compresi i contenitori senza compositore, e
+  // sono quelle che avrebbero preso il difetto sul parcheggio della finestra.
+  expect(s.onScreen, 'la finestra si sovrappone a un monitor vero').toBe(false);
   expect(s.focused).toBe(false);
+  if (await trasparenzaDisponibile(app)) expect(s.opacity).toBe(0);
+  else console.log('[hidden-window] niente compositore: la trasparenza non è verificabile qui, la posizione sì');
 });
 
 // Il caso che aveva fatto bocciare la prima versione: mettere l'app a tutto
