@@ -498,7 +498,7 @@
       const secchio = pr >= 1 && pr <= 3 ? pr : 0;
       perPriorita[secchio] += 1;
       pushId(idsPriorita, String(secchio), fbId);
-      const riap = Math.max(0, Number(it.fb && it.fb.reopenRequests) || 0);
+      const riap = reopenCount(it.fb && it.fb.reopenRequests);
       riaperture += riap;
       if (riap && fbId != null && fbId !== '') idsRiaperti.push(fbId);
       // Stessa regola della lista: `stalls` è il totale che non si azzera mai,
