@@ -1039,10 +1039,18 @@
                          chiusa: si scrive una volta sola, e da aperta occupava
                          una fetta di dettaglio su ogni segnalazione aperta. -->
                     <button type="button" class="mg-star-btn mg-usernote-toggle" id="mgUserNoteToggle"
-                      aria-expanded="false" aria-controls="mgUserNote">Frase per chi ha segnalato</button>
-                    <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
+                      aria-expanded="false" aria-controls="mgUserNote">Frase</button>
                   </div>
                 </div>
+              </div>
+
+              <!-- Gli esiti stanno SOTTO la riga, non dentro: un messaggio
+                   lungo (una scrittura rifiutata, una chiave scaduta) si
+                   prendeva il posto dei tasti e li mandava a capo finché
+                   restava lì. -->
+              <div class="mg-owner-msgs">
+                <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
+                <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
               </div>
 
               <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo
