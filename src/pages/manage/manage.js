@@ -2468,10 +2468,44 @@
   // combacia con niente, così il salvataggio dopo riparte comunque.
   const FRASE_IGNOTA = Symbol('frase ignota');
 
+  // ── Aprire e chiudere la frase ────────────────────────────────────────────
+  // Il modulo della frase sta CHIUSO finché non lo si chiede: è un testo che si
+  // scrive una volta sola, mentre il dettaglio — la conversazione — si legge
+  // sempre. Aprendolo il cursore ci finisce dentro: chi ha premuto quel tasto
+  // vuole scrivere, non cercare la casella.
+  function mostraFrase(aperta) {
+    if (!mgUserNote) return;
+    mgUserNote.hidden = !aperta;
+    if (mgUserNoteToggle) mgUserNoteToggle.setAttribute('aria-expanded', aperta ? 'true' : 'false');
+    if (aperta && mgUserNoteText) mgUserNoteText.focus();
+  }
+  function collassaFrase() { mostraFrase(false); }
+
+  // Da chiusa, la sezione non direbbe da nessuna parte che una frase c'è già:
+  // il tasto se lo tiene addosso (pallino + bordo acceso) e la mostra intera
+  // nell'hover, così l'owner sa se sta scrivendo o riscrivendo.
+  function riflettiFrase(frase) {
+    if (!mgUserNoteToggle) return;
+    const testo = String(frase || '').trim();
+    mgUserNoteToggle.classList.toggle('mg-usernote-piena', !!testo);
+    mgUserNoteToggle.title = testo
+      ? `Frase già scritta: “${testo}”`
+      : 'Scrivi la riga che leggerà chi ha segnalato';
+  }
+
+  if (mgUserNoteToggle) {
+    mgUserNoteToggle.addEventListener('click', () => {
+      mostraFrase(!!(mgUserNote && mgUserNote.hidden));
+    });
+  }
+
   function setUserNoteMsg(text, kind) {
     if (!mgUserNoteMsg) return;
     mgUserNoteMsg.textContent = text || '';
     mgUserNoteMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    // Un errore dentro una sezione chiusa non lo legge nessuno: il salvataggio
+    // può fallire mentre la sezione è già stata richiusa. Si riapre da sola.
+    if (kind === 'err') mostraFrase(true);
   }
 
   // Salva SOLO la frase: non tocca la conversazione, quindi si può scrivere
