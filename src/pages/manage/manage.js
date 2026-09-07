@@ -3675,10 +3675,16 @@
       // l'unico modo perché «12» non venga letto come un totale quando è un
       // minimo. Stessa regola dei contatori delle schede.
       const tetto = loadHitCap() ? ' · la lista si ferma ai più recenti: i numeri sono minimi' : '';
+      // Il registro delle esecuzioni tiene solo le più recenti: quando la
+      // finestra comincia prima della più vecchia che conserva, il numero è un
+      // minimo e va detto. Una finestra SENZA inizio («Sempre») comincia prima
+      // di qualunque cosa, quindi è il caso in cui il numero è più lontano dal
+      // totale: pretendere un inizio per scrivere la frase la faceva sparire
+      // proprio lì.
       const registro = (Array.isArray(stWorkerLog) && stWorkerLogError)
         ? ` · registro delle esecuzioni ${stWorkerLogError}`
         : (Array.isArray(stWorkerLog) && stWorkerLog.length && data.runsLogFrom != null
-          && range.from != null && data.runsLogFrom > range.from)
+          && (range.from == null || data.runsLogFrom > range.from))
           ? ` · le esecuzioni sono registrate dal ${formatDate(data.runsLogFrom)}`
           : '';
       rangeLine.textContent = `${quando} · ${chi}${tetto}${registro}`;
