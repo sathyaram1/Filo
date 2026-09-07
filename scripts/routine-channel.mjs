@@ -339,6 +339,23 @@ if (isMain) {
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
   ]);
+  // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
+  // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
+  // resta è uno dei nostri campi. La conchiglia di Git trasforma `/guasto` in
+  // un percorso, quindi si guarda anche l'ultimo pezzo del percorso.
+  const SEMBRA_OPZIONE_STORTA = (arg, campi) => {
+    const t = String(arg ?? '');
+    if (!t || t.startsWith('--')) return false;
+    const TRATTINI = ['-', '‐', '‑', '‒', '–', '—', '−'];
+    if (TRATTINI.includes(t[0])) {
+      let i = 0;
+      while (i < t.length && TRATTINI.includes(t[i])) i += 1;
+      return campi.has(t.slice(i).split('=')[0]);
+    }
+    if (t.includes('/')) return campi.has(t.split('/').pop().split('=')[0]);
+    return false;
+  };
+
   // Quelli che senza il loro testo non hanno senso: un «sì» al loro posto
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
