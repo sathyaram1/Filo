@@ -1347,13 +1347,19 @@
             Quante critiche ha ricevuto un lavoro prima di passare la verifica.
             I lavori fermati non hanno un numero di giri: stanno a parte.
           </p>
+          <!-- Le due torte hanno un nome SCRITTO. Il nome della seconda stava
+               solo nell'aria-label dell'SVG: guardandola non c'era niente che
+               la nominasse, e quando ognuna è un cerchio pieno le due sono
+               identiche a parte il colore. -->
           <div class="mg-st-pies" id="mgStPies">
             <div class="mg-st-pie">
+              <h4 class="mg-st-pie-name">Giri prima del pass</h4>
               <svg id="mgStLoopChart" width="180" height="180" viewBox="0 0 180 180" role="img"
                 aria-label="Giri di verifica prima del pass"></svg>
               <ul class="mg-st-legend" id="mgStLoopLegend"></ul>
             </div>
             <div class="mg-st-pie" id="mgStOutcomePie">
+              <h4 class="mg-st-pie-name">Esito delle critiche</h4>
               <svg id="mgStOutcomeChart" width="180" height="180" viewBox="0 0 180 180" role="img"
                 aria-label="Esito delle critiche"></svg>
               <ul class="mg-st-legend" id="mgStOutcomeLegend"></ul>
