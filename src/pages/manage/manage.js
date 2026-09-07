@@ -3735,6 +3735,18 @@
     // esercitare il codice reale cliccando la lente e digitando nel campo).
     isSearchMode() { return searchMode; },
     runSearch(q) { return runSearch(q); },
+    // Statistiche feedback (#496): apertura della scheda, registro dei worker
+    // finto (gli spec non hanno Firestore) e stato dei filtri.
+    openStats() { return stOpen(); },
+    setWorkerLog(entries) { stWorkerLog = Array.isArray(entries) ? entries : []; stWorkerLogError = ''; stRender(); },
+    setStatsWindow(key, fromISO, toISO) {
+      stWindow = key;
+      if (fromISO !== undefined) stFromISO = fromISO || '';
+      if (toISO !== undefined) stToISO = toISO || '';
+      stRender();
+    },
+    setStatsCreators(kinds) { stCreators = new Set(ST.normalizeCreators(kinds)); stRender(); },
+    statsCreators() { return [...stCreators]; },
   };
 
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
