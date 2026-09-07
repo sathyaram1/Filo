@@ -53,6 +53,8 @@ require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a s
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro del verificatore che corregge (fonte unica, feedback #561)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
 require(path.join(SHARED, 'manageReview.js'));
+require(path.join(SHARED, 'feedbackThread.js')); // classificazione dell'autore + turni delle note (pura)
+require(path.join(SHARED, 'feedbackStats.js'));  // #496 — conti della scheda «Statistiche feedback» (dipende dai due sopra)
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
