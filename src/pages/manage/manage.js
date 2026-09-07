@@ -2634,9 +2634,12 @@
   // gemella, che così faceva già.
   const FRASE_PAUSA_MS = 1500;
   let userNoteTimer = null;
-  // L'ultimo salvataggio partito: chi deve sapere se la frase è a destinazione
-  // (un'azione di stato) aspetta questo, non ne lancia un altro.
+  // L'ultimo salvataggio partito, e COSA portava: chi deve sapere se la frase è
+  // a destinazione (un'azione di stato, il tasto premuto un istante dopo che la
+  // casella ha perso il fuoco) aspetta questo invece di spedirlo una seconda
+  // volta.
   let userNoteInVolo = null;
+  let userNoteInVoloTesto = null;
 
   function bozzaFrase() {
     if (!mgUserNoteText) return false;
