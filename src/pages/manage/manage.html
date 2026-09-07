@@ -669,7 +669,7 @@
        messaggio lungo si prendeva lo spazio dei tasti e li mandava a capo. Da
        vuoto non occupa niente. */
     .mg-owner-msgs { display: flex; flex-wrap: wrap; gap: 10px; }
-    .mg-owner-msgs:empty { display: none; }
+    .mg-owner-msgs[hidden] { display: none; }
     /* Gruppo di tasti dentro la riga: niente bordo né padding suoi, li dà la
        barra. `[hidden]` va riaffermato o `display:flex` se lo mangia. */
     .mg-actions-group { display: flex; align-items: center; min-width: 0; }
