@@ -2591,11 +2591,54 @@
     }
   }
 
-  if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', saveUserNote);
+  // ── La frase non si perde per strada ──────────────────────────────────────
+  // Il tasto "Salva la frase" era l'UNICA strada: tutto il resto (premere
+  // "Risolto", ricliccare la stessa segnalazione, cambiare sezione) ridipinge
+  // il pannello e riporta la casella al valore salvato, buttando via la riga
+  // appena scritta senza dire niente — e quella riga è l'unica cosa che chi ha
+  // segnalato leggerà. Adesso si salva da sola: mentre scrivi, dopo una pausa,
+  // e appena il cursore lascia la casella. È lo stesso comportamento della
+  // gemella, che così faceva già.
+  const FRASE_PAUSA_MS = 1500;
+  let userNoteTimer = null;
+  // L'ultimo salvataggio partito: chi deve sapere se la frase è a destinazione
+  // (un'azione di stato) aspetta questo, non ne lancia un altro.
+  let userNoteInVolo = null;
+
+  function bozzaFrase() {
+    if (!mgUserNoteText) return false;
+    return String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '');
+  }
+  function annullaSalvataggioProgrammato() {
+    if (userNoteTimer) { clearTimeout(userNoteTimer); userNoteTimer = null; }
+  }
+  function programmaSalvataggioFrase() {
+    annullaSalvataggioProgrammato();
+    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseSubito(); }, FRASE_PAUSA_MS);
+  }
+  // Salva ORA quello che c'è nella casella, se differisce da quello salvato.
+  // Ritorna la promessa dell'esito (true = a destinazione c'è quello che
+  // l'owner ha scritto), così chi deve proseguire può aspettarla.
+  function salvaFraseSubito(opts) {
+    annullaSalvataggioProgrammato();
+    if (!bozzaFrase()) return userNoteInVolo || Promise.resolve(true);
+    userNoteInVolo = saveUserNote(opts).finally(() => { userNoteInVolo = null; });
+    return userNoteInVolo;
+  }
+  // Quello che l'owner ha scritto è a destinazione? Aspetta la bozza in corso e
+  // il salvataggio già partito. Il "muto" evita di scrivere "Nessuna modifica"
+  // sotto il naso di chi sta solo cambiando segnalazione.
+  function fraseAlSicuro() {
+    const inVolo = userNoteInVolo || Promise.resolve(true);
+    return bozzaFrase() || userNoteTimer ? salvaFraseSubito({ muto: true }) : inVolo;
+  }
+
+  if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', () => salvaFraseSubito());
   if (mgUserNoteText) {
-    mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; });
+    mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; programmaSalvataggioFrase(); });
+    mgUserNoteText.addEventListener('blur', () => { salvaFraseSubito({ muto: true }); });
     mgUserNoteText.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); saveUserNote(); }
+      if (e.key === 'Enter') { e.preventDefault(); salvaFraseSubito(); }
     });
   }
 
