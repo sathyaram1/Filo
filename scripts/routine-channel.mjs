@@ -366,6 +366,12 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
     'userNote', 'guasto', 'reason', 'branch', 'sha', 'status',
   ]);
+  // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
+  // questo elenco `--json` finiva fra i campi con valore, spariva dai
+  // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
+  // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
+  // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
+  const CAMPI_BANDIERA = new Set(['json']);
   const args = [];
   const flags = [];
   const data = {};
