@@ -93,7 +93,7 @@
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
   // giusta (verifica del giro 6).
-  const LEVEL_LABEL = new RegExp(`^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—]`);
+  const LEVEL_LABEL = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—]`);
 
   // Un a capo scritto coi due caratteri barra e n: è come esce il comando
   // d'esempio («<riassunto>\n[livello] …») copiato dentro virgolette doppie, in
