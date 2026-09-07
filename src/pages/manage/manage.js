@@ -211,7 +211,7 @@
     prober:   { icon: '🔍', label: 'Claude (esplorazione)' },
     worker:   { icon: '🔧', label: 'Claude (sviluppo)' },
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
-    // I rilievi che la verifica ha trovato e non ha corretto (feedback #561:
+    // I rilievi rimasti fuori dal giro di correzione (feedback #561:
     // livello 0, bilancio esaurito, o che chiedono una decisione), raccolti dal
     // server in UN feedback derivato per lavoro, figlio #N.k: categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
