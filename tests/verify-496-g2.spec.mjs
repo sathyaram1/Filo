@@ -374,6 +374,58 @@ test('venti cambi di finestra e doppi clic sulle tessere: i numeri restano coere
   expect(finale.aperti).toBeLessThanOrEqual(1);
 });
 
+// ── 11b. Da OGNI riga si arriva davvero alla segnalazione ─────────────────
+test('il salto alla segnalazione funziona da ogni categoria, illeggibili compresi', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const errori = [];
+  page.on('pageerror', (e) => errori.push(String(e)));
+  await apri(page, [
+    fb({ id: 'att', seq: 1, at: iso(1), status: 'attack', name: 'un attacco' }),
+    fb({ id: 'spm', seq: 2, at: iso(1), status: 'spam', name: 'uno spam' }),
+    fb({ id: 'arc', seq: 3, at: iso(1), status: 'archived', name: 'un archiviato' }),
+    fb({ id: 'cnf', seq: 4, at: iso(1), status: 'attack_confirmed', name: 'attacco confermato' }),
+    // Stato illeggibile: nessun `status` in chiaro e un payload cifrato che
+    // questo computer non sa aprire.
+    { _id: 'ill', seq: 5, subSeq: 0, name: 'illeggibile', text: 'x', clientId: 'utente-esterno-1', createdAt: iso(1), images: [], cipher: 'v1:xxxx', notes: '' },
+  ]);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
+  await page.locator('#mgStTileRicevuti').click();
+
+  const righe = await page.locator('#mgStDrawer .mg-st-row[data-open]').count();
+  console.log('RIGHE APRIBILI:', righe,
+    JSON.stringify(await page.locator('#mgStDrawer .mg-st-row').allInnerTexts()));
+  expect(righe).toBeGreaterThan(0);
+
+  for (let i = 0; i < righe; i += 1) {
+    // Ogni giro riparte dalla scheda statistiche: il salto porta via.
+    await page.locator('.mg-tab[data-tab="fbstats"]').click();
+    await page.waitForTimeout(150);
+    if (await page.locator('#mgStDrawer .mg-st-row[data-open]').count() === 0) {
+      await page.locator('#mgStTileRicevuti').click();
+      await page.waitForTimeout(150);
+    }
+    const riga = page.locator('#mgStDrawer .mg-st-row[data-open]').nth(i);
+    const etichetta = (await riga.innerText()).replace(/\s+/g, ' ').trim();
+    await riga.click();
+    await page.waitForTimeout(150);
+    const voce = page.locator('#mgStDrawer .mg-st-item[data-id]').first();
+    if (!(await voce.count())) { console.log(`RIGA «${etichetta}» → nessuna voce`); continue; }
+    const id = await voce.getAttribute('data-id');
+    await voce.click();
+    await page.waitForTimeout(400);
+    const esito = await page.evaluate(() => ({
+      lista: document.getElementById('panel-list').classList.contains('mg-panel--active'),
+      dettaglio: (() => { const d = document.getElementById('mgDetail'); return !!d && !d.hidden && d.offsetHeight > 0; })(),
+      scheda: (document.querySelector('.mg-tab--active') || {}).textContent,
+      selezionato: !!document.querySelector('.mg-item--active, .mg-item.mg-item--sel'),
+    }));
+    console.log(`RIGA «${etichetta}» → id ${id}:`, JSON.stringify(esito));
+    expect(esito.lista, `«${etichetta}»: il clic deve portare alla lista`).toBe(true);
+    expect(esito.dettaglio, `«${etichetta}»: il dettaglio deve aprirsi`).toBe(true);
+  }
+  expect(errori).toEqual([]);
+});
+
 // ── 12. I filtri si ritrovano riaprendo la scheda ─────────────────────────
 test('i filtri scelti si ritrovano tornando sulla scheda', async ({ openTab }) => {
   const page = await openTab(URL);
