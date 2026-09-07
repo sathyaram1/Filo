@@ -534,6 +534,10 @@
   // stessa azione, deve suonare uguale da dove la si faccia.
   async function clearClipboard() {
     const btn = $('sec-clip-clear');
+    // Niente da svuotare, niente conferma: il tasto in questo caso è già
+    // nascosto, ma chiedere «spariscono tutte e 0 le voci» resta una frase che
+    // non deve poter uscire da nessuna strada.
+    if (vociCorrenti.length === 0) return;
     // La conferma dice QUANTE voci spariscono, e se una ricerca ne sta
     // nascondendo una parte lo dichiara: con un filtro attivo la lista mostrava
     // una riga sola e lo svuotamento le portava via tutte.
