@@ -124,10 +124,13 @@
   const mgClarifyText = document.getElementById('mgClarifyText');
   const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
   const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
-  const mgUserNote     = document.getElementById('mgUserNote');
-  const mgUserNoteText = document.getElementById('mgUserNoteText');
-  const mgUserNoteBtn  = document.getElementById('mgUserNoteBtn');
-  const mgUserNoteMsg  = document.getElementById('mgUserNoteMsg');
+  // Frase per chi ha segnalato: il modulo (`mgUserNote`) sta chiuso finché non
+  // lo si apre col tasto della barra (`mgUserNoteToggle`).
+  const mgUserNote       = document.getElementById('mgUserNote');
+  const mgUserNoteToggle = document.getElementById('mgUserNoteToggle');
+  const mgUserNoteText   = document.getElementById('mgUserNoteText');
+  const mgUserNoteBtn    = document.getElementById('mgUserNoteBtn');
+  const mgUserNoteMsg    = document.getElementById('mgUserNoteMsg');
 
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
