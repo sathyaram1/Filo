@@ -1606,6 +1606,12 @@ if (isMainModule) {
       // Qui l'unica opzione è `--frase`: qualunque altra cosa coi trattini
       // davanti finirebbe sepolta dentro al report cifrato, e la frase per chi
       // ha segnalato partirebbe vuota (#565).
+      // `--frase` in fondo alla riga, senza niente dopo: spariva, e la frase
+      // per chi ha segnalato partiva vuota (feedback #565).
+      if (fi !== -1 && rest[fi + 1] === undefined) {
+        console.error('--frase vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.');
+        process.exit(1);
+      }
       const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => SEMBRA_OPZIONE(a));
       if (altra) {
         console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui c'è solo --frase "…"; il resto è il report, un testo solo fra virgolette.`);
