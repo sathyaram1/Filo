@@ -116,6 +116,22 @@
   // La stessa rete per il livello scritto BENE ma con davanti qualcosa che
   // il lettore non conosce («(a) [2] …»): lì la prima parentesi non è il
   // livello, e cercarla come prima cosa la mancava.
+  // FINE DELLA RINCORSA: dovunque stia nella riga. Per cinque giri di fila
+  // il controllo ha guardato una finestra sempre un po' piu' larga, e ogni
+  // volta bastava un'etichetta di una parola in piu' perche' un rilievo —
+  // anche di sicurezza — finisse nel riassunto e la bocciatura diventasse
+  // una promozione. Adesso la regola e' netta: le parentesi quadre con
+  // dentro un livello sono SEMPRE un rilievo; se la riga non si legge come
+  // rilievo viene respinta con la spiegazione. Il prezzo, che vale la pena:
+  // nel riassunto un livello si cita senza le quadre («il livello 2»),
+  // altrimenti si riscrive la riga. Rovescia una scelta del giro 4 su #561,
+  // che quelle parentesi in mezzo a una frase le lasciava passare
+  // (feedback #565).
+  const QUADRA_OVUNQUE = new RegExp(`(${LEVEL_TOKEN_SRC})`);
+  // Dentro la CONTINUAZIONE di un rilievo, invece, un livello citato in mezzo
+  // a una frase resta testo («Passi: critica con [2] - poi start», verifica
+  // del giro 6): lì il danno è minore — il rilievo sopra è comunque
+  // registrato e la bocciatura non si perde — quindi vale la finestra.
   const QUADRA_VICINA = new RegExp(`^.{0,14}?(${LEVEL_TOKEN_SRC})`);
   // «Difetto: [2] …», «rilievo grave [2] …»: l'etichetta sta PRIMA del livello,
   // col separatore o senza. Il controllo guardava solo la forma opposta
@@ -180,7 +196,8 @@
       }
       const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
       const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]))
-        || QUADRA_VICINA.test(raw.trim()) || ETICHETTA_PRIMA.test(raw);
+        || (current ? QUADRA_VICINA.test(raw.trim()) : QUADRA_OVUNQUE.test(raw))
+        || ETICHETTA_PRIMA.test(raw);
       if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
         flush();
         out.push(raw.trim());

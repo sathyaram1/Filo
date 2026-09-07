@@ -300,7 +300,10 @@ ${davanti}[2] il pulsante non salva`;
     assert.equal(R.parseFindings(testo).findings.length, 1);
   }
   // In mezzo a una frase le parentesi restano testo.
-  assert.equal(R.unparsedLevelLines('ho ri-provato la porta [2] del giro scorso e regge').length, 0);
+  // Dal giro 22 su #565 le quadre con dentro un livello sono SEMPRE un rilievo:
+  // nel riassunto un livello si cita senza quadre («il livello 2»).
+  assert.equal(R.unparsedLevelLines('ho ri-provato la porta [2] del giro scorso e regge').length, 1);
+  assert.equal(R.unparsedLevelLines('ho ri-provato la porta di livello 2 del giro scorso').length, 0);
 });
 
 // Stessa famiglia: il lettore riconosce il livello solo fra parentesi quadre e
@@ -314,7 +317,7 @@ ${forma}`;
     assert.equal(R.parseFindings(testo).findings.length, 0);
   }
   // Il testo normale del riassunto non ne risente.
-  for (const buona of ['Provato tutto (anche il tema scuro) e regge.', '1) primo punto', 'ho ri-provato la porta [2] del giro scorso']) {
+  for (const buona of ['Provato tutto (anche il tema scuro) e regge.', '1) primo punto', 'ho ri-provato la porta di livello 2']) {
     assert.equal(R.unparsedLevelLines(buona).length, 0, `«${buona}» è testo, non un livello`);
   }
 });
@@ -329,10 +332,10 @@ ${davanti}[2] il pulsante non salva`;
     assert.equal(R.unparsedLevelLines(testo).length, 1, `«${davanti}[2]» non deve finire nel riassunto`);
     assert.equal(R.parseFindings(testo).findings.length, 0);
   }
-  // E il testo vero resta testo: una frase con le parentesi in mezzo, o una
-  // parentesi che non dice un livello, non vengono respinte.
+  // E il testo vero resta testo: una parentesi che non dice un livello, o un
+  // livello citato senza le quadre, non vengono respinti.
   for (const buona of [
-    'ho ri-provato la porta [2] del giro scorso',
+    'ho ri-provato la porta di livello 2 del giro scorso',
     'Provato tutto (anche il tema scuro) e regge.',
     'Passi: apri l\'editor, salva, guarda il risultato',
   ]) {
@@ -342,6 +345,9 @@ ${davanti}[2] il pulsante non salva`;
   // prime parole viene respinta con la spiegazione. Costa una riscrittura, e
   // vale meno di una bocciatura letta come promozione.
   assert.equal(R.unparsedLevelLines('Nel caso [2] ho provato tutto').length, 1);
+  // Dovunque stia nella riga, non solo nelle prime parole: è la fine della
+  // rincorsa cominciata al giro 18 (feedback #565).
+  assert.equal(R.unparsedLevelLines('Rilievo di sicurezza grave e conclamato: [3] chiavi SSH').length, 1);
 });
 
 // L'etichetta prima del livello («Difetto: [2] …») e l'a capo scritto a mano
