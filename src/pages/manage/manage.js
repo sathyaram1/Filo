@@ -3468,40 +3468,46 @@
     if (stOpenTile === 'ricevuti') {
       const rows = d.categorie.map((c) => {
         const meta = ST.CATEGORIES.find((x) => x.key === c.key);
-        return { key: c.key, label: meta ? meta.label : c.key, count: c.count };
+        return { key: c.key, label: meta ? meta.label : c.key, count: c.count, ids: c.ids };
       });
       // Uno stato che questo computer non sa leggere non si traveste da
       // categoria: si dice che c'è e che non si legge.
       if (d.illeggibili) {
         rows.push({
           key: 'illeggibili', label: 'Stato non leggibile', count: d.illeggibili,
-          title: 'Lo stato di queste segnalazioni viaggia cifrato e questo computer non ha la chiave: non si possono classificare.',
+          ids: d.idsIlleggibili,
+          title: 'Lo stato di queste segnalazioni viaggia cifrato e questo computer non ha la chiave: non si possono classificare. Apri per vedere quali.',
         });
       }
-      box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.ricevuti, empty: 'Nessun feedback in questa finestra.' })}</ul>`;
+      box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.ricevuti, scope: 'cat', empty: 'Nessun feedback in questa finestra.' })}</ul>`;
       return;
     }
 
     if (stOpenTile === 'lavorati') {
-      const perCat = Object.fromEntries(d.categorie.map((c) => [c.key, c.count]));
+      const perCat = Object.fromEntries(d.categorie.map((c) => [c.key, c]));
+      const idsDi = (k) => (perCat[k] ? perCat[k].ids : []);
       const nonLavorati = Math.max(0, d.ricevuti - d.lavorati - d.illeggibili);
       const rows = [
-        { key: 'lavorazione', label: 'In lavorazione ora', count: perCat.lavorazione || 0 },
-        { key: 'done', label: 'Risolti', count: perCat.done || 0 },
-        { key: 'archived', label: 'Archiviati', count: perCat.archived || 0 },
-        { key: 'nonLavorati', label: 'Non ancora lavorati', count: nonLavorati },
+        { key: 'lavorazione', label: 'In lavorazione ora', count: perCat.lavorazione ? perCat.lavorazione.count : 0, ids: idsDi('lavorazione') },
+        { key: 'done', label: 'Risolti', count: perCat.done ? perCat.done.count : 0, ids: idsDi('done') },
+        { key: 'archived', label: 'Archiviati', count: perCat.archived ? perCat.archived.count : 0, ids: idsDi('archived') },
+        { key: 'nonLavorati', label: 'Non ancora lavorati', count: nonLavorati, ids: d.idsNonLavorati },
       ];
-      if (d.illeggibili) rows.push({ key: 'illeggibili', label: 'Stato non leggibile', count: d.illeggibili });
-      box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.ricevuti, empty: 'Nessun feedback in questa finestra.' })}</ul>`;
+      if (d.illeggibili) {
+        rows.push({ key: 'illeggibili', label: 'Stato non leggibile', count: d.illeggibili, ids: d.idsIlleggibili });
+      }
+      box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.ricevuti, scope: 'fase', empty: 'Nessun feedback in questa finestra.' })}</ul>`;
       return;
     }
 
-    // prober → tutte le esecuzioni, per ruolo.
+    // prober → tutte le esecuzioni, per ruolo. Qui sotto ci sono esecuzioni, non
+    // segnalazioni: si leggono una a una nella scheda Log, ed è lì che porta il
+    // clic (aprire un elenco di segnalazioni direbbe una cosa falsa).
     const rows = d.ruoli.map((r) => {
       const meta = ST.RUN_ROLES.find((x) => x.key === r.key);
       return { key: r.key, label: meta ? meta.label : r.key, count: r.count };
     });
-    box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.esecuzioni, empty: 'Nessuna esecuzione registrata in questa finestra.' })}</ul>`;
+    box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.esecuzioni, toLog: true, empty: 'Nessuna esecuzione registrata in questa finestra.' })}</ul>`;
   }
 
   // Una torta: un <path> per fetta, `data-group` per gli spec. Con una fetta
