@@ -117,11 +117,11 @@ test('«Sempre»: il registro delle esecuzioni è parziale — la scheda lo dice
   console.log('RIGA ANNO   :', JSON.stringify(anno));
   console.log('RIGA SEMPRE :', JSON.stringify(sempre));
   console.log('PROBER SEMPRE:', await page.locator('#mgStTileProber [data-num]').innerText());
-  // RILIEVO REGISTRATO (#496, giro 1): «Ultimo anno» dichiara da quando il
-  // registro esiste, «Sempre» no — ed è lì che il numero è più lontano dal
-  // totale. Quando la frase comparirà anche su «Sempre», questo diventa
-  // expect(sempre).toMatch(/registrate dal/).
+  // «Sempre» comincia prima di qualunque cosa: è la finestra in cui il numero
+  // delle esecuzioni è più lontano dal totale, quindi è proprio lì che deve
+  // dire da quando il registro esiste.
   expect(anno).toMatch(/registrate dal/);
+  expect(sempre).toMatch(/registrate dal/);
 });
 
 test('dalle statistiche si arriva ai feedback che le compongono?', async ({ openTab }) => {
