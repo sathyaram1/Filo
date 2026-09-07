@@ -264,6 +264,53 @@ test.describe('colore tab dal favicon', () => {
   });
 });
 
+// ───────────────── continuità scheda attiva / pagina (#429) ────────────────
+test.describe('la scheda attiva continua la pagina', () => {
+  // Il caso segnalato: una pagina dal fondo quasi bianco (nessuna croma) con un
+  // favicon monocromatico. Il colore identità che ne esce è un GRIGIO, e prima
+  // quel grigio scavalcava il colore vero della pagina: la scheda attiva
+  // smetteva di essere la continuazione di quello che aveva sotto.
+  const favSvg = encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">' +
+    '<rect width="16" height="16" fill="rgb(90,90,90)"/></svg>',
+  );
+  const HTML =
+    '<!doctype html><html><head>' +
+    `<link rel="icon" href="data:image/svg+xml,${favSvg}">` +
+    '<title>Pagina chiara</title></head>' +
+    '<body style="margin:0;background:rgb(248, 246, 240)">' +
+    '<div style="height:1500px"></div></body></html>';
+
+  test('con la pagina chiara e il marchio grigio la scheda prende la pagina, non il grigio', async () => {
+    await testServer.openReady(openTab, HTML);
+
+    // Il colore identità (grigio del favicon) arriva davvero: senza, il test
+    // non starebbe provando niente — passerebbe anche col difetto.
+    await expect.poll(async () => shell.evaluate(async () => {
+      const snap = await window.filoShell.tabs.snapshot();
+      const a = snap.tabs.find((t) => t.id === snap.activeId);
+      return (a && a.identityColor) || null;
+    }), { timeout: 9_000 }).toMatch(/rgb\(/);
+
+    const identity = await shell.evaluate(async () => {
+      const snap = await window.filoShell.tabs.snapshot();
+      const a = snap.tabs.find((t) => t.id === snap.activeId);
+      return a ? a.identityColor : null;
+    });
+    const parts = /rgba?\(([^)]+)\)/.exec(identity)[1].split(',').map((n) => parseFloat(n));
+    const chroma = Math.max(...parts.slice(0, 3)) - Math.min(...parts.slice(0, 3));
+    expect(chroma, `il favicon di prova deve dare un colore identità NEUTRO, dato: ${identity}`)
+      .toBeLessThan(24);
+
+    // La scheda attiva è tinta col fondo della pagina: stesso colore, quindi
+    // nessuna cucitura fra la scheda e la pagina sotto.
+    await expect.poll(async () => shell.evaluate(() => {
+      const el = document.querySelector('.tab.active');
+      return el ? el.style.getPropertyValue('--tab-active').trim() : null;
+    }), { timeout: 9_000 }).toBe('rgb(248, 246, 240)');
+  });
+});
+
 // ─────────────────────────── tab-activity-signals ──────────────────────────
 test.describe('segnali di attività per-tab', () => {
   const PAGE = `<!doctype html><html><head><title>Pagina attività</title></head>
