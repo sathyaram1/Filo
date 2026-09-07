@@ -116,7 +116,7 @@ body {
 
 /* la trama: il ragionamento che scorre, illeggibile e vivo */
 .trama {
-  height: 16px; line-height: 16px; overflow: hidden; white-space: nowrap;
+  height: 25px; line-height: 25px; cursor: pointer; overflow: hidden; white-space: nowrap;
   font-size: 10.5px; color: var(--dash-ink-mute); opacity: 0.5;
   direction: rtl; text-align: left; padding-left: 2px;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
@@ -169,6 +169,14 @@ body {
       <label><input type="radio" name="filo" value="verticale" checked><span>verticale, coi nodi</span></label>
       <label><input type="radio" name="filo" value="orizzontale"><span>orizzontale, accanto alla riga</span></label>
       <label><input type="radio" name="filo" value="rotella"><span>una rotella</span></label>
+    </div>
+  </div>
+
+  <div class="gruppo" data-opt="nodi">
+    <div class="tit">Che cos'è un nodo</div>
+    <div class="opz">
+      <label><input type="radio" name="nodi" value="unito" checked><span>il pensiero e l'azione che ne è nata</span></label>
+      <label><input type="radio" name="nodi" value="diviso"><span>due nodi separati</span></label>
     </div>
   </div>
 
