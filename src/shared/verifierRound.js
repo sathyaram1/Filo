@@ -104,6 +104,15 @@
   const PARENTESI_QUALUNQUE = '(?:\\[{1,2}|\\(|\\{)\\s*[^\\]\\)\\}\\n]{0,20}(?:\\]{1,2}|\\)|\\})';
   const APERTURA_PARENTESI = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?(${PARENTESI_QUALUNQUE})`);
   const DENTRO_SEMBRA_LIVELLO = /\d|zero|uno|due|tre|livello|level|priorit/i;
+  // E la rete che tiene tutte le altre aperture: QUALUNQUE cosa stia davanti —
+  // un trattino lungo, un «+», «1.1», «100.», «(a)», un apice inverso, un
+  // pallino diverso — se subito dopo (al più sei caratteri) c'è un livello e il
+  // lettore non riesce a leggere la riga come rilievo, quella riga è un rilievo
+  // scritto male, non riassunto. Elencare i modi di elencare ammessi è una
+  // rincorsa che si perde: ogni forma dimenticata era una bocciatura che
+  // passava per promozione (feedback #565). Sei caratteri perché una frase vera
+  // («Nel caso [2] ho provato…») ha più parole davanti, e resta testo.
+  const LIVELLO_VICINO = new RegExp(`^.{0,6}?(${PARENTESI_QUALUNQUE})`);
   // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
