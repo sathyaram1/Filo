@@ -729,6 +729,9 @@
       barre.push({ from, to: Math.max(from + 1, Math.min(to, aMs)), count: 0 });
     }
     for (const it of selezionati) {
+      // Senza una data d'arrivo non c'è una barretta dove metterla: sta nei
+      // conti (con «Sempre») e fuori dal grafico, che lo dichiara.
+      if (it.ms == null) continue;
       const i = Math.min(nBarre - 1, Math.max(0, Math.floor((it.ms - daMs) / bucket.ms)));
       barre[i].count += 1;
     }
