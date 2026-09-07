@@ -448,9 +448,13 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
   const vuoto = withCritique(s, 'r', { critique: 'Provato: regge quasi tutto.\n[2]', sha: SHA });
   assert.equal(vuoto.ok, false);
   assert.match(vuoto.reason, /rilievo senza testo/);
-  const inMezzo = withCritique(s, 'r', { critique: 'Provato il caso [2?] del giro prima: chiuso, e testi di [10000] caratteri.', sha: SHA });
-  assert.equal(inMezzo.ok, true);
-  assert.equal(inMezzo.outcome, 'pass');
+  // Dal 2026-09-07 (#565, decisione dell'owner) le quadre col livello dentro
+  // sono sempre un rilievo: nel riassunto il livello si cita a parole.
+  const conQuadre = withCritique(s, 'r', { critique: 'Provato il caso [2?] del giro prima: chiuso.', sha: SHA });
+  assert.equal(conQuadre.ok, false);
+  const aParole = withCritique(s, 'r', { critique: 'Provato il caso di livello 2 del giro prima: chiuso, e testi lunghi.', sha: SHA });
+  assert.equal(aParole.ok, true);
+  assert.equal(aParole.outcome, 'pass');
 });
 
 // ── Un modo solo per promuovere, uno solo per bocciare (#565) ────────────────────
