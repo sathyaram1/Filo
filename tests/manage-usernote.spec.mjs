@@ -450,10 +450,11 @@ test('#497 — la frase parte chiusa, il tasto la apre, e cambiando feedback si 
   await expect(tasto).not.toHaveClass(/mg-usernote-piena/);
 });
 
-// Una bozza scritta e poi richiusa non deve sparire: il pannello si ridisegna
-// da solo quando arrivano aggiornamenti, e la guardia che lo trattiene guardava
-// solo le caselle VISIBILI.
-test('#497 — una bozza richiusa sopravvive a un aggiornamento in arrivo', async ({ openTab }) => {
+// Una frase scritta e poi lasciata lì non deve sparire. Adesso non resta
+// nemmeno una bozza: appena il cursore lascia la casella parte, quindi un
+// ridisegno può anche avvenire — quello che l'owner ha scritto è già a
+// destinazione e la casella lo rimostra.
+test('#497 — la frase scritta e non salvata a mano parte da sola, e sopravvive a un aggiornamento', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
