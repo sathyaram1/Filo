@@ -63,40 +63,33 @@ test('U1 — tolta la password dalla pagina della Sicurezza, incollarla la rimet
     const web = await findTabPage(app, '127.0.0.1');
     await web.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 20000 });
 
-    // L'utente copia la password (appunti veri di sistema + cronologia di Filo).
+    // La password è negli appunti veri di sistema, come dopo un «copia».
     await app.evaluate(({ clipboard }) => clipboard.writeText('password-segretissima'));
-    await web.evaluate(async () => {
-      await chrome.runtime.sendMessage({
-        type: window.SN_MSG?.MSG?.PUSH_CLIPBOARD_ENTRY || 'push_clipboard_entry',
-        entry: { type: 'text', text: 'password-segretissima' },
-      });
-    }).catch(async () => {
-      await app.evaluate(() => null);
-    });
-    await web.waitForTimeout(400);
-    console.log('[U1] dopo la copia:', JSON.stringify(suDisco(userData)));
 
-    // Apre la pagina della Sicurezza e toglie la voce.
+    // Primo «Incolla» dal menu del tasto destro: la password entra in cronologia.
+    await web.locator('#ta').click({ button: 'right' });
+    await web.waitForTimeout(300);
+    await web.locator('.sn-menu-paste-main').first().click();
+    await web.waitForTimeout(1200);
+    console.log('[U1] dopo il primo incolla:', JSON.stringify(suDisco(userData)));
+    expect(suDisco(userData), 'la password è finita in cronologia').toContain('password-segretissima');
+
+    // L'utente se ne accorge e la toglie da Impostazioni → Sicurezza.
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const sec = await findTabPage(app, 'security');
     await sec.waitForLoadState('domcontentloaded');
     await sec.locator('#sec-clip-list .sn-clip-item').first().waitFor({ timeout: 10000 });
     await sec.locator('#sec-clip-list .sn-clip-remove').first().click();
-    await sec.waitForTimeout(600);
+    await sec.waitForTimeout(700);
     console.log('[U1] dopo la rimozione:', JSON.stringify(suDisco(userData)));
     expect(suDisco(userData), 'la voce se n\'è andata').toEqual([]);
 
-    // Adesso l'utente incolla la password nel modulo di accesso, come voleva fare.
-    await web.bringToFront().catch(() => {});
-    await web.locator('#ta').click();
+    // Poi incolla la password nel modulo di accesso, che è perché l'aveva copiata.
     await web.locator('#ta').click({ button: 'right' });
     await web.waitForTimeout(300);
-    const vociMenu = await web.evaluate(() => [...document.querySelectorAll('.sn-menu-item .sn-menu-label')].map((s) => s.textContent.trim()));
-    console.log('[U1] voci del menu:', JSON.stringify(vociMenu));
-    const incolla = web.locator('.sn-menu-item', { hasText: 'Incolla' }).first();
-    await incolla.click();
+    await web.locator('.sn-menu-paste-main').first().click();
     await web.waitForTimeout(1200);
-    console.log('[U1] dopo aver incollato:', JSON.stringify(suDisco(userData)));
+    console.log('[U1] dopo il secondo incolla:', JSON.stringify(suDisco(userData)));
     console.log('[U1] testo nel campo:', JSON.stringify(await web.locator('#ta').inputValue()));
   } finally {
     server.close();
