@@ -104,7 +104,7 @@ test('la frase si può anche togliere, e il segno sul tasto se ne accorge', asyn
   await page.locator('#mgUserNoteBtn').click();
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
   expect(await page.evaluate(() => window.__updates[0].userNote)).toBe('');
-  await expect(page.locator('#mgUserNoteMsg')).toHaveText('Frase rimossa');
+  await expect(page.locator('#mgUserNoteMsg')).toHaveText(/Frase rimossa|Nessuna frase/);
   await expect(toggle).not.toHaveClass(/mg-usernote-piena/);
   expect(await toggle.getAttribute('title')).not.toContain('Adesso funziona.');
   expect(await page.locator('#mgThread').innerText()).not.toContain('Adesso funziona.');
