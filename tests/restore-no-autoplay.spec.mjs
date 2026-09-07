@@ -17,11 +17,12 @@
 // tab nuova → l'assert sulla tab ripristinata diventa rosso.
 
 import { test, expect, _electron as electron } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -31,7 +32,7 @@ const PAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>autop
 
 function launch(userData) {
   return electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -79,7 +80,7 @@ const isPausedAfterAutoplay = (page) => page.evaluate(async () => {
 
 test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)', async () => {
   test.setTimeout(120_000); // due avvii di Electron in sequenza
-  const userData = mkdtempSync(join(tmpdir(), 'filo-autoplay-'));
+  const userData = cartellaTemporanea('filo-autoplay-');
   // Server persistente: deve sopravvivere ai DUE avvii dell'app.
   const server = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

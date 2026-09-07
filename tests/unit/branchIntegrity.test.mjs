@@ -12,10 +12,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 import {
   attemptStamp, newWorkBranch, identityVerdict,
@@ -46,7 +46,7 @@ function commit(dir, name, body) {
 
 /** Crea `origin` (bare) + un clone con un commit iniziale su main. */
 function makeRepo() {
-  const base = mkdtempSync(resolve(tmpdir(), 'filo-bi-'));
+  const base = cartellaTemporanea('filo-bi-');
   made.push(base);
   const origin = resolve(base, 'origin.git');
   const work = resolve(base, 'work');

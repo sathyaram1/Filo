@@ -1,9 +1,10 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #422: le istruzioni fisse dei prompt lunghi ora stanno in testa,
 // così i fornitori riusano quella parte invece di rielaborarla a ogni messaggio.
@@ -44,11 +45,11 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
       usage: { promptTokens: 8000, completionTokens: 40, cachedPromptTokens: 0 } },
   ];
 
-  const userData = mkdtempSync(join(tmpdir(), 'filo-hist-reuse-'));
+  const userData = cartellaTemporanea('filo-hist-reuse-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ aiHistory }), 'utf8');
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

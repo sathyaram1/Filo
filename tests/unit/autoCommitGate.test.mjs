@@ -9,10 +9,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync, copyFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync, readFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const HOOKS_DIR = resolve(ROOT, '.claude', 'hooks');
@@ -34,7 +34,7 @@ function git(cwd, args) {
  * imposta DA SÉ su ogni ramo nato da origin/main.
  */
 function scene({ poison = false } = {}) {
-  const base = mkdtempSync(resolve(tmpdir(), 'filo-hook-'));
+  const base = cartellaTemporanea('filo-hook-');
   made.push(base);
   const origin = resolve(base, 'origin.git');
   const work = resolve(base, 'work');
@@ -58,10 +58,18 @@ function scene({ poison = false } = {}) {
 }
 
 function runHook(work, env = {}, hook = 'auto-commit-merge.sh', stdin = '') {
+  // Chi lancia i test NON deve poter dichiarare la sessione al posto del test.
+  // Una routine si dichiara con FILO_ROUTINE=1 nella sua shell, e quella
+  // variabile arrivava fin qui: il caso "locale" ereditava la dichiarazione, i
+  // due autori diventavano lo stesso, e il controllo sulla provenienza era rosso
+  // per tutta la durata di ogni giro di routine — un rosso che parlava di chi
+  // lanciava il test, non del codice. La dichiarazione entra solo da `env`.
+  const ambiente = { ...process.env };
+  delete ambiente.FILO_ROUTINE;
   try {
     execFileSync('bash', [resolve(work, '.claude', 'hooks', hook)], {
       cwd: work, encoding: 'utf8', input: stdin,
-      env: { ...process.env, CLAUDE_PROJECT_DIR: work, ...env },
+      env: { ...ambiente, CLAUDE_PROJECT_DIR: work, ...env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
   } catch (_) { /* l'hook non fallisce mai per contratto */ }

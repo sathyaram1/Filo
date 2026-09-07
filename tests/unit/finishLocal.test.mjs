@@ -18,8 +18,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -191,7 +190,7 @@ function g(cwd, args) {
 
 /** origin finto (bare) + un clone con un commit su main. */
 function repoDiProva() {
-  const base = mkdtempSync(resolve(tmpdir(), 'filo-finish-'));
+  const base = cartellaTemporanea('filo-finish-');
   temporanei.push(base);
   const origin = resolve(base, 'origin.git');
   const work = resolve(base, 'work');
@@ -347,6 +346,7 @@ describe('quale ramo NON si spedisce mai', () => {
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
 import { splitKnownRed } from '../../scripts/finish-local.mjs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
   const r = splitKnownRed(['tests/a', 'tests/decks-chat-stress', 'tests/b'], ['tests/decks-chat-stress', 'tests/altro.spec.mjs']);
@@ -355,9 +355,35 @@ test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano
   assert.deepEqual(splitKnownRed(['tests/a'], null), { blocking: ['tests/a'], informative: [] });
 });
 
-test('l\'elenco dei rossi noti è tracciato e ogni voce è uno spec che esiste', () => {
+// L'elenco dei rossi noti è un elenco di controlli SPENTI: vuoto è lo stato
+// giusto, e ci è tornato col feedback #563 risolvendo i rossi d'ambiente uno per
+// uno. Quello che questa sentinella difende non è "che sia vuoto" — un'eccezione
+// motivata può servire di nuovo — ma che non marcisca: niente voci fantasma per
+// spec che non esistono più (starebbero lì a spegnere un controllo che nessuno
+// ricorda) e una nota che dice sempre perché e con che numero si toglie.
+test('l\'elenco dei rossi noti non marcisce: ogni voce è uno spec che esiste', () => {
   const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
-  assert.ok(Array.isArray(j.specs) && j.specs.length > 0);
-  assert.match(j.nota, /#\d+/, 'l\'elenco cita il feedback che lo svuoterà');
+  assert.ok(Array.isArray(j.specs), 'rossi-noti.json deve avere un elenco `specs` (anche vuoto)');
+  assert.match(j.nota, /#\d+/, 'la nota cita il feedback da cui l\'elenco dipende');
   for (const s of j.specs) assert.ok(existsSync(resolve(ROOT, `${s}.spec.mjs`)), `${s} non esiste più: toglilo dall'elenco`);
+});
+
+// I rossi dei contenitori senza schermo delle routine. Vivevano nella memoria di
+// chi verificava, elencati a voce nelle sue istruzioni: nessun nome preciso,
+// nessun motivo scritto, nessuna scadenza. Da lì a lasciar passare una
+// regressione vera perché "assomiglia" a un rosso d'ambiente c'è un passo. Qui
+// hanno un nome, un caso, un perché e un numero di feedback, e questa sentinella
+// li tiene onesti.
+test('i rossi del contenitore hanno nome, caso, motivo e un feedback', () => {
+  const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
+  const c = j.contenitore;
+  assert.ok(c && Array.isArray(c.specs), 'rossi-noti.json deve avere `contenitore.specs` (anche vuoto)');
+  const bloccanti = new Set(j.specs.map(String));
+  for (const v of c.specs) {
+    assert.ok(existsSync(resolve(ROOT, `${v.spec}.spec.mjs`)), `${v.spec} non esiste più: toglilo dall'elenco`);
+    assert.ok(v.caso && v.caso.length > 3, `${v.spec}: manca il caso preciso che è rosso`);
+    assert.ok(v.perche && v.perche.length > 20, `${v.spec}: manca il motivo, e senza motivo non si toglierà mai`);
+    assert.match(String(v.feedback || ''), /#\d+/, `${v.spec}: manca il feedback che lo farà togliere`);
+    assert.ok(!bloccanti.has(v.spec), `${v.spec} sta in tutti e due gli elenchi: decidi quale`);
+  }
 });

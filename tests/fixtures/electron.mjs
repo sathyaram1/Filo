@@ -15,24 +15,46 @@
 //     vogliono il pixel-perfect.
 
 import { test as base, _electron as electron, expect } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { argomentiScala } from '../helpers/scala.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
 
+// Zoom di sistema simulato: la manopola vive in tests/helpers/scala.mjs, perché
+// Filo si apre anche da porte che non passano di qui (il pilota condiviso, e la
+// ventina di spec che chiamano `electron.launch` per conto proprio). Qui la si
+// ri-esporta perché quegli spec la importano da questa fixture da sempre.
+export { argomentiScala };
+
 export const test = base.extend({
   app: async ({}, use) => {
-    const userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
+    // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
+    // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
+    // il percorso che l'app riporta.
+    const userData = cartellaTemporanea('filo-test-');
     const app = await electron.launch({
-      // host-resolver-rules: fa risolvere il dominio finto "blocked.test" al
-      // loopback, così l'e2e del blocco siti (siteBlock.spec.mjs) può mettere in
-      // blacklist un DOMINIO REALE (con estensione valida) — non un IP, che l'app
-      // scarta di proposito — e comunque farlo servire dal testServer locale.
-      args: ['--host-resolver-rules=MAP blocked.test 127.0.0.1', '.'],
+      // host-resolver-rules:
+      //  • "blocked.test" al loopback, così l'e2e del blocco siti
+      //    (siteBlock.spec.mjs) può mettere in blacklist un DOMINIO REALE (con
+      //    estensione valida) — non un IP, che l'app scarta di proposito — e
+      //    comunque farlo servire dal testServer locale;
+      //  • 192.168.1.1 su una porta CHIUSA del loopback: è l'indirizzo del
+      //    router di casa di mezzo mondo, e dove risponde davvero la pagina
+      //    rimbalza altrove (https, o un nome tipo `fritz.box`) e gli spec che
+      //    guardano l'indirizzo della scheda diventano rossi per colpa della
+      //    rete di chi li lancia. Nessun test deve parlare con un apparecchio
+      //    vero della LAN di qualcuno: la connessione viene rifiutata e la
+      //    scheda resta sull'indirizzo chiesto, uguale ovunque.
+      args: [
+        ...argomentiScala,
+        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9',
+        '.',
+      ],
       cwd: APP_ROOT,
       env: {
         ...process.env,

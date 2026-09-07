@@ -26,9 +26,35 @@
 // composita: lì l'immagine È il risultato e serve una finestra vera su uno
 // schermo vero. Quegli strumenti non impostano la variabile.
 
-// Abbastanza lontano da stare fuori da qualsiasi disposizione di monitor
-// plausibile, non così tanto da uscire dai limiti che Windows accetta.
-const OFFSCREEN = { x: -32000, y: -32000 };
+// Dove parcheggiare la finestra: abbastanza lontano da stare fuori da qualsiasi
+// disposizione di monitor plausibile, non così tanto da uscire dai limiti che i
+// sistemi accettano.
+//
+// Il limite è in pixel FISICI (le coordinate delle finestre viaggiano come
+// interi a 16 bit, ±32767), mentre il numero che si passa a Electron è logico:
+// su uno schermo al 125% un -32000 logico diventa -40000 fisici, il numero gira
+// e la finestra si ritrova dall'altra parte. Misurato al 125%: chiesto -32000,
+// riletto +20428, e da lì il sistema smette di aggiornare la vista dentro la
+// finestra (la pagina non si accorgeva più che la finestra si era accorciata:
+// tre spec del menu del tasto destro rossi solo su uno schermo scalato).
+// Si divide per il fattore di scala, così il numero fisico è lo stesso ovunque.
+const LONTANO_FISICO = 30000;
+
+/** Coordinata logica di parcheggio dato il fattore di scala dello schermo. PURA. */
+function coordinataFuoriSchermo(scala) {
+  const s = Number.isFinite(scala) && scala > 0 ? scala : 1;
+  return -Math.round(LONTANO_FISICO / s);
+}
+
+function posizioneFuoriSchermo() {
+  let scala = 1;
+  try {
+    const { screen } = require('electron');
+    scala = screen.getPrimaryDisplay().scaleFactor;
+  } catch (_) { /* prima che l'app sia pronta: vale 1 */ }
+  const v = coordinataFuoriSchermo(scala);
+  return { x: v, y: v };
+}
 
 const HIDDEN = process.env.FILO_HIDE_WINDOW === '1';
 
@@ -42,11 +68,12 @@ function hideForTests(win, { main = false } = {}) {
   try {
     win.setOpacity(0);
     if (!main) return true;
-    win.setPosition(OFFSCREEN.x, OFFSCREEN.y);
+    const via = posizioneFuoriSchermo();
+    win.setPosition(via.x, via.y);
     // Uscendo dal tutto schermo il sistema rimette la finestra dov'era prima di
-    // entrarci — cioè potenzialmente sullo schermo: riportiamola via.
+    // entrarci, cioè potenzialmente sullo schermo: riportiamola via.
     win.on('leave-full-screen', () => {
-      try { win.setPosition(OFFSCREEN.x, OFFSCREEN.y); win.setOpacity(0); } catch (_) {}
+      try { const p = posizioneFuoriSchermo(); win.setPosition(p.x, p.y); win.setOpacity(0); } catch (_) {}
     });
     // Alcune superfici rimettono l'opacità (animazioni, ripristini): il giro a
     // tutto schermo è il caso noto, quindi la riaffermiamo anche lì.
@@ -57,4 +84,4 @@ function hideForTests(win, { main = false } = {}) {
   return true;
 }
 
-module.exports = { HIDDEN, OFFSCREEN, hideForTests };
+module.exports = { HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests };

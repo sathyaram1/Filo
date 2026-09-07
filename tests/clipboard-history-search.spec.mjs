@@ -1,9 +1,10 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback: poter scorrere fra tutto ciò che è stato incollato e, in basso, una
 // barra "Cerca…" (grigia) per cercare fra le cose incollate.
@@ -36,7 +37,7 @@ test('paste history submenu is scrollable and has a working search bar', async (
       ts: Date.now() - i,
     });
   }
-  const userData = mkdtempSync(join(tmpdir(), 'filo-clip-'));
+  const userData = cartellaTemporanea('filo-clip-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: history }), 'utf8');
 
   const url = testServer.html(
@@ -45,7 +46,7 @@ test('paste history submenu is scrollable and has a working search bar', async (
   const host = new URL(url).hostname;
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

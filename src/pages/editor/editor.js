@@ -2098,7 +2098,24 @@
         pop.style.bottom = 'auto';
         pop.style.top = `${r.bottom + 4}px`;
       }
+      // …e dentro la finestra. La tendina è larga almeno 180px (min-width) anche
+      // quando il modulo è più stretto, e i moduli stanno nella colonna di
+      // destra: allineata al bordo sinistro del bottone, la parte che sporge
+      // finisce fuori dallo schermo e i nomi dei font si leggono a metà. Si
+      // misura la larghezza VERA (quella calcolata, non quella chiesta) e la si
+      // riporta dentro, con un filo di margine.
+      const MARGINE = 8;
+      const largh = pop.getBoundingClientRect().width || r.width;
+      const massimo = window.innerWidth - largh - MARGINE;
+      pop.style.left = `${Math.max(MARGINE, Math.min(r.left, massimo))}px`;
     }
+    // La finestra non sta ferma mentre la tendina è aperta: la si stringe, e in
+    // Filo si zooma di continuo. Riposare solo all'apertura vuol dire calcolare
+    // il rientro su uno spazio che un istante dopo non esiste più: misurato, in
+    // una finestra da 1280 la tendina sta fra 859 e 1039, e portando la finestra
+    // a 520 restava lì, cioè tutta fuori dalla pagina. Il pattern di Filo sulla
+    // posa dei riquadri lo dice in una riga: il ritaglio si rifà a OGNI misura.
+    const riposa = () => { if (!pop.hidden) placePop(); };
     function open() {
       if (!pop.hidden) return;
       saveDocSelection(); // prima che il focus passi al popup
@@ -2111,6 +2128,13 @@
       setHover(visibleOptions()[0] || null);
       document.addEventListener('mousedown', onDocDown, true);
       window.addEventListener('scroll', close, true);
+      window.addEventListener('resize', riposa);
+      // Lo zoom della pagina muove il riquadro visuale senza sempre cambiare la
+      // finestra: è una misura a sé, e va ascoltata a sé.
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', riposa);
+        window.visualViewport.addEventListener('scroll', riposa);
+      }
       setTimeout(() => search.focus(), 0);
     }
     function close() {
@@ -2121,6 +2145,11 @@
       setHover(null);
       document.removeEventListener('mousedown', onDocDown, true);
       window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', riposa);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', riposa);
+        window.visualViewport.removeEventListener('scroll', riposa);
+      }
     }
 
     button.addEventListener('mousedown', (e) => {

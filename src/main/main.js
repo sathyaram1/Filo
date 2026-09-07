@@ -163,9 +163,24 @@ app.whenReady().then(async () => {
   // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
   // verifica che i content script si caricano in quest'ultima, cattura
   // screenshot di entrambe, scrive un report e si chiude.
+  //
+  // ORDINE: il sentinel — l'unica cosa che lo script fuori sta aspettando — si
+  // scrive appena lo stato delle schede è quello da riportare, PRIMA delle
+  // catture. Le catture sono diagnostica: aprono altre finestre e aspettano che
+  // finiscano di caricare, cioè dipendono dalla rete e da quanto è carica la
+  // macchina. Scrivendo il sentinel dopo, una cattura lenta diventava
+  // indistinguibile da un'app che non parte — «sentinel non scritto entro 20 s»
+  // su un avvio andato benissimo. Adesso l'esito è deciso dal boot, e il resto
+  // può prendersi il suo tempo (o fallire) senza cambiarlo.
   if (process.env.FILO_SMOKE) {
     const fs = require('node:fs');
     const path = require('node:path');
+    // Aspetta una promessa fino a un tetto: nessuna attesa dello smoke può
+    // durare per sempre, o l'app resta appesa senza dire niente.
+    const entro = (promessa, ms, cosa) => Promise.race([
+      promessa,
+      new Promise((r) => setTimeout(() => { console.log(`[smoke] ${cosa}: scaduti ${ms}ms, proseguo`); r(null); }, ms)),
+    ]);
     const checkReady = async () => {
       const tabs = mainWindow?._filoTabs;
       const ready = tabs && tabs.tabs.length > 0 && tabs.tabs.some((t) => !t.loading);
@@ -173,6 +188,14 @@ app.whenReady().then(async () => {
       // Diamo un attimo al renderer per dipingere dopo did-stop-loading.
       await new Promise((r) => setTimeout(r, 800));
       const outDir = path.dirname(process.env.FILO_SMOKE);
+      // Il verdetto, subito: da qui in poi è tutta diagnostica.
+      try {
+        fs.writeFileSync(process.env.FILO_SMOKE, JSON.stringify({
+          ts: new Date().toISOString(),
+          tabs: tabs.snapshot(),
+        }));
+        console.log('[smoke] sentinel scritto:', process.env.FILO_SMOKE);
+      } catch (e) { console.log('[smoke] sentinel non scritto:', e?.message || String(e)); }
       // Forza la finestra in primo piano. Quando spawn-ata da Node non
       // sempre Windows la mostra automaticamente; senza una composizione
       // visibile, capturePage delle child WebContentsView fallisce con
@@ -193,7 +216,7 @@ app.whenReady().then(async () => {
       const dump = async (label, wc) => {
         console.log(`[smoke] dump:${label} start`);
         try {
-          const img = await wc.capturePage();
+          const img = await entro(wc.capturePage(), 15_000, `cattura ${label}`);
           console.log(`[smoke] dump:${label} capturePage resolved, img=`, !!img, 'empty=', img?.isEmpty?.());
           if (!img) { console.log(`[smoke] dump:${label} no img`); return; }
           const png = img.toPNG();
@@ -222,7 +245,12 @@ app.whenReady().then(async () => {
             },
           });
           captureWin.loadURL(url);
-          await new Promise((res) => captureWin.webContents.once('did-stop-loading', res));
+          // Con un tetto: una pagina che non finisce mai di caricare (rete
+          // lenta, richiesta appesa) non deve bloccare la chiusura dell'app.
+          await entro(
+            new Promise((res) => captureWin.webContents.once('did-stop-loading', res)),
+            15_000, `attesa caricamento ${label}`,
+          );
           captureWin.show(); captureWin.moveTop(); captureWin.focus();
           captureWin.setAlwaysOnTop(true);
           await new Promise((r) => setTimeout(r, 900));
@@ -243,18 +271,18 @@ app.whenReady().then(async () => {
       const csWin = await captureUrl('test-page', testPageUrl, 'page-preload.js');
       if (csWin) {
         try {
-          const csDiag = await csWin.webContents.executeJavaScript(
+          const csDiag = await entro(csWin.webContents.executeJavaScript(
             "({ href: location.href," +
             " filoReady: document.documentElement.dataset.filoReady," +
             " filoModules: document.documentElement.dataset.filoModules," +
             " filoTheme: document.documentElement.dataset.snTheme," +
             " filoStyleInjected: !!document.querySelector('link[href*=\"filo://style/\"]')," +
             " linkCount: document.querySelectorAll('link[rel=stylesheet]').length })"
-          );
+          ), 10_000, 'diagnostica content-script');
           console.log('[smoke] content-script diag:', JSON.stringify(csDiag, null, 2));
 
           // Simula selezione + right-click per verificare che il menu compaia.
-          await csWin.webContents.executeJavaScript(`(() => {
+          await entro(csWin.webContents.executeJavaScript(`(() => {
             const span = document.querySelector('.selectable');
             if (!span) return false;
             const range = document.createRange();
@@ -270,22 +298,18 @@ app.whenReady().then(async () => {
               button: 2,
             });
             return span.dispatchEvent(evt);
-          })()`);
+          })()`), 10_000, 'tasto destro simulato');
           await new Promise((r) => setTimeout(r, 500));
-          const menuDiag = await csWin.webContents.executeJavaScript(
+          const menuDiag = await entro(csWin.webContents.executeJavaScript(
             "({ menu: !!document.querySelector('.sn-menu')," +
             " menuItems: document.querySelectorAll('.sn-menu .sn-menu-item, .sn-menu button').length," +
             " menuHtml: (document.querySelector('.sn-menu')?.outerHTML || '').slice(0,300) })"
-          );
+          ), 10_000, 'diagnostica menu');
           console.log('[smoke] right-click menu diag:', JSON.stringify(menuDiag, null, 2));
           await dump('menu', csWin.webContents);
         } catch (e) { console.log('[smoke] content-script diag failed', e.message); }
         csWin.close();
       }
-      fs.writeFileSync(process.env.FILO_SMOKE, JSON.stringify({
-        ts: new Date().toISOString(),
-        tabs: tabs.snapshot(),
-      }));
       setTimeout(() => app.quit(), 200);
     };
     setTimeout(checkReady, 500);

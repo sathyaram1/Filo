@@ -12,10 +12,11 @@
 // dove arrivano `app`/`shell`/`openTab` (helper locali sull'app condivisa).
 
 import { _electron as electron, expect, test as base } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -31,9 +32,9 @@ const test = base; // alias, manteniamo la stessa API expect/test
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
-  userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
+  userData = cartellaTemporanea('filo-test-');
   app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

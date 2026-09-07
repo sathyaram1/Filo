@@ -7,9 +7,10 @@
 // custom di webPreferences. Il sentinel è deterministico e abbastanza.
 
 import { spawn } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -32,9 +33,25 @@ const electronExe = path.join(electronModule, 'dist', process.platform === 'win3
 // sandbox non serve mai: lo passiamo sempre, così gira identico in locale e in cloud.
 const electronArgs = ['--no-sandbox', '.'];
 
+// Profilo ISOLATO, come per ogni spec Playwright (fixtures/electron.mjs).
+// Prima lo smoke partiva sui dati veri dell'utente, e lì non provava più il
+// boot: provava la sessione di quella macchina. Con dieci schede da ripristinare
+// l'avvio ci mette molto di più — e il controllo qui sotto ("una scheda sola,
+// la newtab") era comunque falso per costruzione. Peggio: la stessa cartella
+// dove Filo tiene le schede aperte veniva scritta da un processo che poi
+// riceve un SIGTERM a metà. Isolato, lo smoke prova il boot e basta, uguale
+// ovunque, e non tocca niente di chi lo lancia.
+const userData = cartellaTemporanea('filo-smoke-');
+
 const proc = spawn(electronExe, electronArgs, {
   cwd: ROOT,
-  env: { ...process.env, FILO_SMOKE: sentinel, NODE_ENV: 'test' },
+  env: {
+    ...process.env,
+    FILO_SMOKE: sentinel,
+    FILO_USER_DATA: userData,
+    FILO_DOWNLOAD_DIR: path.join(userData, 'downloads'),
+    NODE_ENV: 'test',
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
@@ -43,8 +60,18 @@ const stdoutChunks = [];
 proc.stderr.on('data', (d) => stderrChunks.push(d));
 proc.stdout.on('data', (d) => stdoutChunks.push(d));
 
+let uscito = null;
+proc.on('exit', (code, signal) => { uscito = { code, signal }; });
+
 const startedAt = Date.now();
-const TIMEOUT = 20_000;
+// Largo di proposito. Prima di scrivere il sentinel il main apre la finestra,
+// carica la newtab, apre due finestre di cattura e ci aspetta sopra: sono
+// secondi di lavoro vero anche a macchina scarica, e la stessa macchina spesso
+// sta girando altro. Un tetto stretto qui non protegge da niente — se l'app non
+// parte lo si vede lo stesso — e in cambio produce un rosso che dice "20 secondi"
+// invece di "non parte". Novanta secondi sono il caso peggiore con margine; il
+// caso normale esce in pochi secondi e non li aspetta.
+const TIMEOUT = 90_000;
 const POLL = 250;
 
 let result = null;
@@ -55,13 +82,35 @@ while (Date.now() - startedAt < TIMEOUT) {
       break;
     } catch (_) { /* il main potrebbe star ancora scrivendo */ }
   }
+  // L'app è morta: aspettare il resto del tetto non cambia l'esito, e in cambio
+  // nasconde il motivo vero dietro un "scaduto il tempo".
+  if (uscito) break;
   await new Promise((r) => setTimeout(r, POLL));
 }
 
+// Il sentinel è il verdetto, ma gli screenshot arrivano DOPO (vedi il blocco
+// FILO_SMOKE in src/main/main.js): l'app li scrive e poi si chiude da sé.
+// Ucciderla appena letto il sentinel li porterebbe via tutti, e sono la sola
+// diagnostica che questo test lascia. Quindi le si dà tempo di finire — con un
+// tetto, che è il punto di tutto il resto di questo file.
+if (result) {
+  const graziaFinoA = Date.now() + 60_000;
+  while (!uscito && Date.now() < graziaFinoA) await new Promise((r) => setTimeout(r, POLL));
+}
+
 try { proc.kill('SIGTERM'); } catch (_) {}
+// Un attimo prima di cancellare: su Windows una cartella con un file ancora
+// aperto dal processo che sta chiudendo non si rimuove.
+await new Promise((r) => setTimeout(r, 800));
+try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
 
 if (!result) {
-  console.error('[smoke] FAIL: sentinel non scritto entro', TIMEOUT, 'ms');
+  if (uscito) {
+    console.error('[smoke] FAIL: Filo si è chiuso senza scrivere il sentinel',
+      `(uscita ${uscito.code}${uscito.signal ? `, segnale ${uscito.signal}` : ''})`);
+  } else {
+    console.error('[smoke] FAIL: sentinel non scritto entro', TIMEOUT, 'ms');
+  }
   console.error('[smoke] stderr:', Buffer.concat(stderrChunks).toString().slice(-2000));
   process.exit(1);
 }

@@ -10,16 +10,16 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const {
   normalizeRole, isFresh, writeRole, readRole, clearRole, roleFile, MAX_AGE_MS,
 } = await import('../../scripts/lib/routine-role.mjs');
 
 function tmpRoot() {
-  return mkdtempSync(join(tmpdir(), 'filo-role-'));
+  return cartellaTemporanea('filo-role-');
 }
 
 test('normalizeRole: accetta solo i ruoli del dispatcher', () => {

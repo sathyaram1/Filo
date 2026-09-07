@@ -18,10 +18,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(__dirname, '..', '..', '.claude', 'hooks', 'auto-commit-merge.sh');
@@ -90,7 +90,7 @@ function fintoServer(risposta, status = 200) {
  * il test non può più servire. Deadlock silenzioso, già successo qui.
  */
 function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
-  const casa = mkdtempSync(join(tmpdir(), 'filo-mg-client-'));
+  const casa = cartellaTemporanea('filo-mg-client-');
   const env = {
     ...process.env,
     FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
@@ -241,7 +241,7 @@ const skip = !hasGit() ? 'git non disponibile' : false;
 // una volta sola, a lavoro finito (`npm run finish` / il cancello sul server).
 // Spec: ROUTINE-BRANCH-INTEGRITY.md §Via 1.
 test('nessun branch di lavoro arriva su main da solo, nemmeno con un nome qualsiasi', { skip }, () => {
-  const base = mkdtempSync(join(tmpdir(), 'filo-mg-normal-'));
+  const base = cartellaTemporanea('filo-mg-normal-');
   try {
     const origin = setupOrigin(base);
     const r = freshClone(base, origin, 'routine');
@@ -257,7 +257,7 @@ test('nessun branch di lavoro arriva su main da solo, nemmeno con un nome qualsi
 });
 
 test('un branch worker/* NON arriva su main, ma resta sul suo branch', { skip }, () => {
-  const base = mkdtempSync(join(tmpdir(), 'filo-mg-worker-'));
+  const base = cartellaTemporanea('filo-mg-worker-');
   try {
     const origin = setupOrigin(base);
     const r = freshClone(base, origin, 'routine');

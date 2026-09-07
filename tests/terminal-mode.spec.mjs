@@ -13,10 +13,8 @@
 // attivano), non solo l'assenza di errori. shell.js fuori da Windows usa
 // /bin/sh, quindi `/echo …` è eseguibile anche nel cloud Linux headless.
 
-import os from 'node:os';
-import fs from 'node:fs';
-import path from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -126,15 +124,29 @@ test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si 
   // Cartella temporanea reale, distinta dalla home, in cui spostarsi con `cd`.
   // Il processo di test gira sulla stessa macchina della shell: ne prendiamo il
   // path canonico, quello che la shell riporterà come $PWD / %cd% dopo il cd.
-  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'filo-cwd-')));
+  // (Su Windows con un nome utente che contiene uno spazio, `os.tmpdir()` dà la
+  // forma abbreviata 8.3 e la shell risponde con quella lunga: vedi
+  // tests/helpers/percorsi.mjs.)
+  //
+  // Lo SPAZIO nel nome è voluto, e va tenuto. Il percorso canonico di chi
+  // sviluppa Filo ne contiene già uno (l'utente si chiama «agenti AI»), quindi
+  // lì questo caso girava su un percorso spaziato mentre altrove no: la
+  // differenza fra le due macchine tornava a nascondersi qui. Con lo spazio
+  // messo apposta, il percorso è spaziato ovunque e il caso vale ovunque.
+  const dir = cartellaTemporanea('filo cwd-');
   const home = await page.evaluate(async () => {
     const r = await window.filo?.shellHome?.();
     return r?.cwd || '';
   });
   expect(dir).not.toBe(home); // la temp dir NON deve coincidere con la home
+  expect(dir).toContain(' ');  // il caso perde il suo senso se lo spazio sparisce
 
-  // Spostati nella cartella: la riga grigia deve mostrarla.
-  await submitInput(page, `/cd ${dir}`);
+  // Spostati nella cartella: la riga grigia deve mostrarla. Il percorso va fra
+  // VIRGOLETTE: la shell riceve il comando come lo scriverebbe una persona, e
+  // senza virgolette si ferma alla prima parola («can't cd to /tmp/con»), non si
+  // sposta, e il rosso parla della riga di comando invece che della cartella
+  // ricordata. Il test gemello sul contesto del terminale le ha sempre avute.
+  await submitInput(page, `/cd "${dir}"`);
   await expect(page.locator('#dashDir')).toHaveText(dir, { timeout: 12_000 });
 
   // "Esci e rientra": ricarica la dashboard (rilancia l'init, la stessa via che

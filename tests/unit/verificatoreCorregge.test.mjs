@@ -16,8 +16,8 @@ import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -48,7 +48,7 @@ function esegui(argv, env) {
 
 /** Un deposito git posizionato sul ramo del lavoro, con lo stato locale del giro. */
 function casaSulRamo() {
-  const casa = mkdtempSync(resolve(tmpdir(), 'filo-verif-corregge-'));
+  const casa = cartellaTemporanea('filo-verif-corregge-');
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
   execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
   execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });

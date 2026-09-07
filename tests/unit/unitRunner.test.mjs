@@ -18,13 +18,13 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import { collectTestFiles, isTestFile, UNIT_DIR, REPO_ROOT } from '../../scripts/run-unit-tests.mjs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
@@ -70,7 +70,7 @@ describe('raccolta dei file di test', () => {
   });
 
   test('scende nelle sottocartelle, e ignora quello che non è un test', () => {
-    const casa = mkdtempSync(join(tmpdir(), 'filo-runner-'));
+    const casa = cartellaTemporanea('filo-runner-');
     try {
       mkdirSync(join(casa, 'dentro'), { recursive: true });
       mkdirSync(join(casa, 'node_modules'), { recursive: true });
@@ -87,7 +87,7 @@ describe('raccolta dei file di test', () => {
   });
 
   test('cartella assente o vuota: nessun file, e nessuna eccezione', () => {
-    const vuota = mkdtempSync(join(tmpdir(), 'filo-runner-vuota-'));
+    const vuota = cartellaTemporanea('filo-runner-vuota-');
     try {
       assert.deepEqual(collectTestFiles(vuota), []);
       assert.deepEqual(collectTestFiles(join(vuota, 'non-esiste')), []);
@@ -104,7 +104,7 @@ describe('raccolta dei file di test', () => {
 
 describe('il lanciatore lanciato da fuori', () => {
   test('da una cartella qualunque trova comunque i test del repo', () => {
-    const altrove = mkdtempSync(join(tmpdir(), 'filo-altrove-'));
+    const altrove = cartellaTemporanea('filo-altrove-');
     try {
       const r = spawnSync(process.execPath, [LANCIATORE, '--list'], {
         cwd: altrove, encoding: 'utf8',
@@ -120,7 +120,7 @@ describe('il lanciatore lanciato da fuori', () => {
   });
 
   test('zero test trovati = uscita ROSSA, mai un verde silenzioso', () => {
-    const vuota = mkdtempSync(join(tmpdir(), 'filo-vuota-'));
+    const vuota = cartellaTemporanea('filo-vuota-');
     try {
       const r = spawnSync(process.execPath, [LANCIATORE], {
         cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_UNIT_DIR: vuota },

@@ -13,10 +13,11 @@ import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -40,7 +41,7 @@ test('buildExportZip: zip valido con data.json, manifest e immagini estratte', (
   expect(zip[0]).toBe(0x50);
   expect(zip[1]).toBe(0x4b);
 
-  const dir = mkdtempSync(join(tmpdir(), 'filo-zip-'));
+  const dir = cartellaTemporanea('filo-zip-');
   try {
     const zipPath = join(dir, 'export.zip');
     writeFileSync(zipPath, zip);
@@ -67,7 +68,7 @@ test('buildExportZip: zip valido con data.json, manifest e immagini estratte', (
 });
 
 test('pagina Sicurezza: il bottone "Esporta dati" salva uno zip con i dati', async ({ testServer }) => {
-  const userData = mkdtempSync(join(tmpdir(), 'filo-exp-'));
+  const userData = cartellaTemporanea('filo-exp-');
   const seed = {
     filo_memory: { PROFILO: 'TestUtente' },
     clipboardHistory: [
@@ -78,7 +79,7 @@ test('pagina Sicurezza: il bottone "Esporta dati" salva uno zip con i dati', asy
   const outPath = join(userData, 'out.zip');
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

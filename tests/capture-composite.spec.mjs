@@ -10,8 +10,7 @@
 // variegati che portano il file ad almeno qualche decina di kB.
 
 import { _electron as electron, test, expect } from '@playwright/test';
-import { mkdtempSync, rmSync, mkdirSync, statSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, mkdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

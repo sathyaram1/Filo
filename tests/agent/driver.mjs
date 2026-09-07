@@ -19,11 +19,12 @@
 // (con y-SHELL_HEIGHT nelle coordinate della pagina view).
 
 import { _electron as electron } from 'playwright';
-import { mkdtempSync, mkdirSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { argomentiScala } from '../helpers/scala.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
@@ -32,10 +33,16 @@ export const SHELL_HEIGHT = 88;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {} } = {}) {
-  const userData = mkdtempSync(join(tmpdir(), userDataPrefix));
+  // Cartella canonica e con uno spazio nel nome, come per ogni altra partenza:
+  // tests/helpers/percorsi.mjs.
+  const userData = cartellaTemporanea(userDataPrefix);
   const env = { ...process.env, FILO_USER_DATA: userData, ...extraEnv };
   delete env.NODE_ENV; // produzione-like (relay log resta attivo)
-  const app = await electron.launch({ args: ['.'], cwd: APP_ROOT, env });
+  // `argomentiScala` porta qui FILO_TEST_SCALE. Senza, il comando con cui si
+  // GUARDA una modifica visiva girava sempre al 100% anche con la manopola
+  // accesa, e non lo diceva: chi la usava per rivedere un rosso da 125% vedeva
+  // un'immagine che non c'entrava niente.
+  const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env });
   const shell = await app.firstWindow();
   await shell.waitForLoadState('domcontentloaded');
   await sleep(1200); // attendi prima tab + paint

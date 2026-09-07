@@ -3146,6 +3146,22 @@
       reindexByClient();
       renderList();
     },
+    // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
+    // inventati quando i dati non sono arrivati" si affidava al fatto che nel
+    // sandbox dei test Firestore non è raggiungibile: sulla macchina di chi
+    // sviluppa Filo lo è, il caricamento riesce, e quel rosso non parlava di un
+    // difetto ma della rete di casa. Qui lo stato di guasto si CHIEDE, e vale
+    // ovunque allo stesso modo.
+    simulaCaricamentoFallito() {
+      stopLive();
+      liveBlocked = true;
+      testDataInjected = true;   // il caricamento vero, se atterra dopo, non lo annulla
+      allFeedbacks = [];
+      dataLoaded = false;
+      loadFailed = true;
+      reindexByClient();
+      renderList();
+    },
     // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
     // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
     pollNow() { return refreshFromRemote(); },

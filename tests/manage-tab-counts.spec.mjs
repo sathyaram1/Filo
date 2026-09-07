@@ -9,6 +9,7 @@
 // "Ricevuti", "In coda", … e basta.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { righeDiTesto } from './helpers/righe.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -166,21 +167,13 @@ test('#495 — a finestra stretta il nome e il suo numero restano sulla stessa r
   ]);
   await expect(tab(page, 'queue')).toHaveText('In coda (1)');
 
-  // Ogni scheda visibile sta su UNA riga sola: tutti i pezzi del suo contenuto
-  // (nome e numero) hanno lo stesso bordo superiore.
-  const righe = await page.evaluate(() => {
-    const out = [];
-    for (const btn of document.querySelectorAll('.mg-tab')) {
-      if (btn.hidden) continue;
-      const range = document.createRange();
-      range.selectNodeContents(btn);
-      const tops = [...range.getClientRects()].map((r) => Math.round(r.top));
-      out.push({ txt: btn.textContent, righe: new Set(tops).size });
-    }
-    return out;
-  });
+  // Ogni scheda visibile sta su UNA riga sola: nome e numero si sovrappongono
+  // in verticale invece di stare uno sotto l'altro (tests/helpers/righe.mjs:
+  // confrontare i bordi alti arrotondati diceva "due righe" per una scheda
+  // intera su uno schermo al 125%, perché il numero è di un corpo più piccolo).
+  const righe = await righeDiTesto(page, '.mg-tab');
   expect(righe.length).toBeGreaterThan(0);
-  for (const t of righe) expect(t, `"${t.txt}" spezzata su più righe`).toMatchObject({ righe: 1 });
+  for (const t of righe) expect(t, `"${t.testo}" spezzata su più righe`).toMatchObject({ righe: 1 });
 
   // Vanno a capo le schede intere: l'ultima sta più in basso della prima e
   // resta dentro il bordo destro, senza scorrimento laterale della pagina.
@@ -364,8 +357,13 @@ test('#495 — caricamento fallito: nessun numero e nessun "vuoto" inventato', a
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
-  // In questo ambiente non c'è Firestore: il caricamento fallisce da solo.
+  // Il guasto si CHIEDE, non si spera: aspettando che Firestore sia
+  // irraggiungibile, questo spec era verde nel sandbox delle routine e rosso
+  // sulla macchina di chi sviluppa Filo, dove la rete c'è e il caricamento
+  // riesce. Prima si lascia finire il caricamento vero, poi si impone il
+  // fallimento — così lo stato in prova è quello, ovunque.
   await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.simulaCaricamentoFallito());
 
   const vuoto = page.locator('#mgListEmpty');
   await expect(vuoto).toContainText('Errore');

@@ -1,10 +1,10 @@
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIRM_HOST } from './helpers/confirm.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #256: nella cronologia degli appunti (freccia accanto a "Incolla")
 // l'utente poteva solo incollare le voci, non rimuoverne una singola né svuotare
@@ -48,7 +48,7 @@ const PAGE_HTML = `<!doctype html><html><body style="padding:40px"><textarea id=
 
 async function launchWithHistory(userData) {
   return electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -61,7 +61,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     { type: 'text', text: 'secondo testo generico', ts: Date.now() - 2000 },
     { type: 'text', text: 'terzo testo normale', ts: Date.now() - 1000 },
   ];
-  const userData = mkdtempSync(join(tmpdir(), 'filo-clip-rm-'));
+  const userData = cartellaTemporanea('filo-clip-rm-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: history }), 'utf8');
 
   const url = testServer.html(
@@ -70,7 +70,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
   const host = new URL(url).hostname;
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -137,7 +137,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     { type: 'text', text: 'secondo testo generico', ts: Date.now() - 2000 },
     { type: 'text', text: 'terzo testo normale', ts: Date.now() - 1000 },
   ];
-  const userData = mkdtempSync(join(tmpdir(), 'filo-clip-rm2-'));
+  const userData = cartellaTemporanea('filo-clip-rm2-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: history }), 'utf8');
 
   const url = testServer.html(PAGE_HTML);
@@ -169,7 +169,27 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
 
     // Porta il mouse lontano: il sotto-menu si richiude da solo, il menu del
     // tasto destro resta aperto (si chiude solo con un click o Esc).
-    await page.mouse.move(4, 4);
+    //
+    // Il punto "lontano" si CHIEDE alla pagina invece di scriverlo a mano: menu
+    // e sotto-menu nascono dove capita il click e sono grandi quanto li fa il
+    // testo, che cambia coi font di sistema. Un angolo fisso che su una macchina
+    // è vuoto, su un'altra sta ancora dentro il sotto-menu — e allora il mouse
+    // non ne è mai uscito, il timer di chiusura non parte, e il rosso dice
+    // "non si chiude" parlando del test, non di Filo. E ci si arriva muovendosi,
+    // non teletrasportandosi: è quello che fa una mano.
+    const lontano = await page.evaluate(() => {
+      const rects = Array.from(document.querySelectorAll('.sn-menu'))
+        .map((el) => el.getBoundingClientRect());
+      const dentro = (x, y) => rects.some((r) => x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4);
+      const candidati = [
+        [4, 4], [window.innerWidth - 4, 4],
+        [4, window.innerHeight - 4], [window.innerWidth - 4, window.innerHeight - 4],
+      ];
+      const buono = candidati.find(([x, y]) => !dentro(x, y));
+      return buono ? { x: buono[0], y: buono[1] } : null;
+    });
+    expect(lontano, 'nessun angolo della pagina è fuori dal menu').toBeTruthy();
+    await page.mouse.move(lontano.x, lontano.y, { steps: 12 });
     await expect(page.locator('.sn-menu-history-sub')).toHaveCount(0, { timeout: 5000 });
     await expect(page.locator('.sn-menu')).toBeVisible();
 

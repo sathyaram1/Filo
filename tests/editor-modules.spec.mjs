@@ -14,10 +14,11 @@
 // describe per file di provenienza.
 
 import { _electron as electron, expect, test } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -30,9 +31,9 @@ let userData = null;
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
-  userData = mkdtempSync(join(tmpdir(), 'filo-test-'));
+  userData = cartellaTemporanea('filo-test-');
   app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -319,6 +320,33 @@ test.describe('font picker e drag dei moduli', () => {
     expect(spurious).toBe('');
   });
 
+  // Un punto della pagina che è DAVVERO su `dentro` e non su qualcos'altro:
+  // lo si chiede al browser (`elementFromPoint`) invece di fidarsi di una
+  // coordinata scritta a mano. La tendina del font è `position: fixed` e nasce
+  // dove capita il modulo: un angolo che su una macchina è vuoto, su un'altra —
+  // altri font di sistema, altre altezze di riga, quindi un'altra griglia — sta
+  // sotto la tendina, e il click che doveva chiuderla non la raggiunge nemmeno.
+  // È la stessa causa del flake già annotato qui sotto per la topbar.
+  async function puntoSu(page, selettore) {
+    const p = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      // Si prova a scendere lungo la diagonale: il primo punto che appartiene
+      // davvero all'elemento (o a un suo discendente) è quello buono.
+      for (let f = 0.05; f < 0.95; f += 0.05) {
+        const x = Math.round(r.left + r.width * f);
+        const y = Math.round(r.top + r.height * f);
+        if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) continue;
+        const sotto = document.elementFromPoint(x, y);
+        if (sotto && (sotto === el || el.contains(sotto))) return { x, y };
+      }
+      return null;
+    }, selettore);
+    expect(p, `nessun punto cliccabile di ${selettore}: è tutto coperto`).toBeTruthy();
+    return p;
+  }
+
   test('il dropdown del font si chiude con un click fuori da esso', async () => {
     const page = await openTab(EDITOR);
     await page.waitForSelector('.ed-grid');
@@ -331,13 +359,24 @@ test.describe('font picker e drag dei moduli', () => {
     // Click sul documento → si chiude.
     await button.click();
     await expect(pop).toBeVisible();
-    await page.locator('#doc').click({ position: { x: 5, y: 5 } });
+    const nelDoc = await puntoSu(page, '#doc');
+    await page.mouse.click(nelDoc.x, nelDoc.y);
     await expect(pop).toBeHidden();
 
-    // Click in un angolo lontano della pagina → si chiude.
+    // Click lontano dalla tendina → si chiude. L'angolo si sceglie DOPO aver
+    // guardato dove sta la tendina: quello opposto, così è lontano davvero.
     await button.click();
     await expect(pop).toBeVisible();
-    await page.mouse.click(2, 2);
+    const angolo = await page.evaluate(() => {
+      const r = document.querySelector('.ed-font-pop').getBoundingClientRect();
+      const centroX = (r.left + r.right) / 2;
+      const centroY = (r.top + r.bottom) / 2;
+      return {
+        x: centroX > window.innerWidth / 2 ? 2 : window.innerWidth - 3,
+        y: centroY > window.innerHeight / 2 ? 2 : window.innerHeight - 3,
+      };
+    });
+    await page.mouse.click(angolo.x, angolo.y);
     await expect(pop).toBeHidden();
 
     // Click su un controllo della topbar → si chiude. NB: la .ed-topbar è un
@@ -352,6 +391,79 @@ test.describe('font picker e drag dei moduli', () => {
     await expect(pop).toBeVisible();
     await page.locator('#sidebarToggle').click();
     await expect(pop).toBeHidden();
+  });
+
+  // La tendina è larga almeno 180px anche quando il modulo che la apre è più
+  // stretto, e i moduli stanno nella colonna di destra: allineata al bordo
+  // sinistro del suo bottone, in una finestra stretta la metà destra finisce
+  // fuori dallo schermo e i nomi dei font si leggono a metà. Senza il rientro
+  // il primo assert è rosso: il bordo destro della tendina supera la finestra.
+  test('la tendina del font resta dentro la finestra anche quando è stretta', async () => {
+    const page = await openTab(EDITOR);
+    await page.waitForSelector('.ed-grid');
+    await page.setViewportSize({ width: 520, height: 800 });
+    await addFontModule(page);
+
+    const mod = page.locator('.ed-module[data-type="font"]');
+    await mod.locator('.ed-font-button').click();
+    await expect(mod.locator('.ed-font-pop')).toBeVisible();
+
+    const m = await page.evaluate(() => {
+      const pop = document.querySelector('.ed-font-pop');
+      const btn = document.querySelector('.ed-font-button');
+      const p = pop.getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      return {
+        vw: window.innerWidth, left: p.left, right: p.right,
+        // Se allineata al bottone la tendina non sarebbe uscita, questo caso non
+        // prova niente: meglio saperlo subito che avere un verde vuoto.
+        sarebbeUscita: b.left + p.width > window.innerWidth,
+      };
+    });
+    expect(m.sarebbeUscita, 'a questa larghezza la tendina non sborderebbe comunque: il caso non prova niente').toBe(true);
+    expect(m.right, 'la tendina esce dal bordo destro').toBeLessThanOrEqual(m.vw);
+    expect(m.left, 'la tendina esce dal bordo sinistro').toBeGreaterThanOrEqual(0);
+
+    // E si legge davvero: i nomi dei font sono cliccabili, non tagliati fuori.
+    await expect(mod.locator('.ed-font-pop .sn-select-option').first()).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  // La finestra si stringe anche DOPO. Rientrare solo all'apertura vuol dire
+  // calcolare lo spazio su una finestra che un istante dopo non c'è più: la
+  // tendina resta dov'era, cioè fuori dalla pagina, e non si raggiunge in nessun
+  // modo. Misurato prima della cura: aperta in una finestra da 1280 la tendina
+  // stava fra 859 e 1039, e portando la finestra a 520 restava esattamente lì.
+  test('la tendina del font rientra anche se la finestra si stringe mentre è aperta', async () => {
+    const page = await openTab(EDITOR);
+    await page.waitForSelector('.ed-grid');
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await addFontModule(page);
+
+    const mod = page.locator('.ed-module[data-type="font"]');
+    const pop = mod.locator('.ed-font-pop');
+    await mod.locator('.ed-font-button').click();
+    await expect(pop).toBeVisible();
+
+    // Aperta in una finestra larga sta comodamente dentro: è il punto di
+    // partenza, non ancora la prova.
+    const prima = await page.evaluate(() => {
+      const p = document.querySelector('.ed-font-pop').getBoundingClientRect();
+      return { vw: window.innerWidth, left: p.left, right: p.right };
+    });
+    expect(prima.right).toBeLessThanOrEqual(prima.vw);
+
+    // Adesso la finestra si stringe, con la tendina ancora aperta.
+    await page.setViewportSize({ width: 520, height: 800 });
+    await expect(pop).toBeVisible();
+    await expect.poll(async () => page.evaluate(() => {
+      const p = document.querySelector('.ed-font-pop').getBoundingClientRect();
+      return Math.round(p.right) <= window.innerWidth && Math.round(p.left) >= 0;
+    }), { timeout: 3000, message: 'la tendina è rimasta fuori dalla finestra ristretta' }).toBe(true);
+
+    // E resta usabile: i nomi dei font si vedono e si possono cliccare.
+    await expect(pop.locator('.sn-select-option').first()).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
   });
 
   test('un modulo si può afferrare da qualsiasi punto tenendo premuto (non solo dalla maniglia)', async () => {

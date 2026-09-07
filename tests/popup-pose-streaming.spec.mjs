@@ -84,6 +84,14 @@ const misura = () => {
   return {
     vh: window.innerHeight,
     vw: window.innerWidth,
+    // `larghezzaDiLayout` è la larghezza del riquadro SENZA la trasformazione:
+    // il rettangolo qui sopra la include, e la compensazione zoom ne mette una
+    // (`scale()`) ogni volta che `devicePixelRatio` cambia. Su uno schermo di
+    // sistema al 125% quel fattore parte da 1.25, e `setViewportSize` lo
+    // riporta a 1: il riquadro resta largo 380 di layout ma ne misura 475 sullo
+    // schermo. Chi vuole sapere se il riquadro "è tornato largo com'era" deve
+    // guardare la sua larghezza, non quanto lo ingrandisce lo zoom.
+    larghezzaDiLayout: root.offsetWidth,
     top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height,
     inputTop: i.top, inputBottom: i.bottom, inputLeft: i.left, inputRight: i.right,
     sendRight: s ? s.right : 0,
@@ -943,7 +951,7 @@ test('finestra ristretta col riquadro aperto: si stringe per starci, e riallarga
   test.setTimeout(90_000);
   const page = await openTab('filo://newtab/');
   const prima = await riquadroPosato(app, page);
-  const largo = prima.right - prima.left;
+  const largo = prima.larghezzaDiLayout;
   expect(largo, 'in una finestra larga il riquadro deve avere la sua larghezza piena').toBeGreaterThan(300);
 
   const alta = prima.vh;
@@ -965,7 +973,7 @@ test('finestra ristretta col riquadro aperto: si stringe per starci, e riallarga
   await expect.poll(
     async () => {
       const m = await page.evaluate(misura);
-      return Math.round(m.right - m.left);
+      return Math.round(m.larghezzaDiLayout);
     },
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
   ).toBe(Math.round(largo));

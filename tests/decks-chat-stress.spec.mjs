@@ -70,10 +70,17 @@ async function mockProvider(app) {
     globalThis.__chatCalls = [];
     globalThis.__nextReply = JSON.stringify({ reply: 'ok' });
     globalThis.__failNext = false;
+    globalThis.__trattieni = null;   // se armata, il provider resta "a pensare"
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       globalThis.__chatCalls.push(messages);
       if (globalThis.__failNext) { globalThis.__failNext = false; throw new Error('provider giù'); }
-      await new Promise((r) => setTimeout(r, 50));
+      // "Mentre il provider pensa" dev'essere un FATTO, non una speranza: con
+      // una semplice attesa di 50ms, su una macchina in cui i comandi del test
+      // viaggiano più lenti di così la prima risposta era già arrivata quando
+      // partiva il secondo invio — e il secondo scambio, legittimamente, partiva
+      // davvero. Il test si tiene in mano il momento in cui la risposta esce.
+      if (globalThis.__trattieni) await globalThis.__trattieni;
+      else await new Promise((r) => setTimeout(r, 50));
       return { text: String(globalThis.__nextReply), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
     // La chat dei mazzi chiede il reasoning → cammino streaming: delega al
@@ -88,6 +95,21 @@ async function mockProvider(app) {
 
 async function setReply(app, value) {
   await app.evaluate((_electron, v) => { globalThis.__nextReply = v; }, value);
+}
+
+// Blocca il provider sul "sto pensando" finché non lo si libera.
+async function trattieni(app) {
+  await app.evaluate(() => {
+    globalThis.__trattieni = new Promise((r) => { globalThis.__liberaProvider = r; });
+  });
+}
+async function libera(app) {
+  await app.evaluate(() => {
+    const r = globalThis.__liberaProvider;
+    globalThis.__trattieni = null;
+    globalThis.__liberaProvider = null;
+    if (r) r();
+  });
 }
 
 async function deckWithCommander(page) {
@@ -144,11 +166,25 @@ test('input vuoto/spazi non parte; 10k caratteri e doppio invio rapido non rompo
   expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(0);
 
   // Doppio invio rapido mentre il provider "pensa": parte UN solo scambio.
+  // Il provider viene TRATTENUTO, così la seconda invio cade con certezza
+  // mentre il primo è ancora in volo (vedi `trattieni`).
   await setReply(app, JSON.stringify({ reply: 'prima risposta' }));
+  await trattieni(app);
   await page.fill('#chatInput', 'primo');
   await page.press('#chatInput', 'Enter');
+  await expect.poll(() => app.evaluate(() => globalThis.__chatCalls.length)).toBe(1);
+
+  // Il provider è DAVVERO ancora al lavoro: se questa riga fosse verde perché
+  // la risposta è già arrivata, lo scenario "mentre pensa" non ci sarebbe e il
+  // resto del test non proverebbe niente.
+  await expect(page.locator('#chatLog')).not.toContainText('prima risposta');
+
   await page.fill('#chatInput', 'secondo (mentre pensa)');
   await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-user')).toHaveCount(1);
+  expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(1);
+
+  await libera(app);
   await expect(page.locator('.dk-msg-bot').last()).toContainText('prima risposta');
   await expect(page.locator('.dk-msg-user')).toHaveCount(1);
   expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(1);

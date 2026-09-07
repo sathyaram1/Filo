@@ -21,10 +21,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs';
+import { rmSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -91,7 +92,7 @@ describe('il percorso: chi suona e chi ascolta devono guardare lo stesso punto',
   });
 
   test('suonare scrive, e chi legge ritrova la richiesta', () => {
-    const base = mkdtempSync(join(tmpdir(), 'filo-mac-'));
+    const base = cartellaTemporanea('filo-mac-');
     try {
       assert.equal(S.note('ab12cd34ef56ab12cd34ef56', base), true);
       assert.ok(existsSync(S.signalFile(base)));
@@ -105,7 +106,7 @@ describe('il percorso: chi suona e chi ascolta devono guardare lo stesso punto',
     // `npm run finish` non deve morire perché una cartella non è scrivibile:
     // l'avviso si vedrà comunque al rientro nella finestra o riaprendo. Qui la
     // base è un FILE, non una cartella: mkdir non può riuscire.
-    const base = mkdtempSync(join(tmpdir(), 'filo-mac-'));
+    const base = cartellaTemporanea('filo-mac-');
     const finto = join(base, 'non-e-una-cartella');
     try {
       writeFileSync(finto, 'x');
@@ -207,7 +208,7 @@ describe('il rientro nella finestra', () => {
 // ── L'ascolto vero, su file veri ────────────────────────────────────────────
 
 test('chi ascolta sente chi suona (file veri, processi diversi)', async () => {
-  const base = mkdtempSync(join(tmpdir(), 'filo-mac-'));
+  const base = cartellaTemporanea('filo-mac-');
   let colpi = 0;
   const stop = S.watchSignal(() => { colpi++; }, { base, debounceMs: 30 });
   try {

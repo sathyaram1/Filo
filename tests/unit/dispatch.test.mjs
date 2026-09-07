@@ -13,13 +13,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
-const TMP = mkdtempSync(resolve(tmpdir(), 'filo-dispatch-'));
+const TMP = cartellaTemporanea('filo-dispatch-');
 process.env.FILO_DISPATCH_STATE_DIR = TMP;
 // Anche la ROOT: emit() ci scrive il marcatore di ruolo (#443) e non deve
 // sporcare il checkout vero durante i test.
@@ -573,7 +573,7 @@ test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il 
   const { spawnSync } = await import('node:child_process');
   const { writeTicket, ticketFile } = await import('../../scripts/lib/routine-ticket.mjs');
   const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
-  const sandbox = mkdtempSync(resolve(tmpdir(), 'filo-cli-'));
+  const sandbox = cartellaTemporanea('filo-cli-');
   try {
     const env = {
       ...process.env,

@@ -1,9 +1,10 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #272: nella pagina Cronologia AI alcune azioni (descrivi immagine,
 // trascrizione vocale/OCR, modifica testo, spiega link) comparivano col loro
@@ -46,11 +47,11 @@ test('history page shows readable labels and filter options for all action types
     costEur: 0.0001,
   }));
 
-  const userData = mkdtempSync(join(tmpdir(), 'filo-hist-'));
+  const userData = cartellaTemporanea('filo-hist-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ aiHistory }), 'utf8');
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

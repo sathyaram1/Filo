@@ -1,16 +1,45 @@
 {
-  "nota": "Spec Playwright rossi ANCHE su main sulla macchina dell'owner (Windows, utente con lo spazio nel nome), per motivi d'ambiente e non di codice: percorso abbreviato del terminale, misure di layout sotto carico, rete di casa. Il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. Risolverli alla radice, e svuotare l'elenco: feedback #563.",
-  "specs": [
-    "tests/filo-terminal-command",
-    "tests/filo-terminal-context",
-    "tests/terminal-mode",
-    "tests/verify-downloads-410",
-    "tests/verifier-stress-410",
-    "tests/verify-398-local-address",
-    "tests/clipboard-history-remove",
-    "tests/editor-modules",
-    "tests/popup-pose-streaming",
-    "tests/manage-tab-counts",
-    "tests/decks-chat-stress"
-  ]
+  "nota": "Spec Playwright che sono rossi ANCHE su main su una macchina precisa, per motivi d'ambiente e non di codice. Due elenchi, perché le macchine sono due e le regole diverse. `specs` sono i rossi della macchina di chi sviluppa Filo: il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. `contenitore` sono i rossi dei contenitori senza schermo in cui girano le routine: nessuno strumento li salta, servono a chi verifica per non scambiarli per regressioni. Per entrambi vale la stessa cosa: l'elenco VUOTO è lo stato normale, ogni voce è un controllo spento, e un controllo spento non protegge nessuno. Se devi aggiungere una voce scrivi QUI perché e apri un feedback per toglierla: un'eccezione senza una data di scadenza diventa permanente. Il primo elenco (feedback #563) conteneva undici spec della macchina di chi sviluppa Filo, ed è stato svuotato risolvendo caso per caso: quasi sempre era il test a dare per scontato qualcosa dell'ambiente (il percorso abbreviato 8.3 di %TEMP% quando il nome utente ha uno spazio, lo zoom di sistema al 125%, la rete di casa raggiungibile, un provider finto che risponde più in fretta di quanto il test riesca a digitare).",
+  "specs": [],
+  "contenitore": {
+    "nota": "Rossi a ogni giro di routine, su qualunque ramo, perché il contenitore non ha uno schermo vero né la rete aperta. Stavano nella memoria di chi verificava (le sue istruzioni ne facevano l'elenco a voce) e nessuno aveva una data di scadenza: un controllo spento senza un posto dove essere scritto è un controllo che nessuno rimetterà mai in piedi. Chi verifica confronta questo elenco con i rossi della sua corsa: quello che non è qui dentro è una regressione. Il primo elenco (feedback #563, terzo giro) ne contava sei; il settimo, «la finestra non compare sullo schermo», è uscito subito chiedendo la trasparenza solo dove il sistema sa darla e verificando sempre la posizione, che è la metà che conta.",
+    "specs": [
+      {
+        "spec": "tests/capture-composite",
+        "caso": "screenshot newtab e screenshot dashboard: file esiste e non è vuoto",
+        "perche": "cattura la finestra a livello di sistema operativo, ma durante la suite la finestra è parcheggiata fuori dallo schermo di proposito: quello che torna è nero. Serve uno schermo vero con la finestra sopra.",
+        "feedback": "#563"
+      },
+      {
+        "spec": "tests/filo-window-command",
+        "caso": "COMANDO_FINESTRA fullscreen mette e toglie lo schermo intero",
+        "perche": "sotto Xvfb, senza gestore di finestre, chiedere il tutto schermo fa morire il processo dell'app.",
+        "feedback": "#563"
+      },
+      {
+        "spec": "tests/fullscreen-content",
+        "caso": "il contenuto copre la barra e Esc ripristina",
+        "perche": "stessa causa: il tutto schermo non esiste in un contenitore senza gestore di finestre.",
+        "feedback": "#563"
+      },
+      {
+        "spec": "tests/tab-html-fullscreen",
+        "caso": "la richiesta di fullscreen della pagina porta la view a tutto schermo",
+        "perche": "stessa causa: il tutto schermo non esiste in un contenitore senza gestore di finestre.",
+        "feedback": "#563"
+      },
+      {
+        "spec": "tests/hidden-window",
+        "caso": "nemmeno a tutto schermo la finestra diventa visibile",
+        "perche": "stessa causa: il caso deve METTERE la finestra a tutto schermo per provarla, e lì l'app muore. Gli altri casi dello stesso file girano.",
+        "feedback": "#563"
+      },
+      {
+        "spec": "tests/transparency-page",
+        "caso": "un link a una fonte apre una scheda e non porta via la pagina interna",
+        "perche": "apre un sito vero su internet, che dal contenitore non si raggiunge.",
+        "feedback": "#563"
+      }
+    ]
+  }
 }

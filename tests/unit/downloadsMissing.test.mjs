@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, writeFileSync, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,7 +21,7 @@ const ROOT = join(__dirname, '..', '..');
 
 const DL = require(join(ROOT, 'src', 'main', 'services', 'downloads.js'));
 
-const dir = mkdtempSync(join(tmpdir(), 'filo-dl-'));
+const dir = cartellaTemporanea('filo-dl-');
 
 function rec(over) {
   return {

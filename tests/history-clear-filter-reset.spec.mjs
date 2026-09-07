@@ -1,10 +1,11 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #392: nella Cronologia AI il pulsante "Cancella tutto" svuotava la
 // lista ma NON aggiornava il menu "filtra per tipo", che continuava a elencare i
@@ -45,11 +46,11 @@ test('Cronologia AI: dopo "Cancella tutto" il menu filtro torna alla sola "Tutte
       output: 'testo rivisto', origin: 'https://example.com', costEur: 0.0001 },
   ];
 
-  const userData = mkdtempSync(join(tmpdir(), 'filo-hist-clear-'));
+  const userData = cartellaTemporanea('filo-hist-clear-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ aiHistory }), 'utf8');
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });

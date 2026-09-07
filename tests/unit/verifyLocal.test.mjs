@@ -9,8 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -245,7 +244,7 @@ function g(cwd, args) {
  * toccano lo stesso file.
  */
 function scenario({ conflitto }) {
-  const base = mkdtempSync(resolve(tmpdir(), 'filo-verify-'));
+  const base = cartellaTemporanea('filo-verify-');
   sandbox.push(base);
   const origin = resolve(base, 'origin.git');
   const work = resolve(base, 'work');
@@ -467,12 +466,12 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
 // `critica`. Prima stampava «il lavoro torna a chi l'ha fatto» e la fase 2
 // non usciva mai: start e critica respinti, e l'unica uscita era «corretto».
 import { execFileSync as _exec } from 'node:child_process';
-import { mkdtempSync as _mkdtemp, writeFileSync as _write } from 'node:fs';
-import { tmpdir as _tmp } from 'node:os';
+import { writeFileSync as _write } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 const _ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 function depositoUsaEGetta() {
-  const casa = _mkdtemp(resolve(_tmp(), 'filo-vl-cli-'));
+  const casa = cartellaTemporanea('filo-vl-cli-');
   const g = (...a) => _exec('git', a, { cwd: casa, encoding: 'utf8' });
   g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
   _write(resolve(casa, '.gitignore'), '.claude/\n', 'utf8');

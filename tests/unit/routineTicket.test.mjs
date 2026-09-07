@@ -11,8 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,7 +21,7 @@ const { readTicket, writeTicket, clearTicket, isFresh, ticketFile, MAX_AGE_MS } 
   await import('../../scripts/lib/routine-ticket.mjs');
 
 function tempRoot() {
-  const d = mkdtempSync(resolve(tmpdir(), 'filo-ticket-'));
+  const d = cartellaTemporanea('filo-ticket-');
   mkdirSync(resolve(d, '.claude'), { recursive: true });
   return d;
 }
@@ -251,6 +250,7 @@ test('scrivere un biglietto vuoto non crea un marcatore fasullo', () => {
 // Adesso un argomento non capito ferma la consegna invece di essere ignorato.
 
 import { spawnSync } from 'node:child_process';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const CANALE = resolve(fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url)));
 

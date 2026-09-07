@@ -13,7 +13,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
-import os from 'node:os';
+import { tempCanonico } from './helpers/percorsi.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -52,7 +52,7 @@ test('livello 1 (sola lettura) esegue subito e cattura l’output', async ({ app
 test('livello 2 (mkdir) non esegue senza conferma; la conferma crea la cartella', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
-  const dir = path.join(os.tmpdir(), `filo-cmd-${Date.now()}`);
+  const dir = path.join(tempCanonico(), `filo-cmd-${Date.now()}`);
   const action = { type: 'ESEGUI_COMANDO', comando: `mkdir "${dir}"` };
 
   // Senza conferma: livello 2, non esegue, la cartella non esiste.
@@ -118,13 +118,22 @@ test('#390 — i git che scartano lavoro non salvato chiedono la conferma forte,
 test('#201 — una concatenazione di soli comandi sicuri esegue senza conferma', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
-  // `cd <tmp> && echo <marker>`: due letture concatenate. Prima del fix #201 il
-  // solo `&&` la portava a livello 3 ("conferma" per un'azione irreversibile);
-  // ora il livello è il massimo dei pezzi (1) → esegue subito.
+  // `cd <tmp> <sep> echo <marker>`: due letture concatenate. Prima del fix #201
+  // il solo separatore la portava a livello 3 ("conferma" per un'azione
+  // irreversibile); ora il livello è il massimo dei pezzi (1) → esegue subito.
+  //
+  // Il separatore è quello che capisce la shell che gira DAVVERO (la sceglie
+  // src/main/services/terminal.js in base alla piattaforma): Windows PowerShell
+  // 5.1 non conosce `&&` e lo rifiuta come errore di sintassi, quindi lì il
+  // comando non uscirebbe mai — e il rosso parlerebbe della shell, non del
+  // livello di sicurezza, che è la cosa in prova qui. Che `&&` valga 1 su una
+  // sequenza di sole letture lo verifica tests/unit/cmdClassify.test.mjs, che è
+  // logica pura e gira uguale ovunque.
+  const separatore = process.platform === 'win32' ? ';' : '&&';
   const marker = `filo201-${Date.now()}`;
   const r = await execAction(app, {
     type: 'ESEGUI_COMANDO',
-    comando: `cd "${os.tmpdir()}" && echo ${marker}`,
+    comando: `cd "${tempCanonico()}" ${separatore} echo ${marker}`,
   });
   expect(r.executed).toBe(true);
   expect(r.needsConfirm).toBeFalsy();

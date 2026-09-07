@@ -14,10 +14,11 @@ import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 import { createRequire } from 'node:module';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -42,7 +43,7 @@ async function findInternalPage(app, hostname, timeout = 10000) {
 }
 
 test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'filo-imp-'));
+  const userData = cartellaTemporanea('filo-imp-');
 
   // Sul computer di destinazione c'è già qualcosa: deve sopravvivere all'import.
   const preesistente = {
@@ -63,7 +64,7 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
   writeFileSync(zipPath, buildExportZip(backup));
 
   const app = await electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
@@ -142,8 +143,8 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
 test('"trasferire i dati su un altro computer": esporto da un profilo, importo in uno vuoto', async () => {
   // La promessa scritta sotto "Esporta dati". Qui la esercitiamo per intero,
   // dalla UI: nessuno dei due passaggi usa scorciatoie interne.
-  const profiloA = mkdtempSync(join(tmpdir(), 'filo-pcA-'));
-  const profiloB = mkdtempSync(join(tmpdir(), 'filo-pcB-'));
+  const profiloA = cartellaTemporanea('filo-pcA-');
+  const profiloB = cartellaTemporanea('filo-pcB-');
   const trasferimento = join(profiloA, 'trasferimento.zip');
 
   const miei = {
@@ -153,7 +154,7 @@ test('"trasferire i dati su un altro computer": esporto da un profilo, importo i
   writeFileSync(join(profiloA, 'storage.json'), JSON.stringify(miei), 'utf8');
 
   const launch = (userData) => electron.launch({
-    args: ['.'],
+    args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
