@@ -111,8 +111,18 @@
       const b = toMillis(o.toISO);
       // Una sola delle due date è una scelta legittima («da allora in poi»,
       // «fino a quel giorno»): non è un errore, è un limite solo.
+      //
+      // Nemmeno NESSUNA delle due è un errore: senza limiti la finestra è
+      // «sempre», ed è esattamente quello che i numeri qui sotto raccontano.
+      // Chiamarlo errore («Scegli almeno una delle due date», in rosso) mentre
+      // la riga accanto diceva «da sempre» e le tessere mostravano tutto lo
+      // storico faceva dire alla stessa schermata tre cose diverse. È una nota:
+      // dice cosa stai guardando e cosa fare per restringere.
       if (a == null && b == null) {
-        return { key: 'custom', label: 'Personalizzata', from: null, to: null, invalid: 'Scegli almeno una delle due date.' };
+        return {
+          key: 'custom', label: 'Personalizzata', from: null, to: null,
+          nota: 'Nessuna data scelta: questi sono i numeri di sempre. Scegline una per restringere la finestra.',
+        };
       }
       let from = a == null ? null : startOfDay(a);
       let to = b == null ? null : startOfDay(b) + DAY;
