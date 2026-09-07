@@ -7,8 +7,33 @@
 //   funzionare e invece cadeva in due casi reali, entrambi coperti qui sotto.
 //
 // Senza la protezione ognuno di questi assert diventa rosso.
+//
+// LA TRASPARENZA NON SI PUÒ CHIEDERE DAPPERTUTTO, LA POSIZIONE SÌ
+//   L'opacità di una finestra la applica il compositore del sistema. Nei
+//   contenitori senza schermo delle routine (Xvfb, nessun compositore) chiederla
+//   non fa niente e rileggerla dà sempre 1: questo spec era rosso a ogni giro in
+//   cloud, si fermava sulla PRIMA riga, e le due cose che lì si possono ancora
+//   verificare — che la finestra stia fuori dallo schermo e non rubi il fuoco —
+//   non venivano più guardate da nessuno. È così che è passato inosservato per
+//   settimane un difetto vero sul parcheggio della finestra (a schermo scalato la
+//   coordinata girava e la finestra ricompariva sul monitor). Adesso la
+//   trasparenza si chiede solo dove il sistema sa darla, e il resto si verifica
+//   sempre: un controllo che non gira non protegge nessuno.
 
 import { test, expect } from './fixtures/electron.mjs';
+
+// Il sistema sa davvero rendere trasparente una finestra? Si chiede a una
+// finestra di prova, non a quella sotto esame: così la risposta non è l'assert
+// che vogliamo fare.
+async function trasparenzaDisponibile(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const prova = new BrowserWindow({ show: false, width: 120, height: 120 });
+    try {
+      prova.setOpacity(0.5);
+      return prova.getOpacity() < 1;
+    } finally { prova.destroy(); }
+  });
+}
 
 // Stato della finestra letto DAL PROCESSO PRINCIPALE: è la verità del sistema
 // operativo, non un'opinione del codice sotto test.
