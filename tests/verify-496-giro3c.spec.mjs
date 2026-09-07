@@ -28,22 +28,20 @@ async function pronta(page) {
   await page.evaluate(() => window.__mgTest.whenReady());
 }
 
-// Tasto destro VERO (nessun force): si prende il rettangolo e si preme dentro.
-async function destroSu(page, sel, dentro) {
+// Tasto destro come lo fa Playwright quando funziona: locator.click destro.
+async function destroSu(page, sel) {
   const el = page.locator(sel).first();
   if (await el.count() === 0) return 'ELEMENTO ASSENTE';
-  const b = await el.boundingBox();
-  if (!b || b.width < 1 || b.height < 1) return `RETTANGOLO NULLO ${JSON.stringify(b)}`;
-  const p = dentro || { x: b.width / 2, y: b.height / 2 };
-  await page.mouse.click(b.x + p.x, b.y + p.y, { button: 'right' });
+  try { await el.click({ button: 'right', timeout: 4000 }); }
+  catch (e) { return 'CLIC IMPOSSIBILE: ' + String(e.message).split('\n')[0]; }
   await page.waitForTimeout(350);
   const testo = await page.evaluate(() => {
     const m = [...document.querySelectorAll('[class*="ctxmenu"], [class*="context-menu"], .sn-select-menu')]
-      .filter((x) => x.offsetParent !== null);
+      .filter((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(x).visibility !== 'hidden'; });
     return m.length ? m.map((x) => x.innerText.replace(/\s*\n\s*/g, ' | ')).join(' ### ') : 'NESSUN MENU VISIBILE';
   });
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(200);
   return testo;
 }
 
@@ -60,7 +58,7 @@ test('sonda: tasto destro punto per punto', async ({ openTab }) => {
   esiti['riga priorità alta'] = await destroSu(page, '#mgStHealthRows .mg-st-row');
   esiti['riga riaperture'] = await destroSu(page, '#mgStSignalRows .mg-st-row');
   esiti['titolo di una sezione'] = await destroSu(page, '#panel-fbstats h3');
-  esiti['spazio bianco del pannello'] = await destroSu(page, '#panel-fbstats', { x: 4, y: 4 });
+  esiti['spazio bianco del pannello'] = await destroSu(page, '#mgStSparkDesc');
 
   // Le barrette: quella con più feedback dentro (non una a zero).
   const iPiena = await page.evaluate(() => {
@@ -78,5 +76,9 @@ test('sonda: tasto destro punto per punto', async ({ openTab }) => {
     return b.map((x) => ({ count: x.dataset.count, h: Math.round(x.getBoundingClientRect().height), w: +x.getBoundingClientRect().width.toFixed(1) }));
   });
   console.log('MISURE BARRETTE →', JSON.stringify(misure));
+  esiti['riga creatori (secondo tentativo, in coda)'] = await destroSu(page, '#mgStCreatorRows .mg-st-row');
+  esiti['riga priorità alta (secondo tentativo)'] = await destroSu(page, '#mgStHealthRows .mg-st-row');
+  esiti['riga riaperture (secondo tentativo)'] = await destroSu(page, '#mgStSignalRows .mg-st-row');
+  esiti['titolo di sezione (secondo tentativo)'] = await destroSu(page, '#panel-fbstats h3');
   console.log('SONDA TASTO DESTRO →', JSON.stringify(esiti, null, 2));
 });
