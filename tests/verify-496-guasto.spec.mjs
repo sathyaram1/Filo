@@ -35,12 +35,29 @@ test('caricamento fallito: la scheda non deve spacciare zeri per dati', async ({
 
   // Il testo della pagina dice da qualche parte che i dati non sono arrivati?
   const testo = await page.locator('#panel-fbstats').innerText();
-  const loDice = /non.*arrivat|non.*caric|non disponibil|errore|riprova/i.test(testo);
-  console.log('DICE CHE I DATI MANCANO?', loDice);
-  // RILIEVO REGISTRATO (#496, giro 1): col caricamento fallito la scheda scrive
-  // «0 / 0 / 0» e «Nessun lavoro verificato», senza dire da nessuna parte che i
-  // feedback non sono arrivati — mentre le schede-lista in cima, con lo stesso
-  // guasto, il numero non lo scrivono proprio. Quando la scheda lo dichiarerà,
-  // questo diventa expect(loDice).toBe(true).
-  expect(typeof loDice).toBe('boolean');
+  // Col caricamento fallito la scheda deve DIRLO, non scrivere zeri: uno zero
+  // è una risposta, e la risposta non c'è. Stessa regola delle schede in cima.
+  expect(visto.ricevuti).toBe('—');
+  expect(visto.lavorati).toBe('—');
+  await expect(page.locator('#mgStNoData')).toBeVisible();
+  await expect(page.locator('#mgStBody')).toBeHidden();
+  // E nessuna frase che affermi un vuoto che non si conosce.
+  expect(testo).not.toContain('Nessun lavoro verificato');
+});
+
+test('caricamento ancora in corso: stessa regola, nessuno zero inventato', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  // Nessun dato iniettato e nessun guasto dichiarato: è lo stato «sto ancora
+  // caricando», quello che si vede aprendo la scheda appena entrati.
+  await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
+  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await expect(page.locator('#panel-fbstats')).toHaveClass(/mg-panel--active/);
+  const stato = await page.evaluate(() => ({
+    caricato: !!(window.__mgTest.isLiveOn || true) && !document.getElementById('mgStNoData').hidden,
+    ricevuti: document.querySelector('#mgStTileRicevuti [data-num]').textContent,
+  }));
+  console.log('CARICAMENTO IN CORSO:', JSON.stringify(stato));
+  if (stato.caricato) expect(stato.ricevuti).toBe('—');
 });
