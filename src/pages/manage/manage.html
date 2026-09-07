@@ -163,11 +163,24 @@
        sono sezioni (Statistiche, Modelli, Automazioni, Log) restano dove sono:
        non dipendono dallo stato delle segnalazioni. */
     .mg-no-sections {
-      margin: -12px 0 16px; font-size: 12px; color: var(--sn-muted);
+      margin: -6px 0 12px; font-size: 12px; color: var(--sn-muted);
     }
     .mg-no-sections[hidden] { display: none; }
     .mg-panel { display: none; }
-    .mg-panel--active { display: block; }
+    /* `flex: 0 0 auto`: dentro la colonna della pagina un pannello vale la sua
+       altezza naturale e non si lascia stringere. L'unico che cresce è quello
+       della lista, qui sotto. */
+    .mg-panel--active { display: block; flex: 0 0 auto; }
+    /* Pannello-lista: assorbe tutta l'altezza che avanza sotto le schede,
+       qualunque cosa ci sia sopra (banner di sola lettura, riga di stato
+       illeggibile, barra di ricerca, schede andate a capo). Prima era la
+       griglia a tenere un `calc(100vh - 180px)` scritto a mano: senza banner
+       avanzavano quasi cento pixel vuoti in fondo, col banner la pagina
+       scrollava di quel tanto (#498). */
+    #panel-list.mg-panel--active {
+      display: flex; flex-direction: column;
+      flex: 1 1 auto; min-height: 0;
+    }
 
     /* ── Ricerca "a senso" (semantica) ─────────────────────────────────────
        La lente vive in fondo alla barra delle schede, spinta a destra: cliccarla
