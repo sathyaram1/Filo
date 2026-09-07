@@ -28,6 +28,7 @@
         'Prima di svuotare la cronologia degli appunti, Filo dice quante voci stanno per sparire; se hai una ricerca in corso avverte che spariscono anche quelle che il filtro sta nascondendo.',
         'La cronologia appunti in Impostazioni → Sicurezza si aggiorna da sola: quello che copi mentre la pagina è aperta compare subito, e una voce tolta dal menu "Incolla" sparisce anche lì. Prima la pagina restava ferma a com\'era quando l\'avevi aperta, e sembrava che una password copiata poco prima non ci fosse.',
         'Una voce copiata fatta di soli spazi non è più una riga vuota senza spiegazione: adesso dice che sono spazi e quanti.',
+        'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
       ],
     },
     {
