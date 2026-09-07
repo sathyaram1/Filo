@@ -23,6 +23,11 @@ scendere è un vicolo cieco.
 - **L'elenco ha un tetto, e il tetto si dichiara.** Oltre qualche centinaio di
   voci l'elenco dentro un pannello non si sfoglia più: si mostrano le prime e si
   scrive quante ne restano fuori, mai un taglio muto (CLAUDE.md § Limiti).
+- **Le stesse azioni anche col tasto destro.** Aprire l'elenco col clic
+  sinistro è la scorciatoia; il tasto destro è dove si va a cercare cosa si può
+  fare con un numero, e lì stanno anche le azioni che un clic solo non può
+  offrire (copiare la riga, portare il numero altrove, restringere la finestra a
+  quel periodo). Vedi [Menu contestuale proprio nelle pagine filo://](menu-contestuale-proprio-nelle-pagine-filo-preventdefault.md).
 - **Dove:** la scheda «Statistiche feedback» della dashboard di gestione
   (`stRowsHtml`, `stItemsHtml`, `stApriFeedback` in
   `src/pages/manage/manage.js`); gli id per gruppo li calcola
