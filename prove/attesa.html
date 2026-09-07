@@ -155,6 +155,24 @@ body {
   white-space: nowrap;
 }
 .nodo-hint.vis { opacity: 1; }
+
+/* Fermare: sta sulla riga viva, e si vede sempre — una cosa urgente non
+   può stare nascosta dietro il passaggio del mouse. */
+.seg { position: relative; }
+.stop {
+  display: none; position: absolute; right: 0; top: 3px;
+  font: inherit; font-size: 11.5px; line-height: 1;
+  border: 1px solid var(--dash-line-strong); background: var(--dash-paper);
+  color: var(--dash-ink-mute); border-radius: 12px; padding: 3px 10px; cursor: pointer;
+}
+.seg.vivo .stop { display: block; }
+.stop:hover { background: var(--dash-accent); border-color: var(--dash-accent); color: #fff; }
+
+/* La coda del filo: l'ultimo pensiero, senza nodo e senza titolo. */
+.seg.coda .seg-corpo { display: block; opacity: 0.8; padding-top: 0; }
+.seg.coda .seg-cot { font-size: 12.5px; }
+.blocco.fermato .capo svg path { opacity: 0.55; }
+.bolla-filo.interrotta { color: var(--dash-ink-mute); font-style: italic; }
 </style>
 </head>
 <body>
@@ -205,6 +223,25 @@ body {
     </div>
   </div>
 
+  <div class="gruppo" data-opt="multi">
+    <div class="tit">Un nodo con più azioni</div>
+    <div class="opz">
+      <label><input type="radio" name="multi" value="uno"><span>il primo dettaglio, e quanti altri</span></label>
+      <label><input type="radio" name="multi" value="due" checked><span>i primi due, e quanti altri</span></label>
+      <label><input type="radio" name="multi" value="tre"><span>tutti e tre</span></label>
+      <label><input type="radio" name="multi" value="llm"><span>un titolo da un modello piccolo</span></label>
+    </div>
+  </div>
+
+  <div class="gruppo" data-opt="coda">
+    <div class="tit">L'ultimo pensiero</div>
+    <div class="opz">
+      <label><input type="radio" name="coda" value="coda" checked><span>è la coda del filo, nel gomitolo</span></label>
+      <label><input type="radio" name="coda" value="nodo"><span>fa un nodo finale</span></label>
+      <label><input type="radio" name="coda" value="perde"><span>si perde</span></label>
+    </div>
+  </div>
+
   <div class="gruppo" data-opt="fine">
     <div class="tit">Quando comincia a rispondere</div>
     <div class="opz">
@@ -247,42 +284,58 @@ body {
 
 <script>
 /* ——————————————————————————————————————————————————————
-   Il copione. Un blocco = il pensiero e l'azione che ne è nata.
-   L'ultimo blocco non ha azione: sfocia nella risposta.
+   Il copione. Un blocco = il pensiero e le azioni che ne sono nate.
+   Le azioni di un blocco partono INSIEME: sono una decisione sola,
+   quindi fanno un nodo solo. L'ultimo blocco non ha azioni: sfocia
+   nella risposta.
 —————————————————————————————————————————————————————— */
 var BLOCCHI = [
   {
     spunto: 'da dove partire', ms: 4300,
     cot: "L'utente chiede gli orari dei treni per Bologna di domani mattina. Non ho un orario in memoria, quindi devo cercarlo. Comincio dal sito ufficiale e poi confronto con un secondo, perché i cambi stagionali sono spesso disallineati.",
-    azione: { icona: '🔎', vivo: 'Cerco sul web…', fatto: 'Cercato sul web', dettaglio: 'orari treni Bologna',
-      esito: '8 risultati, fra orari ufficiali e siti di terzi.', ms: 1900 },
+    vivo: 'Cerco sul web…', gruppo: 'Cercato sul web', titoletto: 'Cercato gli orari di domani',
+    azioni: [
+      { icona: '🔎', fatto: 'Cercato sul web', breve: 'orari treni Bologna', esito: '8 risultati, fra orari ufficiali e siti di terzi.' },
+    ],
+    durataAzioni: 1900,
   },
   {
     spunto: 'manca il prezzo', ms: 3200,
-    cot: "Il primo risultato dà tre partenze fra le 7 e le 9. Manca il prezzo, che l'utente non ha chiesto ma vorrà sapere subito dopo. Provo a recuperarlo dalla stessa pagina prima di rispondere.",
-    azione: { icona: '📄', vivo: 'Leggo la pagina…', fatto: 'Letta una pagina', dettaglio: 'orari ufficiali',
-      esito: 'Tabella con 11 partenze fra le 06:10 e le 09:55.', ms: 1800 },
+    cot: "Il primo risultato dà tre partenze fra le 7 e le 9. Manca il prezzo, che l'utente non ha chiesto ma vorrà sapere subito dopo. Tanto vale guardare i tre siti insieme invece che uno alla volta: se sono d'accordo il numero è affidabile.",
+    vivo: 'Guardo tre siti…', gruppo: 'Lette tre pagine', titoletto: 'Confrontati i prezzi sui tre siti',
+    azioni: [
+      { icona: '📄', fatto: 'Letta una pagina', breve: 'trenitalia.com', esito: '11 partenze fra le 06:10 e le 09:55. Diretto 7:42, 34 €.' },
+      { icona: '📄', fatto: 'Letta una pagina', breve: 'italotreno.it', esito: 'Nessun diretto la mattina presto. 19 € con cambio.' },
+      { icona: '📄', fatto: 'Letta una pagina', breve: 'omio.it', esito: 'Conferma i tre orari. 21 € il secondo con cambio.' },
+    ],
+    durataAzioni: 2400,
   },
   {
-    spunto: 'quanto costano', ms: 3000,
-    cot: "Tre treni: due con cambio e uno diretto. Il diretto costa di più ma arriva prima, e senza i prezzi non posso dirlo. Controllo su un secondo sito, così se i due sono d'accordo il numero è affidabile.",
-    azione: { icona: '💶', vivo: 'Controllo i prezzi…', fatto: 'Confrontati i prezzi', dettaglio: 'due siti',
-      esito: '34 €, 19 €, 21 €. Il secondo sito conferma.', ms: 1700 },
+    spunto: 'quale mettere per primo', ms: 3000,
+    cot: "I tre siti concordano, quindi i numeri li do per buoni. Prima di scrivere controllo gli scioperi: domani è venerdì e a gennaio ce ne sono stati. Se c'è un'agitazione, l'orario che sto per dare è carta straccia.",
+    vivo: 'Controllo gli scioperi…', gruppo: 'Controllati gli scioperi', titoletto: 'Verificato che non ci siano scioperi',
+    azioni: [
+      { icona: '⚠️', fatto: 'Controllati gli scioperi', breve: 'nessuno', esito: 'Nessuna agitazione annunciata sulla tratta per domani.' },
+    ],
+    durataAzioni: 1700,
   },
   {
-    spunto: 'come scriverlo', ms: 2600,
-    cot: "Ho tutto. Metto il diretto per primo perché è quello che risolve la giornata a chi ha fretta, e cito gli altri due sotto con il prezzo, che è l'unico motivo per preferirli. Niente tabelle: sono tre righe.",
-    azione: null,
+    spunto: 'come scriverlo', ms: 2800,
+    cot: "Ho tutto. Metto il diretto per primo perché è quello che risolve la giornata a chi ha fretta, e cito gli altri due sotto con il prezzo, che è l'unico motivo per preferirli. Niente tabelle: sono tre righe. Lo sciopero non lo nomino: dire «non ci sono scioperi» a chi non ha chiesto di scioperi semina un dubbio che non aveva.",
+    vivo: null, gruppo: 'Scritta la risposta', titoletto: 'Deciso come metterla in fila',
+    azioni: null, durataAzioni: 0,
   },
 ];
-var BLOCCHI_EXTRA = [
-  {
-    spunto: 'e gli scioperi?', ms: 2800,
-    cot: "Domani è venerdì e a gennaio ci sono stati scioperi. Vale la pena controllare: se c'è uno sciopero l'orario che sto per dare è carta straccia.",
-    azione: { icona: '⚠️', vivo: 'Controllo gli scioperi…', fatto: 'Controllati gli scioperi', dettaglio: 'nessuno',
-      esito: 'Nessuna agitazione annunciata sulla tratta per domani.', ms: 1800 },
-  },
-];
+var BLOCCO_EXTRA = {
+  spunto: 'e i bagagli?', ms: 2600,
+  cot: "Chi parte la mattina presto spesso ha un trolley. Sui regionali non c'è vincolo, sulle Frecce nemmeno, quindi non è un'informazione che cambia la scelta. La lascio fuori.",
+  vivo: 'Controllo due regolamenti…', gruppo: 'Letti due regolamenti', titoletto: 'Controllate le regole sui bagagli',
+  azioni: [
+    { icona: '🧳', fatto: 'Letto un regolamento', breve: 'bagagli Frecce', esito: 'Nessun limite di pezzi, ingombro ragionevole.' },
+    { icona: '🧳', fatto: 'Letto un regolamento', breve: 'bagagli regionali', esito: 'Nessun limite.' },
+  ],
+  durataAzioni: 2000,
+};
 var RISPOSTA = 'Domani mattina hai tre treni per Bologna: il diretto delle 7:42 (1 h 05, 34 €) e due con cambio a Firenze, alle 7:10 e alle 8:25 — più lenti ma la metà del prezzo.';
 var PAROLE = ['Sta ragionando', 'Ci sto lavorando', 'Ci penso'];
 
@@ -290,7 +343,7 @@ var PAROLE = ['Sta ragionando', 'Ci sto lavorando', 'Ci penso'];
 var opt = {}, vel = 1, corsa = null, bloccoVivo = null;
 
 function leggiOpzioni() {
-  ['filo', 'nodi', 'ragionamento', 'nodo', 'fine', 'parole'].forEach(function (n) {
+  ['filo', 'nodi', 'ragionamento', 'nodo', 'multi', 'coda', 'fine', 'parole'].forEach(function (n) {
     var v = document.querySelector('input[name="' + n + '"]:checked');
     opt[n] = v ? v.value : null;
   });
@@ -330,17 +383,18 @@ function legaHint(nodo, testo) {
   nodo.addEventListener('mouseleave', function () { hint.classList.remove('vis'); });
 }
 
-/* Le righe da mostrare: unite (pensiero + azione) o separate. */
+/* Le righe da mostrare: unite (pensiero + azioni) o separate. */
 function costruisciRighe() {
   var blocchi = BLOCCHI.slice();
-  if (opt.lungo) blocchi.splice(2, 0, BLOCCHI_EXTRA[0]);
+  if (opt.lungo) blocchi.splice(2, 0, BLOCCO_EXTRA);
   var out = [];
-  blocchi.forEach(function (b) {
+  blocchi.forEach(function (b, i) {
+    var ultimo = !b.azioni;
     if (opt.nodi === 'unito') {
-      out.push({ cot: b.cot, ms: b.ms, azione: b.azione, spunto: b.spunto });
+      out.push({ blocco: b, cot: b.cot, ms: b.ms, azioni: b.azioni, ultimo: ultimo });
     } else {
-      out.push({ cot: b.cot, ms: b.ms, azione: null, spunto: b.spunto, titoloPensiero: b.azione ? 'Riflettuto' : null });
-      if (b.azione) out.push({ cot: null, ms: 0, azione: b.azione });
+      out.push({ blocco: b, cot: b.cot, ms: b.ms, azioni: null, ultimo: ultimo, soloPensiero: !ultimo });
+      if (b.azioni) out.push({ blocco: b, cot: null, ms: 0, azioni: b.azioni, ultimo: false });
     }
   });
   return out;
@@ -349,7 +403,7 @@ function costruisciRighe() {
 /* ——————————————————————————————————————————————————————
    Il blocco di attività.
 —————————————————————————————————————————————————————— */
-function creaBlocco(host) {
+function creaBlocco(host, suStop) {
   var blocco = el('div', 'blocco');
   var righe = el('div', 'righe');
   var capo = el('div', 'capo');
@@ -358,7 +412,7 @@ function creaBlocco(host) {
 
   var segmenti = [], apertoIdx = -1, arrotolato = false, vivo = true;
   var rail = null, railPath = null, nodi = [], filiOrizz = [];
-  var onda = { fase: 0, amp: 2.4, ampObiettivo: 2.4, vel: 0.06, ultimoNodoY: 0 };
+  var onda = { fase: 0, amp: 2.4, ampObiettivo: 2.4, vel: 0.06, ultimoNodoY: 0, tagliato: false };
 
   if (opt.filo === 'verticale') {
     blocco.classList.add('verticale');
@@ -373,7 +427,6 @@ function creaBlocco(host) {
 
   function disegna() {
     if (!vivo) return;
-    // Il filo corto accanto alla riga viva: stessa onda, in orizzontale.
     for (var q = 0; q < filiOrizz.length; q++) {
       var f = filiOrizz[q];
       if (!opt.calmo) f.fase += onda.vel;
@@ -390,32 +443,33 @@ function creaBlocco(host) {
     // I nodi stanno sulla LORO riga: se una sezione si apre, quello che sta
     // sotto scende, e il nodo scende con la sua riga.
     for (var k = 0; k < nodi.length; k++) {
-      var riga = nodi[k].seg.el;
-      var ny = riga.offsetTop + Math.min(25, riga.offsetHeight) / 2 + 3;
+      var ny = nodi[k].seg.el.offsetTop + 15;
       nodi[k].c.setAttribute('cy', ny);
       if (nodi[k].alone) nodi[k].alone.setAttribute('cy', ny);
       if (k === nodi.length - 1) onda.ultimoNodoY = ny;
     }
 
     var H = Math.max(18, righe.offsetHeight);
-    rail.setAttribute('height', H + 12);
-    rail.style.height = (H + 12) + 'px';
+    rail.setAttribute('height', H + 16);
+    rail.style.height = (H + 16) + 'px';
     if (!arrotolato) {
       onda.amp += (onda.ampObiettivo - onda.amp) * 0.07;
       if (!opt.calmo) onda.fase += onda.vel;
-      var Hd = H + 8, d = '', n = Math.max(10, Math.round(Hd / 4));
+      var Hd = H + (onda.tagliato ? 2 : 8), d = '', n = Math.max(10, Math.round(Hd / 4));
       for (var i = 0; i <= n; i++) {
         var y = (i / n) * Hd;
         var giu = Math.max(0, Math.min(1, (y - onda.ultimoNodoY) / 34));
-        d += (i ? 'L' : 'M') + (13 + Math.sin(y * 0.16 + onda.fase) * onda.amp * giu).toFixed(2) + ',' + y.toFixed(1);
+        // Tagliato: la punta si affloscia di lato invece di ondeggiare.
+        var x = onda.tagliato
+          ? 13 + giu * 3.2 * Math.min(1, (y - onda.ultimoNodoY) / 60)
+          : 13 + Math.sin(y * 0.16 + onda.fase) * onda.amp * giu;
+        d += (i ? 'L' : 'M') + x.toFixed(2) + ',' + y.toFixed(1);
       }
       railPath.setAttribute('d', d);
     }
     requestAnimationFrame(disegna);
   }
 
-  // Il nodo. Un passo con uno strumento lascia un nodo più grosso, con
-  // l'alone; un nodo di solo pensiero è piccolo.
   function piazzaNodo(seg, azione, titolo) {
     if (!rail) return;
     var y = seg.el.offsetTop + 15;
@@ -453,17 +507,25 @@ function creaBlocco(host) {
     setTimeout(function () { seg.eti.textContent = t; seg.eti.classList.remove('giu'); }, 170);
   }
 
-  function titoloFatto(az, ms) {
-    if (opt.nodo === 'durata') return az.fatto + ' · ' + dur(ms);
-    if (opt.nodo === 'dettaglio') return az.fatto + ' · ' + az.dettaglio;
-    return az.fatto;
+  // Il titolo di un nodo. Con una sola azione è il suo nome; con più azioni
+  // il verbo al plurale è gratis, e cambia solo quanti dettagli seguono.
+  function titoloNodo(desc, ms) {
+    var az = desc.azioni, b = desc.blocco;
+    if (az.length === 1) {
+      if (opt.nodo === 'durata') return az[0].fatto + ' · ' + dur(ms);
+      if (opt.nodo === 'dettaglio') return az[0].fatto + ' · ' + az[0].breve;
+      return az[0].fatto;
+    }
+    if (opt.multi === 'llm') return b.titoletto;
+    var quanti = opt.multi === 'uno' ? 1 : (opt.multi === 'due' ? 2 : 3);
+    var mostrati = az.slice(0, quanti).map(function (a) { return a.breve; });
+    var restano = az.length - mostrati.length;
+    return b.gruppo + ' · ' + mostrati.join(', ') + (restano > 0 ? ' +' + restano : '');
   }
 
   return {
     blocco: blocco,
 
-    // Apre una riga. Se c'è un pensiero, parte con la sola trama e nessuna
-    // scritta: è il filo a dire che sta lavorando.
     apriRiga: function (desc) {
       var wrap = el('div', 'seg vivo');
       var testa = el('div', 'seg-testa');
@@ -471,15 +533,19 @@ function creaBlocco(host) {
       var eti = el('span', 'seg-eti');
       testa.append(ico, eti);
       var trama = el('div', 'trama');
+      var stop = el('button', 'stop', 'ferma');
+      stop.type = 'button';
+      stop.title = 'Ferma il lavoro';
       var corpo = el('div', 'seg-corpo');
       var cotEl = el('div', 'seg-cot');
       corpo.append(cotEl);
-      wrap.append(testa, trama, corpo);
+      wrap.append(testa, trama, stop, corpo);
       righe.append(wrap);
 
       var idx = segmenti.length;
       testa.addEventListener('click', function () { apri(idx); });
       trama.addEventListener('click', function () { apri(idx); });
+      stop.addEventListener('click', function (e) { e.stopPropagation(); suStop(); });
 
       var seg = { el: wrap, testa: testa, ico: ico, eti: eti, trama: trama, corpo: corpo, cotEl: cotEl,
                   desc: desc, acc: '', viste: 0, filo: null };
@@ -488,11 +554,12 @@ function creaBlocco(host) {
       var conTrama = desc.cot && opt.ragionamento === 'trama';
       if (desc.cot) {
         onda.ampObiettivo = 3.2; onda.vel = 0.06;
-        // Con la trama la riga è la trama: nessun «sta ragionando».
+        // Con la trama la riga È la trama: nessuna scritta di stato.
         testa.style.display = conTrama ? 'none' : '';
         if (!conTrama) trama.style.display = 'none';
-        if (opt.ragionamento === 'niente') scriviEtichetta(seg, V() + '…');
-        if (opt.ragionamento === 'frase' || opt.ragionamento === 'parziale') eti.textContent = V() + '…';
+        if (opt.ragionamento === 'niente' || opt.ragionamento === 'frase' || opt.ragionamento === 'parziale') {
+          eti.textContent = V() + '…';
+        }
         if (!conTrama) filoVivo(seg);
       } else {
         trama.style.display = 'none';
@@ -500,7 +567,6 @@ function creaBlocco(host) {
       return seg;
     },
 
-    // Un pezzo di ragionamento dal modello.
     ragiona: function (seg, pezzo) {
       seg.acc += pezzo;
       seg.cotEl.textContent = seg.acc;
@@ -518,57 +584,77 @@ function creaBlocco(host) {
       }
     },
 
-    // Il modello chiama uno strumento: il filo si annoda qui, e al posto
-    // della trama compare l'azione.
+    // Il modello chiama gli strumenti: il filo si annoda qui, e al posto
+    // della trama compare l'azione. Più strumenti insieme = un nodo solo.
     parteAzione: function (seg) {
-      var az = seg.desc.azione;
+      var b = seg.desc.blocco;
       seg.el.classList.remove('vivo');
       seg.trama.remove();
       seg.testa.style.display = '';
       spegniFilo(seg);
-      seg.ico.textContent = opt.filo === 'verticale' ? '' : az.icona;
       if (opt.filo === 'verticale') seg.ico.style.display = 'none';
-      seg.eti.textContent = az.vivo;
+      else seg.ico.textContent = seg.desc.azioni[0].icona;
+      seg.eti.textContent = b.vivo;
       onda.ampObiettivo = 1.7; onda.vel = 0.13;
-      piazzaNodo(seg, true, az.fatto + ' · ' + az.dettaglio);
+      piazzaNodo(seg, true, b.gruppo);
     },
 
-    // L'azione è finita: il nodo prende il suo nome.
     finisceAzione: function (seg, ms) {
-      var az = seg.desc.azione;
-      scriviEtichetta(seg, titoloFatto(az, ms));
-      var riga = el('div', 'att-riga');
-      riga.append(el('span', 'att-riga-ico', az.icona), el('span', null, az.esito));
-      seg.corpo.append(riga);
+      scriviEtichetta(seg, titoloNodo(seg.desc, ms));
+      seg.desc.azioni.forEach(function (a) {
+        var riga = el('div', 'att-riga');
+        riga.append(el('span', 'att-riga-ico', a.icona), el('span', null, a.fatto + ' · ' + a.breve + ' — ' + a.esito));
+        seg.corpo.append(riga);
+      });
       onda.ampObiettivo = 3.2; onda.vel = 0.06;
     },
 
     // Modalità a nodi separati: anche il solo pensiero si annoda.
     annodaPensiero: function (seg, ms) {
-      seg.el.classList.remove('vivo');
-      seg.trama.remove();
-      seg.testa.style.display = '';
-      spegniFilo(seg);
-      seg.ico.style.display = 'none';
+      chiudiRigaViva(seg);
       var t = 'Riflettuto';
       if (opt.nodo === 'durata') t += ' · ' + dur(ms);
-      if (opt.nodo === 'dettaglio') t += ' · ' + seg.desc.spunto;
+      if (opt.nodo === 'dettaglio') t += ' · ' + seg.desc.blocco.spunto;
       seg.eti.textContent = t;
       piazzaNodo(seg, false, t);
     },
 
-    // L'ultimo pensiero non si annoda: sfocia nella risposta.
-    lasciaAperto: function (seg) {
-      seg.el.classList.remove('vivo');
-      seg.trama.remove();
-      seg.el.remove();
-      var i = segmenti.indexOf(seg);
-      if (i >= 0) segmenti.splice(i, 1);
-      spegniFilo(seg);
+    // L'ULTIMO pensiero, quello che decide come scrivere: tre destini.
+    chiudiUltimo: function (seg, ms) {
+      if (opt.coda === 'nodo') {
+        chiudiRigaViva(seg);
+        var t = seg.desc.blocco.gruppo;
+        if (opt.nodo === 'durata') t += ' · ' + dur(ms);
+        if (opt.nodo === 'dettaglio') t += ' · ' + seg.desc.blocco.spunto;
+        seg.eti.textContent = t;
+        piazzaNodo(seg, false, t);
+      } else if (opt.coda === 'coda') {
+        // Nessun nodo: è la coda del filo, e si legge srotolando il gomitolo.
+        chiudiRigaViva(seg);
+        seg.testa.style.display = 'none';
+        seg.el.classList.add('coda');
+      } else {
+        chiudiRigaViva(seg);
+        seg.el.remove();
+        var i = segmenti.indexOf(seg);
+        if (i >= 0) segmenti.splice(i, 1);
+      }
     },
 
-    // Comincia la risposta: il filo si arrotola.
-    chiudi: function (riassunto, msTot) {
+    // Fermato dall'utente: il filo si taglia, la punta si affloscia.
+    taglia: function (seg) {
+      if (seg) {
+        chiudiRigaViva(seg);
+        seg.testa.style.display = '';
+        seg.eti.textContent = 'Fermato qui';
+        seg.el.classList.add('coda');
+      }
+      onda.tagliato = true;
+      onda.ampObiettivo = 0;
+      blocco.classList.add('fermato');
+    },
+
+    chiudi: function (riassunto, msTot, restaAperto) {
       onda.ampObiettivo = 0.4; onda.vel = 0.012;
       if (opt.fine === 'sparisce') { vivo = false; blocco.remove(); return; }
       if (opt.fine === 'resta') return;
@@ -600,20 +686,32 @@ function creaBlocco(host) {
         chiuso = !v;
         righe.style.maxHeight = righe.scrollHeight + 'px';
         righe.style.opacity = v ? '' : '0';
-        if (rail) rail.style.display = v ? '' : 'none';
+        if (rail && !v) rail.style.display = 'none';
         requestAnimationFrame(function () { righe.style.maxHeight = v ? righe.scrollHeight + 'px' : '0px'; });
-        // Finita l'animazione il tetto si toglie: se no, aprire una sezione
-        // dopo aver srotolato la taglierebbe a metà.
-        if (v) setTimeout(function () { if (!chiuso) righe.style.maxHeight = 'none'; }, 460);
+        // Il filo torna solo a srotolamento finito: disegnato fuori dal
+        // ritaglio, altrimenti passa sopra la risposta mentre la lista cresce.
+        if (v) setTimeout(function () {
+          if (chiuso) return;
+          righe.style.maxHeight = 'none';
+          if (rail) rail.style.display = '';
+        }, 460);
       }
-      mostra(false);
+      // Dopo un «ferma» resta aperto: si è fermato per guardare, non per
+      // nascondere.
+      if (restaAperto) { chiuso = false; righe.style.maxHeight = 'none'; }
+      else mostra(false);
       capo.addEventListener('click', function () { mostra(chiuso); });
     },
 
     ferma: function () { vivo = false; },
   };
 
-  // il filo corto accanto alla riga viva (modalità orizzontale)
+  function chiudiRigaViva(seg) {
+    seg.el.classList.remove('vivo');
+    seg.trama.remove();
+    spegniFilo(seg);
+    seg.ico.style.display = 'none';
+  }
   function filoVivo(seg) {
     if (opt.filo === 'rotella') { seg.ico.className = 'rotella'; seg.ico.textContent = ''; return; }
     if (opt.filo !== 'orizzontale') { seg.ico.style.display = 'none'; return; }
@@ -644,19 +742,33 @@ function creaBlocco(host) {
 /* ——————————————————————————————————————————————————————
    La corsa.
 —————————————————————————————————————————————————————— */
+var segVivo = null, fermato = false;
+
 async function gioca() {
   if (bloccoVivo) bloccoVivo.ferma();
   var mio = corsa = {};
+  fermato = false;
+  segVivo = null;
   leggiOpzioni();
   var host = document.getElementById('blocco');
   host.textContent = '';
   var risposta = document.getElementById('risposta');
   risposta.textContent = '';
+  risposta.classList.remove('interrotta');
 
-  var b = creaBlocco(host);
+  var inizio = Date.now();
+  var b = creaBlocco(host, function () {
+    // FERMA: il turno finisce qui, e lo si vede.
+    if (corsa !== mio || fermato) return;
+    fermato = true;
+    corsa = {};
+    b.taglia(segVivo);
+    b.chiudi('Fermato', Date.now() - inizio, true);
+    risposta.classList.add('interrotta');
+    risposta.textContent = 'Fermato prima della risposta.';
+  });
   bloccoVivo = b;
   var righe = costruisciRighe();
-  var inizio = Date.now();
 
   await attendi(700);
   if (corsa !== mio) return;
@@ -664,6 +776,7 @@ async function gioca() {
   for (var i = 0; i < righe.length; i++) {
     var desc = righe[i];
     var seg = b.apriRiga(desc);
+    segVivo = seg;
     var t = Date.now();
 
     if (desc.cot) {
@@ -677,22 +790,23 @@ async function gioca() {
       }
     }
 
-    if (desc.azione) {
+    if (desc.azioni) {
       b.parteAzione(seg);
       var ta = Date.now();
-      await attendi(desc.azione.ms);
+      await attendi(desc.blocco.durataAzioni);
       if (corsa !== mio) return;
       b.finisceAzione(seg, Date.now() - ta);
-    } else if (desc.titoloPensiero) {
+    } else if (desc.ultimo) {
+      b.chiudiUltimo(seg, Date.now() - t);
+    } else if (desc.soloPensiero) {
       b.annodaPensiero(seg, Date.now() - t);
-    } else {
-      b.lasciaAperto(seg);
     }
+    segVivo = null;
     await attendi(260);
     if (corsa !== mio) return;
   }
 
-  b.chiudi('Ha cercato sul web, letto una pagina e confrontato i prezzi', Date.now() - inizio);
+  b.chiudi('Ha cercato sul web, letto tre pagine e controllato gli scioperi', Date.now() - inizio);
   await attendi(420);
   if (corsa !== mio) return;
 
@@ -706,9 +820,9 @@ async function gioca() {
 
 /* —————————————————— comandi —————————————————— */
 var PRESET = {
-  filo:   { filo: 'verticale', nodi: 'unito',  ragionamento: 'trama',    nodo: 'dettaglio', fine: 'arrotola' },
-  cinque: { filo: 'rotella',   nodi: 'diviso', ragionamento: 'trama',    nodo: 'due',       fine: 'resta' },
-  oggi:   { filo: 'rotella',   nodi: 'diviso', ragionamento: 'parziale', nodo: 'dettaglio', fine: 'resta' },
+  filo:   { filo: 'verticale', nodi: 'unito',  ragionamento: 'trama',    nodo: 'dettaglio', multi: 'due', coda: 'coda', fine: 'arrotola' },
+  cinque: { filo: 'rotella',   nodi: 'diviso', ragionamento: 'trama',    nodo: 'due',       multi: 'tre', coda: 'perde', fine: 'resta' },
+  oggi:   { filo: 'rotella',   nodi: 'diviso', ragionamento: 'parziale', nodo: 'dettaglio', multi: 'tre', coda: 'perde', fine: 'resta' },
 };
 document.querySelectorAll('[data-preset]').forEach(function (b) {
   b.addEventListener('click', function () {
