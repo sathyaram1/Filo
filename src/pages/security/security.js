@@ -335,6 +335,7 @@
     if (identica) {
       aggiornaAvvisoInAttesa();
       applyClipFilter();
+      sincronizzaControlli();
       return;
     }
 
