@@ -61,10 +61,29 @@ test('V1 — incollata in un campo password, la password finisce in cronologia i
     await web.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 20000 });
 
     await app.evaluate(({ clipboard }) => clipboard.writeText('Tr0ubad0ur&3-la-mia-password'));
-    await web.locator('#pw').click({ button: 'right' });
-    await web.waitForTimeout(300);
-    await web.locator('.sn-menu-paste-main').first().click();
-    await web.waitForTimeout(1200);
+    await web.locator('#pw').click({ button: 'right', force: true });
+    await web.waitForTimeout(700);
+    const menuPw = await web.evaluate(() => ({
+      menu: !!document.querySelector('.sn-menu'),
+      voci: [...document.querySelectorAll('.sn-menu .sn-menu-label')].map((s) => s.textContent.trim()),
+      incolla: !!document.querySelector('.sn-menu-paste-main'),
+      freccia: !!document.querySelector('.sn-menu-paste-arrow'),
+    }));
+    console.log('[V1] menu sul campo password:', JSON.stringify(menuPw));
+    if (menuPw.incolla) {
+      await web.locator('.sn-menu-paste-main').first().click();
+      await web.waitForTimeout(1200);
+    } else {
+      await web.keyboard.press('Escape');
+      await web.locator('#user').click({ button: 'right', force: true });
+      await web.waitForTimeout(700);
+      const menuTesto = await web.evaluate(() => ({
+        incolla: !!document.querySelector('.sn-menu-paste-main'),
+        voci: [...document.querySelectorAll('.sn-menu .sn-menu-label')].map((s) => s.textContent.trim()),
+      }));
+      console.log('[V1] menu sul campo di testo normale:', JSON.stringify(menuTesto));
+      if (menuTesto.incolla) { await web.locator('.sn-menu-paste-main').first().click(); await web.waitForTimeout(1200); }
+    }
     console.log('[V1] cronologia dopo aver incollato nel campo password:', JSON.stringify(suDisco(userData)));
     console.log('[V1] campo password:', JSON.stringify(await web.locator('#pw').inputValue()));
 
