@@ -57,7 +57,9 @@ for (const tema of ['light', 'dark']) {
     await shell.waitForTimeout(3000);
     const schede = await shell.evaluate(SCHEDE);
     for (const s of schede) {
-      const c = contrasto(rgb(s.bg), rgb(s.fg));
+      const a = rgb(s.bg), b = rgb(s.fg);
+      if (!a || !b) { console.log(`[${tema}] colore non interpretabile: fondo ${s.bg} testo ${s.fg}`); continue; }
+      const c = contrasto(a, b);
       console.log(`[${tema}] ${s.active ? 'ATTIVA ' : 'inattiva'} "${s.text}" fondo ${s.bg} testo ${s.fg} → contrasto ${c.toFixed(2)}:1   (tinta inline: ${s.bgEff || '—'})`);
     }
     await shell.screenshot({ path: join(SHOTS, `v429-leggibilita-${tema}.png`), clip: { x: 0, y: 0, width: 700, height: 44 } });
