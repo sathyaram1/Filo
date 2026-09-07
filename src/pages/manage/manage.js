@@ -2071,8 +2071,11 @@
     // La frase parte CHIUSA su ogni segnalazione (#497): si scrive una volta
     // sola, e da aperta si mangiava una fetta di dettaglio a ogni feedback
     // aperto. Il tasto della barra la apre, e dice se una frase c'è già.
+    // Su un ridisegno però la sezione resta com'era: se l'owner l'aveva
+    // aperta, un aggiornamento arrivato da remoto non gliela chiude in faccia.
     if (mgUserNote) {
-      collassaFrase();
+      const restaAperta = ridisegno && !mgUserNote.hidden;
+      if (!restaAperta) collassaFrase();
       mgUserNoteText.value = String(fb.userNote || '');
       riflettiFrase(mgUserNoteText.value);
       // Il valore con cui la riga è stata riempita: una bozza è ciò che differisce.
