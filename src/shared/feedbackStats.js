@@ -326,11 +326,23 @@
 
   // ── Il conto ──────────────────────────────────────────────────────────────
 
-  function sortedEntries(map, order) {
+  // `ids` porta, per ogni gruppo, gli identificativi delle segnalazioni che lo
+  // compongono: senza, un numero è un vicolo cieco (non si può andare a vedere
+  // CHI c'è dentro) e chi disegna dovrebbe rifare il filtro per conto suo, cioè
+  // tenere una seconda copia della stessa regola.
+  function sortedEntries(map, order, ids) {
+    const conIds = (k) => ({ key: k, count: map[k], ids: (ids && ids[k]) ? ids[k].slice() : [] });
     if (Array.isArray(order)) {
-      return order.filter((k) => map[k]).map((k) => ({ key: k, count: map[k] }));
+      return order.filter((k) => map[k]).map(conIds);
     }
-    return Object.keys(map).map((k) => ({ key: k, count: map[k] })).sort((a, b) => b.count - a.count);
+    return Object.keys(map).map(conIds).sort((a, b) => b.count - a.count);
+  }
+
+  /** Aggiunge `id` alla lista del gruppo `k`. Salta gli id vuoti. */
+  function pushId(mappa, k, id) {
+    if (id == null || id === '') return;
+    if (!mappa[k]) mappa[k] = [];
+    mappa[k].push(id);
   }
 
   // Il tetto alle barrette: oltre, il grafico diventa una riga di peli.
