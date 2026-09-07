@@ -195,3 +195,78 @@ test('bagliore audio: senza un colore vero ritorna null (accento di Filo)', () =
   assert.equal(TC.pickGlowTint('rgb(20, 40, 200)', null), 'rgb(20, 40, 200)');
   assert.equal(TC.pickGlowTint('rgb(255, 255, 255)', 'rgb(220, 30, 90)'), 'rgb(220, 30, 90)');
 });
+
+// ─── #429: il nome della scheda deve restare leggibile su QUALSIASI tinta ───
+// Al buio, la scheda in secondo piano di un sito dal marchio chiaro (Wikipedia,
+// GitHub, le pagine di Filo) diventava un rettangolo grigio chiaro col nome
+// scritto nel grigio caldo del tema scuro: 1,08 a 1 di contrasto.
+
+test('readableOn sceglie il testo che contrasta di più, non una soglia secca', () => {
+  // Fondo chiaro → testo scuro; fondo scuro → testo chiaro.
+  assert.equal(TC.readableOn('rgb(248, 246, 240)'), TC.TESTO_SCURO);
+  assert.equal(TC.readableOn('rgb(30, 29, 27)'), TC.TESTO_CHIARO);
+  // Il caso che una soglia di luminanza a 0.45 sbagliava: il grigio di mezzo.
+  // Luminanza relativa ~0.32 (sotto 0.45) ma il nero contrasta il doppio.
+  const grigio = 'rgb(154, 151, 148)';
+  assert.equal(TC.readableOn(grigio), TC.TESTO_SCURO);
+  assert.ok(
+    TC.contrastRatio(grigio, TC.TESTO_SCURO) > TC.contrastRatio(grigio, TC.TESTO_CHIARO),
+    'sul grigio di mezzo il testo scuro contrasta di più',
+  );
+});
+
+test('readableOn dà sempre il migliore dei due, su tutta la scala dei grigi', () => {
+  for (let v = 0; v <= 255; v += 5) {
+    const bg = `rgb(${v}, ${v}, ${v})`;
+    const scelto = TC.readableOn(bg);
+    const altro = scelto === TC.TESTO_SCURO ? TC.TESTO_CHIARO : TC.TESTO_SCURO;
+    assert.ok(
+      TC.contrastRatio(bg, scelto) >= TC.contrastRatio(bg, altro),
+      `grigio ${v}: scelto il testo meno leggibile`,
+    );
+    // Col nero e il bianco di Filo il peggior fondo possibile (il grigio a metà
+    // strada) dà 4,06: sotto quello non si scende mai.
+    assert.ok(TC.contrastRatio(bg, scelto) >= 4.0, `grigio ${v}: contrasto troppo basso`);
+  }
+});
+
+test('softOn attenua il nome delle schede in secondo piano senza renderlo illeggibile', () => {
+  // La tinta che rendeva illeggibile il nome al buio: marchio chiaro (228)
+  // mescolato al 60% col fondo scuro della barra (#2a241d).
+  const tinta = TC.mixSrgb('rgb(228, 228, 228)', 'rgb(42, 36, 29)', 0.6);
+  assert.equal(tinta, 'rgb(154, 151, 148)');
+  const soft = TC.softOn(tinta);
+  const c = TC.contrastRatio(tinta, soft);
+  assert.ok(c >= 4.5, `il nome attenuato resta leggibile (contrasto ${c.toFixed(2)})`);
+  // e resta comunque più spento del testo pieno
+  assert.ok(c < TC.contrastRatio(tinta, TC.readableOn(tinta)), 'è attenuato, non pieno');
+  // il grigio caldo del tema scuro, quello di prima, era a 1,08: mai più.
+  assert.ok(TC.contrastRatio(tinta, 'rgb(170, 156, 132)') < 1.2, 'la pre-condizione del difetto');
+});
+
+test('softOn regge tutta la scala dei grigi e i colori pieni', () => {
+  const fondi = [];
+  for (let v = 0; v <= 255; v += 5) fondi.push(`rgb(${v}, ${v}, ${v})`);
+  fondi.push('rgb(190, 40, 40)', 'rgb(20, 90, 200)', 'rgb(30, 120, 60)', 'rgb(240, 220, 40)');
+  for (const bg of fondi) {
+    const soft = TC.softOn(bg);
+    const c = TC.contrastRatio(bg, soft);
+    // O l'attenuazione sta sopra 4,5, o la cintura è scattata e il colore è
+    // quello pieno: mai una via di mezzo illeggibile.
+    assert.ok(c >= 4.5 || soft === TC.readableOn(bg), `${bg}: contrasto ${c.toFixed(2)}`);
+    assert.ok(c >= 4.0, `${bg}: contrasto ${c.toFixed(2)} sotto il minimo assoluto`);
+  }
+});
+
+test('mixSrgb replica color-mix(in srgb, a p%, b)', () => {
+  assert.equal(TC.mixSrgb('rgb(0, 0, 0)', 'rgb(200, 100, 50)', 0.5), 'rgb(100, 50, 25)');
+  assert.equal(TC.mixSrgb('rgb(10, 20, 30)', 'rgb(10, 20, 30)', 0.3), 'rgb(10, 20, 30)');
+});
+
+test('colori illeggibili non fanno esplodere niente', () => {
+  assert.equal(TC.readableOn(null), null);
+  assert.equal(TC.readableOn('non-un-colore'), null);
+  assert.equal(TC.softOn(''), null);
+  assert.equal(TC.mixSrgb('boh', 'rgb(0,0,0)', 0.5), null);
+  assert.equal(TC.contrastRatio('boh', 'rgb(0,0,0)'), null);
+});

@@ -126,10 +126,17 @@
   function softOn(bg, forza) {
     const pieno = readableOn(bg);
     if (!pieno) return null;
-    const f = (typeof forza === 'number' && forza > 0 && forza <= 1) ? forza : 0.72;
-    const soft = mixSrgb(pieno, bg, f);
-    // Cintura: se l'attenuazione porta sotto 4,5 a 1 si torna al colore pieno.
-    if (soft && contrastRatio(bg, soft) >= 4.5) return soft;
+    // Si prova prima l'attenuazione più marcata; si molla di un gradino alla
+    // volta finché il nome non torna sopra 4,5 a 1. Su una tinta di mezzo
+    // nessun gradino ci arriva e resta il colore pieno: meglio un nome poco
+    // "spento" che un nome che non si legge.
+    const scala = (typeof forza === 'number' && forza > 0 && forza < 1)
+      ? [forza, (forza + 1) / 2, 1]
+      : [0.72, 0.8, 0.88, 0.94, 1];
+    for (const f of scala) {
+      const soft = mixSrgb(pieno, bg, f);
+      if (soft && contrastRatio(bg, soft) >= 4.5) return soft;
+    }
     return pieno;
   }
 
