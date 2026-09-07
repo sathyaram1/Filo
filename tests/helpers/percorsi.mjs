@@ -37,9 +37,22 @@ export function tempCanonico() {
   return percorsoCanonico(tmpdir());
 }
 
-// Una cartella temporanea nuova, già canonica. Da usare al posto di
-// `mkdtempSync(join(tmpdir(), prefisso))` in qualunque test che poi confronti
-// quel percorso con uno che arriva dall'app.
+// Lo SPAZIO che ogni cartella temporanea dei test si porta nel nome.
+//
+// L'utente di chi sviluppa Filo si chiama «agenti AI», quindi da lui ogni
+// percorso ha uno spazio dentro e altrove no: cinque delle undici prove rimaste
+// rosse per settimane (feedback #563) erano codice che si spezzava proprio lì, e
+// le vedeva una macchina sola. Un modo di RIMETTERE lo spazio a comando non
+// basterebbe: chi non sa che esiste non lo accende. Quindi lo spazio c'è sempre,
+// per tutti, e quella differenza fra le due macchine sparisce invece di restare
+// in attesa di essere riprodotta. La suite intera (1486 casi) è stata girata su
+// percorsi spaziati prima di renderlo la regola.
+export const SPAZIO = 'con spazio-';
+
+// Una cartella temporanea nuova, già canonica e con uno spazio nel nome. Da
+// usare al posto di `mkdtempSync(join(tmpdir(), prefisso))` in qualunque test:
+// una sentinella negli unit test diventa rossa se qualcuno torna alla forma
+// vecchia. Il prefisso resta in testa, così la cartella si riconosce a occhio.
 export function cartellaTemporanea(prefisso) {
-  return percorsoCanonico(mkdtempSync(join(tmpdir(), prefisso)));
+  return percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`)));
 }
