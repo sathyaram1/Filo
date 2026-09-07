@@ -41,6 +41,28 @@ export function normalizza(arg) {
 }
 
 /**
+ * `--opzione=valore` → `['--opzione', 'valore']`. PURA.
+ *
+ * È la forma che regge quando la riga passa da npm, e quindi quella che
+ * consigliamo: se la consigliamo deve funzionare anche quando arriva intera,
+ * altrimenti chi segue il consiglio si sente rispondere «opzione sconosciuta»
+ * seguita dallo stesso consiglio (feedback #565). Tocca solo le opzioni che
+ * un valore lo vogliono davvero.
+ */
+export function espandiUguali(argv, conValore = []) {
+  const vuole = new Set(conValore);
+  const fuori = [];
+  for (const arg of (Array.isArray(argv) ? argv : [])) {
+    const s = String(arg ?? '');
+    const i = s.indexOf('=');
+    const nome = i > 0 ? normalizza(s.slice(0, i)) : '';
+    if (i > 0 && sembraOpzione(s) && vuole.has(nome)) fuori.push(nome, s.slice(i + 1));
+    else fuori.push(s);
+  }
+  return fuori;
+}
+
+/**
  * Le opzioni che npm si è MANGIATO, riprese dall'ambiente. PURA.
  *
  * `npm run feedback:apri --allega spec.md` non passa `--allega` allo

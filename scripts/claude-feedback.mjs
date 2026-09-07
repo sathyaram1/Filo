@@ -237,11 +237,12 @@ export async function main(argvIn) {
   // controllo sta in un posto solo, scripts/lib/argomenti.mjs. Le opzioni che
   // npm si è mangiato le riprendiamo dall'ambiente invece di rifiutare una
   // riga che chi l'ha scritta considera giusta.
-  const { controllaArgomenti, argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const { controllaArgomenti, argomentiDaNpm, espandiUguali } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega'],
   };
+  argv = espandiUguali(argv, OPZ.conValore);
   const daNpm = argomentiDaNpm(process.env, OPZ);
   if (daNpm.errore) {
     console.error(`RIFIUTATO: ${daNpm.errore}`);
