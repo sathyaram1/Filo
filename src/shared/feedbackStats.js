@@ -487,9 +487,14 @@
       // illeggibile («2 critiche» prima di «nessuna critica»).
       slices: Object.keys(loopBuckets)
         .map(Number).sort((a, b) => a - b)
-        .map((n) => ({ key: String(n), loops: n, label: loopBucketLabel(n), count: loopBuckets[n] })),
+        .map((n) => ({
+          key: String(n), loops: n, label: loopBucketLabel(n), count: loopBuckets[n],
+          ids: (idsLoop[n] || []).slice(),
+        })),
       passati,
       nonPassati,
+      nonPassatiIds: idsNonPassati,
+      nonLeggibili,
       conVerifica,
       media: passati ? sommaLoop / passati : null,
       critiche: critFail + critMigliorabile,
