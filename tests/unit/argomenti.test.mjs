@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { controllaArgomenti, sembraOpzione, normalizza, argomentiDaNpm, espandiUguali } = await import('../../scripts/lib/argomenti.mjs');
+const { controllaArgomenti, sembraOpzione, normalizza, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('../../scripts/lib/argomenti.mjs');
 
 const FEEDBACK = {
   opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
@@ -123,4 +123,32 @@ test("la forma con l'uguale, che consigliamo per npm, funziona anche quando arri
   // Scritta con l'uguale ma sconosciuta: rifiutata come le altre.
   assert.match(controllaArgomenti(['--allgea=spec.md'], FEEDBACK), /opzione sconosciuta --allgea/);
   assert.match(controllaArgomenti(['--dry-run=1'], FEEDBACK), /non vuole un valore/);
+});
+
+// ── L'opzione scritta male che npm si porta via ──────────────────────────────
+//
+// Il recupero conosce i nomi giusti; il nome SBAGLIATO npm se lo porta via lo
+// stesso, e allo strumento non arriva niente da rifiutare: la cosa vera
+// partirebbe in silenzio. Il residuo nell'ambiente è l'unico segnale.
+
+test('un nome sbagliato lasciato da npm viene riconosciuto e ferma tutto', () => {
+  assert.match(opzioneStorpiata({ npm_config_allgea: 'spec.md' }, ['--allega', '--dry-run']), /--allgea non esiste/);
+  assert.match(opzioneStorpiata({ npm_config_allgea: 'spec.md' }, ['--allega']), /forse intendevi --allega/);
+  assert.match(opzioneStorpiata({ npm_config_dryrun: 'true' }, ['--dry-run']), /--dry-run/);
+  assert.match(opzioneStorpiata({ npm_config_chek: 'true' }, ['--check']), /--check/);
+});
+
+test('la roba di npm non viene scambiata per un nostro errore', () => {
+  const AMBIENTE_NPM = {
+    npm_config_registry: 'https://registry.npmjs.org/',
+    npm_config_cache: 'C:/npm-cache',
+    npm_config_prefix: 'C:/npm',
+    npm_config_color: 'true',
+    npm_config_user_agent: 'npm/10',
+    npm_config_global: '',
+  };
+  const NOSTRE = ['--check', '--dry-run', '--allega', '--url', '--priorita', '--print', '--frase', '--branch', '--reason'];
+  assert.equal(opzioneStorpiata(AMBIENTE_NPM, NOSTRE), null);
+  // E un'opzione scritta GIUSTA non è un errore: la riprende chi di dovere.
+  assert.equal(opzioneStorpiata({ npm_config_dry_run: 'true' }, ['--dry-run']), null);
 });
