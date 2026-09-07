@@ -1066,9 +1066,10 @@
                    segnalazione — anche su una già chiusa, per correggerla
                    dopo. Il tasto qui sopra la apre. -->
               <div class="mg-usernote" id="mgUserNote" hidden>
-                <label class="mg-usernote-label" for="mgUserNoteText">Frase per chi ha segnalato
-                  <span class="mg-usernote-hint">— è quello che legge lui quando il feedback si chiude</span>
-                </label>
+                <!-- Il titolo lo dice già il tasto che ha aperto questa
+                     sezione: qui resta solo quello che il tasto non dice. -->
+                <label class="mg-usernote-label mg-usernote-hint" for="mgUserNoteText">È quello che
+                  legge chi ha segnalato, quando il feedback si chiude</label>
                 <input type="text" id="mgUserNoteText" class="mg-accept-comment" maxlength="500"
                   placeholder="Una riga: cosa può fare adesso.">
                 <div class="mg-actions-row">

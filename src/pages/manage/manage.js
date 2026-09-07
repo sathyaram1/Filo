@@ -3116,16 +3116,20 @@
   // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
   // ricerca la lista mostra i risultati: quelli restano, i dati sotto sono
   // comunque aggiornati (il dettaglio li legge da lì).
+  // Ritorna true se il DETTAGLIO è stato ridisegnato davvero: serve ai test per
+  // distinguere "trattenuto da una bozza in corso" da "non c'era niente da
+  // ridisegnare". I chiamanti veri il valore lo ignorano.
   function rerenderAfterLive(touched) {
-    if (!dataLoaded) return;
+    if (!dataLoaded) return false;
     if (!searchMode) {
       const scrollers = [mgList, mgList && mgList.parentElement].filter(Boolean);
       const tops = scrollers.map((el) => el.scrollTop);
       renderList();
       scrollers.forEach((el, i) => { el.scrollTop = tops[i]; });
     }
-    if (!selectedId || closeDetailIfGone()) return;
-    if (touched.has(selectedId) && !detailBeingEdited()) openDetail(selectedId);
+    if (!selectedId || closeDetailIfGone()) return false;
+    if (touched.has(selectedId) && !detailBeingEdited()) { openDetail(selectedId); return true; }
+    return false;
   }
 
   // Un giro: versioni → differenze → documenti cambiati → decifratura → fusione.
@@ -3224,6 +3228,9 @@
     // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
     // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
     pollNow() { return refreshFromRemote(); },
+    // Un giro di ridisegno da aggiornamento remoto, su richiesta: i test lo
+    // usano per verificare che una bozza in corso lo trattenga (ritorna false).
+    rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
     setLiveSources(src) { Object.assign(liveSources, src || {}); },
     isLiveOn() { return liveEnabled; },
     setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },

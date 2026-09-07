@@ -1719,6 +1719,46 @@ test('owner ripristina un feedback archiviato → bottone "Ripristina" + patch s
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
+// ── #497: i tasti dell'owner stanno tutti sulla stessa riga ────────────────
+// Erano tre blocchi impilati (azioni di stato, frase per chi ha segnalato,
+// preferito) e si prendevano tre righe di dettaglio su ogni segnalazione
+// aperta, sottraendole alla conversazione. Il controllo è geometrico: i tasti
+// devono stare alla stessa altezza, non solo esistere.
+test('#497 — azioni di stato, ⭐ e frase: tutti i tasti sulla stessa riga', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+
+  await page.evaluate((fb) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([fb]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.openDetail(fb._id);
+  }, FB_PLAIN_TODO);
+
+  const stato = page.locator('#mgActionsRow button').first();
+  await expect(stato).toBeVisible();
+  await expect(page.locator('#mgStarBtn')).toBeVisible();
+  await expect(page.locator('#mgUserNoteToggle')).toBeVisible();
+
+  const centri = await page.evaluate(() => {
+    const centro = (sel) => {
+      const el = document.querySelector(sel);
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2;
+    };
+    return {
+      azione: centro('#mgActionsRow button'),
+      stella: centro('#mgStarBtn'),
+      frase: centro('#mgUserNoteToggle'),
+    };
+  });
+  // Stessa riga = stessa altezza a meno di qualche pixel di allineamento.
+  expect(Math.abs(centri.stella - centri.azione)).toBeLessThan(6);
+  expect(Math.abs(centri.frase - centri.azione)).toBeLessThan(6);
+});
+
 // ── Priorità visibile + modificabile dalla coda ─────────────────────────────
 // I feedback "In coda" mostrano i pallini priorità; per l'owner il click li
 // modifica (patch priority + priorityManual) e la coda si riordina (priorità
