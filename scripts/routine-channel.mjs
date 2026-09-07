@@ -365,8 +365,15 @@ if (isMain) {
     }
     const key = a.slice(2);
     const next = rest[i + 1];
-    if (next === undefined || next.startsWith('--')) data[key] = true;
-    else { data[key] = next; i += 1; }
+    if (next === undefined || next.startsWith('--')) {
+      // Un campo di TESTO senza il suo testo non è un sì: è un report che
+      // parte vuoto mentre la risposta dice OK (feedback #565).
+      if (CAMPI_TESTO.has(key)) {
+        console.error(`--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
+        process.exit(1);
+      }
+      data[key] = true;
+    } else { data[key] = next; i += 1; }
   }
 
   // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8) hanno destinatari diversi: il
