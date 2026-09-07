@@ -3286,6 +3286,14 @@
     }
     const custom = $st('mgStCustom');
     if (custom) custom.hidden = stWindow !== 'custom';
+    // I due campi mostrano SEMPRE la finestra che rappresentano, da qualunque
+    // strada sia stata scelta (le preferenze riprese, il tasto destro su una
+    // barretta del grafico): un campo vuoto sopra una finestra che c'è dice il
+    // falso. Non si tocca quello su cui si sta scrivendo.
+    for (const [id, val] of [['mgStFrom', stFromISO], ['mgStTo', stToISO]]) {
+      const inp = $st(id);
+      if (inp && document.activeElement !== inp && inp.value !== val) inp.value = val;
+    }
     const echo = $st('mgStDateEcho');
     if (echo) {
       const da = stDataParlata(stFromISO);
