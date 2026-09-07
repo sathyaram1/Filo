@@ -1153,6 +1153,12 @@ export function stripTicketArg(list) {
  * nuovo senza biglietto e cancellandogli il promemoria. Chi chiede aiuto deve
  * ricevere aiuto, senza effetti collaterali. PURA.
  */
+/** «Sembra un'opzione?» — stessa regola di scripts/lib/argomenti.mjs. PURA. */
+const SEMBRA_OPZIONE = (a) => {
+  const s = String(a ?? '');
+  return s.length > 1 && ['-', '‐', '‑', '‒', '–', '—', '−'].includes(s[0]) && !/^[0-9]/.test(s.slice(1));
+};
+
 export function usageText() {
   return [
     'Uso: node scripts/dispatch.mjs <comando>',
