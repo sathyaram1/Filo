@@ -15,7 +15,8 @@ const ORA = new Date();
 const iso = (g) => new Date(ORA.getTime() - g * 86400000).toISOString();
 const PASS = 'Verifica superata. Provato tutto.';
 const TURNO = "\n--- Aggiornamento dell'agente del 1/1/2026 ---\n";
-const CRIT = (n) => Array.from({ length: n }, (_, i) => `${TURNO}[1] rilievo numero ${i + 1}.`).join('');
+// N giri di verifica con una critica ciascuno, come li scrive il verificatore.
+const CRIT = (n) => Array.from({ length: n }, () => `${TURNO}Verifica: 1 rilievo. Il verificatore corregge.`).join('');
 
 const fb = (o) => ({
   _id: o.id, seq: o.seq, subSeq: 0, name: o.name || o.id, text: o.text || `Segnalazione ${o.id}`,
