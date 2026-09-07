@@ -26,6 +26,9 @@ test('#498 zoom vero di Filo: le aree restano dentro la finestra', async ({ app,
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('#mgReviewGrid')).toBeVisible();
+  // Vista dell'owner: il banner di sola lettura è di chi owner non è (e che su
+  // questa pagina non vede comunque nessun dato).
+  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
 
   for (const lvl of [0, 1, 2, 3, -1, -2]) {
     await app.evaluate(async ({ webContents }, l) => {
