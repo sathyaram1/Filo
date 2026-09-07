@@ -46,7 +46,7 @@ test('#429/19 — la pagina passa a scuro: la scheda attiva la segue?', async ({
   console.log('dopo un evento di scroll:', JSON.stringify(await shell.evaluate(ATTIVA)));
 });
 
-test('#429/20 — il sito accende il suo tema scuro da un interruttore interno', async ({ shell, testServer }) => {
+test('#429/20 — il sito accende il suo tema scuro da un interruttore interno', async ({ shell, app, testServer }) => {
   const url = testServer.html(`
     <title>Sito con interruttore</title>
     <body style="margin:0;background:#ffffff">
