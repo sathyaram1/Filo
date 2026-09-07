@@ -125,11 +125,20 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
 
-test('la parola del vecchio verdetto è ignorata; senza rilievi la risposta "pass" si stampa e lo stato dice verificato', async () => {
+test('la parola del vecchio verdetto è RIFIUTATA (ignorarla faceva promuovere chi voleva bocciare); senza rilievi la risposta "pass" si stampa e lo stato dice verificato', async () => {
   const { casa } = casaSulRamo();
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict' ? { reply: { outcome: 'pass', derived: null } } : {}));
   try {
-    const r = await esegui(['--record-verifier', 'fid-901', 'pass', 'Provato tutto: aperto, salvato, trascinato e riaperto. Regge, non ho trovato niente da segnalare.'], ENV(casa, port));
+    // Prima la porta chiusa: la vecchia parola veniva buttata via in silenzio,
+    // la critica partiva senza rilievi, e senza rilievi l'esito è «superata».
+    for (const parola of ['fail', 'pass']) {
+      const vecchio = await esegui(['--record-verifier', 'fid-901', parola,
+        'Il pulsante non salva col titolo vuoto: aperta la pagina, titolo vuoto, premuto Salva, non succede niente.'], ENV(casa, port));
+      assert.equal(vecchio.code, 1, `«${parola}» davanti al motivo deve fermare`);
+      assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
+    }
+
+    const r = await esegui(['--record-verifier', 'fid-901', 'Provato tutto: aperto, salvato, trascinato e riaperto. Regge, non ho trovato niente da segnalare.'], ENV(casa, port));
     assert.equal(r.code, 0, r.se);
     const d = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
     assert.deepEqual(d.findings, [], 'nessun rilievo');
