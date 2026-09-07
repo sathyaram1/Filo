@@ -355,6 +355,14 @@ if (isMain) {
       process.exit(1);
     }
     flags.push(a);
+    // `--campo=valore` è la forma che regge quando la riga passa da npm, e va
+    // capita qui: prima diventava un CAMPO di nome «campo=valore» col valore
+    // `true`, e la consegna partiva col report vuoto rispondendo OK (#565).
+    const uguale = a.indexOf('=');
+    if (uguale > 2) {
+      data[a.slice(2, uguale)] = a.slice(uguale + 1);
+      continue;
+    }
     const key = a.slice(2);
     const next = rest[i + 1];
     if (next === undefined || next.startsWith('--')) data[key] = true;
