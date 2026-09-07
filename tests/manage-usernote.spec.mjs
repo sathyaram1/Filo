@@ -467,12 +467,14 @@ test('#497 — la frase scritta e non salvata a mano parte da sola, e sopravvive
 
   await page.locator('#mgUserNoteToggle').click();
   await page.locator('#mgUserNoteText').fill('Bozza da non perdere.');
+  // Richiudere la sezione toglie il fuoco dalla casella: da lì la frase parte.
   await page.locator('#mgUserNoteToggle').click();
   await expect(page.locator('#mgUserNote')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
+  expect(await page.evaluate(() => window.__updates[0].userNote)).toBe('Bozza da non perdere.');
 
-  // Il pannello si ridisegnerebbe: con una bozza in ballo non lo fa.
-  const ridisegnato = await page.evaluate(() => window.__mgTest.rerenderIfIdle('fb-bozza'));
-  expect(ridisegnato).toBe(false);
+  // E un aggiornamento in arrivo non la fa tornare indietro.
+  await page.evaluate(() => window.__mgTest.rerenderIfIdle('fb-bozza'));
   await page.locator('#mgUserNoteToggle').click();
   await expect(page.locator('#mgUserNoteText')).toHaveValue('Bozza da non perdere.');
 });
