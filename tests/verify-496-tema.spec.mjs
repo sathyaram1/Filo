@@ -99,3 +99,45 @@ test('finestra stretta: la scheda non sborda in orizzontale', async ({ openTab, 
     await page.screenshot({ path: `tests/.shots/496-stretta-${w}.png` });
   }
 });
+
+test('«Sempre»: il registro delle esecuzioni è parziale — la scheda lo dice?', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  // Registro che parte solo da due giorni fa: su «Sempre» il numero delle
+  // esecuzioni è un minimo, non un totale.
+  await page.evaluate((l) => window.__mgTest.setWorkerLog(l), [
+    { role: 'prober', startedAt: iso(0), num: '' },
+    { role: 'prober', startedAt: iso(2), num: '' },
+  ]);
+
+  await page.evaluate(() => window.__mgTest.setStatsWindow('365d'));
+  const anno = await page.locator('#mgStRange').innerText();
+  await page.evaluate(() => window.__mgTest.setStatsWindow('all'));
+  const sempre = await page.locator('#mgStRange').innerText();
+  console.log('RIGA ANNO   :', JSON.stringify(anno));
+  console.log('RIGA SEMPRE :', JSON.stringify(sempre));
+  console.log('PROBER SEMPRE:', await page.locator('#mgStTileProber [data-num]').innerText());
+  expect(sempre).toMatch(/registrate dal/);
+});
+
+test('dalle statistiche si arriva ai feedback che le compongono?', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  await page.locator('#mgStTileRicevuti').click();
+  const riga = page.locator('#mgStDrawer .mg-st-row').first();
+  await expect(riga).toBeVisible();
+  const prima = await page.locator('#panel-fbstats').getAttribute('class');
+  await riga.click();
+  await page.waitForTimeout(300);
+  const dopo = await page.locator('#panel-fbstats').getAttribute('class');
+  const listaAperta = await page.locator('#panel-list').evaluate((e) => e.classList.contains('mg-panel--active'));
+  console.log('CLIC SU RIGA CATEGORIA → pannello lista attivo?', listaAperta, prima === dopo ? '(nessun cambio)' : '(cambiato)');
+
+  // Tasto destro su una riga: menu di Filo o menu di sistema?
+  let menu = 0;
+  await riga.click({ button: 'right' });
+  await page.waitForTimeout(300);
+  menu = await page.locator('.mg-sort-menu, .mg-menu, [role="menu"]').count();
+  console.log('MENU TASTO DESTRO SU RIGA:', menu);
+  expect(listaAperta).toBe(true);
+});
