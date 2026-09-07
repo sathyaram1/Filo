@@ -18,6 +18,15 @@ scrive «—» e accanto si dice perché.
   i documenti dei feedback viaggiano cifrati: senza la chiave, contarli come
   «zero giri di verifica» li fa sparire in silenzio). Le tre strade producono lo
   stesso zero falso: si chiudono insieme.
+- **Le tre strade non bastano se la regola gira solo all'apertura.** Il dato
+  cambia mentre la superficie è già aperta, e questi tre stati si scambiano
+  proprio lì: chi apre la scheda un secondo dopo essere entrato la vede dire «i
+  dati non ci sono» e ce la vede restare anche dopo che i dati sono arrivati.
+  Nel verso opposto è peggio: la scheda che aveva i suoi numeri, dopo un
+  caricamento andato male, continua a scriverli come se avessero ancora
+  qualcosa sotto. Il ridisegno lo deve chiamare chi TOCCA i dati, non chi apre
+  la vista. Vedi ["Vai a guardare in quell'altro posto": quel posto deve
+  accorgersene DA APERTO](vai-a-guardare-in-quellaltro-posto-quel-posto.md).
 - **Le fonti diverse si trattano separatamente.** Se un numero viene da
   un'altra sorgente e QUELLA è arrivata, il suo numero resta: spegnere tutta la
   pagina per un dato mancante ne butta via altri che si conoscono.

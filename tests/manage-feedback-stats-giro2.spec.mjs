@@ -87,13 +87,13 @@ test('il tasto destro offre le azioni del punto in cui hai premuto', async ({ op
   await expect(menu).toBeVisible();
   await expect(menu).toContainText('Apri il dettaglio per categoria');
   await expect(menu).toContainText('Copia il numero');
-  await menu.getByText('Apri il dettaglio per categoria').click();
+  await menu.locator('.sn-select-option', { hasText: 'Apri il dettaglio per categoria' }).click();
   await expect(page.locator('#mgStDrawer .mg-st-row')).not.toHaveCount(0);
 
   // Su una riga di ripartizione: vedere le segnalazioni che ha contato.
   await page.locator('#mgStDrawer .mg-st-row[data-open]').first().click({ button: 'right' });
   await expect(menu).toContainText('Mostra le segnalazioni contate');
-  await menu.getByText('Mostra le segnalazioni contate').click();
+  await menu.locator('.sn-select-option', { hasText: 'Mostra le segnalazioni contate' }).click();
   await expect(page.locator('#mgStDrawer .mg-st-item[data-id]').first()).toBeVisible();
 
   // Su una fetta della torta: le stesse azioni della sua voce di legenda.
@@ -114,9 +114,11 @@ test('il tasto destro offre le azioni del punto in cui hai premuto', async ({ op
   // Su una barretta di «Quando arrivano»: restringere la finestra a quel
   // giorno. Si prende una barretta piena: quelle a zero sono alte due pixel.
   const barra = page.locator('#mgStSpark .mg-st-spark-bar:not(.mg-st-spark-bar--zero)').last();
+  await barra.scrollIntoViewIfNeeded();
   await barra.click({ button: 'right' });
-  await expect(menu).toContainText('Restringi la finestra a questo periodo');
-  await menu.getByText('Restringi la finestra a questo periodo').click();
+  const restringi = menu.locator('.sn-select-option', { hasText: 'Restringi la finestra' });
+  await expect(restringi).toBeVisible();
+  await restringi.click();
   await expect(page.locator('.mg-st-chip[data-window="custom"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#mgStCustom')).toBeVisible();
 });
@@ -133,7 +135,7 @@ test('il tasto destro sulla segnalazione di un elenco la apre', async ({ openTab
   await page.locator('#mgStDrawer .mg-st-item[data-id]').first().click({ button: 'right' });
   const menu = page.locator('.mg-ctxmenu');
   await expect(menu).toContainText('Apri la segnalazione');
-  await menu.getByText(/Apri la segnalazione/).click();
+  await menu.locator('.sn-select-option', { hasText: /Apri la segnalazione/ }).click();
   await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#mgDetail')).toBeVisible();
 });
