@@ -318,8 +318,17 @@
        «hai sbagliato» sopra dei numeri giusti. */
     .mg-st-warn { font-size: 12.5px; color: var(--sn-muted); margin: 0 0 4px; }
     .mg-st-warn[hidden], .mg-st-note[hidden], .mg-st-flash[hidden] { display: none; }
+    /* «Copiato: …» è un avviso di passaggio, non un pezzo della scheda: stando
+       nel flusso spingeva tutta la pagina giù di 18 pixel per tre secondi e
+       poi la riportava su, e chi aveva appena copiato un numero in fondo si
+       vedeva scappare via la riga sotto il puntatore. Ora galleggia. */
     .mg-st-flash {
-      font-size: 12.5px; color: var(--sn-accent); margin: 0 0 4px;
+      position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+      z-index: 60; max-width: min(560px, 90vw);
+      margin: 0; padding: 8px 14px; border-radius: 999px;
+      font-size: 12.5px; color: var(--sn-text);
+      background: var(--sn-panel); border: 1px solid var(--sn-border);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .mg-st-note { font-size: 12px; color: var(--sn-muted); margin: 0 0 18px; }
