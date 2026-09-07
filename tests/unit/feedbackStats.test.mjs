@@ -288,6 +288,18 @@ test('l\'andamento sceglie la barretta in base alla lunghezza della finestra', (
     'ogni feedback della finestra sta in esattamente una barretta');
 });
 
+test('su una finestra lunghissima le barrette restano sotto il tetto e coprono tutta la finestra', () => {
+  const vecchi = Array.from({ length: 12 }, (_, i) => fbDi({
+    id: `v${i}`, at: new Date(NOW.getTime() - i * 300 * 86400000).toISOString(), status: 'todo',
+  }));
+  const s = conta(vecchi, { range: S.windowRange('all', { now: NOW }) });
+  assert.ok(s.andamento.barre.length <= S.MAX_BARRE);
+  const ultima = s.andamento.barre[s.andamento.barre.length - 1];
+  assert.ok(ultima.to >= NOW.getTime(),
+    'l\'ultima barretta arriva fino a oggi: se si fermasse prima conterebbe roba che la sua etichetta non nomina');
+  assert.equal(s.andamento.barre.reduce((n, b) => n + b.count, 0), s.ricevuti);
+});
+
 test('i gruppi di creatori coprono tutte le categorie d\'autore, senza doppioni', () => {
   const dai = S.CREATOR_GROUPS.flatMap((g) => g.kinds);
   assert.deepEqual([...dai].sort(), [...S.CREATOR_KINDS].sort(),
