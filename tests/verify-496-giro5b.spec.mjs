@@ -129,7 +129,7 @@ test('dati malformati: niente NaN, niente undefined', async ({ openTab }) => {
       notes: '', priority: 3.7, images: [], _updateTime: 't1' },
   ]));
   await apriStats(page);
-  await page.evaluate(() => window.__mgTest.setWorkerLog([{ role: 'sconosciuto', startedAt: iso(0) }, { role: 'prober', startedAt: iso(0) }]));
+  await page.evaluate((d) => window.__mgTest.setWorkerLog(d), [{ role: 'sconosciuto', startedAt: iso(0) }, { role: 'prober', startedAt: iso(0) }]);
   await page.evaluate(() => window.__mgTest.setStatsWindow('all'));
   await page.waitForTimeout(200);
   const testo = await page.locator('#panel-fbstats').innerText();
