@@ -397,8 +397,13 @@
       const pr = Math.round(Number(it.fb && it.fb.priority) || 0);
       perPriorita[pr >= 1 && pr <= 3 ? pr : 0] += 1;
       riaperture += Math.max(0, Number(it.fb && it.fb.reopenRequests) || 0);
-      stalli += Math.max(0, Number(it.fb && it.fb.workingResets) || 0)
-        + Math.max(0, Number(it.fb && it.fb.stalls) || 0);
+      // Stessa regola della lista: `stalls` è il totale che non si azzera mai,
+      // `workingResets` il contatore operativo che una consegna riporta a zero.
+      // Si legge il primo che c'è — SOMMARLI conterebbe due volte lo stesso
+      // arenamento.
+      stalli += Math.max(0, Math.round(
+        Number(it.fb && it.fb.stalls) || Number(it.fb && it.fb.workingResets) || 0
+      ));
     }
 
     // ── I giri di verifica ───────────────────────────────────────────────────
