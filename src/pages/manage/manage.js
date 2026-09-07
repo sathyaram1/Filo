@@ -1000,7 +1000,7 @@
       currentTab = tab;
       // La frase scritta e non ancora partita se ne va con la selezione: si
       // salva finché `selectedId` dice ancora a chi appartiene.
-      salvaFraseSubito({ muto: true });
+      salvaFraseAutomatico();
       // Cambiando tab si azzera la selezione: il feedback aperto potrebbe non
       // appartenere alla nuova lista.
       selectedId = null;
@@ -1995,7 +1995,7 @@
     // Quello che c'è nella casella della frase e non è ancora partito parte
     // ADESSO, finché `selectedId` è ancora quello di prima: un istante dopo
     // andrebbe a finire sul feedback sbagliato, o in nessun posto.
-    if (!ridisegno) salvaFraseSubito({ muto: true });
+    if (!ridisegno) salvaFraseAutomatico();
     selectedId = id;
 
     // Aggiorna selezione visiva nella lista
@@ -2661,7 +2661,7 @@
   }
   function programmaSalvataggioFrase() {
     annullaSalvataggioProgrammato();
-    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseSubito({ muto: true }); }, FRASE_PAUSA_MS);
+    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseAutomatico(); }, FRASE_PAUSA_MS);
   }
   // Salva ORA quello che c'è nella casella, se non è già a destinazione.
   // Ritorna la promessa dell'esito (true = a destinazione c'è quello che
@@ -2687,7 +2687,12 @@
   // una frase che nessuno ha toccato (ripulita degli spazi, tagliata a 500) e
   // il mittente si vedrebbe cambiare la riga sotto il naso.
   function salvaFraseAutomatico() {
-    if (!userNoteToccata) return userNoteInVolo || Promise.resolve(true);
+    // Una scrittura fallita lascia la frase IGNOTA: lì si riprova comunque,
+    // anche se da allora nessuno ha più toccato la casella. Altrimenti "la
+    // frase è al sicuro?" risponderebbe di sì su una riga che non è mai
+    // arrivata.
+    const ignota = !!selectedId && userNoteSpedito.get(selectedId) === FRASE_IGNOTA;
+    if (!userNoteToccata && !ignota) return userNoteInVolo || Promise.resolve(true);
     return salvaFraseSubito({ muto: true });
   }
   // Quello che l'owner ha scritto è a destinazione? Aspetta sia il salvataggio
@@ -2718,7 +2723,7 @@
   if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', salvaFraseAMano);
   if (mgUserNoteText) {
     mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; programmaSalvataggioFrase(); });
-    mgUserNoteText.addEventListener('blur', () => { salvaFraseSubito({ muto: true }); });
+    mgUserNoteText.addEventListener('blur', () => { salvaFraseAutomatico(); });
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
     });
