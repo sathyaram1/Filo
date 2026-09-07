@@ -96,7 +96,7 @@
    * La finestra scelta, in millisecondi. PURA.
    * @param {string} key    una chiave di WINDOWS
    * @param {object} opts   { now, fromISO, toISO } — le due date solo per 'custom'
-   * @returns {{from:number|null, to:number|null, label:string, key:string, invalid?:string}}
+   * @returns {{from:number|null, to:number|null, label:string, key:string, nota?:string}}
    *   `from`/`to` a null = nessun limite da quel lato. `to` è ESCLUSIVO (fine
    *   della giornata scelta), così un intervallo «dal 1 al 1» contiene tutto
    *   quel giorno invece di niente.
