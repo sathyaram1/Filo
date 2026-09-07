@@ -3778,7 +3778,12 @@
     // Statistiche feedback (#496): apertura della scheda, registro dei worker
     // finto (gli spec non hanno Firestore) e stato dei filtri.
     openStats() { return stOpen(); },
-    setWorkerLog(entries) { stWorkerLog = Array.isArray(entries) ? entries : []; stWorkerLogError = ''; stRender(); },
+    setWorkerLog(entries) {
+      stWorkerLog = Array.isArray(entries) ? entries : [];
+      stWorkerLogError = '';
+      stWorkerLogFinto = true;
+      stRender();
+    },
     setStatsWindow(key, fromISO, toISO) {
       stWindow = key;
       if (fromISO !== undefined) stFromISO = fromISO || '';
