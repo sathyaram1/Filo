@@ -3379,7 +3379,7 @@
         const meta = ST.CATEGORIES.find((x) => x.key === c.key);
         return { key: c.key, label: meta ? meta.label : c.key, count: c.count };
       });
-      // Uno stato che questo computer non sa leggere non si travesteda
+      // Uno stato che questo computer non sa leggere non si traveste da
       // categoria: si dice che c'è e che non si legge.
       if (d.illeggibili) {
         rows.push({
@@ -3982,6 +3982,16 @@
     const btn = e.target.closest('.mg-tab');
     if (!btn || btn.dataset.tab !== 'models') return;
     if (!smLoaded && !smLoading) loadSupportModels();
+  });
+
+  // Tab "Statistiche feedback": si ridisegna a OGNI apertura. I feedback sono
+  // già in pagina (li tiene aggiornati il giro continuo), il registro delle
+  // esecuzioni è una lettura di documento sola: rileggerlo a ogni clic costa
+  // niente e mostra quello che è partito nel frattempo.
+  mgTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mg-tab');
+    if (!btn || btn.dataset.tab !== 'fbstats') return;
+    stOpen();
   });
 
   // Tab "Log": ricarica il log dei worker a OGNI apertura (non solo la prima) —
