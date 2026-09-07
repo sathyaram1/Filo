@@ -1337,6 +1337,13 @@ una conseguenza; va fatto il contrario.
   59px sotto il fondo al 150% di zoom, con la riga per scrivere di nuovo
   irraggiungibile. Tieni il punto GREZZO e ritaglialo sulla finestra di adesso:
   il punto ancorato è una funzione, non un numero.
+  **Vale per ogni pannello che galleggia**, non solo per il riquadro della
+  risposta: menu, tendine, suggerimenti. La tendina dei font dell'Editor
+  rientrava nella finestra all'apertura e basta, e chi stringeva la finestra
+  mentre era aperta se la ritrovava fuori (aperta a 1280 stava fra 859 e 1039, e
+  a finestra portata a 520 restava lì, cioè fuori del tutto). Chi si riposiziona
+  all'apertura si iscrive anche a `resize` della finestra e del `visualViewport`,
+  e si cancella alla chiusura.
 - **Il LATO si sceglie una volta e non cambia più**, e si sceglie sull'altezza
   che il riquadro **potrà** raggiungere (il suo tetto, letto dal foglio di
   stile — non ricopiato in JS), non su quella che ha adesso. Se ci sta sotto il
