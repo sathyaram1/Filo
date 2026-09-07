@@ -3838,27 +3838,35 @@
     const box = $st('mgStHealthRows');
     const signals = $st('mgStSignalRows');
     const p = d.priorita || {};
+    // Anche qui ogni riga si apre su ciò che ha contato: erano gli ultimi
+    // numeri della scheda da cui non si scendeva, e «priorità alta: 2» è
+    // proprio il posto dove la domanda «quali due?» viene per prima.
+    const ids = d.idsPriorita || {};
     if (box) {
       box.innerHTML = stRowsHtml([
-        { key: 'p3', label: 'Priorità alta (3)', count: p[3] || 0 },
-        { key: 'p2', label: 'Priorità media (2)', count: p[2] || 0 },
-        { key: 'p1', label: 'Priorità bassa (1)', count: p[1] || 0 },
-        { key: 'p0', label: 'Senza priorità', count: p[0] || 0 },
-      ], { total: d.ricevuti });
+        { key: '3', label: 'Priorità alta (3)', count: p[3] || 0, ids: ids['3'] },
+        { key: '2', label: 'Priorità media (2)', count: p[2] || 0, ids: ids['2'] },
+        { key: '1', label: 'Priorità bassa (1)', count: p[1] || 0, ids: ids['1'] },
+        { key: '0', label: 'Senza priorità', count: p[0] || 0, ids: ids['0'] },
+      ], { total: d.ricevuti, scope: 'priorita' });
     }
     if (signals) {
       // Eventi, non segnalazioni: niente barre e niente percentuali sul totale
-      // dei ricevuti, che sarebbe un rapporto fra due cose diverse.
+      // dei ricevuti, che sarebbe un rapporto fra due cose diverse. L'elenco
+      // che si apre sono le SEGNALAZIONI su cui quegli eventi sono successi, e
+      // il suggerimento lo dice per non far leggere l'elenco come il conteggio.
       signals.innerHTML = stRowsHtml([
         {
           key: 'riaperture', label: 'Riaperture chieste', count: d.riaperture,
-          title: 'Quante volte chi aveva segnalato ha detto «è ancora rotto» su un feedback di questa finestra.',
+          ids: d.idsRiaperti,
+          title: `Quante volte chi aveva segnalato ha detto «è ancora rotto» su un feedback di questa finestra.${(d.idsRiaperti || []).length ? ' Apri per vedere su quali segnalazioni.' : ''}`,
         },
         {
           key: 'stalli', label: 'Lavori rientrati in coda', count: d.stalli,
-          title: 'Quante volte una lavorazione si è arenata (il ramo fermo troppo a lungo) ed è rientrata in coda da sola.',
+          ids: d.idsArenati,
+          title: `Quante volte una lavorazione si è arenata (il ramo fermo troppo a lungo) ed è rientrata in coda da sola.${(d.idsArenati || []).length ? ' Apri per vedere su quali segnalazioni.' : ''}`,
         },
-      ], { percent: false, bars: false });
+      ], { percent: false, bars: false, scope: 'segnale' });
     }
   }
 
