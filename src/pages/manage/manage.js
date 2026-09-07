@@ -4034,8 +4034,11 @@
       return [];
     }
 
-    // Una riga di ripartizione o una voce di legenda.
-    const riga = target.closest('[data-open], [data-goto]');
+    // Una riga di ripartizione o una voce di legenda. Anche una voce che non si
+    // apre su niente (l'esito delle critiche non porta segnalazioni) ha almeno
+    // il suo numero da incollare: senza, il tasto destro cambierebbe risposta
+    // fra due righe che si somigliano.
+    const riga = target.closest('[data-open], [data-goto], .mg-st-legend li[data-group]');
     if (riga) return stVociGruppo(riga);
 
     // Una barretta di «Quando arrivano».
