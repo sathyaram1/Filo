@@ -974,7 +974,7 @@
   // ── Tab bar ───────────────────────────────────────────────────────────────
   // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
-  // sinistra. Le tab segnaposto (stats/models) hanno il loro pannello.
+  // sinistra. Le altre (fbstats/stats/models/automation/log) hanno il loro.
   function selectTab(tab) {
     // Cambiando scheda la ricerca si chiude da sola: vedi la scheda scelta.
     if (searchMode) closeSearch({ keepList: true });
@@ -1306,7 +1306,8 @@
   // ── Quanti feedback ci sono in ogni scheda (#495) ─────────────────────────
   // Le quattro schede che ELENCANO feedback (Ricevuti, In coda, Risolti,
   // Archiviati) portano il loro numero accanto al nome, come la pagina gemella
-  // dei feedback. Le altre quattro (Statistiche, Modelli, Automazioni, Log) non
+  // dei feedback. Le altre (Statistiche feedback, Statistiche Red Team, Modelli,
+  // Automazioni, Log) non
   // elencano niente: lì un numero non vorrebbe dire nulla e non si scrive.
   // Il conteggio degli Archiviati segue i filtri della colonna (⭐ e "Bloccati
   // confermati"), altrimenti direbbe un numero diverso da quello che si vede.
@@ -1351,9 +1352,13 @@
   }
 
   // Mostra o nasconde le SEZIONI (le quattro schede-lista) e l'avviso che ne
-  // spiega l'assenza. Le altre schede della barra non sono sezioni — Statistiche,
-  // Modelli, Automazioni, Log non dipendono dallo stato delle segnalazioni e
-  // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
+  // spiega l'assenza. Le altre schede della barra non sono sezioni e restano
+  // raggiungibili: Statistiche Red Team, Modelli, Automazioni e Log non
+  // dipendono dallo stato delle segnalazioni. «Statistiche feedback» ci
+  // dipende in parte, e per quella parte non tace: le segnalazioni con lo
+  // stato illeggibile finiscono in una riga «Stato non leggibile» invece di
+  // essere infilate in una categoria a caso (#496).
+  // Ritorna true se le sezioni si possono disegnare.
   function mostraSezioni() {
     const ok = sezioniAttendibili();
     for (const tab of LIST_TABS) {
