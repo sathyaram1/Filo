@@ -700,12 +700,11 @@
     #mgUserNoteText { margin-bottom: 8px; }
 
     /* ── Preferito ⭐, owner-only ────────────────────────────────────────── */
-    /* Archivia/Ripristina non sta più qui: è un'azione di STATO e vive nella
-       riga generata da renderActions, che sparisce insieme alle altre quando lo
+    /* Archivia/Ripristina non sta qui: è un'azione di STATO e vive nella riga
+       generata da renderActions, che sparisce insieme alle altre quando lo
        stato non si legge (il bottone DICE dov'è la segnalazione, e senza chiave
        direbbe sempre "Archivia"). Il preferito invece è un flag in chiaro e
-       resta. */
-    .mg-manage[hidden] { display: none; }
+       resta, accanto alle azioni sulla stessa riga. */
     .mg-star-btn {
       all: unset; cursor: pointer;
       padding: 7px 12px; border-radius: 8px;
