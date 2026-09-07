@@ -14,7 +14,6 @@
   --dash-line: rgba(34, 30, 25, 0.10);
   --dash-line-strong: rgba(34, 30, 25, 0.18);
   --dash-accent: #c0552b;
-  --dash-accent-2: #e8a06a;
   --dash-radius: 18px;
 }
 body.scuro {
@@ -27,80 +26,120 @@ body.scuro {
   --dash-line-strong: rgba(236, 230, 218, 0.20);
 }
 * { box-sizing: border-box; }
+html, body { height: 100%; }
 body {
-  margin: 0;
-  background: var(--dash-paper);
-  color: var(--dash-ink);
+  margin: 0; background: var(--dash-paper); color: var(--dash-ink);
   font: 14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
-  padding: 22px 26px 60px;
+  display: flex; min-height: 100%;
 }
-h1 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
-.sub { color: var(--dash-ink-mute); font-size: 12.5px; margin: 0 0 4px; }
 
-.barra {
-  position: sticky; top: 0; z-index: 5;
-  background: var(--dash-paper);
-  padding: 10px 0 12px; margin-bottom: 6px;
-  border-bottom: 1px solid var(--dash-line);
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+/* ————— colonna delle impostazioni ————— */
+.lato {
+  width: 232px; flex: none; padding: 18px 16px 40px;
+  border-right: 1px solid var(--dash-line);
+  overflow-y: auto; max-height: 100vh;
 }
-.barra button, .barra label {
-  font: inherit; font-size: 12.5px;
-  border: 1px solid var(--dash-line-strong); background: transparent;
-  color: var(--dash-ink); border-radius: 20px; padding: 5px 13px; cursor: pointer;
+.lato h1 { font-size: 14px; font-weight: 600; margin: 0 0 3px; }
+.lato .sub { font-size: 11.5px; color: var(--dash-ink-mute); margin: 0 0 16px; }
+.gruppo { margin-bottom: 15px; }
+.gruppo > .tit {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--dash-ink-mute); margin-bottom: 5px;
 }
-.barra button:hover { background: var(--dash-ink); color: var(--dash-paper); }
-.barra input[type=range] { vertical-align: middle; width: 90px; accent-color: var(--dash-accent); }
+.opz { display: flex; flex-direction: column; gap: 2px; }
+.opz label {
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px;
+  padding: 4px 8px; border-radius: 8px; cursor: pointer; color: var(--dash-ink-soft);
+}
+.opz label:hover { background: var(--dash-line); }
+.opz input { accent-color: var(--dash-accent); margin: 0; flex: none; }
+.opz input:checked + span { color: var(--dash-ink); font-weight: 500; }
+.riga-cmd { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 14px; }
+.riga-cmd button {
+  font: inherit; font-size: 12px; border: 1px solid var(--dash-line-strong);
+  background: transparent; color: var(--dash-ink); border-radius: 16px;
+  padding: 4px 11px; cursor: pointer;
+}
+.riga-cmd button:hover { background: var(--dash-ink); color: var(--dash-paper); }
+.cursore { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dash-ink-soft); }
+.cursore input { flex: 1; accent-color: var(--dash-accent); }
+.presetti { margin: 4px 0 18px; display: flex; flex-direction: column; gap: 5px; }
+.presetti button { text-align: left; }
 
-.griglia { display: flex; flex-direction: column; gap: 14px; max-width: 780px; }
-
-.prova {
-  background: var(--dash-card);
-  border: 1px solid var(--dash-line);
-  border-radius: var(--dash-radius);
-  padding: 15px 18px 17px;
+/* ————— il palco ————— */
+.palco { flex: 1; min-width: 0; padding: 34px 30px 60px; display: flex; justify-content: center; }
+.chat { width: 100%; max-width: 560px; display: flex; flex-direction: column; align-items: stretch; }
+.bolla {
+  border-radius: var(--dash-radius); padding: 9px 14px; font-size: 13.5px;
+  max-width: 86%; margin-bottom: 12px;
 }
-.prova > h2 {
-  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--dash-ink-mute); margin: 0 0 3px;
+.bolla-utente { align-self: flex-end; background: var(--dash-ink); color: var(--dash-paper); }
+.bolla-filo {
+  align-self: flex-start; background: var(--dash-card); border: 1px solid var(--dash-line);
+  color: var(--dash-ink); white-space: pre-wrap; min-height: 0;
 }
-.prova > .nota { font-size: 12px; color: var(--dash-ink-mute); margin: 0 0 13px; }
-.palco { min-height: 44px; display: flex; flex-direction: column; justify-content: center; }
+.bolla-filo:empty { display: none; }
 
-.att { color: var(--dash-ink-mute); font-size: 13px; line-height: 1.45; display: flex; flex-direction: column; gap: 3px; }
-.att-testa { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; user-select: none; }
-.att-testa:hover { color: var(--dash-ink-soft); }
-.att-eti { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.att-corpo {
-  display: none; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto;
-  padding: 4px 10px 4px 12px; margin: 4px 0 2px 5px;
-  border-left: 2px solid var(--dash-line-strong); font-size: 12.5px; white-space: pre-wrap;
+/* ————— il blocco di attività ————— */
+.blocco {
+  align-self: flex-start; width: 100%; position: relative;
+  color: var(--dash-ink-mute); font-size: 13px; margin-bottom: 10px;
 }
-.att.aperto .att-corpo { display: flex; }
-.att-riga { display: flex; gap: 8px; align-items: baseline; }
-.tempo { color: var(--dash-ink-mute); opacity: 0; transition: opacity 400ms ease; font-variant-numeric: tabular-nums; flex: none; }
-.tempo.vis { opacity: 0.75; }
+.blocco.verticale { padding-left: 26px; }
+.rail { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.rail path { fill: none; stroke: var(--dash-accent); stroke-width: 1.7; stroke-linecap: round; }
+.rail circle { fill: var(--dash-accent); pointer-events: all; }
 
+.righe { display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+.blocco.chiuso .righe { max-height: 0 !important; opacity: 0; }
+.righe { transition: max-height 420ms cubic-bezier(.4,0,.2,1), opacity 300ms ease; max-height: 3000px; }
+
+.seg { display: flex; flex-direction: column; }
+.seg-testa {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 3px 4px 3px 0; border-radius: 7px; cursor: pointer; user-select: none;
+  transition: color 160ms ease;
+}
+.seg-testa:hover { color: var(--dash-ink-soft); }
+.seg.vivo .seg-testa { color: var(--dash-ink-soft); }
+.seg-eti { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity 180ms ease; }
+.seg-eti.giu { opacity: 0; }
+.seg-dur { font-variant-numeric: tabular-nums; opacity: 0.6; flex: none; font-size: 12px; }
+.seg-ico { flex: none; font-size: 12px; width: 14px; text-align: center; }
+.seg-corpo {
+  display: none; white-space: pre-wrap; font-size: 12.5px; line-height: 1.5;
+  padding: 3px 10px 8px 2px; color: var(--dash-ink-soft); user-select: text;
+  max-height: 220px; overflow-y: auto;
+}
+.seg.aperto .seg-corpo { display: block; }
+
+/* la trama: il ragionamento che scorre, illeggibile e vivo */
+.trama {
+  height: 16px; line-height: 16px; overflow: hidden; white-space: nowrap;
+  font-size: 10.5px; color: var(--dash-ink-mute); opacity: 0.5;
+  direction: rtl; text-align: left; padding-left: 2px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+.seg.aperto .trama { display: none; }
+
+/* capo arrotolato */
+.capo { display: none; align-items: center; gap: 9px; cursor: pointer; padding: 2px 0; user-select: none; }
+.blocco.arrotolabile .capo { display: flex; }
+.capo:hover { color: var(--dash-ink-soft); }
+.capo svg { flex: none; overflow: visible; }
+.capo svg path { fill: none; stroke: var(--dash-accent); stroke-width: 1.25; stroke-linecap: round; }
+
+/* rotella e filo orizzontale, per il confronto */
 .rotella {
   width: 12px; height: 12px; flex: none; border-radius: 50%;
   border: 2px solid currentColor; border-top-color: transparent; opacity: 0.7;
   animation: gira 0.9s linear infinite;
 }
 @keyframes gira { to { transform: rotate(360deg); } }
-
-.eti-fade { transition: opacity 180ms ease; }
-.eti-fade.giu { opacity: 0; }
-
-.texture {
-  height: 15px; overflow: hidden; margin-left: 30px;
-  font-size: 10.5px; line-height: 15px; color: var(--dash-ink-mute); opacity: 0.45;
-  white-space: nowrap; direction: rtl; text-align: left;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 72%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 72%, transparent);
-}
-
-svg.filo { display: block; overflow: visible; }
-svg.filo path { fill: none; stroke: currentColor; stroke-linecap: round; }
+.orizz { display: block; overflow: visible; margin: 1px 0 3px; max-width: 100%; }
+.orizz path { fill: none; stroke: var(--dash-accent); stroke-width: 1.6; stroke-linecap: round; }
+.orizz circle { fill: var(--dash-accent); }
 .nodo-hint {
   position: fixed; z-index: 20; pointer-events: none;
   background: var(--dash-ink); color: var(--dash-paper);
@@ -109,135 +148,148 @@ svg.filo path { fill: none; stroke: currentColor; stroke-linecap: round; }
   white-space: nowrap;
 }
 .nodo-hint.vis { opacity: 1; }
-.bolla {
-  align-self: flex-start; background: var(--dash-paper); border: 1px solid var(--dash-line);
-  border-radius: var(--dash-radius); padding: 9px 13px; color: var(--dash-ink);
-  margin-top: 7px; max-width: 92%; font-size: 13.5px; opacity: 0; transition: opacity 300ms ease;
-}
-.bolla.vis { opacity: 1; }
 </style>
 </head>
 <body>
 
-<h1>L'attesa in chat — sei varianti</h1>
-<p class="sub">Stesso copione per tutte: attesa, ragionamento a raffiche, tre passi con strumenti, risposta. Clicca una riga per aprire la cronologia.</p>
+<aside class="lato">
+  <h1>L'attesa in chat</h1>
+  <p class="sub">Un esempio solo. Cambia un'impostazione e riparte.</p>
 
-<div class="barra">
-  <button id="rigioca">↺ rigioca</button>
-  <label>velocità <input type="range" id="vel" min="0.4" max="3" step="0.1" value="1"></label>
-  <button id="tema">◐ scuro</button>
-  <button id="lento">lavoro più lungo</button>
-  <button id="verbo">parole: «Sta ragionando»</button>
-</div>
+  <div class="presetti">
+    <button data-preset="filo">↩ l'idea del filo verticale</button>
+    <button data-preset="cinque">↩ la «5» di prima</button>
+    <button data-preset="oggi">↩ com'è adesso</button>
+  </div>
 
-<div class="griglia" id="griglia"></div>
+  <div class="gruppo" data-opt="filo">
+    <div class="tit">Il filo</div>
+    <div class="opz">
+      <label><input type="radio" name="filo" value="verticale" checked><span>verticale, coi nodi</span></label>
+      <label><input type="radio" name="filo" value="orizzontale"><span>orizzontale, sotto la riga</span></label>
+      <label><input type="radio" name="filo" value="rotella"><span>una rotella</span></label>
+    </div>
+  </div>
+
+  <div class="gruppo" data-opt="ragionamento">
+    <div class="tit">Il ragionamento, mentre corre</div>
+    <div class="opz">
+      <label><input type="radio" name="ragionamento" value="trama" checked><span>trama che scorre</span></label>
+      <label><input type="radio" name="ragionamento" value="frase"><span>frase intera nella riga</span></label>
+      <label><input type="radio" name="ragionamento" value="parziale"><span>frase mentre cresce</span></label>
+      <label><input type="radio" name="ragionamento" value="niente"><span>niente</span></label>
+    </div>
+  </div>
+
+  <div class="gruppo" data-opt="nodo">
+    <div class="tit">Il titolo del nodo</div>
+    <div class="opz">
+      <label><input type="radio" name="nodo" value="due" checked><span>due parole</span></label>
+      <label><input type="radio" name="nodo" value="durata"><span>due parole e la durata</span></label>
+      <label><input type="radio" name="nodo" value="dettaglio"><span>due parole e il dettaglio</span></label>
+    </div>
+  </div>
+
+  <div class="gruppo" data-opt="fine">
+    <div class="tit">Quando comincia a rispondere</div>
+    <div class="opz">
+      <label><input type="radio" name="fine" value="arrotola" checked><span>il filo si arrotola</span></label>
+      <label><input type="radio" name="fine" value="resta"><span>resta disteso</span></label>
+      <label><input type="radio" name="fine" value="sparisce"><span>sparisce tutto</span></label>
+    </div>
+  </div>
+
+  <div class="gruppo" data-opt="parole">
+    <div class="tit">Le parole</div>
+    <div class="opz">
+      <label><input type="radio" name="parole" value="0" checked><span>Sta ragionando</span></label>
+      <label><input type="radio" name="parole" value="1"><span>Ci sto lavorando</span></label>
+      <label><input type="radio" name="parole" value="2"><span>Ci penso</span></label>
+    </div>
+  </div>
+
+  <div class="gruppo">
+    <div class="tit">Il lavoro</div>
+    <div class="opz">
+      <label><input type="checkbox" id="lungo"><span>lungo (sei passi)</span></label>
+      <label><input type="checkbox" id="calmo"><span>meno movimento</span></label>
+      <label><input type="checkbox" id="tema"><span>tema scuro</span></label>
+    </div>
+    <div class="cursore" style="margin-top:8px">velocità <input type="range" id="vel" min="0.4" max="3" step="0.1" value="1"></div>
+  </div>
+
+  <div class="riga-cmd"><button id="rigioca">↺ rigioca</button></div>
+</aside>
+
+<main class="palco">
+  <div class="chat">
+    <div class="bolla bolla-utente">che treni ci sono domani mattina per bologna?</div>
+    <div id="blocco"></div>
+    <div class="bolla bolla-filo" id="risposta"></div>
+  </div>
+</main>
 <div class="nodo-hint" id="hint"></div>
 
 <script>
-var RAGIONAMENTI = [
-  "L'utente chiede gli orari dei treni per Bologna di domani mattina. Non ho un orario in memoria, quindi devo cercarlo. Comincio dal sito ufficiale e poi confronto con un secondo, perché i cambi stagionali sono spesso disallineati.",
-  "Il primo risultato dà tre partenze fra le 7 e le 9. Manca il prezzo, che l'utente non ha chiesto ma vorrà sapere subito dopo. Provo a recuperarlo dalla stessa pagina prima di rispondere.",
-  "Ho tutto: tre treni, due con cambio e uno diretto. Il diretto costa di più ma arriva prima. Metto il diretto per primo e cito gli altri due sotto, senza tabelle: sono tre righe.",
+/* ——————————————————————————————————————————————————————
+   Copione. Un segmento alla volta: vive, poi si annoda.
+—————————————————————————————————————————————————————— */
+var PASSI = [
+  { tipo: 'ragiona', durata: 4300, titolo: 'Riflettuto', dettaglio: 'da dove partire',
+    testo: "L'utente chiede gli orari dei treni per Bologna di domani mattina. Non ho un orario in memoria, quindi devo cercarlo. Comincio dal sito ufficiale e poi confronto con un secondo, perché i cambi stagionali sono spesso disallineati." },
+  { tipo: 'azione', durata: 1900, icona: '🔎', vivo: 'Cerco sul web…', titolo: 'Cercato sul web', dettaglio: 'orari treni Bologna',
+    testo: 'Ricerca: «treni Firenze Bologna orari domani mattina» — 8 risultati.' },
+  { tipo: 'ragiona', durata: 3200, titolo: 'Riflettuto', dettaglio: 'manca il prezzo',
+    testo: "Il primo risultato dà tre partenze fra le 7 e le 9. Manca il prezzo, che l'utente non ha chiesto ma vorrà sapere subito dopo. Provo a recuperarlo dalla stessa pagina prima di rispondere." },
+  { tipo: 'azione', durata: 1800, icona: '📄', vivo: 'Leggo la pagina…', titolo: 'Letta una pagina', dettaglio: 'orari ufficiali',
+    testo: 'Pagina letta: tabella con 11 partenze fra le 06:10 e le 09:55.' },
+  { tipo: 'ragiona', durata: 3000, titolo: 'Riflettuto', dettaglio: 'quale mettere per primo',
+    testo: "Ho tutto: tre treni, due con cambio e uno diretto. Il diretto costa di più ma arriva prima. Metto il diretto per primo e cito gli altri due sotto, senza tabelle: sono tre righe." },
+  { tipo: 'azione', durata: 1700, icona: '💶', vivo: 'Controllo i prezzi…', titolo: 'Confrontati i prezzi', dettaglio: 'due siti',
+    testo: 'Prezzi: 34 €, 19 €, 21 €. Il secondo sito conferma.' },
 ];
-var COPIONE = [
-  { t: 900,   tipo: 'ragiona', i: 0 },
-  { t: 5200,  tipo: 'agisce',  testo: 'Cerco sul web…', icona: '🔎' },
-  { t: 7000,  tipo: 'passo',   testo: 'Cercato sul web · orari treni Bologna', icona: '🔎' },
-  { t: 7200,  tipo: 'ragiona', i: 1 },
-  { t: 10400, tipo: 'agisce',  testo: 'Leggo la pagina…', icona: '📄' },
-  { t: 12200, tipo: 'passo',   testo: 'Letta una pagina · orari ufficiali', icona: '📄' },
-  { t: 12500, tipo: 'ragiona', i: 2 },
-  { t: 15600, tipo: 'agisce',  testo: 'Controllo i prezzi…', icona: '💶' },
-  { t: 17400, tipo: 'passo',   testo: 'Confrontati due siti · prezzi', icona: '💶' },
-  { t: 17800, tipo: 'scrive',  testo: 'Scrivo la risposta…' },
-  { t: 19600, tipo: 'fine',    testo: 'Ha cercato sul web, letto una pagina e confrontato i prezzi' },
+var PASSI_EXTRA = [
+  { tipo: 'ragiona', durata: 2800, titolo: 'Riflettuto', dettaglio: 'e gli scioperi?',
+    testo: "Domani è venerdì e a gennaio ci sono stati scioperi. Vale la pena controllare: se c'è uno sciopero l'orario che sto per dare è carta straccia." },
+  { tipo: 'azione', durata: 1800, icona: '⚠️', vivo: 'Controllo gli scioperi…', titolo: 'Controllati gli scioperi', dettaglio: 'nessuno',
+    testo: 'Nessuno sciopero annunciato per domani sulla tratta.' },
+  { tipo: 'ragiona', durata: 2400, titolo: 'Riflettuto', dettaglio: 'come scriverlo',
+    testo: "Tre righe, il diretto per primo. Non aggiungo lo sciopero: dire «non ci sono scioperi» a chi non ha chiesto di scioperi semina un dubbio che non aveva." },
 ];
+var RISPOSTA = 'Domani mattina hai tre treni per Bologna: il diretto delle 7:42 (1 h 05, 34 €) e due con cambio a Firenze, alle 7:10 e alle 8:25 — più lenti ma la metà del prezzo.';
+var PAROLE = ['Sta ragionando', 'Ci sto lavorando', 'Ci penso'];
 
-var ascoltatori = [];
-var vel = 1, allunga = false, t0 = 0, timers = [], batt = null;
-
-// Le parole della riga. Cambiarle dal vivo è l'unico modo per capire quale
-// suona giusta: fuori contesto sembrano tutte uguali.
-var VERBI = ['Sta ragionando', 'Ci sto lavorando', 'Ci penso', 'Filo pensa'];
-var verboIdx = 0;
-function V() { return VERBI[verboIdx]; }
-
-function pulisci() { timers.forEach(clearTimeout); timers = []; if (batt) clearInterval(batt); }
-function poi(ms, fn) { timers.push(setTimeout(fn, ms / vel)); }
-
-// I token arrivano a raffiche disuguali: è questo che fa "scattare" la riga.
-function streamRagionamento(indice, durataMs, emetti) {
-  var testo = RAGIONAMENTI[indice];
-  var pos = 0, quando = 0;
-  while (pos < testo.length) {
-    var n = 2 + Math.floor(Math.random() * 8);
-    var pezzo = testo.slice(pos, pos + n);
-    pos += n;
-    (function (p, q) { poi(q, function () { emetti(p); }); })(pezzo, quando);
-    quando += (durataMs / testo.length) * n * (0.35 + Math.random() * 1.6);
-  }
-}
-
-function avvia() {
-  pulisci();
-  ascoltatori.forEach(function (a) { a.reset(); });
-  t0 = Date.now();
-  var f = allunga ? 2.2 : 1;
-  COPIONE.forEach(function (ev, k) {
-    var quando = ev.t * f;
-    poi(quando, function () {
-      if (ev.tipo === 'ragiona') {
-        ascoltatori.forEach(function (a) { a.nuovoTurno(); });
-        var prossimo = COPIONE[k + 1] ? COPIONE[k + 1].t * f : quando + 3000;
-        streamRagionamento(ev.i, prossimo - quando - 250, function (p) {
-          ascoltatori.forEach(function (a) { a.ragiona(p); });
-        });
-      } else {
-        ascoltatori.forEach(function (a) { if (a[ev.tipo]) a[ev.tipo](ev); });
-      }
-    });
+/* —————————————————— utilità —————————————————— */
+var opt = {}, vel = 1, corsa = null;
+function leggiOpzioni() {
+  ['filo', 'ragionamento', 'nodo', 'fine', 'parole'].forEach(function (n) {
+    var v = document.querySelector('input[name="' + n + '"]:checked');
+    opt[n] = v ? v.value : null;
   });
-  batt = setInterval(function () {
-    var ms = Date.now() - t0;
-    ascoltatori.forEach(function (a) { if (a.batti) a.batti(ms); });
-  }, 250);
+  opt.lungo = document.getElementById('lungo').checked;
+  opt.calmo = document.getElementById('calmo').checked;
 }
-
-var frasiChiuse = function (t) {
-  var m = String(t || '').replace(/\s+/g, ' ').trim().match(/[^.!?…]+[.!?…]/g);
-  return m || [];
-};
-var ultimaFrase = function (t) {
-  var p = String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…])\s+/);
-  return p[p.length - 1] || '';
-};
-var durata = function (ms) {
-  var s = Math.round(ms / 1000);
-  return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min ' + (s % 60) + ' s';
-};
+function V() { return PAROLE[Number(opt.parole) || 0]; }
 function el(tag, cls, testo) {
   var e = document.createElement(tag);
   if (cls) e.className = cls;
   if (testo != null) e.textContent = testo;
   return e;
 }
-function riquadro(titolo, nota) {
-  var box = el('div', 'prova');
-  box.append(el('h2', null, titolo), el('p', 'nota', nota));
-  var palco = el('div', 'palco');
-  box.append(palco);
-  document.getElementById('griglia').append(box);
-  return palco;
+function svgNS(tag) { return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+function dur(ms) {
+  var s = Math.round(ms / 1000);
+  return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min ' + (s % 60) + ' s';
 }
-function scheletro(palco) {
-  var att = el('div', 'att');
-  var testa = el('div', 'att-testa');
-  var corpo = el('div', 'att-corpo');
-  att.append(testa, corpo);
-  var bolla = el('div', 'bolla', 'Domani mattina hai tre treni per Bologna: il diretto delle 7:42 (1 h 05, 34 €) e due con cambio a Firenze, alle 7:10 e alle 8:25.');
-  palco.append(att, bolla);
-  testa.addEventListener('click', function () { att.classList.toggle('aperto'); });
-  return { att: att, testa: testa, corpo: corpo, bolla: bolla };
+function frasiChiuse(t) {
+  return String(t || '').replace(/\s+/g, ' ').trim().match(/[^.!?…]+[.!?…]/g) || [];
+}
+function ultimaFrase(t) {
+  var p = String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…])\s+/);
+  return p[p.length - 1] || '';
+}
+function attendi(ms) {
+  return new Promise(function (r) { setTimeout(r, ms / vel); });
 }
 var hint = document.getElementById('hint');
 function legaHint(nodo, testo) {
@@ -250,278 +302,274 @@ function legaHint(nodo, testo) {
   });
   nodo.addEventListener('mouseleave', function () { hint.classList.remove('vis'); });
 }
-function dissolvenza(eti) {
-  return function (t) {
-    if (eti.textContent === t) return;
-    eti.classList.add('giu');
-    setTimeout(function () { eti.textContent = t; eti.classList.remove('giu'); }, 180);
+
+/* ——————————————————————————————————————————————————————
+   Il blocco. Una riga per segmento; il filo dipende dall'opzione.
+—————————————————————————————————————————————————————— */
+function creaBlocco(host) {
+  var blocco = el('div', 'blocco');
+  var righe = el('div', 'righe');
+  var capo = el('div', 'capo');
+  blocco.append(capo, righe);
+  host.append(blocco);
+
+  var segmenti = [], apertoIdx = -1, arrotolato = false;
+  var rail = null, railPath = null, nodi = [];
+  var onda = { fase: 0, amp: 2.4, ampObiettivo: 2.4, vel: 0.06, ultimoNodoY: 0, fine: 0 };
+  var vivo = true;
+
+  if (opt.filo === 'verticale') {
+    blocco.classList.add('verticale');
+    rail = svgNS('svg');
+    rail.setAttribute('class', 'rail');
+    rail.setAttribute('width', 26);
+    railPath = svgNS('path');
+    rail.append(railPath);
+    blocco.append(rail);
+    requestAnimationFrame(disegna);
+  }
+
+  // Il filo: dritto sopra l'ultimo nodo (quello è già fatto), vivo sotto.
+  function disegna() {
+    if (!vivo) return;
+    var H = Math.max(18, righe.offsetHeight);
+    rail.setAttribute('height', H + 10);
+    rail.style.height = (H + 10) + 'px';
+    if (!arrotolato) {
+      onda.amp += (onda.ampObiettivo - onda.amp) * 0.07;
+      if (!opt.calmo) onda.fase += onda.vel;
+      var x0 = 13, d = '', n = Math.max(10, Math.round(H / 4));
+      for (var i = 0; i <= n; i++) {
+        var y = (i / n) * H;
+        var giu = Math.max(0, Math.min(1, (y - onda.ultimoNodoY) / 34));
+        var punta = Math.min(1, (H - y) / 10 + 0.2);
+        var x = x0 + Math.sin(y * 0.16 + onda.fase) * onda.amp * giu * punta;
+        d += (i ? 'L' : 'M') + x.toFixed(2) + ',' + y.toFixed(1);
+      }
+      railPath.setAttribute('d', d);
+    }
+    requestAnimationFrame(disegna);
+  }
+
+  function piazzaNodo(seg) {
+    if (!rail) return;
+    var y = seg.testa.offsetTop + seg.testa.offsetHeight / 2;
+    var c = svgNS('circle');
+    c.setAttribute('cx', 13); c.setAttribute('cy', y); c.setAttribute('r', 0);
+    c.style.transition = 'r 340ms cubic-bezier(.3,1.8,.5,1)';
+    rail.append(c);
+    requestAnimationFrame(function () { c.setAttribute('r', 3.4); });
+    legaHint(c, seg.dati.titolo);
+    nodi.push(c);
+    onda.ultimoNodoY = y;
+  }
+
+  function apri(i) {
+    apertoIdx = (apertoIdx === i) ? -1 : i;
+    segmenti.forEach(function (s, k) { s.el.classList.toggle('aperto', k === apertoIdx); });
+  }
+
+  function etichettaNodo(dati, ms) {
+    if (opt.nodo === 'durata') return dati.titolo + ' · ' + dur(ms);
+    if (opt.nodo === 'dettaglio') return dati.titolo + ' · ' + dati.dettaglio;
+    return dati.titolo;
+  }
+
+  return {
+    blocco: blocco,
+    // Apre un segmento: da qui in poi è "quello vivo".
+    apriSegmento: function (dati) {
+      var wrap = el('div', 'seg vivo');
+      var testa = el('div', 'seg-testa');
+      var ico = el('span', 'seg-ico');
+      var eti = el('span', 'seg-eti');
+      testa.append(ico, eti);
+      var corpo = el('div', 'seg-corpo');
+      var trama = el('div', 'trama');
+      wrap.append(testa, trama, corpo);
+      righe.append(wrap);
+      var idx = segmenti.length;
+      testa.addEventListener('click', function () { apri(idx); });
+
+      // L'icona del segmento vivo: rotella o niente (col filo verticale il
+      // movimento ce l'ha già il filo, una rotella in più è rumore).
+      if (opt.filo === 'rotella') { ico.className = 'rotella'; ico.textContent = ''; }
+      else if (opt.filo === 'orizzontale') { ico.textContent = ''; ico.style.display = 'none'; }
+      else { ico.textContent = ''; ico.style.width = '0'; }
+
+      var seg = { el: wrap, testa: testa, eti: eti, corpo: corpo, trama: trama, dati: dati, acc: '', viste: 0 };
+      segmenti.push(seg);
+      if (dati.tipo === 'azione') {
+        onda.ampObiettivo = 1.6; onda.vel = 0.13;
+        eti.textContent = dati.vivo;
+        trama.style.display = 'none';
+        corpo.textContent = dati.testo;
+      } else {
+        onda.ampObiettivo = 3.2; onda.vel = 0.06;
+        eti.textContent = V() + '…';
+        if (opt.ragionamento !== 'trama') trama.style.display = 'none';
+      }
+      return seg;
+    },
+    // Un pezzo di ragionamento arrivato dal modello.
+    ragiona: function (seg, pezzo) {
+      seg.acc += pezzo;
+      seg.corpo.textContent = seg.acc;
+      seg.corpo.scrollTop = seg.corpo.scrollHeight;
+      if (opt.ragionamento === 'trama') {
+        seg.trama.textContent = seg.acc.replace(/\s+/g, ' ').slice(-80);
+      } else if (opt.ragionamento === 'parziale') {
+        seg.eti.textContent = V() + ' · ' + ultimaFrase(seg.acc);
+      } else if (opt.ragionamento === 'frase') {
+        var fr = frasiChiuse(seg.acc);
+        if (fr.length > seg.viste) {
+          seg.viste = fr.length;
+          var t = V() + ' · ' + fr[fr.length - 1].trim();
+          seg.eti.classList.add('giu');
+          setTimeout(function () { seg.eti.textContent = t; seg.eti.classList.remove('giu'); }, 170);
+        }
+      }
+    },
+    // Il segmento si chiude: nodo e titolo.
+    annoda: function (seg, ms) {
+      seg.el.classList.remove('vivo');
+      seg.trama.remove();
+      if (seg.dati.tipo === 'azione' || opt.filo !== 'verticale') {
+        seg.testa.querySelector('.seg-ico').style.display = '';
+        seg.testa.querySelector('.seg-ico').className = 'seg-ico';
+        seg.testa.querySelector('.seg-ico').textContent = seg.dati.icona || '';
+        if (!seg.dati.icona) seg.testa.querySelector('.seg-ico').style.width = '0';
+      }
+      seg.eti.classList.add('giu');
+      setTimeout(function () {
+        seg.eti.textContent = etichettaNodo(seg.dati, ms);
+        seg.eti.classList.remove('giu');
+      }, 170);
+      piazzaNodo(seg);
+    },
+    // Comincia la risposta: il filo si arrotola (o resta, o sparisce).
+    chiudi: function (riassunto, msTot) {
+      onda.ampObiettivo = 0.4; onda.vel = 0.012;
+      if (opt.fine === 'sparisce') { vivo = false; blocco.remove(); return; }
+      if (opt.fine === 'resta') return;
+      arrotolato = true;
+      blocco.classList.add('arrotolabile', 'chiuso');
+      if (rail) rail.style.display = 'none';
+      // il gomitolo: una spirale che si avvolge in mezzo secondo
+      var svg = svgNS('svg');
+      svg.setAttribute('width', 20); svg.setAttribute('height', 20);
+      svg.setAttribute('viewBox', '0 0 20 20');
+      var d = '';
+      for (var a = 0; a < Math.PI * 4.6; a += 0.08) {
+        var r = 0.9 + a * 0.55;
+        d += (d ? 'L' : 'M') + (10 + Math.cos(a) * r).toFixed(2) + ',' + (10 + Math.sin(a) * r * 0.86).toFixed(2);
+      }
+      var p = svgNS('path');
+      p.setAttribute('d', d);
+      svg.append(p);
+      capo.append(svg, el('span', 'seg-eti', riassunto + (opt.nodo === 'durata' ? '' : ' · ' + dur(msTot))));
+      var len = 200;
+      try { len = p.getTotalLength(); } catch (e) {}
+      p.style.strokeDasharray = len;
+      p.style.strokeDashoffset = len;
+      if (opt.calmo) { p.style.strokeDashoffset = 0; }
+      else {
+        p.style.transition = 'stroke-dashoffset 700ms cubic-bezier(.4,0,.2,1)';
+        requestAnimationFrame(function () { p.style.strokeDashoffset = 0; });
+      }
+      capo.addEventListener('click', function () {
+        blocco.classList.toggle('chiuso');
+        if (rail) rail.style.display = blocco.classList.contains('chiuso') ? 'none' : '';
+      });
+    },
+    ferma: function () { vivo = false; },
   };
 }
-function rigaPasso(corpo, ev) {
-  var r = el('div', 'att-riga');
-  r.append(el('span', null, ev.icona), el('span', null, ev.testo));
-  corpo.append(r);
-  corpo.scrollTop = corpo.scrollHeight;
-}
 
-/* Il filo: un'onda che scorre. Ampiezza e velocità dicono quanto sta tirando. */
-function svgFilo(L, H, spessore) {
-  var ns = 'http://www.w3.org/2000/svg';
-  var svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('class', 'filo');
-  svg.setAttribute('width', L); svg.setAttribute('height', H);
-  svg.setAttribute('viewBox', '0 0 ' + L + ' ' + H);
-  var p = document.createElementNS(ns, 'path');
-  p.setAttribute('stroke-width', spessore);
-  svg.append(p);
-  return { svg: svg, p: p, ns: ns };
-}
-function ondaFilo(p, L, H, onde) {
-  var s = { fase: 0, amp: 1.6, ampObiettivo: 1.6, vel: 0.055 };
-  function passo() {
-    s.amp += (s.ampObiettivo - s.amp) * 0.06;
-    s.fase += s.vel;
-    var y0 = H / 2, d = '', n = Math.max(14, Math.round(L / 3));
-    for (var i = 0; i <= n; i++) {
-      var x = (i / n) * L;
-      var bordo = Math.sin((i / n) * Math.PI);
-      var y = y0 + Math.sin((x / L) * Math.PI * 2 * onde + s.fase) * s.amp * bordo;
-      d += (i ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(2);
+/* ——————————————————————————————————————————————————————
+   La corsa.
+—————————————————————————————————————————————————————— */
+var bloccoVivo = null;
+async function gioca() {
+  if (bloccoVivo) bloccoVivo.ferma();
+  var mio = corsa = {};
+  leggiOpzioni();
+  var host = document.getElementById('blocco');
+  host.textContent = '';
+  var risposta = document.getElementById('risposta');
+  risposta.textContent = '';
+
+  var b = creaBlocco(host);
+  bloccoVivo = b;
+  var passi = opt.lungo ? PASSI.concat(PASSI_EXTRA) : PASSI;
+  var inizio = Date.now();
+
+  await attendi(700);
+  if (corsa !== mio) return;
+
+  for (var i = 0; i < passi.length; i++) {
+    var dati = passi[i];
+    var seg = b.apriSegmento(dati);
+    var t = Date.now();
+    if (dati.tipo === 'ragiona') {
+      // token a raffiche disuguali, come dal vero
+      var pos = 0;
+      while (pos < dati.testo.length) {
+        var n = 2 + Math.floor(Math.random() * 8);
+        b.ragiona(seg, dati.testo.slice(pos, pos + n));
+        pos += n;
+        await attendi((dati.durata / dati.testo.length) * n * (0.4 + Math.random() * 1.4));
+        if (corsa !== mio) return;
+      }
+    } else {
+      await attendi(dati.durata);
+      if (corsa !== mio) return;
     }
-    p.setAttribute('d', d);
-    requestAnimationFrame(passo);
+    b.annoda(seg, Date.now() - t);
+    await attendi(260);
+    if (corsa !== mio) return;
   }
-  requestAnimationFrame(passo);
-  return s;
+
+  b.chiudi('Ha cercato sul web, letto una pagina e confrontato i prezzi', Date.now() - inizio);
+  await attendi(420);
+  if (corsa !== mio) return;
+
+  // la risposta si scrive
+  for (var k = 1; k <= RISPOSTA.length; k += 2) {
+    risposta.textContent = RISPOSTA.slice(0, k);
+    await attendi(22);
+    if (corsa !== mio) return;
+  }
+  risposta.textContent = RISPOSTA;
 }
 
-/* ==========  1 — com'è adesso  ========== */
-(function () {
-  var palco = riquadro('1 · com’è adesso', 'Rotella e ultima frase mentre cresce. Guarda gli scatti: la riga si allunga a strappi e riparte da capo a ogni frase.');
-  var s = scheletro(palco);
-  var rot = el('span', 'rotella'), eti = el('span', 'att-eti');
-  s.testa.append(rot, eti);
-  var acc = '', rag = null;
-  ascoltatori.push({
-    reset: function () { acc = ''; rag = null; s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…'; rot.style.display = ''; s.bolla.classList.remove('vis'); },
-    nuovoTurno: function () { acc = ''; rag = el('div'); s.corpo.append(rag); },
-    ragiona: function (p) { acc += p; if (rag) rag.textContent = acc; eti.textContent = V() + ' · ' + ultimaFrase(acc); s.corpo.scrollTop = s.corpo.scrollHeight; },
-    agisce: function (ev) { eti.textContent = ev.testo; },
-    passo: function (ev) { rigaPasso(s.corpo, ev); },
-    scrive: function (ev) { eti.textContent = ev.testo; },
-    fine: function (ev) { rot.style.display = 'none'; eti.textContent = ev.testo + ' · ' + durata(Date.now() - t0); s.bolla.classList.add('vis'); },
+/* —————————————————— comandi —————————————————— */
+var PRESET = {
+  filo:    { filo: 'verticale',   ragionamento: 'trama',  nodo: 'due',   fine: 'arrotola' },
+  cinque:  { filo: 'rotella',     ragionamento: 'trama',  nodo: 'due',   fine: 'resta' },
+  oggi:    { filo: 'rotella',     ragionamento: 'parziale', nodo: 'dettaglio', fine: 'resta' },
+};
+document.querySelectorAll('[data-preset]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var p = PRESET[b.dataset.preset];
+    Object.keys(p).forEach(function (k) {
+      var i = document.querySelector('input[name="' + k + '"][value="' + p[k] + '"]');
+      if (i) i.checked = true;
+    });
+    gioca();
   });
-})();
-
-/* ==========  2 — frase intera  ========== */
-(function () {
-  var palco = riquadro('2 · frase intera (correzione minima)', 'Stessa struttura, ma la riga cambia solo a frase finita, con dissolvenza. Nessuno scatto, nessuna parola tagliata, costo zero.');
-  var s = scheletro(palco);
-  var rot = el('span', 'rotella'), eti = el('span', 'att-eti eti-fade');
-  s.testa.append(rot, eti);
-  var cambia = dissolvenza(eti);
-  var acc = '', rag = null, viste = 0;
-  ascoltatori.push({
-    reset: function () { acc = ''; rag = null; viste = 0; s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…'; rot.style.display = ''; s.bolla.classList.remove('vis'); },
-    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
-    ragiona: function (p) {
-      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
-      var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia(V() + '…');
-    },
-    agisce: function (ev) { cambia(ev.testo); },
-    passo: function (ev) { rigaPasso(s.corpo, ev); },
-    scrive: function (ev) { cambia(ev.testo); },
-    fine: function (ev) { rot.style.display = 'none'; cambia(ev.testo + ' · ' + durata(Date.now() - t0)); s.bolla.classList.add('vis'); },
-  });
-})();
-
-/* ==========  3 — il filo al posto della rotella  ========== */
-(function () {
-  var palco = riquadro('3 · il filo al posto della rotella', 'Un filo teso che vibra: si agita mentre pensa, corre mentre agisce, si calma mentre scrive, si tende dritto quando ha finito.');
-  var s = scheletro(palco);
-  var f = svgFilo(24, 12, 1.6);
-  f.svg.style.flex = 'none'; f.svg.style.color = 'var(--dash-accent)';
-  var eti = el('span', 'att-eti eti-fade');
-  s.testa.append(f.svg, eti);
-  var onda = ondaFilo(f.p, 24, 12, 2);
-  var cambia = dissolvenza(eti);
-  var acc = '', rag = null, viste = 0;
-  ascoltatori.push({
-    reset: function () { acc = ''; rag = null; viste = 0; s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…'; onda.ampObiettivo = 1.1; onda.vel = 0.04; s.bolla.classList.remove('vis'); },
-    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
-    ragiona: function (p) {
-      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
-      onda.ampObiettivo = 2.7; onda.vel = 0.08;
-      var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia(V() + '…');
-    },
-    agisce: function (ev) { onda.ampObiettivo = 1.7; onda.vel = 0.15; cambia(ev.testo); },
-    passo: function (ev) { rigaPasso(s.corpo, ev); },
-    scrive: function (ev) { onda.ampObiettivo = 0.8; onda.vel = 0.045; cambia(ev.testo); },
-    fine: function (ev) { onda.ampObiettivo = 0; cambia(ev.testo + ' · ' + durata(Date.now() - t0)); s.bolla.classList.add('vis'); },
-  });
-})();
-
-/* ==========  4 — il filo con i nodi  ========== */
-(function () {
-  var palco = riquadro('4 · il filo con i nodi', 'Il filo corre sotto la riga e ogni passo compiuto lascia un nodo. Passa sopra un nodo per vedere cos’era. Il tempo compare solo se l’attesa si allunga.');
-  var s = scheletro(palco);
-  var eti = el('span', 'att-eti eti-fade'), tempo = el('span', 'tempo');
-  s.testa.append(eti, tempo);
-  var L = 430, H = 16;
-  var f = svgFilo(L, H, 1.6);
-  f.svg.style.color = 'var(--dash-accent)'; f.svg.style.maxWidth = '100%'; f.svg.style.marginTop = '2px';
-  s.att.insertBefore(f.svg, s.corpo);
-  var onda = ondaFilo(f.p, L, H, 9);
-  var cambia = dissolvenza(eti);
-  var acc = '', rag = null, viste = 0, nodi = 0, finito = false;
-  function aggiungiNodo(ev) {
-    nodi++;
-    var c = document.createElementNS(f.ns, 'circle');
-    c.setAttribute('cx', 30 + nodi * 66); c.setAttribute('cy', H / 2); c.setAttribute('r', 0);
-    c.setAttribute('fill', 'currentColor');
-    c.style.transition = 'r 340ms cubic-bezier(.3,1.7,.5,1)';
-    c.style.pointerEvents = 'all'; c.style.cursor = 'default';
-    f.svg.append(c);
-    requestAnimationFrame(function () { c.setAttribute('r', 3.2); });
-    legaHint(c, ev.icona + '  ' + ev.testo);
-  }
-  ascoltatori.push({
-    reset: function () {
-      acc = ''; rag = null; viste = 0; nodi = 0; finito = false;
-      s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…';
-      tempo.classList.remove('vis'); tempo.textContent = '';
-      f.svg.querySelectorAll('circle').forEach(function (c) { c.remove(); });
-      onda.ampObiettivo = 1.3; onda.vel = 0.045; s.bolla.classList.remove('vis');
-    },
-    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
-    ragiona: function (p) {
-      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
-      onda.ampObiettivo = 3.6; onda.vel = 0.065;
-      var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia(V() + '…');
-    },
-    agisce: function (ev) { onda.ampObiettivo = 2.1; onda.vel = 0.14; cambia(ev.testo); },
-    passo: function (ev) { aggiungiNodo(ev); rigaPasso(s.corpo, ev); },
-    scrive: function (ev) { onda.ampObiettivo = 1; onda.vel = 0.04; cambia(ev.testo); },
-    batti: function (ms) { if (!finito && ms > 8000) { tempo.classList.add('vis'); tempo.textContent = durata(ms); } },
-    fine: function (ev) {
-      finito = true; onda.ampObiettivo = 0.3; onda.vel = 0.01;
-      tempo.classList.add('vis'); tempo.textContent = durata(Date.now() - t0);
-      cambia(ev.testo); s.bolla.classList.add('vis');
-    },
-  });
-})();
-
-/* ==========  5 — il ragionamento come tessitura  ========== */
-(function () {
-  var palco = riquadro('5 · il ragionamento come tessitura', 'La riga dice solo cosa sta facendo. Il ragionamento scorre sotto, piccolo e sfumato: non si legge, si intravede. È decorazione, e lo sembra.');
-  var s = scheletro(palco);
-  var f = svgFilo(24, 12, 1.6);
-  f.svg.style.flex = 'none'; f.svg.style.color = 'var(--dash-accent)';
-  var eti = el('span', 'att-eti eti-fade');
-  s.testa.append(f.svg, eti);
-  var tex = el('div', 'texture');
-  s.att.insertBefore(tex, s.corpo);
-  var onda = ondaFilo(f.p, 24, 12, 2);
-  var cambia = dissolvenza(eti);
-  var acc = '', rag = null;
-  ascoltatori.push({
-    reset: function () { acc = ''; rag = null; s.corpo.textContent = ''; tex.textContent = ''; tex.style.opacity = ''; eti.textContent = 'Aspetto la risposta…'; onda.ampObiettivo = 1.1; onda.vel = 0.04; s.bolla.classList.remove('vis'); },
-    nuovoTurno: function () { acc = ''; rag = el('div'); s.corpo.append(rag); },
-    ragiona: function (p) {
-      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
-      onda.ampObiettivo = 2.7; onda.vel = 0.08;
-      cambia(V() + '…');
-      tex.textContent = acc.replace(/\s+/g, ' ').slice(-70);
-    },
-    agisce: function (ev) { onda.ampObiettivo = 1.7; onda.vel = 0.15; cambia(ev.testo); tex.textContent = ''; },
-    passo: function (ev) { rigaPasso(s.corpo, ev); },
-    scrive: function (ev) { onda.ampObiettivo = 0.8; cambia(ev.testo); tex.textContent = ''; },
-    fine: function (ev) { onda.ampObiettivo = 0; tex.style.opacity = '0'; cambia(ev.testo + ' · ' + durata(Date.now() - t0)); s.bolla.classList.add('vis'); },
-  });
-})();
-
-/* ==========  6 — il gomitolo  ========== */
-(function () {
-  var palco = riquadro('6 · il gomitolo', 'Il filo si avvolge mentre lavora. Non promette una percentuale che non conosce: dice solo che sta ancora filando. A lavoro finito resta il gomitolo come segno.');
-  var s = scheletro(palco);
-  var ns = 'http://www.w3.org/2000/svg';
-  var svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('class', 'filo'); svg.setAttribute('width', 20); svg.setAttribute('height', 20);
-  svg.setAttribute('viewBox', '0 0 20 20');
-  svg.style.flex = 'none'; svg.style.color = 'var(--dash-accent)';
-  var d = '';
-  for (var a = 0; a < Math.PI * 4.6; a += 0.08) {
-    var r = 0.9 + a * 0.55;
-    var x = 10 + Math.cos(a) * r, y = 10 + Math.sin(a) * r * 0.86;
-    d += (d ? 'L' : 'M') + x.toFixed(2) + ',' + y.toFixed(2);
-  }
-  var p = document.createElementNS(ns, 'path');
-  p.setAttribute('d', d); p.setAttribute('stroke-width', 1.25);
-  svg.append(p);
-  var eti = el('span', 'att-eti eti-fade'), tempo = el('span', 'tempo');
-  s.testa.append(svg, eti, tempo);
-  var len = 200;
-  try { len = p.getTotalLength(); } catch (e) {}
-  p.style.strokeDasharray = len;
-  p.style.strokeDashoffset = len;
-  var avvolto = 0, girando = false, finito = false;
-  function fila() {
-    if (!girando) return;
-    avvolto = (avvolto + len / 190) % (len * 1.3);
-    p.style.strokeDashoffset = Math.max(0, len - avvolto);
-    requestAnimationFrame(fila);
-  }
-  var cambia = dissolvenza(eti);
-  var acc = '', rag = null, viste = 0;
-  ascoltatori.push({
-    reset: function () {
-      acc = ''; rag = null; viste = 0; finito = false; s.corpo.textContent = '';
-      eti.textContent = 'Aspetto la risposta…'; tempo.classList.remove('vis'); tempo.textContent = '';
-      avvolto = 0; if (!girando) { girando = true; requestAnimationFrame(fila); }
-      s.bolla.classList.remove('vis');
-    },
-    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
-    ragiona: function (pz) {
-      acc += pz; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
-      var fr = frasiChiuse(acc);
-      if (fr.length > viste) { viste = fr.length; cambia(V() + ' · ' + fr[fr.length - 1].trim()); }
-      else if (!viste) cambia(V() + '…');
-    },
-    agisce: function (ev) { cambia(ev.testo); },
-    passo: function (ev) { rigaPasso(s.corpo, ev); },
-    scrive: function (ev) { cambia(ev.testo); },
-    batti: function (ms) { if (!finito && ms > 8000) { tempo.classList.add('vis'); tempo.textContent = durata(ms); } },
-    fine: function (ev) {
-      finito = true; girando = false; p.style.strokeDashoffset = 0;
-      tempo.classList.add('vis'); tempo.textContent = durata(Date.now() - t0);
-      cambia(ev.testo); s.bolla.classList.add('vis');
-    },
-  });
-})();
-
-document.getElementById('rigioca').addEventListener('click', avvia);
+});
+document.querySelectorAll('input[type=radio]').forEach(function (i) {
+  i.addEventListener('change', gioca);
+});
+document.getElementById('lungo').addEventListener('change', gioca);
+document.getElementById('calmo').addEventListener('change', gioca);
+document.getElementById('rigioca').addEventListener('click', gioca);
 document.getElementById('vel').addEventListener('input', function (e) { vel = Number(e.target.value); });
-document.getElementById('tema').addEventListener('click', function (e) {
-  document.body.classList.toggle('scuro');
-  e.target.textContent = document.body.classList.contains('scuro') ? '◑ chiaro' : '◐ scuro';
+document.getElementById('tema').addEventListener('change', function (e) {
+  document.body.classList.toggle('scuro', e.target.checked);
 });
-document.getElementById('verbo').addEventListener('click', function (e) {
-  verboIdx = (verboIdx + 1) % VERBI.length;
-  e.target.textContent = 'parole: «' + V() + '»';
-  avvia();
-});
-document.getElementById('lento').addEventListener('click', function (e) {
-  allunga = !allunga;
-  e.target.textContent = allunga ? 'lavoro breve' : 'lavoro più lungo';
-  avvia();
-});
-avvia();
+gioca();
 </script>
 </body>
 </html>
