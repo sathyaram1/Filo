@@ -696,11 +696,24 @@
         if (tint) {
           // `opacita_tab` controlla la frazione di tinta nel mix col fondo del
           // tab bar: 0.6 (default) ≈ tinta percepibile ma sobria, 1 = piena.
-          const pct = Math.round(tabOpacity * 100);
-          el.style.setProperty(
-            '--tab-bg-eff',
-            `color-mix(in srgb, ${tint} ${pct}%, var(--tab-bg))`,
-          );
+          // Il mix lo facciamo QUI e non in CSS: serve conoscere il colore
+          // finale per scegliere il testo. Un color-mix nel CSS lo sa solo il
+          // motore di stile, e il nome restava del colore del tema — al buio,
+          // su una scheda tinta di chiaro, illeggibile (#429).
+          const barra = tokenColor('--tab-bg');
+          const TC = window.SN_TAB_COLOR;
+          const fuso = (TC && TC.mixSrgb && barra) ? TC.mixSrgb(tint, barra, tabOpacity) : null;
+          if (fuso) {
+            el.style.setProperty('--tab-bg-eff', fuso);
+            const soft = softOn(fuso);
+            if (soft) el.style.color = soft;
+          } else {
+            const pct = Math.round(tabOpacity * 100);
+            el.style.setProperty(
+              '--tab-bg-eff',
+              `color-mix(in srgb, ${tint} ${pct}%, var(--tab-bg))`,
+            );
+          }
         }
       }
 
