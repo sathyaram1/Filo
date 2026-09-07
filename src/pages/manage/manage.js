@@ -2371,6 +2371,7 @@
   function setManageMsg(text, kind) {
     mgManageMsg.textContent = text || '';
     mgManageMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    riflettiMessaggiOwner();
   }
 
   // ── Azione: preferito ⭐ (toggle) ───────────────────────────────────────────
