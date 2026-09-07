@@ -3490,6 +3490,13 @@
           status: MR.normalizeStatus(fb).status,
           unreadable: MR.statusUnreadable(fb),
         }),
+        // Mittente e priorità viaggiano cifrati come lo stato. Senza questo la
+        // scheda li leggeva lo stesso: il mittente diventava «Utente» e la
+        // priorità «Senza priorità», cioè numeri sicuri su dati mai letti,
+        // sulla stessa schermata che due righe più su dichiara di non saperli
+        // leggere. Il riconoscimento è quello di SN_MANAGE_REVIEW, uno solo per
+        // tutta la pagina.
+        unreadable: (v) => MR.valueUnreadable(v),
       }),
     };
   }
