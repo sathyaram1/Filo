@@ -2543,7 +2543,7 @@
       //    feedback, parole già sostituite — e da lì la pagina rispondeva
       //    "Nessuna modifica" su un testo che a destinazione non c'era mai
       //    arrivato.
-      if (mio !== userNoteInvii.get(id)) return;
+      if (mio !== userNoteInvii.get(id)) return true;
       // 2) Il dato si aggiorna SEMPRE, anche se intanto l’owner è passato a un
       //    altro feedback: la scrittura è andata a buon fine davvero, e
       //    rientrando deve trovare quello che ha salvato.
