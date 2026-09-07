@@ -3738,14 +3738,22 @@
     }
     stDrawPie('mgStLoopChart', 'mgStLoopLegend', fette);
 
+    // Anche queste due voci si aprono sui lavori che hanno contato. Sono
+    // CRITICHE, cioè eventi, e un lavoro può averne prese più d'una: il numero
+    // e la lunghezza dell'elenco non combaciano di proposito, e il suggerimento
+    // lo dice invece di lasciar credere a un elenco troncato.
     stDrawPie('mgStOutcomeChart', 'mgStOutcomeLegend', [
       {
         key: 'fail', label: 'Fermate (fail)', count: loop.fail, color: ST_OUTCOME_COLORS.fail,
-        hint: 'Critiche che hanno fermato il lavoro: c\'è un rilievo grave che il verificatore non può correggere da solo.',
+        ids: loop.failIds || [],
+        hint: 'Critiche che hanno fermato il lavoro: c\'è un rilievo grave che il verificatore non può correggere da solo.'
+          + ((loop.failIds || []).length ? ' Apri per vedere su quali lavori (un lavoro può averne prese più d\'una).' : ''),
       },
       {
         key: 'migliorabile', label: 'Migliorabile', count: loop.migliorabile, color: ST_OUTCOME_COLORS.migliorabile,
-        hint: 'Critiche con rilievi che NON fermano il lavoro: li corregge il verificatore, o finiscono in un feedback derivato.',
+        ids: loop.migliorabileIds || [],
+        hint: 'Critiche con rilievi che NON fermano il lavoro: li corregge il verificatore, o finiscono in un feedback derivato.'
+          + ((loop.migliorabileIds || []).length ? ' Apri per vedere su quali lavori (un lavoro può averne prese più d\'una).' : ''),
       },
     ]);
 
