@@ -478,16 +478,22 @@
     return L > 0.45 ? '#1a1918' : '#f8f6f0';
   }
 
-  // Un colore "ha identità" solo se ha croma sufficiente: bianco/nero/grigio
-  // (es. l'header bianco di YouTube campionato per il vetro smerigliato §1.1)
-  // non rappresentano il sito. Soglia allineata a SN_TAB_COLOR
-  // (src/shared/tabColor.js) e al campionatore favicon in pageColor.js.
-  function hasColorIdentity(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return false;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return false;
-    return Math.max(p[0], p[1], p[2]) - Math.min(p[0], p[1], p[2]) >= 24;
+  // Quale colore tinge la scheda attiva e il suo bagliore audio lo decide
+  // SN_TAB_COLOR (src/shared/tabColor.js), caricato da shell.html: la soglia di
+  // croma e la regola di ripiego stanno in un posto solo, unit-testate. Qui ne
+  // esisteva una copia, e una copia può divergere.
+  // Se il modulo non fosse caricato si ripiega sul colore campionato dalla cima
+  // della pagina: la scheda resta la continuazione della pagina, mai un grigio
+  // deciso a caso.
+  function pickActiveTint(sampled, identity) {
+    const TC = global.SN_TAB_COLOR;
+    if (TC && TC.pickActiveTint) return TC.pickActiveTint(sampled, identity);
+    return sampled || null;
+  }
+  function pickGlowTint(sampled, identity) {
+    const TC = global.SN_TAB_COLOR;
+    if (TC && TC.pickGlowTint) return TC.pickGlowTint(sampled, identity);
+    return sampled || null;
   }
 
   // Colore identità attenuato (§1.2): smorza la saturazione del colore del sito
