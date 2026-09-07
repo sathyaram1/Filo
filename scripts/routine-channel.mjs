@@ -408,6 +408,9 @@ if (isMain) {
       continue;
     }
     const key = a.slice(2);
+    // Un interruttore non mangia mai la parola dopo di sé: scritto prima della
+    // parola d'ordine se la prendeva per valore, e restavano zero posizionali.
+    if (CAMPI_BANDIERA.has(key)) { data[key] = true; continue; }
     const next = rest[i + 1];
     if (next === undefined || next.startsWith('--')) {
       // Un campo di TESTO senza il suo testo non è un sì: è un report che
