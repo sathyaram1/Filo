@@ -3932,6 +3932,10 @@
       loadFailed = false;
       reindexByClient();
       renderList();
+      // Stessa coda del caricamento vero: i dati che arrivano raggiungono ogni
+      // vista aperta, non solo la lista. Se qui divergesse, lo spec proverebbe
+      // un cammino che nell'app non esiste.
+      dataChanged();
     },
     // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
     // inventati quando i dati non sono arrivati" si affidava al fatto che nel
