@@ -156,10 +156,20 @@
     return { key: spec.key, label: spec.label, from: to - spec.days * DAY, to };
   }
 
-  /** L'istante cade nella finestra? Un istante ignoto (null) non ci cade. PURA. */
+  /**
+   * L'istante cade nella finestra? PURA.
+   *
+   * Un istante IGNOTO (segnalazione senza data d'arrivo, o con una data che non
+   * è una data) non cade in nessuna finestra che abbia dei limiti: non si può
+   * dire che sia dentro. Ma «Sempre» di limiti non ne ha, e una finestra senza
+   * limiti non può lasciare fuori niente: lì ci sta. Prima cadeva fuori anche
+   * da «Sempre», e la tessera scriveva un numero più piccolo del vero senza
+   * dire quante ne aveva lasciate indietro. Chi disegna riceve comunque il
+   * conto di quelle senza data (`senzaData`) e lo dichiara.
+   */
   function inRange(ms, range) {
-    if (ms == null) return false;
     const r = range || {};
+    if (ms == null) return r.from == null && r.to == null;
     if (r.from != null && ms < r.from) return false;
     if (r.to != null && ms >= r.to) return false;
     return true;
