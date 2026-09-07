@@ -336,7 +336,9 @@
     .mg-st-drawer[hidden] { display: none; }
 
     /* Una riga di ripartizione: etichetta, barra proporzionale, numero. */
-    .mg-st-rows { list-style: none; margin: 0; padding: 0; }
+    /* Le barre non si stirano per tutta la pagina: oltre una certa larghezza
+       la lunghezza smette di dire qualcosa e resta solo un tratto lungo. */
+    .mg-st-rows { list-style: none; margin: 0; padding: 0; max-width: 760px; }
     .mg-st-row {
       display: grid; grid-template-columns: minmax(120px, 190px) 1fr auto;
       align-items: center; gap: 12px;
