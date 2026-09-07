@@ -332,10 +332,32 @@ ${davanti}[2] il pulsante non salva`;
   // E il testo vero resta testo: una frase con le parentesi in mezzo, o una
   // parentesi che non dice un livello, non vengono respinte.
   for (const buona of [
-    'Nel caso [2] ho provato tutto e regge',
     'ho ri-provato la porta [2] del giro scorso',
     'Provato tutto (anche il tema scuro) e regge.',
+    'Passi: apri l\'editor, salva, guarda il risultato',
   ]) {
     assert.equal(R.unparsedLevelLines(buona).length, 0, `«${buona}» è testo`);
+  }
+  // Il prezzo, dichiarato: una frase del riassunto che porta un livello nelle
+  // prime parole viene respinta con la spiegazione. Costa una riscrittura, e
+  // vale meno di una bocciatura letta come promozione.
+  assert.equal(R.unparsedLevelLines('Nel caso [2] ho provato tutto').length, 1);
+});
+
+// L'etichetta prima del livello («Difetto: [2] …») e l'a capo scritto a mano
+// coi due caratteri barra-n: due modi in più con cui una bocciatura finiva nel
+// riassunto (feedback #565).
+test('un livello dopo un'etichetta, o dopo un a capo scritto a mano, non passa per riassunto', () => {
+  for (const riga of ['Difetto: [2] rotto', 'problema: [2] rotto', 'rilievo grave [2] rotto', 'osservazione: [3] grave']) {
+    const testo = `Provato tutto, il resto regge bene.
+${riga}`;
+    assert.equal(R.unparsedLevelLines(testo).length, 1, `«${riga}» non è riassunto`);
+    assert.equal(R.parseFindings(testo).findings.length, 0);
+  }
+  // L'a capo scritto a mano vale davanti a TUTTI i modi di elencare che il
+  // lettore accetta, non solo davanti a cinque.
+  for (const davanti of ['', '- ', '### ', '> ', 'a) ', '1. ']) {
+    const unaRiga = `Provato tutto.\n${davanti}[2] il pulsante non salva`;
+    assert.equal(R.parseFindings(unaRiga).findings.length, 1, `«\n${davanti}[2]» deve valere come rilievo`);
   }
 });
