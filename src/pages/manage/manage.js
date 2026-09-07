@@ -3879,7 +3879,10 @@
         {
           key: 'riaperture', label: 'Riaperture chieste', count: d.riaperture,
           ids: d.idsRiaperti,
-          title: `Quante riaperture sono state chieste sui feedback di questa finestra, una per ogni persona che ha detto «è ancora rotto».${(d.idsRiaperti || []).length ? ST_NOTA_EVENTI.replace('lavori', 'segnalazioni') : ''}`,
+          title: 'Quante riaperture sono state chieste sui feedback di questa finestra, una per ogni persona che ha detto «è ancora rotto».'
+            + ((d.idsRiaperti || []).length
+              ? ' Apri per vedere su quali segnalazioni: la stessa può essere stata riaperta da più persone, quindi l\'elenco è più corto del numero.'
+              : ''),
         },
         {
           key: 'stalli', label: 'Lavori rientrati in coda', count: d.stalli,
