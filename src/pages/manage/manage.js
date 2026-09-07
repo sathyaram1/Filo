@@ -3891,12 +3891,24 @@
     // proprio il posto dove la domanda «quali due?» viene per prima.
     const ids = d.idsPriorita || {};
     if (box) {
-      box.innerHTML = stRowsHtml([
+      const righe = [
         { key: '3', label: 'Priorità alta (3)', count: p[3] || 0, ids: ids['3'] },
         { key: '2', label: 'Priorità media (2)', count: p[2] || 0, ids: ids['2'] },
         { key: '1', label: 'Priorità bassa (1)', count: p[1] || 0, ids: ids['1'] },
         { key: '0', label: 'Senza priorità', count: p[0] || 0, ids: ids['0'] },
-      ], { total: d.ricevuti, scope: 'priorita' });
+      ];
+      // Anche la priorità viaggia cifrata. Quella che non si legge non è
+      // «senza priorità»: senza questa riga, su un computer senza chiave le
+      // quattro righe qui sopra dicevano «alta: 0, media: 0, bassa: 0, senza
+      // priorità: tutte», e nessuno di quei numeri era stato misurato.
+      if (d.prioritaIgnota) {
+        righe.push({
+          key: 'ignota', label: '🔒 Priorità non leggibile', count: d.prioritaIgnota,
+          ids: d.idsPrioritaIgnota,
+          title: 'La priorità di queste segnalazioni viaggia cifrata e questo computer non ha la chiave: non si sa quale sia. Apri per vedere quali.',
+        });
+      }
+      box.innerHTML = stRowsHtml(righe, { total: d.ricevuti, scope: 'priorita' });
     }
     if (signals) {
       // Eventi, non segnalazioni: niente barre e niente percentuali sul totale
