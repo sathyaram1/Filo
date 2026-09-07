@@ -2555,6 +2555,9 @@
       // rientrandoci il pannello lo ha già ridipinto col valore VECCHIO, e il
       // confronto lo scambierebbe per una correzione.
       if (!userNoteToccata) mgUserNoteText.value = frase;
+      // Il tasto della barra porta il segno di quello che c'è a destinazione:
+      // da chiuso è l'unico posto dove si vede che una frase esiste.
+      riflettiFrase(frase);
       setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
       renderThread(fb);
     } catch (e) {
