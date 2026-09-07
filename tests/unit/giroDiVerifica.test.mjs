@@ -162,9 +162,16 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
     assert.doesNotMatch(male.se, /identit|directory non corrisponde/, 'non è un guasto d\'identità');
     assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
 
+    // Una critica vuota non arriva più fin qui: la ferma il pavimento al
+    // motivo, perché senza rilievi l'esito calcolato è «superata» (#565).
     const vuota = await esegui(['--record-verifier', 'fid-901', ''], ENV(casa, port));
-    assert.equal(vuota.code, 4);
-    assert.match(vuota.se, /malformed: critica vuota/, 'la frase del server arriva a chi ha consegnato');
+    assert.equal(vuota.code, 1, 'una critica vuota è un errore d\'uso, non una consegna');
+    assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
+
+    const respinta = await esegui(['--record-verifier', 'fid-901',
+      'Provato ad aprire la pagina, a salvare col titolo vuoto e a trascinare: non ho trovato niente da segnalare.'], ENV(casa, port));
+    assert.equal(respinta.code, 4);
+    assert.match(respinta.se, /malformed: la critica non corrisponde/, 'la frase del server arriva a chi ha consegnato');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
 
