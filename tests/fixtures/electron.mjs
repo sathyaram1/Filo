@@ -20,18 +20,16 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { argomentiScala } from '../helpers/scala.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
 
-// Zoom di sistema simulato. Lo schermo di chi sviluppa Filo sta al 125%, quindi
-// `devicePixelRatio` parte da 1.25 e non da 1: bastava quello a far divergere
-// una manciata di spec fra la sua macchina e le routine cloud, dove ogni schermo
-// è al 100%. `FILO_TEST_SCALE=1.25 npx playwright test …` rimette quel fattore
-// anche su Linux, che è l'unico modo di RIVEDERE quei rossi senza avere lo
-// stesso schermo sotto mano.
-const SCALA = Number(process.env.FILO_TEST_SCALE) > 0 ? Number(process.env.FILO_TEST_SCALE) : 0;
-export const argomentiScala = SCALA ? [`--force-device-scale-factor=${SCALA}`] : [];
+// Zoom di sistema simulato: la manopola vive in tests/helpers/scala.mjs, perché
+// Filo si apre anche da porte che non passano di qui (il pilota condiviso, e la
+// ventina di spec che chiamano `electron.launch` per conto proprio). Qui la si
+// ri-esporta perché quegli spec la importano da questa fixture da sempre.
+export { argomentiScala };
 
 export const test = base.extend({
   app: async ({}, use) => {
