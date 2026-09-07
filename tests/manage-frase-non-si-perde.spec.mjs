@@ -65,9 +65,9 @@ test('chiudo la segnalazione col tasto: la frase appena scritta parte con lei', 
   await page.locator('#mgResolveBtn').click();
 
   // Il mittente riceve la sua riga E la segnalazione risulta chiusa.
-  await expect.poll(() => page.evaluate(() => window.__updates.some((u) => u.userNote === FRASE_ATTESA), FRASE))
-    .toBeTruthy();
-  await expect.poll(() => page.evaluate(() => window.__updates.some((u) => u.status === 'done'))).toBeTruthy();
+  await expect.poll(() => page.evaluate((f) => window.__updates.some((u) => u.userNote === f), FRASE))
+    .toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__updates.some((u) => u.status === 'done'))).toBe(true);
 });
 
 test('la frase parte anche archiviando, e prima del cambio di stato', async ({ openTab }) => {
