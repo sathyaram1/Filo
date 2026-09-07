@@ -412,6 +412,10 @@
     const perCategoria = {};
     const perCreatore = {};
     const perPriorita = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    const idsCategoria = {};
+    const idsCreatore = {};
+    const idsIlleggibili = [];
+    const idsNonLavorati = [];
     let illeggibili = 0;
     let lavorati = 0;
     let risolti = 0;
@@ -419,14 +423,19 @@
     let stalli = 0;
 
     for (const it of selezionati) {
+      const fbId = it.fb && it.fb._id;
       perCreatore[it.kind] = (perCreatore[it.kind] || 0) + 1;
+      pushId(idsCreatore, it.kind, fbId);
       const st = statusOf(it.fb) || {};
       if (st.unreadable || !st.status) {
         illeggibili += 1;
+        if (fbId != null && fbId !== '') idsIlleggibili.push(fbId);
       } else {
         const cat = STATUS_TO_CATEGORY[st.status] || 'unlabeled';
         perCategoria[cat] = (perCategoria[cat] || 0) + 1;
+        pushId(idsCategoria, cat, fbId);
         if (WORKED_STATUSES.includes(st.status)) lavorati += 1;
+        else if (fbId != null && fbId !== '') idsNonLavorati.push(fbId);
         if (st.status === 'done' || st.status === 'archived') risolti += 1;
       }
       const pr = Math.round(Number(it.fb && it.fb.priority) || 0);
