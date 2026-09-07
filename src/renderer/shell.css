@@ -93,6 +93,12 @@ html[data-chrome-compact="1"] .addr {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none; /* Firefox */
+  /* I due piedini "a goccia" della scheda attiva sporgono di 8px oltre i suoi
+     bordi. Senza questo spazio la striscia li ritagliava (a destra quando la
+     scheda attiva è l'ultima, cioè appena ne apri una nuova; a sinistra quando
+     è la prima) e per 8px si dichiarava scrollabile anche con due sole schede:
+     la rotella faceva scivolare la fila senza motivo. */
+  padding: 0 8px;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
