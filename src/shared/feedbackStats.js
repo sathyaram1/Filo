@@ -298,7 +298,10 @@
     const giri = parseVerifications(notes);
     let fail = 0, migliorabile = 0, prima = 0, passed = false;
     for (const g of giri) {
-      if (g.outcome === 'pass') { if (!passed) { passed = true; } continue; }
+      // Dopo il primo pass i giri continuano a contare come critiche (una
+      // riapertura ne genera altri), ma non entrano più in `prima`: quel numero
+      // risponde a «quanti giri è costato ARRIVARE al pass».
+      if (g.outcome === 'pass') { passed = true; continue; }
       if (g.outcome === 'fail') fail += 1; else migliorabile += 1;
       if (!passed) prima += 1;
     }
