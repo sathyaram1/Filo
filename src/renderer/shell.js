@@ -467,15 +467,40 @@
     '<path d="M12 3a13.5 13.5 0 0 1 0 18"/><path d="M12 3a13.5 13.5 0 0 0 0 18"/></svg>';
 
   // "Vetro smerigliato" della tab attiva (§1.1): dato il colore campionato dal
-  // sito, scegli un testo leggibile per contrasto (luminanza relativa).
+  // sito, scegli un testo leggibile per contrasto. La regola sta in
+  // SN_TAB_COLOR (unit-testata): fra chiaro e scuro vince quello che contrasta
+  // di più, MISURATO — una soglia secca di luminanza sbagliava le tinte di
+  // mezzo, ed è lì che il nome sparisce.
   function readableOn(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return null;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    const L = 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
-    return L > 0.45 ? '#1a1918' : '#f8f6f0';
+    const TC = window.SN_TAB_COLOR;
+    if (TC && TC.readableOn) return TC.readableOn(rgbStr);
+    return null;
+  }
+  // Testo attenuato per le schede NON attive, deciso sul colore che la scheda
+  // avrà DAVVERO (tinta del marchio mescolata col fondo della barra). Prima il
+  // nome usava un colore fisso del tema: al buio, su una scheda tinta di chiaro,
+  // spariva (#429).
+  function softOn(bgStr) {
+    const TC = window.SN_TAB_COLOR;
+    if (TC && TC.softOn) return TC.softOn(bgStr);
+    return null;
+  }
+  // Legge un token colore del tema (es. --tab-bg) già risolto in rgb().
+  // getPropertyValue lo restituisce come sta nel CSS (#efe3cb): lo passiamo per
+  // un elemento sonda così torna sempre in "rgb(r, g, b)", l'unico formato che
+  // SN_TAB_COLOR sa leggere.
+  const tokenCache = new Map();
+  function tokenColor(name) {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (!raw) return null;
+    if (tokenCache.has(raw)) return tokenCache.get(raw);
+    const probe = document.createElement('span');
+    probe.style.cssText = 'display:none;color:' + raw;
+    document.body.appendChild(probe);
+    const out = getComputedStyle(probe).color || null;
+    probe.remove();
+    tokenCache.set(raw, out);
+    return out;
   }
 
   // Quale colore tinge la scheda attiva e il suo bagliore audio lo decide
