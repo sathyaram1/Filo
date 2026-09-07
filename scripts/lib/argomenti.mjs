@@ -88,44 +88,24 @@ function distanza(a, b) {
  *
  * @returns {string|null} il messaggio da stampare, o null
  */
-// I nomi che npm mette nell'ambiente per conto suo. Tutto il resto, sotto una
-// scorciatoia, è roba che qualcuno ha scritto sulla riga di comando e che a
-// noi non è arrivata.
-const CONFIG_DI_NPM = new Set([
-  'access', 'all', 'audit', 'audit-level', 'auth-type', 'before', 'bin-links', 'browser', 'ca', 'cache',
-  'cache-max', 'cache-min', 'cafile', 'call', 'cert', 'ci', 'cidr', 'color', 'commit-hooks', 'cpu', 'depth',
-  'description', 'diff', 'editor', 'engine-strict', 'fetch-retries', 'fetch-timeout', 'force',
-  'foreground-scripts', 'format-package-lock', 'fund', 'git', 'git-tag-version', 'global', 'globalconfig',
-  'global-style', 'heading', 'https-proxy', 'if-present', 'ignore-scripts', 'include', 'include-staged',
-  'include-workspace-root', 'init-author-email', 'init-author-name', 'init-author-url', 'init-license',
-  'init-module', 'init-version', 'install-links', 'install-strategy', 'json', 'key', 'legacy-bundling',
-  'legacy-peer-deps', 'libc', 'link', 'local-address', 'local-prefix', 'location', 'lockfile-version',
-  'loglevel', 'logs-dir', 'logs-max', 'long', 'maxsockets', 'message', 'metrics-registry', 'node-gyp',
-  'node-options', 'node-version', 'noproxy', 'npm-version', 'offline', 'omit', 'only', 'optional', 'os',
-  'otp', 'pack-destination', 'package', 'package-lock', 'package-lock-only', 'parseable', 'prefer-dedupe',
-  'prefer-offline', 'prefer-online', 'prefix', 'preid', 'progress', 'provenance', 'proxy', 'read-only',
-  'rebuild-bundle', 'registry', 'replace-registry-host', 'save', 'save-bundle', 'save-dev', 'save-exact',
-  'save-optional', 'save-peer', 'save-prefix', 'save-prod', 'sbom-format', 'sbom-type', 'scope',
-  'script-shell', 'searchexclude', 'searchlimit', 'searchopts', 'searchstaleness', 'shell', 'shrinkwrap',
-  'sign-git-commit', 'sign-git-tag', 'strict-peer-deps', 'strict-ssl', 'tag', 'tag-version-prefix', 'timing',
-  'umask', 'unicode', 'update-notifier', 'usage', 'user', 'user-agent', 'userconfig', 'version', 'versions',
-  'viewer', 'which', 'workspace', 'workspaces', 'workspaces-update', 'yes',
-]);
-
 export function opzioneStorpiata(env = {}, opzioni = []) {
   const nomi = opzioni.map((o) => String(o).replace(/^--/, ''));
   for (const chiave of Object.keys(env)) {
     if (!chiave.startsWith('npm_config_')) continue;
     const nome = chiave.slice('npm_config_'.length).replace(/_/g, '-');
     if (nomi.includes(nome)) continue;                 // scritta giusta: la riprende chi di dovere
-    if (CONFIG_DI_NPM.has(nome)) continue;             // roba di npm, non nostra
-    // Un nome nostro storpiato lo diciamo col suggerimento; uno che non
-    // somiglia a niente lo diciamo lo stesso: è comunque qualcosa che qualcuno
-    // ha scritto sulla riga e che a noi non è arrivato.
+    // SOLO i nomi VICINI ai nostri. Il contrario — segnalare tutto ciò che non
+    // stia in un elenco delle configurazioni di npm — è stato provato e ha
+    // spento OGNI scorciatoia del progetto: npm mette nell'ambiente
+    // impostazioni sue che un elenco scritto a mano non contiene mai tutte
+    // (`npm_config_global_prefix`, per dirne una), e venivano lette come
+    // opzioni digitate da chi lanciava il comando. Un controllo che blocca
+    // tutto è peggio del buco che chiude: un nome lontano dai nostri resta
+    // fuori portata, e va bene così.
     const vicino = nomi.find((buono) => distanza(nome, buono) <= (buono.length >= 5 ? 2 : 1));
-    return vicino
-      ? `--${nome} non esiste (forse intendevi --${vicino}?) — non ho toccato niente. Passando da npm l'opzione non arriva fin qui: me ne accorgo solo perché npm la lascia scritta nell'ambiente.`
-      : `--${nome} non la conosco — non ho toccato niente. Passando da npm non mi arriva: se era un'opzione di npm mettila in .npmrc, se era per me guarda l'aiuto (--help).`;
+    if (vicino) {
+      return `--${nome} non esiste (forse intendevi --${vicino}?) — non ho toccato niente. Passando da npm l'opzione non arriva fin qui: me ne accorgo solo perché npm la lascia scritta nell'ambiente.`;
+    }
   }
   return null;
 }
