@@ -143,9 +143,11 @@ test('dalle statistiche si arriva ai feedback che le compongono?', async ({ open
   await page.waitForTimeout(300);
   menu = await page.locator('.mg-sort-menu, .mg-menu, [role="menu"]').count();
   console.log('MENU TASTO DESTRO SU RIGA:', menu);
-  // RILIEVO REGISTRATO (#496, giro 1): da una riga di ripartizione non si
-  // arriva ai feedback che la compongono — né col clic né col tasto destro
-  // (che apre il menu generale della pagina, non uno per quella riga).
-  // Quando il salto ci sarà, questo diventa expect(listaAperta).toBe(true).
-  expect(typeof listaAperta).toBe('boolean');
+  // Il clic sulla riga apre l'elenco delle segnalazioni di quel gruppo; da lì
+  // un secondo clic porta alla segnalazione vera, nella scheda che la contiene.
+  expect(listaAperta).toBe(false);
+  await expect(page.locator('#mgStDrawer .mg-st-item[data-id]').first()).toBeVisible();
+  await page.locator('#mgStDrawer .mg-st-item[data-id]').first().click();
+  await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgDetail')).toBeVisible();
 });
