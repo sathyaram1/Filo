@@ -324,14 +324,24 @@ html[data-chrome-compact="1"] .addr {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-soft);
+  /* `inherit`, non var(--fg-soft): la scheda può essere tinta col colore della
+     pagina o del marchio del sito, e shell.js le assegna un testo leggibile su
+     QUELLA tinta. Un colore fisso del tema faceva sparire la crocetta esatta-
+     mente dove spariva il nome (#429). */
+  color: inherit;
   cursor: pointer;
   opacity: 0;
 }
 .tab .close svg { display: block; }
 .tab:hover .close,
 .tab.active .close { opacity: 1; }
-.tab .close:hover { background: color-mix(in srgb, var(--border) 60%, transparent); color: var(--fg); }
+/* Sfondo dell'hover ricavato dal testo stesso: funziona su qualunque tinta. */
+.tab .close:hover { background: color-mix(in srgb, currentColor 22%, transparent); }
+
+/* Schede strette (marchiate da shell.js sotto i 160px): la crocetta invisibile
+   smette di rubare spazio al nome e ricompare al passaggio del mouse, così
+   chiudere resta un clic solo. */
+.tab.stretta:not(.active):not(:hover) .close { display: none; }
 .tab .favicon {
   width: 16px; height: 16px;
   flex: 0 0 16px;
