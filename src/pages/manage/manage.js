@@ -3749,14 +3749,14 @@
       {
         key: 'fail', label: 'Fermate (fail)', count: loop.fail, color: ST_OUTCOME_COLORS.fail,
         ids: loop.failIds || [],
-        hint: 'Critiche che hanno fermato il lavoro: c\'è un rilievo grave che il verificatore non può correggere da solo.'
-          + ((loop.failIds || []).length ? ' Apri per vedere su quali lavori (un lavoro può averne prese più d\'una).' : ''),
+        hint: 'Critiche che hanno fermato il lavoro: c\'è un rilievo grave che il verificatore non può correggere da solo.',
+        apriNota: ST_NOTA_EVENTI,
       },
       {
         key: 'migliorabile', label: 'Migliorabile', count: loop.migliorabile, color: ST_OUTCOME_COLORS.migliorabile,
         ids: loop.migliorabileIds || [],
-        hint: 'Critiche con rilievi che NON fermano il lavoro: li corregge il verificatore, o finiscono in un feedback derivato.'
-          + ((loop.migliorabileIds || []).length ? ' Apri per vedere su quali lavori (un lavoro può averne prese più d\'una).' : ''),
+        hint: 'Critiche con rilievi che NON fermano il lavoro: li corregge il verificatore, o finiscono in un feedback derivato.',
+        apriNota: ST_NOTA_EVENTI,
       },
     ]);
 
