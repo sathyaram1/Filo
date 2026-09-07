@@ -63,9 +63,17 @@ async function apriSicurezza(app) {
 
 // Porta il puntatore FISICAMENTE dentro la lista e ce lo lascia (senza premere).
 async function puntatoreSullaLista(page) {
-  const box = await page.locator('#sec-clip-list').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + Math.min(20, box.height / 2));
-  await page.waitForTimeout(150);
+  await page.locator('#sec-clip-list').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
+  const box = await page.locator('#sec-clip-list .sn-clip-item').first().boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(120);
+  await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 2 + 1);
+  await page.waitForTimeout(250);
+  return page.evaluate(() => {
+    const l = document.getElementById('sec-clip-list');
+    return { hover: l.matches(':hover'), box: l.getBoundingClientRect().top };
+  });
 }
 
 const etichette = (page) => page.evaluate(() => [...document.querySelectorAll('#sec-clip-list .sn-clip-item')]
@@ -221,7 +229,7 @@ test('S4 — Sicurezza: due voci tolte nello stesso istante restano tolte tutte 
   try {
     const page = await apriSicurezza(app);
     const esito = await page.evaluate(async () => {
-      const MSG = window.SN_MESSAGES.MSG;
+      const MSG = window.SN_MSG.MSG;
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       const [a, b] = [r.items[1], r.items[3]];
       const res = await Promise.all([
@@ -357,7 +365,7 @@ test('S8 — Sicurezza: svuotata da un\'altra scheda col puntatore fermo sulla l
     });
     await page.evaluate(async () => {
       // Simula la stessa richiesta che parte dal menu del tasto destro.
-      await chrome.runtime.sendMessage({ type: window.SN_MESSAGES.MSG.CLEAR_CLIPBOARD_HISTORY });
+      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.CLEAR_CLIPBOARD_HISTORY });
     });
     await page.waitForTimeout(600);
     const fermo = await page.evaluate(() => ({
