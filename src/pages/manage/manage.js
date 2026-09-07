@@ -3764,8 +3764,8 @@
 
     const warn = $st('mgStWarn');
     if (warn) {
-      warn.hidden = !range.invalid;
-      if (range.invalid) warn.textContent = range.invalid;
+      warn.hidden = !range.nota;
+      if (range.nota) warn.textContent = range.nota;
     }
 
     const rangeLine = $st('mgStRange');
