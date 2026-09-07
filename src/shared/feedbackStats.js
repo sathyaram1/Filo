@@ -691,11 +691,20 @@
     // Math.min su una lista lunga la passa tutta come argomenti).
     let primoMs = null, ultimoMs = null;
     for (const it of selezionati) {
+      if (it.ms == null) continue;
       if (primoMs == null || it.ms < primoMs) primoMs = it.ms;
       if (ultimoMs == null || it.ms > ultimoMs) ultimoMs = it.ms;
     }
+    // Le barrette partono da MEZZANOTTE, anche quando la finestra non ha un
+    // inizio proprio («Sempre», o una personalizzata con la sola data «al»).
+    // Partendo dall'istante esatto della segnalazione più vecchia ogni barretta
+    // scavalcava la mezzanotte e si portava dentro un pezzo del giorno dopo,
+    // sotto l'etichetta del giorno prima: una segnalazione del 6 settembre
+    // finiva nella barretta scritta «05/09». Le finestre con un inizio (gli
+    // «ultimi N giorni») partono già da mezzanotte, e infatti lì i giorni
+    // cadevano giusti.
     const daMs = range.from != null ? range.from
-      : (primoMs != null ? primoMs : startOfDay(now));
+      : startOfDay(primoMs != null ? primoMs : now);
     // Senza un limite in fondo («Sempre», o una finestra personalizzata con la
     // sola data d'inizio) il grafico arrivava comunque a oggi, e un feedback
     // con la data nel futuro (l'orologio storto di chi ha segnalato) finiva
