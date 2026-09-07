@@ -175,7 +175,8 @@
         continue;
       }
       const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
-      const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1])) || QUADRA_VICINA.test(raw.trim());
+      const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]))
+        || QUADRA_VICINA.test(raw.trim()) || ETICHETTA_PRIMA.test(raw);
       if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
         flush();
         out.push(raw.trim());
