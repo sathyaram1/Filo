@@ -3177,6 +3177,11 @@
   function liveTickIfDue(force) {
     if (!liveEnabled || document.hidden) return;
     if (!force && Date.now() - liveLastAt < LIVE.POLL_MS / 2) return;
+    // Il registro delle esecuzioni si rilegge a OGNI giro, anche quando dai
+    // feedback non è cambiato niente: le esecuzioni partono per conto loro, e
+    // un giro che esce subito perché la lista è ferma lascerebbe indietro solo
+    // quel numero.
+    stRefreshWorkerLog();
     // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
     // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
     if (!dataLoaded) { loadData().catch(() => {}); return; }
