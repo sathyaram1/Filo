@@ -185,8 +185,11 @@ test.describe('larghezza e separatori stile Chrome', () => {
     expect(gap).toBe('0px');
 
     // Una tab inattiva NON ultima ha il separatore ::after visibile (largo 1px);
-    // la tab attiva non lo ha (display:none).
-    const probe = await shell.locator('.tab').evaluateAll((els) => {
+    // la tab attiva non lo ha (al suo posto ::after fa da piedino "a goccia",
+    // largo 8px — vedi test dedicato). La lettura si ripete: la shell ricrea i
+    // nodi .tab a ogni aggiornamento e su un nodo appena staccato
+    // getComputedStyle ritorna stringhe vuote.
+    await expect.poll(async () => shell.locator('.tab').evaluateAll((els) => {
       const result = { inactiveDivider: null, activeDivider: null };
       for (const el of els) {
         const after = getComputedStyle(el, '::after');
@@ -198,16 +201,15 @@ test.describe('larghezza e separatori stile Chrome', () => {
           result.inactiveDivider = { display: after.display, width: after.width };
         }
       }
-      return result;
-    });
-
-    // La scheda attiva non mostra la sottile linea verticale da 1px (al suo posto
-    // ::after fa da piedino "a goccia", largo 8px — vedi test dedicato).
-    expect(probe.activeDivider).toBeTruthy();
-    expect(probe.activeDivider.width).not.toBe('1px');
-    expect(probe.inactiveDivider).toBeTruthy();
-    expect(probe.inactiveDivider.display).not.toBe('none');
-    expect(probe.inactiveDivider.width).toBe('1px');
+      if (!result.activeDivider || !result.inactiveDivider) return null;
+      if (!result.activeDivider.width || !result.inactiveDivider.width) return null;
+      return {
+        attivaSenzaLinea: result.activeDivider.width !== '1px',
+        inattivaConLinea: result.inactiveDivider.display !== 'none'
+          && result.inactiveDivider.width === '1px',
+      };
+    }).catch(() => null), { timeout: 8_000 })
+      .toEqual({ attivaSenzaLinea: true, inattivaConLinea: true });
   });
 
   test('la scheda attiva ha le curve "a goccia" in stile Chrome', async () => {
