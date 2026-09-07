@@ -90,9 +90,10 @@ body {
 .rail path { fill: none; stroke: var(--dash-accent); stroke-width: 1.7; stroke-linecap: round; }
 .rail circle { fill: var(--dash-accent); pointer-events: all; }
 
-.righe { display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
-.blocco.chiuso .righe { max-height: 0 !important; opacity: 0; }
-.righe { transition: max-height 420ms cubic-bezier(.4,0,.2,1), opacity 300ms ease; max-height: 3000px; }
+.righe {
+  display: flex; flex-direction: column; gap: 1px; overflow: hidden;
+  transition: max-height 420ms cubic-bezier(.4,0,.2,1), opacity 280ms ease;
+}
 
 .seg { display: flex; flex-direction: column; }
 .seg-testa {
@@ -338,11 +339,11 @@ function creaBlocco(host) {
     if (!arrotolato) {
       onda.amp += (onda.ampObiettivo - onda.amp) * 0.07;
       if (!opt.calmo) onda.fase += onda.vel;
-      var x0 = 13, d = '', n = Math.max(10, Math.round(H / 4));
+      var Hd = H + 8, x0 = 13, d = '', n = Math.max(10, Math.round(Hd / 4));
       for (var i = 0; i <= n; i++) {
-        var y = (i / n) * H;
+        var y = (i / n) * Hd;
         var giu = Math.max(0, Math.min(1, (y - onda.ultimoNodoY) / 34));
-        var punta = Math.min(1, (H - y) / 10 + 0.2);
+        var punta = 1;
         var x = x0 + Math.sin(y * 0.16 + onda.fase) * onda.amp * giu * punta;
         d += (i ? 'L' : 'M') + x.toFixed(2) + ',' + y.toFixed(1);
       }
@@ -407,7 +408,7 @@ function creaBlocco(host) {
       // movimento ce l'ha già il filo, una rotella in più è rumore).
       if (opt.filo === 'rotella') { ico.className = 'rotella'; ico.textContent = ''; }
       else if (opt.filo === 'orizzontale') { ico.textContent = ''; ico.style.display = 'none'; }
-      else { ico.textContent = ''; ico.style.width = '0'; }
+      else { ico.textContent = ''; ico.style.display = 'none'; }
 
       var seg = { el: wrap, testa: testa, eti: eti, corpo: corpo, trama: trama, dati: dati, acc: '', viste: 0 };
       segmenti.push(seg);
@@ -449,7 +450,7 @@ function creaBlocco(host) {
       // Col filo verticale l'icona non serve: il nodo È il segno, e il titolo
       // dice già cos'era. Due marcatori sulla stessa riga sono uno di troppo.
       var ico = seg.testa.querySelector('.seg-ico');
-      if (opt.filo === 'verticale') { ico.className = 'seg-ico'; ico.textContent = ''; ico.style.width = '0'; }
+      if (opt.filo === 'verticale') { ico.className = 'seg-ico'; ico.textContent = ''; ico.style.display = 'none'; }
       else {
         ico.className = 'seg-ico'; ico.style.display = '';
         ico.textContent = seg.dati.icona || '·';
@@ -468,8 +469,7 @@ function creaBlocco(host) {
       if (opt.fine === 'sparisce') { vivo = false; blocco.remove(); return; }
       if (opt.fine === 'resta') return;
       arrotolato = true;
-      blocco.classList.add('arrotolabile', 'chiuso');
-      if (rail) rail.style.display = 'none';
+      blocco.classList.add('arrotolabile');
       // il gomitolo: una spirale che si avvolge in mezzo secondo
       var svg = svgNS('svg');
       svg.setAttribute('width', 20); svg.setAttribute('height', 20);
@@ -492,10 +492,20 @@ function creaBlocco(host) {
         p.style.transition = 'stroke-dashoffset 700ms cubic-bezier(.4,0,.2,1)';
         requestAnimationFrame(function () { p.style.strokeDashoffset = 0; });
       }
-      capo.addEventListener('click', function () {
-        blocco.classList.toggle('chiuso');
-        if (rail) rail.style.display = blocco.classList.contains('chiuso') ? 'none' : '';
-      });
+      // L'altezza la governa il JS: una regola CSS che vince sull'altra è
+      // proprio il modo in cui questa cosa non si riapriva.
+      var chiuso = false;
+      function mostra(v) {
+        chiuso = !v;
+        righe.style.maxHeight = righe.scrollHeight + 'px';
+        righe.style.opacity = v ? '' : '0';
+        if (rail) rail.style.display = v ? '' : 'none';
+        requestAnimationFrame(function () {
+          righe.style.maxHeight = v ? righe.scrollHeight + 'px' : '0px';
+        });
+      }
+      mostra(false);
+      capo.addEventListener('click', function () { mostra(chiuso); });
     },
     ferma: function () { vivo = false; },
   };
