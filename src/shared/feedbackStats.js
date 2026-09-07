@@ -594,9 +594,23 @@
     }
 
     // ── L'andamento degli arrivi ────────────────────────────────────────────
+    // Gli estremi di ciò che si sta contando, in un giro solo (lo spread di
+    // Math.min su una lista lunga la passa tutta come argomenti).
+    let primoMs = null, ultimoMs = null;
+    for (const it of selezionati) {
+      if (primoMs == null || it.ms < primoMs) primoMs = it.ms;
+      if (ultimoMs == null || it.ms > ultimoMs) ultimoMs = it.ms;
+    }
     const daMs = range.from != null ? range.from
-      : (selezionati.length ? Math.min(...selezionati.map((x) => x.ms)) : startOfDay(now));
-    const aMs = range.to != null ? range.to : startOfDay(now) + DAY;
+      : (primoMs != null ? primoMs : startOfDay(now));
+    // Senza un limite in fondo («Sempre», o una finestra personalizzata con la
+    // sola data d'inizio) il grafico arrivava comunque a oggi, e un feedback
+    // con la data nel futuro (l'orologio storto di chi ha segnalato) finiva
+    // schiacciato nell'ultima barretta, quella etichettata con la data di oggi:
+    // la barretta di oggi contava una segnalazione dell'anno prossimo. Il
+    // grafico arriva dove arriva ciò che sta contando.
+    const aMs = range.to != null ? range.to
+      : Math.max(startOfDay(now) + DAY, ultimoMs != null ? startOfDay(ultimoMs) + DAY : 0);
     const bucket = bucketSizeFor(Math.max(DAY, aMs - daMs));
     const nBarre = Math.max(1, Math.min(MAX_BARRE, Math.ceil((aMs - daMs) / bucket.ms)));
     const barre = [];
