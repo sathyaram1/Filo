@@ -4107,7 +4107,14 @@
       if (item) { e.preventDefault(); stApriFeedback(item.dataset.id); return; }
       const goto = e.target.closest('[data-goto]');
       if (goto) { e.preventDefault(); selectTab(goto.dataset.goto); return; }
-      const riga = e.target.closest('[data-open]');
+      // Una fetta di torta fa quello che fa la sua voce di legenda gemella: è
+      // lo stesso numero, e il tasto destro sulla fetta offriva già l'azione
+      // che il clic sinistro non faceva. Le azioni stanno in UN posto solo (la
+      // legenda), qui si va a cercarle lì.
+      const fetta = e.target.closest('svg [data-apribile]');
+      const riga = fetta
+        ? stPanel.querySelector(`.mg-st-legend li[data-group="${CSS.escape(fetta.dataset.group)}"][data-open]`)
+        : e.target.closest('[data-open]');
       if (!riga) return;
       e.preventDefault();
       stOpenGroup = stOpenGroup === riga.dataset.open ? null : riga.dataset.open;
