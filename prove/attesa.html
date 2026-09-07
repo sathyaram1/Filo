@@ -156,6 +156,12 @@ var COPIONE = [
 var ascoltatori = [];
 var vel = 1, allunga = false, t0 = 0, timers = [], batt = null;
 
+// Le parole della riga. Cambiarle dal vivo è l'unico modo per capire quale
+// suona giusta: fuori contesto sembrano tutte uguali.
+var VERBI = ['Sta ragionando', 'Ci sto lavorando', 'Ci penso', 'Filo pensa'];
+var verboIdx = 0;
+function V() { return VERBI[verboIdx]; }
+
 function pulisci() { timers.forEach(clearTimeout); timers = []; if (batt) clearInterval(batt); }
 function poi(ms, fn) { timers.push(setTimeout(fn, ms / vel)); }
 
