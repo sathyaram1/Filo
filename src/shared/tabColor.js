@@ -42,6 +42,36 @@
   }
 
   // ------------------------------------------------------------
+  // Scelta della tinta della SCHEDA ATTIVA (§1.1, "vetro smerigliato")
+  // ------------------------------------------------------------
+  // `sampled` è il colore campionato dalla cima della pagina, `identity` il
+  // colore identità del sito (theme-color → manifest → favicon).
+  //
+  // La regola normale è: la scheda attiva È la cima della pagina, così sembra
+  // la continuazione di quello che c'è sotto. Il ripiego sull'identità serve a
+  // un caso solo — la chrome neutra che nasconde un brand colorato (YouTube:
+  // header bianco, marchio rosso) — e quindi vale solo se quel colore un
+  // colore ce l'ha davvero. `extractIdentityFromPixels` ha un ripiego
+  // acromatico che ritorna un GRIGIO per i siti senza pixel saturi (ed è la
+  // norma sulle pagine interne di Filo, il cui favicon è monocromatico):
+  // quel grigio non è un marchio, e sostituirlo alla pagina spegneva la scheda
+  // attiva in una tinta che non era né la pagina né il brand.
+  function pickActiveTint(sampled, identity) {
+    if (hasIdentity(sampled)) return sampled;
+    if (hasIdentity(identity)) return identity;
+    return sampled || null;
+  }
+
+  // Colore del bagliore audio della scheda. Qui un neutro non serve a niente:
+  // un alone grigio è un alone che non si vede. Senza un colore vero si
+  // ritorna null e la shell ripiega sull'accento di Filo.
+  function pickGlowTint(sampled, identity) {
+    if (hasIdentity(sampled)) return sampled;
+    if (hasIdentity(identity)) return identity;
+    return null;
+  }
+
+  // ------------------------------------------------------------
   // Estrazione colore identità dal favicon (spec "Colore identità delle tab")
   // ------------------------------------------------------------
   // Pipeline a due path sui pixel del favicon (scalato es. 64×64):
