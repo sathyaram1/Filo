@@ -217,7 +217,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   // farlo finire nel riassunto trasformava un [2] in un pass silenzioso.
   const brutte = ROUND.unparsedLevelLines(critique);
   if (brutte.length) {
-    return { ok: false, state: s, reason: `rilievi non riconosciuti: il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»); in mezzo a una frase del riassunto le parentesi quadre sono testo e vanno bene. Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { ok: false, state: s, reason: `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto un livello si cita a parole («il livello 2»), mai «[2]». Il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]», «1. [2]», «### [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
   // Il testo si conserva con gli a capo veri (una barra-n scritta come a capo
   // vale come a capo): è quello che il verificatore dopo rilegge nel brief.
@@ -554,6 +554,9 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     'principale · 1 cosmetica/attrito fuori cammino · 0 situazione rara; `[1?]` = chiede una',
     'decisione dell’owner). Le righe prima del primo rilievo sono il riassunto di cosa',
     'funziona. Nessun rilievo = verifica superata.',
+    'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
+    'nel riassunto un livello si cita a parole («il livello 2»), mai «[2]», o la riga',
+    'viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
     '  node scripts/verify-local.mjs critica "funziona X e Y.',
     '  [2] il pulsante non salva se il titolo è vuoto: passi …',
     '  [0] con la finestra sotto i 300 pixel il menu esce dallo schermo"',
