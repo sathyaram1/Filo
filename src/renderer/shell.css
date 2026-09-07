@@ -365,7 +365,7 @@ html[data-chrome-compact="1"] .addr {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-soft);
+  color: inherit; /* come la crocetta: leggibile sulla tinta della scheda */
   cursor: pointer;
 }
 .tab .mute-ind svg { display: block; }
