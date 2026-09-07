@@ -3064,6 +3064,10 @@
   // comunque aggiornati (il dettaglio li legge da lì).
   function rerenderAfterLive(touched) {
     if (!dataLoaded) return;
+    // La scheda delle statistiche legge gli STESSI feedback: lasciata aperta
+    // mostrerebbe la fotografia di quando è stata aperta, e un numero fermo
+    // mentre la coda si muove è indistinguibile da un numero sbagliato.
+    if (document.getElementById('panel-fbstats')?.classList.contains('mg-panel--active')) stRender();
     if (!searchMode) {
       const scrollers = [mgList, mgList && mgList.parentElement].filter(Boolean);
       const tops = scrollers.map((el) => el.scrollTop);
