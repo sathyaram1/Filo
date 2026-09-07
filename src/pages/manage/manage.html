@@ -362,6 +362,31 @@
     }
     .mg-st-row-pct { color: var(--sn-muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
 
+    /* Una riga che rappresenta delle segnalazioni si apre su quelle
+       segnalazioni: si comporta da pulsante e lo fa vedere. */
+    .mg-st-row--apribile { cursor: pointer; border-radius: 7px; }
+    .mg-st-row--apribile:hover,
+    .mg-st-row--apribile:focus-visible { background: var(--sn-hover); }
+    .mg-st-row--apribile:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-st-row--aperta { background: var(--sn-hover); }
+    .mg-st-items { list-style: none; margin: 0 0 8px; padding: 0; }
+    .mg-st-items-list {
+      list-style: none; margin: 2px 0 0; padding: 4px 0 4px 12px;
+      border-left: 2px solid var(--sn-border); max-height: 260px; overflow-y: auto;
+    }
+    .mg-st-item {
+      display: flex; align-items: baseline; gap: 8px; cursor: pointer;
+      padding: 4px 6px; border-radius: 6px; font-size: 12.5px;
+    }
+    .mg-st-item:hover, .mg-st-item:focus-visible { background: var(--sn-hover); }
+    .mg-st-item:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-st-item--nota { cursor: default; }
+    .mg-st-item--nota:hover { background: none; }
+    .mg-st-item-num {
+      color: var(--sn-muted); font-variant-numeric: tabular-nums; flex: 0 0 auto;
+    }
+    .mg-st-item-title { color: var(--sn-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
     .mg-st-section { margin-top: 34px; }
     .mg-st-section h3 { font-size: 15px; margin: 0 0 3px; }
     .mg-st-section-desc { font-size: 12.5px; color: var(--sn-muted); margin: 0 0 14px; }
