@@ -137,6 +137,11 @@
   // un livello: «(3)», «{2}», «[2)», «(due)». Il contenuto è stretto apposta —
   // «(3 volte)» in mezzo a una frase resta testo normale (feedback #565).
   const SOLO_UN_LIVELLO = '\\s*(?:(?:livello|level|priorit[àa]|liv|L|P)\\s*)?(?:\\d+(?:\\s*[.,\\-–/]\\s*\\d+)?|zero|uno|due|tre)\\s*[?!]*\\s*';
+  /** Una quadra che contiene qualcosa che somiglia a un livello. PURA. */
+  function quadraColLivello(riga) {
+    const m = QUADRA_OVUNQUE.exec(String(riga || ''));
+    return !!m && DENTRO_SEMBRA_LIVELLO.test(m[0]);
+  }
   const PARENTESI_LIVELLO = new RegExp(`(?:\\[{1,2}|\\(|\\{)${SOLO_UN_LIVELLO}(?:\\]{1,2}|\\)|\\})`);
   // Dentro la CONTINUAZIONE di un rilievo, invece, un livello citato in mezzo
   // a una frase resta testo («Passi: critica con [2] - poi start», verifica

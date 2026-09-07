@@ -411,3 +411,20 @@ ${riga}`).findings.length, 0);
     assert.equal(R.unparsedLevelLines(buona).length, 0, `«${buona}» è testo`);
   }
 });
+
+test('dentro le quadre vale qualunque modo di scrivere il livello', () => {
+  const riassunto = 'Provato tutto per bene, il resto regge.';
+  for (const riga of [
+    'Grave: [3 - sicurezza] si scrive nelle chiavi SSH',
+    'Secondo: [2, grave] rotto',
+    'Rilievo: [2 molto grave] rotto',
+    'Nota lunga: [3.] rotto',
+    'Grave: [#2] rotto',
+    'Grave: [2%] rotto',
+  ]) {
+    assert.equal(R.unparsedLevelLines(`${riassunto}
+${riga}`).length, 1, `«${riga}» non è riassunto`);
+  }
+  // Una quadra che non dice un livello resta testo.
+  assert.equal(R.unparsedLevelLines('Ho letto [la nota] e va bene').length, 0);
+});
