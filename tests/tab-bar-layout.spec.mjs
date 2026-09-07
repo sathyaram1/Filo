@@ -221,19 +221,16 @@ test.describe('larghezza e separatori stile Chrome', () => {
     // I due piedini curvi sono pseudo-elementi ::before/::after sulla scheda
     // attiva: devono essere visibili (display block, 8px) e disegnati con un
     // radial-gradient (l'arco concavo che fonde la scheda con la barra).
-    const feet = await shell.locator('.tab.active').evaluate((el) => {
+    // La lettura si ripete: la shell ricrea i nodi .tab a ogni aggiornamento e
+    // su un nodo appena staccato getComputedStyle ritorna stringhe vuote.
+    const foot = { display: 'block', width: '8px', gradient: true };
+    await expect.poll(async () => shell.locator('.tab.active').evaluate((el) => {
       const read = (sel) => {
         const s = getComputedStyle(el, sel);
-        return { display: s.display, width: s.width, bg: s.backgroundImage };
+        return { display: s.display, width: s.width, gradient: /radial-gradient/.test(s.backgroundImage) };
       };
       return { before: read('::before'), after: read('::after') };
-    });
-
-    for (const foot of [feet.before, feet.after]) {
-      expect(foot.display).not.toBe('none');
-      expect(foot.width).toBe('8px');
-      expect(foot.bg).toContain('radial-gradient');
-    }
+    }).catch(() => null), { timeout: 8_000 }).toEqual({ before: foot, after: foot });
   });
 });
 
