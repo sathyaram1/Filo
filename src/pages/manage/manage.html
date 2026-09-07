@@ -126,7 +126,9 @@
       flex-wrap: wrap;
       gap: 2px;
       border-bottom: 1px solid var(--sn-border);
-      margin: 8px 0 20px;
+      /* Niente margine sopra: la barra è la prima cosa della pagina e parte
+         dal bordo (#498). Sotto resta l'aria che la stacca dal contenuto. */
+      margin: 0 0 14px;
     }
     .mg-tab {
       all: unset;
