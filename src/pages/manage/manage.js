@@ -2930,17 +2930,16 @@
     // hanno implementato, gli esiti del controllo funzionalità e le risposte
     // dell'owner ai chiarimenti, in ordine. Il parser condiviso li separa.
     const notes = String(fb.notes || '');
-    // Report illeggibile su questo computer: al posto del blob si dice perché,
-    // e si mostra la frase scritta per chi ha segnalato, che è in chiaro.
+    // Report illeggibile su questo computer: al posto del blob si dice perché.
     if (TH && TH.reportUnreadable && TH.reportUnreadable(notes)) {
-      const frase = String(fb.userNote || '').trim();
-      if (frase) appendBubble('model', 'Filo (per chi ha segnalato)', esc(frase));
       appendBubble('model', 'Filo', esc('Il report della lavorazione è cifrato e questo computer non ha la chiave privata per leggerlo.'));
+      appendFraseBubble(fb);
       return;
     }
     if (!TH) {
       // Fallback senza parser: mostra il blob intero come un turno unico.
       if (notes.trim()) appendBubble('model', 'Filo (lavorazione)', esc(notes));
+      appendFraseBubble(fb);
       return;
     }
     for (const seg of TH.splitNotes(notes)) {
@@ -2948,6 +2947,19 @@
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       appendBubble(seg.role === 'user' ? 'user' : 'model', who, esc(seg.body), seg.attachments);
     }
+    appendFraseBubble(fb);
+  }
+
+  // La riga che leggerà chi ha segnalato è l'ULTIMO turno della conversazione:
+  // è l'unica cosa che il mittente vede quando la segnalazione si chiude, ed è
+  // in chiaro anche quando il resto non si legge. Prima compariva solo sul
+  // report cifrato: da quando la sezione parte chiusa, nel caso normale la
+  // frase non era scritta da nessuna parte e si scopriva solo passando col
+  // mouse sul tasto.
+  function appendFraseBubble(fb) {
+    const frase = String((fb && fb.userNote) || '').trim();
+    if (!frase) return;
+    appendBubble('model', 'Filo (per chi ha segnalato)', esc(frase));
   }
 
   // ── Pannello laterale ─────────────────────────────────────────────────────
