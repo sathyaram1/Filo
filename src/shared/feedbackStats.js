@@ -452,9 +452,19 @@
 
     // ── I giri di verifica ───────────────────────────────────────────────────
     const loopBuckets = {};
-    let conVerifica = 0, passati = 0, nonPassati = 0;
+    const idsLoop = {};
+    const idsNonPassati = [];
+    // Una segnalazione che questo computer non sa decifrare non ha «zero giri»:
+    // ha giri che nessuno può leggere. Contarla come le altre la farebbe
+    // sparire dalla torta in silenzio, mentre nella ripartizione per categoria
+    // viene dichiarata: due parti della stessa scheda direbbero cose diverse
+    // sullo stesso documento.
+    let conVerifica = 0, passati = 0, nonPassati = 0, nonLeggibili = 0;
     let critFail = 0, critMigliorabile = 0, sommaLoop = 0;
     for (const it of selezionati) {
+      const fbId = it.fb && it.fb._id;
+      const st = statusOf(it.fb) || {};
+      if (st.unreadable || !st.status) { nonLeggibili += 1; continue; }
       const v = verificationSummary(it.fb && it.fb.notes);
       if (!v.rounds) continue;
       conVerifica += 1;
@@ -465,8 +475,10 @@
         sommaLoop += v.loopsBeforePass;
         const b = Math.min(LOOP_MAX_BUCKET, v.loopsBeforePass);
         loopBuckets[b] = (loopBuckets[b] || 0) + 1;
+        pushId(idsLoop, b, fbId);
       } else {
         nonPassati += 1;
+        if (fbId != null && fbId !== '') idsNonPassati.push(fbId);
       }
     }
     const loop = {
