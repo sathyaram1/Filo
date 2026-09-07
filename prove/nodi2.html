@@ -52,7 +52,7 @@ section > p.desc { font-size: 12.5px; color: var(--dash-ink-mute); margin: 0 0 1
 }
 .cella .dentro { display: flex; align-items: center; justify-content: center; }
 .cella .nome { font-size: 11.5px; color: var(--dash-ink-mute); text-align: center; max-width: 170px; }
-.cella svg { display: block; overflow: visible; }
+.cella svg { display: block; overflow: hidden; }
 .filo { fill: none; stroke: var(--dash-accent); stroke-linecap: round; stroke-linejoin: round; }
 .guaina { fill: none; stroke: var(--dash-card); stroke-linecap: round; stroke-linejoin: round; }
 .pieno { fill: var(--dash-accent); stroke: none; }
@@ -90,35 +90,34 @@ var NG = 64;              // grani
 var SPESS = 1.1;          // spessore della corda, in unità di simulazione
 var FOTO = 110;           // fotogrammi da cuocere
 
-// La posa di partenza: il capo passa a sinistra davanti, torna a destra
-// dietro, e rientra nel proprio giro. È l'unica cosa scritta a mano, e conta
-// solo che sia annodata — non che sia bella.
-var POSA = [
-  [0, -34, 0], [0, -22, 0], [0, -13, 0.5],
-  [-9, -8, 3], [-13, 2, 3], [-6, 10, 3], [4, 8, 2],
-  [9, 0, -1], [7, -8, -3], [-1, -11, -3], [-6, -4, -2],
-  [-4, 4, 0], [2, 9, 0.5], [1, 18, 0], [0, 26, 0], [0, 38, 0],
-];
-
-function lungoWaypoint(W, n) {
-  var seg = [], tot = 0;
-  for (var i = 1; i < W.length; i++) {
-    var d = Math.hypot(W[i][0] - W[i-1][0], W[i][1] - W[i-1][1], W[i][2] - W[i-1][2]);
-    seg.push(d); tot += d;
-  }
-  var out = [], acc = 0, k = 0;
-  for (var j = 0; j < n; j++) {
-    var s = (j / (n - 1)) * tot * 0.9999;
-    while (k < seg.length - 1 && acc + seg[k] < s) { acc += seg[k]; k++; }
-    var t = seg[k] ? (s - acc) / seg[k] : 0;
-    out.push([
-      W[k][0] + (W[k+1][0] - W[k][0]) * t,
-      W[k][1] + (W[k+1][1] - W[k][1]) * t,
-      W[k][2] + (W[k+1][2] - W[k][2]) * t,
+// La posa di partenza deve essere annodata DAVVERO, e a occhio non ci si
+// riesce (il primo tentativo si e sciolto al primo tiro). Quindi si parte
+// dalla curva del trifoglio nello spazio, che e annodata per costruzione, e
+// le si attaccano due code dritte. I capi vengono poi fissati sopra e sotto:
+// la fisica li porta li e il groviglio in mezzo si stringe in un nodo
+// semplice, che e esattamente quello che succede tirando uno spago.
+var SCALA_POSA = 3.4, CODA = 26;
+function posaAnnodata() {
+  var arco = [], n = 44, t0 = 0.45, t1 = Math.PI * 2 - 0.45;
+  for (var i = 0; i <= n; i++) {
+    var t = t0 + (t1 - t0) * (i / n);
+    arco.push([
+      (Math.sin(t) + 2 * Math.sin(2 * t)) * SCALA_POSA,
+      (Math.cos(t) - 2 * Math.cos(2 * t)) * SCALA_POSA,
+      (-Math.sin(3 * t)) * SCALA_POSA,
     ]);
   }
-  return out;
+  var pre = [], post = [];
+  var A = arco[0], B = arco[arco.length - 1];
+  for (var j = 6; j >= 1; j--) {
+    pre.push([A[0] * (1 - j / 9), A[1] - CODA * (j / 6), A[2] * (1 - j / 9)]);
+  }
+  for (var k = 1; k <= 6; k++) {
+    post.push([B[0] * (1 - k / 9), B[1] + CODA * (k / 6), B[2] * (1 - k / 9)]);
+  }
+  return pre.concat(arco, post);
 }
+var POSA = posaAnnodata();
 
 function cuociCorda() {
   var p = lungoWaypoint(POSA, NG);
@@ -132,7 +131,11 @@ function cuociCorda() {
 
   for (var f = 0; f < FOTO; f++) {
     // i capi si allontanano: è così che un nodo si stringe davvero
-    var tira = f * 0.34;
+    // i capi vanno sull'asse verticale e si allontanano: e cosi che un nodo
+    // si stringe davvero
+    var q = Math.min(1, f / 45), tira = f * 0.42;
+    capoA[0] = POSA[0][0] * (1 - q); capoA[2] = POSA[0][2] * (1 - q);
+    capoB[0] = POSA[POSA.length-1][0] * (1 - q); capoB[2] = POSA[POSA.length-1][2] * (1 - q);
     capoA[1] = POSA[0][1] - tira;
     capoB[1] = POSA[POSA.length-1][1] + tira;
 
@@ -229,10 +232,10 @@ function grumo(cy, larghezza, solchi, altezza, spess, gonfio) {
   }
   var su = '', giu = '';
   for (var j = 0; j <= n; j++) {
-    su += (j ? 'L' : 'M') + (20 + pts[j][1]).toFixed(2) + ',' + pts[j][0].toFixed(2);
+    su += (j ? 'L' : 'M') + (22 + pts[j][1]).toFixed(2) + ',' + pts[j][0].toFixed(2);
   }
   for (var k = n; k >= 0; k--) {
-    giu += 'L' + (20 - pts[k][1]).toFixed(2) + ',' + pts[k][0].toFixed(2);
+    giu += 'L' + (22 - pts[k][1]).toFixed(2) + ',' + pts[k][0].toFixed(2);
   }
   var corpo = '<path class="pieno" d="' + su + giu + 'Z"/>';
   var tacche = '';
@@ -240,7 +243,7 @@ function grumo(cy, larghezza, solchi, altezza, spess, gonfio) {
     var y = cy + s[0], inc = s[1];
     var w = spess / 2 + gonfio * Math.exp(-(s[0] / larghezza) * (s[0] / larghezza));
     tacche += '<path class="solco" stroke-width="' + (spess * 0.5) + '" d="M' + (20 - w * 0.95) + ',' + (y - inc) +
-              ' L' + (20 + w * 0.95) + ',' + (y + inc) + '"/>';
+              ' L' + (22 + w * 0.95) + ',' + (y + inc) + '"/>';
   });
   return corpo + tacche;
 }
@@ -288,45 +291,45 @@ function sezione(titolo, desc) {
 var f1 = sezione('Strada 1 — la corda simulata',
   'Sessanta grani legati, che non possono attraversarsi. Si parte da una posa già annodata e si tirano i due capi: il nodo si stringe da solo. Il primo riquadro è a dimensione vera, quella che avrebbe in chat.');
 [1, 2, 4, 7].forEach(function (s) {
-  cella(f1, s === 1 ? 'dimensione vera' : s + '×', 40, 76, function (c, p, z) {
+  cella(f1, s === 1 ? 'dimensione vera' : s + '×', 44, 130, function (c, p, z) {
     var f = CORDA[Math.min(CORDA.length - 1, Math.round(p * (CORDA.length - 1)))];
-    c.svg.innerHTML = tracciaCorda(f, 1.55, 20, 38, 0, 1.7);
+    c.svg.innerHTML = tracciaCorda(f, 1.55, 22, 65, 0, 1.7);
   }, { fissa: s });
 });
-cella(f1, 'che gira, per vedere il sopra e il sotto', 40, 76, function (c, p, z) {
+cella(f1, 'che gira, per vedere il sopra e il sotto', 44, 130, function (c, p, z) {
   var f = CORDA[CORDA.length - 1];
-  c.svg.innerHTML = tracciaCorda(f, 1.55, 20, 38, p * Math.PI * 2, 1.7);
+  c.svg.innerHTML = tracciaCorda(f, 1.55, 22, 65, p * Math.PI * 2, 1.7);
 }, { fissa: 4 });
-cella(f1, 'che si scioglie (al contrario)', 40, 76, function (c, p, z) {
+cella(f1, 'che si scioglie (al contrario)', 44, 130, function (c, p, z) {
   var f = CORDA[Math.min(CORDA.length - 1, Math.round((1 - p) * (CORDA.length - 1)))];
-  c.svg.innerHTML = tracciaCorda(f, 1.55, 20, 38, 0, 1.7);
+  c.svg.innerHTML = tracciaCorda(f, 1.55, 22, 65, 0, 1.7);
 }, { fissa: 4 });
 
 // —— strada 2: il grumo ——
 var f2 = sezione('Strada 2 — il grumo',
   'Nessuna topologia: a quella misura un nodo è un ingrossamento con due solchi, e si disegna così. Non è un ripiego — è come appare davvero una cordicella annodata vista da lontano.');
 [1, 2, 4].forEach(function (s) {
-  cella(f2, (s === 1 ? 'dimensione vera' : s + '×') + ' — nodo', 40, 76, function (c, p, z) {
+  cella(f2, (s === 1 ? 'dimensione vera' : s + '×') + ' — nodo', 44, 130, function (c, p, z) {
     var g = 1.9 * p;
-    c.svg.innerHTML = grumo(38, 3.2, [[-1.6, 1.1], [1.6, 1.1]], 76, 1.7, g);
+    c.svg.innerHTML = grumo(65, 3.2, [[-1.6, 1.1], [1.6, 1.1]], 130, 1.7, g);
   }, { fissa: s });
 });
-cella(f2, 'grumo piccolo (ha letto)', 40, 76, function (c, p, z) {
-  c.svg.innerHTML = grumo(38, 2.6, [], 76, 1.7, 0.9 * p);
+cella(f2, 'grumo piccolo (ha letto)', 44, 130, function (c, p, z) {
+  c.svg.innerHTML = grumo(65, 2.6, [], 130, 1.7, 0.9 * p);
 }, { fissa: 4 });
-cella(f2, 'grumo doppio (verso l’esterno)', 40, 76, function (c, p, z) {
-  c.svg.innerHTML = grumo(38, 4.6, [[-2.6, 1.2], [0, 1.2], [2.6, 1.2]], 76, 1.7, 2.3 * p);
+cella(f2, 'grumo doppio (verso l’esterno)', 44, 130, function (c, p, z) {
+  c.svg.innerHTML = grumo(65, 4.6, [[-2.6, 1.2], [0, 1.2], [2.6, 1.2]], 130, 1.7, 2.3 * p);
 }, { fissa: 4 });
 
 // —— strada 3: grande e poi piccolo ——
 var f3 = sezione('Strada 3 — si annoda in grande, poi si stringe',
   'La stessa corda simulata, ma l’animazione comincia a quattro volte la misura e finisce a quella vera. L’occhio legge la forma finché è grande, e accetta il grumo che resta.');
-cella(f3, 'a dimensione vera, com’è in chat', 40, 76, function (c, p, z) {
+cella(f3, 'a dimensione vera, com’è in chat', 44, 130, function (c, p, z) {
   var f = CORDA[Math.min(CORDA.length - 1, Math.round(p * (CORDA.length - 1)))];
   var scala = 1.55 * (3.4 - 2.4 * p);
   c.svg.innerHTML = tracciaCorda(f, scala, 20, 38, 0, 1.7 * (1.9 - 0.9 * p));
 }, { fissa: 1 });
-cella(f3, 'la stessa, ingrandita per guardarla', 40, 76, function (c, p, z) {
+cella(f3, 'la stessa, ingrandita per guardarla', 44, 130, function (c, p, z) {
   var f = CORDA[Math.min(CORDA.length - 1, Math.round(p * (CORDA.length - 1)))];
   var scala = 1.55 * (3.4 - 2.4 * p);
   c.svg.innerHTML = tracciaCorda(f, scala, 20, 38, 0, 1.7 * (1.9 - 0.9 * p));
@@ -336,11 +339,11 @@ cella(f3, 'la stessa, ingrandita per guardarla', 40, 76, function (c, p, z) {
 var f4 = sezione('A riposo, in fila, a dimensione vera',
   'L’unica prova che conta: come si distinguono uno accanto all’altro nella colonna della chat.');
 ['corda', 'grumo', 'grumo piccolo', 'grumo doppio'].forEach(function (n) {
-  cella(f4, n, 40, 60, function (c, p, z) {
-    if (n === 'corda') c.svg.innerHTML = tracciaCorda(CORDA[CORDA.length-1], 1.55, 20, 30, 0, 1.7);
-    else if (n === 'grumo') c.svg.innerHTML = grumo(30, 3.2, [[-1.6,1.1],[1.6,1.1]], 60, 1.7, 1.9);
-    else if (n === 'grumo piccolo') c.svg.innerHTML = grumo(30, 2.6, [], 60, 1.7, 0.9);
-    else c.svg.innerHTML = grumo(30, 4.6, [[-2.6,1.2],[0,1.2],[2.6,1.2]], 60, 1.7, 2.3);
+  cella(f4, n, 44, 130, function (c, p, z) {
+    if (n === 'corda') c.svg.innerHTML = tracciaCorda(CORDA[CORDA.length-1], 1.55, 22, 65, 0, 1.7);
+    else if (n === 'grumo') c.svg.innerHTML = grumo(65, 3.2, [[-1.6,1.1],[1.6,1.1]], 130, 1.7, 1.9);
+    else if (n === 'grumo piccolo') c.svg.innerHTML = grumo(65, 2.6, [], 130, 1.7, 0.9);
+    else c.svg.innerHTML = grumo(65, 4.6, [[-2.6,1.2],[0,1.2],[2.6,1.2]], 130, 1.7, 2.3);
   }, { fissa: 1 });
 });
 
