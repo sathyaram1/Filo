@@ -143,9 +143,10 @@ test('numero assegnato: si stampa, e quando manca non lo si inventa', async () =
 // e deve partire CON il feedback nella forma che l'app usa per i file
 // ({ name, type, dataUrl }), così viene cifrata e caricata come dall'app.
 
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 test('mimeDiAllegato: solo i tipi dell\'allowlist del gate L0, dal nome', () => {
   assert.equal(SCRIPT.mimeDiAllegato('spec.md'), 'text/markdown');
@@ -158,7 +159,7 @@ test('mimeDiAllegato: solo i tipi dell\'allowlist del gate L0, dal nome', () => 
 });
 
 test('--allega: il documento parte con il feedback, nella forma dell\'app', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+  const dir = cartellaTemporanea('filo-allega-');
   const spec = join(dir, 'spec.md');
   writeFileSync(spec, '# Spec\n\nContenuto della spec.', 'utf8');
   await conSubmit(async () => ({ id: 'd1', seq: 800, files: [{ url: 'u', name: 'spec.md', type: 'text/markdown' }], failed: [] }), async (visti) => {
@@ -178,7 +179,7 @@ test('--allega: il documento parte con il feedback, nella forma dell\'app', asyn
 test('--allega: file mancante o di tipo non ammesso → errore d\'uso, niente deposito', async () => {
   await conSubmit(async () => { throw new Error('submit non doveva essere chiamata'); }, async (visti) => {
     assert.equal(await SCRIPT.main(['T', 'X', '--allega', join(tmpdir(), 'non-esiste-' + Date.now() + '.md')]), SCRIPT.EXIT.USO);
-    const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+    const dir = cartellaTemporanea('filo-allega-');
     const html = join(dir, 'pagina.html');
     writeFileSync(html, '<script>1</script>', 'utf8');
     assert.equal(await SCRIPT.main(['T', 'X', '--allega', html]), SCRIPT.EXIT.USO);
@@ -187,7 +188,7 @@ test('--allega: file mancante o di tipo non ammesso → errore d\'uso, niente de
 });
 
 test('--allega: un allegato non caricato si dice e l\'uscita non è "fatto"', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+  const dir = cartellaTemporanea('filo-allega-');
   const spec = join(dir, 'spec.md');
   writeFileSync(spec, '# Spec', 'utf8');
   const errori = [];
@@ -203,7 +204,7 @@ test('--allega: un allegato non caricato si dice e l\'uscita non è "fatto"', as
 });
 
 test('--allega: una immagine va nel campo delle immagini (i giudici la guardano), un documento nei file', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'filo-allega-'));
+  const dir = cartellaTemporanea('filo-allega-');
   const png = join(dir, 'shot.png');
   writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]));
   const md = join(dir, 'spec.md');

@@ -43,7 +43,8 @@ test('nessun test costruisce la cartella temporanea a mano', () => {
   const colpevoli = [];
   for (const p of fileDiTest()) {
     if (p === AMMESSO) continue;
-    if (/mkdtempSync/.test(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
+    // La CHIAMATA, non la parola: questo file la nomina per spiegarla.
+    if (/mkdtempSync\s*\(/.test(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
   }
   assert.deepEqual(colpevoli, [],
     'questi file si costruiscono la cartella temporanea da soli: usa '

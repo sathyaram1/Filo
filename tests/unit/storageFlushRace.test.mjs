@@ -16,13 +16,13 @@ import { createRequire } from 'node:module';
 import Module from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const userData = mkdtempSync(join(tmpdir(), 'filo-storage-test-'));
+const userData = cartellaTemporanea('filo-storage-test-');
 process.env.FILO_USER_DATA = userData;
 
 const electronMock = {

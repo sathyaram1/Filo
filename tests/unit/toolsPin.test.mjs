@@ -21,10 +21,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 // Un percorso alla unix, su Windows, viene ancorato al disco corrente. L'atteso
 // si costruisce con la stessa normalizzazione dello strumento, o il controllo
@@ -36,7 +37,7 @@ import {
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
-  const casa = mkdtempSync(resolve(tmpdir(), 'filo-strumenti-'));
+  const casa = cartellaTemporanea('filo-strumenti-');
   // Tutto quello che la copia deve contenere: se qui ne manca un pezzo, il
   // banco di prova diverge dalla produzione e nasconde proprio il guasto che
   // ha bocciato la prima versione (copia incompleta, giro che si ferma).
@@ -175,7 +176,7 @@ test('dalla copia, git continua a parlare col PROGETTO', async () => {
   // "nessuna credenziale" invece di "sto guardando nel posto sbagliato".
   const { spawn } = await import('node:child_process');
   const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const finto = mkdtempSync(resolve(tmpdir(), 'filo-progetto-'));
+  const finto = cartellaTemporanea('filo-progetto-');
   const dove = resolve(tmpdir(), `filo-strumenti-git-${process.pid}`);
 
   try {
@@ -593,7 +594,7 @@ test('la guardia sul ramo NON dipende da come il giro si dichiara', () => {
 // Banco di prova: un progetto con un suo "altrove" da cui aggiornarsi, così i
 // casi si costruiscono davvero invece di simularli.
 async function laboratorioGit() {
-  const casa = mkdtempSync(resolve(tmpdir(), 'filo-guardia-'));
+  const casa = cartellaTemporanea('filo-guardia-');
   const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
   const { cpSync } = await import('node:fs');
   const g = (args, cwd = casa) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();

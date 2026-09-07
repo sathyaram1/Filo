@@ -18,17 +18,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { beatIsLive, readBeat, startBeat, stopBeat, beatFile } from '../../scripts/lib/routine-beat.mjs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 function casaFinta() {
-  const casa = mkdtempSync(resolve(tmpdir(), 'filo-battito-'));
+  const casa = cartellaTemporanea('filo-battito-');
   mkdirSync(resolve(casa, '.claude'), { recursive: true });
   return casa;
 }

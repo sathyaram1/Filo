@@ -10,11 +10,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -32,7 +32,7 @@ function fintoServer() {
 
 test('deliver status (primo passaggio) lascia il punto fermo sulla consegna', async () => {
   const { srv, port } = await fintoServer();
-  const casa = mkdtempSync(resolve(tmpdir(), 'filo-seal-'));
+  const casa = cartellaTemporanea('filo-seal-');
   const g = (args) => execFileSync('git', args, { cwd: casa, encoding: 'utf8' }).trim();
   try {
     g(['init', '-q', '-b', 'main']);

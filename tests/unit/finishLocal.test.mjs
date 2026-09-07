@@ -18,8 +18,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -191,7 +190,7 @@ function g(cwd, args) {
 
 /** origin finto (bare) + un clone con un commit su main. */
 function repoDiProva() {
-  const base = mkdtempSync(resolve(tmpdir(), 'filo-finish-'));
+  const base = cartellaTemporanea('filo-finish-');
   temporanei.push(base);
   const origin = resolve(base, 'origin.git');
   const work = resolve(base, 'work');
@@ -347,6 +346,7 @@ describe('quale ramo NON si spedisce mai', () => {
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
 import { splitKnownRed } from '../../scripts/finish-local.mjs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
   const r = splitKnownRed(['tests/a', 'tests/decks-chat-stress', 'tests/b'], ['tests/decks-chat-stress', 'tests/altro.spec.mjs']);

@@ -24,10 +24,10 @@ import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
 
 import '../../src/shared/feedbackThread.js';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
@@ -82,7 +82,7 @@ test('il canale manda DUE testi distinti: il report e la frase', async () => {
 
 test('la correzione consegna il report E la frase (non solo il report)', async () => {
   const { srv, ricevuti, port } = await fintoServer();
-  const casa = mkdtempSync(resolve(tmpdir(), 'filo-due-testi-'));
+  const casa = cartellaTemporanea('filo-due-testi-');
   try {
     // `--record-fixed` passa dallo stato locale del giro: gli si dà una cartella
     // usa-e-getta, così non tocca niente di reale. Deve essere un deposito git

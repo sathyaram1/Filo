@@ -21,10 +21,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -62,7 +62,7 @@ function fintoServer(rispostaLavoro, consegne = []) {
  */
 async function giro(rispostaLavoro, consegne = []) {
   const { srv, port } = await fintoServer(rispostaLavoro, consegne);
-  const casa = mkdtempSync(resolve(tmpdir(), 'filo-catena-'));
+  const casa = cartellaTemporanea('filo-catena-');
   try {
     mkdirSync(resolve(casa, '.claude'), { recursive: true });
     // Le ricette dei ruoli si cercano sotto la stessa radice: senza copiarle,
