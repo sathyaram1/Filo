@@ -103,6 +103,11 @@
   const mgSideClose  = document.getElementById('mgSideClose');
   const mgSideBody   = document.getElementById('mgSideBody');
 
+  // La barra dell'owner: contiene TUTTI i tasti su una riga sola (azioni di
+  // stato + preferito + frase per chi ha segnalato) e, sotto, i moduli che si
+  // aprono da quei tasti (riapertura, frase).
+  const mgOwnerBar      = document.getElementById('mgOwnerBar');
+
   // Azioni di stato (owner-only): i pulsanti li genera renderActions() leggendo
   // MR.ownerActions — la stessa tabella della pagina dei feedback.
   const mgActions       = document.getElementById('mgActions');
