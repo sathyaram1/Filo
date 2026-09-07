@@ -56,6 +56,24 @@ scrive «—» e accanto si dice perché.
   di questa riga passava con `reopenRequests: 2`, un numero che in Firestore non
   esiste. Il ripiego che regge più forme (mappa, lista, numero) sta in
   `reopenCount`.
+- **La chiave manca per TUTTI i campi cifrati, non solo per quello che ti sei
+  ricordato.** Chiuso lo stato, restano gli altri: in Filo viaggiano cifrati
+  anche il mittente e la priorità. Letti lo stesso, il mittente diventava
+  «Utente» e la priorità «Senza priorità», cioè numeri sicuri su dati mai letti,
+  sulla stessa schermata che due righe più su dichiara di non saperli leggere.
+  Ogni campo cifrato ha la sua riga («Mittente non leggibile», «Priorità non
+  leggibile»), col suo elenco, accanto alle altre. E un FILTRO costruito su un
+  campo che non si legge non può rispondere né sì né no: lascia fuori quelle
+  segnalazioni e scrive quante ne ha lasciate fuori, invece di mostrare zeri.
+  Un numero che si misura su un campo cifrato (i «lavorati», che si misurano
+  sullo stato) è un minimo finché qualcuno si legge, e un dato che manca quando
+  non se ne legge nessuno.
+- **Il quinto zero falso ha un fratello: il numero più piccolo del vero.** Una
+  segnalazione senza data d'arrivo leggibile usciva da tutte le finestre,
+  compresa «Sempre», in silenzio. Ma una finestra SENZA LIMITI non può lasciare
+  fuori niente: «Sempre» le prende, il grafico degli arrivi (dove non hanno un
+  giorno in cui stare) le esclude e lo dichiara, e una finestra con dei limiti
+  scrive quante ne sta lasciando indietro e dove trovarle.
 - **Un numero parziale lo dichiara accanto a sé.** Se la fonte tiene solo le
   voci recenti (un registro cappato, una lista che si ferma ai primi N), il
   numero è un MINIMO: la frase che lo dice va scritta anche, e soprattutto,
