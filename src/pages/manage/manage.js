@@ -45,7 +45,7 @@
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
   // I tre bilanci dei giri di correzione (feedback #561): cap2 = giri
   // per i rilievi di livello 3/2, cap1 = per gli 1, cap0 = per i soli 0; più il
-  // testo della fase 2 (fixInstructions).
+  // testo in coda alla risposta (fixInstructions).
   const mgCap2     = document.getElementById('mgCap2');
   const mgCap2Save = document.getElementById('mgCap2Save');
   const mgCap2Msg  = document.getElementById('mgCap2Msg');
