@@ -2681,6 +2681,10 @@
   // c'è niente di nuovo lo dicono ("Nessuna modifica") invece di tacere.
   function salvaFraseAMano() {
     annullaSalvataggioProgrammato();
+    // Premere il tasto subito dopo aver scritto arriva DOPO che la casella ha
+    // perso il fuoco e ha già spedito: l'esito lo scrive quel salvataggio lì,
+    // e dirgli sopra "Nessuna modifica" sarebbe una bugia.
+    if (userNoteInVolo && userNoteInVoloTesto === fraseInCasella()) return;
     if (!bozzaFrase()) { saveUserNote(); return; }
     salvaFraseSubito();
   }
