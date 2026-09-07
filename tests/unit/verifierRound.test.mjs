@@ -280,3 +280,25 @@ test('parseFindings: titolo Markdown, citazione ed elenco con le lettere davanti
   assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, false], [0, false], [1, true]]);
   assert.equal(R.unparsedLevelLines('Provato.\n### [2] rotto').length, 0, 'non è una riga da sistemare: è un rilievo');
 });
+
+// Il lettore e il controllo devono guardare gli STESSI modi di elencare: dove
+// il controllo ne guardava meno, un livello fuori scala scritto dopo un `>` o
+// dei cancelletti finiva nel riassunto — cioè una bocciatura diventava una
+// promozione, in silenzio (feedback #565).
+test('un livello scritto male è respinto in TUTTE le forme di elenco che il lettore accetta', () => {
+  for (const davanti of ['', '- ', '* ', '1. ', 'a) ', '> ', '### ']) {
+    const testo = `Provato tutto, il resto regge.
+${davanti}[4] gravissimo`;
+    assert.equal(R.unparsedLevelLines(testo).length, 1, `«${davanti}[4]» deve essere respinto`);
+    assert.equal(R.parseFindings(testo).findings.length, 0);
+  }
+  // E le stesse forme, scritte bene, restano rilievi veri.
+  for (const davanti of ['', '- ', '1. ', 'a) ', '> ', '### ']) {
+    const testo = `Provato tutto.
+${davanti}[2] il pulsante non salva`;
+    assert.equal(R.unparsedLevelLines(testo).length, 0, `«${davanti}[2]» è un rilievo buono`);
+    assert.equal(R.parseFindings(testo).findings.length, 1);
+  }
+  // In mezzo a una frase le parentesi restano testo.
+  assert.equal(R.unparsedLevelLines('ho ri-provato la porta [2] del giro scorso e regge').length, 0);
+});
