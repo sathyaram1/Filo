@@ -257,12 +257,18 @@ test('un livello scritto con una parola davanti («[livello 2]») è respinto, n
   }
 });
 
-test('una riga di continuazione di un rilievo con «[2] -» in mezzo è testo, non un livello scritto male', () => {
+// DAL 2026-09-07 (decisione dell'owner su #565) le quadre col livello dentro
+// sono un rilievo ANCHE nella continuazione: lì un rilievo grave scritto dopo
+// un'etichetta si incollava a quello sopra, spariva dall'elenco e il giro si
+// pagava dal bilancio sbagliato. Nei passi il livello si cita a parole.
+test('anche nella continuazione le quadre col livello dentro non sono testo', () => {
   const testo = 'Provato.\n[2] rotto\nPassi: critica con [2] - poi start\n[1] bordo';
-  assert.deepEqual(R.unparsedLevelLines(testo), []);
-  const p = R.parseFindings(testo);
+  assert.equal(R.unparsedLevelLines(testo).length, 1);
+  const aParole = 'Provato.\n[2] rotto\nPassi: critica di livello 2 - poi start\n[1] bordo';
+  assert.deepEqual(R.unparsedLevelLines(aParole), []);
+  const p = R.parseFindings(aParole);
   assert.equal(p.findings.length, 2);
-  assert.equal(p.findings[0].text, 'rotto\nPassi: critica con [2] - poi start');
+  assert.equal(p.findings[0].text, 'rotto\nPassi: critica di livello 2 - poi start');
 });
 
 test('nel riassunto l\'etichetta breve col separatore («Porta [2]: chiusa») resta respinta', () => {
