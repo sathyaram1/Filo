@@ -39,7 +39,7 @@ const storpiata = opzioneStorpiata(process.env, ['--print']);
 if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
 const daNpm = argomentiDaNpm(process.env, { opzioni: ['--print'] });
 if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
-const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--print'] });
+const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--print'], senzaParoleLibere: true });
 if (argomentiSbagliati) {
   console.error(`RIFIUTATO: ${argomentiSbagliati}`);
   process.exit(1);

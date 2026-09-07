@@ -172,7 +172,7 @@ export function argomentiDaNpm(env = {}, { opzioni = [], conValore = [] } = {}) 
  * @param {string[]} conValore   quelle che pretendono un valore dopo di sé
  * @returns {string|null} il messaggio da stampare, o null se è tutto a posto
  */
-export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) {
+export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaParoleLibere = false } = {}) {
   const lista = Array.isArray(argv) ? argv.map((a) => String(a ?? '')) : [];
   const ammesse = new Set(opzioni);
   const vuole = new Set(conValore);

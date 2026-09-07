@@ -61,7 +61,7 @@ const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
 if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
 const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
 if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
-const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'] });
+const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'], senzaParoleLibere: true });
 if (argomentiSbagliati) {
   console.error(`RIFIUTATO: ${argomentiSbagliati}`);
   process.exit(1);
