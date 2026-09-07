@@ -220,6 +220,15 @@
     for (const raw of lines) {
       const m = FINDING_LINE.exec(raw);
       if (m) {
+        // Due livelli sulla STESSA riga: il secondo finiva dentro al testo del
+        // primo, e un difetto di sicurezza spariva in coda a uno cosmetico.
+        // Basta un a capo dimenticato, che è lo stesso errore della virgoletta
+        // che manca (feedback #565).
+        if (quadraColLivello(m[3])) {
+          flush();
+          out.push(raw.trim());
+          continue;
+        }
         flush();
         count += 1;
         current = { line: raw.trim(), text: m[3].trim() };
