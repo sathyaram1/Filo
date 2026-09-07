@@ -199,6 +199,8 @@ poteva passare per riassunto, un rilievo grave — anche di sicurezza — spariv
 in silenzio e la bocciatura diventava una promozione (feedback #565). Il testo
 va passato **in un pezzo solo**, tutto dentro le stesse virgolette: spezzato in
 due, i rilievi del secondo pezzo non aprono più una riga e fanno la stessa fine.
+La regola vale anche nei passi che scrivi sotto un rilievo: lì un livello si
+cita a parole («una critica di livello 2»), non `[2]`.
 
 ```
 Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona.
