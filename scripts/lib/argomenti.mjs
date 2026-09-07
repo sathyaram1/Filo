@@ -94,12 +94,14 @@ export function opzioneStorpiata(env = {}, opzioni = []) {
     if (!chiave.startsWith('npm_config_')) continue;
     const nome = chiave.slice('npm_config_'.length).replace(/_/g, '-');
     if (nomi.includes(nome)) continue;                 // scritta giusta: la riprende chi di dovere
-    for (const buono of nomi) {
-      const tetto = buono.length >= 5 ? 2 : 1;
-      if (distanza(nome, buono) <= tetto) {
-        return `--${nome} non esiste (forse intendevi --${buono}?) — non ho toccato niente. Passando da npm l'opzione non arriva fin qui: me ne accorgo solo perché npm la lascia scritta nell'ambiente.`;
-      }
-    }
+    if (CONFIG_DI_NPM.has(nome)) continue;             // roba di npm, non nostra
+    // Un nome nostro storpiato lo diciamo col suggerimento; uno che non
+    // somiglia a niente lo diciamo lo stesso: è comunque qualcosa che qualcuno
+    // ha scritto sulla riga e che a noi non è arrivato.
+    const vicino = nomi.find((buono) => distanza(nome, buono) <= (buono.length >= 5 ? 2 : 1));
+    return vicino
+      ? `--${nome} non esiste (forse intendevi --${vicino}?) — non ho toccato niente. Passando da npm l'opzione non arriva fin qui: me ne accorgo solo perché npm la lascia scritta nell'ambiente.`
+      : `--${nome} non la conosco — non ho toccato niente. Passando da npm non mi arriva: se era un'opzione di npm mettila in .npmrc, se era per me guarda l'aiuto (--help).`;
   }
   return null;
 }
