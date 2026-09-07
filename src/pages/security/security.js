@@ -429,6 +429,16 @@
     applyClipFilter();
   }
 
+  // Le righe su cui si può ancora agire: quelle che il filtro lascia vedere e
+  // che non sono già state tolte. Sono le stesse prima e dopo una rimozione,
+  // meno quella tolta, quindi l'indice di una riga qui dentro resta confrontabile
+  // fra i due momenti anche quando la lista sta ferma sotto il puntatore e le
+  // righe tolte restano a schermo barrate.
+  function righeVive() {
+    return [...$('sec-clip-list').querySelectorAll('.sn-clip-item')]
+      .filter((r) => r.style.display !== 'none' && !r.classList.contains('sn-clip-gone'));
+  }
+
   // Dopo una rimozione fatta da tastiera, il fuoco va sul "Rimuovi" della voce
   // che ha preso quel posto in lista (o dell'ultima, se hai tolto quella in
   // fondo). Se non resta niente da togliere va sul tasto per svuotare, e se
