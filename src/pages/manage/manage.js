@@ -3556,7 +3556,9 @@
     for (const f of vive) {
       const li = document.createElement('li');
       li.dataset.group = f.key;
-      li.title = f.hint || `${f.label}: ${stFmtInt(f.count)} (${stPct(f.count, tot)})`;
+      const apribile = !!(f.ids && f.ids.length);
+      li.title = f.hint || `${f.label}: ${stFmtInt(f.count)} (${stPct(f.count, tot)})`
+        + (apribile ? '. Apri per vedere quali.' : '');
       const sw = document.createElement('span');
       sw.className = 'mg-st-swatch';
       sw.style.background = f.color;
@@ -3566,7 +3568,24 @@
       val.className = 'mg-st-legend-val';
       val.textContent = `${stFmtInt(f.count)} · ${stPct(f.count, tot)}`;
       li.append(sw, lab, val);
+      // Anche una fetta è un numero da cui si deve poter arrivare ai feedback
+      // che ci stanno dentro: la voce di legenda apre lo stesso elenco delle
+      // righe di ripartizione.
+      if (apribile) {
+        const gruppo = `loop:${f.key}`;
+        li.classList.add('mg-st-legend--apribile');
+        li.dataset.open = gruppo;
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+        li.setAttribute('aria-expanded', stOpenGroup === gruppo ? 'true' : 'false');
+      }
       legend.appendChild(li);
+      if (apribile && stOpenGroup === `loop:${f.key}`) {
+        const holder = document.createElement('li');
+        holder.className = 'mg-st-legend-items';
+        holder.innerHTML = `<ul class="mg-st-rows">${stItemsHtml(f.ids)}</ul>`;
+        legend.appendChild(holder);
+      }
     }
   }
 
