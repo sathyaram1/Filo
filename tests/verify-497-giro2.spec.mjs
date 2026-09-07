@@ -314,15 +314,9 @@ test('#497 — 10.000 caratteri incollati nella casella', async ({ openTab }) =>
   await apri(page, { ...BASE, status: 'todo', reviewDecision: 'accepted', _id: 'v497-lungo' }, 'queue');
   await page.locator('#mgUserNoteToggle').click();
   const lungo = 'a'.repeat(10000);
-  // Incollato per davvero (rispetta maxlength, come farebbe un utente).
+  // Inserito come lo inserirebbe un utente (rispetta maxlength del campo).
   await page.locator('#mgUserNoteText').click();
-  await page.evaluate((t) => {
-    const el = document.getElementById('mgUserNoteText');
-    el.focus();
-    const dt = new DataTransfer();
-    dt.setData('text/plain', t);
-    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-  }, lungo);
+  await page.keyboard.insertText(lungo);
   await page.waitForTimeout(300);
   const dopoIncolla = await page.locator('#mgUserNoteText').inputValue();
   console.log('INCOLLA 10k → caratteri rimasti:', dopoIncolla.length);
