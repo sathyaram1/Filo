@@ -3774,12 +3774,40 @@
       rangeLine.textContent = `${quando} · ${chi}${tetto}${registro}`;
     }
 
-    stSetTile('mgStTileRicevuti', stFmtInt(data.ricevuti),
-      data.ricevuti ? `${stFmtInt(data.categorie.length)} categorie` : 'niente in questa finestra');
-    stSetTile('mgStTileLavorati', stFmtInt(data.lavorati),
-      data.ricevuti ? `${stPct(data.lavorati, data.ricevuti)} dei ricevuti · ${stFmtInt(data.risolti)} risolti` : '');
+    // I feedback non sono arrivati? Allora questi numeri NON sono zero: non ci
+    // sono. Uno zero scritto qui si legge come «in questa finestra non è
+    // arrivato niente», che è il contrario di quello che è successo. Stessa
+    // regola dei numeri sulle schede in cima alla pagina, che infatti in questo
+    // caso non si scrivono affatto. Le esecuzioni vengono da un'altra fonte, e
+    // se quella è arrivata il suo numero resta.
+    const datiPronti = dataLoaded;
+    const noData = $st('mgStNoData');
+    if (noData) {
+      noData.hidden = datiPronti;
+      if (!datiPronti) {
+        noData.textContent = loadFailed
+          ? 'I feedback non si sono caricati, quindi qui non c\'è nessun numero da mostrare. Non è uno zero: è un dato che manca.'
+          : 'Sto caricando i feedback…';
+      }
+    }
+    const body = $st('mgStBody');
+    if (body) body.hidden = !datiPronti;
+
+    stSetTile('mgStTileRicevuti', datiPronti ? stFmtInt(data.ricevuti) : '—',
+      !datiPronti ? 'dati non arrivati'
+        : data.ricevuti ? `${stFmtInt(data.categorie.length)} categorie` : 'niente in questa finestra');
+    stSetTile('mgStTileLavorati', datiPronti ? stFmtInt(data.lavorati) : '—',
+      !datiPronti ? 'dati non arrivati'
+        : data.ricevuti ? `${stPct(data.lavorati, data.ricevuti)} dei ricevuti · ${stFmtInt(data.risolti)} risolti` : '');
     stSetTile('mgStTileProber', stFmtInt(data.prober),
       `${stFmtInt(data.esecuzioni)} esecuzioni in tutto`);
+    // I due numeri che dipendono dai feedback non si aprono su niente finché i
+    // feedback non ci sono.
+    for (const id of ['mgStTileRicevuti', 'mgStTileLavorati']) {
+      const t = $st(id);
+      if (t) t.disabled = !datiPronti;
+    }
+    if (!datiPronti && (stOpenTile === 'ricevuti' || stOpenTile === 'lavorati')) stOpenTile = null;
 
     for (const tile of document.querySelectorAll('.mg-st-tile')) {
       tile.setAttribute('aria-expanded', tile.dataset.stat === stOpenTile ? 'true' : 'false');
