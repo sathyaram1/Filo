@@ -2553,7 +2553,7 @@
       //    feedback: altrimenti ci finirebbe dentro la frase di un altro, e il
       //    salvataggio dopo manderebbe il messaggio di uno al mittente
       //    dell’altro.
-      if (selectedId !== id) return;
+      if (selectedId !== id) return true;
       // La casella si riallinea solo se l’owner non ci ha messo mano dopo
       // l’invio, altrimenti gli cancellerebbe la correzione sotto le dita. Non
       // basta confrontare il testo con quello inviato: uscendo dal feedback e
