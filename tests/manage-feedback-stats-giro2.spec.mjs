@@ -111,8 +111,9 @@ test('il tasto destro offre le azioni del punto in cui hai premuto', async ({ op
   await expect(menu).toContainText('Copia la ripartizione');
   await page.keyboard.press('Escape');
 
-  // Su una barretta di «Quando arrivano»: restringere la finestra a quel giorno.
-  const barra = page.locator('#mgStSpark .mg-st-spark-bar').last();
+  // Su una barretta di «Quando arrivano»: restringere la finestra a quel
+  // giorno. Si prende una barretta piena: quelle a zero sono alte due pixel.
+  const barra = page.locator('#mgStSpark .mg-st-spark-bar:not(.mg-st-spark-bar--zero)').last();
   await barra.click({ button: 'right' });
   await expect(menu).toContainText('Restringi la finestra a questo periodo');
   await menu.getByText('Restringi la finestra a questo periodo').click();

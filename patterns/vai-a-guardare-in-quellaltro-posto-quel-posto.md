@@ -39,6 +39,24 @@ stata scritta.
   quando non c'è niente da mostrare.
 - **Se l'elenco non è cambiato, non si tocca la pagina**: un avviso che si
   ridisegna sotto le dita (magari con "Confermi?" già armato) è rumore.
+- **La stessa regola dentro UNA pagina: chi cambia i dati ridisegna ogni vista
+  aperta, non solo quella principale.** Una pagina che mostra gli stessi dati in
+  due posti (la lista dei feedback e la scheda delle statistiche che li conta)
+  finisce per avere una funzione «ridisegna» per la vista principale, chiamata
+  da tutti, e una per la seconda vista, chiamata solo quando quella vista si
+  apre. Chi apriva le statistiche mentre la lista stava ancora arrivando restava
+  per sempre sul suo «i dati non ci sono» anche dopo che i dati erano arrivati, e
+  nel verso opposto la scheda continuava a mostrare i numeri di prima dopo un
+  caricamento andato male: numeri senza più niente sotto, peggio di uno zero
+  perché sembrano veri. Il rimedio non è aggiungere una chiamata dove il difetto
+  si è visto: è che chi tocca i dati chiami UNA funzione «i dati sono cambiati»
+  che sveglia tutte le viste, e che i finti dati degli spec passino dalla stessa
+  (altrimenti il test prova un cammino che nell'app non esiste, ed è esattamente
+  come il difetto era passato). Le porte sono tutte quelle che scrivono i dati o
+  il loro stato di caricamento: il caricamento riuscito, quello fallito, il
+  ritentativo automatico dopo un guasto, il giro di aggiornamento continuo.
+  Dove: `dataChanged()` in `src/pages/manage/manage.js`. Vedi anche
+  [Un numero che non si conosce non si scrive zero](un-numero-che-non-si-conosce-non-si-scrive-zero.md).
 - **Dove:** `src/main/services/mergeApprovalSignal.js` (campanello + decisione
   con l'I/O iniettato), `broadcastToFiloPages` in
   `src/main/services/handlers.js`, `MSG.MERGE_APPROVALS_CHANGED`. Test:
