@@ -57,6 +57,17 @@ function quando(iso) {
 }
 
 async function main() {
+  // Qui non esistono opzioni, e le azioni non si annullano: una parola che
+  // sembra un'opzione — «--dry-run», che ogni strumento vicino accetta —
+  // veniva ignorata in silenzio e la parola d'ordine revocata davvero
+  // (feedback #565).
+  const { controllaArgomenti } = await import('./lib/argomenti.mjs');
+  const male = controllaArgomenti(process.argv.slice(2), { opzioni: [] });
+  if (male) {
+    console.error(`RIFIUTATO: ${male.replace(' Ammesse: ', ' Qui non ci sono opzioni: ')}`);
+    console.error('Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome>]');
+    process.exit(1);
+  }
   const [cmd, nome, potere, ...resto] = process.argv.slice(2);
 
   if (cmd === 'elenco' || !cmd) {
