@@ -2641,60 +2641,68 @@
   let userNoteInVolo = null;
   let userNoteInVoloTesto = null;
 
+  function fraseInCasella() {
+    return mgUserNoteText ? (mgUserNoteText.value || '').trim().slice(0, 500) : '';
+  }
+  // C'è qualcosa da spedire? La domanda si fa su quello che è PARTITO, non su
+  // quello che la pagina si ricorda: finché la risposta non torna, il valore
+  // memorizzato è ancora quello di prima, e un ripensamento scritto in quella
+  // finestra verrebbe inghiottito. È lo stesso confronto che fa il salvataggio.
   function bozzaFrase() {
-    if (!mgUserNoteText) return false;
-    return String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '');
+    if (!mgUserNoteText || !selectedId) return false;
+    const fb = allFeedbacks.find((f) => f._id === selectedId);
+    const gia = userNoteSpedito.has(selectedId)
+      ? userNoteSpedito.get(selectedId)
+      : String((fb && fb.userNote) || '');
+    return gia !== fraseInCasella();
   }
   function annullaSalvataggioProgrammato() {
     if (userNoteTimer) { clearTimeout(userNoteTimer); userNoteTimer = null; }
   }
   function programmaSalvataggioFrase() {
     annullaSalvataggioProgrammato();
-    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseSubito(); }, FRASE_PAUSA_MS);
+    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseSubito({ muto: true }); }, FRASE_PAUSA_MS);
   }
-  // Salva ORA quello che c'è nella casella, se differisce da quello salvato.
+  // Salva ORA quello che c'è nella casella, se non è già a destinazione.
   // Ritorna la promessa dell'esito (true = a destinazione c'è quello che
   // l'owner ha scritto), così chi deve proseguire può aspettarla.
-  function fraseInCasella() {
-    return mgUserNoteText ? (mgUserNoteText.value || '').trim().slice(0, 500) : '';
-  }
   function salvaFraseSubito(opts) {
     annullaSalvataggioProgrammato();
-    // Già partito con ESATTAMENTE questo testo: si aspetta quello.
-    if (userNoteInVolo && userNoteInVoloTesto === fraseInCasella()) return userNoteInVolo;
+    const testo = fraseInCasella();
+    // Già partito con ESATTAMENTE questo testo: si aspetta quello, non se ne
+    // manda un altro uguale.
+    if (userNoteInVolo && userNoteInVoloTesto === testo) return userNoteInVolo;
     if (!bozzaFrase()) return userNoteInVolo || Promise.resolve(true);
-    userNoteInVoloTesto = fraseInCasella();
-    userNoteInVolo = saveUserNote(opts).finally(() => { userNoteInVolo = null; userNoteInVoloTesto = null; });
-    return userNoteInVolo;
+    const mia = saveUserNote(opts);
+    userNoteInVolo = mia;
+    userNoteInVoloTesto = testo;
+    // Solo se è ancora la mia: un salvataggio più recente ha già preso il posto.
+    mia.finally(() => {
+      if (userNoteInVolo === mia) { userNoteInVolo = null; userNoteInVoloTesto = null; }
+    });
+    return mia;
   }
-  // Quello che l'owner ha scritto è a destinazione? Aspetta la bozza in corso e
-  // il salvataggio già partito. Il "muto" evita di scrivere "Nessuna modifica"
-  // sotto il naso di chi sta solo cambiando segnalazione.
+  // Quello che l'owner ha scritto è a destinazione? Aspetta sia il salvataggio
+  // già partito sia quello che parte adesso.
   async function fraseAlSicuro() {
     const giaPartito = userNoteInVolo;                 // preso PRIMA: salvaFraseSubito lo sostituisce
-    const nuovo = (bozzaFrase() || userNoteTimer) ? salvaFraseSubito({ muto: true }) : null;
-    const esiti = await Promise.all([giaPartito || true, nuovo || true]);
+    const nuovo = salvaFraseSubito({ muto: true });
+    const esiti = await Promise.all([giaPartito || true, nuovo]);
     return esiti.every(Boolean);
   }
 
-  // Il tasto e Invio restano la strada esplicita, e rispondono sempre: se non
-  // c'è niente di nuovo lo dicono ("Nessuna modifica") invece di tacere.
+  // Il tasto e Invio restano la strada esplicita, e rispondono sempre.
   function salvaFraseAMano() {
     annullaSalvataggioProgrammato();
-    // Premere il tasto subito dopo aver scritto arriva DOPO che la casella ha
-    // perso il fuoco e ha già spedito: l'esito lo scrive quel salvataggio lì,
-    // e dirgli sopra "Nessuna modifica" sarebbe una bugia.
+    // Premuto un istante dopo che la casella ha perso il fuoco: quel
+    // salvataggio è già in volo con questo stesso testo, e l'esito lo scrive lui.
     if (userNoteInVolo && userNoteInVoloTesto === fraseInCasella()) return;
     if (!bozzaFrase()) {
-      // Niente di nuovo da spedire, quasi sempre perché il salvataggio
-      // automatico l'ha già portato via. Quello che l'owner vuole sapere
-      // premendo il tasto è se a destinazione c'è la sua riga: glielo si dice,
-      // invece di un "Nessuna modifica" che sembra un rifiuto.
+      // Niente da spedire perché a destinazione c'è già questa riga (di solito
+      // ce l'ha portata il salvataggio automatico). È quello che l'owner vuole
+      // sapere premendo il tasto.
       const testo = fraseInCasella();
-      const fb = allFeedbacks.find((f) => f._id === selectedId);
-      const aDestinazione = String((fb && fb.userNote) || '');
-      if (aDestinazione === testo) { setUserNoteMsg(testo ? 'Salvata' : 'Nessuna frase', 'ok'); return; }
-      saveUserNote();
+      setUserNoteMsg(testo ? 'Salvata' : 'Nessuna frase', 'ok');
       return;
     }
     salvaFraseSubito();
