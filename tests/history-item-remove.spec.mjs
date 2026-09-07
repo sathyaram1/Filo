@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #320: nella Cronologia AI non c'era modo di eliminare UNA sola voce —
 // l'unica opzione era "Cancella tutto". Se una voce conteneva qualcosa di privato
@@ -49,7 +49,7 @@ test('history page: rimuovi una singola voce e la rimozione persiste', async () 
       output: 'buongiorno', origin: 'https://example.com', costEur: 0.0001 },
   ];
 
-  const userData = mkdtempSync(join(tmpdir(), 'filo-hist-rm-'));
+  const userData = cartellaTemporanea('filo-hist-rm-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ aiHistory }), 'utf8');
 
   const app = await electron.launch({

@@ -17,11 +17,11 @@
 
 import { test, expect } from '@playwright/test';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EDITOR = 'filo://editor/editor.html';
@@ -34,7 +34,7 @@ const OLD_NOTES = [
 ];
 
 function seedUserData() {
-  const userData = mkdtempSync(join(tmpdir(), 'filo-migra-'));
+  const userData = cartellaTemporanea('filo-migra-');
   writeFileSync(
     join(userData, 'storage.json'),
     JSON.stringify({ filo_notes: OLD_NOTES }),

@@ -19,11 +19,11 @@ import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createServer as createNetServer, connect as netConnect } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -226,7 +226,7 @@ test('regola persistente per dominio: REGOLA_PROXY_DOMINIO salva, la riapertura 
 test('la regola persistente sopravvive al RIAVVIO: riaprendo il dominio la scheda nasce proxata', async ({ testServer }) => {
   test.setTimeout(120_000);
   const socks = await startSocks5();
-  const userData = mkdtempSync(join(tmpdir(), 'filo-test-proxynl-'));
+  const userData = cartellaTemporanea('filo-test-proxynl-');
   const launchOpts = {
     args: [...argomentiScala, '.'],
     cwd: APP_ROOT,

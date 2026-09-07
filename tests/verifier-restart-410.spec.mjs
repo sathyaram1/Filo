@@ -7,11 +7,11 @@
 
 import { test, expect, _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -59,7 +59,7 @@ function fileServer(name, body, dripMs) {
 
 test('la cronologia degli scaricamenti è ancora lì dopo aver chiuso e riaperto Filo', async () => {
   test.setTimeout(180_000);
-  const userData = mkdtempSync(join(tmpdir(), 'filo-restart-'));
+  const userData = cartellaTemporanea('filo-restart-');
   const s = await fileServer('sopravvive.bin', Buffer.alloc(4096, 8));
   let app = null;
   try {
@@ -107,7 +107,7 @@ test('la cronologia degli scaricamenti è ancora lì dopo aver chiuso e riaperto
 
 test('mentre scarica, l\'utente vede percentuale e barra che avanzano davvero', async () => {
   test.setTimeout(180_000);
-  const userData = mkdtempSync(join(tmpdir(), 'filo-progress-'));
+  const userData = cartellaTemporanea('filo-progress-');
   const s = await fileServer('visibile.bin', Buffer.alloc(900 * 1024, 6), 250);
   let app = null;
   try {

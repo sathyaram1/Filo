@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback: alla riapertura di Filo devono essere riaperte tutte le tab
 // presenti al momento della chiusura.
@@ -32,7 +32,7 @@ async function waitForTabWindow(app, hostname, timeout = 15000) {
 test('reopens previous session tabs after restart', async ({ testServer }) => {
   const url = testServer.html('<title>RestoreTarget</title><body><h1>restore me</h1></body>');
   const host = new URL(url).hostname;
-  const userData = mkdtempSync(join(tmpdir(), 'filo-session-'));
+  const userData = cartellaTemporanea('filo-session-');
   const launch = () => electron.launch({
     args: [...argomentiScala, '.'],
     cwd: APP_ROOT,

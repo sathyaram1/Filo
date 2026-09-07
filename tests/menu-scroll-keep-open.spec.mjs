@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback alpha: "lo scroll non funziona — quando uso la rotella si chiude il
 // box invece di mostrare gli appunti più vecchi". La cronologia incolla è
@@ -33,7 +33,7 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
   for (let i = 1; i <= 30; i++) {
     history.push({ type: 'text', text: `appunto numero ${i}`, ts: Date.now() - i });
   }
-  const userData = mkdtempSync(join(tmpdir(), 'filo-scroll-'));
+  const userData = cartellaTemporanea('filo-scroll-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: history }), 'utf8');
 
   const url = testServer.html(
