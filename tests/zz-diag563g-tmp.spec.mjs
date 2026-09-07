@@ -56,17 +56,11 @@ async function openTab(url) {
 }
 
 async function addFontModule(page) {
-  await page.evaluate(() => {
-    const g = document.querySelector('.ed-grid');
-    if (!g) throw new Error('griglia assente');
-  });
-  // Via UI: menu "Aggiungi modulo" → Font.
-  const already = await page.locator('.ed-module[data-type="font"]').count();
-  if (already) return;
-  await page.locator('.ed-add-mod, [data-act="add-module"], .ed-mod-add').first().click({ timeout: 5000 }).catch(() => {});
-  const voce = page.locator('.sn-menu-item, .sn-select-option, button', { hasText: /^Font/ }).first();
-  await voce.click({ timeout: 5000 });
-  await expect(page.locator('.ed-module[data-type="font"]')).toHaveCount(1, { timeout: 5000 });
+  if (await page.locator('.ed-module[data-type="font"]').count()) return;
+  await page.locator('.ed-cell-empty').first().click();
+  await expect(page.locator('.ed-overlay [data-add="font"]')).toHaveCount(1);
+  await page.locator('.ed-overlay [data-add="font"]').click();
+  await page.waitForSelector('.ed-module[data-type="font"]');
 }
 
 test('A) finestra BASSA con la tendina aperta: resta dentro anche in verticale?', async () => {
