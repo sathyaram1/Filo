@@ -815,6 +815,8 @@
       try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
     }
 
+    marcaSchedeStrette();
+
     // Barra di navigazione (icone). Il campo URL è stato rimosso: l'indirizzo
     // si digita dalla home di Filo. Qui aggiorniamo solo lo stato dei tasti.
     const a = activeTab();
