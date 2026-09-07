@@ -75,6 +75,33 @@
 
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule, { passive: true });
+
+    // La cima della pagina cambia colore anche senza che l'utente tocchi niente,
+    // e prima la scheda restava del colore vecchio finché non si scorreva: il
+    // sistema che passa a tema scuro da solo al tramonto, l'interruttore
+    // chiaro/scuro del sito, un'intestazione o un banner che arriva un secondo
+    // dopo il caricamento. La scheda diventava l'unico pezzo di schermo del
+    // colore sbagliato, e ci restava (#429).
+    //
+    // Tre reti, in ordine di prontezza:
+    //  1. il tema di sistema: si sa nell'istante in cui cambia;
+    //  2. il ritorno in primo piano della scheda (mentre era nascosta non si
+    //     campiona: rAF non scatta e il colore sarebbe vecchio comunque);
+    //  3. un controllo lento di sicurezza per tutto il resto. Costa nove
+    //     `elementFromPoint` ogni 1,5s sulla SOLA scheda in primo piano, e non
+    //     manda niente se il colore non è cambiato (dedup su lastSent).
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      if (mq.addEventListener) mq.addEventListener('change', schedule);
+      else if (mq.addListener) mq.addListener(schedule);
+    } catch (_) {}
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') schedule();
+    });
+    setInterval(() => {
+      if (document.visibilityState === 'visible') schedule();
+    }, 1500);
+
     // Primo campione subito + ritardati per le pagine che colorano dopo il paint.
     schedule();
     setTimeout(schedule, 400);
