@@ -48,12 +48,14 @@ test('fetta di torta: il clic sinistro fa quello che fa la sua voce di legenda?'
   await page.waitForTimeout(200);
   const dopoFetta = await aperti();
   console.log('[giro6c] dopo il clic SULLA FETTA:', dopoFetta);
+  // Il secondo clic, sulla voce di legenda gemella, richiude lo stesso elenco:
+  // fetta e legenda sono lo stesso interruttore, non due.
   await page.locator(`#mgStLoopLegend li[data-group="${gruppo}"]`).click();
   await page.waitForTimeout(200);
   const dopoLegenda = await aperti();
   console.log('[giro6c] dopo il clic SULLA LEGENDA gemella:', dopoLegenda);
-  // Diagnostico: la differenza fra i due cammini si LEGGE nei log qui sopra.
-  expect(dopoLegenda).toBeGreaterThanOrEqual(dopoFetta);
+  expect(dopoFetta).toBe(1);
+  expect(dopoLegenda).toBe(0);
 });
 
 test('«Copiato: …»: il messaggio fa saltare la pagina?', async ({ openTab }) => {
@@ -73,6 +75,5 @@ test('«Copiato: …»: il messaggio fa saltare la pagina?', async ({ openTab })
   const dopo = await misura();
   console.log('[giro6c] «Salute della coda» prima:', prima, '· col messaggio:', dopo,
     '· salto:', dopo - prima, 'px');
-  // Diagnostico: il salto in pixel si legge nel log qui sopra.
-  expect(typeof (dopo - prima)).toBe('number');
+  expect(dopo).toBe(prima);
 });

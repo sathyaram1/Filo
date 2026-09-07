@@ -4016,9 +4016,10 @@
     const body = $st('mgStBody');
     if (body) body.hidden = !datiPronti;
 
+    const nCat = data.categorie.length;
     stSetTile('mgStTileRicevuti', datiPronti ? stFmtInt(data.ricevuti) : '—',
       !datiPronti ? 'dati non arrivati'
-        : data.ricevuti ? `${stFmtInt(data.categorie.length)} categorie` : 'niente in questa finestra');
+        : data.ricevuti ? `${stFmtInt(nCat)} ${nCat === 1 ? 'categoria' : 'categorie'}` : 'niente in questa finestra');
     // «Lavorati» si misura sullo stato. Uno stato cifrato che questo computer
     // non sa leggere non vale «non è stato lavorato»: quando NESSUNO stato si
     // legge quel numero non si conosce, e va scritto come si scrive un numero

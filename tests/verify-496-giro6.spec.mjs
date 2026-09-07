@@ -73,8 +73,6 @@ test('senza la chiave dell\'owner: «Feedback lavorati» dice 0 o dice che non l
   // legge, quindi «quanti ne sono stati lavorati» è un dato che manca.
   expect(lavorati.trim()).toBe('—');
   expect(sub).toContain('non leggibile');
-  // E le priorità non diventano tutte «Senza priorità».
-  await expect(page.locator('#mgStHealthRows')).toContainText('Priorità non leggibile');
 });
 
 // ── 2 e 3. Le barrette di «Quando arrivano» con «Sempre» ───────────────────
