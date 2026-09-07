@@ -245,10 +245,10 @@ html[data-chrome-compact="1"] .addr {
   margin-bottom: 0;
   z-index: 1;
   /* La tab selezionata è un po' più larga delle altre (richiesta esplicita) e
-     "stacca" leggermente, in stile Chrome: parte da una base più larga, così
-     resta più larga anche quando la striscia si stringe (le schede si
-     accorciano in proporzione alla base) senza rubare spazio ai titoli delle
-     altre. */
+     "stacca" leggermente, in stile Chrome: parte da una larghezza maggiore e
+     resta maggiore anche quando la striscia si stringe, perché le schede si
+     accorciano in proporzione alla loro larghezza. Non toglie più spazio ai
+     titoli delle altre: quando la barra ha posto, ognuna ha il suo. */
   width: 320px;
   min-width: 110px;
   max-width: 320px;
