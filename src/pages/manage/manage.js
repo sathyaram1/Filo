@@ -3325,6 +3325,9 @@
 
   // ── Il registro dei worker ──────────────────────────────────────────────
   async function stLoadWorkerLog() {
+    // Registro finto iniettato da uno spec: la lettura vera non lo sovrascrive,
+    // o sarebbe una gara persa a caso a seconda di quanto ci mette l'IPC.
+    if (stWorkerLogFinto) return;
     if (!isAdmin) { stWorkerLog = []; stWorkerLogError = 'riservato all\'owner'; return; }
     try {
       const r = await sendToMain({ type: WORKER_LOG_GET });
