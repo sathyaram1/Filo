@@ -139,8 +139,16 @@
   const SOLO_UN_LIVELLO = '\\s*(?:(?:livello|level|priorit[àa]|liv|L|P)\\s*)?(?:\\d+(?:\\s*[.,\\-–/]\\s*\\d+)?|zero|uno|due|tre)\\s*[?!]*\\s*';
   /** Una quadra che contiene qualcosa che somiglia a un livello. PURA. */
   function quadraColLivello(riga) {
-    const m = QUADRA_OVUNQUE.exec(String(riga || ''));
-    return !!m && DENTRO_SEMBRA_LIVELLO.test(m[0]);
+    // TUTTE le quadre della riga, non solo la prima: bastava una frase fra
+    // quadre all'inizio per far sparire il livello scritto più avanti. E il
+    // contenuto può essere lungo: «[3 dati dell'utente a rischio]» è come uno
+    // scrive davvero (feedback #565).
+    const testo = String(riga || '');
+    QUADRA_OVUNQUE.lastIndex = 0;
+    for (let m = QUADRA_OVUNQUE.exec(testo); m; m = QUADRA_OVUNQUE.exec(testo)) {
+      if (DENTRO_SEMBRA_LIVELLO.test(m[0])) { QUADRA_OVUNQUE.lastIndex = 0; return true; }
+    }
+    return false;
   }
   const PARENTESI_LIVELLO = new RegExp(`(?:\\[{1,2}|\\(|\\{)${SOLO_UN_LIVELLO}(?:\\]{1,2}|\\)|\\})`);
   // Dentro la CONTINUAZIONE di un rilievo, invece, un livello citato in mezzo
