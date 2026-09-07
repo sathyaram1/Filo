@@ -57,6 +57,7 @@ export function normalizza(arg) {
 export function argomentiDaNpm(env = {}, { opzioni = [], conValore = [] } = {}) {
   const args = [];
   const prese = [];
+  const senzaValore = [];
   const vuole = new Set(conValore);
   for (const opzione of opzioni) {
     const nome = String(opzione).replace(/^--/, '');
