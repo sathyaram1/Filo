@@ -131,3 +131,48 @@ test('finestra ancorata a mezzanotte («Ultimi 7 giorni»): stessa prova, deve r
   const dopo = await numero(page, 'mgStTileRicevuti').textContent();
   expect(dopo.trim()).toBe(String(prima.n));
 });
+
+// ── 4. Senza chiave: le altre sezioni ───────────────────────────────────────
+test('senza la chiave: priorità e «Chi le manda» che numeri scrivono?', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const ora = Date.now();
+  const iso = (g) => new Date(ora - g * 86400000).toISOString();
+  // Come arriva un documento a chi non ha la chiave: status/clientId/notes
+  // sostituiti dal segnaposto, priority ancora ciphertext (scelta dichiarata).
+  const CIFR = '[cifrato — chiave privata non configurata]';
+  const dati = [1, 2, 3].map((n) => ({
+    _id: `k${n}`, seq: 500 + n, subSeq: 0,
+    name: CIFR, text: CIFR, clientId: CIFR,
+    createdAt: iso(n), status: CIFR, notes: CIFR,
+    images: [], priority: 'FENC1:blob-priorita',
+  }));
+  await apri(page, dati);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
+
+  const salute = await page.locator('#mgStHealthRows').textContent();
+  const creatori = await page.locator('#mgStCreatorRows').textContent();
+  console.log('[giro6] salute della coda =', JSON.stringify(salute.replace(/\s+/g, ' ').trim()));
+  console.log('[giro6] chi le manda    =', JSON.stringify(creatori.replace(/\s+/g, ' ').trim()));
+  await page.screenshot({ path: 'tests/.shots/496-giro6-senza-chiave.png', fullPage: true });
+});
+
+test('foto: la scheda piena, tema chiaro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const ora = Date.now();
+  const iso = (g) => new Date(ora - g * 86400000).toISOString();
+  const T = "\n--- Aggiornamento dell'agente del 1/1/2026 ---\n";
+  const PASS = 'Verifica superata. Provato tutto.';
+  const CRIT = 'Verifica: 2 rilievi.\nIl verificatore corregge tutti i rilievi; poi un altro verificatore ricontrolla.\n- [1] x';
+  const dati = [
+    fb({ id: 'p1', seq: 601, at: iso(1), status: 'done', clientId: 'routine:prober', notes: `R.${T}${CRIT}${T}${PASS}`, priority: 3 }),
+    fb({ id: 'p2', seq: 602, at: iso(2), status: 'done', clientId: 'owner:pino', notes: `R.${T}${PASS}`, priority: 2 }),
+    fb({ id: 'p3', seq: 603, at: iso(3), status: 'todo', clientId: 'utente-x', priority: 1 }),
+    fb({ id: 'p4', seq: 604, at: iso(4), status: 'working', clientId: 'routine:fixer' }),
+  ];
+  await apri(page, dati, [
+    { role: 'prober', startedAt: iso(1), num: '' },
+    { role: 'verifier', startedAt: iso(1), num: '#601' },
+  ]);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
+  await page.screenshot({ path: 'tests/.shots/496-giro6-piena.png', fullPage: true });
+});
