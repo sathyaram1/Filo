@@ -149,3 +149,49 @@ test('centralità: logo centrale vince su rumore saturo ai bordi', () => {
   const h = hueDeg(out);
   assert.ok(h > 90 && h < 160, `atteso verde (centrale), ottenuto hue ${h}° (${out})`);
 });
+
+// ────────────────────── scelta della tinta (#429) ──────────────────────────
+// La scheda attiva è la continuazione della pagina che ha sotto: la sua tinta è
+// il colore campionato dalla cima pagina. Il ripiego sul colore identità serve
+// a un caso solo — chrome neutra che nasconde un marchio colorato (YouTube) —
+// e quindi vale solo se quel colore un colore ce l'ha. Prima il ripiego
+// scattava su QUALSIASI identityColor: sulle pagine interne di Filo, il cui
+// favicon è monocromatico, il grigio del ripiego acromatico prendeva il posto
+// del bianco caldo della pagina e la scheda attiva smetteva di continuarla.
+
+test('scheda attiva: cima pagina colorata → vince la cima pagina', () => {
+  assert.equal(
+    TC.pickActiveTint('rgb(20, 40, 200)', 'rgb(220, 30, 90)'),
+    'rgb(20, 40, 200)',
+  );
+});
+
+test('scheda attiva: cima neutra + marchio colorato → vince il marchio (caso YouTube)', () => {
+  assert.equal(
+    TC.pickActiveTint('rgb(255, 255, 255)', 'rgb(220, 30, 90)'),
+    'rgb(220, 30, 90)',
+  );
+});
+
+test('scheda attiva: cima neutra + identità neutra → resta la pagina, non il grigio', () => {
+  // Il caso delle pagine interne di Filo: sfondo bianco caldo, favicon
+  // monocromatico che l'estrazione risolve in un grigio.
+  assert.equal(
+    TC.pickActiveTint('rgb(248, 246, 240)', 'rgb(228, 228, 228)'),
+    'rgb(248, 246, 240)',
+  );
+});
+
+test('scheda attiva: senza nessun colore → null (la shell tiene il suo default)', () => {
+  assert.equal(TC.pickActiveTint(null, null), null);
+  assert.equal(TC.pickActiveTint(null, 'rgb(228, 228, 228)'), null);
+  // Ma un identityColor VERO vale anche senza campionamento della pagina.
+  assert.equal(TC.pickActiveTint(null, 'rgb(220, 30, 90)'), 'rgb(220, 30, 90)');
+});
+
+test('bagliore audio: senza un colore vero ritorna null (accento di Filo)', () => {
+  // Un alone grigio è un alone che non si vede: meglio l'accento.
+  assert.equal(TC.pickGlowTint('rgb(248, 246, 240)', 'rgb(228, 228, 228)'), null);
+  assert.equal(TC.pickGlowTint('rgb(20, 40, 200)', null), 'rgb(20, 40, 200)');
+  assert.equal(TC.pickGlowTint('rgb(255, 255, 255)', 'rgb(220, 30, 90)'), 'rgb(220, 30, 90)');
+});

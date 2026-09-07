@@ -139,6 +139,45 @@ test.describe('larghezza e separatori stile Chrome', () => {
     }
   });
 
+  // #429 — con la barra mezza vuota i titoli restavano tagliati ("Cro…") perché
+  // lo spazio veniva ripartito a proporzione fissa senza mai guardarli. Il test
+  // verifica la cosa dal punto di vista di chi guarda: se nella barra avanza
+  // spazio, il nome della scheda si legge per intero.
+  test('con spazio libero nella barra nessun titolo resta tagliato', async () => {
+    await openTab('filo://history/history.html');      // "Cronologia AI"
+    await openTab('filo://preferences/preferences.html'); // "Preferenze"
+    await expect(shell.locator('.tab')).toHaveCount(3, { timeout: 8_000 });
+
+    // I titoli arrivano dopo il caricamento della pagina: aspetta che tutte e
+    // tre le schede abbiano un nome e una larghezza vera prima di misurare.
+    await expect.poll(() => shell.evaluate(() => {
+      const els = [...document.querySelectorAll('#tabs .tab')];
+      return els.length === 3
+        && els.every((el) => el.getBoundingClientRect().width > 0
+          && (el.querySelector('.title').textContent || '').trim().length > 0);
+    }), { timeout: 8_000 }).toBe(true);
+
+    const probe = await shell.evaluate(() => {
+      const row = document.querySelector('.tab-row').getBoundingClientRect();
+      const plus = document.querySelector('.tab-new').getBoundingClientRect();
+      const titles = [...document.querySelectorAll('#tabs .tab .title')].map((t) => ({
+        text: t.textContent,
+        // Tagliato = il testo non ci sta nella sua casella (ellissi visibile).
+        clipped: t.scrollWidth > Math.ceil(t.getBoundingClientRect().width) + 1,
+      }));
+      return { freeSpace: row.right - plus.right, titles };
+    });
+
+    // Pre-condizione del feedback: nella barra AVANZA spazio dopo il "+".
+    // Senza spazio libero il test non direbbe niente, quindi lo dichiariamo.
+    expect(probe.freeSpace, 'la barra deve avere spazio libero perché il test abbia senso')
+      .toBeGreaterThan(100);
+    expect(probe.titles.length).toBe(3);
+    for (const t of probe.titles) {
+      expect(t.clipped, `il titolo "${t.text}" è tagliato benché nella barra avanzi spazio`).toBe(false);
+    }
+  });
+
   test('le tab si toccano e usano un separatore verticale in stile Chrome', async () => {
     await openTab('filo://newtab/');
     await openTab('filo://newtab/');
