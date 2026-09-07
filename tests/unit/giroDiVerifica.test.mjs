@@ -114,7 +114,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     // Poi la correzione (un commit nuovo) e la consegna, dallo STESSO verificatore.
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'corretto', 'utf8');
     execFileSync('git', ['commit', '-qam', 'correzione'], { cwd: casa });
-    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto.'], ENV(casa, port));
+    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto, e il caso raro l'ho lasciato stare perche' non era in elenco.'], ENV(casa, port));
     assert.equal(c.code, 0, `la consegna doveva riuscire (stderr: ${c.se})`);
     const fixed = ricevuti.filter((x) => x.url.includes('routineDeliver')).at(-1);
     assert.equal(fixed.body.intent, 'fixed');
@@ -129,7 +129,7 @@ test('la parola del vecchio verdetto è ignorata; senza rilievi la risposta "pas
   const { casa } = casaSulRamo();
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict' ? { reply: { outcome: 'pass', derived: null } } : {}));
   try {
-    const r = await esegui(['--record-verifier', 'fid-901', 'pass', 'Provato tutto: regge.'], ENV(casa, port));
+    const r = await esegui(['--record-verifier', 'fid-901', 'pass', 'Provato tutto: aperto, salvato, trascinato e riaperto. Regge, non ho trovato niente da segnalare.'], ENV(casa, port));
     assert.equal(r.code, 0, r.se);
     const d = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
     assert.deepEqual(d.findings, [], 'nessun rilievo');
@@ -151,7 +151,7 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
     req.on('end', () => {
       ricevuti.push({ url: req.url, body: body ? JSON.parse(body) : {} });
       res.setHeader('Content-Type', 'application/json');
-      if (req.url.includes('routineDeliver')) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'malformed', detail: 'critica vuota: un pass senza riassunto non è una verifica' })); return; }
+      if (req.url.includes('routineDeliver')) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'malformed', detail: 'la critica non corrisponde al commit consegnato' })); return; }
       res.end(JSON.stringify({ ok: true }));
     });
   });
