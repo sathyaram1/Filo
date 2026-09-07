@@ -493,7 +493,7 @@
   function pickGlowTint(sampled, identity) {
     const TC = window.SN_TAB_COLOR;
     if (TC && TC.pickGlowTint) return TC.pickGlowTint(sampled, identity);
-    return sampled || null;
+    return null; // senza il modulo, l'accento di Filo: mai un alone grigio.
   }
 
   // Colore identità attenuato (§1.2): smorza la saturazione del colore del sito
