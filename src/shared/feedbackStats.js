@@ -251,12 +251,24 @@
   const RE_DERIVATO     = /Nessun rilievo da correggere adesso\b/i;
 
   // I marcatori che, dentro `notes`, aprono un turno nuovo. Copia MINIMA di
-  // quelli di SN_FEEDBACK_THREAD (che è codice di pagina e qui non c'è): per
-  // contare basta sapere dove finisce un turno, non chi l'ha scritto.
+  // quelli di SN_FEEDBACK_THREAD (che è codice di pagina e qui non c'è): serve
+  // sapere dove finisce un turno, e se a scriverlo è stata una PERSONA.
   const RE_TURNO = /^---\s*(?:Riaperto il|La tua risposta del|Aggiornamento dell'agente del|Filo ha risposto il)\b/;
+  // I due marcatori che aprono un turno dell'UTENTE (stessa coppia di
+  // SN_FEEDBACK_THREAD.USER_TURN_RE). Dentro un turno dell'utente non c'è
+  // nessuna verifica: c'è quello che una persona ha scritto, e una persona può
+  // benissimo scrivere «Verifica superata? non mi pare» o «Verifica: 2 rilievi
+  // ancora aperti». Contate come giri, quelle frasi mettevano nella torta un
+  // lavoro passato senza critiche che nessuno aveva mai verificato.
+  const RE_TURNO_UTENTE = /^---\s*(?:Riaperto il|La tua risposta del)\b/;
 
   /**
    * I giri di verifica raccontati dalle note, in ordine. PURA.
+   *
+   * Si leggono solo i turni scritti da un agente: il corpo iniziale delle note
+   * (il report di chi ha lavorato) e i turni aperti dai marcatori dell'agente.
+   * I turni dell'utente si saltano.
+   *
    * @returns {Array<{outcome:'pass'|'fail'|'migliorabile', findings:number}>}
    *   `fail` = il giro ha fermato il lavoro (serve l'owner);
    *   `migliorabile` = ci sono rilievi ma il lavoro prosegue (li corregge il
@@ -267,16 +279,24 @@
     if (!testo.trim()) return [];
     // Un turno per blocco: una nota di verifica non può essere spezzata a metà
     // e contata due volte, né due note nello stesso blocco contate una volta.
+    // Il primo blocco non ha marcatore: è il report di chi ha lavorato, quindi
+    // di un agente.
     const blocchi = [];
     let corrente = [];
+    let diUnUtente = false;
     for (const riga of testo.split('\n')) {
-      if (RE_TURNO.test(riga)) { blocchi.push(corrente.join('\n')); corrente = []; }
-      else corrente.push(riga);
+      if (RE_TURNO.test(riga)) {
+        blocchi.push({ testo: corrente.join('\n'), utente: diUnUtente });
+        corrente = [];
+        diUnUtente = RE_TURNO_UTENTE.test(riga);
+      } else corrente.push(riga);
     }
-    blocchi.push(corrente.join('\n'));
+    blocchi.push({ testo: corrente.join('\n'), utente: diUnUtente });
 
     const giri = [];
-    for (const b of blocchi) {
+    for (const blocco of blocchi) {
+      if (blocco.utente) continue;
+      const b = blocco.testo;
       if (!b.trim()) continue;
       if (RE_FAIL_STORICO.test(b))  { giri.push({ outcome: 'fail', findings: 1 }); continue; }
       if (RE_MIGL_STORICO.test(b))  { giri.push({ outcome: 'migliorabile', findings: 1 }); continue; }
