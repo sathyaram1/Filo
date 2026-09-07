@@ -1624,6 +1624,13 @@ if (isMainModule) {
     } else if (flag === '--record-secaudit') {
       const [, id, verdict] = conBiglietto(argv);
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
+      // Qui non c'è altro da dire: un argomento in più veniva ignorato in
+      // silenzio e il verdetto partiva lo stesso (feedback #565).
+      const avanzo = conBiglietto(argv).slice(3);
+      if (avanzo.length) {
+        console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci vanno solo l'identificativo e pass|fail.`);
+        process.exit(1);
+      }
       const s = await recordSecaudit(id, verdict);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);
