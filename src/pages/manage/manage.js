@@ -3565,7 +3565,7 @@
     if (!box) return;
     const barre = d.andamento.barre;
     const max = barre.reduce((m, b) => Math.max(m, b.count), 0);
-    const unita = { day: 'giorno', week: 'settimana', month: 'mese' }[d.andamento.bucket.key] || 'giorno';
+    const unita = { day: 'giorno', week: 'settimana', month: 'mese', year: 'anno' }[d.andamento.bucket.key] || 'giorno';
     if (desc) {
       desc.textContent = max
         ? `Feedback ricevuti per ${unita}. Il picco è ${stFmtInt(max)}.`

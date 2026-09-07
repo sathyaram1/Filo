@@ -333,14 +333,24 @@
     return Object.keys(map).map((k) => ({ key: k, count: map[k] })).sort((a, b) => b.count - a.count);
   }
 
+  // Il tetto alle barrette: oltre, il grafico diventa una riga di peli.
+  const MAX_BARRE = 60;
+
   /**
    * Quanto lunga è una barretta dell'andamento: un giorno finché la finestra
-   * sta in un mese, poi una settimana, poi un mese. PURA.
+   * sta in un mese, poi una settimana, poi un mese, poi un anno. PURA.
+   *
+   * L'ultimo scalino esiste perché il tetto alle barrette non basta da solo:
+   * tenendo il mese su una finestra di dieci anni, tutto quello che sta oltre
+   * il tetto finirebbe schiacciato nell'ultima barretta, che conterebbe roba
+   * che l'etichetta sotto non nomina — un grafico che dice il falso proprio
+   * dove nessuno va a controllare.
    */
   function bucketSizeFor(spanMs) {
     if (spanMs <= 31 * DAY) return { key: 'day', ms: DAY, label: 'al giorno' };
     if (spanMs <= 200 * DAY) return { key: 'week', ms: 7 * DAY, label: 'a settimana' };
-    return { key: 'month', ms: 30 * DAY, label: 'al mese' };
+    if (spanMs <= MAX_BARRE * 30 * DAY) return { key: 'month', ms: 30 * DAY, label: 'al mese' };
+    return { key: 'year', ms: 365 * DAY, label: 'all\'anno' };
   }
 
   /**
@@ -467,7 +477,7 @@
       : (selezionati.length ? Math.min(...selezionati.map((x) => x.ms)) : startOfDay(now));
     const aMs = range.to != null ? range.to : startOfDay(now) + DAY;
     const bucket = bucketSizeFor(Math.max(DAY, aMs - daMs));
-    const nBarre = Math.max(1, Math.min(60, Math.ceil((aMs - daMs) / bucket.ms)));
+    const nBarre = Math.max(1, Math.min(MAX_BARRE, Math.ceil((aMs - daMs) / bucket.ms)));
     const barre = [];
     for (let i = 0; i < nBarre; i += 1) {
       barre.push({ from: daMs + i * bucket.ms, to: daMs + (i + 1) * bucket.ms, count: 0 });
@@ -503,7 +513,7 @@
     WINDOWS, DEFAULT_WINDOW, CREATOR_KINDS, CREATOR_GROUPS, CATEGORIES, RUN_ROLES,
     ROLE_TO_KIND, WORKED_STATUSES, LOOP_MAX_BUCKET,
     toMillis, startOfDay, windowRange, inRange, kindsOfGroup, normalizeCreators,
-    parseVerifications, verificationSummary, loopBucketLabel, bucketSizeFor, compute,
+    parseVerifications, verificationSummary, loopBucketLabel, bucketSizeFor, MAX_BARRE, compute,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

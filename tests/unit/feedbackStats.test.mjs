@@ -271,6 +271,9 @@ test('l\'andamento sceglie la barretta in base alla lunghezza della finestra', (
   assert.equal(S.bucketSizeFor(7 * 86400000).key, 'day');
   assert.equal(S.bucketSizeFor(90 * 86400000).key, 'week');
   assert.equal(S.bucketSizeFor(365 * 86400000).key, 'month');
+  // Oltre il tetto delle barrette la barretta si allarga, invece di lasciare
+  // dieci anni schiacciati nell'ultima che l'etichetta non nomina.
+  assert.equal(S.bucketSizeFor(10 * 365 * 86400000).key, 'year');
 
   const list = [
     fbDi({ id: 'a', at: '2026-09-06T10:00:00' }),
