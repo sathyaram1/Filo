@@ -3237,6 +3237,7 @@
   let stOpenGroup = null;     // quale riga è aperta sull'elenco delle sue segnalazioni
   let stWorkerLog = null;     // null = non ancora letto; [] = letto e vuoto
   let stWorkerLogError = '';  // perché non si è potuto leggere
+  let stWorkerLogVisto = false; // una lettura è riuscita almeno una volta
   let stWorkerLogFinto = false; // registro consegnato da uno spec: non si rilegge
   let stPrefsLoaded = false;
 
