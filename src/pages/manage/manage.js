@@ -1003,6 +1003,11 @@
       // stesso per le quattro schede-lista, quindi si ricontrolla qui.
       applyMergeApprovalsVisibility();
     }
+    // Statistiche feedback (#496): si ricalcolano a OGNI apertura. Sta QUI e
+    // non in un ascoltatore del clic perché alla scheda si arriva anche senza
+    // cliccarla (gli spec, e un domani un collegamento diretto): agganciare il
+    // ricalcolo al clic la lascerebbe vuota su quelle strade.
+    if (tab === 'fbstats') stOpen();
   }
 
   mgTabs.addEventListener('click', (e) => {
