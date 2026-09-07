@@ -195,6 +195,19 @@ test('D4 — da tastiera, tolta una voce il fuoco resta sulla lista anche col mo
     });
     console.log('[D4] mouse sulla lista, fuoco dopo Invio:', JSON.stringify(dove2));
     expect(dove2.corpo, 'col mouse fermo sulla lista il fuoco non deve tornare al corpo della pagina').toBe(false);
+    expect(dove2.classe, 'il fuoco resta su un «Rimuovi» premibile').toContain('sn-clip-remove');
+    expect(dove2.disabilitato, 'e quel «Rimuovi» si può premere').toBe(false);
+
+    // La prova che conta: un altro Invio toglie la voce dopo, senza rifare il
+    // giro col tabulatore, e ne toglie UNA sola.
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(600);
+    const testi = await page.evaluate(async () => {
+      const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_CLIPBOARD_HISTORY });
+      return (r.items || []).map((x) => x.text);
+    });
+    console.log('[D4] voci rimaste dopo tre rimozioni da tastiera:', JSON.stringify(testi));
+    expect(testi.length, 'tre Invio, tre voci in meno').toBe(3);
   } finally {
     try { await app.close(); } catch (_) {}
     rmSync(userData, { recursive: true, force: true });
