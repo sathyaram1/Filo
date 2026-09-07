@@ -458,6 +458,14 @@ test('#497 — la frase scritta e non salvata a mano parte da sola, e sopravvive
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    window.__updates = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
+      return orig(msg);
+    };
+  });
   await page.evaluate((f) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([{ ...f, _id: 'fb-bozza' }]);
