@@ -3389,13 +3389,71 @@
       const pct = o.percent === false ? '' : stPct(r.count, tot);
       const bar = o.bars === false ? ''
         : `<span class="mg-st-row-bar"><span class="mg-st-row-fill" style="width:${w}%${r.color ? `;background:${r.color}` : ''}"></span></span>`;
-      return `<li class="mg-st-row" data-row="${esc(r.key)}" title="${esc(r.title || `${r.label}: ${stFmtInt(r.count)}`)}">`
+      // Una riga che rappresenta delle segnalazioni si apre su quelle
+      // segnalazioni: un numero da cui non si arriva a ciò che conta è un
+      // vicolo cieco. Le righe che contano ESECUZIONI (non segnalazioni)
+      // portano invece alla scheda Log, dove le esecuzioni si leggono una a una.
+      const gruppo = o.scope ? `${o.scope}:${r.key}` : '';
+      const apribile = !!(gruppo && r.ids && r.ids.length);
+      const aperta = apribile && stOpenGroup === gruppo;
+      const vaiAlLog = !!o.toLog && r.count > 0;
+      const attrs = apribile
+        ? ` data-open="${esc(gruppo)}" role="button" tabindex="0" aria-expanded="${aperta ? 'true' : 'false'}"`
+        : (vaiAlLog ? ' data-goto="log" role="button" tabindex="0"' : '');
+      const cls = 'mg-st-row' + (apribile || vaiAlLog ? ' mg-st-row--apribile' : '') + (aperta ? ' mg-st-row--aperta' : '');
+      const suggerimento = r.title
+        || (apribile ? `${r.label}: ${stFmtInt(r.count)}. Apri per vedere quali.`
+          : vaiAlLog ? `${r.label}: ${stFmtInt(r.count)}. Apri la scheda Log per vederle.`
+            : `${r.label}: ${stFmtInt(r.count)}`);
+      return `<li class="${cls}" data-row="${esc(r.key)}"${attrs} title="${esc(suggerimento)}">`
         + `<span class="mg-st-row-label">${esc(r.label)}</span>`
         + bar
         + `<span class="mg-st-row-num">${stFmtInt(r.count)}`
         + (pct ? `<span class="mg-st-row-pct">${pct}</span>` : '')
-        + '</span></li>';
+        + '</span></li>'
+        + (aperta ? stItemsHtml(r.ids) : '');
     }).join('');
+  }
+
+  // L'elenco delle segnalazioni dietro un numero: #N e titolo, come nella
+  // colonna di sinistra, e un clic porta alla segnalazione vera.
+  const ST_MAX_ITEMS = 200;
+  function stItemsHtml(ids) {
+    const list = (ids || []).map((id) => allFeedbacks.find((f) => f._id === id)).filter(Boolean);
+    if (!list.length) return '<li class="mg-st-items"><span class="sn-muted">Nessuna segnalazione da mostrare.</span></li>';
+    list.sort((a, b) => (Number(b.seq) || 0) - (Number(a.seq) || 0));
+    const mostrate = list.slice(0, ST_MAX_ITEMS);
+    const righe = mostrate.map((fb) => {
+      const num = FB.formatNum(fb.seq, fb.subSeq);
+      const titolo = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
+      return `<li class="mg-st-item" data-id="${esc(fb._id)}" role="button" tabindex="0"`
+        + ` title="${esc((num ? `#${num} · ` : '') + titolo)}">`
+        + (num ? `<span class="mg-st-item-num">#${esc(num)}</span>` : '')
+        + `<span class="mg-st-item-title">${esc(titolo)}</span></li>`;
+    }).join('');
+    // Un taglio muto mangerebbe proprio le segnalazioni che non si vedono: se
+    // ne restano fuori, il numero di quelle che mancano è scritto.
+    const resto = list.length - mostrate.length;
+    const coda = resto
+      ? `<li class="mg-st-item mg-st-item--nota"><span class="sn-muted">e altre ${stFmtInt(resto)}: aprile dalla colonna di sinistra.</span></li>`
+      : '';
+    return `<li class="mg-st-items"><ul class="mg-st-items-list">${righe}${coda}</ul></li>`;
+  }
+
+  // Da un numero alla segnalazione: si va nella scheda che la contiene (così la
+  // colonna di sinistra la mostra selezionata) e si apre il dettaglio.
+  function stApriFeedback(id) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb) return;
+    let dove = 'inbox';
+    for (const t of LIST_TABS) {
+      const lista = t === 'archived'
+        ? MR.listArchiveTab(allFeedbacks, { starredOnly, confirmedOnly })
+        : MR.listForManageTab(allFeedbacks, t, { releasedVersion });
+      if (Array.isArray(lista) && lista.some((f) => f._id === id)) { dove = t; break; }
+    }
+    selectTab(dove);
+    openDetail(id);
   }
 
   // Il dettaglio del numero aperto. Uno alla volta: due aperti insieme
