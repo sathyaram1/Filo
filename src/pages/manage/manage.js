@@ -2980,6 +2980,10 @@
       mgListEmpty.hidden = false;
       mgListEmpty.textContent = 'Errore nel caricamento dei feedback.';
       console.error('[manage] errore caricamento:', err);
+      // Il guasto raggiunge anche la scheda delle statistiche, se è aperta:
+      // senza, resterebbe a dire «sto caricando» per sempre, oppure a mostrare
+      // i numeri di prima come se avessero ancora qualcosa sotto.
+      dataChanged();
       return;
     }
 
