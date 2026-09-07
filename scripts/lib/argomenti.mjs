@@ -116,6 +116,25 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) 
       return `l'opzione ${arg} va scritta --${arg.slice(1).toLowerCase()} — non ho toccato niente.`;
     }
     if (!sembraOpzione(arg)) continue;
+    // `--opzione=valore` è la forma che regge quando la riga passa da npm:
+    // qui vale come opzione col suo valore, non come un nome sconosciuto.
+    const uguale = arg.indexOf('=');
+    if (uguale > 0) {
+      const conNome = normalizza(arg.slice(0, uguale));
+      if (!ammesse.has(conNome)) {
+        return `opzione sconosciuta ${arg.slice(0, uguale)} — non ho toccato niente. Ammesse: ${[...ammesse].join(' ')}`;
+      }
+      if (arg.slice(0, uguale) !== conNome) {
+        return `l'opzione ${arg.slice(0, uguale)} va scritta ${conNome} — non ho toccato niente.`;
+      }
+      if (!vuole.has(conNome)) {
+        return `l'opzione ${conNome} non vuole un valore — non ho toccato niente.`;
+      }
+      if (!arg.slice(uguale + 1)) {
+        return `l'opzione ${conNome} vuole un valore dopo di sé — non ho toccato niente.`;
+      }
+      continue;
+    }
     const forma = normalizza(arg);
     if (!ammesse.has(forma)) {
       const vicina = [...ammesse].find((o) => o === forma.toLowerCase());
