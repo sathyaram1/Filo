@@ -114,7 +114,10 @@ test('i sottotitoli delle tessere si accordano al singolare', async ({ openTab }
   const subProb = (await page.locator('#mgStTileProber [data-sub]').textContent()).trim();
   const subLav = (await page.locator('#mgStTileLavorati [data-sub]').textContent()).trim();
   console.log('SUB ricevuti:', subRic, '| lavorati:', subLav, '| prober:', subProb);
-  expect(subRic.length).toBeGreaterThan(0);
+  // Una segnalazione, una categoria, una esecuzione: i sottotitoli si accordano
+  // al singolare invece di scrivere «1 categorie» e «1 esecuzioni».
+  expect(subRic).not.toMatch(/\b1 categorie\b/);
+  expect(subProb).not.toMatch(/\b1 esecuzioni\b/);
 });
 
 // ── 4. «Apri la scheda Log per vederle»: la scheda Log non è filtrata ──────
