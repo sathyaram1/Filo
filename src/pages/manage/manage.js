@@ -114,6 +114,8 @@
   const mgAcceptComment = document.getElementById('mgAcceptComment');
   const mgActionsRow    = document.getElementById('mgActionsRow');
   const mgActionMsg     = document.getElementById('mgActionMsg');
+  // La riga degli esiti (azione di stato + preferito), sotto i tasti.
+  const mgOwnerMsgs     = document.getElementById('mgOwnerMsgs');
   const mgReopen        = document.getElementById('mgReopen');
   const mgReopenText    = document.getElementById('mgReopenText');
   const mgReopenCancel  = document.getElementById('mgReopenCancelBtn');
