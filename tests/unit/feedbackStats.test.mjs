@@ -139,12 +139,16 @@ test('«Sempre» non ha limiti; la finestra personalizzata comprende il giorno f
     'date invertite si raddrizzano: nessuno intende «dal 10 al 3» come «niente»');
 
   const vuota = S.windowRange('custom', { now: NOW });
-  assert.ok(vuota.invalid, 'senza nessuna delle due date lo dice, invece di mostrare zero');
+  assert.ok(vuota.nota, 'senza nessuna delle due date lo dice, invece di mostrare zero');
+  assert.equal(vuota.from, null);
+  assert.equal(vuota.to, null);
+  assert.match(vuota.nota, /sempre/i,
+    'la nota deve dire cosa si sta guardando: senza limiti la finestra è «sempre», e i numeri sotto sono quelli');
 });
 
 test('una sola delle due date personalizzate è un limite legittimo, non un errore', () => {
   const da = S.windowRange('custom', { now: NOW, fromISO: '2026-09-05' });
-  assert.equal(da.invalid, undefined);
+  assert.equal(da.nota, undefined);
   assert.equal(da.to, null);
   assert.equal(S.inRange(new Date('2027-01-01').getTime(), da), true);
 });
@@ -298,6 +302,31 @@ test('su una finestra lunghissima le barrette restano sotto il tetto e coprono t
   assert.ok(ultima.to >= NOW.getTime(),
     'l\'ultima barretta arriva fino a oggi: se si fermasse prima conterebbe roba che la sua etichetta non nomina');
   assert.equal(s.andamento.barre.reduce((n, b) => n + b.count, 0), s.ricevuti);
+});
+
+test('nessuna barretta dichiara di finire oltre la fine della finestra', () => {
+  // Le barrette sono tutte larghe uguale, quindi l'ultima sfora sempre: prima
+  // l'etichetta in fondo all'asse scriveva una data nel futuro sotto una riga
+  // che diceva «a oggi» (con «Sempre» venti giorni avanti; partendo dal 1900,
+  // «29/11/2028»).
+  const casi = [
+    ['all', S.windowRange('all', { now: NOW })],
+    ['30d', S.windowRange('30d', { now: NOW })],
+    ['dal 1900', S.windowRange('custom', { now: NOW, fromISO: '1900-01-01', toISO: '2026-09-07' })],
+    ['solo dal', S.windowRange('custom', { now: NOW, fromISO: '2026-01-01' })],
+  ];
+  const vecchi = Array.from({ length: 12 }, (_, i) => fbDi({
+    id: `v${i}`, at: new Date(NOW.getTime() - i * 300 * 86400000).toISOString(), status: 'todo',
+  }));
+  for (const [nome, range] of casi) {
+    const s = conta(vecchi, { range });
+    const fine = range.to != null ? range.to : S.startOfDay(NOW.getTime()) + 86400000;
+    const ultima = s.andamento.barre[s.andamento.barre.length - 1];
+    assert.ok(ultima.to <= fine, `${nome}: l'ultima barretta promette un periodo oltre la finestra`);
+    assert.ok(ultima.to > ultima.from, `${nome}: una barretta non può finire prima di cominciare`);
+    // …e continua a contenere tutto: tagliare l'etichetta non deve perdere nessuno.
+    assert.equal(s.andamento.barre.reduce((n, b) => n + b.count, 0), s.ricevuti, nome);
+  }
 });
 
 test('i gruppi di creatori coprono tutte le categorie d\'autore, senza doppioni', () => {

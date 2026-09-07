@@ -1272,6 +1272,13 @@
             <div class="mg-st-custom" id="mgStCustom" hidden>
               <label class="mg-st-date">dal <input type="date" id="mgStFrom" /></label>
               <label class="mg-st-date">al <input type="date" id="mgStTo" /></label>
+              <!-- L'ORDINE con cui un campo data scrive giorno e mese lo decide
+                   la lingua del sistema, e non si può cambiare: su un computer
+                   non italiano questi due campi dicono «09/01/2026» dove tutte
+                   le altre date della scheda direbbero «01/09/2026». Qui la
+                   data scelta si rilegge col mese scritto a parole, dove un
+                   ordine da indovinare non c'è. -->
+              <span class="mg-st-date-echo" id="mgStDateEcho"></span>
             </div>
           </div>
           <div class="mg-st-field">
