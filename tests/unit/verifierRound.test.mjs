@@ -274,9 +274,10 @@ test('#561 giro 7: il segno prima della cifra («[?2]») o un segno diverso dopo
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[?2] rotto'), ['[?2] rotto']);
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2!] rotto'), ['[2!] rotto']);
   assert.deepEqual(R.unparsedLevelLines('Provato.\n- [2?!] rotto'), ['- [2?!] rotto']);
-  // Il formato giusto resta un rilievo, e in mezzo a una frase le parentesi restano testo.
+  // Il formato giusto resta un rilievo; in mezzo a una frase, dal 2026-09-07,
+  // le quadre col livello dentro sono comunque un rilievo scritto male.
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2?] decidi tu'), []);
-  assert.deepEqual(R.unparsedLevelLines('Provato il caso [?2] del giro prima: chiuso.\n[1] bordo'), []);
+  assert.equal(R.unparsedLevelLines('Provato il caso [?2] del giro prima: chiuso.\n[1] bordo').length, 1);
   assert.equal(R.parseFindings('Provato.\n[2?] decidi tu').findings[0].decision, true);
 });
 
