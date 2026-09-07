@@ -1293,9 +1293,17 @@
     setTimeout(() => {
       document.addEventListener('mousedown', onSortOutside, true);
       document.addEventListener('keydown', onSortKeydown, true);
-      window.addEventListener('scroll', closeSortMenu, true);
       window.addEventListener('resize', closeSortMenu);
     }, 0);
+    // Lo scorrimento chiude il menu, ma NON quello che l'ha fatto nascere. Un
+    // menu aperto su un elemento in fondo alla pagina arriva dopo che il
+    // browser ha portato quell'elemento in vista, e l'evento di quello
+    // scorrimento viene consegnato al fotogramma dopo: agganciato subito, il
+    // menu si chiudeva nell'istante in cui compariva. Due fotogrammi bastano
+    // perché sia già passato; uno scorrimento vero, dopo, chiude come prima.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (sortMenu === menu) window.addEventListener('scroll', closeSortMenu, true);
+    }));
     return true;
   }
   function openSortMenu(x, y) {
