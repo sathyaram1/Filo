@@ -2233,6 +2233,19 @@
       setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
       return;
     }
+    // La riga per chi ha segnalato parte PRIMA del cambio di stato, e il
+    // cambio di stato non parte se lei non è arrivata: chiudere una
+    // segnalazione buttando via l'unica frase che il mittente leggerà è il
+    // modo più facile di perderla, e succedeva in silenzio.
+    setActionsBusy(true);
+    const fraseOk = await fraseAlSicuro();
+    setActionsBusy(false);
+    if (!fraseOk) {
+      setActionMsg('La frase per chi ha segnalato non si è salvata: riprova prima di cambiare stato.', 'err');
+      mostraFrase(true);
+      return;
+    }
+    if (selectedId !== id) return;
     const payload = { type: 'feedback_update', id, status: action.to };
     const locale = { status: action.to };
     const comment = (mgAcceptComment && !mgAcceptComment.hidden) ? (mgAcceptComment.value || '').trim() : '';
