@@ -2658,9 +2658,11 @@
   // Quello che l'owner ha scritto è a destinazione? Aspetta la bozza in corso e
   // il salvataggio già partito. Il "muto" evita di scrivere "Nessuna modifica"
   // sotto il naso di chi sta solo cambiando segnalazione.
-  function fraseAlSicuro() {
-    const inVolo = userNoteInVolo || Promise.resolve(true);
-    return bozzaFrase() || userNoteTimer ? salvaFraseSubito({ muto: true }) : inVolo;
+  async function fraseAlSicuro() {
+    const giaPartito = userNoteInVolo;                 // preso PRIMA: salvaFraseSubito lo sostituisce
+    const nuovo = (bozzaFrase() || userNoteTimer) ? salvaFraseSubito({ muto: true }) : null;
+    const esiti = await Promise.all([giaPartito || true, nuovo || true]);
+    return esiti.every(Boolean);
   }
 
   // Il tasto e Invio restano la strada esplicita, e rispondono sempre: se non
