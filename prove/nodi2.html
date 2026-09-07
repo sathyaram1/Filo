@@ -144,53 +144,60 @@ function cuociCorda() {
   var p = lungoWaypoint(POSA, NG);
   var vecchio = p.map(function (a) { return a.slice(); });
   var riposo = 0;
-  for (var i = 1; i < NG; i++) riposo += Math.hypot(p[i][0]-p[i-1][0], p[i][1]-p[i-1][1], p[i][2]-p[i-1][2]);
+  for (var i = 1; i < NG; i++) {
+    var ax = p[i][0]-p[i-1][0], ay = p[i][1]-p[i-1][1], az = p[i][2]-p[i-1][2];
+    riposo += Math.sqrt(ax*ax + ay*ay + az*az);
+  }
+  var LUNGA = riposo;
   riposo /= (NG - 1);
 
   var capoA = p[0].slice(), capoB = p[NG-1].slice();
   var frames = [];
+  var minimo = SPESS * SPESS;
 
   for (var f = 0; f < FOTO; f++) {
-    // i capi si allontanano: è così che un nodo si stringe davvero
-    // i capi vanno sull'asse verticale e si allontanano: e cosi che un nodo
-    // si stringe davvero
-    var q = Math.min(1, f / 45), tira = f * 0.26;
+    // I capi si portano sull'asse verticale e si allontanano, ma non oltre:
+    // oltre l'86% della lunghezza della corda si starebbe strappando un nodo
+    // che invece deve solo stringersi.
+    var q = Math.min(1, f / 30);
     capoA[0] = POSA[0][0] * (1 - q); capoA[2] = POSA[0][2] * (1 - q);
     capoB[0] = POSA[POSA.length-1][0] * (1 - q); capoB[2] = POSA[POSA.length-1][2] * (1 - q);
-    capoA[1] = POSA[0][1] - tira;
-    capoB[1] = POSA[POSA.length-1][1] + tira;
+    var span = capoB[1] - capoA[1];
+    if (span < LUNGA * 0.86) { capoA[1] -= 0.55; capoB[1] += 0.55; }
 
-    // inerzia
     for (var i2 = 0; i2 < NG; i2++) {
-      for (var c = 0; c < 3; c++) {
-        var v = (p[i2][c] - vecchio[i2][c]) * 0.86;
-        vecchio[i2][c] = p[i2][c];
-        p[i2][c] += v;
-      }
+      var q0 = p[i2], v0 = vecchio[i2];
+      var vx = (q0[0]-v0[0])*0.9, vy = (q0[1]-v0[1])*0.9, vz = (q0[2]-v0[2])*0.9;
+      v0[0]=q0[0]; v0[1]=q0[1]; v0[2]=q0[2];
+      q0[0]+=vx; q0[1]+=vy; q0[2]+=vz;
     }
-    // vincoli
+
     for (var it = 0; it < 10; it++) {
-      p[0] = capoA.slice(); p[NG-1] = capoB.slice();
+      p[0][0]=capoA[0]; p[0][1]=capoA[1]; p[0][2]=capoA[2];
+      p[NG-1][0]=capoB[0]; p[NG-1][1]=capoB[1]; p[NG-1][2]=capoB[2];
       for (var i3 = 1; i3 < NG; i3++) {
-        var a = p[i3-1], b = p[i3];
-        var dx = b[0]-a[0], dy = b[1]-a[1], dz = b[2]-a[2];
-        var d = Math.hypot(dx, dy, dz) || 1e-6;
+        var A1 = p[i3-1], B1 = p[i3];
+        var dx = B1[0]-A1[0], dy = B1[1]-A1[1], dz = B1[2]-A1[2];
+        var d = Math.sqrt(dx*dx+dy*dy+dz*dz) || 1e-6;
         var k = (d - riposo) / d * 0.5;
         var mx = dx*k, my = dy*k, mz = dz*k;
-        if (i3 > 1) { a[0]+=mx; a[1]+=my; a[2]+=mz; }
-        if (i3 < NG-1) { b[0]-=mx; b[1]-=my; b[2]-=mz; }
+        if (i3 > 1) { A1[0]+=mx; A1[1]+=my; A1[2]+=mz; }
+        if (i3 < NG-1) { B1[0]-=mx; B1[1]-=my; B1[2]-=mz; }
       }
-      // la corda non può passare attraverso sé stessa
+      // La corda non passa attraverso se stessa. Va fatto a ogni giro: se lo
+      // si salta anche solo una volta ogni due, il nodo si sfila.
       for (var i4 = 0; i4 < NG; i4++) {
+        var A2 = p[i4];
         for (var j4 = i4 + 4; j4 < NG; j4++) {
-          var A = p[i4], B = p[j4];
-          var ex = B[0]-A[0], ey = B[1]-A[1], ez = B[2]-A[2];
-          var dd = Math.hypot(ex, ey, ez);
-          if (dd > SPESS || dd < 1e-6) continue;
+          var B2 = p[j4];
+          var ex = B2[0]-A2[0], ey = B2[1]-A2[1], ez = B2[2]-A2[2];
+          var q2 = ex*ex + ey*ey + ez*ez;
+          if (q2 > minimo || q2 < 1e-9) continue;
+          var dd = Math.sqrt(q2);
           var spinta = (SPESS - dd) / dd * 0.5;
           var sx = ex*spinta, sy = ey*spinta, sz = ez*spinta;
-          if (i4 > 0 && i4 < NG-1) { A[0]-=sx; A[1]-=sy; A[2]-=sz; }
-          if (j4 > 0 && j4 < NG-1) { B[0]+=sx; B[1]+=sy; B[2]+=sz; }
+          if (i4 > 0 && i4 < NG-1) { A2[0]-=sx; A2[1]-=sy; A2[2]-=sz; }
+          if (j4 > 0 && j4 < NG-1) { B2[0]+=sx; B2[1]+=sy; B2[2]+=sz; }
         }
       }
     }
