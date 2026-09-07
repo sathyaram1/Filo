@@ -375,7 +375,7 @@
     .mg-st-avg strong { font-size: 17px; }
 
     /* L'andamento: una barretta per giorno/settimana/mese. */
-    .mg-st-spark { display: flex; align-items: flex-end; gap: 3px; height: 76px; margin-top: 4px; }
+    .mg-st-spark { display: flex; align-items: flex-end; gap: 3px; height: 76px; margin-top: 4px; max-width: 760px; }
     .mg-st-spark-bar {
       flex: 1 1 0; min-width: 2px; border-radius: 3px 3px 0 0;
       background: var(--sn-accent); opacity: 0.75; min-height: 2px;
@@ -383,9 +383,13 @@
     .mg-st-spark-bar:hover { opacity: 1; }
     .mg-st-spark-bar--zero { background: var(--sn-border); opacity: 1; }
     .mg-st-spark-axis {
-      display: flex; justify-content: space-between;
+      display: flex; justify-content: space-between; max-width: 760px;
       font-size: 11px; color: var(--sn-muted); margin-top: 6px;
     }
+    /* Segnali contati in eventi, non in segnalazioni: niente barra, che li
+       metterebbe sulla stessa scala delle priorità. */
+    .mg-st-signals { margin-top: 10px; }
+    .mg-st-signals .mg-st-row { grid-template-columns: minmax(120px, 190px) auto; }
     .mg-st-empty { font-size: 13px; color: var(--sn-muted); padding: 22px 0; }
     .mg-st-empty[hidden] { display: none; }
 
@@ -1301,6 +1305,11 @@
             e sono rientrati in coda da soli.
           </p>
           <ul class="mg-st-rows" id="mgStHealthRows"></ul>
+          <!-- Riaperture e arenamenti non si misurano sulla stessa scala delle
+               priorità (là si contano segnalazioni, qui eventi): una barra che
+               li confronta direbbe una cosa che non vuol dire niente. Numeri e
+               basta. -->
+          <ul class="mg-st-rows mg-st-signals" id="mgStSignalRows"></ul>
         </section>
       </div>
     </section>

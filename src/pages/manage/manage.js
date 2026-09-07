@@ -3361,17 +3361,24 @@
   }
 
   // Una riga di ripartizione: etichetta, barra proporzionale, numero (+%).
+  // `bars: false` toglie la barra: quando le righe non si misurano sulla stessa
+  // scala (eventi accanto a segnalazioni) confrontarle a occhio direbbe una
+  // cosa che non vuol dire niente.
   function stRowsHtml(rows, opts) {
     const o = opts || {};
     const max = rows.reduce((m, r) => Math.max(m, r.count), 0) || 1;
     const tot = o.total != null ? o.total : rows.reduce((n, r) => n + r.count, 0);
     if (!rows.length) return `<li class="mg-st-row"><span class="mg-st-row-label sn-muted">${esc(o.empty || 'Niente da mostrare.')}</span></li>`;
     return rows.map((r) => {
-      const w = Math.max(2, Math.round((r.count / max) * 100));
+      // Zero non ha moncone: un tratto colorato su un valore nullo si legge
+      // come «poco», non come «niente».
+      const w = r.count ? Math.max(2, Math.round((r.count / max) * 100)) : 0;
       const pct = o.percent === false ? '' : stPct(r.count, tot);
+      const bar = o.bars === false ? ''
+        : `<span class="mg-st-row-bar"><span class="mg-st-row-fill" style="width:${w}%${r.color ? `;background:${r.color}` : ''}"></span></span>`;
       return `<li class="mg-st-row" data-row="${esc(r.key)}" title="${esc(r.title || `${r.label}: ${stFmtInt(r.count)}`)}">`
         + `<span class="mg-st-row-label">${esc(r.label)}</span>`
-        + `<span class="mg-st-row-bar"><span class="mg-st-row-fill" style="width:${w}%${r.color ? `;background:${r.color}` : ''}"></span></span>`
+        + bar
         + `<span class="mg-st-row-num">${stFmtInt(r.count)}`
         + (pct ? `<span class="mg-st-row-pct">${pct}</span>` : '')
         + '</span></li>';
