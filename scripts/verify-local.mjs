@@ -620,6 +620,19 @@ if (isMain) {
     process.exit(1);
   }
 
+  // Qui nessun comando accetta opzioni: una parola con due trattini in coda
+  // finiva DENTRO al testo della critica (o del report) e l'esito veniva
+  // registrato lo stesso — un testo che non si modifica più, e che l'owner
+  // legge nella chat del feedback (feedback #565).
+  if (['critica', 'corretto', 'start'].includes(cmd)) {
+    const { sembraOpzione } = await import('./lib/argomenti.mjs');
+    const opzione = rest.find((a) => sembraOpzione(a));
+    if (opzione) {
+      console.error(`Argomento non capito: ${opzione} — non ho toccato niente. Qui non ci sono opzioni: il testo va fra virgolette, tutto in un pezzo solo.`);
+      process.exit(1);
+    }
+  }
+
   if (cmd === 'critica') {
     const text = rest.join(' ').trim();
     const prev = readState()[branch];
