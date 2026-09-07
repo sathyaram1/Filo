@@ -3666,6 +3666,7 @@
       c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
       c.setAttribute('fill', vive[0].color);
       c.dataset.group = vive[0].key;
+      if (vive[0].ids && vive[0].ids.length) c.dataset.apribile = '1';
       const t = document.createElementNS(NS, 'title');
       t.textContent = `${vive[0].label}: ${stFmtInt(vive[0].count)} (100%)`;
       c.appendChild(t);
