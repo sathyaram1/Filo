@@ -367,7 +367,18 @@ if (isMain) {
   const data = {};
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
-    if (!a.startsWith('--')) { args.push(a); continue; }
+    // Un'opzione scritta storta non è un posizionale: presa per tale, il
+    // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
+    // che diceva «OK» (feedback #565).
+    if (!a.startsWith('--')) {
+      if (SEMBRA_OPZIONE_STORTA(a, new Set([...CAMPI, ...CAMPI_TESTO]))) {
+        const nome = String(a).replace(/^[-‐‑‒–—−]+/, '').split('/').pop().split('=')[0];
+        console.error(`Argomento non capito: "${a}" — non ho fatto niente. Le opzioni si scrivono con due trattini: --${nome} …`);
+        process.exit(1);
+      }
+      args.push(a);
+      continue;
+    }
     // Un nome sbagliato non deve passare in silenzio: `--noets "…"` faceva
     // partire la consegna col report VUOTO e il server rispondeva OK — lo
     // stesso danno che il controllo sui posizionali, qui sotto, esiste per
