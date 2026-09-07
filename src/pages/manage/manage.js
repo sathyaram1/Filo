@@ -3880,6 +3880,22 @@
         ? `<span>${esc(formatDate(barre[0].from))}</span><span>${esc(formatDate(barre[barre.length - 1].to - 1))}</span>`
         : '';
     }
+    // Una segnalazione senza data d'arrivo leggibile non ha una barretta dove
+    // stare. Con «Sempre» è nei numeri e fuori dal grafico; con una finestra
+    // che ha dei limiti è fuori da tutto. Prima usciva anche da «Sempre» in
+    // silenzio, e la tessera scriveva un numero più piccolo del vero.
+    const nota = $st('mgStSparkNote');
+    if (nota) {
+      const fuori = d.senzaData || 0;
+      const dentro = d.senzaDataDentro || 0;
+      nota.hidden = !fuori;
+      if (fuori) {
+        const quante = fuori === 1 ? '1 segnalazione non ha' : `${stFmtInt(fuori)} segnalazioni non hanno`;
+        nota.textContent = dentro
+          ? `${quante} una data d'arrivo leggibile: ${fuori === 1 ? 'è contata' : 'sono contate'} nei numeri di «Sempre», ma non in questo grafico.`
+          : `${quante} una data d'arrivo leggibile: ${fuori === 1 ? 'resta' : 'restano'} fuori da ogni finestra con dei limiti. ${fuori === 1 ? 'La trovi' : 'Le trovi'} scegliendo «Sempre».`;
+      }
+    }
   }
 
   function stRenderHealth(d) {
