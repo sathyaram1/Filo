@@ -429,6 +429,43 @@ test.describe('font picker e drag dei moduli', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
+  // La finestra si stringe anche DOPO. Rientrare solo all'apertura vuol dire
+  // calcolare lo spazio su una finestra che un istante dopo non c'è più: la
+  // tendina resta dov'era, cioè fuori dalla pagina, e non si raggiunge in nessun
+  // modo. Misurato prima della cura: aperta in una finestra da 1280 la tendina
+  // stava fra 859 e 1039, e portando la finestra a 520 restava esattamente lì.
+  test('la tendina del font rientra anche se la finestra si stringe mentre è aperta', async () => {
+    const page = await openTab(EDITOR);
+    await page.waitForSelector('.ed-grid');
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await addFontModule(page);
+
+    const mod = page.locator('.ed-module[data-type="font"]');
+    const pop = mod.locator('.ed-font-pop');
+    await mod.locator('.ed-font-button').click();
+    await expect(pop).toBeVisible();
+
+    // Aperta in una finestra larga sta comodamente dentro: è il punto di
+    // partenza, non ancora la prova.
+    const prima = await page.evaluate(() => {
+      const p = document.querySelector('.ed-font-pop').getBoundingClientRect();
+      return { vw: window.innerWidth, left: p.left, right: p.right };
+    });
+    expect(prima.right).toBeLessThanOrEqual(prima.vw);
+
+    // Adesso la finestra si stringe, con la tendina ancora aperta.
+    await page.setViewportSize({ width: 520, height: 800 });
+    await expect(pop).toBeVisible();
+    await expect.poll(async () => page.evaluate(() => {
+      const p = document.querySelector('.ed-font-pop').getBoundingClientRect();
+      return Math.round(p.right) <= window.innerWidth && Math.round(p.left) >= 0;
+    }), { timeout: 3000, message: 'la tendina è rimasta fuori dalla finestra ristretta' }).toBe(true);
+
+    // E resta usabile: i nomi dei font si vedono e si possono cliccare.
+    await expect(pop.locator('.sn-select-option').first()).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
   test('un modulo si può afferrare da qualsiasi punto tenendo premuto (non solo dalla maniglia)', async () => {
     const page = await openTab(EDITOR);
     await page.waitForSelector('.ed-grid');
