@@ -101,3 +101,14 @@ test("senza niente nell'ambiente non si inventa niente", () => {
   // non si indovina: meglio il rifiuto del controllo normale.
   assert.deepEqual(argomentiDaNpm({ npm_config_allega: 'true' }, FEEDBACK).args, []);
 });
+
+test("un'opzione col valore mangiato da npm ferma tutto e dice come si scrive", () => {
+  // npm spezza `--allega spec.md` in due: si tiene il nome (come «true») e
+  // passa allo strumento il solo valore, che scala e diventa il titolo.
+  const r = argomentiDaNpm({ npm_config_allega: 'true' }, FEEDBACK);
+  assert.deepEqual(r.args, []);
+  assert.equal(r.nota, null);
+  assert.match(r.errore, /senza il suo valore/);
+  assert.match(r.errore, /--allega=<valore>/, 'dice la forma che regge');
+  assert.match(r.errore, /non ho toccato niente/);
+});

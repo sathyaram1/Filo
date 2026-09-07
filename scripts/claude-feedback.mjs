@@ -223,6 +223,7 @@ function leggiStdin() {
 function uso() {
   console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
+  console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
 
 export async function main(argvIn) {
