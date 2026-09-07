@@ -11,6 +11,11 @@
 const { BrowserWindow, nativeTheme } = require('electron');
 const { hideForTests } = require('./test-window-mode');
 
+// Larghezza massima del riquadro. Abbondante di proposito: un titolo normale ci
+// sta su una riga sola e il riquadro resta piccolo; oltre, va a capo invece di
+// crescere fuori dallo schermo.
+const MAX_LARGHEZZA_TIP = 420;
+
 let tipWin = null;
 let tipReady = false;
 let pendingShow = null;
