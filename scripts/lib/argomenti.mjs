@@ -235,5 +235,21 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) 
       i += 1; // il valore è suo: non lo si esamina come argomento a sé
     }
   }
+  // Dove non esiste nessuna parola libera, una parola nuda è un'opzione a cui
+  // sono stati dimenticati i trattini: `print` invece di `--print` rigenerava
+  // la chiave dei feedback, e il giro «a vuoto» scriveva davvero (#565).
+  if (senzaParoleLibere) {
+    for (let i = 0; i < lista.length; i += 1) {
+      const arg = lista[i];
+      if (sembraOpzione(arg)) {
+        if (vuole.has(normalizza(arg)) && !arg.includes('=')) i += 1; // il valore è suo
+        continue;
+      }
+      const vicina = [...ammesse].find((o) => o.replace(/^--/, '') === arg.toLowerCase());
+      return vicina
+        ? `«${arg}» è l'opzione ${vicina} senza i trattini davanti — non ho toccato niente.`
+        : `«${arg}» non è un'opzione né un valore — non ho toccato niente. Qui vanno solo: ${[...ammesse].join(' ')}`;
+    }
+  }
   return null;
 }
