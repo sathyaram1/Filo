@@ -56,6 +56,22 @@ silenzio, su una segnalazione che nessuno aveva scelto (#509).
   vicino, altrimenti il controllo che resta. `event.detail === 0` distingue
   Invio/Barra dal clic: col mouse il fuoco non si sposta, o comparirebbe un
   anello di fuoco sulla riga vicina a ogni clic.
+- **La condizione per rimettere il fuoco è "il bottone è ancora PREMIBILE", non
+  "il bottone è ancora nella pagina".** Con le due protezioni insieme il
+  bottone premuto ha due destini diversi: se la lista si ricompone sparisce, se
+  la lista sta ferma sotto il puntatore resta a schermo disabilitato. Un
+  controllo `document.contains(btn)` copre solo il primo, e chi tiene la mano
+  ferma sul mouse mentre usa la tastiera resta senza fuoco: proprio il caso di
+  partenza. Anche l'indice da cui ripartire va contato sulle righe VIVE (né
+  tolte né nascoste dal filtro), o con righe barrate ancora a schermo punta al
+  posto sbagliato. E nel ramo d'errore, dove la riga resta viva, il fuoco torna
+  sul suo stesso bottone.
+- **Ferma è la LISTA, non i controlli intorno.** Il tasto che svuota, il campo
+  di ricerca, i conteggi: quelli parlano dei dati veri, subito, anche mentre a
+  schermo restano righe barrate. Nella cronologia appunti, tolte a mano tutte le
+  voci senza uscire dalla lista, «Svuota cronologia» restava a schermo e
+  raggiunto col tabulatore chiedeva conferma di far sparire zero voci. Le righe
+  aspettano; le decisioni no.
 - **L'aggiornamento ottimistico non è il colpevole; il ridisegno sì.** Scrivere
   subito nel modello va benissimo: quello che non si può fare è ricostruire
   l'elenco mentre la mano dell'utente è ancora lì. Serve anche nel ramo
