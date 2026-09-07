@@ -3507,16 +3507,22 @@
 
   function stRenderLoop(d) {
     const loop = d.loop;
-    const fette = loop.slices.map((s, i) => ({
+    // Il colore dice QUANTE critiche, quindi si prende dal numero di giri e non
+    // dalla posizione della fetta: indicizzando sulla posizione, «2 critiche»
+    // usciva verde (il colore di «passata subito») ogni volta che i gruppi più
+    // bassi erano vuoti, e la scala si leggeva al contrario.
+    const fette = loop.slices.map((s) => ({
       key: `loop-${s.loops}`,
       label: s.label,
       count: s.count,
-      color: ST_LOOP_COLORS[Math.min(i, ST_LOOP_COLORS.length - 1)],
+      ids: s.ids || [],
+      color: ST_LOOP_COLORS[Math.min(s.loops, ST_LOOP_COLORS.length - 1)],
     }));
     if (loop.nonPassati) {
       fette.push({
         key: 'fermati', label: 'Fermati (mai passati)', count: loop.nonPassati,
         color: ST_STOPPED_COLOR,
+        ids: loop.nonPassatiIds || [],
         hint: 'Lavori con almeno una critica che non hanno ancora passato la verifica: un numero di giri non ce l\'hanno.',
       });
     }
@@ -3535,8 +3541,33 @@
 
     const avg = $st('mgStLoopAvg');
     const empty = $st('mgStLoopEmpty');
+    const pies = $st('mgStPies');
     const vuoto = loop.conVerifica === 0;
     if (empty) empty.hidden = !vuoto;
+    // Due torte vuote sono un rettangolo bianco alto un terzo di schermo, con
+    // la spiegazione staccata sotto: quando non c'è niente da disegnare le
+    // torte si tolgono e resta la frase, attaccata al titolo che la riguarda.
+    if (pies) pies.hidden = vuoto;
+    // Nessuna critica non è «nessun dato»: la seconda torta resta senza fette
+    // anche quando la prima è piena, e senza una riga sarebbe un quadrato muto.
+    const outcomeEmpty = $st('mgStOutcomeEmpty');
+    const outcomePie = $st('mgStOutcomePie');
+    const senzaCritiche = !vuoto && loop.critiche === 0;
+    if (outcomeEmpty) outcomeEmpty.hidden = !senzaCritiche;
+    if (outcomePie) outcomePie.classList.toggle('mg-st-pie--vuota', senzaCritiche);
+    // Le segnalazioni che questo computer non sa decifrare non hanno «zero
+    // giri»: hanno giri illeggibili. Dirlo qui evita che la torta si legga come
+    // «in questa finestra nessuno ha lavorato».
+    const nota = $st('mgStLoopUnreadable');
+    if (nota) {
+      const n = loop.nonLeggibili || 0;
+      nota.hidden = !n;
+      if (n) {
+        nota.textContent = n === 1
+          ? '1 segnalazione di questa finestra viaggia cifrata e questo computer non la sa leggere: non è in questi conti.'
+          : `${stFmtInt(n)} segnalazioni di questa finestra viaggiano cifrate e questo computer non le sa leggere: non sono in questi conti.`;
+      }
+    }
     if (avg) {
       avg.hidden = vuoto;
       if (!vuoto) {
