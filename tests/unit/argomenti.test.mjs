@@ -179,3 +179,13 @@ test("l'opzione con la barra trasformata in percorso dalla conchiglia viene rico
   // Un percorso vero non viene scambiato per un'opzione.
   assert.equal(controllaArgomenti(['t', 'C:/Users/x/appunti.md'], FEEDBACK), null);
 });
+
+test("dove non vanno parole libere, una parola nuda è un'opzione senza trattini", () => {
+  const SOLO_PRINT = { opzioni: ['--print'], senzaParoleLibere: true };
+  assert.match(controllaArgomenti(['print'], SOLO_PRINT), /senza i trattini davanti/);
+  assert.match(controllaArgomenti(['pippo'], SOLO_PRINT), /non è un'opzione né un valore/);
+  assert.equal(controllaArgomenti(['--print'], SOLO_PRINT), null);
+  assert.equal(controllaArgomenti([], SOLO_PRINT), null);
+  // Dove le parole libere servono (titolo e testo di un feedback) non cambia niente.
+  assert.equal(controllaArgomenti(['titolo', 'testo', '--dry-run'], FEEDBACK), null);
+});

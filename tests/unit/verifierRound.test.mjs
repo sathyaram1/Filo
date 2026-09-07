@@ -302,3 +302,19 @@ ${davanti}[2] il pulsante non salva`;
   // In mezzo a una frase le parentesi restano testo.
   assert.equal(R.unparsedLevelLines('ho ri-provato la porta [2] del giro scorso e regge').length, 0);
 });
+
+// Stessa famiglia: il lettore riconosce il livello solo fra parentesi quadre e
+// in cifre, e ogni altra forma finiva nel riassunto — cioè una bocciatura
+// diventava una promozione (feedback #565).
+test('un livello scritto in una parentesi qualunque, o a parole, è respinto', () => {
+  for (const forma of ['(2) rotto', '[[2]] rotto', '[2) rotto', '{2} rotto', '[due] rotto', '[2.5] rotto', '[2 grave] rotto', '[livello 2] rotto']) {
+    const testo = `Provato tutto, il resto regge bene.
+${forma}`;
+    assert.equal(R.unparsedLevelLines(testo).length, 1, `«${forma}» deve essere respinto`);
+    assert.equal(R.parseFindings(testo).findings.length, 0);
+  }
+  // Il testo normale del riassunto non ne risente.
+  for (const buona of ['Provato tutto (anche il tema scuro) e regge.', '1) primo punto', 'ho ri-provato la porta [2] del giro scorso']) {
+    assert.equal(R.unparsedLevelLines(buona).length, 0, `«${buona}» è testo, non un livello`);
+  }
+});
