@@ -683,8 +683,16 @@ test('CLI #565: un esito senza motivo non si registra (e «fail» da sola non pr
     for (const parola of ['fail', 'pass', 'migliorabile']) {
       const r = lancia(['--record-verifier', 'ID1', parola]);
       assert.equal(r.status, 1, `«${parola}» da sola deve fermare`);
-      assert.match(String(r.stderr), /non è una critica/, `«${parola}»: va detto perché`);
+      assert.match(String(r.stderr), /non è più un verdetto/, `«${parola}»: va detto perché`);
       nienteScritto(parola);
+      // E soprattutto col motivo scritto dopo: è il caso in cui chi scrive è
+      // SICURO di aver bocciato, e prima la parola veniva inghiottita, la
+      // critica arrivava senza rilievi e l'esito era «superata» (#565).
+      const conMotivo = lancia(['--record-verifier', 'ID1', parola,
+        'Il pulsante Salva non salva col titolo vuoto: aperta la pagina, lasciato vuoto il titolo, premuto Salva, e non succede niente.']);
+      assert.equal(conMotivo.status, 1, `«${parola}» col motivo dopo deve fermare`);
+      assert.match(String(conMotivo.stderr), /non è più un verdetto/);
+      nienteScritto(`${parola} col motivo`);
     }
     // L'identificativo e basta: la critica è vuota, e vuota vuol dire pass.
     const nudo = lancia(['--record-verifier', 'ID1']);
