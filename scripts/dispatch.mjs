@@ -1169,6 +1169,8 @@ export function usageText() {
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
     '  --record-verifier <id> "<critica>" [--ticket <b>]   una riga per rilievo,',
     '                         col livello davanti ([2] …; [1?] = chiede una decisione);',
+    '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
+    '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
     '  --record-fixed    <id> ["report"] [--frase "…"] [--ticket <b>]',
     '  --record-secaudit <id> <pass|fail> [--ticket <b>]',

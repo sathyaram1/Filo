@@ -32,6 +32,8 @@
 //     Lo lancia l'istanza che ha verificato. Formato: `[2] testo`, `[1?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
 //     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
+//     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
+//     nella riga: nel riassunto il livello si cita a parole («il livello 2»).
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
