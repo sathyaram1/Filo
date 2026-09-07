@@ -631,6 +631,17 @@ if (isMain) {
       console.error(`Argomento non capito: ${opzione} — non ho toccato niente. Qui non ci sono opzioni: il testo va fra virgolette, tutto in un pezzo solo.`);
       process.exit(1);
     }
+    // IL TESTO IN UN PEZZO SOLO, e non per pignoleria: unendo i pezzi con uno
+    // spazio, un rilievo che sta nel secondo pezzo non apre più una riga —
+    // smette di essere un rilievo, e una BOCCIATURA diventa una promozione,
+    // col ramo che risulta pubblicabile. Basta una virgoletta dimenticata
+    // (feedback #565).
+    if (rest.length > 1) {
+      console.error(`Ho ricevuto ${rest.length} pezzi invece di uno: non ho toccato niente.`);
+      console.error('Il testo va fra virgolette, tutto in un pezzo solo — probabilmente ne manca una.');
+      console.error(`Primo pezzo: "${String(rest[0]).slice(0, 60)}…" · secondo: "${String(rest[1]).slice(0, 60)}…"`);
+      process.exit(1);
+    }
   }
 
   if (cmd === 'critica') {
