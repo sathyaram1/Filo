@@ -1981,7 +1981,16 @@
   });
 
   // ── Rendering pannello centrale ───────────────────────────────────────────
-  function openDetail(id) {
+  // `opts.ridisegno` = questo non è l'owner che apre una segnalazione, è il
+  // pannello che si ridipinge da solo (un aggiornamento arrivato da remoto).
+  // La differenza conta per la frase: una sezione che l'owner ha aperto non
+  // deve richiudersi da sé mentre lui la sta guardando.
+  function openDetail(id, opts) {
+    const ridisegno = !!(opts && opts.ridisegno && id === selectedId);
+    // Quello che c'è nella casella della frase e non è ancora partito parte
+    // ADESSO, finché `selectedId` è ancora quello di prima: un istante dopo
+    // andrebbe a finire sul feedback sbagliato, o in nessun posto.
+    if (!ridisegno) salvaFraseSubito({ muto: true });
     selectedId = id;
 
     // Aggiorna selezione visiva nella lista
