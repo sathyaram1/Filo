@@ -446,11 +446,14 @@ function creaBlocco(host) {
     annoda: function (seg, ms) {
       seg.el.classList.remove('vivo');
       seg.trama.remove();
-      if (seg.dati.tipo === 'azione' || opt.filo !== 'verticale') {
-        seg.testa.querySelector('.seg-ico').style.display = '';
-        seg.testa.querySelector('.seg-ico').className = 'seg-ico';
-        seg.testa.querySelector('.seg-ico').textContent = seg.dati.icona || '';
-        if (!seg.dati.icona) seg.testa.querySelector('.seg-ico').style.width = '0';
+      // Col filo verticale l'icona non serve: il nodo È il segno, e il titolo
+      // dice già cos'era. Due marcatori sulla stessa riga sono uno di troppo.
+      var ico = seg.testa.querySelector('.seg-ico');
+      if (opt.filo === 'verticale') { ico.className = 'seg-ico'; ico.textContent = ''; ico.style.width = '0'; }
+      else {
+        ico.className = 'seg-ico'; ico.style.display = '';
+        ico.textContent = seg.dati.icona || '·';
+        ico.style.width = '';
       }
       seg.eti.classList.add('giu');
       setTimeout(function () {
