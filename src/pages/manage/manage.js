@@ -3561,7 +3561,7 @@
     // ne restano fuori, il numero di quelle che mancano è scritto.
     const resto = list.length - mostrate.length;
     const coda = resto
-      ? `<li class="mg-st-item mg-st-item--nota"><span class="sn-muted">e altre ${stFmtInt(resto)}: aprile dalla colonna di sinistra.</span></li>`
+      ? `<li class="mg-st-item mg-st-item--nota"><span class="sn-muted">e altre ${stFmtInt(resto)}: aprirle dalla colonna di sinistra.</span></li>`
       : '';
     return `<li class="mg-st-items"><ul class="mg-st-items-list">${righe}${coda}</ul></li>`;
   }
