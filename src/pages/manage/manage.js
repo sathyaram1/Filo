@@ -4009,7 +4009,10 @@
 
     // Una delle tre tessere.
     const tile = target.closest('.mg-st-tile');
-    if (tile) {
+    // Una tessera spenta (i feedback non sono arrivati) non ha niente da
+    // aprire e niente da copiare: offrire «Apri il dettaglio» prometterebbe
+    // una cosa che non succede.
+    if (tile && !tile.disabled) {
       const stat = tile.dataset.stat;
       const aperto = stOpenTile === stat;
       const che = { ricevuti: 'categoria', lavorati: 'fase', prober: 'ruolo' }[stat] || 'dettaglio';
@@ -4030,8 +4033,9 @@
     const fetta = target.closest('svg [data-group]');
     if (fetta) {
       const legenda = stPanel.querySelector(`.mg-st-legend li[data-group="${CSS.escape(fetta.dataset.group)}"]`);
+      // Senza la gemella si prosegue: sotto c'è la risposta della torta intera,
+      // che è comunque meglio di un tasto destro che non fa niente.
       if (legenda) return stVociGruppo(legenda);
-      return [];
     }
 
     // Una riga di ripartizione o una voce di legenda. Anche una voce che non si
