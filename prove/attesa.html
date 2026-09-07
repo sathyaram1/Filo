@@ -511,6 +511,11 @@ document.getElementById('tema').addEventListener('click', function (e) {
   document.body.classList.toggle('scuro');
   e.target.textContent = document.body.classList.contains('scuro') ? '◑ chiaro' : '◐ scuro';
 });
+document.getElementById('verbo').addEventListener('click', function (e) {
+  verboIdx = (verboIdx + 1) % VERBI.length;
+  e.target.textContent = 'parole: «' + V() + '»';
+  avvia();
+});
 document.getElementById('lento').addEventListener('click', function (e) {
   allunga = !allunga;
   e.target.textContent = allunga ? 'lavoro breve' : 'lavoro più lungo';
