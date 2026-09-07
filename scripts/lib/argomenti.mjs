@@ -189,7 +189,9 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [] } = {}) 
     // («C:/Program Files/Git/dry-run») prima di consegnarlo: lì la barra non
     // si vede più, e la modalità che non spedisce non si accendeva mentre il
     // feedback partiva davvero (feedback #565). Si guarda l'ultimo pezzo.
-    if (arg.includes('/') && ammesse.has(`--${arg.split('/').pop().toLowerCase()}`)) {
+    // Solo un PERCORSO ASSOLUTO: un titolo che finisce per «pages/allega» è
+    // testo legittimo, e rifiutarlo manda a riscrivere una riga giusta.
+    if (/^([A-Za-z]:)?\//.test(arg) && arg.includes('/') && ammesse.has(`--${arg.split('/').pop().toLowerCase()}`)) {
       const nome = arg.split('/').pop().toLowerCase();
       return `«${arg}» è la tua opzione /${nome} trasformata in percorso dalla conchiglia — non ho toccato niente. Scrivila --${nome}.`;
     }
