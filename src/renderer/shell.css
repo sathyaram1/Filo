@@ -196,7 +196,8 @@ html[data-chrome-compact="1"] .addr {
      (1 contro 1.8 dell'attiva) senza mai guardare il titolo: con la barra
      mezza vuota una scheda restava tagliata a "Cro…" mentre a destra
      avanzavano centinaia di pixel (#429). */
-  flex: 1 1 260px;
+  width: 260px;
+  flex: 0 1 auto;
   min-width: 40px;
   max-width: 260px;
   padding: 0 8px 0 10px;
