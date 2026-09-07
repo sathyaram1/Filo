@@ -20,6 +20,9 @@
       fixes: [
         'Il nome della scheda si legge per intero. Finché nella barra c\'è posto le schede restano larghe, invece di tagliare il titolo dopo tre lettere.',
         'La scheda che stai guardando prende il colore della pagina che ha aperto, e fra le due non si vede più lo stacco. Sulle pagine di Filo restava grigia.',
+        'La scheda continua a seguire la pagina anche quando è la pagina a cambiare colore: il tema scuro che si accende da solo la sera, l\'interruttore chiaro/scuro di un sito, un\'intestazione che arriva tardi. Prima restava del colore vecchio finché non scorrevi.',
+        'Col tema scuro il nome delle schede aperte dietro si leggeva a malapena: spariva dentro il colore della scheda stessa.',
+        'Con dieci schede aperte del nome si legge di più: la crocetta per chiudere, che comunque non era disegnata, smette di tenersi il posto e lo lascia al titolo.',
       ],
     },
     {
