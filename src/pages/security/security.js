@@ -445,8 +445,7 @@
   // nemmeno quello c'è più sul campo di ricerca: qualcosa sotto le dita resta
   // sempre.
   function fuocoDopoRimozione(indice) {
-    const righe = [...$('sec-clip-list').querySelectorAll('.sn-clip-item')]
-      .filter((r) => r.style.display !== 'none' && !r.classList.contains('sn-clip-gone'));
+    const righe = righeVive();
     if (righe.length) {
       const i = Math.min(Math.max(indice, 0), righe.length - 1);
       const b = righe[i].querySelector('.sn-clip-remove');
