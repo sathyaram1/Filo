@@ -4041,7 +4041,8 @@
     // lista dei feedback quando un giro di aggiornamento va male.
     const registroPronto = stWorkerLogVisto;
     stSetTile('mgStTileProber', registroPronto ? stFmtInt(data.prober) : '—',
-      registroPronto ? `${stFmtInt(data.esecuzioni)} esecuzioni in tutto`
+      registroPronto
+        ? `${stFmtInt(data.esecuzioni)} ${data.esecuzioni === 1 ? 'esecuzione' : 'esecuzioni'} in tutto`
         : stWorkerLogError ? `registro ${stWorkerLogError}` : 'sto leggendo il registro…');
     // Un numero che non si conosce non si apre su niente: offrire il dettaglio
     // prometterebbe una ripartizione che non c'è.
