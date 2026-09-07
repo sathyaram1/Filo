@@ -3043,8 +3043,19 @@
   // mostrare i numeri di prima dopo un caricamento andato male. Chi cambia i
   // feedback chiama QUESTA, non `renderList` da sola.
   function dataChanged() {
+    if (!statsAperte()) return;
+    stRender();
+    // Il registro delle esecuzioni è la SECONDA sorgente della stessa riga di
+    // tre numeri, e ha un orologio suo: si rilegge insieme ai feedback, non
+    // solo all'apertura. Senza, «Prober lanciati» restava fermo a quando avevi
+    // aperto la scheda mentre i due numeri accanto si muovevano, e un
+    // caricamento fallito del registro non si ritentava mai.
+    stRefreshWorkerLog();
+  }
+
+  function statsAperte() {
     const p = document.getElementById('panel-fbstats');
-    if (p && p.classList.contains('mg-panel--active')) stRender();
+    return !!(p && p.classList.contains('mg-panel--active'));
   }
 
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
