@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prove — l'attesa in chat</title>
+<style>
+:root {
+  --dash-paper: #f2ece0;
+  --dash-card: #f7f2e8;
+  --dash-ink: #221e19;
+  --dash-ink-soft: #5b554b;
+  --dash-ink-mute: #8c8273;
+  --dash-line: rgba(34, 30, 25, 0.10);
+  --dash-line-strong: rgba(34, 30, 25, 0.18);
+  --dash-accent: #c0552b;
+  --dash-accent-2: #e8a06a;
+  --dash-radius: 18px;
+}
+body.scuro {
+  --dash-paper: #1c1916;
+  --dash-card: #25211c;
+  --dash-ink: #ece6da;
+  --dash-ink-soft: #b8b0a1;
+  --dash-ink-mute: #7e7567;
+  --dash-line: rgba(236, 230, 218, 0.10);
+  --dash-line-strong: rgba(236, 230, 218, 0.20);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--dash-paper);
+  color: var(--dash-ink);
+  font: 14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+  padding: 22px 26px 60px;
+}
+h1 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+.sub { color: var(--dash-ink-mute); font-size: 12.5px; margin: 0 0 4px; }
+
+.barra {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--dash-paper);
+  padding: 10px 0 12px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--dash-line);
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.barra button, .barra label {
+  font: inherit; font-size: 12.5px;
+  border: 1px solid var(--dash-line-strong); background: transparent;
+  color: var(--dash-ink); border-radius: 20px; padding: 5px 13px; cursor: pointer;
+}
+.barra button:hover { background: var(--dash-ink); color: var(--dash-paper); }
+.barra input[type=range] { vertical-align: middle; width: 90px; accent-color: var(--dash-accent); }
+
+.griglia { display: flex; flex-direction: column; gap: 14px; max-width: 780px; }
+
+.prova {
+  background: var(--dash-card);
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  padding: 15px 18px 17px;
+}
+.prova > h2 {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--dash-ink-mute); margin: 0 0 3px;
+}
+.prova > .nota { font-size: 12px; color: var(--dash-ink-mute); margin: 0 0 13px; }
+.palco { min-height: 44px; display: flex; flex-direction: column; justify-content: center; }
+
+.att { color: var(--dash-ink-mute); font-size: 13px; line-height: 1.45; display: flex; flex-direction: column; gap: 3px; }
+.att-testa { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; user-select: none; }
+.att-testa:hover { color: var(--dash-ink-soft); }
+.att-eti { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-corpo {
+  display: none; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto;
+  padding: 4px 10px 4px 12px; margin: 4px 0 2px 5px;
+  border-left: 2px solid var(--dash-line-strong); font-size: 12.5px; white-space: pre-wrap;
+}
+.att.aperto .att-corpo { display: flex; }
+.att-riga { display: flex; gap: 8px; align-items: baseline; }
+.tempo { color: var(--dash-ink-mute); opacity: 0; transition: opacity 400ms ease; font-variant-numeric: tabular-nums; flex: none; }
+.tempo.vis { opacity: 0.75; }
+
+.rotella {
+  width: 12px; height: 12px; flex: none; border-radius: 50%;
+  border: 2px solid currentColor; border-top-color: transparent; opacity: 0.7;
+  animation: gira 0.9s linear infinite;
+}
+@keyframes gira { to { transform: rotate(360deg); } }
+
+.eti-fade { transition: opacity 180ms ease; }
+.eti-fade.giu { opacity: 0; }
+
+.texture {
+  height: 15px; overflow: hidden; margin-left: 30px;
+  font-size: 10.5px; line-height: 15px; color: var(--dash-ink-mute); opacity: 0.45;
+  white-space: nowrap; direction: rtl; text-align: left;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 72%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 72%, transparent);
+}
+
+svg.filo { display: block; overflow: visible; }
+svg.filo path { fill: none; stroke: currentColor; stroke-linecap: round; }
+.nodo-hint {
+  position: fixed; z-index: 20; pointer-events: none;
+  background: var(--dash-ink); color: var(--dash-paper);
+  font-size: 11.5px; padding: 4px 9px; border-radius: 7px;
+  transform: translate(-50%, -125%); opacity: 0; transition: opacity 140ms ease;
+  white-space: nowrap;
+}
+.nodo-hint.vis { opacity: 1; }
+.bolla {
+  align-self: flex-start; background: var(--dash-paper); border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius); padding: 9px 13px; color: var(--dash-ink);
+  margin-top: 7px; max-width: 92%; font-size: 13.5px; opacity: 0; transition: opacity 300ms ease;
+}
+.bolla.vis { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>L'attesa in chat — sei varianti</h1>
+<p class="sub">Stesso copione per tutte: attesa, ragionamento a raffiche, tre passi con strumenti, risposta. Clicca una riga per aprire la cronologia.</p>
+
+<div class="barra">
+  <button id="rigioca">↺ rigioca</button>
+  <label>velocità <input type="range" id="vel" min="0.4" max="3" step="0.1" value="1"></label>
+  <button id="tema">◐ scuro</button>
+  <button id="lento">lavoro più lungo</button>
+</div>
+
+<div class="griglia" id="griglia"></div>
+<div class="nodo-hint" id="hint"></div>
+
+<script>
+var RAGIONAMENTI = [
+  "L'utente chiede gli orari dei treni per Bologna di domani mattina. Non ho un orario in memoria, quindi devo cercarlo. Comincio dal sito ufficiale e poi confronto con un secondo, perché i cambi stagionali sono spesso disallineati.",
+  "Il primo risultato dà tre partenze fra le 7 e le 9. Manca il prezzo, che l'utente non ha chiesto ma vorrà sapere subito dopo. Provo a recuperarlo dalla stessa pagina prima di rispondere.",
+  "Ho tutto: tre treni, due con cambio e uno diretto. Il diretto costa di più ma arriva prima. Metto il diretto per primo e cito gli altri due sotto, senza tabelle: sono tre righe.",
+];
+var COPIONE = [
+  { t: 900,   tipo: 'ragiona', i: 0 },
+  { t: 5200,  tipo: 'agisce',  testo: 'Cerco sul web…', icona: '🔎' },
+  { t: 7000,  tipo: 'passo',   testo: 'Cercato sul web · orari treni Bologna', icona: '🔎' },
+  { t: 7200,  tipo: 'ragiona', i: 1 },
+  { t: 10400, tipo: 'agisce',  testo: 'Leggo la pagina…', icona: '📄' },
+  { t: 12200, tipo: 'passo',   testo: 'Letta una pagina · orari ufficiali', icona: '📄' },
+  { t: 12500, tipo: 'ragiona', i: 2 },
+  { t: 15600, tipo: 'agisce',  testo: 'Controllo i prezzi…', icona: '💶' },
+  { t: 17400, tipo: 'passo',   testo: 'Confrontati due siti · prezzi', icona: '💶' },
+  { t: 17800, tipo: 'scrive',  testo: 'Scrivo la risposta…' },
+  { t: 19600, tipo: 'fine',    testo: 'Ha cercato sul web, letto una pagina e confrontato i prezzi' },
+];
+
+var ascoltatori = [];
+var vel = 1, allunga = false, t0 = 0, timers = [], batt = null;
+
+function pulisci() { timers.forEach(clearTimeout); timers = []; if (batt) clearInterval(batt); }
+function poi(ms, fn) { timers.push(setTimeout(fn, ms / vel)); }
+
+// I token arrivano a raffiche disuguali: è questo che fa "scattare" la riga.
+function streamRagionamento(indice, durataMs, emetti) {
+  var testo = RAGIONAMENTI[indice];
+  var pos = 0, quando = 0;
+  while (pos < testo.length) {
+    var n = 2 + Math.floor(Math.random() * 8);
+    var pezzo = testo.slice(pos, pos + n);
+    pos += n;
+    (function (p, q) { poi(q, function () { emetti(p); }); })(pezzo, quando);
+    quando += (durataMs / testo.length) * n * (0.35 + Math.random() * 1.6);
+  }
+}
+
+function avvia() {
+  pulisci();
+  ascoltatori.forEach(function (a) { a.reset(); });
+  t0 = Date.now();
+  var f = allunga ? 2.2 : 1;
+  COPIONE.forEach(function (ev, k) {
+    var quando = ev.t * f;
+    poi(quando, function () {
+      if (ev.tipo === 'ragiona') {
+        ascoltatori.forEach(function (a) { a.nuovoTurno(); });
+        var prossimo = COPIONE[k + 1] ? COPIONE[k + 1].t * f : quando + 3000;
+        streamRagionamento(ev.i, prossimo - quando - 250, function (p) {
+          ascoltatori.forEach(function (a) { a.ragiona(p); });
+        });
+      } else {
+        ascoltatori.forEach(function (a) { if (a[ev.tipo]) a[ev.tipo](ev); });
+      }
+    });
+  });
+  batt = setInterval(function () {
+    var ms = Date.now() - t0;
+    ascoltatori.forEach(function (a) { if (a.batti) a.batti(ms); });
+  }, 250);
+}
+
+var frasiChiuse = function (t) {
+  var m = String(t || '').replace(/\s+/g, ' ').trim().match(/[^.!?…]+[.!?…]/g);
+  return m || [];
+};
+var ultimaFrase = function (t) {
+  var p = String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…])\s+/);
+  return p[p.length - 1] || '';
+};
+var durata = function (ms) {
+  var s = Math.round(ms / 1000);
+  return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min ' + (s % 60) + ' s';
+};
+function el(tag, cls, testo) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (testo != null) e.textContent = testo;
+  return e;
+}
+function riquadro(titolo, nota) {
+  var box = el('div', 'prova');
+  box.append(el('h2', null, titolo), el('p', 'nota', nota));
+  var palco = el('div', 'palco');
+  box.append(palco);
+  document.getElementById('griglia').append(box);
+  return palco;
+}
+function scheletro(palco) {
+  var att = el('div', 'att');
+  var testa = el('div', 'att-testa');
+  var corpo = el('div', 'att-corpo');
+  att.append(testa, corpo);
+  var bolla = el('div', 'bolla', 'Domani mattina hai tre treni per Bologna: il diretto delle 7:42 (1 h 05, 34 €) e due con cambio a Firenze, alle 7:10 e alle 8:25.');
+  palco.append(att, bolla);
+  testa.addEventListener('click', function () { att.classList.toggle('aperto'); });
+  return { att: att, testa: testa, corpo: corpo, bolla: bolla };
+}
+var hint = document.getElementById('hint');
+function legaHint(nodo, testo) {
+  nodo.addEventListener('mouseenter', function () {
+    hint.textContent = testo;
+    var r = nodo.getBoundingClientRect();
+    hint.style.left = (r.left + r.width / 2) + 'px';
+    hint.style.top = r.top + 'px';
+    hint.classList.add('vis');
+  });
+  nodo.addEventListener('mouseleave', function () { hint.classList.remove('vis'); });
+}
+function dissolvenza(eti) {
+  return function (t) {
+    if (eti.textContent === t) return;
+    eti.classList.add('giu');
+    setTimeout(function () { eti.textContent = t; eti.classList.remove('giu'); }, 180);
+  };
+}
+function rigaPasso(corpo, ev) {
+  var r = el('div', 'att-riga');
+  r.append(el('span', null, ev.icona), el('span', null, ev.testo));
+  corpo.append(r);
+  corpo.scrollTop = corpo.scrollHeight;
+}
+
+/* Il filo: un'onda che scorre. Ampiezza e velocità dicono quanto sta tirando. */
+function svgFilo(L, H, spessore) {
+  var ns = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'filo');
+  svg.setAttribute('width', L); svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', '0 0 ' + L + ' ' + H);
+  var p = document.createElementNS(ns, 'path');
+  p.setAttribute('stroke-width', spessore);
+  svg.append(p);
+  return { svg: svg, p: p, ns: ns };
+}
+function ondaFilo(p, L, H, onde) {
+  var s = { fase: 0, amp: 1.6, ampObiettivo: 1.6, vel: 0.055 };
+  function passo() {
+    s.amp += (s.ampObiettivo - s.amp) * 0.06;
+    s.fase += s.vel;
+    var y0 = H / 2, d = '', n = Math.max(14, Math.round(L / 3));
+    for (var i = 0; i <= n; i++) {
+      var x = (i / n) * L;
+      var bordo = Math.sin((i / n) * Math.PI);
+      var y = y0 + Math.sin((x / L) * Math.PI * 2 * onde + s.fase) * s.amp * bordo;
+      d += (i ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(2);
+    }
+    p.setAttribute('d', d);
+    requestAnimationFrame(passo);
+  }
+  requestAnimationFrame(passo);
+  return s;
+}
+
+/* ==========  1 — com'è adesso  ========== */
+(function () {
+  var palco = riquadro('1 · com’è adesso', 'Rotella e ultima frase mentre cresce. Guarda gli scatti: la riga si allunga a strappi e riparte da capo a ogni frase.');
+  var s = scheletro(palco);
+  var rot = el('span', 'rotella'), eti = el('span', 'att-eti');
+  s.testa.append(rot, eti);
+  var acc = '', rag = null;
+  ascoltatori.push({
+    reset: function () { acc = ''; rag = null; s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…'; rot.style.display = ''; s.bolla.classList.remove('vis'); },
+    nuovoTurno: function () { acc = ''; rag = el('div'); s.corpo.append(rag); },
+    ragiona: function (p) { acc += p; if (rag) rag.textContent = acc; eti.textContent = 'Sta ragionando · ' + ultimaFrase(acc); s.corpo.scrollTop = s.corpo.scrollHeight; },
+    agisce: function (ev) { eti.textContent = ev.testo; },
+    passo: function (ev) { rigaPasso(s.corpo, ev); },
+    scrive: function (ev) { eti.textContent = ev.testo; },
+    fine: function (ev) { rot.style.display = 'none'; eti.textContent = ev.testo + ' · ' + durata(Date.now() - t0); s.bolla.classList.add('vis'); },
+  });
+})();
+
+/* ==========  2 — frase intera  ========== */
+(function () {
+  var palco = riquadro('2 · frase intera (correzione minima)', 'Stessa struttura, ma la riga cambia solo a frase finita, con dissolvenza. Nessuno scatto, nessuna parola tagliata, costo zero.');
+  var s = scheletro(palco);
+  var rot = el('span', 'rotella'), eti = el('span', 'att-eti eti-fade');
+  s.testa.append(rot, eti);
+  var cambia = dissolvenza(eti);
+  var acc = '', rag = null, viste = 0;
+  ascoltatori.push({
+    reset: function () { acc = ''; rag = null; viste = 0; s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…'; rot.style.display = ''; s.bolla.classList.remove('vis'); },
+    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
+    ragiona: function (p) {
+      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
+      var fr = frasiChiuse(acc);
+      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia('Sta ragionando…');
+    },
+    agisce: function (ev) { cambia(ev.testo); },
+    passo: function (ev) { rigaPasso(s.corpo, ev); },
+    scrive: function (ev) { cambia(ev.testo); },
+    fine: function (ev) { rot.style.display = 'none'; cambia(ev.testo + ' · ' + durata(Date.now() - t0)); s.bolla.classList.add('vis'); },
+  });
+})();
+
+/* ==========  3 — il filo al posto della rotella  ========== */
+(function () {
+  var palco = riquadro('3 · il filo al posto della rotella', 'Un filo teso che vibra: si agita mentre pensa, corre mentre agisce, si calma mentre scrive, si tende dritto quando ha finito.');
+  var s = scheletro(palco);
+  var f = svgFilo(24, 12, 1.6);
+  f.svg.style.flex = 'none'; f.svg.style.color = 'var(--dash-accent)';
+  var eti = el('span', 'att-eti eti-fade');
+  s.testa.append(f.svg, eti);
+  var onda = ondaFilo(f.p, 24, 12, 2);
+  var cambia = dissolvenza(eti);
+  var acc = '', rag = null, viste = 0;
+  ascoltatori.push({
+    reset: function () { acc = ''; rag = null; viste = 0; s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…'; onda.ampObiettivo = 1.1; onda.vel = 0.04; s.bolla.classList.remove('vis'); },
+    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
+    ragiona: function (p) {
+      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
+      onda.ampObiettivo = 2.7; onda.vel = 0.08;
+      var fr = frasiChiuse(acc);
+      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia('Sta ragionando…');
+    },
+    agisce: function (ev) { onda.ampObiettivo = 1.7; onda.vel = 0.15; cambia(ev.testo); },
+    passo: function (ev) { rigaPasso(s.corpo, ev); },
+    scrive: function (ev) { onda.ampObiettivo = 0.8; onda.vel = 0.045; cambia(ev.testo); },
+    fine: function (ev) { onda.ampObiettivo = 0; cambia(ev.testo + ' · ' + durata(Date.now() - t0)); s.bolla.classList.add('vis'); },
+  });
+})();
+
+/* ==========  4 — il filo con i nodi  ========== */
+(function () {
+  var palco = riquadro('4 · il filo con i nodi', 'Il filo corre sotto la riga e ogni passo compiuto lascia un nodo. Passa sopra un nodo per vedere cos’era. Il tempo compare solo se l’attesa si allunga.');
+  var s = scheletro(palco);
+  var eti = el('span', 'att-eti eti-fade'), tempo = el('span', 'tempo');
+  s.testa.append(eti, tempo);
+  var L = 430, H = 16;
+  var f = svgFilo(L, H, 1.6);
+  f.svg.style.color = 'var(--dash-accent)'; f.svg.style.maxWidth = '100%'; f.svg.style.marginTop = '2px';
+  s.att.insertBefore(f.svg, s.corpo);
+  var onda = ondaFilo(f.p, L, H, 9);
+  var cambia = dissolvenza(eti);
+  var acc = '', rag = null, viste = 0, nodi = 0, finito = false;
+  function aggiungiNodo(ev) {
+    nodi++;
+    var c = document.createElementNS(f.ns, 'circle');
+    c.setAttribute('cx', 30 + nodi * 66); c.setAttribute('cy', H / 2); c.setAttribute('r', 0);
+    c.setAttribute('fill', 'currentColor');
+    c.style.transition = 'r 340ms cubic-bezier(.3,1.7,.5,1)';
+    c.style.pointerEvents = 'all'; c.style.cursor = 'default';
+    f.svg.append(c);
+    requestAnimationFrame(function () { c.setAttribute('r', 3.2); });
+    legaHint(c, ev.icona + '  ' + ev.testo);
+  }
+  ascoltatori.push({
+    reset: function () {
+      acc = ''; rag = null; viste = 0; nodi = 0; finito = false;
+      s.corpo.textContent = ''; eti.textContent = 'Aspetto la risposta…';
+      tempo.classList.remove('vis'); tempo.textContent = '';
+      f.svg.querySelectorAll('circle').forEach(function (c) { c.remove(); });
+      onda.ampObiettivo = 1.3; onda.vel = 0.045; s.bolla.classList.remove('vis');
+    },
+    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
+    ragiona: function (p) {
+      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
+      onda.ampObiettivo = 3.6; onda.vel = 0.065;
+      var fr = frasiChiuse(acc);
+      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia('Sta ragionando…');
+    },
+    agisce: function (ev) { onda.ampObiettivo = 2.1; onda.vel = 0.14; cambia(ev.testo); },
+    passo: function (ev) { aggiungiNodo(ev); rigaPasso(s.corpo, ev); },
+    scrive: function (ev) { onda.ampObiettivo = 1; onda.vel = 0.04; cambia(ev.testo); },
+    batti: function (ms) { if (!finito && ms > 8000) { tempo.classList.add('vis'); tempo.textContent = durata(ms); } },
+    fine: function (ev) {
+      finito = true; onda.ampObiettivo = 0.3; onda.vel = 0.01;
+      tempo.classList.add('vis'); tempo.textContent = durata(Date.now() - t0);
+      cambia(ev.testo); s.bolla.classList.add('vis');
+    },
+  });
+})();
+
+/* ==========  5 — il ragionamento come tessitura  ========== */
+(function () {
+  var palco = riquadro('5 · il ragionamento come tessitura', 'La riga dice solo cosa sta facendo. Il ragionamento scorre sotto, piccolo e sfumato: non si legge, si intravede. È decorazione, e lo sembra.');
+  var s = scheletro(palco);
+  var f = svgFilo(24, 12, 1.6);
+  f.svg.style.flex = 'none'; f.svg.style.color = 'var(--dash-accent)';
+  var eti = el('span', 'att-eti eti-fade');
+  s.testa.append(f.svg, eti);
+  var tex = el('div', 'texture');
+  s.att.insertBefore(tex, s.corpo);
+  var onda = ondaFilo(f.p, 24, 12, 2);
+  var cambia = dissolvenza(eti);
+  var acc = '', rag = null;
+  ascoltatori.push({
+    reset: function () { acc = ''; rag = null; s.corpo.textContent = ''; tex.textContent = ''; tex.style.opacity = ''; eti.textContent = 'Aspetto la risposta…'; onda.ampObiettivo = 1.1; onda.vel = 0.04; s.bolla.classList.remove('vis'); },
+    nuovoTurno: function () { acc = ''; rag = el('div'); s.corpo.append(rag); },
+    ragiona: function (p) {
+      acc += p; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
+      onda.ampObiettivo = 2.7; onda.vel = 0.08;
+      cambia('Sta ragionando…');
+      tex.textContent = acc.replace(/\s+/g, ' ').slice(-70);
+    },
+    agisce: function (ev) { onda.ampObiettivo = 1.7; onda.vel = 0.15; cambia(ev.testo); tex.textContent = ''; },
+    passo: function (ev) { rigaPasso(s.corpo, ev); },
+    scrive: function (ev) { onda.ampObiettivo = 0.8; cambia(ev.testo); tex.textContent = ''; },
+    fine: function (ev) { onda.ampObiettivo = 0; tex.style.opacity = '0'; cambia(ev.testo + ' · ' + durata(Date.now() - t0)); s.bolla.classList.add('vis'); },
+  });
+})();
+
+/* ==========  6 — il gomitolo  ========== */
+(function () {
+  var palco = riquadro('6 · il gomitolo', 'Il filo si avvolge mentre lavora. Non promette una percentuale che non conosce: dice solo che sta ancora filando. A lavoro finito resta il gomitolo come segno.');
+  var s = scheletro(palco);
+  var ns = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'filo'); svg.setAttribute('width', 16); svg.setAttribute('height', 16);
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.style.flex = 'none'; svg.style.color = 'var(--dash-accent)';
+  var d = '';
+  for (var a = 0; a < Math.PI * 6.5; a += 0.1) {
+    var r = 0.5 + a * 0.32;
+    var x = 8 + Math.cos(a) * r, y = 8 + Math.sin(a) * r * 0.85;
+    d += (d ? 'L' : 'M') + x.toFixed(2) + ',' + y.toFixed(2);
+  }
+  var p = document.createElementNS(ns, 'path');
+  p.setAttribute('d', d); p.setAttribute('stroke-width', 1.15);
+  svg.append(p);
+  var eti = el('span', 'att-eti eti-fade'), tempo = el('span', 'tempo');
+  s.testa.append(svg, eti, tempo);
+  var len = 200;
+  try { len = p.getTotalLength(); } catch (e) {}
+  p.style.strokeDasharray = len;
+  p.style.strokeDashoffset = len;
+  var avvolto = 0, girando = false, finito = false;
+  function fila() {
+    if (!girando) return;
+    avvolto = (avvolto + len / 190) % (len * 1.3);
+    p.style.strokeDashoffset = Math.max(0, len - avvolto);
+    requestAnimationFrame(fila);
+  }
+  var cambia = dissolvenza(eti);
+  var acc = '', rag = null, viste = 0;
+  ascoltatori.push({
+    reset: function () {
+      acc = ''; rag = null; viste = 0; finito = false; s.corpo.textContent = '';
+      eti.textContent = 'Aspetto la risposta…'; tempo.classList.remove('vis'); tempo.textContent = '';
+      avvolto = 0; if (!girando) { girando = true; requestAnimationFrame(fila); }
+      s.bolla.classList.remove('vis');
+    },
+    nuovoTurno: function () { acc = ''; viste = 0; rag = el('div'); s.corpo.append(rag); },
+    ragiona: function (pz) {
+      acc += pz; if (rag) rag.textContent = acc; s.corpo.scrollTop = s.corpo.scrollHeight;
+      var fr = frasiChiuse(acc);
+      if (fr.length > viste) { viste = fr.length; cambia('Sta ragionando · ' + fr[fr.length - 1].trim()); }
+      else if (!viste) cambia('Sta ragionando…');
+    },
+    agisce: function (ev) { cambia(ev.testo); },
+    passo: function (ev) { rigaPasso(s.corpo, ev); },
+    scrive: function (ev) { cambia(ev.testo); },
+    batti: function (ms) { if (!finito && ms > 8000) { tempo.classList.add('vis'); tempo.textContent = durata(ms); } },
+    fine: function (ev) {
+      finito = true; girando = false; p.style.strokeDashoffset = 0;
+      tempo.classList.add('vis'); tempo.textContent = durata(Date.now() - t0);
+      cambia(ev.testo); s.bolla.classList.add('vis');
+    },
+  });
+})();
+
+document.getElementById('rigioca').addEventListener('click', avvia);
+document.getElementById('vel').addEventListener('input', function (e) { vel = Number(e.target.value); });
+document.getElementById('tema').addEventListener('click', function (e) {
+  document.body.classList.toggle('scuro');
+  e.target.textContent = document.body.classList.contains('scuro') ? '◑ chiaro' : '◐ scuro';
+});
+document.getElementById('lento').addEventListener('click', function (e) {
+  allunga = !allunga;
+  e.target.textContent = allunga ? 'lavoro breve' : 'lavoro più lungo';
+  avvia();
+});
+avvia();
+</script>
+</body>
+</html>
