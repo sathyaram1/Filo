@@ -51,6 +51,9 @@ html,body{background:transparent;overflow:hidden;height:100%;
   -webkit-box-orient:vertical;
   -webkit-line-clamp:6;
   overflow:hidden;
+  /* max-content + max-width = si stringe sul testo, ma non oltre il tetto.
+     Senza `width`, il box occuperebbe tutta la finestra di misura. */
+  width:max-content;
   max-width:${MAX_LARGHEZZA_TIP}px;
   overflow-wrap:anywhere;
   padding:4px 8px;
