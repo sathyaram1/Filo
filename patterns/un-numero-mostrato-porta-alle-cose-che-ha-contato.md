@@ -20,6 +20,16 @@ scendere è un vicolo cieco.
 - **Se le cose contate non sono quelle della pagina, si porta dove sono.** Un
   numero che conta esecuzioni, non segnalazioni, non apre un elenco di
   segnalazioni: manda alla superficie dove quelle esecuzioni si leggono davvero.
+- **Un numero che conta EVENTI apre le cose su cui sono successi.** «Riaperture
+  chieste: 5» conta eventi, e cinque eventi possono stare su tre segnalazioni:
+  il numero resta 5 e l'elenco ne mostra tre. Le due cose non combaciano di
+  proposito, quindi il suggerimento della riga lo dice invece di lasciar credere
+  a un elenco troncato.
+- **Nessuna riga è esente perché sta in fondo.** Le ultime sezioni di una
+  scheda sono quelle scritte per ultime, ed è lì che la regola salta: le righe
+  delle priorità e i due contatori della coda restavano vicoli ciechi mentre
+  ogni altra riga della stessa scheda si apriva, e proprio «priorità alta: 2» è
+  il posto dove la domanda «quali due?» viene per prima.
 - **L'elenco ha un tetto, e il tetto si dichiara.** Oltre qualche centinaio di
   voci l'elenco dentro un pannello non si sfoglia più: si mostrano le prime e si
   scrive quante ne restano fuori, mai un taglio muto (CLAUDE.md § Limiti).
