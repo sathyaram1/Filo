@@ -616,7 +616,11 @@ if (isMain) {
     // La forma con la barra («/frase»): la conchiglia di Git la trasforma in un
     // percorso vero prima di consegnarla, e la barra non si vede più. Qui il
     // testo è sempre prosa, e una prosa non comincia per barra né per «C:/».
-    const percorso = rest.find((a) => /^(?:[A-Za-z]:)?[\/]/.test(String(a ?? '')));
+    const percorso = rest.find((a) => {
+      const s = String(a ?? '');
+      const senzaDisco = /^[A-Za-z]:/.test(s) ? s.slice(2) : s;
+      return senzaDisco.startsWith('/') || senzaDisco.startsWith('\\');
+    });
     if (percorso) {
       console.error(`Argomento non capito: ${percorso} — non ho toccato niente. Se era un’opzione scritta con la barra, la conchiglia l’ha trasformata in un percorso: qui non ci sono opzioni, il testo va fra virgolette, tutto in un pezzo solo.`);
       process.exit(1);
