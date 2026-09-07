@@ -333,6 +333,12 @@ if (isMain) {
   // Un passaggio solo: i `--campo valore` diventano dati dell'intento, il resto
   // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
   // valore che assomiglia a un comando non viene scambiato per tale.
+  // I nomi di campo che questo strumento conosce.
+  const CAMPI = new Set([
+    'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
+    'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
+    'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
+  ]);
   const args = [];
   const flags = [];
   const data = {};
