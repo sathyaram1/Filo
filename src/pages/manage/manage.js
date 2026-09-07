@@ -3819,6 +3819,27 @@
     const rows = d.creatori.map((c) => ({
       key: c.key, label: stCreatorLabel(c.key), count: c.count, ids: c.ids,
     }));
+    // Chi non dice chi l'ha mandato non si traveste da «Utente»: ha una riga
+    // sua, come lo stato non leggibile ce l'ha nella ripartizione per
+    // categoria. Sotto, la riga dice quante ne sta lasciando fuori il filtro
+    // per creatore, che su un mittente ignoto non può rispondere né sì né no.
+    if (d.mittenteIgnoto) {
+      rows.push({
+        key: 'ignoto', label: '🔒 Mittente non leggibile', count: d.mittenteIgnoto,
+        ids: d.idsMittenteIgnoto,
+        title: 'Il mittente di queste segnalazioni viaggia cifrato e questo computer non ha la chiave: non si sa chi le ha mandate. Apri per vedere quali.',
+      });
+    }
+    const nota = $st('mgStCreatorNote');
+    if (nota) {
+      const n = d.mittenteFuoriFiltro || 0;
+      nota.hidden = !n;
+      if (n) {
+        nota.textContent = n === 1
+          ? '1 segnalazione di questa finestra non dice chi l\'ha mandata su questo computer: il filtro per creatore non la può includere né escludere, quindi non è in questi numeri.'
+          : `${stFmtInt(n)} segnalazioni di questa finestra non dicono chi le ha mandate su questo computer: il filtro per creatore non le può includere né escludere, quindi non sono in questi numeri.`;
+      }
+    }
     // La frase del vuoto la dice il paragrafo qui sotto, non anche una riga
     // dell'elenco: scritta lì finiva nella colonna stretta delle etichette e si
     // leggeva «Nessun feedback in questa finest…», due volte di fila.
