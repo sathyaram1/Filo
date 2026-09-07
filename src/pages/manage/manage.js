@@ -4299,6 +4299,7 @@
     setWorkerLog(entries) {
       stWorkerLog = Array.isArray(entries) ? entries : [];
       stWorkerLogError = '';
+      stWorkerLogVisto = true;
       stWorkerLogFinto = true;
       stRender();
     },
