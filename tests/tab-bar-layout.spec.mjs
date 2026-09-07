@@ -115,28 +115,23 @@ test.describe('larghezza e separatori stile Chrome', () => {
     await expect(shell.locator('.tab')).toHaveCount(3, { timeout: 8_000 });
     await expect(shell.locator('.tab.active')).toHaveCount(1);
 
-    // Attendi che il layout flex si assesti: subito dopo l'apertura la riga di
-    // tab può misurare 0px per un frame (corsa di layout), falsando i confronti.
-    await expect
-      .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
-      .toBeGreaterThan(0);
-
-    const widths = await shell.locator('.tab').evaluateAll((els) =>
-      els.map((el) => ({
+    // La misura si ripete finché non cade su un disegno buono. Due motivi:
+    // subito dopo l'apertura la riga di tab può misurare 0px per un frame
+    // (corsa di layout), e la shell RICREA tutti i nodi .tab a ogni
+    // aggiornamento (titolo, favicon, caricamento) — una lettura può quindi
+    // finire su un nodo appena staccato, che misura zero.
+    await expect.poll(async () => shell.locator('.tab').evaluateAll((els) => {
+      const w = els.map((el) => ({
         active: el.classList.contains('active'),
         width: el.getBoundingClientRect().width,
-      })),
-    );
-
-    const active = widths.find((w) => w.active);
-    const inactive = widths.filter((w) => !w.active);
-    expect(active).toBeTruthy();
-    expect(inactive.length).toBeGreaterThan(0);
-
-    // La tab attiva deve essere strettamente più larga di OGNI tab inattiva.
-    for (const t of inactive) {
-      expect(active.width).toBeGreaterThan(t.width);
-    }
+      }));
+      const active = w.find((x) => x.active);
+      const inactive = w.filter((x) => !x.active);
+      if (!active || !active.width || !inactive.length) return null;
+      if (inactive.some((t) => !t.width)) return null;
+      // La tab attiva deve essere strettamente più larga di OGNI tab inattiva.
+      return inactive.every((t) => active.width > t.width);
+    }).catch(() => null), { timeout: 8_000 }).toBe(true);
   });
 
   // #429 — con la barra mezza vuota i titoli restavano tagliati ("Cro…") perché
