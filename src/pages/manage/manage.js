@@ -2685,6 +2685,16 @@
   function setActionMsg(text, kind) {
     mgActionMsg.textContent = text || '';
     mgActionMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    riflettiMessaggiOwner();
+  }
+
+  // La riga degli esiti esiste solo quando ha qualcosa da dire: vuota
+  // lascerebbe uno spazio sotto i tasti che non significa niente.
+  function riflettiMessaggiOwner() {
+    if (!mgOwnerMsgs) return;
+    const vuoto = !(mgActionMsg && mgActionMsg.textContent.trim())
+      && !(mgManageMsg && mgManageMsg.textContent.trim());
+    mgOwnerMsgs.hidden = vuoto;
   }
 
   function renderJudgesRow(fb) {
