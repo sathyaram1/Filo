@@ -3205,7 +3205,12 @@
       scrollers.forEach((el, i) => { el.scrollTop = tops[i]; });
     }
     if (!selectedId || closeDetailIfGone()) return false;
-    if (touched.has(selectedId) && !detailBeingEdited()) { openDetail(selectedId); return true; }
+    if (touched.has(selectedId) && !detailBeingEdited()) {
+      // Ridisegno, non una nuova apertura: la sezione della frase resta come
+      // l'owner l'ha lasciata.
+      openDetail(selectedId, { ridisegno: true });
+      return true;
+    }
     return false;
   }
 
