@@ -582,10 +582,15 @@
         else if (fbId != null && fbId !== '') idsNonLavorati.push(fbId);
         if (st.status === 'done' || st.status === 'archived') risolti += 1;
       }
-      const pr = Math.round(Number(it.fb && it.fb.priority) || 0);
-      const secchio = pr >= 1 && pr <= 3 ? pr : 0;
-      perPriorita[secchio] += 1;
-      pushId(idsPriorita, String(secchio), fbId);
+      if (unreadable(it.fb && it.fb.priority)) {
+        prioritaIgnota += 1;
+        if (fbId != null && fbId !== '') idsPrioritaIgnota.push(fbId);
+      } else {
+        const pr = Math.round(Number(it.fb && it.fb.priority) || 0);
+        const secchio = pr >= 1 && pr <= 3 ? pr : 0;
+        perPriorita[secchio] += 1;
+        pushId(idsPriorita, String(secchio), fbId);
+      }
       const riap = reopenCount(it.fb && it.fb.reopenRequests);
       riaperture += riap;
       if (riap && fbId != null && fbId !== '') idsRiaperti.push(fbId);
