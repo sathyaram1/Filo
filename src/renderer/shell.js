@@ -486,12 +486,12 @@
   // della pagina: la scheda resta la continuazione della pagina, mai un grigio
   // deciso a caso.
   function pickActiveTint(sampled, identity) {
-    const TC = global.SN_TAB_COLOR;
+    const TC = window.SN_TAB_COLOR;
     if (TC && TC.pickActiveTint) return TC.pickActiveTint(sampled, identity);
     return sampled || null;
   }
   function pickGlowTint(sampled, identity) {
-    const TC = global.SN_TAB_COLOR;
+    const TC = window.SN_TAB_COLOR;
     if (TC && TC.pickGlowTint) return TC.pickGlowTint(sampled, identity);
     return sampled || null;
   }
@@ -650,12 +650,10 @@
       // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
       // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
       // assumono lo stesso colore. Il testo passa a chiaro/scuro per contrasto.
-      // Se il colore campionato dalla cima pagina è neutro (header bianco/grigio:
-      // es. YouTube) non porta identità → ripieghiamo sul colore identità del
-      // sito (theme-color/favicon), così la tab attiva mostra il brand e non il
-      // bianco. Se manca anche quello, si resta sul colore campionato.
+      // La scelta (colore della cima pagina, o brand del sito quando la cima è
+      // chrome neutra che nasconde un marchio colorato) è in SN_TAB_COLOR.
       if (t.id === state.activeId) {
-        const activeColor = hasColorIdentity(t.color) ? t.color : (t.identityColor || t.color);
+        const activeColor = pickActiveTint(t.color, t.identityColor);
         if (activeColor) {
           const fg = readableOn(activeColor);
           el.style.setProperty('--tab-active', activeColor);
