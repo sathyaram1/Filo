@@ -3126,6 +3126,553 @@
     if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
   }
 
+  // ── Scheda «Statistiche feedback» (#496) ─────────────────────────────────
+  //
+  // I CONTI stanno tutti in SN_FEEDBACK_STATS (logica pura, unit test in
+  // tests/unit/feedbackStats.test.mjs). Qui si sceglie la finestra, si filtra
+  // per creatore e si DISEGNA: nessun numero nasce in questo file.
+  //
+  // Due sorgenti con due orologi: i feedback (già in `allFeedbacks`, per data
+  // d'arrivo) e il registro dei worker (`config/automation.workerLog`, la
+  // stessa fonte della scheda «Log», per istante d'avvio). Il registro è una
+  // lettura di documento sola: si rilegge a ogni apertura, come fa il Log.
+  const ST = window.SN_FEEDBACK_STATS;
+  const ST_WINDOW_KEY   = 'filo_manage_stats_window';
+  const ST_CREATORS_KEY = 'filo_manage_stats_creators';
+  const ST_DATES_KEY    = 'filo_manage_stats_dates';
+
+  // Palette delle torte. Fissa e scelta per restare distinguibile su tema
+  // chiaro E scuro (pattern «Grafici/chart: SVG generato a mano»): i token del
+  // tema danno un accento solo, e qui servono più colori insieme. La scala dei
+  // giri va dal verde («passato subito») al rosso mattone: è una scala, e si
+  // legge come tale prima ancora della legenda.
+  const ST_LOOP_COLORS = ['#3bbf7a', '#c9a13b', '#d98032', '#c45a3b', '#8a3b2e'];
+  const ST_STOPPED_COLOR = '#7a7a7a';
+  // Gli esiti riprendono i colori che già dicono «grave» e «da guardare» nel
+  // resto della dashboard (attacco rosso, spam ambra).
+  const ST_OUTCOME_COLORS = { fail: '#c0392b', migliorabile: '#e08e0b' };
+
+  let stWindow = ST ? ST.DEFAULT_WINDOW : '30d';
+  let stFromISO = '';
+  let stToISO = '';
+  let stCreators = new Set(ST ? ST.CREATOR_KINDS : []);
+  let stOpenTile = null;      // quale numero è aperto sul suo dettaglio
+  let stWorkerLog = null;     // null = non ancora letto; [] = letto e vuoto
+  let stWorkerLogError = '';  // perché non si è potuto leggere
+  let stPrefsLoaded = false;
+
+  const $st = (id) => document.getElementById(id);
+
+  function stFmtInt(n) {
+    return Number(n || 0).toLocaleString('it-IT');
+  }
+  function stPct(n, tot) {
+    if (!tot) return '';
+    return `${Math.round((n / tot) * 100)}%`;
+  }
+
+  // Le etichette dei creatori vengono da AUTHOR_META, la stessa mappa che
+  // disegna l'icona d'autore sulle schede: due elenchi di nomi per la stessa
+  // cosa finirebbero per divergere.
+  function stCreatorLabel(kind) {
+    const m = AUTHOR_META[kind];
+    return m ? `${m.icon} ${m.label}` : kind;
+  }
+
+  // ── I pulsanti dei filtri ───────────────────────────────────────────────
+  function stRenderWindowChips() {
+    const box = $st('mgStWindows');
+    if (!box || !ST) return;
+    box.innerHTML = '';
+    for (const w of ST.WINDOWS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mg-st-chip';
+      b.dataset.window = w.key;
+      b.textContent = w.label;
+      b.setAttribute('aria-pressed', w.key === stWindow ? 'true' : 'false');
+      b.title = w.key === 'custom'
+        ? 'Scegli tu le due date'
+        : `Mostra i dati di: ${w.label.toLowerCase()}`;
+      b.addEventListener('click', () => stChooseWindow(w.key));
+      box.appendChild(b);
+    }
+    const custom = $st('mgStCustom');
+    if (custom) custom.hidden = stWindow !== 'custom';
+  }
+
+  function stRenderCreatorChips() {
+    const box = $st('mgStCreators');
+    if (!box || !ST) return;
+    box.innerHTML = '';
+
+    // «Tutti» è il modo di tornare indietro da qualunque combinazione: senza,
+    // per rivedere il totale bisogna ricliccare nove caselle a mano.
+    const tutti = document.createElement('button');
+    tutti.type = 'button';
+    tutti.className = 'mg-st-chip mg-st-chip--group';
+    tutti.dataset.group = 'tutti';
+    tutti.textContent = 'Tutti';
+    tutti.title = 'Nessun filtro: tutti i creatori';
+    tutti.setAttribute('aria-pressed', stCreators.size === ST.CREATOR_KINDS.length ? 'true' : 'false');
+    tutti.addEventListener('click', () => {
+      stCreators = new Set(ST.CREATOR_KINDS);
+      stSavePrefs();
+      stRender();
+    });
+    box.appendChild(tutti);
+
+    // I gruppi rapidi: «Routine cloud» è la domanda che ci si fa davvero, e
+    // spuntare cinque caselle a mano per farla è attrito.
+    for (const g of ST.CREATOR_GROUPS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mg-st-chip mg-st-chip--group';
+      b.dataset.group = g.key;
+      b.textContent = g.label;
+      b.title = `Solo: ${g.kinds.map(stCreatorLabel).join(', ')}`;
+      const esatto = g.kinds.length === stCreators.size && g.kinds.every((k) => stCreators.has(k));
+      b.setAttribute('aria-pressed', esatto ? 'true' : 'false');
+      b.addEventListener('click', () => {
+        stCreators = new Set(g.kinds);
+        stSavePrefs();
+        stRender();
+      });
+      box.appendChild(b);
+    }
+
+    // …e le singole, per chi vuole la combinazione precisa.
+    for (const k of ST.CREATOR_KINDS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mg-st-chip';
+      b.dataset.creator = k;
+      b.textContent = stCreatorLabel(k);
+      b.title = `Aggiungi o togli: ${stCreatorLabel(k)}`;
+      b.setAttribute('aria-pressed', stCreators.has(k) ? 'true' : 'false');
+      b.addEventListener('click', () => stToggleCreator(k));
+      box.appendChild(b);
+    }
+  }
+
+  function stToggleCreator(kind) {
+    // Da «tutti selezionati» il primo clic vuol dire «solo questo»: togliere
+    // una casella da un elenco tutto pieno non è quasi mai ciò che si intende.
+    if (stCreators.size === ST.CREATOR_KINDS.length) stCreators = new Set([kind]);
+    else if (stCreators.has(kind)) stCreators.delete(kind);
+    else stCreators.add(kind);
+    // Restare senza nessuno darebbe una pagina di zeri che non dice perché:
+    // svuotare del tutto significa «tutti», come nel modulo dei conti.
+    if (!stCreators.size) stCreators = new Set(ST.CREATOR_KINDS);
+    stSavePrefs();
+    stRender();
+  }
+
+  function stChooseWindow(key) {
+    stWindow = key;
+    stSavePrefs();
+    stRender();
+  }
+
+  function stSavePrefs() {
+    try {
+      chrome.storage.local.set({
+        [ST_WINDOW_KEY]: stWindow,
+        [ST_CREATORS_KEY]: [...stCreators],
+        [ST_DATES_KEY]: { from: stFromISO, to: stToISO },
+      }).catch(() => {});
+    } catch (_) { /* la scheda funziona lo stesso, riparte dai valori di serie */ }
+  }
+
+  async function stLoadPrefs() {
+    if (stPrefsLoaded || !ST) return;
+    stPrefsLoaded = true;
+    try {
+      const d = await chrome.storage.local.get([ST_WINDOW_KEY, ST_CREATORS_KEY, ST_DATES_KEY]);
+      const w = d && d[ST_WINDOW_KEY];
+      if (w && ST.WINDOWS.some((x) => x.key === w)) stWindow = w;
+      const c = d && d[ST_CREATORS_KEY];
+      if (Array.isArray(c) && c.length) stCreators = new Set(ST.normalizeCreators(c));
+      const dates = d && d[ST_DATES_KEY];
+      if (dates && typeof dates === 'object') {
+        stFromISO = String(dates.from || '');
+        stToISO = String(dates.to || '');
+      }
+    } catch (_) { /* valori di serie */ }
+  }
+
+  // ── Il registro dei worker ──────────────────────────────────────────────
+  async function stLoadWorkerLog() {
+    if (!isAdmin) { stWorkerLog = []; stWorkerLogError = 'riservato all\'owner'; return; }
+    try {
+      const r = await sendToMain({ type: WORKER_LOG_GET });
+      if (!r || r.ok === false) {
+        stWorkerLogError = (r && r.error) ? String(r.error) : 'non disponibile';
+        if (!Array.isArray(stWorkerLog)) stWorkerLog = [];
+        return;
+      }
+      stWorkerLog = Array.isArray(r.entries) ? r.entries : [];
+      stWorkerLogError = '';
+    } catch (err) {
+      console.error('[manage] statistiche: registro dei worker non letto:', err);
+      stWorkerLogError = 'non raggiungibile';
+      if (!Array.isArray(stWorkerLog)) stWorkerLog = [];
+    }
+  }
+
+  // ── Disegno ─────────────────────────────────────────────────────────────
+  function stStats() {
+    const range = ST.windowRange(stWindow, { fromISO: stFromISO, toISO: stToISO });
+    return {
+      range,
+      data: ST.compute({
+        feedbacks: allFeedbacks,
+        workerLog: stWorkerLog || [],
+        range,
+        creators: [...stCreators],
+        authorKindOf: (fb) => authorKindOf(fb),
+        statusOf: (fb) => ({
+          status: MR.normalizeStatus(fb).status,
+          unreadable: MR.statusUnreadable(fb),
+        }),
+      }),
+    };
+  }
+
+  function stSetTile(id, num, sub) {
+    const tile = $st(id);
+    if (!tile) return;
+    const n = tile.querySelector('[data-num]');
+    const s = tile.querySelector('[data-sub]');
+    if (n) n.textContent = num;
+    if (s) s.textContent = sub || '';
+  }
+
+  // Una riga di ripartizione: etichetta, barra proporzionale, numero (+%).
+  function stRowsHtml(rows, opts) {
+    const o = opts || {};
+    const max = rows.reduce((m, r) => Math.max(m, r.count), 0) || 1;
+    const tot = o.total != null ? o.total : rows.reduce((n, r) => n + r.count, 0);
+    if (!rows.length) return `<li class="mg-st-row"><span class="mg-st-row-label sn-muted">${esc(o.empty || 'Niente da mostrare.')}</span></li>`;
+    return rows.map((r) => {
+      const w = Math.max(2, Math.round((r.count / max) * 100));
+      const pct = o.percent === false ? '' : stPct(r.count, tot);
+      return `<li class="mg-st-row" data-row="${esc(r.key)}" title="${esc(r.title || `${r.label}: ${stFmtInt(r.count)}`)}">`
+        + `<span class="mg-st-row-label">${esc(r.label)}</span>`
+        + `<span class="mg-st-row-bar"><span class="mg-st-row-fill" style="width:${w}%${r.color ? `;background:${r.color}` : ''}"></span></span>`
+        + `<span class="mg-st-row-num">${stFmtInt(r.count)}`
+        + (pct ? `<span class="mg-st-row-pct">${pct}</span>` : '')
+        + '</span></li>';
+    }).join('');
+  }
+
+  // Il dettaglio del numero aperto. Uno alla volta: due aperti insieme
+  // spingerebbero i grafici fuori schermo a ogni clic.
+  function stRenderDrawer(d) {
+    const box = $st('mgStDrawer');
+    if (!box) return;
+    if (!stOpenTile) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+
+    if (stOpenTile === 'ricevuti') {
+      const rows = d.categorie.map((c) => {
+        const meta = ST.CATEGORIES.find((x) => x.key === c.key);
+        return { key: c.key, label: meta ? meta.label : c.key, count: c.count };
+      });
+      // Uno stato che questo computer non sa leggere non si travesteda
+      // categoria: si dice che c'è e che non si legge.
+      if (d.illeggibili) {
+        rows.push({
+          key: 'illeggibili', label: 'Stato non leggibile', count: d.illeggibili,
+          title: 'Lo stato di queste segnalazioni viaggia cifrato e questo computer non ha la chiave: non si possono classificare.',
+        });
+      }
+      box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.ricevuti, empty: 'Nessun feedback in questa finestra.' })}</ul>`;
+      return;
+    }
+
+    if (stOpenTile === 'lavorati') {
+      const perCat = Object.fromEntries(d.categorie.map((c) => [c.key, c.count]));
+      const nonLavorati = Math.max(0, d.ricevuti - d.lavorati - d.illeggibili);
+      const rows = [
+        { key: 'lavorazione', label: 'In lavorazione ora', count: perCat.lavorazione || 0 },
+        { key: 'done', label: 'Risolti', count: perCat.done || 0 },
+        { key: 'archived', label: 'Archiviati', count: perCat.archived || 0 },
+        { key: 'nonLavorati', label: 'Non ancora lavorati', count: nonLavorati },
+      ];
+      if (d.illeggibili) rows.push({ key: 'illeggibili', label: 'Stato non leggibile', count: d.illeggibili });
+      box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.ricevuti, empty: 'Nessun feedback in questa finestra.' })}</ul>`;
+      return;
+    }
+
+    // prober → tutte le esecuzioni, per ruolo.
+    const rows = d.ruoli.map((r) => {
+      const meta = ST.RUN_ROLES.find((x) => x.key === r.key);
+      return { key: r.key, label: meta ? meta.label : r.key, count: r.count };
+    });
+    box.innerHTML = `<ul class="mg-st-rows">${stRowsHtml(rows, { total: d.esecuzioni, empty: 'Nessuna esecuzione registrata in questa finestra.' })}</ul>`;
+  }
+
+  // Una torta: un <path> per fetta, `data-group` per gli spec. Con una fetta
+  // sola l'arco 0→2π collasserebbe, quindi si disegna un cerchio pieno.
+  function stDrawPie(svgId, legendId, fette) {
+    const svg = $st(svgId);
+    const legend = $st(legendId);
+    if (!svg || !legend) return;
+    svg.innerHTML = '';
+    legend.innerHTML = '';
+    const NS = 'http://www.w3.org/2000/svg';
+    const cx = 90, cy = 90, r = 78;
+    const tot = fette.reduce((n, f) => n + f.count, 0);
+    if (!tot) { svg.setAttribute('aria-hidden', 'true'); return; }
+    svg.removeAttribute('aria-hidden');
+
+    const vive = fette.filter((f) => f.count > 0);
+    if (vive.length === 1) {
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
+      c.setAttribute('fill', vive[0].color);
+      c.dataset.group = vive[0].key;
+      const t = document.createElementNS(NS, 'title');
+      t.textContent = `${vive[0].label}: ${stFmtInt(vive[0].count)} (100%)`;
+      c.appendChild(t);
+      svg.appendChild(c);
+    } else {
+      let a = -Math.PI / 2; // si parte da ore 12
+      for (const f of vive) {
+        const next = a + (f.count / tot) * Math.PI * 2;
+        const grande = next - a > Math.PI ? 1 : 0;
+        const x1 = cx + r * Math.cos(a), y1 = cy + r * Math.sin(a);
+        const x2 = cx + r * Math.cos(next), y2 = cy + r * Math.sin(next);
+        const p = document.createElementNS(NS, 'path');
+        p.setAttribute('d', `M${cx} ${cy} L${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${grande} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`);
+        p.setAttribute('fill', f.color);
+        p.dataset.group = f.key;
+        const t = document.createElementNS(NS, 'title');
+        t.textContent = `${f.label}: ${stFmtInt(f.count)} (${stPct(f.count, tot)})`;
+        p.appendChild(t);
+        svg.appendChild(p);
+        a = next;
+      }
+    }
+
+    for (const f of vive) {
+      const li = document.createElement('li');
+      li.dataset.group = f.key;
+      li.title = f.hint || `${f.label}: ${stFmtInt(f.count)} (${stPct(f.count, tot)})`;
+      const sw = document.createElement('span');
+      sw.className = 'mg-st-swatch';
+      sw.style.background = f.color;
+      const lab = document.createElement('span');
+      lab.textContent = f.label;
+      const val = document.createElement('span');
+      val.className = 'mg-st-legend-val';
+      val.textContent = `${stFmtInt(f.count)} · ${stPct(f.count, tot)}`;
+      li.append(sw, lab, val);
+      legend.appendChild(li);
+    }
+  }
+
+  function stRenderLoop(d) {
+    const loop = d.loop;
+    const fette = loop.slices.map((s, i) => ({
+      key: `loop-${s.loops}`,
+      label: s.label,
+      count: s.count,
+      color: ST_LOOP_COLORS[Math.min(i, ST_LOOP_COLORS.length - 1)],
+    }));
+    if (loop.nonPassati) {
+      fette.push({
+        key: 'fermati', label: 'Fermati (mai passati)', count: loop.nonPassati,
+        color: ST_STOPPED_COLOR,
+        hint: 'Lavori con almeno una critica che non hanno ancora passato la verifica: un numero di giri non ce l\'hanno.',
+      });
+    }
+    stDrawPie('mgStLoopChart', 'mgStLoopLegend', fette);
+
+    stDrawPie('mgStOutcomeChart', 'mgStOutcomeLegend', [
+      {
+        key: 'fail', label: 'Fermate (fail)', count: loop.fail, color: ST_OUTCOME_COLORS.fail,
+        hint: 'Critiche che hanno fermato il lavoro: c\'è un rilievo grave che il verificatore non può correggere da solo.',
+      },
+      {
+        key: 'migliorabile', label: 'Migliorabile', count: loop.migliorabile, color: ST_OUTCOME_COLORS.migliorabile,
+        hint: 'Critiche con rilievi che NON fermano il lavoro: li corregge il verificatore, o finiscono in un feedback derivato.',
+      },
+    ]);
+
+    const avg = $st('mgStLoopAvg');
+    const empty = $st('mgStLoopEmpty');
+    const vuoto = loop.conVerifica === 0;
+    if (empty) empty.hidden = !vuoto;
+    if (avg) {
+      avg.hidden = vuoto;
+      if (!vuoto) {
+        const media = loop.media == null ? '—' : loop.media.toFixed(1).replace('.', ',');
+        avg.innerHTML = `In media <strong>${esc(media)}</strong> critiche prima del pass`
+          + ` — su ${stFmtInt(loop.passati)} ${loop.passati === 1 ? 'lavoro passato' : 'lavori passati'}`
+          + `, ${stFmtInt(loop.critiche)} ${loop.critiche === 1 ? 'critica' : 'critiche'} in tutto`
+          + ` (${stFmtInt(loop.fail)} ${loop.fail === 1 ? 'ha fermato' : 'hanno fermato'} il lavoro).`;
+      }
+    }
+  }
+
+  function stRenderCreators(d) {
+    const box = $st('mgStCreatorRows');
+    const empty = $st('mgStCreatorEmpty');
+    if (!box) return;
+    const rows = d.creatori.map((c) => ({ key: c.key, label: stCreatorLabel(c.key), count: c.count }));
+    box.innerHTML = stRowsHtml(rows, { total: d.ricevuti, empty: 'Nessun feedback in questa finestra.' });
+    if (empty) empty.hidden = rows.length > 0;
+  }
+
+  function stRenderSpark(d) {
+    const box = $st('mgStSpark');
+    const axis = $st('mgStSparkAxis');
+    const desc = $st('mgStSparkDesc');
+    if (!box) return;
+    const barre = d.andamento.barre;
+    const max = barre.reduce((m, b) => Math.max(m, b.count), 0);
+    const unita = { day: 'giorno', week: 'settimana', month: 'mese' }[d.andamento.bucket.key] || 'giorno';
+    if (desc) {
+      desc.textContent = max
+        ? `Feedback ricevuti per ${unita}. Il picco è ${stFmtInt(max)}.`
+        : `Feedback ricevuti per ${unita}.`;
+    }
+    box.innerHTML = barre.map((b) => {
+      const h = max ? Math.max(2, Math.round((b.count / max) * 100)) : 2;
+      const quando = d.andamento.bucket.key === 'day'
+        ? formatDate(b.from)
+        : `${formatDate(b.from)} – ${formatDate(b.to - 1)}`;
+      return `<span class="mg-st-spark-bar${b.count ? '' : ' mg-st-spark-bar--zero'}"`
+        + ` style="height:${h}%" title="${esc(quando)}: ${stFmtInt(b.count)}"></span>`;
+    }).join('');
+    if (axis) {
+      axis.innerHTML = barre.length
+        ? `<span>${esc(formatDate(barre[0].from))}</span><span>${esc(formatDate(barre[barre.length - 1].to - 1))}</span>`
+        : '';
+    }
+  }
+
+  function stRenderHealth(d) {
+    const box = $st('mgStHealthRows');
+    if (!box) return;
+    const p = d.priorita || {};
+    box.innerHTML = stRowsHtml([
+      { key: 'p3', label: 'Priorità alta (3)', count: p[3] || 0 },
+      { key: 'p2', label: 'Priorità media (2)', count: p[2] || 0 },
+      { key: 'p1', label: 'Priorità bassa (1)', count: p[1] || 0 },
+      { key: 'p0', label: 'Senza priorità', count: p[0] || 0 },
+      {
+        key: 'riaperture', label: 'Riaperture chieste', count: d.riaperture,
+        title: 'Quante volte chi aveva segnalato ha detto «è ancora rotto» su un feedback di questa finestra.',
+      },
+      {
+        key: 'stalli', label: 'Lavori rientrati in coda', count: d.stalli,
+        title: 'Quante volte una lavorazione si è arenata (il ramo fermo troppo a lungo) ed è rientrata in coda da sola.',
+      },
+    ], { total: d.ricevuti, percent: false });
+  }
+
+  function stRender() {
+    if (!ST) return;
+    stRenderWindowChips();
+    stRenderCreatorChips();
+
+    const { range, data } = stStats();
+
+    const warn = $st('mgStWarn');
+    if (warn) {
+      warn.hidden = !range.invalid;
+      if (range.invalid) warn.textContent = range.invalid;
+    }
+
+    const rangeLine = $st('mgStRange');
+    if (rangeLine) {
+      const da = range.from == null ? null : formatDate(range.from);
+      const a = range.to == null ? null : formatDate(range.to - 1);
+      const quando = (da && a) ? `dal ${da} al ${a}` : da ? `dal ${da} a oggi` : a ? `fino al ${a}` : 'da sempre';
+      const chi = stCreators.size === ST.CREATOR_KINDS.length
+        ? 'tutti i creatori'
+        : [...stCreators].map((k) => (AUTHOR_META[k] ? AUTHOR_META[k].label : k)).join(', ');
+      // Il tetto del caricamento (500 più recenti) vale anche qui: dirlo è
+      // l'unico modo perché «12» non venga letto come un totale quando è un
+      // minimo. Stessa regola dei contatori delle schede.
+      const tetto = loadHitCap() ? ' · la lista si ferma ai più recenti: i numeri sono minimi' : '';
+      const registro = (Array.isArray(stWorkerLog) && stWorkerLogError)
+        ? ` · registro delle esecuzioni ${stWorkerLogError}`
+        : (Array.isArray(stWorkerLog) && stWorkerLog.length && data.runsLogFrom != null
+          && range.from != null && data.runsLogFrom > range.from)
+          ? ` · le esecuzioni sono registrate dal ${formatDate(data.runsLogFrom)}`
+          : '';
+      rangeLine.textContent = `${quando} · ${chi}${tetto}${registro}`;
+    }
+
+    stSetTile('mgStTileRicevuti', stFmtInt(data.ricevuti),
+      data.ricevuti ? `${stFmtInt(data.categorie.length)} categorie` : 'niente in questa finestra');
+    stSetTile('mgStTileLavorati', stFmtInt(data.lavorati),
+      data.ricevuti ? `${stPct(data.lavorati, data.ricevuti)} dei ricevuti · ${stFmtInt(data.risolti)} risolti` : '');
+    stSetTile('mgStTileProber', stFmtInt(data.prober),
+      `${stFmtInt(data.esecuzioni)} esecuzioni in tutto`);
+
+    for (const tile of document.querySelectorAll('.mg-st-tile')) {
+      tile.setAttribute('aria-expanded', tile.dataset.stat === stOpenTile ? 'true' : 'false');
+      const more = tile.querySelector('.mg-st-tile-more');
+      if (more) {
+        const aperto = tile.dataset.stat === stOpenTile;
+        const che = { ricevuti: 'categoria', lavorati: 'fase', prober: 'ruolo' }[tile.dataset.stat] || 'dettaglio';
+        more.textContent = aperto ? '▾ Chiudi il dettaglio' : `▸ Apri per ${che}`;
+      }
+    }
+
+    stRenderDrawer(data);
+    stRenderLoop(data);
+    stRenderCreators(data);
+    stRenderSpark(data);
+    stRenderHealth(data);
+  }
+
+  // Aggancio dei controlli. Le date personalizzate si applicano mentre si
+  // scrivono: nessun pulsante «Applica» — un filtro che non parte finché non
+  // confermi è attrito, e qui non c'è niente di irreversibile da confermare.
+  if ($st('mgStFrom')) {
+    $st('mgStFrom').addEventListener('change', () => {
+      stFromISO = $st('mgStFrom').value || '';
+      stWindow = 'custom';
+      stSavePrefs();
+      stRender();
+    });
+  }
+  if ($st('mgStTo')) {
+    $st('mgStTo').addEventListener('change', () => {
+      stToISO = $st('mgStTo').value || '';
+      stWindow = 'custom';
+      stSavePrefs();
+      stRender();
+    });
+  }
+  if ($st('mgStTiles')) {
+    $st('mgStTiles').addEventListener('click', (e) => {
+      const tile = e.target.closest('.mg-st-tile');
+      if (!tile) return;
+      stOpenTile = stOpenTile === tile.dataset.stat ? null : tile.dataset.stat;
+      stRender();
+    });
+  }
+
+  // Apertura della scheda: preferenze (una volta), registro dei worker (a ogni
+  // apertura, come il Log: una lettura di documento sola, e un'esecuzione
+  // partita nel frattempo deve comparire).
+  async function stOpen() {
+    if (!ST) return;
+    await stLoadPrefs();
+    if ($st('mgStFrom')) $st('mgStFrom').value = stFromISO;
+    if ($st('mgStTo')) $st('mgStTo').value = stToISO;
+    stRender();               // subito, coi feedback che ci sono già
+    await stLoadWorkerLog();
+    stRender();               // e di nuovo quando il registro è arrivato
+  }
+
   // ── Hook di test ────────────────────────────────────────────────────────
   // Solo per gli spec Playwright: inietta feedback e apre il dettaglio
   // esercitando il VERO codice di rendering, senza duplicarne la logica nel
