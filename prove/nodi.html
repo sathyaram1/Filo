@@ -101,7 +101,7 @@ section > p.desc { font-size: 12.5px; color: var(--dash-ink-mute); margin: 0 0 1
    disegnarli. Ogni pezzo ha sotto una guaina del colore della
    carta: è così che si vede chi passa sopra e chi sotto.
 ———————————————————————————————————————————————————————— */
-var N = 200;
+var N = 140;
 var mp = document.getElementById('misuraPath');
 var cache = {};
 function campiona(d) {
@@ -324,25 +324,59 @@ function ridimensiona() {
   document.getElementById('ozoom').textContent = z < 0.5 ? 'vera' : z.toFixed(1) + '×';
 }
 
-function tracciaPezzi(svg, pts, tagli, z, classe) {
-  var conf = [];
+// Gli elementi si creano una volta sola: a ogni fotogramma cambia solo la
+// `d`. Ricostruire l'SVG a ogni giro, con venticinque celle, non regge.
+function pezziDi(v) {
   var lim = [0];
-  (tagli || []).forEach(function (f) { lim.push(Math.round(f * (N - 1))); });
+  (v.tagli || []).forEach(function (f) { lim.push(Math.round(f * (N - 1))); });
   lim.push(N - 1);
+  var conf = [];
   for (var i = 0; i < lim.length - 1; i++) conf.push([lim[i], lim[i + 1]]);
-  var ordine = (z && z.length === conf.length) ? z : conf.map(function (_, i) { return i; });
-  var out = '';
-  ordine.forEach(function (idx) {
-    var seg = conf[idx];
-    if (!seg) return;
-    out += '<path class="guaina" stroke-width="' + GUAINA + '" d="' + dOf(pts, seg[0], seg[1]) + '"/>';
-    out += '<path class="filo ' + (classe || '') + '" stroke-width="' + SPESSORE + '" d="' + dOf(pts, seg[0], seg[1]) + '"/>';
-  });
-  return out;
+  var ordine = (v.z && v.z.length === conf.length) ? v.z : conf.map(function (_, i) { return i; });
+  return ordine.map(function (idx) { return conf[idx]; }).filter(Boolean);
+}
+
+function preparaCella(c) {
+  var ns = 'http://www.w3.org/2000/svg';
+  var v = c.v;
+  c.altroPezzi = [];
+  c.pezzi = [];
+  function coppia(classe, spess) {
+    var g = document.createElementNS(ns, 'path');
+    g.setAttribute('class', 'guaina');
+    g.setAttribute('stroke-width', GUAINA);
+    var f = document.createElementNS(ns, 'path');
+    f.setAttribute('class', 'filo ' + (classe || ''));
+    f.setAttribute('stroke-width', spess || SPESSORE);
+    c.svg.append(g, f);
+    return { g: g, f: f };
+  }
+  if (c.gomitolo) {
+    c.filoLungo = coppia('', SPESSORE * 0.62);
+    c.nodiG = [0, 1, 2].map(function () {
+      var el = document.createElementNS(ns, 'circle');
+      el.setAttribute('fill', 'var(--dash-accent)');
+      c.svg.append(el);
+      return el;
+    });
+    return;
+  }
+  if (v.altro) {
+    c.altroSeg = pezziDi(v.altro);
+    c.altroPezzi = c.altroSeg.map(function () { return coppia('altro'); });
+  }
+  c.seg = pezziDi(v);
+  c.pezzi = c.seg.map(function () { return coppia(''); });
+  if (v.goccia) {
+    c.gocciaEl = document.createElementNS(ns, 'circle');
+    c.gocciaEl.setAttribute('cx', v.goccia[0]);
+    c.gocciaEl.setAttribute('cy', v.goccia[1]);
+    c.gocciaEl.setAttribute('fill', 'var(--dash-accent)');
+    c.svg.append(c.gocciaEl);
+  }
 }
 
 function statoNodo(v, p) {
-  // p: 0..1 lungo tutta la sequenza di fotogrammi
   var f = v.fasi, n = f.length - 1;
   if (n <= 0) return campiona(f[0]);
   var x = Math.min(0.9999, Math.max(0, p)) * n;
@@ -353,57 +387,64 @@ function statoNodo(v, p) {
 function disegnaNodo(c, p) {
   var v = c.v;
   var pts = statoNodo(v, p);
-  var html = tracciaPezzi(c.svg, pts, v.tagli, v.z, '');
+  c.seg.forEach(function (sg, i) {
+    var d = dOf(pts, sg[0], sg[1]);
+    c.pezzi[i].g.setAttribute('d', d);
+    c.pezzi[i].f.setAttribute('d', d);
+  });
   if (v.altro) {
     var ap = statoNodo(v.altro, p);
-    html = tracciaPezzi(c.svg, ap, v.altro.tagli, v.altro.z, 'altro') + html;
+    c.altroSeg.forEach(function (sg, i) {
+      var d = dOf(ap, sg[0], sg[1]);
+      c.altroPezzi[i].g.setAttribute('d', d);
+      c.altroPezzi[i].f.setAttribute('d', d);
+    });
   }
-  if (v.goccia && p > 0.75) {
-    var op = Math.min(1, (p - 0.75) * 4);
-    html += '<circle cx="' + v.goccia[0] + '" cy="' + v.goccia[1] + '" r="' + (3.4 * op) + '" fill="var(--dash-accent)"/>';
+  if (c.gocciaEl) {
+    var op = p > 0.75 ? Math.min(1, (p - 0.75) * 4) : 0;
+    c.gocciaEl.setAttribute('r', (3.4 * op).toFixed(2));
   }
-  c.svg.innerHTML = html;
 }
 
 function disegnaGomitolo(c, p) {
-  // filo lungo dritto con tre nodi, che si avvolge
   var H = 150, pts = [], lung = [0];
+  var ora = performance.now();
   for (var i = 0; i < N; i++) {
     var y = (i / (N - 1)) * H;
-    var vib = (1 - p) * Math.sin(y * 0.14 + performance.now() / 260) * 1.4;
+    var vib = (1 - p) * Math.sin(y * 0.14 + ora / 260) * 1.4;
     pts.push([30 + vib, y]);
   }
   for (var j = 1; j < N; j++) lung.push(lung[j - 1] + Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]));
   var totale = lung[N - 1];
 
-  var m = facile(Math.min(1, p));
-  var giro = 0, verso = 1, cx = 30, cy = 16;
+  var m = facile(Math.min(1, p)), giro = 0, verso = 1, cx = 30, cy = 18, slack = 0;
   if (c.v.modo === 'gira') giro = m * Math.PI * 3.2;
   if (c.v.modo === 'fuori') verso = -1;
   if (c.v.modo === 'affloscia') {
-    // prima metà: il filo si affloscia; seconda metà: si raccoglie
-    if (p < 0.4) { m = 0; } else { m = facile((p - 0.4) / 0.6); }
+    m = p < 0.4 ? 0 : facile((p - 0.4) / 0.6);
+    slack = Math.max(0, 1 - Math.abs(p - 0.4) / 0.4);
   }
-  var slack = c.v.modo === 'affloscia' ? Math.max(0, 1 - Math.abs(p - 0.4) / 0.4) : 0;
 
-  var out = [];
+  var out = [], d = '';
   for (var k = 0; k < N; k++) {
     var s = verso > 0 ? lung[k] : (totale - lung[k]);
     var sp = puntoSpirale(s);
     var rx = sp[0] * Math.cos(giro) - sp[1] * Math.sin(giro);
     var ry = sp[0] * Math.sin(giro) + sp[1] * Math.cos(giro);
-    var px = pts[k][0] + slack * Math.sin(lung[k] * 0.06) * 6;
-    var py = pts[k][1] + slack * 3;
-    out.push([px + (cx + rx - px) * m, py + (cy + ry - py) * m]);
+    var px = pts[k][0] + slack * Math.sin(lung[k] * 0.06) * 7;
+    var py = pts[k][1] + slack * 4;
+    var pt = [px + (cx + rx - px) * m, py + (cy + ry - py) * m];
+    out.push(pt);
+    d += (k ? 'L' : 'M') + pt[0].toFixed(2) + ',' + pt[1].toFixed(2);
   }
-  var d = '';
-  for (var q = 0; q < N; q++) d += (q ? 'L' : 'M') + out[q][0].toFixed(2) + ',' + out[q][1].toFixed(2);
-  var html = '<path class="filo" stroke-width="' + SPESSORE * 0.62 + '" d="' + d + '"/>';
-  [0.28, 0.55, 0.82].forEach(function (f) {
+  c.filoLungo.g.setAttribute('d', d);
+  c.filoLungo.f.setAttribute('d', d);
+  [0.28, 0.55, 0.82].forEach(function (f, i) {
     var idx = Math.round(f * (N - 1));
-    html += '<circle cx="' + out[idx][0].toFixed(2) + '" cy="' + out[idx][1].toFixed(2) + '" r="' + (2.6 * (1 - m * 0.4)) + '" fill="var(--dash-accent)"/>';
+    c.nodiG[i].setAttribute('cx', out[idx][0].toFixed(2));
+    c.nodiG[i].setAttribute('cy', out[idx][1].toFixed(2));
+    c.nodiG[i].setAttribute('r', (2.6 * (1 - m * 0.4)).toFixed(2));
   });
-  c.svg.innerHTML = html;
 }
 
 /* ————————————— montaggio ————————————— */
@@ -429,8 +470,11 @@ SEZIONI.forEach(function (s) {
 })();
 
 /* ————————————— il tempo ————————————— */
-var fermo = false;
+var fermo = false, inCorso = false;
+// Fermo o «solo lo stato finale»: si disegna una volta e ci si ferma. Un
+// ciclo che gira a vuoto su trenta celle scalda il computer per niente.
 function battito() {
+  inCorso = false;
   var lento = Number(document.getElementById('lento').value);
   var durata = 900 * lento;
   var riposo = document.getElementById('riposo').checked;
@@ -444,13 +488,21 @@ function battito() {
       var e = (ora - c.t0) % (durata + 900 * lento * 0.5);
       p = Math.min(1, e / durata);
     }
+    var fermoQui = (riposo || fermo) && !c.gomitolo;
+    if (fermoQui && c.ultimo === p) return;
+    c.ultimo = p;
     if (c.gomitolo) disegnaGomitolo(c, p);
     else disegnaNodo(c, p);
   });
+  if (!(riposo || fermo)) avvia();
+}
+function avvia() {
+  if (inCorso) return;
+  inCorso = true;
   requestAnimationFrame(battito);
 }
 
-document.getElementById('zoom').addEventListener('input', ridimensiona);
+document.getElementById('zoom').addEventListener('input', function () { ridimensiona(); avvia(); });
 document.getElementById('lento').addEventListener('input', function (e) {
   document.getElementById('olento').textContent = '÷' + Number(e.target.value).toFixed(1);
 });
@@ -458,26 +510,30 @@ document.getElementById('scrub').addEventListener('input', function (e) {
   fermo = true;
   document.getElementById('ferma').classList.add('acceso');
   document.getElementById('oscrub').textContent = Number(e.target.value).toFixed(2);
+  avvia();
 });
 document.getElementById('ferma').addEventListener('click', function (e) {
   fermo = !fermo;
   e.target.classList.toggle('acceso', fermo);
+  avvia();
 });
 document.getElementById('riparti').addEventListener('click', function () {
   fermo = false;
   document.getElementById('ferma').classList.remove('acceso');
   var ora = performance.now();
-  celle.forEach(function (c) { c.t0 = ora; });
+  celle.forEach(function (c) { c.t0 = ora; c.ultimo = -1; });
+  avvia();
 });
 document.getElementById('tema').addEventListener('change', function (e) {
   document.body.classList.toggle('scuro', e.target.checked);
 });
-document.getElementById('riposo').addEventListener('change', function () {});
+document.getElementById('riposo').addEventListener('change', avvia);
 
+celle.forEach(preparaCella);
 ridimensiona();
 document.getElementById('olento').textContent = '÷3.0';
 document.getElementById('oscrub').textContent = '1.00';
-requestAnimationFrame(battito);
+avvia();
 </script>
 </body>
 </html>
