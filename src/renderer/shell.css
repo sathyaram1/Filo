@@ -189,13 +189,17 @@ html[data-chrome-compact="1"] .addr {
   align-items: center;
   gap: 6px;
   height: 32px;
-  /* Larghezza in stile Chrome: ogni scheda PARTE dalla sua larghezza piena
-     (260px, la base) e si stringe solo quando la striscia non ci sta più,
-     fino a min-width; poi la striscia scrolla (vedi .tabs).
-     Prima la base era 0 e lo spazio veniva spartito a proporzione fissa
-     (1 contro 1.8 dell'attiva) senza mai guardare il titolo: con la barra
-     mezza vuota una scheda restava tagliata a "Cro…" mentre a destra
-     avanzavano centinaia di pixel (#429). */
+  /* Larghezza in stile Chrome: ogni scheda parte dalla sua larghezza piena e
+     si stringe solo quando la striscia non ci sta più, fino a min-width; poi
+     la striscia scrolla (vedi .tabs).
+     Prima era `flex: 1 1 0`: la striscia si dimensionava sui titoli, ma poi lo
+     spazio veniva ripartito a proporzione fissa (1 contro 1.8 della scheda
+     attiva) senza più guardarli. Con la barra mezza vuota una scheda restava
+     tagliata a "Cro…" mentre a destra avanzavano centinaia di pixel (#429).
+     La larghezza è una `width` e non un `flex-basis` di proposito: solo una
+     larghezza DEFINITA entra nel calcolo intrinseco della striscia, che è
+     `flex: 0 1 auto` — con un flex-basis, Chromium ridimensiona il contenitore
+     sui titoli e il problema torna identico. */
   width: 260px;
   flex: 0 1 auto;
   min-width: 40px;
@@ -245,7 +249,7 @@ html[data-chrome-compact="1"] .addr {
      resta più larga anche quando la striscia si stringe (le schede si
      accorciano in proporzione alla base) senza rubare spazio ai titoli delle
      altre. */
-  flex-basis: 320px;
+  width: 320px;
   min-width: 110px;
   max-width: 320px;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
