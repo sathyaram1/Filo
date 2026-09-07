@@ -166,7 +166,7 @@
         current = { line: raw.trim(), text: m[3].trim() };
         continue;
       }
-      const apertura = APERTURA_PARENTESI.exec(raw);
+      const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
       const parentesiStorta = !!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]);
       if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
         flush();
