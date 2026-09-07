@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prove — i nodi, altre strade</title>
+<style>
+:root {
+  --dash-paper: #f2ece0; --dash-card: #f7f2e8; --dash-ink: #221e19;
+  --dash-ink-soft: #5b554b; --dash-ink-mute: #8c8273;
+  --dash-line: rgba(34,30,25,0.10); --dash-line-strong: rgba(34,30,25,0.18);
+  --dash-accent: #c0552b; --dash-altro: #8c8273;
+}
+body.scuro {
+  --dash-paper: #1c1916; --dash-card: #25211c; --dash-ink: #ece6da;
+  --dash-ink-soft: #b8b0a1; --dash-ink-mute: #7e7567;
+  --dash-line: rgba(236,230,218,0.10); --dash-line-strong: rgba(236,230,218,0.20);
+  --dash-altro: #8a8072;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--dash-paper); color: var(--dash-ink);
+  font: 14px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; padding: 0 0 60px;
+}
+.barra {
+  position: sticky; top: 0; z-index: 10; background: var(--dash-paper);
+  border-bottom: 1px solid var(--dash-line); padding: 12px 26px;
+  display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+}
+.barra h1 { font-size: 15px; font-weight: 600; margin: 0 10px 0 0; }
+.cur { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dash-ink-soft); }
+.cur input[type=range] { width: 110px; accent-color: var(--dash-accent); }
+.cur output { font-variant-numeric: tabular-nums; min-width: 32px; color: var(--dash-ink-mute); }
+.barra button {
+  font: inherit; font-size: 12px; border: 1px solid var(--dash-line-strong);
+  background: transparent; color: var(--dash-ink); border-radius: 16px; padding: 5px 12px; cursor: pointer;
+}
+.barra button:hover { background: var(--dash-ink); color: var(--dash-paper); }
+.barra button.acceso { background: var(--dash-accent); border-color: var(--dash-accent); color: #fff; }
+.barra label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dash-ink-soft); cursor: pointer; }
+.barra input[type=checkbox] { accent-color: var(--dash-accent); }
+
+main { padding: 22px 26px; }
+section { margin-bottom: 34px; }
+section > h2 { font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dash-ink-mute); margin: 0 0 3px; }
+section > p.desc { font-size: 12.5px; color: var(--dash-ink-mute); margin: 0 0 14px; max-width: 760px; }
+.fila { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.cella {
+  background: var(--dash-card); border: 1px solid var(--dash-line); border-radius: 14px;
+  padding: 10px 12px 8px; cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; gap: 6px;
+}
+.cella .dentro { display: flex; align-items: center; justify-content: center; }
+.cella .nome { font-size: 11.5px; color: var(--dash-ink-mute); text-align: center; max-width: 170px; }
+.cella svg { display: block; overflow: visible; }
+.filo { fill: none; stroke: var(--dash-accent); stroke-linecap: round; stroke-linejoin: round; }
+.guaina { fill: none; stroke: var(--dash-card); stroke-linecap: round; stroke-linejoin: round; }
+.pieno { fill: var(--dash-accent); stroke: none; }
+.solco { fill: none; stroke: var(--dash-card); stroke-linecap: round; }
+.stato { font-size: 11px; color: var(--dash-ink-mute); }
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <h1>I nodi, altre strade</h1>
+  <div class="cur">grandezza <input type="range" id="zoom" min="1" max="8" step="0.25" value="3"><output id="ozoom"></output></div>
+  <div class="cur">lentezza <input type="range" id="lento" min="1" max="10" step="0.5" value="3"><output id="olento"></output></div>
+  <div class="cur">fotogramma <input type="range" id="scrub" min="0" max="1" step="0.005" value="1"><output id="oscrub"></output></div>
+  <button id="riparti">↺ rigioca</button>
+  <button id="ferma">⏸ ferma</button>
+  <label><input type="checkbox" id="riposo"><span>solo lo stato finale</span></label>
+  <label><input type="checkbox" id="tema"><span>scuro</span></label>
+  <span class="stato" id="stato"></span>
+</div>
+
+<main id="main"></main>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   STRADA 1 — la corda simulata.
+   Una corda vera: sessanta grani legati fra loro, che non
+   possono compenetrarsi. Si parte da una posa nello spazio che
+   è GIÀ annodata (topologia giusta, forma brutta), poi si
+   tirano i due capi e la fisica fa il nodo da sola. Nessuna
+   curva disegnata a mano: il nodo viene fuori perché è un nodo.
+   I fotogrammi si calcolano una volta sola al caricamento.
+════════════════════════════════════════════════════════════ */
+var NG = 64;              // grani
+var SPESS = 1.1;          // spessore della corda, in unità di simulazione
+var FOTO = 110;           // fotogrammi da cuocere
+
+// La posa di partenza: il capo passa a sinistra davanti, torna a destra
+// dietro, e rientra nel proprio giro. È l'unica cosa scritta a mano, e conta
+// solo che sia annodata — non che sia bella.
+var POSA = [
+  [0, -34, 0], [0, -22, 0], [0, -13, 0.5],
+  [-9, -8, 3], [-13, 2, 3], [-6, 10, 3], [4, 8, 2],
+  [9, 0, -1], [7, -8, -3], [-1, -11, -3], [-6, -4, -2],
+  [-4, 4, 0], [2, 9, 0.5], [1, 18, 0], [0, 26, 0], [0, 38, 0],
+];
+
+function lungoWaypoint(W, n) {
+  var seg = [], tot = 0;
+  for (var i = 1; i < W.length; i++) {
+    var d = Math.hypot(W[i][0] - W[i-1][0], W[i][1] - W[i-1][1], W[i][2] - W[i-1][2]);
+    seg.push(d); tot += d;
+  }
+  var out = [], acc = 0, k = 0;
+  for (var j = 0; j < n; j++) {
+    var s = (j / (n - 1)) * tot * 0.9999;
+    while (k < seg.length - 1 && acc + seg[k] < s) { acc += seg[k]; k++; }
+    var t = seg[k] ? (s - acc) / seg[k] : 0;
+    out.push([
+      W[k][0] + (W[k+1][0] - W[k][0]) * t,
+      W[k][1] + (W[k+1][1] - W[k][1]) * t,
+      W[k][2] + (W[k+1][2] - W[k][2]) * t,
+    ]);
+  }
+  return out;
+}
+
+function cuociCorda() {
+  var p = lungoWaypoint(POSA, NG);
+  var vecchio = p.map(function (a) { return a.slice(); });
+  var riposo = 0;
+  for (var i = 1; i < NG; i++) riposo += Math.hypot(p[i][0]-p[i-1][0], p[i][1]-p[i-1][1], p[i][2]-p[i-1][2]);
+  riposo /= (NG - 1);
+
+  var capoA = p[0].slice(), capoB = p[NG-1].slice();
+  var frames = [];
+
+  for (var f = 0; f < FOTO; f++) {
+    // i capi si allontanano: è così che un nodo si stringe davvero
+    var tira = f * 0.34;
+    capoA[1] = POSA[0][1] - tira;
+    capoB[1] = POSA[POSA.length-1][1] + tira;
+
+    // inerzia
+    for (var i2 = 0; i2 < NG; i2++) {
+      for (var c = 0; c < 3; c++) {
+        var v = (p[i2][c] - vecchio[i2][c]) * 0.86;
+        vecchio[i2][c] = p[i2][c];
+        p[i2][c] += v;
+      }
+    }
+    // vincoli
+    for (var it = 0; it < 14; it++) {
+      p[0] = capoA.slice(); p[NG-1] = capoB.slice();
+      for (var i3 = 1; i3 < NG; i3++) {
+        var a = p[i3-1], b = p[i3];
+        var dx = b[0]-a[0], dy = b[1]-a[1], dz = b[2]-a[2];
+        var d = Math.hypot(dx, dy, dz) || 1e-6;
+        var k = (d - riposo) / d * 0.5;
+        var mx = dx*k, my = dy*k, mz = dz*k;
+        if (i3 > 1) { a[0]+=mx; a[1]+=my; a[2]+=mz; }
+        if (i3 < NG-1) { b[0]-=mx; b[1]-=my; b[2]-=mz; }
+      }
+      // la corda non può passare attraverso sé stessa
+      for (var i4 = 0; i4 < NG; i4++) {
+        for (var j4 = i4 + 3; j4 < NG; j4++) {
+          var A = p[i4], B = p[j4];
+          var ex = B[0]-A[0], ey = B[1]-A[1], ez = B[2]-A[2];
+          var dd = Math.hypot(ex, ey, ez);
+          if (dd > SPESS || dd < 1e-6) continue;
+          var spinta = (SPESS - dd) / dd * 0.5;
+          var sx = ex*spinta, sy = ey*spinta, sz = ez*spinta;
+          if (i4 > 0 && i4 < NG-1) { A[0]-=sx; A[1]-=sy; A[2]-=sz; }
+          if (j4 > 0 && j4 < NG-1) { B[0]+=sx; B[1]+=sy; B[2]+=sz; }
+        }
+      }
+    }
+    frames.push(p.map(function (a) { return a.slice(); }));
+  }
+  return frames;
+}
+var t0Cuoci = performance.now();
+var CORDA = cuociCorda();
+var msCuoci = Math.round(performance.now() - t0Cuoci);
+
+/* Disegno di una corda 3D: si spezza dove la profondità cambia segno e si
+   dipinge dal fondo verso l'alto, ognuno con la sua guaina. È il modo in cui
+   si disegnano i nodi a mano: chi sta davanti copre chi sta dietro. */
+function tracciaCorda(pts3, scala, cx, cy, giro, spess) {
+  var pr = [];
+  for (var i = 0; i < pts3.length; i++) {
+    var x = pts3[i][0], y = pts3[i][1], z = pts3[i][2];
+    var rx = x * Math.cos(giro) + z * Math.sin(giro);
+    var rz = -x * Math.sin(giro) + z * Math.cos(giro);
+    var persp = 1 + rz * 0.012;
+    pr.push([cx + rx * scala * persp, cy + y * scala * persp, rz]);
+  }
+  // corse separate ai cambi di profondità
+  var corse = [], inizio = 0;
+  for (var j = 1; j < pr.length; j++) {
+    if ((pr[j][2] >= 0) !== (pr[j-1][2] >= 0)) { corse.push([inizio, j]); inizio = j - 1; }
+  }
+  corse.push([inizio, pr.length - 1]);
+  corse.forEach(function (c) {
+    var somma = 0;
+    for (var k = c[0]; k <= c[1]; k++) somma += pr[k][2];
+    c.push(somma / (c[1] - c[0] + 1));
+  });
+  corse.sort(function (a, b) { return a[2] - b[2]; });
+  var out = '';
+  corse.forEach(function (c) {
+    var d = '';
+    for (var k = c[0]; k <= c[1]; k++) d += (k === c[0] ? 'M' : 'L') + pr[k][0].toFixed(2) + ',' + pr[k][1].toFixed(2);
+    out += '<path class="guaina" stroke-width="' + (spess * 2.1) + '" d="' + d + '"/>';
+    out += '<path class="filo" stroke-width="' + spess + '" d="' + d + '"/>';
+  });
+  return out;
+}
+
+/* ════════════════════════════════════════════════════════════
+   STRADA 2 — il grumo.
+   A otto pixel un nodo vero non si vede come nodo: si vede come
+   un ingrossamento del filo con uno o due solchi. Quindi lo si
+   disegna così: il filo ha spessore variabile, e dove c'è il
+   nodo si gonfia e prende due tacche.
+════════════════════════════════════════════════════════════ */
+function grumo(cy, larghezza, solchi, altezza, spess, gonfio) {
+  var pts = [], n = 90;
+  for (var i = 0; i <= n; i++) {
+    var y = (i / n) * altezza;
+    var d = (y - cy) / larghezza;
+    var w = spess / 2 + gonfio * Math.exp(-d * d);
+    pts.push([y, w]);
+  }
+  var su = '', giu = '';
+  for (var j = 0; j <= n; j++) {
+    su += (j ? 'L' : 'M') + (20 + pts[j][1]).toFixed(2) + ',' + pts[j][0].toFixed(2);
+  }
+  for (var k = n; k >= 0; k--) {
+    giu += 'L' + (20 - pts[k][1]).toFixed(2) + ',' + pts[k][0].toFixed(2);
+  }
+  var corpo = '<path class="pieno" d="' + su + giu + 'Z"/>';
+  var tacche = '';
+  (solchi || []).forEach(function (s) {
+    var y = cy + s[0], inc = s[1];
+    var w = spess / 2 + gonfio * Math.exp(-(s[0] / larghezza) * (s[0] / larghezza));
+    tacche += '<path class="solco" stroke-width="' + (spess * 0.5) + '" d="M' + (20 - w * 0.95) + ',' + (y - inc) +
+              ' L' + (20 + w * 0.95) + ',' + (y + inc) + '"/>';
+  });
+  return corpo + tacche;
+}
+
+/* ════════════════════════════════════════════════════════════
+   STRADA 3 — il nodo grande che rimpicciolisce.
+   La corda simulata, ma l'animazione parte a quattro volte la
+   misura e si stringe fino a quella vera: l'occhio legge la
+   forma quando è grande e accetta il grumo che resta.
+════════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════════
+   Il palco
+════════════════════════════════════════════════════════════ */
+var celle = [];
+function cella(fila, nome, larg, alt, disegna, opt) {
+  var box = document.createElement('div');
+  box.className = 'cella';
+  var dentro = document.createElement('div');
+  dentro.className = 'dentro';
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + larg + ' ' + alt);
+  dentro.append(svg);
+  var et = document.createElement('div');
+  et.className = 'nome';
+  et.textContent = nome;
+  box.append(dentro, et);
+  fila.append(box);
+  var c = { svg: svg, larg: larg, alt: alt, disegna: disegna, t0: performance.now(), fissa: (opt||{}).fissa };
+  box.addEventListener('click', function () { c.t0 = performance.now(); avvia(); });
+  celle.push(c);
+  return c;
+}
+function sezione(titolo, desc) {
+  var s = document.createElement('section');
+  var h = document.createElement('h2'); h.textContent = titolo;
+  var p = document.createElement('p'); p.className = 'desc'; p.textContent = desc;
+  var f = document.createElement('div'); f.className = 'fila';
+  s.append(h, p, f);
+  document.getElementById('main').append(s);
+  return f;
+}
+
+// —— strada 1: la corda simulata ——
+var f1 = sezione('Strada 1 — la corda simulata',
+  'Sessanta grani legati, che non possono attraversarsi. Si parte da una posa già annodata e si tirano i due capi: il nodo si stringe da solo. Il primo riquadro è a dimensione vera, quella che avrebbe in chat.');
+[1, 2, 4, 7].forEach(function (s) {
+  cella(f1, s === 1 ? 'dimensione vera' : s + '×', 40, 76, function (c, p, z) {
+    var f = CORDA[Math.min(CORDA.length - 1, Math.round(p * (CORDA.length - 1)))];
+    c.svg.innerHTML = tracciaCorda(f, 1.55, 20, 38, 0, 1.7);
+  }, { fissa: s });
+});
+cella(f1, 'che gira, per vedere il sopra e il sotto', 40, 76, function (c, p, z) {
+  var f = CORDA[CORDA.length - 1];
+  c.svg.innerHTML = tracciaCorda(f, 1.55, 20, 38, p * Math.PI * 2, 1.7);
+}, { fissa: 4 });
+cella(f1, 'che si scioglie (al contrario)', 40, 76, function (c, p, z) {
+  var f = CORDA[Math.min(CORDA.length - 1, Math.round((1 - p) * (CORDA.length - 1)))];
+  c.svg.innerHTML = tracciaCorda(f, 1.55, 20, 38, 0, 1.7);
+}, { fissa: 4 });
+
+// —— strada 2: il grumo ——
+var f2 = sezione('Strada 2 — il grumo',
+  'Nessuna topologia: a quella misura un nodo è un ingrossamento con due solchi, e si disegna così. Non è un ripiego — è come appare davvero una cordicella annodata vista da lontano.');
+[1, 2, 4].forEach(function (s) {
+  cella(f2, (s === 1 ? 'dimensione vera' : s + '×') + ' — nodo', 40, 76, function (c, p, z) {
+    var g = 1.9 * p;
+    c.svg.innerHTML = grumo(38, 3.2, [[-1.6, 1.1], [1.6, 1.1]], 76, 1.7, g);
+  }, { fissa: s });
+});
+cella(f2, 'grumo piccolo (ha letto)', 40, 76, function (c, p, z) {
+  c.svg.innerHTML = grumo(38, 2.6, [], 76, 1.7, 0.9 * p);
+}, { fissa: 4 });
+cella(f2, 'grumo doppio (verso l’esterno)', 40, 76, function (c, p, z) {
+  c.svg.innerHTML = grumo(38, 4.6, [[-2.6, 1.2], [0, 1.2], [2.6, 1.2]], 76, 1.7, 2.3 * p);
+}, { fissa: 4 });
+
+// —— strada 3: grande e poi piccolo ——
+var f3 = sezione('Strada 3 — si annoda in grande, poi si stringe',
+  'La stessa corda simulata, ma l’animazione comincia a quattro volte la misura e finisce a quella vera. L’occhio legge la forma finché è grande, e accetta il grumo che resta.');
+cella(f3, 'a dimensione vera, com’è in chat', 40, 76, function (c, p, z) {
+  var f = CORDA[Math.min(CORDA.length - 1, Math.round(p * (CORDA.length - 1)))];
+  var scala = 1.55 * (3.4 - 2.4 * p);
+  c.svg.innerHTML = tracciaCorda(f, scala, 20, 38, 0, 1.7 * (1.9 - 0.9 * p));
+}, { fissa: 1 });
+cella(f3, 'la stessa, ingrandita per guardarla', 40, 76, function (c, p, z) {
+  var f = CORDA[Math.min(CORDA.length - 1, Math.round(p * (CORDA.length - 1)))];
+  var scala = 1.55 * (3.4 - 2.4 * p);
+  c.svg.innerHTML = tracciaCorda(f, scala, 20, 38, 0, 1.7 * (1.9 - 0.9 * p));
+}, { fissa: 4 });
+
+// —— confronto a riposo ——
+var f4 = sezione('A riposo, in fila, a dimensione vera',
+  'L’unica prova che conta: come si distinguono uno accanto all’altro nella colonna della chat.');
+['corda', 'grumo', 'grumo piccolo', 'grumo doppio'].forEach(function (n) {
+  cella(f4, n, 40, 60, function (c, p, z) {
+    if (n === 'corda') c.svg.innerHTML = tracciaCorda(CORDA[CORDA.length-1], 1.55, 20, 30, 0, 1.7);
+    else if (n === 'grumo') c.svg.innerHTML = grumo(30, 3.2, [[-1.6,1.1],[1.6,1.1]], 60, 1.7, 1.9);
+    else if (n === 'grumo piccolo') c.svg.innerHTML = grumo(30, 2.6, [], 60, 1.7, 0.9);
+    else c.svg.innerHTML = grumo(30, 4.6, [[-2.6,1.2],[0,1.2],[2.6,1.2]], 60, 1.7, 2.3);
+  }, { fissa: 1 });
+});
+
+/* ————— tempo e comandi ————— */
+var fermo = false, inCorso = false;
+function ridimensiona() {
+  var z = Number(document.getElementById('zoom').value);
+  celle.forEach(function (c) {
+    var s = (c.fissa || 1) * z / 3;
+    if (c.fissa === 1) s = z / 3;
+    c.svg.setAttribute('width', (c.larg * (c.fissa || 1) * (z / 3)).toFixed(0));
+    c.svg.setAttribute('height', (c.alt * (c.fissa || 1) * (z / 3)).toFixed(0));
+  });
+  document.getElementById('ozoom').textContent = (z / 3).toFixed(1) + '×';
+}
+function battito() {
+  inCorso = false;
+  var lento = Number(document.getElementById('lento').value);
+  var durata = 1100 * lento;
+  var riposo = document.getElementById('riposo').checked;
+  var scrub = Number(document.getElementById('scrub').value);
+  var ora = performance.now();
+  celle.forEach(function (c) {
+    var p;
+    if (riposo) p = 1;
+    else if (fermo) p = scrub;
+    else p = Math.min(1, ((ora - c.t0) % (durata * 1.5)) / durata);
+    c.disegna(c, p);
+  });
+  if (!(riposo || fermo)) avvia();
+}
+function avvia() { if (inCorso) return; inCorso = true; requestAnimationFrame(battito); }
+
+document.getElementById('zoom').addEventListener('input', function () { ridimensiona(); avvia(); });
+document.getElementById('lento').addEventListener('input', function (e) {
+  document.getElementById('olento').textContent = '÷' + Number(e.target.value).toFixed(1);
+});
+document.getElementById('scrub').addEventListener('input', function (e) {
+  fermo = true; document.getElementById('ferma').classList.add('acceso');
+  document.getElementById('oscrub').textContent = Number(e.target.value).toFixed(2);
+  avvia();
+});
+document.getElementById('ferma').addEventListener('click', function (e) {
+  fermo = !fermo; e.target.classList.toggle('acceso', fermo); avvia();
+});
+document.getElementById('riparti').addEventListener('click', function () {
+  fermo = false; document.getElementById('ferma').classList.remove('acceso');
+  var ora = performance.now();
+  celle.forEach(function (c) { c.t0 = ora; });
+  avvia();
+});
+document.getElementById('riposo').addEventListener('change', avvia);
+document.getElementById('tema').addEventListener('change', function (e) {
+  document.body.classList.toggle('scuro', e.target.checked);
+});
+document.getElementById('stato').textContent = 'corda cotta in ' + msCuoci + ' ms';
+ridimensiona();
+document.getElementById('olento').textContent = '÷3.0';
+document.getElementById('oscrub').textContent = '1.00';
+avvia();
+</script>
+</body>
+</html>
