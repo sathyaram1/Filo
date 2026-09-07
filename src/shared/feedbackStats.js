@@ -358,18 +358,22 @@
     const giri = [];
     for (const blocco of blocchi) {
       if (blocco.utente) continue;
-      const b = blocco.testo;
-      if (!b.trim()) continue;
-      if (RE_FAIL_STORICO.test(b))  { giri.push({ outcome: 'fail', findings: 1 }); continue; }
-      if (RE_MIGL_STORICO.test(b))  { giri.push({ outcome: 'migliorabile', findings: 1 }); continue; }
-      if (RE_PASS_OGGI.test(b) || RE_PASS_STORICO.test(b)) { giri.push({ outcome: 'pass', findings: 0 }); continue; }
-      const m = RE_GIRO_OGGI.exec(b);
+      if (!blocco.testo.trim()) continue;
+      const { apertura, decisione } = testaNota(blocco.testo);
+      if (!apertura) continue;
+      if (RE_FAIL_STORICO.test(apertura)) { giri.push({ outcome: 'fail', findings: 1 }); continue; }
+      if (RE_MIGL_STORICO.test(apertura)) { giri.push({ outcome: 'migliorabile', findings: 1 }); continue; }
+      if (RE_PASS_OGGI.test(apertura) || RE_PASS_STORICO.test(apertura)) {
+        giri.push({ outcome: 'pass', findings: 0 });
+        continue;
+      }
+      const m = RE_GIRO_OGGI.exec(apertura);
       if (m) {
-        const findings = Math.max(1, Number(m[2]) || 1);
+        const findings = Math.max(1, Number(m[1]) || 1);
         // Con rilievi il giro non è un pass. «Si ferma» = serve l'owner (fail);
         // tutto il resto — corretti dal verificatore o passati al feedback
         // derivato — è lavoro che PROSEGUE, cioè «migliorabile».
-        giri.push({ outcome: RE_STOP.test(b) ? 'fail' : 'migliorabile', findings });
+        giri.push({ outcome: RE_STOP.test(decisione) ? 'fail' : 'migliorabile', findings });
       }
     }
     return giri;
