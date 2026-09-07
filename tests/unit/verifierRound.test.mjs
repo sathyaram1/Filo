@@ -201,9 +201,14 @@ test('#561 giro 4: un livello senza testo non sparisce; nel riassunto le parente
   // Col testo sulla riga dopo è un rilievo intero.
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2]\nil pulsante non salva'), []);
   assert.equal(R.parseFindings('Provato.\n[2]\nil pulsante non salva').findings[0].text, 'il pulsante non salva');
-  // Il riassunto può nominare un livello in mezzo a una frase.
-  assert.deepEqual(R.unparsedLevelLines('Provato il caso [2?] del giro prima: chiuso. Anche il [4] e testi di [10000] caratteri.\n[1] bordo'), []);
-  assert.equal(R.parseFindings('Provato il caso [2?] del giro prima: chiuso.\n[1] bordo').summary, 'Provato il caso [2?] del giro prima: chiuso.');
+  // DAL 2026-09-07 (decisione dell'owner su #565) le quadre con dentro un
+  // livello sono SEMPRE un rilievo, anche in mezzo a una frase del riassunto:
+  // la tolleranza di prima lasciava passare un rilievo scritto dopo
+  // un'etichetta lunga, e con lui la bocciatura. Nel riassunto il livello si
+  // cita a parole.
+  assert.equal(R.unparsedLevelLines('Provato il caso [2?] del giro prima: chiuso.\n[1] bordo').length, 1);
+  assert.deepEqual(R.unparsedLevelLines('Provato il caso di livello 2 del giro prima: chiuso.\n[1] bordo'), []);
+  assert.equal(R.parseFindings('Provato il caso di livello 2 del giro prima: chiuso.\n[1] bordo').summary, 'Provato il caso di livello 2 del giro prima: chiuso.');
   // Le forme sbagliate di prima restano respinte: livello a inizio riga fuori scala, o dopo un'etichetta breve e prima di un separatore.
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[4] gravissimo'), ['[4] gravissimo']);
   assert.deepEqual(R.unparsedLevelLines('Provato. Rilievo [2]: non salva.'), ['Provato. Rilievo [2]: non salva.']);
