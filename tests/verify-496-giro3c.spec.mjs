@@ -15,12 +15,12 @@ const fb = (o) => ({
   status: o.status || 'todo', notes: o.notes || '', images: [], priority: o.priority || 0,
   _updateTime: 't1',
 });
-const DATI = [
-  fb({ id: 'a', seq: 1, at: iso(1), status: 'done', priority: 3, notes: `R.${TURNO}${PASS}` }),
-  fb({ id: 'b', seq: 2, at: iso(1), priority: 3 }),
-  fb({ id: 'c', seq: 3, at: iso(2), priority: 2, status: 'working' }),
-  fb({ id: 'd', seq: 4, at: iso(3), priority: 1 }),
-];
+// Un feedback per ciascuno degli ultimi 6 giorni: così le barrette degli
+// arrivi non sono tutte a zero e se ne può prendere una piena.
+const DATI = [0, 1, 2, 3, 4, 5].map((g) => fb({
+  id: `f${g}`, seq: g + 1, at: iso(g), priority: g % 4,
+  status: g === 0 ? 'done' : 'todo', notes: g === 0 ? `R.${TURNO}${PASS}` : '',
+}));
 
 async function pronta(page) {
   await page.waitForLoadState('domcontentloaded');
@@ -28,7 +28,26 @@ async function pronta(page) {
   await page.evaluate(() => window.__mgTest.whenReady());
 }
 
-test('sonda: tasto destro punto per punto, con qualunque menu compaia', async ({ openTab }) => {
+// Tasto destro VERO (nessun force): si prende il rettangolo e si preme dentro.
+async function destroSu(page, sel, dentro) {
+  const el = page.locator(sel).first();
+  if (await el.count() === 0) return 'ELEMENTO ASSENTE';
+  const b = await el.boundingBox();
+  if (!b || b.width < 1 || b.height < 1) return `RETTANGOLO NULLO ${JSON.stringify(b)}`;
+  const p = dentro || { x: b.width / 2, y: b.height / 2 };
+  await page.mouse.click(b.x + p.x, b.y + p.y, { button: 'right' });
+  await page.waitForTimeout(350);
+  const testo = await page.evaluate(() => {
+    const m = [...document.querySelectorAll('[class*="ctxmenu"], [class*="context-menu"], .sn-select-menu')]
+      .filter((x) => x.offsetParent !== null);
+    return m.length ? m.map((x) => x.innerText.replace(/\s*\n\s*/g, ' | ')).join(' ### ') : 'NESSUN MENU VISIBILE';
+  });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+  return testo;
+}
+
+test('sonda: tasto destro punto per punto', async ({ openTab }) => {
   const page = await openTab(URL);
   await pronta(page);
   await page.evaluate((d) => window.__mgTest.setData(d), DATI);
@@ -36,49 +55,28 @@ test('sonda: tasto destro punto per punto, con qualunque menu compaia', async ({
   await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
   await expect(page.locator('#mgStPies')).toBeVisible();
 
-  const punti = [
-    ['spazio bianco della scheda', '#panel-fbstats > *:last-child'],
-    ['titolo di sezione', '#panel-fbstats h3'],
-    ['riga priorità alta', '#mgStHealthRows .mg-st-row'],
-    ['riga riaperture', '#mgStSignalRows .mg-st-row'],
-    ['barretta arrivi', '.mg-st-spark-bar'],
-    ['riga creatori', '#mgStCreatorRows .mg-st-row'],
-  ];
   const esiti = {};
-  for (const [nome, sel] of punti) {
-    const el = page.locator(sel).first();
-    if (await el.count() === 0) { esiti[nome] = 'ELEMENTO ASSENTE'; continue; }
-    try { await el.click({ button: 'right', force: true, timeout: 4000 }); }
-    catch (e) { esiti[nome] = 'CLIC IMPOSSIBILE: ' + String(e.message).split('\n')[0]; continue; }
-    await page.waitForTimeout(300);
-    esiti[nome] = await page.evaluate(() => {
-      const menus = [...document.querySelectorAll('.mg-ctxmenu, .sn-ctxmenu, .filo-ctxmenu, [class*="ctxmenu"], [class*="context-menu"]')]
-        .filter((m) => m.offsetParent !== null);
-      return menus.length ? menus.map((m) => m.innerText.replace(/\s*\n\s*/g, ' | ')).join(' ### ') : 'NESSUN MENU VISIBILE';
-    });
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(150);
-  }
-  console.log('SONDA TASTO DESTRO →', JSON.stringify(esiti, null, 2));
+  esiti['riga creatori (controllo: qui deve uscire)'] = await destroSu(page, '#mgStCreatorRows .mg-st-row');
+  esiti['riga priorità alta'] = await destroSu(page, '#mgStHealthRows .mg-st-row');
+  esiti['riga riaperture'] = await destroSu(page, '#mgStSignalRows .mg-st-row');
+  esiti['titolo di una sezione'] = await destroSu(page, '#panel-fbstats h3');
+  esiti['spazio bianco del pannello'] = await destroSu(page, '#panel-fbstats', { x: 4, y: 4 });
 
-  // Le righe che rappresentano segnalazioni si aprono su quelle segnalazioni?
-  const apribili = await page.evaluate(() => {
-    const q = (sel) => [...document.querySelectorAll(sel)].map((r) => ({
-      testo: (r.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 60),
-      apribile: !!(r.dataset.open || r.dataset.goto),
-    }));
-    return {
-      priorita: q('#mgStHealthRows .mg-st-row'),
-      segnali: q('#mgStSignalRows .mg-st-row'),
-      creatori: q('#mgStCreatorRows .mg-st-row'),
-    };
+  // Le barrette: quella con più feedback dentro (non una a zero).
+  const iPiena = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.mg-st-spark-bar')];
+    let best = 0;
+    b.forEach((x, i) => { if (Number(x.dataset.count || 0) > Number(b[best].dataset.count || 0)) best = i; });
+    b[best].setAttribute('data-sonda', '1');
+    return { indice: best, count: b[best].dataset.count, quante: b.length };
   });
-  console.log('RIGHE APRIBILI →', JSON.stringify(apribili, null, 2));
-
-  // Clic sinistro su «Priorità alta»: succede qualcosa?
-  const prima = await page.locator('#panel-fbstats').innerText();
-  await page.locator('#mgStHealthRows .mg-st-row').first().click({ force: true });
-  await page.waitForTimeout(300);
-  const dopo = await page.locator('#panel-fbstats').innerText();
-  console.log('CLIC SU PRIORITÀ ALTA CAMBIA QUALCOSA →', prima !== dopo);
+  console.log('BARRETTA SCELTA →', JSON.stringify(iPiena));
+  esiti['barretta arrivi piena'] = await destroSu(page, '.mg-st-spark-bar[data-sonda]');
+  esiti['barretta arrivi a zero'] = await destroSu(page, '.mg-st-spark-bar:not([data-sonda])');
+  const misure = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.mg-st-spark-bar')].slice(0, 3);
+    return b.map((x) => ({ count: x.dataset.count, h: Math.round(x.getBoundingClientRect().height), w: +x.getBoundingClientRect().width.toFixed(1) }));
+  });
+  console.log('MISURE BARRETTE →', JSON.stringify(misure));
+  console.log('SONDA TASTO DESTRO →', JSON.stringify(esiti, null, 2));
 });
