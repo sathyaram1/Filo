@@ -372,8 +372,8 @@
   }
 
   // ----------------------------------------------------------------
-  // Posa del riquadro — vedi PATTERNS.md § "Un riquadro che si riempie dopo si
-  // ancora dal lato che non si muove"
+  // Posa del riquadro — un riquadro che si riempie dopo si ancora dal lato che
+  // non si muove: patterns/un-riquadro-che-si-riempie-dopo-si-ancora-dal-lato.md
   // ----------------------------------------------------------------
   // Il riquadro nasce VUOTO (circa 300px) e si riempie dopo, mentre la risposta
   // arriva, fino al tetto d'altezza del foglio di stile. Una posa calcolata una
@@ -1094,7 +1094,7 @@
   }
 
   // Aggiorna il corpo della risposta senza STRAPPARE la lettura —
-  // vedi PATTERNS.md § "Liste/chat che si ricostruiscono in streaming".
+  // vedi patterns/liste-chat-che-si-ricostruiscono-in-streaming-auto-follow.md
   //
   // Il corpo del riquadro è una finestrella che scorre, e quando lo spazio è
   // poco si accorcia parecchio: leggere scorrendo mentre la risposta arriva è
@@ -1290,7 +1290,7 @@
   // `position: fixed` sullo stesso angolo: due ravvicinati — anche solo
   // "sto lavorando" seguito dall'esito — finivano uno sopra l'altro e non si
   // leggeva nessuno dei due. Stesso pattern della shell (NOTIFS) e dell'editor
-  // (.ed-toasts), vedi PATTERNS.md § "Stack di overlay impilati".
+  // (.ed-toasts), vedi patterns/stack-di-overlay-impilati-limita-il-numero-e-non-superare.md
   let toastHostEl = null;
 
   // Tetto al numero di avvisi vivi insieme: senza, una raffica (una pagina che

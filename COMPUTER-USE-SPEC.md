@@ -1,8 +1,9 @@
 # Filo — Uso del computer ("Filo fa le cose al posto tuo")
 
 Stato: **spec approvata, non implementata** (2026-08-08).
-Prerequisiti di lettura (filosofia e design sono già nel prompt, via CLAUDE.md): `PATTERNS.md`,
-`src/shared/actionLevels.js`, `src/shared/cmdClassify.js`.
+Prerequisiti di lettura (filosofia e design sono già nel prompt, via CLAUDE.md): `PATTERNS.md`
+(l'indice; i racconti in `patterns/<slug>.md`), `src/shared/actionLevels.js`,
+`src/shared/cmdClassify.js`.
 
 ## Obiettivo
 
@@ -418,7 +419,8 @@ ma complica il loop; prima va misurato quanto serve davvero.
 
 ## 10. UI
 
-Rimandi a `PATTERNS.md` per lo stile; qui solo i pezzi nuovi.
+Rimandi a `PATTERNS.md` (e ai racconti in `patterns/`) per lo stile; qui solo i
+pezzi nuovi.
 
 - **La scheda del piano** (§6.1): non un popup di conferma generico. Un box con
   obiettivo, applicazioni come chip, i passi irreversibili evidenziati **con

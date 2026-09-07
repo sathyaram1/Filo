@@ -66,7 +66,8 @@ assets/icons/                   Icone applicazione
 Le istruzioni operative per Claude vivono in `CLAUDE.md` (con lo "switch di
 ruolo": `LOCAL.md` per le sessioni locali; le routine cloud ricevono il proprio
 ruolo da `scripts/dispatch.mjs`, file in `routines/roles/`); le convenzioni UI
-in `PATTERNS.md`.
+in `PATTERNS.md` — l'indice delle regole, con il racconto di ognuna in
+`patterns/<slug>.md`.
 
 ## Quick start
 

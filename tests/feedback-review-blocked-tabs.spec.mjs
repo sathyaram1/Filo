@@ -66,25 +66,21 @@ test('gli stati dell\'iter stanno "In coda", il fix bocciato torna nei "Ricevuti
   await expect(secCard.locator('.fb-state')).toContainText('Audit sicurezza');
   await page.screenshot({ path: 'tests/.shots/feedback-review-tab.png' }).catch(() => {});
 
-  // "Ricevuti": solo il fix bocciato troppe volte, che aspetta l'owner, col
-  // motivo scritto accanto allo stato e non solo il codice grezzo.
-  //
-  // Il motivo si CHIEDE al vocabolario condiviso invece di ricopiarlo qui: la
-  // frase è cambiata una volta ("fix bocciato troppe volte" → quella di oggi) e
-  // questo controllo è rimasto rosso per tutti, su ogni macchina, finché
-  // qualcuno non è andato a leggerselo. Quello che deve restare vero è che il
-  // motivo compaia scritto in italiano, non che sia una frase precisa.
+  // "Ricevuti": solo il fix bocciato troppe volte, che aspetta l'owner — col
+  // motivo scritto accanto allo stato, non solo il codice grezzo.
   await inboxTab.click();
   await expect(page.locator('.fb-card')).toHaveCount(1);
   const blkCard = page.locator('.fb-card', { hasText: 'bloccato' });
   await expect(blkCard).toHaveCount(1);
   await expect(blkCard.locator('.fb-branch')).toHaveText(/worker\/41\.2/);
-  const motivo = await page.evaluate(() => {
-    const b = window.SN_MANAGE_REVIEW.stateBadge({ status: 'design', statusReason: 'loop' });
-    return b && b.showReason ? b.reasonText : '';
-  });
-  expect(motivo, 'il motivo `loop` deve avere una frase in italiano nel vocabolario condiviso')
-    .not.toBe('');
+  // Il motivo dev'essere scritto in PAROLE accanto allo stato, non lasciato al
+  // codice grezzo. La frase la chiediamo alla tabella condivisa invece di
+  // ricopiarla qui: una copia a mano si scolla appena qualcuno riscrive
+  // l'etichetta, e allora questo controllo diventa rosso senza che sia rotto
+  // niente — è già successo, con la vecchia dicitura «fix bocciato troppe
+  // volte». Il confronto con il codice grezzo tiene comunque in piedi l'assert:
+  // se la tabella smettesse di tradurre `loop`, questo diventa rosso davvero.
+  const motivo = await page.evaluate(() => SN_MANAGE_REVIEW.reasonText('loop'));
   expect(motivo).not.toBe('loop');
   await expect(blkCard.locator('.fb-state')).toContainText(motivo);
 
