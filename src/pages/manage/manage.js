@@ -3284,7 +3284,7 @@
   }
 
   // ── I pulsanti dei filtri ───────────────────────────────────────────────
-  function stRenderWindowChips() {
+  function stRenderWindowChips(range) {
     const box = $st('mgStWindows');
     if (!box || !ST) return;
     box.innerHTML = '';
