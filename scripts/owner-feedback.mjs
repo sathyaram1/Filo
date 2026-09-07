@@ -240,12 +240,18 @@ if (isMain) {
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
-  const { controllaArgomenti, argomentiDaNpm, espandiUguali } = await import('./lib/argomenti.mjs');
+  const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'],
     conValore: ['--branch', '--reason', '--frase'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
+  const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
+  if (storpiata) {
+    console.error(`RIFIUTATO: ${storpiata}`);
+    uso();
+    process.exit(1);
+  }
   const daNpm = argomentiDaNpm(process.env, OPZ);
   if (daNpm.errore) {
     console.error(`RIFIUTATO: ${daNpm.errore}`);

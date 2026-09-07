@@ -270,7 +270,14 @@ async function main() {
   // sua e lo strumento parte SENZA, cioè spedisce il ramo e chiede la fusione
   // a chi voleva solo i controlli. L'opzione resta scritta nell'ambiente: da
   // lì ce ne accorgiamo e ci fermiamo (feedback #565).
-  const { argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const { argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  const storpiata = opzioneStorpiata(process.env, ['--check']);
+  if (storpiata) {
+    console.error(`${storpiata}
+`);
+    console.error(AIUTO);
+    process.exit(1);
+  }
   const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check'] });
   if (daNpm.nota) { console.error(daNpm.nota); argv.push(...daNpm.args); }
   // Prima dell'elenco degli sconosciuti: a chi prova la vecchia scorciatoia

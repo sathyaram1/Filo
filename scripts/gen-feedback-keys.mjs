@@ -32,9 +32,11 @@ if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
   ].join('\n'));
   process.exit(0);
 }
-const { controllaArgomenti, argomentiDaNpm } = await import('./lib/argomenti.mjs');
+const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
 // Qui la cosa vera è irreversibile: se `--print` è finita a npm, riprenderla
 // dall'ambiente è la differenza fra stampare e rigenerare (feedback #565).
+const storpiata = opzioneStorpiata(process.env, ['--print']);
+if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
 const daNpm = argomentiDaNpm(process.env, { opzioni: ['--print'] });
 if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
 const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--print'] });

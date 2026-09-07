@@ -1568,6 +1568,14 @@ if (isMainModule) {
       // ignorata: l'esito lo calcola il server dai livelli della critica.
       if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) rest.shift();
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, col livello davanti: [2] …>"'); process.exit(1); }
+      // Qui la critica è UN testo, e non ci sono opzioni: una parola con due
+      // trattini finiva incollata dentro alla critica — che poi non si
+      // modifica più, e che l'owner legge nella chat del feedback (#565).
+      const intrusa = rest.find((a) => SEMBRA_OPZIONE(a));
+      if (intrusa) {
+        console.error(`Argomento non capito: ${intrusa} — non ho registrato niente. Qui la critica è un testo solo, fra virgolette: opzioni non ce ne sono.`);
+        process.exit(1);
+      }
       const s = await recordVerifier(id, rest.join(' '));
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);

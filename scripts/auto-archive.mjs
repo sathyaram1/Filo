@@ -84,11 +84,13 @@ if (isMain) {
     console.log('Uso: node scripts/auto-archive.mjs [--dry-run]\n  archivia i feedback risolti oltre la soglia; --dry-run mostra solo cosa farebbe');
     process.exit(0);
   }
-  const { controllaArgomenti, argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   // npm si mangia le opzioni scritte prima dei due trattini (e su PowerShell
   // anche quelle scritte dopo): le riprendiamo dall'ambiente, invece di fare
   // la cosa vera a chi aveva chiesto un giro a vuoto (feedback #565).
-  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+  const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
   if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
   const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'] });
   if (male) {
