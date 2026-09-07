@@ -157,6 +157,20 @@ test('i piedini della scheda in primo piano stanno dentro la striscia', async ({
   expect(m.scrollWidth, 'con due schede la striscia non deve essere scrollabile').toBeLessThanOrEqual(m.clientWidth);
   expect(m.scorsa, 'la rotella non deve poter far scivolare la fila').toBe(0);
   expect(m.spazioDestra, 'il piedino destro non ci sta').toBeGreaterThanOrEqual(8);
+
+  // E l'altro piedino: quando la scheda in primo piano è la PRIMA, quello di
+  // sinistra cadeva fuori dalla striscia allo stesso modo.
+  await shell.evaluate(() => document.querySelector('.tab').click());
+  await expect.poll(async () => shell.evaluate(() => {
+    const t = [...document.querySelectorAll('.tab')];
+    return t[0] && t[0].classList.contains('active');
+  }), { timeout: 8_000 }).toBe(true);
+  const sinistra = await shell.evaluate(() => {
+    const s = document.querySelector('.tabs').getBoundingClientRect();
+    const r = document.querySelector('.tab.active').getBoundingClientRect();
+    return Math.round(r.left - s.left);
+  });
+  expect(sinistra, 'il piedino sinistro non ci sta').toBeGreaterThanOrEqual(8);
 });
 
 test('il suggerimento di una scheda dal nome lunghissimo non diventa una striscia', async ({ shell, app, testServer }) => {
