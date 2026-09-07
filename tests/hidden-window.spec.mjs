@@ -68,6 +68,9 @@ test('durante i test la finestra sta fuori dallo schermo, è trasparente e non r
 // qualche secondo in 3 lanci su 4 degli spec che usano il tutto schermo.
 test('nemmeno a tutto schermo la finestra diventa visibile', async ({ app, shell }) => {
   await shell.waitForLoadState('domcontentloaded');
+  // Prima del tutto schermo: la finestra di prova va aperta e chiusa mentre lo
+  // stato della finestra vera è ancora quello normale.
+  const trasparenza = await trasparenzaDisponibile(app);
 
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => !w.getParentWindow());
@@ -75,7 +78,6 @@ test('nemmeno a tutto schermo la finestra diventa visibile', async ({ app, shell
   });
   await new Promise((r) => setTimeout(r, 600));
 
-  const trasparenza = await trasparenzaDisponibile(app);
   const full = await windowState(app);
   expect(full.fullScreen).toBe(true);
   // A tutto schermo la finestra COPRE il monitor: l'unica cosa che la tiene
