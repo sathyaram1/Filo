@@ -347,7 +347,7 @@ ${davanti}[2] il pulsante non salva`;
 // L'etichetta prima del livello («Difetto: [2] …») e l'a capo scritto a mano
 // coi due caratteri barra-n: due modi in più con cui una bocciatura finiva nel
 // riassunto (feedback #565).
-test('un livello dopo un'etichetta, o dopo un a capo scritto a mano, non passa per riassunto', () => {
+test("un livello dopo un'etichetta, o dopo un a capo scritto a mano, non passa per riassunto", () => {
   for (const riga of ['Difetto: [2] rotto', 'problema: [2] rotto', 'rilievo grave [2] rotto', 'osservazione: [3] grave']) {
     const testo = `Provato tutto, il resto regge bene.
 ${riga}`;
