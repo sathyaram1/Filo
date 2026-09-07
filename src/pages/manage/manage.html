@@ -251,6 +251,140 @@
     .mg-log-section h3 { font-size: 15px; margin: 0 0 4px; }
     .mg-log-role--deny { color: var(--sn-error); }
 
+    /* ── Tab «Statistiche feedback» (#496) ─────────────────────────────── */
+    /* Niente riquadro intorno alla pagina (filo_design: "non mettere il
+       contenuto della pagina in un box"): le sezioni si separano con lo
+       spazio e con una riga di titolo, non con cornici. I riquadri ci sono
+       solo dove sono un OGGETTO da cliccare — i numeri grandi e i pulsanti
+       del filtro. */
+    .mg-st { max-width: 1080px; }
+    .mg-st h2 { font-size: 18px; margin: 0 0 4px; }
+    .mg-st-intro { font-size: 13px; color: var(--sn-muted); margin: 0 0 18px; }
+
+    /* Barra dei filtri: due gruppi di pulsanti, finestra e creatore. */
+    .mg-st-bar { display: flex; flex-wrap: wrap; gap: 22px 34px; margin-bottom: 12px; }
+    .mg-st-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+    .mg-st-field-label {
+      font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--sn-muted); font-weight: 600;
+    }
+    .mg-st-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .mg-st-chip {
+      all: unset; cursor: pointer;
+      padding: 5px 11px; border-radius: 999px;
+      border: 1px solid var(--sn-border);
+      font-size: 12.5px; color: var(--sn-muted);
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .mg-st-chip:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-st-chip:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-st-chip[aria-pressed="true"] {
+      color: var(--sn-fg); font-weight: 600;
+      border-color: var(--sn-accent);
+      background: rgba(var(--sn-accent-rgb), 0.14);
+    }
+    /* I gruppi rapidi («Routine cloud») sono scorciatoie su più caselle, non
+       una scelta a sé: si distinguono senza diventare un secondo linguaggio. */
+    .mg-st-chip--group { border-style: dashed; }
+    .mg-st-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+    .mg-st-custom[hidden] { display: none; }
+    .sn-page label.mg-st-date {
+      display: inline-flex; align-items: center; gap: 6px; margin: 0;
+      font-size: 12.5px; color: var(--sn-muted);
+    }
+    .mg-st-date input {
+      font: inherit; font-size: 12.5px; color: var(--sn-fg);
+      background: var(--sn-bg); border: 1px solid var(--sn-border);
+      border-radius: 6px; padding: 4px 7px;
+    }
+    .mg-st-date input:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+
+    .mg-st-range { font-size: 12.5px; color: var(--sn-muted); margin: 0 0 4px; }
+    .mg-st-warn { font-size: 12.5px; color: var(--sn-error); margin: 0 0 4px; }
+    .mg-st-warn[hidden], .mg-st-note[hidden] { display: none; }
+    .mg-st-note { font-size: 12px; color: var(--sn-muted); margin: 0 0 18px; }
+
+    /* I tre numeri. Sono pulsanti: cliccarli apre il dettaglio sotto. */
+    .mg-st-tiles {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px; margin: 14px 0 0;
+    }
+    .mg-st-tile {
+      all: unset; cursor: pointer; box-sizing: border-box;
+      padding: 14px 16px; border-radius: 12px;
+      border: 1px solid var(--sn-border);
+      display: flex; flex-direction: column; gap: 2px;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .mg-st-tile:hover { background: var(--sn-hover); }
+    .mg-st-tile:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-st-tile[aria-expanded="true"] { border-color: var(--sn-accent); background: var(--sn-hover); }
+    .mg-st-tile-num {
+      font-size: 30px; font-weight: 700; color: var(--sn-fg);
+      font-variant-numeric: tabular-nums; line-height: 1.1;
+    }
+    .mg-st-tile-name { font-size: 13px; color: var(--sn-fg); }
+    .mg-st-tile-sub { font-size: 12px; color: var(--sn-muted); }
+    /* La freccetta dice che sotto c'è dell'altro: senza, un numero cliccabile
+       sembra solo un numero. */
+    .mg-st-tile-more { font-size: 11px; color: var(--sn-muted); margin-top: 4px; }
+    .mg-st-tile[aria-expanded="true"] .mg-st-tile-more { color: var(--sn-accent); }
+
+    .mg-st-drawer { margin: 12px 0 0; }
+    .mg-st-drawer[hidden] { display: none; }
+
+    /* Una riga di ripartizione: etichetta, barra proporzionale, numero. */
+    .mg-st-rows { list-style: none; margin: 0; padding: 0; }
+    .mg-st-row {
+      display: grid; grid-template-columns: minmax(120px, 190px) 1fr auto;
+      align-items: center; gap: 12px;
+      padding: 6px 4px; font-size: 13px;
+    }
+    .mg-st-row-label { color: var(--sn-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mg-st-row-bar { height: 8px; border-radius: 999px; background: var(--sn-hover); overflow: hidden; }
+    .mg-st-row-fill { display: block; height: 100%; border-radius: 999px; background: var(--sn-accent); }
+    .mg-st-row-num {
+      color: var(--sn-fg); font-variant-numeric: tabular-nums; font-weight: 600;
+      min-width: 3.5em; text-align: right;
+    }
+    .mg-st-row-pct { color: var(--sn-muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+
+    .mg-st-section { margin-top: 34px; }
+    .mg-st-section h3 { font-size: 15px; margin: 0 0 3px; }
+    .mg-st-section-desc { font-size: 12.5px; color: var(--sn-muted); margin: 0 0 14px; }
+
+    /* La torta e la sua legenda, affiancate finché c'è spazio. */
+    .mg-st-pies { display: flex; flex-wrap: wrap; gap: 34px; }
+    .mg-st-pie { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .mg-st-pie svg { display: block; flex: 0 0 auto; }
+    .mg-st-legend { list-style: none; margin: 0; padding: 0; min-width: 190px; }
+    .mg-st-legend li {
+      display: flex; align-items: center; gap: 9px;
+      padding: 3px 0; font-size: 13px; color: var(--sn-fg);
+    }
+    .mg-st-swatch { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+    .mg-st-legend-val {
+      margin-left: auto; color: var(--sn-muted);
+      font-variant-numeric: tabular-nums; padding-left: 14px;
+    }
+    .mg-st-avg { font-size: 13px; color: var(--sn-fg); margin: 14px 0 0; }
+    .mg-st-avg strong { font-size: 17px; }
+
+    /* L'andamento: una barretta per giorno/settimana/mese. */
+    .mg-st-spark { display: flex; align-items: flex-end; gap: 3px; height: 76px; margin-top: 4px; }
+    .mg-st-spark-bar {
+      flex: 1 1 0; min-width: 2px; border-radius: 3px 3px 0 0;
+      background: var(--sn-accent); opacity: 0.75; min-height: 2px;
+    }
+    .mg-st-spark-bar:hover { opacity: 1; }
+    .mg-st-spark-bar--zero { background: var(--sn-border); opacity: 1; }
+    .mg-st-spark-axis {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--sn-muted); margin-top: 6px;
+    }
+    .mg-st-empty { font-size: 13px; color: var(--sn-muted); padding: 22px 0; }
+    .mg-st-empty[hidden] { display: none; }
+
     /* ── Layout 3 colonne della sezione Revisione ──────────────────────── */
     /* Le due colonne esterne hanno larghezza fissa, decisa dall'utente
        trascinando i divisori (JS riscrive grid-template-columns e persiste le
