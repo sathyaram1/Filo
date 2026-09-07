@@ -3458,6 +3458,7 @@
       }
       stWorkerLog = Array.isArray(r.entries) ? r.entries : [];
       stWorkerLogError = '';
+      stWorkerLogVisto = true;
     } catch (err) {
       console.error('[manage] statistiche: registro dei worker non letto:', err);
       stWorkerLogError = 'non raggiungibile';
