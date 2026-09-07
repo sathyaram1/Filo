@@ -302,9 +302,10 @@ test('#497 — stress sul tasto: doppio clic, aperture in sequenza, tasti specia
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
   const html = await page.locator('#mgThread').innerHTML();
   expect(html).not.toContain('<script>');
-  expect(html).not.toContain('onerror=');
+  expect(html).not.toContain('<img');
   const testo = await page.locator('#mgThread').innerText();
   expect(testo).toContain('alert(1)');
+  expect(await page.evaluate(() => document.querySelectorAll('#mgThread img, #mgThread script').length)).toBe(0);
 });
 
 test('#497 — 10.000 caratteri incollati nella casella', async ({ openTab }) => {
