@@ -2583,8 +2583,8 @@
       // SEMPRE, anche se intanto si sta guardando un altro feedback, o il
       // salvataggio successivo verrebbe di nuovo inghiottito.
       userNoteSpedito.set(id, FRASE_IGNOTA);
-      if (selectedId !== id) return;
-      setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
+      if (selectedId === id) setUserNoteMsg(e.message || 'Errore nel salvataggio', 'err');
+      return false;
     } finally {
       mgUserNoteBtn.disabled = false;
     }
