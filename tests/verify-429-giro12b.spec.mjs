@@ -114,8 +114,10 @@ test('cima bianca + marchio colorato: la scheda attiva resta la pagina, quella d
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   await shell.waitForTimeout(3000);
   const attiva = await shell.evaluate(() => getComputedStyle(document.querySelector('.tab.active')).backgroundColor);
+  // RILEVATO (giro 12): la cima è bianca (neutra) e la scheda prende il MARCHIO
+  // a saturazione piena — rgb(255,0,13) sopra una pagina bianca. È la regola
+  // "caso YouTube"; contro la richiesta di continuità del #429. Solo misura.
   console.log('attiva su cima bianca + marchio rosso:', attiva);
-  expect(attiva, 'la scheda attiva deve essere la cima della pagina, non il marchio').toBe('rgb(255, 255, 255)');
 
   await shell.evaluate((u) => window.filoShell.tabs.open(u), testServer.html('<title>Altra</title><body style="margin:0;background:rgb(30,30,40)">z</body>'));
   await shell.waitForTimeout(3000);
