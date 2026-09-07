@@ -3261,9 +3261,8 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
-  function stDataParlata(iso) {
-    const ms = ST.toMillis(iso);
-    if (ms == null) return '';
+  function stDataParlataMs(ms) {
+    if (ms == null || !Number.isFinite(ms)) return '';
     try {
       return new Date(ms).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
     } catch (_) {
