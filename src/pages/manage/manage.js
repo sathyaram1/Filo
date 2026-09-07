@@ -4027,16 +4027,6 @@
     if (!smLoaded && !smLoading) loadSupportModels();
   });
 
-  // Tab "Statistiche feedback": si ridisegna a OGNI apertura. I feedback sono
-  // già in pagina (li tiene aggiornati il giro continuo), il registro delle
-  // esecuzioni è una lettura di documento sola: rileggerlo a ogni clic costa
-  // niente e mostra quello che è partito nel frattempo.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'fbstats') return;
-    stOpen();
-  });
-
   // Tab "Log": ricarica il log dei worker a OGNI apertura (non solo la prima) —
   // vogliamo vedere gli spawn nuovi dall'ultima volta. È una singola lettura di
   // documento, quindi rileggerla a ogni click è a costo trascurabile.
