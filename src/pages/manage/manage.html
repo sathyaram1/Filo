@@ -403,7 +403,17 @@
     /* La torta e la sua legenda, affiancate finché c'è spazio. */
     .mg-st-pies { display: flex; flex-wrap: wrap; gap: 34px; }
     .mg-st-pie { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    /* Il nome della torta sta sopra, su una riga sua: due torte affiancate
+       senza nome sono indistinguibili quando ognuna è un cerchio pieno. */
+    .mg-st-pie-name {
+      flex: 0 0 100%; margin: 0; font-size: 13px; font-weight: 600;
+      color: var(--sn-text);
+    }
     .mg-st-pie svg { display: block; flex: 0 0 auto; }
+    /* Una fetta che si apre si comporta come la sua voce di legenda: stesso
+       puntatore, stessa risposta al passaggio del mouse, stesso clic. */
+    .mg-st-pie svg [data-apribile] { cursor: pointer; }
+    .mg-st-pie svg [data-apribile]:hover { opacity: 0.82; }
     .mg-st-legend { list-style: none; margin: 0; padding: 0; min-width: 190px; }
     .mg-st-legend li {
       display: flex; align-items: center; gap: 9px;
