@@ -113,6 +113,10 @@
   // passava per promozione (feedback #565). Sei caratteri perché una frase vera
   // («Nel caso [2] ho provato…») ha più parole davanti, e resta testo.
   const LIVELLO_VICINO = new RegExp(`^.{0,6}?(${PARENTESI_QUALUNQUE})`);
+  // La stessa rete per il livello scritto BENE ma con davanti qualcosa che
+  // il lettore non conosce («(a) [2] …»): lì la prima parentesi non è il
+  // livello, e cercarla come prima cosa la mancava.
+  const QUADRA_VICINA = new RegExp(`^.{0,8}?(${LEVEL_TOKEN_SRC})`);
   // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
@@ -167,7 +171,7 @@
         continue;
       }
       const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
-      const parentesiStorta = !!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]);
+      const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1])) || QUADRA_VICINA.test(raw.trim());
       if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
         flush();
         out.push(raw.trim());

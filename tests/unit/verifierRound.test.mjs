@@ -318,3 +318,24 @@ ${forma}`;
     assert.equal(R.unparsedLevelLines(buona).length, 0, `«${buona}» è testo, non un livello`);
   }
 });
+
+// La rete finale: qualunque cosa stia davanti al livello. Elencare i modi di
+// elencare ammessi è una rincorsa che si perde — ogni forma dimenticata era
+// una bocciatura letta come promozione (feedback #565).
+test('un rilievo scritto dopo un modo di elencare che il lettore non conosce non passa per riassunto', () => {
+  for (const davanti of ['— ', '+ ', '1.1 ', '100. ', '(a) ', '_', '`', '▪ ']) {
+    const testo = `Provato tutto, il resto regge bene.
+${davanti}[2] il pulsante non salva`;
+    assert.equal(R.unparsedLevelLines(testo).length, 1, `«${davanti}[2]» non deve finire nel riassunto`);
+    assert.equal(R.parseFindings(testo).findings.length, 0);
+  }
+  // E il testo vero resta testo: una frase con le parentesi in mezzo, o una
+  // parentesi che non dice un livello, non vengono respinte.
+  for (const buona of [
+    'Nel caso [2] ho provato tutto e regge',
+    'ho ri-provato la porta [2] del giro scorso',
+    'Provato tutto (anche il tema scuro) e regge.',
+  ]) {
+    assert.equal(R.unparsedLevelLines(buona).length, 0, `«${buona}» è testo`);
+  }
+});
