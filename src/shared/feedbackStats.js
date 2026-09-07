@@ -528,7 +528,16 @@
     const nBarre = Math.max(1, Math.min(MAX_BARRE, Math.ceil((aMs - daMs) / bucket.ms)));
     const barre = [];
     for (let i = 0; i < nBarre; i += 1) {
-      barre.push({ from: daMs + i * bucket.ms, to: daMs + (i + 1) * bucket.ms, count: 0 });
+      const from = daMs + i * bucket.ms;
+      // Le barrette sono tutte larghe uguale, quindi l'ultima finisce sempre
+      // OLTRE la fine della finestra: fino a un secchio più in là. Scritta così
+      // com'è, l'etichetta in fondo all'asse prometteva un periodo che non è
+      // ancora successo (con «Sempre» una data di venti giorni nel futuro, e
+      // partendo dal 1900 il «29/11/2028» sotto una riga che diceva «a oggi»).
+      // La barretta resta larga uguale, la sua FINE dichiarata no: si ferma
+      // dove finisce la finestra.
+      const to = daMs + (i + 1) * bucket.ms;
+      barre.push({ from, to: Math.max(from + 1, Math.min(to, aMs)), count: 0 });
     }
     for (const it of selezionati) {
       const i = Math.min(nBarre - 1, Math.max(0, Math.floor((it.ms - daMs) / bucket.ms)));
