@@ -241,6 +241,13 @@
     function azzeraRivendicazioni() { escFortiDiFila = 0; escDeboliDiFila = 0; }
     window.addEventListener('mousedown', azzeraRivendicazioni, { capture: true });
 
+    // L'Esc che stiamo guardando ce l'ha consegnato il main invece di lasciarlo
+    // arrivare da sé? Succede quando lo schermo pieno è del SITO: lì il browser
+    // il tasto se lo mangia per uscire, e senza questa consegna nessun riquadro
+    // di Filo lo vedrebbe mai (#514, giro 10). Quando è consegnato, la deroga
+    // qui sotto non vale: il main ha già deciso che quel tasto passa di qui.
+    let escInoltrato = false;
+
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') { azzeraRivendicazioni(); return; }
       if (!contentFullscreen) return;
@@ -248,7 +255,7 @@
       // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
       // browser la fa uscire e il main ripristina la barra da solo. Chiedere
       // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
-      if (document.fullscreenElement) return;
+      if (document.fullscreenElement && !escInoltrato) return;
       escInCorso = {
         ev: e,
         pezziPrima: pezziDiFiloSullaPagina(),
