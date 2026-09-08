@@ -65,15 +65,14 @@
     return el;
   }
 
-  // Quelle vive adesso. Le altre le buttiamo mentre passiamo: chi si è chiuso
-  // non torna più (chi riapre passa da `mark()` con un elemento nuovo).
+  // Quelle attaccate al documento adesso. Non si pota qui: `mark()` arriva anche
+  // un istante prima dell'inserimento, e una potatura fatta in mezzo butterebbe
+  // via un riquadro che stava per nascere. A tenere corto l'elenco pensa il
+  // tetto di `mark()`.
   function aperti() {
     const vive = [];
     try {
-      for (const el of nostre) {
-        if (el && el.isConnected) vive.push(el);
-        else nostre.delete(el);
-      }
+      for (const el of nostre) if (el && el.isConnected) vive.push(el);
     } catch (_) {}
     return vive;
   }
