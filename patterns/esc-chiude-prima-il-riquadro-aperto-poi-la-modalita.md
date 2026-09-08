@@ -5,9 +5,9 @@
 **La regola.** Un Esc che il main intercetta per uscire da una modalità (oggi lo
 schermo intero) non è suo finché la pagina non ha finito col tasto. Il main
 mette l'uscita **in attesa** e la fa partire solo se nessuno se l'è preso. Chi
-se lo prende lo dichiara come si fa nel web: `preventDefault()` e
-`stopPropagation()` nel proprio gestore. Nessun riquadro deve iscriversi da
-nessuna parte.
+se l'è preso non deve dirlo a nessuno: lo si vede da fuori, perché il riquadro
+che si chiude sparisce. Nessun riquadro si iscrive da nessuna parte e nessuno
+deve ricordarsi di dichiarare niente.
 
 **Il caso.** #514 chiedeva che Esc facesse uscire dallo schermo intero. La prima
 soluzione lo intercettava in `before-input-event`, cioè prima che il documento
