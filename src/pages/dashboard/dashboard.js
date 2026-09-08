@@ -1028,7 +1028,17 @@
         if (failed) wrap.dataset.failed = '1';
         head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
       },
-      remove() { wrap.remove(); },
+      // L'utente ha smesso di aspettare (#520): il blocco si chiude dicendo
+      // proprio quello. Non è un tentativo fallito e non va marcato come tale:
+      // non è successo niente di sbagliato, è stato lui a fermarlo. Se dentro
+      // non c'era ancora niente da leggere, il blocco sparisce.
+      interrotta() {
+        closeTurnReasoning();
+        chiudiAttesa();
+        if (!items) { wrap.remove(); setPhase('done', ''); return; }
+        setPhase('done', `Attesa interrotta · ${fmtActivityDuration(Date.now() - startedAt)}`);
+      },
+      remove() { clearInterval(tick); wrap.remove(); },
     };
   }
 
