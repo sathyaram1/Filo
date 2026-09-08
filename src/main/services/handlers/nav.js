@@ -155,6 +155,18 @@ module.exports = function register(on, ctx) {
     return { ok: true, fullscreen: !!win?._filoTabs?.contentFullscreen };
   });
 
+  on(MSG.FILO_BOX_OPEN, async (msg, sender) => {
+    // La scheda ci dice se ha un riquadro di Filo aperto (menu del tasto
+    // destro, riquadro della risposta, immagine a tutta pagina). Lo usiamo per
+    // una cosa sola: a tutto schermo l'Esc lo prende il main prima della
+    // pagina, e con un riquadro aperto deve invece lasciarglielo (#514).
+    // Nessun gate d'origine: dice solo "ho una cosa mia aperta", e vale sulla
+    // scheda che parla, mai su un'altra.
+    const win = winOf(sender);
+    win?._filoTabs?.setTabFiloBox(sender?.tab?.id, !!(msg && msg.open));
+    return { ok: true };
+  });
+
   on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
     const win = winOf(sender);
     if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
