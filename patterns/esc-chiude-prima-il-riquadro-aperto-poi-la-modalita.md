@@ -134,8 +134,8 @@ un Esc, e si concede tutto il resto — senza gestore Electron concede, quindi i
 `callback(true)` finale tiene il comportamento di prima su ogni altro permesso.
 Rifiutare **lì** e non a cose fatte è l'unico posto che funziona: quando arriva
 `enter-html-full-screen` la finestra è già passata a tutto schermo (l'evento
-della finestra arriva prima) e la modalità è già stata adottata. Lo stato «l'
-ultimo tasto era l'Esc» si scrive in `before-input-event`, che arriva prima che
+della finestra arriva prima) e la modalità è già stata adottata. Lo stato
+«l'ultimo tasto era l'Esc» si scrive in `before-input-event`, che arriva prima che
 il documento veda il tasto, e si cancella al primo input che Esc non è — un
 clic, un'altra lettera. La prova sta in `tests/verify-514-g7.spec.mjs` e
 `tests/verify-514-g7b.spec.mjs`, con la controprova della stessa pagina senza
