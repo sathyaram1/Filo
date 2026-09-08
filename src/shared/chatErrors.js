@@ -79,6 +79,19 @@
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
     if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED' || e.code === 'NO_MODEL_FOR_ACTION')) return raw;
 
+    // Attesa interrotta perché il servizio ha smesso di rispondere (#520): è
+    // il caso in cui prima si restava per sempre su "sta pensando". Va prima di
+    // tutto il resto perché l'errore non porta nessuno status da interpretare.
+    if (e && e.code === 'TIMEOUT') {
+      if (e.provider) {
+        return 'il servizio AI ha smesso di rispondere e ho smesso di aspettare. Riprova, o prova con un altro modello nelle Impostazioni.';
+      }
+      const srcT = String(o.dataSource || '').trim();
+      return srcT
+        ? `${srcT} non ha risposto in tempo. Riprova tra poco.`
+        : 'il servizio non ha risposto in tempo. Riprova tra poco.';
+    }
+
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
