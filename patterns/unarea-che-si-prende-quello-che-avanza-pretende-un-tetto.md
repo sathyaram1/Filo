@@ -55,6 +55,9 @@ sintomo di partenza, ricomparso da un'altra porta.
   la metà di quanto aveva a blocco vuoto. Senza il tetto quegli assert devono
   diventare rossi: la controprova sta in
   `tests/verify-498-giro9.spec.mjs`, che rimette a mano i valori di prima.
+  Il tetto non basta provarlo alla misura di finestra predefinita: la stessa
+  prova va rifatta con lo zoom della pagina alzato (una, due, tre tacche) e su
+  finestre più basse, che è dove la mancanza di pressione si vede.
 - **Dove:** `--mg-attesa-max` e `.mg-merge-approvals` in
   `src/pages/manage/manage.html`, test in `tests/manage-layout.spec.mjs`.
 - Vale anche l'altra metà della stessa lezione: se una misura serve a due
