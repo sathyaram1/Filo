@@ -1108,7 +1108,7 @@
       const meta = AUTHOR_META[key] || AUTHOR_META.user;
       parti.push(chip(
         `data-creator="${esc(key)}" title="${esc(meta.label)}"`,
-        `${meta.icon} ${esc(meta.label)}`,
+        `${meta.icon} ${esc(ST_CREATOR_SHORT[key] || meta.label)}`,
         scelti.has(key),
         conteggi[key] || 0,
       ));
