@@ -155,22 +155,23 @@ test.describe('larghezza e separatori stile Chrome', () => {
       return result;
     });
 
-    // Uno pseudo-elemento ha una MISURA solo dopo che il browser l'ha disegnato:
-    // finché non è disegnato `width` torna vuota, e leggerla una volta sola
-    // rendeva questa prova un testa o croce (verde da sola, rossa sotto carico).
-    // Si aspetta la misura, invece di sperare che ci sia già.
-    await expect
-      .poll(async () => (await leggiSeparatori()).inactiveDivider?.width || '', { timeout: 8_000 })
-      .not.toBe('');
-    const probe = await leggiSeparatori();
-
     // La scheda attiva non mostra la sottile linea verticale da 1px (al suo posto
-    // ::after fa da piedino "a goccia", largo 8px — vedi test dedicato).
-    expect(probe.activeDivider).toBeTruthy();
-    expect(probe.activeDivider.width).not.toBe('1px');
-    expect(probe.inactiveDivider).toBeTruthy();
-    expect(probe.inactiveDivider.display).not.toBe('none');
-    expect(probe.inactiveDivider.width).toBe('1px');
+    // ::after fa da piedino "a goccia", largo 8px, vedi test dedicato).
+    // Il verdetto si calcola dentro l'attesa per lo stesso motivo del test qui
+    // sopra: uno pseudo-elemento ha una misura solo dopo che il browser l'ha
+    // disegnato, e prima `width` torna vuota.
+    await expect
+      .poll(async () => {
+        const probe = await leggiSeparatori();
+        const att = probe.activeDivider;
+        const inatt = probe.inactiveDivider;
+        if (!att || !inatt || !att.width || !inatt.width) return 'striscia non ancora disegnata';
+        if (att.width === '1px') return `la scheda attiva mostra il separatore (${att.width})`;
+        if (inatt.display === 'none') return 'le schede inattive non mostrano il separatore';
+        if (inatt.width !== '1px') return `separatore inattivo largo ${inatt.width}`;
+        return 'separatore da 1px solo sulle inattive';
+      }, { timeout: 8_000 })
+      .toBe('separatore da 1px solo sulle inattive');
   });
 
   test('la scheda attiva ha le curve "a goccia" in stile Chrome', async () => {
