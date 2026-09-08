@@ -229,13 +229,18 @@ test('sito ladro senza eventi finti: il tetto delle rivendicazioni regge', async
 // Una pagina dove i nostri script non girano affatto (il visore PDF di
 // Electron): nessuno può rivendicare il tasto, e l'uscita deve partire lo
 // stesso allo scadere dell'attesa.
-test('PDF aperto in una scheda: Esc esce lo stesso dallo schermo intero', async ({ app, openTab }) => {
+test('PDF aperto in una scheda: Esc esce lo stesso dallo schermo intero', async ({ app, shell }) => {
   test.setTimeout(120_000);
   const { pathToFileURL } = await import('node:url');
   const path = await import('node:path');
   const url = pathToFileURL(path.resolve('tests/fixtures/documenti/documento-con-testo.pdf')).href;
-  await openTab(url);
-  await new Promise((r) => setTimeout(r, 2500));
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  await new Promise((r) => setTimeout(r, 4000));
+  const attiva = await app.evaluate(({ BrowserWindow }) => {
+    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    return t.tabs.find((x) => x.id === t.activeId).view.webContents.getURL();
+  });
+  expect(attiva, 'la scheda attiva deve essere il PDF').toContain('.pdf');
   await entra(app);
   expect(await schermoIntero(app)).toBe(true);
   await esc(app);
