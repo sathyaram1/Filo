@@ -839,9 +839,25 @@
     }
     .mg-auto-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css. Qui solo
-       la spaziatura nella pagina. */
-    .mg-merge-approvals { margin: 0 0 20px; }
+    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css. Qui la
+       spaziatura nella pagina e, soprattutto, il TETTO.
+
+       Il riquadro sta sopra le tre aree, dentro la stessa colonna, e cresce
+       quanto sono le richieste: una richiesta ne prende già 266 pixel, e le
+       richieste valgono una settimana, quindi si accumulano. Senza tetto, con
+       due le aree scendevano al loro minimo e la pagina ricominciava a
+       scorrere; con tre le aree uscivano quasi tutte dallo schermo e dei
+       Ricevuti restava la sola intestazione (#498). Oltre il tetto il riquadro
+       scorre dentro di sé: niente sparisce, e quante siano lo dice comunque il
+       titolo ("3 fusioni aspettano il tuo via libera"). `min-height: 0` serve
+       perché è un elemento di una colonna flex, e senza si rifiuterebbe di
+       scendere sotto la propria altezza naturale. */
+    .mg-merge-approvals {
+      margin: 0 0 20px;
+      max-height: var(--mg-attesa-max);
+      min-height: 0;
+      overflow-y: auto;
+    }
     .mg-merge-approvals-recent { margin: 0 0 20px; }
 
     /* ── Sezione "Modelli di supporto" (DD1) ────────────────────────────── */
