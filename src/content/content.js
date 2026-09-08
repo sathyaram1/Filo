@@ -329,7 +329,16 @@
       escInCorso.consumato = !!e.defaultPrevented;
     });
 
+    // Il giro è finito: se sopra la pagina non è rimasto niente di nostro, il
+    // tasto torna al browser. Da lì l'Esc dopo vale come prima, e a nessuno
+    // resta chiesto un tasto che non serve più.
     function decidiEsc() {
+      try { decidiChiEraQuellEsc(); } finally {
+        try { if (!pezziDiFiloSullaPagina().length) restituisciEsc(); } catch (_) {}
+      }
+    }
+
+    function decidiChiEraQuellEsc() {
       const giro = escInCorso;
       escInCorso = null;
       if (!giro || !contentFullscreen) return;
