@@ -98,8 +98,7 @@ ingrandita della home). Il taglio giusto è quello che si è visto succedere:
 Una prova forte riazzera il conto delle deboli: la pagina sta dimostrando di
 fare qualcosa, non di mangiare tasti. Entrambi i conteggi tornano a zero appena
 l'utente fa qualcos'altro, così riaprire un'immagine le ridà il suo tasto. Il
-caso peggiore è un'uscita in ritardo di mezzo istante, mai una modalità senza
-uscite.
+caso peggiore è un'uscita in ritardo, mai una modalità senza uscite.
 
 **Il tetto che vale sta nel main, non nella pagina.** Il conteggio tenuto dal
 content script è il primo filtro, non la garanzia: sta nel mondo isolato, ma
