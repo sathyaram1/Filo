@@ -325,6 +325,7 @@ class TabManager {
     // sistema, assistente): un'uscita rimasta in attesa di una risposta parla
     // di un momento che non c'è più.
     this.annullaUscitaSchermoIntero();
+    this.azzeraRivendicazioniEsc();
     if (this.contentFullscreen === on) return on;
     this.contentFullscreen = on;
     this.layout();
