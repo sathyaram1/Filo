@@ -1,4 +1,4 @@
-// #514 (giro 10) — diagnostica: il menu a tendina di SISTEMA della cronologia.
+// #514 (giro 10) — diagnostica: la tendina di SISTEMA della cronologia.
 import { test, expect } from './fixtures/electron.mjs';
 
 async function stato(app) {
@@ -20,18 +20,40 @@ async function tasto(app, keyCode, mods = []) {
     wc.sendInputEvent({ type: 'keyDown', keyCode: code, modifiers });
     wc.sendInputEvent({ type: 'keyUp', keyCode: code, modifiers });
   }, [keyCode, mods]);
-  await new Promise((r) => setTimeout(r, 1200));
+  await new Promise((r) => setTimeout(r, 1400));
 }
 
-test('diagnostica: tendina di sistema aperta nella cronologia, poi Esc', async ({ app, openTab }) => {
+test('A: cronologia, fuoco sulla tendina, NESSUNA tendina aperta', async ({ app, openTab }) => {
   test.setTimeout(180_000);
   const page = await openTab('filo://history/history.html');
   await page.waitForSelector('#filter', { timeout: 15000 });
   await page.locator('#filter').focus();
   await entra(app);
-  // Apre la tendina di sistema come farebbe la tastiera.
-  await tasto(app, 'Down', ['alt']);
-  console.log('DOPO-APERTURA', JSON.stringify(await stato(app)));
   await tasto(app, 'Escape');
-  console.log('DOPO-ESC', JSON.stringify(await stato(app)));
+  console.log('A-DOPO-ESC1', JSON.stringify(await stato(app)));
+  await tasto(app, 'Escape');
+  console.log('A-DOPO-ESC2', JSON.stringify(await stato(app)));
+});
+
+test('B: cronologia, tendina di sistema aperta con Alt+Giu', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  const page = await openTab('filo://history/history.html');
+  await page.waitForSelector('#filter', { timeout: 15000 });
+  await page.locator('#filter').focus();
+  await entra(app);
+  await tasto(app, 'Down', ['alt']);
+  await tasto(app, 'Escape');
+  console.log('B-DOPO-ESC1', JSON.stringify(await stato(app)));
+  await tasto(app, 'Escape');
+  console.log('B-DOPO-ESC2', JSON.stringify(await stato(app)));
+});
+
+test('C: cronologia, fuoco sul corpo della pagina', async ({ app, openTab }) => {
+  test.setTimeout(180_000);
+  const page = await openTab('filo://history/history.html');
+  await page.waitForSelector('#filter', { timeout: 15000 });
+  await page.evaluate(() => { try { document.activeElement.blur(); } catch (_) {} });
+  await entra(app);
+  await tasto(app, 'Escape');
+  console.log('C-DOPO-ESC1', JSON.stringify(await stato(app)));
 });
