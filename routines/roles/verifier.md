@@ -270,7 +270,8 @@ e niente di più.
 **Se apre una fase di correzione, la correzione la fai tu** (dal 2026-09-05 non
 torna più a chi ha risolto), e prima di consegnarla **rilancia le prove del
 giro**: `npx playwright test tests/verifica/<numero>`, le tue di adesso e
-quelle dei giri prima. Una che diventa rossa è una regressione della tua stessa
+quelle dei giri prima (se quella cartella non c'è, non c'era niente da
+rilanciare). Una che diventa rossa è una regressione della tua stessa
 correzione — la porta che il giro dopo ritroverebbe aperta, ed è per non
 ripagarlo che le prove restano nel ramo. «Niente di più» vale su quali rilievi
 si correggono, non su questa corsa.
