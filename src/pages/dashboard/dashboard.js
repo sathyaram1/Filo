@@ -2894,6 +2894,14 @@
   // (non più un <input>), quindi Invio di suo andrebbe a capo: lo intercettiamo.
   // `isComposing` evita di mandare a metà di una composizione IME.
   inputEl.addEventListener('keydown', (e) => {
+    // Escape mentre Filo sta rispondendo smette di aspettare, come il bottone
+    // «Interrompi» (#520): è il gesto istintivo per uscire, e i due cammini
+    // devono fare la stessa cosa.
+    if (e.key === 'Escape' && chatPending) {
+      e.preventDefault();
+      interrompiTurno();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'));
