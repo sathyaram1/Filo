@@ -3265,6 +3265,7 @@ globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
 module.exports = {
   handleMessage,
   handleStream,
+  getEffectiveSettings,
   broadcastLiveUpdate,
   broadcastToTabs,
   broadcastToFiloPages,

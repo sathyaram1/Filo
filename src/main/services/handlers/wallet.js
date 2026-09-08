@@ -218,7 +218,20 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
-  globalThis.SN_WALLET_MAIN = { recordUsage, outOfCreditsNotice, flush, readState };
+  // Da dove viene la chiave OpenRouter che parte davvero: 'own' (scritta
+  // dall'utente), 'personal' (creata dal server), 'factory' (incastonata,
+  // solo installazioni vecchie), 'none'. Lo legge la pagina Crediti e lo
+  // usano i test.
+  async function keySource() {
+    const s = await ctx.getEffectiveSettings();
+    const k = String((s && s.apiKeys && s.apiKeys.openrouter) || '');
+    if (!k) return 'none';
+    if (await ownKeySet()) return 'own';
+    if (k === walletStore.personalKey()) return 'personal';
+    return 'factory';
+  }
+
+  globalThis.SN_WALLET_MAIN = { recordUsage, outOfCreditsNotice, flush, readState, keySource };
 
   // All'avvio: identità pronta e stato del server letto una volta, così la
   // prima riga del registro ha già i parametri di conversione. In background.

@@ -123,11 +123,7 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   // La chiave personale è arrivata al main e da lì entra nelle chiamate ai
   // modelli: con «usa modelli predefiniti» attivo e nessuna chiave propria,
   // la chiave effettiva è quella personale.
-  const effective = await app.evaluate(async () => {
-    const H = require('./src/main/services/handlers.js');
-    const s = await H.getEffectiveSettings();
-    return s.apiKeys && s.apiKeys.openrouter;
-  });
-  expect(effective).toBe('sk-or-v1-test-personal');
+  const source = await app.evaluate(() => globalThis.SN_WALLET_MAIN.keySource());
+  expect(source).toBe('personal');
   expect(seen.redeems).toEqual(['ZZZZ-9999', 'abcd-efgh']);
 });

@@ -2,6 +2,11 @@
 // TIPO D'USO (non per modello) e movimenti recenti. Il costo in € non viene MAI
 // mostrato — la vista pubblica del motore crediti (publicView) lo elimina già a
 // monte. Vedi src/main/services/creditStore.js + handlers/credits.js.
+//
+// Crediti sul server (#598): se questa installazione ha un portafoglio, il
+// saldo grande è quello che dice il server (tetto della chiave OpenRouter
+// personale meno consumo), non il conteggio locale. Se non lo ha, in cima c'è
+// il campo per riscattare un codice d'invito. Sotto, i propri codici da dare.
 
 (function () {
   'use strict';
@@ -34,11 +39,15 @@
       $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
     }
 
-    const r = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
-    render(r || {});
+    // Le due letture non dipendono l'una dall'altra: partono insieme.
+    const [r, w] = await Promise.all([
+      chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }),
+      chrome.runtime.sendMessage({ type: MSG.WALLET_STATE }).catch(() => null),
+    ]);
+    render(r || {}, w || null);
   }
 
-  function render(r) {
+  function render(r, w) {
     const credits = r.credits || {};
     // Saldo con precisione fino a 1 decimale: un uso leggero consuma frazioni di
     // credito, e arrotondare all'intero le nasconderebbe (il saldo resterebbe
@@ -48,8 +57,123 @@
     $('balance').textContent = formatCredits(bal);
     $('offlineHint').hidden = !!r.signedIn;
 
+    renderWallet(w);
     renderUsage(credits.byUsage || {});
     renderMoves(credits.rewards || []);
+  }
+
+  // ── Crediti sul server (#598) ──────────────────────────────────────────────
+  function renderWallet(w) {
+    const box = $('wallet');
+    if (!w || !w.ok) { box.hidden = true; return; }
+    box.hidden = false;
+    const server = w.server;
+    const has = Boolean(server && server.hasWallet);
+    const note = $('walletNote');
+    note.hidden = true;
+
+    if (has) {
+      // Il saldo vero è quello del server: sostituisce il conteggio locale.
+      const b = server.balance || {};
+      if (b.credits != null) $('balance').textContent = formatCredits(b.credits);
+      $('offlineHint').hidden = true;
+      const daily = Number(server.dailyCredits) || 0;
+      $('refillHint').textContent = daily > 0
+        ? `Ricevi +${formatInt(daily)} crediti ogni giorno, e si accumulano.`
+        : 'I crediti li tiene il server.';
+      $('redeemForm').hidden = true;
+      if (w.usingOwnKey) {
+        note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo restano fermi finché la tieni.';
+        note.hidden = false;
+      } else if (server.stale) {
+        note.textContent = 'Saldo dell\'ultima lettura: il servizio dei modelli non risponde adesso.';
+        note.hidden = false;
+      } else if (!w.hasPersonalKey) {
+        note.textContent = 'La chiave personale non è su questo computer: i crediti ci sono, ma questa copia di Filo non li può usare.';
+        note.hidden = false;
+      }
+      renderInvites(server.invites || []);
+      return;
+    }
+
+    // Nessun portafoglio: si entra con un invito.
+    $('invitesSection').hidden = true;
+    const form = $('redeemForm');
+    form.hidden = false;
+    if (w.identity && !w.identity.ok) {
+      note.textContent = w.identity.error || 'Non riesco a preparare l\'identità di questa installazione.';
+      note.hidden = false;
+    } else if (w.error === 'not_reachable') {
+      note.textContent = 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
+      note.hidden = false;
+    } else if (server && server.invitesOpen === false) {
+      note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';
+      note.hidden = false;
+    }
+  }
+
+  function renderInvites(invites) {
+    const section = $('invitesSection');
+    const list = $('invites');
+    list.innerHTML = '';
+    section.hidden = invites.length === 0;
+    for (const inv of invites) {
+      const li = document.createElement('li');
+      li.className = 'sn-wallet-invite' + (inv.used ? ' is-used' : '');
+      li.dataset.code = inv.code;
+
+      const code = document.createElement('button');
+      code.type = 'button';
+      code.className = 'sn-wallet-code';
+      code.textContent = inv.code;
+      code.title = inv.used ? 'Già usato' : 'Copia';
+      code.disabled = Boolean(inv.used);
+      code.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(inv.code); } catch (_) {}
+        const prev = code.textContent;
+        code.textContent = 'Copiato';
+        code.classList.add('is-copied');
+        setTimeout(() => { code.textContent = prev; code.classList.remove('is-copied'); }, 1200);
+      });
+
+      const state = document.createElement('span');
+      state.className = 'sn-wallet-invite-state';
+      state.textContent = inv.used ? `usato${inv.usedAt ? ' il ' + formatDate(inv.usedAt) : ''}` : 'da dare';
+
+      li.append(code, state);
+      list.appendChild(li);
+    }
+  }
+
+  async function redeem(ev) {
+    ev.preventDefault();
+    const input = $('inviteCode');
+    const btn = $('redeemBtn');
+    const msg = $('redeemMsg');
+    const code = String(input.value || '').trim();
+    if (!code) { input.focus(); return; }
+    btn.disabled = true;
+    input.disabled = true;
+    msg.hidden = false;
+    msg.classList.remove('is-error', 'is-ok');
+    msg.textContent = 'Un attimo…';
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({ type: MSG.WALLET_REDEEM, code });
+    } catch (_) { r = null; }
+    btn.disabled = false;
+    input.disabled = false;
+    if (r && r.ok) {
+      msg.textContent = r.message || 'Fatto.';
+      msg.classList.add('is-ok');
+      // Il saldo grande e i codici arrivano dallo stato nuovo.
+      render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
+      return;
+    }
+    msg.textContent = (r && r.message) || 'Non ci sono riuscito: riprova.';
+    msg.classList.add('is-error');
+    input.focus();
+    input.select();
   }
 
   function renderUsage(byUsage) {
@@ -191,6 +315,8 @@
       return new Date(ts).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
     } catch (_) { return ''; }
   }
+
+  $('redeemForm').addEventListener('submit', (ev) => { redeem(ev).catch(() => {}); });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
   if (chrome.runtime && chrome.runtime.onMessage) {

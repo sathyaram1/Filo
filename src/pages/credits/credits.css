@@ -71,3 +71,45 @@
 .sn-credits-move-gain { color: var(--sn-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
 .sn-credits-move-label { flex: 1 1 auto; }
 .sn-credits-move-date { color: var(--sn-muted); font-size: 12px; }
+
+/* ── Crediti sul server e inviti (#598) ─────────────────────────────────── */
+.sn-wallet { margin-top: 20px; }
+.sn-wallet-redeem label { display: block; font-weight: 600; margin-bottom: 6px; }
+.sn-wallet-redeem-row { display: flex; gap: 8px; align-items: center; max-width: 420px; }
+.sn-wallet-redeem-row input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border: 1px solid var(--sn-border);
+  border-radius: 10px;
+  background: var(--sn-bg-elev, var(--sn-bg));
+  color: var(--sn-fg);
+}
+.sn-wallet-redeem-row input:focus { outline: none; border-color: var(--sn-accent); }
+.sn-wallet-msg { margin: 8px 0 0; }
+.sn-wallet-msg.is-error { color: var(--sn-danger, #c45a3b); }
+.sn-wallet-msg.is-ok { color: var(--sn-accent); }
+.sn-wallet-note { margin-top: 8px; }
+
+.sn-wallet-invites { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.sn-wallet-invite { display: flex; align-items: center; gap: 10px; }
+.sn-wallet-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  padding: 6px 12px;
+  border: 1px dashed var(--sn-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sn-fg);
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
+}
+.sn-wallet-code:hover:not(:disabled) { background: var(--sn-hover, rgba(0,0,0,.05)); border-color: var(--sn-accent); }
+.sn-wallet-code:active:not(:disabled) { transform: scale(.97); }
+.sn-wallet-code.is-copied { border-style: solid; border-color: var(--sn-accent); color: var(--sn-accent); }
+.sn-wallet-invite.is-used .sn-wallet-code { text-decoration: line-through; opacity: .55; cursor: default; }
+.sn-wallet-invite-state { color: var(--sn-muted); font-size: 13px; }
