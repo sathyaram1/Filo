@@ -116,28 +116,15 @@ test.describe('larghezza e separatori stile Chrome', () => {
     await expect(shell.locator('.tab')).toHaveCount(3, { timeout: 8_000 });
     await expect(shell.locator('.tab.active')).toHaveCount(1);
 
-    // Attendi che il layout flex si assesti: subito dopo l'apertura la riga di
-    // tab può misurare 0px per un frame (corsa di layout), falsando i confronti.
-    await expect
-      .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
-      .toBeGreaterThan(0);
-
-    const widths = await shell.locator('.tab').evaluateAll((els) =>
-      els.map((el) => ({
-        active: el.classList.contains('active'),
-        width: el.getBoundingClientRect().width,
-      })),
-    );
-
-    const active = widths.find((w) => w.active);
-    const inactive = widths.filter((w) => !w.active);
-    expect(active).toBeTruthy();
-    expect(inactive.length).toBeGreaterThan(0);
-
     // La tab attiva deve essere strettamente più larga di OGNI tab inattiva.
-    for (const t of inactive) {
-      expect(active.width).toBeGreaterThan(t.width);
-    }
+    // Il verdetto si CALCOLA dentro l'attesa, non dopo: la striscia si ridisegna
+    // quando il main annuncia le schede, e per un frame le tab esistono nel DOM
+    // senza avere ancora una misura. Misurare fuori dall'attesa leggeva 0 a caso
+    // (verde da sola, rossa sotto carico). Se il CSS regredisce l'attesa scade e
+    // il messaggio riporta le larghezze vere.
+    await expect
+      .poll(async () => verdettoLarghezze(3), { timeout: 8_000 })
+      .toBe('attiva più larga');
   });
 
   test('le tab si toccano e usano un separatore verticale in stile Chrome', async () => {
