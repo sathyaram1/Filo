@@ -7,7 +7,7 @@
 //   mazzi: nella home, che è la prima in cui si scrive, l'attesa restava muta.
 //   Due chat che mostrano la stessa attesa devono mostrarla allo stesso modo,
 //   quindi la regola sta qui una volta sola (vedi
-//   patterns/due-cose-con-lo-stesso-nome-una-regola-sola-e-la-regola.md).
+//   patterns/sezioni-con-lo-stesso-nome-una-regola-sola-e-la-regola.md).
 //
 // API
 //   SN_ATTESA.etichetta(startedAt, adesso?) → '' | '12s' | '2m 05s'
