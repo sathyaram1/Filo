@@ -1350,12 +1350,23 @@
     const ask = ids.filter((id) => refresh
       || (!opinionsByCard.has(id) && !opinionPending.has(id)));
     if (!ask.length || !current) return;
-    for (const id of ask) opinionPending.add(id);
+    for (const id of ask) { opinionPending.add(id); opinionFailed.delete(id); }
     try {
       const r = await send({ type: MSG.DECKS_OPINION, deckId: current.id, cardIds: ask, compute: true, refresh });
       if (r && r.ok) {
         for (const [id, op] of Object.entries(r.opinions || {})) opinionsByCard.set(id, op);
+        // Chiesto e non tornato vale come non riuscito: se non lo registrassimo,
+        // la richiesta ripartirebbe al ridisegno subito dopo, all'infinito.
+        for (const id of ask) {
+          if (!opinionsByCard.has(id)) opinionFailed.set(id, 'parere non disponibile');
+        }
+      } else {
+        const motivo = (r && r.error) || 'nessuna risposta';
+        for (const id of ask) opinionFailed.set(id, motivo);
       }
+    } catch (e) {
+      const motivo = (e && e.message) || 'errore di rete';
+      for (const id of ask) opinionFailed.set(id, motivo);
     } finally {
       for (const id of ask) opinionPending.delete(id);
     }
