@@ -201,17 +201,28 @@ parentesi quadre**. Le righe che seguono un rilievo senza livello davanti sono
 la sua continuazione (i passi per riprodurlo). Nessun rilievo = verifica
 superata.
 
-**Prima di registrare la critica, pulisci la directory**: togli le spec
-temporanee che hai scritto e porta la directory a un commit. Il salvataggio
-automatico parte solo a un Edit o a un Write: dopo un `rm` dalla shell non
-arriva da solo, e aspettarlo è aspettare niente — committa tu la pulizia
-(`git add -A && git commit -m "verifica: pulizia"`). Il pass vale per il
-commit di quel momento; con file non registrati in giro il salvataggio li
-committerebbe dopo, la punta del ramo si sposterebbe e il cancello di fusione
-respingerebbe il lavoro come non verificato. La registrazione rifiuta una
-directory sporca e ti stampa l'elenco (vale anche in locale, con
-`verify-local.mjs critica`): non è un rilievo, è da sistemare e riprovare con
-la stessa critica.
+**Le tue prove restano nel ramo.** Le spec con cui riproduci la lamentela e
+apri le porte vanno in `tests/verifica/<numero>/giro<k>-<cosa>.spec.mjs`
+(il numero del feedback senza cancelletto; con `FILO_TEST_SCALE` e le
+fixture del repo, come ogni altro spec) e si committano prima di registrare
+la critica. Non si cancellano: sono la memoria del giro. Chi corregge le
+rilancia prima di consegnare, il giro dopo le ritrova pronte, e dopo la
+fusione restano nella suite come test di regressione. Nei giri di agosto e
+settembre un giro su tre trovava una porta già chiusa dal giro prima e
+riaperta dalla correzione: le prove venivano cancellate a ogni giro, e nessuno
+le rilanciava. Se una prova era solo esplorazione e non vale come test
+(dipende dall'ambiente, o non asserisce niente), cancellala e basta.
+
+**Prima di registrare la critica, porta la directory a un commit.** Il
+salvataggio automatico parte solo a un Edit o a un Write: dopo un `rm` o un
+`mv` dalla shell non arriva da solo, e aspettarlo è aspettare niente —
+committa tu (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`).
+Il pass vale per il commit di quel momento; con file non registrati in giro il
+salvataggio li committerebbe dopo, la punta del ramo si sposterebbe e il
+cancello di fusione respingerebbe il lavoro come non verificato. La
+registrazione rifiuta una directory sporca e ti stampa l'elenco (vale anche in
+locale, con `verify-local.mjs critica`): non è un rilievo, è da sistemare e
+riprovare con la stessa critica.
 
 **Le parentesi quadre con dentro un livello sono SEMPRE un rilievo**, dovunque
 stiano nella riga: nel riassunto un livello si cita **a parole** («il livello
