@@ -35,31 +35,61 @@ const LETTORE = `<!doctype html><html><body style="margin:0;height:1200px">
 
 const menuAperto = (page) => page.evaluate(() => !!document.querySelector('.sn-menu'));
 
-test('diagnostica: schermo pieno del sito + menu di Filo + Esc', async ({ app, openTab, testServer }) => {
+async function vaiAPienoDelSito(app, page) {
+  await page.locator('#fs').click();
+  await expect.poll(async () => (await stato(app)).cf, { timeout: 8000 }).toBe(true);
+}
+
+// ── QR code aperto sopra lo schermo pieno del sito ───────────────────────────
+test('diagnostica: schermo pieno del sito + QR + Esc', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, LETTORE);
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-
-  await page.locator('#fs').click();
-  await expect.poll(async () => (await stato(app)).cf, { timeout: 8000 }).toBe(true);
-  const dopoFs = await stato(app);
+  await vaiAPienoDelSito(app, page);
 
   await page.locator('#t').click({ button: 'right' });
   await expect.poll(() => menuAperto(page), { timeout: 8000 }).toBe(true);
-  await new Promise((r) => setTimeout(r, 400));
-  await page.evaluate(() => { window.__tasti = []; });
+  const voce = page.locator('[data-sn-icon-id="qrCode"]');
+  if (await voce.count() === 0) await page.locator('.sn-menu-row-overflow').first().click();
+  await voce.first().click();
+  await new Promise((r) => setTimeout(r, 1200));
+  const qrAperto = () => page.evaluate(() => !!document.querySelector('.sn-popup, .sn-qr, [class*="qr"]'));
+  console.log('QR-APERTO-PRIMA', await qrAperto(), 'MENU', await menuAperto(page));
 
-  const traccia = [];
-  for (let i = 0; i < 3; i++) {
-    await esc(app);
-    traccia.push({
-      esc: i + 1,
-      menu: await menuAperto(page),
-      ...(await stato(app)),
-      fsElem: await page.evaluate(() => !!document.fullscreenElement),
-      tasti: await page.evaluate(() => window.__tasti.slice()),
-    });
+  await esc(app);
+  console.log('DOPO-ESC-1', JSON.stringify({
+    qr: await qrAperto(), menu: await menuAperto(page), ...(await stato(app)),
+    tasti: await page.evaluate(() => window.__tasti.slice()),
+  }));
+});
+
+// ── Il menu che resta aperto dopo il primo Esc: che nome porta la voce? ──────
+test('diagnostica: il menu rimasto aperto dopo l\'uscita', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, LETTORE);
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await vaiAPienoDelSito(app, page);
+
+  await page.locator('#t').click({ button: 'right' });
+  await expect.poll(() => menuAperto(page), { timeout: 8000 }).toBe(true);
+  const voce = page.locator('[data-sn-icon-id="fullscreen"]');
+  if (await voce.count() === 0) await page.locator('.sn-menu-row-overflow').first().click();
+  await expect(voce.first()).toBeVisible({ timeout: 8000 });
+  console.log('ETICHETTA-PRIMA', await voce.first().getAttribute('aria-label'), '|', (await voce.first().innerText()).slice(0, 60));
+
+  await esc(app);
+  console.log('DOPO-ESC', JSON.stringify({ menu: await menuAperto(page), ...(await stato(app)) }));
+  if (await voce.count() > 0) {
+    console.log('ETICHETTA-DOPO', await voce.first().getAttribute('aria-label'), '|', (await voce.first().innerText()).slice(0, 60));
   }
-  console.log('DOPO-FS', JSON.stringify(dopoFs));
-  console.log('TRACCIA', JSON.stringify(traccia, null, 1));
+});
+
+// ── E se il sito è a schermo pieno ma nessun riquadro è aperto? ──────────────
+test('diagnostica: schermo pieno del sito senza riquadri — un Esc basta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, LETTORE);
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await vaiAPienoDelSito(app, page);
+  await esc(app);
+  console.log('SENZA-RIQUADRI', JSON.stringify(await stato(app)));
 });
