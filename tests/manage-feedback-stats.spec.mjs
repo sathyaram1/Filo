@@ -208,7 +208,7 @@ test('le partenze delle routine arrivano dal registro dei worker, con la riparti
       { role: 'verifier', startedAt: iso(3), num: '#3' },
       { role: 'prober', startedAt: iso(40), num: '#4' },
     ]);
-  }, GIORNO);
+  });
 
   await expect(valore(page, 'routine')).toHaveText('2');
   const dettaglio = page.locator('[data-card-detail="routine"]');
