@@ -9,7 +9,6 @@
 //    l'annuncio dello schermo intero non ci arriva: il riquadro non sa in che
 //    modalità si trova, la voce del menu sbaglia nome e l'Esc costa la
 //    modalità;
-//  · un sito che si prende l'Esc prima che ci arrivi il menu di Filo;
 //  · una pagina occupata quando l'Esc viene premuto: la sua risposta arriva
 //    tardi e la modalità è già uscita;
 //  · la controprova sul verso opposto: un sito deve poter ancora andare a
