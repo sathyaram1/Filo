@@ -351,35 +351,63 @@ class TabManager {
   //
   // `tabId` è la scheda da cui arriva il tasto, `null` se arriva dalla barra.
   // Ritorna true se ha gestito il tasto: chi chiama fa il preventDefault.
-  // Una scheda dice se ha aperto o chiuso un riquadro di Filo che si chiude
-  // con Esc. Idempotente, e tollerante a un id che non c'è più.
-  setTabFiloBox(tabId, open) {
-    if (tabId == null) return;
-    if (open) this.tabsWithFiloBox.add(tabId);
-    else this.tabsWithFiloBox.delete(tabId);
-  }
-
+  //
+  // La regola, in una riga: **l'Esc premuto sulla pagina è prima della pagina,
+  // e la modalità esce solo se nessuno se l'è preso.** Prendercelo noi prima
+  // che la pagina lo veda vuol dire scavalcare tutto quello che Filo apre sopra
+  // la pagina e che si chiude con Esc — il menu del tasto destro, la risposta,
+  // un'immagine ingrandita, una domanda di conferma, il QR, la selezione di una
+  // parte dello schermo. Erano sei riquadri conosciuti e infiniti da scrivere:
+  // una lista da tenere aggiornata a mano invecchia male, quindi non c'è più
+  // lista (#514). Chi consuma il tasto lo dice (MSG.ESC_CONSUMATO) e l'uscita
+  // in attesa si annulla; chi non dice niente esce, e se la pagina non risponde
+  // affatto (nessun content script, renderer bloccato) esce lo stesso allo
+  // scadere dell'attesa. Il caso peggiore è un'uscita in ritardo di mezzo
+  // istante, mai restare chiusi dentro senza uscite.
   handleFullscreenEscape(tabId = null) {
     if (!this.contentFullscreen) return false;
-    // Seconda deroga: la scheda in primo piano ha un riquadro DI FILO aperto
-    // (menu del tasto destro, riquadro della risposta, immagine a tutta
-    // pagina). L'Esc è del riquadro: lo chiude lui, e solo l'Esc dopo esce
-    // dallo schermo intero. Prendercelo noi lascerebbe il riquadro aperto
-    // sopra la pagina e farebbe perdere lo schermo intero a chi voleva solo
-    // chiudere un riquadro. Se la scheda si sbagliasse (riquadro già chiuso e
-    // avviso non ancora arrivato) non si resta chiusi dentro: il tasto arriva
-    // alla pagina, che rifà il controllo su dati freschi ed esce lei.
-    if (tabId != null && tabId === this.activeId && this.tabsWithFiloBox.has(tabId)) return false;
-    // Unica deroga: il fullscreen l'ha chiesto la PAGINA e il tasto arriva
-    // proprio da lei, mentre è quella in primo piano. Lì l'Esc deve arrivarle:
-    // esce dal suo fullscreen e `leave-html-full-screen` ripristina la shell.
-    // Intercettarlo noi la lascerebbe bloccata a tutto schermo.
+    // Deroga: il fullscreen l'ha chiesto la PAGINA e il tasto arriva proprio da
+    // lei, mentre è quella in primo piano. Lì l'Esc deve arrivarle: esce dal suo
+    // fullscreen e `leave-html-full-screen` ripristina la shell. Nemmeno
+    // l'attesa va armata, perché a spegnere la modalità ci pensa quel giro.
     if (this.pageFullscreen
       && tabId != null
       && tabId === this.pageFullscreenTabId
       && tabId === this.activeId) return false;
-    this.setContentFullscreen(false);
-    return true;
+    // Dalla barra di Filo, o da una scheda che non è quella davanti: la pagina
+    // quel tasto non lo vedrà mai, quindi decidiamo subito noi.
+    if (tabId == null || tabId !== this.activeId) {
+      this.setContentFullscreen(false);
+      return true;
+    }
+    this.armaUscitaSchermoIntero();
+    return false;
+  }
+
+  // Mette l'uscita in attesa: parte solo se nessuno rivendica il tasto.
+  armaUscitaSchermoIntero() {
+    this.annullaUscitaSchermoIntero();
+    this._escUscitaTimer = setTimeout(() => {
+      this._escUscitaTimer = null;
+      if (this.contentFullscreen) this.setContentFullscreen(false);
+    }, ESC_ATTESA_MS);
+    // Un timer non deve tenere sveglio il processo se non c'è altro da fare.
+    try { this._escUscitaTimer.unref?.(); } catch (_) {}
+  }
+
+  annullaUscitaSchermoIntero() {
+    if (!this._escUscitaTimer) return;
+    clearTimeout(this._escUscitaTimer);
+    this._escUscitaTimer = null;
+  }
+
+  // La pagina davanti dice che quell'Esc se l'è preso un riquadro di Filo.
+  // Tollerante sul mittente: le schede in secondo piano il tasto non lo
+  // ricevono, e un riquadro dentro un riquadro incorporato parla per la sua
+  // pagina.
+  escConsumato(tabId = null) {
+    if (tabId != null && tabId !== this.activeId) return;
+    this.annullaUscitaSchermoIntero();
   }
 
   // Attiva/disattiva il "chrome compatto": quando true la barra indirizzi è
