@@ -383,17 +383,28 @@ export function codaText({ findings, derived, budgets, branch, instructions }) {
     'chiedila a chi guida. In ogni caso si correggono SOLO i rilievi dell\'elenco qui sopra, e si consegna con',
     '  node scripts/verify-local.mjs corretto "<report della correzione>"',
   ].join('\n');
-  return [
+  // Le prove del giro le rilancia CHI CORREGGE, prima di consegnare: è la metà
+  // che rende utile tenerle nel ramo. In cloud sta nelle istruzioni del ruolo;
+  // qui la coda arriva da un file fuori dal repo, che non le nomina — quindi la
+  // riga la mette lo strumento, che è la parte che vive nel repo.
+  const cartella = cartellaProveGiro(branch);
+  const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
     'Rilievi da correggere in questo giro (solo questi):',
     fmt(findings),
     'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     fmt(derived),
-    b ? `Bilanci: ${b}` : '',
+  ];
+  if (b) righe.push(`Bilanci: ${b}`);
+  righe.push(
+    '',
+    `Prima di consegnare rilancia le prove del giro (le tue e quelle dei giri prima): npx playwright test ${cartella}`,
+    'Una che diventa rossa è una regressione della correzione. Se quella cartella non c\'è, non c\'era niente da rilanciare.',
     '',
     testo,
-  ].filter((l, i) => l !== '' || i === 7).join('\n');
+  );
+  return righe.join('\n');
 }
 
 // ─── Riallineamento alla linea principale (caso #500) ───────────────────────
