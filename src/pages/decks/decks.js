@@ -1474,14 +1474,23 @@
                 <button class="dk-mod-btn" data-op-refresh="${esc(card.id)}">Aggiorna</button>
               </div>`);
           body = `<p class="dk-op-text">${proseHtml(op.text)}</p>${staleBar}`;
+        } else if (pending) {
+          body = '<p class="dk-mod-note dk-op-pending">Filo sta pensando…</p>';
+        } else if (opinionFailed.has(card.id)) {
+          // Il parere non è arrivato (#520): si dice, e a riprovare è l'utente.
+          body = `<p class="dk-mod-note dk-op-error">Non ha funzionato: ${esc(opinionFailed.get(card.id))}</p>
+            <div class="dk-mod-actions">
+              <button class="dk-mod-btn" data-op-refresh="${esc(card.id)}">Riprova</button>
+            </div>`;
         } else {
-          body = `<p class="dk-mod-note dk-op-pending">${pending ? 'Filo sta pensando…' : 'Chiedo un parere a Filo…'}</p>`;
+          body = '<p class="dk-mod-note dk-op-pending">Chiedo un parere a Filo…</p>';
         }
         host.innerHTML = `<p class="dk-module-title">Parere di Filo</p>${body}`;
         // L'hover con questo modulo attivo È il trigger (§6.1): cache-first.
         // Un parere STANTIO invece non si ricalcola da solo: refresh solo su
-        // richiesta (§6.2), col bottone qui sopra.
-        if (!op && !pending) requestOpinions([card.id]).catch(() => {});
+        // richiesta (§6.2), col bottone qui sopra. Nemmeno un parere FALLITO si
+        // richiede da sé: sarebbe un ciclo di chiamate a pagamento (#520).
+        if (!op && !pending && !opinionFailed.has(card.id)) requestOpinions([card.id]).catch(() => {});
       },
     },
   };
