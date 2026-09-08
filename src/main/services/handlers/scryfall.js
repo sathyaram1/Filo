@@ -176,6 +176,11 @@ module.exports = function register(on, ctx) {
         }
       };
 
+      // Fermato mentre si raccoglieva il contesto: non si chiama il modello
+      // per una risposta che nessuno leggerà (#520).
+      if (ac.signal.aborted) {
+        return { ok: false, aborted: true, error: 'interrotto', ...(reasoning ? { reasoning } : {}) };
+      }
       const r = await handleAIRequest({
         action: ACTIONS.DECKS_CHAT,
         payload: { messages },
