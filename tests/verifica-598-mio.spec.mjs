@@ -363,7 +363,7 @@ test('identità non abilitata sul server: la pagina lo dice', async () => {
     // Riscatto tentato lo stesso: messaggio chiaro
     await page.locator('#inviteCode').fill('XXXX-YYYY');
     await page.locator('#redeemBtn').click();
-    await expect(page.locator('#redeemMsg')).toHaveText(REDEEM_MESSAGES.internal, { timeout: 10000 });
+    await expect(page.locator('#redeemMsg')).toHaveText(REDEEM_MESSAGES.not_reachable, { timeout: 10000 });
     // Il server si sblocca: al prossimo tentativo funziona senza riavviare
     srv.identityMode = 'ok';
     await page.locator('#inviteCode').fill('XXXX-YYYY');
