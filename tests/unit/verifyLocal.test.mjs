@@ -705,14 +705,16 @@ test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un p
   const altra = vl(casa, 'critica', LUNGA_FIX.replace('rotto', 'rotto diversamente'));
   assert.equal(altra.code, 1);
   assert.match(altra.out, /già registrata/);
-  // Pass su un albero sporco: registrato, ma senza promettere la pubblicazione.
+  // Pass su un albero sporco: NON si registra (#256 sulla strada locale — il
+  // salvataggio automatico committerebbe dopo, la punta si sposterebbe e la
+  // chiusura respingerebbe il pass). Si dice quale file, e niente resta scritto.
   _exec('git', ['checkout', '-q', '-b', 'claude/sporco'], { cwd: casa });
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   _write(resolve(casa, 'a.txt'), 'modifica non salvata', 'utf8');
   const p = vl(casa, 'critica', 'Provato inserimento, tasto destro, tema scuro e finestra stretta: regge tutto quanto.');
-  assert.equal(p.code, 0, p.out);
-  assert.match(p.out, /verifica superata/);
-  assert.doesNotMatch(p.out, /Si può pubblicare/);
-  assert.match(p.out, /[Mm]odifiche non salvate/);
-  assert.match(vl(casa, 'status').out, /modifiche non salvate/);
+  assert.equal(p.code, 1, p.out);
+  assert.match(p.out, /file non registrati/);
+  assert.match(p.out, /a\.txt/, 'dice quale file');
+  assert.doesNotMatch(p.out, /verifica superata/);
+  assert.match(vl(casa, 'status').out, /senza esito/, 'nessun pass registrato');
 });
