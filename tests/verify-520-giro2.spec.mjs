@@ -208,3 +208,28 @@ test('mazzi: Invio mentre Filo pensa dà un riscontro e non perde il testo', asy
   await page.press('#chatInput', 'Enter');
   await expect(page.locator('.dk-msg-user')).toHaveCount(2);
 });
+
+// Guardata: la riga dell'attesa nella home, chiaro e scuro.
+for (const tema of ['light', 'dark']) {
+  test(`home: la riga dell'attesa si legge bene (tema ${tema})`, async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible();
+    await app.evaluate(async (t) => { await globalThis.SN_STORAGE.updateSettings({ theme: t }); }, tema);
+    await providerAppeso(app, 'FILO_CHAT');
+    await page.reload();
+    await expect(page.locator('#input')).toBeVisible();
+
+    await page.locator('#input').fill('raccontami qualcosa di interessante');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('[data-attesa]')).toHaveText(/\d+s/, { timeout: 20_000 });
+    await page.screenshot({ path: `tests/.shots/520-home-attesa-${tema}.png` });
+
+    // Il bottone resta dentro la colonna della conversazione.
+    const b = await page.locator('.dash-stop[data-stop-chat]').boundingBox();
+    const col = await page.locator('#bubbles').boundingBox();
+    expect(b.x).toBeGreaterThanOrEqual(col.x - 1);
+    expect(b.x + b.width).toBeLessThanOrEqual(col.x + col.width + 1);
+  });
+}

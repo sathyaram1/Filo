@@ -1849,6 +1849,11 @@
     retry.title = 'Rimanda lo stesso messaggio';
     retry.addEventListener('click', () => retryTurn(bolla, p.args));
     row.appendChild(retry);
+    // #524 — durante l'accoglienza il solo «Riprova» è un vicolo cieco: se il
+    // modello non risponde, alla home non ci si arriva più. Vale qui come nella
+    // bolla d'errore: chi ha appena smesso di aspettare è nella stessa strada
+    // chiusa.
+    if (onboardingActive) row.appendChild(makeSkipOnboardingBtn('Salta e vai alla home'));
     bolla.appendChild(row);
     bubblesEl.appendChild(bolla);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
