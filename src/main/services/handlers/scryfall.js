@@ -451,6 +451,11 @@ module.exports = function register(on, ctx) {
         ...(importPending ? { importPending } : {}),
       };
     } catch (e) {
+      // Fermato dall'utente (#520): non è un guasto, e la pagina lo sa già —
+      // niente frase d'errore, solo il fatto.
+      if (ac.signal.aborted) {
+        return { ok: false, aborted: true, error: 'interrotto', ...(reasoning ? { reasoning } : {}) };
+      }
       // Mai il codice grezzo in chat (#331): l'errore diventa una frase per
       // l'utente, e il ragionamento raccolto fin lì resta comunque visibile.
       // Il dettaglio tecnico resta nei log per la diagnosi.
@@ -460,6 +465,8 @@ module.exports = function register(on, ctx) {
         error: friendlyChatError(e) || 'chat fallita',
         ...(reasoning ? { reasoning } : {}),
       };
+    } finally {
+      if (reqIdRegistrato) chatInCorso.delete(reqIdRegistrato);
     }
   });
 
