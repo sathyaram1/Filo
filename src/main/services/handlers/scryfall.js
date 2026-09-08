@@ -94,6 +94,21 @@ module.exports = function register(on, ctx) {
     return CE.friendly(e, { dataSource: SCRYFALL_SOURCE });
   }
 
+  // Turni di chat in corso, per poterli FERMARE (#520): reqId → AbortController.
+  // Senza, l'unico modo di uscire da un'attesa era chiudere la scheda, e la
+  // richiesta continuava comunque a consumare token per una risposta che
+  // nessuno avrebbe letto.
+  const chatInCorso = new Map();
+
+  on(MSG.DECKS_CHAT_ABORT, async (msg) => {
+    const reqId = String(msg?.reqId || '');
+    const ac = chatInCorso.get(reqId);
+    if (!ac) return { ok: false, error: 'not_found' };
+    chatInCorso.delete(reqId);
+    try { ac.abort(); } catch (_) {}
+    return { ok: true };
+  });
+
   on(MSG.DECKS_CHAT, async (msg, sender) => {
     // Ragionamento del modello (CoT, #331): accumulato qui e ritornato alla
     // pagina (che lo mostra in un blocco collassabile); se la pagina ha aperto
