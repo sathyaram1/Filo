@@ -498,6 +498,21 @@ class TabManager {
     return true;
   }
 
+  // Un riquadro incorporato ha aperto qualcosa di Filo sopra lo schermo pieno,
+  // ma il tasto lo può chiedere al browser solo il frame principale: la
+  // richiesta gliela giriamo noi.
+  chiediEscAlFramePrincipale(tabId) {
+    const tab = tabId != null ? this.tabs.find((t) => t.id === tabId) : null;
+    const wc = tab?.view?.webContents;
+    if (!wc || wc.isDestroyed?.()) return;
+    const type = globalThis.SN_MSG?.MSG?.ESC_CHIEDI_TASTO || 'esc_chiedi_tasto';
+    try {
+      const mf = wc.mainFrame;
+      if (mf && !mf.detached) mf.send('filo:broadcast', { type });
+      else wc.send('filo:broadcast', { type });
+    } catch (_) {}
+  }
+
   // L'utente ha fatto qualcosa che non è l'Esc in questione: la volta dopo è una
   // volta nuova. Lo chiama chi vede l'input VERO (mai la pagina).
   azzeraRivendicazioniEsc() {
