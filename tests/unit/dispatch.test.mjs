@@ -103,7 +103,13 @@ test('verifierReplyText: la risposta del server si stampa intera; pass e stop di
   assert.match(fix, /FASE 2 — correggi/);
   assert.match(verifierReplyText({ outcome: 'pass', derived: { num: '#42.1' } }), /#42\.1/);
   assert.match(verifierReplyText({ outcome: 'stop', blocking: [{ level: 3, text: 'grave' }] }), /si ferma[\s\S]*\[3\] grave/);
-  assert.match(verifierReplyText(undefined), /verifica superata/);
+  // Un «ok» senza esito non è un pass: dirlo superato mandava a rilasciare il
+  // biglietto anche con un rilievo di livello 2 nella critica (verifica del
+  // giro 3 sul lavoro di lancio delle routine).
+  assert.doesNotMatch(verifierReplyText(undefined), /verifica superata/);
+  assert.match(verifierReplyText(undefined), /esito non comunicato/);
+  assert.match(verifierReplyText({ ok: true }), /esito non comunicato/);
+  assert.match(verifierReplyText({ outcome: 'pass' }), /verifica superata/);
 });
 
 test('applySecaudit: marca secauditDone e il verdetto', () => {
