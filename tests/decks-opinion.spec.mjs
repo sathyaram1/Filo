@@ -318,3 +318,57 @@ test('auto-tag dalla chat: applica i tag e riusa la cache (carta, tag) in un alt
   const autotagCallsAfter = await app.evaluate(() => globalThis.__calls.autotag);
   expect(autotagCallsAfter, 'secondo mazzo: giudizi dalla cache, zero chiamate').toBe(1);
 });
+
+// #520 — il parere che non arriva. Prima il modulo tornava a "Chiedo un parere
+// a Filo…", e siccome quello stato È il trigger la richiesta ripartiva a ogni
+// ridisegno: attesa senza fine per l'utente e chiamate al modello a ripetizione,
+// tutte a pagamento. Si asserisce il successo dal punto di vista dell'utente:
+// legge cosa è andato storto, riprova quando vuole, e nel frattempo Filo non
+// chiama nessuno.
+test('parere non arrivato: si legge il motivo e «Riprova» funziona, senza chiamate a ripetizione', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await app.evaluate(() => {
+    globalThis.__pareriRotti = true;
+    const orig = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
+      const last = String(args.messages[args.messages.length - 1].content || '');
+      if (last.includes('CARTE DA VALUTARE') && globalThis.__pareriRotti) {
+        globalThis.__calls.opinion++;
+        const e = new Error('OpenRouter 503: Service Unavailable');
+        e.status = 503;
+        e.provider = 'openrouter';
+        throw e;
+      }
+      return orig(args);
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+  await addBoltViaChat(page);
+
+  // Il motivo è scritto in italiano, senza codici HTTP.
+  await chooseModule(page, 'bolt-1', 'Parere di Filo');
+  const errore = page.locator('#previewModule .dk-op-error');
+  await expect(errore).toContainText('sovraccarico');
+  await expect(errore).not.toContainText('503');
+  await expect(page.locator('#previewModule [data-op-refresh]')).toHaveText('Riprova');
+
+  // Nessun ciclo: ripassando col mouse (altri ridisegni) le chiamate non salgono.
+  const prima = await app.evaluate(() => globalThis.__calls.opinion);
+  for (let i = 0; i < 3; i++) {
+    await page.hover('#chatInput');
+    await page.hover('#deckList .dk-row[data-card-id="bolt-1"]');
+  }
+  await page.waitForTimeout(1000);
+  const dopo = await app.evaluate(() => globalThis.__calls.opinion);
+  expect(dopo, 'un parere fallito non si richiede da solo').toBe(prima);
+
+  // «Riprova» col servizio tornato: il parere arriva.
+  await app.evaluate(() => { globalThis.__pareriRotti = false; });
+  await page.locator('#previewModule [data-op-refresh]').click();
+  await expect(page.locator('#previewModule .dk-op-text')).toContainText('Parere n.');
+  await expect(page.locator('#previewModule .dk-op-error')).toHaveCount(0);
+});
