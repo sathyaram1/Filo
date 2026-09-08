@@ -122,7 +122,7 @@ test('cronologia: il menu del tasto destro si chiude col primo Esc, lo schermo i
 // ── Un sito non può fingersi un riquadro di Filo ──────────────────────────────
 // Il marchio che dice «questo pezzo l'ha disegnato Filo» è un attributo del
 // documento, e il documento è del sito: se a decidere fosse l'attributo, una
-// pagina qualunque potrebbe mettersorlo addosso e toglierselo a ogni Esc,
+// pagina qualunque potrebbe metterselo addosso e toglierselo a ogni Esc,
 // facendo credere che il tasto sia servito a chiudere un riquadro di Filo. Da lì
 // lo schermo intero non si spegneva più.
 function paginaOstile(conEsca) {
