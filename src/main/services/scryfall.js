@@ -32,6 +32,12 @@
     USER_AGENT = `Filo/${require('../../../package.json').version} (https://singolarita.com)`;
   } catch (_) { /* fallback senza versione */ }
 
+  // Scadenza delle chiamate (#520): il modulo lo carica il loader; in un
+  // contesto isolato (unit test che require() solo questo file) lo tiriamo su.
+  if (!global.SN_NET_TIMEOUT) {
+    try { require('../../shared/netTimeout.js'); } catch (_) { /* senza, nessuna sorveglianza */ }
+  }
+
   // Fetch sostituibile nei TEST (niente rete): SN_SCRYFALL._setFetch(fake).
   let _fetch = (...args) => fetch(...args);
   function _setFetch(fn) { _fetch = fn || ((...args) => fetch(...args)); }
