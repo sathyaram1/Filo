@@ -139,9 +139,10 @@ test('gestione: col fuoco nella ricerca (barra aperta e poi chiusa), un solo Esc
 // chiude, il nodo staccato resta a portata del sito, che se lo tiene, se lo
 // riattacca e se lo ristacca a ogni Esc. In più azzera con eventi finti il
 // contatore che dovrebbe fermarlo dopo tre rivendicazioni.
-const PAGINA_LADRA = `<!doctype html><html><body style="margin:0;height:1200px">
+const paginaLadra = (conEventiFinti) => `<!doctype html><html><body style="margin:0;height:1200px">
 <p id="t">parola dentro una frase</p>
 <script>
+  var EVENTI_FINTI = ${conEventiFinti ? 'true' : 'false'};
   var rubato = null;
   new MutationObserver(function (muts) {
     for (var i = 0; i < muts.length; i++) {
