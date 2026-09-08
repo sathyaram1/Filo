@@ -1236,7 +1236,7 @@
     mgStPieLegend.replaceChildren();
 
     if (!totale) {
-      mgStPie.hidden = true;
+      statsMostra(mgStPie, false);
       const li = document.createElement('li');
       li.className = 'mg-st-empty';
       li.textContent = res.giri.senzaDati
@@ -1244,7 +1244,7 @@
         : 'Nessuna lavorazione chiusa in questa finestra.';
       mgStPieLegend.appendChild(li);
     } else {
-      mgStPie.hidden = false;
+      statsMostra(mgStPie, true);
       const cx = 110, cy = 110, r = 100;
       if (fette.length === 1) {
         // Con una sola categoria l'arco da 0 a 2π collasserebbe: cerchio pieno.
@@ -1297,11 +1297,12 @@
       if (g.alPrimoColpo !== null) frasi.push(`al primo colpo ${Math.round(g.alPrimoColpo * 100)}%`);
     }
     if (g.giriTotali) {
-      frasi.push(`${g.perEsito.fix} giri di correzione`);
-      frasi.push(`${g.perEsito.stop} bloccanti, passati all’owner (i vecchi «fail»)`);
+      const plur = (n, uno, tanti) => `${n} ${n === 1 ? uno : tanti}`;
+      frasi.push(plur(g.perEsito.fix, 'giro di correzione', 'giri di correzione'));
+      frasi.push(`${plur(g.perEsito.stop, 'bloccante', 'bloccanti')}, passati all’owner (i vecchi «fail»)`);
       frasi.push(`${g.perEsito.rimandati} con rilievi rimandati a un feedback derivato (i vecchi «migliorabile»)`);
     }
-    if (g.ferme) frasi.push(`${g.ferme} lavorazioni chiuse senza un pass registrato`);
+    if (g.ferme) frasi.push(`${g.ferme} ${g.ferme === 1 ? 'lavorazione chiusa' : 'lavorazioni chiuse'} senza un pass registrato`);
     if (g.senzaDati) frasi.push(`${g.senzaDati} senza verbale di verifica nelle note`);
     if (mgStPieNote) mgStPieNote.textContent = frasi.join(' · ');
   }
@@ -1319,11 +1320,11 @@
     mgStBars.replaceChildren();
     const t = res.ricevuti.timeline;
     if (!t || !t.buckets.length) {
-      mgStBars.hidden = true;
+      statsMostra(mgStBars, false);
       if (mgStBarsNote) mgStBarsNote.textContent = 'Nessuna segnalazione da mettere in fila in questa finestra.';
       return;
     }
-    mgStBars.hidden = false;
+    statsMostra(mgStBars, true);
     const W = 1000, H = 140, base = H - 18, top = 6;
     mgStBars.setAttribute('viewBox', `0 0 ${W} ${H}`);
     mgStBars.setAttribute('preserveAspectRatio', 'none');
