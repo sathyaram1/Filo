@@ -234,7 +234,11 @@ test('sito ladro: la voce del menu resta comunque una via d\'uscita', async ({ a
   expect(await schermoIntero(app), 'preparazione: doveva restare bloccato').toBe(true);
   await page.locator('#t').click({ button: 'right' });
   await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
-  const voce = page.locator('[data-sn-icon-id="fullscreen"], [data-sn-icon-id="fullscreenExit"], [data-sn-icon-id="shrink"]').first();
-  await voce.click({ timeout: 8000 });
+  const diretto = page.locator('[data-sn-icon-id="fullscreen"]');
+  if (await diretto.count() === 0) {
+    await page.locator('.sn-menu-row-overflow').first().click();
+    await expect(diretto.first()).toBeVisible({ timeout: 8000 });
+  }
+  await diretto.first().click({ timeout: 8000 });
   await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
 });
