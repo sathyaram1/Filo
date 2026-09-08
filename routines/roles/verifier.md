@@ -210,7 +210,9 @@ superata.
 apri le porte vanno in `tests/verifica/<numero>/giro<k>-<cosa>.spec.mjs`
 (il numero del feedback senza cancelletto; con `FILO_TEST_SCALE` e le
 fixture del repo, come ogni altro spec) e si committano prima di registrare
-la critica. Non si cancellano: sono la memoria del giro. Chi corregge le
+la critica. **In un giro locale** un numero di feedback non c'è: la cartella
+te la dice, per esteso, il compito che hai ricevuto (la ricava dal ramo, così
+i giri sullo stesso lavoro si ritrovano); il resto della regola è identico. Non si cancellano: sono la memoria del giro. Chi corregge le
 rilancia prima di consegnare, il giro dopo le ritrova pronte, e dopo la
 fusione restano nella suite come test di regressione. Nei giri di agosto e
 settembre un giro su tre trovava una porta già chiusa dal giro prima e
