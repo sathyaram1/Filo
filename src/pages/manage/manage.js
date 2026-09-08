@@ -3724,6 +3724,11 @@
       if (!allByClient[c]) allByClient[c] = [];
       allByClient[c].push(fb);
     }
+    // Ogni volta che la lista cambia (primo caricamento, giro di aggiornamento,
+    // dati iniettati da uno spec) le statistiche aperte si rifanno: una scheda
+    // lasciata aperta che continua a mostrare i numeri di mezz'ora fa è una
+    // fotografia vecchia che non dice di esserlo.
+    if (statsActive()) renderStats();
   }
 
   // ── Aggiornamento continuo ────────────────────────────────────────────────
