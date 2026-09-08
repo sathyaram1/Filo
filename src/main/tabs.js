@@ -445,6 +445,8 @@ class TabManager {
   // pagina.
   escConsumato(tabId = null) {
     if (tabId != null && tabId !== this.activeId) return;
+    // Conta solo se c'era davvero un'uscita in attesa: è quella la rivendicazione.
+    if (this._escUscitaTimer) this._escRivendicazioni = (this._escRivendicazioni || 0) + 1;
     this.annullaUscitaSchermoIntero();
   }
 
