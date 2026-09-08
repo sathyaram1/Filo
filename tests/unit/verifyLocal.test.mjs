@@ -587,6 +587,66 @@ test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta co
   assert.equal(typeof leggiCoda, 'function');
 });
 
+// ─── #256 sulla strada locale: la critica non si registra con file non registrati ───
+//
+// Il salvataggio automatico committa DOPO, la punta si sposta e la chiusura
+// respinge il pass come dato su un'altra versione: tutta la verifica da
+// rifare. La strada delle routine rifiutava già prima; questa no.
+
+test('#256 locale: con file non registrati la critica è respinta con l\'elenco, e niente viene scritto', () => {
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const r = withCritique(s, 'r', { critique: 'Provato tutto: funziona.', sha: SHA, dirtyFiles: ['tests/verify-tmp.spec.mjs'] });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /tests\/verify-tmp\.spec\.mjs/, 'l\'elenco dice quale file');
+  assert.match(r.reason, /git add -A && git commit/, 'e come si arriva al commit');
+  assert.equal(r.state.r.verdict, undefined, 'niente pass registrato');
+  assert.equal(checkVerdict(r.state.r, SHA).ok, false);
+  // Vale anche per una bocciatura: il commit della pulizia passerebbe poi per una correzione.
+  const boccia = withCritique(s, 'r', { critique: '[2] rotto', sha: SHA, dirtyFiles: ['tests/x.spec.mjs'] });
+  assert.equal(boccia.ok, false);
+  assert.equal(boccia.state.r.verdict, undefined);
+  // Con la directory pulita la stessa critica passa.
+  const pulita = withCritique(s, 'r', { critique: 'Provato tutto: funziona.', sha: SHA, dirtyFiles: [] });
+  assert.equal(pulita.ok, true);
+  assert.equal(pulita.outcome, 'pass');
+});
+
+test('#256 locale (CLI): una spec cancellata dalla shell ma non committata ferma «critica»; committata, la critica passa sul commit nuovo', () => {
+  const base = cartellaTemporanea('filo-verify-256-');
+  sandbox.push(base);
+  const work = resolve(base, 'work');
+  mkdirSync(work);
+  g(work, ['init', '-q', '--initial-branch=main']);
+  g(work, ['config', 'user.email', 't@t']);
+  g(work, ['config', 'user.name', 't']);
+  writeFileSync(resolve(work, 'base.txt'), 'base\n', 'utf8');
+  g(work, ['add', '-A']);
+  g(work, ['commit', '-q', '-m', 'base']);
+  g(work, ['checkout', '-q', '-b', 'claude/prova']);
+  // Il salvataggio automatico ha già committato la spec temporanea della verifica…
+  writeFileSync(resolve(work, 'verify-tmp.spec.mjs'), 'spec\n', 'utf8');
+  g(work, ['add', '-A']);
+  g(work, ['commit', '-q', '-m', 'auto: verify-tmp.spec.mjs']);
+  const start = spawnSync(process.execPath, [VERIFY, 'start', 'richiesta di prova'], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
+  assert.equal(start.status, 0, start.stderr);
+  // …e chi verifica la toglie dalla shell, senza commit.
+  rmSync(resolve(work, 'verify-tmp.spec.mjs'));
+  const critica = 'Provato tutto quanto con calma e nel dettaglio, come farebbe l\'owner: funziona, nessun rilievo da segnalare.';
+  const sporca = spawnSync(process.execPath, [VERIFY, 'critica', critica], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
+  assert.equal(sporca.status, 1, 'con la directory sporca la critica non si registra');
+  assert.match(String(sporca.stderr), /verify-tmp\.spec\.mjs/, 'e dice quale file');
+  const status1 = spawnSync(process.execPath, [VERIFY, 'status'], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
+  assert.match(String(status1.stdout), /senza esito/, 'nessun pass registrato');
+  // Committata la pulizia, la stessa critica passa, e vale per il commit nuovo.
+  g(work, ['add', '-A']);
+  g(work, ['commit', '-q', '-m', 'verifica: pulizia']);
+  const pulita = spawnSync(process.execPath, [VERIFY, 'critica', critica], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
+  assert.equal(pulita.status, 0, pulita.stderr);
+  assert.match(String(pulita.stdout), /Si può pubblicare/);
+  const status2 = spawnSync(process.execPath, [VERIFY, 'status'], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
+  assert.equal(status2.status, 0, 'il pass vale per il commit su cui è stato dato');
+});
+
 test('quando il testo in coda manca, il messaggio non tace', () => {
   const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
   const conFile = codaText({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
