@@ -246,6 +246,14 @@
     // le ospita è a tutto schermo, cioè quello che il broadcast racconta già a
     // tutte. → { ok, fullscreen: bool }
     FULLSCREEN_STATE: 'fullscreen_state',
+    // Questa scheda ha aperto (o chiuso) un RIQUADRO DI FILO che si chiude con
+    // Esc: il menu del tasto destro, il riquadro della risposta, l'immagine a
+    // tutta pagina. Serve a una cosa sola: a tutto schermo l'Esc lo prende il
+    // main prima che la pagina lo veda, e senza questo avviso chiuderebbe lo
+    // schermo intero lasciando il riquadro aperto (#514). Con l'avviso il main
+    // si tira indietro e il primo Esc chiude il riquadro, il secondo esce.
+    // → { open: bool }
+    FILO_BOX_OPEN: 'filo_box_open',
     OPEN_NEW_TAB: 'open_new_tab',
     OPEN_INCOGNITO: 'open_incognito',               // apre una nuova finestra incognito
     // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone in
