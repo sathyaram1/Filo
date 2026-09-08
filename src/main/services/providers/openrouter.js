@@ -314,7 +314,9 @@
       try {
         return await p;
       } catch (e) {
-        if (w.expired) throw Net.timeoutError(w.expired, { provider: 'openrouter', cosa: 'il servizio AI' });
+        const scattata = w.expired;
+        w.done();
+        if (scattata) throw Net.timeoutError(scattata, { provider: 'openrouter', cosa: 'il servizio AI' });
         throw e;
       }
     };
