@@ -1750,6 +1750,7 @@
   // ------------------------------------------------------------
   function onRuntimeMessage(msg, sender, sendResponse) {
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
+      fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
       return;
     }
