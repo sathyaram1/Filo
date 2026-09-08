@@ -81,8 +81,10 @@ test('home: immagine ingrandita — il primo Esc deve chiudere lei, non lo scher
 
   await esc(app);
   const dopo = await stato(app);
-  await expect(page.locator('.dash-lightbox.open'), 'il primo Esc doveva chiudere l\'immagine').toHaveCount(0);
-  expect(dopo.cf, 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
+  const ancoraAperta = await page.locator('.dash-lightbox.open').count();
+  console.log('[g4 home] immagine ancora aperta:', ancoraAperta, '| schermo intero:', dopo.cf);
+  expect({ immagineAperta: ancoraAperta > 0, schermoIntero: dopo.cf })
+    .toEqual({ immagineAperta: false, schermoIntero: true });
 });
 
 test('riquadro di conferma su un sito — il primo Esc deve annullarlo, non uscire', async ({ app, openTab, testServer }) => {
