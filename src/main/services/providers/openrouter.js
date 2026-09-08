@@ -240,14 +240,15 @@
       if (!res.ok) throw new Error(`OpenRouter models: ${res.status}`);
       const data = await res.json();
       return (data.data || []).map((m) => ({
-      id: m.id,
-      name: m.name,
-      pricing: m.pricing && {
-        // OpenRouter espone i prezzi in USD per token. Riconvertiamo in USD per 1M.
-        input: parseFloat(m.pricing.prompt) * 1_000_000,
-        output: parseFloat(m.pricing.completion) * 1_000_000,
-      },
-    }));
+        id: m.id,
+        name: m.name,
+        pricing: m.pricing && {
+          // OpenRouter espone i prezzi in USD per token. Riconvertiamo in USD per 1M.
+          input: parseFloat(m.pricing.prompt) * 1_000_000,
+          output: parseFloat(m.pricing.completion) * 1_000_000,
+        },
+      }));
+    });
   }
 
   async function complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
