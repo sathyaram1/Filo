@@ -16,6 +16,16 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.222', date: '2026-09-08',
+      features: [
+        'Nella chat dei mazzi, mentre aspetti una risposta vedi da quanto stai aspettando e puoi fermarla con «Interrompi». La chat torna subito libera e puoi riscrivere.',
+      ],
+      fixes: [
+        'Quando il servizio dei modelli accettava la richiesta e poi restava zitto, Filo aspettava per sempre e la chat non si sbloccava più. Adesso smette di aspettare, ti dice cosa è successo e puoi riprovare.',
+        'Nei mazzi, una richiesta all\'archivio delle carte rimasta appesa bloccava anche tutte quelle dopo: anteprime, ricerche e pareri smettevano di rispondere. Ora quella richiesta scade da sola e il resto riparte.',
+      ],
+    },
+    {
       version: '0.2.219', date: '2026-09-05',
       features: [
         'Nella chat della nuova scheda Filo fa tutto in un turno solo: cerca, legge il risultato, mette la sveglia e poi risponde, senza chiudere il messaggio a metà per dirti cosa farà dopo. Nel blocco sopra la risposta vedi ogni passo mentre succede: il ragionamento, ogni azione appena la decide («Cerco sul web…»), l\'esito, le due parole che scrive a metà lavoro.',
