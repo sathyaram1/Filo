@@ -53,9 +53,27 @@
 
   async function apiGet(path) {
     return throttled(async () => {
-      const res = await _fetch(BASE + path, {
-        headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
-      });
+      // Scadenza (#520): la coda qui sopra è SERIALIZZATA, quindi una singola
+      // richiesta appesa (server che accetta e poi tace: `fetch` da solo non
+      // molla mai) blocca per sempre anche tutte quelle dopo — anteprime,
+      // ricerche, pareri: l'app "si blocca" e non risponde più. Con la
+      // scadenza quella richiesta fallisce e la coda riparte.
+      const Net = global.SN_NET_TIMEOUT;
+      const w = Net
+        ? Net.watch({ totalMs: Net.LIMITI.datiTettoMs })
+        : { signal: undefined, done() {}, expired: '' };
+      let res;
+      try {
+        res = await _fetch(BASE + path, {
+          headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
+          signal: w.signal,
+        });
+      } catch (e) {
+        if (w.expired) throw Net.timeoutError(w.expired, { cosa: `Scryfall (${path})` });
+        throw e;
+      } finally {
+        w.done();
+      }
       if (res.status === 404) return null; // "nessun risultato" per Scryfall
       if (!res.ok) {
         // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi
