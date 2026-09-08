@@ -1490,6 +1490,13 @@
       // stesso per le quattro schede-lista, quindi si ricontrolla qui.
       applyMergeApprovalsVisibility();
     }
+    // Statistiche: si ridisegnano a ogni apertura (i feedback in pagina
+    // cambiano da soli, col giro di aggiornamento) e, la prima volta, si chiede
+    // il registro delle partenze delle routine.
+    if (tab === 'fbstats') {
+      renderStats();
+      if (workerLogEntries === null && !logLoading) loadWorkerLog();
+    }
   }
 
   mgTabs.addEventListener('click', (e) => {
