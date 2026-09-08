@@ -54,6 +54,17 @@
   // successo qualcosa».
   const TETTO = 256;
 
+  // Chi vuole sapere che è appena nato un pezzo nostro. Serve a chi deve
+  // preparare qualcosa PRIMA che l'utente prema un tasto: sopra lo schermo
+  // pieno di un sito l'Esc va chiesto al browser mentre un nostro riquadro è
+  // aperto, o quel tasto non arriva mai al documento (#514, giro 10).
+  const osservatori = new Set();
+  function onMark(fn) {
+    if (typeof fn !== 'function') return () => {};
+    osservatori.add(fn);
+    return () => osservatori.delete(fn);
+  }
+
   function mark(el) {
     try { if (el && el.setAttribute) el.setAttribute(ATTR, '1'); } catch (_) {}
     try {
@@ -62,6 +73,7 @@
         while (nostre.size > TETTO) nostre.delete(nostre.values().next().value);
       }
     } catch (_) {}
+    for (const fn of osservatori) { try { fn(el); } catch (_) {} }
     return el;
   }
 
