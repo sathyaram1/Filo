@@ -54,37 +54,38 @@
   // è più fresco della risposta alla domanda che facciamo al montaggio, e vince.
   let fullscreenAnnunciato = false;
 
-  // ── I riquadri di Filo aperti sulla pagina ────────────────────────────────
-  // Il menu del tasto destro e il riquadro della risposta si chiudono con Esc.
-  // A tutto schermo l'Esc lo prende il main PRIMA che la pagina lo veda: se non
-  // sapesse dei riquadri chiuderebbe lo schermo intero e li lascerebbe aperti,
-  // mentre ovunque altro in Filo l'Esc chiude prima la cosa più in alto (#514).
-  // Quindi glielo diciamo a ogni apertura e a ogni chiusura, e rifacciamo il
-  // controllo anche qui: se l'avviso fosse in ritardo, l'ultima parola è di chi
-  // guarda i riquadri veri.
-  // I riquadri condivisi li riconosciamo da qui. Una pagina interna che ha un
-  // riquadro suo (l'immagine a tutta pagina della gestione feedback) mette la
-  // sua risposta in `__filoRiquadroAperto` e chiama il gancio qui sotto: così
-  // la regola resta una sola, e la pagina dichiara solo la cosa che sa lei.
-  function riquadroDiFiloAperto() {
+  // ── Chi si è preso l'Esc, a schermo intero ────────────────────────────────
+  // Sopra la pagina Filo apre roba che si chiude con Esc: il menu del tasto
+  // destro, la risposta, il riquadro per riscrivere, il QR, la selezione di una
+  // parte dello schermo, una domanda di conferma, un'immagine ingrandita. A
+  // schermo intero quel tasto serve anche a uscire, e chi arriva prima vince: se
+  // esce la modalità, il riquadro resta aperto sopra una pagina che nessuno
+  // aveva chiesto di lasciare (#514).
+  //
+  // La domanda giusta non è "quali riquadri esistono" — quella è una lista che
+  // invecchia — ma "questo Esc l'ha usato qualcuno?". Si risponde guardando due
+  // cose, dopo che il tasto ha finito il suo giro nel documento:
+  //  · quanti pezzi di UI DI FILO ci sono sulla pagina. Ognuno porta il marchio
+  //    di casa (SN_FILO_UI) e chi si chiude sparisce dal documento: se il numero
+  //    è calato, quell'Esc l'ha usato un riquadro di Filo. Il marchio lo mette
+  //    già chi disegna, quindi un riquadro nuovo è coperto il giorno che nasce.
+  //  · su una pagina DI FILO, in più, basta che qualcuno l'abbia consumato
+  //    (fermando la propagazione o chiedendo di ignorare il tasto): lì tutto
+  //    quello che c'è sullo schermo è roba nostra. Sui siti no — un sito che si
+  //    mangia i tasti non deve poterci chiudere dentro allo schermo intero.
+  // Se nessuno l'ha usato, chiediamo noi di uscire. Se non chiediamo niente, il
+  // main esce da solo dopo un attimo: l'errore possibile è un'uscita in ritardo,
+  // mai restare chiusi dentro.
+  const PAGINA_DI_FILO = (() => {
+    try { return location.protocol === 'filo:'; } catch (_) { return false; }
+  })();
+
+  function quantiPezziDiFilo() {
     try {
-      if (Menu?.isOpen?.()) return true;
-      if (Popup?.hasOpen?.()) return true;
-      if (self.__filoRiquadroAperto?.()) return true;
-    } catch (_) {}
-    return false;
+      const sel = self.SN_FILO_UI?.SELECTOR;
+      return sel ? document.querySelectorAll(sel).length : 0;
+    } catch (_) { return 0; }
   }
-  let riquadriSegnalati = null;
-  function segnalaRiquadri() {
-    const aperto = riquadroDiFiloAperto();
-    if (aperto === riquadriSegnalati) return;
-    riquadriSegnalati = aperto;
-    try {
-      chrome.runtime.sendMessage({ type: MSG.FILO_BOX_OPEN, open: aperto }).catch(() => {});
-    } catch (_) {}
-  }
-  // Il gancio che menu.js e popup.js chiamano quando si aprono o si chiudono.
-  self.SN_RIQUADRI_CAMBIATI = segnalaRiquadri;
 
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
   // blocco commenti) invece che nella pagina? Il menu del tasto destro e tutto
