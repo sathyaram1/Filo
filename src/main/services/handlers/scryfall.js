@@ -253,6 +253,7 @@ module.exports = function register(on, ctx) {
                 payload: { messages: retryMessages },
                 origin: 'filo://decks',
                 onReasoning,
+                signal: ac.signal,
               });
               const p2 = Q.parseAgentReply(r2.text);
               // La reply del retry si accoda solo se aggiunge qualcosa (il
