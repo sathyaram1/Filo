@@ -210,14 +210,11 @@ class TabManager {
     // Filo) alla pagina non arriverebbe mai, e lasciarlo passare chiuderebbe
     // dentro allo schermo intero senza uscite (#514).
     this.pageFullscreenTabId = null;
-    // Le schede che in questo momento hanno aperto un riquadro DI FILO che si
-    // chiude con Esc (menu del tasto destro, riquadro della risposta, immagine
-    // a tutta pagina). Ce lo dicono loro (MSG.FILO_BOX_OPEN) e la lista si
-    // svuota a ogni navigazione. A tutto schermo l'Esc lo prendiamo noi prima
-    // della pagina: senza questa lista chiuderebbe lo schermo intero e
-    // lascerebbe il riquadro aperto, mentre ovunque altro in Filo l'Esc chiude
-    // prima la cosa più in alto (#514).
-    this.tabsWithFiloBox = new Set();
+    // Uscita dallo schermo intero messa in attesa: l'Esc premuto sulla pagina
+    // è prima suo (un riquadro di Filo aperto sopra la pagina lo usa per
+    // chiudersi), e usciamo solo se nessuno se l'è preso. Vedi
+    // handleFullscreenEscape (#514).
+    this._escUscitaTimer = null;
     // Chrome compatto: fuori dalla home di Filo la barra indirizzi (icone di
     // navigazione + campo URL) viene nascosta, lasciando solo la fila di tab +
     // controlli finestra. In questo stato la WebContentsView risale a coprire
