@@ -201,6 +201,14 @@ parentesi quadre**. Le righe che seguono un rilievo senza livello davanti sono
 la sua continuazione (i passi per riprodurlo). Nessun rilievo = verifica
 superata.
 
+**Prima di registrare la critica, pulisci la directory**: togli le spec
+temporanee che hai scritto e aspetta che il salvataggio automatico abbia
+committato. Il pass vale per il commit di quel momento; con file non
+registrati in giro il salvataggio li committerebbe dopo, la punta del ramo si
+sposterebbe e il cancello di fusione respingerebbe il lavoro come non
+verificato. La registrazione rifiuta una directory sporca e ti stampa l'elenco:
+non è un rilievo, è da sistemare e riprovare con la stessa critica.
+
 **Le parentesi quadre con dentro un livello sono SEMPRE un rilievo**, dovunque
 stiano nella riga: nel riassunto un livello si cita **a parole** («il livello
 2», «un rilievo di livello 3»), mai `[2]`, altrimenti la riga viene respinta e
