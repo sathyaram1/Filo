@@ -10,6 +10,13 @@
 
   // Stack di popup aperti. L'ultimo è il topmost.
   const popups = [];
+
+  // Un riquadro di Filo si è aperto o chiuso: content.js lo dice al main, che
+  // a tutto schermo deve sapere se l'Esc è di questo riquadro o dello schermo
+  // intero (#514). Se il gancio non c'è ancora non succede niente.
+  function avvisaCambio() {
+    try { global.SN_RIQUADRI_CAMBIATI?.(); } catch (_) {}
+  }
   // z-index iniziale e step per stacking deterministico
   const Z_BASE = 2147483600;
   const Z_STEP = 1;
@@ -358,6 +365,7 @@
     if (!root) return null;
     const entry = { root, isExternal: true };
     popups.push(entry);
+    avvisaCambio();
     root.style.zIndex = String(Z_BASE + (popups.length - 1) * Z_STEP);
     const onMd = () => bringToFront(entry);
     root.addEventListener('mousedown', onMd, true);
@@ -366,6 +374,7 @@
       unregister: () => {
         const idx = popups.indexOf(entry);
         if (idx >= 0) popups.splice(idx, 1);
+        avvisaCambio();
         try { root.removeEventListener('mousedown', onMd, true); } catch (_) {}
       },
     };
@@ -944,6 +953,7 @@
     popup.root.remove();
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
+    avvisaCambio();
     // Rimette la selezione che il fuoco della riga per scrivere aveva spento:
     // la parola torna selezionata com'era, pronta per la cosa dopo. Solo se
     // nel frattempo l'utente non ne ha fatta una sua, che comanda lei.
@@ -1074,6 +1084,7 @@
     try { popup.inputEl.focus({ preventScroll: true }); } catch (_) {}
 
     popups.push(popup);
+    avvisaCambio();
     return popup;
   }
 
@@ -1415,5 +1426,8 @@
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
+    // è l'Esc quando si è a tutto schermo (#514).
+    hasOpen: () => popups.length > 0,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

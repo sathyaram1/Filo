@@ -54,6 +54,33 @@
   // è più fresco della risposta alla domanda che facciamo al montaggio, e vince.
   let fullscreenAnnunciato = false;
 
+  // ── I riquadri di Filo aperti sulla pagina ────────────────────────────────
+  // Il menu del tasto destro e il riquadro della risposta si chiudono con Esc.
+  // A tutto schermo l'Esc lo prende il main PRIMA che la pagina lo veda: se non
+  // sapesse dei riquadri chiuderebbe lo schermo intero e li lascerebbe aperti,
+  // mentre ovunque altro in Filo l'Esc chiude prima la cosa più in alto (#514).
+  // Quindi glielo diciamo a ogni apertura e a ogni chiusura, e rifacciamo il
+  // controllo anche qui: se l'avviso fosse in ritardo, l'ultima parola è di chi
+  // guarda i riquadri veri.
+  function riquadroDiFiloAperto() {
+    try {
+      if (global.SN_MENU?.isOpen?.()) return true;
+      if (global.SN_POPUP?.hasOpen?.()) return true;
+    } catch (_) {}
+    return false;
+  }
+  let riquadriSegnalati = null;
+  function segnalaRiquadri() {
+    const aperto = riquadroDiFiloAperto();
+    if (aperto === riquadriSegnalati) return;
+    riquadriSegnalati = aperto;
+    try {
+      chrome.runtime.sendMessage({ type: MSG.FILO_BOX_OPEN, open: aperto }).catch(() => {});
+    } catch (_) {}
+  }
+  // Il gancio che menu.js e popup.js chiamano quando si aprono o si chiudono.
+  global.SN_RIQUADRI_CAMBIATI = segnalaRiquadri;
+
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
   // blocco commenti) invece che nella pagina? Il menu del tasto destro e tutto
   // ciò che riguarda l'ELEMENTO cliccato funzionano identici qui dentro; ciò che
