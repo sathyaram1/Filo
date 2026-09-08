@@ -1763,6 +1763,10 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: i riquadri di Filo aperti in quello vecchio sono andati
+      // via con lui, e nessuno ce lo verrà a dire. Se restassero segnati qui,
+      // l'Esc smetterebbe di uscire dallo schermo intero su una pagina pulita.
+      this.tabsWithFiloBox.delete(tab.id);
       // #441 — quando la pagina corrente si è committata: una pagina-ponte
       // ("il download partirà a breve…") avvia il file entro pochi secondi da
       // qui. Oltre quella finestra la scheda non è più un semplice ponte.
