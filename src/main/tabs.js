@@ -31,13 +31,26 @@ const HOVER_INPUT_TYPES = new Set([
 ]);
 
 // #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
-// conto nostro. È il tempo che serve alla pagina per dire "quell'Esc me lo sono
-// preso io" (un giro di eventi del documento più un messaggio: millisecondi).
-// Largo di proposito: una pagina lenta che risponde in ritardo farebbe tornare
-// il difetto di #514 (esci dallo schermo intero E il riquadro resta aperto),
-// mentre il prezzo di un'attesa larga lo paga solo chi il content script non ce
-// l'ha affatto — lì l'uscita arriva mezzo istante dopo, e basta.
+// conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
+// dire "quell'Esc me lo sono preso io".
+//
+// Due tempi, perché i due casi sono diversi e mescolarli è già costato.
+//  · Una pagina che RISPONDE (ha i pezzi di Filo dentro, si è presentata da
+//    sola appena montata) risponde in entrambi i casi: se il tasto era suo lo
+//    rivendica, se non lo era chiede lei l'uscita. Quindi qui l'attesa non è un
+//    ritardo — l'uscita arriva quando arriva la sua risposta — ed è solo la
+//    rete di sicurezza per il caso in cui quella risposta non arrivi MAI
+//    (renderer morto, script che gira all'infinito). Larga: una pagina
+//    impegnata mezzo secondo quando l'utente preme Esc rispondeva fuori tempo
+//    massimo, e usciva dallo schermo intero chiudendo insieme il riquadro che
+//    stava sopra — il danno di #514 da un'altra porta.
+//  · Una pagina che NON risponde (il visore PDF, una pagina d'errore, una
+//    scheda ancora vuota) non dirà niente per definizione: lì l'attesa è tutta
+//    ritardo, e resta corta.
+// In tutti e due i casi l'errore possibile è un'uscita in ritardo, mai restare
+// chiusi dentro.
 const ESC_ATTESA_MS = 400;
+const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
 
 // #514 — quante volte di fila la pagina può dire "quell'Esc me lo sono preso
 // io" prima che il main smetta di crederle. Il conto sta QUI, nel main, perché
