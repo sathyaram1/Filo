@@ -232,7 +232,7 @@ test('sito ladro: la voce del menu resta comunque una via d\'uscita', async ({ a
   await entra(app);
   await quantiEsc(app, 3);
   expect(await schermoIntero(app), 'preparazione: doveva restare bloccato').toBe(true);
-  await page.locator('#t').click({ button: 'right' });
+  await page.mouse.click(200, 200, { button: 'right' });
   await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
   const diretto = page.locator('[data-sn-icon-id="fullscreen"]');
   if (await diretto.count() === 0) {
