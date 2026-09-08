@@ -119,6 +119,28 @@ essere contato dentro quella pagina**, per isolato che sia il mondo in cui
 gira. La prova sta in `tests/verify-514-g6.spec.mjs` («sito ladro»), con la
 controprova della stessa pagina senza gli eventi finti.
 
+**Un tasto che serve a USCIRE non vale come gesto per ENTRARE.** Dal momento in
+cui l'Esc arriva al documento — e ci deve arrivare, è il tasto che chiude i
+riquadri — il browser lo conta come gesto dell'utente, esattamente come un clic.
+Una pagina che chiede lo schermo pieno dentro il proprio gestore dell'Esc lo
+otteneva quindi senza che nessuno avesse cliccato niente, e da lì il tasto di
+#514 diventava un testa o croce: un Esc esce, il successivo rientra, perché la
+modalità tornava «della pagina» e l'Esc dopo era suo (deroga del player video).
+Lo stesso valeva fuori dallo schermo intero, dove un solo Esc regalava tutto lo
+schermo al sito, barra di Filo compresa, senza avviso. Il rifiuto sta nel
+gestore dei permessi della sessione (`installaPermessi` in `src/main/tabs.js`):
+il permesso `fullscreen` si nega quando l'ultimo input vero di quella scheda era
+un Esc, e si concede tutto il resto — senza gestore Electron concede, quindi il
+`callback(true)` finale tiene il comportamento di prima su ogni altro permesso.
+Rifiutare **lì** e non a cose fatte è l'unico posto che funziona: quando arriva
+`enter-html-full-screen` la finestra è già passata a tutto schermo (l'evento
+della finestra arriva prima) e la modalità è già stata adottata. Lo stato «l'
+ultimo tasto era l'Esc» si scrive in `before-input-event`, che arriva prima che
+il documento veda il tasto, e si cancella al primo input che Esc non è — un
+clic, un'altra lettera. La prova sta in `tests/verify-514-g7.spec.mjs` e
+`tests/verify-514-g7b.spec.mjs`, con la controprova della stessa pagina senza
+quella riga.
+
 **Chi apre un riquadro nuovo non deve fare niente.** Un riquadro disegnato sopra
 un sito passa già da `SN_FILO_UI.mark()`, perché il marchio serve anche a chi
 traduce la pagina; uno disegnato da una pagina di Filo non deve nemmeno quello,
