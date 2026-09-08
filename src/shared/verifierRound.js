@@ -79,6 +79,10 @@
   // scritto dopo un `>` o dei cancelletti finiva nel riassunto — cioè una
   // bocciatura diventava una promozione, in silenzio (feedback #565).
   const PREFISSO_ELENCO = '(?:#{1,6}\\s*|>\\s*|[-*•]\\s*|\\d{1,2}[.)]\\s*|[A-Za-z][.)]\\s*)?';
+  // Il grassetto di Markdown si scrive con gli asterischi O con gli
+  // underscore: guardando solo gli asterischi, «__tre] …» passava muta e la
+  // bocciatura finiva nel riassunto (feedback #565).
+  const GRASSETTO = '(?:\\*{1,3}|_{1,3})?';
   const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?\\[\\s*([0-3])\\s*(\\?)?\\s*\\](?:\\*\\*)?\\s*(.*)$`);
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
@@ -153,6 +157,14 @@
   const LIVELLO_NUDO = '(?:\\d|\\b(?:zero|uno|due|tre)\\b|[?!])';
   const QUADRA_APERTA = new RegExp(`\\[{1,2}[^\\[\\]\\n]{0,200}?${LIVELLO_NUDO}`, 'i');
   const QUADRA_CHIUSA = new RegExp(`${LIVELLO_NUDO}[^\\[\\]\\n]{0,200}?\\]{1,2}`, 'i');
+
+  // Un livello che APRE la riga e incontra una parentesi di CHIUSURA senza
+  // che ne sia mai stata aperta una: «tre] …», «tre) …», «__tre] …». È la
+  // parentesi dimenticata, e con una tonda al posto della quadra passava muta
+  // (feedback #565). La finestra non può contenere una parentesi APERTA,
+  // quindi «3 volte (ok)» in mezzo a una frase resta testo.
+  const APRE_LIVELLO_SENZA_APERTURA = new RegExp(
+    `^\s*${PREFISSO_ELENCO}${GRASSETTO}${LIVELLO_NUDO}[^\[\](){}\n]{0,200}?[\])}]`, 'i');
 
   function quadraColLivello(riga) {
     // TUTTE le quadre della riga, non solo la prima: bastava una frase fra
@@ -261,6 +273,7 @@
       const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
       const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]))
         || quadraColLivello(raw)
+        || APRE_LIVELLO_SENZA_APERTURA.test(raw)
         || PARENTESI_LIVELLO.test(raw)
         || ETICHETTA_PRIMA.test(raw);
       if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
