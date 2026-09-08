@@ -56,8 +56,17 @@ test('senza il tetto sul riquadro delle fusioni le aree uscivano dallo schermo',
   expect(adesso.scrollH).toBeLessThanOrEqual(adesso.viewport + 1);
   expect(adesso.gridBottom).toBeLessThanOrEqual(adesso.viewport + 1);
 
-  // Com'era prima: tolgo il tetto, e la stessa scena rompe gli stessi assert.
-  await page.addStyleTag({ content: '#mgMergeApprovals { max-height: none !important; overflow-y: visible !important; }' });
+  // Com'era prima: rimetto a mano le due misure di allora e la stessa scena
+  // rompe gli stessi assert. Sono DUE, non una. Il tetto dice quanto il
+  // riquadro può chiedere; l'altezza della colonna è ciò che lo obbliga a
+  // rinunciare. Con la colonna a `min-height: 100vh` poteva crescere oltre la
+  // finestra, e allora nessuno gli chiedeva niente: era la metà che mancava, e
+  // si vedeva con lo zoom alzato o su una finestra bassa (#498, terzo giro).
+  await page.addStyleTag({ content: `
+    .sn-page { height: auto !important; min-height: 100vh !important; }
+    #mgMergeApprovals { max-height: none !important; min-height: 0 !important; overflow-y: visible !important; }
+    #mgReviewGrid { min-height: 300px !important; }
+  ` });
   await page.waitForTimeout(250);
   const prima = await conFusioni(3);
   console.log('PRIMA 3 fusioni', JSON.stringify(prima));
