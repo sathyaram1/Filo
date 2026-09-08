@@ -65,10 +65,11 @@
   // La domanda giusta non è "quali riquadri esistono" — quella è una lista che
   // invecchia — ma "questo Esc l'ha usato qualcuno?". Si risponde guardando due
   // cose, dopo che il tasto ha finito il suo giro nel documento:
-  //  · quanti pezzi di UI DI FILO ci sono sulla pagina. Ognuno porta il marchio
-  //    di casa (SN_FILO_UI) e chi si chiude sparisce dal documento: se il numero
-  //    è calato, quell'Esc l'ha usato un riquadro di Filo. Il marchio lo mette
-  //    già chi disegna, quindi un riquadro nuovo è coperto il giorno che nasce.
+  //  · i pezzi di UI DI FILO che c'erano sulla pagina un istante prima. Ognuno
+  //    porta il marchio di casa (SN_FILO_UI) e chi si chiude si stacca dal
+  //    documento: se uno di quelli è sparito, quell'Esc l'ha usato lui. Il
+  //    marchio lo mette già chi disegna, quindi un riquadro nuovo è coperto il
+  //    giorno che nasce, senza doversi ricordare di iscriversi da nessuna parte.
   //  · su una pagina DI FILO, in più, basta che qualcuno l'abbia consumato
   //    (fermando la propagazione o chiedendo di ignorare il tasto): lì tutto
   //    quello che c'è sullo schermo è roba nostra. Sui siti no — un sito che si
@@ -80,11 +81,19 @@
     try { return location.protocol === 'filo:'; } catch (_) { return false; }
   })();
 
-  function quantiPezziDiFilo() {
+  function pezziDiFiloSullaPagina() {
     try {
       const sel = self.SN_FILO_UI?.SELECTOR;
-      return sel ? document.querySelectorAll(sel).length : 0;
-    } catch (_) { return 0; }
+      return sel ? Array.from(document.querySelectorAll(sel)) : [];
+    } catch (_) { return []; }
+  }
+  // Uno di quelli che c'erano non è più attaccato al documento: si è chiuso.
+  // Guardiamo i pezzi UNO A UNO e non quanti sono, perché nello stesso istante
+  // ne può nascere un altro — chiudendo la selezione di un'area compare
+  // l'avvisino che dice com'è andata, e a contarli sembrerebbe che non sia
+  // successo niente.
+  function qualcosaSiEChiuso(pezziPrima) {
+    try { return pezziPrima.some((el) => el && !el.isConnected); } catch (_) { return false; }
   }
 
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
@@ -162,7 +171,7 @@
       // browser la fa uscire e il main ripristina la barra da solo. Chiedere
       // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
       if (document.fullscreenElement) return;
-      escInCorso = { ev: e, pezziPrima: quantiPezziDiFilo(), inFondo: false, consumato: false };
+      escInCorso = { ev: e, pezziPrima: pezziDiFiloSullaPagina(), inFondo: false, consumato: false };
       setTimeout(decidiEsc, 0);
     }, { capture: true });
 
@@ -176,7 +185,7 @@
       const giro = escInCorso;
       escInCorso = null;
       if (!giro || !contentFullscreen) return;
-      const chiuso = quantiPezziDiFilo() < giro.pezziPrima;
+      const chiuso = qualcosaSiEChiuso(giro.pezziPrima);
       const consumato = PAGINA_DI_FILO && (!giro.inFondo || giro.consumato);
       if (chiuso || (consumato && escConsumatiDiFila === 0)) {
         // Era il tasto del riquadro: il main annulla l'uscita che aspettava.

@@ -499,7 +499,12 @@
       close();
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') close();
+      if (e.key !== 'Escape') return;
+      close();
+      // Quel tasto l'abbiamo usato noi: dichiararlo è ciò che tiene lo schermo
+      // intero acceso mentre il menu si chiude (#514).
+      e.preventDefault();
+      e.stopPropagation();
     };
     const onScroll = (e) => {
       // Lo scroll DENTRO il menu (es. la lista scorrevole della cronologia
