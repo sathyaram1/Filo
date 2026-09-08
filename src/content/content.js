@@ -1951,6 +1951,13 @@
       try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
       return;
     }
+    // Il main ci consegna un Esc che il browser ci avrebbe mangiato (schermo
+    // pieno del sito): lo rimettiamo in circolo e il giro di sempre decide di
+    // chi era (#514, giro 10).
+    if (msg?.type === MSG.ESC_INOLTRATO) {
+      try { consegnaEsc?.(); } catch (_) {}
+      return;
+    }
     // Toast di sistema inviato dal main (es. esito differito dell'invio di un
     // feedback, #341). Il broadcast arriva a TUTTE le schede: lo mostra solo
     // quella in primo piano, per non moltiplicare lo stesso avviso.
