@@ -127,8 +127,12 @@
       gap: 2px;
       border-bottom: 1px solid var(--sn-border);
       /* Niente margine sopra: la barra è la prima cosa della pagina e parte
-         dal bordo (#498). Sotto resta l'aria che la stacca dal contenuto. */
-      margin: 0 0 14px;
+         dal bordo (#498). Sotto resta l'aria che la stacca dal contenuto, e
+         quella misura è UNA (`--mg-tabs-gap`): la barra di ricerca si tira su
+         partendo da lì invece di ricopiarla a mano. Quando questo numero è
+         cambiato (20 → 14) la copia nella barra di ricerca è rimasta indietro
+         e il campo è finito appiccicato alla barra, a due pixel. */
+      margin: 0 0 var(--mg-tabs-gap);
     }
     .mg-tab {
       all: unset;
