@@ -45,7 +45,9 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
    nuovi. Le prove dei giri passati sono già nel ramo, in
    `tests/verifica/<numero>/`: lanciale per prime
    (`npx playwright test tests/verifica/<numero>`), prima di scriverne di
-   nuove.
+   nuove. Al primo giro quella cartella non esiste e il comando risponde
+   «No tests found» uscendo con un errore: è l'assenza di giri passati, non
+   un guasto del ramo.
 2. **Sei già sul branch del lavoro: non cambiarlo, e non verificare `main`.**
    Se ti sposti una guardia ti ferma, e la tua critica verrebbe comunque
    **rifiutata** perché emessa da una versione diversa del codice.
