@@ -899,6 +899,34 @@ async function recordVerifier(id, critiqueText) {
  * Quando c'è da correggere stampa i rilievi, quelli messi da parte, i bilanci
  * residui e la coda che arriva dal server; senza, l'esito e basta.
  */
+/**
+ * I file che il salvataggio automatico committerebbe DOPO la registrazione
+ * della critica: le righe di `git status --porcelain` (modificati, aggiunti,
+ * tolti, non tracciati), ridotte al percorso. PURA.
+ */
+export function dirtyTreeLines(porcelain) {
+  return String(porcelain || '')
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\s+$/, ''))
+    .filter((l) => l.length > 3)
+    .map((l) => l.slice(3).replace(/^"(.*)"$/, '$1'));
+}
+
+/** Il rifiuto per una directory non pulita, con l'elenco. PURA. */
+export function dirtyTreeText(lines) {
+  const elenco = (Array.isArray(lines) ? lines : []).slice(0, 30).map((l) => `  ${l}`).join('\n');
+  const altri = Array.isArray(lines) && lines.length > 30 ? `\n  … e altri ${lines.length - 30}` : '';
+  return `critica non registrata: ci sono file non registrati nella directory, e il salvataggio automatico li committerebbe DOPO il verdetto, spostando la punta del ramo (il pass vale per un commit preciso, e il cancello di fusione respingerebbe quello nuovo). Togli le tue spec temporanee (o registra ciò che deve restare), aspetta che il salvataggio automatico abbia committato, poi riprova con la stessa critica.\n${elenco}${altri}`;
+}
+
+function gitStatusPorcelain(root) {
+  try {
+    return execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (_) {
+    return '';
+  }
+}
+
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
