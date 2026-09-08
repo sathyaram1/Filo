@@ -1059,12 +1059,11 @@
         if (r.deck && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
       }
     } catch (e) {
+      if (bot.aborted) { chiudiTurno(); return; }
       bot.pending = false;
       bot.error = (e && e.message) || 'errore di rete';
     }
-    if (offReasoning) offReasoning();
-    if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
-    chatBusy = false;
+    chiudiTurno();
     if (deckChanged) await renderBuilder();
     else renderChat();
   }
