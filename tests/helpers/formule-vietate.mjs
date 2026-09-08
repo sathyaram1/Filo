@@ -33,8 +33,11 @@ export const TITOLI = [
 
 export const OVUNQUE = [
   /verificatore[^'"\n]{0,30}corregg/i,
-  /chi (?:ha )?(?:verific|critic|scritto la critica)[^.\n]{0,60}corregg/i,
-  /corregg[^.\n]{0,60}chi (?:ha )?(?:verific|critic|scritto la critica)/i,
+  // Il « chi » in mezzo è la differenza fra la frase che svela («chi ha
+  // criticato corregge») e quella che dice il contrario, elencando due ruoli
+  // distinti («chi verifica E CHI corregge»): la seconda va lasciata stare.
+  /chi (?:ha )?(?:verific|critic|scritto la critica)(?:(?! chi )[^.\n]){0,60}corregg/i,
+  /corregg(?:(?! chi )[^.\n]){0,60}chi (?:ha )?(?:verific|critic|scritto la critica)/i,
   /stessa istanza/i,
   /(?:seconda fase|fase 2)[^.\n]{0,40}(?:la fa|la scrive|tocca a)/i,
 ];
