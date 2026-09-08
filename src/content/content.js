@@ -250,6 +250,22 @@
     // di Filo lo vedrebbe mai (#514, giro 10). Quando è consegnato, la deroga
     // qui sotto non vale: il main ha già deciso che quel tasto passa di qui.
     let escInoltrato = false;
+    // Il tasto lo rimettiamo in circolo com'era: parte dal documento, sale fino
+    // a window e passa da tutti i gestori — i nostri riquadri e quelli della
+    // pagina — esattamente come farebbe un Esc vero. Non è "fidato", quindi non
+    // vale come gesto dell'utente: una pagina non può usarlo per riprendersi lo
+    // schermo (#514, giro 7).
+    consegnaEsc = () => {
+      if (escInoltrato) return;
+      escInoltrato = true;
+      try {
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+          bubbles: true, cancelable: true, composed: true,
+        }));
+      } catch (_) {}
+      escInoltrato = false;
+    };
 
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') { azzeraRivendicazioni(); return; }
