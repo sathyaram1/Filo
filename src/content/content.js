@@ -94,6 +94,11 @@
     // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && contentFullscreen) {
+        // Deroga (la stessa del main, src/main/tabs.js): se a tutto schermo c'è
+        // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
+        // browser la fa uscire e il main ripristina la barra da solo. Chiedere
+        // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
+        if (document.fullscreenElement) return;
         e.preventDefault();
         e.stopPropagation();
         contentFullscreen = false; // evita ripetizioni mentre il main esce
