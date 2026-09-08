@@ -1796,7 +1796,8 @@ if (isMainModule) {
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
-      // cade dopo 30 minuti di silenzio e la suite completa in cloud ne dura 37,
+      // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
+      // la suite completa in cloud dura più di mezz'ora,
       // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
       // biglietto morto (è già costato un giro intero: venti commit spinti e
       // nessun esito registrato). Chiederlo al prompt del lavoratore è la
