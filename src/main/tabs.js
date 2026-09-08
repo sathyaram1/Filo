@@ -489,8 +489,15 @@ class TabManager {
     const wc = tab?.view?.webContents;
     if (!wc || wc.isDestroyed?.()) return false;
     const type = globalThis.SN_MSG?.MSG?.ESC_INOLTRATO || 'esc_inoltrato';
+    // Al frame con cui l'utente sta interagendo, dove sarebbe arrivato il tasto
+    // vero: il menu del tasto destro aperto dentro un riquadro incorporato vive
+    // lì, e consegnarlo al frame principale lo lascerebbe aperto (#405 tiene
+    // aggiornato `_filoActiveFrame` a ogni interazione).
     let frame = null;
-    try { frame = wc.focusedFrame || wc.mainFrame; } catch (_) { frame = null; }
+    try {
+      const attivo = wc._filoActiveFrame;
+      frame = (attivo && !attivo.detached ? attivo : null) || wc.focusedFrame || wc.mainFrame;
+    } catch (_) { frame = null; }
     try {
       if (frame && !frame.detached) frame.send('filo:broadcast', { type });
       else wc.send('filo:broadcast', { type });
