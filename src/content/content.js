@@ -177,25 +177,38 @@
     // (in bolla su window, dopo chiunque) vede se il tasto è arrivato fino in
     // fondo intatto. La decisione arriva subito dopo, a giro finito.
     let escInCorso = null;
-    // Quante volte di fila un Esc è finito a qualcun altro senza che sulla
-    // pagina cambiasse niente di visibile. Serve solo alle pagine di Filo, dove
-    // la prova è "qualcuno l'ha consumato": una pagina che si prendesse ogni
-    // Esc a prescindere ci chiuderebbe dentro allo schermo intero, e invece il
-    // secondo Esc di fila esce comunque. Torna a zero appena l'utente fa
-    // qualcos'altro (un clic, un altro tasto), perché a quel punto la volta
-    // dopo è una volta nuova: riapri un'immagine e il suo Esc è di nuovo suo.
-    let escConsumatiDiFila = 0;
-    window.addEventListener('mousedown', () => { escConsumatiDiFila = 0; }, { capture: true });
+    // Quante volte di fila un Esc è stato rivendicato da qualcuno. Nessuna prova
+    // vale all'infinito, perché nessuna prova è a prova di pagina ostile: chi si
+    // prendesse ogni Esc ci chiuderebbe dentro allo schermo intero. Due tetti,
+    // perché le prove non valgono uguale. Sulla roba nostra (l'elenco di
+    // SN_FILO_UI, che dalla pagina non si tocca) la prova è solida e il tetto
+    // serve solo a non lasciare un "per sempre" scritto da nessuna parte: tre
+    // riquadri impilati chiusi uno per Esc sono già più di quanti ne esistano.
+    // Sugli indizi delle pagine di Filo (il tasto consumato, la pagina che si
+    // alleggerisce) il tetto è uno: il secondo Esc di fila esce comunque. Il
+    // conteggio torna a zero appena l'utente fa qualcos'altro (un clic, un altro
+    // tasto), perché a quel punto la volta dopo è una volta nuova: riapri
+    // un'immagine e il suo Esc è di nuovo suo.
+    const TETTO_ROBA_NOSTRA = 3;
+    const TETTO_INDIZI = 1;
+    let escRivendicatiDiFila = 0;
+    window.addEventListener('mousedown', () => { escRivendicatiDiFila = 0; }, { capture: true });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') { escConsumatiDiFila = 0; return; }
+      if (e.key !== 'Escape') { escRivendicatiDiFila = 0; return; }
       if (!contentFullscreen) return;
       // Deroga (la stessa del main, src/main/tabs.js): se a tutto schermo c'è
       // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
       // browser la fa uscire e il main ripristina la barra da solo. Chiedere
       // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
       if (document.fullscreenElement) return;
-      escInCorso = { ev: e, pezziPrima: pezziDiFiloSullaPagina(), inFondo: false, consumato: false };
+      escInCorso = {
+        ev: e,
+        pezziPrima: pezziDiFiloSullaPagina(),
+        pesoPrima: pesoDellaPagina(),
+        inFondo: false,
+        consumato: false,
+      };
       setTimeout(decidiEsc, 0);
     }, { capture: true });
 
