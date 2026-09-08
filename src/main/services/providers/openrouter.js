@@ -10,6 +10,37 @@
 (function (global) {
   'use strict';
 
+  // Scadenza delle chiamate (#520): `fetch` da solo non ne ha, e un router che
+  // accetta la connessione e poi tace lascia la chat su "sta pensando" per
+  // sempre. Il modulo lo carica il loader; in un contesto isolato (unit test
+  // che require() solo questo file) lo tiriamo su qui.
+  if (!global.SN_NET_TIMEOUT) {
+    try { require('../../../shared/netTimeout.js'); } catch (_) { /* senza, nessuna sorveglianza */ }
+  }
+
+  // Esegue `run(w)` sotto sorveglianza: `w.signal` va passato a fetch, `w.touch()`
+  // segnala che qualcosa è arrivato (solo dove c'è un flusso). Se la
+  // sorveglianza scatta, l'AbortError grezzo diventa un errore parlante con
+  // `code: 'TIMEOUT'`; se ad abortire è stato il CHIAMANTE (l'utente che
+  // interrompe) l'errore passa invariato.
+  async function conScadenza({ signal, stallMs, totalMs, cosa }, run) {
+    const Net = global.SN_NET_TIMEOUT;
+    if (!Net) return run({ signal, touch() {}, done() {} });
+    const w = Net.watch({
+      signal,
+      stallMs: stallMs || 0,
+      totalMs: totalMs === undefined ? Net.LIMITI.aiTettoMs : totalMs,
+    });
+    try {
+      return await run(w);
+    } catch (e) {
+      if (w.expired) throw Net.timeoutError(w.expired, { provider: 'openrouter', cosa });
+      throw e;
+    } finally {
+      w.done();
+    }
+  }
+
   const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
   const MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models';
   const SPEECH_ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
