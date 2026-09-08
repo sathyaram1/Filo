@@ -60,6 +60,8 @@ module.exports = function register(on, ctx) {
       // storico, così il tentativo successivo sa cosa era già stato fatto.
       const actions = Array.isArray(e && e.filoActions) ? e.filoActions : [];
       return { ok: false, error, code: (e && e.code) || 'UNKNOWN', actions };
+    } finally {
+      if (reqId) chatInCorso.delete(reqId);
     }
   });
 
