@@ -47,6 +47,10 @@
   const TRANSCRIPTIONS_ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
   const EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
   const GENERATION_ENDPOINT = 'https://openrouter.ai/api/v1/generation';
+  // Le due interrogazioni di servizio (elenco modelli, chi ha servito) sono
+  // risposte secche di metadati: non generano niente, quindi il tetto dei
+  // modelli sarebbe assurdo. Mezzo minuto è già larghissimo.
+  const LIMITE_INTERROGAZIONE_MS = 30_000;
 
   function buildHeaders(apiKey) {
     return {
