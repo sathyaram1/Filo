@@ -110,9 +110,10 @@ test('"Feedback ricevuti" segue la finestra e si apre sulla ripartizione per cat
   await expect(dettaglio).toContainText('Attacchi');
   await expect(dettaglio.locator('.mg-st-row', { hasText: 'Attacchi' }).locator('.mg-st-row-n')).toHaveText('1');
 
-  // Finestra più larga: entra anche quella di venti giorni fa.
+  // Finestra più larga: entrano anche quella di venti giorni fa e le quattro
+  // lavorazioni, che sono arrivate nove giorni fa.
   await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
-  await expect(valore(page, 'ricevuti')).toHaveText('4');
+  await expect(valore(page, 'ricevuti')).toHaveText('8');
 
   // E la si può chiudere: il riquadro è un interruttore, non una porta a senso
   // unico.
