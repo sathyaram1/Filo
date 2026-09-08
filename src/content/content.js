@@ -62,10 +62,15 @@
   // Quindi glielo diciamo a ogni apertura e a ogni chiusura, e rifacciamo il
   // controllo anche qui: se l'avviso fosse in ritardo, l'ultima parola è di chi
   // guarda i riquadri veri.
+  // I riquadri condivisi li riconosciamo da qui. Una pagina interna che ha un
+  // riquadro suo (l'immagine a tutta pagina della gestione feedback) mette la
+  // sua risposta in `__filoRiquadroAperto` e chiama il gancio qui sotto: così
+  // la regola resta una sola, e la pagina dichiara solo la cosa che sa lei.
   function riquadroDiFiloAperto() {
     try {
       if (Menu?.isOpen?.()) return true;
       if (Popup?.hasOpen?.()) return true;
+      if (self.__filoRiquadroAperto?.()) return true;
     } catch (_) {}
     return false;
   }
