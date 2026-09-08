@@ -153,7 +153,7 @@ test.describe('larghezza e separatori stile Chrome', () => {
 
     // Una tab inattiva NON ultima ha il separatore ::after visibile (largo 1px);
     // la tab attiva non lo ha (display:none).
-    const probe = await shell.locator('.tab').evaluateAll((els) => {
+    const leggiSeparatori = () => shell.locator('.tab').evaluateAll((els) => {
       const result = { inactiveDivider: null, activeDivider: null };
       for (const el of els) {
         const after = getComputedStyle(el, '::after');
@@ -167,6 +167,15 @@ test.describe('larghezza e separatori stile Chrome', () => {
       }
       return result;
     });
+
+    // Uno pseudo-elemento ha una MISURA solo dopo che il browser l'ha disegnato:
+    // finché non è disegnato `width` torna vuota, e leggerla una volta sola
+    // rendeva questa prova un testa o croce (verde da sola, rossa sotto carico).
+    // Si aspetta la misura, invece di sperare che ci sia già.
+    await expect
+      .poll(async () => (await leggiSeparatori()).inactiveDivider?.width || '', { timeout: 8_000 })
+      .not.toBe('');
+    const probe = await leggiSeparatori();
 
     // La scheda attiva non mostra la sottile linea verticale da 1px (al suo posto
     // ::after fa da piedino "a goccia", largo 8px — vedi test dedicato).
