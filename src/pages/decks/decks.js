@@ -940,9 +940,45 @@
     preloadVisibleCards();
   }
 
+  // Turno in corso (#520): serve per fermarlo dal bottone «Interrompi» e per
+  // tenere aggiornato il cronometro dell'attesa senza rigenerare le bolle.
+  let chatPending = null;
+  let chatTurno = 0;
+  let attesaTick = 0;
+
+  function fermaTick() {
+    if (attesaTick) { clearInterval(attesaTick); attesaTick = 0; }
+  }
+
+  function avviaTick(bot) {
+    fermaTick();
+    attesaTick = setInterval(() => {
+      const el = $('chatLog') && $('chatLog').querySelector('[data-attesa]');
+      if (!el || !bot.pending) { fermaTick(); return; }
+      el.textContent = attesaLabel(bot);
+    }, 1000);
+  }
+
+  // «Interrompi»: libera subito la chat e ferma davvero la chiamata al modello
+  // nel main (niente token spesi per una risposta che nessuno leggerà).
+  function abortChat() {
+    const p = chatPending;
+    if (!p) return;
+    chatPending = null;
+    fermaTick();
+    p.bot.pending = false;
+    p.bot.aborted = true;
+    chatBusy = false;
+    if (p.reqId) send({ type: MSG.DECKS_CHAT_ABORT, reqId: p.reqId }).catch(() => {});
+    renderChat();
+    const input = $('chatInput');
+    if (input) input.focus();
+  }
+
   async function sendChat(text) {
     if (chatBusy) return;
     chatBusy = true;
+    const mioTurno = ++chatTurno;
     const msgs = chatMsgs();
     // Le bolle precedenti tornano collassate quando arriva un nuovo scambio (§3.3).
     for (const m of msgs) m.expanded = false;
