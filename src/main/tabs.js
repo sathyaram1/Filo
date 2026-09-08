@@ -236,6 +236,9 @@ class TabManager {
     // chiudersi), e usciamo solo se nessuno se l'è preso. Vedi
     // handleFullscreenEscape (#514).
     this._escUscitaTimer = null;
+    // Quanti Esc di fila la pagina si è presa senza che l'utente facesse altro.
+    // Il conto sta nel main perché nella pagina il sito ci arriva (#514).
+    this._escRivendicazioni = 0;
     // Chrome compatto: fuori dalla home di Filo la barra indirizzi (icone di
     // navigazione + campo URL) viene nascosta, lasciando solo la fila di tab +
     // controlli finestra. In questo stato la WebContentsView risale a coprire
