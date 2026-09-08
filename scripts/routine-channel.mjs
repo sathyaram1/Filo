@@ -77,6 +77,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { dirtyTreeLines, dirtyTreeText, gitStatusPorcelain } from './lib/dirty-tree.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -262,6 +263,11 @@ export async function release(t, fault = '', opts) {
 export function classifyReply(status, body) {
   if (status === 200 && body && body.ok) return 'ok';
   if (status === 0 || status >= 500) return 'fault';
+  // Una risposta che non si legge (una pagina HTML al posto del JSON) non è
+  // un no del server: è il server che non ha risposto. Detta come rifiuto
+  // mandava a «leggere il motivo» di un motivo che non c'era (verifica del
+  // giro 3 su questo lavoro).
+  if (body && body.reason === 'malformed_response') return 'fault';
   return 'refused';
 }
 
@@ -574,6 +580,24 @@ if (isMain) {
         const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
         if (pkg.version) data.resolvedInVersion = pkg.version;
       } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
+    }
+    // Le consegne che passano il ramo a una verifica valgono per un commit:
+    // la messa in revisione (il primo passaggio di chi risolve), la correzione
+    // e il verdetto. Con modifiche non salvate la verifica dopo proverebbe il
+    // ramo senza di esse e boccerebbe una cosa fatta: un giro sprecato. Lo
+    // strumento delle routine (dispatch --record-*) respingeva già; da qui,
+    // che è la strada della ricetta per il primo passaggio, no (verifica del
+    // giro 3 su questo lavoro). Stessa regola, stessa fonte (lib/dirty-tree).
+    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed'
+      || (intento === 'status' && data.status === 'revision_capability');
+    if (passaAllaVerifica) {
+      const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
+      if (sporchi.length) {
+        const cosa = intento === 'verdict' ? 'critica' : intento === 'fixed' ? 'consegna' : 'revisione';
+        console.error(dirtyTreeText(sporchi, cosa));
+        console.error('Niente è stato consegnato: porta la directory a un commit e rilancia lo stesso comando.');
+        process.exit(1);
+      }
     }
     const r = await deliver(biglietto, intento, data);
     if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed')) {

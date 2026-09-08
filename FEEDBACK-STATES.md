@@ -64,7 +64,7 @@ vero su "qualcuno ci sta lavorando ORA").
 - `attack` —owner→ `attack_confirmed` | `todo` (falso positivo).
 - `spam` —owner→ `spam_confirmed` | `todo`.
 - `design` —owner (risponde in chat)→ `todo` | `archived`.
-- `aligned` —owner→ `todo` (anche bulk dalla dashboard).
+- `aligned` —owner→ `todo` (anche bulk dalla dashboard) | `archived` (doppione, o non si fa).
 - `todo` —routine (claim §6)→ `working`.
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota

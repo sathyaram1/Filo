@@ -75,6 +75,15 @@ test('rete giù per tutti i tentativi → guasto dichiarato, mai un finto "ok"',
   assert.equal(readTicketReply(r.status, r.body).outcome, 'fault');
 });
 
+test('una risposta che non si legge alla consegna è un guasto, non un rifiuto da «leggere il motivo»', () => {
+  // Verifica del giro 3 sul lavoro di lancio: una pagina HTML con codice 200
+  // usciva come «il server ha guardato e ha detto no».
+  assert.equal(mod.classifyReply(200, { ok: false, reason: 'malformed_response' }), 'fault');
+  assert.equal(mod.classifyReply(404, { ok: false, reason: 'malformed_response' }), 'fault');
+  assert.equal(mod.classifyReply(400, { ok: false, reason: 'malformed' }), 'refused');
+  assert.equal(mod.classifyReply(200, { ok: true }), 'ok');
+});
+
 test('una risposta non interpretabile è un guasto, non un successo vuoto', async () => {
   const fetchImpl = async () => ({ status: 200, ok: true, text: async () => 'non-json' });
   const r = await call('routineTicket', {}, { fetchImpl, sleep: async () => {}, attempts: 1 });

@@ -81,6 +81,8 @@ test('solo l\'owner fa uscire dagli stati di revisione umana', () => {
   assert.ok(FS.canTransition('spam', 'spam_confirmed', 'owner'));
   assert.ok(FS.canTransition('design', 'todo', 'owner'));
   assert.ok(FS.canTransition('aligned', 'todo', 'owner'));          // approvazione (bulk)
+  assert.ok(FS.canTransition('aligned', 'archived', 'owner'));      // doppione: si chiude senza approvarlo
+  assert.ok(!FS.canTransition('aligned', 'archived', 'routine'));
   assert.ok(FS.canTransition('done', 'archived', 'owner'));         // verifica umana
   assert.ok(FS.canTransition('done', 'todo', 'owner'));             // riapertura
   assert.ok(FS.canTransition('archived', 'todo', 'owner'));         // ripristino
@@ -148,7 +150,7 @@ test('canReach: accetta le CATENE di passi dello stesso attore (coda collassata)
 });
 
 test('transitionsFrom elenca le destinazioni per attore', () => {
-  assert.deepEqual(FS.transitionsFrom('aligned', 'owner'), ['todo']);
+  assert.deepEqual(FS.transitionsFrom('aligned', 'owner'), ['todo', 'archived']);
   assert.deepEqual(FS.transitionsFrom('aligned', 'routine'), []);
   assert.ok(FS.transitionsFrom('working', 'routine').includes('revision_capability'));
 });

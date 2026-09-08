@@ -227,4 +227,14 @@ describe('il lavoro di pubblicazione non scrive su main', () => {
     // E chiede il numero a chi lo può scrivere.
     assert.match(comandi, /release-bump\.mjs/);
   });
+
+  test('nel testo dell\'allarme l\'elenco dei test rossi ha un tetto, e il taglio si dice', () => {
+    // Verifica del giro 3 sul lavoro di lancio: le righe oltre le ottanta
+    // sparivano senza avviso, e con un modulo condiviso rotto sono cento test.
+    const yml = readFileSync(resolve(__dirname, '..', '..', '.github', 'workflows', 'release.yml'), 'utf8');
+    const comandi = yml.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
+    assert.match(comandi, /head -80/, 'il tetto resta: il testo viaggia in un feedback');
+    assert.match(comandi, /elenco tagliato/, 'ma oltre il tetto si dice che manca qualcosa');
+    assert.match(comandi, /N_TUTTE - 80/, 'con il conto delle righe rimaste fuori');
+  });
 });

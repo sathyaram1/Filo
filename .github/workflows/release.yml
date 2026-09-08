@@ -123,8 +123,31 @@ jobs:
         run: |
           echo "::error::Controlli automatici rossi: pubblicazione annullata."
           PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti sul ramo principale: la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
+          # I test rossi stanno all'INIZIO del log (una riga «not ok» per
+          # ciascuno), la coda porta solo il riepilogo: prima si elencano
+          # quelli, poi la coda. Un allarme con la sola coda non diceva quali
+          # test erano rossi, e chi lo prendeva doveva rifare tutta la suite.
+          # La riga «not ok» porta il nome del test ma non il file (o, a
+          # seconda della versione di Node, il file ma non il test, rientrata):
+          # si prende con qualunque rientro, e con la riga «location:» che la
+          # segue, che dice file e riga. Senza, con più di cento file di test,
+          # chi prendeva l'allarme cercava il test per nome.
+          # L'elenco ha un tetto (il testo dell'allarme viaggia in un feedback),
+          # ma il taglio si DICE: un elenco mozzato senza avviso fa credere di
+          # avere tutti i rossi, e con un modulo condiviso rotto sono cento.
+          ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null || true)
+          ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
+          N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
+          if [ "${N_TUTTE:-0}" -gt 80 ]; then
+            ROSSI="${ROSSI}
+          … elenco tagliato: altre $((N_TUTTE - 80)) righe di test rossi stanno nel registro di questa esecuzione (Actions)"
+          fi
           TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
+
+          Test rossi:
+          ${ROSSI:-(nessuna riga not ok: guarda la coda)}
+
 
           ${TAIL}"
           node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" || echo "::warning::allarme non consegnato"

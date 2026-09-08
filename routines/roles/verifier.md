@@ -162,6 +162,16 @@ un giro tolto a ciò che un utente nuovo vede per primo. La regola ufficiale
 del repo (CLAUDE.md § Iniziativa) resta valida per chi risolve; per te decide
 solo il livello, non la ricerca.
 
+**Il livello 2 vale per il lavoro che stai verificando**: la cosa segnalata,
+le strade equivalenti per ottenerla, le porte trovate nei giri passati, e ciò
+che questo lavoro ha peggiorato. Un difetto che scopri girando per il resto
+di Filo — c'era già prima di questo ramo, e questo ramo non l'ha toccato —
+vale **al massimo 1**, anche se sta sul cammino principale: entra nel feedback
+derivato, che ha una coda sua, e non trattiene un lavoro finito. Solo il
+livello 3 non conosce questa distinzione. Nei giri di settembre ogni giro
+trovava un difetto nuovo e lontano dalla segnalazione, e un lavoro pronto
+girava nove volte.
+
 **Il segno `?`** dopo il livello (`[2?]`, `[1?]`) dice che il rilievo **chiede
 una decisione dell'owner**: un trade-off vero, una scelta di prodotto o di
 gusto, qualcosa che non spetta a un automatismo decidere. Usalo solo per
@@ -190,6 +200,18 @@ inclusi gli stress test), poi **una riga per rilievo, col livello davanti fra
 parentesi quadre**. Le righe che seguono un rilievo senza livello davanti sono
 la sua continuazione (i passi per riprodurlo). Nessun rilievo = verifica
 superata.
+
+**Prima di registrare la critica, pulisci la directory**: togli le spec
+temporanee che hai scritto e porta la directory a un commit. Il salvataggio
+automatico parte solo a un Edit o a un Write: dopo un `rm` dalla shell non
+arriva da solo, e aspettarlo è aspettare niente — committa tu la pulizia
+(`git add -A && git commit -m "verifica: pulizia"`). Il pass vale per il
+commit di quel momento; con file non registrati in giro il salvataggio li
+committerebbe dopo, la punta del ramo si sposterebbe e il cancello di fusione
+respingerebbe il lavoro come non verificato. La registrazione rifiuta una
+directory sporca e ti stampa l'elenco (vale anche in locale, con
+`verify-local.mjs critica`): non è un rilievo, è da sistemare e riprovare con
+la stessa critica.
 
 **Le parentesi quadre con dentro un livello sono SEMPRE un rilievo**, dovunque
 stiano nella riga: nel riassunto un livello si cita **a parole** («il livello

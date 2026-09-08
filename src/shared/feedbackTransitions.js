@@ -70,7 +70,8 @@
       archived: ['owner'],  // oppure decide che non si fa
     },
     aligned: {
-      todo: ['owner'],      // approvazione manuale (anche bulk)
+      todo:     ['owner'],  // approvazione manuale (anche bulk)
+      archived: ['owner'],  // un doppione, o una cosa che non si farà: si chiude qui, senza approvarla prima
     },
     todo: {
       working: ['routine'], // presa in carico (il semaforo lo tiene il server)

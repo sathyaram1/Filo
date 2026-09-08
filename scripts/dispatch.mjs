@@ -80,6 +80,7 @@ import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
+import { dirtyTreeLines, dirtyTreeText, gitStatusPorcelain } from './lib/dirty-tree.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -838,6 +839,16 @@ async function recordVerifier(id, critiqueText) {
   if (String(critiqueText || '').length > MAX_CRITIQUE_CHARS) {
     return { rejected: true, formatRejected: true, message: `critica non registrata: troppo lunga (${String(critiqueText).length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}). Accorcia il riassunto, non i rilievi.` };
   }
+  // Il pass vale per il commit dichiarato qui sotto. Se nella directory ci sono
+  // file non registrati (di solito le spec temporanee della verifica), il
+  // salvataggio automatico li committerà DOPO la registrazione, la punta si
+  // sposterà e il cancello dirà «la verifica vale per un altro commit» (#256:
+  // le spec tolte tredici secondi dopo il pass, e il lavoro fermo due giorni).
+  // Si rifiuta PRIMA, con l'elenco: si pulisce e si riprova.
+  const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
+  if (sporchi.length) {
+    return { rejected: true, formatRejected: true, message: dirtyTreeText(sporchi) };
+  }
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
@@ -876,7 +887,11 @@ async function recordVerifier(id, critiqueText) {
     return { rejected: true, serverDown: true, message: `critica non registrata: il server non risponde (${sent.reason})` };
   }
   const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
-  const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'pass';
+  // Un «ok» senza esito non è un pass: l'esito lo calcola il server, e se non
+  // l'ha detto nessuno l'ha calcolato. Darlo per superato stampava «rilascia
+  // il biglietto» anche con un rilievo di livello 2 nella critica (verifica
+  // del giro 3 su questo lavoro).
+  const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'non comunicato';
   const next = applyVerifierVerdict(base, outcome, critiqueText);
   next.id = id;
   sealTransition(next, `verifier:${outcome}`);
@@ -889,6 +904,12 @@ async function recordVerifier(id, critiqueText) {
  * Quando c'è da correggere stampa i rilievi, quelli messi da parte, i bilanci
  * residui e la coda che arriva dal server; senza, l'esito e basta.
  */
+// I file che il salvataggio automatico committerebbe DOPO la registrazione
+// della critica, e il rifiuto con l'elenco: stanno in lib/dirty-tree.mjs,
+// perché la stessa regola vale sulla strada locale (verify-local critica).
+// Ri-esportati da qui per chi li importava da dispatch.
+export { dirtyTreeLines, dirtyTreeText };
+
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? VERIFIER_ROUND.formatFindings(list) : '  (nessuno)');
@@ -918,15 +939,34 @@ export function verifierReplyText(reply) {
       'Non c\'è niente da correggere: rilascia il biglietto.',
     ].join('\n');
   }
+  if (r.outcome === 'pass') {
+    return [
+      '══ RISPOSTA DEL SERVER: verifica superata ══',
+      r.derived && r.derived.num ? `I rilievi non corretti sono diventati il feedback ${r.derived.num}.` : 'Nessun rilievo da mettere da parte.',
+      'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
+    ].join('\n');
+  }
+  // Il server ha accettato la critica ma non ha detto l'esito: non è un pass,
+  // e non lo si inventa qui.
   return [
-    '══ RISPOSTA DEL SERVER: verifica superata ══',
-    r.derived && r.derived.num ? `I rilievi non corretti sono diventati il feedback ${r.derived.num}.` : 'Nessun rilievo da mettere da parte.',
-    'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
+    '══ RISPOSTA DEL SERVER: critica registrata, esito non comunicato ══',
+    'Il server ha accettato la critica ma non ha detto se il lavoro passa, si corregge o si ferma (server vecchio?).',
+    'L\'esito vero sta in dashboard, nella chat del feedback: leggilo lì prima di rilasciare il biglietto.',
   ].join('\n');
 }
 async function recordFixed(id, report = '', frase = '') {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, message: guard.message };
+  // La consegna vale per un commit, come la critica (stessa regola, stessa
+  // fonte: lib/dirty-tree.mjs). Con modifiche non salvate il server segnerebbe
+  // «corretto» su una correzione che non sta in nessun commit, e la verifica
+  // dopo proverebbe il ramo senza di essa: un giro sprecato. In locale
+  // «verify-local.mjs corretto» la respinge già; qui si respinge allo stesso
+  // modo, PRIMA del server e con l'elenco.
+  const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
+  if (sporchi.length) {
+    return { rejected: true, formatRejected: true, message: dirtyTreeText(sporchi, 'consegna') };
+  }
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
 
@@ -1619,7 +1659,7 @@ if (isMainModule) {
       }
       const s = await recordVerifier(id, critica);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);
+      console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply));
       process.exit(0);
     } else if (flag === '--record-fixed') {
@@ -1769,7 +1809,8 @@ if (isMainModule) {
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
-      // cade dopo 30 minuti di silenzio e la suite completa in cloud ne dura 37,
+      // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
+      // la suite completa in cloud dura più di mezz'ora,
       // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
       // biglietto morto (è già costato un giro intero: venti commit spinti e
       // nessun esito registrato). Chiederlo al prompt del lavoratore è la
