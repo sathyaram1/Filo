@@ -71,6 +71,14 @@
   //    chiude si stacca dal documento, quindi se uno di quelli è sparito quell'Esc
   //    l'ha usato lui. Il marchio lo mette già chi disegna, quindi un riquadro
   //    nuovo è coperto il giorno che nasce, senza iscriversi da nessuna parte.
+  //    Non basta guardare la RADICE: Filo apre roba anche DENTRO un suo riquadro
+  //    già aperto, e lì la radice non si stacca da niente. L'immagine ingrandita
+  //    dello screenshot allegato al box «Invia feedback» è così, e su un sito
+  //    l'Esc che la chiudeva portava via anche lo schermo intero (#514). Quindi
+  //    di ogni radice nostra guardiamo anche il SOTTOALBERO, con lo stesso metro
+  //    della pagina di Filo: un elemento in meno lì dentro, o uno in più
+  //    nascosto, vuol dire che il tasto l'ha usato un pezzo nostro. Vale anche
+  //    sui siti perché il sottoalbero è roba nostra, non del sito.
   //  · su una pagina DI FILO, in più, che la pagina si sia ALLEGGERITA nel giro
   //    del tasto: un elemento in meno, o uno in più nascosto. I riquadri che
   //    disegnano le pagine interne (i menu del tasto destro della cronologia e
