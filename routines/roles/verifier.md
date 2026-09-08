@@ -202,12 +202,16 @@ la sua continuazione (i passi per riprodurlo). Nessun rilievo = verifica
 superata.
 
 **Prima di registrare la critica, pulisci la directory**: togli le spec
-temporanee che hai scritto e aspetta che il salvataggio automatico abbia
-committato. Il pass vale per il commit di quel momento; con file non
-registrati in giro il salvataggio li committerebbe dopo, la punta del ramo si
-sposterebbe e il cancello di fusione respingerebbe il lavoro come non
-verificato. La registrazione rifiuta una directory sporca e ti stampa l'elenco:
-non è un rilievo, è da sistemare e riprovare con la stessa critica.
+temporanee che hai scritto e porta la directory a un commit. Il salvataggio
+automatico parte solo a un Edit o a un Write: dopo un `rm` dalla shell non
+arriva da solo, e aspettarlo è aspettare niente — committa tu la pulizia
+(`git add -A && git commit -m "verifica: pulizia"`). Il pass vale per il
+commit di quel momento; con file non registrati in giro il salvataggio li
+committerebbe dopo, la punta del ramo si sposterebbe e il cancello di fusione
+respingerebbe il lavoro come non verificato. La registrazione rifiuta una
+directory sporca e ti stampa l'elenco (vale anche in locale, con
+`verify-local.mjs critica`): non è un rilievo, è da sistemare e riprovare con
+la stessa critica.
 
 **Le parentesi quadre con dentro un livello sono SEMPRE un rilievo**, dovunque
 stiano nella riga: nel riassunto un livello si cita **a parole** («il livello
