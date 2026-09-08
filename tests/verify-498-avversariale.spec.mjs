@@ -181,6 +181,12 @@ test('#498 le altre schede della dashboard: quanta finestra riempiono', async ({
       };
     });
     console.log('TAB', tab, JSON.stringify(info));
+    // Sulle tre schede-lista gemelle le aree arrivano in fondo come sui
+    // Ricevuti: la disposizione è la stessa, il filtro cambia solo la lista.
+    if (['queue', 'resolved', 'archived'].includes(tab)) {
+      expect(info.gridBottom, `${tab}: le aree non arrivano in fondo`).toBeGreaterThan(info.viewportH - 28);
+      expect(info.scrollH, `${tab}: la pagina scrolla`).toBeLessThanOrEqual(info.viewportH + 1);
+    }
   }
 });
 
