@@ -981,6 +981,474 @@
     }
   }
 
+  // ══ Tab "Statistiche feedback" (#496) ═════════════════════════════════════
+  //
+  // I numeri li fa il modulo condiviso (SN_FEEDBACK_STATS, logica pura con i
+  // suoi unit test); qui c'è il disegno, i due controlli e — soprattutto — le
+  // frasi che dicono cosa questi numeri NON possono dire.
+  //
+  // La sorgente sono i feedback GIÀ IN PAGINA: la scheda non fa nessuna lettura
+  // in più, quindi aprirla è istantaneo e gratis. L'unica cosa che chiede
+  // altrove è il registro delle partenze delle routine, lo stesso della scheda
+  // Log: una lettura di documento sola.
+  const ST = window.SN_FEEDBACK_STATS;
+  const mgStWindows   = document.getElementById('mgStWindows');
+  const mgStCustom    = document.getElementById('mgStCustom');
+  const mgStFrom      = document.getElementById('mgStFrom');
+  const mgStTo        = document.getElementById('mgStTo');
+  const mgStCreators  = document.getElementById('mgStCreators');
+  const mgStNote      = document.getElementById('mgStNote');
+  const mgStCards     = document.getElementById('mgStCards');
+  const mgStPie       = document.getElementById('mgStPie');
+  const mgStPieLegend = document.getElementById('mgStPieLegend');
+  const mgStPieNote   = document.getElementById('mgStPieNote');
+  const mgStBars      = document.getElementById('mgStBars');
+  const mgStBarsNote  = document.getElementById('mgStBarsNote');
+  const mgStMore      = document.getElementById('mgStMore');
+  const STATS_PREFS_KEY = 'filo_manage_stats';
+
+  // La finestra scelta e il filtro per creatore sopravvivono alla chiusura
+  // della pagina: chi guarda queste statistiche torna a guardare le stesse.
+  let statsSel = { key: ST ? ST.DEFAULT_WINDOW : '30d', from: '', to: '' };
+  let statsCreators = [];   // vuoto = tutti
+  const statsOpen = new Set(['ricevuti']);  // quali riquadri sono aperti
+  let workerLogEntries = null;  // null = il registro non è ancora stato letto
+
+  // I colori delle fette: dal verde (passata al primo colpo) al rosso (tanti
+  // giri). Non è una palette qualunque — la scala DICE se il numero è buono, ed
+  // è la prima cosa che si legge in una torta.
+  const ST_PIE_COLORS = ['#3bbf7a', '#c9a13b', '#d1741f', '#c0392b', '#8a2b8a', '#5b6ee0'];
+
+  async function loadStatsPrefs() {
+    try {
+      const data = await chrome.storage.local.get(STATS_PREFS_KEY);
+      const v = data && data[STATS_PREFS_KEY];
+      if (v && typeof v === 'object') {
+        if (v.key && ST && ST.windowByKey(v.key)) statsSel.key = v.key;
+        if (typeof v.from === 'string') statsSel.from = v.from;
+        if (typeof v.to === 'string') statsSel.to = v.to;
+        if (Array.isArray(v.creators)) statsCreators = v.creators.filter((k) => typeof k === 'string');
+      }
+    } catch (_) { /* ripiego sui valori di partenza */ }
+  }
+  function saveStatsPrefs() {
+    try {
+      chrome.storage.local.set({
+        [STATS_PREFS_KEY]: { key: statsSel.key, from: statsSel.from, to: statsSel.to, creators: statsCreators },
+      });
+    } catch (_) { /* la scelta vale comunque per questa sessione */ }
+  }
+
+  function statsActive() {
+    const panel = document.getElementById('panel-fbstats');
+    return !!(panel && panel.classList.contains('mg-panel--active'));
+  }
+
+  function statsPercent(n, tot) {
+    if (!tot) return '';
+    return `${Math.round((n / tot) * 100)}%`;
+  }
+  // Un numero che potrebbe non essere un totale si scrive "24+", come le
+  // schede: il "+" costa un carattere e dice la verità.
+  function statsNum(n, parziale) {
+    return parziale ? `${n}+` : String(n);
+  }
+  function statsDate(ms) {
+    if (!Number.isFinite(ms)) return '';
+    return new Date(ms).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  // ── I due controlli ───────────────────────────────────────────────────────
+  function renderStatsControls(res) {
+    if (!mgStWindows || !ST) return;
+    mgStWindows.innerHTML = ST.WINDOWS.map((w) => (
+      `<button type="button" class="mg-st-chip${w.key === statsSel.key ? ' mg-st-chip--on' : ''}" `
+      + `data-window="${esc(w.key)}">${esc(w.label)}</button>`
+    )).join('');
+    if (mgStCustom) mgStCustom.hidden = statsSel.key !== 'custom';
+    if (mgStFrom && mgStFrom.value !== statsSel.from) mgStFrom.value = statsSel.from;
+    if (mgStTo && mgStTo.value !== statsSel.to) mgStTo.value = statsSel.to;
+
+    if (!mgStCreators) return;
+    const conteggi = Object.fromEntries((res.creatori || []).map((c) => [c.key, c.n]));
+    const scelti = new Set(statsCreators);
+    const chip = (attrs, label, on, count) =>
+      `<button type="button" class="mg-st-chip${on ? ' mg-st-chip--on' : ''}" ${attrs}>${label}`
+      + (count === null || count === undefined ? '' : ` <span class="mg-st-chip-count">${count}</span>`)
+      + '</button>';
+    const parti = [
+      chip('data-creator-all="1"', 'Tutti', scelti.size === 0, null),
+      chip('data-creator-group="persone"', 'Persone', gruppoAcceso(ST.CREATORS_PEOPLE, scelti), null),
+      chip('data-creator-group="routine"', 'Routine', gruppoAcceso(ST.CREATORS_ROUTINE, scelti), null),
+    ];
+    for (const key of ST.creatorKeys()) {
+      const meta = AUTHOR_META[key] || AUTHOR_META.user;
+      parti.push(chip(
+        `data-creator="${esc(key)}" title="${esc(meta.label)}"`,
+        `${meta.icon} ${esc(meta.label)}`,
+        scelti.has(key),
+        conteggi[key] || 0,
+      ));
+    }
+    mgStCreators.innerHTML = parti.join('');
+  }
+  function gruppoAcceso(gruppo, scelti) {
+    return scelti.size === gruppo.length && gruppo.every((k) => scelti.has(k));
+  }
+
+  // ── I riquadri delle misure principali ────────────────────────────────────
+  function statsCard({ id, value, label, sub, rows, empty }) {
+    const aperto = statsOpen.has(id);
+    const righe = (rows || []).filter((r) => r && r.n > 0);
+    const dettaglio = righe.length
+      ? righe.map((r) => (
+        `<div class="mg-st-row"><span class="mg-st-row-label">${esc(r.label)}</span>`
+        + `<span class="mg-st-row-n">${esc(String(r.n))}</span>`
+        + `<span class="mg-st-row-share">${esc(r.share || '')}</span></div>`
+      )).join('')
+      : `<div class="mg-st-empty">${esc(empty || 'Niente in questa finestra.')}</div>`;
+    return `<div class="mg-st-card" data-card="${esc(id)}">`
+      + `<button type="button" class="mg-st-card-head" data-card-toggle="${esc(id)}" aria-expanded="${aperto}">`
+      + `<span class="mg-st-card-value">${esc(value)}</span>`
+      + `<span class="mg-st-card-label">${esc(label)}</span>`
+      + `<span class="mg-st-card-caret">${aperto ? '▾' : '▸'}</span>`
+      + `</button>`
+      + (sub ? `<div class="mg-st-card-sub">${esc(sub)}</div>` : '')
+      + `<div class="mg-st-card-detail" data-card-detail="${esc(id)}"${aperto ? '' : ' hidden'}>${dettaglio}</div>`
+      + `</div>`;
+  }
+
+  function renderStatsCards(res) {
+    if (!mgStCards) return;
+    const parz = res.copertura.parziale;
+    const ric = res.ricevuti;
+    const rout = res.routine;
+    const cards = [
+      statsCard({
+        id: 'ricevuti',
+        value: statsNum(ric.total, parz),
+        label: 'Feedback ricevuti',
+        sub: 'per data d’arrivo',
+        rows: ric.perCategoria.map((c) => ({
+          label: c.label, n: c.n, share: statsPercent(c.n, ric.total),
+        })),
+        empty: 'Nessuna segnalazione arrivata in questa finestra.',
+      }),
+      statsCard({
+        id: 'lavorati',
+        value: statsNum(res.lavorati.total, parz),
+        label: 'Feedback lavorati',
+        sub: 'lavorazione chiusa, per data dell’ultimo movimento',
+        rows: [
+          { label: 'Passate alla prima verifica', n: res.giri.fette.find((f) => f.giri === 0)?.n || 0 },
+          { label: 'Passate dopo almeno una correzione', n: res.giri.fette.filter((f) => f.giri > 0).reduce((a, f) => a + f.n, 0) },
+          { label: 'Verifica ferma, decide l’owner', n: res.giri.ferme },
+          { label: 'Senza verbale di verifica nelle note', n: res.giri.senzaDati },
+        ],
+        empty: 'Nessuna lavorazione chiusa in questa finestra.',
+      }),
+      statsCard({
+        id: 'routine',
+        value: statsNum(rout.prober, rout.parziale),
+        label: 'Prober lanciati',
+        sub: 'partenze registrate dal server, tutti i creatori',
+        rows: rout.byRole.map((r) => ({ label: r.label, n: r.n, share: statsPercent(r.n, rout.total) })),
+        empty: 'Nessuna partenza registrata in questa finestra.',
+      }),
+      statsCard({
+        id: 'adesso',
+        value: String(res.adesso.inCoda + res.adesso.inLavorazione),
+        label: 'Aperte adesso',
+        sub: 'istantanea: non dipende dalla finestra',
+        rows: [
+          { label: 'In coda', n: res.adesso.inCoda },
+          { label: 'In lavorazione', n: res.adesso.inLavorazione },
+        ],
+        empty: 'Niente in coda né in lavorazione.',
+      }),
+    ];
+    mgStCards.innerHTML = cards.join('');
+  }
+
+  // ── La torta dei giri di verifica ─────────────────────────────────────────
+  // Una fetta per "quanti giri è costato": 0 giri, 1 giro, 2 giri… Le fette
+  // sono <path> con `data-group`, come la torta dei crediti, così uno spec può
+  // asserire QUALI fette esistono e non solo che c'è un grafico.
+  function fettaLabel(giri) {
+    if (giri === 0) return 'Passata subito (0 critiche)';
+    return giri === 1 ? '1 critica' : `${giri} critiche`;
+  }
+  function slicePath(cx, cy, r, start, end) {
+    const large = end - start > Math.PI ? 1 : 0;
+    const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
+    const x2 = cx + r * Math.cos(end), y2 = cy + r * Math.sin(end);
+    return `M${cx} ${cy} L${x1.toFixed(2)} ${y1.toFixed(2)} `
+      + `A${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+  }
+  function renderStatsPie(res) {
+    if (!mgStPie || !mgStPieLegend) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    const fette = res.giri.fette;
+    const totale = fette.reduce((a, f) => a + f.n, 0);
+    mgStPie.replaceChildren();
+    mgStPieLegend.replaceChildren();
+
+    if (!totale) {
+      mgStPie.hidden = true;
+      const li = document.createElement('li');
+      li.className = 'mg-st-empty';
+      li.textContent = res.giri.senzaDati
+        ? 'Nessuna lavorazione con un verbale di verifica leggibile in questa finestra.'
+        : 'Nessuna lavorazione chiusa in questa finestra.';
+      mgStPieLegend.appendChild(li);
+    } else {
+      mgStPie.hidden = false;
+      const cx = 110, cy = 110, r = 100;
+      if (fette.length === 1) {
+        // Con una sola categoria l'arco da 0 a 2π collasserebbe: cerchio pieno.
+        const circle = document.createElementNS(NS, 'circle');
+        circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
+        circle.setAttribute('fill', ST_PIE_COLORS[0]);
+        circle.dataset.group = String(fette[0].giri);
+        mgStPie.appendChild(circle);
+      } else {
+        let angle = -Math.PI / 2;  // parti da ore 12
+        fette.forEach((f, i) => {
+          const next = angle + (f.n / totale) * Math.PI * 2;
+          const path = document.createElementNS(NS, 'path');
+          path.setAttribute('d', slicePath(cx, cy, r, angle, next));
+          path.setAttribute('fill', ST_PIE_COLORS[Math.min(i, ST_PIE_COLORS.length - 1)]);
+          path.dataset.group = String(f.giri);
+          const t = document.createElementNS(NS, 'title');
+          t.textContent = `${fettaLabel(f.giri)}: ${f.n}`;
+          path.appendChild(t);
+          mgStPie.appendChild(path);
+          angle = next;
+        });
+      }
+      fette.forEach((f, i) => {
+        const li = document.createElement('li');
+        li.dataset.group = String(f.giri);
+        const sw = document.createElement('span');
+        sw.className = 'mg-st-swatch';
+        sw.style.background = ST_PIE_COLORS[Math.min(i, ST_PIE_COLORS.length - 1)];
+        const label = document.createElement('span');
+        label.className = 'mg-st-legend-label';
+        label.textContent = fettaLabel(f.giri);
+        const n = document.createElement('span');
+        n.className = 'mg-st-legend-n';
+        n.textContent = `${f.n} · ${statsPercent(f.n, totale)}`;
+        li.append(sw, label, n);
+        mgStPieLegend.appendChild(li);
+      });
+    }
+
+    // Sotto la torta: la media, e che tipo di critiche sono state quelle che
+    // hanno fatto girare di nuovo. «Fail» e «migliorabile» non sono più due
+    // verdetti (li ha sostituiti la critica coi livelli, feedback #561): qui si
+    // chiamano con quello che il server fa DAVVERO in quel caso, e le vecchie
+    // parole restano fra parentesi per chi le ha in mente.
+    const g = res.giri;
+    const frasi = [];
+    if (totale) {
+      frasi.push(`Media: ${ST.formatAvg(g.media)} giri prima del pass`);
+      if (g.alPrimoColpo !== null) frasi.push(`al primo colpo ${Math.round(g.alPrimoColpo * 100)}%`);
+    }
+    if (g.giriTotali) {
+      frasi.push(`${g.perEsito.fix} giri di correzione`);
+      frasi.push(`${g.perEsito.stop} bloccanti, passati all’owner (i vecchi «fail»)`);
+      frasi.push(`${g.perEsito.rimandati} con rilievi rimandati a un feedback derivato (i vecchi «migliorabile»)`);
+    }
+    if (g.ferme) frasi.push(`${g.ferme} lavorazioni chiuse senza un pass registrato`);
+    if (g.senzaDati) frasi.push(`${g.senzaDati} senza verbale di verifica nelle note`);
+    if (mgStPieNote) mgStPieNote.textContent = frasi.join(' · ');
+  }
+
+  // ── L'andamento nel tempo ─────────────────────────────────────────────────
+  function bucketLabel(unit, start) {
+    const d = new Date(start);
+    const p = (n) => String(n).padStart(2, '0');
+    if (unit === 'mese') return d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' });
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}`;
+  }
+  function renderStatsBars(res) {
+    if (!mgStBars) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    mgStBars.replaceChildren();
+    const t = res.ricevuti.timeline;
+    if (!t || !t.buckets.length) {
+      mgStBars.hidden = true;
+      if (mgStBarsNote) mgStBarsNote.textContent = 'Nessuna segnalazione da mettere in fila in questa finestra.';
+      return;
+    }
+    mgStBars.hidden = false;
+    const W = 1000, H = 140, base = H - 18, top = 6;
+    mgStBars.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    mgStBars.setAttribute('preserveAspectRatio', 'none');
+    const n = t.buckets.length;
+    const max = Math.max(1, ...t.buckets.map((b) => b.n));
+    const passo = W / n;
+    const larghezza = Math.max(2, passo - Math.min(6, passo * 0.25));
+    t.buckets.forEach((b, i) => {
+      const h = b.n ? Math.max(2, ((base - top) * b.n) / max) : 0;
+      if (!h) return;
+      const rect = document.createElementNS(NS, 'rect');
+      rect.setAttribute('x', (i * passo + (passo - larghezza) / 2).toFixed(2));
+      rect.setAttribute('y', (base - h).toFixed(2));
+      rect.setAttribute('width', larghezza.toFixed(2));
+      rect.setAttribute('height', h.toFixed(2));
+      rect.setAttribute('class', 'mg-st-bar');
+      rect.dataset.bucket = String(b.start);
+      const title = document.createElementNS(NS, 'title');
+      title.textContent = `${bucketLabel(t.unit, b.start)}: ${b.n}`;
+      rect.appendChild(title);
+      mgStBars.appendChild(rect);
+    });
+    // Due sole etichette (prima e ultima colonna): con sessanta colonne
+    // un'etichetta per barra sarebbe illeggibile, e il dettaglio sta nell'hover.
+    const first = document.createElementNS(NS, 'text');
+    first.setAttribute('x', '2'); first.setAttribute('y', String(H - 4));
+    first.setAttribute('class', 'mg-st-bar-axis');
+    first.textContent = bucketLabel(t.unit, t.buckets[0].start);
+    const last = document.createElementNS(NS, 'text');
+    last.setAttribute('x', String(W - 2)); last.setAttribute('y', String(H - 4));
+    last.setAttribute('text-anchor', 'end');
+    last.setAttribute('class', 'mg-st-bar-axis');
+    last.textContent = bucketLabel(t.unit, t.buckets[n - 1].start);
+    mgStBars.append(first, last);
+    if (mgStBarsNote) {
+      const unitLabel = t.unit === 'giorno' ? 'giorno' : (t.unit === 'settimana' ? 'settimana' : 'mese');
+      mgStBarsNote.textContent = `Una colonna per ${unitLabel}; il massimo di una colonna è ${max}.`;
+    }
+  }
+
+  // ── Le misure che stanno in una riga ──────────────────────────────────────
+  function renderStatsMore(res) {
+    if (!mgStMore) return;
+    const g = res.giri;
+    const rilievi = g.perLivello;
+    const righe = [
+      ['Tempo mediano dalla segnalazione alla chiusura', res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMediano) : '—'],
+      ['Tempo medio dalla segnalazione alla chiusura', res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMedio) : '—'],
+      ['Giri di verifica registrati', String(g.giriTotali)],
+      ['Rilievi per livello (3 · 2 · 1 · 0)', `${rilievi[3]} · ${rilievi[2]} · ${rilievi[1]} · ${rilievi[0]}`],
+      ['Segnalazioni fermate dai giudici (attacchi + spam)', (() => {
+        const per = Object.fromEntries(res.ricevuti.perCategoria.map((c) => [c.key, c.n]));
+        const bloccate = (per.attacco || 0) + (per.spam || 0);
+        const q = statsPercent(bloccate, res.ricevuti.total);
+        return q ? `${bloccate} · ${q}` : String(bloccate);
+      })()],
+      ['Partenze delle routine, tutti i ruoli', statsNum(res.routine.total, res.routine.parziale)],
+    ];
+    mgStMore.innerHTML = righe.map(([label, value]) => (
+      `<li><span class="mg-st-more-label">${esc(label)}</span>`
+      + `<span class="mg-st-more-value">${esc(value)}</span></li>`
+    )).join('');
+  }
+
+  // ── Le frasi che dicono cosa questi numeri non possono dire ───────────────
+  function renderStatsNote(res) {
+    if (!mgStNote) return;
+    const frasi = [];
+    if (!res.range.valid) {
+      frasi.push('La finestra scelta non si legge: scrivi una data d’inizio e una di fine, con l’inizio prima della fine. Finché non è a posto, i numeri qui sotto sono quelli di TUTTO lo storico in pagina.');
+    } else if (res.range.from !== null || res.range.to !== null) {
+      const da = res.range.from !== null ? statsDate(res.range.from) : 'sempre';
+      const a = res.range.to !== null ? statsDate(res.range.to) : 'oggi';
+      frasi.push(`Finestra: dal ${da} al ${a}.`);
+    } else {
+      frasi.push('Finestra: tutto lo storico in pagina.');
+    }
+    if (!res.statiLeggibili) {
+      frasi.push('Questo computer non può leggere lo stato delle segnalazioni: categorie, lavorazioni e giri di verifica restano vuoti. Quante ne sono arrivate e da chi si sa lo stesso.');
+    }
+    if (res.copertura.parziale) {
+      frasi.push(`${FB.COUNT_CAP_HINT} Il più vecchio in pagina è del ${statsDate(res.copertura.piuVecchio)}: i numeri con il "+" sono minimi, non totali.`);
+    }
+    if (res.routine.parziale) {
+      frasi.push(`Il registro delle partenze delle routine comincia il ${statsDate(res.routine.oldest)}: prima di quella data non c’è traccia, e le partenze contate sono un minimo.`);
+    }
+    if (workerLogEntries === null) {
+      frasi.push('Il registro delle partenze non è ancora arrivato.');
+    }
+    mgStNote.textContent = frasi.join(' ');
+    mgStNote.hidden = frasi.length === 0;
+  }
+
+  function renderStats() {
+    if (!ST || !mgStCards) return;
+    // La finestra personalizzata scritta a metà non deve azzerare la pagina: si
+    // mostra tutto lo storico e la frase in cima dice perché (mai una schermata
+    // di zeri che sembra una risposta).
+    const sel = { key: statsSel.key, from: statsSel.from, to: statsSel.to };
+    const provvisoria = ST.windowRange(sel, Date.now());
+    const usata = provvisoria.valid ? sel : { key: 'all' };
+    const res = ST.compute({
+      feedbacks: dataLoaded ? allFeedbacks : [],
+      workerLog: workerLogEntries || [],
+      sel: usata,
+      creators: statsCreators,
+      now: Date.now(),
+      pageSize: FB.LIST_PAGE_SIZE,
+    });
+    res.range.valid = provvisoria.valid;
+    renderStatsControls(res);
+    renderStatsNote(res);
+    renderStatsCards(res);
+    renderStatsPie(res);
+    renderStatsBars(res);
+    renderStatsMore(res);
+  }
+
+  // I click dei controlli e dei riquadri.
+  if (mgStWindows) {
+    mgStWindows.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-window]');
+      if (!btn) return;
+      statsSel.key = btn.dataset.window;
+      saveStatsPrefs();
+      renderStats();
+    });
+  }
+  for (const campo of [mgStFrom, mgStTo]) {
+    if (!campo) continue;
+    campo.addEventListener('change', () => {
+      statsSel.from = mgStFrom ? mgStFrom.value : '';
+      statsSel.to = mgStTo ? mgStTo.value : '';
+      saveStatsPrefs();
+      renderStats();
+    });
+  }
+  if (mgStCreators) {
+    mgStCreators.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mg-st-chip');
+      if (!btn) return;
+      if (btn.dataset.creatorAll) statsCreators = [];
+      else if (btn.dataset.creatorGroup) {
+        const gruppo = btn.dataset.creatorGroup === 'routine' ? ST.CREATORS_ROUTINE : ST.CREATORS_PEOPLE;
+        // Ricliccare il gruppo già acceso lo spegne: un filtro che si accende e
+        // non si spegne dallo stesso posto è una porta senza maniglia.
+        statsCreators = gruppoAcceso(gruppo, new Set(statsCreators)) ? [] : gruppo.slice();
+      } else if (btn.dataset.creator) {
+        const key = btn.dataset.creator;
+        statsCreators = statsCreators.includes(key)
+          ? statsCreators.filter((k) => k !== key)
+          : statsCreators.concat([key]);
+      } else return;
+      saveStatsPrefs();
+      renderStats();
+    });
+  }
+  if (mgStCards) {
+    mgStCards.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-card-toggle]');
+      if (!btn) return;
+      const id = btn.dataset.cardToggle;
+      if (statsOpen.has(id)) statsOpen.delete(id); else statsOpen.add(id);
+      renderStats();
+    });
+  }
+
   // ── Tab bar ───────────────────────────────────────────────────────────────
   // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
