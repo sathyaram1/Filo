@@ -300,10 +300,11 @@
     .mg-coming-icon { font-size: 32px; opacity: 0.4; }
 
     /* ── Tab Statistiche feedback (#496) ──────────────────────────────── */
-    /* La scheda scorre per conto suo: il pannello-lista è alto quanto la
-       finestra, questo no — cresce coi blocchi e si scorre dentro l'area del
-       pannello, senza spingere fuori la barra delle schede. */
-    .mg-st { overflow-y: auto; padding-bottom: 24px; }
+    /* La scheda vale la sua altezza naturale e a scorrere è la PAGINA, come le
+       altre schede che non sono la lista. Un `overflow` qui creerebbe un
+       secondo scorrimento dentro il primo — e i due controlli in cima, che si
+       appiccicano al bordo, si appiccicherebbero a un bordo che non si muove. */
+    .mg-st { padding-bottom: 24px; }
 
     /* I due controlli in cima. Restano visibili scorrendo: cambiare finestra
        mentre si guarda un numero in fondo non deve costare un viaggio su. */
