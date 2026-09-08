@@ -308,5 +308,11 @@
     init,
     buildGlobalIconRow,
     runIconAction,
+    // Ridisegna le icone del menu già aperto. Serve quando lo stato che
+    // decide il NOME di una voce cambia mentre il menu è sotto gli occhi: lo
+    // schermo intero si spegne per un'altra strada (l'assistente, un gesto di
+    // sistema, un'altra scheda) e la voce continuerebbe a promettere «Esci da
+    // schermo intero» quando non c'è più niente da cui uscire (#514).
+    redrawIconRows,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
