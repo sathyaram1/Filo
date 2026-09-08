@@ -1389,7 +1389,11 @@
     if (res.routine.parziale) {
       frasi.push(`Il registro delle partenze delle routine comincia il ${statsDate(res.routine.oldest)}: prima di quella data non c’è traccia, e le partenze contate sono un minimo.`);
     }
-    if (workerLogEntries === null) {
+    if (workerLogMissing === 'riservato') {
+      frasi.push('Il registro delle partenze delle routine è riservato all’owner: da qui le partenze non si contano.');
+    } else if (workerLogMissing === 'errore') {
+      frasi.push('Il registro delle partenze delle routine non si è caricato: riapri la scheda per riprovare.');
+    } else if (workerLogEntries === null) {
       frasi.push('Il registro delle partenze non è ancora arrivato.');
     }
     mgStNote.textContent = frasi.join(' ');
