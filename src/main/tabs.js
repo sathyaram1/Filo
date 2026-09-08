@@ -309,6 +309,10 @@ class TabManager {
   // coerenza. Idempotente. Ritorna lo stato risultante.
   setContentFullscreen(on) {
     on = !!on;
+    // La modalità cambia per una strada qualunque (voce di menu, gesto di
+    // sistema, assistente): un'uscita rimasta in attesa di una risposta parla
+    // di un momento che non c'è più.
+    this.annullaUscitaSchermoIntero();
     if (this.contentFullscreen === on) return on;
     this.contentFullscreen = on;
     this.layout();
@@ -666,10 +670,10 @@ class TabManager {
       this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     }
-    // Nessun riquadro può restare aperto in una scheda che non c'è più: se
-    // l'id restasse nella lista e venisse riusato, l'Esc smetterebbe di uscire
-    // dallo schermo intero in una scheda che di riquadri non ne ha.
-    this.tabsWithFiloBox.delete(id);
+    // Un'uscita dallo schermo intero in attesa della risposta di questa scheda
+    // non ha più nessuno che risponda: se la scheda se ne va, l'attesa se ne va
+    // con lei (a spegnere la modalità, se serve, ci pensa il giro qui sopra).
+    this.annullaUscitaSchermoIntero();
     // §3.1/§4 — "Chiudi = archivia": prima di distruggere la view salviamo i
     // metadati della tab nell'archivio (consultabile da filo://archive).
     this._archiveClosedTab(tab);
@@ -1798,9 +1802,12 @@ class TabManager {
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
       // Documento nuovo: i riquadri di Filo aperti in quello vecchio sono andati
-      // via con lui, e nessuno ce lo verrà a dire. Se restassero segnati qui,
-      // l'Esc smetterebbe di uscire dallo schermo intero su una pagina pulita.
-      this.tabsWithFiloBox.delete(tab.id);
+      // via con lui. Se un Esc era in attesa della risposta del documento
+      // vecchio, quella risposta non arriverà mai: l'uscita parte adesso.
+      if (this._escUscitaTimer) {
+        this.annullaUscitaSchermoIntero();
+        if (this.contentFullscreen) this.setContentFullscreen(false);
+      }
       // #441 — quando la pagina corrente si è committata: una pagina-ponte
       // ("il download partirà a breve…") avvia il file entro pochi secondi da
       // qui. Oltre quella finestra la scheda non è più un semplice ponte.
