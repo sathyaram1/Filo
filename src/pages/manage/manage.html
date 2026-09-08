@@ -299,6 +299,130 @@
     }
     .mg-coming-icon { font-size: 32px; opacity: 0.4; }
 
+    /* ── Tab Statistiche feedback (#496) ──────────────────────────────── */
+    /* La scheda scorre per conto suo: il pannello-lista è alto quanto la
+       finestra, questo no — cresce coi blocchi e si scorre dentro l'area del
+       pannello, senza spingere fuori la barra delle schede. */
+    .mg-st { overflow-y: auto; padding-bottom: 24px; }
+
+    /* I due controlli in cima. Restano visibili scorrendo: cambiare finestra
+       mentre si guarda un numero in fondo non deve costare un viaggio su. */
+    .mg-st-controls {
+      position: sticky; top: 0; z-index: 2;
+      display: flex; flex-wrap: wrap; gap: 10px 28px;
+      padding: 2px 0 12px;
+      background: var(--sn-bg);
+      border-bottom: 1px solid var(--sn-border);
+      margin-bottom: 16px;
+    }
+    .mg-st-ctl { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .mg-st-ctl-label {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--sn-muted);
+    }
+    .mg-st-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    /* Una scelta = una pastiglia. Stessa forma delle schede sopra (testo
+       tenue, acceso quando è scelto), così le due barre si leggono come
+       parenti e non come due invenzioni diverse. */
+    .mg-st-chip {
+      all: unset;
+      cursor: pointer;
+      padding: 4px 10px;
+      border: 1px solid var(--sn-border);
+      border-radius: 999px;
+      font-size: 12.5px;
+      color: var(--sn-muted);
+      white-space: nowrap;
+      transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    }
+    .mg-st-chip:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-st-chip--on {
+      color: var(--sn-btn-fg); background: var(--sn-btn-bg); border-color: transparent;
+    }
+    .mg-st-chip-count { opacity: 0.7; font-variant-numeric: tabular-nums; }
+    .mg-st-custom { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--sn-muted); }
+    /* `.sn-page label` impone display:block e occuperebbe tutta la riga. */
+    .sn-page .mg-st-custom label { display: inline; margin: 0; font-size: 12.5px; }
+    .sn-page input.mg-st-date {
+      width: auto;
+      padding: 4px 8px;
+      background: var(--sn-bg); color: var(--sn-fg);
+      border: 1px solid var(--sn-border); border-radius: var(--sn-radius);
+      font-family: inherit; font-size: 12.5px;
+    }
+    /* Il calendarietto del campo data lo disegna Chromium: senza questa riga
+       resta chiaro sul tema scuro, che è l'unico punto fuori palette. */
+    [data-sn-theme="dark"] .mg-st-date { color-scheme: dark; }
+    [data-sn-theme="light"] .mg-st-date { color-scheme: light; }
+
+    .mg-st-note {
+      margin: 0 0 16px; padding: 8px 12px;
+      border-left: 3px solid var(--sn-border);
+      font-size: 12.5px; color: var(--sn-muted);
+    }
+    .mg-st-note[hidden] { display: none; }
+
+    /* I riquadri delle misure principali. */
+    .mg-st-cards {
+      display: grid; gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      margin-bottom: 22px;
+    }
+    .mg-st-card {
+      border: 1px solid var(--sn-border); border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--sn-overlay-bg);
+    }
+    /* La testata del riquadro è il tasto che lo apre: tutta cliccabile, con la
+       freccina che dice da che parte sta il contenuto. */
+    .mg-st-card-head {
+      all: unset; display: flex; align-items: baseline; gap: 8px; width: 100%;
+      cursor: pointer;
+    }
+    .mg-st-card-head:hover .mg-st-card-label { color: var(--sn-fg); }
+    .mg-st-card-value {
+      font-size: 26px; font-weight: 600; color: var(--sn-fg);
+      font-variant-numeric: tabular-nums; line-height: 1.1;
+    }
+    .mg-st-card-label { font-size: 13px; color: var(--sn-muted); }
+    .mg-st-card-caret { margin-left: auto; font-size: 11px; color: var(--sn-muted); }
+    .mg-st-card-sub { font-size: 12px; color: var(--sn-muted); margin-top: 4px; }
+    .mg-st-card-detail { margin-top: 10px; border-top: 1px solid var(--sn-border); padding-top: 8px; }
+    .mg-st-card-detail[hidden] { display: none; }
+    .mg-st-row {
+      display: flex; align-items: baseline; gap: 8px;
+      font-size: 12.5px; padding: 3px 0; color: var(--sn-muted);
+    }
+    .mg-st-row-label { color: var(--sn-fg); }
+    .mg-st-row-n { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--sn-fg); }
+    .mg-st-row-share { font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+    .mg-st-empty { font-size: 12.5px; color: var(--sn-muted); padding: 4px 0; }
+
+    /* I blocchi coi grafici. */
+    .mg-st-block { margin-bottom: 26px; }
+    .mg-st-h { font-size: 14px; margin: 0 0 10px; color: var(--sn-fg); }
+    .mg-st-sub { font-size: 12.5px; color: var(--sn-muted); margin: 10px 0 0; }
+    .mg-st-chart-row { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
+    .mg-st-pie { flex: 0 0 auto; }
+    .mg-st-legend { list-style: none; margin: 0; padding: 0; min-width: 260px; }
+    .mg-st-legend li {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12.5px; padding: 3px 0; color: var(--sn-muted);
+    }
+    .mg-st-swatch { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+    .mg-st-legend-label { color: var(--sn-fg); }
+    .mg-st-legend-n { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--sn-fg); }
+    .mg-st-bars { width: 100%; height: 140px; display: block; }
+    .mg-st-more { list-style: none; margin: 0; padding: 0; max-width: 620px; }
+    .mg-st-more li {
+      display: flex; align-items: baseline; gap: 12px;
+      font-size: 13px; padding: 7px 2px;
+      border-bottom: 1px solid var(--sn-border);
+    }
+    .mg-st-more li:last-child { border-bottom: none; }
+    .mg-st-more-label { color: var(--sn-muted); }
+    .mg-st-more-value { margin-left: auto; color: var(--sn-fg); font-variant-numeric: tabular-nums; }
+
     /* ── Tab Log (worker delle routine) ───────────────────────────────── */
     .mg-log { max-width: 720px; }
     .mg-log h2 { font-size: 18px; margin: 0 0 4px; }
