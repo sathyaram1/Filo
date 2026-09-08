@@ -200,7 +200,7 @@ test('le partenze delle routine arrivano dal registro dei worker, con la riparti
   await apriStatistiche(page);
   await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
 
-  await page.evaluate((g) => {
+  await page.evaluate(() => {
     const iso = (gg) => new Date(Date.now() - gg * 24 * 3600 * 1000).toISOString();
     window.__mgTest.renderWorkerLog([
       { role: 'prober', startedAt: iso(1), num: '#1' },
