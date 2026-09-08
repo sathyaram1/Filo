@@ -271,8 +271,12 @@
     // c'è) resta il comportamento di prima: si esce, e il riquadro va chiuso
     // a mano.
     let tastoChiesto = false;
+    // Nessuna guardia sul riquadro incorporato: lì dentro Filo disegna il suo
+    // menu come nella pagina che ospita, quindi il tasto serve uguale. Se il
+    // browser non lo presta a un frame annidato la promessa viene rifiutata e
+    // si torna al comportamento di prima, senza rompere niente.
     function chiediEsc() {
-      if (tastoChiesto || IS_SUBFRAME) return;
+      if (tastoChiesto) return;
       try {
         const p = navigator.keyboard?.lock?.(['Escape']);
         if (!p) return;
