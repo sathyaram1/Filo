@@ -1139,7 +1139,8 @@
   // schermo intero lasciando l'immagine aperta (#514). Con l'avviso il primo
   // Esc chiude l'immagine e il secondo esce dallo schermo intero.
   function avvisaRiquadro(open) {
-    try { sendToMain({ type: 'filo_box_open', open }).catch(() => {}); } catch (_) {}
+    const tipo = (window.SN_MSG?.MSG?.FILO_BOX_OPEN) || 'filo_box_open';
+    try { sendToMain({ type: tipo, open }).catch(() => {}); } catch (_) {}
   }
   function openLightbox(src) {
     mgLightboxImg.src = src;
