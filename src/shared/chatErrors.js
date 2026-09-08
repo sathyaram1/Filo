@@ -57,6 +57,11 @@
     // Annullato da noi (l'utente ha cambiato pagina, nuovo invio): non è un
     // guasto, e ritentare sarebbe sbagliato.
     if (e.name === 'AbortError' || e.code === 'ABORT_ERR') return false;
+    // Scadenza scattata (#520): non è un buco di un istante, è un servizio che
+    // ha smesso di rispondere. Ripetere la STESSA chiamata rifarebbe aspettare
+    // tutto il tempo daccapo; meglio passare subito al tentativo successivo
+    // della catena (un altro modello) o dirlo all'utente.
+    if (e.code === 'TIMEOUT') return false;
     // Un errore con status HTTP è una RISPOSTA del server: non è un guasto di
     // rete, ritentarlo alla cieca non serve.
     if (Number(e.status) > 0) return false;
