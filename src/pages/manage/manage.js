@@ -1134,24 +1134,23 @@
   }
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
-  // Il main deve sapere che c'è un riquadro nostro aperto: a tutto schermo
-  // l'Esc lo prende lui prima di noi, e senza questo avviso spegnerebbe lo
-  // schermo intero lasciando l'immagine aperta (#514). Con l'avviso il primo
-  // Esc chiude l'immagine e il secondo esce dallo schermo intero.
-  function avvisaRiquadro(open) {
-    const tipo = (window.SN_MSG?.MSG?.FILO_BOX_OPEN) || 'filo_box_open';
-    try { sendToMain({ type: tipo, open }).catch(() => {}); } catch (_) {}
-  }
+  // L'immagine a tutta pagina è un riquadro di Filo che si chiude con Esc: il
+  // main deve saperlo, perché a tutto schermo l'Esc lo prende lui prima di noi
+  // e senza l'avviso spegnerebbe lo schermo intero lasciando l'immagine aperta
+  // (#514). Il gancio e l'invio stanno nel preload delle pagine interne; qui
+  // rispondiamo solo alla domanda "ce n'è uno aperto?".
+  window.__filoRiquadroAperto = () => mgLightbox.classList.contains('open');
+  const avvisaRiquadro = () => { try { window.SN_RIQUADRI_CAMBIATI?.(); } catch (_) {} };
   function openLightbox(src) {
     mgLightboxImg.src = src;
     mgLightbox.classList.add('open');
-    avvisaRiquadro(true);
+    avvisaRiquadro();
   }
   function closeLightbox() {
     if (!mgLightbox.classList.contains('open')) return false;
     mgLightbox.classList.remove('open');
     mgLightboxImg.removeAttribute('src');
-    avvisaRiquadro(false);
+    avvisaRiquadro();
     return true;
   }
   mgLightbox.addEventListener('click', closeLightbox);
