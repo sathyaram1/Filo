@@ -20,8 +20,8 @@
       fixes: [
         'Esc esce sempre dallo schermo intero. Prima restava senza effetto in tre casi, e da lì non si tornava più indietro: se avevi appena toccato la barra in alto di Filo, se eri passato a un\'altra scheda, o se avevi chiuso quella che il sito aveva messo a schermo pieno.',
         'Il menu del tasto destro non sbaglia più il nome dello schermo intero. In una scheda aperta, o portata su un altro indirizzo, mentre eri già a schermo intero, offriva «Schermo intero» al posto di «Esci da schermo intero»: la voce per uscire non si trovava.',
-        'A schermo intero Esc chiude prima quello che hai aperto sopra la pagina, qualunque cosa sia: la risposta di Filo, un menu del tasto destro, un\'immagine ingrandita, una domanda di conferma, il QR code, la selezione di una parte dello schermo, la ricerca in una pagina di Filo. Dallo schermo intero esci col tasto dopo. Prima li scavalcava tutti e ti buttava fuori lasciandoli lì.',
-        'Nessun sito può più tenerti dentro allo schermo intero. Qualunque cosa faccia la pagina per prendersi il tasto, con Esc esci.',
+        'A schermo intero Esc chiude prima quello che hai aperto sopra la pagina, qualunque cosa sia: la risposta di Filo, un menu del tasto destro, un\'immagine ingrandita, una domanda di conferma, il QR code, la selezione di una parte dello schermo, la ricerca in una pagina di Filo. Se ne hai aperte due, un Esc per ciascuna. Dallo schermo intero esci col tasto dopo. Prima li scavalcava tutti e ti buttava fuori lasciandoli lì.',
+        'Nessun sito può più tenerti dentro allo schermo intero, né riportartici mentre premi Esc per uscirne. E premere Esc su una pagina qualunque non le regala più tutto lo schermo, barra di Filo compresa: per prendersi lo schermo un sito deve chiedertelo con un clic, come prima.',
       ],
     },
     {
