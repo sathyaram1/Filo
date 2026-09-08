@@ -2229,7 +2229,10 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, sender = null }) {
+// `signal` (#520): l'utente ha smesso di aspettare. Arriva fino alla chiamata
+// al modello, così la richiesta si ferma davvero invece di continuare a costare
+// per una risposta che nessuno leggerà.
+async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, sender = null, signal = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
 
