@@ -162,6 +162,7 @@ test('#498 ridimensionando a pagina aperta le aree si riadattano', async ({ app,
 test('#498 le altre schede della dashboard: quanta finestra riempiono', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
+  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
   for (const tab of ['queue', 'resolved', 'archived', 'stats', 'models', 'automation', 'log']) {
     await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
     await page.waitForTimeout(350);
