@@ -81,6 +81,8 @@ test('solo l\'owner fa uscire dagli stati di revisione umana', () => {
   assert.ok(FS.canTransition('spam', 'spam_confirmed', 'owner'));
   assert.ok(FS.canTransition('design', 'todo', 'owner'));
   assert.ok(FS.canTransition('aligned', 'todo', 'owner'));          // approvazione (bulk)
+  assert.ok(FS.canTransition('aligned', 'archived', 'owner'));      // doppione: si chiude senza approvarlo
+  assert.ok(!FS.canTransition('aligned', 'archived', 'routine'));
   assert.ok(FS.canTransition('done', 'archived', 'owner'));         // verifica umana
   assert.ok(FS.canTransition('done', 'todo', 'owner'));             // riapertura
   assert.ok(FS.canTransition('archived', 'todo', 'owner'));         // ripristino
