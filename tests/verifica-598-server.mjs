@@ -17,6 +17,7 @@ export async function startFakeServer() {
   const state = {
     // identità
     signUps: 0,
+    expiresIn: '3600',
     refreshes: 0,
     refreshFails: false,
     // wallet
@@ -52,7 +53,7 @@ export async function startFakeServer() {
     if (url.pathname === '/accounts:signUp') {
       state.signUps += 1;
       const uid = `uid-anon-${state.signUps}`;
-      return json(res, 200, { idToken: fakeJwt(uid), refreshToken: `rt-${state.signUps}`, expiresIn: '3600', localId: uid });
+      return json(res, 200, { idToken: fakeJwt(uid), refreshToken: `rt-${state.signUps}`, expiresIn: state.expiresIn, localId: uid });
     }
     if (url.pathname === '/token') {
       state.refreshes += 1;
@@ -60,7 +61,7 @@ export async function startFakeServer() {
       const m = /refresh_token=([^&]+)/.exec(raw);
       const n = m ? m[1].replace('rt-', '') : '1';
       const uid = `uid-anon-${n}`;
-      return json(res, 200, { id_token: fakeJwt(uid), refresh_token: `rt-${n}`, expires_in: '3600', user_id: uid });
+      return json(res, 200, { id_token: fakeJwt(uid), refresh_token: `rt-${n}`, expires_in: state.expiresIn, user_id: uid });
     }
     if (url.pathname === '/walletState') {
       if (state.walletStateHttp) return json(res, state.walletStateHttp, { error: { message: 'boom' } });

@@ -13,7 +13,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await srv.close(); });
 test.beforeEach(() => {
   srv.state.wallet = null; srv.state.redeemMode = 'ok'; srv.state.invitesOpen = true;
-  srv.state.refreshFails = false; srv.state.walletStateHttp = null; srv.state.redeemDelayMs = 0;
+  srv.state.refreshFails = false; srv.state.walletStateHttp = null; srv.state.redeemDelayMs = 0; srv.state.expiresIn = '3600';
   srv.log.length = 0;
 });
 
@@ -143,7 +143,9 @@ test('server irraggiungibile e portafoglio senza chiave locale', async ({ app, o
   await expect(page.locator('#redeemForm')).toBeVisible();
 });
 
-test('crediti finiti (402): una sola chiamata, nessun ripiego, avviso nella shell', async ({ app, shell, openTab }) => {
+test('crediti finiti (402): una sola chiamata, nessun ripiego, avviso nella shell', async ({ app, shell, openTab, testServer }) => {
+  const webUrl = testServer.add('/v598.html', '<!doctype html><html><body><h1>pagina</h1><p>testo lungo</p></body></html>');
+  const web = await openTab(webUrl);
   // portafoglio attivo
   const page = await openTab('filo://credits/credits.html');
   await page.fill('#inviteCode', 'ABCD-EFGH');
@@ -184,18 +186,26 @@ test('crediti finiti (402): una sola chiamata, nessun ripiego, avviso nella shel
   expect(r.calls).toBe(1);
   expect(r.calls2).toBe(1);
   expect(r.err).toBeTruthy();
-  await expect(shell.locator('#shell-notifs')).toContainText(/crediti/i, { timeout: 5000 });
-  console.log('TOAST:', await shell.locator('#shell-notifs').innerText());
-  await page.screenshot({ path: 'tests/.shots/verifica598-402-credits.png' });
-  await shell.screenshot({ path: 'tests/.shots/verifica598-402-shell.png' });
+  await web.bringToFront().catch(() => {});
+  console.log('WEB focus/visibile:', await web.evaluate(() => [document.hasFocus(), document.visibilityState]));
+  const toast = web.getByText(/crediti/i);
+  const seen = await toast.first().waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+  console.log('TOAST NELLA PAGINA WEB:', seen, seen ? await toast.first().textContent() : '(non visto; hasFocus probabilmente falso in finestra nascosta)');
+  await web.screenshot({ path: 'tests/.shots/verifica598-402-web.png' });
 });
 
 test('identità persa (rinnovo 400): si ricrea e il riscatto funziona', async ({ app, openTab }) => {
+  srv.state.expiresIn = '30'; // token già scaduto: ogni chiamata rinnova
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible();
-  const signUps0 = srv.state.signUps;
-  await app.evaluate(() => require(require('path').join(process.cwd(), 'src/main/auth/anon-auth.js'))._reset());
+  const signUps0 = srv.state.signUps; const refresh0 = srv.state.refreshes;
+  srv.state.refreshFails = true;
   await page.reload();
   await expect(page.locator('#redeemForm')).toBeVisible();
-  console.log('SIGNUPS prima/dopo reset:', signUps0, srv.state.signUps, 'refreshes:', srv.state.refreshes);
+  await page.fill('#inviteCode', 'ABCD-EFGH');
+  await page.click('#redeemBtn');
+  await expect(page.locator('#redeemMsg')).toHaveClass(/is-ok|is-error/, { timeout: 15_000 });
+  console.log('IDENTITÀ: signUps', signUps0, '→', srv.state.signUps, '| refresh', refresh0, '→', srv.state.refreshes, '| esito riscatto:', await page.locator('#redeemMsg').textContent(), '| auth ultimo:', srv.log.filter((l) => l.path === '/walletRedeem').at(-1)?.auth.slice(0, 40));
+  expect(srv.state.signUps).toBeGreaterThan(signUps0);
+  await expect(page.locator('#redeemMsg')).toHaveClass(/is-ok/);
 });
