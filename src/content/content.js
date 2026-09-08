@@ -208,7 +208,7 @@
     window.addEventListener('mousedown', azzeraRivendicazioni, { capture: true });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') { escRivendicatiDiFila = 0; return; }
+      if (e.key !== 'Escape') { azzeraRivendicazioni(); return; }
       if (!contentFullscreen) return;
       // Deroga (la stessa del main, src/main/tabs.js): se a tutto schermo c'è
       // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
