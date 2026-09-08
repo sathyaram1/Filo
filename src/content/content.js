@@ -250,6 +250,44 @@
     // di Filo lo vedrebbe mai (#514, giro 10). Quando è consegnato, la deroga
     // qui sotto non vale: il main ha già deciso che quel tasto passa di qui.
     let escInoltrato = false;
+    // ── Chiedere l'Esc al browser, sopra lo schermo pieno di un SITO ─────────
+    // Quando è la pagina ad avere lo schermo pieno (il pulsante del lettore
+    // video), l'Esc il browser se lo mangia per uscire: il documento non lo
+    // vede mai, e ogni riquadro che Filo ha aperto lì sopra veniva scavalcato,
+    // restava aperto e la modalità se ne andava lo stesso (#514, giro 10). Il
+    // tasto si può CHIEDERE (Keyboard Lock): da quel momento arriva a Filo,
+    // che lo consegna alla pagina e decide con la regola di sempre.
+    // Lo chiediamo solo mentre c'è qualcosa di nostro aperto, e solo l'Esc: un
+    // sito che si è preso dei tasti suoi (un gioco, un desktop remoto) non
+    // deve perderli perché Filo sta a schermo pieno. Appena non abbiamo più
+    // niente aperto lo restituiamo, e da lì il tasto torna a valere come prima.
+    // Dove il browser non lo presta (una pagina non sicura, dove l'API non
+    // c'è) resta il comportamento di prima: si esce, e il riquadro va chiuso
+    // a mano.
+    let tastoChiesto = false;
+    function chiediEsc() {
+      if (tastoChiesto || IS_SUBFRAME) return;
+      try {
+        const p = navigator.keyboard?.lock?.(['Escape']);
+        if (!p) return;
+        tastoChiesto = true;
+        p.catch?.(() => { tastoChiesto = false; });
+      } catch (_) { tastoChiesto = false; }
+    }
+    function restituisciEsc() {
+      if (!tastoChiesto) return;
+      tastoChiesto = false;
+      try { navigator.keyboard?.unlock?.(); } catch (_) {}
+    }
+    try {
+      self.SN_FILO_UI?.onMark?.(() => {
+        if (document.fullscreenElement) chiediEsc();
+      });
+    } catch (_) {}
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) restituisciEsc();
+    });
+
     // Il tasto lo rimettiamo in circolo com'era: parte dal documento, sale fino
     // a window e passa da tutti i gestori — i nostri riquadri e quelli della
     // pagina — esattamente come farebbe un Esc vero. Non è "fidato", quindi non
