@@ -993,7 +993,7 @@
     const lastList = [...msgs].reverse().find((m) => m.who === 'bot' && m.cardIds && m.cardIds.length);
     const lastResults = lastList ? [...lastList.cardIds] : [];
     msgs.push({ who: 'user', text });
-    const bot = { who: 'bot', pending: true };
+    const bot = { who: 'bot', pending: true, startedAt: Date.now() };
     msgs.push(bot);
     renderChat(true); // nuovo turno: porta la vista in fondo per mostrarlo
     // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
