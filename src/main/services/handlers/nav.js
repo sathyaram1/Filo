@@ -152,6 +152,11 @@ module.exports = function register(on, ctx) {
     // risposta è un solo booleano sulla finestra che ospita chi chiede, la
     // stessa cosa che l'annuncio dice già a ogni pagina aperta.
     const win = winOf(sender);
+    // È anche il modo in cui la pagina si presenta: da qui in poi il main sa
+    // che a un Esc questa scheda risponde, e la aspetta invece di uscire dallo
+    // schermo intero a tempo scaduto. Una pagina impegnata mezzo secondo
+    // rispondeva fuori tempo massimo e ci perdeva la modalità (#514).
+    win?._filoTabs?.paginaRispondeAllEsc(sender?.tab?.id ?? null);
     return { ok: true, fullscreen: !!win?._filoTabs?.contentFullscreen };
   });
 
