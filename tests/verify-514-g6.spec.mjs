@@ -175,8 +175,10 @@ const paginaLadra = (conEventiFinti) => `<!doctype html><html><body style="margi
       // E azzera il contatore delle rivendicazioni con eventi che il sito può
       // fabbricare da solo.
       try {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
-        window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        if (EVENTI_FINTI) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+          window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        }
       } catch (_) {}
       setTimeout(riattacca, 60);
     }, 0);
