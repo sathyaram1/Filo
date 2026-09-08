@@ -1913,6 +1913,10 @@ class TabManager {
       // rivendicazioni dell'Esc. Tutto tranne l'Esc stesso conta come "l'utente
       // ha fatto altro": un clic per aprire un riquadro, una lettera scritta.
       const esc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      // Anche il mouse passa di qui, e un clic è il gesto con cui una pagina
+      // può legittimamente prendersi lo schermo: l'Esc no (vedi
+      // `enter-html-full-screen`).
+      tab._ultimoInputEsc = esc;
       if (!esc) this.azzeraRivendicazioniEsc();
     });
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
