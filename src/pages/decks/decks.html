@@ -208,6 +208,20 @@
       transition: background .18s ease, color .18s ease;
     }
     .dk-stop:hover { background: var(--sn-hover); color: var(--sn-text); }
+    /* Invio a chat occupata (#520): la bolla in attesa si accende un istante.
+       Il messaggio non è partito perché sta ancora rispondendo a quello prima,
+       e il modo di uscirne è proprio lì dentro. */
+    .dk-msg-pending.dk-nudge {
+      animation: dk-nudge 1.2s ease-out;
+      border-radius: 8px;
+    }
+    @keyframes dk-nudge {
+      0% { background: var(--sn-hover); color: var(--sn-text); }
+      100% { background: transparent; color: var(--sn-muted); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dk-msg-pending.dk-nudge { animation: none; background: var(--sn-hover); }
+    }
     /* Ragionamento del modello (CoT, #331): blocco collassabile cliccabile in
        testa alla bolla. Aperto mentre Filo pensa (scorre in diretta), poi
        collassato a una riga discreta riespandibile. */
