@@ -408,6 +408,12 @@
     .mg-st-sub { font-size: 12.5px; color: var(--sn-muted); margin: 10px 0 0; }
     .mg-st-chart-row { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
     .mg-st-pie { flex: 0 0 auto; }
+    /* Un `hidden` su un elemento SVG non basta a farlo sparire (la regola di
+       serie del browser non lo raggiunge, e sulle barre `display: block` la
+       batterebbe comunque): senza queste due righe il grafico nascosto lascia
+       il suo buco, e la frase che spiega perché non c'è finisce in mezzo al
+       vuoto. */
+    .mg-st-pie[hidden], .mg-st-bars[hidden] { display: none; }
     .mg-st-legend { list-style: none; margin: 0; padding: 0; min-width: 260px; }
     .mg-st-legend li {
       display: flex; align-items: center; gap: 8px;
