@@ -772,8 +772,13 @@
   }
 
   function renderWorkerLog(entries) {
-    if (!mgLogList) return;
     const list = Array.isArray(entries) ? entries : [];
+    // Lo stesso registro serve alla scheda "Statistiche feedback" (le partenze
+    // delle routine): si tiene qui, così le due schede non fanno due letture
+    // per lo stesso documento.
+    workerLogEntries = list;
+    if (statsActive()) renderStats();
+    if (!mgLogList) return;
     if (!list.length) { setLogView('empty'); mgLogList.innerHTML = ''; return; }
     mgLogList.innerHTML = list.map((e) => {
       const role = roleLabel(e && e.role);
