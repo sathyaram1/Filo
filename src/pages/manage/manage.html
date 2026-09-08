@@ -30,10 +30,60 @@
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
   <style>
+    /* Le misure verticali della testata stanno qui, una volta sola, perché più
+       di un pezzo le usa e una copia rimasta indietro si vede (#498). */
+    :root {
+      /* Aria fra la barra delle sezioni e ciò che le sta sotto. */
+      --mg-tabs-gap: 14px;
+      /* Aria fra la barra delle sezioni e la barra di ricerca, che le
+         appartiene: più stretta, perché le due si leggono come una cosa sola. */
+      --mg-search-gap: 8px;
+      /* Quanto può prendersi, al massimo, ciò che aspetta una decisione sopra
+         le tre aree. Oltre, scorre dentro di sé invece di spingerle fuori. */
+      --mg-attesa-max: 40vh;
+      /* E quanto gli resta al minimo quando la finestra è bassa: tanto da far
+         leggere l'intestazione ("2 fusioni aspettano il tuo via libera"), che
+         è come si scopre che sotto c'è dell'altro. Sotto quella riga il
+         riquadro sparirebbe senza dirlo, ed è la cosa che CLAUDE.md § Limiti
+         vieta. */
+      --mg-attesa-min: min(64px, 15vh);
+      /* Il minimo delle tre aree. Su una finestra normale sono 300 pixel; su
+         una bassa cedono anche loro, invece di uscire dal fondo. */
+      --mg-aree-min: min(300px, 60vh);
+    }
+
     /* La dashboard di gestione sfrutta tutta la larghezza: override locale del
        limite globale `.sn-page { max-width: 960px }` di pages.css (che serve alle
-       altre pagine, quindi NON si tocca lì). */
-    .sn-page { max-width: none; }
+       altre pagine, quindi NON si tocca lì).
+
+       E anche tutta l'ALTEZZA (#498): la pagina è una colonna alta quanto la
+       finestra, così le schede partono vicino al bordo e le tre aree del
+       pannello-lista si prendono ciò che avanza fino in fondo. Il margine sopra
+       è ridotto rispetto alle pagine di lettura: qui la prima cosa utile è la
+       barra delle sezioni, non un titolo da far respirare. */
+    .sn-page {
+      max-width: none;
+      box-sizing: border-box;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 14px 24px 18px;
+    }
+
+    /* Sulle schede-lista la colonna è alta ESATTAMENTE la finestra, non "almeno".
+       È la metà che mancava al tetto del riquadro delle fusioni: un tetto dice
+       quanto un blocco può CHIEDERE, ma se la colonna può crescere oltre la
+       finestra nessuno lo obbliga a rinunciare a niente, e la somma (testata +
+       tetto + minimo delle aree) esce dal fondo lo stesso. Succedeva con lo
+       zoom di Filo alzato o su una finestra bassa: due fusioni in attesa a zoom
+       +2 e delle aree restava la sola intestazione "RICEVUTI" (#498).
+       Con l'altezza fissa la pressione esiste, e a cedere è il riquadro sopra
+       (che scorre dentro di sé) invece delle aree.
+       Solo sulle schede-lista: Statistiche, Modelli, Automazioni e Log hanno
+       contenuti più alti della finestra e devono far scorrere la pagina. */
+    .sn-page:has(> #panel-list.mg-panel--active) { height: 100vh; }
+    /* Testata: altezza sua, non si lascia stringere dalla pressione qui sopra. */
+    .mg-banner, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
 
     /* ── Switch "Modalità automatica" (tab Automazioni, owner-only) ─────── */
     /* `.sn-page label` (pages.css) impone `display: block` + colore smorzato a
@@ -113,7 +163,13 @@
       flex-wrap: wrap;
       gap: 2px;
       border-bottom: 1px solid var(--sn-border);
-      margin: 8px 0 20px;
+      /* Niente margine sopra: la barra è la prima cosa della pagina e parte
+         dal bordo (#498). Sotto resta l'aria che la stacca dal contenuto, e
+         quella misura è UNA (`--mg-tabs-gap`): la barra di ricerca si tira su
+         partendo da lì invece di ricopiarla a mano. Quando questo numero è
+         cambiato (20 → 14) la copia nella barra di ricerca è rimasta indietro
+         e il campo è finito appiccicato alla barra, a due pixel. */
+      margin: 0 0 var(--mg-tabs-gap);
     }
     .mg-tab {
       all: unset;
@@ -148,11 +204,24 @@
        sono sezioni (Statistiche, Modelli, Automazioni, Log) restano dove sono:
        non dipendono dallo stato delle segnalazioni. */
     .mg-no-sections {
-      margin: -12px 0 16px; font-size: 12px; color: var(--sn-muted);
+      margin: -6px 0 12px; font-size: 12px; color: var(--sn-muted);
     }
     .mg-no-sections[hidden] { display: none; }
     .mg-panel { display: none; }
-    .mg-panel--active { display: block; }
+    /* `flex: 0 0 auto`: dentro la colonna della pagina un pannello vale la sua
+       altezza naturale e non si lascia stringere. L'unico che cresce è quello
+       della lista, qui sotto. */
+    .mg-panel--active { display: block; flex: 0 0 auto; }
+    /* Pannello-lista: assorbe tutta l'altezza che avanza sotto le schede,
+       qualunque cosa ci sia sopra (banner di sola lettura, riga di stato
+       illeggibile, barra di ricerca, schede andate a capo). Prima era la
+       griglia a tenere un `calc(100vh - 180px)` scritto a mano: senza banner
+       avanzavano quasi cento pixel vuoti in fondo, col banner la pagina
+       scrollava di quel tanto (#498). */
+    #panel-list.mg-panel--active {
+      display: flex; flex-direction: column;
+      flex: 1 1 auto; min-height: 0;
+    }
 
     /* ── Ricerca "a senso" (semantica) ─────────────────────────────────────
        La lente vive in fondo alla barra delle schede, spinta a destra: cliccarla
@@ -171,9 +240,15 @@
     .mg-search-toggle--active { color: var(--sn-accent); }
     .mg-search-toggle svg { display: block; }
 
+    /* La barra di ricerca appartiene alla barra delle sezioni (la apre la lente
+       che sta lì dentro), quindi le sta più vicina di quanto stia al contenuto:
+       `--mg-search-gap` sopra, 20px sotto. Il margine negativo RIASSORBE l'aria
+       della barra delle sezioni invece di ripeterne il numero, così se quella
+       cambia lo stacco resta questo. */
     .mg-searchbar {
       display: flex; align-items: center; gap: 8px;
-      margin: -12px 0 20px; padding: 8px 12px;
+      margin: calc(var(--mg-search-gap) - var(--mg-tabs-gap)) 0 20px;
+      padding: 8px 12px;
       border: 1px solid var(--sn-border); border-radius: 8px;
       background: var(--sn-overlay-bg);
     }
@@ -260,8 +335,10 @@
       display: grid;
       grid-template-columns: 220px 12px minmax(0, 1fr) 12px 280px;
       gap: 0;
-      height: calc(100vh - 180px);
-      min-height: 300px;
+      /* L'altezza la decide la colonna della pagina (#panel-list): qui si dice
+         solo "prendi quello che avanza", mai una misura in pixel. */
+      flex: 1 1 auto;
+      min-height: var(--mg-aree-min);
     }
     .mg-col {
       display: flex; flex-direction: column;
@@ -786,9 +863,31 @@
     }
     .mg-auto-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css. Qui solo
-       la spaziatura nella pagina. */
-    .mg-merge-approvals { margin: 0 0 20px; }
+    /* Fusioni in attesa: l'aspetto sta tutto in mergeApprovals.css. Qui la
+       spaziatura nella pagina e, soprattutto, il TETTO.
+
+       Il riquadro sta sopra le tre aree, dentro la stessa colonna, e cresce
+       quanto sono le richieste: una richiesta ne prende già 266 pixel, e le
+       richieste valgono una settimana, quindi si accumulano. Senza tetto, con
+       due le aree scendevano al loro minimo e la pagina ricominciava a
+       scorrere; con tre le aree uscivano quasi tutte dallo schermo e dei
+       Ricevuti restava la sola intestazione (#498). Oltre il tetto il riquadro
+       scorre dentro di sé: niente sparisce, e quante siano lo dice comunque il
+       titolo ("3 fusioni aspettano il tuo via libera"). `min-height: 0` serve
+       perché è un elemento di una colonna flex, e senza si rifiuterebbe di
+       scendere sotto la propria altezza naturale. */
+    .mg-merge-approvals {
+      margin: 0 0 20px;
+      max-height: var(--mg-attesa-max);
+      /* Il tetto dice quanto può chiedere; `flex: 0 1 auto` più un minimo basso
+         dicono a quanto deve rinunciare quando lo spazio non basta. È lui a
+         cedere, non le aree: le aree sono la cosa che il feedback chiedeva di
+         espandere. Sotto il minimo non scende, così l'intestazione col numero
+         resta leggibile e il resto si raggiunge scorrendo. */
+      min-height: var(--mg-attesa-min);
+      flex: 0 1 auto;
+      overflow-y: auto;
+    }
     .mg-merge-approvals-recent { margin: 0 0 20px; }
 
     /* ── Sezione "Modelli di supporto" (DD1) ────────────────────────────── */
