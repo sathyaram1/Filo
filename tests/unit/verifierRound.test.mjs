@@ -338,11 +338,22 @@ ${forma}`;
 // elencare ammessi è una rincorsa che si perde — ogni forma dimenticata era
 // una bocciatura letta come promozione (feedback #565).
 test('un rilievo scritto dopo un modo di elencare che il lettore non conosce non passa per riassunto', () => {
-  for (const davanti of ['— ', '+ ', '1.1 ', '100. ', '(a) ', '_', '`', '▪ ']) {
+  for (const davanti of ['— ', '+ ', '1.1 ', '100. ', '(a) ', '`', '▪ ']) {
     const testo = `Provato tutto, il resto regge bene.
 ${davanti}[2] il pulsante non salva`;
     assert.equal(R.unparsedLevelLines(testo).length, 1, `«${davanti}[2]» non deve finire nel riassunto`);
     assert.equal(R.parseFindings(testo).findings.length, 0);
+  }
+  // L'underscore davanti al livello è il corsivo di Markdown, e da quando il
+  // grassetto vale anche con gli underscore la riga viene LETTA come rilievo
+  // invece che respinta. Va bene così — quello che conta è che non finisca nel
+  // riassunto — ma la proprietà si scrive per intero, o cambiando il lettore
+  // nessuno se ne accorge (feedback #565).
+  for (const davanti of ['_', '__', '___']) {
+    const testo = `Provato tutto, il resto regge bene.
+${davanti}[2] il pulsante non salva`;
+    assert.equal(R.parseFindings(testo).findings.length, 1, `«${davanti}[2]» è un rilievo`);
+    assert.equal(R.unparsedLevelLines(testo).length, 0);
   }
   // E il testo vero resta testo: una parentesi che non dice un livello, o un
   // livello citato senza le quadre, non vengono respinti.
