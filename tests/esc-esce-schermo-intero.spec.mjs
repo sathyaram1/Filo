@@ -24,13 +24,21 @@ function stato(app) {
   });
 }
 
-function focusScheda(app) {
-  return app.evaluate(({ BrowserWindow }) => {
+// Un Esc VERO. La tastiera di Playwright passa dal debugger (CDP) e non tocca
+// `before-input-event`, che è il gancio del main: un test scritto con
+// `keyboard.press` resterebbe verde anche togliendo il fix, perché a spegnere
+// lo schermo intero sarebbe il content script della pagina. `sendInputEvent`
+// entra invece nella pipeline d'input come un tasto premuto davvero.
+function premiEsc(app, { dallaBarra = false } = {}) {
+  return app.evaluate(({ BrowserWindow }, barra) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     const tabs = win._filoTabs;
     const active = tabs.tabs.find((t) => t.id === tabs.activeId);
-    try { active.view.webContents.focus(); } catch (_) {}
-  });
+    const wc = barra ? win.webContents : active.view.webContents;
+    try { wc.focus(); } catch (_) {}
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+  }, dallaBarra);
 }
 
 // Porta la pagina a tutto schermo col suo pulsante (HTML5 requestFullscreen),
@@ -50,7 +58,7 @@ async function fullscreenDalSito(app) {
 
 const PAGINA = '<html><body style="margin:0"><div id="box" style="width:100px;height:100px;background:#09f"></div></body></html>';
 
-test('Esc esce anche col fuoco sulla barra di Filo', async ({ app, shell, openTab }) => {
+test('Esc esce anche col fuoco sulla barra di Filo', async ({ app, openTab }) => {
   // Chi apre lo schermo intero dopo aver toccato la barra in alto (indirizzo,
   // un pulsante, il menu su Mac) lascia il fuoco lì: la barra sparisce sotto la
   // pagina ma continua a ricevere i tasti, e l'Esc non arrivava a nessuno.
@@ -59,11 +67,7 @@ test('Esc esce anche col fuoco sulla barra di Filo', async ({ app, shell, openTa
   await page.evaluate(() => chrome.runtime.sendMessage({ type: 'toggle_fullscreen' }));
   await expect.poll(async () => (await stato(app)).contentFullscreen).toBe(true);
 
-  await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    win.webContents.focus();
-  });
-  await shell.keyboard.press('Escape');
+  await premiEsc(app, { dallaBarra: true });
 
   await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 5000 }).toBe(false);
 });
@@ -78,8 +82,7 @@ test('Esc esce da un\'altra scheda quando a tutto schermo c\'è andato un sito',
 
   const altra = await openTab('filo://editor/editor.html');
   await altra.waitForLoadState('domcontentloaded').catch(() => {});
-  await focusScheda(app);
-  await altra.keyboard.press('Escape');
+  await premiEsc(app);
 
   await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 8000 }).toBe(false);
 });
@@ -112,8 +115,7 @@ test('lo schermo intero del sistema è lo schermo intero di Filo, e Esc ne esce'
   });
   await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 8000 }).toBe(true);
 
-  await focusScheda(app);
-  await page.keyboard.press('Escape');
+  await premiEsc(app);
 
   await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 8000 }).toBe(false);
   await expect.poll(async () => (await stato(app)).osFullscreen, { timeout: 8000 }).toBe(false);

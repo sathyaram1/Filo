@@ -72,8 +72,17 @@ function hideForTests(win, { main = false } = {}) {
     win.setPosition(via.x, via.y);
     // Uscendo dal tutto schermo il sistema rimette la finestra dov'era prima di
     // entrarci, cioè potenzialmente sullo schermo: riportiamola via.
+    // La bandierina non è prudenza teorica: su X11 (i contenitori delle routine)
+    // spostare la finestra qui dentro fa riemettere `leave-full-screen` al
+    // sistema, e senza guardia il gestore rientra in se stesso finché il
+    // processo non muore per stack esaurito. È la ragione per cui il tutto
+    // schermo "non si poteva provare in un contenitore".
+    let riposizionando = false;
     win.on('leave-full-screen', () => {
+      if (riposizionando) return;
+      riposizionando = true;
       try { const p = posizioneFuoriSchermo(); win.setPosition(p.x, p.y); win.setOpacity(0); } catch (_) {}
+      riposizionando = false;
     });
     // Alcune superfici rimettono l'opacità (animazioni, ripristini): il giro a
     // tutto schermo è il caso noto, quindi la riaffermiamo anche lì.
