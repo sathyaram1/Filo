@@ -1076,6 +1076,16 @@
     return !!(panel && panel.classList.contains('mg-panel--active'));
   }
 
+  // Mostra/nasconde un elemento SVG. `el.hidden = true` NON funziona su un
+  // <svg>: la proprietà `hidden` esiste solo sugli elementi HTML, quindi lì
+  // scrive un campo qualunque e il grafico resta al suo posto lasciando un buco
+  // accanto alla frase che spiega perché non c'è.
+  function statsMostra(el, visibile) {
+    if (!el) return;
+    if (visibile) el.removeAttribute('hidden');
+    else el.setAttribute('hidden', '');
+  }
+
   function statsPercent(n, tot) {
     if (!tot) return '';
     return `${Math.round((n / tot) * 100)}%`;
