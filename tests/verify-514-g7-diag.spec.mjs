@@ -53,6 +53,7 @@ const ladra = `<!doctype html><html><body style="margin:0;height:1200px">
   window.__riattacca = riattacca;
   window.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (window.__chiediFs) { try { document.documentElement.requestFullscreen(); } catch (_) {} }
     setTimeout(function () {
       if (rubato && rubato.isConnected) { try { rubato.remove(); } catch (_) {} }
       setTimeout(riattacca, 60);
@@ -61,8 +62,8 @@ const ladra = `<!doctype html><html><body style="margin:0;height:1200px">
 </script>
 </body></html>`;
 
-for (const gap of [80, 200, 400]) {
-  test(`diag: raffica a ${gap}ms sul sito ladro`, async ({ app, openTab, testServer }) => {
+for (const [gap, fs] of [[80, true], [400, true], [900, true]]) {
+  test(`diag: raffica a ${gap}ms sul sito ladro (chiedeFs=${fs})`, async ({ app, openTab, testServer }) => {
     test.setTimeout(240_000);
     const page = await testServer.openReady(openTab, ladra);
     await page.locator('#t').click({ button: 'right' });
@@ -70,6 +71,7 @@ for (const gap of [80, 200, 400]) {
     await page.keyboard.press('Escape');
     await expect.poll(() => page.evaluate(() => !!window.__rubato), { timeout: 8000 }).toBe(true);
     await page.evaluate(() => window.__riattacca());
+    await page.evaluate((v) => { window.__chiediFs = v; }, fs);
     await new Promise((r) => setTimeout(r, 300));
     await entra(app);
     const traccia = [];
@@ -78,8 +80,8 @@ for (const gap of [80, 200, 400]) {
       await esc(app, gap);
     }
     traccia.push(await stato(app));
-    console.log(`GAP ${gap} →`, JSON.stringify(traccia));
+    console.log(`GAP ${gap} fs=${fs} →`, JSON.stringify(traccia));
     await new Promise((r) => setTimeout(r, 1500));
-    console.log(`GAP ${gap} finale →`, JSON.stringify(await stato(app)));
+    console.log(`GAP ${gap} fs=${fs} finale →`, JSON.stringify(await stato(app)));
   });
 }
