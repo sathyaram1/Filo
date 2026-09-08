@@ -62,35 +62,34 @@
       const w = Net
         ? Net.watch({ totalMs: Net.LIMITI.datiTettoMs })
         : { signal: undefined, done() {}, expired: '' };
-      let res;
       try {
-        res = await _fetch(BASE + path, {
+        const res = await _fetch(BASE + path, {
           headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
           signal: w.signal,
         });
+        if (res.status === 404) return null; // "nessun risultato" per Scryfall
+        if (!res.ok) {
+          // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi
+          // sbagliata di una query 400): recuperalo, così chi gestisce l'errore
+          // può correggere la query o spiegare il problema all'utente invece di
+          // mostrare un codice HTTP nudo (#331).
+          let details = '';
+          try {
+            const body = await res.json();
+            if (body && body.details) details = String(body.details);
+          } catch (_) { /* body non-JSON: pazienza */ }
+          const err = new Error(`Scryfall ${res.status} su ${path}${details ? ` — ${details}` : ''}`);
+          err.status = res.status;
+          err.details = details;
+          throw err;
+        }
+        return await res.json();
       } catch (e) {
         if (w.expired) throw Net.timeoutError(w.expired, { cosa: `Scryfall (${path})` });
         throw e;
       } finally {
         w.done();
       }
-      if (res.status === 404) return null; // "nessun risultato" per Scryfall
-      if (!res.ok) {
-        // Scryfall spiega gli errori nel body JSON (`details`, es. la sintassi
-        // sbagliata di una query 400): recuperalo, così chi gestisce l'errore
-        // può correggere la query o spiegare il problema all'utente invece di
-        // mostrare un codice HTTP nudo (#331).
-        let details = '';
-        try {
-          const body = await res.json();
-          if (body && body.details) details = String(body.details);
-        } catch (_) { /* body non-JSON: pazienza */ }
-        const err = new Error(`Scryfall ${res.status} su ${path}${details ? ` — ${details}` : ''}`);
-        err.status = res.status;
-        err.details = details;
-        throw err;
-      }
-      return res.json();
     });
   }
 
