@@ -128,7 +128,9 @@ test('home: lo stesso box di segnalazione — l\'immagine ingrandita si chiude e
   }
   expect(page, 'nuova scheda non trovata').toBeTruthy();
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-  await apriBoxConImmagine(page);
+  await page.waitForFunction(() => !!window.SN_FEEDBACK_UI, null, { timeout: 15_000 });
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await allegaImmagine(page);
 
   await entra(app);
   await page.locator('.sn-fb-thumb img').first().click();
