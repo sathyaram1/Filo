@@ -190,21 +190,20 @@ test.describe('larghezza e separatori stile Chrome', () => {
       return { before: read('::before'), after: read('::after') };
     });
 
-    // Stessa attesa del test qui sopra: finché il browser non ha disegnato i
-    // due piedini, `width` torna vuota e il confronto cade a caso.
+    // Stesso verdetto dentro l'attesa dei due test qui sopra: finché il browser
+    // non ha disegnato i piedini, `width` torna vuota.
     await expect
       .poll(async () => {
-        const f = await leggiPiedini();
-        return `${f.before.width}|${f.after.width}`;
+        const feet = await leggiPiedini();
+        for (const [nome, foot] of [['sinistro', feet.before], ['destro', feet.after]]) {
+          if (!foot || !foot.width) return 'piedini non ancora disegnati';
+          if (foot.display === 'none') return `il piedino ${nome} non si vede`;
+          if (foot.width !== '8px') return `il piedino ${nome} è largo ${foot.width}`;
+          if (!String(foot.bg).includes('radial-gradient')) return `il piedino ${nome} non è un arco`;
+        }
+        return 'due piedini a goccia da 8px';
       }, { timeout: 8_000 })
-      .not.toMatch(/(^\||\|$)/);
-    const feet = await leggiPiedini();
-
-    for (const foot of [feet.before, feet.after]) {
-      expect(foot.display).not.toBe('none');
-      expect(foot.width).toBe('8px');
-      expect(foot.bg).toContain('radial-gradient');
-    }
+      .toBe('due piedini a goccia da 8px');
   });
 });
 
