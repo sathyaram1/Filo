@@ -50,9 +50,23 @@ const PAGINA = `<!doctype html><html><body style="margin:0;height:1400px">
 <h1 id="t">un sito qualunque</h1>
 </body></html>`;
 
-async function apriBoxConImmagine(page) {
-  await page.waitForFunction(() => !!window.SN_FEEDBACK_UI, null, { timeout: 10_000 });
-  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+// Sui siti il box si apre come lo apre l'utente: tasto destro sulla pagina,
+// voce «Invia feedback». (Il modulo vive nel mondo isolato del content script,
+// quindi da fuori non lo si chiama a mano.)
+async function apriBoxDalMenu(page) {
+  await page.waitForFunction(
+    () => document.documentElement.dataset.filoContentScripts === '1',
+    null,
+    { timeout: 15_000 },
+  );
+  await page.locator('#t').click({ button: 'right' });
+  const voce = page.locator('.sn-menu-item, .sn-menu [role="menuitem"], .sn-menu li')
+    .filter({ hasText: 'Invia feedback' }).first();
+  await expect(voce).toBeVisible({ timeout: 8000 });
+  await voce.click();
+}
+
+async function allegaImmagine(page) {
   await expect(page.locator('.sn-fb-modal')).toBeVisible({ timeout: 8000 });
   await page.locator('.sn-fb-file').setInputFiles([
     { name: 'schermata.png', mimeType: 'image/png', buffer: PNG_1x1 },
