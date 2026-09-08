@@ -30,6 +30,15 @@ const HOVER_INPUT_TYPES = new Set([
   'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
 ]);
 
+// #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
+// conto nostro. È il tempo che serve alla pagina per dire "quell'Esc me lo sono
+// preso io" (un giro di eventi del documento più un messaggio: millisecondi).
+// Largo di proposito: una pagina lenta che risponde in ritardo farebbe tornare
+// il difetto di #514 (esci dallo schermo intero E il riquadro resta aperto),
+// mentre il prezzo di un'attesa larga lo paga solo chi il content script non ce
+// l'ha affatto — lì l'uscita arriva mezzo istante dopo, e basta.
+const ESC_ATTESA_MS = 400;
+
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
 // pagine Impostazioni, gli editor…). Riaprirla mentre è già aperta deve
