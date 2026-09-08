@@ -263,6 +263,11 @@ export async function release(t, fault = '', opts) {
 export function classifyReply(status, body) {
   if (status === 200 && body && body.ok) return 'ok';
   if (status === 0 || status >= 500) return 'fault';
+  // Una risposta che non si legge (una pagina HTML al posto del JSON) non è
+  // un no del server: è il server che non ha risposto. Detta come rifiuto
+  // mandava a «leggere il motivo» di un motivo che non c'era (verifica del
+  // giro 3 su questo lavoro).
+  if (body && body.reason === 'malformed_response') return 'fault';
   return 'refused';
 }
 
