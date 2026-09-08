@@ -598,6 +598,15 @@ class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
+    // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
+    // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
+    // acceso con la deroga dell'Esc appesa a una pagina che non esiste più:
+    // nessun tasto ne uscirebbe. Spegniamolo insieme a lei (#514).
+    if (this.pageFullscreenTabId === id) {
+      this.pageFullscreen = false;
+      this.pageFullscreenTabId = null;
+      this.setContentFullscreen(false);
+    }
     // §3.1/§4 — "Chiudi = archivia": prima di distruggere la view salviamo i
     // metadati della tab nell'archivio (consultabile da filo://archive).
     this._archiveClosedTab(tab);
