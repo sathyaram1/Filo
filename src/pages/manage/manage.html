@@ -1224,6 +1224,73 @@
       </div>
     </section>
 
+    <!-- ═══ TAB STATISTICHE FEEDBACK (#496) ═════════════════════════════ -->
+    <!-- Tutto quello che si vede qui esce dai feedback già in pagina (la stessa
+         lista delle quattro schede) e dal registro delle partenze delle
+         routine: nessuna lettura in più, quindi la scheda si apre istantanea e
+         non costa niente aprirla per curiosità.
+         I numeri li fa SN_FEEDBACK_STATS (logica pura, unit test); qui c'è il
+         disegno e i due controlli — finestra di riferimento e creatore. -->
+    <section class="mg-panel" id="panel-fbstats" data-panel="fbstats">
+      <div class="mg-st">
+
+        <!-- I due controlli, in cima: cambiano tutto ciò che sta sotto. -->
+        <div class="mg-st-controls">
+          <div class="mg-st-ctl">
+            <span class="mg-st-ctl-label">Finestra</span>
+            <div class="mg-st-chips" id="mgStWindows"></div>
+            <!-- Le date scelte a mano: compaiono solo con "Dal… al…" acceso.
+                 Servono per "la settimana scorsa", che una finestra a
+                 scorrimento non sa dire. -->
+            <div class="mg-st-custom" id="mgStCustom" hidden>
+              <label for="mgStFrom">dal</label>
+              <input type="date" id="mgStFrom" class="mg-st-date" />
+              <label for="mgStTo">al</label>
+              <input type="date" id="mgStTo" class="mg-st-date" />
+            </div>
+          </div>
+          <div class="mg-st-ctl">
+            <span class="mg-st-ctl-label">Creatore</span>
+            <div class="mg-st-chips" id="mgStCreators"></div>
+          </div>
+        </div>
+
+        <!-- Quello che questi numeri NON possono dire (caricamento al tetto,
+             stato illeggibile, finestra scritta male): sempre in chiaro, mai
+             un numero che finge di essere un totale. -->
+        <p class="mg-st-note" id="mgStNote" hidden></p>
+
+        <!-- Le misure principali. Ogni riquadro si apre con un click e mostra
+             la sua ripartizione (categoria, ruolo, esito). -->
+        <div class="mg-st-cards" id="mgStCards"></div>
+
+        <!-- La torta dei giri di verifica prima del pass. -->
+        <section class="mg-st-block" id="mgStPieBlock">
+          <h3 class="mg-st-h">Giri di verifica prima del pass</h3>
+          <div class="mg-st-chart-row">
+            <svg class="mg-st-pie" id="mgStPie" viewBox="0 0 220 220" width="220" height="220"
+              role="img" aria-label="Giri di verifica prima del pass"></svg>
+            <ul class="mg-st-legend" id="mgStPieLegend"></ul>
+          </div>
+          <p class="mg-st-sub" id="mgStPieNote"></p>
+        </section>
+
+        <!-- L'andamento nel tempo delle segnalazioni ricevute. -->
+        <section class="mg-st-block" id="mgStBarsBlock">
+          <h3 class="mg-st-h">Segnalazioni ricevute nel tempo</h3>
+          <svg class="mg-st-bars" id="mgStBars" role="img" aria-label="Segnalazioni ricevute nel tempo"></svg>
+          <p class="mg-st-sub" id="mgStBarsNote"></p>
+        </section>
+
+        <!-- Le misure che stanno in una riga sola. -->
+        <section class="mg-st-block">
+          <h3 class="mg-st-h">Altre misure</h3>
+          <ul class="mg-st-more" id="mgStMore"></ul>
+        </section>
+
+      </div>
+    </section>
+
     <!-- ═══ TAB STATISTICHE RED TEAM ════════════════════════════════════ -->
     <section class="mg-panel" id="panel-stats" data-panel="stats">
       <div class="mg-coming">
