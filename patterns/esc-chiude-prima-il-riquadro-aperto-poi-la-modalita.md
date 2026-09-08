@@ -20,6 +20,16 @@ home, quella nella pagina dei feedback, la domanda di conferma, il QR code,
 la selezione di una parte dello schermo. Una lista scritta a mano invecchia
 male: chi scrive il riquadro numero sette non sa che esiste.
 
+La terza soluzione tolse la lista e chiese invece una riga a ogni riquadro
+(`preventDefault()` più `stopPropagation()` nel proprio gestore). Un giro dopo
+saltarono fuori altre quattro porte, tutte dentro le pagine di Filo: il menu di
+ordinamento e la barra di ricerca della gestione, il menu del tasto destro sul
+titolo nell'editor, il menu del tasto destro nella cronologia. Nessuno di loro
+sapeva di doverla scrivere, quella riga. **Una regola che chiede qualcosa a chi
+scrive il riquadro nuovo è una lista travestita**: non serve tenerla
+aggiornata, ma si scopre incompleta esattamente allo stesso modo, un giro per
+porta.
+
 **Come si decide, oggi.** Il main (`handleFullscreenEscape` in
 `src/main/tabs.js`) distingue tre casi:
 
