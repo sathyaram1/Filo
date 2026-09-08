@@ -203,9 +203,15 @@
     .mg-search-toggle--active { color: var(--sn-accent); }
     .mg-search-toggle svg { display: block; }
 
+    /* La barra di ricerca appartiene alla barra delle sezioni (la apre la lente
+       che sta lì dentro), quindi le sta più vicina di quanto stia al contenuto:
+       `--mg-search-gap` sopra, 20px sotto. Il margine negativo RIASSORBE l'aria
+       della barra delle sezioni invece di ripeterne il numero, così se quella
+       cambia lo stacco resta questo. */
     .mg-searchbar {
       display: flex; align-items: center; gap: 8px;
-      margin: -12px 0 20px; padding: 8px 12px;
+      margin: calc(var(--mg-search-gap) - var(--mg-tabs-gap)) 0 20px;
+      padding: 8px 12px;
       border: 1px solid var(--sn-border); border-radius: 8px;
       background: var(--sn-overlay-bg);
     }
