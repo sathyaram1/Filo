@@ -126,6 +126,10 @@
         runEdit();
       } else if (e.key === 'Escape') {
         close();
+        // Il tasto è nostro e lo dichiariamo (#514): a schermo intero è così
+        // che si chiude il riquadro senza uscire anche dalla modalità.
+        e.preventDefault();
+        e.stopPropagation();
       }
     });
     $cancel.addEventListener('click', close);
@@ -159,7 +163,10 @@
       document.removeEventListener('keydown', onDocKey, true);
     }
     const onDocKey = (e) => {
-      if (e.key === 'Escape') close();
+      if (e.key !== 'Escape') return;
+      close();
+      e.preventDefault();
+      e.stopPropagation();
     };
     document.addEventListener('keydown', onDocKey, true);
     root.addEventListener('mousedown', (e) => {

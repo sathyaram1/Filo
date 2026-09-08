@@ -144,6 +144,41 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  on(MSG.FULLSCREEN_STATE, async (msg, sender) => {
+    // La pagina lo chiede appena si monta. Serve perché l'annuncio
+    // (FULLSCREEN_CHANGED) parte quando la modalità CAMBIA: una pagina nata
+    // dopo non l'ha mai sentito e mostrerebbe "Schermo intero" nel menu del
+    // tasto destro mentre ci si è già dentro. Nessun gate d'origine: la
+    // risposta è un solo booleano sulla finestra che ospita chi chiede, la
+    // stessa cosa che l'annuncio dice già a ogni pagina aperta.
+    const win = winOf(sender);
+    // È anche il modo in cui la pagina si presenta: da qui in poi il main sa
+    // che a un Esc questa scheda risponde, e la aspetta invece di uscire dallo
+    // schermo intero a tempo scaduto. Una pagina impegnata mezzo secondo
+    // rispondeva fuori tempo massimo e ci perdeva la modalità (#514).
+    win?._filoTabs?.paginaRispondeAllEsc(sender?.tab?.id ?? null);
+    return { ok: true, fullscreen: !!win?._filoTabs?.contentFullscreen };
+  });
+
+  on(MSG.ESC_CHIEDI_TASTO, async (msg, sender) => {
+    // Da un riquadro incorporato: lì il tasto non si può chiedere al browser,
+    // lo può fare solo il frame principale della scheda. Nessun gate d'origine:
+    // dice solo «ho qualcosa di aperto», e vale sulla scheda che parla (#514).
+    const win = winOf(sender);
+    win?._filoTabs?.chiediEscAlFramePrincipale(sender?.tab?.id ?? null);
+    return { ok: true };
+  });
+
+  on(MSG.ESC_CONSUMATO, async (msg, sender) => {
+    // A tutto schermo l'Esc l'ha usato un riquadro di Filo aperto sopra la
+    // pagina: quel tasto era suo, e l'uscita che il main aveva messo in attesa
+    // si annulla (#514). Nessun gate d'origine: dice solo "quel tasto l'ho
+    // usato io", e vale sulla scheda che parla, mai su un'altra.
+    const win = winOf(sender);
+    win?._filoTabs?.escConsumato(sender?.tab?.id ?? null);
+    return { ok: true };
+  });
+
   on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
     const win = winOf(sender);
     if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');

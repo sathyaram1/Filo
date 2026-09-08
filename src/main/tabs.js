@@ -3,7 +3,7 @@
 // La shell parla con il main via IPC (tabs:* canali); il main risponde con
 // broadcast tabs:updated alla shell perché ridisegni la barra.
 
-const { WebContentsView, Menu, MenuItem, session, shell } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
@@ -29,6 +29,84 @@ const { indiceSaltoScheda } = globalThis.SN_TASTI;
 const HOVER_INPUT_TYPES = new Set([
   'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
 ]);
+
+// #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
+// conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
+// dire "quell'Esc me lo sono preso io".
+//
+// Due tempi, perché i due casi sono diversi e mescolarli è già costato.
+//  · Una pagina che RISPONDE (ha i pezzi di Filo dentro, si è presentata da
+//    sola appena montata) risponde in entrambi i casi: se il tasto era suo lo
+//    rivendica, se non lo era chiede lei l'uscita. Quindi qui l'attesa non è un
+//    ritardo — l'uscita arriva quando arriva la sua risposta — ed è solo la
+//    rete di sicurezza per il caso in cui quella risposta non arrivi MAI
+//    (renderer morto, script che gira all'infinito). Larga: una pagina
+//    impegnata mezzo secondo quando l'utente preme Esc rispondeva fuori tempo
+//    massimo, e usciva dallo schermo intero chiudendo insieme il riquadro che
+//    stava sopra — il danno di #514 da un'altra porta.
+//  · Una pagina che NON risponde (il visore PDF, una pagina d'errore, una
+//    scheda ancora vuota) non dirà niente per definizione: lì l'attesa è tutta
+//    ritardo, e resta corta.
+// In tutti e due i casi l'errore possibile è un'uscita in ritardo, mai restare
+// chiusi dentro.
+const ESC_ATTESA_MS = 400;
+const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
+
+// #514 — quante volte di fila la pagina può dire "quell'Esc me lo sono preso
+// io" prima che il main smetta di crederle. Il conto sta QUI, nel main, perché
+// nella pagina il sito ci arriva: un evento finto fabbricato dal documento
+// azzerava il conto tenuto dal content script, e da lì un sito scritto apposta
+// si rivendicava ogni Esc e teneva l'utente dentro allo schermo intero per
+// sempre. Il main vede solo l'input vero, che una pagina non può fabbricare.
+// Tre è più di quanti riquadri di Filo si possano impilare uno sull'altro, e il
+// conto riparte da zero appena l'utente fa qualsiasi altra cosa (un clic, un
+// altro tasto) o appena la modalità cambia: aprire un riquadro chiede sempre un
+// gesto, quindi in mano a chi usa Filo il tetto non si tocca mai.
+const ESC_RIVENDICAZIONI_MAX = 3;
+
+// #514 — la scheda a cui appartiene una WebContents, in qualunque finestra. La
+// sessione è condivisa fra finestre e schede, mentre "l'ultimo tasto era l'Esc"
+// è una cosa della singola scheda: il gestore dei permessi deve poter risalire
+// dall'una all'altra.
+function tabDiWebContents(wc) {
+  try {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm || !Array.isArray(tm.tabs)) continue;
+      const t = tm.tabs.find((x) => {
+        const c = x && x.view && x.view.webContents;
+        return c && !c.isDestroyed() && c.id === wc.id;
+      });
+      if (t) return t;
+    }
+  } catch (_) {}
+  return null;
+}
+
+// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo.
+// Da quando il tasto arriva al documento (serve: è quello che chiude i riquadri
+// aperti sopra la pagina, e prendercelo prima li scavalcava), il browser lo
+// conta come gesto dell'utente. Una pagina che chiede lo schermo pieno dentro
+// il proprio gestore dell'Esc lo otteneva senza che nessuno avesse cliccato
+// niente: da lì il tasto di questa segnalazione diventava un testa o croce —
+// un Esc esce, il successivo rientra — perché la modalità tornava "della
+// pagina" e l'Esc dopo era suo. Si rifiuta qui, prima che succeda qualsiasi
+// cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
+// altro permesso si resta al comportamento di prima (senza gestore, Electron
+// concede), e questo è il motivo del `callback(true)` finale.
+function installaPermessi(ses) {
+  if (!ses || ses._filoPermessi) return;
+  ses._filoPermessi = true;
+  try {
+    ses.setPermissionRequestHandler((wc, permission, callback) => {
+      if (permission === 'fullscreen') {
+        const t = tabDiWebContents(wc);
+        if (t && t._ultimoInputEsc) { callback(false); return; }
+      }
+      callback(true);
+    });
+  } catch (_) {}
+}
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
@@ -205,6 +283,19 @@ class TabManager {
     // fullscreen (poi `leave-html-full-screen` ripristina la shell), invece di
     // intercettarlo noi e lasciare la pagina convinta di essere a tutto schermo.
     this.pageFullscreen = false;
+    // Quale scheda ha chiesto quel fullscreen. Serve perché la deroga qui sopra
+    // vale SOLO per lei: un Esc che arriva da un'altra scheda (o dalla barra di
+    // Filo) alla pagina non arriverebbe mai, e lasciarlo passare chiuderebbe
+    // dentro allo schermo intero senza uscite (#514).
+    this.pageFullscreenTabId = null;
+    // Uscita dallo schermo intero messa in attesa: l'Esc premuto sulla pagina
+    // è prima suo (un riquadro di Filo aperto sopra la pagina lo usa per
+    // chiudersi), e usciamo solo se nessuno se l'è preso. Vedi
+    // handleFullscreenEscape (#514).
+    this._escUscitaTimer = null;
+    // Quanti Esc di fila la pagina si è presa senza che l'utente facesse altro.
+    // Il conto sta nel main perché nella pagina il sito ci arriva (#514).
+    this._escRivendicazioni = 0;
     // Chrome compatto: fuori dalla home di Filo la barra indirizzi (icone di
     // navigazione + campo URL) viene nascosta, lasciando solo la fila di tab +
     // controlli finestra. In questo stato la WebContentsView risale a coprire
@@ -290,12 +381,23 @@ class TabManager {
   // coerenza. Idempotente. Ritorna lo stato risultante.
   setContentFullscreen(on) {
     on = !!on;
+    // La modalità cambia per una strada qualunque (voce di menu, gesto di
+    // sistema, assistente): un'uscita rimasta in attesa di una risposta parla
+    // di un momento che non c'è più.
+    this.annullaUscitaSchermoIntero();
+    this.azzeraRivendicazioniEsc();
     if (this.contentFullscreen === on) return on;
     this.contentFullscreen = on;
     this.layout();
     try {
       if (typeof this.win.setFullScreen === 'function') this.win.setFullScreen(on);
     } catch (_) {}
+    // Uscita per una strada che NON è l'Esc sulla pagina che aveva chiesto il
+    // fullscreen (Esc da un'altra scheda, dalla barra, uscita dal fullscreen di
+    // sistema, chiusura della scheda): la pagina resterebbe convinta di essere a
+    // tutto schermo, col suo player disegnato a schermo pieno dentro una view
+    // ormai tornata sotto la barra. Chiediamole di uscire davvero.
+    if (!on && this.pageFullscreen) this._exitPageFullscreen();
     // Avvisa i content script così la voce di menu mostra "Esci da schermo
     // intero" (icona shrink) mentre la modalità è attiva.
     try {
@@ -307,6 +409,165 @@ class TabManager {
 
   toggleContentFullscreen() {
     return this.setContentFullscreen(!this.contentFullscreen);
+  }
+
+  // Fa uscire dal fullscreen HTML5 la pagina che l'aveva chiesto, quando a
+  // spegnere lo schermo intero è stato qualcun altro. Best-effort: se la scheda
+  // non c'è più (chiusa, processo caduto) resta solo da dimenticarla, così la
+  // deroga dell'Esc non sopravvive alla pagina che la giustificava.
+  _exitPageFullscreen() {
+    const owner = this.tabs.find((t) => t.id === this.pageFullscreenTabId);
+    this.pageFullscreen = false;
+    this.pageFullscreenTabId = null;
+    if (!owner) return;
+    try {
+      owner.view.webContents
+        .executeJavaScript('try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} true', true)
+        .catch(() => {});
+    } catch (_) {}
+  }
+
+  // Esc esce dallo schermo intero. Regola UNICA, valida per ogni porta d'ingresso
+  // (menu del tasto destro, barra laterale, barra dei menu su Mac, comando
+  // dell'assistente, pulsante del player di un sito, schermo intero del sistema)
+  // e per ogni posto da cui il tasto può arrivare: la pagina (before-input-event
+  // sulla scheda) o la barra di Filo, che a tutto schermo è nascosta sotto la
+  // pagina ma continua a tenere il fuoco se l'ultimo clic era lì — era il buco
+  // di #514: Esc non faceva niente e si restava chiusi dentro.
+  //
+  // `tabId` è la scheda da cui arriva il tasto, `null` se arriva dalla barra.
+  // Ritorna true se ha gestito il tasto: chi chiama fa il preventDefault.
+  //
+  // La regola, in una riga: **l'Esc premuto sulla pagina è prima della pagina,
+  // e la modalità esce solo se nessuno se l'è preso.** Prendercelo noi prima
+  // che la pagina lo veda vuol dire scavalcare tutto quello che Filo apre sopra
+  // la pagina e che si chiude con Esc — il menu del tasto destro, la risposta,
+  // un'immagine ingrandita, una domanda di conferma, il QR, la selezione di una
+  // parte dello schermo. Erano sei riquadri conosciuti e infiniti da scrivere:
+  // una lista da tenere aggiornata a mano invecchia male, quindi non c'è più
+  // lista (#514). Chi consuma il tasto lo dice (MSG.ESC_CONSUMATO) e l'uscita
+  // in attesa si annulla; chi non dice niente esce, e se la pagina non risponde
+  // affatto (nessun content script, renderer bloccato) esce lo stesso allo
+  // scadere dell'attesa. Il caso peggiore è un'uscita in ritardo di mezzo
+  // istante, mai restare chiusi dentro senza uscite.
+  handleFullscreenEscape(tabId = null) {
+    if (!this.contentFullscreen) return false;
+    // Dalla barra di Filo, o da una scheda che non è quella davanti: la pagina
+    // quel tasto non lo vedrà mai, quindi decidiamo subito noi.
+    if (tabId == null || tabId !== this.activeId) {
+      this.setContentFullscreen(false);
+      return true;
+    }
+    // La pagina si è già presa gli ultimi Esc uno dopo l'altro, senza che
+    // l'utente facesse nient'altro in mezzo: da qui in avanti non le crediamo
+    // più e usciamo noi. È il tetto che nessun sito può azzerare.
+    if ((this._escRivendicazioni || 0) >= ESC_RIVENDICAZIONI_MAX) {
+      this.setContentFullscreen(false);
+      return true;
+    }
+    // Lo schermo pieno se l'è preso la PAGINA (il pulsante del lettore video) e
+    // il tasto arriva da lei. Qui il tasto NON si può lasciar passare: il
+    // browser lo consuma per uscire dal suo fullscreen e il documento non lo
+    // vede mai — la traccia dei tasti della pagina resta vuota — quindi ogni
+    // riquadro che Filo ha aperto sopra la pagina veniva scavalcato, restava
+    // aperto e la modalità se ne andava lo stesso (#514, giro 10). Ce lo
+    // prendiamo noi (l'unico modo di fermare l'uscita del browser) e lo
+    // consegniamo alla pagina, che poi decide con la regola di sempre.
+    const nostro = this.pageFullscreen && tabId === this.pageFullscreenTabId
+      ? this._inoltraEscAllaPagina(tabId)
+      : false;
+    this.armaUscitaSchermoIntero(tabId);
+    return nostro;
+  }
+
+  // Consegna alla pagina l'Esc che il browser le avrebbe mangiato. Va al frame
+  // che ha il fuoco, dove sarebbe arrivato il tasto vero: il menu del tasto
+  // destro aperto dentro un riquadro incorporato vive lì. Torna true se il
+  // messaggio è partito, cioè se il tasto ce lo siamo presi noi.
+  _inoltraEscAllaPagina(tabId) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    const wc = tab?.view?.webContents;
+    if (!wc || wc.isDestroyed?.()) return false;
+    const type = globalThis.SN_MSG?.MSG?.ESC_INOLTRATO || 'esc_inoltrato';
+    // Al frame con cui l'utente sta interagendo, dove sarebbe arrivato il tasto
+    // vero: il menu del tasto destro aperto dentro un riquadro incorporato vive
+    // lì, e consegnarlo al frame principale lo lascerebbe aperto (#405 tiene
+    // aggiornato `_filoActiveFrame` a ogni interazione).
+    let frame = null;
+    try {
+      const attivo = wc._filoActiveFrame;
+      frame = (attivo && !attivo.detached ? attivo : null) || wc.focusedFrame || wc.mainFrame;
+    } catch (_) { frame = null; }
+    try {
+      if (frame && !frame.detached) frame.send('filo:broadcast', { type });
+      else wc.send('filo:broadcast', { type });
+    } catch (_) { return false; }
+    return true;
+  }
+
+  // Un riquadro incorporato ha aperto qualcosa di Filo sopra lo schermo pieno,
+  // ma il tasto lo può chiedere al browser solo il frame principale: la
+  // richiesta gliela giriamo noi.
+  chiediEscAlFramePrincipale(tabId) {
+    const tab = tabId != null ? this.tabs.find((t) => t.id === tabId) : null;
+    const wc = tab?.view?.webContents;
+    if (!wc || wc.isDestroyed?.()) return;
+    const type = globalThis.SN_MSG?.MSG?.ESC_CHIEDI_TASTO || 'esc_chiedi_tasto';
+    try {
+      const mf = wc.mainFrame;
+      if (mf && !mf.detached) mf.send('filo:broadcast', { type });
+      else wc.send('filo:broadcast', { type });
+    } catch (_) {}
+  }
+
+  // L'utente ha fatto qualcosa che non è l'Esc in questione: la volta dopo è una
+  // volta nuova. Lo chiama chi vede l'input VERO (mai la pagina).
+  azzeraRivendicazioniEsc() {
+    this._escRivendicazioni = 0;
+  }
+
+  // Mette l'uscita in attesa: parte solo se nessuno rivendica il tasto. Quanto
+  // si aspetta dipende da chi c'è dall'altra parte (vedi ESC_ATTESA_MS): una
+  // pagina che risponde risponde comunque, e l'attesa è solo la rete di
+  // sicurezza per il caso in cui non risponda mai.
+  armaUscitaSchermoIntero(tabId = null) {
+    this.annullaUscitaSchermoIntero();
+    const tab = tabId != null ? this.tabs.find((t) => t.id === tabId) : null;
+    const attesa = tab && tab._rispondeAllEsc
+      ? ESC_ATTESA_PAGINA_CHE_RISPONDE_MS
+      : ESC_ATTESA_MS;
+    this._escUscitaTimer = setTimeout(() => {
+      this._escUscitaTimer = null;
+      if (this.contentFullscreen) this.setContentFullscreen(false);
+    }, attesa);
+    // Un timer non deve tenere sveglio il processo se non c'è altro da fare.
+    try { this._escUscitaTimer.unref?.(); } catch (_) {}
+  }
+
+  // La pagina si è presentata: ha i pezzi di Filo dentro e a un Esc risponde
+  // (rivendicandolo o chiedendo lei l'uscita). Da qui in poi il main la aspetta
+  // invece di uscire a tempo. Lo dichiara il content script appena montato.
+  paginaRispondeAllEsc(tabId) {
+    if (tabId == null) return;
+    const t = this.tabs.find((x) => x.id === tabId);
+    if (t) t._rispondeAllEsc = true;
+  }
+
+  annullaUscitaSchermoIntero() {
+    if (!this._escUscitaTimer) return;
+    clearTimeout(this._escUscitaTimer);
+    this._escUscitaTimer = null;
+  }
+
+  // La pagina davanti dice che quell'Esc se l'è preso un riquadro di Filo.
+  // Tollerante sul mittente: le schede in secondo piano il tasto non lo
+  // ricevono, e un riquadro dentro un riquadro incorporato parla per la sua
+  // pagina.
+  escConsumato(tabId = null) {
+    if (tabId != null && tabId !== this.activeId) return;
+    // Conta solo se c'era davvero un'uscita in attesa: è quella la rivendicazione.
+    if (this._escUscitaTimer) this._escRivendicazioni = (this._escRivendicazioni || 0) + 1;
+    this.annullaUscitaSchermoIntero();
   }
 
   // Attiva/disattiva il "chrome compatto": quando true la barra indirizzi è
@@ -322,9 +583,27 @@ class TabManager {
     return on;
   }
 
+  // #514 — a OGNI frame, non al solo frame principale. Dentro i riquadri
+  // incorporati di un sito (il video, la mappa, il blocco commenti) girano i
+  // pezzi di Filo come nella pagina che li ospita: lì c'è il menu del tasto
+  // destro, e lì l'Esc va deciso. Mandando l'annuncio al solo frame principale,
+  // un riquadro che c'era già quando la modalità è cambiata non lo sapeva mai
+  // più: la sua voce del menu diceva «Schermo intero» a chi ci era già dentro
+  // (e «Esci da schermo intero» a chi ne era già uscito, rimettendocelo con un
+  // clic), e il suo Esc chiudeva il menu portandosi via anche la modalità.
   _broadcastToViews(message) {
     for (const t of this.tabs) {
-      try { t.view.webContents.send('filo:broadcast', message); } catch (_) {}
+      const wc = t.view?.webContents;
+      if (!wc || wc.isDestroyed?.()) continue;
+      let frames = null;
+      try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
+      if (!frames || !frames.length) {
+        try { wc.send('filo:broadcast', message); } catch (_) {}
+        continue;
+      }
+      for (const f of frames) {
+        try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
+      }
     }
   }
 
@@ -414,6 +693,7 @@ class TabManager {
     if (!this.incognito) {
       try { require('./services/downloads').attachSession(view.webContents.session); } catch (_) {}
     }
+    installaPermessi(view.webContents.session);
     return view;
   }
 
@@ -547,6 +827,19 @@ class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
+    // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
+    // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
+    // acceso con la deroga dell'Esc appesa a una pagina che non esiste più:
+    // nessun tasto ne uscirebbe. Spegniamolo insieme a lei (#514).
+    if (this.pageFullscreenTabId === id) {
+      this.pageFullscreen = false;
+      this.pageFullscreenTabId = null;
+      this.setContentFullscreen(false);
+    }
+    // Un'uscita dallo schermo intero in attesa della risposta di questa scheda
+    // non ha più nessuno che risponda: se la scheda se ne va, l'attesa se ne va
+    // con lei (a spegnere la modalità, se serve, ci pensa il giro qui sopra).
+    this.annullaUscitaSchermoIntero();
     // §3.1/§4 — "Chiudi = archivia": prima di distruggere la view salviamo i
     // metadati della tab nell'archivio (consultabile da filo://archive).
     this._archiveClosedTab(tab);
@@ -1398,23 +1691,37 @@ class TabManager {
     // Senza questi handler la view restava confinata sotto la barra e il video
     // non copriva davvero lo schermo. Riusiamo la stessa modalità del menu
     // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
+    // Qui la richiesta è già passata: chi non doveva ottenerla si ferma prima,
+    // nel gestore dei permessi della sessione (#514, `installaPermessi`). Non
+    // si rifiuta da qui perché quando questo evento arriva la finestra è già a
+    // tutto schermo e la modalità è già stata adottata.
     wc.on('enter-html-full-screen', () => {
       this.pageFullscreen = true;
+      this.pageFullscreenTabId = tab.id;
       this.setContentFullscreen(true);
     });
     wc.on('leave-html-full-screen', () => {
+      // Solo la scheda che il fullscreen l'aveva davvero chiesto spegne la
+      // modalità: l'uscita di una pagina a cui l'abbiamo appena rifiutato non
+      // deve portare via lo schermo intero che l'utente aveva acceso lui.
+      if (!this.pageFullscreen || this.pageFullscreenTabId !== tab.id) return;
       this.pageFullscreen = false;
+      this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     });
     wc.on('before-input-event', (event, input) => {
-      if (this.contentFullscreen && input.type === 'keyDown' && input.key === 'Escape') {
-        // Se il fullscreen è della pagina, lascia che l'Esc arrivi alla pagina:
-        // uscirà dal suo fullscreen e `leave-html-full-screen` ripristinerà la
-        // shell. Intercettarlo noi lascerebbe la pagina bloccata in fullscreen.
-        if (this.pageFullscreen) return;
-        event.preventDefault();
-        this.setContentFullscreen(false);
-        return;
+      // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
+      // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,
+      // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
+      // dentro quel giro che la pagina chiede.
+      tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      if (input.type === 'keyDown' && input.key === 'Escape') {
+        // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
+        // l'Esc va invece lasciato alla pagina che ha chiesto il fullscreen).
+        if (this.handleFullscreenEscape(tab.id)) {
+          event.preventDefault();
+          return;
+        }
       }
       // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
       // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
@@ -1576,6 +1883,12 @@ class TabManager {
     // CORRENTE (non su tab.isInternal, fissato alla creazione): così anche una
     // newtab interna che naviga verso un sito esterno riceve gli stili.
     wc.on('dom-ready', () => {
+      // Qui NON si annuncia lo schermo intero. Ci si era provato, e l'annuncio
+      // arrivava prima che il content script avesse un orecchio: si perdeva, e
+      // il menu del tasto destro continuava a offrire "Schermo intero" mentre
+      // ci si era già dentro (#514). Adesso è la pagina a CHIEDERE lo stato
+      // appena è pronta (MSG.FULLSCREEN_STATE), che è l'unico momento in cui la
+      // risposta non può cadere nel vuoto.
       let current = '';
       try { current = wc.getURL() || ''; } catch (_) {}
       if (current.startsWith('filo://')) return; // pagine interne: CSS via <link>
@@ -1666,6 +1979,17 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: chi rispondeva era quello vecchio. Il nuovo si
+      // ripresenterà da solo appena montato (MSG.FULLSCREEN_STATE); fino ad
+      // allora vale l'attesa corta, quella di chi non risponde.
+      tab._rispondeAllEsc = false;
+      // Documento nuovo: i riquadri di Filo aperti in quello vecchio sono andati
+      // via con lui. Se un Esc era in attesa della risposta del documento
+      // vecchio, quella risposta non arriverà mai: l'uscita parte adesso.
+      if (this._escUscitaTimer) {
+        this.annullaUscitaSchermoIntero();
+        if (this.contentFullscreen) this.setContentFullscreen(false);
+      }
       // #441 — quando la pagina corrente si è committata: una pagina-ponte
       // ("il download partirà a breve…") avvia il file entro pochi secondi da
       // qui. Oltre quella finestra la scheda non è più un semplice ponte.
@@ -1714,6 +2038,16 @@ class TabManager {
       const type = (input && input.type) || '';
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
+      // #514 — qui passa l'input VERO, quello che la pagina non può fabbricare:
+      // è il posto giusto per far ripartire da zero il conto delle
+      // rivendicazioni dell'Esc. Tutto tranne l'Esc stesso conta come "l'utente
+      // ha fatto altro": un clic per aprire un riquadro, una lettera scritta.
+      const esc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      // Anche il mouse passa di qui, e un clic è il gesto con cui una pagina
+      // può legittimamente prendersi lo schermo: l'Esc no (vedi
+      // `enter-html-full-screen`).
+      tab._ultimoInputEsc = esc;
+      if (!esc) this.azzeraRivendicazioniEsc();
     });
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
     // /region-block, … — lista curata in geoBlock.js): il match viene

@@ -105,6 +105,28 @@ test.describe('etichette delle schede', () => {
   });
 });
 
+// Le larghezze delle schede, riassunte in una frase. Serve dentro `expect.poll`:
+// la striscia si ridisegna quando il main annuncia le schede, e finché il
+// browser non l'ha disegnata le misure tornano a zero. Un verdetto calcolato
+// dentro l'attesa aspetta il disegno e resta rosso se il CSS cambia davvero,
+// perché l'attesa scade riportando le larghezze vere.
+async function verdettoLarghezze(quante) {
+  const w = await shell.locator('.tab').evaluateAll((els) =>
+    els.map((el) => ({
+      active: el.classList.contains('active'),
+      width: el.getBoundingClientRect().width,
+    })),
+  );
+  if (w.length !== quante) return `${w.length} schede invece di ${quante}`;
+  const attiva = w.find((t) => t.active);
+  const inattive = w.filter((t) => !t.active);
+  if (!attiva || inattive.length === 0) return 'nessuna scheda attiva';
+  if (w.some((t) => !(t.width > 0))) return 'striscia non ancora disegnata';
+  const larghe = inattive.filter((t) => t.width >= attiva.width);
+  if (larghe.length) return `attiva ${attiva.width}, inattive ${inattive.map((t) => t.width).join(' ')}`;
+  return 'attiva più larga';
+}
+
 // ───────────────────────── tab-active-width-chrome ─────────────────────────
 test.describe('larghezza e separatori stile Chrome', () => {
   test('la tab selezionata è più larga delle altre', async () => {
@@ -116,28 +138,15 @@ test.describe('larghezza e separatori stile Chrome', () => {
     await expect(shell.locator('.tab')).toHaveCount(3, { timeout: 8_000 });
     await expect(shell.locator('.tab.active')).toHaveCount(1);
 
-    // Attendi che il layout flex si assesti: subito dopo l'apertura la riga di
-    // tab può misurare 0px per un frame (corsa di layout), falsando i confronti.
-    await expect
-      .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
-      .toBeGreaterThan(0);
-
-    const widths = await shell.locator('.tab').evaluateAll((els) =>
-      els.map((el) => ({
-        active: el.classList.contains('active'),
-        width: el.getBoundingClientRect().width,
-      })),
-    );
-
-    const active = widths.find((w) => w.active);
-    const inactive = widths.filter((w) => !w.active);
-    expect(active).toBeTruthy();
-    expect(inactive.length).toBeGreaterThan(0);
-
     // La tab attiva deve essere strettamente più larga di OGNI tab inattiva.
-    for (const t of inactive) {
-      expect(active.width).toBeGreaterThan(t.width);
-    }
+    // Il verdetto si CALCOLA dentro l'attesa, non dopo: la striscia si ridisegna
+    // quando il main annuncia le schede, e per un frame le tab esistono nel DOM
+    // senza avere ancora una misura. Misurare fuori dall'attesa leggeva 0 a caso
+    // (verde da sola, rossa sotto carico). Se il CSS regredisce l'attesa scade e
+    // il messaggio riporta le larghezze vere.
+    await expect
+      .poll(async () => verdettoLarghezze(3), { timeout: 8_000 })
+      .toBe('attiva più larga');
   });
 
   test('le tab si toccano e usano un separatore verticale in stile Chrome', async () => {
@@ -153,7 +162,7 @@ test.describe('larghezza e separatori stile Chrome', () => {
 
     // Una tab inattiva NON ultima ha il separatore ::after visibile (largo 1px);
     // la tab attiva non lo ha (display:none).
-    const probe = await shell.locator('.tab').evaluateAll((els) => {
+    const leggiSeparatori = () => shell.locator('.tab').evaluateAll((els) => {
       const result = { inactiveDivider: null, activeDivider: null };
       for (const el of els) {
         const after = getComputedStyle(el, '::after');
@@ -169,26 +178,33 @@ test.describe('larghezza e separatori stile Chrome', () => {
     });
 
     // La scheda attiva non mostra la sottile linea verticale da 1px (al suo posto
-    // ::after fa da piedino "a goccia", largo 8px — vedi test dedicato).
-    expect(probe.activeDivider).toBeTruthy();
-    expect(probe.activeDivider.width).not.toBe('1px');
-    expect(probe.inactiveDivider).toBeTruthy();
-    expect(probe.inactiveDivider.display).not.toBe('none');
-    expect(probe.inactiveDivider.width).toBe('1px');
+    // ::after fa da piedino "a goccia", largo 8px, vedi test dedicato).
+    // Il verdetto si calcola dentro l'attesa per lo stesso motivo del test qui
+    // sopra: uno pseudo-elemento ha una misura solo dopo che il browser l'ha
+    // disegnato, e prima `width` torna vuota.
+    await expect
+      .poll(async () => {
+        const probe = await leggiSeparatori();
+        const att = probe.activeDivider;
+        const inatt = probe.inactiveDivider;
+        if (!att || !inatt || !att.width || !inatt.width) return 'striscia non ancora disegnata';
+        if (att.width === '1px') return `la scheda attiva mostra il separatore (${att.width})`;
+        if (inatt.display === 'none') return 'le schede inattive non mostrano il separatore';
+        if (inatt.width !== '1px') return `separatore inattivo largo ${inatt.width}`;
+        return 'separatore da 1px solo sulle inattive';
+      }, { timeout: 8_000 })
+      .toBe('separatore da 1px solo sulle inattive');
   });
 
   test('la scheda attiva ha le curve "a goccia" in stile Chrome', async () => {
     await openTab('filo://newtab/');
     await openTab('filo://newtab/');
     await expect(shell.locator('.tab.active')).toHaveCount(1, { timeout: 8_000 });
-    await expect
-      .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
-      .toBeGreaterThan(0);
 
     // I due piedini curvi sono pseudo-elementi ::before/::after sulla scheda
     // attiva: devono essere visibili (display block, 8px) e disegnati con un
     // radial-gradient (l'arco concavo che fonde la scheda con la barra).
-    const feet = await shell.locator('.tab.active').evaluate((el) => {
+    const leggiPiedini = () => shell.locator('.tab.active').evaluate((el) => {
       const read = (sel) => {
         const s = getComputedStyle(el, sel);
         return { display: s.display, width: s.width, bg: s.backgroundImage };
@@ -196,11 +212,20 @@ test.describe('larghezza e separatori stile Chrome', () => {
       return { before: read('::before'), after: read('::after') };
     });
 
-    for (const foot of [feet.before, feet.after]) {
-      expect(foot.display).not.toBe('none');
-      expect(foot.width).toBe('8px');
-      expect(foot.bg).toContain('radial-gradient');
-    }
+    // Stesso verdetto dentro l'attesa dei due test qui sopra: finché il browser
+    // non ha disegnato i piedini, `width` torna vuota.
+    await expect
+      .poll(async () => {
+        const feet = await leggiPiedini();
+        for (const [nome, foot] of [['sinistro', feet.before], ['destro', feet.after]]) {
+          if (!foot || !foot.width) return 'piedini non ancora disegnati';
+          if (foot.display === 'none') return `il piedino ${nome} non si vede`;
+          if (foot.width !== '8px') return `il piedino ${nome} è largo ${foot.width}`;
+          if (!String(foot.bg).includes('radial-gradient')) return `il piedino ${nome} non è un arco`;
+        }
+        return 'due piedini a goccia da 8px';
+      }, { timeout: 8_000 })
+      .toBe('due piedini a goccia da 8px');
   });
 });
 

@@ -10,6 +10,7 @@
 
   // Stack di popup aperti. L'ultimo è il topmost.
   const popups = [];
+
   // z-index iniziale e step per stacking deterministico
   const Z_BASE = 2147483600;
   const Z_STEP = 1;
@@ -366,7 +367,7 @@
       unregister: () => {
         const idx = popups.indexOf(entry);
         if (idx >= 0) popups.splice(idx, 1);
-        try { root.removeEventListener('mousedown', onMd, true); } catch (_) {}
+            try { root.removeEventListener('mousedown', onMd, true); } catch (_) {}
       },
     };
   }
@@ -1415,5 +1416,8 @@
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
+    // è l'Esc quando si è a tutto schermo (#514).
+    hasOpen: () => popups.length > 0,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

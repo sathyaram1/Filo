@@ -50,6 +50,121 @@
   // Rispecchia la modalità "contenuto a tutto schermo" del main (vedi tabs.js).
   // Serve a mostrare l'icona/etichetta giusta nella voce di menu "Schermo intero".
   let contentFullscreen = false;
+  // Vero appena il main ci ha annunciato un cambio: da quel momento l'annuncio
+  // è più fresco della risposta alla domanda che facciamo al montaggio, e vince.
+  let fullscreenAnnunciato = false;
+  // Il main ci consegna un Esc che il browser avrebbe mangiato (MSG.ESC_INOLTRATO,
+  // vedi sotto). La consegna la esegue il giro dell'Esc montato in init().
+  let consegnaEsc = null;
+  // Un riquadro incorporato ci chiede di prendere noi il tasto (MSG.ESC_CHIEDI_TASTO):
+  // il browser lo presta solo al frame principale.
+  let consegnaChiediEsc = null;
+
+  // ── Chi si è preso l'Esc, a schermo intero ────────────────────────────────
+  // Sopra la pagina Filo apre roba che si chiude con Esc: il menu del tasto
+  // destro, la risposta, il riquadro per riscrivere, il QR, la selezione di una
+  // parte dello schermo, una domanda di conferma, un'immagine ingrandita. A
+  // schermo intero quel tasto serve anche a uscire, e chi arriva prima vince: se
+  // esce la modalità, il riquadro resta aperto sopra una pagina che nessuno
+  // aveva chiesto di lasciare (#514).
+  //
+  // La domanda giusta non è "quali riquadri esistono" — quella è una lista che
+  // invecchia — ma "questo Esc l'ha usato qualcuno?". Si risponde guardando tre
+  // cose, dopo che il tasto ha finito il suo giro nel documento:
+  //  · i pezzi di UI DISEGNATI DA NOI che c'erano sulla pagina un istante prima.
+  //    L'elenco lo tiene SN_FILO_UI nel mondo isolato dei content script, e ci
+  //    finisce solo chi passa da `mark()`: dalla pagina non ci si arriva. Chi si
+  //    chiude si stacca dal documento, quindi se uno di quelli è sparito quell'Esc
+  //    l'ha usato lui. Il marchio lo mette già chi disegna, quindi un riquadro
+  //    nuovo è coperto il giorno che nasce, senza iscriversi da nessuna parte.
+  //    Non basta guardare la RADICE: Filo apre roba anche DENTRO un suo riquadro
+  //    già aperto, e lì la radice non si stacca da niente. L'immagine ingrandita
+  //    dello screenshot allegato al box «Invia feedback» è così, e su un sito
+  //    l'Esc che la chiudeva portava via anche lo schermo intero (#514). Quindi
+  //    di ogni radice nostra guardiamo anche il SOTTOALBERO, con lo stesso metro
+  //    della pagina di Filo: un elemento in meno lì dentro, o uno in più
+  //    nascosto, vuol dire che il tasto l'ha usato un pezzo nostro. Vale anche
+  //    sui siti perché il sottoalbero è roba nostra, non del sito.
+  //  · su una pagina DI FILO, in più, che la pagina si sia ALLEGGERITA nel giro
+  //    del tasto: un elemento in meno, o uno in più nascosto. I riquadri che
+  //    disegnano le pagine interne (i menu del tasto destro della cronologia e
+  //    dell'editor, il menu di ordinamento e la barra di ricerca della gestione)
+  //    non passano da `mark()` e non dichiarano niente: sparire dal documento è
+  //    l'unica cosa che fanno tutti. Conta solo la direzione "qualcosa è
+  //    sparito": una pagina che sta AGGIUNGENDO roba (una risposta che arriva a
+  //    pezzi) non deve poter rivendicare il tasto.
+  //  · su una pagina DI FILO, sempre in più, che qualcuno l'abbia consumato
+  //    (fermando la propagazione o chiedendo di ignorare il tasto): lì tutto
+  //    quello che c'è sullo schermo è roba nostra. Sui siti no — un sito che si
+  //    mangia i tasti non deve poterci chiudere dentro allo schermo intero.
+  // Se nessuno l'ha usato, chiediamo noi di uscire. Se non chiediamo niente, il
+  // main esce da solo dopo un attimo: l'errore possibile è un'uscita in ritardo,
+  // mai restare chiusi dentro.
+  //
+  // Tutto questo però presuppone che il tasto arrivi. Quando lo schermo pieno è
+  // del SITO (il pulsante del suo lettore video) non arriva: se lo prende il
+  // browser per uscire, prima di chiunque, e non lo vede né il documento né il
+  // main. Lì il tasto va CHIESTO — vedi `chiediEsc` più sotto — e poi il giro è
+  // questo, identico.
+  const PAGINA_DI_FILO = (() => {
+    try { return location.protocol === 'filo:'; } catch (_) { return false; }
+  })();
+
+  // Quanta roba c'è dentro un pezzo di pagina, in due numeri. Lo stesso metro
+  // vale per il documento intero e per il sottoalbero di una nostra radice.
+  function peso(radice) {
+    try {
+      if (!radice) return null;
+      return {
+        elementi: radice.getElementsByTagName('*').length,
+        nascosti: radice.querySelectorAll('[hidden]').length,
+      };
+    } catch (_) { return null; }
+  }
+  // Solo la direzione "qualcosa è sparito": chi sta AGGIUNGENDO roba (una
+  // risposta che arriva a pezzi) non deve poter rivendicare il tasto.
+  function siEAlleggerito(prima, dopo) {
+    if (!prima || !dopo) return false;
+    return dopo.elementi < prima.elementi || dopo.nascosti > prima.nascosti;
+  }
+
+  // Le nostre radici aperte adesso, ciascuna col peso del suo sottoalbero.
+  function pezziDiFiloSullaPagina() {
+    const out = [];
+    try {
+      for (const el of (self.SN_FILO_UI?.aperti?.() || [])) out.push({ el, dentro: peso(el) });
+    } catch (_) {}
+    return out;
+  }
+  // Uno dei pezzi che c'erano si è chiuso: o la radice si è staccata dal
+  // documento, o dentro la radice è sparito qualcosa (un riquadro che Filo
+  // aveva aperto DENTRO un altro suo riquadro: l'immagine ingrandita dello
+  // screenshot nel box di segnalazione).
+  // Guardiamo i pezzi UNO A UNO e non quanti sono, perché nello stesso istante
+  // ne può nascere un altro — chiudendo la selezione di un'area compare
+  // l'avvisino che dice com'è andata, e a contarli sembrerebbe che non sia
+  // successo niente.
+  function qualcosaSiEChiuso(pezziPrima) {
+    try {
+      return pezziPrima.some((p) => {
+        if (!p || !p.el) return false;
+        if (!p.el.isConnected) return true;
+        return siEAlleggerito(p.dentro, peso(p.el));
+      });
+    } catch (_) { return false; }
+  }
+
+  // Quanta pagina c'è. Il documento INTERO conta solo sulle pagine di Filo: su
+  // un sito sarebbe il sito a decidere quando l'Esc è suo, che è esattamente ciò
+  // da cui ci difendiamo (i sottoalberi delle nostre radici, invece, sono roba
+  // nostra ovunque).
+  function pesoDellaPagina() {
+    if (!PAGINA_DI_FILO) return null;
+    return peso(document.documentElement);
+  }
+  function siEAlleggerita(prima) {
+    return siEAlleggerito(prima, pesoDellaPagina());
+  }
 
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
   // blocco commenti) invece che nella pagina? Il menu del tasto destro e tutto
@@ -89,17 +204,193 @@
       try { startTabActivityReporter(); } catch (_) {}
     }
 
-    // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
-    // registrato anche su pagine "bloccate" (senza menu) e in capture, così
-    // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && contentFullscreen) {
-        e.preventDefault();
-        e.stopPropagation();
-        contentFullscreen = false; // evita ripetizioni mentre il main esce
-        chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {});
+    // Siamo nati mentre lo schermo intero era già acceso? Lo CHIEDIAMO, non
+    // aspettiamo l'annuncio: l'annuncio parte quando la modalità cambia, e una
+    // pagina arrivata dopo (scheda nuova, navigazione) non lo sentirà mai. Era
+    // il buco di #514: il menu del tasto destro offriva "Schermo intero" mentre
+    // ci si era già dentro, e la via d'uscita col suo nome non c'era.
+    try {
+      chrome.runtime.sendMessage({ type: MSG.FULLSCREEN_STATE })
+        .then((r) => {
+          if (!fullscreenAnnunciato && r && r.ok) contentFullscreen = !!r.fullscreen;
+        })
+        .catch(() => {});
+    } catch (_) {}
+
+    // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js), ma
+    // solo se non se l'è preso nessun altro. Due ascoltatori sullo stesso tasto:
+    // il primo (in capture, prima di chiunque) fotografa la pagina, l'ultimo
+    // (in bolla su window, dopo chiunque) vede se il tasto è arrivato fino in
+    // fondo intatto. La decisione arriva subito dopo, a giro finito.
+    let escInCorso = null;
+    // Quante volte di fila un Esc è stato rivendicato da qualcuno. Nessuna prova
+    // vale all'infinito, perché nessuna prova è a prova di pagina ostile: chi si
+    // prendesse ogni Esc ci chiuderebbe dentro allo schermo intero. Due tetti,
+    // perché le prove non valgono uguale, e il taglio è **cosa si è visto
+    // succedere**, non su quale pagina siamo:
+    //  · PROVA FORTE — qualcosa è sparito davvero: un pezzo nostro si è
+    //    staccato dal documento, oppure (su una pagina di Filo) la pagina si è
+    //    alleggerita. Tetto tre, come i riquadri che si possono impilare.
+    //  · PROVA DEBOLE — solo "qualcuno ha consumato il tasto", senza che si sia
+    //    visto sparire niente. Tetto uno: chi si prendesse ogni Esc senza
+    //    chiudere nulla si ferma al secondo.
+    // Contare i due tipi INSIEME era il difetto del giro 7: con due riquadri
+    // aperti sopra una pagina di Filo (la ricerca della gestione e l'immagine a
+    // tutta pagina; la domanda di conferma e l'immagine ingrandita nella home)
+    // il secondo Esc chiudeva il riquadro di sotto e portava via anche lo
+    // schermo intero, che nessuno aveva chiesto di lasciare. Una prova forte
+    // riazzera il conto delle deboli: la pagina sta dimostrando di fare
+    // qualcosa, non di mangiare tasti.
+    // Il tetto che GARANTISCE resta quello del main (ESC_RIVENDICAZIONI_MAX in
+    // src/main/tabs.js): questo è solo il primo filtro, e vive dentro la pagina.
+    // Entrambi i conteggi tornano a zero appena l'utente fa qualcos'altro (un
+    // clic, un altro tasto): a quel punto la volta dopo è una volta nuova, e
+    // riaprire un'immagine le ridà il suo tasto.
+    const TETTO_PROVE_FORTI = 3;
+    const TETTO_PROVE_DEBOLI = 1;
+    let escFortiDiFila = 0;
+    let escDeboliDiFila = 0;
+    function azzeraRivendicazioni() { escFortiDiFila = 0; escDeboliDiFila = 0; }
+    window.addEventListener('mousedown', azzeraRivendicazioni, { capture: true });
+
+    // L'Esc che stiamo guardando ce l'ha consegnato il main invece di lasciarlo
+    // arrivare da sé? Succede quando lo schermo pieno è del SITO: lì il browser
+    // il tasto se lo mangia per uscire, e senza questa consegna nessun riquadro
+    // di Filo lo vedrebbe mai (#514, giro 10). Quando è consegnato, la deroga
+    // qui sotto non vale: il main ha già deciso che quel tasto passa di qui.
+    let escInoltrato = false;
+    // ── Chiedere l'Esc al browser, sopra lo schermo pieno di un SITO ─────────
+    // Quando è la pagina ad avere lo schermo pieno (il pulsante del lettore
+    // video), l'Esc il browser se lo mangia per uscire: il documento non lo
+    // vede mai, e ogni riquadro che Filo ha aperto lì sopra veniva scavalcato,
+    // restava aperto e la modalità se ne andava lo stesso (#514, giro 10). Il
+    // tasto si può CHIEDERE (Keyboard Lock): da quel momento arriva a Filo,
+    // che lo consegna alla pagina e decide con la regola di sempre.
+    // Lo chiediamo solo mentre c'è qualcosa di nostro aperto, e solo l'Esc: un
+    // sito che si è preso dei tasti suoi (un gioco, un desktop remoto) non
+    // deve perderli perché Filo sta a schermo pieno. Appena non abbiamo più
+    // niente aperto lo restituiamo, e da lì il tasto torna a valere come prima.
+    // Dove il browser non lo presta (una pagina non sicura, dove l'API non
+    // c'è) resta il comportamento di prima: si esce, e il riquadro va chiuso
+    // a mano.
+    let tastoChiesto = false;
+    // Dentro un riquadro incorporato Filo disegna il suo menu come nella pagina
+    // che ospita, e il tasto serve uguale; ma il browser lo presta solo al
+    // frame principale, quindi da qui la richiesta si gira a lui passando dal
+    // main. Chi la riceve la esegue con questa stessa funzione.
+    function chiediEsc() {
+      if (tastoChiesto) return;
+      if (IS_SUBFRAME) {
+        tastoChiesto = true;
+        try { chrome.runtime.sendMessage({ type: MSG.ESC_CHIEDI_TASTO }).catch(() => {}); } catch (_) {}
+        return;
       }
+      try {
+        const p = navigator.keyboard?.lock?.(['Escape']);
+        if (!p) return;
+        tastoChiesto = true;
+        p.catch?.(() => { tastoChiesto = false; });
+      } catch (_) { tastoChiesto = false; }
+    }
+    function restituisciEsc() {
+      if (!tastoChiesto) return;
+      tastoChiesto = false;
+      if (IS_SUBFRAME) return; // il tasto ce l'ha il frame principale, non noi
+      try { navigator.keyboard?.unlock?.(); } catch (_) {}
+    }
+    // Il frame principale lo restituisce quando finisce lo schermo pieno, che è
+    // l'unico momento in cui quel tasto smette di essere in ballo: un riquadro
+    // aperto in un riquadro incorporato non gli dice quando si chiude, e
+    // tenerlo un attimo in più non toglie niente a nessuno.
+    consegnaChiediEsc = () => { if (document.fullscreenElement) chiediEsc(); };
+    try {
+      self.SN_FILO_UI?.onMark?.(() => {
+        if (document.fullscreenElement) chiediEsc();
+      });
+    } catch (_) {}
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) restituisciEsc();
+      // Il nome della voce del menu guarda anche lo schermo pieno della PAGINA,
+      // non solo la modalità di Filo: quando finisce quello, ridisegnarla è
+      // affar nostro. L'annuncio del main non basta, perché arriva mentre il
+      // documento sta ancora uscendo e la voce si ridisegnerebbe identica
+      // (#514, giro 10).
+      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
+    });
+
+    // Il tasto lo rimettiamo in circolo com'era: parte dal documento, sale fino
+    // a window e passa da tutti i gestori — i nostri riquadri e quelli della
+    // pagina — esattamente come farebbe un Esc vero. Non è "fidato", quindi non
+    // vale come gesto dell'utente: una pagina non può usarlo per riprendersi lo
+    // schermo (#514, giro 7).
+    consegnaEsc = () => {
+      if (escInoltrato) return;
+      escInoltrato = true;
+      try {
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+          bubbles: true, cancelable: true, composed: true,
+        }));
+      } catch (_) {}
+      escInoltrato = false;
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') { azzeraRivendicazioni(); return; }
+      if (!contentFullscreen) return;
+      // Deroga (la stessa del main, src/main/tabs.js): se a tutto schermo c'è
+      // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
+      // browser la fa uscire e il main ripristina la barra da solo. Chiedere
+      // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
+      if (document.fullscreenElement && !escInoltrato) return;
+      escInCorso = {
+        ev: e,
+        pezziPrima: pezziDiFiloSullaPagina(),
+        pesoPrima: pesoDellaPagina(),
+        inFondo: false,
+        consumato: false,
+      };
+      setTimeout(decidiEsc, 0);
     }, { capture: true });
+
+    window.addEventListener('keydown', (e) => {
+      if (!escInCorso || escInCorso.ev !== e) return;
+      escInCorso.inFondo = true;
+      escInCorso.consumato = !!e.defaultPrevented;
+    });
+
+    // Il giro è finito: se sopra la pagina non è rimasto niente di nostro, il
+    // tasto torna al browser. Da lì l'Esc dopo vale come prima, e a nessuno
+    // resta chiesto un tasto che non serve più.
+    function decidiEsc() {
+      try { decidiChiEraQuellEsc(); } finally {
+        try { if (!pezziDiFiloSullaPagina().length) restituisciEsc(); } catch (_) {}
+      }
+    }
+
+    function decidiChiEraQuellEsc() {
+      const giro = escInCorso;
+      escInCorso = null;
+      if (!giro || !contentFullscreen) return;
+      // Qualcosa è sparito davvero: un pezzo nostro staccato dal documento, o
+      // (solo su una pagina di Filo) la pagina che si è alleggerita.
+      const forte = qualcosaSiEChiuso(giro.pezziPrima)
+        || (PAGINA_DI_FILO && siEAlleggerita(giro.pesoPrima));
+      // Nessuno si è visto sparire, ma su una pagina di Filo qualcuno il tasto
+      // se l'è preso: lì tutto quello che c'è sullo schermo è roba nostra.
+      const debole = PAGINA_DI_FILO && (!giro.inFondo || giro.consumato);
+      const rivendica = (forte && escFortiDiFila < TETTO_PROVE_FORTI)
+        || (debole && escDeboliDiFila < TETTO_PROVE_DEBOLI);
+      if (rivendica) {
+        // Era il tasto del riquadro: il main annulla l'uscita che aspettava.
+        if (forte) { escFortiDiFila++; escDeboliDiFila = 0; } else { escDeboliDiFila++; }
+        try { chrome.runtime.sendMessage({ type: MSG.ESC_CONSUMATO }).catch(() => {}); } catch (_) {}
+        return;
+      }
+      azzeraRivendicazioni();
+      contentFullscreen = false; // evita ripetizioni mentre il main esce
+      try { chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {}); } catch (_) {}
+    }
 
     // Ctrl/Cmd+Z → torna alla pagina precedente (feedback #267). Ecceziona un
     // solo caso, ma cruciale: dentro un campo di testo (input/textarea/
@@ -1729,7 +2020,25 @@
   // ------------------------------------------------------------
   function onRuntimeMessage(msg, sender, sendResponse) {
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
+      fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
+      // Se un menu è aperto proprio adesso, la sua voce dello schermo intero
+      // sta dicendo una cosa che non è più vera: ridisegnala sul posto invece
+      // di lasciarla mentire finché il menu non si chiude (#514).
+      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
+      return;
+    }
+    // Il main ci consegna un Esc che il browser ci avrebbe mangiato (schermo
+    // pieno del sito): lo rimettiamo in circolo e il giro di sempre decide di
+    // chi era (#514, giro 10).
+    if (msg?.type === MSG.ESC_INOLTRATO) {
+      try { consegnaEsc?.(); } catch (_) {}
+      return;
+    }
+    // Un riquadro incorporato della stessa scheda ha aperto qualcosa sopra lo
+    // schermo pieno: il tasto lo chiediamo noi, che siamo il frame principale.
+    if (msg?.type === MSG.ESC_CHIEDI_TASTO) {
+      try { consegnaChiediEsc?.(); } catch (_) {}
       return;
     }
     // Toast di sistema inviato dal main (es. esito differito dell'invio di un

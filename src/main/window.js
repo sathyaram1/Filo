@@ -47,12 +47,33 @@ function wireWindowCommon(win, tabs) {
   } catch (_) {}
 
   win.on('resize', () => tabs.layout());
-  win.on('enter-full-screen', () => tabs.layout());
+  // Se la finestra va a tutto schermo per una strada che non è quella di Filo
+  // (gesto o scorciatoia del sistema, gestore finestre), adottiamo la modalità
+  // invece di limitarci al layout: altrimenti resterebbe uno schermo intero che
+  // Filo non sa di avere, e l'Esc non avrebbe niente da spegnere. Le due cose
+  // sono la stessa cosa nei due versi — l'uscita era già simmetrica qui sotto.
+  win.on('enter-full-screen', () => {
+    if (!tabs.contentFullscreen) tabs.setContentFullscreen(true);
+    else tabs.layout();
+  });
   // Se l'utente esce dal fullscreen OS con un gesto/scorciatoia di sistema,
   // ripristina anche la barra (esce dalla modalità contenuto a tutto schermo).
   win.on('leave-full-screen', () => {
     if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
     else tabs.layout();
+  });
+
+  // Esc esce dallo schermo intero anche quando il fuoco è sulla barra di Filo
+  // (#514). A tutto schermo la barra è nascosta sotto la pagina, ma tiene il
+  // fuoco se l'ultimo clic era lì — barra indirizzi, un pulsante, il menu su
+  // Mac: da lì il tasto non passa da nessun before-input-event delle schede, e
+  // prima moriva nel nulla. La regola sta in un posto solo (tabs.js); qui non si
+  // decide niente, si porta il tasto dove si decide. Quando la barra è visibile
+  // handleFullscreenEscape risponde false e l'Esc resta a chi lo usa nella barra
+  // (il pannello degli scaricamenti si chiude ancora con Esc).
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'Escape') return;
+    if (tabs.handleFullscreenEscape(null)) event.preventDefault();
   });
 }
 

@@ -238,6 +238,32 @@
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
+    // Lo stato a tutto schermo CHIESTO dalla pagina appena si monta, invece di
+    // aspettare solo l'annuncio qui sopra: una pagina che nasce mentre la
+    // modalità è già accesa può montarsi dopo l'annuncio e non sentirlo più
+    // (#514: il menu del tasto destro offriva "Schermo intero" mentre ci si era
+    // già dentro). Aperto anche alle pagine web: dice solo se la finestra che
+    // le ospita è a tutto schermo, cioè quello che il broadcast racconta già a
+    // tutte. → { ok, fullscreen: bool }
+    FULLSCREEN_STATE: 'fullscreen_state',
+    // A tutto schermo l'Esc è arrivato alla pagina e se l'è preso un riquadro
+    // di Filo (il menu del tasto destro, la risposta, un'immagine ingrandita,
+    // una domanda di conferma…): quel tasto era del riquadro, non della
+    // modalità, e il main annulla l'uscita che aveva messo in attesa (#514).
+    // Chi non manda niente esce: il silenzio significa "nessuno l'ha usato".
+    ESC_CONSUMATO: 'esc_consumato',
+    // Il main consegna alla pagina un Esc che il browser le avrebbe mangiato.
+    // Succede quando lo schermo pieno è del SITO (il pulsante del lettore
+    // video): lì il browser usa l'Esc per uscire e il documento non lo vede
+    // mai, quindi ogni riquadro di Filo aperto sopra la pagina veniva
+    // scavalcato (#514, giro 10). Il main se lo prende, lo passa di qui, e la
+    // pagina fa il giro di sempre: se un riquadro se l'è preso lo dice
+    // (ESC_CONSUMATO), altrimenti chiede lei l'uscita (EXIT_FULLSCREEN).
+    ESC_INOLTRATO: 'esc_inoltrato',
+    // Un riquadro incorporato (un video, una mappa) ha aperto qualcosa di Filo
+    // sopra uno schermo pieno, ma il tasto lo può chiedere solo il frame
+    // principale: lo dice al main, che gira la richiesta a chi può farla.
+    ESC_CHIEDI_TASTO: 'esc_chiedi_tasto',
     OPEN_NEW_TAB: 'open_new_tab',
     OPEN_INCOGNITO: 'open_incognito',               // apre una nuova finestra incognito
     // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone in

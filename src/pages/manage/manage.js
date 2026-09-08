@@ -1134,14 +1134,32 @@
   }
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
+  // L'immagine a tutta pagina si chiude con Esc, e a schermo intero quel tasto
+  // serve anche a uscire. Chi dei due lo prende lo decide una regola sola, in
+  // src/content/content.js: qui basta DICHIARARE che il tasto ce lo siamo preso
+  // noi (preventDefault + stop), come fa qualunque riquadro sulle pagine di
+  // Filo (#514).
   function openLightbox(src) {
     mgLightboxImg.src = src;
     mgLightbox.classList.add('open');
   }
-  mgLightbox.addEventListener('click', () => {
+  function closeLightbox() {
+    if (!mgLightbox.classList.contains('open')) return false;
     mgLightbox.classList.remove('open');
-    mgLightboxImg.src = '';
-  });
+    mgLightboxImg.removeAttribute('src');
+    return true;
+  }
+  mgLightbox.addEventListener('click', closeLightbox);
+  // Esc chiude l'immagine aperta a tutta pagina, come ovunque altro in Filo
+  // (la home, la pagina dei feedback, il riquadro di segnalazione nei siti).
+  // In capture: il visore è l'ultima cosa aperta e sta sopra tutto, quindi
+  // l'Esc è suo prima che lo prendano la ricerca o un menu rimasto aperto.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!closeLightbox()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
 
   // ── Utilità date ──────────────────────────────────────────────────────────
   function formatDate(isoOrTs) {
@@ -3712,6 +3730,10 @@
   // non hanno una sessione admin né Firestore).
   window.__mgTest.renderSupportModelsEditor = (models) => { renderSupportModelsEditor(models); smLoaded = true; };
   window.__mgTest.collectJudgeRegistry = collectJudgeRegistry;
+  // L'immagine a tutta pagina: gli spec la aprono e la chiudono dalla stessa
+  // porta dell'utente, così passano anche dall'avviso al main (#514).
+  window.__mgTest.openLightbox = openLightbox;
+  window.__mgTest.closeLightbox = closeLightbox;
   // Tab "Log": render diretto con voci finte (bypassa il canale main), e
   // ri-lettura via IPC per gli spec che stubbano la risposta.
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
