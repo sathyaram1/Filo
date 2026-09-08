@@ -38,7 +38,7 @@
     if (!Number.isFinite(usd) || usd <= 0) return 0;
     const e = Number(eurPerCredit) || 0.0007;
     const fx = Number(eurUsd) || 1.1;
-    return Math.ceil((usd / (e * fx)) * 10) / 10;
+    return Math.ceil((usd / (e * fx)) * 10 - 1e-6) / 10;
   }
 
   // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
