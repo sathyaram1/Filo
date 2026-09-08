@@ -105,6 +105,28 @@ test.describe('etichette delle schede', () => {
   });
 });
 
+// Le larghezze delle schede, riassunte in una frase. Serve dentro `expect.poll`:
+// la striscia si ridisegna quando il main annuncia le schede, e finché il
+// browser non l'ha disegnata le misure tornano a zero. Un verdetto calcolato
+// dentro l'attesa aspetta il disegno e resta rosso se il CSS cambia davvero,
+// perché l'attesa scade riportando le larghezze vere.
+async function verdettoLarghezze(quante) {
+  const w = await shell.locator('.tab').evaluateAll((els) =>
+    els.map((el) => ({
+      active: el.classList.contains('active'),
+      width: el.getBoundingClientRect().width,
+    })),
+  );
+  if (w.length !== quante) return `${w.length} schede invece di ${quante}`;
+  const attiva = w.find((t) => t.active);
+  const inattive = w.filter((t) => !t.active);
+  if (!attiva || inattive.length === 0) return 'nessuna scheda attiva';
+  if (w.some((t) => !(t.width > 0))) return 'striscia non ancora disegnata';
+  const larghe = inattive.filter((t) => t.width >= attiva.width);
+  if (larghe.length) return `attiva ${attiva.width}, inattive ${inattive.map((t) => t.width).join(' ')}`;
+  return 'attiva più larga';
+}
+
 // ───────────────────────── tab-active-width-chrome ─────────────────────────
 test.describe('larghezza e separatori stile Chrome', () => {
   test('la tab selezionata è più larga delle altre', async () => {
