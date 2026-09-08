@@ -160,6 +160,15 @@ module.exports = function register(on, ctx) {
     return { ok: true, fullscreen: !!win?._filoTabs?.contentFullscreen };
   });
 
+  on(MSG.ESC_CHIEDI_TASTO, async (msg, sender) => {
+    // Da un riquadro incorporato: lì il tasto non si può chiedere al browser,
+    // lo può fare solo il frame principale della scheda. Nessun gate d'origine:
+    // dice solo «ho qualcosa di aperto», e vale sulla scheda che parla (#514).
+    const win = winOf(sender);
+    win?._filoTabs?.chiediEscAlFramePrincipale(sender?.tab?.id ?? null);
+    return { ok: true };
+  });
+
   on(MSG.ESC_CONSUMATO, async (msg, sender) => {
     // A tutto schermo l'Esc l'ha usato un riquadro di Filo aperto sopra la
     // pagina: quel tasto era suo, e l'uscita che il main aveva messo in attesa
