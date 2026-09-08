@@ -144,9 +144,19 @@
     // (in bolla su window, dopo chiunque) vede se il tasto è arrivato fino in
     // fondo intatto. La decisione arriva subito dopo, a giro finito.
     let escInCorso = null;
+    // Quante volte di fila un Esc è finito a qualcun altro senza che sulla
+    // pagina cambiasse niente di visibile. Serve solo alle pagine di Filo, dove
+    // la prova è "qualcuno l'ha consumato": una pagina che si prendesse ogni
+    // Esc a prescindere ci chiuderebbe dentro allo schermo intero, e invece il
+    // secondo Esc di fila esce comunque. Torna a zero appena l'utente fa
+    // qualcos'altro (un clic, un altro tasto), perché a quel punto la volta
+    // dopo è una volta nuova: riapri un'immagine e il suo Esc è di nuovo suo.
+    let escConsumatiDiFila = 0;
+    window.addEventListener('mousedown', () => { escConsumatiDiFila = 0; }, { capture: true });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || !contentFullscreen) return;
+      if (e.key !== 'Escape') { escConsumatiDiFila = 0; return; }
+      if (!contentFullscreen) return;
       // Deroga (la stessa del main, src/main/tabs.js): se a tutto schermo c'è
       // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
       // browser la fa uscire e il main ripristina la barra da solo. Chiedere
