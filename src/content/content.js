@@ -56,6 +56,9 @@
   // Il main ci consegna un Esc che il browser avrebbe mangiato (MSG.ESC_INOLTRATO,
   // vedi sotto). La consegna la esegue il giro dell'Esc montato in init().
   let consegnaEsc = null;
+  // Un riquadro incorporato ci chiede di prendere noi il tasto (MSG.ESC_CHIEDI_TASTO):
+  // il browser lo presta solo al frame principale.
+  let consegnaChiediEsc = null;
 
   // ── Chi si è preso l'Esc, a schermo intero ────────────────────────────────
   // Sopra la pagina Filo apre roba che si chiude con Esc: il menu del tasto
