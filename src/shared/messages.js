@@ -252,6 +252,14 @@
     // modalità, e il main annulla l'uscita che aveva messo in attesa (#514).
     // Chi non manda niente esce: il silenzio significa "nessuno l'ha usato".
     ESC_CONSUMATO: 'esc_consumato',
+    // Il main consegna alla pagina un Esc che il browser le avrebbe mangiato.
+    // Succede quando lo schermo pieno è del SITO (il pulsante del lettore
+    // video): lì il browser usa l'Esc per uscire e il documento non lo vede
+    // mai, quindi ogni riquadro di Filo aperto sopra la pagina veniva
+    // scavalcato (#514, giro 10). Il main se lo prende, lo passa di qui, e la
+    // pagina fa il giro di sempre: se un riquadro se l'è preso lo dice
+    // (ESC_CONSUMATO), altrimenti chiede lei l'uscita (EXIT_FULLSCREEN).
+    ESC_INOLTRATO: 'esc_inoltrato',
     OPEN_NEW_TAB: 'open_new_tab',
     OPEN_INCOGNITO: 'open_incognito',               // apre una nuova finestra incognito
     // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone in
