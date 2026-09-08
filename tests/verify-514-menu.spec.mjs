@@ -48,7 +48,10 @@ test('la voce del menu esce dallo schermo intero e si chiama «Esci da schermo i
 });
 
 test('scheda aperta MENTRE si è a tutto schermo: il menu dice la verità', async ({ app, openTab, testServer }) => {
-  await testServer.openReady(openTab, HTML);
+  // Prima scheda su una pagina di Filo, così la seconda (sul mini server) è
+  // riconoscibile per hostname e non rischio di rileggere la prima.
+  const prima = await openTab('filo://manage/manage.html');
+  await prima.waitForLoadState('domcontentloaded').catch(() => {});
   await accendi(app);
   await expect.poll(async () => (await stato(app)).contentFullscreen).toBe(true);
 
