@@ -142,6 +142,12 @@
         // browser la fa uscire e il main ripristina la barra da solo. Chiedere
         // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
         if (document.fullscreenElement) return;
+        // Seconda deroga (#514): un riquadro di Filo aperto si prende l'Esc.
+        // Il menu del tasto destro e il riquadro della risposta hanno i loro
+        // gestori più in giù; lasciamoglielo, e sarà l'Esc dopo a uscire dallo
+        // schermo intero. Il main fa lo stesso controllo con la lista che gli
+        // mandiamo: quello vero è questo, che guarda i riquadri adesso.
+        if (riquadroDiFiloAperto()) return;
         e.preventDefault();
         e.stopPropagation();
         contentFullscreen = false; // evita ripetizioni mentre il main esce
