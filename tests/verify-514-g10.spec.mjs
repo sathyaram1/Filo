@@ -126,8 +126,12 @@ test('sito a schermo pieno col suo pulsante: il primo Esc deve chiudere il QR, n
   ).toBe(true);
 });
 
-// ── 3. Il menu rimasto aperto promette il contrario di quello che fa ─────────
-test('sito a schermo pieno col suo pulsante: la voce del menu rimasto aperto non deve mentire', async ({ app, openTab, testServer }) => {
+// ── 3. La voce del menu non deve promettere il contrario di quello che fa ────
+// Lo schermo pieno del sito finisce per una strada che non è l'Esc (il pulsante
+// del lettore, un comando della pagina) mentre il menu è sotto gli occhi: la
+// voce va ridisegnata sul posto, o «Esci da schermo intero» su uno schermo che
+// intero non è più ci rimette dentro con un clic.
+test('sito a schermo pieno col suo pulsante: la voce del menu non deve mentire quando la modalità finisce da un\'altra strada', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, LETTORE);
   await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -136,13 +140,12 @@ test('sito a schermo pieno col suo pulsante: la voce del menu rimasto aperto non
   const voce = await voceSchermoIntero(page);
   expect(await voce.getAttribute('aria-label')).toBe('Esci da schermo intero');
 
-  await esc(app);
-  // Il menu è rimasto aperto (rilievo 1) e lo schermo pieno se n'è andato: la
-  // voce ora promette un'uscita che non c'è più.
-  expect(
-    await voce.getAttribute('aria-label'),
-    'lo schermo pieno è già spento ma la voce dice ancora «Esci da schermo intero»',
-  ).toBe('Schermo intero');
+  await page.evaluate(() => { try { document.exitFullscreen(); } catch (_) {} });
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
+  expect(await menuAperto(page), 'il menu è ancora aperto').toBe(true);
+  await expect
+    .poll(() => voce.getAttribute('aria-label'), { timeout: 5000 })
+    .toBe('Schermo intero');
 });
 
 // ── 4. Controprova: senza niente aperto sopra, un Esc basta e avanza ─────────
