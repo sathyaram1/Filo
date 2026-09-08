@@ -1268,5 +1268,8 @@
     refreshIconRow,
     refreshIconGrid,
     isSubMenuOpen,
+    // C'è un menu aperto adesso? Lo chiede content.js per decidere di chi è
+    // l'Esc quando si è a tutto schermo (#514).
+    isOpen: () => !!activeMenu,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
