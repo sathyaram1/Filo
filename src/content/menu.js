@@ -29,14 +29,6 @@
 
   let activeMenu = null;
 
-  // Un riquadro di Filo si è aperto o chiuso: content.js lo dice al main, che
-  // a tutto schermo deve sapere se l'Esc è di questo menu o dello schermo
-  // intero (#514). Se il gancio non c'è ancora (menu.js si carica prima di
-  // content.js) non succede niente: la prima apertura vera arriva dopo.
-  function avvisaCambio() {
-    try { global.SN_RIQUADRI_CAMBIATI?.(); } catch (_) {}
-  }
-
   function close() {
     try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
@@ -50,7 +42,6 @@
       try { activeMenu.cleanupZoom?.(); } catch (_) {}
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
       activeMenu = null;
-      avvisaCambio();
     }
     // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
     dropZones.length = 0;
@@ -556,7 +547,6 @@
       root, onDocClick, onKey, onScroll, onResize, cleanupZoom, cleanups,
       subRoot: null, subAnchor: null, subMode: null,
     };
-    avvisaCambio();
   }
 
   // Impedisce che l'elemento del menu prenda il fuoco quando lo si clicca.
