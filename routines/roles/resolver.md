@@ -84,6 +84,12 @@ quello che gli farà il verificatore:
    vista dell'utente, in `tests/verifica/<numero>/giro0-<cosa>.spec.mjs` (il
    numero del feedback senza cancelletto). Resta nel ramo: il verificatore la
    rilancia, e dopo la fusione resta nella suite.
+   Quale prova, lo dicono i minimi di CLAUDE.md § Verifica, non questa cartella:
+   se il lavoro **non ha niente da aprire** (logica pura, testi, strumenti da
+   riga di comando) la prova è il controllo veloce in `tests/unit/`, e la
+   cartella del giro resta vuota. Una spec che apre Filo per non guardarci
+   niente non prova niente: la cartella serve a chi ha una schermata o un flusso
+   da ripercorrere.
 2. **Le strade equivalenti**: ogni altro modo con cui l'utente ottiene la
    stessa cosa (menu, scorciatoia, tasto destro, chat, l'altra pagina che ha la
    stessa funzione) fa la stessa cosa.
