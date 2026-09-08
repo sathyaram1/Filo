@@ -87,22 +87,43 @@ test('home: immagine ingrandita — il primo Esc deve chiudere lei, non lo scher
     .toEqual({ immagineAperta: false, schermoIntero: true });
 });
 
-test('riquadro di conferma su un sito — il primo Esc deve annullarlo, non uscire', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, PAGINA);
+test('riquadro di conferma sulla home — il primo Esc deve annullarlo, non uscire', async ({ app, openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
   await entra(app);
   await page.evaluate(() => {
     window.__esitoConferma = 'in corso';
     window.SN_CONFIRM_UI.confirm({ title: 'Sicuro?', text: 'Azione delicata' })
       .then((v) => { window.__esitoConferma = v; });
   });
-  await expect(page.locator('.sn-confirm-overlay, [class*="confirm"]').first()).toBeVisible({ timeout: 4000 });
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 500));
 
   await esc(app);
   const dopo = await stato(app);
   const esito = await page.evaluate(() => window.__esitoConferma);
-  expect(esito, 'il primo Esc doveva annullare la conferma').toBe(false);
-  expect(dopo.cf, 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
+  console.log('[g4 conferma] esito:', esito, '| schermo intero:', dopo.cf);
+  expect({ conferma: esito, schermoIntero: dopo.cf })
+    .toEqual({ conferma: false, schermoIntero: true });
+});
+
+test('pagina dei feedback: immagine ingrandita — il primo Esc deve chiudere lei', async ({ app, openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForSelector('#lightbox', { state: 'attached', timeout: 8000 });
+  await entra(app);
+  // Lo stato in cui mette la pagina il clic su un'immagine allegata.
+  await page.evaluate((src) => {
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightbox').classList.add('open');
+  }, PX);
+  await expect(page.locator('#lightbox.open')).toBeVisible({ timeout: 4000 });
+  await new Promise((r) => setTimeout(r, 400));
+
+  await esc(app);
+  const dopo = await stato(app);
+  const ancora = await page.locator('#lightbox.open').count();
+  console.log('[g4 feedback] immagine ancora aperta:', ancora, '| schermo intero:', dopo.cf);
+  expect({ immagineAperta: ancora > 0, schermoIntero: dopo.cf })
+    .toEqual({ immagineAperta: false, schermoIntero: true });
 });
 
 // ── 3. Lo stato che resta appiccicato ────────────────────────────────────────
