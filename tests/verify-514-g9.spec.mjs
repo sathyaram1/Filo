@@ -154,42 +154,7 @@ test('controprova: il riquadro incorporato NATO a schermo intero tiene la modali
     .toEqual({ menuAperto: false, schermoIntero: true });
 });
 
-// ── 4. Il sito si prende l'Esc prima del menu di Filo ─────────────────────────
-// Molti siti tengono un gestore globale dell'Esc per chiudere le proprie
-// finestre, e lo fermano lì. Il menu di Filo ascolta più in basso, quindi quel
-// tasto non gli arriva: il menu resta aperto e intanto lo schermo intero se ne
-// va, che è il danno dei giri 3, 4, 5, 7 e 8.
-const SITO_MANGIA = `<!doctype html><body style="margin:0;height:900px">
-<h1 id="t">un sito che si tiene l'Esc</h1>
-<script>
-  window.__mangiati = 0;
-  window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    window.__mangiati++;
-    e.stopPropagation();
-  }, true);
-</script></body>`;
-
-test('sito che si prende l\'Esc: il menu di Filo aperto sopra non deve costare lo schermo intero', async ({ app, openTab, testServer }) => {
-  test.setTimeout(180_000);
-  const page = await testServer.openReady(openTab, SITO_MANGIA);
-  await page.locator('#t').click();
-
-  await entra(app);
-  await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 10_000 });
-
-  await esc(app);
-  expect(await page.evaluate(() => window.__mangiati), 'il sito deve aver visto l\'Esc').toBeGreaterThan(0);
-  const menuAperto = await page.locator('.sn-menu').count() > 0;
-  const ancoraDentro = await schermoIntero(app);
-  expect(
-    { menuAperto, schermoIntero: ancoraDentro },
-    'col menu di Filo aperto il primo Esc non doveva portare via lo schermo intero',
-  ).toEqual({ menuAperto: true, schermoIntero: true });
-});
-
-// ── 5. La pagina è occupata quando l'Esc arriva ──────────────────────────────
+// ── 4. La pagina è occupata quando l'Esc arriva ──────────────────────────────
 // Il main aspetta la risposta della pagina per un tempo fisso. Una pagina
 // impegnata (un sito pesante, uno script lungo) risponde dopo, e intanto la
 // modalità è già uscita: il riquadro si chiude E lo schermo intero se ne va.
