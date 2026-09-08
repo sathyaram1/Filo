@@ -369,6 +369,9 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
 export function cartellaProveGiro(branch) {
   const slug = String(branch || '')
     .replace(/^(claude|feature|fix)\//i, '')
+    // «però» deve restare «pero», non «per»: una lettera accentata è una
+    // lettera, e mangiarla cambia il nome della cartella.
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^A-Za-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .toLowerCase()
