@@ -232,12 +232,14 @@
   }
 
   async function listModels(apiKey) {
-    const res = await fetch(MODELS_ENDPOINT, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!res.ok) throw new Error(`OpenRouter models: ${res.status}`);
-    const data = await res.json();
-    return (data.data || []).map((m) => ({
+    return conScadenza({ totalMs: LIMITE_INTERROGAZIONE_MS, cosa: 'l\'elenco dei modelli' }, async (w) => {
+      const res = await fetch(MODELS_ENDPOINT, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: w.signal,
+      });
+      if (!res.ok) throw new Error(`OpenRouter models: ${res.status}`);
+      const data = await res.json();
+      return (data.data || []).map((m) => ({
       id: m.id,
       name: m.name,
       pricing: m.pricing && {
