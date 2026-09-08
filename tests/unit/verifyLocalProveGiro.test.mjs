@@ -30,7 +30,7 @@ test('il compito consegnato a chi verifica in locale dice DOVE lasciare le prove
   assert.match(brief, /non si\s*\n?cancellano|non si cancellano/, 'e che non si cancellano');
 });
 
-test('la fase 2 in locale dice a chi corregge di rilanciare le prove del giro, e con quale comando', () => {
+test('la coda stampata dopo la critica dice di rilanciare le prove del giro, e con quale comando', () => {
   const t = codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/giri-corti' });
   assert.match(t, /npx playwright test tests\/verifica\/locale-giri-corti/);
   assert.match(t, /regressione della correzione/);
