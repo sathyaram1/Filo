@@ -199,7 +199,12 @@
   // Markdown o una citazione dopo la barra-n l'a capo non veniva riconosciuto,
   // la riga non diventava mai una riga e il rilievo finiva nel riassunto —
   // un'altra bocciatura letta come promozione (feedback #565).
-  const ESCAPED_BREAK_BEFORE_BRACKET = new RegExp(`(?:\\\\r)?\\\\n\\s*${PREFISSO_ELENCO}(?:\\*\\*)?[\\[({]`);
+  // E la parentesi di apertura può mancare: «\ntre] i dati in chiaro». Chiesta
+  // una parentesi per forza, quell'a capo non veniva riconosciuto, la riga non
+  // diventava mai una riga e finiva nel riassunto — bocciatura letta come
+  // promozione, con tre sbagli insieme ma sempre lo stesso esito (#565).
+  const DOPO_A_CAPO = `(?:[\\[({]|${LIVELLO_NUDO}[^\\[\\]\\n]{0,200}?[\\]})])`;
+  const ESCAPED_BREAK_BEFORE_BRACKET = new RegExp(`(?:\\\\r)?\\\\n\\s*${PREFISSO_ELENCO}(?:\\*\\*)?${DOPO_A_CAPO}`, 'i');
 
   /** La critica con gli a capo veri: `\r\n` → `\n`, e la barra-n letterale usata come a capo. PURA. */
   function normalizeCritique(text) {
