@@ -556,6 +556,7 @@
       root, onDocClick, onKey, onScroll, onResize, cleanupZoom, cleanups,
       subRoot: null, subAnchor: null, subMode: null,
     };
+    avvisaCambio();
   }
 
   // Impedisce che l'elemento del menu prenda il fuoco quando lo si clicca.
