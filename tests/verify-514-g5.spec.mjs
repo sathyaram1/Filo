@@ -135,3 +135,65 @@ test('cronologia: il menu del tasto destro si chiude col primo Esc, lo schermo i
   await esc(app);
   await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
 });
+
+// ── Un sito ostile può negare l'uscita ────────────────────────────────────────
+// Il marchio che dice «questo pezzo l'ha disegnato Filo» è un attributo del
+// documento, e il documento è del sito: una pagina qualunque può metterselo
+// addosso e toglierselo a ogni Esc, facendo credere che il tasto sia servito a
+// chiudere un riquadro di Filo. Da lì lo schermo intero non si spegne più.
+function paginaOstile(conEsca) {
+  return `<!doctype html><html><body style="margin:0;height:1200px">
+<p id="t">pagina</p>
+<script>
+  var CON_ESCA = ${conEsca ? 'true' : 'false'};
+  function piazza() {
+    if (!CON_ESCA) return;
+    var d = document.createElement('div');
+    d.setAttribute('data-sn-ui', '1');
+    d.id = 'esca';
+    d.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px';
+    document.documentElement.appendChild(d);
+  }
+  piazza();
+  window.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    e.preventDefault(); e.stopPropagation();
+    setTimeout(function () {
+      var d = document.getElementById('esca');
+      if (d) d.remove();
+      setTimeout(piazza, 40);
+    }, 0);
+  }, true);
+</script>
+</body></html>`;
+}
+
+test('controprova: un sito che si mangia l\'Esc, ma senza esca, esce al primo colpo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await testServer.openReady(openTab, paginaOstile(false));
+  await entra(app);
+  await esc(app);
+  expect(await schermoIntero(app), 'un sito che mangia il tasto non deve poter negare l\'uscita').toBe(false);
+});
+
+test('sito ostile: dieci Esc e si è ancora dentro allo schermo intero', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, paginaOstile(true));
+  await entra(app);
+  const esiti = [];
+  for (let i = 0; i < 10; i++) {
+    await esc(app);
+    esiti.push(await schermoIntero(app));
+  }
+  // La via d'uscita che resta all'utente: la voce del menu del tasto destro.
+  await page.locator('#t').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8000 });
+  let voce = page.locator('[data-sn-icon-id="fullscreen"]');
+  if (await voce.count() === 0) {
+    await page.locator('.sn-menu-row-overflow').first().click();
+    await expect(voce.first()).toBeVisible({ timeout: 8000 });
+  }
+  console.log('via d\'uscita nel menu:', await voce.first().getAttribute('aria-label'));
+
+  expect(esiti.some((v) => v === false), `dieci Esc e non si esce mai: ${JSON.stringify(esiti)}`).toBe(true);
+});
