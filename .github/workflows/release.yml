@@ -123,8 +123,17 @@ jobs:
         run: |
           echo "::error::Controlli automatici rossi: pubblicazione annullata."
           PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti sul ramo principale: la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
+          # I test rossi stanno all'INIZIO del log (una riga «not ok» per
+          # ciascuno), la coda porta solo il riepilogo: prima si elencano
+          # quelli, poi la coda. Un allarme con la sola coda non diceva quali
+          # test erano rossi, e chi lo prendeva doveva rifare tutta la suite.
+          ROSSI=$(grep -E '^not ok' unit.log 2>/dev/null | head -40 || true)
           TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
+
+          Test rossi:
+          ${ROSSI:-(nessuna riga not ok: guarda la coda)}
+
 
           ${TAIL}"
           node scripts/build-alarm.mjs "Controlli automatici rossi: nessuna versione pubblicata" "$TESTO" || echo "::warning::allarme non consegnato"
