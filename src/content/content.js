@@ -180,19 +180,32 @@
     // Quante volte di fila un Esc è stato rivendicato da qualcuno. Nessuna prova
     // vale all'infinito, perché nessuna prova è a prova di pagina ostile: chi si
     // prendesse ogni Esc ci chiuderebbe dentro allo schermo intero. Due tetti,
-    // perché le prove non valgono uguale. Sulla roba nostra (l'elenco di
-    // SN_FILO_UI, che dalla pagina non si tocca) la prova è solida e il tetto
-    // serve solo a non lasciare un "per sempre" scritto da nessuna parte: tre
-    // riquadri impilati chiusi uno per Esc sono già più di quanti ne esistano.
-    // Sugli indizi delle pagine di Filo (il tasto consumato, la pagina che si
-    // alleggerisce) il tetto è uno: il secondo Esc di fila esce comunque. Il
-    // conteggio torna a zero appena l'utente fa qualcos'altro (un clic, un altro
-    // tasto), perché a quel punto la volta dopo è una volta nuova: riapri
-    // un'immagine e il suo Esc è di nuovo suo.
-    const TETTO_ROBA_NOSTRA = 3;
-    const TETTO_INDIZI = 1;
-    let escRivendicatiDiFila = 0;
-    window.addEventListener('mousedown', () => { escRivendicatiDiFila = 0; }, { capture: true });
+    // perché le prove non valgono uguale, e il taglio è **cosa si è visto
+    // succedere**, non su quale pagina siamo:
+    //  · PROVA FORTE — qualcosa è sparito davvero: un pezzo nostro si è
+    //    staccato dal documento, oppure (su una pagina di Filo) la pagina si è
+    //    alleggerita. Tetto tre, come i riquadri che si possono impilare.
+    //  · PROVA DEBOLE — solo "qualcuno ha consumato il tasto", senza che si sia
+    //    visto sparire niente. Tetto uno: chi si prendesse ogni Esc senza
+    //    chiudere nulla si ferma al secondo.
+    // Contare i due tipi INSIEME era il difetto del giro 7: con due riquadri
+    // aperti sopra una pagina di Filo (la ricerca della gestione e l'immagine a
+    // tutta pagina; la domanda di conferma e l'immagine ingrandita nella home)
+    // il secondo Esc chiudeva il riquadro di sotto e portava via anche lo
+    // schermo intero, che nessuno aveva chiesto di lasciare. Una prova forte
+    // riazzera il conto delle deboli: la pagina sta dimostrando di fare
+    // qualcosa, non di mangiare tasti.
+    // Il tetto che GARANTISCE resta quello del main (ESC_RIVENDICAZIONI_MAX in
+    // src/main/tabs.js): questo è solo il primo filtro, e vive dentro la pagina.
+    // Entrambi i conteggi tornano a zero appena l'utente fa qualcos'altro (un
+    // clic, un altro tasto): a quel punto la volta dopo è una volta nuova, e
+    // riaprire un'immagine le ridà il suo tasto.
+    const TETTO_PROVE_FORTI = 3;
+    const TETTO_PROVE_DEBOLI = 1;
+    let escFortiDiFila = 0;
+    let escDeboliDiFila = 0;
+    function azzeraRivendicazioni() { escFortiDiFila = 0; escDeboliDiFila = 0; }
+    window.addEventListener('mousedown', azzeraRivendicazioni, { capture: true });
 
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') { escRivendicatiDiFila = 0; return; }
