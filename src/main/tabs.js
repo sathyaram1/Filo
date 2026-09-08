@@ -1936,6 +1936,10 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: chi rispondeva era quello vecchio. Il nuovo si
+      // ripresenterà da solo appena montato (MSG.FULLSCREEN_STATE); fino ad
+      // allora vale l'attesa corta, quella di chi non risponde.
+      tab._rispondeAllEsc = false;
       // Documento nuovo: i riquadri di Filo aperti in quello vecchio sono andati
       // via con lui. Se un Esc era in attesa della risposta del documento
       // vecchio, quella risposta non arriverà mai: l'uscita parte adesso.
