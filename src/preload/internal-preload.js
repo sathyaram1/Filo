@@ -132,6 +132,36 @@ const filoApi = {
 // Espone window.filo SOLO su origine filo:// (vedi IS_FILO_ORIGIN sopra).
 if (IS_FILO_ORIGIN) window.filo = filoApi;
 
+// ─── I riquadri di Filo aperti su questa pagina interna (#514) ─────────────
+// A tutto schermo l'Esc lo prende il main PRIMA che la pagina lo veda: senza
+// saperlo chiuderebbe lo schermo intero lasciando aperto il riquadro della
+// risposta o l'immagine a tutta pagina, mentre ovunque altro in Filo l'Esc
+// chiude prima la cosa più in alto. Glielo diciamo a ogni apertura e a ogni
+// chiusura. I riquadri condivisi (il riquadro della risposta, il menu del
+// tasto destro) li riconosciamo da soli; una pagina che ne ha di suoi mette la
+// sua risposta in `window.__filoRiquadroAperto` e chiama il gancio.
+// Il tipo del messaggio sta in src/shared/messages.js (MSG.FILO_BOX_OPEN):
+// qui non possiamo leggerlo, quindi se lo cambi cambialo anche qui.
+if (IS_FILO_ORIGIN) {
+  let riquadriSegnalati = null;
+  const riquadroAperto = () => {
+    try {
+      if (window.SN_POPUP?.hasOpen?.()) return true;
+      if (window.SN_MENU?.isOpen?.()) return true;
+      if (window.__filoRiquadroAperto?.()) return true;
+    } catch (_) {}
+    return false;
+  };
+  window.SN_RIQUADRI_CAMBIATI = () => {
+    const aperto = riquadroAperto();
+    if (aperto === riquadriSegnalati) return;
+    riquadriSegnalati = aperto;
+    try {
+      ipcRenderer.invoke('filo:message', { type: 'filo_box_open', open: aperto }).catch(() => {});
+    } catch (_) {}
+  };
+}
+
 // Shim chrome.* compatibile con il codice estensione: i file portati lo usano
 // senza sapere che siamo in Electron. Overscriviamo l'oggetto chrome stub
 // che Chromium predefinisce nel renderer.
