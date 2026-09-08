@@ -4221,6 +4221,17 @@
   // Tab "Log": render diretto con voci finte (bypassa il canale main), e
   // ri-lettura via IPC per gli spec che stubbano la risposta.
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
+  // Scheda "Statistiche feedback": impostare finestra e creatori come farebbe
+  // un click, e rileggere quello che la scheda sta mostrando.
+  window.__mgTest.setStatsWindow = (key, from, to) => {
+    statsSel = { key, from: from || '', to: to || '' };
+    renderStats();
+  };
+  window.__mgTest.setStatsCreators = (list) => {
+    statsCreators = Array.isArray(list) ? list.slice() : [];
+    renderStats();
+  };
+  window.__mgTest.renderStats = renderStats;
   window.__mgTest.loadWorkerLog = loadWorkerLog;
   window.__mgTest.renderChannelLog = renderChannelLog;
   // Fusioni in attesa: rilettura via IPC dopo lo stub (in test non c'è né una
