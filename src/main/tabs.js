@@ -1884,6 +1884,11 @@ class TabManager {
       const type = (input && input.type) || '';
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
+      // #514 — qui passa l'input VERO, quello che la pagina non può fabbricare:
+      // è il posto giusto per far ripartire da zero il conto delle
+      // rivendicazioni dell'Esc. Tutto tranne l'Esc stesso conta come "l'utente
+      // ha fatto altro": un clic per aprire un riquadro, una lettera scritta.
+      if (String(input.key || '') !== 'Escape') this.azzeraRivendicazioniEsc();
     });
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
     // /region-block, … — lista curata in geoBlock.js): il match viene
