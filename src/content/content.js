@@ -292,8 +292,14 @@
     function restituisciEsc() {
       if (!tastoChiesto) return;
       tastoChiesto = false;
+      if (IS_SUBFRAME) return; // il tasto ce l'ha il frame principale, non noi
       try { navigator.keyboard?.unlock?.(); } catch (_) {}
     }
+    // Il frame principale lo restituisce quando finisce lo schermo pieno, che è
+    // l'unico momento in cui quel tasto smette di essere in ballo: un riquadro
+    // aperto in un riquadro incorporato non gli dice quando si chiude, e
+    // tenerlo un attimo in più non toglie niente a nessuno.
+    consegnaChiediEsc = () => { if (document.fullscreenElement) chiediEsc(); };
     try {
       self.SN_FILO_UI?.onMark?.(() => {
         if (document.fullscreenElement) chiediEsc();
