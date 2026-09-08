@@ -483,15 +483,31 @@ class TabManager {
     this._escRivendicazioni = 0;
   }
 
-  // Mette l'uscita in attesa: parte solo se nessuno rivendica il tasto.
-  armaUscitaSchermoIntero() {
+  // Mette l'uscita in attesa: parte solo se nessuno rivendica il tasto. Quanto
+  // si aspetta dipende da chi c'è dall'altra parte (vedi ESC_ATTESA_MS): una
+  // pagina che risponde risponde comunque, e l'attesa è solo la rete di
+  // sicurezza per il caso in cui non risponda mai.
+  armaUscitaSchermoIntero(tabId = null) {
     this.annullaUscitaSchermoIntero();
+    const tab = tabId != null ? this.tabs.find((t) => t.id === tabId) : null;
+    const attesa = tab && tab._rispondeAllEsc
+      ? ESC_ATTESA_PAGINA_CHE_RISPONDE_MS
+      : ESC_ATTESA_MS;
     this._escUscitaTimer = setTimeout(() => {
       this._escUscitaTimer = null;
       if (this.contentFullscreen) this.setContentFullscreen(false);
-    }, ESC_ATTESA_MS);
+    }, attesa);
     // Un timer non deve tenere sveglio il processo se non c'è altro da fare.
     try { this._escUscitaTimer.unref?.(); } catch (_) {}
+  }
+
+  // La pagina si è presentata: ha i pezzi di Filo dentro e a un Esc risponde
+  // (rivendicandolo o chiedendo lei l'uscita). Da qui in poi il main la aspetta
+  // invece di uscire a tempo. Lo dichiara il content script appena montato.
+  paginaRispondeAllEsc(tabId) {
+    if (tabId == null) return;
+    const t = this.tabs.find((x) => x.id === tabId);
+    if (t) t._rispondeAllEsc = true;
   }
 
   annullaUscitaSchermoIntero() {
