@@ -2035,6 +2035,12 @@
       try { consegnaEsc?.(); } catch (_) {}
       return;
     }
+    // Un riquadro incorporato della stessa scheda ha aperto qualcosa sopra lo
+    // schermo pieno: il tasto lo chiediamo noi, che siamo il frame principale.
+    if (msg?.type === MSG.ESC_CHIEDI_TASTO) {
+      try { consegnaChiediEsc?.(); } catch (_) {}
+      return;
+    }
     // Toast di sistema inviato dal main (es. esito differito dell'invio di un
     // feedback, #341). Il broadcast arriva a TUTTE le schede: lo mostra solo
     // quella in primo piano, per non moltiplicare lo stesso avviso.
