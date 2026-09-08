@@ -219,7 +219,11 @@
   // una parentesi per forza, quell'a capo non veniva riconosciuto, la riga non
   // diventava mai una riga e finiva nel riassunto — bocciatura letta come
   // promozione, con tre sbagli insieme ma sempre lo stesso esito (#565).
-  const DOPO_A_CAPO = `(?:[\\[({]|${LIVELLO_NUDO}[^\\[\\]\\n]{0,200}?[\\]})])`;
+  // Qui il confine a sinistra ce l'ha già il pattern (l'a capo e il punto
+  // elenco), e guardarlo di nuovo lo romperebbe: l'a capo scritto a mano
+  // finisce per «n», che è una lettera, e la riga tornava muta (#565).
+  const LIVELLO_DOPO_CONFINE = '(?:\\d|(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])|[?!])';
+  const DOPO_A_CAPO = `(?:[\\[({]|${LIVELLO_DOPO_CONFINE}[^\\[\\]\\n]{0,200}?[\\]})])`;
   const ESCAPED_BREAK_BEFORE_BRACKET = new RegExp(`(?:\\\\r)?\\\\n\\s*${PREFISSO_ELENCO}${GRASSETTO}${DOPO_A_CAPO}`, 'i');
 
   /** La critica con gli a capo veri: `\r\n` → `\n`, e la barra-n letterale usata come a capo. PURA. */
