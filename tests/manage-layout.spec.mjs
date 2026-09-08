@@ -317,6 +317,47 @@ test('con lo zoom alzato o la finestra bassa le fusioni in attesa non buttano fu
   await page.screenshot({ path: 'tests/.shots/manage-fusioni-finestra-bassa.png' });
 });
 
+// L'altra metà della stessa regola: l'altezza fissa vale SOLO dove ci sono le
+// tre aree. Le schede senza aree (Statistiche, Modelli, Automazioni, Log) hanno
+// contenuti più alti della finestra, e lì la pagina deve continuare a scorrere
+// fino in fondo, altrimenti l'ultima impostazione diventa irraggiungibile.
+test('le schede senza aree scorrono ancora fino in fondo', async ({ app, openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.setContentSize(1200, 700);
+  });
+  await page.waitForTimeout(300);
+
+  let almenoUnaLunga = false;
+  for (const tab of ['stats', 'models', 'automation', 'log']) {
+    const btn = page.locator(`.mg-tab[data-tab="${tab}"]`);
+    if (!(await btn.count()) || !(await btn.isVisible())) continue;
+    await btn.click();
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => {
+      const doc = document.documentElement;
+      doc.scrollTop = doc.scrollHeight;
+      return {
+        lunga: doc.scrollHeight > doc.clientHeight + 1,
+        inFondo: doc.scrollTop + doc.clientHeight >= doc.scrollHeight - 2,
+        sbordo: doc.scrollWidth > doc.clientWidth + 1,
+      };
+    });
+    if (r.lunga) {
+      almenoUnaLunga = true;
+      expect(r.inFondo, `scheda ${tab}: la pagina non scorre fino in fondo`).toBe(true);
+    }
+    expect(r.sbordo, `scheda ${tab}: sbordo laterale`).toBe(false);
+    await page.evaluate(() => { document.documentElement.scrollTop = 0; });
+  }
+  expect(almenoUnaLunga, 'nessuna scheda più alta della finestra: il caso non è stato provato').toBe(true);
+});
+
 // #498, secondo giro. La barra di ricerca si tira su di un margine negativo per
 // stare attaccata alla barra delle sezioni: quando la barra delle sezioni è
 // salita, quel numero è rimasto quello di prima e il campo è finito a due pixel
