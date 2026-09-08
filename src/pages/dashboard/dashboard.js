@@ -1021,6 +1021,7 @@
       // l'altro.
       finish({ failed = false } = {}) {
         closeTurnReasoning();
+        chiudiAttesa();
         if (!items) { wrap.remove(); setPhase('done', ''); return; }
         const summary = `${summarizeActivity(doneTypes, sawReasoning)} · ${fmtActivityDuration(Date.now() - startedAt)}`;
         setPhase('done', failed ? `Tentativo non riuscito · ${summary}` : summary);
