@@ -353,6 +353,16 @@
       try { chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {}); } catch (_) {}
     }
 
+    // Il giro è finito: se sopra la pagina non è rimasto niente di nostro, il
+    // tasto torna al browser. Da lì l'Esc dopo vale come prima, e a nessuno
+    // resta chiesto un tasto che non serve più.
+    const decidiEscOriginale = decidiEsc;
+    decidiEsc = function decidiEscEPoiRestituisci() {
+      try { decidiEscOriginale(); } finally {
+        try { if (!pezziDiFiloSullaPagina().length) restituisciEsc(); } catch (_) {}
+      }
+    };
+
     // Ctrl/Cmd+Z → torna alla pagina precedente (feedback #267). Ecceziona un
     // solo caso, ma cruciale: dentro un campo di testo (input/textarea/
     // contenteditable) Ctrl+Z resta "annulla", il significato universale — così
