@@ -620,6 +620,8 @@ test('#256 locale (CLI): una spec cancellata dalla shell ma non committata ferma
   g(work, ['config', 'user.email', 't@t']);
   g(work, ['config', 'user.name', 't']);
   writeFileSync(resolve(work, 'base.txt'), 'base\n', 'utf8');
+  // Come nel repo vero: i marcatori di sessione sotto .claude/ sono ignorati.
+  writeFileSync(resolve(work, '.gitignore'), '.claude/\n', 'utf8');
   g(work, ['add', '-A']);
   g(work, ['commit', '-q', '-m', 'base']);
   g(work, ['checkout', '-q', '-b', 'claude/prova']);
