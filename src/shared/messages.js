@@ -260,6 +260,10 @@
     // pagina fa il giro di sempre: se un riquadro se l'è preso lo dice
     // (ESC_CONSUMATO), altrimenti chiede lei l'uscita (EXIT_FULLSCREEN).
     ESC_INOLTRATO: 'esc_inoltrato',
+    // Un riquadro incorporato (un video, una mappa) ha aperto qualcosa di Filo
+    // sopra uno schermo pieno, ma il tasto lo può chiedere solo il frame
+    // principale: lo dice al main, che gira la richiesta a chi può farla.
+    ESC_CHIEDI_TASTO: 'esc_chiedi_tasto',
     OPEN_NEW_TAB: 'open_new_tab',
     OPEN_INCOGNITO: 'open_incognito',               // apre una nuova finestra incognito
     // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone in
