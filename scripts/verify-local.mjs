@@ -713,7 +713,7 @@ if (isMain) {
     }
     // Con una correzione in sospeso decide withCritique: la stessa identica
     // critica ristampa la risposta (persa), un'altra è respinta.
-    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS });
+    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS, dirtyFiles: dirtyTreeLines(gitStatusPorcelain(ROOT)) });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
