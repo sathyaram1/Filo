@@ -301,13 +301,31 @@
     if (r) reqBody.reasoning = r;
     const pb = providerBlock(providerRouting);
     if (pb) reqBody.provider = pb;
-    const res = await fetch(ENDPOINT, {
+    // In streaming c'è un flusso da sorvegliare: il conto dello stallo riparte
+    // a ogni pezzo che arriva (#520), quindi una risposta lunga ma viva non
+    // viene mai interrotta — solo il silenzio prolungato lo è.
+    const Net = global.SN_NET_TIMEOUT;
+    const w = Net
+      ? Net.watch({ signal, stallMs: Net.LIMITI.aiStalloMs, totalMs: Net.LIMITI.aiTettoMs })
+      : { signal, touch() {}, done() {}, expired: '' };
+    // Un AbortError della sorveglianza diventa un errore parlante; quello del
+    // chiamante (l'utente che interrompe) passa invariato.
+    const atteso = async (p) => {
+      try {
+        return await p;
+      } catch (e) {
+        if (w.expired) throw Net.timeoutError(w.expired, { provider: 'openrouter', cosa: 'il servizio AI' });
+        throw e;
+      }
+    };
+    const res = await atteso(fetch(ENDPOINT, {
       method: 'POST',
       headers: buildHeaders(apiKey),
       body: JSON.stringify(reqBody),
-      signal,
-    });
+      signal: w.signal,
+    }));
     if (!res.ok || !res.body) {
+      w.done();
       const errText = await res.text().catch(() => '');
       const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
       err.status = res.status;
@@ -326,7 +344,8 @@
     let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
 
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await atteso(reader.read());
+      w.touch();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
