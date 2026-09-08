@@ -229,6 +229,94 @@ test('le fusioni in attesa non spingono le aree fuori dallo schermo', async ({ o
   }
 });
 
+// #498, terzo giro. Il tetto da solo non bastava: dice quanto il riquadro può
+// CHIEDERE, ma finché la colonna della pagina poteva crescere oltre la finestra
+// nessuno lo obbligava a rinunciare a niente, e la somma (testata + tetto +
+// minimo delle aree) usciva dal fondo lo stesso. Si vedeva con lo zoom di Filo
+// alzato o su una finestra bassa: a zoom +2 con due fusioni in attesa delle
+// aree restava la sola intestazione dei Ricevuti, e la pagina scorreva di quasi
+// cento pixel. Adesso sulle schede-lista la colonna è alta ESATTAMENTE la
+// finestra, e sotto pressione cede il riquadro (che scorre dentro di sé), non
+// le aree.
+async function misuraColonna(page) {
+  return page.evaluate(() => {
+    const doc = document.documentElement;
+    const grid = document.getElementById('mgReviewGrid').getBoundingClientRect();
+    const blocco = document.getElementById('mgMergeApprovals');
+    return {
+      gridH: Math.round(grid.height),
+      gridBottom: Math.round(grid.bottom),
+      bloccoH: Math.round(blocco.getBoundingClientRect().height),
+      bloccoScrollH: blocco.scrollHeight,
+      viewport: doc.clientHeight,
+      scrollH: doc.scrollHeight,
+    };
+  });
+}
+
+test('con lo zoom alzato o la finestra bassa le fusioni in attesa non buttano fuori le aree', async ({ app, openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.setData([]));
+  await page.evaluate((reqs) => {
+    window.SN_MERGE_APPROVALS.render(
+      document.getElementById('mgMergeApprovals'), { requests: reqs, failed: [] });
+  }, [0, 1].map((i) => richiestaFinta(i)));
+  await page.waitForTimeout(250);
+
+  // a) lo zoom di Filo, che è un tasto solo (Ctrl e il più).
+  for (const lvl of [0, 1, 2, 3]) {
+    await app.evaluate(async ({ webContents }, l) => {
+      for (const wc of webContents.getAllWebContents()) {
+        try { if ((wc.getURL() || '').includes('manage.html')) wc.setZoomLevel(l); } catch (_) {}
+      }
+    }, lvl);
+    await page.waitForTimeout(400);
+    const g = await misuraColonna(page);
+    expect(g.scrollH, `zoom ${lvl}: la pagina scrolla`).toBeLessThanOrEqual(g.viewport + 2);
+    expect(g.gridBottom, `zoom ${lvl}: le aree escono dal fondo`).toBeLessThanOrEqual(g.viewport + 2);
+    // Delle aree resta molto più dell'intestazione: la lista si vede.
+    expect(g.gridH, `zoom ${lvl}: delle aree resta solo l'intestazione`).toBeGreaterThan(220);
+    // E il riquadro non sparisce: l'intestazione col numero resta leggibile.
+    expect(g.bloccoH, `zoom ${lvl}: il riquadro in attesa sparisce`).toBeGreaterThan(40);
+  }
+  await app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      try { if ((wc.getURL() || '').includes('manage.html')) wc.setZoomLevel(0); } catch (_) {}
+    }
+  });
+  await page.waitForTimeout(300);
+
+  // b) finestre più basse del solito, con la ricerca aperta (che ruba altra aria).
+  await page.locator('#mgSearchToggle').click();
+  await expect(page.locator('#mgSearchBar')).toBeVisible();
+  for (const [w, h] of [[1366, 768], [1100, 700], [1000, 620]]) {
+    await app.evaluate(async ({ BrowserWindow }, [w, h]) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.setContentSize(w, h);
+    }, [w, h]);
+    await page.waitForTimeout(400);
+    const g = await misuraColonna(page);
+    expect(g.scrollH, `${w}x${h}: la pagina scrolla`).toBeLessThanOrEqual(g.viewport + 2);
+    expect(g.gridBottom, `${w}x${h}: le aree escono dal fondo`).toBeLessThanOrEqual(g.viewport + 2);
+    expect(g.bloccoH, `${w}x${h}: il riquadro in attesa sparisce`).toBeGreaterThan(40);
+    // Quello che il riquadro non mostra si raggiunge scorrendo dentro di lui.
+    if (g.bloccoScrollH > g.bloccoH + 1) {
+      const inFondo = await page.evaluate(() => {
+        const b = document.getElementById('mgMergeApprovals');
+        b.scrollTop = b.scrollHeight;
+        return b.scrollTop + b.clientHeight >= b.scrollHeight - 2;
+      });
+      expect(inFondo, `${w}x${h}: il riquadro non scorre fino in fondo`).toBe(true);
+    }
+  }
+  await page.screenshot({ path: 'tests/.shots/manage-fusioni-finestra-bassa.png' });
+});
+
 // #498, secondo giro. La barra di ricerca si tira su di un margine negativo per
 // stare attaccata alla barra delle sezioni: quando la barra delle sezioni è
 // salita, quel numero è rimasto quello di prima e il campo è finito a due pixel
