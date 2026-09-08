@@ -52,10 +52,7 @@ function wireWindowCommon(win, tabs) {
   // invece di limitarci al layout: altrimenti resterebbe uno schermo intero che
   // Filo non sa di avere, e l'Esc non avrebbe niente da spegnere. Le due cose
   // sono la stessa cosa nei due versi — l'uscita era già simmetrica qui sotto.
-  win.on('enter-full-screen', () => {
-    if (!tabs.contentFullscreen) tabs.setContentFullscreen(true);
-    else tabs.layout();
-  });
+  win.on('enter-full-screen', () => { tabs.layout(); });
   // Se l'utente esce dal fullscreen OS con un gesto/scorciatoia di sistema,
   // ripristina anche la barra (esce dalla modalità contenuto a tutto schermo).
   win.on('leave-full-screen', () => {
