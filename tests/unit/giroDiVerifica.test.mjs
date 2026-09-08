@@ -74,6 +74,23 @@ const ENV = (casa, port) => ({
   FILO_NO_BEAT: '1',
 });
 
+test('con una spec temporanea non registrata la critica è rifiutata prima del server, con l\'elenco (#256)', async () => {
+  const { casa } = casaSulRamo();
+  writeFileSync(resolve(casa, 'verify-901-giro2.spec.mjs'), '// spec temporanea del verificatore', 'utf8');
+  const { srv, ricevuti, port } = await fintoServer(() => ({ reply: { outcome: 'pass' } }));
+  try {
+    const r = await esegui(['--record-verifier', 'fid-901', 'Provato tutto. Funziona.'], ENV(casa, port));
+    assert.notEqual(r.code, 0, 'una directory sporca non registra niente');
+    assert.match(r.se + r.so, /critica non registrata/);
+    assert.match(r.se + r.so, /verify-901-giro2\.spec\.mjs/, 'il file da togliere è nell\'elenco');
+    assert.ok(!ricevuti.some((x) => x.url.includes('routineDeliver')), 'il server non deve vedere una critica che vale per un commit che sta per cambiare');
+    // Tolta la spec, la stessa critica passa.
+    rmSync(resolve(casa, 'verify-901-giro2.spec.mjs'));
+    const ok = await esegui(['--record-verifier', 'fid-901', 'Provato tutto. Funziona.'], ENV(casa, port));
+    assert.equal(ok.code, 0, `pulita la directory la critica deve passare (stderr: ${ok.se})`);
+  } finally { srv.close(); }
+});
+
 test('la critica parte strutturata, la risposta del server viene stampata intera, poi la consegna', async () => {
   const { casa, sha } = casaSulRamo();
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict'
