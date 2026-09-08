@@ -127,7 +127,12 @@ jobs:
           # ciascuno), la coda porta solo il riepilogo: prima si elencano
           # quelli, poi la coda. Un allarme con la sola coda non diceva quali
           # test erano rossi, e chi lo prendeva doveva rifare tutta la suite.
-          ROSSI=$(grep -E '^not ok' unit.log 2>/dev/null | head -40 || true)
+          # La riga «not ok» porta il nome del test ma non il file (o, a
+          # seconda della versione di Node, il file ma non il test, rientrata):
+          # si prende con qualunque rientro, e con la riga «location:» che la
+          # segue, che dice file e riga. Senza, con più di cento file di test,
+          # chi prendeva l'allarme cercava il test per nome.
+          ROSSI=$(grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || true)
           TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
 
