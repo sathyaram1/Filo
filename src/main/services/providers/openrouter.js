@@ -250,37 +250,42 @@
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
+    // Senza streaming la risposta arriva tutta insieme alla fine: non c'è
+    // nessun segnale intermedio da sorvegliare, quindi vale solo il tetto
+    // totale (#520).
+    return conScadenza({ signal, cosa: 'il servizio AI' }, async (w) => {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: buildHeaders(apiKey),
+        body: JSON.stringify(body),
+        signal: w.signal,
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        // status/provider strutturati sull'errore: chi lo mostra all'utente può
+        // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
+        const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
+        err.status = res.status;
+        err.provider = 'openrouter';
+        throw err;
+      }
+      const data = await res.json();
+      const message = data.choices?.[0]?.message || {};
+      const text = message.content || '';
+      const usage = data.usage || {};
+      return {
+        text,
+        toolCalls: flatToolCalls(message.tool_calls),
+        reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
+        finishReason: data.choices?.[0]?.finish_reason || null,
+        servedBy: extractServedBy(data),
+        usage: {
+          promptTokens: usage.prompt_tokens || 0,
+          completionTokens: usage.completion_tokens || 0,
+          cachedPromptTokens: cachedPromptTokens(usage),
+        },
+      };
     });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      // status/provider strutturati sull'errore: chi lo mostra all'utente può
-      // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-      const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
-      err.status = res.status;
-      err.provider = 'openrouter';
-      throw err;
-    }
-    const data = await res.json();
-    const message = data.choices?.[0]?.message || {};
-    const text = message.content || '';
-    const usage = data.usage || {};
-    return {
-      text,
-      toolCalls: flatToolCalls(message.tool_calls),
-      reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
-      finishReason: data.choices?.[0]?.finish_reason || null,
-      servedBy: extractServedBy(data),
-      usage: {
-        promptTokens: usage.prompt_tokens || 0,
-        completionTokens: usage.completion_tokens || 0,
-        cachedPromptTokens: cachedPromptTokens(usage),
-      },
-    };
   }
 
   // Streaming SSE — onDelta(textChunk) chiamato per ogni delta di testo,
