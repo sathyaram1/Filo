@@ -15,8 +15,6 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
 
-const GIORNO = 24 * 3600 * 1000;
-
 // Verbali di verifica come li scrive il server nelle note del feedback.
 const PASS_SUBITO = 'Report del lavoro.\n\nVerifica superata.';
 const UN_GIRO = [
