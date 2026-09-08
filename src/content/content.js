@@ -64,8 +64,8 @@
   // guarda i riquadri veri.
   function riquadroDiFiloAperto() {
     try {
-      if (global.SN_MENU?.isOpen?.()) return true;
-      if (global.SN_POPUP?.hasOpen?.()) return true;
+      if (Menu?.isOpen?.()) return true;
+      if (Popup?.hasOpen?.()) return true;
     } catch (_) {}
     return false;
   }
