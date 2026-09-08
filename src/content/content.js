@@ -235,17 +235,22 @@
       const giro = escInCorso;
       escInCorso = null;
       if (!giro || !contentFullscreen) return;
-      const robaNostra = qualcosaSiEChiuso(giro.pezziPrima);
-      const indizio = PAGINA_DI_FILO
-        && (!giro.inFondo || giro.consumato || siEAlleggerita(giro.pesoPrima));
-      const tetto = robaNostra ? TETTO_ROBA_NOSTRA : TETTO_INDIZI;
-      if ((robaNostra || indizio) && escRivendicatiDiFila < tetto) {
+      // Qualcosa è sparito davvero: un pezzo nostro staccato dal documento, o
+      // (solo su una pagina di Filo) la pagina che si è alleggerita.
+      const forte = qualcosaSiEChiuso(giro.pezziPrima)
+        || (PAGINA_DI_FILO && siEAlleggerita(giro.pesoPrima));
+      // Nessuno si è visto sparire, ma su una pagina di Filo qualcuno il tasto
+      // se l'è preso: lì tutto quello che c'è sullo schermo è roba nostra.
+      const debole = PAGINA_DI_FILO && (!giro.inFondo || giro.consumato);
+      const rivendica = (forte && escFortiDiFila < TETTO_PROVE_FORTI)
+        || (debole && escDeboliDiFila < TETTO_PROVE_DEBOLI);
+      if (rivendica) {
         // Era il tasto del riquadro: il main annulla l'uscita che aspettava.
-        escRivendicatiDiFila++;
+        if (forte) { escFortiDiFila++; escDeboliDiFila = 0; } else { escDeboliDiFila++; }
         try { chrome.runtime.sendMessage({ type: MSG.ESC_CONSUMATO }).catch(() => {}); } catch (_) {}
         return;
       }
-      escRivendicatiDiFila = 0;
+      azzeraRivendicazioni();
       contentFullscreen = false; // evita ripetizioni mentre il main esce
       try { chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {}); } catch (_) {}
     }
