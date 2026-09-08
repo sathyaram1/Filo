@@ -53,6 +53,9 @@
   // Vero appena il main ci ha annunciato un cambio: da quel momento l'annuncio
   // è più fresco della risposta alla domanda che facciamo al montaggio, e vince.
   let fullscreenAnnunciato = false;
+  // Il main ci consegna un Esc che il browser avrebbe mangiato (MSG.ESC_INOLTRATO,
+  // vedi sotto). La consegna la esegue il giro dell'Esc montato in init().
+  let consegnaEsc = null;
 
   // ── Chi si è preso l'Esc, a schermo intero ────────────────────────────────
   // Sopra la pagina Filo apre roba che si chiude con Esc: il menu del tasto
