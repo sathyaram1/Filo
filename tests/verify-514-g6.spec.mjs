@@ -186,9 +186,7 @@ const paginaLadra = (conEventiFinti) => `<!doctype html><html><body style="margi
 </script>
 </body></html>`;
 
-test('sito ladro: si riprende un pezzo di Filo e nega l\'uscita a ripetizione', async ({ app, openTab, testServer }) => {
-  test.setTimeout(240_000);
-  const page = await testServer.openReady(openTab, PAGINA_LADRA);
+async function preparaLadra({ page }) {
   // Prima serve un pezzo di Filo davvero disegnato su questa pagina: il menu
   // del tasto destro, la cosa più comune che un utente ci apre sopra.
   await page.locator('#t').click({ button: 'right' });
@@ -197,13 +195,46 @@ test('sito ladro: si riprende un pezzo di Filo e nega l\'uscita a ripetizione', 
   await expect.poll(() => page.evaluate(() => !!window.__rubato), { timeout: 8000 }).toBe(true);
   await page.evaluate(() => window.__riattacca());
   await new Promise((r) => setTimeout(r, 300));
+}
 
-  await entra(app);
+async function quantiEsc(app, max) {
   const esiti = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < max; i++) {
     esiti.push(await schermoIntero(app));
     if (!esiti[esiti.length - 1]) break;
     await esc(app);
   }
+  return esiti;
+}
+
+test('sito ladro: si riprende un pezzo di Filo e nega l\'uscita a ripetizione', async ({ app, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, paginaLadra(true));
+  await preparaLadra({ page });
+  await entra(app);
+  const esiti = await quantiEsc(app, 6);
   expect(await schermoIntero(app), `Esc ripetuto e non si esce mai: ${JSON.stringify(esiti)}`).toBe(false);
+});
+
+test('sito ladro senza eventi finti: il tetto delle rivendicazioni regge', async ({ app, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, paginaLadra(false));
+  await preparaLadra({ page });
+  await entra(app);
+  const esiti = await quantiEsc(app, 6);
+  expect(await schermoIntero(app), `Esc ripetuto e non si esce mai: ${JSON.stringify(esiti)}`).toBe(false);
+});
+
+test('sito ladro: la voce del menu resta comunque una via d\'uscita', async ({ app, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, paginaLadra(true));
+  await preparaLadra({ page });
+  await entra(app);
+  await quantiEsc(app, 3);
+  expect(await schermoIntero(app), 'preparazione: doveva restare bloccato').toBe(true);
+  await page.locator('#t').click({ button: 'right' });
+  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  const voce = page.locator('[data-sn-icon-id="fullscreen"], [data-sn-icon-id="fullscreenExit"], [data-sn-icon-id="shrink"]').first();
+  await voce.click({ timeout: 8000 });
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
 });
