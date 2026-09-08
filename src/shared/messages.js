@@ -75,6 +75,11 @@
     // { ok, reply, cardIds, cards, query, deck? }. `lastResults` sono gli id
     // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1).
     DECKS_CHAT: 'decks_chat',
+    // Ferma il turno di chat ancora in corso (#520): { reqId } — lo stesso
+    // `reasoningReqId` con cui la pagina ha chiesto il turno. Il main annulla
+    // la chiamata al modello, così l'attesa finisce quando lo decide l'utente
+    // e non si pagano token per una risposta che nessuno leggerà.
+    DECKS_CHAT_ABORT: 'decks_chat_abort',
     // Parere LLM carta-vs-mazzo (§6). { deckId, cardIds, compute?, refresh? } →
     // { ok, opinions: { cardId → { text, versione, stale } } }.
     // compute=false: solo cache (mai LLM). refresh=true: ricalcola anche i freschi.
