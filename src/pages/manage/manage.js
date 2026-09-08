@@ -794,16 +794,30 @@
     setLogView('list');
   }
 
+  // Il registro non è arrivato, e non arriverà: chi guarda le statistiche deve
+  // leggere il MOTIVO, non un numero fermo a zero che sembra una risposta.
+  function workerLogUnavailable(motivo) {
+    workerLogEntries = [];
+    workerLogMissing = motivo;
+    if (statsActive()) renderStats();
+  }
+
   async function loadWorkerLog() {
     if (logLoading) return;
     logLoading = true;
-    if (!isAdmin) { setLogView('denied'); logLoading = false; return; }
+    if (!isAdmin) {
+      setLogView('denied');
+      workerLogUnavailable('riservato');
+      logLoading = false;
+      return;
+    }
     setLogView('loading');
     try {
       const r = await sendToMain({ type: WORKER_LOG_GET });
       if (!r || r.ok === false) {
         // Non-admin o sessione scaduta lato main → sezione riservata.
         setLogView('denied');
+        workerLogUnavailable('riservato');
         logLoading = false;
         return;
       }
@@ -812,6 +826,7 @@
     } catch (err) {
       console.error('[manage] caricamento log worker fallito:', err);
       setLogView('empty');
+      workerLogUnavailable('errore');
     }
     loadChannelLog();
     logLoading = false;
