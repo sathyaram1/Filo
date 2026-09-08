@@ -478,6 +478,10 @@
     // { userMessage, threadHistory: [{role, text, actions?}] }
     // Risposta: { ok, text, actions: [...], model, costEur }
     FILO_CHAT: 'filo_chat',
+    // Smetti di aspettare la risposta di un turno di chat (#520): { reqId }
+    // (lo stesso `reasoningReqId` con cui il turno è partito).
+    // Risposta: { ok } oppure { ok: false, error: 'not_found' }.
+    FILO_CHAT_ABORT: 'filo_chat_abort',
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
