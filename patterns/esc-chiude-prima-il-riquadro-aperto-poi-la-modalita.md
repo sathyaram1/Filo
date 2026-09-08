@@ -141,10 +141,28 @@ clic, un'altra lettera. La prova sta in `tests/verify-514-g7.spec.mjs` e
 `tests/verify-514-g7b.spec.mjs`, con la controprova della stessa pagina senza
 quella riga.
 
+**«Sparito» vuol dire anche dentro una nostra radice, non solo la radice.** Il
+giro 8 ha trovato l'ultima porta di questa famiglia: su un SITO, l'immagine
+ingrandita dello screenshot allegato al box «Invia feedback» si apre DENTRO il
+box, che resta attaccato al documento. A chiudersi era un pezzo interno, quindi
+nessuna radice nostra si staccava da niente, e su un sito le altre due prove non
+valgono: il primo Esc chiudeva l'immagine e portava via anche lo schermo intero.
+Guardare solo `isConnected` della radice è di nuovo una lista travestita, che
+copre i riquadri di primo livello e non quelli annidati. Quindi di ogni radice
+nostra si guarda anche il **sottoalbero**, con lo stesso metro della pagina di
+Filo (un elemento in meno lì dentro, o uno in più nascosto), e su un sito vale
+lo stesso perché quel sottoalbero l'abbiamo disegnato noi. Il prezzo è un falso
+positivo possibile: un pezzo dentro una nostra radice che sparisce da solo nel
+millisecondo dell'Esc (un avviso che scade nel contenitore degli avvisi) fa
+credere che il tasto fosse suo. Costa un Esc in più, ed è la direzione giusta
+dell'errore. La prova sta in `tests/verify-514-g8.spec.mjs`, con la controprova
+dello stesso box sulla home di Filo.
+
 **Chi apre un riquadro nuovo non deve fare niente.** Un riquadro disegnato sopra
 un sito passa già da `SN_FILO_UI.mark()`, perché il marchio serve anche a chi
 traduce la pagina; uno disegnato da una pagina di Filo non deve nemmeno quello,
-gli basta chiudersi. Le prove stanno in
+gli basta chiudersi. Un riquadro aperto dentro un altro riquadro nostro non
+deve marcarsi: basta che sparisca. Le prove stanno in
 `tests/esc-riquadri-schermo-intero.spec.mjs` (cinque famiglie di riquadri sopra
 i siti) e in `tests/verify-514-g5.spec.mjs` (quattro riquadri delle pagine di
 Filo, più il sito che si traveste da riquadro nostro).
