@@ -197,13 +197,23 @@ test.describe('larghezza e separatori stile Chrome', () => {
     // I due piedini curvi sono pseudo-elementi ::before/::after sulla scheda
     // attiva: devono essere visibili (display block, 8px) e disegnati con un
     // radial-gradient (l'arco concavo che fonde la scheda con la barra).
-    const feet = await shell.locator('.tab.active').evaluate((el) => {
+    const leggiPiedini = () => shell.locator('.tab.active').evaluate((el) => {
       const read = (sel) => {
         const s = getComputedStyle(el, sel);
         return { display: s.display, width: s.width, bg: s.backgroundImage };
       };
       return { before: read('::before'), after: read('::after') };
     });
+
+    // Stessa attesa del test qui sopra: finché il browser non ha disegnato i
+    // due piedini, `width` torna vuota e il confronto cade a caso.
+    await expect
+      .poll(async () => {
+        const f = await leggiPiedini();
+        return `${f.before.width}|${f.after.width}`;
+      }, { timeout: 8_000 })
+      .not.toMatch(/(^\||\|$)/);
+    const feet = await leggiPiedini();
 
     for (const foot of [feet.before, feet.after]) {
       expect(foot.display).not.toBe('none');
