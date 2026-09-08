@@ -50,6 +50,9 @@
   // Rispecchia la modalità "contenuto a tutto schermo" del main (vedi tabs.js).
   // Serve a mostrare l'icona/etichetta giusta nella voce di menu "Schermo intero".
   let contentFullscreen = false;
+  // Vero appena il main ci ha annunciato un cambio: da quel momento l'annuncio
+  // è più fresco della risposta alla domanda che facciamo al montaggio, e vince.
+  let fullscreenAnnunciato = false;
 
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
   // blocco commenti) invece che nella pagina? Il menu del tasto destro e tutto
