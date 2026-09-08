@@ -887,7 +887,11 @@ async function recordVerifier(id, critiqueText) {
     return { rejected: true, serverDown: true, message: `critica non registrata: il server non risponde (${sent.reason})` };
   }
   const reply = sent.reply && typeof sent.reply === 'object' ? sent.reply : {};
-  const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'pass';
+  // Un «ok» senza esito non è un pass: l'esito lo calcola il server, e se non
+  // l'ha detto nessuno l'ha calcolato. Darlo per superato stampava «rilascia
+  // il biglietto» anche con un rilievo di livello 2 nella critica (verifica
+  // del giro 3 su questo lavoro).
+  const outcome = VERIFIER_OUTCOMES.includes(reply.outcome) ? reply.outcome : 'non comunicato';
   const next = applyVerifierVerdict(base, outcome, critiqueText);
   next.id = id;
   sealTransition(next, `verifier:${outcome}`);
