@@ -286,6 +286,12 @@
     } catch (_) {}
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) restituisciEsc();
+      // Il nome della voce del menu guarda anche lo schermo pieno della PAGINA,
+      // non solo la modalità di Filo: quando finisce quello, ridisegnarla è
+      // affar nostro. L'annuncio del main non basta, perché arriva mentre il
+      // documento sta ancora uscendo e la voce si ridisegnerebbe identica
+      // (#514, giro 10).
+      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
     });
 
     // Il tasto lo rimettiamo in circolo com'era: parte dal documento, sale fino

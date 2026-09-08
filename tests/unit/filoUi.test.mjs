@@ -81,3 +81,34 @@ test('mark() non pota: una radice marcata prima di essere attaccata sopravvive',
   nascente.isConnected = true;
   assert.ok(UI.aperti().includes(nascente));
 });
+
+// ── onMark: chi deve prepararsi PRIMA che l'utente prema un tasto ────────────
+// Sopra lo schermo pieno di un sito l'Esc il browser se lo mangia per uscire, e
+// nessun riquadro di Filo lo vede mai (#514, giro 10). Il tasto va CHIESTO nel
+// momento in cui il riquadro nasce, quindi serve saperlo: `mark()` è l'unico
+// punto da cui passano tutti, e da lì l'avviso arriva senza che chi scrive il
+// riquadro numero otto debba ricordarsi di niente.
+test('onMark avvisa chi si è iscritto, con l\'elemento appena marcato', () => {
+  const visti = [];
+  const stop = UI.onMark((el) => visti.push(el));
+  const uno = UI.mark(elemento());
+  const due = UI.mark(elemento());
+  assert.deepEqual(visti, [uno, due]);
+  stop();
+  UI.mark(elemento());
+  assert.equal(visti.length, 2, 'disiscritto: non arriva più niente');
+});
+
+test('un osservatore che esplode non ferma mark()', () => {
+  const stop = UI.onMark(() => { throw new Error('rotto'); });
+  const el = elemento();
+  assert.equal(UI.mark(el), el, 'il marchio va messo comunque');
+  assert.equal(UI.is(el), true);
+  stop();
+});
+
+test('onMark ignora chi non passa una funzione e restituisce sempre un disiscrivi', () => {
+  assert.equal(typeof UI.onMark(null), 'function');
+  assert.equal(typeof UI.onMark('ciao'), 'function');
+  UI.onMark(undefined)();
+});
