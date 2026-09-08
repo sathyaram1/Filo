@@ -1479,7 +1479,7 @@
   // ── Tab bar ───────────────────────────────────────────────────────────────
   // Le tab-lista (inbox/queue/resolved/archived) condividono il pannello
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
-  // sinistra. Le tab segnaposto (stats/models) hanno il loro pannello.
+  // sinistra. Le altre (fbstats/stats/models/automation/log) hanno il loro.
   function selectTab(tab) {
     // Cambiando scheda la ricerca si chiude da sola: vedi la scheda scelta.
     if (searchMode) closeSearch({ keepList: true });
