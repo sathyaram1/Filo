@@ -42,7 +42,10 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
    l'utente e cosa lamentava. Se `payload.history` non è vuoto, leggi anche le
    critiche dei giri passati: le porte già trovate vanno **ri-provate** (una
    regressione lì è un rilievo di livello 2), non ri-scoperte come rilievi
-   nuovi.
+   nuovi. Le prove dei giri passati sono già nel ramo, in
+   `tests/verifica/<numero>/`: lanciale per prime
+   (`npx playwright test tests/verifica/<numero>`), prima di scriverne di
+   nuove.
 2. **Sei già sul branch del lavoro: non cambiarlo, e non verificare `main`.**
    Se ti sposti una guardia ti ferma, e la tua critica verrebbe comunque
    **rifiutata** perché emessa da una versione diversa del codice.
