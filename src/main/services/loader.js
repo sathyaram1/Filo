@@ -53,6 +53,10 @@ require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a s
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
 require(path.join(SHARED, 'manageReview.js'));
+// Conti della scheda "Statistiche feedback" (#496): dopo manageReview, da cui
+// prende lo stato vero di un feedback, e dopo verifierRound, con cui rilegge i
+// verbali di verifica dalle note.
+require(path.join(SHARED, 'feedbackStats.js'));
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
