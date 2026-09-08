@@ -1557,17 +1557,38 @@ class TabManager {
     // non copriva davvero lo schermo. Riusiamo la stessa modalità del menu
     // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
     wc.on('enter-html-full-screen', () => {
+      // #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo
+      // schermo. Da quando l'Esc arriva al documento (è il tasto che chiude i
+      // riquadri, e prendercelo prima li scavalcava), il browser lo conta come
+      // gesto dell'utente: una pagina che chiede lo schermo pieno dentro il
+      // proprio gestore dell'Esc lo ottiene senza che nessuno abbia cliccato
+      // niente. Da lì il tasto che questa segnalazione chiedeva diventava un
+      // testa o croce — un Esc esce, il successivo rientra — perché la
+      // modalità tornava "della pagina" e l'Esc dopo era suo. Qui si rifiuta:
+      // per prendersi lo schermo serve un gesto che non sia l'uscita.
+      if (tab._ultimoInputEsc) {
+        this._rifiutaSchermoPienoDellaPagina(wc);
+        return;
+      }
       this.pageFullscreen = true;
       this.pageFullscreenTabId = tab.id;
       this.setContentFullscreen(true);
     });
     wc.on('leave-html-full-screen', () => {
-      if (this.pageFullscreenTabId != null && this.pageFullscreenTabId !== tab.id) return;
+      // Solo la scheda che il fullscreen l'aveva davvero chiesto spegne la
+      // modalità: l'uscita di una pagina a cui l'abbiamo appena rifiutato non
+      // deve portare via lo schermo intero che l'utente aveva acceso lui.
+      if (!this.pageFullscreen || this.pageFullscreenTabId !== tab.id) return;
       this.pageFullscreen = false;
       this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     });
     wc.on('before-input-event', (event, input) => {
+      // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
+      // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,
+      // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
+      // dentro quel giro che la pagina chiede.
+      tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
       if (input.type === 'keyDown' && input.key === 'Escape') {
         // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
         // l'Esc va invece lasciato alla pagina che ha chiesto il fullscreen).
