@@ -93,6 +93,11 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
     execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
     execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
+    // Lo stato del giro sta fuori da git, come nel repo vero
+    // (`.claude/routine-state/` è ignorato): la consegna vale per un commit e
+    // con file non registrati si ferma prima del server — non è ciò che si
+    // prova qui.
+    writeFileSync(resolve(casa, '.gitignore'), 'stato/\n', 'utf8');
     execFileSync('git', ['add', '-A'], { cwd: casa });
     execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
     execFileSync('git', ['checkout', '-q', '-b', 'worker/900'], { cwd: casa });
