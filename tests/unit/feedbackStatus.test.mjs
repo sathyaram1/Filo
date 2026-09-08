@@ -150,7 +150,7 @@ test('canReach: accetta le CATENE di passi dello stesso attore (coda collassata)
 });
 
 test('transitionsFrom elenca le destinazioni per attore', () => {
-  assert.deepEqual(FS.transitionsFrom('aligned', 'owner'), ['todo']);
+  assert.deepEqual(FS.transitionsFrom('aligned', 'owner'), ['todo', 'archived']);
   assert.deepEqual(FS.transitionsFrom('aligned', 'routine'), []);
   assert.ok(FS.transitionsFrom('working', 'routine').includes('revision_capability'));
 });

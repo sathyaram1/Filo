@@ -74,19 +74,21 @@ const ENV = (casa, port) => ({
   FILO_NO_BEAT: '1',
 });
 
+const CRITICA_OK = 'Provato: incolla, trascina, salva con titolo vuoto e con diecimila caratteri. Tutto funziona, nessun rilievo.';
+
 test('con una spec temporanea non registrata la critica è rifiutata prima del server, con l\'elenco (#256)', async () => {
   const { casa } = casaSulRamo();
   writeFileSync(resolve(casa, 'verify-901-giro2.spec.mjs'), '// spec temporanea del verificatore', 'utf8');
   const { srv, ricevuti, port } = await fintoServer(() => ({ reply: { outcome: 'pass' } }));
   try {
-    const r = await esegui(['--record-verifier', 'fid-901', 'Provato tutto. Funziona.'], ENV(casa, port));
+    const r = await esegui(['--record-verifier', 'fid-901', CRITICA_OK], ENV(casa, port));
     assert.notEqual(r.code, 0, 'una directory sporca non registra niente');
     assert.match(r.se + r.so, /critica non registrata/);
     assert.match(r.se + r.so, /verify-901-giro2\.spec\.mjs/, 'il file da togliere è nell\'elenco');
     assert.ok(!ricevuti.some((x) => x.url.includes('routineDeliver')), 'il server non deve vedere una critica che vale per un commit che sta per cambiare');
     // Tolta la spec, la stessa critica passa.
     rmSync(resolve(casa, 'verify-901-giro2.spec.mjs'));
-    const ok = await esegui(['--record-verifier', 'fid-901', 'Provato tutto. Funziona.'], ENV(casa, port));
+    const ok = await esegui(['--record-verifier', 'fid-901', CRITICA_OK], ENV(casa, port));
     assert.equal(ok.code, 0, `pulita la directory la critica deve passare (stderr: ${ok.se})`);
   } finally { srv.close(); }
 });
