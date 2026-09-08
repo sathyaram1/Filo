@@ -31,6 +31,25 @@ sintomo di partenza, ricomparso da un'altra porta.
 - **Il minimo dell'area non è una difesa.** `min-height: 300px` sulle aree non
   impedisce niente: quando la somma sfora, la pagina scrolla e l'area esce
   dallo schermo lo stesso. Il tetto va su chi cresce, non su chi subisce.
+- **Un tetto senza pressione non morde.** Il tetto dice quanto un blocco può
+  CHIEDERE. Se la colonna che lo contiene è `min-height: 100vh`, cioè può
+  crescere oltre la finestra, nessuno lo obbliga a rinunciare a niente: la
+  somma di testata, tetto e minimo dell'area esce dal fondo lo stesso, e la
+  pagina ricomincia a scorrere. Si è visto appena la finestra è scesa sotto i
+  745 pixel o l'utente ha alzato lo zoom di Filo di due tacche: due fusioni in
+  attesa e delle aree restava di nuovo la sola intestazione dei Ricevuti.
+  Perché il tetto morda, la colonna vuole `height: 100vh`, così la pressione
+  esiste davvero e il blocco sopra si stringe. Nella pagina di gestione
+  l'altezza fissa vale solo sulle schede-lista (`:has(> #panel-list.mg-panel--active)`):
+  Statistiche, Modelli, Automazioni e Log hanno contenuti più alti della
+  finestra e devono continuare a far scorrere la pagina.
+- **Chi cede è chi cresce, e non fino a sparire.** Sotto pressione il blocco
+  sopra prende `flex: 0 1 auto` (si stringe) e l'area resta al suo minimo. Ma
+  il minimo del blocco non è zero: tanto quanto basta a leggere l'intestazione
+  che dice quante cose contiene, altrimenti sparisce senza dirlo. Nella pagina
+  di gestione sono `--mg-attesa-min: min(64px, 15vh)` per il riquadro e
+  `--mg-aree-min: min(300px, 60vh)` per le aree, che su una finestra molto
+  bassa cedono anche loro invece di uscire dal fondo.
 - **Come si verifica:** un test che disegna 1, 2, 3 e 6 elementi nel blocco
   sopra e controlla che la pagina non torni a scorrere e che l'area resti sopra
   la metà di quanto aveva a blocco vuoto. Senza il tetto quegli assert devono
