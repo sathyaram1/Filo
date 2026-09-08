@@ -132,7 +132,16 @@ jobs:
           # si prende con qualunque rientro, e con la riga «location:» che la
           # segue, che dice file e riga. Senza, con più di cento file di test,
           # chi prendeva l'allarme cercava il test per nome.
-          ROSSI=$(grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || true)
+          # L'elenco ha un tetto (il testo dell'allarme viaggia in un feedback),
+          # ma il taglio si DICE: un elenco mozzato senza avviso fa credere di
+          # avere tutti i rossi, e con un modulo condiviso rotto sono cento.
+          ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null || true)
+          ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
+          N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
+          if [ "${N_TUTTE:-0}" -gt 80 ]; then
+            ROSSI="${ROSSI}
+          … elenco tagliato: altre $((N_TUTTE - 80)) righe di test rossi stanno nel registro di questa esecuzione (Actions)"
+          fi
           TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
 
