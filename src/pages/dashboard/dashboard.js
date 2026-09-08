@@ -1822,6 +1822,40 @@
     return h;
   }
 
+  // Turno in corso (#520): la maniglia per fermarlo. Ci sta il reqId (che nel
+  // main è anche la maniglia della chiamata al modello), il blocco di attività
+  // da chiudere e gli argomenti del turno, per il «Riprova».
+  let chatPending = null;
+
+  // «Interrompi»: libera subito la chat e ferma davvero la chiamata al modello,
+  // senza aspettare che il main risponda. La bolla dice cosa è successo e offre
+  // di rimandare lo stesso messaggio.
+  function interrompiTurno() {
+    const p = chatPending;
+    if (!p) return;
+    chatPending = null;
+    p.annullato = true;
+    if (p.activity) { try { p.activity.interrotta(); } catch (_) {} }
+    if (p.reqId) send({ type: MSG.FILO_CHAT_ABORT, reqId: p.reqId }).catch(() => {});
+    const testo = (window.SN_ATTESA && window.SN_ATTESA.TESTO_INTERROTTA) || 'Attesa interrotta.';
+    const bolla = makeBubble({ role: 'filo', text: testo });
+    const row = document.createElement('div');
+    row.className = 'dash-bubble-actions';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'dash-action-btn dash-action-btn-primary';
+    retry.textContent = '↻ Riprova';
+    retry.title = 'Rimanda lo stesso messaggio';
+    retry.addEventListener('click', () => retryTurn(bolla, p.args));
+    row.appendChild(retry);
+    bolla.appendChild(row);
+    bubblesEl.appendChild(bolla);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    sending = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+
   async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
