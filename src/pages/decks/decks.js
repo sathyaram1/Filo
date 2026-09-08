@@ -860,9 +860,27 @@
       </div>`;
   }
 
+  // Da quanto si sta aspettando, in parole (#520). Sotto i cinque secondi non
+  // si scrive niente: una risposta rapida non ha bisogno di un cronometro.
+  function attesaLabel(m) {
+    const s = Math.floor((Date.now() - (m.startedAt || Date.now())) / 1000);
+    return s >= 5 ? `${s}s` : '';
+  }
+
   function chatBubbleHtml(m, isLast) {
     if (m.who === 'user') return `<div class="dk-msg dk-msg-user">${esc(m.text)}</div>`;
-    if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Filo sta pensando…</div></div>`;
+    // Attesa con una via d'uscita (#520): si vede da quanto dura e si può
+    // fermare. Prima l'unica uscita da una risposta che non arrivava era
+    // chiudere la scheda, e la chat restava occupata per sempre.
+    if (m.pending) {
+      return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">`
+        + '<span>Filo sta pensando…</span>'
+        + `<span class="dk-attesa" data-attesa="1">${esc(attesaLabel(m))}</span>`
+        + '<button type="button" class="dk-stop" data-stop-chat="1"'
+        + ' title="Smetti di aspettare questa risposta">Interrompi</button>'
+        + '</div></div>';
+    }
+    if (m.aborted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Attesa interrotta. Riprova quando vuoi.</div></div>`;
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div></div>`;
     const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
