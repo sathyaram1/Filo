@@ -83,7 +83,7 @@
   // underscore: guardando solo gli asterischi, «__tre] …» passava muta e la
   // bocciatura finiva nel riassunto (feedback #565).
   const GRASSETTO = '(?:\\*{1,3}|_{1,3})?';
-  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?\\[\\s*([0-3])\\s*(\\?)?\\s*\\](?:\\*\\*)?\\s*(.*)$`);
+  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
   // COMINCIA così, o che lo porta dopo una breve etichetta e prima di un
@@ -98,7 +98,7 @@
   // messo prima della cifra («[?2]») o un segno diverso dopo («[2!]»): non
   // erano né rilievi né errori (verifica del giro 7).
   const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/.,]\\s*\\d+)?\\s*[?!]*\\s*(?:[A-Za-zÀ-ÿ]{1,10}\\s*)?\\]';
-  const LEVEL_START = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
+  const LEVEL_START = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}${LEVEL_TOKEN_SRC}`);
   // Un livello scritto in una parentesi qualunque — tonda, graffa, doppia,
   // spaiata — o con la cifra a parole. Il lettore riconosce solo la quadra con
   // la cifra: tutto il resto finiva nel riassunto in silenzio, e una
@@ -106,7 +106,7 @@
   // APRE la riga, e basta che dentro ci sia una cifra o una parola che dice un
   // livello.
   const PARENTESI_QUALUNQUE = '(?:\\[{1,2}|\\(|\\{)\\s*[^\\]\\)\\}\\n]{0,20}(?:\\]{1,2}|\\)|\\})';
-  const APERTURA_PARENTESI = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?(${PARENTESI_QUALUNQUE})`);
+  const APERTURA_PARENTESI = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}(${PARENTESI_QUALUNQUE})`);
   const DENTRO_SEMBRA_LIVELLO = /\d|zero|uno|due|tre|livello|level|priorit/i;
   // E la rete che tiene tutte le altre aperture: QUALUNQUE cosa stia davanti —
   // un trattino lungo, un «+», «1.1», «100.», «(a)», un apice inverso, un
@@ -197,7 +197,7 @@
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
   // giusta (verifica del giro 6).
-  const LEVEL_LABEL = new RegExp(`^\\s*${PREFISSO_ELENCO}(?:\\*\\*)?[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—]`);
+  const LEVEL_LABEL = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—]`);
 
   // Un a capo scritto coi due caratteri barra e n: è come esce il comando
   // d'esempio («<riassunto>\n[livello] …») copiato dentro virgolette doppie, in
@@ -216,7 +216,7 @@
   // diventava mai una riga e finiva nel riassunto — bocciatura letta come
   // promozione, con tre sbagli insieme ma sempre lo stesso esito (#565).
   const DOPO_A_CAPO = `(?:[\\[({]|${LIVELLO_NUDO}[^\\[\\]\\n]{0,200}?[\\]})])`;
-  const ESCAPED_BREAK_BEFORE_BRACKET = new RegExp(`(?:\\\\r)?\\\\n\\s*${PREFISSO_ELENCO}(?:\\*\\*)?${DOPO_A_CAPO}`, 'i');
+  const ESCAPED_BREAK_BEFORE_BRACKET = new RegExp(`(?:\\\\r)?\\\\n\\s*${PREFISSO_ELENCO}${GRASSETTO}${DOPO_A_CAPO}`, 'i');
 
   /** La critica con gli a capo veri: `\r\n` → `\n`, e la barra-n letterale usata come a capo. PURA. */
   function normalizeCritique(text) {
