@@ -226,6 +226,25 @@ test('sito ladro senza eventi finti: il tetto delle rivendicazioni regge', async
   expect(await schermoIntero(app), `Esc ripetuto e non si esce mai: ${JSON.stringify(esiti)}`).toBe(false);
 });
 
+test('sito ladro: il menu del tasto destro riaperto sta comunque sullo schermo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, paginaLadra(true));
+  await preparaLadra({ page });
+  await entra(app);
+  await esc(app);
+  await page.mouse.click(200, 200, { button: 'right' });
+  await expect(page.locator('.sn-menu').last()).toBeVisible({ timeout: 8000 });
+  // Il nodo che il sito si è ripreso resta appeso alla pagina, quindi di
+  // `.sn-menu` ce ne sono due: quello vero è il menu nuovo, e deve stare dentro
+  // lo schermo. È la via d'uscita di scorta quando l'Esc viene rivendicato.
+  const rettangoli = await page.evaluate(() => Array.from(document.querySelectorAll('.sn-menu')).map((m) => {
+    const r = m.getBoundingClientRect();
+    return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+  }));
+  const dentro = rettangoli.some((r) => r.x >= 0 && r.x < 1280 && r.w > 0 && r.h > 0);
+  expect(dentro, `nessun menu dentro lo schermo: ${JSON.stringify(rettangoli)}`).toBe(true);
+});
+
 // Una pagina che si è piantata (script che gira all'infinito): nessuno può
 // rispondere per lei, e l'uscita deve partire lo stesso.
 test('pagina bloccata: Esc esce lo stesso dallo schermo intero', async ({ app, openTab, testServer }) => {
