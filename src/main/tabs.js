@@ -632,6 +632,10 @@ class TabManager {
       this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     }
+    // Nessun riquadro può restare aperto in una scheda che non c'è più: se
+    // l'id restasse nella lista e venisse riusato, l'Esc smetterebbe di uscire
+    // dallo schermo intero in una scheda che di riquadri non ne ha.
+    this.tabsWithFiloBox.delete(id);
     // §3.1/§4 — "Chiudi = archivia": prima di distruggere la view salviamo i
     // metadati della tab nell'archivio (consultabile da filo://archive).
     this._archiveClosedTab(tab);
