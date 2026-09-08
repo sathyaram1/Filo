@@ -19,6 +19,7 @@
       version: '0.2.222', date: '2026-09-08',
       fixes: [
         'Esc esce sempre dallo schermo intero. Prima restava senza effetto in tre casi, e da lì non si tornava più indietro: se avevi appena toccato la barra in alto di Filo, se eri passato a un\'altra scheda, o se avevi chiuso quella che il sito aveva messo a schermo pieno.',
+        'Il menu del tasto destro non sbaglia più il nome dello schermo intero. In una scheda aperta, o portata su un altro indirizzo, mentre eri già a schermo intero, offriva «Schermo intero» al posto di «Esci da schermo intero»: la voce per uscire non si trovava.',
       ],
     },
     {
