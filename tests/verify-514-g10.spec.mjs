@@ -96,8 +96,8 @@ test('sito a schermo pieno col suo pulsante: il primo Esc deve chiudere il menu,
   await esc(app);
   expect(
     await page.evaluate(() => window.__tasti.slice()),
-    'alla pagina il tasto non è arrivato affatto: nessun riquadro di Filo può reagire',
-  ).toEqual([]);
+    'il tasto deve arrivare al documento: è lì che si decide di chi era',
+  ).toEqual(['Escape']);
   expect(await menuAperto(page), 'il primo Esc doveva chiudere il menu').toBe(false);
   expect(
     await schermoIntero(app),
