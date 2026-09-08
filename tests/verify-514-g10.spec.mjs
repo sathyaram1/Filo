@@ -103,6 +103,10 @@ test('sito a schermo pieno col suo pulsante: il primo Esc deve chiudere il menu,
     await schermoIntero(app),
     'il primo Esc ha spento lo schermo pieno e ha lasciato il menu aperto sopra la pagina',
   ).toBe(true);
+
+  // E il tasto dopo esce, che è la cosa che questa segnalazione chiedeva.
+  await esc(app);
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
 });
 
 // ── 2. Il QR code sopra lo schermo pieno del sito ────────────────────────────
