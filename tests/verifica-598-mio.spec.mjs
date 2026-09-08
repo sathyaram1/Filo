@@ -339,6 +339,32 @@ test('crediti finiti: un avviso con la quota di domani, non uno per chiamata; ow
   await expect(page.locator('#ownerSection')).toBeHidden();
 });
 
+test('portafoglio attivo ma server giù (o offline): cosa vede la pagina', async ({ openTab }) => {
+  const page = await openTab(CREDITS_URL);
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+  await page.locator('#inviteCode').fill('ABCD-EFGH');
+  await page.locator('#redeemBtn').click();
+  await expect(page.locator('#redeemMsg')).toContainText('Invito riscattato', { timeout: 15000 });
+  await expect(page.locator('#balance')).toHaveText('5.000');
+  srv.down = true;
+  await page.reload();
+  await expect(page.locator('#wallet')).toBeVisible({ timeout: 15000 });
+  await page.waitForTimeout(1500);
+  const snap = await page.evaluate(() => ({
+    form: !document.getElementById('redeemForm').hidden,
+    hero: !document.getElementById('hero').hidden,
+    balance: document.getElementById('balance').textContent,
+    refill: document.getElementById('refillHint').hidden ? '' : document.getElementById('refillHint').textContent,
+    note: document.getElementById('walletNote').hidden ? '' : document.getElementById('walletNote').textContent,
+    invites: !document.getElementById('invitesSection').hidden,
+  }));
+  console.log('SERVER GIÙ con portafoglio:', JSON.stringify(snap));
+  await page.screenshot({ path: join(SHOTS, 'v598-server-giu-con-portafoglio.png') });
+  srv.down = false;
+  const ws = await walletState(page);
+  expect(ws.keySource).toBe('personal');
+});
+
 test('movimenti locali e saldo locale con il portafoglio attivo', async ({ app, openTab }) => {
   srv.state = WITH_WALLET();
   await app.evaluate(() => globalThis.SN_CREDITS.award({ kind: 'auto_feedback_bonus', credits: 10 }));
