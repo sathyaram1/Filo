@@ -267,18 +267,18 @@ test('passando fra le sezioni le aree tornano intere e non restano schiacciate',
 });
 
 // ── 8. Zoom della pagina, col riquadro acceso ────────────────────────────
-test('lo zoom non fa uscire le aree né tornare lo scorrimento', async ({ openTab }) => {
+test('lo zoom non fa uscire le aree né tornare lo scorrimento', async ({ app, openTab }) => {
   const page = await openTab(URL);
   await preparaOwner(page);
   await mettiFusioni(page, 3);
 
   for (const z of [-2, -1, 0, 1, 2, 3]) {
-    await page.evaluate((v) => {
-      require('electron').webFrame.setZoomLevel(v);
-    }, z).catch(async () => {
-      await page.keyboard.press(z > 0 ? 'Control+=' : 'Control+-');
-    });
-    await page.waitForTimeout(300);
+    await app.evaluate(async ({ webContents }, l) => {
+      for (const wc of webContents.getAllWebContents()) {
+        try { if ((wc.getURL() || '').includes('manage.html')) wc.setZoomLevel(l); } catch (_) {}
+      }
+    }, z);
+    await page.waitForTimeout(400);
     const g = await geom(page);
     expect(g.scrollH, `zoom ${z}: la pagina scrolla`).toBeLessThanOrEqual(g.viewport + 2);
     expect(g.gridBottom, `zoom ${z}: le aree escono`).toBeLessThanOrEqual(g.viewport + 2);
