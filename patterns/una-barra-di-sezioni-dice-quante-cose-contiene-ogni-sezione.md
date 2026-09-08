@@ -70,6 +70,16 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   porta anche Statistiche Red Team, Modelli di supporto, Automazioni e Log:
   non elencano segnalazioni e non dipendono dal loro stato, quindi restano
   raggiungibili. Spariscono le quattro sezioni, non la barra come oggetto.
+- **Una scheda che CONTA invece di elencare segue le stesse due regole.**
+  "Statistiche feedback" (#496) non è una lista, ma i suoi numeri nascono dagli
+  stessi feedback: al tetto del caricamento scrive `312+` come le sezioni, e
+  senza la chiave dell'owner ogni misura che nasce dallo stato — quante ne sono
+  state lavorate, quante sono aperte adesso, i giri di verifica — diventa `—`
+  con la frase che dice perché, invece di uno `0` che dichiara il vuoto. Restano
+  scritti i numeri che stanno in chiaro: quante ne sono arrivate, quando e da
+  chi. E quando una finestra temporale filtra su date DIVERSE a seconda della
+  misura (l'arrivo per i ricevuti, l'ultimo movimento per i lavorati), accanto
+  a ogni numero c'è scritto su quale data sta filtrando.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
   anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
   a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
