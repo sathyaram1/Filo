@@ -164,7 +164,7 @@
   // (feedback #565). La finestra non può contenere una parentesi APERTA,
   // quindi «3 volte (ok)» in mezzo a una frase resta testo.
   const APRE_LIVELLO_SENZA_APERTURA = new RegExp(
-    `^\s*${PREFISSO_ELENCO}${GRASSETTO}${LIVELLO_NUDO}[^\[\](){}\n]{0,200}?[\])}]`, 'i');
+    `^\\s*${PREFISSO_ELENCO}${GRASSETTO}${LIVELLO_NUDO}[^\\[\\](){}\\n]{0,200}?[\\])}]`, 'i');
 
   function quadraColLivello(riga) {
     // TUTTE le quadre della riga, non solo la prima: bastava una frase fra
