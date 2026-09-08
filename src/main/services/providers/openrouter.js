@@ -416,26 +416,28 @@
     if (Number.isFinite(sp) && sp > 0 && sp !== 1) body.speed = sp;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(SPEECH_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
+    return conScadenza({ signal, cosa: 'la voce di lettura' }, async (w) => {
+      const res = await fetch(SPEECH_ENDPOINT, {
+        method: 'POST',
+        headers: buildHeaders(apiKey),
+        body: JSON.stringify(body),
+        signal: w.signal,
+      });
+      if (!res.ok) throw await httpError(res);
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (!buf.length) {
+        const err = new Error('OpenRouter: audio vuoto');
+        err.provider = 'openrouter';
+        throw err;
+      }
+      const ct = String(res.headers.get('content-type') || '');
+      const mimeType = /rate=\d+/.test(ct) ? ct : 'audio/pcm;rate=24000';
+      return {
+        audioBase64: buf.toString('base64'),
+        mimeType,
+        generationId: res.headers.get('x-generation-id') || null,
+      };
     });
-    if (!res.ok) throw await httpError(res);
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (!buf.length) {
-      const err = new Error('OpenRouter: audio vuoto');
-      err.provider = 'openrouter';
-      throw err;
-    }
-    const ct = String(res.headers.get('content-type') || '');
-    const mimeType = /rate=\d+/.test(ct) ? ct : 'audio/pcm;rate=24000';
-    return {
-      audioBase64: buf.toString('base64'),
-      mimeType,
-      generationId: res.headers.get('x-generation-id') || null,
-    };
   }
 
   // ─── Dettatura ────────────────────────────────────────────────────────────
