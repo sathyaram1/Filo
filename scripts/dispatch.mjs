@@ -1659,7 +1659,7 @@ if (isMainModule) {
       }
       const s = await recordVerifier(id, critica);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);
+      console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply));
       process.exit(0);
     } else if (flag === '--record-fixed') {
