@@ -248,6 +248,11 @@ modifica:
   sai cosa tocchi (~25 min: avvisa l'owner, gli occupi la macchina). Se temi
   una regressione precisa, verificala subito: non rimandarla.
 
+Le prove di un **giro di verifica** non si cancellano: restano nel ramo, in
+`tests/verifica/<numero>/` (in locale, dove un numero non c'è, la cartella la
+dice il compito che riceve chi verifica). Chi corregge le rilancia prima di
+consegnare, e dopo la fusione restano nella suite come test di regressione.
+
 Com'è fatto un test che vale: asserisce il **successo dal punto di vista
 dell'utente** (l'immagine arriva al destinatario), non l'assenza di un errore
 (il toast non compare); e **senza il fix deve essere rosso** — se non sai quale
