@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.222', date: '2026-09-08',
+      fixes: [
+        'Esc esce sempre dallo schermo intero. Prima restava senza effetto in tre casi, e da lì non si tornava più indietro: se avevi appena toccato la barra in alto di Filo, se eri passato a un\'altra scheda, o se avevi chiuso quella che il sito aveva messo a schermo pieno.',
+      ],
+    },
+    {
       version: '0.2.219', date: '2026-09-05',
       features: [
         'Nella chat della nuova scheda Filo fa tutto in un turno solo: cerca, legge il risultato, mette la sveglia e poi risponde, senza chiudere il messaggio a metà per dirti cosa farà dopo. Nel blocco sopra la risposta vedi ogni passo mentre succede: il ragionamento, ogni azione appena la decide («Cerco sul web…»), l\'esito, le due parole che scrive a metà lavoro.',
