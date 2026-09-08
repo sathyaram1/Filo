@@ -827,14 +827,44 @@
     label.className = 'dash-activity-label';
     label.textContent = 'Aspetto la risposta…';
     head.append(icon, label);
+    // Riga dell'attesa (#520): da quanto si sta aspettando e come smettere.
+    // Prima qui c'era solo «Aspetto la risposta…», ferma: chi aspettava non
+    // sapeva da quanto né aveva un modo per uscirne, e il tasto d'invio restava
+    // spento fino alla scadenza del servizio. Sta fuori dalla testa (che è
+    // cliccabile per aprire la cronologia) e fuori dal corpo (che è nascosto da
+    // chiuso): un bottone dentro un bottone non si può cliccare.
+    const attesaRow = document.createElement('div');
+    attesaRow.className = 'dash-activity-attesa';
+    const attesaEl = document.createElement('span');
+    attesaEl.className = 'dash-attesa';
+    attesaEl.dataset.attesa = '1';
+    const stopBtn = document.createElement('button');
+    stopBtn.type = 'button';
+    stopBtn.className = 'dash-stop';
+    stopBtn.dataset.stopChat = '1';
+    stopBtn.textContent = 'Interrompi';
+    stopBtn.title = 'Smetti di aspettare questa risposta';
+    stopBtn.addEventListener('click', () => interrompiTurno());
+    attesaRow.append(attesaEl, stopBtn);
     const body = document.createElement('div');
     body.className = 'dash-activity-body';
     body.hidden = true;
-    wrap.append(head, body);
+    wrap.append(head, attesaRow, body);
     bubblesEl.appendChild(wrap);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
     const startedAt = Date.now();
+    // Il cronometro segue la stessa regola della chat dei mazzi (shared/attesa.js):
+    // muto sotto i cinque secondi, poi secondi, poi minuti e secondi.
+    const Att = window.SN_ATTESA;
+    const tick = setInterval(() => {
+      if (!attesaRow.isConnected) { clearInterval(tick); return; }
+      attesaEl.textContent = Att ? Att.etichetta(startedAt) : '';
+    }, (Att && Att.INTERVALLO_MS) || 1000);
+    const chiudiAttesa = () => {
+      clearInterval(tick);
+      attesaRow.remove();
+    };
     let phase = 'wait';
     let open = false;
     let items = 0;
