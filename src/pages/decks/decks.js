@@ -1013,9 +1013,25 @@
           }
         })
       : null;
+    // Da qui il turno è interrompibile e il cronometro dell'attesa cammina.
+    chatPending = { bot, reqId: reasoningReqId };
+    avviaTick(bot);
+    // Chiude il turno comunque sia finito. `chatBusy` si libera solo se nel
+    // frattempo non è partito un turno nuovo (dopo un'interruzione l'utente può
+    // aver già riscritto): altrimenti gli si bloccherebbe la chat appena aperta.
+    const chiudiTurno = () => {
+      if (offReasoning) offReasoning();
+      if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
+      if (chatPending && chatPending.bot === bot) chatPending = null;
+      fermaTick();
+      if (mioTurno === chatTurno) chatBusy = false;
+    };
     let deckChanged = false;
     try {
       const r = await send({ type: MSG.DECKS_CHAT, deckId: current.id, text, history, lastResults, reasoningReqId });
+      // Risposta arrivata DOPO che l'utente aveva interrotto: si butta, la
+      // bolla resta "attesa interrotta" e non si riscrive niente sotto gli occhi.
+      if (bot.aborted) { chiudiTurno(); return; }
       bot.pending = false;
       // Il testo completo del ragionamento torna con la risposta (anche in
       // caso d'errore): è la versione autoritativa rispetto ai chunk live.
