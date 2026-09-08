@@ -1949,7 +1949,12 @@
     }
     // Da qui il turno è interrompibile (#520): il reqId è la maniglia, e il
     // cronometro nel blocco di attività cammina già.
-    const mio = { reqId: reasoningReqId, activity: pending, args: { userMessage, images, internal }, annullato: false };
+    const mio = {
+      reqId: reasoningReqId, activity: pending, args: { userMessage, images, internal }, annullato: false,
+      // Il pezzo di risposta già a schermo quando l'utente ferma l'attesa se ne
+      // va con lei: mezza frase lasciata lì sopra sembrerebbe la risposta.
+      buttaParziale() { if (streamBubble) { streamBubble.remove(); streamBubble = null; } },
+    };
     chatPending = mio;
     const r = await send(msg);
 
