@@ -166,6 +166,37 @@ deve marcarsi: basta che sparisca. Le prove stanno in
 i siti) e in `tests/verify-514-g5.spec.mjs` (quattro riquadri delle pagine di
 Filo, più il sito che si traveste da riquadro nostro).
 
+**Chi disegna la UI di Filo sono TUTTI i frame, quindi l'annuncio va a tutti.**
+Dentro i riquadri incorporati di un sito (un video, una mappa, un blocco
+commenti) girano gli stessi pezzi di Filo della pagina che li ospita: lì si apre
+il menu del tasto destro, e lì si decide di chi era l'Esc. L'annuncio del cambio
+di modalità partiva verso il solo frame principale (`webContents.send`), così un
+riquadro incorporato che c'era già quando la modalità è cambiata non lo sapeva
+mai più: la sua voce del menu diceva «Schermo intero» a chi ci era già dentro e
+«Esci da schermo intero» a chi ne era già uscito — e cliccarla ci rimetteva —
+mentre il suo Esc chiudeva il menu portandosi via anche la modalità, perché
+quel frame credeva di non essere a schermo intero e non rivendicava niente. Ora
+`_broadcastToViews` percorre `mainFrame.framesInSubtree`. La regola generale:
+**uno stato che ogni frame usa per decidere va annunciato a ogni frame**; il
+frame nato dopo se lo chiede da solo (`MSG.FULLSCREEN_STATE`), ma quello nato
+prima può saperlo solo se glielo si dice. La prova sta in
+`tests/verify-514-g9.spec.mjs`, con la controprova del riquadro incorporato nato
+mentre la modalità era già accesa.
+
+**L'attesa non è una scadenza per chi risponde.** Una pagina che ha i pezzi di
+Filo dentro risponde sempre, in tutti e due i versi: se il tasto era suo lo
+rivendica, se non lo era chiede lei l'uscita. Per lei l'attesa del main non è un
+ritardo — l'uscita parte con la sua risposta — ed è solo la rete di sicurezza
+per il caso in cui quella risposta non arrivi mai. Tenerla stretta come per chi
+non risponde affatto ha rifatto il danno da un'altra porta: una pagina impegnata
+mezzo secondo quando l'utente preme Esc rispondeva fuori tempo massimo, e la
+modalità se n'era già andata insieme al riquadro che si chiudeva. Quindi i tempi
+sono due (`ESC_ATTESA_MS` per chi non risponde, `ESC_ATTESA_PAGINA_CHE_RISPONDE_MS`
+per chi si è presentato), e la pagina si presenta da sola appena montata. La
+regola generale: **un'attesa messa lì per chi non risponderà mai non va usata
+come tetto per chi risponde**, o si finisce a scommettere su quanto è veloce il
+computer di chi sta davanti.
+
 **Il nome della voce cambia con lo stato, anche a menu aperto.** Se la modalità
 si spegne per un'altra strada mentre il menu è sotto gli occhi, la voce va
 ridisegnata sul posto (`SN_MENU_ICONS.redrawIconRows`): «Esci da schermo
