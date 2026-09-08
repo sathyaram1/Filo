@@ -138,28 +138,44 @@
         .catch(() => {});
     } catch (_) {}
 
-    // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
-    // registrato anche su pagine "bloccate" (senza menu) e in capture, così
-    // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
+    // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js), ma
+    // solo se non se l'è preso nessun altro. Due ascoltatori sullo stesso tasto:
+    // il primo (in capture, prima di chiunque) fotografa la pagina, l'ultimo
+    // (in bolla su window, dopo chiunque) vede se il tasto è arrivato fino in
+    // fondo intatto. La decisione arriva subito dopo, a giro finito.
+    let escInCorso = null;
+
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && contentFullscreen) {
-        // Deroga (la stessa del main, src/main/tabs.js): se a tutto schermo c'è
-        // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
-        // browser la fa uscire e il main ripristina la barra da solo. Chiedere
-        // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
-        if (document.fullscreenElement) return;
-        // Seconda deroga (#514): un riquadro di Filo aperto si prende l'Esc.
-        // Il menu del tasto destro e il riquadro della risposta hanno i loro
-        // gestori più in giù; lasciamoglielo, e sarà l'Esc dopo a uscire dallo
-        // schermo intero. Il main fa lo stesso controllo con la lista che gli
-        // mandiamo: quello vero è questo, che guarda i riquadri adesso.
-        if (riquadroDiFiloAperto()) return;
-        e.preventDefault();
-        e.stopPropagation();
-        contentFullscreen = false; // evita ripetizioni mentre il main esce
-        chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {});
-      }
+      if (e.key !== 'Escape' || !contentFullscreen) return;
+      // Deroga (la stessa del main, src/main/tabs.js): se a tutto schermo c'è
+      // andata LA PAGINA col suo pulsante (player video), l'Esc è suo — il
+      // browser la fa uscire e il main ripristina la barra da solo. Chiedere
+      // noi l'uscita la lascerebbe convinta di essere ancora a schermo pieno.
+      if (document.fullscreenElement) return;
+      escInCorso = { ev: e, pezziPrima: quantiPezziDiFilo(), inFondo: false, consumato: false };
+      setTimeout(decidiEsc, 0);
     }, { capture: true });
+
+    window.addEventListener('keydown', (e) => {
+      if (!escInCorso || escInCorso.ev !== e) return;
+      escInCorso.inFondo = true;
+      escInCorso.consumato = !!e.defaultPrevented;
+    });
+
+    function decidiEsc() {
+      const giro = escInCorso;
+      escInCorso = null;
+      if (!giro || !contentFullscreen) return;
+      const chiuso = quantiPezziDiFilo() < giro.pezziPrima;
+      const consumatoQui = PAGINA_DI_FILO && (!giro.inFondo || giro.consumato);
+      if (chiuso || consumatoQui) {
+        // Era il tasto del riquadro: il main annulla l'uscita che aspettava.
+        try { chrome.runtime.sendMessage({ type: MSG.ESC_CONSUMATO }).catch(() => {}); } catch (_) {}
+        return;
+      }
+      contentFullscreen = false; // evita ripetizioni mentre il main esce
+      try { chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {}); } catch (_) {}
+    }
 
     // Ctrl/Cmd+Z → torna alla pagina precedente (feedback #267). Ecceziona un
     // solo caso, ma cruciale: dentro un campo di testo (input/textarea/
