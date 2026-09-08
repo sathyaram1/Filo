@@ -86,9 +86,14 @@ test('home: l\'attesa si vede, si ferma, e la chat torna subito libera', async (
   const ultima = page.locator('.dash-bubble-filo').last();
   await expect(ultima).toContainText('Attesa interrotta');
   await expect(ultima).not.toContainText(/errore|non ha funzionato/i);
-  // Il blocco di attività lo dice a sua volta, e non è marcato come fallito.
+  // Il blocco di attività lo dice a sua volta, e non è marcato come fallito:
+  // non è andato storto niente, è stato l'utente a fermare.
   await expect(page.locator('.dash-activity-label')).toContainText('Attesa interrotta');
   await expect(page.locator('.dash-activity[data-failed="1"]')).toHaveCount(0);
+  // Il ragionamento già arrivato resta leggibile: aiuta a capire cosa stava
+  // tentando prima che il servizio smettesse di rispondere.
+  await page.locator('.dash-activity-head').first().click();
+  await expect(page.locator('.dash-activity-reasoning')).toContainText('Sto valutando');
   // Il cronometro e il bottone se ne vanno con l'attesa.
   await expect(page.locator('.dash-stop[data-stop-chat]')).toHaveCount(0);
 
