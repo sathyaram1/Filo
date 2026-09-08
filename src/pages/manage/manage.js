@@ -1516,7 +1516,7 @@
     // il registro delle partenze delle routine.
     if (tab === 'fbstats') {
       renderStats();
-      if (workerLogEntries === null && !logLoading) loadWorkerLog();
+      if ((workerLogEntries === null || workerLogMissing) && !logLoading) loadWorkerLog();
     }
   }
 
