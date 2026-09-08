@@ -405,9 +405,9 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border-radius: 999px;
   padding: 1px 9px;
   cursor: pointer;
-  transition: background var(--dash-anim-fast, .18s) ease, color var(--dash-anim-fast, .18s) ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.dash-stop:hover { background: var(--dash-hover, rgba(0, 0, 0, .05)); color: var(--dash-ink); }
+.dash-stop:hover { background: var(--dash-line); color: var(--dash-ink); }
 .dash-activity-icon {
   width: 12px;
   height: 12px;
