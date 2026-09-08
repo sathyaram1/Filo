@@ -1962,9 +1962,18 @@
       e.preventDefault();
       const input = $('chatInput');
       const text = input.value.trim();
-      if (!text || chatBusy) return;
+      if (!text) return;
+      // Chat occupata: il messaggio non parte, ma l'utente deve vedere perché.
+      if (chatBusy) { segnalaChatOccupata(); return; }
       input.value = '';
       sendChat(text);
+    });
+    // Escape mentre Filo pensa smette di aspettare, come il bottone: è il gesto
+    // istintivo per uscire, e i due cammini devono fare la stessa cosa (#520).
+    $('chatInput').addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !chatPending) return;
+      e.preventDefault();
+      abortChat();
     });
     const log = $('chatLog');
     // Toggle del blocco Ragionamento (#331): click (o Invio/Spazio) apre e
