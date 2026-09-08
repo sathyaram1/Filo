@@ -116,10 +116,15 @@ module.exports = function register(on, ctx) {
     // così si vede "pensare" in diretta. Dichiarato fuori dal try: anche un
     // turno fallito ritorna il ragionamento raccolto fin lì.
     let reasoning = '';
-    // Interruzione dell'utente (#520): il turno si registra qui sotto appena si
-    // conosce il suo reqId, e si cancella comunque alla fine.
+    // Interruzione dell'utente (#520): il turno diventa interrompibile SUBITO,
+    // prima di qualunque attesa. Registrarlo più in basso (dopo aver raccolto il
+    // contesto del mazzo, che passa dall'archivio carte) lasciava una finestra
+    // in cui «Interrompi» liberava la chat ma non fermava niente: la chiamata al
+    // modello partiva lo stesso e continuava a costare. Il reqId arriva già nel
+    // messaggio, quindi non c'è ragione di aspettare.
     const ac = new AbortController();
-    let reqIdRegistrato = '';
+    const reqIdRegistrato = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
+    if (reqIdRegistrato) chatInCorso.set(reqIdRegistrato, ac);
     try {
       const text = String(msg?.text || '').trim();
       if (!text) return { ok: false, error: 'empty' };
