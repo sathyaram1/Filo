@@ -73,6 +73,59 @@ test('dirtyTreeText per la consegna: dice che la correzione starebbe fuori da og
   assert.match(t, /\n  a\.txt$/);
 });
 
+// Verifica del 2026-09-08 (giro 3): la PRIMA consegna del lavoro — chi risolve
+// mette il feedback in revisione dal canale, come dice la sua ricetta — e le
+// consegne dirette della correzione e del verdetto passavano con modifiche non
+// salvate: la verifica dopo provava il ramo senza di esse. Le strade gemelle
+// passate da dispatch respingevano già.
+test('CLI routine-channel deliver: revisione, correzione e verdetto con modifiche non salvate respingono PRIMA del server; a commit fatto vanno al server', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
+  const sandbox = cartellaTemporanea('filo-deliver-dirty-');
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: sandbox, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    g(['init', '-q', '--initial-branch=main']);
+    g(['config', 'user.email', 't@t']); g(['config', 'user.name', 't']);
+    writeFileSync(resolve(sandbox, 'a.txt'), 'base\n', 'utf8');
+    g(['add', '-A']); g(['commit', '-qm', 'base']); g(['checkout', '-qb', 'claude/lavoro']);
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: sandbox,
+      FILO_TOOLS_ROOT: sandbox,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_API: 'http://127.0.0.1:9',
+    };
+    const REPORT = 'Corretto il salvataggio col titolo vuoto: ora salva anche senza titolo. Lasciato stare il menu sotto i 300 pixel, fuori dal giro.';
+    const lancia = (...args) => spawnSync(process.execPath, [CANALE, 'deliver', 'biglietto-finto', ...args], { env, encoding: 'utf8', cwd: sandbox });
+    const consegne = [
+      ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ok', '--branch', 'claude/lavoro'],
+      ['fixed', '--report', REPORT],
+      ['verdict', '--critique', REPORT, '--sha', 'abc'],
+    ];
+
+    writeFileSync(resolve(sandbox, 'a.txt'), 'base\nfix\n', 'utf8');
+    for (const c of consegne) {
+      const sporco = lancia(...c);
+      assert.equal(sporco.status, 1, `${c[0]}: con modifiche non salvate deve fermarsi prima del server: ${sporco.stderr}`);
+      assert.match(String(sporco.stderr), /non registrata: ci sono (file non registrati|modifiche non salvate)/);
+      assert.match(String(sporco.stderr), /\n  a\.txt/, `${c[0]}: elenca il file`);
+      assert.match(String(sporco.stderr), /Niente è stato consegnato/);
+    }
+    // Una consegna che NON passa il ramo a una verifica (la chiusura) non
+    // guarda la directory: non ha un commit da difendere.
+    const chiusura = lancia('status', '--status', 'done', '--notes', REPORT);
+    assert.equal(chiusura.status, 3, `la chiusura deve arrivare al server (che qui è giù): ${chiusura.stderr}`);
+
+    g(['add', '-A']); g(['commit', '-qm', 'fix']);
+    const pulito = lancia(...consegne[0]);
+    assert.equal(pulito.status, 3, `a commit fatto deve arrivare al server (che qui è giù): ${pulito.stderr}`);
+    assert.doesNotMatch(String(pulito.stderr), /non registrata/);
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
 test('CLI --record-fixed: con modifiche non salvate respinge PRIMA del server, con l\'elenco; a commit fatto va al server', async () => {
   const { spawnSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
