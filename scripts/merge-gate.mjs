@@ -99,13 +99,32 @@ export function exitCodeFor(reply) {
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
+const USO = [
+  'Uso: node scripts/merge-gate.mjs <ramo>',
+  '  Chiede al SERVER di fondere <ramo> su main: lui scarica il diff, fa girare',
+  '  i controlli e fonde con la sua identità. Qui non ci sono opzioni.',
+  '  Serve il biglietto del giro, che si rilegge da solo dal promemoria.',
+  '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
+  '        20 conflitto · 1 uso sbagliato o rifiuto del server',
+].join('\n');
+
 async function main() {
   const { source, unknown } = parseArgs(process.argv.slice(2));
+  // Chiedere aiuto a uno strumento è il primo gesto di chi verifica: qui si
+  // sentiva rispondere «opzione sconosciuta» e basta, ed era l'ultimo rimasto
+  // (feedback #565).
+  const argomenti = process.argv.slice(2).map((a) => String(a).toLowerCase());
+  if (argomenti.some((a) => ['--help', '-help', '-h', '/h', '/help', '/?', 'help'].includes(a))) {
+    console.log(USO);
+    console.log('Non ho toccato niente.');
+    process.exit(0);
+  }
   if (unknown.length) {
     console.error(`opzioni sconosciute: ${unknown.join(' ')} (il gate non prende più flag: il merge lo fa il server)`);
+    console.error(USO);
     process.exit(1);
   }
-  if (!source) { console.error('uso: node scripts/merge-gate.mjs <sourceBranch>'); process.exit(1); }
+  if (!source) { console.error(USO); process.exit(1); }
   if (!isValidBranch(source)) { console.error(`branch sorgente non valido: "${source}"`); process.exit(1); }
 
   // Il biglietto del giro: senza, questa richiesta non ha un lavoro a cui
