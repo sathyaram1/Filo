@@ -3,8 +3,9 @@
 // layout a 3 colonne (lista filtrata per tab / dettaglio / pannello laterale):
 // la lista a sinistra mostra il sottoinsieme di feedback della tab corrente,
 // il dettaglio al centro ne mostra la conversazione + azioni contestuali
-// (sblocco per i bloccati, risposta per i chiarimenti). Le tab "Statistiche
-// Red Team" e "Modelli di supporto" sono segnaposto per ora.
+// (sblocco per i bloccati, risposta per i chiarimenti). La tab "Statistiche
+// feedback" (#496) conta quello che i feedback già in pagina sanno dire; la tab
+// "Statistiche Red Team" è ancora un segnaposto.
 
 (function () {
   'use strict';
