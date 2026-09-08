@@ -119,7 +119,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     assert.match(String(fixed.body.data.report), /ora salva anche col titolo vuoto/);
     const dopo = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(dopo.verifierVerdict, null, 'torna in verifica sul commit nuovo');
-    assert.match(JSON.stringify(dopo), /verifier:consegna/, 'la consegna resta sigillata da chi l'ha mandata');
+    assert.match(JSON.stringify(dopo), /verifier:consegna/, 'la consegna resta sigillata da chi la manda');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
 

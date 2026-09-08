@@ -535,3 +535,33 @@ test('a capo scritto a mano, livello a parole e quadra dimenticata: la riga non 
   // subito dopo, resta testo.
   assert.equal(R.unparsedLevelLines(`${riassunto} Ho provato 3 volte (ok) e regge.`).length, 0);
 });
+
+test('grassetto con gli underscore e parentesi di apertura dimenticata: niente passa muto', () => {
+  const NL = String.fromCharCode(10);
+  const BARRA_N = String.fromCharCode(92) + 'n';
+  const prefissi = ['', '- ', '> ', '1. ', '**', '__', '_', '***', '___', '- __'];
+  const livelli = ['tre]', 'tre ]', 'tre)', 'tre}', 'due]', 'zero]', '3]', '[tre', '3 dati a rischio]'];
+  // Per la regex l'underscore è un carattere di parola, e l'a capo scritto a
+  // mano finisce per «n»: in tutti e due i casi il confine della parola non
+  // c'era e la riga finiva nel riassunto — bocciatura letta come promozione
+  // (feedback #565).
+  for (const capo of [NL, BARRA_N]) {
+    for (const p of prefissi) {
+      for (const l of livelli) {
+        const testo = `Provato tutto e funziona bene.${capo}${p}${l} i dati dell utente in chiaro`;
+        const letta = R.parseFindings(testo).findings.length > 0;
+        const respinta = R.unparsedLevelLines(testo).length > 0;
+        assert.ok(letta || respinta, `muta: ${JSON.stringify(capo + p + l)}`);
+      }
+    }
+  }
+  // Le forme buone restano rilievi, grassetto con gli underscore compreso.
+  for (const riga of ['[2] non salva', '**[2]** non salva', '__[2]__ non salva', '- [1?] bordo freddo']) {
+    assert.equal(R.parseFindings(`Provato tutto.${NL}${riga}`).findings.length, 1, `non letta: ${riga}`);
+    assert.equal(R.unparsedLevelLines(`Provato tutto.${NL}${riga}`).length, 0, `respinta a torto: ${riga}`);
+  }
+  // E la prosa resta prosa: le parole dei livelli valgono solo intere.
+  for (const riga of ['Ho provato 3 volte (ok) e regge.', 'Le altre due prove passano tutte.', 'Ho letto [la nota] e va bene.']) {
+    assert.equal(R.unparsedLevelLines(`Provato tutto.${NL}${riga}`).length, 0, `respinta a torto: ${riga}`);
+  }
+});
