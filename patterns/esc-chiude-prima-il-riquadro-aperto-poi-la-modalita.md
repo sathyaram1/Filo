@@ -85,11 +85,13 @@ appena l'utente fa qualcos'altro, così riaprire un'immagine le ridà il suo
 tasto. Il caso peggiore è un'uscita in ritardo di mezzo istante, mai una
 modalità senza uscite.
 
-**Chi apre un riquadro nuovo non deve sapere niente di tutto questo**: gli basta
-marcare la radice con `SN_FILO_UI.mark()` come già si fa, e dichiarare il tasto
-nel proprio gestore di Esc. Le prove stanno in
-`tests/esc-riquadri-schermo-intero.spec.mjs`, con cinque famiglie di riquadri
-diverse e nessuna iscrizione da nessuna parte.
+**Chi apre un riquadro nuovo non deve fare niente.** Un riquadro disegnato sopra
+un sito passa già da `SN_FILO_UI.mark()`, perché il marchio serve anche a chi
+traduce la pagina; uno disegnato da una pagina di Filo non deve nemmeno quello,
+gli basta chiudersi. Le prove stanno in
+`tests/esc-riquadri-schermo-intero.spec.mjs` (cinque famiglie di riquadri sopra
+i siti) e in `tests/verify-514-g5.spec.mjs` (quattro riquadri delle pagine di
+Filo, più il sito che si traveste da riquadro nostro).
 
 **Il nome della voce cambia con lo stato, anche a menu aperto.** Se la modalità
 si spegne per un'altra strada mentre il menu è sotto gli occhi, la voce va
