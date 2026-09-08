@@ -71,6 +71,32 @@ lavoro passi. Venticinque minuti di attesa a ogni consegna erano metà del costo
 di un giro. Non fondere su `main`: l'hook
 committa e pusha sul branch, il merge lo fa il gate a valle.
 
+## Prima di consegnare: la verifica la fai tu, per primo
+
+Nei giri di agosto e settembre il primo giro di verifica trovava un rilievo di
+livello 2 in 15 lavori su 17, quasi sempre su qualcosa che chi aveva risolto
+poteva vedere da sé: la strada gemella (il menu oltre alla scorciatoia, la chat
+della home oltre a quella dell'editor), il tema scuro, un input limite. Ogni
+giro in più è un agente intero. Quindi, prima della consegna, fai al tuo lavoro
+quello che gli farà il verificatore:
+
+1. **Una prova sul cammino segnalato**, che asserisce il successo dal punto di
+   vista dell'utente, in `tests/verifica/<numero>/giro0-<cosa>.spec.mjs` (il
+   numero del feedback senza cancelletto). Resta nel ramo: il verificatore la
+   rilancia, e dopo la fusione resta nella suite.
+2. **Le strade equivalenti**: ogni altro modo con cui l'utente ottiene la
+   stessa cosa (menu, scorciatoia, tasto destro, chat, l'altra pagina che ha la
+   stessa funzione) fa la stessa cosa.
+3. **Tema scuro e tema chiaro**, se hai toccato qualcosa che si vede.
+4. **Input limite**: vuoto, soli spazi, 10.000 caratteri, caratteri speciali,
+   azioni ripetute in fretta.
+5. **Le invarianti UX** di CLAUDE.md § Iniziativa: se si può aggiungere si può
+   togliere; cammini equivalenti si comportano allo stesso modo.
+6. Se il ramo ha già `tests/verifica/<numero>/` (un riallineamento, o una
+   ripresa), lancia quelle prove: una che diventa rossa è una regressione tua.
+
+Quello che trovi lo correggi adesso, non lo lasci al verificatore.
+
 ## Consegna
 
 I TRE testi (report, frase, changelog) sono definiti in CLAUDE.md § Consegna.
