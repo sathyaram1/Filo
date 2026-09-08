@@ -166,12 +166,9 @@ module.exports = function register(on, ctx) {
       // Canale del ragionamento: accumulo sempre (torna nella risposta) +
       // inoltro live alla scheda che ha chiesto il turno, se c'è un reqId.
       const wc = sender && sender.wc;
-      const reasoningReqId = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
-      // Lo stesso id serve da maniglia per fermare il turno (#520).
-      if (reasoningReqId) {
-        reqIdRegistrato = reasoningReqId;
-        chatInCorso.set(reasoningReqId, ac);
-      }
+      // Lo stesso id fa da maniglia per fermare il turno (#520): registrato in
+      // testa all'handler, qui serve solo per il canale del ragionamento.
+      const reasoningReqId = reqIdRegistrato;
       const onReasoning = (t) => {
         reasoning += t;
         if (reasoningReqId && wc && !wc.isDestroyed?.()) {
