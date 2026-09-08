@@ -50,6 +50,7 @@
       try { activeMenu.cleanupZoom?.(); } catch (_) {}
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
       activeMenu = null;
+      avvisaCambio();
     }
     // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
     dropZones.length = 0;
