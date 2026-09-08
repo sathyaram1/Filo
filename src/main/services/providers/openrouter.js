@@ -449,29 +449,31 @@
     if (language) body.language = language;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(TRANSCRIPTIONS_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
+    return conScadenza({ signal, cosa: 'la dettatura' }, async (w) => {
+      const res = await fetch(TRANSCRIPTIONS_ENDPOINT, {
+        method: 'POST',
+        headers: buildHeaders(apiKey),
+        body: JSON.stringify(body),
+        signal: w.signal,
+      });
+      if (!res.ok) throw await httpError(res);
+      const data = await res.json();
+      const usage = data.usage || {};
+      return {
+        text: typeof data.text === 'string' ? data.text : '',
+        servedBy: extractServedBy(data),
+        generationId: res.headers.get('x-generation-id') || data.id || null,
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          cachedPromptTokens: 0,
+          seconds: Number(usage.seconds) || 0,
+          // Il router riporta il costo in dollari: per l'audio è l'unico numero
+          // che abbia senso (non ci sono token), e va registrato tale e quale.
+          costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        },
+      };
     });
-    if (!res.ok) throw await httpError(res);
-    const data = await res.json();
-    const usage = data.usage || {};
-    return {
-      text: typeof data.text === 'string' ? data.text : '',
-      servedBy: extractServedBy(data),
-      generationId: res.headers.get('x-generation-id') || data.id || null,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        cachedPromptTokens: 0,
-        seconds: Number(usage.seconds) || 0,
-        // Il router riporta il costo in dollari: per l'audio è l'unico numero
-        // che abbia senso (non ci sono token), e va registrato tale e quale.
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
-      },
-    };
   }
 
   // ─── Indicizzazione (embedding) ───────────────────────────────────────────
