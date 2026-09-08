@@ -177,12 +177,14 @@
       escInCorso = null;
       if (!giro || !contentFullscreen) return;
       const chiuso = quantiPezziDiFilo() < giro.pezziPrima;
-      const consumatoQui = PAGINA_DI_FILO && (!giro.inFondo || giro.consumato);
-      if (chiuso || consumatoQui) {
+      const consumato = PAGINA_DI_FILO && (!giro.inFondo || giro.consumato);
+      if (chiuso || (consumato && escConsumatiDiFila === 0)) {
         // Era il tasto del riquadro: il main annulla l'uscita che aspettava.
+        escConsumatiDiFila = chiuso ? 0 : 1;
         try { chrome.runtime.sendMessage({ type: MSG.ESC_CONSUMATO }).catch(() => {}); } catch (_) {}
         return;
       }
+      escConsumatiDiFila = 0;
       contentFullscreen = false; // evita ripetizioni mentre il main esce
       try { chrome.runtime.sendMessage({ type: MSG.EXIT_FULLSCREEN }).catch(() => {}); } catch (_) {}
     }
