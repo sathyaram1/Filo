@@ -93,5 +93,5 @@
     } catch (_) { return false; }
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside };
+  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
