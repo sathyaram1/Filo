@@ -1,12 +1,16 @@
-// #514 (giro 5) — a schermo intero l'Esc deve chiudere PRIMA il riquadro che sta
-// sopra la pagina e solo dopo uscire dalla modalità. La regola vale per i
-// riquadri disegnati dai content script; i riquadri disegnati dalle PAGINE DI
-// FILO (menu di ordinamento e barra di ricerca della gestione, menu del tasto
-// destro sul titolo nell'editor, menu del tasto destro nella cronologia) vengono
-// ancora scavalcati: il primo Esc li chiude E spegne lo schermo intero.
+// #514 (giro 5) — a schermo intero l'Esc chiude PRIMA il riquadro che sta sopra
+// la pagina e solo dopo esce dalla modalità, e questo vale anche per i riquadri
+// disegnati dalle PAGINE di Filo, che non passano dal marchio SN_FILO_UI e non
+// dichiarano il tasto in nessun modo: il menu di ordinamento e la barra di
+// ricerca della gestione, il menu del tasto destro sul titolo nell'editor, il
+// menu del tasto destro nella cronologia.
 //
-// Ogni prova ha la sua controprova fuori dallo schermo intero: lì lo stesso Esc
-// chiude il riquadro, quindi il tasto è davvero suo.
+// In coda, la parte avversariale: un sito non deve poter fingere di essere un
+// riquadro di Filo per tenere l'utente dentro allo schermo intero.
+//
+// L'ordine dei passi conta. Si entra a schermo intero PRIMA di aprire il
+// riquadro, come fa una persona: entrare ridimensiona la pagina, e un menu
+// aperto prima si chiuderebbe da solo per il ridimensionamento, non per l'Esc.
 import { test, expect } from './fixtures/electron.mjs';
 
 const PAGE = `<!doctype html><html><head><title>Sito Archiviato</title></head>
@@ -36,6 +40,26 @@ async function esc(app) {
   await new Promise((r) => setTimeout(r, 900));
 }
 
+// Il giro completo su un riquadro qualunque: fuori dallo schermo intero l'Esc lo
+// chiude (controprova: il tasto è davvero suo), dentro lo chiude senza spegnere
+// la modalità, e l'Esc dopo esce.
+async function provaRiquadro({ app, apri, aperto, nome }) {
+  await apri();
+  await expect.poll(aperto, { timeout: 5000 }).toBe(true);
+  await esc(app);
+  expect(await aperto(), `fuori dallo schermo intero Esc deve chiudere ${nome}`).toBe(false);
+
+  await entra(app);
+  await apri();
+  await expect.poll(aperto, { timeout: 5000 }).toBe(true);
+  await esc(app);
+  expect(await aperto(), `${nome}: doveva chiudersi col primo Esc`).toBe(false);
+  expect(await schermoIntero(app), 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
+
+  await esc(app);
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
+}
+
 async function apriGestione(openTab) {
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -45,68 +69,37 @@ async function apriGestione(openTab) {
 
 test('gestione: il menu di ordinamento si chiude col primo Esc, lo schermo intero resta', async ({ app, openTab }) => {
   const page = await apriGestione(openTab);
-  const menuAperto = () => page.evaluate(() => !!document.querySelector('.mg-ctxmenu'));
-
-  // Controprova: fuori dallo schermo intero quell'Esc chiude il menu.
-  await page.click('#mgSortBtn');
-  await expect.poll(menuAperto, { timeout: 5000 }).toBe(true);
-  await esc(app);
-  expect(await menuAperto(), 'fuori dallo schermo intero Esc deve chiudere il menu').toBe(false);
-
-  await page.click('#mgSortBtn');
-  await expect.poll(menuAperto, { timeout: 5000 }).toBe(true);
-  await entra(app);
-  await esc(app);
-  expect(await menuAperto(), 'il menu doveva chiudersi col primo Esc').toBe(false);
-  expect(await schermoIntero(app), 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
-
-  await esc(app);
-  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
+  await provaRiquadro({
+    app,
+    nome: 'il menu di ordinamento',
+    apri: () => page.click('#mgSortBtn'),
+    aperto: () => page.evaluate(() => !!document.querySelector('.mg-ctxmenu')),
+  });
 });
 
 test('gestione: la barra di ricerca si chiude col primo Esc, lo schermo intero resta', async ({ app, openTab }) => {
   const page = await apriGestione(openTab);
-  const ricercaAperta = () => page.evaluate(() => !document.getElementById('mgSearchBar').hidden);
-  // Il fuoco fuori dal campo è il caso di chi ha appena cliccato un risultato.
-  const sfuoca = () => page.evaluate(() => { try { document.activeElement.blur(); } catch (_) {} });
-
-  await page.click('#mgSearchToggle');
-  await expect.poll(ricercaAperta, { timeout: 5000 }).toBe(true);
-  await sfuoca();
-  await esc(app);
-  expect(await ricercaAperta(), 'fuori dallo schermo intero Esc deve chiudere la ricerca').toBe(false);
-
-  await page.click('#mgSearchToggle');
-  await expect.poll(ricercaAperta, { timeout: 5000 }).toBe(true);
-  await sfuoca();
-  await entra(app);
-  await esc(app);
-  expect(await ricercaAperta(), 'la ricerca doveva chiudersi col primo Esc').toBe(false);
-  expect(await schermoIntero(app), 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
-
-  await esc(app);
-  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
+  await provaRiquadro({
+    app,
+    nome: 'la barra di ricerca',
+    // Il fuoco fuori dal campo è il caso di chi ha appena cliccato un risultato.
+    apri: async () => {
+      await page.click('#mgSearchToggle');
+      await page.evaluate(() => { try { document.activeElement.blur(); } catch (_) {} });
+    },
+    aperto: () => page.evaluate(() => !document.getElementById('mgSearchBar').hidden),
+  });
 });
 
 test('editor: il menu del tasto destro sul titolo si chiude col primo Esc, lo schermo intero resta', async ({ app, openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#docbar', { timeout: 15000 });
-  const menuAperto = () => page.evaluate(() => !!document.querySelector('.ed-title-ctxmenu'));
-
-  await page.locator('#docbar').click({ button: 'right' });
-  await expect.poll(menuAperto, { timeout: 5000 }).toBe(true);
-  await esc(app);
-  expect(await menuAperto(), 'fuori dallo schermo intero Esc deve chiudere il menu').toBe(false);
-
-  await page.locator('#docbar').click({ button: 'right' });
-  await expect.poll(menuAperto, { timeout: 5000 }).toBe(true);
-  await entra(app);
-  await esc(app);
-  expect(await menuAperto(), 'il menu doveva chiudersi col primo Esc').toBe(false);
-  expect(await schermoIntero(app), 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
-
-  await esc(app);
-  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
+  await provaRiquadro({
+    app,
+    nome: 'il menu del titolo',
+    apri: () => page.locator('#docbar').click({ button: 'right' }),
+    aperto: () => page.evaluate(() => !!document.querySelector('.ed-title-ctxmenu')),
+  });
 });
 
 test('cronologia: il menu del tasto destro si chiude col primo Esc, lo schermo intero resta', async ({ app, shell, openTab, testServer }) => {
@@ -118,29 +111,20 @@ test('cronologia: il menu del tasto destro si chiude col primo Esc, lo schermo i
   const archive = await openTab('filo://archive/archive.html');
   const row = archive.locator('.arc-tab', { hasText: 'Sito Archiviato' });
   await expect(row).toBeVisible({ timeout: 10000 });
-  const menuAperto = () => archive.evaluate(() => !!document.querySelector('.arc-ctxmenu'));
-
-  await row.click({ button: 'right' });
-  await expect.poll(menuAperto, { timeout: 5000 }).toBe(true);
-  await esc(app);
-  expect(await menuAperto(), 'fuori dallo schermo intero Esc deve chiudere il menu').toBe(false);
-
-  await row.click({ button: 'right' });
-  await expect.poll(menuAperto, { timeout: 5000 }).toBe(true);
-  await entra(app);
-  await esc(app);
-  expect(await menuAperto(), 'il menu doveva chiudersi col primo Esc').toBe(false);
-  expect(await schermoIntero(app), 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
-
-  await esc(app);
-  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
+  await provaRiquadro({
+    app,
+    nome: 'il menu della scheda archiviata',
+    apri: () => row.click({ button: 'right' }),
+    aperto: () => archive.evaluate(() => !!document.querySelector('.arc-ctxmenu')),
+  });
 });
 
-// ── Un sito ostile può negare l'uscita ────────────────────────────────────────
+// ── Un sito non può fingersi un riquadro di Filo ──────────────────────────────
 // Il marchio che dice «questo pezzo l'ha disegnato Filo» è un attributo del
-// documento, e il documento è del sito: una pagina qualunque può metterselo
-// addosso e toglierselo a ogni Esc, facendo credere che il tasto sia servito a
-// chiudere un riquadro di Filo. Da lì lo schermo intero non si spegne più.
+// documento, e il documento è del sito: se a decidere fosse l'attributo, una
+// pagina qualunque potrebbe mettersorlo addosso e toglierselo a ogni Esc,
+// facendo credere che il tasto sia servito a chiudere un riquadro di Filo. Da lì
+// lo schermo intero non si spegneva più.
 function paginaOstile(conEsca) {
   return `<!doctype html><html><body style="margin:0;height:1200px">
 <p id="t">pagina</p>
@@ -168,7 +152,7 @@ function paginaOstile(conEsca) {
 </body></html>`;
 }
 
-test('controprova: un sito che si mangia l\'Esc, ma senza esca, esce al primo colpo', async ({ app, openTab, testServer }) => {
+test('controprova: un sito che si mangia l\'Esc, senza esca, esce al primo colpo', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   await testServer.openReady(openTab, paginaOstile(false));
   await entra(app);
@@ -176,24 +160,15 @@ test('controprova: un sito che si mangia l\'Esc, ma senza esca, esce al primo co
   expect(await schermoIntero(app), 'un sito che mangia il tasto non deve poter negare l\'uscita').toBe(false);
 });
 
-test('sito ostile: dieci Esc e si è ancora dentro allo schermo intero', async ({ app, openTab, testServer }) => {
+test('sito ostile: il travestimento da riquadro di Filo non tiene dentro allo schermo intero', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
-  const page = await testServer.openReady(openTab, paginaOstile(true));
+  await testServer.openReady(openTab, paginaOstile(true));
   await entra(app);
   const esiti = [];
-  for (let i = 0; i < 10; i++) {
-    await esc(app);
+  for (let i = 0; i < 4; i++) {
     esiti.push(await schermoIntero(app));
+    if (!esiti[esiti.length - 1]) break;
+    await esc(app);
   }
-  // La via d'uscita che resta all'utente: la voce del menu del tasto destro.
-  await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8000 });
-  let voce = page.locator('[data-sn-icon-id="fullscreen"]');
-  if (await voce.count() === 0) {
-    await page.locator('.sn-menu-row-overflow').first().click();
-    await expect(voce.first()).toBeVisible({ timeout: 8000 });
-  }
-  console.log('via d\'uscita nel menu:', await voce.first().getAttribute('aria-label'));
-
-  expect(esiti.some((v) => v === false), `dieci Esc e non si esce mai: ${JSON.stringify(esiti)}`).toBe(true);
+  expect(await schermoIntero(app), `Esc ripetuto e non si esce mai: ${JSON.stringify(esiti)}`).toBe(false);
 });
