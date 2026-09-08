@@ -514,3 +514,24 @@ test('quadra dimenticata con una descrizione lunga accanto al livello: non passa
   // E la prosa con una quadra appaiata e un numero più avanti resta prosa.
   assert.equal(R.unparsedLevelLines(`${riassunto}\nHo letto [la nota] e va bene, poi ho riprovato 3 volte.`).length, 0);
 });
+
+test('a capo scritto a mano, livello a parole e quadra dimenticata: la riga non passa muta', () => {
+  const riassunto = 'Provato tutto per bene e funziona.';
+  // Tre sbagli insieme, e l'a capo scritto coi due caratteri barra e n non
+  // veniva riconosciuto perché dopo non c'era una parentesi di apertura: la
+  // riga non diventava mai una riga e finiva nel riassunto (#565).
+  for (const coda of [
+    '\ntre] i dati dell utente finiscono in chiaro',
+    '\n3 dati dell utente a rischio] i passi per rifarlo',
+    '\n- tre] i dati in chiaro',
+    '\n> tre] i dati in chiaro',
+  ]) {
+    assert.equal(R.unparsedLevelLines(riassunto + coda).length, 1, `muta: ${coda}`);
+  }
+  // Il rilievo scritto bene dopo la stessa barra-n resta un rilievo.
+  assert.equal(R.parseFindings(`${riassunto}\n[2] il pulsante non salva`).findings.length, 1);
+  assert.equal(R.unparsedLevelLines(`${riassunto}\n[2] il pulsante non salva`).length, 0);
+  // E una barra-n in mezzo a una frase, senza niente che somigli a un livello
+  // subito dopo, resta testo.
+  assert.equal(R.unparsedLevelLines(`${riassunto} Ho provato 3 volte (ok) e regge.`).length, 0);
+});
