@@ -179,6 +179,7 @@ module.exports = function register(on, ctx) {
         payload: { messages },
         origin: 'filo://decks',
         onReasoning,
+        signal: ac.signal,
       });
       const parsed = Q.parseAgentReply(r.text);
 
