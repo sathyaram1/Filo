@@ -162,6 +162,11 @@ module.exports = function register(on, ctx) {
       // inoltro live alla scheda che ha chiesto il turno, se c'è un reqId.
       const wc = sender && sender.wc;
       const reasoningReqId = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
+      // Lo stesso id serve da maniglia per fermare il turno (#520).
+      if (reasoningReqId) {
+        reqIdRegistrato = reasoningReqId;
+        chatInCorso.set(reasoningReqId, ac);
+      }
       const onReasoning = (t) => {
         reasoning += t;
         if (reasoningReqId && wc && !wc.isDestroyed?.()) {
