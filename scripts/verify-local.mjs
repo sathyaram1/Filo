@@ -349,6 +349,27 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
   return { ok: true, state: s, outcome: 'fixed' };
 }
 
+/**
+ * La cartella dove restano le prove di un giro locale. PURA.
+ *
+ * In cloud la cartella si intitola al numero del feedback. In locale un numero
+ * non c'è, e finché nessuno diceva quale usare le prove non venivano scritte da
+ * nessuna parte: chi correggeva non aveva niente da rilanciare e il giro dopo
+ * ripagava tutto — cioè proprio la cosa che le prove nel ramo tolgono (verifica
+ * del giro 2 su questo lavoro). Il nome viene dal RAMO, perché è l'unica cosa
+ * stabile per tutta la vita del lavoro: lo stesso ramo dà sempre la stessa
+ * cartella, e i giri si ritrovano.
+ */
+export function cartellaProveGiro(branch) {
+  const slug = String(branch || '')
+    .replace(/^(claude|feature|fix)\//i, '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+    .slice(0, 60) || 'giro';
+  return `tests/verifica/locale-${slug}`;
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
