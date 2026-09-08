@@ -183,6 +183,34 @@ prima può saperlo solo se glielo si dice. La prova sta in
 `tests/verify-514-g9.spec.mjs`, con la controprova del riquadro incorporato nato
 mentre la modalità era già accesa.
 
+**Un tasto che il browser si prende va CHIESTO, non aspettato.** Il giro 10 ha
+trovato l'ultima famiglia, ed è quella che l'utente incontra più spesso: lo
+schermo pieno che si è preso il SITO col pulsante del suo lettore video. Lì
+l'Esc il browser se lo mangia per uscire, e il documento non lo vede mai: la
+traccia dei tasti della pagina resta vuota, nessun riquadro di Filo può
+reagire, e il primo Esc portava via la modalità lasciando aperto quello che
+stava sopra la pagina (il menu del tasto destro, il QR, e per costruzione ogni
+altro). Nemmeno il main lo vedeva, perché in quella modalità
+`before-input-event` non arriva affatto: non c'era niente da intercettare.
+Il tasto però si può chiedere. `navigator.keyboard.lock(['Escape'])` dice al
+browser «l'Esc lo gestisco io», e da lì il tasto ricomincia a passare da dove
+si decide: main, poi documento, poi la regola di sempre. Filo lo chiede solo
+mentre ha qualcosa di suo aperto sopra la pagina (l'avviso arriva da
+`SN_FILO_UI.onMark`, l'unico punto da cui passa ogni riquadro disegnato sopra
+un sito) e lo restituisce appena non gli resta niente aperto. Chiederlo sempre
+avrebbe portato via i tasti a chi se li era presi lui — un gioco, un desktop
+remoto — per un tasto che in quel momento non serviva a nessuno. Dove il
+browser non lo presta (una pagina non sicura, dove l'API non esiste) resta il
+comportamento di prima. La regola generale: **prima di aspettare un tasto,
+chiediti se qualcun altro se lo prende prima di te**; quando è il browser, non
+c'è ordine di intercettazione che tenga, si chiede.
+La stessa famiglia porta con sé il nome della voce: quello guarda anche lo
+schermo pieno della PAGINA, quindi si ridisegna anche sul `fullscreenchange`
+del documento e non solo sull'annuncio del main, che arriva mentre il documento
+sta ancora uscendo. Le prove stanno in `tests/verify-514-g10.spec.mjs`, con le
+controprove della stessa pagina senza niente aperto sopra e della modalità di
+Filo.
+
 **L'attesa non è una scadenza per chi risponde.** Una pagina che ha i pezzi di
 Filo dentro risponde sempre, in tutti e due i versi: se il tasto era suo lo
 rivendica, se non lo era chiede lei l'uscita. Per lei l'attesa del main non è un
