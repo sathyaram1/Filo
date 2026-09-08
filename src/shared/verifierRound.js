@@ -154,7 +154,11 @@
   // stessa misura delle quadre appaiate (200), e non allarga niente: qui la
   // finestra non può contenere una parentesi, quindi vale solo per la quadra
   // SPAIATA — quelle appaiate le guarda già QUADRA_OVUNQUE (feedback #565).
-  const LIVELLO_NUDO = '(?:\\d|\\b(?:zero|uno|due|tre)\\b|[?!])';
+  // Il confine si guarda alle LETTERE, non con `\b`: per la regex l'underscore
+  // è un carattere di parola, quindi dopo un grassetto scritto «__tre]» il
+  // confine non c'era e la riga passava muta; e la stessa cosa dopo un a capo
+  // scritto a mano, dove il carattere prima è la «n» (feedback #565).
+  const LIVELLO_NUDO = '(?:\\d|(?<![A-Za-zÀ-ÿ])(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])|[?!])';
   const QUADRA_APERTA = new RegExp(`\\[{1,2}[^\\[\\]\\n]{0,200}?${LIVELLO_NUDO}`, 'i');
   const QUADRA_CHIUSA = new RegExp(`${LIVELLO_NUDO}[^\\[\\]\\n]{0,200}?\\]{1,2}`, 'i');
 
