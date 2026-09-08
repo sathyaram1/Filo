@@ -1888,7 +1888,8 @@ class TabManager {
       // è il posto giusto per far ripartire da zero il conto delle
       // rivendicazioni dell'Esc. Tutto tranne l'Esc stesso conta come "l'utente
       // ha fatto altro": un clic per aprire un riquadro, una lettera scritta.
-      if (String(input.key || '') !== 'Escape') this.azzeraRivendicazioniEsc();
+      const esc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      if (!esc) this.azzeraRivendicazioniEsc();
     });
     // Redirect main-frame verso URL "di blocco" (/geo, /not-available,
     // /region-block, … — lista curata in geoBlock.js): il match viene
