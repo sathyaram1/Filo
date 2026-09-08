@@ -838,6 +838,16 @@ async function recordVerifier(id, critiqueText) {
   if (String(critiqueText || '').length > MAX_CRITIQUE_CHARS) {
     return { rejected: true, formatRejected: true, message: `critica non registrata: troppo lunga (${String(critiqueText).length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}). Accorcia il riassunto, non i rilievi.` };
   }
+  // Il pass vale per il commit dichiarato qui sotto. Se nella directory ci sono
+  // file non registrati (di solito le spec temporanee della verifica), il
+  // salvataggio automatico li committerà DOPO la registrazione, la punta si
+  // sposterà e il cancello dirà «la verifica vale per un altro commit» (#256:
+  // le spec tolte tredici secondi dopo il pass, e il lavoro fermo due giorni).
+  // Si rifiuta PRIMA, con l'elenco: si pulisce e si riprova.
+  const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
+  if (sporchi.length) {
+    return { rejected: true, formatRejected: true, message: dirtyTreeText(sporchi) };
+  }
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
