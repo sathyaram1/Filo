@@ -1928,6 +1928,9 @@
       return true;
     };
     log.addEventListener('click', (e) => {
+      // «Interrompi» prima di tutto: sta dentro la bolla in attesa, che non ha
+      // altri comandi (#520).
+      if (e.target.closest('[data-stop-chat]')) { abortChat(); return; }
       if (toggleCot(e.target)) return;
       const impAll = e.target.closest('[data-import-all]');
       if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }
