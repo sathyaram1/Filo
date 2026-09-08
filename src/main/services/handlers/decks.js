@@ -67,7 +67,11 @@ module.exports = function register(on, ctx) {
       });
       return { ok: true, opinions: r.opinions };
     } catch (e) {
-      return { ok: false, error: e?.message || 'parere non disponibile' };
+      // Mai un codice HTTP nudo nel pannello (#331, #520): la pagina mostra
+      // questa frase così com'è, accanto al bottone «Riprova».
+      const CE = globalThis.SN_CHAT_ERRORS;
+      const frase = CE ? CE.friendly(e) : '';
+      return { ok: false, error: frase || e?.message || 'parere non disponibile' };
     }
   });
 };
