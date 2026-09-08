@@ -118,6 +118,56 @@ test('schermo intero di Filo + schermo pieno del sito impilati: un Esc non lasci
   expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
 });
 
+test('la scheda che NAVIGA mentre lo schermo intero è acceso trova nel menu la via d\'uscita', async ({ app, testServer, openTab }) => {
+  const HTML = '<html><body style="margin:0"><p id="t">ciao</p></body></html>';
+  const page = await testServer.openReady(openTab, HTML);
+  await entra(app);
+  const altra = testServer.html(HTML);
+  await page.evaluate((u) => { window.location.href = u; }, altra);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10000 });
+
+  await page.locator('#t').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8000 });
+  const voce = page.locator('[data-sn-icon-id="fullscreen"]');
+  if (await voce.count() === 0) {
+    await page.locator('.sn-menu-row-overflow').first().click();
+    await expect(voce.first()).toBeVisible({ timeout: 8000 });
+  }
+  await expect.poll(async () => voce.first().getAttribute('aria-label'), { timeout: 8000 })
+    .toMatch(/esci da schermo intero/i);
+});
+
+test('lo stato a tutto schermo si può CHIEDERE, e la risposta segue la finestra', async ({ app, testServer, openTab }) => {
+  await testServer.openReady(openTab, '<html><body><h1>ciao</h1></body></html>');
+  const chiedi = (sender) => app.evaluate((_e, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'fullscreen_state' }, s), sender);
+  const web = { tab: { id: 1, url: 'http://sito.example/' }, url: 'http://sito.example/' };
+
+  // Scelta dichiarata: la domanda è aperta anche alle pagine web, perché dice
+  // solo se la finestra che le ospita è a tutto schermo — quello che l'annuncio
+  // racconta già a tutte. Se qualcuno la chiudesse, questo test diventa rosso.
+  expect((await chiedi(web)).ok).toBe(true);
+  expect((await chiedi(web)).fullscreen).toBe(false);
+  await entra(app);
+  expect((await chiedi(web)).fullscreen).toBe(true);
+});
+
+test('nella pagina di gestione Esc chiude l\'immagine aperta a tutta pagina', async ({ openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  // Quello che fa il clic su un'immagine allegata a un feedback.
+  await page.evaluate(() => {
+    document.getElementById('mgLightboxImg').src =
+      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    document.getElementById('mgLightbox').classList.add('open');
+  });
+  await expect(page.locator('#mgLightbox')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#mgLightbox')).toBeHidden({ timeout: 4000 });
+  // L'immagine viene sganciata: alla prossima apertura non si vede la vecchia.
+  expect(await page.locator('#mgLightboxImg').getAttribute('src')).toBe(null);
+});
+
 test('fuori dallo schermo intero, Esc resta della pagina', async ({ app, testServer, openTab }) => {
   const page = await testServer.openReady(
     openTab,
