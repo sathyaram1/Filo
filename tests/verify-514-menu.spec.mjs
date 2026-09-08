@@ -19,15 +19,20 @@ function accendi(app) {
   });
 }
 
-async function etichettaFullscreen(page) {
+async function bottoneFullscreen(page) {
   await page.locator('#t').click({ button: 'right' });
   await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8000 });
-  return page.evaluate(() => {
-    const el = document.querySelector('.sn-menu [data-id="fullscreen"], .sn-menu #sn-mi-fullscreen');
-    if (el) return el.textContent.trim();
-    const voci = [...document.querySelectorAll('.sn-menu *')].map((n) => n.textContent.trim());
-    return voci.find((t) => /schermo intero/i.test(t)) || null;
-  });
+  const diretto = page.locator('[data-sn-icon-id="fullscreen"]');
+  if (await diretto.count() === 0) {
+    await page.locator('.sn-menu-row-overflow').first().click();
+    await expect(diretto.first()).toBeVisible({ timeout: 8000 });
+  }
+  return diretto.first();
+}
+
+async function etichettaFullscreen(page) {
+  const b = await bottoneFullscreen(page);
+  return b.getAttribute('aria-label');
 }
 
 test('la voce del menu esce dallo schermo intero e si chiama «Esci da schermo intero»', async ({ app, openTab, testServer }) => {
