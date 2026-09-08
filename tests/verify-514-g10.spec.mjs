@@ -103,7 +103,7 @@ test('sito a schermo pieno col suo pulsante: il box di segnalazione si chiude co
   await page.locator('#fs').click();
   await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(true);
 
-  await page.evaluate(() => { window.SN_FEEDBACK?.open?.(); });
+  await page.evaluate(() => { window.SN_FEEDBACK_UI?.open?.(); });
   const box = page.locator('.sn-fb-modal, .sn-fb-root');
   await expect(box.first()).toBeVisible({ timeout: 8000 });
   await new Promise((r) => setTimeout(r, 400));
