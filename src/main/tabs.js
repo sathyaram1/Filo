@@ -398,20 +398,6 @@ class TabManager {
     return this.setContentFullscreen(!this.contentFullscreen);
   }
 
-  // Rimanda indietro una richiesta di schermo pieno che la pagina non doveva
-  // ottenere (#514): la modalità di Filo non si tocca, e alla pagina si chiede
-  // di uscire dal fullscreen che il browser le ha già concesso. Silenzioso di
-  // proposito: l'utente non ha chiesto niente, e un avviso su ogni pagina che
-  // ci prova sarebbe rumore su un'azione che non è sua.
-  _rifiutaSchermoPienoDellaPagina(wc) {
-    try {
-      wc.executeJavaScript(
-        'try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} true',
-        true,
-      ).catch(() => {});
-    } catch (_) {}
-  }
-
   // Fa uscire dal fullscreen HTML5 la pagina che l'aveva chiesto, quando a
   // spegnere lo schermo intero è stato qualcun altro. Best-effort: se la scheda
   // non c'è più (chiusa, processo caduto) resta solo da dimenticarla, così la
