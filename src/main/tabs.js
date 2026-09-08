@@ -301,6 +301,12 @@ class TabManager {
     try {
       if (typeof this.win.setFullScreen === 'function') this.win.setFullScreen(on);
     } catch (_) {}
+    // Uscita per una strada che NON è l'Esc sulla pagina che aveva chiesto il
+    // fullscreen (Esc da un'altra scheda, dalla barra, uscita dal fullscreen di
+    // sistema, chiusura della scheda): la pagina resterebbe convinta di essere a
+    // tutto schermo, col suo player disegnato a schermo pieno dentro una view
+    // ormai tornata sotto la barra. Chiediamole di uscire davvero.
+    if (!on && this.pageFullscreen) this._exitPageFullscreen();
     // Avvisa i content script così la voce di menu mostra "Esci da schermo
     // intero" (icona shrink) mentre la modalità è attiva.
     try {
