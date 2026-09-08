@@ -148,6 +148,41 @@ test('sito a schermo pieno col suo pulsante: la voce del menu non deve mentire q
     .toBe('Schermo intero');
 });
 
+// ── 3bis. Il riquadro dentro un altro riquadro, sopra lo schermo pieno ───────
+// La famiglia del giro 8, ma sulla modalità del sito: a chiudersi è un pezzo
+// disegnato DENTRO un riquadro che resta dov'è.
+const PNG_1x1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+test('sito a schermo pieno col suo pulsante: l\'immagine ingrandita del box di segnalazione', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, LETTORE);
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await pienoDelSito(app, page);
+
+  await apriMenu(page);
+  const voce = page.locator('.sn-menu .sn-menu-item').filter({ hasText: 'Invia feedback' }).first();
+  await expect(voce).toBeVisible({ timeout: 8000 });
+  await voce.click();
+  await expect(page.locator('.sn-fb-modal')).toBeVisible({ timeout: 8000 });
+  await page.locator('.sn-fb-file').setInputFiles([
+    { name: 'schermata.png', mimeType: 'image/png', buffer: PNG_1x1 },
+  ]);
+  await expect(page.locator('.sn-fb-thumb img')).toHaveCount(1, { timeout: 8000 });
+  await page.locator('.sn-fb-thumb img').first().click();
+  await expect(page.locator('.sn-fb-lightbox')).toHaveCount(1, { timeout: 8000 });
+
+  await esc(app);
+  expect(await page.locator('.sn-fb-lightbox').count(), 'il primo Esc doveva chiudere l\'immagine').toBe(0);
+  expect(await page.locator('.sn-fb-modal').count(), 'il box di segnalazione resta aperto').toBe(1);
+  expect(
+    await schermoIntero(app),
+    'il primo Esc ha chiuso l\'immagine e si è portato via lo schermo pieno',
+  ).toBe(true);
+});
+
 // ── 4. Controprova: senza niente aperto sopra, un Esc basta e avanza ─────────
 test('controprova: schermo pieno del sito senza riquadri aperti — un Esc esce', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
