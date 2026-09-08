@@ -1947,11 +1947,20 @@
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
       msg.images = images;
     }
+    // Da qui il turno è interrompibile (#520): il reqId è la maniglia, e il
+    // cronometro nel blocco di attività cammina già.
+    const mio = { reqId: reasoningReqId, activity: pending, args: { userMessage, images, internal }, annullato: false };
+    chatPending = mio;
     const r = await send(msg);
 
     if (offReasoning) { try { offReasoning(); } catch (_) {} }
     if (offAnswer) { try { offAnswer(); } catch (_) {} }
     if (offAction) { try { offAction(); } catch (_) {} }
+    if (chatPending === mio) chatPending = null;
+    // Risposta arrivata DOPO che l'utente aveva smesso di aspettare: si butta.
+    // La conversazione dice già «Attesa interrotta» e non le si riscrive sotto
+    // gli occhi una risposta che non aspettava più.
+    if (mio.annullato || r?.aborted) return { ok: false, aborted: true };
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
