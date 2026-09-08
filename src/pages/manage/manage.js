@@ -3734,6 +3734,10 @@
   // non hanno una sessione admin né Firestore).
   window.__mgTest.renderSupportModelsEditor = (models) => { renderSupportModelsEditor(models); smLoaded = true; };
   window.__mgTest.collectJudgeRegistry = collectJudgeRegistry;
+  // L'immagine a tutta pagina: gli spec la aprono e la chiudono dalla stessa
+  // porta dell'utente, così passano anche dall'avviso al main (#514).
+  window.__mgTest.openLightbox = openLightbox;
+  window.__mgTest.closeLightbox = closeLightbox;
   // Tab "Log": render diretto con voci finte (bypassa il canale main), e
   // ri-lettura via IPC per gli spec che stubbano la risposta.
   window.__mgTest.renderWorkerLog = (entries) => { renderWorkerLog(entries); logLoaded = true; };
