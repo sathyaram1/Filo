@@ -47,6 +47,15 @@ export function dirtyTreeText(lines, cosa = 'critica') {
       + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "correzione"). Poi riprova con lo stesso report.\n'
       + `${elenco}${altri}`;
   }
+  // La prima consegna del lavoro (chi risolve mette il feedback in revisione):
+  // stesso danno della correzione, un giro prima. Quello che sta fuori dai
+  // commit la verifica non lo vede, e boccia una cosa che era fatta (verifica
+  // del giro 3 su questo lavoro).
+  if (cosa === 'revisione') {
+    return 'consegna non registrata: ci sono modifiche non salvate nella directory, e la messa in revisione vale per un commit: quello che sta fuori dai commit la verifica non lo vede, e boccerebbe una cosa che in realtà è fatta. '
+      + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "consegna"). Poi riprova con la stessa consegna.\n'
+      + `${elenco}${altri}`;
+  }
   return 'critica non registrata: ci sono file non registrati nella directory, e il salvataggio automatico li committerebbe DOPO il verdetto, spostando la punta del ramo (il pass vale per un commit preciso, e chi chiude — il cancello di fusione, o «npm run finish» in locale — respingerebbe quello nuovo). '
     + 'Togli le tue spec temporanee (o registra ciò che deve restare) e porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu la pulizia va bene (git add -A && git commit -m "verifica: pulizia"). Poi riprova con la stessa critica.\n'
     + `${elenco}${altri}`;
