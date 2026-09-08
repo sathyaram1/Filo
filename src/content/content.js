@@ -79,7 +79,7 @@
     } catch (_) {}
   }
   // Il gancio che menu.js e popup.js chiamano quando si aprono o si chiudono.
-  global.SN_RIQUADRI_CAMBIATI = segnalaRiquadri;
+  self.SN_RIQUADRI_CAMBIATI = segnalaRiquadri;
 
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
   // blocco commenti) invece che nella pagina? Il menu del tasto destro e tutto
