@@ -51,6 +51,10 @@ function casaSulRamo() {
   execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
   execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
   writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
+  // Come nel repo vero: lo stato del giro e i file del biglietto sono
+  // ignorati da git. Senza, la registrazione li vedrebbe come file che il
+  // salvataggio automatico committerebbe dopo il verdetto, e rifiuterebbe.
+  writeFileSync(resolve(casa, '.gitignore'), 'stato/\n.claude/\n', 'utf8');
   execFileSync('git', ['add', '-A'], { cwd: casa });
   execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
   execFileSync('git', ['checkout', '-q', '-b', 'worker/901'], { cwd: casa });
