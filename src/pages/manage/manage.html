@@ -30,6 +30,19 @@
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
   <style>
+    /* Le misure verticali della testata stanno qui, una volta sola, perché più
+       di un pezzo le usa e una copia rimasta indietro si vede (#498). */
+    :root {
+      /* Aria fra la barra delle sezioni e ciò che le sta sotto. */
+      --mg-tabs-gap: 14px;
+      /* Aria fra la barra delle sezioni e la barra di ricerca, che le
+         appartiene: più stretta, perché le due si leggono come una cosa sola. */
+      --mg-search-gap: 8px;
+      /* Quanto può prendersi, al massimo, ciò che aspetta una decisione sopra
+         le tre aree. Oltre, scorre dentro di sé invece di spingerle fuori. */
+      --mg-attesa-max: 40vh;
+    }
+
     /* La dashboard di gestione sfrutta tutta la larghezza: override locale del
        limite globale `.sn-page { max-width: 960px }` di pages.css (che serve alle
        altre pagine, quindi NON si tocca lì).
