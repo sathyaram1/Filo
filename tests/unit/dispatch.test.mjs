@@ -570,27 +570,32 @@ test('usageText: elenca tutti i comandi, compresa la scorta --ticket', () => {
 // Stessa ragione, altra superficie: i titoli dei test si stampano a schermo a
 // OGNI esecuzione della suite, e la suite chi verifica la lancia per mestiere,
 // prima di dare il pass. Un titolo che racconta il copione glielo mette davanti
-// senza che lo cerchi. Dentro i file la spiegazione resta: quelli li apre solo
-// chi ci lavora (feedback #565).
-test('i titoli dei test restano nel vocabolario del codice', async () => {
+// senza che lo cerchi.
+//
+// E il CORPO dei file non è un posto al riparo, come diceva la versione prima
+// di questa: il file di uno strumento nomina il proprio file di prove, quindi
+// da lì basta aprirlo e leggere la prima riga. Le formule stanno in
+// `tests/helpers/formule-vietate.mjs`, che questa camminata non legge — se
+// stessero qui, l'elenco sarebbe la frase che vieta (feedback #565).
+test('nei file di prova non si anticipa il seguito del giro', async () => {
   const { readdirSync, readFileSync: read } = await import('node:fs');
   const { join } = await import('node:path');
+  const { TITOLI, OVUNQUE } = await import('../helpers/formule-vietate.mjs');
   const TESTS = fileURLToPath(new URL('..', import.meta.url));
-  const vietati = [/fase 2/i, /verificatore[^'"]{0,30}corregg/i, /stessa istanza/i, /si corregge/i, /si paga da cap/i, /da soli si ignorano/i];
   const colpevoli = [];
   const cammina = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name);
       if (e.isDirectory()) { if (!e.name.startsWith('.') && e.name !== 'node_modules') cammina(p); continue; }
       if (!/\.(test|spec)\.mjs$/.test(e.name)) continue;
-      for (const riga of read(p, 'utf8').split('\n')) {
-        if (!/^\s*(test|it)\(/.test(riga)) continue;
-        if (vietati.some((r) => r.test(riga))) colpevoli.push(`${e.name}: ${riga.trim().slice(0, 90)}`);
-      }
+      read(p, 'utf8').split('\n').forEach((riga, i) => {
+        const elenco = /^\s*(test|it)\(/.test(riga) ? TITOLI : OVUNQUE;
+        if (elenco.some((r) => r.test(riga))) colpevoli.push(`${e.name}:${i + 1}: ${riga.trim().slice(0, 90)}`);
+      });
     }
   };
   cammina(TESTS);
-  assert.deepEqual(colpevoli, [], `titoli da riscrivere (il seguito del giro non si anticipa):\n  ${colpevoli.join('\n  ')}`);
+  assert.deepEqual(colpevoli, [], `righe da riscrivere (il seguito del giro non si anticipa):\n  ${colpevoli.join('\n  ')}`);
 });
 
 // La seconda fase (chi ha criticato corregge) arriva dal server DOPO la
