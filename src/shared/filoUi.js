@@ -104,5 +104,5 @@
     } catch (_) { return false; }
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti };
+  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
