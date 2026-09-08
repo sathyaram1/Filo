@@ -434,6 +434,75 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ── Crediti sul server e chiave OpenRouter personale (#598) ──────────────
+    //
+    // Il saldo NON lo scrive più il client: è il tetto di spesa della chiave
+    // OpenRouter personale meno il consumo, e lo legge il server. Qui il
+    // client può solo LEGGERE il proprio portafoglio e i propri inviti, e
+    // AGGIUNGERE righe al registro d'uso per il proprio pseudonimo. Tutto il
+    // resto lo scrive il server (Admin SDK, che bypassa queste regole).
+    //
+    // L'identità è quella dell'INSTALLAZIONE: un account Firebase anonimo per
+    // copia di Filo (request.auth c'è anche senza login Google).
+
+    // Il portafoglio: pseudonimo, hash della chiave, tetto, consumo letto,
+    // crediti elargiti, chi ha invitato. Legge il proprietario (e l'admin).
+    match /wallet-accounts/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Un codice d'invito. Legge chi lo possiede (per mostrarlo e sapere se è
+    // stato usato). Il riscatto passa dal server.
+    match /wallet-invites/{code} {
+      allow read: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Il registro d'uso: una riga per chiamata ai modelli fatta con la chiave
+    // personale. SOLA AGGIUNTA, e solo per il proprio pseudonimo: lo
+    // pseudonimo della riga deve essere quello scritto dal server nel
+    // portafoglio di chi scrive (chi non ha un portafoglio non scrive). Campi
+    // fissi (hasOnly): sono gli stessi di src/shared/wallet.js USAGE_FIELDS.
+    // Nessuna modifica né cancellazione: il server confronta ogni ora la somma
+    // delle righe col consumo che OpenRouter dichiara per la chiave.
+    match /wallet-usage/{id} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['pseudonym', 'at', 'action', 'model', 'servedBy',
+             'promptTokens', 'completionTokens', 'costUsd', 'credits'])
+        && request.resource.data.pseudonym is string
+        && request.resource.data.pseudonym.size() == 16
+        && request.resource.data.pseudonym
+             == get(/databases/$(database)/documents/wallet-accounts/$(request.auth.uid)).data.pseudonym
+        && request.resource.data.at is string && request.resource.data.at.size() <= 40
+        && request.resource.data.action is string && request.resource.data.action.size() <= 80
+        && request.resource.data.model is string && request.resource.data.model.size() <= 200
+        && request.resource.data.servedBy is string && request.resource.data.servedBy.size() <= 100
+        && request.resource.data.promptTokens is number
+        && request.resource.data.completionTokens is number
+        && request.resource.data.costUsd is number
+        && request.resource.data.credits is number;
+      allow update, delete: if false;
+    }
+
+    // Stato delle funzioni programmate (giornaliera, riconciliazione): solo
+    // il server scrive, l'admin legge.
+    match /wallet-state/{doc} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
+    // rimasti, tetto globale) più cambio e somma dei tetti scritti dal server.
+    // Campi non enumerati, come gli altri config/*: aggiungerne uno non
+    // richiede un redeploy delle regole.
+    match /config/credits {
+      allow read, write: if isAdmin();
+    }
+
     // Percorsi di navigazione raccolti dalla sidebar "Aiuto" (Fase 2).
     // Tupla anonima (sito, posizione iniziale, intento, azioni, esito) usata
     // per insegnare globalmente all'AI come muoversi su un dominio.

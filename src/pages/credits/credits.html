@@ -31,6 +31,24 @@
       Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
     </p>
 
+    <!-- Crediti sul server (#598): si entra con un codice d'invito. Finché non
+         c'è un portafoglio si vede il campo; dopo, i propri codici da dare. -->
+    <section class="sn-wallet" id="wallet" hidden>
+      <form class="sn-wallet-redeem" id="redeemForm" autocomplete="off" hidden>
+        <label for="inviteCode">Hai un codice d’invito?</label>
+        <div class="sn-wallet-redeem-row">
+          <input type="text" id="inviteCode" maxlength="16" placeholder="ABCD-EFGH" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="sn-btn" id="redeemBtn">Riscatta</button>
+        </div>
+        <p class="sn-wallet-msg" id="redeemMsg" role="status" hidden></p>
+      </form>
+      <p class="sn-muted sn-wallet-note" id="walletNote" role="status" hidden></p>
+      <section id="invitesSection" hidden>
+        <h2>I tuoi inviti</h2>
+        <ul id="invites" class="sn-wallet-invites"></ul>
+      </section>
+    </section>
+
     <section class="sn-credits-usage" id="usageSection" hidden>
       <h2>Come hai usato i crediti</h2>
       <div class="sn-credits-chart-row">
