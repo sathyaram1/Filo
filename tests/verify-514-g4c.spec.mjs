@@ -71,3 +71,23 @@ test('fuori dallo schermo intero il QR si chiude con Esc (controprova)', async (
   console.log('[qr controprova] overlay ancora aperto:', ancora);
   expect(ancora).toBe(0);
 });
+
+test('cattura di una parte dello schermo: a schermo intero il primo Esc deve annullare la selezione', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  await entra(app);
+  await page.locator('#t').click({ button: 'right' });
+  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  const crop = await voceMenu(page, 'screenshotCrop');
+  await expect(crop).toBeVisible({ timeout: 8000 });
+  await crop.click();
+  await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 8000 });
+  await new Promise((r) => setTimeout(r, 500));
+  console.log('[crop] setup:', JSON.stringify(await stato(app)));
+
+  await esc(app);
+  const dopo = await stato(app);
+  const ancora = await page.locator('.sn-region-overlay').count();
+  console.log('[crop] selezione ancora attiva:', ancora, '| schermo intero:', dopo.cf);
+  expect({ selezioneAttiva: ancora > 0, schermoIntero: dopo.cf })
+    .toEqual({ selezioneAttiva: false, schermoIntero: true });
+});

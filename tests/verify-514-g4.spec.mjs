@@ -35,18 +35,6 @@ async function esc(app) {
   await new Promise((r) => setTimeout(r, 900));
 }
 
-async function incollaImmagine(page) {
-  await page.evaluate(() => {
-    const bin = atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    const dt = new DataTransfer();
-    dt.items.add(new File([arr], 'p.gif', { type: 'image/gif' }));
-    document.getElementById('inputForm')
-      .dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-  });
-}
-
 // ── 1. La lamentela originale, ricontrollata ─────────────────────────────────
 
 test('sito: Esc esce dallo schermo intero', async ({ app, openTab, testServer }) => {
@@ -67,44 +55,8 @@ test('home di Filo: Esc esce dallo schermo intero', async ({ app, openTab }) => 
 });
 
 // ── 2. Le altre porte dello stesso difetto del giro scorso ───────────────────
-
-test('home: immagine ingrandita — il primo Esc deve chiudere lei, non lo schermo intero', async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
-  await incollaImmagine(page);
-  await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 4000 });
-
-  await entra(app);
-  await page.locator('#imgPreviews .dash-img-preview img').first().click();
-  await expect(page.locator('.dash-lightbox.open')).toBeVisible({ timeout: 4000 });
-  await new Promise((r) => setTimeout(r, 400));
-
-  await esc(app);
-  const dopo = await stato(app);
-  const ancoraAperta = await page.locator('.dash-lightbox.open').count();
-  console.log('[g4 home] immagine ancora aperta:', ancoraAperta, '| schermo intero:', dopo.cf);
-  expect({ immagineAperta: ancoraAperta > 0, schermoIntero: dopo.cf })
-    .toEqual({ immagineAperta: false, schermoIntero: true });
-});
-
-test('riquadro di conferma sulla home — il primo Esc deve annullarlo, non uscire', async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
-  await entra(app);
-  await page.evaluate(() => {
-    window.__esitoConferma = 'in corso';
-    window.SN_CONFIRM_UI.confirm({ title: 'Sicuro?', text: 'Azione delicata' })
-      .then((v) => { window.__esitoConferma = v; });
-  });
-  await new Promise((r) => setTimeout(r, 500));
-
-  await esc(app);
-  const dopo = await stato(app);
-  const esito = await page.evaluate(() => window.__esitoConferma);
-  console.log('[g4 conferma] esito:', esito, '| schermo intero:', dopo.cf);
-  expect({ conferma: esito, schermoIntero: dopo.cf })
-    .toEqual({ conferma: false, schermoIntero: true });
-});
+// (le porte sulla home stanno in verify-514-g4b: lì la pagina pilotata è la
+// scheda ATTIVA, che è quello che conta per la regola del main.)
 
 test('pagina dei feedback: immagine ingrandita — il primo Esc deve chiudere lei', async ({ app, openTab }) => {
   const page = await openTab('filo://feedback/feedback.html');
