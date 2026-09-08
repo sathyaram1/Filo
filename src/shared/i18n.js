@@ -170,7 +170,7 @@
     popup_send: 'Invia',
 
     // Errori
-    err_no_api_key: 'Accedi con un profilo per attivare Filo: è gratis e non serve nessuna chiave. In alternativa, se preferisci, imposta una tua chiave API nelle Opzioni.',
+    err_no_api_key: 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti. In alternativa imposta una tua chiave OpenRouter nelle Opzioni.',
     err_provider_failed: 'Il provider AI ha fallito. Controlla la connessione e la API key.',
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
     err_blocked_domain: 'Estensione disabilitata su questo dominio.',

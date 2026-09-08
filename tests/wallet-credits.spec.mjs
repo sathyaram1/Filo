@@ -92,10 +92,18 @@ test.afterAll(async () => {
 test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il saldo del server e i codici da dare', async ({ app, openTab }) => {
   const page = await openTab('filo://credits/credits.html');
 
-  // Il campo c'è, il saldo è ancora quello locale (1000 di partenza).
+  // Il campo c'è, in cima. Senza nessuna chiave il conteggio locale non
+  // compra niente: niente saldo finto, niente «+100 a mezzanotte», niente
+  // invito al login.
   const form = page.locator('#redeemForm');
   await expect(form).toBeVisible({ timeout: 15000 });
   await expect(page.locator('#invitesSection')).toBeHidden();
+  await expect(page.locator('#hero')).toBeHidden();
+  await expect(page.locator('#refillHint')).toBeHidden();
+  await expect(page.locator('#offlineHint')).toBeHidden();
+  await expect(page.locator('#ownerSection')).toBeHidden();
+  const formBox = await form.boundingBox();
+  expect(formBox.y).toBeLessThan(200);
   expect(seen.signups).toBeGreaterThan(0); // l'identità dell'installazione è nata
 
   // Codice sbagliato: frase chiara, si resta lì.
@@ -109,6 +117,7 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   await expect(page.locator('#redeemMsg')).toContainText('riscattato', { timeout: 10000 });
 
   // Il saldo grande è quello del SERVER, non più il conteggio locale.
+  await expect(page.locator('#hero')).toBeVisible();
   await expect(page.locator('#balance')).toHaveText('4.990');
   await expect(page.locator('#refillHint')).toContainText('+100');
   await expect(form).toBeHidden();

@@ -168,6 +168,10 @@
     //   personale e la consegna UNA volta: il main la salva cifrata.
     //   { code } → { ok, status, message, credits?, inviteCodes?, state? }
     WALLET_REDEEM: 'wallet_redeem',
+    // WALLET_REISSUE: il portafoglio c'è sul server ma la chiave personale non
+    //   è su questo computer: il server ne emette un'altra (la vecchia si
+    //   spegne, il saldo resta). { } → { ok, status, message, state? }
+    WALLET_REISSUE: 'wallet_reissue',
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).

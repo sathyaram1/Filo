@@ -57,6 +57,21 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
+  // Da dove viene la chiave OpenRouter che parte davvero: 'own' (scritta
+  // dall'utente), 'personal' (creata dal server), 'factory' (incastonata,
+  // solo installazioni vecchie), 'none'. Lo legge la pagina Crediti e lo
+  // usano i test.
+  async function keySource() {
+    try {
+      const s = await ctx.getEffectiveSettings();
+      const k = String((s && s.apiKeys && s.apiKeys.openrouter) || '');
+      if (!k) return 'none';
+      if (await ownKeySet()) return 'own';
+      if (k === walletStore.personalKey()) return 'personal';
+      return 'factory';
+    } catch (_) { return 'none'; }
+  }
+
   async function ownKeySet() {
     try {
       const s = await globalThis.SN_STORAGE.getSettings();
@@ -68,7 +83,10 @@ module.exports = function register(on, ctx) {
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
   //   server: <walletState> | null, error? }
   async function readState() {
-    const out = { ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(), usingOwnKey: await ownKeySet(), server: null };
+    const out = {
+      ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
+      usingOwnKey: await ownKeySet(), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
+    };
     try {
       await identity.getIdToken();
       out.identity.ok = true;
@@ -92,6 +110,22 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.WALLET_STATE, async () => readState());
+
+  // Nuova chiave: il portafoglio esiste sul server, la chiave non è qui.
+  on(MSG.WALLET_REISSUE, async () => {
+    let r;
+    try {
+      r = await callable('walletReissue', {});
+    } catch (e) {
+      const status = /no_identity/.test(String(e?.message)) ? 'internal' : 'not_reachable';
+      return { ok: false, status, message: W.redeemMessage(status) };
+    }
+    const status = (r && r.status) || 'internal';
+    if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status === 'no_wallet' ? 'internal' : status) };
+    walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    return { ok: true, status, message: 'Nuova chiave pronta: i tuoi crediti si usano di nuovo da qui.', state: await readState() };
+  });
 
   // Riscatto: { code } → { ok, status, message, state? }.
   on(MSG.WALLET_REDEEM, async (msg) => {
@@ -216,19 +250,6 @@ module.exports = function register(on, ctx) {
     const text = W.outOfCreditsMessage({ usingOwnKey, dailyCredits: lastServer && lastServer.dailyCredits });
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000 }); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
-  }
-
-  // Da dove viene la chiave OpenRouter che parte davvero: 'own' (scritta
-  // dall'utente), 'personal' (creata dal server), 'factory' (incastonata,
-  // solo installazioni vecchie), 'none'. Lo legge la pagina Crediti e lo
-  // usano i test.
-  async function keySource() {
-    const s = await ctx.getEffectiveSettings();
-    const k = String((s && s.apiKeys && s.apiKeys.openrouter) || '');
-    if (!k) return 'none';
-    if (await ownKeySet()) return 'own';
-    if (k === walletStore.personalKey()) return 'personal';
-    return 'factory';
   }
 
   globalThis.SN_WALLET_MAIN = { recordUsage, outOfCreditsNotice, flush, readState, keySource };

@@ -2633,7 +2633,7 @@ function buildNoKeyDashboard(settings, saved) {
   }));
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Accedi con un profilo per attivare Filo: è gratis e non serve nessuna chiave (icona del profilo in alto a destra). In alternativa, se preferisci, puoi usare una tua chiave API dalle Opzioni. Intanto, le tue pagine salvate sono qui.';
+    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, puoi mettere una tua chiave OpenRouter nelle Opzioni. Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 

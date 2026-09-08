@@ -18,7 +18,23 @@
   <main class="sn-page">
     <h1 id="title">Crediti</h1>
 
-    <section class="sn-credits-hero">
+    <!-- Crediti sul server (#598): si entra con un codice d'invito. Sta in
+         cima: per chi non ha ancora un portafoglio è l'unica cosa da fare, e
+         un saldo locale sopra sarebbe una promessa vuota. -->
+    <section class="sn-wallet" id="wallet" hidden>
+      <form class="sn-wallet-redeem" id="redeemForm" autocomplete="off" hidden>
+        <label for="inviteCode">Hai un codice d’invito?</label>
+        <div class="sn-wallet-redeem-row">
+          <input type="text" id="inviteCode" maxlength="16" placeholder="ABCD-EFGH" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="sn-btn" id="redeemBtn">Riscatta</button>
+        </div>
+        <p class="sn-wallet-msg" id="redeemMsg" role="status" hidden></p>
+      </form>
+      <p class="sn-muted sn-wallet-note" id="walletNote" role="status" hidden></p>
+      <button type="button" class="sn-btn sn-btn-secondary" id="reissueBtn" hidden>Richiedi una nuova chiave</button>
+    </section>
+
+    <section class="sn-credits-hero" id="hero">
       <span class="sn-credits-coin" id="coin"></span>
       <div class="sn-credits-balance">
         <span class="sn-credits-amount" id="balance">—</span>
@@ -31,22 +47,37 @@
       Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
     </p>
 
-    <!-- Crediti sul server (#598): si entra con un codice d'invito. Finché non
-         c'è un portafoglio si vede il campo; dopo, i propri codici da dare. -->
-    <section class="sn-wallet" id="wallet" hidden>
-      <form class="sn-wallet-redeem" id="redeemForm" autocomplete="off" hidden>
-        <label for="inviteCode">Hai un codice d’invito?</label>
-        <div class="sn-wallet-redeem-row">
-          <input type="text" id="inviteCode" maxlength="16" placeholder="ABCD-EFGH" autocomplete="off" spellcheck="false" />
-          <button type="submit" class="sn-btn" id="redeemBtn">Riscatta</button>
-        </div>
-        <p class="sn-wallet-msg" id="redeemMsg" role="status" hidden></p>
-      </form>
-      <p class="sn-muted sn-wallet-note" id="walletNote" role="status" hidden></p>
-      <section id="invitesSection" hidden>
-        <h2>I tuoi inviti</h2>
-        <ul id="invites" class="sn-wallet-invites"></ul>
-      </section>
+    <section id="invitesSection" class="sn-wallet-section" hidden>
+      <h2>I tuoi inviti</h2>
+      <ul id="invites" class="sn-wallet-invites"></ul>
+    </section>
+
+    <!-- Solo owner: codici da dare, elargizioni, chi ha cosa. -->
+    <section id="ownerSection" class="sn-wallet-section sn-wallet-owner" hidden>
+      <h2>Inviti e utenti</h2>
+      <p class="sn-muted" id="ownerTotals"></p>
+      <div class="sn-wallet-owner-row">
+        <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off">
+          <label for="ownerInviteCount">Nuovi codici</label>
+          <input type="number" id="ownerInviteCount" min="1" max="200" value="5" />
+          <button type="submit" class="sn-btn" id="ownerInvitesBtn">Genera</button>
+        </form>
+        <form id="ownerGrantForm" class="sn-wallet-inline" autocomplete="off">
+          <label for="ownerGrantPseudonym">Regala crediti a</label>
+          <input type="text" id="ownerGrantPseudonym" placeholder="pseudonimo" maxlength="16" spellcheck="false" />
+          <input type="number" id="ownerGrantCredits" min="1" placeholder="crediti" />
+          <button type="submit" class="sn-btn" id="ownerGrantBtn">Regala</button>
+        </form>
+      </div>
+      <p class="sn-wallet-msg" id="ownerMsg" role="status" hidden></p>
+      <ul id="ownerCodes" class="sn-wallet-invites"></ul>
+      <div class="sn-wallet-table-wrap">
+        <table class="sn-wallet-table" id="ownerUsers" hidden>
+          <thead><tr><th>Pseudonimo</th><th>Saldo</th><th>Ricevuti</th><th>Speso ($)</th><th>Registro</th><th>Invitato da</th><th>Dal</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="sn-muted" id="ownerRuns"></p>
     </section>
 
     <section class="sn-credits-usage" id="usageSection" hidden>

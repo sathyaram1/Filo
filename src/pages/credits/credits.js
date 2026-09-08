@@ -65,12 +65,24 @@
   // ── Crediti sul server (#598) ──────────────────────────────────────────────
   function renderWallet(w) {
     const box = $('wallet');
+    const reissue = $('reissueBtn');
+    reissue.hidden = true;
     if (!w || !w.ok) { box.hidden = true; return; }
     box.hidden = false;
     const server = w.server;
     const has = Boolean(server && server.hasWallet);
     const note = $('walletNote');
     note.hidden = true;
+    // Senza nessuna chiave (né personale, né propria, né di fabbrica) il
+    // conteggio locale non compra niente: saldo, ricarica a mezzanotte e
+    // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
+    // ancora una chiave di fabbrica o una propria.
+    const noKey = !has && w.keySource === 'none';
+    $('hero').hidden = noKey;
+    $('refillHint').hidden = noKey;
+    if (noKey) $('offlineHint').hidden = true;
+
+    renderOwner(w);
 
     if (has) {
       // Il saldo vero è quello del server: sostituisce il conteggio locale.
@@ -89,8 +101,9 @@
         note.textContent = 'Saldo dell\'ultima lettura: il servizio dei modelli non risponde adesso.';
         note.hidden = false;
       } else if (!w.hasPersonalKey) {
-        note.textContent = 'La chiave personale non è su questo computer: i crediti ci sono, ma questa copia di Filo non li può usare.';
+        note.textContent = 'La chiave personale non è su questo computer: i crediti ci sono, ma questa copia di Filo non li può usare finché non ne chiedi una nuova.';
         note.hidden = false;
+        reissue.hidden = false;
       }
       renderInvites(server.invites || []);
       return;
@@ -143,6 +156,155 @@
       li.append(code, state);
       list.appendChild(li);
     }
+  }
+
+  async function reissueKey() {
+    const btn = $('reissueBtn');
+    const note = $('walletNote');
+    btn.disabled = true;
+    note.textContent = 'Un attimo…';
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_REISSUE }); } catch (_) { r = null; }
+    btn.disabled = false;
+    if (r && r.ok) {
+      render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
+      $('walletNote').textContent = r.message || 'Fatto.';
+      $('walletNote').hidden = false;
+      return;
+    }
+    note.textContent = (r && r.message) || 'Non ci sono riuscito: riprova.';
+  }
+
+  // ── Owner: codici, regali, chi ha cosa ─────────────────────────────────────
+  let overviewLoaded = false;
+  function renderOwner(w) {
+    const sec = $('ownerSection');
+    sec.hidden = !w.isOwner;
+    if (!w.isOwner || overviewLoaded) return;
+    overviewLoaded = true;
+    loadOverview().catch(() => {});
+  }
+
+  async function loadOverview() {
+    const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OVERVIEW });
+    const o = r && r.ok && r.overview;
+    if (!o) {
+      $('ownerTotals').textContent = r && r.error ? `Vista non disponibile (${r.error}).` : 'Vista non disponibile.';
+      return;
+    }
+    const cfg = o.config || {};
+    const tot = o.totals || {};
+    $('ownerTotals').textContent =
+      `${formatInt(tot.users || 0)} utenti · tetti ${fmtUsd(tot.totalLimitUsd)} su ${fmtUsd(tot.maxGrantUsd)} elargibili · `
+      + `inviti riscattabili rimasti ${formatInt(cfg.invitesRemaining || 0)} · ingresso ${formatInt(cfg.entryCredits || 0)}, +${formatInt(cfg.dailyCredits || 0)}/giorno`
+      + (cfg.eurUsd ? ` · cambio ${cfg.eurUsd} (${cfg.eurUsdAt || ''})` : ' · cambio mancante');
+    const table = $('ownerUsers');
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    const users = (o.users || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    table.hidden = users.length === 0;
+    for (const u of users) {
+      const tr = document.createElement('tr');
+      const b = u.balance || {};
+      const rec = u.reconcile;
+      const regTxt = !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok');
+      const cells = [
+        u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd), regTxt,
+        u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
+      ];
+      cells.forEach((c, i) => {
+        const td = document.createElement('td');
+        td.textContent = c;
+        if (i === 0) { td.className = 'sn-wallet-pseudonym'; td.title = 'Copia'; td.addEventListener('click', () => { try { navigator.clipboard.writeText(u.pseudonym); } catch (_) {} $('ownerGrantPseudonym').value = u.pseudonym; }); }
+        if (i === 4 && rec && rec.flagged) td.className = 'is-flagged';
+        tr.appendChild(td);
+      });
+      if (u.disabled) tr.className = 'is-used';
+      tbody.appendChild(tr);
+    }
+    const runs = [];
+    if (o.daily && o.daily.lastRunAt) runs.push(`giornaliera ${formatDateTime(o.daily.lastRunAt)}${summ(o.daily.summary)}`);
+    if (o.reconcile && o.reconcile.lastRunAt) runs.push(`riconciliazione ${formatDateTime(o.reconcile.lastRunAt)}${summ(o.reconcile.summary)}`);
+    $('ownerRuns').textContent = runs.length ? `Ultime: ${runs.join(' · ')}` : 'Giornaliera e riconciliazione non hanno ancora girato.';
+  }
+
+  function summ(s) {
+    if (!s) return '';
+    const parts = [];
+    if (s.granted != null) parts.push(`${s.granted} quote`);
+    if (s.refused) parts.push(`${s.refused} rifiutate`);
+    if (s.flagged != null) parts.push(`${s.flagged} segnalati`);
+    if (s.errors) parts.push(`${s.errors} errori`);
+    return parts.length ? ` (${parts.join(', ')})` : '';
+  }
+
+  async function ownerInvites(ev) {
+    ev.preventDefault();
+    const btn = $('ownerInvitesBtn');
+    const msg = $('ownerMsg');
+    btn.disabled = true;
+    const count = Math.max(1, Math.min(200, Number($('ownerInviteCount').value) || 1));
+    const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_INVITES, count }).catch(() => null);
+    btn.disabled = false;
+    msg.hidden = false;
+    msg.classList.remove('is-error', 'is-ok');
+    if (!(r && r.ok)) { msg.textContent = `Codici non generati${r && r.error ? ` (${r.error})` : ''}.`; msg.classList.add('is-error'); return; }
+    msg.textContent = `${r.codes.length} codici nuovi: copiali adesso, non si rileggono da qui.`;
+    msg.classList.add('is-ok');
+    const list = $('ownerCodes');
+    for (const code of r.codes) {
+      const li = document.createElement('li');
+      li.className = 'sn-wallet-invite';
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sn-wallet-code'; b.textContent = code; b.title = 'Copia';
+      b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(code); } catch (_) {}
+        b.classList.add('is-copied'); setTimeout(() => b.classList.remove('is-copied'), 1200);
+      });
+      li.appendChild(b);
+      list.prepend(li);
+    }
+    loadOverview().catch(() => {});
+  }
+
+  async function ownerGrant(ev) {
+    ev.preventDefault();
+    const msg = $('ownerMsg');
+    const pseudonym = String($('ownerGrantPseudonym').value || '').trim();
+    const credits = Math.floor(Number($('ownerGrantCredits').value) || 0);
+    if (!pseudonym || credits <= 0) { $('ownerGrantPseudonym').focus(); return; }
+    $('ownerGrantBtn').disabled = true;
+    const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_GRANT, pseudonym, credits, why: 'owner' }).catch(() => null);
+    $('ownerGrantBtn').disabled = false;
+    msg.hidden = false;
+    msg.classList.remove('is-error', 'is-ok');
+    const res = r && r.ok && r.result;
+    if (res && res.ok) {
+      msg.textContent = `+${formatInt(res.credits)} crediti a ${pseudonym}.`;
+      msg.classList.add('is-ok');
+      $('ownerGrantCredits').value = '';
+      loadOverview().catch(() => {});
+      return;
+    }
+    const reason = (res && res.reason) || (r && r.error) || 'errore';
+    const why = {
+      no_wallet: 'nessun utente con questo pseudonimo',
+      global_cap: `oltre il tetto globale (tetti ${fmtUsd(res && res.totalLimitUsd)} + ${fmtUsd(res && res.deltaUsd)} > ${fmtUsd(res && res.maxGrantUsd)}): alza il tetto in configurazione o carica OpenRouter`,
+      missing_exchange_rate: 'manca il cambio del giorno',
+      provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
+    }[reason] || reason;
+    msg.textContent = `Regalo non fatto: ${why}.`;
+    msg.classList.add('is-error');
+  }
+
+  function fmtUsd(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '—';
+    return `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 }).format(v)} $`;
+  }
+  function formatDateTime(ts) {
+    if (!ts) return '';
+    try { return new Date(ts).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
   }
 
   async function redeem(ev) {
@@ -317,6 +479,9 @@
   }
 
   $('redeemForm').addEventListener('submit', (ev) => { redeem(ev).catch(() => {}); });
+  $('reissueBtn').addEventListener('click', () => { reissueKey().catch(() => {}); });
+  $('ownerInvitesForm').addEventListener('submit', (ev) => { ownerInvites(ev).catch(() => {}); });
+  $('ownerGrantForm').addEventListener('submit', (ev) => { ownerGrant(ev).catch(() => {}); });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
   if (chrome.runtime && chrome.runtime.onMessage) {

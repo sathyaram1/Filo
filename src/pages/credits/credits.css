@@ -113,3 +113,25 @@
 .sn-wallet-code.is-copied { border-style: solid; border-color: var(--sn-accent); color: var(--sn-accent); }
 .sn-wallet-invite.is-used .sn-wallet-code { text-decoration: line-through; opacity: .55; cursor: default; }
 .sn-wallet-invite-state { color: var(--sn-muted); font-size: 13px; }
+
+.sn-wallet-section { margin-top: 24px; }
+.sn-wallet-owner-row { display: flex; flex-wrap: wrap; gap: 18px 32px; margin-top: 10px; }
+.sn-wallet-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sn-wallet-inline label { font-weight: 600; }
+.sn-wallet-inline input {
+  padding: 6px 10px; border: 1px solid var(--sn-border); border-radius: 8px;
+  background: var(--sn-bg-elev, var(--sn-bg)); color: var(--sn-fg); width: 9em;
+}
+.sn-wallet-inline input:focus { outline: none; border-color: var(--sn-accent); }
+.sn-wallet-table-wrap { overflow-x: auto; margin-top: 12px; }
+.sn-wallet-table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.sn-wallet-table th, .sn-wallet-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--sn-border); white-space: nowrap; }
+.sn-wallet-table th { color: var(--sn-muted); font-weight: 600; }
+.sn-wallet-table tr:hover td { background: var(--sn-hover, rgba(0,0,0,.04)); }
+.sn-wallet-table .sn-wallet-pseudonym { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: pointer; }
+.sn-wallet-table .is-flagged { color: var(--sn-danger, #c45a3b); font-weight: 600; }
+.sn-wallet-table tr.is-used td { opacity: .55; }
+#reissueBtn { margin-top: 8px; }
+
+/* L attributo hidden vince sul display delle sezioni flex/grid. */
+.sn-page [hidden] { display: none !important; }
