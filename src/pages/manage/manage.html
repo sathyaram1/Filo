@@ -879,7 +879,13 @@
     .mg-merge-approvals {
       margin: 0 0 20px;
       max-height: var(--mg-attesa-max);
-      min-height: 0;
+      /* Il tetto dice quanto può chiedere; `flex: 0 1 auto` più un minimo basso
+         dicono a quanto deve rinunciare quando lo spazio non basta. È lui a
+         cedere, non le aree: le aree sono la cosa che il feedback chiedeva di
+         espandere. Sotto il minimo non scende, così l'intestazione col numero
+         resta leggibile e il resto si raggiunge scorrendo. */
+      min-height: var(--mg-attesa-min);
+      flex: 0 1 auto;
       overflow-y: auto;
     }
     .mg-merge-approvals-recent { margin: 0 0 20px; }
