@@ -57,7 +57,7 @@ export function dirtyTreeText(lines, cosa = 'critica') {
       + `${elenco}${altri}`;
   }
   return 'critica non registrata: ci sono file non registrati nella directory, e il salvataggio automatico li committerebbe DOPO il verdetto, spostando la punta del ramo (il pass vale per un commit preciso, e chi chiude — il cancello di fusione, o «npm run finish» in locale — respingerebbe quello nuovo). '
-    + 'Togli le tue spec temporanee (o registra ciò che deve restare) e porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu la pulizia va bene (git add -A && git commit -m "verifica: pulizia"). Poi riprova con la stessa critica.\n'
+    + 'Porta la directory a un commit (le tue prove in tests/verifica/<numero>/ restano nel ramo; togli solo quello che non vale come test): il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "verifica: prove"). Poi riprova con la stessa critica.\n'
     + `${elenco}${altri}`;
 }
 
