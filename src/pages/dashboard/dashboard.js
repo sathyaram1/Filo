@@ -2094,6 +2094,9 @@
     // Un turno solo: la sequenza «azione → esito → modello» la guida il main,
     // e la scheda la racconta in diretta dentro il blocco (runFiloTurn).
     const r = await runFiloTurn({ ...args, activity });
+    // Fermato dall'utente (#520): il blocco è già chiuso e la barra d'invio già
+    // libera — l'ha fatto «Interrompi», senza aspettare il main.
+    if (r?.aborted) return r;
     activity.finish({ failed: !r?.ok });
 
     sending = false;
