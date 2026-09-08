@@ -274,3 +274,53 @@ test('la stessa consegna con --notes non viene fermata dalla guardia', () => {
   const r = lancia(['deliver', 'status', '--status', 'done', '--notes', 'il mio report']);
   assert.equal(/Argomento non capito/.test(r.stderr), false);
 });
+
+// Verifica del 2026-09-08 su #565: l'opzione che chiede biglietto E ruolo
+// insieme non aveva più nessun effetto — finiva fra i campi con valore invece
+// che fra i posizionali, dove il comando la cercava. Chi guida leggeva il ruolo
+// vuoto, e vuoto vuol dire «server vecchio»: partiva sempre il worker generico,
+// col biglietto ormai ritirato, che è la cosa che non si annulla.
+//
+// Il finto server vive in QUESTO processo, quindi il comando va lanciato senza
+// bloccare il giro degli eventi: con spawnSync il server non risponderebbe mai.
+test('#565 ticket --json stampa biglietto E ruolo (e il biglietto non si spreca)', async () => {
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const srv = createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true, work: true, ticket: 'b-123', role: 'verifier' }));
+    });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  const porta = srv.address().port;
+  const esegui = (argomenti) => new Promise((ok) => {
+    const p = spawn(process.execPath, [CANALE, ...argomenti], {
+      env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${porta}` },
+    });
+    let so = ''; let se = '';
+    p.stdout.on('data', (c) => { so += c; });
+    p.stderr.on('data', (c) => { se += c; });
+    p.on('close', (code) => ok({ code, so, se }));
+  });
+  try {
+    const conJson = await esegui(['ticket', 'parola-d-ordine', '--json']);
+    assert.equal(conJson.code, 0, conJson.se);
+    assert.deepEqual(JSON.parse(conJson.so.trim()), { ticket: 'b-123', role: 'verifier' },
+      'con --json escono biglietto e ruolo: senza il ruolo chi guida lancia sempre il worker generico');
+
+    // Anche scritta prima della parola d'ordine: un interruttore non deve
+    // mangiarsi il posizionale che gli sta dietro.
+    const prima = await esegui(['ticket', '--json', 'parola-d-ordine']);
+    assert.equal(prima.code, 0, prima.se);
+    assert.deepEqual(JSON.parse(prima.so.trim()), { ticket: 'b-123', role: 'verifier' });
+
+    // Senza l'opzione resta la sola riga di sempre.
+    const senza = await esegui(['ticket', 'parola-d-ordine']);
+    assert.equal(senza.code, 0, senza.se);
+    assert.equal(senza.so.trim(), 'b-123');
+  } finally {
+    await new Promise((ok) => srv.close(ok));
+  }
+});

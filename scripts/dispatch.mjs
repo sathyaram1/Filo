@@ -47,7 +47,7 @@
 //   node scripts/dispatch.mjs --ticket <biglietto>     # traduce la busta del server
 //   node scripts/dispatch.mjs --preflight               # prontezza (prima del setup)
 //   node scripts/dispatch.mjs --record-verifier <id> "<critica coi livelli>" [--ticket <b>]
-//   node scripts/dispatch.mjs --record-fixed <id> ["report"] [--frase "…"] [--ticket <b>]
+//   node scripts/dispatch.mjs --record-fixed <id> "<report>" [--frase "…"] [--ticket <b>]
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
@@ -105,8 +105,8 @@ const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
 
-// I tre bilanci del verificatore che corregge (feedback #561: cap2 per i
-// rilievi di livello 3/2, cap1 per gli 1, cap0 per gli 0). Li CONSUMA il
+// I tre bilanci dei giri di correzione (feedback #561: cap2 per i rilievi
+// di livello 3/2, cap1 per gli 1, cap0 per gli 0). Li CONSUMA il
 // SERVER quando registra la critica; qui servono solo come dato di riferimento
 // per gli strumenti. I DEFAULT vivono con le transizioni promosse a dati
 // (src/shared/feedbackTransitions.js): una sorgente sola, incorporata anche dal
@@ -134,8 +134,8 @@ export const VERIFIER_CAPS = (() => {
 // solo per resolveLoopCap, che gli strumenti e i test usano ancora.
 const LOOP_CAP_DEFAULT = 10;
 
-// Le regole del giro del verificatore che corregge (feedback #561): il parser
-// della critica coi livelli e la decisione su cosa si corregge. Dagli
+// Le regole del giro (feedback #561): il parser della critica coi livelli e
+// la decisione su cosa si corregge. Dagli
 // STRUMENTI, per la stessa ragione dei dati qui sopra. Il paracadute è un
 // parser minimo: senza il modulo la critica arriva comunque al server, che ha
 // la sua copia delle regole e decide lui.
@@ -281,22 +281,29 @@ export function defaultState(id, branch) {
 // ─── Transizioni di stato (pure) ──────────────────────────────────────────────
 
 // Gli esiti che il SERVER può dare a una critica (feedback #561): `pass` (nessun
-// rilievo da correggere: si prosegue), `fix` (il verificatore corregge, fase
-// 2), `stop` (un rilievo di livello 3/2 non correggibile: decide l'owner). Non
+// rilievo da correggere: si prosegue), `fix` (c'è da correggere), `stop` (un
+// rilievo di livello 3/2 non correggibile: decide l'owner). Non
 // esiste più il verdetto a tre valori scelto dal verificatore: lui registra i
 // rilievi coi livelli, l'esito lo calcola il server dai bilanci. I vecchi
-// `pass|migliorabile|fail` restano accettati SOLO come parola opzionale sulla
-// riga di comando, per le ricette non ancora aggiornate (vengono ignorati).
+// `pass|migliorabile|fail` sulla riga di comando vengono RIFIUTATI: ignorarli
+// in silenzio faceva registrare una promozione a chi credeva di bocciare
+// (feedback #565), e una ricetta non aggiornata è meglio che si fermi.
 export const VERIFIER_OUTCOMES = ['pass', 'fix', 'stop'];
 // Tetto di una critica, lo stesso del server. Oltre: rifiuto con la
 // spiegazione, non un taglio.
 export const MAX_CRITIQUE_CHARS = 12000;
+// E un pavimento, lo stesso dello strumento locale: una verifica di due parole
+// non è una verifica, e vale in tutti e due i sensi. Senza rilievi l'esito
+// calcolato è «superata», quindi una critica vuota è una PROMOZIONE, non una
+// bocciatura: il pavimento è l'unica cosa che impedisce di promuovere senza
+// aver scritto niente (feedback #565).
+export const MIN_CRITIQUE_CHARS = 80;
 export const LEGACY_VERDICT_WORDS = ['pass', 'migliorabile', 'fail'];
 
 /**
  * Lo specchio locale dell'esito che il server ha calcolato sulla critica.
- * `pass` → verificato; `fix` → il verificatore sta correggendo (la consegna
- * `fixed` arriverà da lui, stesso biglietto); `stop` → fermato. La critica si
+ * `pass` → verificato; `fix` → giro di correzione aperto; `stop` → fermato.
+ * La critica si
  * conserva com'è stata scritta (coi livelli), per il fogliettino locale.
  */
 export function applyVerifierVerdict(state, outcome, critique = '') {
@@ -810,9 +817,8 @@ function sealTransition(state, by) {
  * `[1?]` = chiede una decisione dell'owner; le righe prima del primo rilievo
  * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
  * la critica intera e il commit su cui è stata fatta la prova: il pass vale
- * per quel commit. L'ESITO lo calcola il server e torna nella risposta: con
- * qualcosa da correggere porta la fase 2 (rilievi da correggere e istruzioni),
- * che non sta da nessun'altra parte.
+ * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
+ * si stampa intera: non sta da nessun'altra parte.
  */
 async function recordVerifier(id, critiqueText) {
   const guard = guardIdentity(id);
@@ -825,7 +831,7 @@ async function recordVerifier(id, critiqueText) {
     // Un rifiuto di FORMATO, non della guardia d'identità: il testo di quella
     // («la directory non corrisponde al branch») mandava il verificatore a
     // controllare ramo e cartella invece della riga (verifica del giro 4).
-    return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»); in mezzo a una frase del riassunto le parentesi quadre sono testo e vanno bene. Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2]». Il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]», «1. [2]», «### [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
   // Stesso tetto del server (12000 caratteri), detto QUI prima del viaggio e
   // col numero: mai un taglio silenzioso (CLAUDE.md § Limiti).
@@ -879,9 +885,9 @@ async function recordVerifier(id, critiqueText) {
 }
 
 /**
- * La risposta del server alla critica, per chi la legge a schermo. PURA.
- * Con la fase 2 stampa i rilievi da correggere, quelli messi da parte, i
- * bilanci residui e le istruzioni; senza, l'esito e basta.
+ * La risposta del server alla critica, come si stampa a schermo. PURA.
+ * Quando c'è da correggere stampa i rilievi, quelli messi da parte, i bilanci
+ * residui e la coda che arriva dal server; senza, l'esito e basta.
  */
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};
@@ -893,13 +899,15 @@ export function verifierReplyText(reply) {
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
-      'Rilievi da correggere ADESSO (solo questi):',
+      'Rilievi da correggere in questo giro (solo questi):',
       fmt(r.phase2.findings),
-      'Rilievi messi da parte (li apre il server come feedback derivato, NON li correggi):',
+      'Rilievi messi da parte (fuori da questo giro: li apre il server come feedback derivato):',
       fmt(r.phase2.derived),
       budgets ? `Bilanci: ${budgets}` : '',
       '',
       String(r.phase2.instructions || ''),
+      '',
+      'A giro chiuso, rilascia il biglietto.',
     ].filter((l, i) => l !== '' || i === 6).join('\n');
   }
   if (r.outcome === 'stop') {
@@ -936,11 +944,9 @@ async function recordFixed(id, report = '', frase = '') {
   if (sent.outcome !== 'ok') {
     return { rejected: true, serverDown: true, message: `consegna non registrata: il server non risponde (${sent.reason})` };
   }
-  // Chi consegna: il verificatore che corregge (#561) o il correttore separato
-  // del riallineamento. Il marcatore locale del ruolo lo sa; il server lo sa
+  // Il marcatore locale del ruolo dice chi sta consegnando; il server lo sa
   // dal biglietto, ed è lui che ha accettato o rifiutato.
-  const chi = readRole(ROOT) === 'verifier' ? 'verifier' : 'fixer';
-  sealTransition(next, `${chi}:consegna`);
+  sealTransition(next, `${readRole(ROOT) || 'fixer'}:consegna`);
   return next;
 }
 async function recordSecaudit(id, verdict) {
@@ -1154,6 +1160,12 @@ export function stripTicketArg(list) {
  * nuovo senza biglietto e cancellandogli il promemoria. Chi chiede aiuto deve
  * ricevere aiuto, senza effetti collaterali. PURA.
  */
+/** «Sembra un'opzione?» — stessa regola di scripts/lib/argomenti.mjs. PURA. */
+const SEMBRA_OPZIONE = (a) => {
+  const s = String(a ?? '');
+  return s.length > 1 && ['-', '‐', '‑', '‒', '–', '—', '−'].includes(s[0]) && !/^[0-9]/.test(s.slice(1));
+};
+
 export function usageText() {
   return [
     'Uso: node scripts/dispatch.mjs <comando>',
@@ -1164,8 +1176,11 @@ export function usageText() {
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
     '  --record-verifier <id> "<critica>" [--ticket <b>]   una riga per rilievo,',
     '                         col livello davanti ([2] …; [1?] = chiede una decisione);',
-    '                         l\'esito lo calcola il server e lo stampa qui (fase 2 inclusa)',
-    '  --record-fixed    <id> ["report"] [--frase "…"] [--ticket <b>]',
+    '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
+    '                         riassunto il livello si cita a parole («il livello 2»);',
+    '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--ticket <b>]   il report',
+    '                         non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> [--ticket <b>]',
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
@@ -1565,11 +1580,44 @@ if (isMainModule) {
   try {
     if (flag === '--record-verifier') {
       const [, id, ...rest] = conBiglietto(argv);
-      // La parola del vecchio verdetto (pass|migliorabile|fail) è tollerata e
-      // ignorata: l'esito lo calcola il server dai livelli della critica.
-      if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) rest.shift();
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, col livello davanti: [2] …>"'); process.exit(1); }
-      const s = await recordVerifier(id, rest.join(' '));
+      // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
+      // più: veniva buttata via in silenzio, e senza rilievi la verifica
+      // risulta superata — chi scriveva `fail` per bocciare registrava una
+      // PROMOZIONE. Tollerarla solo quando è da sola non bastava: il caso
+      // peggiore è proprio quello in cui il motivo c'è, perché chi scrive
+      // verdetto E perché è sicuro di aver bocciato (feedback #565).
+      if (rest.length && LEGACY_VERDICT_WORDS.includes(rest[0])) {
+        console.error(`«${rest[0]}» non è più un verdetto: non ho registrato niente.`);
+        console.error('L\'esito non lo scegli tu, lo calcolano i livelli dei rilievi: senza rilievi la verifica risulta SUPERATA, quindi questa riga registrerebbe una promozione.');
+        console.error('Togli quella parola e scrivi i rilievi, uno per riga, col livello davanti: «[2] il pulsante Salva non salva col titolo vuoto», coi passi per rifarlo.');
+        process.exit(1);
+      }
+      // Qui la critica è UN testo, e non ci sono opzioni: una parola con due
+      // trattini finiva incollata dentro alla critica — che poi non si
+      // modifica più, e che l'owner legge nella chat del feedback (#565).
+      const intrusa = rest.find((a) => SEMBRA_OPZIONE(a));
+      if (intrusa) {
+        console.error(`Argomento non capito: ${intrusa} — non ho registrato niente. Qui la critica è un testo solo, fra virgolette: opzioni non ce ne sono.`);
+        process.exit(1);
+      }
+      // In UN pezzo solo: unendo i pezzi con uno spazio, un rilievo che sta nel
+      // secondo non apre più una riga, smette di essere un rilievo, e la
+      // bocciatura diventa una promozione (feedback #565).
+      if (rest.length > 1) {
+        console.error(`Ho ricevuto ${rest.length} pezzi invece di uno: non ho registrato niente. La critica va fra virgolette, tutta in un pezzo solo — probabilmente ne manca una.`);
+        console.error(`Primo pezzo: "${String(rest[0]).slice(0, 60)}…" · secondo: "${String(rest[1]).slice(0, 60)}…"`);
+        process.exit(1);
+      }
+      // Il pavimento al motivo, uguale nei due sensi: copre insieme la critica
+      // vuota (l'identificativo e basta) e quella di due parole.
+      const critica = rest.join(' ').trim();
+      if (critica.length < MIN_CRITIQUE_CHARS) {
+        console.error(`Critica troppo corta (${critica.length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho registrato niente.`);
+        console.error('Vale anche quando promuovi: senza rilievi la verifica risulta superata, e una promozione senza motivo non dice a nessuno cosa hai provato.');
+        process.exit(1);
+      }
+      const s = await recordVerifier(id, critica);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${s.reply?.outcome || 'pass'}`);
       console.log(verifierReplyText(s.reply));
@@ -1582,6 +1630,28 @@ if (isMainModule) {
       const fi = rest.indexOf('--frase');
       const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
       const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
+      // Qui l'unica opzione è `--frase`: qualunque altra cosa coi trattini
+      // davanti finirebbe sepolta dentro al report cifrato, e la frase per chi
+      // ha segnalato partirebbe vuota (#565).
+      // `--frase` in fondo alla riga, senza niente dopo: spariva, e la frase
+      // per chi ha segnalato partiva vuota (feedback #565).
+      if (fi !== -1 && rest[fi + 1] === undefined) {
+        console.error('--frase vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.');
+        process.exit(1);
+      }
+      const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => SEMBRA_OPZIONE(a));
+      if (altra) {
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui c'è solo --frase "…"; il resto è il report, un testo solo fra virgolette.`);
+        process.exit(1);
+      }
+      // Anche di qui esce un esito — il lavoro torna in coda a un'altra
+      // verifica — e un esito senza motivo non vale: stesso pavimento della
+      // critica, per la stessa ragione (feedback #565).
+      if (report.trim().length < MIN_CRITIQUE_CHARS) {
+        console.error(`Report della correzione troppo corto (${report.trim().length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho consegnato niente.`);
+        console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: è quello che l\'owner legge, e non si riscrive più.');
+        process.exit(1);
+      }
       const s = await recordFixed(id, report, frase);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: ri-messo in coda verifier (loop=${s.loopCount})`);
@@ -1589,6 +1659,13 @@ if (isMainModule) {
     } else if (flag === '--record-secaudit') {
       const [, id, verdict] = conBiglietto(argv);
       if (!id || !['pass', 'fail'].includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail>'); process.exit(1); }
+      // Qui non c'è altro da dire: un argomento in più veniva ignorato in
+      // silenzio e il verdetto partiva lo stesso (feedback #565).
+      const avanzo = conBiglietto(argv).slice(3);
+      if (avanzo.length) {
+        console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci vanno solo l'identificativo e pass|fail.`);
+        process.exit(1);
+      }
       const s = await recordSecaudit(id, verdict);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: secaudit=${s.secauditVerdict}`);

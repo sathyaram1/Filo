@@ -154,7 +154,7 @@
   // e spazio per stati futuri. Cambiarla NON rompe i documenti già scritti.
   const CIPHER_PAD = 32;
 
-  // ── I tre bilanci del verificatore che corregge (feedback #561, §4) ────────
+  // ── I tre bilanci dei giri di correzione (feedback #561, §4) ────────
   // DEFAULT quando la config non dice niente. I valori EFFETTIVI li detta
   // l'owner dalla dashboard (doc Firestore `config/routines`, campi `cap2`,
   // `cap1`, `cap0`) e li applica il SERVER quando registra la critica — mai il

@@ -191,6 +191,17 @@ parentesi quadre**. Le righe che seguono un rilievo senza livello davanti sono
 la sua continuazione (i passi per riprodurlo). Nessun rilievo = verifica
 superata.
 
+**Le parentesi quadre con dentro un livello sono SEMPRE un rilievo**, dovunque
+stiano nella riga: nel riassunto un livello si cita **a parole** («il livello
+2», «un rilievo di livello 3»), mai `[2]`, altrimenti la riga viene respinta e
+non registri niente. La regola è netta apposta: finché una riga scritta così
+poteva passare per riassunto, un rilievo grave — anche di sicurezza — spariva
+in silenzio e la bocciatura diventava una promozione (feedback #565). Il testo
+va passato **in un pezzo solo**, tutto dentro le stesse virgolette: spezzato in
+due, i rilievi del secondo pezzo non aprono più una riga e fanno la stessa fine.
+La regola vale anche nei passi che scrivi sotto un rilievo: lì un livello si
+cita a parole («una critica di livello 2»), non `[2]`.
+
 ```
 Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona.
 [2] Il pulsante «Salva» non salva se il titolo è vuoto.

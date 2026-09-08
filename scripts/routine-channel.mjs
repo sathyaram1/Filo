@@ -32,8 +32,10 @@
 //       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
 //         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
 //
-//   node scripts/routine-channel.mjs ticket <parola-d-ordine>
+//   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json]
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
+//         Con `--json` stampa biglietto E ruolo insieme: serve a chi guida per
+//         scegliere il tipo di worker PRIMA di lanciarlo.
 //         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
 //
 //   node scripts/routine-channel.mjs work <biglietto>
@@ -333,17 +335,92 @@ if (isMain) {
   // Un passaggio solo: i `--campo valore` diventano dati dell'intento, il resto
   // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
   // valore che assomiglia a un comando non viene scambiato per tale.
+  // I nomi di campo che questo strumento conosce.
+  const CAMPI = new Set([
+    'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
+    'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
+    'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
+  ]);
+  // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
+  // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
+  // resta è uno dei nostri campi. La conchiglia di Git trasforma `/guasto` in
+  // un percorso, quindi si guarda anche l'ultimo pezzo del percorso.
+  const SEMBRA_OPZIONE_STORTA = (arg) => {
+    const t = String(arg ?? '');
+    if (!t || t.startsWith('--')) return false;
+    const TRATTINI = ['-', '‐', '‑', '‒', '–', '—', '−'];
+    // QUALUNQUE nome, non solo i nostri: `-guast` scritto male veniva preso per
+    // una parola libera e buttato via, e il giro si chiudeva senza dichiarare
+    // il guasto, rispondendo «OK» (feedback #565). Un numero negativo resta un
+    // valore.
+    if (TRATTINI.includes(t[0])) return !/^[0-9]/.test(t.replace(/^[-‐‑‒–—−]+/, ''));
+    // La conchiglia di Git riscrive `/guasto` come percorso: si guarda l'ultimo
+    // pezzo, e solo per i nomi che conosciamo — un percorso vero è un valore.
+    if (t.includes('/')) return CAMPI.has(t.split('/').pop().split('=')[0]);
+    return false;
+  };
+
+  // Quelli che senza il loro testo non hanno senso: un «sì» al loro posto
+  // vuol dire consegnare a vuoto.
+  const CAMPI_TESTO = new Set([
+    'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status',
+  ]);
+  // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
+  // questo elenco `--json` finiva fra i campi con valore, spariva dai
+  // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
+  // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
+  // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
+  const CAMPI_BANDIERA = new Set(['json']);
   const args = [];
   const flags = [];
   const data = {};
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
-    if (!a.startsWith('--')) { args.push(a); continue; }
+    // Un'opzione scritta storta non è un posizionale: presa per tale, il
+    // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
+    // che diceva «OK» (feedback #565).
+    if (!a.startsWith('--')) {
+      if (SEMBRA_OPZIONE_STORTA(a)) {
+        const nome = String(a).replace(/^[-‐‑‒–—−]+/, '').split('/').pop().split('=')[0];
+        console.error(`Argomento non capito: "${a}" — non ho fatto niente. Le opzioni si scrivono con due trattini: --${nome} …`);
+        process.exit(1);
+      }
+      args.push(a);
+      continue;
+    }
+    // Un nome sbagliato non deve passare in silenzio: `--noets "…"` faceva
+    // partire la consegna col report VUOTO e il server rispondeva OK — lo
+    // stesso danno che il controllo sui posizionali, qui sotto, esiste per
+    // impedire (feedback #565).
+    if (!CAMPI.has(a.slice(2).split('=')[0])) {
+      console.error(`Campo non capito: "${a}" — non ho consegnato niente.`);
+      console.error(`Campi ammessi: ${[...CAMPI].map((c) => `--${c}`).join(' ')}`);
+      process.exit(1);
+    }
     flags.push(a);
+    // `--campo=valore` è la forma che regge quando la riga passa da npm, e va
+    // capita qui: prima diventava un CAMPO di nome «campo=valore» col valore
+    // `true`, e la consegna partiva col report vuoto rispondendo OK (#565).
+    const uguale = a.indexOf('=');
+    if (uguale > 2) {
+      data[a.slice(2, uguale)] = a.slice(uguale + 1);
+      continue;
+    }
     const key = a.slice(2);
+    // Un interruttore non mangia mai la parola dopo di sé: scritto prima della
+    // parola d'ordine se la prendeva per valore, e restavano zero posizionali.
+    if (CAMPI_BANDIERA.has(key)) { data[key] = true; continue; }
     const next = rest[i + 1];
-    if (next === undefined || next.startsWith('--')) data[key] = true;
-    else { data[key] = next; i += 1; }
+    if (next === undefined || next.startsWith('--')) {
+      // Un campo di TESTO senza il suo testo non è un sì: è un report che
+      // parte vuoto mentre la risposta dice OK (feedback #565).
+      if (CAMPI_TESTO.has(key)) {
+        console.error(`--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
+        process.exit(1);
+      }
+      data[key] = true;
+    } else { data[key] = next; i += 1; }
   }
 
   // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8) hanno destinatari diversi: il
@@ -376,7 +453,7 @@ if (isMain) {
     const r = await ticket(args[0]);
     // `--json`: biglietto E ruolo, per chi deve scegliere il worker prima di
     // lanciarlo. Senza flag resta la sola stringa, come sempre.
-    if (r.outcome === 'work') { console.log(args.includes('--json') ? JSON.stringify({ ticket: r.ticket, role: r.role || '' }) : r.ticket); process.exit(0); }
+    if (r.outcome === 'work') { console.log(data.json === true ? JSON.stringify({ ticket: r.ticket, role: r.role || '' }) : r.ticket); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'work') {
@@ -427,6 +504,13 @@ if (isMain) {
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
     // parole nel testo di ritorno (che nessuna macchina legge).
+    // Una parola in più qui non è un posizionale: è un `--guasto` scritto
+    // senza trattini, e il giro si chiuderebbe senza dichiarare niente,
+    // rispondendo «OK» (feedback #565).
+    if (args.length > 1) {
+      console.error(`Argomento non capito: "${String(args[1]).slice(0, 40)}" — non ho rilasciato niente. Il motivo di un guasto si scrive così: --guasto "…"`);
+      process.exit(1);
+    }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
     const r = await release(args[0], guasto);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo

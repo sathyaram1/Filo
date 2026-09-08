@@ -21,6 +21,29 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBKEY_FILE = join(__dirname, '..', 'src', 'shared', 'feedbackPublicKey.js');
 
+// Qui l'azione di serie RIGENERA la chiave, e i feedback cifrati con la
+// vecchia non si leggono più: un'opzione scritta male non deve arrivarci
+// (feedback #565).
+if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
+  console.log([
+    'Uso: node scripts/gen-feedback-keys.mjs [--print]',
+    '  ATTENZIONE: senza --print RIGENERA la chiave, e i feedback cifrati con la',
+    '  vecchia non si leggono più. --print stampa soltanto la chiave attuale.',
+  ].join('\n'));
+  process.exit(0);
+}
+const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+// Qui la cosa vera è irreversibile: se `--print` è finita a npm, riprenderla
+// dall'ambiente è la differenza fra stampare e rigenerare (feedback #565).
+const storpiata = opzioneStorpiata(process.env, ['--print']);
+if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--print'] });
+if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
+const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--print'], senzaParoleLibere: true });
+if (argomentiSbagliati) {
+  console.error(`RIFIUTATO: ${argomentiSbagliati}`);
+  process.exit(1);
+}
 const printOnly = process.argv.includes('--print');
 
 function bytesToB64url(buf) {

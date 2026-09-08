@@ -1,5 +1,4 @@
-// Il giro del verificatore che corregge — la parte PURA (spec «Il verificatore
-// corregge: un agente per giro», feedback #561, decisa con l'owner il
+// Il giro di verifica — la parte PURA (feedback #561, deciso con l'owner il
 // 2026-09-04/05).
 //
 // COSA C'È QUI
@@ -74,7 +73,17 @@
   // Davanti al livello valgono anche un titolo Markdown («### [2]»), una
   // citazione («> [2]») e un elenco con le lettere («a) [2]»): chi scrive in
   // Markdown se le aspetta come «- [2]» e «1. [2]» (verifica del giro 11).
-  const FINDING_LINE = /^\s*(?:#{1,6}\s*|>\s*|[-*•]\s*|\d{1,2}[.)]\s*|[A-Za-z][.)]\s*)?(?:\*\*)?\[\s*([0-3])\s*(\?)?\s*\](?:\*\*)?\s*(.*)$/;
+  // I modi di elencare ammessi davanti al livello stanno in UN posto solo: il
+  // controllo che respinge un livello scritto male deve guardarne esattamente
+  // quanti ne accetta il lettore. Quando ne guardava meno, un «[4] gravissimo»
+  // scritto dopo un `>` o dei cancelletti finiva nel riassunto — cioè una
+  // bocciatura diventava una promozione, in silenzio (feedback #565).
+  const PREFISSO_ELENCO = '(?:#{1,6}\\s*|>\\s*|[-*•]\\s*|\\d{1,2}[.)]\\s*|[A-Za-z][.)]\\s*)?';
+  // Il grassetto di Markdown si scrive con gli asterischi O con gli
+  // underscore: guardando solo gli asterischi, «__tre] …» passava muta e la
+  // bocciatura finiva nel riassunto (feedback #565).
+  const GRASSETTO = '(?:\\*{1,3}|_{1,3})?';
+  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
   // COMINCIA così, o che lo porta dopo una breve etichetta e prima di un
@@ -88,13 +97,119 @@
   // silenzio e il lavoro passava (verifica del giro 6). Lo stesso per il segno
   // messo prima della cifra («[?2]») o un segno diverso dopo («[2!]»): non
   // erano né rilievi né errori (verifica del giro 7).
-  const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/]\\s*\\d+)?\\s*[?!]*\\s*\\]';
-  const LEVEL_START = new RegExp(`^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?${LEVEL_TOKEN_SRC}`);
+  const LEVEL_TOKEN_SRC = '\\[\\s*(?:[A-Za-zÀ-ÿ.?!]{1,10}\\s*)?\\d+(?:\\s*[-–/.,]\\s*\\d+)?\\s*[?!]*\\s*(?:[A-Za-zÀ-ÿ]{1,10}\\s*)?\\]';
+  const LEVEL_START = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}${LEVEL_TOKEN_SRC}`);
+  // Un livello scritto in una parentesi qualunque — tonda, graffa, doppia,
+  // spaiata — o con la cifra a parole. Il lettore riconosce solo la quadra con
+  // la cifra: tutto il resto finiva nel riassunto in silenzio, e una
+  // bocciatura diventava una promozione (feedback #565). Qui si guarda come
+  // APRE la riga, e basta che dentro ci sia una cifra o una parola che dice un
+  // livello.
+  const PARENTESI_QUALUNQUE = '(?:\\[{1,2}|\\(|\\{)\\s*[^\\]\\)\\}\\n]{0,20}(?:\\]{1,2}|\\)|\\})';
+  const APERTURA_PARENTESI = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}(${PARENTESI_QUALUNQUE})`);
+  const DENTRO_SEMBRA_LIVELLO = /\d|zero|uno|due|tre|livello|level|priorit/i;
+  // E la rete che tiene tutte le altre aperture: QUALUNQUE cosa stia davanti —
+  // un trattino lungo, un «+», «1.1», «100.», «(a)», un apice inverso, un
+  // pallino diverso — se subito dopo (al più sei caratteri) c'è un livello e il
+  // lettore non riesce a leggere la riga come rilievo, quella riga è un rilievo
+  // scritto male, non riassunto. Elencare i modi di elencare ammessi è una
+  // rincorsa che si perde: ogni forma dimenticata era una bocciatura che
+  // passava per promozione (feedback #565). Sei caratteri perché una frase vera
+  // («Nel caso [2] ho provato…») ha più parole davanti, e resta testo.
+  const LIVELLO_VICINO = new RegExp(`^.{0,6}?(${PARENTESI_QUALUNQUE})`);
+  // La stessa rete per il livello scritto BENE ma con davanti qualcosa che
+  // il lettore non conosce («(a) [2] …»): lì la prima parentesi non è il
+  // livello, e cercarla come prima cosa la mancava.
+  // FINE DELLA RINCORSA: dovunque stia nella riga. Per cinque giri di fila
+  // il controllo ha guardato una finestra sempre un po' piu' larga, e ogni
+  // volta bastava un'etichetta di una parola in piu' perche' un rilievo —
+  // anche di sicurezza — finisse nel riassunto e la bocciatura diventasse
+  // una promozione. Adesso la regola e' netta: le parentesi quadre con
+  // dentro un livello sono SEMPRE un rilievo; se la riga non si legge come
+  // rilievo viene respinta con la spiegazione. Il prezzo, che vale la pena:
+  // nel riassunto un livello si cita senza le quadre («il livello 2»),
+  // altrimenti si riscrive la riga. Rovescia una scelta del giro 4 su #561,
+  // che quelle parentesi in mezzo a una frase le lasciava passare
+  // (feedback #565).
+  // QUALUNQUE cosa dentro le quadre che somigli a un livello, dovunque nella
+  // riga: «[3 - sicurezza]», «[2, grave]», «[3.]», «[#2]», «[2%]». Inseguire una
+  // forma per volta è la rincorsa che questo feedback ha perso sei volte: la
+  // regola dell'owner è che le quadre col livello dentro sono sempre un
+  // rilievo, e questa è quella regola scritta per intero (feedback #565).
+  const QUADRA_OVUNQUE = /\[{1,2}[^\]\n]{0,200}\]{1,2}/g;
+  // E, dovunque nella riga, una parentesi di QUALUNQUE forma che contenga SOLO
+  // un livello: «(3)», «{2}», «[2)», «(due)». Il contenuto è stretto apposta —
+  // «(3 volte)» in mezzo a una frase resta testo normale (feedback #565).
+  const SOLO_UN_LIVELLO = '\\s*(?:(?:livello|level|priorit[àa]|liv|L|P)\\s*)?(?:\\d+(?:\\s*[.,\\-–/]\\s*\\d+)?|zero|uno|due|tre)\\s*[?!]*\\s*';
+  /** Una quadra che contiene qualcosa che somiglia a un livello. PURA. */
+  // Dentro la quadra spaiata può esserci qualunque cosa fra il livello e la
+  // parentesi: guardare solo «cifra più lettere» lasciava passare «3 -
+  // sicurezza]», «3, grave]», «[#3», «[tre». Due sbagli insieme — la quadra
+  // dimenticata E il livello scritto in una forma sua — e la bocciatura
+  // spariva nel riassunto (feedback #565). Le parole si ancorano ai confini,
+  // o «altre» conterrebbe «tre».
+  // E fra il livello e la parentesi ci può stare una descrizione intera, non
+  // una dozzina di caratteri: «3 dati dell'utente a rischio]» è come uno
+  // scrive davvero, e con la finestra corta finiva muta nel riassunto. La
+  // stessa misura delle quadre appaiate (200), e non allarga niente: qui la
+  // finestra non può contenere una parentesi, quindi vale solo per la quadra
+  // SPAIATA — quelle appaiate le guarda già QUADRA_OVUNQUE (feedback #565).
+  // Il confine si guarda alle LETTERE, non con `\b`: per la regex l'underscore
+  // è un carattere di parola, quindi dopo un grassetto scritto «__tre]» il
+  // confine non c'era e la riga passava muta; e la stessa cosa dopo un a capo
+  // scritto a mano, dove il carattere prima è la «n» (feedback #565).
+  const LIVELLO_NUDO = '(?:\\d|(?<![A-Za-zÀ-ÿ])(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])|[?!])';
+  const QUADRA_APERTA = new RegExp(`\\[{1,2}[^\\[\\]\\n]{0,200}?${LIVELLO_NUDO}`, 'i');
+  const QUADRA_CHIUSA = new RegExp(`${LIVELLO_NUDO}[^\\[\\]\\n]{0,200}?\\]{1,2}`, 'i');
+
+  // Un livello che APRE la riga e incontra una parentesi di CHIUSURA senza
+  // che ne sia mai stata aperta una: «tre] …», «tre) …», «__tre] …». È la
+  // parentesi dimenticata, e con una tonda al posto della quadra passava muta
+  // (feedback #565). La finestra non può contenere una parentesi APERTA,
+  // quindi «3 volte (ok)» in mezzo a una frase resta testo.
+  const APRE_LIVELLO_SENZA_APERTURA = new RegExp(
+    `^\\s*${PREFISSO_ELENCO}${GRASSETTO}(?:`
+    // Quadra e graffa di chiusura: nessuno le usa per elencare, quindi valgono
+    // sempre.
+    + `${LIVELLO_NUDO}[^\\[\\](){}\\n]{0,200}?[\\]}]`
+    // La tonda invece È un modo di elencare: «1) primo punto» è testo normale.
+    // Vale solo col livello scritto a parole, o con qualcosa in mezzo.
+    + `|(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])[^\\[\\](){}\\n]{0,200}?\\)`
+    + `|\\d[^\\[\\](){}\\n]{1,200}?\\)`
+    + `)`, 'i');
+
+  function quadraColLivello(riga) {
+    // TUTTE le quadre della riga, non solo la prima: bastava una frase fra
+    // quadre all'inizio per far sparire il livello scritto più avanti. E il
+    // contenuto può essere lungo: «[3 dati dell'utente a rischio]» è come uno
+    // scrive davvero (feedback #565).
+    const testo = String(riga || '');
+    // La quadra SPAIATA — aperta e mai chiusa, o chiusa e mai aperta — e il
+    // contenuto lunghissimo: una parentesi dimenticata è lo stesso errore di
+    // battitura della virgoletta che manca, e non deve costare una bocciatura
+    // (feedback #565).
+    if (QUADRA_APERTA.test(testo) || QUADRA_CHIUSA.test(testo)) return true;
+    QUADRA_OVUNQUE.lastIndex = 0;
+    for (let m = QUADRA_OVUNQUE.exec(testo); m; m = QUADRA_OVUNQUE.exec(testo)) {
+      if (DENTRO_SEMBRA_LIVELLO.test(m[0])) { QUADRA_OVUNQUE.lastIndex = 0; return true; }
+    }
+    return false;
+  }
+  const PARENTESI_LIVELLO = new RegExp(`(?:\\[{1,2}|\\(|\\{)${SOLO_UN_LIVELLO}(?:\\]{1,2}|\\)|\\})`);
+  // Dentro la CONTINUAZIONE di un rilievo, invece, un livello citato in mezzo
+  // a una frase resta testo («Passi: critica con [2] - poi start», verifica
+  // del giro 6): lì il danno è minore — il rilievo sopra è comunque
+  // registrato e la bocciatura non si perde — quindi vale la finestra.
+  const QUADRA_VICINA = new RegExp(`^.{0,14}?(${LEVEL_TOKEN_SRC})`);
+  // «Difetto: [2] …», «rilievo grave [2] …»: l'etichetta sta PRIMA del livello,
+  // col separatore o senza. Il controllo guardava solo la forma opposta
+  // («Rilievo [2]: …»), e questa passava per riassunto (feedback #565).
+  const ETICHETTA_PRIMA = new RegExp(`^\\s*${PREFISSO_ELENCO}[^\\[\\]]{1,20}?[:\\-–—]\\s*${LEVEL_TOKEN_SRC}`);
   // L'etichetta breve col separatore («Rilievo [2]: …») vale solo nel
   // riassunto: dentro la continuazione di un rilievo («Passi: critica con
   // [2] - poi start») è testo, e respingerla mandava a riscrivere una riga
   // giusta (verifica del giro 6).
-  const LEVEL_LABEL = new RegExp(`^\\s*(?:[-*•]\\s*|\\d{1,2}[.)]\\s*)?(?:\\*\\*)?[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—]`);
+  const LEVEL_LABEL = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}[^\\[\\]]{1,30}?\\s*${LEVEL_TOKEN_SRC}\\s*[:\\-–—]`);
 
   // Un a capo scritto coi due caratteri barra e n: è come esce il comando
   // d'esempio («<riassunto>\n[livello] …») copiato dentro virgolette doppie, in
@@ -104,7 +219,20 @@
   // questo un «[2]» dopo una barra-n finiva nel riassunto e il lavoro passava
   // in silenzio, in tutti e tre i posti (porta chiusa al giro 3 su #561 e
   // riaperta al giro 5).
-  const ESCAPED_BREAK_BEFORE_BRACKET = /(?:\\r)?\\n\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(?:\*\*)?\[/;
+  // Gli stessi modi di elencare del lettore, non cinque su nove: con un titolo
+  // Markdown o una citazione dopo la barra-n l'a capo non veniva riconosciuto,
+  // la riga non diventava mai una riga e il rilievo finiva nel riassunto —
+  // un'altra bocciatura letta come promozione (feedback #565).
+  // E la parentesi di apertura può mancare: «\ntre] i dati in chiaro». Chiesta
+  // una parentesi per forza, quell'a capo non veniva riconosciuto, la riga non
+  // diventava mai una riga e finiva nel riassunto — bocciatura letta come
+  // promozione, con tre sbagli insieme ma sempre lo stesso esito (#565).
+  // Qui il confine a sinistra ce l'ha già il pattern (l'a capo e il punto
+  // elenco), e guardarlo di nuovo lo romperebbe: l'a capo scritto a mano
+  // finisce per «n», che è una lettera, e la riga tornava muta (#565).
+  const LIVELLO_DOPO_CONFINE = '(?:\\d|(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])|[?!])';
+  const DOPO_A_CAPO = `(?:[\\[({]|${LIVELLO_DOPO_CONFINE}[^\\[\\]\\n]{0,200}?[\\]})])`;
+  const ESCAPED_BREAK_BEFORE_BRACKET = new RegExp(`(?:\\\\r)?\\\\n\\s*${PREFISSO_ELENCO}${GRASSETTO}${DOPO_A_CAPO}`, 'i');
 
   /** La critica con gli a capo veri: `\r\n` → `\n`, e la barra-n letterale usata come a capo. PURA. */
   function normalizeCritique(text) {
@@ -138,12 +266,33 @@
     for (const raw of lines) {
       const m = FINDING_LINE.exec(raw);
       if (m) {
+        // Due livelli sulla STESSA riga: il secondo finiva dentro al testo del
+        // primo, e un difetto di sicurezza spariva in coda a uno cosmetico.
+        // Basta un a capo dimenticato, che è lo stesso errore della virgoletta
+        // che manca (feedback #565).
+        if (quadraColLivello(m[3])) {
+          flush();
+          out.push(raw.trim());
+          continue;
+        }
         flush();
         count += 1;
         current = { line: raw.trim(), text: m[3].trim() };
         continue;
       }
-      if (LEVEL_START.test(raw) || (!current && LEVEL_LABEL.test(raw))) {
+      // La regola, senza finestre e senza eccezioni (decisione dell'owner del
+      // 2026-09-07 su #565): le QUADRE con dentro un livello sono sempre un
+      // rilievo, dovunque stiano nella riga e anche dentro la continuazione di
+      // un altro rilievo. Le altre parentesi valgono all'inizio della riga, che
+      // è dove uno le userebbe per aprire un rilievo: in mezzo a una frase
+      // «(3 volte)» è testo normale.
+      const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
+      const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]))
+        || quadraColLivello(raw)
+        || APRE_LIVELLO_SENZA_APERTURA.test(raw)
+        || PARENTESI_LIVELLO.test(raw)
+        || ETICHETTA_PRIMA.test(raw);
+      if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
         flush();
         out.push(raw.trim());
         continue;
@@ -353,7 +502,7 @@
     if (d.stop) {
       parts.push('Il lavoro si ferma: c\'è un rilievo di livello 2 o 3 che non si può correggere da soli (bilancio esaurito, o chiede una tua decisione).');
     } else if (Array.isArray(d.fix) && d.fix.length) {
-      parts.push(`Il verificatore corregge ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un altro verificatore ricontrolla.`);
+      parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
     } else {
       parts.push('Nessun rilievo da correggere adesso: il lavoro prosegue e i rilievi vanno in un feedback derivato.');
     }

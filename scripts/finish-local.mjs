@@ -250,12 +250,50 @@ function readKnownRed(root) {
 
 async function main() {
   const argv = process.argv.slice(2);
-  const checkOnly = argv.includes('--check');
+  // Un aiuto vero: senza, QUALUNQUE argomento (`--help` compreso) faceva
+  // partire l'intera chiusura, e chi voleva solo sapere cosa fa lo strumento
+  // si ritrovava dentro la procedura (feedback #565).
+  const AIUTO = [
+    'Uso: npm run finish [-- --check]',
+    '',
+    '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
+    '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
+    '                       (con npm: `npm run finish -- --check`, oppure `npm run finish:check`)',
+    '  --help               questa schermata',
+  ].join('\n');
+  if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
+  // Un argomento che non conosciamo NON fa partire la chiusura: prima faceva
+  // girare tutto — controlli, verifica e, con la verifica già a posto, il
+  // ramo spedito e la fusione chiesta — per un errore di battitura
+  // (feedback #565).
+  // `npm run finish --check` non arriva qui: npm si prende `--check` come roba
+  // sua e lo strumento parte SENZA, cioè spedisce il ramo e chiede la fusione
+  // a chi voleva solo i controlli. L'opzione resta scritta nell'ambiente: da
+  // lì ce ne accorgiamo e ci fermiamo (feedback #565).
+  const { argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  const storpiata = opzioneStorpiata(process.env, ['--check']);
+  if (storpiata) {
+    console.error(`${storpiata}
+`);
+    console.error(AIUTO);
+    process.exit(1);
+  }
+  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check'] });
+  if (daNpm.nota) { console.error(daNpm.nota); argv.push(...daNpm.args); }
+  // Prima dell'elenco degli sconosciuti: a chi prova la vecchia scorciatoia
+  // serve il PERCHÉ, non «argomento sconosciuto» (feedback #565).
   if (argv.includes('--no-verify')) {
     console.error('La scorciatoia --no-verify non esiste più: i controlli e la verifica');
     console.error('indipendente girano sempre (SPEC-RIDISEGNO-MAX.md §8).');
     process.exit(1);
   }
+  const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
+  if (ignoti.length) {
+    console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
+    console.error(AIUTO);
+    process.exit(1);
+  }
+  const checkOnly = argv.includes('--check');
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
@@ -339,8 +377,9 @@ async function main() {
       console.error('    node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"');
       console.error('  poi consegna il testo stampato a un\'ISTANZA NUOVA (non a te stesso:');
       console.error('  chi ha scritto il codice non può verificarlo), e lascia che registri');
-      console.error('  la critica. Se corregge qualcosa, dopo la sua consegna serve un\'altra');
-      console.error('  verifica (rilancia `start`, senza argomenti).');
+      console.error('  la critica. Un esito vale per il commit su cui è stato dato: se il');
+      console.error('  ramo cambia, serve un\'altra verifica (rilancia `start`, senza');
+      console.error('  argomenti).');
       process.exit(1);
     }
     console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);

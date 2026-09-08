@@ -43,9 +43,9 @@
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgProberIdleBlock = document.getElementById('mgProberIdleBlock');
-  // I tre bilanci del verificatore che corregge (feedback #561): cap2 = giri
+  // I tre bilanci dei giri di correzione (feedback #561): cap2 = giri
   // per i rilievi di livello 3/2, cap1 = per gli 1, cap0 = per i soli 0; più il
-  // testo della fase 2 (fixInstructions).
+  // testo in coda alla risposta (fixInstructions).
   const mgCap2     = document.getElementById('mgCap2');
   const mgCap2Save = document.getElementById('mgCap2Save');
   const mgCap2Msg  = document.getElementById('mgCap2Msg');
@@ -211,7 +211,7 @@
     prober:   { icon: '🔍', label: 'Claude (esplorazione)' },
     worker:   { icon: '🔧', label: 'Claude (sviluppo)' },
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
-    // I rilievi che la verifica ha trovato e non ha corretto (feedback #561:
+    // I rilievi rimasti fuori dal giro di correzione (feedback #561:
     // livello 0, bilancio esaurito, o che chiedono una decisione), raccolti dal
     // server in UN feedback derivato per lavoro, figlio #N.k: categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
@@ -524,15 +524,15 @@
     applyAutoApproveGate();
   }
 
-  // ── I tre bilanci del verificatore che corregge (tab Automazioni) ────────
+  // ── I tre bilanci dei giri di correzione (tab Automazioni) ────────
   // Quattro campi sul doc Firestore config/routines (feedback #561, §4):
   //   cap2  giri di correzione per i rilievi di livello 3 e 2 (a bilancio
   //         finito un 3/2 ferma la pratica e chiama l'owner);
   //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
   //         feedback derivato);
   //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);
-  //   fixInstructions  il testo della fase 2 che il server manda al
-  //         verificatore dopo la critica (vuoto = il testo del server).
+  //   fixInstructions  il testo che il server aggiunge in coda alla risposta
+  //         a una critica (vuoto = il testo del server).
   // Li applica il SERVER quando registra la critica; chrome.storage.local è
   // solo una CACHE per mostrare subito un valore (e un ripiego offline).
   function clampCap(n, def, min = AUTOMATION.CAP_MIN) {

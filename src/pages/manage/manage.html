@@ -851,7 +851,7 @@
       color: var(--sn-fg); text-align: center;
     }
     .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
-    /* Il testo della fase 2 (istruzioni per chi corregge): stessa pelle del
+    /* Il testo in coda alla risposta (istruzioni per chi corregge): stessa pelle del
        campo numerico, ma largo e a più righe. */
     .mg-auto-field-row--stack { flex-direction: column; align-items: stretch; gap: 8px; }
     .mg-auto-textarea {
@@ -1434,7 +1434,7 @@
               <input type="checkbox" id="mgAutoApproveVerifier" checked />
               <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
             </label>
-            <label class="mg-switch mg-switch--sm" title="I rilievi che la verifica ha trovato e non ha corretto, raccolti dal server in un feedback figlio del lavoro">
+            <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro">
               <span class="mg-switch-text">🧹 Claude (rilievi residui)</span>
               <input type="checkbox" id="mgAutoApproveResiduo" checked />
               <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
@@ -1472,14 +1472,14 @@
           </p>
         </section>
 
-        <!-- I tre bilanci del verificatore che corregge (feedback #561): quanti
+        <!-- I tre bilanci dei giri di correzione (feedback #561): quanti
              giri di correzione si pagano per livello di rilievo. Valgono solo se
              le routine lavorano. -->
         <section class="mg-auto-block" id="mgCap2Block">
           <label class="mg-auto-field-label" for="mgCap2">Correzioni per i difetti gravi (livello 3 e 2)</label>
           <p class="mg-auto-block-desc">
-            Quante volte la verifica può correggere da sola un difetto che
-            impedisce di ottenere la cosa chiesta. Finito il bilancio, il
+            Quante volte un difetto che impedisce di ottenere la cosa chiesta
+            può tornare indietro per essere corretto. Finito il bilancio, il
             lavoro si ferma e decidi tu.
           </p>
           <div class="mg-auto-field-row">
@@ -1493,9 +1493,10 @@
         <section class="mg-auto-block" id="mgCap1Block">
           <label class="mg-auto-field-label" for="mgCap1">Correzioni per i rilievi minori (livello 1)</label>
           <p class="mg-auto-block-desc">
-            Quante volte la verifica può correggere da sola cosmetica e attrito
-            fuori dal cammino principale. Finito il bilancio, il lavoro passa e
-            i rilievi rimasti diventano un feedback a parte, figlio del lavoro.
+            Quante volte cosmetica e attrito fuori dal cammino principale
+            possono tornare indietro per essere corretti. Finito il bilancio, il
+            lavoro passa e i rilievi rimasti diventano un feedback a parte,
+            figlio del lavoro.
           </p>
           <div class="mg-auto-field-row">
             <input type="number" id="mgCap1" class="mg-auto-number"
@@ -1523,9 +1524,8 @@
         <section class="mg-auto-block" id="mgFixInstructionsBlock">
           <label class="mg-auto-field-label" for="mgFixInstructions">Istruzioni per chi corregge</label>
           <p class="mg-auto-block-desc">
-            Il testo che il server consegna alla verifica dopo che ha registrato
-            i suoi rilievi, quando c'è da correggere. Vuoto: vale il testo del
-            server.
+            Il testo che il server aggiunge in coda alla risposta, quando c'è
+            da correggere. Vuoto: vale il testo del server.
           </p>
           <div class="mg-auto-field-row mg-auto-field-row--stack">
             <textarea id="mgFixInstructions" class="mg-auto-textarea" rows="6" spellcheck="false"

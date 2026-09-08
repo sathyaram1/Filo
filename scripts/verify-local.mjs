@@ -13,12 +13,11 @@
 //   condividono i suoi punti ciechi. Da qui in poi anche in locale si passa di
 //   qui, e `npm run finish` non pubblica senza un esito positivo.
 //
-// IL GIRO (feedback #561: «il verificatore corregge, un agente per giro»)
+// IL GIRO (feedback #561)
 //   Stessa struttura del giro in cloud. Chi verifica registra la CRITICA coi
 //   livelli; questo strumento calcola l'esito dai livelli e dai tre bilanci
-//   (le stesse regole del server, src/shared/verifierRound.js) e, se c'è da
-//   correggere, stampa SOLO ALLORA le istruzioni della fase 2. Chi ha
-//   corretto consegna; poi serve un'altra verifica, di un'altra istanza.
+//   (le stesse regole del server, src/shared/verifierRound.js) e lo stampa.
+//   Chiuso il giro serve un'altra verifica, fatta da un'altra istanza.
 //
 // COME SI USA
 //
@@ -32,18 +31,19 @@
 //   node scripts/verify-local.mjs critica "<una riga per rilievo, col livello davanti>"
 //     Lo lancia l'istanza che ha verificato. Formato: `[2] testo`, `[1?]` =
 //     chiede una decisione dell'owner; le righe prima del primo rilievo sono
-//     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito e, se
-//     c'è da correggere, le istruzioni della fase 2.
+//     il riassunto. Nessun rilievo = verifica superata. Stampa l'esito.
+//     Le quadre col livello dentro sono SEMPRE un rilievo, dovunque stiano
+//     nella riga: nel riassunto il livello si cita a parole («il livello 2»).
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
-//     Lo lancia chi ha corretto (lo stesso verificatore): chiude la fase 2 e
-//     chiede un'altra verifica sul commit nuovo.
+//     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
+//     sul commit nuovo.
 //
 //   node scripts/verify-local.mjs status
 //     Esito per il ramo corrente. Exit 0 = si può pubblicare.
 //
-//   (`pass "<testo>"` e `fail "<testo>"` restano come scorciatoie: nessun
-//   rilievo, oppure un solo rilievo di livello 2.)
+//   Non ci sono scorciatoie: si promuove e si boccia dallo stesso comando, e
+//   in tutti e due i casi il motivo si scrive (feedback #565).
 //
 // L'ESITO È LEGATO AL CONTENUTO, NON AL RAMO
 //   Il verdetto vale per il commit su cui è stato dato. Se dopo il PASS si
@@ -80,12 +80,13 @@ export function stateFile(root = ROOT) {
 // registrazione è respinta con la spiegazione, mai tagliata in silenzio
 // (CLAUDE.md § Limiti).
 export const MAX_CRITIQUE_CHARS = 12000;
+// E un pavimento: una verifica di due parole non è una verifica. Vale anche
+// per il pass, che è la promozione (feedback #565).
+export const MIN_CRITIQUE_CHARS = 80;
 
-// Le istruzioni della fase 2 in locale vivono FUORI dal repo, nella cartella
-// sopra (accanto a LOCAL.md): il verificatore, che legge il repo, non deve
-// trovarle prima di aver registrato la critica. Le stampa questo strumento,
-// solo dopo la critica, senza passare da nessun altro agente.
-export function phase2InstructionsFile(root = ROOT) {
+// La coda della risposta vive fuori dal repo, accanto a LOCAL.md: è roba di
+// questa macchina, non del progetto.
+export function codaFile(root = ROOT) {
   // «Sopra il repo» vuol dire sopra il checkout PRINCIPALE: un lavoro che sta
   // in una cartella di lavoro separata (`.claude/worktrees/<nome>`) ha come
   // cartella sopra quella dei worktree, e lì il file non c'è (verifica del
@@ -94,12 +95,12 @@ export function phase2InstructionsFile(root = ROOT) {
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    if (common) return resolve(common, '..', '..', 'FASE2-LOCALE.md');
+    if (common) return resolve(common, '..', '..', 'CODA-GIRO-LOCALE.md');
   } catch (_) { /* niente git: ripiego */ }
-  return resolve(root, '..', 'FASE2-LOCALE.md');
+  return resolve(root, '..', 'CODA-GIRO-LOCALE.md');
 }
-export function readPhase2Instructions(root = ROOT) {
-  const f = phase2InstructionsFile(root);
+export function leggiCoda(root = ROOT) {
+  const f = codaFile(root);
   try { return existsSync(f) ? readFileSync(f, 'utf8').trim() : ''; } catch (_) { return ''; }
 }
 
@@ -112,7 +113,7 @@ export function readPhase2Instructions(root = ROOT) {
  * Casi di NO, tutti reali:
  *   - nessuno ha mai verificato questo ramo;
  *   - la verifica è avviata ma senza esito;
- *   - il verificatore sta correggendo (fase 2) e non ha ancora consegnato;
+ *   - c'è un giro di correzione aperto, non ancora consegnato;
  *   - ha corretto: serve un'altra verifica sul commit nuovo;
  *   - qualcuno ha verificato e si è fermato (un 3/2 non correggibile);
  *   - qualcuno ha verificato e ha approvato, ma POI il codice è cambiato → il
@@ -128,10 +129,10 @@ export function checkVerdict(entry, headSha, dirty = false) {
     return { ok: false, reason: 'verifica avviata ma senza esito: chi doveva verificare non ha ancora registrato la critica' };
   }
   if (entry.verdict === 'fix-pending') {
-    return { ok: false, reason: 'il verificatore sta correggendo i suoi rilievi e non ha ancora consegnato (verify-local.mjs corretto)' };
+    return { ok: false, reason: 'c\'è un giro di correzione aperto su questo ramo: i rilievi non sono ancora stati consegnati (verify-local.mjs corretto)' };
   }
   if (entry.verdict === 'fixed') {
-    return { ok: false, reason: 'il verificatore ha corretto: serve un\'altra verifica sul contenuto nuovo (verify-local.mjs start)' };
+    return { ok: false, reason: 'la correzione è stata consegnata: serve un\'altra verifica sul contenuto nuovo (verify-local.mjs start)' };
   }
   if (entry.verdict !== 'pass') {
     return { ok: false, reason: `la verifica ha bocciato il lavoro: ${entry.critique || '(nessuna critica registrata)'}` };
@@ -190,7 +191,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   if (prev.verdict === 'fix-pending' && prev.pending) {
     // La STESSA critica (stesso testo, stesso commit) rimandata dalla stessa
     // istanza: è la risposta persa (uscita troncata, terminale chiuso), e si
-    // ridà la stessa fase 2 senza scrivere niente e senza ripagare il giro,
+    // ridà la stessa risposta senza scrivere niente e senza ripagare il giro,
     // come già sul server (verifica del giro 10 su #561). Un testo diverso
     // resta una seconda critica, e viene respinto.
     if (ROUND.normalizeCritique(critique) === String(prev.critique || '') && String(sha || '') === String(prev.sha || '')) {
@@ -200,20 +201,12 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
         decision: { fix: p.findings || [], derived: Array.isArray(p.derived) ? p.derived : [], budgets: p.budgets || null, blocking: [] },
       };
     }
-    return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start. (Se ti serve rileggere la fase 2, rimanda la stessa identica critica: viene ristampata senza pagare.)' };
+    return { ok: false, state: s, reason: 'critica già registrata su questo giro: non si modifica più, e un giro non si paga due volte. Prima chi corregge consegna (verify-local.mjs corretto "<report>"), poi si riparte con start. (Se ti serve rileggere la risposta, rimanda la stessa identica critica: viene ristampata senza pagare.)' };
   }
   // Consegnata la correzione, la verifica dopo la fa un'ALTRA istanza, e parte
-  // da `start`: una critica registrata qui in mezzo sarebbe chi ha corretto che
-  // si approva da solo (la porta del giro 1, vista dal lato locale).
+  // da `start` (la porta del giro 1, vista dal lato locale).
   if (prev.verdict === 'fixed') {
-    return { ok: false, state: s, reason: 'la correzione è stata consegnata: la verifica sul contenuto nuovo la fa un\'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida). Una critica adesso sarebbe chi ha corretto che si approva da solo.' };
-  }
-  // Dopo un pass o uno stop la critica del giro è registrata: una seconda,
-  // senza un nuovo `start`, è la stessa istanza che ci ripensa — e con un [2]
-  // dentro trasformava un pass in «sta correggendo», pagando un giro (verifica
-  // del giro 3 su #561; sul server la porta era già chiusa).
-  if (prev.verdict === 'pass' || prev.verdict === 'fail') {
-    return { ok: false, state: s, reason: `la critica di questo giro è già registrata (esito: ${prev.verdict === 'pass' ? 'superata' : 'fermato'}) e non si modifica più. La verifica dopo la fa un'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida).` };
+    return { ok: false, state: s, reason: 'la correzione è stata consegnata: la verifica sul contenuto nuovo la fa un\'altra istanza, e parte da "verify-local.mjs start" (lo rilancia chi guida).' };
   }
   // Dopo un pass o uno stop la critica del giro è registrata: una seconda,
   // senza un nuovo `start`, è la stessa istanza che ci ripensa — e con un [2]
@@ -226,7 +219,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   // farlo finire nel riassunto trasformava un [2] in un pass silenzioso.
   const brutte = ROUND.unparsedLevelLines(critique);
   if (brutte.length) {
-    return { ok: false, state: s, reason: `rilievi non riconosciuti: il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]» o «1. [2]»); in mezzo a una frase del riassunto le parentesi quadre sono testo e vanno bene. Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { ok: false, state: s, reason: `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2]». Il livello, fra 0 e 3, va a inizio riga col testo del rilievo dopo, una riga per rilievo («[2] testo», anche «- [2]», «1. [2]», «### [2]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
   // Il testo si conserva con gli a capo veri (una barra-n scritta come a capo
   // vale come a capo): è quello che il verificatore dopo rilegge nel brief.
@@ -268,7 +261,7 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   } else if (outcome === 'fix') {
     entry.verdict = 'fix-pending';
     // Anche i rilievi messi da parte e i bilanci del giro: servono a
-    // ristampare la fase 2 tale e quale se la risposta si è persa.
+    // ristampare la risposta tale e quale se si è persa.
     entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, budgets: decision.budgets };
     entry.derived = (Array.isArray(prev.derived) ? prev.derived : []).concat(decision.derived);
   } else {
@@ -293,7 +286,7 @@ export function historyFromRounds(rounds) {
 }
 
 /**
- * Chi ha corretto ha consegnato: la fase 2 è chiusa. PURA. Ritorna
+ * Chi ha corretto ha consegnato: il giro è chiuso. PURA. Ritorna
  * { ok, state, outcome }:
  *   outcome 'fixed' → c'è un commit nuovo: serve un'altra verifica;
  *   outcome 'pass'  → nessun commit nuovo e in sospeso solo rilievi 1/0: niente
@@ -312,7 +305,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
     if (prev.verdict === 'fixed') {
       return { ok: false, reason: `la correzione è già stata consegnata su questo ramo (${String(prev.fixedSha || '').slice(0, 8) || 'commit non registrato'}): non c'è altro da consegnare. Serve un'altra verifica, di un'altra istanza (verify-local.mjs start, lo rilancia chi guida).` };
     }
-    return { ok: false, reason: 'nessuna correzione in sospeso su questo ramo: prima la critica (verify-local.mjs critica)' };
+    return { ok: false, reason: 'nessun giro aperto su questo ramo' };
   }
   if (dirty) {
     return { ok: false, reason: 'ci sono modifiche non salvate: la consegna vale per un commit, e la verifica dopo deve provare quello. Salva e rilancia.' };
@@ -345,36 +338,25 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
   return { ok: true, state: s, outcome: 'fixed' };
 }
 
-/** Registra un verdetto secco sul contenuto `sha` (scorciatoie pass/fail). PURA. */
-export function withVerdict(state, branch, { verdict, critique, sha, at }) {
-  const text = verdict === 'pass' ? String(critique || '') : `[2] ${String(critique || 'la cosa chiesta non si ottiene')}`;
-  // Un fail secco deve FERMARE, qualunque sia il bilancio: è la bocciatura
-  // senza appello di chi non entra nel giro delle correzioni.
-  const caps = verdict === 'pass' ? CAPS : { cap2: 0, cap1: 0, cap0: 0 };
-  // Un "pass" con dentro rilievi di livello alto non è un pass: vale il testo,
-  // non la parola — è withCritique a decidere.
-  return withCritique(state, branch, { critique: text, sha, at, caps }).state;
-}
-
-/** Il testo della fase 2 in locale: stampato SOLO dopo la critica. PURA. */
-export function phase2Text({ findings, derived, budgets, branch, instructions }) {
+/** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
+export function codaText({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
   const b = budgets && typeof budgets === 'object'
     ? ['cap2', 'cap1', 'cap0'].map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
-  // Il testo delle istruzioni NON sta qui: arriva dal file fuori dal repo. Se
-  // manca, si dice dove doveva essere e come si consegna, e basta.
+  // La coda non sta qui: arriva da quel file. Se manca, si dice dove doveva
+  // essere e come si consegna, e basta.
   const testo = String(instructions || '').trim() || [
-    'Istruzioni della fase 2 non trovate (file FASE2-LOCALE.md nella cartella sopra il repo):',
-    'chiedile a chi guida. In ogni caso correggi SOLO i rilievi dell\'elenco qui sopra e consegna con',
+    'Coda non trovata (file CODA-GIRO-LOCALE.md nella cartella sopra il repo):',
+    'chiedila a chi guida. In ogni caso si correggono SOLO i rilievi dell\'elenco qui sopra, e si consegna con',
     '  node scripts/verify-local.mjs corretto "<report della correzione>"',
   ].join('\n');
   return [
     '══ ESITO: c\'è da correggere ══',
-    `Sei sul ramo ${branch}.`,
-    'Rilievi da correggere ADESSO (solo questi):',
+    `Ramo: ${branch}.`,
+    'Rilievi da correggere in questo giro (solo questi):',
     fmt(findings),
-    'Rilievi messi da parte (NON li correggi: finiscono nel report per l\'owner):',
+    'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     fmt(derived),
     b ? `Bilanci: ${b}` : '',
     '',
@@ -536,10 +518,6 @@ export function verdictForCurrentBranch(root = ROOT) {
  * Costruisce il compito per l'istanza che verifica. Contiene la RICHIESTA e il
  * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato.
  * PURA (testata): è il punto in cui l'isolamento o c'è o non c'è.
- *
- * Non contiene nemmeno la fase 2: chi verifica deve cercare come se il suo
- * lavoro finisse con la critica. Le istruzioni della correzione arrivano dopo,
- * dalla risposta a `critica`, e solo se c'è da correggere.
  */
 export function buildVerifierBrief({ request, branch, recipe, history }) {
   const past = Array.isArray(history) && history.length
@@ -578,6 +556,9 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     'principale · 1 cosmetica/attrito fuori cammino · 0 situazione rara; `[1?]` = chiede una',
     'decisione dell’owner). Le righe prima del primo rilievo sono il riassunto di cosa',
     'funziona. Nessun rilievo = verifica superata.',
+    'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
+    'nel riassunto E NEI PASSI un livello si cita a parole («il livello 2»), mai',
+    '«[2]», o la riga viene respinta. Il testo va in UN pezzo solo, fra virgolette.',
     '  node scripts/verify-local.mjs critica "funziona X e Y.',
     '  [2] il pulsante non salva se il titolo è vuoto: passi …',
     '  [0] con la finestra sotto i 300 pixel il menu esce dallo schermo"',
@@ -600,6 +581,63 @@ export function readRecipe(root = ROOT) {
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
+
+  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | status';
+  // L’aiuto si stampa e basta, DOVUNQUE stia nella riga. Chiedere aiuto a uno
+  // strumento è il primo gesto di chi verifica, e qui era l’unico posto dove
+  // al posto dell’aiuto partiva l’azione: `start --help` apriva il giro per
+  // davvero e la parola «--help» prendeva il posto della richiesta — l’unica
+  // cosa che chi verifica sa, e che non sta scritta da nessun’altra parte
+  // (feedback #565).
+  const chiedeAiuto = (a) => {
+    let s = String(a ?? '').toLowerCase();
+    while (s.length && '-‐‑‒–—−/'.includes(s[0])) s = s.slice(1);
+    return s === 'h' || s === 'help' || s === 'aiuto' || s === '?';
+  };
+  if ([cmd, ...rest].some(chiedeAiuto)) {
+    console.log(USO);
+    console.log('Non ho toccato niente. Nessun comando accetta opzioni: il testo va fra virgolette, tutto in un pezzo solo.');
+    process.exit(0);
+  }
+
+  // Qui nessun comando accetta opzioni: una parola con due trattini in coda
+  // finiva DENTRO al testo della critica (o del report) e l'esito veniva
+  // registrato lo stesso — un testo che non si modifica più, e che l'owner
+  // legge nella chat del feedback (feedback #565).
+  // STA PRIMA DI TUTTI E TRE I COMANDI, e non è un dettaglio: quando stava
+  // dopo, `start` aveva già aperto il giro e per lui non scattava mai.
+  if (['critica', 'corretto', 'start'].includes(cmd)) {
+    const { sembraOpzione } = await import('./lib/argomenti.mjs');
+    const opzione = rest.find((a) => sembraOpzione(a));
+    if (opzione) {
+      console.error(`Argomento non capito: ${opzione} — non ho toccato niente. Qui non ci sono opzioni: il testo va fra virgolette, tutto in un pezzo solo.`);
+      process.exit(1);
+    }
+    // La forma con la barra («/frase»): la conchiglia di Git la trasforma in un
+    // percorso vero prima di consegnarla, e la barra non si vede più. Qui il
+    // testo è sempre prosa, e una prosa non comincia per barra né per «C:/».
+    const percorso = rest.find((a) => {
+      const s = String(a ?? '');
+      const senzaDisco = /^[A-Za-z]:/.test(s) ? s.slice(2) : s;
+      return senzaDisco.startsWith('/') || senzaDisco.startsWith('\\');
+    });
+    if (percorso) {
+      console.error(`Argomento non capito: ${percorso} — non ho toccato niente. Se era un’opzione scritta con la barra, la conchiglia l’ha trasformata in un percorso: qui non ci sono opzioni, il testo va fra virgolette, tutto in un pezzo solo.`);
+      process.exit(1);
+    }
+    // IL TESTO IN UN PEZZO SOLO, e non per pignoleria: unendo i pezzi con uno
+    // spazio, un rilievo che sta nel secondo pezzo non apre più una riga —
+    // smette di essere un rilievo, e una BOCCIATURA diventa una promozione,
+    // col ramo che risulta pubblicabile. Basta una virgoletta dimenticata
+    // (feedback #565).
+    if (rest.length > 1) {
+      console.error(`Ho ricevuto ${rest.length} pezzi invece di uno: non ho toccato niente.`);
+      console.error('Il testo va fra virgolette, tutto in un pezzo solo — probabilmente ne manca una.');
+      console.error(`Primo pezzo: "${String(rest[0]).slice(0, 60)}…" · secondo: "${String(rest[1]).slice(0, 60)}…"`);
+      process.exit(1);
+    }
+  }
+
   const branch = currentBranch();
   const sha = headSha();
 
@@ -631,7 +669,21 @@ if (isMain) {
     process.exit(0);
   }
 
-  if (cmd === 'critica' || cmd === 'pass' || cmd === 'fail') {
+  // Le vecchie scorciatoie non esistono più (feedback #565): `pass "prova"`
+  // registrava un'approvazione vera con una parola, e chi verifica prova i
+  // sottocomandi per capire lo strumento — una volta è successo davvero.
+  // Promuovere e bocciare passano dallo stesso comando, e il motivo si scrive.
+  if (cmd === 'pass' || cmd === 'fail') {
+    console.error('«pass» e «fail» non esistono più: non ho toccato niente.');
+    console.error('Si registra sempre una critica, e il motivo si scrive in tutti e due i casi:');
+    console.error('  node scripts/verify-local.mjs critica "<cosa hai provato e cosa funziona>"');
+    console.error('Nessun rilievo = verifica superata. Per bocciare, una riga col livello davanti:');
+    console.error('  «[2] il pulsante Salva non salva col titolo vuoto» (e i passi per rifarlo).');
+    process.exit(1);
+  }
+
+
+  if (cmd === 'critica') {
     const text = rest.join(' ').trim();
     const prev = readState()[branch];
     if (!prev || !prev.request) {
@@ -639,29 +691,24 @@ if (isMain) {
       process.exit(1);
     }
     if (!text) {
-      console.error(cmd === 'fail'
-        ? 'Una bocciatura senza motivo non è utile a nessuno: scrivi cosa non funziona.'
-        : 'Una verifica senza riassunto non dice cosa hai provato: scrivi cosa funziona, e i rilievi se ci sono.');
+      console.error('Una verifica senza riassunto non dice cosa hai provato: scrivi cosa funziona, e i rilievi se ci sono.');
+      process.exit(1);
+    }
+    // Anche un'approvazione va motivata: senza, «ok» varrebbe come verifica.
+    if (text.length < MIN_CRITIQUE_CHARS) {
+      console.error(`Motivazione troppo corta (${text.length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho toccato niente.`);
+      console.error('Scrivi cosa hai provato e cosa hai visto — vale sia quando promuovi sia quando bocci.');
       process.exit(1);
     }
     // Con una correzione in sospeso decide withCritique: la stessa identica
-    // critica ristampa la fase 2 (risposta persa), un'altra è respinta.
-    // Le scorciatoie passano dagli stessi controlli della critica (correzione
-    // consegnata senza un nuovo start, rilievi scritti male) e stampano lo
-    // STESSO esito: un «pass» con dentro un [2] vale il testo, e prima diceva
-    // «il lavoro torna a chi l'ha fatto» mentre lo stato era «sta correggendo»
-    // e la fase 2 non veniva stampata (verifica del giro 7 su #561). Un «fail»
-    // secco ferma sempre: bilanci a zero.
-    const r = withCritique(readState(), branch, {
-      critique: cmd === 'fail' ? `[2] ${text}` : text, sha,
-      caps: cmd === 'fail' ? { cap2: 0, cap1: 0, cap0: 0 } : CAPS,
-    });
+    // critica ristampa la risposta (persa), un'altra è respinta.
+    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
     if (r.outcome === 'fix') {
       if (r.replayed) console.log('(critica già registrata su questo giro: ristampo la fase 2, il giro non si ripaga)');
-      console.log(phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: readPhase2Instructions() }));
+      console.log(codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch, instructions: leggiCoda() }));
     } else if (r.outcome === 'stop') {
       console.log(`══ ESITO: il lavoro si ferma ══\nRilievi di livello 3/2 che non si possono correggere da soli (bilancio esaurito, o chiedono una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}`);
     } else {
@@ -684,6 +731,15 @@ if (isMain) {
 
   if (cmd === 'corretto') {
     const report = rest.join(' ').trim();
+    // Anche di qui si esce con un verdetto (a rilievi minori, il lavoro
+    // diventa pubblicabile): il motivo si scrive, con lo stesso minimo della
+    // critica. Senza, promuovere costava una parola da questa porta e ottanta
+    // caratteri dall'altra (feedback #565).
+    if (report.length < MIN_CRITIQUE_CHARS) {
+      console.error(`Report della correzione troppo corto (${report.length} caratteri, il minimo è ${MIN_CRITIQUE_CHARS}): non ho toccato niente.`);
+      console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: da qui esce un esito, e un esito senza motivo non vale.');
+      process.exit(1);
+    }
     const r = withFixed(readState(), branch, { report, sha, dirty: isDirty() });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
@@ -713,6 +769,6 @@ if (isMain) {
     process.exit(r.ok ? 0 : 1);
   }
 
-  console.error('Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | corretto "<report>" | pass "<testo>" | fail "<testo>" | status');
+  console.error(USO);
   process.exit(1);
 }

@@ -227,11 +227,43 @@ export async function scrivi(id, to, nota, opts = {}) {
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
-  const argv = process.argv.slice(2);
+  let argv = process.argv.slice(2);
   const flag = (nome) => {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
   };
+  // Come nello strumento gemello (#565), con lo stesso controllo: un'opzione
+  // scritta male non deve scalare sui posizionali e far partire lo stesso il
+  // cambio di stato. `--help` è legittima: chiedere aiuto non è un errore.
+  const uso = () => {
+    console.error('Uso: node scripts/owner-feedback.mjs <id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
+    console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
+  };
+  if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
+  const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  const OPZ = {
+    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar'],
+    conValore: ['--branch', '--reason', '--frase'],
+  };
+  argv = espandiUguali(argv, OPZ.conValore);
+  const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
+  if (storpiata) {
+    console.error(`RIFIUTATO: ${storpiata}`);
+    uso();
+    process.exit(1);
+  }
+  const daNpm = argomentiDaNpm(process.env, OPZ);
+  if (daNpm.errore) {
+    console.error(`RIFIUTATO: ${daNpm.errore}`);
+    uso();
+    process.exit(1);
+  }
+  if (daNpm.nota) { console.error(daNpm.nota); argv = [...argv, ...daNpm.args]; }
+  const male = controllaArgomenti(argv, OPZ);
+  if (male) {
+    console.error(`RIFIUTATO: ${male}`);
+    process.exit(1);
+  }
   const branch = flag('branch');
   const reason = flag('reason');
   const frase = flag('frase');
@@ -241,8 +273,16 @@ if (isMain) {
   if (argv.includes('--starred')) starred = true;
   else if (argv.includes('--unstar')) starred = false;
 
-  const valoriDiFlag = new Set([branch, reason, frase].filter((v) => v !== undefined));
-  const posizionali = argv.filter((a) => !a.startsWith('--') && !valoriDiFlag.has(a));
+  // Per POSTO, non per valore: come nello strumento gemello (#565). Prima si
+  // toglievano le parole «uguali al valore di un'opzione», e una nota scritta
+  // identica alla frase per chi ha segnalato spariva senza dire niente.
+  const CON_VALORE = new Set(['--branch', '--reason', '--frase']);
+  const posizionali = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    posizionali.push(a);
+  }
   const [id, status, ...nota] = posizionali;
 
   if (!id || !status) {

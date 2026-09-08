@@ -47,6 +47,25 @@ require(resolve(ROOT, 'src', 'shared', 'feedbackStatus.js'));
 
 const C = globalThis.SN_FEEDBACK_CRYPTO;
 const FS = globalThis.SN_FB_STATUS;
+if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
+  console.log([
+    'Uso: node scripts/migrate-status-padding.mjs [--dry-run]',
+    '  rifà l\'imbottitura degli stati dei feedback; --dry-run mostra solo cosa farebbe',
+  ].join('\n'));
+  process.exit(0);
+}
+const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+// Vedi auto-archive: le opzioni mangiate da npm si riprendono dall'ambiente
+// (feedback #565).
+const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
+const argomentiSbagliati = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'], senzaParoleLibere: true });
+if (argomentiSbagliati) {
+  console.error(`RIFIUTATO: ${argomentiSbagliati}`);
+  process.exit(1);
+}
 const DRY = process.argv.includes('--dry-run');
 
 const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');

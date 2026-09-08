@@ -447,7 +447,7 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
-// I tre bilanci del verificatore che corregge (config/routines, campi `cap2`,
+// I tre bilanci dei giri di correzione (config/routines, campi `cap2`,
 // `cap1`, `cap0` — feedback #561) e il testo della fase 2 (`fixInstructions`).
 // Li applica il SERVER quando registra la critica; qui la dashboard li legge e
 // li scrive. I DEFAULT vengono dalla fonte unica

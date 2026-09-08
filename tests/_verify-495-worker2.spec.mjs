@@ -20,6 +20,10 @@ test('#495 — caricamento fallito: nessun numero, e il guasto non evapora al pr
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
+  // Il guasto si CHIEDE, non si spera: dove la rete c'è il caricamento riesce,
+  // le schede dicono il numero vero, e questo caso era rosso per l'ambiente e
+  // non per il codice (feedback #563, #565).
+  await page.evaluate(() => window.__mgTest.simulaCaricamentoFallito());
 
   for (const t of ['inbox', 'queue', 'resolved', 'archived']) {
     await page.click(`.mg-tab[data-tab="${t}"]`);

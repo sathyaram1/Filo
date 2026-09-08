@@ -1,4 +1,4 @@
-// Il verificatore che corregge, giro 9 su #561: le critiche più vecchie tolte
+// Giro di verifica, giro 9 su #561: le critiche più vecchie tolte
 // dalla serie dal server vengono DETTE a chi legge il fascicolo, invece di
 // passare per inesistenti (la ricetta chiede di ri-provare le porte di ogni
 // giro passato: un giro sparito in silenzio è una porta data per chiusa).

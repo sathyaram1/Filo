@@ -1,13 +1,11 @@
-// Il verificatore che corregge, dal lato dello strumento (feedback #561).
+// Il giro di verifica, dal lato dello strumento (feedback #561).
 //
 // COSA INCHIODA
 //   Lanciando il CLI VERO contro un server finto: la critica coi livelli parte
 //   STRUTTURATA (findings), con il riassunto, il testo intero e il commit
-//   provato; la risposta del server con la fase 2 viene STAMPATA intera (è
-//   l'unico posto da cui il verificatore riceve le istruzioni della
-//   correzione); lo specchio locale dice "sta correggendo". Poi la consegna
-//   `fixed` dallo stesso verificatore parte col report e viene sigillata come
-//   sua. Un controllo sulle sole funzioni non vedrebbe un campo scartato dalla
+//   provato; la risposta del server viene STAMPATA intera; lo specchio locale
+//   dice "c'e' da correggere". Poi la consegna `fixed` parte col report e viene
+//   sigillata. Un controllo sulle sole funzioni non vedrebbe un campo scartato dalla
 //   riga di comando, che è già successo una volta.
 
 import { test } from 'node:test';
@@ -72,7 +70,7 @@ const ENV = (casa, port) => ({
   FILO_NO_BEAT: '1',
 });
 
-test('la critica parte strutturata e la fase 2 del server viene stampata; poi la consegna del verificatore', async () => {
+test('la critica parte strutturata, la risposta del server viene stampata intera, poi la consegna', async () => {
   const { casa, sha } = casaSulRamo();
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict'
     ? { reply: { outcome: 'fix', phase2: {
@@ -107,29 +105,38 @@ test('la critica parte strutturata e la fase 2 del server viene stampata; poi la
     assert.match(r.so, /\[0\] caso raro/);
     assert.match(r.so, /cap2: 4 giri residui su 5/);
 
-    // Lo specchio locale dice che il verificatore sta correggendo.
+    // Lo specchio locale dice che c'e' una correzione in sospeso.
     const stato = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(stato.verifierVerdict, 'fix-pending');
 
-    // Poi la correzione (un commit nuovo) e la consegna, dallo STESSO verificatore.
+    // Poi la correzione (un commit nuovo) e la sua consegna.
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'corretto', 'utf8');
     execFileSync('git', ['commit', '-qam', 'correzione'], { cwd: casa });
-    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto.'], ENV(casa, port));
+    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto. Il caso raro non l\'ho toccato: non era in elenco.'], ENV(casa, port));
     assert.equal(c.code, 0, `la consegna doveva riuscire (stderr: ${c.se})`);
     const fixed = ricevuti.filter((x) => x.url.includes('routineDeliver')).at(-1);
     assert.equal(fixed.body.intent, 'fixed');
     assert.match(String(fixed.body.data.report), /ora salva anche col titolo vuoto/);
     const dopo = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(dopo.verifierVerdict, null, 'torna in verifica sul commit nuovo');
-    assert.match(JSON.stringify(dopo), /verifier:consegna/, 'sigillata come consegna del verificatore, non del correttore');
+    assert.match(JSON.stringify(dopo), /verifier:consegna/, 'la consegna resta sigillata da chi la manda');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
 
-test('la parola del vecchio verdetto è ignorata; senza rilievi la risposta "pass" si stampa e lo stato dice verificato', async () => {
+test('la parola del vecchio verdetto è RIFIUTATA (ignorarla faceva promuovere chi voleva bocciare); senza rilievi la risposta "pass" si stampa e lo stato dice verificato', async () => {
   const { casa } = casaSulRamo();
   const { srv, ricevuti, port } = await fintoServer((j) => (j.intent === 'verdict' ? { reply: { outcome: 'pass', derived: null } } : {}));
   try {
-    const r = await esegui(['--record-verifier', 'fid-901', 'pass', 'Provato tutto: regge.'], ENV(casa, port));
+    // Prima la porta chiusa: la vecchia parola veniva buttata via in silenzio,
+    // la critica partiva senza rilievi, e senza rilievi l'esito è «superata».
+    for (const parola of ['fail', 'pass']) {
+      const vecchio = await esegui(['--record-verifier', 'fid-901', parola,
+        'Il pulsante non salva col titolo vuoto: aperta la pagina, titolo vuoto, premuto Salva, non succede niente.'], ENV(casa, port));
+      assert.equal(vecchio.code, 1, `«${parola}» davanti al motivo deve fermare`);
+      assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
+    }
+
+    const r = await esegui(['--record-verifier', 'fid-901', 'Provato tutto: aperto, salvato, trascinato e riaperto. Regge, non ho trovato niente da segnalare.'], ENV(casa, port));
     assert.equal(r.code, 0, r.se);
     const d = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
     assert.deepEqual(d.findings, [], 'nessun rilievo');
@@ -151,20 +158,28 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
     req.on('end', () => {
       ricevuti.push({ url: req.url, body: body ? JSON.parse(body) : {} });
       res.setHeader('Content-Type', 'application/json');
-      if (req.url.includes('routineDeliver')) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'malformed', detail: 'critica vuota: un pass senza riassunto non è una verifica' })); return; }
+      if (req.url.includes('routineDeliver')) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'malformed', detail: 'la critica non corrisponde al commit consegnato' })); return; }
       res.end(JSON.stringify({ ok: true }));
     });
   });
   try {
-    const male = await esegui(['--record-verifier', 'fid-901', 'Provato.\n[4] gravissimo'], ENV(casa, port));
+    const male = await esegui(['--record-verifier', 'fid-901',
+      'Provato ad aprire la pagina, a salvare col titolo vuoto e a trascinare.\n[4] gravissimo'], ENV(casa, port));
     assert.equal(male.code, 1, 'si sistema la riga e si rilancia: errore d\'uso');
     assert.match(male.se, /\[4\] gravissimo/);
     assert.doesNotMatch(male.se, /identit|directory non corrisponde/, 'non è un guasto d\'identità');
     assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
 
+    // Una critica vuota non arriva più fin qui: la ferma il pavimento al
+    // motivo, perché senza rilievi l'esito calcolato è «superata» (#565).
     const vuota = await esegui(['--record-verifier', 'fid-901', ''], ENV(casa, port));
-    assert.equal(vuota.code, 4);
-    assert.match(vuota.se, /malformed: critica vuota/, 'la frase del server arriva a chi ha consegnato');
+    assert.equal(vuota.code, 1, 'una critica vuota è un errore d\'uso, non una consegna');
+    assert.equal(ricevuti.filter((x) => x.url.includes('routineDeliver')).length, 0, 'il server non viene chiamato');
+
+    const respinta = await esegui(['--record-verifier', 'fid-901',
+      'Provato ad aprire la pagina, a salvare col titolo vuoto e a trascinare: non ho trovato niente da segnalare.'], ENV(casa, port));
+    assert.equal(respinta.code, 4);
+    assert.match(respinta.se, /malformed: la critica non corrisponde/, 'la frase del server arriva a chi ha consegnato');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
 

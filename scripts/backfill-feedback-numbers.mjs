@@ -88,6 +88,28 @@ async function backfillNumbers(bearer) {
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
+  // Un'opzione che non riconosciamo non deve far partire il giro VERO: basta
+  // un trattino o una lettera sbagliati in «--dry-run» perché quello che
+  // doveva essere un giro a vuoto scriva davvero (feedback #565).
+  if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
+    console.log([
+      'Uso: node scripts/backfill-feedback-numbers.mjs [--dry-run]',
+      '  assegna i numeri ai feedback che non ce l\'hanno; --dry-run mostra solo cosa farebbe',
+    ].join('\n'));
+    process.exit(0);
+  }
+  const { controllaArgomenti, argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  // Vedi auto-archive: le opzioni mangiate da npm si riprendono dall'ambiente
+  // (feedback #565).
+  const storpiata = opzioneStorpiata(process.env, ['--dry-run']);
+if (storpiata) { console.error(`RIFIUTATO: ${storpiata}`); process.exit(1); }
+const daNpm = argomentiDaNpm(process.env, { opzioni: ['--dry-run'] });
+  if (daNpm.nota) { console.error(daNpm.nota); process.argv.push(...daNpm.args); }
+  const male = controllaArgomenti(process.argv.slice(2), { opzioni: ['--dry-run'], senzaParoleLibere: true });
+  if (male) {
+    console.error(`RIFIUTATO: ${male}`);
+    process.exit(1);
+  }
   const DRY = process.argv.includes('--dry-run');
   try {
     const bearer = DRY ? null : await acquireBearer();

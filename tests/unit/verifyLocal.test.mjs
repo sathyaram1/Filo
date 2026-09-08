@@ -9,12 +9,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const {
-  checkVerdict, withRequest, withVerdict, withCritique, withFixed, buildVerifierBrief, phase2Text, historyFromRounds,
+  checkVerdict, withRequest, withCritique, withFixed, buildVerifierBrief, codaText, historyFromRounds,
   realignPlan, afterRebase,
 } = await import('../../scripts/verify-local.mjs');
 
@@ -63,10 +63,10 @@ test('checkVerdict: modifiche non salvate invalidano l’approvazione', () => {
   assert.match(sporco.reason, /modifiche non salvate/);
 });
 
-test('withRequest / withVerdict: lo stato è per ramo e non si calpesta', () => {
+test('lo stato è per ramo e non si calpesta', () => {
   let s = withRequest({}, 'claude/uno', { request: 'fai X', sha: SHA, at: 't0' });
   s = withRequest(s, 'claude/due', { request: 'fai Y', sha: ALTRO_SHA, at: 't0' });
-  s = withVerdict(s, 'claude/uno', { verdict: 'pass', critique: 'ok', sha: SHA, at: 't1' });
+  s = withCritique(s, 'claude/uno', { critique: 'Provato tutto, regge.', sha: SHA, at: 't1' }).state;
 
   assert.equal(s['claude/uno'].verdict, 'pass');
   assert.equal(s['claude/uno'].request, 'fai X');   // la richiesta non si perde
@@ -74,13 +74,7 @@ test('withRequest / withVerdict: lo stato è per ramo e non si calpesta', () => 
   assert.equal(checkVerdict(s['claude/due'], ALTRO_SHA).ok, false);
 });
 
-test('withVerdict: qualunque cosa diversa da "pass" è una bocciatura', () => {
-  const s = withVerdict({}, 'r', { verdict: 'boh', sha: SHA });
-  assert.equal(s.r.verdict, 'fail');
-  assert.equal(checkVerdict(s.r, SHA).ok, false);
-});
-
-// ─── Il verificatore che corregge, in locale (feedback #561) ─────────────────
+// ─── Il giro di verifica, in locale (feedback #561) ──────────────────────────
 //
 // Stessa struttura del giro in cloud: critica coi livelli → l'esito lo
 // calcolano le regole condivise → se c'è da correggere, la fase 2 (stampata
@@ -92,7 +86,7 @@ test('critica senza rilievi: verifica superata sul contenuto', () => {
   assert.equal(checkVerdict(r.state.r, SHA).ok, true);
 });
 
-test('critica con un 2: fase 2, il verificatore corregge; finché non consegna non si pubblica, e dopo serve un\'altra verifica', () => {
+test('critica con un 2: finché il giro non è chiuso non si pubblica, e dopo serve un\'altra verifica', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const r = withCritique(s, 'r', { critique: 'funziona Y\n[2] il pulsante non salva\n[0] caso raro', sha: SHA });
   assert.equal(r.outcome, 'fix');
@@ -101,9 +95,9 @@ test('critica con un 2: fase 2, il verificatore corregge; finché non consegna n
   assert.equal(r.state.r.counts.count2, 1, 'il giro si paga da cap2');
   const bloccato = checkVerdict(r.state.r, SHA);
   assert.equal(bloccato.ok, false);
-  assert.match(bloccato.reason, /sta correggendo/);
+  assert.match(bloccato.reason, /giro di correzione aperto/);
   // La fase 2 si vede solo adesso, e dice cosa correggere e come consegnare.
-  const testo = phase2Text({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch: 'r' });
+  const testo = codaText({ findings: r.decision.fix, derived: r.decision.derived, budgets: r.decision.budgets, branch: 'r' });
   assert.match(testo, /\[2\] il pulsante non salva/);
   assert.match(testo, /verify-local\.mjs corretto/);
   // Consegna: chiude la fase 2, ma NON approva: serve un'altra verifica.
@@ -119,12 +113,12 @@ test('critica con un 2: fase 2, il verificatore corregge; finché non consegna n
   assert.equal(s.r.verdict, undefined, 'la verifica nuova parte senza esito');
 });
 
-test('withFixed senza una correzione in sospeso: rifiutata', () => {
+test('withFixed senza un giro aperto: rifiutata', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   assert.equal(withFixed(s, 'r', { report: 'x', sha: SHA }).ok, false);
 });
 
-test('un 2 a bilancio esaurito, o che chiede una decisione: il lavoro si ferma (fail), niente da correggere', () => {
+test('un 2 a bilancio esaurito, o col segno ?: esito stop', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   s.r.counts = { count2: 5 };
   const r = withCritique(s, 'r', { critique: '[2] ancora rotto', sha: SHA });
@@ -135,14 +129,14 @@ test('un 2 a bilancio esaurito, o che chiede una decisione: il lavoro si ferma (
   assert.equal(d.outcome, 'stop');
 });
 
-test('i rilievi non corretti (0 da soli, 1 a bilancio finito) restano in `derived` per il report', () => {
+test('i rilievi fuori dal giro restano in `derived` per il report', () => {
   const r = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[0] caso raro', sha: SHA });
   assert.equal(r.outcome, 'pass');
   assert.equal(r.state.r.derived.length, 1);
   assert.equal(checkVerdict(r.state.r, SHA).ok, true, 'uno 0 da solo non ferma la pubblicazione');
 });
 
-test('il brief non contiene la fase 2: chi verifica deve cercare come se il suo lavoro finisse con la critica', () => {
+test('buildVerifierBrief: niente che non serva a criticare', () => {
   const brief = buildVerifierBrief({ request: 'x', branch: 'r', recipe: 'RECIPE' });
   assert.match(brief, /verify-local\.mjs critica/);
   assert.ok(!/corretto "/.test(brief), 'il comando della correzione non si annuncia prima');
@@ -317,6 +311,47 @@ test('start col riallineamento in conflitto: abort, ramo intatto, niente rebase 
     'nessun rebase in corso dopo l\'abort');
 });
 
+// ── Verifica del 2026-09-07 su #565: `start` era rimasto fuori dal controllo ──
+// degli argomenti. Il controllo c'era, nominava anche `start`, ma stava DOPO il
+// punto in cui `start` aveva già finito: per lui non scattava mai.
+
+function statoDi(work) {
+  const f = resolve(work, '.claude', 'verify-local.json');
+  return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
+}
+
+function lancia(work, args) {
+  return spawnSync(process.execPath, [VERIFY, ...args], {
+    env: { ...process.env, FILO_REPO_ROOT: work },
+    encoding: 'utf8',
+  });
+}
+
+test('#565 start --help stampa l\'aiuto e NON prende il posto della richiesta', () => {
+  const { work } = scenario({ conflitto: false });
+  assert.equal(lanciaStart(work).status, 0);
+  const prima = statoDi(work)['claude/prova'].request;
+  assert.equal(prima, 'richiesta di prova');
+  for (const aiuto of ['--help', '-h']) {
+    const r = lancia(work, ['start', aiuto]);
+    assert.equal(r.status, 0, `${aiuto}: chiedere aiuto non è un errore`);
+    assert.match(String(r.stdout), /Comandi: start/, `${aiuto}: deve stampare l'aiuto`);
+    // La richiesta è l'unica cosa che chi verifica sa, e non sta scritta da
+    // nessun'altra parte: sostituirla con «--help» azzera la verifica.
+    assert.equal(statoDi(work)['claude/prova'].request, prima, `${aiuto}: la richiesta resta quella vera`);
+  }
+});
+
+test('#565 start con un argomento non capito si ferma, e il giro non si apre', () => {
+  for (const arg of ['--frase', '-frase', 'C:/Program Files/Git/dry-run']) {
+    const { work } = scenario({ conflitto: false });
+    const r = lancia(work, ['start', 'la richiesta vera', arg]);
+    assert.equal(r.status, 1, `${arg}: deve fermare`);
+    assert.match(String(r.stderr), /non ho toccato niente/, `${arg}: e dirlo`);
+    assert.deepEqual(statoDi(work), {}, `${arg}: nessun giro aperto`);
+  }
+});
+
 // ── Verifica del 2026-09-05 su #561: le porte trovate dal verificatore ──────
 // (i rilievi registrati con `verify-local.mjs critica`, corretti nello stesso giro)
 
@@ -337,7 +372,7 @@ test('#561 verifica: una seconda critica sullo stesso giro è rifiutata e non pa
   assert.match(due.state.r.pending.findings[0].text, /^rotto$/, 'la critica registrata è ancora quella');
 });
 
-test('#561 verifica: il giro dopo vede il TESTO della critica precedente, mai il report di chi ha corretto', () => {
+test('#561 verifica: il giro dopo vede il TESTO della critica precedente, mai il report di chi ha lavorato', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const r = withCritique(s, 'r', { critique: 'ok\n[2] il pulsante non salva col titolo vuoto', sha: SHA });
   const c = withFixed(r.state, 'r', { report: 'REPORT SEGRETO del correttore', sha: ALTRO_SHA });
@@ -373,7 +408,7 @@ test('#561 verifica: «corretto» senza un commit nuovo non chiede un\'altra ver
 
 // ── Verifica del giro 2 (2026-09-05) su #561 ─────────────────────────────────
 
-test('#561 giro 2: dopo «corretto» la stessa istanza non registra la critica: serve un nuovo start', () => {
+test('#561 giro 2: chiuso un giro, la critica non si registra di nuovo: serve un nuovo start', () => {
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const r = withCritique(s, 'r', { critique: 'ok\n[1] bordo', sha: SHA });
   const c = withFixed(r.state, 'r', { report: 'corretto', sha: ALTRO_SHA });
@@ -454,12 +489,16 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
   const vuoto = withCritique(s, 'r', { critique: 'Provato: regge quasi tutto.\n[2]', sha: SHA });
   assert.equal(vuoto.ok, false);
   assert.match(vuoto.reason, /rilievo senza testo/);
-  const inMezzo = withCritique(s, 'r', { critique: 'Provato il caso [2?] del giro prima: chiuso, e testi di [10000] caratteri.', sha: SHA });
-  assert.equal(inMezzo.ok, true);
-  assert.equal(inMezzo.outcome, 'pass');
+  // Dal 2026-09-07 (#565, decisione dell'owner) le quadre col livello dentro
+  // sono sempre un rilievo: nel riassunto il livello si cita a parole.
+  const conQuadre = withCritique(s, 'r', { critique: 'Provato il caso [2?] del giro prima: chiuso.', sha: SHA });
+  assert.equal(conQuadre.ok, false);
+  const aParole = withCritique(s, 'r', { critique: 'Provato il caso di livello 2 del giro prima: chiuso, e testi lunghi.', sha: SHA });
+  assert.equal(aParole.ok, true);
+  assert.equal(aParole.outcome, 'pass');
 });
 
-// ── Le scorciatoie dal CLI (#561 giro 7) ─────────────────────────────────────
+// ── Un modo solo per promuovere, uno solo per bocciare (#565) ────────────────────
 //
 // Un «pass» con dentro una riga di livello 2 vale il testo: lo stato diventa
 // «sta correggendo» e la risposta deve dirlo, con la fase 2, come farebbe
@@ -479,29 +518,53 @@ function depositoUsaEGetta() {
   g('add', '-A'); g('commit', '-qm', 'init'); g('checkout', '-q', '-b', 'claude/prova');
   return casa;
 }
+// Una motivazione vera: sotto gli 80 caratteri il CLI la respinge, e con
+// ragione (una verifica di due parole non è una verifica).
+const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2] rotto';
 function vl(casa, ...args) {
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
 }
 
-test('CLI: «pass» con dentro un [2] risponde con la fase 2 (stato «sta correggendo»), «fail» ferma', () => {
+test('CLI: «pass» e «fail» non registrano più niente, e dicono cosa usare', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  const p = vl(casa, 'pass', 'Provato tutto.\n[2] però questo è rotto');
-  assert.equal(p.code, 0, p.out);
-  assert.match(p.out, /c'è da correggere[\s\S]*Rilievi da correggere ADESSO/);
-  assert.match(p.out, /\[2\] però questo è rotto/);
-  assert.doesNotMatch(p.out, /torna a chi l'ha fatto/);
-  assert.match(vl(casa, 'status').out, /sta correggendo/);
-  // Un pass pulito resta un pass; un fail secco ferma, qualunque sia il bilancio.
-  _exec('git', ['checkout', '-q', '-b', 'claude/due'], { cwd: casa });
+  for (const parola of ['pass', 'fail']) {
+    const r = vl(casa, parola, 'prova');
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /non ho toccato niente/);
+    assert.match(r.out, /verify-local\.mjs critica/);
+    // E soprattutto: niente verdetto scritto da una sonda.
+    assert.match(vl(casa, 'status').out, /senza esito/, `«${parola}» non deve registrare niente`);
+  }
+});
+
+test('CLI: anche la consegna della correzione vuole il suo motivo', () => {
+  const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  assert.match(vl(casa, 'pass', 'Regge tutto.').out, /verifica superata/);
-  _exec('git', ['checkout', '-q', '-b', 'claude/tre'], { cwd: casa });
+  assert.equal(vl(casa, 'critica', LUNGA_FIX).code, 0);
+  // Da questa porta esce un esito come dall'altra: senza motivo, niente.
+  const corto = vl(casa, 'corretto', 'fatto');
+  assert.equal(corto.code, 1, corto.out);
+  assert.match(corto.out, /troppo corto \(5 caratteri/);
+  assert.match(vl(casa, 'status').out, /giro di correzione aperto/, 'niente scritto');
+});
+
+test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per bocciare', () => {
+  const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  assert.match(vl(casa, 'fail', 'non salva').out, /il lavoro si ferma/);
-  assert.match(vl(casa, 'status').out, /bocciato/);
+  const corta = vl(casa, 'critica', 'ok');
+  assert.equal(corta.code, 1, corta.out);
+  assert.match(corta.out, /troppo corta \(2 caratteri/, 'il rifiuto dice il numero');
+  assert.match(vl(casa, 'status').out, /senza esito/, 'niente scritto');
+  const cortaBoccia = vl(casa, 'critica', '[2] rotto');
+  assert.equal(cortaBoccia.code, 1, cortaBoccia.out);
+  assert.match(vl(casa, 'status').out, /senza esito/);
+  // Con la motivazione vera passa, e l'esito è quello del testo.
+  const buona = vl(casa, 'critica', LUNGA_FIX);
+  assert.equal(buona.code, 0, buona.out);
+  assert.match(buona.out, /c'è da correggere/);
 });
 
 // ─── Tetto abbondante, niente taglio silenzioso (CLAUDE.md § Limiti) ────────
@@ -510,7 +573,7 @@ test('CLI: «pass» con dentro un [2] risponde con la fase 2 (stato «sta correg
 // caratteri, e i rilievi (in coda) sparivano dal brief del verificatore dopo.
 
 test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta col numero, non tagliata', async () => {
-  const { MAX_CRITIQUE_CHARS, readPhase2Instructions } = await import('../../scripts/verify-local.mjs');
+  const { MAX_CRITIQUE_CHARS, leggiCoda } = await import('../../scripts/verify-local.mjs');
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const riassunto = 'provato '.repeat(700); // ~5600 caratteri: sopra il vecchio taglio a 4000
   const lunga = withCritique(s, 'r', { critique: `${riassunto}\n[2] LA PORTA ROSSA: il salvataggio non salva col titolo vuoto`, sha: SHA });
@@ -521,23 +584,23 @@ test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta co
   assert.match(troppa.reason, /troppo lunga/);
   assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_CHARS)), 'il rifiuto dice il tetto');
   assert.equal(troppa.state.r.verdict, undefined, 'respinta: niente scritto');
-  assert.equal(typeof readPhase2Instructions, 'function');
+  assert.equal(typeof leggiCoda, 'function');
 });
 
-test('phase2Text: le istruzioni arrivano da fuori (file sopra il repo), non dal codice; senza file si dice dove chiederle', () => {
+test('quando il testo in coda manca, il messaggio non tace', () => {
   const base = { findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'r' };
-  const conFile = phase2Text({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
+  const conFile = codaText({ ...base, instructions: 'ISTRUZIONI SEGRETE DELL\'OWNER' });
   assert.match(conFile, /ISTRUZIONI SEGRETE DELL'OWNER/);
   assert.match(conFile, /\[2\] rotto/);
-  const senza = phase2Text(base);
-  assert.match(senza, /FASE2-LOCALE\.md/, 'dice dove doveva essere il file');
+  const senza = codaText(base);
+  assert.match(senza, /CODA-GIRO-LOCALE\.md/, 'dice dove doveva essere il file');
   assert.match(senza, /verify-local\.mjs corretto/, 'e come si consegna comunque');
   assert.ok(!/adesso correggi tu/.test(senza), 'il testo delle istruzioni non vive nello strumento');
 });
 
 // ─── Giro 10 su #561: la fase 2 persa si rilegge; il pass dice se si può pubblicare davvero ───
 
-test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la fase 2 senza scrivere né ripagare; un\'altra è respinta', () => {
+test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la stessa risposta senza scrivere né ripagare; un\'altra è respinta', () => {
   let s = withRequest({}, 'b', { request: 'X', sha: SHA });
   const testo = 'Provato.\n[2] rotto\n[0] raro';
   const prima = withCritique(s, 'b', { critique: testo, sha: SHA });
@@ -566,27 +629,27 @@ test('#561 giro 10: la STESSA critica rimandata a correzione in sospeso ridà la
   assert.doesNotMatch(bis.reason, /prima la critica/);
 });
 
-test('CLI giro 10: la fase 2 persa si rilegge (stessa critica, o status); un pass con modifiche non salvate non dice «Si può pubblicare»', () => {
+test('CLI giro 10: la risposta persa si rilegge (stessa critica, o status); un pass con modifiche non salvate non dice «Si può pubblicare»', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
-  const testo = 'Provato.\n[2] rotto';
+  const testo = LUNGA_FIX;
   assert.match(vl(casa, 'critica', testo).out, /c'è da correggere/);
   const st = vl(casa, 'status');
-  assert.match(st.out, /sta correggendo/);
+  assert.match(st.out, /giro di correzione aperto/);
   assert.match(st.out, /\[2\] rotto/, 'status elenca i rilievi in sospeso');
   const ridata = vl(casa, 'critica', testo);
   assert.equal(ridata.code, 0, ridata.out);
   assert.match(ridata.out, /ristampo la fase 2/);
-  assert.match(ridata.out, /Rilievi da correggere ADESSO[\s\S]*\[2\] rotto/);
+  assert.match(ridata.out, /Rilievi da correggere in questo giro[\s\S]*\[2\] rotto/);
   assert.match(ridata.out, /cap2: 4 giri residui su 5/, 'il giro non si ripaga');
-  const altra = vl(casa, 'critica', 'Provato.\n[2] rotto diversamente');
+  const altra = vl(casa, 'critica', LUNGA_FIX.replace('rotto', 'rotto diversamente'));
   assert.equal(altra.code, 1);
   assert.match(altra.out, /già registrata/);
   // Pass su un albero sporco: registrato, ma senza promettere la pubblicazione.
   _exec('git', ['checkout', '-q', '-b', 'claude/sporco'], { cwd: casa });
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
   _write(resolve(casa, 'a.txt'), 'modifica non salvata', 'utf8');
-  const p = vl(casa, 'critica', 'Provato: regge.');
+  const p = vl(casa, 'critica', 'Provato inserimento, tasto destro, tema scuro e finestra stretta: regge tutto quanto.');
   assert.equal(p.code, 0, p.out);
   assert.match(p.out, /verifica superata/);
   assert.doesNotMatch(p.out, /Si può pubblicare/);

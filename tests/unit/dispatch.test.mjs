@@ -70,7 +70,7 @@ test('applyVerifierVerdict pass: imposta pass e svuota la critica', () => {
   assert.equal(s.verifierCritique, '');
 });
 
-test('applyVerifierVerdict fix: lo specchio locale dice "il verificatore sta correggendo", con la critica coi livelli', () => {
+test('applyVerifierVerdict fix: lo specchio locale registra la critica coi livelli e il seguito del giro', () => {
   const s = applyVerifierVerdict(defaultState('A', 'worker/A'), 'fix', '[2] rotto qui');
   assert.equal(s.verifierVerdict, 'fix-pending');
   assert.equal(s.verifierCritique, '[2] rotto qui');
@@ -90,7 +90,7 @@ test('VERIFIER_ROUND: il parser della critica coi livelli arriva dagli strumenti
   assert.deepEqual(VERIFIER_OUTCOMES, ['pass', 'fix', 'stop']);
 });
 
-test('verifierReplyText: la fase 2 del server si stampa intera; pass e stop dicono cosa fare', async () => {
+test('verifierReplyText: la risposta del server si stampa intera; pass e stop dicono cosa fare', async () => {
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
   const fix = verifierReplyText({
     outcome: 'fix',
@@ -567,6 +567,48 @@ test('usageText: elenca tutti i comandi, compresa la scorta --ticket', () => {
   }
 });
 
+// Stessa ragione, altra superficie: i titoli dei test si stampano a schermo a
+// OGNI esecuzione della suite, e la suite chi verifica la lancia per mestiere,
+// prima di dare il pass. Un titolo che racconta il copione glielo mette davanti
+// senza che lo cerchi.
+//
+// E il CORPO dei file non è un posto al riparo, come diceva la versione prima
+// di questa: il file di uno strumento nomina il proprio file di prove, quindi
+// da lì basta aprirlo e leggere la prima riga. Le formule stanno in
+// `tests/helpers/formule-vietate.mjs`, che questa camminata non legge — se
+// stessero qui, l'elenco sarebbe la frase che vieta (feedback #565).
+test('nei file di prova non si anticipa il seguito del giro', async () => {
+  const { readdirSync, readFileSync: read } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { TITOLI, OVUNQUE } = await import('../helpers/formule-vietate.mjs');
+  const TESTS = fileURLToPath(new URL('..', import.meta.url));
+  const colpevoli = [];
+  const cammina = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { if (!e.name.startsWith('.') && e.name !== 'node_modules') cammina(p); continue; }
+      if (!/\.(test|spec)\.mjs$/.test(e.name)) continue;
+      read(p, 'utf8').split('\n').forEach((riga, i) => {
+        const elenco = /^\s*(test|it)\(/.test(riga) ? TITOLI : OVUNQUE;
+        if (elenco.some((r) => r.test(riga))) colpevoli.push(`${e.name}:${i + 1}: ${riga.trim().slice(0, 90)}`);
+      });
+    }
+  };
+  cammina(TESTS);
+  assert.deepEqual(colpevoli, [], `righe da riscrivere (il seguito del giro non si anticipa):\n  ${colpevoli.join('\n  ')}`);
+});
+
+// Le istruzioni della correzione arrivano dal server DOPO la critica: se
+// l'aiuto le anticipasse, chi verifica saprebbe come prosegue il giro prima
+// ancora di scrivere i rilievi. `--help` lo legge chiunque, in qualsiasi
+// momento: qui dentro non ci va (feedback #565).
+test('usageText: elenca i comandi e nient\'altro', () => {
+  const u = usageText().toLowerCase();
+  for (const parola of ['fase 2', 'correggi', 'correzion', 'correttore']) {
+    assert.ok(!u.includes(parola), `la schermata di aiuto non deve nominare "${parola}"`);
+  }
+});
+
 // I tre casi CLI che prima cancellavano il promemoria, eseguiti per davvero:
 // senza il fix questi assert sono rossi (il file sparisce).
 test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il promemoria', async () => {
@@ -615,6 +657,69 @@ test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il 
       assert.equal(readFileSync(ticketFile(sandbox), 'utf8').includes('biglietto-vivo'), true,
         `un flag (${finto}) scambiato per biglietto non deve sovrascrivere il promemoria`);
     }
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
+// Verifica del 2026-09-08 su #565: registrare un esito senza motivo.
+// Senza il fix questi assert sono rossi, e il peggiore è il primo: la parola
+// con cui si BOCCIAVA veniva buttata via come vecchio verdetto, la critica
+// arrivava vuota, e zero rilievi vale «verifica superata» — cioè una
+// promozione, scritta da chi voleva bocciare.
+test('CLI #565: un esito senza motivo non si registra (e «fail» da sola non promuove)', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
+  const sandbox = cartellaTemporanea('filo-motivo-');
+  const statoDir = resolve(sandbox, 'stato');
+  try {
+    const env = {
+      ...process.env,
+      FILO_REPO_ROOT: sandbox,
+      FILO_TOOLS_ROOT: sandbox,
+      FILO_DISPATCH_STATE_DIR: statoDir,
+      FILO_NO_BEAT: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-finto',
+    };
+    const lancia = (args) => spawnSync(process.execPath, [DISPATCH, ...args], { env, encoding: 'utf8' });
+    const nienteScritto = (che) => assert.ok(!existsSync(statoDir) || !existsSync(resolve(statoDir, 'ID1.json')),
+      `${che}: non deve restare niente registrato`);
+
+    for (const parola of ['fail', 'pass', 'migliorabile']) {
+      const r = lancia(['--record-verifier', 'ID1', parola]);
+      assert.equal(r.status, 1, `«${parola}» da sola deve fermare`);
+      assert.match(String(r.stderr), /non è più un verdetto/, `«${parola}»: va detto perché`);
+      nienteScritto(parola);
+      // E soprattutto col motivo scritto dopo: è il caso in cui chi scrive è
+      // SICURO di aver bocciato, e prima la parola veniva inghiottita, la
+      // critica arrivava senza rilievi e l'esito era «superata» (#565).
+      const conMotivo = lancia(['--record-verifier', 'ID1', parola,
+        'Il pulsante Salva non salva col titolo vuoto: aperta la pagina, lasciato vuoto il titolo, premuto Salva, e non succede niente.']);
+      assert.equal(conMotivo.status, 1, `«${parola}» col motivo dopo deve fermare`);
+      assert.match(String(conMotivo.stderr), /non è più un verdetto/);
+      nienteScritto(`${parola} col motivo`);
+    }
+    // L'identificativo e basta: la critica è vuota, e vuota vuol dire pass.
+    const nudo = lancia(['--record-verifier', 'ID1']);
+    assert.equal(nudo.status, 1, 'senza critica non si registra un esito');
+    nienteScritto('identificativo nudo');
+    // Due parole non sono una verifica: stesso pavimento dello strumento locale.
+    const corta = lancia(['--record-verifier', 'ID1', 'va bene']);
+    assert.equal(corta.status, 1, 'una critica di due parole deve fermare');
+    assert.match(String(corta.stderr), /troppo corta/);
+    nienteScritto('critica corta');
+    // Anche dalla consegna della correzione esce un esito: il report non è
+    // facoltativo.
+    const senzaReport = lancia(['--record-fixed', 'ID1']);
+    assert.equal(senzaReport.status, 1, 'una correzione senza report deve fermare');
+    assert.match(String(senzaReport.stderr), /troppo corto/);
+    nienteScritto('correzione senza report');
+    // Una critica vera passa i controlli e arriva al server (che qui non c'è:
+    // l'esito non è più 1, ed è l'unico modo di dire che il pavimento non
+    // sbarra anche la strada buona).
+    const vera = lancia(['--record-verifier', 'ID1',
+      'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.']);
+    assert.notEqual(vera.status, 1, `una critica vera non è un errore d'uso: ${vera.stderr}`);
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
   }

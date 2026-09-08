@@ -223,21 +223,62 @@ function leggiStdin() {
 function uso() {
   console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
+  console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
 
-export async function main(argv) {
+export async function main(argvIn) {
+  let argv = Array.isArray(argvIn) ? [...argvIn] : [];
   const flag = (nome) => {
     const i = argv.indexOf(`--${nome}`);
     return i === -1 ? undefined : argv[i + 1];
   };
+  if (argv.includes('--help') || argv.includes('-h')) { uso(); return EXIT.FATTO; }
+  // Quello che non capisco lo dico, e non apro niente (feedback #565): il
+  // controllo sta in un posto solo, scripts/lib/argomenti.mjs. Le opzioni che
+  // npm si è mangiato le riprendiamo dall'ambiente invece di rifiutare una
+  // riga che chi l'ha scritta considera giusta.
+  const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
+  const OPZ = {
+    opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
+    conValore: ['--priorita', '--url', '--allega'],
+  };
+  argv = espandiUguali(argv, OPZ.conValore);
+  const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
+  if (storpiata) {
+    console.error(`RIFIUTATO: ${storpiata}`);
+    uso();
+    return EXIT.USO;
+  }
+  const daNpm = argomentiDaNpm(process.env, OPZ);
+  if (daNpm.errore) {
+    console.error(`RIFIUTATO: ${daNpm.errore}`);
+    uso();
+    return EXIT.USO;
+  }
+  if (daNpm.nota) { console.error(daNpm.nota); argv = [...argv, ...daNpm.args]; }
+  const male = controllaArgomenti(argv, OPZ);
+  if (male) {
+    console.error(`RIFIUTATO: ${male}`);
+    uso();
+    return EXIT.USO;
+  }
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
   // `--allega` è ripetibile: si raccolgono tutti i valori.
   const percorsiAllegati = argv.flatMap((a, i) => (a === '--allega' && argv[i + 1] !== undefined ? [argv[i + 1]] : []));
 
-  const valoriDiFlag = new Set([prioritaRaw, url, ...percorsiAllegati].filter((v) => v !== undefined));
-  const posizionali = argv.filter((a) => !a.startsWith('--') && !valoriDiFlag.has(a));
+  // I posizionali si contano per POSTO, non per valore: prima si toglievano le
+  // parole «uguali al valore di un'opzione», e una parola del testo scritta
+  // identica all'indirizzo passato spariva dal corpo senza dire niente — un
+  // taglio muto sul testo di chi segnala (feedback #565).
+  const CON_VALORE = new Set(['--priorita', '--url', '--allega']);
+  const posizionali = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    posizionali.push(a);
+  }
   const titolo = posizionali[0];
   let testo = posizionali.slice(1).join(' ');
   // Solo su "-" esplicito: leggere stdin "quando non è un terminale" fa

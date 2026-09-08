@@ -31,11 +31,16 @@ const TETTO_INDICE = 60 * 1024;
 
 const testo = readFileSync(INDICE, 'utf8');
 
+// Le righe si spezzano togliendo anche il ritorno a capo di Windows. Con un
+// checkout a CRLF ogni riga finiva per `\r`, che per una regex è un fine riga
+// e quindi `$` non ci arrivava: la sentinella non riconosceva NESSUNA voce e
+// diventava rossa dicendo «l'indice è vuoto». Rossa per l'ambiente, non per i
+// pattern — e la pubblicazione si ferma lì (feedback #565).
 // Una riga dell'indice: - **[Titolo](patterns/<slug>.md)** — regola
 const RIGA = /^- \*\*\[(.+)\]\(patterns\/([a-z0-9-]+)\.md\)\*\*\s+—\s+(.*)$/;
 
 const voci = testo
-  .split('\n')
+  .split(/\r?\n/)
   .map((riga, i) => ({ riga, n: i + 1, m: riga.match(RIGA) }))
   .filter((v) => v.m)
   .map((v) => ({ n: v.n, titolo: v.m[1], slug: v.m[2], regola: v.m[3].trim() }));
@@ -47,7 +52,7 @@ const fileDellaCartella = readdirSync(CARTELLA)
 
 function titoloDelFile(slug) {
   const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
-  const prima = contenuto.split('\n')[0];
+  const prima = contenuto.split(/\r?\n/)[0];
   return prima.startsWith('# ') ? prima.slice(2).trim() : null;
 }
 
@@ -58,7 +63,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     // errore di scrittura che farebbe sparire il pattern dai controlli qui
     // sotto senza che nessuno se ne accorga.
     const sospette = testo
-      .split('\n')
+      .split(/\r?\n/)
       .map((riga, i) => ({ riga, n: i + 1 }))
       .filter((v) => /^- \*\*\[/.test(v.riga) && !RIGA.test(v.riga));
     assert.deepEqual(
@@ -121,7 +126,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     const vuoti = fileDellaCartella.filter((slug) => {
       const contenuto = readFileSync(join(CARTELLA, `${slug}.md`), 'utf8');
       const corpo = contenuto
-        .split('\n')
+        .split(/\r?\n/)
         .slice(1)
         .filter((riga) => !riga.includes('](../PATTERNS.md)'))
         .join('\n');
@@ -242,7 +247,7 @@ describe('PATTERNS.md ↔ patterns/', () => {
     );
     // I racconti stanno nei file: nell'indice non ci sono sezioni di secondo
     // livello (le uniche intestazioni sono il titolo del documento).
-    const sezioni = testo.split('\n').filter((riga) => /^#{2,6} /.test(riga));
+    const sezioni = testo.split(/\r?\n/).filter((riga) => /^#{2,6} /.test(riga));
     assert.deepEqual(sezioni, [], 'PATTERNS.md contiene sezioni: i racconti vanno in patterns/<slug>.md');
   });
 });
