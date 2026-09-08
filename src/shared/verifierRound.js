@@ -168,7 +168,15 @@
   // (feedback #565). La finestra non può contenere una parentesi APERTA,
   // quindi «3 volte (ok)» in mezzo a una frase resta testo.
   const APRE_LIVELLO_SENZA_APERTURA = new RegExp(
-    `^\\s*${PREFISSO_ELENCO}${GRASSETTO}${LIVELLO_NUDO}[^\\[\\](){}\\n]{0,200}?[\\])}]`, 'i');
+    `^\\s*${PREFISSO_ELENCO}${GRASSETTO}(?:`
+    // Quadra e graffa di chiusura: nessuno le usa per elencare, quindi valgono
+    // sempre.
+    + `${LIVELLO_NUDO}[^\\[\\](){}\\n]{0,200}?[\\]}]`
+    // La tonda invece È un modo di elencare: «1) primo punto» è testo normale.
+    // Vale solo col livello scritto a parole, o con qualcosa in mezzo.
+    + `|(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])[^\\[\\](){}\\n]{0,200}?\\)`
+    + `|\\d[^\\[\\](){}\\n]{1,200}?\\)`
+    + `)`, 'i');
 
   function quadraColLivello(riga) {
     // TUTTE le quadre della riga, non solo la prima: bastava una frase fra
