@@ -880,7 +880,10 @@
         + ' title="Smetti di aspettare questa risposta">Interrompi</button>'
         + '</div></div>';
     }
-    if (m.aborted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Attesa interrotta. Riprova quando vuoi.</div></div>`;
+    if (m.aborted) {
+      const testo = (window.SN_ATTESA && window.SN_ATTESA.TESTO_INTERROTTA) || 'Attesa interrotta.';
+      return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">${esc(testo)}</div></div>`;
+    }
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div></div>`;
     const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
