@@ -354,8 +354,25 @@ class TabManager {
   //
   // `tabId` è la scheda da cui arriva il tasto, `null` se arriva dalla barra.
   // Ritorna true se ha gestito il tasto: chi chiama fa il preventDefault.
+  // Una scheda dice se ha aperto o chiuso un riquadro di Filo che si chiude
+  // con Esc. Idempotente, e tollerante a un id che non c'è più.
+  setTabFiloBox(tabId, open) {
+    if (tabId == null) return;
+    if (open) this.tabsWithFiloBox.add(tabId);
+    else this.tabsWithFiloBox.delete(tabId);
+  }
+
   handleFullscreenEscape(tabId = null) {
     if (!this.contentFullscreen) return false;
+    // Seconda deroga: la scheda in primo piano ha un riquadro DI FILO aperto
+    // (menu del tasto destro, riquadro della risposta, immagine a tutta
+    // pagina). L'Esc è del riquadro: lo chiude lui, e solo l'Esc dopo esce
+    // dallo schermo intero. Prendercelo noi lascerebbe il riquadro aperto
+    // sopra la pagina e farebbe perdere lo schermo intero a chi voleva solo
+    // chiudere un riquadro. Se la scheda si sbagliasse (riquadro già chiuso e
+    // avviso non ancora arrivato) non si resta chiusi dentro: il tasto arriva
+    // alla pagina, che rifà il controllo su dati freschi ed esce lei.
+    if (tabId != null && tabId === this.activeId && this.tabsWithFiloBox.has(tabId)) return false;
     // Unica deroga: il fullscreen l'ha chiesto la PAGINA e il tasto arriva
     // proprio da lei, mentre è quella in primo piano. Lì l'Esc deve arrivarle:
     // esce dal suo fullscreen e `leave-html-full-screen` ripristina la shell.
