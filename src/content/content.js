@@ -98,34 +98,60 @@
     try { return location.protocol === 'filo:'; } catch (_) { return false; }
   })();
 
-  function pezziDiFiloSullaPagina() {
-    try { return self.SN_FILO_UI?.aperti?.() || []; } catch (_) { return []; }
+  // Quanta roba c'è dentro un pezzo di pagina, in due numeri. Lo stesso metro
+  // vale per il documento intero e per il sottoalbero di una nostra radice.
+  function peso(radice) {
+    try {
+      if (!radice) return null;
+      return {
+        elementi: radice.getElementsByTagName('*').length,
+        nascosti: radice.querySelectorAll('[hidden]').length,
+      };
+    } catch (_) { return null; }
   }
-  // Uno di quelli che c'erano non è più attaccato al documento: si è chiuso.
+  // Solo la direzione "qualcosa è sparito": chi sta AGGIUNGENDO roba (una
+  // risposta che arriva a pezzi) non deve poter rivendicare il tasto.
+  function siEAlleggerito(prima, dopo) {
+    if (!prima || !dopo) return false;
+    return dopo.elementi < prima.elementi || dopo.nascosti > prima.nascosti;
+  }
+
+  // Le nostre radici aperte adesso, ciascuna col peso del suo sottoalbero.
+  function pezziDiFiloSullaPagina() {
+    const out = [];
+    try {
+      for (const el of (self.SN_FILO_UI?.aperti?.() || [])) out.push({ el, dentro: peso(el) });
+    } catch (_) {}
+    return out;
+  }
+  // Uno dei pezzi che c'erano si è chiuso: o la radice si è staccata dal
+  // documento, o dentro la radice è sparito qualcosa (un riquadro che Filo
+  // aveva aperto DENTRO un altro suo riquadro: l'immagine ingrandita dello
+  // screenshot nel box di segnalazione).
   // Guardiamo i pezzi UNO A UNO e non quanti sono, perché nello stesso istante
   // ne può nascere un altro — chiudendo la selezione di un'area compare
   // l'avvisino che dice com'è andata, e a contarli sembrerebbe che non sia
   // successo niente.
   function qualcosaSiEChiuso(pezziPrima) {
-    try { return pezziPrima.some((el) => el && !el.isConnected); } catch (_) { return false; }
+    try {
+      return pezziPrima.some((p) => {
+        if (!p || !p.el) return false;
+        if (!p.el.isConnected) return true;
+        return siEAlleggerito(p.dentro, peso(p.el));
+      });
+    } catch (_) { return false; }
   }
 
-  // Quanta pagina c'è, in due numeri. Solo sulle pagine di Filo: su un sito
-  // sarebbe il sito a decidere quando l'Esc è suo, che è esattamente ciò da cui
-  // ci difendiamo.
+  // Quanta pagina c'è. Il documento INTERO conta solo sulle pagine di Filo: su
+  // un sito sarebbe il sito a decidere quando l'Esc è suo, che è esattamente ciò
+  // da cui ci difendiamo (i sottoalberi delle nostre radici, invece, sono roba
+  // nostra ovunque).
   function pesoDellaPagina() {
     if (!PAGINA_DI_FILO) return null;
-    try {
-      return {
-        elementi: document.getElementsByTagName('*').length,
-        nascosti: document.querySelectorAll('[hidden]').length,
-      };
-    } catch (_) { return null; }
+    return peso(document.documentElement);
   }
   function siEAlleggerita(prima) {
-    const dopo = pesoDellaPagina();
-    if (!prima || !dopo) return false;
-    return dopo.elementi < prima.elementi || dopo.nascosti > prima.nascosti;
+    return siEAlleggerito(prima, pesoDellaPagina());
   }
 
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
