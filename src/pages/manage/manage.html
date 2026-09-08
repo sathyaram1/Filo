@@ -70,6 +70,21 @@
       padding: 14px 24px 18px;
     }
 
+    /* Sulle schede-lista la colonna è alta ESATTAMENTE la finestra, non "almeno".
+       È la metà che mancava al tetto del riquadro delle fusioni: un tetto dice
+       quanto un blocco può CHIEDERE, ma se la colonna può crescere oltre la
+       finestra nessuno lo obbliga a rinunciare a niente, e la somma (testata +
+       tetto + minimo delle aree) esce dal fondo lo stesso. Succedeva con lo
+       zoom di Filo alzato o su una finestra bassa: due fusioni in attesa a zoom
+       +2 e delle aree restava la sola intestazione "RICEVUTI" (#498).
+       Con l'altezza fissa la pressione esiste, e a cedere è il riquadro sopra
+       (che scorre dentro di sé) invece delle aree.
+       Solo sulle schede-lista: Statistiche, Modelli, Automazioni e Log hanno
+       contenuti più alti della finestra e devono far scorrere la pagina. */
+    .sn-page:has(> #panel-list.mg-panel--active) { height: 100vh; }
+    /* Testata: altezza sua, non si lascia stringere dalla pressione qui sopra. */
+    .mg-banner, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
+
     /* ── Switch "Modalità automatica" (tab Automazioni, owner-only) ─────── */
     /* `.sn-page label` (pages.css) impone `display: block` + colore smorzato a
        OGNI label di una pagina filo://, e con specificità 0-1-1 batteva
