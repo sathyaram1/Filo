@@ -144,6 +144,17 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  on(MSG.FULLSCREEN_STATE, async (msg, sender) => {
+    // La pagina lo chiede appena si monta. Serve perché l'annuncio
+    // (FULLSCREEN_CHANGED) parte quando la modalità CAMBIA: una pagina nata
+    // dopo non l'ha mai sentito e mostrerebbe "Schermo intero" nel menu del
+    // tasto destro mentre ci si è già dentro. Nessun gate d'origine: la
+    // risposta è un solo booleano sulla finestra che ospita chi chiede, la
+    // stessa cosa che l'annuncio dice già a ogni pagina aperta.
+    const win = winOf(sender);
+    return { ok: true, fullscreen: !!win?._filoTabs?.contentFullscreen };
+  });
+
   on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
     const win = winOf(sender);
     if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
