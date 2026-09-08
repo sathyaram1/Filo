@@ -76,14 +76,30 @@ content script e la pagina non può scriverci: da lì passa la decisione.
 nessuna prova vale all'infinito. Se la pagina non risponde affatto (nessun
 content script, renderer bloccato) il main esce da solo allo scadere
 dell'attesa. Se qualcuno rivendica ogni Esc, il conteggio delle rivendicazioni
-di fila lo ferma: **una** sola per gli indizi delle pagine di Filo (il tasto
-consumato, la pagina che si alleggerisce), quindi il secondo Esc esce comunque;
-**tre** per la roba nostra, dove la prova è solida e il tetto serve solo a non
-lasciare scritto «per sempre» da nessuna parte, visto che tre riquadri impilati
-chiusi uno per Esc sono già più di quanti ne esistano. Il conteggio torna a zero
-appena l'utente fa qualcos'altro, così riaprire un'immagine le ridà il suo
-tasto. Il caso peggiore è un'uscita in ritardo di mezzo istante, mai una
-modalità senza uscite.
+di fila lo ferma.
+
+**I tetti si contano separati, per FORZA della prova, non per pagina.** È il
+difetto del giro 7: contando insieme prove che non valgono uguale, due riquadri
+aperti insieme sopra una pagina di Filo costavano la modalità — il primo Esc
+chiudeva quello sopra, il secondo chiudeva quello sotto **e** spegneva lo
+schermo intero, che nessuno aveva chiesto di lasciare (la ricerca della gestione
+sotto l'immagine a tutta pagina; la domanda di conferma sopra l'immagine
+ingrandita della home). Il taglio giusto è quello che si è visto succedere:
+
+- **prova forte** — qualcosa è sparito davvero: un pezzo nostro staccato dal
+  documento, o (solo su una pagina di Filo) la pagina che si è alleggerita.
+  Tetto **tre**: tre riquadri impilati chiusi uno per Esc sono già più di
+  quanti ne esistano, e il tetto serve solo a non lasciare scritto «per
+  sempre» da nessuna parte.
+- **prova debole** — nessuno si è visto sparire, ma su una pagina di Filo
+  qualcuno il tasto se l'è preso. Tetto **uno**: chi si prendesse ogni Esc
+  senza chiudere niente si ferma al secondo.
+
+Una prova forte riazzera il conto delle deboli: la pagina sta dimostrando di
+fare qualcosa, non di mangiare tasti. Entrambi i conteggi tornano a zero appena
+l'utente fa qualcos'altro, così riaprire un'immagine le ridà il suo tasto. Il
+caso peggiore è un'uscita in ritardo di mezzo istante, mai una modalità senza
+uscite.
 
 **Il tetto che vale sta nel main, non nella pagina.** Il conteggio tenuto dal
 content script è il primo filtro, non la garanzia: sta nel mondo isolato, ma
