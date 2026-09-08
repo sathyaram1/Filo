@@ -955,11 +955,32 @@
 
   function avviaTick(bot) {
     fermaTick();
+    const ogni = (window.SN_ATTESA && window.SN_ATTESA.INTERVALLO_MS) || 1000;
     attesaTick = setInterval(() => {
       const el = $('chatLog') && $('chatLog').querySelector('[data-attesa]');
       if (!el || !bot.pending) { fermaTick(); return; }
       el.textContent = attesaLabel(bot);
-    }, 1000);
+    }, ogni);
+  }
+
+  // Invio a chat occupata (#520, giro 2): prima non succedeva NIENTE — né il
+  // messaggio partiva né qualcosa si muoveva. È il gesto di chi crede che l'app
+  // sia bloccata, e il silenzio glielo confermava. Adesso la bolla in attesa si
+  // accende per un istante: è lei che sta occupando la chat, ed è lì che c'è il
+  // modo di uscirne. Il testo scritto resta nel campo, non si perde.
+  let nudgeTimer = 0;
+  function segnalaChatOccupata() {
+    const el = $('chatLog') && $('chatLog').querySelector('.dk-msg-pending');
+    if (!el) return;
+    el.classList.remove('dk-nudge');
+    void el.offsetWidth; // riavvia l'animazione anche a pressioni ravvicinate
+    el.classList.add('dk-nudge');
+    if (nudgeTimer) clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(() => {
+      nudgeTimer = 0;
+      const cur = $('chatLog') && $('chatLog').querySelector('.dk-msg-pending');
+      if (cur) cur.classList.remove('dk-nudge');
+    }, 1200);
   }
 
   // «Interrompi»: libera subito la chat e ferma davvero la chiamata al modello
