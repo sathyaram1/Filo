@@ -122,7 +122,36 @@ test('sito: spento lo schermo intero da un\'altra strada, il riquadro incorporat
   await frame.locator('#t').click({ button: 'right' });
   await expect(frame.locator('.sn-menu').first()).toBeVisible({ timeout: 10_000 });
   const voce = await etichettaFullscreen(frame);
-  expect(await voce.getAttribute('aria-label')).toMatch(/^schermo intero/i);
+  const etichetta = await voce.getAttribute('aria-label');
+  // E se la voce mente, cliccarla fa il contrario di quello che promette:
+  // «Esci da schermo intero» ci RIENTRA.
+  await voce.click();
+  await new Promise((r) => setTimeout(r, 900));
+  const dopoIlClic = await schermoIntero(app);
+  expect(
+    { etichetta, schermoInteroDopoIlClic: dopoIlClic },
+    'la voce prometteva un\'uscita che non c\'era più, e cliccarla ha rimesso dentro',
+  ).toEqual({ etichetta: 'Schermo intero', schermoInteroDopoIlClic: true });
+});
+
+// ── 3b. Controprova: il riquadro NATO mentre la modalità era accesa ──────────
+// Lì lo stato lo chiede lui appena si monta, e infatti lo sa: il primo Esc
+// chiude il menu e lo schermo intero resta. È la prova che a rompere gli altri
+// casi è l'annuncio che al riquadro incorporato non arriva.
+test('controprova: il riquadro incorporato NATO a schermo intero tiene la modalità al primo Esc', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  await entra(app);
+  const page = await testServer.openReady(openTab, conRiquadro(testServer.html(DENTRO)));
+  const frame = page.frameLocator('#f');
+  await frame.locator('#t').click();
+  await frame.locator('#t').click({ button: 'right' });
+  await expect(frame.locator('.sn-menu').first()).toBeVisible({ timeout: 10_000 });
+
+  await esc(app);
+  const menuAperto = await frame.locator('.sn-menu').count() > 0;
+  const ancoraDentro = await schermoIntero(app);
+  expect({ menuAperto, schermoIntero: ancoraDentro })
+    .toEqual({ menuAperto: false, schermoIntero: true });
 });
 
 // ── 4. Il sito si prende l'Esc prima del menu di Filo ─────────────────────────
