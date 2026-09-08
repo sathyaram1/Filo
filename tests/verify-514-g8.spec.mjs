@@ -54,13 +54,9 @@ const PAGINA = `<!doctype html><html><body style="margin:0;height:1400px">
 // voce «Invia feedback». (Il modulo vive nel mondo isolato del content script,
 // quindi da fuori non lo si chiama a mano.)
 async function apriBoxDalMenu(page) {
-  await page.waitForFunction(
-    () => document.documentElement.dataset.filoContentScripts === '1',
-    null,
-    { timeout: 15_000 },
-  );
   await page.locator('#t').click({ button: 'right' });
-  const voce = page.locator('.sn-menu-item, .sn-menu [role="menuitem"], .sn-menu li')
+  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  const voce = page.locator('.sn-menu .sn-menu-item')
     .filter({ hasText: 'Invia feedback' }).first();
   await expect(voce).toBeVisible({ timeout: 8000 });
   await voce.click();
