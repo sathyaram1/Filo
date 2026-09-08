@@ -1033,6 +1033,7 @@
   let statsCreators = [];   // vuoto = tutti
   const statsOpen = new Set(['ricevuti']);  // quali riquadri sono aperti
   let workerLogEntries = null;  // null = il registro non è ancora stato letto
+  let workerLogMissing = '';    // '' = tutto bene; 'riservato' | 'errore'
 
   // I colori delle fette: dal verde (passata al primo colpo) al rosso (tanti
   // giri). Non è una palette qualunque — la scala DICE se il numero è buono, ed
