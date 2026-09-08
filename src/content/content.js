@@ -1785,6 +1785,10 @@
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
+      // Se un menu è aperto proprio adesso, la sua voce dello schermo intero
+      // sta dicendo una cosa che non è più vera: ridisegnala sul posto invece
+      // di lasciarla mentire finché il menu non si chiude (#514).
+      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
       return;
     }
     // Toast di sistema inviato dal main (es. esito differito dell'invio di un
