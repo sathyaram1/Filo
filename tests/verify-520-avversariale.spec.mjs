@@ -168,6 +168,42 @@ test('mazzi: Interrompi nei primi istanti annulla davvero la chiamata', async ({
     'la chiamata al modello è partita e non è stata annullata: token spesi per una risposta buttata').toBeTruthy();
 });
 
+// Stessa prova nella chat della home: lì non c'è nessun bottone per uscire,
+// quindi l'unica speranza è che l'attesa finisca da sola.
+test('home: senza toccare niente, l\'attesa finisce da sola con una frase', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  test.skip(!process.env.FILO_AI_TETTO_MS, 'serve FILO_AI_TETTO_MS stretto');
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.fetch = (_url, opts) => new Promise((_res, rej) => {
+      const s = opts && opts.signal;
+      const fine = () => { const e = new Error('This operation was aborted'); e.name = 'AbortError'; rej(e); };
+      if (!s) return;
+      if (s.aborted) { fine(); return; }
+      s.addEventListener('abort', fine, { once: true });
+    });
+  });
+
+  await page.locator('#input').fill('ciao filo');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-activity')).toBeVisible({ timeout: 15_000 });
+
+  // Nessun clic: la chat deve tornare utilizzabile da sola.
+  await expect(page.locator('#sendBtn')).toBeEnabled({ timeout: 90_000 });
+  const bolle = await page.locator('.dash-bubble').last().innerText();
+  console.log('[#520] home, frase finale:', JSON.stringify(bolle));
+  expect(bolle).not.toMatch(/https?:|openrouter\.ai|AbortError|\bfetch\b/i);
+});
+
 // ── Porta 4: senza toccare niente, l'attesa finisce da sola ────────────────
 // L'utente del feedback non ha premuto niente: ha aspettato «molto tempo».
 // Qui il servizio AI accetta la connessione e poi tace per davvero (fetch
