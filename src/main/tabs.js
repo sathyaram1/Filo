@@ -1638,16 +1638,12 @@ class TabManager {
     // CORRENTE (non su tab.isInternal, fissato alla creazione): così anche una
     // newtab interna che naviga verso un sito esterno riceve gli stili.
     wc.on('dom-ready', () => {
-      // Lo stato "schermo intero" viaggia come annuncio ai content script già
-      // montati: una pagina che arriva DOPO (scheda nuova, navigazione) non
-      // l'avrebbe mai sentito e mostrerebbe "Schermo intero" nel menu del tasto
-      // destro mentre ci si è già dentro. Glielo diciamo appena è pronta.
-      if (this.contentFullscreen) {
-        try {
-          const type = globalThis.SN_MSG?.MSG?.FULLSCREEN_CHANGED || 'fullscreen_changed';
-          wc.send('filo:broadcast', { type, fullscreen: true });
-        } catch (_) {}
-      }
+      // Qui NON si annuncia lo schermo intero. Ci si era provato, e l'annuncio
+      // arrivava prima che il content script avesse un orecchio: si perdeva, e
+      // il menu del tasto destro continuava a offrire "Schermo intero" mentre
+      // ci si era già dentro (#514). Adesso è la pagina a CHIEDERE lo stato
+      // appena è pronta (MSG.FULLSCREEN_STATE), che è l'unico momento in cui la
+      // risposta non può cadere nel vuoto.
       let current = '';
       try { current = wc.getURL() || ''; } catch (_) {}
       if (current.startsWith('filo://')) return; // pagine interne: CSS via <link>
