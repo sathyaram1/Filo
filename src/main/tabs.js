@@ -540,9 +540,27 @@ class TabManager {
     return on;
   }
 
+  // #514 — a OGNI frame, non al solo frame principale. Dentro i riquadri
+  // incorporati di un sito (il video, la mappa, il blocco commenti) girano i
+  // pezzi di Filo come nella pagina che li ospita: lì c'è il menu del tasto
+  // destro, e lì l'Esc va deciso. Mandando l'annuncio al solo frame principale,
+  // un riquadro che c'era già quando la modalità è cambiata non lo sapeva mai
+  // più: la sua voce del menu diceva «Schermo intero» a chi ci era già dentro
+  // (e «Esci da schermo intero» a chi ne era già uscito, rimettendocelo con un
+  // clic), e il suo Esc chiudeva il menu portandosi via anche la modalità.
   _broadcastToViews(message) {
     for (const t of this.tabs) {
-      try { t.view.webContents.send('filo:broadcast', message); } catch (_) {}
+      const wc = t.view?.webContents;
+      if (!wc || wc.isDestroyed?.()) continue;
+      let frames = null;
+      try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
+      if (!frames || !frames.length) {
+        try { wc.send('filo:broadcast', message); } catch (_) {}
+        continue;
+      }
+      for (const f of frames) {
+        try { if (!f.detached) f.send('filo:broadcast', message); } catch (_) {}
+      }
     }
   }
 
