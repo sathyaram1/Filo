@@ -499,3 +499,18 @@ test('quadra dimenticata E livello scritto a modo suo: la riga non passa muta', 
     assert.equal(R.unparsedLevelLines(`${riassunto}\n${riga}`).length, 0, `respinta a torto: ${riga}`);
   }
 });
+
+test('quadra dimenticata con una descrizione lunga accanto al livello: non passa muta', () => {
+  const riassunto = 'Provato tutto per bene e funziona.';
+  const riga = '3 dati dell utente a rischio] i passi per rifarlo';
+  // Prima porta: la riga finiva nel riassunto e l'esito era «verifica superata».
+  assert.equal(R.unparsedLevelLines(`${riassunto}\n${riga}`).length, 1);
+  // Seconda porta: con un rilievo minore sopra, la riga gli veniva incollata in
+  // coda — un difetto di sicurezza spariva dentro a uno cosmetico, e il giro si
+  // pagava dal bilancio sbagliato (#565).
+  assert.equal(R.unparsedLevelLines(`${riassunto}\n[1] bordo freddo\n${riga}`).length, 1);
+  // Anche con la parentesi di chiusura dimenticata invece di quella di apertura.
+  assert.equal(R.unparsedLevelLines(`${riassunto}\n[3 dati dell utente a rischio i passi`).length, 1);
+  // E la prosa con una quadra appaiata e un numero più avanti resta prosa.
+  assert.equal(R.unparsedLevelLines(`${riassunto}\nHo letto [la nota] e va bene, poi ho riprovato 3 volte.`).length, 0);
+});
