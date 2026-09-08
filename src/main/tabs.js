@@ -1615,20 +1615,11 @@ class TabManager {
     // Senza questi handler la view restava confinata sotto la barra e il video
     // non copriva davvero lo schermo. Riusiamo la stessa modalità del menu
     // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
+    // Qui la richiesta è già passata: chi non doveva ottenerla si ferma prima,
+    // nel gestore dei permessi della sessione (#514, `installaPermessi`). Non
+    // si rifiuta da qui perché quando questo evento arriva la finestra è già a
+    // tutto schermo e la modalità è già stata adottata.
     wc.on('enter-html-full-screen', () => {
-      // #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo
-      // schermo. Da quando l'Esc arriva al documento (è il tasto che chiude i
-      // riquadri, e prendercelo prima li scavalcava), il browser lo conta come
-      // gesto dell'utente: una pagina che chiede lo schermo pieno dentro il
-      // proprio gestore dell'Esc lo ottiene senza che nessuno abbia cliccato
-      // niente. Da lì il tasto che questa segnalazione chiedeva diventava un
-      // testa o croce — un Esc esce, il successivo rientra — perché la
-      // modalità tornava "della pagina" e l'Esc dopo era suo. Qui si rifiuta:
-      // per prendersi lo schermo serve un gesto che non sia l'uscita.
-      if (tab._ultimoInputEsc) {
-        this._rifiutaSchermoPienoDellaPagina(wc);
-        return;
-      }
       this.pageFullscreen = true;
       this.pageFullscreenTabId = tab.id;
       this.setContentFullscreen(true);
