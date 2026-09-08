@@ -1451,21 +1451,23 @@ class TabManager {
     // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
     wc.on('enter-html-full-screen', () => {
       this.pageFullscreen = true;
+      this.pageFullscreenTabId = tab.id;
       this.setContentFullscreen(true);
     });
     wc.on('leave-html-full-screen', () => {
+      if (this.pageFullscreenTabId != null && this.pageFullscreenTabId !== tab.id) return;
       this.pageFullscreen = false;
+      this.pageFullscreenTabId = null;
       this.setContentFullscreen(false);
     });
     wc.on('before-input-event', (event, input) => {
-      if (this.contentFullscreen && input.type === 'keyDown' && input.key === 'Escape') {
-        // Se il fullscreen è della pagina, lascia che l'Esc arrivi alla pagina:
-        // uscirà dal suo fullscreen e `leave-html-full-screen` ripristinerà la
-        // shell. Intercettarlo noi lascerebbe la pagina bloccata in fullscreen.
-        if (this.pageFullscreen) return;
-        event.preventDefault();
-        this.setContentFullscreen(false);
-        return;
+      if (input.type === 'keyDown' && input.key === 'Escape') {
+        // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
+        // l'Esc va invece lasciato alla pagina che ha chiesto il fullscreen).
+        if (this.handleFullscreenEscape(tab.id)) {
+          event.preventDefault();
+          return;
+        }
       }
       // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
       // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
