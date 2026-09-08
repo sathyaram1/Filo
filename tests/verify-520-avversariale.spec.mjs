@@ -168,37 +168,58 @@ test('mazzi: Interrompi nei primi istanti annulla davvero la chiamata', async ({
     'la chiamata al modello è partita e non è stata annullata: token spesi per una risposta buttata').toBeTruthy();
 });
 
-// ── Porta 4: il parere sulla carta ─────────────────────────────────────────
-// Stesso modello, stessa attesa: il modulo «Parere di Filo» dice «Filo sta
-// pensando…». Se il modello tace, resta lì?
-test('mazzi: il parere che non arriva non resta «sta pensando» per sempre', async ({ app, openTab }) => {
+// ── Porta 4: senza toccare niente, l'attesa finisce da sola ────────────────
+// L'utente del feedback non ha premuto niente: ha aspettato «molto tempo».
+// Qui il servizio AI accetta la connessione e poi tace per davvero (fetch
+// appeso, percorso vero del provider): senza nessun clic, la chat deve finire
+// l'attesa da sola e mostrare una frase leggibile.
+// Serve FILO_AI_STALLO_MS/FILO_AI_TETTO_MS stretti: senza, l'attesa vera è di
+// minuti e il test non aspetta tanto.
+test('mazzi: se non tocco niente, l\'attesa finisce da sola con una frase', async ({ app, openTab }) => {
   test.setTimeout(120_000);
-  await providerAppeso(app, 'DECKS_OPINION');
+  test.skip(!process.env.FILO_AI_TETTO_MS, 'serve FILO_AI_TETTO_MS stretto');
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.DECKS_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    // Il router accetta e tace: la promessa non si risolve mai da sola.
+    globalThis.__fetchChiamate = 0;
+    globalThis.fetch = (_url, opts) => {
+      globalThis.__fetchChiamate += 1;
+      return new Promise((_res, rej) => {
+        const s = opts && opts.signal;
+        const fine = () => {
+          const e = new Error('This operation was aborted');
+          e.name = 'AbortError';
+          rej(e);
+        };
+        if (!s) return;
+        if (s.aborted) { fine(); return; }
+        s.addEventListener('abort', fine, { once: true });
+      });
+    };
+  });
 
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
   await page.click('#newDeck');
   await expect(page.locator('#screenBuilder')).toBeVisible();
 
-  // Il parere si chiede dal main: lo interroghiamo per la via più corta,
-  // guardando solo se la promessa finisce (con un esito qualsiasi) o resta
-  // appesa per sempre.
-  const esito = await app.evaluate(async () => {
-    const t0 = Date.now();
-    const corsa = await Promise.race([
-      (async () => {
-        try {
-          const decks = await globalThis.SN_DECK_STORE.list();
-          const d = decks[0];
-          const r = await globalThis.SN_HANDLE_AI_REQUEST_PROBE
-            ? null : null;
-          return { via: 'n/d', deck: !!d };
-        } catch (e) { return { errore: String(e && e.message) }; }
-      })(),
-      new Promise((r) => setTimeout(() => r({ appeso: true }), 1000)),
-    ]);
-    return { corsa, ms: Date.now() - t0 };
-  });
-  console.log('[#520] sonda parere:', JSON.stringify(esito));
-  expect(true).toBe(true);
+  await page.fill('#chatInput', 'che ne pensi del mazzo?');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('[data-stop-chat]')).toBeVisible();
+
+  // Nessun clic: si aspetta e basta. La bolla deve smettere di «pensare».
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText(/Non ha funzionato/, { timeout: 90_000 });
+  const testo = await bolla.innerText();
+  console.log('[#520] frase mostrata all\'utente:', JSON.stringify(testo));
+  // Una frase per l'utente, non un codice tecnico né un endpoint.
+  expect(testo).not.toMatch(/https?:|openrouter\.ai|AbortError|\bfetch\b/i);
+  // E la chat è di nuovo libera.
+  await expect(page.locator('[data-stop-chat]')).toHaveCount(0);
 });
