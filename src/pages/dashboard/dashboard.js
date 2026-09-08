@@ -1835,6 +1835,7 @@
     if (!p) return;
     chatPending = null;
     p.annullato = true;
+    if (p.buttaParziale) { try { p.buttaParziale(); } catch (_) {} }
     if (p.activity) { try { p.activity.interrotta(); } catch (_) {} }
     if (p.reqId) send({ type: MSG.FILO_CHAT_ABORT, reqId: p.reqId }).catch(() => {});
     const testo = (window.SN_ATTESA && window.SN_ATTESA.TESTO_INTERROTTA) || 'Attesa interrotta.';
