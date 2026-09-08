@@ -187,6 +187,46 @@ test('sito a schermo pieno col suo pulsante: l\'immagine ingrandita del box di s
   ).toBe(true);
 });
 
+// ── 3ter. Il menu aperto DENTRO un riquadro incorporato a schermo pieno ──────
+// Il video annegato in una pagina si prende lo schermo pieno col suo pulsante,
+// e lì dentro Filo disegna il suo menu come nella pagina che lo ospita.
+const DENTRO = `<!doctype html><body style="margin:0;height:900px">
+<h1 id="t2">dentro il riquadro incorporato</h1>
+<button id="fs2">schermo intero</button>
+<script>
+  document.getElementById('fs2').addEventListener('click', function () {
+    try { document.documentElement.requestFullscreen(); } catch (_) {}
+  });
+</script></body>`;
+
+test('riquadro incorporato a schermo pieno: il primo Esc chiude il menu di Filo, non la modalità', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(
+    openTab,
+    `<!doctype html><body style="margin:0"><h1 id="fuori">la pagina che ospita</h1>`
+      + `<iframe id="f" src="${testServer.html(DENTRO)}" allowfullscreen style="width:700px;height:500px;border:0"></iframe></body>`,
+  );
+  const frame = page.frameLocator('#f');
+  await frame.locator('#fs2').click();
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(true);
+
+  await frame.locator('#t2').click({ button: 'right' });
+  await expect.poll(
+    () => page.evaluate(() => !!document.querySelector('.sn-menu')) ,
+    { timeout: 8000 },
+  ).toBe(false); // il menu vive dentro il riquadro, non nella pagina che ospita
+  const menuDentro = () => frame.locator('.sn-menu').count().then((n) => n > 0);
+  await expect.poll(menuDentro, { timeout: 8000 }).toBe(true);
+  await new Promise((r) => setTimeout(r, 400));
+
+  await esc(app);
+  expect(await menuDentro(), 'il primo Esc doveva chiudere il menu').toBe(false);
+  expect(
+    await schermoIntero(app),
+    'il primo Esc ha chiuso il menu e si è portato via lo schermo pieno',
+  ).toBe(true);
+});
+
 // ── 4. Controprova: senza niente aperto sopra, un Esc basta e avanza ─────────
 test('controprova: schermo pieno del sito senza riquadri aperti — un Esc esce', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
