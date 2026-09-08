@@ -389,6 +389,7 @@
         }
       }
     }
+    w.done();
     return {
       text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy, usage,
     };
