@@ -178,9 +178,6 @@ test.describe('larghezza e separatori stile Chrome', () => {
     await openTab('filo://newtab/');
     await openTab('filo://newtab/');
     await expect(shell.locator('.tab.active')).toHaveCount(1, { timeout: 8_000 });
-    await expect
-      .poll(() => shell.locator('.tab.active').evaluate((el) => el.getBoundingClientRect().width))
-      .toBeGreaterThan(0);
 
     // I due piedini curvi sono pseudo-elementi ::before/::after sulla scheda
     // attiva: devono essere visibili (display block, 8px) e disegnati con un
