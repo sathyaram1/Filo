@@ -320,6 +320,46 @@ class TabManager {
     return this.setContentFullscreen(!this.contentFullscreen);
   }
 
+  // Fa uscire dal fullscreen HTML5 la pagina che l'aveva chiesto, quando a
+  // spegnere lo schermo intero è stato qualcun altro. Best-effort: se la scheda
+  // non c'è più (chiusa, processo caduto) resta solo da dimenticarla, così la
+  // deroga dell'Esc non sopravvive alla pagina che la giustificava.
+  _exitPageFullscreen() {
+    const owner = this.tabs.find((t) => t.id === this.pageFullscreenTabId);
+    this.pageFullscreen = false;
+    this.pageFullscreenTabId = null;
+    if (!owner) return;
+    try {
+      owner.view.webContents
+        .executeJavaScript('try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} true', true)
+        .catch(() => {});
+    } catch (_) {}
+  }
+
+  // Esc esce dallo schermo intero. Regola UNICA, valida per ogni porta d'ingresso
+  // (menu del tasto destro, barra laterale, barra dei menu su Mac, comando
+  // dell'assistente, pulsante del player di un sito, schermo intero del sistema)
+  // e per ogni posto da cui il tasto può arrivare: la pagina (before-input-event
+  // sulla scheda) o la barra di Filo, che a tutto schermo è nascosta sotto la
+  // pagina ma continua a tenere il fuoco se l'ultimo clic era lì — era il buco
+  // di #514: Esc non faceva niente e si restava chiusi dentro.
+  //
+  // `tabId` è la scheda da cui arriva il tasto, `null` se arriva dalla barra.
+  // Ritorna true se ha gestito il tasto: chi chiama fa il preventDefault.
+  handleFullscreenEscape(tabId = null) {
+    if (!this.contentFullscreen) return false;
+    // Unica deroga: il fullscreen l'ha chiesto la PAGINA e il tasto arriva
+    // proprio da lei, mentre è quella in primo piano. Lì l'Esc deve arrivarle:
+    // esce dal suo fullscreen e `leave-html-full-screen` ripristina la shell.
+    // Intercettarlo noi la lascerebbe bloccata a tutto schermo.
+    if (this.pageFullscreen
+      && tabId != null
+      && tabId === this.pageFullscreenTabId
+      && tabId === this.activeId) return false;
+    this.setContentFullscreen(false);
+    return true;
+  }
+
   // Attiva/disattiva il "chrome compatto": quando true la barra indirizzi è
   // nascosta dalla shell e la WebContentsView attiva risale a coprire anche il
   // suo spazio (top = tabRowHeight invece di shellHeight). La shell lo richiama
