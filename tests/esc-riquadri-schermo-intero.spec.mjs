@@ -98,11 +98,9 @@ test('immagine a tutta pagina nella gestione: il primo Esc la chiude, il secondo
   await page.evaluate(() => window.__mgTest.whenReady());
   await entra(app);
   // Quello che fa il clic su un'immagine allegata a un feedback.
-  await page.evaluate(() => {
-    document.getElementById('mgLightboxImg').src =
-      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    document.getElementById('mgLightbox').classList.add('open');
-  });
+  await page.evaluate(() => window.__mgTest.openLightbox(
+    'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  ));
   await expect(page.locator('#mgLightbox')).toBeVisible();
   await new Promise((r) => setTimeout(r, 400));
 
