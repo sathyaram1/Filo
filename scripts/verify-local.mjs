@@ -307,7 +307,7 @@ export function historyFromRounds(rounds) {
  * Rifiuta se non c'era niente in sospeso, o con modifiche non salvate: la
  * consegna vale per un commit, e la verifica dopo deve provare quello.
  */
-export function withFixed(state, branch, { report, sha, at, dirty = false }) {
+export function withFixed(state, branch, { report, sha, at, dirty = false, dirtyFiles = [] }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
