@@ -581,6 +581,24 @@ if (isMain) {
         if (pkg.version) data.resolvedInVersion = pkg.version;
       } catch (_) { /* senza versione si chiude lo stesso: non è un motivo per fermarsi */ }
     }
+    // Le consegne che passano il ramo a una verifica valgono per un commit:
+    // la messa in revisione (il primo passaggio di chi risolve), la correzione
+    // e il verdetto. Con modifiche non salvate la verifica dopo proverebbe il
+    // ramo senza di esse e boccerebbe una cosa fatta: un giro sprecato. Lo
+    // strumento delle routine (dispatch --record-*) respingeva già; da qui,
+    // che è la strada della ricetta per il primo passaggio, no (verifica del
+    // giro 3 su questo lavoro). Stessa regola, stessa fonte (lib/dirty-tree).
+    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed'
+      || (intento === 'status' && data.status === 'revision_capability');
+    if (passaAllaVerifica) {
+      const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
+      if (sporchi.length) {
+        const cosa = intento === 'verdict' ? 'critica' : intento === 'fixed' ? 'consegna' : 'revisione';
+        console.error(dirtyTreeText(sporchi, cosa));
+        console.error('Niente è stato consegnato: porta la directory a un commit e rilancia lo stesso comando.');
+        process.exit(1);
+      }
+    }
     const r = await deliver(biglietto, intento, data);
     if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed')) {
       // La consegna è REGISTRATA dal server: da questo istante il contenuto
