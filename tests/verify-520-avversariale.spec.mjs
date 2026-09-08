@@ -259,3 +259,75 @@ test('mazzi: se non tocco niente, l\'attesa finisce da sola con una frase', asyn
   // E la chat è di nuovo libera.
   await expect(page.locator('[data-stop-chat]')).toHaveCount(0);
 });
+
+// ── Guardata: l'attesa nei due temi ────────────────────────────────────────
+// Il cronometro e «Interrompi» sono elementi nuovi: si guardano davvero, con
+// il tema chiaro e con quello scuro, e con un messaggio lungo che potrebbe
+// spingerli fuori dalla riga.
+test('mazzi: l\'attesa si vede bene, chiaro e scuro', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await providerAppeso(app, 'DECKS_CHAT');
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+
+  // Messaggio lunghissimo: la bolla utente non deve schiacciare l'attesa.
+  await page.fill('#chatInput', 'valuta '.repeat(400));
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('[data-stop-chat]')).toBeVisible();
+  await expect(page.locator('[data-attesa]')).toHaveText(/\d+s/, { timeout: 20_000 });
+
+  await page.screenshot({ path: 'tests/.shots/520-attesa-chiaro.png' });
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: 'tests/.shots/520-attesa-scuro.png' });
+
+  // Il bottone resta dentro la colonna della chat (niente sbordamenti).
+  const b = await page.locator('[data-stop-chat]').boundingBox();
+  const col = await page.locator('#chatLog').boundingBox();
+  console.log('[#520] bottone:', JSON.stringify(b), 'colonna:', JSON.stringify(col));
+  expect(b.x + b.width).toBeLessThanOrEqual(col.x + col.width + 1);
+});
+
+test('mazzi: l\'attesa nel tema scuro (tema impostato prima di aprire)', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
+  await providerAppeso(app, 'DECKS_CHAT');
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  await page.fill('#chatInput', 'che ne pensi del mazzo?');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('[data-attesa]')).toHaveText(/\d+s/, { timeout: 20_000 });
+  await page.screenshot({ path: 'tests/.shots/520-attesa-scuro2.png' });
+});
+
+// L'utente che crede che l'app sia bloccata riprova: riscrive e preme Invio.
+test('mazzi: riscrivere mentre Filo pensa dà un qualche riscontro', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await providerAppeso(app, 'DECKS_CHAT');
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  await page.fill('#chatInput', 'prima domanda');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('[data-stop-chat]')).toBeVisible();
+
+  const prima = await page.locator('#chatLog').innerText();
+  await page.fill('#chatInput', 'ci sei?');
+  await page.press('#chatInput', 'Enter');
+  await page.waitForTimeout(1200);
+  const dopo = await page.locator('#chatLog').innerText();
+  const testoRimasto = await page.inputValue('#chatInput');
+  console.log('[#520] invio a chat occupata — log cambiato:', prima !== dopo,
+    '· testo rimasto nel campo:', JSON.stringify(testoRimasto));
+  // Escape: gesto naturale per «basta, esci da qui».
+  await page.press('#chatInput', 'Escape');
+  await page.waitForTimeout(500);
+  const dopoEsc = await page.locator('[data-stop-chat]').count();
+  console.log('[#520] dopo Escape, attesa ancora in corso:', dopoEsc > 0);
+  expect(prima !== dopo, 'Invio a chat occupata: nessun riscontro di alcun tipo').toBeTruthy();
+});
