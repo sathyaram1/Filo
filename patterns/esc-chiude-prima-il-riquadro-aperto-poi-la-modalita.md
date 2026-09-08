@@ -73,8 +73,8 @@ allo schermo intero a tempo indeterminato. L'elenco vive nel mondo isolato dei
 content script e la pagina non può scriverci: da lì passa la decisione.
 
 **Non si resta mai chiusi dentro.** È la parte che conta più della regola, e
-nessuna prova vale all'infinito. Se la pagina non risponde affatto — nessun
-content script, renderer bloccato — il main esce da solo allo scadere
+nessuna prova vale all'infinito. Se la pagina non risponde affatto (nessun
+content script, renderer bloccato) il main esce da solo allo scadere
 dell'attesa. Se qualcuno rivendica ogni Esc, il conteggio delle rivendicazioni
 di fila lo ferma: **una** sola per gli indizi delle pagine di Filo (il tasto
 consumato, la pagina che si alleggerisce), quindi il secondo Esc esce comunque;
@@ -84,6 +84,24 @@ chiusi uno per Esc sono già più di quanti ne esistano. Il conteggio torna a ze
 appena l'utente fa qualcos'altro, così riaprire un'immagine le ridà il suo
 tasto. Il caso peggiore è un'uscita in ritardo di mezzo istante, mai una
 modalità senza uscite.
+
+**Il tetto che vale sta nel main, non nella pagina.** Il conteggio tenuto dal
+content script è il primo filtro, non la garanzia: sta nel mondo isolato, ma
+vive dentro la pagina, e il documento arriva a farlo ripartire da zero. Un sito
+scritto apposta se ne serviva così: teneva da parte un riquadro di Filo vero
+(il menu del tasto destro appena chiuso resta un nodo del suo documento), se lo
+riattaccava invisibile e se lo ristaccava a ogni Esc per far credere che il
+tasto fosse servito a chiudere qualcosa di nostro, e intanto azzerava il conto
+con un `mousedown` finto fabbricato dal documento. Sei Esc, dentro. Per questo
+lo stesso tetto (`ESC_RIVENDICAZIONI_MAX` in `src/main/tabs.js`) è contato
+anche dal main, che conta le rivendicazioni arrivate mentre un'uscita era in
+attesa e, superate tre di fila, smette di credere alla pagina ed esce. Riparte
+da zero solo su cose che la pagina non può fabbricare: l'input vero
+(`input-event` della WebContents, tutto tranne l'Esc stesso) e il cambio di
+modalità. **Regola generale: un limite contro l'abuso di una pagina non può
+essere contato dentro quella pagina**, per isolato che sia il mondo in cui
+gira. La prova sta in `tests/verify-514-g6.spec.mjs` («sito ladro»), con la
+controprova della stessa pagina senza gli eventi finti.
 
 **Chi apre un riquadro nuovo non deve fare niente.** Un riquadro disegnato sopra
 un sito passa già da `SN_FILO_UI.mark()`, perché il marchio serve anche a chi
