@@ -162,7 +162,10 @@ test('controprova: un sito che si mangia l\'Esc, senza esca, esce al primo colpo
 
 test('sito ostile: il travestimento da riquadro di Filo non tiene dentro allo schermo intero', async ({ app, openTab, testServer }) => {
   test.setTimeout(180_000);
-  await testServer.openReady(openTab, paginaOstile(true));
+  const page = await testServer.openReady(openTab, paginaOstile(true));
+  // L'elenco di chi ha disegnato cosa non deve essere raggiungibile dal sito:
+  // se lo fosse, basterebbe iscriversi invece di travestirsi.
+  expect(await page.evaluate(() => typeof window.SN_FILO_UI), 'il sito non deve poter toccare l\'elenco').toBe('undefined');
   await entra(app);
   const esiti = [];
   for (let i = 0; i < 4; i++) {
