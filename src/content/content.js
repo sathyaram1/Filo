@@ -97,6 +97,12 @@
   // Se nessuno l'ha usato, chiediamo noi di uscire. Se non chiediamo niente, il
   // main esce da solo dopo un attimo: l'errore possibile è un'uscita in ritardo,
   // mai restare chiusi dentro.
+  //
+  // Tutto questo però presuppone che il tasto arrivi. Quando lo schermo pieno è
+  // del SITO (il pulsante del suo lettore video) non arriva: se lo prende il
+  // browser per uscire, prima di chiunque, e non lo vede né il documento né il
+  // main. Lì il tasto va CHIESTO — vedi `chiediEsc` più sotto — e poi il giro è
+  // questo, identico.
   const PAGINA_DI_FILO = (() => {
     try { return location.protocol === 'filo:'; } catch (_) { return false; }
   })();
