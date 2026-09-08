@@ -41,6 +41,15 @@
       /* Quanto può prendersi, al massimo, ciò che aspetta una decisione sopra
          le tre aree. Oltre, scorre dentro di sé invece di spingerle fuori. */
       --mg-attesa-max: 40vh;
+      /* E quanto gli resta al minimo quando la finestra è bassa: tanto da far
+         leggere l'intestazione ("2 fusioni aspettano il tuo via libera"), che
+         è come si scopre che sotto c'è dell'altro. Sotto quella riga il
+         riquadro sparirebbe senza dirlo, ed è la cosa che CLAUDE.md § Limiti
+         vieta. */
+      --mg-attesa-min: min(64px, 15vh);
+      /* Il minimo delle tre aree. Su una finestra normale sono 300 pixel; su
+         una bassa cedono anche loro, invece di uscire dal fondo. */
+      --mg-aree-min: min(300px, 60vh);
     }
 
     /* La dashboard di gestione sfrutta tutta la larghezza: override locale del
