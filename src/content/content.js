@@ -92,6 +92,19 @@
       try { startTabActivityReporter(); } catch (_) {}
     }
 
+    // Siamo nati mentre lo schermo intero era già acceso? Lo CHIEDIAMO, non
+    // aspettiamo l'annuncio: l'annuncio parte quando la modalità cambia, e una
+    // pagina arrivata dopo (scheda nuova, navigazione) non lo sentirà mai. Era
+    // il buco di #514: il menu del tasto destro offriva "Schermo intero" mentre
+    // ci si era già dentro, e la via d'uscita col suo nome non c'era.
+    try {
+      chrome.runtime.sendMessage({ type: MSG.FULLSCREEN_STATE })
+        .then((r) => {
+          if (!fullscreenAnnunciato && r && r.ok) contentFullscreen = !!r.fullscreen;
+        })
+        .catch(() => {});
+    } catch (_) {}
+
     // Esc esce dalla modalità "contenuto a tutto schermo" (vedi tabs.js). Va
     // registrato anche su pagine "bloccate" (senza menu) e in capture, così
     // pre-empta gli handler Escape della pagina solo quando la modalità è attiva.
