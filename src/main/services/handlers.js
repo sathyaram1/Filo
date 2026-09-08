@@ -244,9 +244,14 @@ function withDefaults(settings) {
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
-  for (const k of ['openrouter', 'tavily']) {
-    apiKeys[k] = d.apiKeys[k] || userKeys[k] || '';
-  }
+  // OpenRouter (#598): prima la chiave che l'utente ha scritto lui (è il suo
+  // conto, e ha scelto di usarlo), poi la chiave PERSONALE che il server ha
+  // creato al riscatto dell'invito (il suo tetto sono i suoi crediti), e solo
+  // in coda la chiave di fabbrica, che non viene più incastonata nelle
+  // versioni nuove e resta come ripiego per le installazioni vecchie.
+  const personal = personalOpenrouterKey();
+  apiKeys.openrouter = userKeys.openrouter || personal || d.apiKeys.openrouter || '';
+  apiKeys.tavily = d.apiKeys.tavily || userKeys.tavily || '';
   return {
     ...settings,
     provider: d.provider,
@@ -258,6 +263,10 @@ function withDefaults(settings) {
     apiKeys,
     security,
   };
+}
+
+function personalOpenrouterKey() {
+  try { return require('../auth/wallet-store').personalKey(); } catch (_) { return ''; }
 }
 
 // Settings "effettivi" per servire una richiesta AI: come getSettings() ma con
@@ -2803,6 +2812,7 @@ require('./handlers/ai')(on, handlerCtx);
 require('./handlers/filo')(on, handlerCtx);
 require('./handlers/auth')(on, handlerCtx);
 require('./handlers/credits')(on, handlerCtx);
+require('./handlers/wallet')(on, handlerCtx);   // #598 — chiave personale, inviti, registro d'uso
 require('./handlers/board')(on, handlerCtx);
 require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);

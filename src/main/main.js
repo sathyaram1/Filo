@@ -133,6 +133,9 @@ app.whenReady().then(async () => {
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
   // token si rinnova alla prima richiesta che lo serve). Vedi src/main/auth/.
   try { require('./auth/google-auth').restore(); } catch (_) {}
+  // Identità dell'installazione (#598): l'account anonimo Firebase a cui sono
+  // legati crediti e chiave personale. Solo rilettura del file, niente rete.
+  try { require('./auth/anon-auth').restore(); } catch (_) {}
 
   // Carica in background la config "modelli predefiniti" condivisa da Firestore
   // (modelli pubblici + eventuali chiavi ruotate dall'admin, se loggati). Non

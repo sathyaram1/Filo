@@ -96,6 +96,13 @@
       if (st === 401 || st === 403) {
         return 'il servizio AI ha rifiutato la chiave API: controlla che sia giusta (e ancora valida) nelle Impostazioni.';
       }
+      // 402 (#598): il tetto della chiave è esaurito. Con la chiave personale
+      // di Filo sono i crediti finiti; con una chiave propria è il conto
+      // OpenRouter dell'utente. Non si ritenta: OpenRouter rifiuta finché il
+      // tetto non sale (i crediti del giorno dopo, o una ricarica).
+      if (st === 402) {
+        return 'i crediti sono finiti: puoi aspettare quelli di domani, oppure mettere una tua chiave OpenRouter nelle Impostazioni. Se usi già una chiave tua, è il suo credito a essere esaurito.';
+      }
       if (st === 429 || st >= 500) {
         return 'il servizio AI è momentaneamente sovraccarico o non disponibile. Riprova tra qualche minuto.';
       }

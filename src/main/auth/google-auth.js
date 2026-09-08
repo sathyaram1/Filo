@@ -88,19 +88,48 @@ async function exchangeCodeForGoogleToken(code, verifier, redirectUri) {
 }
 
 // Fase 2: Google id_token → Firebase ID token + refresh token.
+//
+// COLLEGAMENTO all'identità dell'installazione (#598): se questa copia di Filo
+// ha già un account anonimo (crediti e chiave personale stanno lì), si passa
+// il suo idToken: Firebase aggiunge Google a QUELLO stesso account, e l'uid
+// non cambia. Se l'account Google è già legato altrove (seconda
+// installazione) Firebase rifiuta il collegamento: allora si fa il login
+// normale, con due identità distinte — il portafoglio resta sull'installazione.
 async function signInWithFirebase(googleIdToken) {
-  const res = await fetch(`${cfg.signInWithIdpEndpoint}?key=${cfg.firebaseApiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const anonToken = currentInstallationToken();
+  const attempt = async (linkTo) => {
+    const body = {
       postBody: `id_token=${googleIdToken}&providerId=google.com`,
       requestUri: 'http://localhost',
       returnIdpCredential: true,
       returnSecureToken: true,
-    }),
-  });
-  if (!res.ok) throw new Error(`Firebase signInWithIdp fallito (${res.status}): ${(await res.text()).slice(0, 300)}`);
-  return res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+    };
+    if (linkTo) body.idToken = linkTo;
+    const res = await fetch(`${cfg.signInWithIdpEndpoint}?key=${cfg.firebaseApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = new Error(`Firebase signInWithIdp fallito (${res.status}): ${(await res.text()).slice(0, 300)}`);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+  };
+  if (anonToken) {
+    try { return await attempt(anonToken); } catch (e) {
+      console.warn("[auth] collegamento all'identità dell'installazione non riuscito, login separato:", e?.message || e);
+    }
+  }
+  return attempt(null);
+}
+
+// L'idToken dell'identità anonima, se c'è ed è fresco (senza fare rete).
+function currentInstallationToken() {
+  try {
+    return require('./anon-auth').currentIdTokenSync();
+  } catch (_) { return null; }
 }
 
 function persist() {

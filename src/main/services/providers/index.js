@@ -64,6 +64,16 @@
     throw lastErr;
   }
 
+  // Crediti finiti (#598): OpenRouter risponde 402 finché il tetto della
+  // chiave non sale. Non si ritenta e non si passa al tentativo successivo
+  // (userebbe la stessa chiave): si avvisa una volta e si esce subito.
+  function stopOnOutOfCredits(err) {
+    const W = global.SN_WALLET;
+    if (!W || !W.isOutOfCredits(err)) return false;
+    try { global.SN_WALLET_MAIN?.outOfCreditsNotice(); } catch (_) {}
+    return true;
+  }
+
   // `tools` / `toolChoice` (tool calling nativo, vedi src/shared/actionTools.js)
   // e `onToolCall` (una chiamata appena il modello ne pronuncia il nome, in
   // streaming) passano tali e quali al provider.
@@ -98,6 +108,7 @@
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
+        if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} fallito (${i + 1}/${attempts.length}):`, err.message || err);
         if (onFallback && i + 1 < attempts.length) {
           try { onFallback({ failed: a.provider, next: attempts[i + 1].provider, error: err }); } catch (_) {}
@@ -143,6 +154,7 @@
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
+        if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
         const hasNext = i + 1 < attempts.length;
         if (onReset && hasNext && emitted) {

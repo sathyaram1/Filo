@@ -69,6 +69,12 @@
     try {
       await global.SN_CREDITS?.recordConsumption({ action, costEur: creditEur, provider, model, usage });
     } catch (_) { /* i crediti non devono mai far fallire una chiamata AI */ }
+    // Registro d'uso sul server (#598): una riga per chiamata fatta con la
+    // chiave personale. Decide l'handler wallet se scriverla; qui si passa
+    // solo quello che si sa. Best-effort come i crediti.
+    try {
+      await global.SN_WALLET_MAIN?.recordUsage({ action, provider, model, servedBy: usage && usage.servedBy, usage });
+    } catch (_) {}
     return eur;
   }
 
