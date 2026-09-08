@@ -121,21 +121,25 @@ test('lo schermo intero del sistema è lo schermo intero di Filo, e Esc ne esce'
   await expect.poll(async () => (await stato(app)).osFullscreen, { timeout: 8000 }).toBe(false);
 });
 
-test('l\'Esc resta alla pagina che ha chiesto il fullscreen col suo pulsante', async ({ app, openTab, testServer }) => {
-  // La deroga deve sopravvivere: sulla scheda in primo piano che è entrata a
-  // tutto schermo col pulsante del sito, l'Esc è suo (esce dal fullscreen del
-  // player e il main ripristina la barra da solo). Dalla barra di Filo, invece,
-  // alla pagina non arriverebbe mai: lì tocca a Filo.
+test('sullo schermo pieno chiesto dal sito il tasto se lo prende Filo, e la pagina decide', async ({ app, openTab, testServer }) => {
+  // Fino al giro 9 questo tasto si lasciava alla pagina: usciva dal fullscreen
+  // del player e il main ripristinava la barra da solo. Ma il tasto alla pagina
+  // non arrivava affatto — se lo prendeva il browser per uscire — e ogni
+  // riquadro che Filo aveva aperto lì sopra veniva scavalcato (#514, giro 10).
+  // Adesso il tasto ce lo prendiamo noi (l'uscita va in attesa e la pagina dice
+  // di chi era) e dalla barra di Filo si decide subito, perché lì la pagina non
+  // lo vedrebbe mai.
   await testServer.openReady(openTab, PAGINA);
   await fullscreenDalSito(app);
 
   const esiti = await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     const tabs = win._filoTabs;
-    // Solo la prima è senza effetti: la seconda spegne davvero, ed è l'ultima.
-    return { dallaPagina: tabs.handleFullscreenEscape(tabs.activeId), dallaBarra: tabs.handleFullscreenEscape(null) };
+    const dallaPagina = tabs.handleFullscreenEscape(tabs.activeId);
+    return { dallaPagina, attesaArmata: !!tabs._escUscitaTimer, dallaBarra: tabs.handleFullscreenEscape(null) };
   });
-  expect(esiti.dallaPagina).toBe(false);
+  expect(esiti.dallaPagina, 'il tasto ce lo prendiamo noi, o il browser esce prima').toBe(true);
+  expect(esiti.attesaArmata, 'l\'uscita va in attesa: decide la pagina').toBe(true);
   expect(esiti.dallaBarra).toBe(true);
   await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 8000 }).toBe(false);
 });
