@@ -1134,14 +1134,23 @@
   }
 
   // ── Lightbox ──────────────────────────────────────────────────────────────
+  // Il main deve sapere che c'è un riquadro nostro aperto: a tutto schermo
+  // l'Esc lo prende lui prima di noi, e senza questo avviso spegnerebbe lo
+  // schermo intero lasciando l'immagine aperta (#514). Con l'avviso il primo
+  // Esc chiude l'immagine e il secondo esce dallo schermo intero.
+  function avvisaRiquadro(open) {
+    try { sendToMain({ type: 'filo_box_open', open }).catch(() => {}); } catch (_) {}
+  }
   function openLightbox(src) {
     mgLightboxImg.src = src;
     mgLightbox.classList.add('open');
+    avvisaRiquadro(true);
   }
   function closeLightbox() {
     if (!mgLightbox.classList.contains('open')) return false;
     mgLightbox.classList.remove('open');
     mgLightboxImg.removeAttribute('src');
+    avvisaRiquadro(false);
     return true;
   }
   mgLightbox.addEventListener('click', closeLightbox);
