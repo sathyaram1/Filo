@@ -196,6 +196,17 @@
     .dk-msg-text { white-space: pre-wrap; overflow-wrap: break-word; margin: 0 0 4px; }
     .dk-msg-pending, .dk-msg-error { color: var(--sn-muted); font-size: 12px; }
     .dk-msg-error { color: var(--sn-danger, #c0392b); }
+    /* Attesa in corso (#520): da quanto si aspetta e come smettere. Il tempo ha
+       una larghezza sua così il bottone non balla a ogni secondo. */
+    .dk-msg-pending { display: flex; align-items: center; gap: 8px; }
+    .dk-attesa { font-variant-numeric: tabular-nums; min-width: 30px; }
+    .dk-stop {
+      margin-left: auto; font: inherit; color: var(--sn-muted);
+      background: transparent; border: 1px solid var(--sn-border);
+      border-radius: 999px; padding: 1px 9px; cursor: pointer;
+      transition: background var(--sn-anim, 120ms) ease, color var(--sn-anim, 120ms) ease;
+    }
+    .dk-stop:hover { background: var(--sn-hover); color: var(--sn-text); }
     /* Ragionamento del modello (CoT, #331): blocco collassabile cliccabile in
        testa alla bolla. Aperto mentre Filo pensa (scorre in diretta), poi
        collassato a una riga discreta riespandibile. */
