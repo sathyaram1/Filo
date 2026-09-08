@@ -189,7 +189,7 @@ test('la torta dice quanti giri costa un lavoro, e sotto quante critiche hanno f
   // vecchio «migliorabile»).
   const nota = page.locator('#mgStPieNote');
   await expect(nota).toContainText('1 giro di correzione');
-  await expect(nota).toContainText('1 giro bloccante');
+  await expect(nota).toContainText('1 giro bloccante, passato all’owner');
   await expect(nota).toContainText('1 giro con rilievi rimandati');
   await expect(nota).toContainText('Media:');
 });

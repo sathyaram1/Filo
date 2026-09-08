@@ -1309,7 +1309,9 @@
     if (g.giriTotali) {
       const plur = (n, uno, tanti) => `${n} ${n === 1 ? uno : tanti}`;
       frasi.push(plur(g.perEsito.fix, 'giro di correzione', 'giri di correzione'));
-      frasi.push(`${plur(g.perEsito.stop, 'giro bloccante', 'giri bloccanti')} che passano all’owner (i vecchi «fail»)`);
+      frasi.push(g.perEsito.stop === 1
+        ? '1 giro bloccante, passato all’owner (il vecchio «fail»)'
+        : `${g.perEsito.stop} giri bloccanti, passati all’owner (i vecchi «fail»)`);
       frasi.push(`${plur(g.perEsito.rimandati, 'giro', 'giri')} con rilievi rimandati a un feedback derivato (i vecchi «migliorabile»)`);
     }
     if (g.ferme) frasi.push(`${g.ferme} ${g.ferme === 1 ? 'lavorazione chiusa' : 'lavorazioni chiuse'} senza un pass registrato`);
