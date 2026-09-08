@@ -29,6 +29,14 @@
 
   let activeMenu = null;
 
+  // Un riquadro di Filo si è aperto o chiuso: content.js lo dice al main, che
+  // a tutto schermo deve sapere se l'Esc è di questo menu o dello schermo
+  // intero (#514). Se il gancio non c'è ancora (menu.js si carica prima di
+  // content.js) non succede niente: la prima apertura vera arriva dopo.
+  function avvisaCambio() {
+    try { global.SN_RIQUADRI_CAMBIATI?.(); } catch (_) {}
+  }
+
   function close() {
     try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
