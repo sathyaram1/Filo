@@ -860,11 +860,11 @@
       </div>`;
   }
 
-  // Da quanto si sta aspettando, in parole (#520). Sotto i cinque secondi non
-  // si scrive niente: una risposta rapida non ha bisogno di un cronometro.
+  // Da quanto si sta aspettando, in parole (#520). La regola vive in
+  // `shared/attesa.js`: la chat della home mostra lo stesso cronometro e le due
+  // non devono divergere.
   function attesaLabel(m) {
-    const s = Math.floor((Date.now() - (m.startedAt || Date.now())) / 1000);
-    return s >= 5 ? `${s}s` : '';
+    return window.SN_ATTESA ? window.SN_ATTESA.etichetta(m.startedAt) : '';
   }
 
   function chatBubbleHtml(m, isLast) {

@@ -59,6 +59,7 @@ require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normali
 require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'netTimeout.js'));  // #520 — scadenza delle chiamate di rete (modelli, archivio carte)
+require(path.join(SHARED, 'attesa.js'));      // #520 — da quanto si sta aspettando, una regola sola per tutte le chat
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
