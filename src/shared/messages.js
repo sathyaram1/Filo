@@ -238,6 +238,14 @@
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }
+    // Lo stato a tutto schermo CHIESTO dalla pagina appena si monta, invece di
+    // aspettare solo l'annuncio qui sopra: una pagina che nasce mentre la
+    // modalità è già accesa può montarsi dopo l'annuncio e non sentirlo più
+    // (#514: il menu del tasto destro offriva "Schermo intero" mentre ci si era
+    // già dentro). Aperto anche alle pagine web: dice solo se la finestra che
+    // le ospita è a tutto schermo, cioè quello che il broadcast racconta già a
+    // tutte. → { ok, fullscreen: bool }
+    FULLSCREEN_STATE: 'fullscreen_state',
     OPEN_NEW_TAB: 'open_new_tab',
     OPEN_INCOGNITO: 'open_incognito',               // apre una nuova finestra incognito
     // L'agente "Aiuto" aziona i comandi rapidi della barra di Filo (le icone in
