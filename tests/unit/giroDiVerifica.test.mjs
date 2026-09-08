@@ -3,10 +3,9 @@
 // COSA INCHIODA
 //   Lanciando il CLI VERO contro un server finto: la critica coi livelli parte
 //   STRUTTURATA (findings), con il riassunto, il testo intero e il commit
-//   provato; la risposta del server con la fase 2 viene STAMPATA intera (è
-//   l'unico posto da cui arrivano le istruzioni della correzione); lo specchio
-//   locale dice "c'e' da correggere". Poi la consegna `fixed` parte col report
-//   e viene sigillata. Un controllo sulle sole funzioni non vedrebbe un campo scartato dalla
+//   provato; la risposta del server viene STAMPATA intera; lo specchio locale
+//   dice "c'e' da correggere". Poi la consegna `fixed` parte col report e viene
+//   sigillata. Un controllo sulle sole funzioni non vedrebbe un campo scartato dalla
 //   riga di comando, che è già successo una volta.
 
 import { test } from 'node:test';
@@ -110,7 +109,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     const stato = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(stato.verifierVerdict, 'fix-pending');
 
-    // Poi la correzione (un commit nuovo) e la consegna, dallo STESSO verificatore.
+    // Poi la correzione (un commit nuovo) e la sua consegna.
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'corretto', 'utf8');
     execFileSync('git', ['commit', '-qam', 'correzione'], { cwd: casa });
     const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto. Il caso raro non l\'ho toccato: non era in elenco.'], ENV(casa, port));
@@ -120,7 +119,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     assert.match(String(fixed.body.data.report), /ora salva anche col titolo vuoto/);
     const dopo = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(dopo.verifierVerdict, null, 'torna in verifica sul commit nuovo');
-    assert.match(JSON.stringify(dopo), /verifier:consegna/, 'sigillata come consegna del verificatore, non del correttore');
+    assert.match(JSON.stringify(dopo), /verifier:consegna/, 'la consegna resta sigillata da chi l'ha mandata');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
 

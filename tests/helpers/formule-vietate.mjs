@@ -33,6 +33,13 @@ export const TITOLI = [
 
 export const OVUNQUE = [
   /verificatore[^'"\n]{0,30}corregg/i,
+  // La stessa frase detta al contrario, o col sostantivo al posto del verbo:
+  // «la consegna dallo STESSO verificatore», «del verificatore, non del
+  // correttore». Guardare una faccia sola voleva dire non guardare
+  // (feedback #565).
+  /stess[oa][^.\n]{0,20}verificator/i,
+  /corre(?:ttore|zione)(?:(?! chi )[^.\n]){0,40}verificator/i,
+  /verificator(?:(?! chi )[^.\n]){0,40}corre(?:ttore|zione)/i,
   // Il « chi » in mezzo è la differenza fra la frase che svela («chi ha
   // criticato corregge») e quella che dice il contrario, elencando due ruoli
   // distinti («chi verifica E CHI corregge»): la seconda va lasciata stare.
