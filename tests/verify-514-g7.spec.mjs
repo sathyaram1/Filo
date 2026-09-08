@@ -250,6 +250,25 @@ test('sito che chiede lui lo schermo pieno dentro l\'Esc: il tasto non deve mai 
   expect(await schermoIntero(app), `dopo sei Esc si è ancora a schermo intero: ${JSON.stringify(traccia)}`).toBe(false);
 });
 
+// Controprova dell'altro verso: con un CLIC — il gesto vero — lo schermo pieno
+// il sito lo ottiene ancora, com'è giusto. A essere rifiutato è solo l'Esc.
+test('controprova: col clic il sito prende ancora lo schermo pieno', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;height:1200px">
+<p id="t">clic qui</p>
+<script>
+  document.addEventListener('click', function () {
+    try { document.documentElement.requestFullscreen(); } catch (_) {}
+  });
+</script>
+</body></html>`);
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  expect(await schermoIntero(app)).toBe(false);
+  await page.locator('#t').click();
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(true);
+  expect((await stato(app)).pageFs, 'lo schermo pieno è della pagina').toBe(true);
+});
+
 // Controprova: la stessa pagina senza quella riga esce al primo Esc e resta
 // fuori. È la riga, non il tasto mangiato, a fare la differenza.
 test('controprova: la stessa pagina senza quella riga esce al primo Esc e resta fuori', async ({ app, openTab, testServer }) => {
