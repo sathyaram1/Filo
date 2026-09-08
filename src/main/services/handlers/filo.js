@@ -17,11 +17,37 @@ module.exports = function register(on, ctx) {
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
 
+  // Turni di chat in corso, per poterli FERMARE (#520). Prima l'unico modo di
+  // uscire da una risposta che non arrivava era aspettare la scadenza del
+  // servizio: minuti con il tasto d'invio spento e niente da guardare. La
+  // maniglia è lo stesso reqId con cui parte il canale del ragionamento, e si
+  // registra PRIMA di qualunque attesa: una registrazione tardiva lascia una
+  // finestra in cui l'interruzione non ferma niente.
+  const chatInCorso = new Map();
+
+  on(MSG.FILO_CHAT_ABORT, async (msg) => {
+    const reqId = String(msg?.reqId || '');
+    const ac = chatInCorso.get(reqId);
+    if (!ac) return { ok: false, error: 'not_found' };
+    chatInCorso.delete(reqId);
+    try { ac.abort(); } catch (_) {}
+    return { ok: true };
+  });
+
   on(MSG.FILO_CHAT, async (msg, sender) => {
+    const ac = new AbortController();
+    const reqId = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
+    if (reqId) chatInCorso.set(reqId, ac);
     try {
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, sender });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, sender, signal: ac.signal });
       return { ok: true, ...r };
     } catch (e) {
+      // Fermato dall'utente (#520): non è un guasto, e la scheda lo sa già —
+      // niente frase d'errore, solo il fatto.
+      if (ac.signal.aborted) {
+        const actions = Array.isArray(e && e.filoActions) ? e.filoActions : [];
+        return { ok: false, aborted: true, error: 'interrotto', actions };
+      }
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
       // KO, chiave rifiutata) l'utente deve leggere COSA non ha funzionato e cosa
       // fare, non il messaggio grezzo dell'eccezione ("fetch failed"). Il
