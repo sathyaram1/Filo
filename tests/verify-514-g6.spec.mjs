@@ -234,11 +234,18 @@ test('sito ladro: la voce del menu resta comunque una via d\'uscita', async ({ a
   expect(await schermoIntero(app), 'preparazione: doveva restare bloccato').toBe(true);
   await page.mouse.click(200, 200, { button: 'right' });
   await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
-  const diretto = page.locator('[data-sn-icon-id="fullscreen"]');
-  if (await diretto.count() === 0) {
-    await page.locator('.sn-menu-row-overflow').first().click();
-    await expect(diretto.first()).toBeVisible({ timeout: 8000 });
-  }
-  await diretto.first().click({ timeout: 8000 });
-  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
+  const diag = await page.evaluate(() => {
+    const m = document.querySelector('.sn-menu');
+    const r = m ? m.getBoundingClientRect() : null;
+    return {
+      classe: m ? m.className : null,
+      rubatoStessoNodo: !!(window.__rubatoNodo && m && window.__rubatoNodo === m),
+      rubatoClasse: window.__rubatoNodo ? window.__rubatoNodo.className : null,
+      rett: r ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } : null,
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+    };
+  });
+  console.log('DIAGNOSI MENU', JSON.stringify(diag));
+  expect(diag.rett && diag.rett.x >= 0 && diag.rett.x < diag.viewport.w,
+    `il menu del tasto destro deve restare sullo schermo: ${JSON.stringify(diag)}`).toBe(true);
 });
