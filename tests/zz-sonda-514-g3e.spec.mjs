@@ -49,7 +49,8 @@ async function apriRiquadro(page) {
 
 test('riquadro della spiegazione + Esc: fuori e dentro lo schermo intero', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, PAGINA);
+  void testServer; void PAGINA;
+  const page = await openTab('filo://newtab/');
   await preparaProvider(app);
 
   // baseline: fuori dallo schermo intero Esc chiude il riquadro
