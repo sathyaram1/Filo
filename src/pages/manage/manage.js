@@ -1041,6 +1041,15 @@
   // giri). Non è una palette qualunque — la scala DICE se il numero è buono, ed
   // è la prima cosa che si legge in una torta.
   const ST_PIE_COLORS = ['#3bbf7a', '#c9a13b', '#d1741f', '#c0392b', '#8a2b8a', '#5b6ee0'];
+  // Il nome corto sulla pastiglia del creatore: dodici pastiglie con scritto
+  // "Claude (sessione locale)" sono una riga di rumore. L'icona più la parola
+  // che distingue bastano; il nome intero resta nell'hover, che è dove si
+  // guarda quando una parola non basta.
+  const ST_CREATOR_SHORT = {
+    owner: 'Owner', user: 'Utente', filo: 'Filo',
+    local: 'Sessione locale', worker: 'Sviluppo', verifier: 'Verifica',
+    residuo: 'Rilievi residui', prober: 'Esplorazione', claude: 'Ruolo ignoto',
+  };
 
   async function loadStatsPrefs() {
     try {
