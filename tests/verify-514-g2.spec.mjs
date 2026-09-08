@@ -193,16 +193,15 @@ test('porta 11 — schermo pieno dal sito + chiusura di quella scheda: la barra 
   expect(s.cf).toBe(false);
 });
 
-test('porta 12 — finestra in INCOGNITO: Esc esce dallo schermo intero', async ({ app }) => {
-  await app.evaluate(async () => {
-    require('./src/main/window').createIncognitoWindow();
-  }).catch(async () => {
-    await app.evaluate(async ({ BrowserWindow }) => {
-      const path = require('path');
-      require(path.join(process.cwd(), 'src', 'main', 'window')).createIncognitoWindow();
-    });
-  });
-  await new Promise((r) => setTimeout(r, 2500));
+test('porta 12 — finestra in INCOGNITO: Esc esce dallo schermo intero', async ({ app, shell }) => {
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const c = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito));
+    if (c) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  await new Promise((r) => setTimeout(r, 1500));
   const dentro = await app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoIncognito);
     if (!win) return null;
