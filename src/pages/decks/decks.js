@@ -1326,6 +1326,12 @@
   // persistente per (carta, versione mazzo) vivono nel main.
   const opinionsByCard = new Map();
   const opinionPending = new Set();
+  // Pareri NON arrivati (#520): cardId → cosa è andato storto. Senza questa
+  // memoria il modulo tornava a "Chiedo un parere a Filo…" e la richiesta
+  // ripartiva a ogni ridisegno: un'attesa che non finiva mai e una chiamata al
+  // modello dopo l'altra, a pagamento. Ora l'errore si legge e a ritentare è
+  // l'utente, col bottone.
+  const opinionFailed = new Map();
 
   // La carta mostrata ADESSO nel pannello destro (preview o carosello).
   function currentDetailCard() {
