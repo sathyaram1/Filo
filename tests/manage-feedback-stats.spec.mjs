@@ -188,10 +188,35 @@ test('la torta dice quanti giri costa un lavoro, e sotto quante critiche hanno f
   // fermato il lavoro (il vecchio «fail»), una ha rimandato i rilievi (il
   // vecchio «migliorabile»).
   const nota = page.locator('#mgStPieNote');
-  await expect(nota).toContainText('1 giri di correzione');
-  await expect(nota).toContainText('1 bloccanti');
+  await expect(nota).toContainText('1 giro di correzione');
+  await expect(nota).toContainText('1 bloccante');
   await expect(nota).toContainText('1 con rilievi rimandati');
   await expect(nota).toContainText('Media:');
+});
+
+test('senza la chiave dell\'owner i numeri che nascono dallo stato NON si scrivono (né uno zero)', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  // Stato cifrato: su questo computer non si scioglie.
+  await page.evaluate(() => {
+    const iso = (g) => new Date(Date.now() - g * 24 * 3600 * 1000).toISOString();
+    window.__mgTest.setData([
+      { _id: 'c1', seq: 301, clientId: 'tester@example.com', text: 'x', status: 'FENC1:aaa', createdAt: iso(1) },
+      { _id: 'c2', seq: 302, clientId: 'tester@example.com', text: 'y', status: 'FENC1:bbb', createdAt: iso(2) },
+    ]);
+  });
+  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  // Quante ne sono arrivate si sa (la data e il mittente sono in chiaro)…
+  await expect(valore(page, 'ricevuti')).toHaveText('2');
+  // …quante ne sono state lavorate no: un "0" qui direbbe "nessuna" dove la
+  // verità è "non lo sappiamo".
+  await expect(valore(page, 'lavorati')).toHaveText('—');
+  await expect(valore(page, 'adesso')).toHaveText('—');
+  await expect(page.locator('#mgStNote')).toContainText('non può leggere lo stato');
 });
 
 test('le partenze delle routine arrivano dal registro dei worker, con la ripartizione per ruolo', async ({ openTab }) => {

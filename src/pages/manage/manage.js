@@ -1160,11 +1160,19 @@
       + `</div>`;
   }
 
+  // Quando lo stato non si legge, tutto ciò che NASCE dallo stato non si scrive:
+  // "Feedback lavorati 0" sarebbe un vuoto dichiarato dove la verità è che non
+  // lo sappiamo (la stessa regola delle sezioni, patterns/una-barra-di-sezioni-
+  // dice-quante-cose-contiene-ogni-sezione.md). Restano i numeri che stanno in
+  // chiaro: quante ne sono arrivate, quando, e da chi.
+  const ST_SENZA_STATO = 'Lo stato delle segnalazioni non si legge su questo computer: senza la chiave dell’owner questo numero non si può sapere.';
+
   function renderStatsCards(res) {
     if (!mgStCards) return;
     const parz = res.copertura.parziale;
     const ric = res.ricevuti;
     const rout = res.routine;
+    const leggibile = res.statiLeggibili;
     const cards = [
       statsCard({
         id: 'ricevuti',
@@ -1178,16 +1186,16 @@
       }),
       statsCard({
         id: 'lavorati',
-        value: statsNum(res.lavorati.total, parz),
+        value: leggibile ? statsNum(res.lavorati.total, parz) : '—',
         label: 'Feedback lavorati',
         sub: 'lavorazione chiusa, per data dell’ultimo movimento',
-        rows: [
+        rows: !leggibile ? [] : [
           { label: 'Passate alla prima verifica', n: res.giri.fette.find((f) => f.giri === 0)?.n || 0 },
           { label: 'Passate dopo almeno una correzione', n: res.giri.fette.filter((f) => f.giri > 0).reduce((a, f) => a + f.n, 0) },
           { label: 'Verifica ferma, decide l’owner', n: res.giri.ferme },
           { label: 'Senza verbale di verifica nelle note', n: res.giri.senzaDati },
         ],
-        empty: 'Nessuna lavorazione chiusa in questa finestra.',
+        empty: leggibile ? 'Nessuna lavorazione chiusa in questa finestra.' : ST_SENZA_STATO,
       }),
       statsCard({
         id: 'routine',
@@ -1199,14 +1207,14 @@
       }),
       statsCard({
         id: 'adesso',
-        value: String(res.adesso.inCoda + res.adesso.inLavorazione),
+        value: leggibile ? String(res.adesso.inCoda + res.adesso.inLavorazione) : '—',
         label: 'Aperte adesso',
         sub: 'istantanea: non dipende dalla finestra',
-        rows: [
+        rows: !leggibile ? [] : [
           { label: 'In coda', n: res.adesso.inCoda },
           { label: 'In lavorazione', n: res.adesso.inLavorazione },
         ],
-        empty: 'Niente in coda né in lavorazione.',
+        empty: leggibile ? 'Niente in coda né in lavorazione.' : ST_SENZA_STATO,
       }),
     ];
     mgStCards.innerHTML = cards.join('');
@@ -1239,9 +1247,11 @@
       statsMostra(mgStPie, false);
       const li = document.createElement('li');
       li.className = 'mg-st-empty';
-      li.textContent = res.giri.senzaDati
-        ? 'Nessuna lavorazione con un verbale di verifica leggibile in questa finestra.'
-        : 'Nessuna lavorazione chiusa in questa finestra.';
+      li.textContent = !res.statiLeggibili
+        ? ST_SENZA_STATO
+        : (res.giri.senzaDati
+          ? 'Nessuna lavorazione con un verbale di verifica leggibile in questa finestra.'
+          : 'Nessuna lavorazione chiusa in questa finestra.');
       mgStPieLegend.appendChild(li);
     } else {
       statsMostra(mgStPie, true);
@@ -1370,12 +1380,14 @@
     if (!mgStMore) return;
     const g = res.giri;
     const rilievi = g.perLivello;
+    const leggibile = res.statiLeggibili;
     const righe = [
-      ['Tempo mediano dalla segnalazione alla chiusura', res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMediano) : '—'],
-      ['Tempo medio dalla segnalazione alla chiusura', res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMedio) : '—'],
-      ['Giri di verifica registrati', String(g.giriTotali)],
-      ['Rilievi per livello (3 · 2 · 1 · 0)', `${rilievi[3]} · ${rilievi[2]} · ${rilievi[1]} · ${rilievi[0]}`],
+      ['Tempo mediano dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMediano) : '—'],
+      ['Tempo medio dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMedio) : '—'],
+      ['Giri di verifica registrati', leggibile ? String(g.giriTotali) : '—'],
+      ['Rilievi per livello (3 · 2 · 1 · 0)', leggibile ? `${rilievi[3]} · ${rilievi[2]} · ${rilievi[1]} · ${rilievi[0]}` : '—'],
       ['Segnalazioni fermate dai giudici (attacchi + spam)', (() => {
+        if (!leggibile) return '—';
         const per = Object.fromEntries(res.ricevuti.perCategoria.map((c) => [c.key, c.n]));
         const bloccate = (per.attacco || 0) + (per.spam || 0);
         const q = statsPercent(bloccate, res.ricevuti.total);
