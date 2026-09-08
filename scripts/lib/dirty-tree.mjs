@@ -35,9 +35,18 @@ export function dirtyTreeLines(porcelain) {
  * normale di togliere una spec) non arriva da solo, e aspettarlo è aspettare
  * niente. Committare da sé la pulizia va bene.
  */
-export function dirtyTreeText(lines) {
+export function dirtyTreeText(lines, cosa = 'critica') {
   const elenco = (Array.isArray(lines) ? lines : []).slice(0, 30).map((l) => `  ${l}`).join('\n');
   const altri = Array.isArray(lines) && lines.length > 30 ? `\n  … e altri ${lines.length - 30}` : '';
+  // La consegna di chi ha corretto: il danno è un altro. La correzione non
+  // sta in nessun commit, il server segna «corretto», e la verifica dopo
+  // prova il ramo senza la correzione e ritrova gli stessi rilievi: un giro
+  // sprecato (in locale «corretto» la respinge già; qui è la stessa regola).
+  if (cosa === 'consegna') {
+    return 'consegna non registrata: ci sono modifiche non salvate nella directory, e la consegna vale per un commit: la correzione starebbe fuori da ogni commit, il server la segnerebbe come fatta, e la verifica dopo proverebbe il ramo senza di essa, ritrovando gli stessi rilievi. '
+      + 'Porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu va bene (git add -A && git commit -m "correzione"). Poi riprova con lo stesso report.\n'
+      + `${elenco}${altri}`;
+  }
   return 'critica non registrata: ci sono file non registrati nella directory, e il salvataggio automatico li committerebbe DOPO il verdetto, spostando la punta del ramo (il pass vale per un commit preciso, e chi chiude — il cancello di fusione, o «npm run finish» in locale — respingerebbe quello nuovo). '
     + 'Togli le tue spec temporanee (o registra ciò che deve restare) e porta la directory a un commit: il salvataggio automatico parte solo al prossimo Edit o Write, dopo un rm dalla shell non arriva da solo — committare tu la pulizia va bene (git add -A && git commit -m "verifica: pulizia"). Poi riprova con la stessa critica.\n'
     + `${elenco}${altri}`;
