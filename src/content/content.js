@@ -63,14 +63,23 @@
   // aveva chiesto di lasciare (#514).
   //
   // La domanda giusta non è "quali riquadri esistono" — quella è una lista che
-  // invecchia — ma "questo Esc l'ha usato qualcuno?". Si risponde guardando due
+  // invecchia — ma "questo Esc l'ha usato qualcuno?". Si risponde guardando tre
   // cose, dopo che il tasto ha finito il suo giro nel documento:
-  //  · i pezzi di UI DI FILO che c'erano sulla pagina un istante prima. Ognuno
-  //    porta il marchio di casa (SN_FILO_UI) e chi si chiude si stacca dal
-  //    documento: se uno di quelli è sparito, quell'Esc l'ha usato lui. Il
-  //    marchio lo mette già chi disegna, quindi un riquadro nuovo è coperto il
-  //    giorno che nasce, senza doversi ricordare di iscriversi da nessuna parte.
-  //  · su una pagina DI FILO, in più, basta che qualcuno l'abbia consumato
+  //  · i pezzi di UI DISEGNATI DA NOI che c'erano sulla pagina un istante prima.
+  //    L'elenco lo tiene SN_FILO_UI nel mondo isolato dei content script, e ci
+  //    finisce solo chi passa da `mark()`: dalla pagina non ci si arriva. Chi si
+  //    chiude si stacca dal documento, quindi se uno di quelli è sparito quell'Esc
+  //    l'ha usato lui. Il marchio lo mette già chi disegna, quindi un riquadro
+  //    nuovo è coperto il giorno che nasce, senza iscriversi da nessuna parte.
+  //  · su una pagina DI FILO, in più, che la pagina si sia ALLEGGERITA nel giro
+  //    del tasto: un elemento in meno, o uno in più nascosto. I riquadri che
+  //    disegnano le pagine interne (i menu del tasto destro della cronologia e
+  //    dell'editor, il menu di ordinamento e la barra di ricerca della gestione)
+  //    non passano da `mark()` e non dichiarano niente: sparire dal documento è
+  //    l'unica cosa che fanno tutti. Conta solo la direzione "qualcosa è
+  //    sparito": una pagina che sta AGGIUNGENDO roba (una risposta che arriva a
+  //    pezzi) non deve poter rivendicare il tasto.
+  //  · su una pagina DI FILO, sempre in più, che qualcuno l'abbia consumato
   //    (fermando la propagazione o chiedendo di ignorare il tasto): lì tutto
   //    quello che c'è sullo schermo è roba nostra. Sui siti no — un sito che si
   //    mangia i tasti non deve poterci chiudere dentro allo schermo intero.
@@ -82,10 +91,7 @@
   })();
 
   function pezziDiFiloSullaPagina() {
-    try {
-      const sel = self.SN_FILO_UI?.SELECTOR;
-      return sel ? Array.from(document.querySelectorAll(sel)) : [];
-    } catch (_) { return []; }
+    try { return self.SN_FILO_UI?.aperti?.() || []; } catch (_) { return []; }
   }
   // Uno di quelli che c'erano non è più attaccato al documento: si è chiuso.
   // Guardiamo i pezzi UNO A UNO e non quanti sono, perché nello stesso istante
@@ -94,6 +100,24 @@
   // successo niente.
   function qualcosaSiEChiuso(pezziPrima) {
     try { return pezziPrima.some((el) => el && !el.isConnected); } catch (_) { return false; }
+  }
+
+  // Quanta pagina c'è, in due numeri. Solo sulle pagine di Filo: su un sito
+  // sarebbe il sito a decidere quando l'Esc è suo, che è esattamente ciò da cui
+  // ci difendiamo.
+  function pesoDellaPagina() {
+    if (!PAGINA_DI_FILO) return null;
+    try {
+      return {
+        elementi: document.getElementsByTagName('*').length,
+        nascosti: document.querySelectorAll('[hidden]').length,
+      };
+    } catch (_) { return null; }
+  }
+  function siEAlleggerita(prima) {
+    const dopo = pesoDellaPagina();
+    if (!prima || !dopo) return false;
+    return dopo.elementi < prima.elementi || dopo.nascosti > prima.nascosti;
   }
 
   // #405 — stiamo girando dentro un riquadro incorporato (video, mappa, modulo,
