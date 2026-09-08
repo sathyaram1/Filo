@@ -116,6 +116,10 @@ module.exports = function register(on, ctx) {
     // così si vede "pensare" in diretta. Dichiarato fuori dal try: anche un
     // turno fallito ritorna il ragionamento raccolto fin lì.
     let reasoning = '';
+    // Interruzione dell'utente (#520): il turno si registra qui sotto appena si
+    // conosce il suo reqId, e si cancella comunque alla fine.
+    const ac = new AbortController();
+    let reqIdRegistrato = '';
     try {
       const text = String(msg?.text || '').trim();
       if (!text) return { ok: false, error: 'empty' };
