@@ -111,6 +111,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   // della stessa feature (es. add/get/delete) puntano alla stessa voce.
   const FILO_MSG_TO_CAP = {
     FILO_CHAT: 'filo-assistant',
+    // «Interrompi» durante l'attesa di una risposta (#520): non è una capacità
+    // a sé, è la via d'uscita della chat. La voce del manifesto la cita.
+    FILO_CHAT_ABORT: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
