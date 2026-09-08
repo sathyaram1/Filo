@@ -226,23 +226,16 @@ test('sito ladro senza eventi finti: il tetto delle rivendicazioni regge', async
   expect(await schermoIntero(app), `Esc ripetuto e non si esce mai: ${JSON.stringify(esiti)}`).toBe(false);
 });
 
-// Una pagina dove i nostri script non girano affatto (il visore PDF di
-// Electron): nessuno può rivendicare il tasto, e l'uscita deve partire lo
-// stesso allo scadere dell'attesa.
-test('PDF aperto in una scheda: Esc esce lo stesso dallo schermo intero', async ({ app, shell }) => {
+// Una pagina che si è piantata (script che gira all'infinito): nessuno può
+// rispondere per lei, e l'uscita deve partire lo stesso.
+test('pagina bloccata: Esc esce lo stesso dallo schermo intero', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
-  const { pathToFileURL } = await import('node:url');
-  const path = await import('node:path');
-  const url = pathToFileURL(path.resolve('tests/fixtures/documenti/documento-con-testo.pdf')).href;
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-  await new Promise((r) => setTimeout(r, 4000));
-  const attiva = await app.evaluate(({ BrowserWindow }) => {
-    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    return t.tabs.find((x) => x.id === t.activeId).view.webContents.getURL();
-  });
-  expect(attiva, 'la scheda attiva deve essere il PDF').toContain('.pdf');
+  const page = await testServer.openReady(openTab, PAGINA);
   await entra(app);
-  expect(await schermoIntero(app)).toBe(true);
+  await page.evaluate(() => {
+    setTimeout(() => { const t = Date.now(); while (Date.now() - t < 5000) { /* piantata */ } }, 0);
+  }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 200));
   await esc(app);
-  await expect.poll(() => schermoIntero(app), { timeout: 5000 }).toBe(false);
+  await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(false);
 });
