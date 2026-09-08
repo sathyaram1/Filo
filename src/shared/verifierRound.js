@@ -144,9 +144,15 @@
   // dimenticata E il livello scritto in una forma sua — e la bocciatura
   // spariva nel riassunto (feedback #565). Le parole si ancorano ai confini,
   // o «altre» conterrebbe «tre».
+  // E fra il livello e la parentesi ci può stare una descrizione intera, non
+  // una dozzina di caratteri: «3 dati dell'utente a rischio]» è come uno
+  // scrive davvero, e con la finestra corta finiva muta nel riassunto. La
+  // stessa misura delle quadre appaiate (200), e non allarga niente: qui la
+  // finestra non può contenere una parentesi, quindi vale solo per la quadra
+  // SPAIATA — quelle appaiate le guarda già QUADRA_OVUNQUE (feedback #565).
   const LIVELLO_NUDO = '(?:\\d|\\b(?:zero|uno|due|tre)\\b|[?!])';
-  const QUADRA_APERTA = new RegExp(`\\[{1,2}[^\\[\\]\\n]{0,12}?${LIVELLO_NUDO}`, 'i');
-  const QUADRA_CHIUSA = new RegExp(`${LIVELLO_NUDO}[^\\[\\]\\n]{0,12}?\\]{1,2}`, 'i');
+  const QUADRA_APERTA = new RegExp(`\\[{1,2}[^\\[\\]\\n]{0,200}?${LIVELLO_NUDO}`, 'i');
+  const QUADRA_CHIUSA = new RegExp(`${LIVELLO_NUDO}[^\\[\\]\\n]{0,200}?\\]{1,2}`, 'i');
 
   function quadraColLivello(riga) {
     // TUTTE le quadre della riga, non solo la prima: bastava una frase fra
