@@ -73,7 +73,7 @@ test('rottura — click veloci fra le schede: i numeri restano coerenti', async 
     { _id: 'd', status: 'archived', text: 'd', name: 'D', seq: 4, subSeq: 0, createdAt: '2026-01-01T00:00:00Z', images: [] },
   ]));
 
-  const order = ['queue', 'archived', 'stats', 'inbox', 'log', 'resolved', 'inbox', 'queue'];
+  const order = ['queue', 'archived', 'stats', 'inbox', 'fbstats', 'log', 'resolved', 'inbox', 'queue'];
   for (const tab of order) {
     await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
   }
@@ -88,7 +88,10 @@ test('rottura — click veloci fra le schede: i numeri restano coerenti', async 
   // Un solo badge per scheda (nessun accumulo di span a forza di ridisegni).
   const badges = await page.evaluate(() => [...document.querySelectorAll('.mg-tab')]
     .map((b) => b.querySelectorAll('.mg-tab-count').length));
-  expect(badges).toEqual([1, 1, 1, 1, 0, 0, 0, 0]);
+  // Le quattro schede-lista hanno il numero; le altre cinque (Statistiche
+  // feedback, Statistiche Red Team, Modelli, Automazioni, Log) no: non
+  // elencano segnalazioni.
+  expect(badges).toEqual([1, 1, 1, 1, 0, 0, 0, 0, 0]);
 });
 
 test('rottura — riordinare la lista non cambia il numero', async ({ openTab }) => {

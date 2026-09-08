@@ -240,7 +240,7 @@ test('#495 — numeri grandi: la barra delle schede non straborda né balla', as
     void cur;
   });
   await page.screenshot({ path: join(SHOTS, 'v495-numeri-grandi.png') });
-  expect(before.length).toBe(8);
+  expect(before.length).toBe(9);
 });
 
 test('#495 — durante la ricerca i numeri delle schede restano quelli veri', async ({ openTab }) => {
