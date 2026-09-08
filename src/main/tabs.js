@@ -405,8 +405,21 @@ class TabManager {
       this.setContentFullscreen(false);
       return true;
     }
+    // La pagina si è già presa gli ultimi Esc uno dopo l'altro, senza che
+    // l'utente facesse nient'altro in mezzo: da qui in avanti non le crediamo
+    // più e usciamo noi. È il tetto che nessun sito può azzerare.
+    if ((this._escRivendicazioni || 0) >= ESC_RIVENDICAZIONI_MAX) {
+      this.setContentFullscreen(false);
+      return true;
+    }
     this.armaUscitaSchermoIntero();
     return false;
+  }
+
+  // L'utente ha fatto qualcosa che non è l'Esc in questione: la volta dopo è una
+  // volta nuova. Lo chiama chi vede l'input VERO (mai la pagina).
+  azzeraRivendicazioniEsc() {
+    this._escRivendicazioni = 0;
   }
 
   // Mette l'uscita in attesa: parte solo se nessuno rivendica il tasto.
