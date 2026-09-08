@@ -489,32 +489,34 @@
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
     const pb = providerBlock(providerRouting);
     if (pb) body.provider = pb;
-    const res = await fetch(EMBEDDINGS_ENDPOINT, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-      signal,
+    return conScadenza({ signal, cosa: 'l\'indicizzazione' }, async (w) => {
+      const res = await fetch(EMBEDDINGS_ENDPOINT, {
+        method: 'POST',
+        headers: buildHeaders(apiKey),
+        body: JSON.stringify(body),
+        signal: w.signal,
+      });
+      if (!res.ok) throw await httpError(res);
+      const data = await res.json();
+      const rows = Array.isArray(data.data) ? data.data.slice() : [];
+      rows.sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
+      const vectors = rows.map((r) => {
+        const v = Array.isArray(r.embedding) ? r.embedding : [];
+        return (Number.isInteger(d) && d > 0 && v.length > d) ? v.slice(0, d) : v;
+      });
+      const usage = data.usage || {};
+      return {
+        vectors,
+        servedBy: extractServedBy(data),
+        generationId: res.headers.get('x-generation-id') || data.id || null,
+        usage: {
+          promptTokens: usage.prompt_tokens || 0,
+          completionTokens: 0,
+          cachedPromptTokens: 0,
+          costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        },
+      };
     });
-    if (!res.ok) throw await httpError(res);
-    const data = await res.json();
-    const rows = Array.isArray(data.data) ? data.data.slice() : [];
-    rows.sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
-    const vectors = rows.map((r) => {
-      const v = Array.isArray(r.embedding) ? r.embedding : [];
-      return (Number.isInteger(d) && d > 0 && v.length > d) ? v.slice(0, d) : v;
-    });
-    const usage = data.usage || {};
-    return {
-      vectors,
-      servedBy: extractServedBy(data),
-      generationId: res.headers.get('x-generation-id') || data.id || null,
-      usage: {
-        promptTokens: usage.prompt_tokens || 0,
-        completionTokens: 0,
-        cachedPromptTokens: 0,
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
-      },
-    };
   }
 
   // ─── Chi ha servito, a posteriori ─────────────────────────────────────────
