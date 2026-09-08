@@ -122,9 +122,10 @@ test('#498 finestra stretta: schede a capo, aree ancora a fondo pagina', async (
   }
 });
 
-test('#498 finestra bassa: cosa succede sotto i 600 e i 460 pixel di altezza', async ({ app, openTab }) => {
+test('#498 finestra bassa: le aree seguono fin dove la finestra può scendere', async ({ app, openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
+  await page.evaluate(() => { document.getElementById('mgBanner').hidden = true; });
   await expect(page.locator('#mgReviewGrid')).toBeVisible();
 
   for (const h of [700, 600, 500, 420]) {
@@ -135,6 +136,12 @@ test('#498 finestra bassa: cosa succede sotto i 600 e i 460 pixel di altezza', a
       viewportH: g.viewportH, scrollH: g.scrollH,
       gridH: g.grid.height, gridBottom: g.grid.bottom, tabsTop: g.tabs.top,
     }));
+    // Sotto una certa misura la finestra non scende (minimo dell'app), quindi
+    // in ogni caso raggiungibile le aree devono ancora arrivare in fondo senza
+    // far scorrere la pagina.
+    expect(g.scrollH, `h=${h}: la pagina scrolla`).toBeLessThanOrEqual(g.viewportH + 1);
+    expect(g.viewportH - g.grid.bottom, `h=${h}: vuoto in fondo`).toBeLessThanOrEqual(28);
+    expect(g.tabs.top, `h=${h}: le sezioni non partono in alto`).toBeLessThanOrEqual(20);
   }
 });
 
