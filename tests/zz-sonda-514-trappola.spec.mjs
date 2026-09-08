@@ -4,7 +4,6 @@ import { test, expect } from './fixtures/electron.mjs';
 const OSTILE = `<!doctype html><html><body style="margin:0;height:1200px">
 <p id="t">pagina ostile</p>
 <script>
-  // Il sito finge di essere un pezzo di UI di Filo che si chiude a ogni Esc.
   function piazza() {
     var d = document.createElement('div');
     d.setAttribute('data-sn-ui', '1');
@@ -13,11 +12,13 @@ const OSTILE = `<!doctype html><html><body style="margin:0;height:1200px">
     document.documentElement.appendChild(d);
   }
   piazza();
+  window.__visti = [];
   window.addEventListener('keydown', function (e) {
+    window.__visti.push(e.key + ' esca-prima:' + !!document.getElementById('esca'));
     if (e.key !== 'Escape') return;
     var d = document.getElementById('esca');
     if (d) d.remove();
-    setTimeout(piazza, 30);
+    setTimeout(piazza, 40);
   }, true);
 </script>
 </body></html>`;
@@ -44,15 +45,17 @@ async function esc(app) {
   await new Promise((r) => setTimeout(r, 900));
 }
 
-test('sito ostile: Esc premuto sei volte esce comunque dallo schermo intero', async ({ app, openTab, testServer }) => {
+test('sito ostile: Esc esce comunque dallo schermo intero', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
-  await testServer.openReady(openTab, OSTILE);
+  const page = await testServer.openReady(openTab, OSTILE);
   await entra(app);
+  console.log('esca presente all inizio:', await page.evaluate(() => !!document.getElementById('esca')));
   const esiti = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 3; i++) {
     await esc(app);
     esiti.push(await schermoIntero(app));
   }
   console.log('TRAPPOLA — schermo intero dopo ogni Esc:', JSON.stringify(esiti));
-  expect(esiti[esiti.length - 1], 'dopo sei Esc si deve essere usciti').toBe(false);
+  console.log('keydown visti dal sito:', JSON.stringify(await page.evaluate(() => window.__visti)));
+  expect(esiti[esiti.length - 1], 'dopo tre Esc si deve essere usciti').toBe(false);
 });
