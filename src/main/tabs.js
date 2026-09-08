@@ -452,14 +452,6 @@ class TabManager {
   // istante, mai restare chiusi dentro senza uscite.
   handleFullscreenEscape(tabId = null) {
     if (!this.contentFullscreen) return false;
-    // Deroga: il fullscreen l'ha chiesto la PAGINA e il tasto arriva proprio da
-    // lei, mentre è quella in primo piano. Lì l'Esc deve arrivarle: esce dal suo
-    // fullscreen e `leave-html-full-screen` ripristina la shell. Nemmeno
-    // l'attesa va armata, perché a spegnere la modalità ci pensa quel giro.
-    if (this.pageFullscreen
-      && tabId != null
-      && tabId === this.pageFullscreenTabId
-      && tabId === this.activeId) return false;
     // Dalla barra di Filo, o da una scheda che non è quella davanti: la pagina
     // quel tasto non lo vedrà mai, quindi decidiamo subito noi.
     if (tabId == null || tabId !== this.activeId) {
@@ -473,8 +465,37 @@ class TabManager {
       this.setContentFullscreen(false);
       return true;
     }
+    // Lo schermo pieno se l'è preso la PAGINA (il pulsante del lettore video) e
+    // il tasto arriva da lei. Qui il tasto NON si può lasciar passare: il
+    // browser lo consuma per uscire dal suo fullscreen e il documento non lo
+    // vede mai — la traccia dei tasti della pagina resta vuota — quindi ogni
+    // riquadro che Filo ha aperto sopra la pagina veniva scavalcato, restava
+    // aperto e la modalità se ne andava lo stesso (#514, giro 10). Ce lo
+    // prendiamo noi (l'unico modo di fermare l'uscita del browser) e lo
+    // consegniamo alla pagina, che poi decide con la regola di sempre.
+    const nostro = this.pageFullscreen && tabId === this.pageFullscreenTabId
+      ? this._inoltraEscAllaPagina(tabId)
+      : false;
     this.armaUscitaSchermoIntero(tabId);
-    return false;
+    return nostro;
+  }
+
+  // Consegna alla pagina l'Esc che il browser le avrebbe mangiato. Va al frame
+  // che ha il fuoco, dove sarebbe arrivato il tasto vero: il menu del tasto
+  // destro aperto dentro un riquadro incorporato vive lì. Torna true se il
+  // messaggio è partito, cioè se il tasto ce lo siamo presi noi.
+  _inoltraEscAllaPagina(tabId) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    const wc = tab?.view?.webContents;
+    if (!wc || wc.isDestroyed?.()) return false;
+    const type = globalThis.SN_MSG?.MSG?.ESC_INOLTRATO || 'esc_inoltrato';
+    let frame = null;
+    try { frame = wc.focusedFrame || wc.mainFrame; } catch (_) { frame = null; }
+    try {
+      if (frame && !frame.detached) frame.send('filo:broadcast', { type });
+      else wc.send('filo:broadcast', { type });
+    } catch (_) { return false; }
+    return true;
   }
 
   // L'utente ha fatto qualcosa che non è l'Esc in questione: la volta dopo è una
