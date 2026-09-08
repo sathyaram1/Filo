@@ -386,6 +386,28 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 /* Un tentativo andato male: resta leggibile, ma non sembra un lavoro riuscito. */
 .dash-activity[data-failed="1"] .dash-activity-label { color: var(--dash-accent); }
+/* Attesa in corso (#520): da quanto si aspetta e come smettere. Stessa forma
+   della chat dei mazzi. Il tempo ha una larghezza sua, così il bottone non
+   balla a ogni secondo. */
+.dash-activity-attesa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 22px;
+  font-size: 12px;
+}
+.dash-attesa { font-variant-numeric: tabular-nums; min-width: 30px; }
+.dash-stop {
+  font: inherit;
+  color: var(--dash-ink-mute);
+  background: transparent;
+  border: 1px solid var(--dash-line);
+  border-radius: 999px;
+  padding: 1px 9px;
+  cursor: pointer;
+  transition: background var(--dash-anim-fast, .18s) ease, color var(--dash-anim-fast, .18s) ease;
+}
+.dash-stop:hover { background: var(--dash-hover, rgba(0, 0, 0, .05)); color: var(--dash-ink); }
 .dash-activity-icon {
   width: 12px;
   height: 12px;
