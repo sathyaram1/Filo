@@ -1165,7 +1165,7 @@
   // lo sappiamo (la stessa regola delle sezioni, patterns/una-barra-di-sezioni-
   // dice-quante-cose-contiene-ogni-sezione.md). Restano i numeri che stanno in
   // chiaro: quante ne sono arrivate, quando, e da chi.
-  const ST_SENZA_STATO = 'Lo stato delle segnalazioni non si legge su questo computer: senza la chiave dell’owner questo numero non si può sapere.';
+  const ST_SENZA_STATO = 'Senza la chiave dell’owner lo stato delle segnalazioni non si legge, e questo numero non si può sapere.';
 
   function renderStatsCards(res) {
     if (!mgStCards) return;
@@ -1209,7 +1209,7 @@
         id: 'adesso',
         value: leggibile ? String(res.adesso.inCoda + res.adesso.inLavorazione) : '—',
         label: 'Aperte adesso',
-        sub: 'istantanea: non dipende dalla finestra',
+        sub: 'quante ce ne sono adesso, non nella finestra',
         rows: !leggibile ? [] : [
           { label: 'In coda', n: res.adesso.inCoda },
           { label: 'In lavorazione', n: res.adesso.inLavorazione },
@@ -1309,8 +1309,8 @@
     if (g.giriTotali) {
       const plur = (n, uno, tanti) => `${n} ${n === 1 ? uno : tanti}`;
       frasi.push(plur(g.perEsito.fix, 'giro di correzione', 'giri di correzione'));
-      frasi.push(`${plur(g.perEsito.stop, 'bloccante', 'bloccanti')}, passati all’owner (i vecchi «fail»)`);
-      frasi.push(`${g.perEsito.rimandati} con rilievi rimandati a un feedback derivato (i vecchi «migliorabile»)`);
+      frasi.push(`${plur(g.perEsito.stop, 'giro bloccante', 'giri bloccanti')} che passano all’owner (i vecchi «fail»)`);
+      frasi.push(`${plur(g.perEsito.rimandati, 'giro', 'giri')} con rilievi rimandati a un feedback derivato (i vecchi «migliorabile»)`);
     }
     if (g.ferme) frasi.push(`${g.ferme} ${g.ferme === 1 ? 'lavorazione chiusa' : 'lavorazioni chiuse'} senza un pass registrato`);
     if (g.senzaDati) frasi.push(`${g.senzaDati} senza verbale di verifica nelle note`);
@@ -1371,7 +1371,7 @@
     mgStBars.append(first, last);
     if (mgStBarsNote) {
       const unitLabel = t.unit === 'giorno' ? 'giorno' : (t.unit === 'settimana' ? 'settimana' : 'mese');
-      mgStBarsNote.textContent = `Una colonna per ${unitLabel}; il massimo di una colonna è ${max}.`;
+      mgStBarsNote.textContent = `Una colonna per ${unitLabel}. La colonna più alta arriva a ${max}.`;
     }
   }
 
@@ -1415,18 +1415,18 @@
       frasi.push('Finestra: tutto lo storico in pagina.');
     }
     if (!res.statiLeggibili) {
-      frasi.push('Questo computer non può leggere lo stato delle segnalazioni: categorie, lavorazioni e giri di verifica restano vuoti. Quante ne sono arrivate e da chi si sa lo stesso.');
+      frasi.push('Questo computer non può leggere lo stato delle segnalazioni, quindi categorie, lavorazioni e giri di verifica restano senza numero. Quante ne sono arrivate, quando e da chi si sa lo stesso.');
     }
     if (res.copertura.parziale) {
-      frasi.push(`${FB.COUNT_CAP_HINT} Il più vecchio in pagina è del ${statsDate(res.copertura.piuVecchio)}: i numeri con il "+" sono minimi, non totali.`);
+      frasi.push(`${FB.COUNT_CAP_HINT} Il più vecchio in pagina è del ${statsDate(res.copertura.piuVecchio)}. I numeri con il «+» sono minimi, non totali.`);
     }
     if (res.routine.parziale) {
-      frasi.push(`Il registro delle partenze delle routine comincia il ${statsDate(res.routine.oldest)}: prima di quella data non c’è traccia, e le partenze contate sono un minimo.`);
+      frasi.push(`Il registro delle partenze delle routine comincia il ${statsDate(res.routine.oldest)}. Prima di quella data non c’è traccia, quindi le partenze contate sono un minimo.`);
     }
     if (workerLogMissing === 'riservato') {
-      frasi.push('Il registro delle partenze delle routine è riservato all’owner: da qui le partenze non si contano.');
+      frasi.push('Il registro delle partenze delle routine è riservato all’owner. Da qui le partenze non si contano.');
     } else if (workerLogMissing === 'errore') {
-      frasi.push('Il registro delle partenze delle routine non si è caricato: riapri la scheda per riprovare.');
+      frasi.push('Il registro delle partenze delle routine non si è caricato. Riapri la scheda per riprovare.');
     } else if (workerLogEntries === null) {
       frasi.push('Il registro delle partenze non è ancora arrivato.');
     }
