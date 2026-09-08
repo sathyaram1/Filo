@@ -526,16 +526,18 @@
   // { servedBy, costUsd } oppure null se ancora non c'è.
   async function lookupServedBy({ apiKey, generationId, signal }) {
     if (!generationId) return null;
-    const res = await fetch(`${GENERATION_ENDPOINT}?id=${encodeURIComponent(generationId)}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal,
+    return conScadenza({ signal, totalMs: LIMITE_INTERROGAZIONE_MS, cosa: 'il router' }, async (w) => {
+      const res = await fetch(`${GENERATION_ENDPOINT}?id=${encodeURIComponent(generationId)}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: w.signal,
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw await httpError(res);
+      const data = (await res.json()).data || {};
+      const name = typeof data.provider_name === 'string' ? data.provider_name.trim() : '';
+      const cost = Number(data.total_cost);
+      return { servedBy: name || null, costUsd: Number.isFinite(cost) ? cost : null };
     });
-    if (res.status === 404) return null;
-    if (!res.ok) throw await httpError(res);
-    const data = (await res.json()).data || {};
-    const name = typeof data.provider_name === 'string' ? data.provider_name.trim() : '';
-    const cost = Number(data.total_cost);
-    return { servedBy: name || null, costUsd: Number.isFinite(cost) ? cost : null };
   }
 
   global.SN_PROVIDER_OPENROUTER = {
