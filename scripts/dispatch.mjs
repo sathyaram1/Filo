@@ -939,10 +939,19 @@ export function verifierReplyText(reply) {
       'Non c\'è niente da correggere: rilascia il biglietto.',
     ].join('\n');
   }
+  if (r.outcome === 'pass') {
+    return [
+      '══ RISPOSTA DEL SERVER: verifica superata ══',
+      r.derived && r.derived.num ? `I rilievi non corretti sono diventati il feedback ${r.derived.num}.` : 'Nessun rilievo da mettere da parte.',
+      'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
+    ].join('\n');
+  }
+  // Il server ha accettato la critica ma non ha detto l'esito: non è un pass,
+  // e non lo si inventa qui.
   return [
-    '══ RISPOSTA DEL SERVER: verifica superata ══',
-    r.derived && r.derived.num ? `I rilievi non corretti sono diventati il feedback ${r.derived.num}.` : 'Nessun rilievo da mettere da parte.',
-    'Il lavoro prosegue verso il controllo di sicurezza: rilascia il biglietto.',
+    '══ RISPOSTA DEL SERVER: critica registrata, esito non comunicato ══',
+    'Il server ha accettato la critica ma non ha detto se il lavoro passa, si corregge o si ferma (server vecchio?).',
+    'L\'esito vero sta in dashboard, nella chat del feedback: leggilo lì prima di rilasciare il biglietto.',
   ].join('\n');
 }
 async function recordFixed(id, report = '', frase = '') {
