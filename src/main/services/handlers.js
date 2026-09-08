@@ -2376,11 +2376,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let exhausted = true;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
+      // Fermato dall'utente (#520): non si comincia un altro giro di modello.
+      if (signal && signal.aborted) {
+        const stop = new Error('Attesa interrotta');
+        stop.name = 'AbortError';
+        throw stop;
+      }
       r = await handleAIRequest({
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
         origin: 'filo:chat',
-        onReasoning, onText, onToolCall, tools,
+        onReasoning, onText, onToolCall, tools, signal,
       });
       costEur += Number(r.costEur) || 0;
       let text = String(r.text || '');
