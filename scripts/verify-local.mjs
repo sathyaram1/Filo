@@ -177,7 +177,7 @@ export function withRequest(state, branch, { request, sha, at }) {
  *   outcome 'fix'  → verdict 'fix-pending' (con `pending`: i rilievi da correggere)
  *   outcome 'stop' → verdict 'fail'
  */
-export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) {
+export function withCritique(state, branch, { critique, sha, at, caps = CAPS, dirtyFiles = [] }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   // Una critica vuota non è un pass: un pass senza una riga di riassunto non
@@ -185,6 +185,16 @@ export function withCritique(state, branch, { critique, sha, at, caps = CAPS }) 
   // una verifica (una bocciatura senza motivo è già rifiutata).
   if (!String(critique || '').trim()) {
     return { ok: false, state: s, reason: 'critica vuota: un pass senza una riga di riassunto non è una verifica. Scrivi cosa hai provato e cosa funziona, e i rilievi se ci sono.' };
+  }
+  // La critica vale per un commit. Con file non registrati (le spec
+  // temporanee della verifica, tolte dalla shell) il salvataggio automatico
+  // committa DOPO, la punta si sposta e la chiusura respinge il pass come dato
+  // su un'altra versione: lo stesso caso di #256, sulla strada locale. Si
+  // rifiuta PRIMA, con l'elenco, come sulla strada delle routine. Vale per
+  // ogni esito, non solo per il pass: a correzione in sospeso, il commit della
+  // pulizia passerebbe per una correzione.
+  if (Array.isArray(dirtyFiles) && dirtyFiles.length) {
+    return { ok: false, state: s, reason: dirtyTreeText(dirtyFiles) };
   }
   // La critica registrata non si modifica più, e un giro non si paga due volte
   // per un comando ripetuto: finché la correzione è in sospeso, prima si
