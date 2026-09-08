@@ -473,7 +473,7 @@ class TabManager {
       this.setContentFullscreen(false);
       return true;
     }
-    this.armaUscitaSchermoIntero();
+    this.armaUscitaSchermoIntero(tabId);
     return false;
   }
 
