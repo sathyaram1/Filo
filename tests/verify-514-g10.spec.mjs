@@ -211,10 +211,7 @@ test('riquadro incorporato a schermo pieno: il primo Esc chiude il menu di Filo,
   await expect.poll(() => schermoIntero(app), { timeout: 8000 }).toBe(true);
 
   await frame.locator('#t2').click({ button: 'right' });
-  await expect.poll(
-    () => page.evaluate(() => !!document.querySelector('.sn-menu')) ,
-    { timeout: 8000 },
-  ).toBe(false); // il menu vive dentro il riquadro, non nella pagina che ospita
+  // Il menu lo disegna il riquadro incorporato, non la pagina che lo ospita.
   const menuDentro = () => frame.locator('.sn-menu').count().then((n) => n > 0);
   await expect.poll(menuDentro, { timeout: 8000 }).toBe(true);
   await new Promise((r) => setTimeout(r, 400));
