@@ -81,7 +81,8 @@ test('sito: l\'immagine ingrandita del box di segnalazione — il primo Esc la c
   test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, PAGINA);
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-  await apriBoxConImmagine(page);
+  await apriBoxDalMenu(page);
+  await allegaImmagine(page);
 
   // Controprova, fuori dallo schermo intero: l'Esc chiude solo l'immagine, il
   // box di segnalazione resta aperto.
