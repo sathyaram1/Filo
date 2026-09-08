@@ -114,7 +114,9 @@ async function main() {
   // sentiva rispondere «opzione sconosciuta» e basta, ed era l'ultimo rimasto
   // (feedback #565).
   const argomenti = process.argv.slice(2).map((a) => String(a).toLowerCase());
-  if (argomenti.some((a) => ['--help', '-help', '-h', '/h', '/help', '/?', 'help'].includes(a))) {
+  // La parola nuda «help» NO: qui il posizionale è un nome di ramo, e uscire 0
+  // senza aver fuso è peggio del non stampare l'aiuto.
+  if (argomenti.some((a) => ['--help', '-help', '-h', '--h', '/h', '/help', '/?'].includes(a))) {
     console.log(USO);
     console.log('Non ho toccato niente.');
     process.exit(0);
