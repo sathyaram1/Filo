@@ -318,8 +318,14 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     }
     return { ok: false, reason: 'nessun giro aperto su questo ramo' };
   }
-  if (dirty) {
-    return { ok: false, reason: 'ci sono modifiche non salvate: la consegna vale per un commit, e la verifica dopo deve provare quello. Salva e rilancia.' };
+  // Stesso rifiuto della consegna in cloud, dalla stessa fonte: elenca i file
+  // rimasti fuori e avverte che dopo un rm dalla shell il salvataggio
+  // automatico non arriva da solo. Detto a metà («salva e rilancia») mandava ad
+  // aspettare un salvataggio che non parte (verifica del giro 2 su questo
+  // lavoro).
+  const sporchi = Array.isArray(dirtyFiles) ? dirtyFiles : [];
+  if (sporchi.length || dirty) {
+    return { ok: false, reason: dirtyTreeText(sporchi, 'consegna') };
   }
   const when = at || new Date().toISOString();
   const rounds = Array.isArray(prev.rounds) ? prev.rounds.slice() : [];
