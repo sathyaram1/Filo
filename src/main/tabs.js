@@ -205,6 +205,11 @@ class TabManager {
     // fullscreen (poi `leave-html-full-screen` ripristina la shell), invece di
     // intercettarlo noi e lasciare la pagina convinta di essere a tutto schermo.
     this.pageFullscreen = false;
+    // Quale scheda ha chiesto quel fullscreen. Serve perché la deroga qui sopra
+    // vale SOLO per lei: un Esc che arriva da un'altra scheda (o dalla barra di
+    // Filo) alla pagina non arriverebbe mai, e lasciarlo passare chiuderebbe
+    // dentro allo schermo intero senza uscite (#514).
+    this.pageFullscreenTabId = null;
     // Chrome compatto: fuori dalla home di Filo la barra indirizzi (icone di
     // navigazione + campo URL) viene nascosta, lasciando solo la fila di tab +
     // controlli finestra. In questo stato la WebContentsView risale a coprire
