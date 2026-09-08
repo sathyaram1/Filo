@@ -365,6 +365,23 @@ test('portafoglio attivo ma server giù (o offline): cosa vede la pagina', async
   expect(ws.keySource).toBe('personal');
 });
 
+test('messaggi wallet da un’origine web: cosa risponde il main', async ({ app, openTab }) => {
+  srv.state = WITH_WALLET();
+  const page = await openTab(CREDITS_URL);
+  await expect(page.locator('#balance')).toHaveText('5.000', { timeout: 15000 });
+  const out = await app.evaluate(async () => {
+    const H = globalThis.SN_HANDLE_MESSAGE;
+    const web = { tab: { url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' };
+    const res = {};
+    for (const type of ['wallet_state', 'wallet_redeem', 'wallet_reissue', 'wallet_owner_invites', 'get_credits']) {
+      try { res[type] = await H({ type, code: 'XXXX-YYYY', count: 1 }, web); } catch (e) { res[type] = { thrown: String(e && e.message) }; }
+    }
+    return res;
+  });
+  console.log('ORIGINE WEB:', JSON.stringify(out).slice(0, 1500));
+  console.log('walletReissue chiamate dal server dopo la prova web:', callsTo('walletReissue'), 'redeem:', callsTo('walletRedeem'));
+});
+
 test('movimenti locali e saldo locale con il portafoglio attivo', async ({ app, openTab }) => {
   srv.state = WITH_WALLET();
   await app.evaluate(() => globalThis.SN_CREDITS.award({ kind: 'auto_feedback_bonus', credits: 10 }));
