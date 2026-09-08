@@ -40,14 +40,10 @@ test('la voce del menu esce dallo schermo intero e si chiama «Esci da schermo i
   await accendi(app);
   await expect.poll(async () => (await stato(app)).contentFullscreen).toBe(true);
 
-  const label = await etichettaFullscreen(page);
-  expect(label).toMatch(/esci da schermo intero/i);
+  const b = await bottoneFullscreen(page);
+  expect(await b.getAttribute('aria-label')).toMatch(/esci da schermo intero/i);
 
-  await page.evaluate(() => {
-    const nodi = [...document.querySelectorAll('.sn-menu *')];
-    const v = nodi.reverse().find((n) => /esci da schermo intero/i.test(n.textContent) && n.children.length <= 2);
-    v.click();
-  });
+  await b.click();
   await expect.poll(async () => (await stato(app)).contentFullscreen, { timeout: 8000 }).toBe(false);
 });
 
