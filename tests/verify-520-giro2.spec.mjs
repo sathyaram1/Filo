@@ -233,3 +233,60 @@ for (const tema of ['light', 'dark']) {
     expect(b.x + b.width).toBeLessThanOrEqual(col.x + col.width + 1);
   });
 }
+
+// L'utente del feedback non ha premuto niente: ha solo aspettato. Anche senza
+// toccare il bottone l'attesa deve finire da sola, con una frase leggibile.
+// Salta senza i tetti stretti: quelli veri sono di minuti, di proposito.
+//   FILO_AI_STALLO_MS=4000 FILO_AI_TETTO_MS=9000 npx playwright test tests/verify-520-giro2.spec.mjs
+for (const dove of ['mazzi', 'home']) {
+  test(`${dove}: senza toccare niente l'attesa finisce da sola con una frase`, async ({ app, shell, openTab }) => {
+    test.setTimeout(120_000);
+    test.skip(!process.env.FILO_AI_TETTO_MS, 'servono FILO_AI_STALLO_MS/FILO_AI_TETTO_MS stretti');
+    const azione = dove === 'mazzi' ? 'DECKS_CHAT' : 'FILO_CHAT';
+    await app.evaluate(async (act) => {
+      const C = globalThis.SN_CONST;
+      await globalThis.SN_STORAGE.updateSettings({
+        useDefaultModels: false,
+        apiKeys: { openrouter: 'k-test' },
+        models: { [C.ACTIONS[act]]: 'deepseek-flash' },
+        modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      });
+      // Il router accetta la connessione e poi tace: `fetch` da solo non molla mai.
+      globalThis.fetch = (_url, opts) => new Promise((_res, rej) => {
+        const s = opts && opts.signal;
+        const fine = () => { const e = new Error('This operation was aborted'); e.name = 'AbortError'; rej(e); };
+        if (!s) return;
+        if (s.aborted) { fine(); return; }
+        s.addEventListener('abort', fine, { once: true });
+      });
+    }, azione);
+
+    let page;
+    let bolla;
+    if (dove === 'mazzi') {
+      page = await openTab('filo://decks/decks.html');
+      await page.waitForLoadState('domcontentloaded');
+      await page.click('#newDeck');
+      await expect(page.locator('#screenBuilder')).toBeVisible();
+      await page.fill('#chatInput', 'che ne pensi del mazzo?');
+      await page.press('#chatInput', 'Enter');
+      bolla = page.locator('.dk-msg-bot').last();
+    } else {
+      await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+      page = await newtabPage(app);
+      await expect(page.locator('#input')).toBeVisible();
+      await page.locator('#input').fill('ciao filo');
+      await page.locator('#sendBtn').click();
+      bolla = page.locator('.dash-bubble-filo').last();
+    }
+    await expect(page.locator('[data-stop-chat]')).toBeVisible({ timeout: 15_000 });
+
+    // Nessun clic: si aspetta e basta.
+    await expect(bolla).toContainText(/ha smesso di rispondere/i, { timeout: 90_000 });
+    const testo = await bolla.innerText();
+    // Una frase per l'utente, non un codice tecnico né un indirizzo.
+    expect(testo).not.toMatch(/https?:|openrouter\.ai|AbortError|\bfetch\b/i);
+    // E la chat è di nuovo libera.
+    await expect(page.locator('[data-stop-chat]')).toHaveCount(0);
+  });
+}

@@ -18,7 +18,7 @@
     {
       version: '0.2.222', date: '2026-09-08',
       features: [
-        'Nella chat dei mazzi, mentre aspetti una risposta vedi da quanto stai aspettando e puoi fermarla con «Interrompi». La chat torna subito libera e puoi riscrivere.',
+        'Mentre aspetti una risposta di Filo vedi da quanto stai aspettando e puoi smettere quando vuoi, col tasto «Interrompi» o con Esc: vale nella chat della nuova scheda e in quella dei mazzi. La chat torna subito libera, un tasto rimanda lo stesso messaggio e la richiesta al modello si ferma davvero, senza consumare crediti per una risposta che non leggerai.',
       ],
       fixes: [
         'Quando il servizio dei modelli accettava la richiesta e poi restava zitto, Filo aspettava per sempre e la chat non si sbloccava più. Adesso smette di aspettare, ti dice cosa è successo e puoi riprovare.',
