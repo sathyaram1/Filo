@@ -1,8 +1,8 @@
 // routine-beat.mjs — il battito parte da solo, insieme al biglietto.
 //
 // PERCHÉ ESISTE
-//   Il semaforo del server cade dopo 30 minuti senza battito. La suite completa
-//   in cloud ne dura 37. Il primo giro che ci è finito dentro ha perso un lavoro
+//   Il semaforo del server cadeva dopo 30 minuti senza battito (oggi 60, ma
+//   il problema è lo stesso). La suite completa in cloud ne dura 37. Il primo giro che ci è finito dentro ha perso un lavoro
 //   intero: venti commit spinti sul ramo, consegna rifiutata (`dead_ticket`),
 //   esito e report mai registrati da nessuna parte. Non è un caso isolato:
 //   capita a ogni ruolo che lanci la suite completa.
