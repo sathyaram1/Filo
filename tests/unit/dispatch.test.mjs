@@ -598,10 +598,10 @@ test('nei file di prova non si anticipa il seguito del giro', async () => {
   assert.deepEqual(colpevoli, [], `righe da riscrivere (il seguito del giro non si anticipa):\n  ${colpevoli.join('\n  ')}`);
 });
 
-// La seconda fase (chi ha criticato corregge) arriva dal server DOPO la
-// critica: se l'aiuto la anticipasse, chi verifica saprebbe prima di scrivere
-// i rilievi che ogni rilievo è lavoro suo — e ne scriverebbe meno. `--help` lo
-// legge chiunque, in qualsiasi momento: qui dentro non ci va (feedback #565).
+// Le istruzioni della correzione arrivano dal server DOPO la critica: se
+// l'aiuto le anticipasse, chi verifica saprebbe come prosegue il giro prima
+// ancora di scrivere i rilievi. `--help` lo legge chiunque, in qualsiasi
+// momento: qui dentro non ci va (feedback #565).
 test('usageText: elenca i comandi e nient\'altro', () => {
   const u = usageText().toLowerCase();
   for (const parola of ['fase 2', 'correggi', 'correzion', 'correttore']) {

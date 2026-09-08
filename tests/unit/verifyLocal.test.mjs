@@ -74,7 +74,7 @@ test('lo stato è per ramo e non si calpesta', () => {
   assert.equal(checkVerdict(s['claude/due'], ALTRO_SHA).ok, false);
 });
 
-// ─── Il verificatore che corregge, in locale (feedback #561) ─────────────────
+// ─── Il giro di verifica, in locale (feedback #561) ──────────────────────────
 //
 // Stessa struttura del giro in cloud: critica coi livelli → l'esito lo
 // calcolano le regole condivise → se c'è da correggere, la fase 2 (stampata

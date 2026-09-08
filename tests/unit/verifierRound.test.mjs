@@ -1,4 +1,4 @@
-// Le regole del giro del verificatore che corregge (src/shared/verifierRound.js,
+// Le regole del giro di verifica (src/shared/verifierRound.js,
 // feedback #561). PURE: sono le stesse che il server incorpora al deploy e che
 // la verifica locale usa, quindi qui si inchiodano i casi della spec (§4).
 
