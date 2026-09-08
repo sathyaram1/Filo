@@ -37,7 +37,7 @@ async function providerAppeso(app, action) {
     });
     globalThis.__chiamate = 0;
     globalThis.__annullato = false;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, signal }) => {
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, signal, onReasoning }) => {
       globalThis.__chiamate += 1;
       if (globalThis.__chiamate > 1) {
         return {
@@ -45,6 +45,9 @@ async function providerAppeso(app, action) {
           model: attempts[0].model, provider: attempts[0].provider, usage: {},
         };
       }
+      // Un pezzo di ragionamento arriva, poi il servizio tace: è il caso vero,
+      // e lascia qualcosa da leggere nel blocco di attività.
+      try { onReasoning && onReasoning('Sto valutando la domanda. '); } catch (_) {}
       return new Promise((_res, rej) => {
         const fine = () => {
           globalThis.__annullato = true;
