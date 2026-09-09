@@ -181,12 +181,8 @@ test('l’owner con il portafoglio suo: il regalo alla propria installazione muo
     await page.click('#redeemBtn');
     await expect(page.locator('#redeemMsg')).toContainText(/riscattato/i, { timeout: 15_000 });
     await expect(page.locator('#balance')).toHaveText('5.000');
-    // La tabella degli utenti non si aggiorna da sola dopo il riscatto (la
-    // vista owner si legge una volta per apertura): si ricarica la pagina.
-    const subito = await page.locator('#ownerUsers tbody tr.sn-wallet-user').count();
-    { const nota = `righe utenti subito dopo il riscatto dell'owner, senza ricaricare: ${subito}`; test.info().annotations.push({ type: 'nota', description: nota }); console.log('[nota]', nota); }
-    await page.reload();
-    await page.waitForFunction(() => !document.getElementById('wallet').hidden);
+    // La tabella degli utenti mostra la riga nuova (la sua) senza ricaricare:
+    // rilievo di livello zero del quinto giro, corretto nello stesso giro.
     await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
     const mio = await page.locator('#ownerUsers tbody tr.sn-wallet-user td').first().innerText();
     await page.fill('#ownerGrantPseudonym', mio);
