@@ -92,5 +92,19 @@
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
   }
 
-  global.SN_WALLET = { USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, REDEEM_MESSAGES };
+  // Il codice dentro quello che l'utente incolla. Il codice arriva per
+  // messaggio e si ricopia com'è, spesso con la riga intorno («Codice:
+  // ABCD-EFGH», «il tuo invito è abcd efgh»): se il testo, ripulito, non è un
+  // codice, si cerca dentro un blocco di otto caratteri (anche quattro più
+  // quattro) staccato dal resto. Se non c'è, torna il testo com'era: sarà il
+  // server a dire «non esiste».
+  function extractCode(raw) {
+    const s = String(raw || '').trim();
+    const norm = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (norm.length === 8) return norm;
+    const m = s.toUpperCase().match(/(?<![A-Z0-9])([A-Z0-9]{4})[\s-]*([A-Z0-9]{4})(?![A-Z0-9])/);
+    return m ? m[1] + m[2] : s;
+  }
+
+  global.SN_WALLET = { USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, extractCode, REDEEM_MESSAGES };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
