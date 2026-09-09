@@ -30,6 +30,13 @@ if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
 export default defineConfig({
   testDir: './tests',
   testMatch: /.*\.spec\.(js|mjs)$/,
+  // Le prove dei giri di verifica (tests/verifica/<numero>/) restano nel ramo
+  // ma NON entrano nella suite completa: quelle di un solo feedback costano
+  // otto minuti e mezzo (misurato il 9/09/2026 su #495), e la suite completa
+  // è proprio l'ultimo passo prima del pass, quello che si voleva accorciare.
+  // Si lanciano per numero (`npx playwright test tests/verifica/<numero>`),
+  // oppure tutte con FILO_TEST_VERIFICA=1.
+  testIgnore: process.env.FILO_TEST_VERIFICA === '1' ? [] : [/[\\/]tests[\\/]verifica[\\/]/],
   timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza
