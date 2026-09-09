@@ -83,7 +83,7 @@ quello che gli farà il verificatore:
 1. **Una prova sul cammino segnalato**, che asserisce il successo dal punto di
    vista dell'utente, in `tests/verifica/<numero>/giro0-<cosa>.spec.mjs` (il
    numero del feedback senza cancelletto). Resta nel ramo: il verificatore la
-   rilancia, e dopo la fusione resta nella suite.
+   rilancia per numero (la suite completa non raccoglie quella cartella).
    Quale prova, lo dicono i minimi di CLAUDE.md § Verifica, non questa cartella:
    se il lavoro **non ha niente da aprire** (logica pura, testi, strumenti da
    riga di comando) la prova è il controllo veloce in `tests/unit/`, e la
