@@ -802,7 +802,9 @@ if (isMain) {
       console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: da qui esce un esito, e un esito senza motivo non vale.');
       process.exit(1);
     }
-    const r = withFixed(readState(), branch, { report, sha, dirtyFiles: dirtyTreeLines(gitStatusPorcelain(ROOT)) });
+    const statoC = statoDirectory(ROOT);
+    if (!statoC.ok) { console.error(statoIllegibileText(statoC.motivo, 'consegna')); process.exit(1); }
+    const r = withFixed(readState(), branch, { report, sha, dirtyFiles: statoC.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
     if (r.outcome === 'stop') {
