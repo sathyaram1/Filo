@@ -199,12 +199,10 @@ test('l’owner con il portafoglio suo: il regalo alla propria installazione muo
 });
 
 test('la quota giornaliera arriva intera: dopo la giornaliera il saldo mostrato è quello ricevuto, senza consumo', async () => {
-  // Rilievo del quinto giro, ancora aperto: col cambio a cinque decimali il
-  // tetto in dollari viene arrotondato al milionesimo e, riconvertito per
-  // difetto, dà un credito in meno (5.199 su 5.200 ricevuti). `test.fail` lo
-  // tiene scritto: quando la correzione arriva il caso passa e l'annotazione
-  // va tolta.
-  test.fail(true, 'aperto dal quinto giro: 5.200 ricevuti, 5.199 mostrati senza consumo');
+  // Rilievo del quinto giro, corretto nello stesso giro: col cambio a cinque
+  // decimali il tetto in dollari veniva arrotondato al milionesimo e,
+  // riconvertito per difetto, dava un credito in meno (5.199 su 5.200
+  // ricevuti). Ora il tetto si arrotonda per eccesso e il giro torna intero.
   // Cambio BCE vero, con cinque decimali, come lo scrive Frankfurter.
   const u = await utenteEsistente('utente-quota');
   server.keys.keys.get(server.keys.hashOf(u.key)).usageUsd = 0;
