@@ -35,6 +35,21 @@ const SECURE_TOKEN_ENDPOINT = process.env.FILO_SECURE_TOKEN_ENDPOINT || cfg.secu
 
 let session = null; // { refreshToken, idToken, idTokenExp, uid }
 let inflight = null;
+// L'identità è stata annullata sul server (rinnovo rifiutato): non se ne crea
+// un'altra in silenzio, perché il portafoglio è legato a quella. Chi legge lo
+// stato lo dice all'utente; ricominciare è una scelta sua (resetIdentity).
+let lost = false;
+
+// Un fetch che non arriva a destinazione è «sei offline», non «fetch failed».
+function humanNetworkError(e) {
+  const msg = String((e && e.message) || e || '');
+  if (/fetch failed|ENOTFOUND|ECONN|EAI_AGAIN|network/i.test(msg)) {
+    const err = new Error('nessuna connessione a internet');
+    err.code = 'offline';
+    return err;
+  }
+  return e;
+}
 
 function filePath() {
   const { app } = require('electron');
@@ -88,11 +103,14 @@ function restore() {
 // Crea l'identità anonima. Errori tipici, resi leggibili: il provider anonimo
 // spento nella console Firebase (ADMIN_ONLY_OPERATION), rete assente.
 async function signUpAnonymous() {
-  const res = await fetch(`${IDENTITY_ENDPOINT}?key=${cfg.firebaseApiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ returnSecureToken: true }),
-  });
+  let res;
+  try {
+    res = await fetch(`${IDENTITY_ENDPOINT}?key=${cfg.firebaseApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ returnSecureToken: true }),
+    });
+  } catch (e) { throw humanNetworkError(e); }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     const err = new Error(/ADMIN_ONLY_OPERATION/.test(text)
@@ -114,15 +132,24 @@ async function signUpAnonymous() {
 
 async function refresh() {
   const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: session.refreshToken });
-  const res = await fetch(`${SECURE_TOKEN_ENDPOINT}?key=${cfg.firebaseApiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
+  let res;
+  try {
+    res = await fetch(`${SECURE_TOKEN_ENDPOINT}?key=${cfg.firebaseApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+  } catch (e) { throw humanNetworkError(e); }
   if (!res.ok) {
-    // Token revocato (account cancellato dalla console): l'identità è persa,
-    // se ne crea una nuova. Il portafoglio legato a quella vecchia non torna.
-    if (res.status === 400) { session = null; try { fs.rmSync(filePath(), { force: true }); } catch (_) {} }
+    // Token revocato (account cancellato dalla console): l'identità è persa.
+    // Non se ne crea un'altra qui: il portafoglio è legato a questa, e
+    // l'utente deve saperlo prima di ricominciare da zero.
+    if (res.status === 400) {
+      lost = true;
+      const err = new Error('l\'identità di questa installazione è stata annullata sul server');
+      err.code = 'identity_lost';
+      throw err;
+    }
     throw new Error(`rinnovo identità fallito (${res.status})`);
   }
   const j = await res.json();
@@ -138,17 +165,33 @@ async function refresh() {
 // dieci account.
 async function getIdToken() {
   if (session?.idToken && Date.now() < session.idTokenExp) return session.idToken;
+  if (lost) {
+    const err = new Error('l\'identità di questa installazione è stata annullata sul server');
+    err.code = 'identity_lost';
+    throw err;
+  }
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      if (session?.refreshToken) {
-        try { return await refresh(); } catch (e) { if (session) throw e; /* identità persa: si ricrea */ }
-      }
+      if (session?.refreshToken) return await refresh();
       await signUpAnonymous();
       return session.idToken;
     } finally { inflight = null; }
   })();
   return inflight;
+}
+
+function isLost() { return lost; }
+
+// Solo per i test: butta via il token in memoria, così la prossima richiesta
+// deve rinnovarlo (è il caso «riapri Filo senza rete»).
+function _expireToken() { if (session) { session.idToken = null; session.idTokenExp = 0; } }
+
+// Ricomincia da zero: scelta esplicita dell'utente dopo che l'identità è stata
+// annullata. La prossima richiesta crea un'identità nuova.
+function resetIdentity() {
+  session = null; lost = false; inflight = null;
+  try { fs.rmSync(filePath(), { force: true }); } catch (_) {}
 }
 
 async function getUid() {
@@ -169,4 +212,4 @@ function hasIdentity() { return Boolean(session?.refreshToken); }
 // token resta valido e punta allo stesso uid: nulla da fare. Esposto per i test.
 function _reset() { session = null; inflight = null; }
 
-module.exports = { restore, getIdToken, getUid, currentIdTokenSync, hasIdentity, _reset };
+module.exports = { restore, getIdToken, getUid, currentIdTokenSync, hasIdentity, isLost, resetIdentity, _reset, _expireToken };

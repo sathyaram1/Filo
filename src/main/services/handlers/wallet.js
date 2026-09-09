@@ -92,6 +92,13 @@ module.exports = function register(on, ctx) {
       out.identity.ok = true;
     } catch (e) {
       out.identity.error = String(e?.message || e);
+      out.identity.lost = e && e.code === 'identity_lost';
+      out.identity.offline = e && e.code === 'offline';
+      // Offline (o identità che non si rinnova) con la chiave personale qui:
+      // l'ultimo stato letto vale anche adesso. Il campo dell'invito e il
+      // saldo locale a chi ha già il portafoglio sarebbero due bugie.
+      const cached = out.hasPersonalKey && !out.identity.lost ? walletStore.lastServer() : null;
+      if (cached && cached.hasWallet) out.server = { ...cached, stale: true, cached: true };
       return out;
     }
     try {
@@ -144,6 +151,14 @@ module.exports = function register(on, ctx) {
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     return { ok: true, status, message: 'Nuova chiave pronta: i tuoi crediti si usano di nuovo da qui.', state: await readState() };
+  }));
+
+  on(MSG.WALLET_RESET_IDENTITY, filoOnly(async () => {
+    identity.resetIdentity();
+    walletStore.clear();
+    lastServer = null;
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    return { ok: true, state: await readState() };
   }));
 
   // L'identità dell'installazione non si crea (provider anonimo spento su
@@ -281,7 +296,11 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
-  globalThis.SN_WALLET_MAIN = { recordUsage, outOfCreditsNotice, flush, readState, keySource };
+  globalThis.SN_WALLET_MAIN = {
+    recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
+    expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
+  };
 
   // All'avvio: identità pronta e stato del server letto una volta, così la
   // prima riga del registro ha già i parametri di conversione. In background.

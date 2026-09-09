@@ -14,6 +14,7 @@ let server;
 const seen = { redeems: [], states: 0, signups: 0, tokens: [] };
 let redeemed = false;
 let serverDown = false;
+let identityDown = false;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -36,6 +37,7 @@ test.beforeAll(async () => {
         return json(res, 200, { idToken: 'anon-id-token', refreshToken: 'anon-refresh', expiresIn: '3600', localId: 'anon-uid-1' });
       }
       if (url === '/token') {
+        if (identityDown) { res.destroy(); return; }
         return json(res, 200, { id_token: 'anon-id-token', refresh_token: 'anon-refresh', expires_in: '3600', user_id: 'anon-uid-1' });
       }
 
@@ -166,4 +168,17 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   await expect(page.locator('#walletNote')).toContainText('non risponde');
   await expect(page.locator('#invites li')).toHaveCount(3);
   serverDown = false;
+
+  // Offline vero: non si rinnova nemmeno l'identità. Stessa cosa: ultimo saldo,
+  // niente invito, niente «fetch failed» in pagina.
+  identityDown = true;
+  await app.evaluate(() => globalThis.SN_WALLET_MAIN.expireIdentityForTest());
+  await page.reload();
+  await expect(page.locator('#hero')).toBeVisible();
+  await expect(page.locator('#balance')).toHaveText('4.990', { timeout: 15000 });
+  await expect(page.locator('#redeemForm')).toBeHidden();
+  await expect(page.locator('#refillHint')).not.toContainText('mezzanotte');
+  await expect(page.locator('#offlineHint')).toBeHidden();
+  await expect(page.locator('body')).not.toContainText('fetch failed');
+  identityDown = false;
 });

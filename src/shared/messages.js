@@ -175,6 +175,11 @@
     //   è su questo computer: il server ne emette un'altra (la vecchia si
     //   spegne, il saldo resta). { } → { ok, status, message, state? }
     WALLET_REISSUE: 'wallet_reissue',
+    // WALLET_RESET_IDENTITY: l'identità dell'installazione è stata annullata
+    //   sul server (il portafoglio legato a essa non si raggiunge più):
+    //   l'utente sceglie di ricominciare con un'identità nuova e un nuovo
+    //   invito. { } → { ok, state }
+    WALLET_RESET_IDENTITY: 'wallet_reset_identity',
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).

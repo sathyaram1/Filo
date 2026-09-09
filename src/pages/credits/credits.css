@@ -135,3 +135,13 @@
 
 /* L attributo hidden vince sul display delle sezioni flex/grid. */
 .sn-page [hidden] { display: none !important; }
+
+.sn-wallet-sub { margin: 14px 0 0; font-size: 14px; color: var(--sn-muted); font-weight: 600; }
+.sn-wallet-user { cursor: pointer; }
+.sn-wallet-user.is-open td { background: var(--sn-hover, rgba(0,0,0,.04)); }
+.sn-wallet-user-detail td { white-space: normal; padding: 8px 10px 12px; }
+.sn-wallet-usage-detail { display: flex; gap: 32px; flex-wrap: wrap; font-size: 13px; }
+.sn-wallet-usage-detail h4 { margin: 0 0 4px; font-size: 13px; color: var(--sn-muted); font-weight: 600; }
+.sn-wallet-usage-detail ul { list-style: none; margin: 0; padding: 0; }
+.sn-wallet-usage-detail li { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
+#resetIdentityBtn { margin-top: 8px; }

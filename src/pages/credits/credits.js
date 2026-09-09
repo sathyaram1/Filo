@@ -66,7 +66,9 @@
   function renderWallet(w) {
     const box = $('wallet');
     const reissue = $('reissueBtn');
+    const resetBtn = $('resetIdentityBtn');
     reissue.hidden = true;
+    resetBtn.hidden = true;
     if (!w || !w.ok) { box.hidden = true; return; }
     box.hidden = false;
     const server = w.server;
@@ -116,8 +118,17 @@
     $('invitesSection').hidden = true;
     const form = $('redeemForm');
     form.hidden = false;
-    if (w.identity && !w.identity.ok) {
-      note.textContent = w.identity.error || 'Non riesco a preparare l\'identità di questa installazione.';
+    if (w.identity && !w.identity.ok && w.identity.lost) {
+      // Il server ha annullato l'identità: il portafoglio legato a essa non
+      // si raggiunge più. Si dice, e ricominciare è una scelta dell'utente.
+      form.hidden = true;
+      note.textContent = 'L\'identità di questa installazione è stata annullata sul server, e con lei i crediti che aveva. Puoi ricominciare con un nuovo invito.';
+      note.hidden = false;
+      resetBtn.hidden = false;
+    } else if (w.identity && !w.identity.ok) {
+      note.textContent = w.identity.offline
+        ? 'Sei offline: per riscattare un invito serve la connessione.'
+        : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
       note.textContent = 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
@@ -178,6 +189,15 @@
     note.textContent = (r && r.message) || 'Non ci sono riuscito: riprova.';
   }
 
+  async function resetIdentity() {
+    const btn = $('resetIdentityBtn');
+    btn.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_RESET_IDENTITY }); } catch (_) { r = null; }
+    btn.disabled = false;
+    if (r && r.ok) render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
+  }
+
   // ── Owner: codici, regali, chi ha cosa ─────────────────────────────────────
   let overviewLoaded = false;
   function renderOwner(w) {
@@ -201,6 +221,11 @@
       `${formatInt(tot.users || 0)} utenti · tetti ${fmtUsd(tot.totalLimitUsd)} su ${fmtUsd(tot.maxGrantUsd)} elargibili · `
       + `inviti riscattabili rimasti ${formatInt(cfg.invitesRemaining || 0)} · ingresso ${formatInt(cfg.entryCredits || 0)}, +${formatInt(cfg.dailyCredits || 0)}/giorno`
       + (cfg.eurUsd ? ` · cambio ${cfg.eurUsd} (${cfg.eurUsdAt || ''})` : ' · cambio mancante');
+    // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
+    // con quelli usati barrati, così chi ne genera cinque e chiude la pagina sa
+    // ancora quali ha già dato.
+    renderOwnerCodes(o.ownerInvites || []);
+
     const table = $('ownerUsers');
     const tbody = table.querySelector('tbody');
     tbody.innerHTML = '';
@@ -218,17 +243,91 @@
       cells.forEach((c, i) => {
         const td = document.createElement('td');
         td.textContent = c;
-        if (i === 0) { td.className = 'sn-wallet-pseudonym'; td.title = 'Copia'; td.addEventListener('click', () => { try { navigator.clipboard.writeText(u.pseudonym); } catch (_) {} $('ownerGrantPseudonym').value = u.pseudonym; }); }
+        if (i === 0) { td.className = 'sn-wallet-pseudonym'; td.title = 'Copia'; td.addEventListener('click', (ev) => { ev.stopPropagation(); try { navigator.clipboard.writeText(u.pseudonym); } catch (_) {} $('ownerGrantPseudonym').value = u.pseudonym; }); }
         if (i === 4 && rec && rec.flagged) td.className = 'is-flagged';
         tr.appendChild(td);
       });
       if (u.disabled) tr.className = 'is-used';
+      tr.classList.add('sn-wallet-user');
+      tr.title = 'Dettaglio per azione e per giorno';
       tbody.appendChild(tr);
+
+      // Il dettaglio d'uso (per azione, per giorno) sta in una riga sotto, che
+      // si apre al clic sulla riga dell'utente.
+      const detail = document.createElement('tr');
+      detail.className = 'sn-wallet-user-detail';
+      detail.hidden = true;
+      const td = document.createElement('td');
+      td.colSpan = cells.length;
+      td.appendChild(usageDetail(u.usage));
+      detail.appendChild(td);
+      tbody.appendChild(detail);
+      tr.addEventListener('click', () => { detail.hidden = !detail.hidden; tr.classList.toggle('is-open', !detail.hidden); });
     }
     const runs = [];
     if (o.daily && o.daily.lastRunAt) runs.push(`giornaliera ${formatDateTime(o.daily.lastRunAt)}${summ(o.daily.summary)}`);
     if (o.reconcile && o.reconcile.lastRunAt) runs.push(`riconciliazione ${formatDateTime(o.reconcile.lastRunAt)}${summ(o.reconcile.summary)}`);
     $('ownerRuns').textContent = runs.length ? `Ultime: ${runs.join(' · ')}` : 'Giornaliera e riconciliazione non hanno ancora girato.';
+  }
+
+  function usageDetail(usage) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-wallet-usage-detail';
+    if (!usage || !usage.rows) {
+      wrap.textContent = 'Nessuna riga nel registro d\'uso.';
+      return wrap;
+    }
+    const byAction = Object.entries(usage.byAction || {}).sort((a, b) => b[1] - a[1]);
+    const byDay = Object.entries(usage.byDay || {}).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14);
+    const col = (title, rows, fmtKey) => {
+      const box = document.createElement('div');
+      const h = document.createElement('h4'); h.textContent = title; box.appendChild(h);
+      const ul = document.createElement('ul');
+      for (const [k, usd] of rows) {
+        const li = document.createElement('li');
+        const a = document.createElement('span'); a.textContent = fmtKey(k);
+        const v = document.createElement('span'); v.textContent = fmtUsd(usd);
+        li.append(a, v);
+        ul.appendChild(li);
+      }
+      box.appendChild(ul);
+      return box;
+    };
+    wrap.appendChild(col(`Per azione (${formatInt(usage.rows)} chiamate)`, byAction, (k) => k));
+    wrap.appendChild(col('Per giorno', byDay, (k) => formatDate(k)));
+    return wrap;
+  }
+
+  function renderOwnerCodes(invites) {
+    const list = $('ownerCodes');
+    list.innerHTML = '';
+    $('ownerCodesTitle').hidden = invites.length === 0;
+    const sorted = invites.slice().sort((a, b) => Number(Boolean(a.used)) - Number(Boolean(b.used)) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    for (const inv of sorted) list.appendChild(inviteItem(inv));
+  }
+
+  function inviteItem(inv) {
+    const li = document.createElement('li');
+    li.className = 'sn-wallet-invite' + (inv.used ? ' is-used' : '');
+    li.dataset.code = inv.code;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sn-wallet-code'; b.textContent = inv.code;
+    b.title = inv.used ? 'Già usato' : 'Copia';
+    b.disabled = Boolean(inv.used);
+    b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(inv.code); } catch (_) {}
+      const prev = b.textContent;
+      b.textContent = 'Copiato';
+      b.classList.add('is-copied');
+      setTimeout(() => { b.textContent = prev; b.classList.remove('is-copied'); }, 1200);
+    });
+    const state = document.createElement('span');
+    state.className = 'sn-wallet-invite-state';
+    state.textContent = inv.used
+      ? `usato${inv.usedAt ? ' il ' + formatDate(inv.usedAt) : ''}${inv.usedBy ? ' da ' + inv.usedBy : ''}`
+      : 'da dare';
+    li.append(b, state);
+    return li;
   }
 
   function summ(s) {
@@ -252,21 +351,11 @@
     msg.hidden = false;
     msg.classList.remove('is-error', 'is-ok');
     if (!(r && r.ok)) { msg.textContent = `Codici non generati${r && r.error ? ` (${r.error})` : ''}.`; msg.classList.add('is-error'); return; }
-    msg.textContent = `${r.codes.length} codici nuovi: copiali adesso, non si rileggono da qui.`;
+    msg.textContent = `${r.codes.length} codici nuovi. Li ritrovi qui sotto anche dopo.`;
     msg.classList.add('is-ok');
     const list = $('ownerCodes');
-    for (const code of r.codes) {
-      const li = document.createElement('li');
-      li.className = 'sn-wallet-invite';
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'sn-wallet-code'; b.textContent = code; b.title = 'Copia';
-      b.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(code); } catch (_) {}
-        b.classList.add('is-copied'); setTimeout(() => b.classList.remove('is-copied'), 1200);
-      });
-      li.appendChild(b);
-      list.prepend(li);
-    }
+    $('ownerCodesTitle').hidden = false;
+    for (const code of r.codes.slice().reverse()) list.prepend(inviteItem({ code, used: false }));
     loadOverview().catch(() => {});
   }
 
@@ -483,6 +572,7 @@
 
   $('redeemForm').addEventListener('submit', (ev) => { redeem(ev).catch(() => {}); });
   $('reissueBtn').addEventListener('click', () => { reissueKey().catch(() => {}); });
+  $('resetIdentityBtn').addEventListener('click', () => { resetIdentity().catch(() => {}); });
   $('ownerInvitesForm').addEventListener('submit', (ev) => { ownerInvites(ev).catch(() => {}); });
   $('ownerGrantForm').addEventListener('submit', (ev) => { ownerGrant(ev).catch(() => {}); });
 

@@ -2631,6 +2631,14 @@ function buildNoKeyDashboard(settings, saved) {
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  if (!settings.apiKeys?.openrouter) {
+    suggestions.unshift({
+      icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
+      action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
+      importance: 3,
+    });
+  }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
     : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, puoi mettere una tua chiave OpenRouter nelle Opzioni. Intanto, le tue pagine salvate sono qui.';

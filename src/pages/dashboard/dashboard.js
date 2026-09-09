@@ -1904,6 +1904,17 @@
       retry.title = 'Rimanda lo stesso messaggio';
       retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
       row.appendChild(retry);
+      // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
+      // strada è la pagina Crediti, e sta qui sotto, non in un menu.
+      if (r?.code === 'NO_API_KEY') {
+        const credits = document.createElement('button');
+        credits.type = 'button';
+        credits.className = 'dash-action-btn';
+        credits.textContent = 'Apri Crediti';
+        credits.title = 'Riscatta il codice d\'invito';
+        credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
+        row.appendChild(credits);
+      }
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
       // modello non risponde (rete assente, provider giù, crediti finiti) alla
       // home non ci si arriva più. L'uscita sta qui, accanto, dove l'utente
