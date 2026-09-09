@@ -206,6 +206,7 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
       let data = {};
       try { data = JSON.parse(body || '{}').data || {}; } catch (_) {}
       counters.calls.push({ name, uid, data });
+      if (flags.delayMs) await new Promise((r) => setTimeout(r, flags.delayMs));
       if (flags.walletHang) { req.socket.destroy(); return; }
       if (flags.walletDown) return json(res, 500, { error: { message: 'boom', status: 'INTERNAL' } });
       if (!uid) return json(res, 401, { error: { message: 'Accesso richiesto.', status: 'UNAUTHENTICATED' } });
