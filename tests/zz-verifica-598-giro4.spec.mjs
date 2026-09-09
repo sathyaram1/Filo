@@ -217,8 +217,7 @@ test('A. installazione nuova: niente chiave, home e chat chiedono l\'invito, ris
     // Chiave propria: precedenza e nota
     await page.evaluate(() => chrome.runtime.sendMessage({ type: 'wallet_state' }));
     await opt.fill('#apiKey', 'sk-or-v1-mia-chiave');
-    await opt.evaluate(() => { const b = document.querySelector('#saveBtn, button[type=submit], #save'); if (b) b.click(); });
-    await opt.waitForTimeout(1000);
+    await opt.waitForTimeout(2500);
     const stOwn = await walletState(page);
     console.log('con chiave propria keySource:', stOwn.keySource, stOwn.usingOwnKey);
     await page.reload(); await page.waitForLoadState('domcontentloaded');
