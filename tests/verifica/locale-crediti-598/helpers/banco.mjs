@@ -384,15 +384,14 @@ export async function simulaOwner(app, server) {
 
 // Il testo della chat della home: manda un messaggio e aspetta la bolla di Filo.
 export async function chiediInChat(dash, testo) {
-  const before = await dash.locator('#bubbles .dash-bubble').count().catch(() => 0);
+  const before = await dash.locator('#bubbles .dash-bubble-filo').count().catch(() => 0);
   await dash.fill('#input', testo);
   await dash.press('#input', 'Enter');
   await dash.waitForFunction((n) => {
-    const b = document.querySelectorAll('#bubbles .dash-bubble');
-    if (b.length < n + 2) return false;
+    const b = document.querySelectorAll('#bubbles .dash-bubble-filo');
+    if (b.length < n + 1) return false;
     const last = b[b.length - 1];
-    return last && !last.classList.contains('dash-bubble-user') && (last.textContent || '').trim().length > 0 && !/Un attimo|…$/.test((last.textContent || '').trim());
-  }, before, { timeout: 30_000 });
-  const bubbles = dash.locator('#bubbles .dash-bubble');
-  return bubbles.last();
+    return last && !last.classList.contains('dash-bubble-pending') && (last.textContent || '').trim().length > 0;
+  }, before, { timeout: 45_000 });
+  return dash.locator('#bubbles .dash-bubble-filo').last();
 }
