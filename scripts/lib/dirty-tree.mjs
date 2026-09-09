@@ -65,12 +65,36 @@ export function dirtyTreeText(lines, cosa = 'critica') {
  * Lo stato della directory come lo vede git, coi nomi VERI: senza
  * `core.quotepath=false` un nome con lettere accentate arriva in sequenze
  * ottali («\303\250»), e l'elenco del rifiuto non dice quale file è.
+ *
+ * Se git non risponde, ALZA: prima ingoiava l'errore e tornava una stringa
+ * vuota, cioè «directory pulita» — e la registrazione passava proprio nel caso
+ * in cui non si sa se sia pulita. Un controllo che tace quando non può
+ * rispondere è peggio di uno assente: chi lo legge crede di essere protetto.
  */
 export function gitStatusPorcelain(root) {
+  return execFileSync('git', ['-c', 'core.quotepath=false', 'status', '--porcelain', '--untracked-files=all'],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+/**
+ * I file fuori dai commit, con l'esito della domanda: `{ ok, lines, motivo }`.
+ * `ok: false` vuol dire «non l'ho potuto sapere», e va trattato come un
+ * rifiuto, non come una directory pulita. È la porta unica delle tre strade
+ * (critica, consegna, messa in revisione).
+ */
+export function statoDirectory(root) {
   try {
-    return execFileSync('git', ['-c', 'core.quotepath=false', 'status', '--porcelain', '--untracked-files=all'],
-      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (_) {
-    return '';
+    return { ok: true, lines: dirtyTreeLines(gitStatusPorcelain(root)), motivo: '' };
+  } catch (e) {
+    const motivo = String((e && (e.stderr || e.message)) || e || '').trim().split(/\r?\n/)[0] || 'git non ha risposto';
+    return { ok: false, lines: [], motivo };
   }
+}
+
+/** Il rifiuto quando lo stato della directory non si è potuto leggere. PURA. */
+export function statoIllegibileText(motivo, cosa = 'critica') {
+  const quale = cosa === 'consegna' ? 'consegna' : cosa === 'revisione' ? 'consegna' : 'critica';
+  return `${quale} non registrata: non sono riuscito a farmi dire se ci sono file fuori dai commit (${motivo || 'git non ha risposto'}), `
+    + 'e senza quella risposta non posso garantire che l\'esito valga per il commit giusto. '
+    + 'Non tratto il silenzio come «directory pulita»: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e riprova con lo stesso testo.';
 }
