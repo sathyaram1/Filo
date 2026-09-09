@@ -26,11 +26,14 @@ function ignorato(percorso) {
 /** Quante regole di esclusione applica la config in queste condizioni. */
 function testIgnoreLen({ env = {}, args = [] } = {}) {
   const src = `import cfg from ${JSON.stringify(new URL('file:///' + resolve(ROOT, 'playwright.config.js').replace(/\\/g, '/')).href)};`
-    + 'console.log(Array.isArray(cfg.testIgnore) ? cfg.testIgnore.length : 1);';
+    + 'console.log("REGOLE=" + (Array.isArray(cfg.testIgnore) ? cfg.testIgnore.length : 1));';
   const out = execFileSync(process.execPath, ['--input-type=module', '-e', src, ...args], {
     cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_TEST_VERIFICA: '', ...env },
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
-  return Number(out.trim());
+  const m = /REGOLE=(\d+)/.exec(String(out));
+  expect(m, `la config non ha risposto: ${String(out).slice(0, 200)}`).not.toBeNull();
+  return Number(m[1]);
 }
 
 test('#giri-corti — una prova del giro non viene scartata dal repo, nemmeno col nome vecchio', () => {
