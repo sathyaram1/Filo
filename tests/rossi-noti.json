@@ -83,6 +83,12 @@
       "caso": "stessa azione, stessa scrittura: nessuna decisione cancellata",
       "perche": "da solo impiega quasi tutto il tetto di 60 secondi e sotto il carico della suite lo sfora; visto dalla verifica del #598 (quarto giro, 2026-09-09). Da rendere stabile o alzare il tetto, poi togliere la voce.",
       "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/verify-downloads-410",
+      "caso": "SUCCESSO: link a file → il file arriva, la barra avanza; STRESS: due download con lo STESSO nome in parallelo non si sovrascrivono",
+      "perche": "rossi anche da soli e identici su main sulla macchina di chi sviluppa Filo (verifica del #598, quinto giro, 2026-09-09): la barra passa da 0% a 100% senza un valore intermedio (il server locale è troppo veloce per vederne uno), e i due download con lo stesso nome finiscono sullo stesso percorso. La causa non è stata indagata da quel ramo, che i download non li tocca: da risolvere o spiegare, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
     }
   ]
 }
