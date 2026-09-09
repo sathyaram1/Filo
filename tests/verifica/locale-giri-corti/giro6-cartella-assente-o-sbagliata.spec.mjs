@@ -31,7 +31,7 @@ const leggi = (p) => readFileSync(resolve(ROOT, p), 'utf8');
 const ASSENZA = /niente da rilanciare|No tests found/i;
 // Il modo di distinguere: nominare la forma del percorso, o mandare a guardare
 // la cartella prima di concludere che non c'è.
-const DISTINGUE = /percorso|barre|(guarda|controlla|elenca|apri)[^.\n]{0,50}cartella|cartella[^.\n]{0,50}(esiste|c'è davvero|c’è davvero)/i;
+const DISTINGUE = /percors|barre/i;
 
 /** Le finestre di testo attorno a ogni frase che parla di assenza. */
 function attorno(testo, raggio = 350) {
