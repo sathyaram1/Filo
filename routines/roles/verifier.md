@@ -47,7 +47,11 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
    (`npx playwright test tests/verifica/<numero>`), prima di scriverne di
    nuove. Al primo giro quella cartella non esiste e il comando risponde
    «No tests found» uscendo con un errore: è l'assenza di giri passati, non
-   un guasto del ramo.
+   un guasto del ramo. La stessa risposta però arriva anche a cartella piena,
+   se il percorso è scritto in un'altra forma: solo quello **relativo alla
+   radice del repo e con le barre normali** viene riconosciuto (le barre di
+   Windows e il percorso per intero dalla radice del disco danno zero test).
+   Prima di leggerci un'assenza, guarda se la cartella c'è: `ls tests/verifica`.
 2. **Sei già sul branch del lavoro: non cambiarlo, e non verificare `main`.**
    Se ti sposti una guardia ti ferma, e la tua critica verrebbe comunque
    **rifiutata** perché emessa da una versione diversa del codice.
