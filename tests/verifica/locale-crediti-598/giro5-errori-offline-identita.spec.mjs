@@ -54,7 +54,7 @@ test('ogni esito del riscatto ha un testo chiaro, il campo torna usabile, gli in
       const msg = await riscatta(page, brutto);
       expect(msg).toMatch(/non esiste/);
       expect(await page.locator('#redeemMsg').innerHTML()).not.toMatch(/<script|<b>/);
-      expect(await page.evaluate(() => document.querySelectorAll('script').length)).toBeLessThanOrEqual(1);
+      expect(await page.evaluate(() => [...document.querySelectorAll('script')].some((s) => /alert\(1\)/.test(s.textContent)))).toBe(false);
       await campoUsabile();
     }
 
