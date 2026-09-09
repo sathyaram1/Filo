@@ -378,18 +378,21 @@ export async function commitFirestore(app) { return app.evaluate(() => globalThi
 // punta al server finto, che risponde con l'email dell'owner.
 export async function simulaOwner(app, server) {
   return app.evaluate(async ({}, o) => {
-    const req = process.mainModule && process.mainModule.require;
-    if (!req) return { ok: false, error: 'process.mainModule.require assente' };
-    const path = req('node:path');
-    const root = process.cwd();
-    const cfg = req(path.join(root, 'src', 'main', 'auth', 'config.js'));
-    const store = req(path.join(root, 'src', 'main', 'auth', 'token-store.js'));
-    const ga = req(path.join(root, 'src', 'main', 'auth', 'google-auth.js'));
-    cfg.secureTokenEndpoint = o.tokenEndpoint;
-    store.save({ refreshToken: o.refresh, email: o.email, name: 'Owner di prova', picture: '' });
-    ga.restore();
-    const tok = await ga.getIdToken();
-    return { ok: Boolean(tok), isAdmin: ga.isAdmin(), email: ga.getProfile()?.email };
+    // Nel processo principale `require` non è in scope: si ricostruisce dalla
+    // cache dei moduli di Node, così i moduli sono GLI STESSI che usa l'app.
+    try {
+      const Module = process.getBuiltinModule('module');
+      const path = process.getBuiltinModule('path');
+      const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+      const cfg = req('./auth/config');
+      const store = req('./auth/token-store');
+      const ga = req('./auth/google-auth');
+      cfg.secureTokenEndpoint = o.tokenEndpoint;
+      store.save({ refreshToken: o.refresh, email: o.email, name: 'Owner di prova', picture: '' });
+      ga.restore();
+      const tok = await ga.getIdToken();
+      return { ok: Boolean(tok), isAdmin: ga.isAdmin(), email: ga.getProfile()?.email };
+    } catch (e) { return { ok: false, error: String(e && e.stack || e) }; }
   }, { tokenEndpoint: `${server.base}/token`, refresh: OWNER_REFRESH, email: OWNER_EMAIL });
 }
 
