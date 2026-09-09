@@ -61,7 +61,7 @@ for (const file of ['routines/roles/verifier.md', 'routines/roles/resolver.md'])
 // Qui non si guarda il sorgente ma i DUE TESTI che chi verifica in locale legge
 // davvero: il compito che riceve all'apertura del giro e la coda della fase di
 // correzione. Sono funzioni pure, quindi si possono chiedere e leggere.
-const { buildVerifierBrief, codaText } = await import(resolve(ROOT, 'scripts/verify-local.mjs'));
+const { buildVerifierBrief, codaText } = await import(pathToFileURL(resolve(ROOT, 'scripts/verify-local.mjs')).href);
 
 const testiLocali = () => [
   ['il compito consegnato a chi verifica', buildVerifierBrief({ request: 'una richiesta', branch: 'claude/giri-corti', recipe: '(ricetta)' })],
