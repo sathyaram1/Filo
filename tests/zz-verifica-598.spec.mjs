@@ -561,7 +561,9 @@ test('sezione owner della pagina Crediti (login simulato nel main)', async () =>
         store.save({ refreshToken: 'rt-owner', email: 'sathyarampontillo@gmail.com', name: 'Owner', picture: '' });
         const ga = req(path.join(root, 'src/main/auth/google-auth.js'));
         ga.restore();
-        return { ok: true, admin: ga.isAdmin() };
+        const cached = Object.keys(req.cache || {}).filter((k) => /google-auth/i.test(k));
+        const st = await globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_state' }, { url: 'filo://credits/credits.html' });
+        return { ok: true, admin: ga.isAdmin(), cached, stIsOwner: st.isOwner, stErr: st.error || null, appPath: root };
       } catch (e) { return { ok: false, why: String(e && e.message || e) }; }
     }, S.base);
     console.log('LOGIN FINTO:', JSON.stringify(ok));
