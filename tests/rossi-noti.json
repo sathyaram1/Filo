@@ -1,6 +1,14 @@
 {
   "nota": "Spec Playwright che sono rossi ANCHE su main su una macchina precisa, per motivi d'ambiente e non di codice. Due elenchi, perché le macchine sono due e le regole diverse. `specs` sono i rossi della macchina di chi sviluppa Filo: il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. `contenitore` sono i rossi dei contenitori senza schermo in cui girano le routine: nessuno strumento li salta, servono a chi verifica per non scambiarli per regressioni. Per entrambi vale la stessa cosa: l'elenco VUOTO è lo stato normale, ogni voce è un controllo spento, e un controllo spento non protegge nessuno. Se devi aggiungere una voce scrivi QUI perché e apri un feedback per toglierla: un'eccezione senza una data di scadenza diventa permanente. Il primo elenco (feedback #563) conteneva undici spec della macchina di chi sviluppa Filo, ed è stato svuotato risolvendo caso per caso: quasi sempre era il test a dare per scontato qualcosa dell'ambiente (il percorso abbreviato 8.3 di %TEMP% quando il nome utente ha uno spazio, lo zoom di sistema al 125%, la rete di casa raggiungibile, un provider finto che risponde più in fretta di quanto il test riesca a digitare).",
-  "specs": [],
+  "specs": [
+    "tests/board-offline-error",
+    "tests/filo-terminal-context",
+    "tests/tab-reorder-reopen",
+    "tests/verifier-stress-410",
+    "tests/verify-495-avversariale",
+    "tests/verify-495-vfx3",
+    "tests/verify-514-g11"
+  ],
   "contenitore": {
     "nota": "Rossi a ogni giro di routine, su qualunque ramo, perché il contenitore non ha uno schermo vero né la rete aperta. Stavano nella memoria di chi verificava (le sue istruzioni ne facevano l'elenco a voce) e nessuno aveva una data di scadenza: un controllo spento senza un posto dove essere scritto è un controllo che nessuno rimetterà mai in piedi. Chi verifica confronta questo elenco con i rossi della sua corsa: quello che non è qui dentro è una regressione. Il primo elenco (feedback #563, terzo giro) ne contava sei; il settimo, «la finestra non compare sullo schermo», è uscito subito chiedendo la trasparenza solo dove il sistema sa darla e verificando sempre la posizione, che è la metà che conta. I quattro del tutto schermo sono usciti col #514, e la diagnosi scritta qui era sbagliata: non mancava il gestore di finestre, rientrava in se stesso il gestore che riparcheggia la finestra fuori schermo quando si esce dal tutto schermo (src/main/test-window-mode.js), finché il processo moriva per stack esaurito. Con la guardia i quattro casi girano nel contenitore così com'è, senza schermo e senza gestore di finestre — è il motivo per cui una voce va tolta appena si può, invece di credere alla sua spiegazione.",
     "specs": [
@@ -17,5 +25,49 @@
         "feedback": "#563"
       }
     ]
-  }
+  },
+  "specsMotivi": [
+    {
+      "spec": "tests/board-offline-error",
+      "caso": "un login (o altro ridisegno) non cancella l'errore",
+      "perche": "la bacheca raggiunge Firestore davvero e carica i dati veri: l'errore che il test aspetta non compare. rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/filo-terminal-context",
+      "caso": "un cd persiste, il pwd successivo lo riflette",
+      "perche": "il pwd di PowerShell su questa macchina stampa l'intestazione «Path ----» prima del percorso e il confronto letterale fallisce. rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/tab-reorder-reopen",
+      "caso": "riordinate per colore anche senza archiviare nulla",
+      "perche": "rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/verifier-stress-410",
+      "caso": "nome file ostile; nome file lunghissimo",
+      "perche": "rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/verify-495-avversariale",
+      "caso": "nessun numero finché i feedback non sono arrivati",
+      "perche": "presume Firestore irraggiungibile; qui è raggiungibile e le schede dicono «Ricevuti (495+)». Stesso caso di manage-tab-counts già noto. rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/verify-495-vfx3",
+      "caso": "i due casi «caricamento fallito»",
+      "perche": "presume Firestore irraggiungibile; qui è raggiungibile e le schede dicono «Ricevuti (495+)». rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/verify-514-g11",
+      "caso": "quattro riquadri impilati",
+      "perche": "rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    }
+  ]
 }

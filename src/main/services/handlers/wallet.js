@@ -102,41 +102,70 @@ module.exports = function register(on, ctx) {
           walletStore.save({ ...walletStore.load(), pseudonym: out.server.pseudonym });
           out.pseudonym = out.server.pseudonym;
         }
+        if (out.hasPersonalKey) walletStore.saveLastServer({ ...out.server, readAt: new Date().toISOString() });
       }
     } catch (e) {
       out.error = /callable \w+ 5\d\d|fetch failed|ENOTFOUND|ECONN/i.test(String(e?.message || e)) ? 'not_reachable' : String(e?.message || e);
+      // Server muto ma chiave personale qui: si mostra l'ultimo stato letto,
+      // dichiarato vecchio. Il campo dell'invito e il saldo locale a chi ha
+      // già il portafoglio sarebbero due bugie.
+      const cached = out.hasPersonalKey ? walletStore.lastServer() : null;
+      if (cached && cached.hasWallet) {
+        out.server = { ...cached, stale: true, cached: true };
+        lastServer = lastServer || out.server;
+      }
     }
     return out;
   }
 
-  on(MSG.WALLET_STATE, async () => readState());
+  // Cancello sull'origine (pattern «nuovo tipo di messaggio»): saldo, codici
+  // d'invito, riscatto e nuova chiave leggono e muovono dati dell'utente.
+  // Solo le pagine filo:// e la shell; una pagina web riceve `forbidden`.
+  const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  const filoOnly = (fn) => async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return fn(msg, sender, origin);
+  };
+
+  on(MSG.WALLET_STATE, filoOnly(async () => readState()));
 
   // Nuova chiave: il portafoglio esiste sul server, la chiave non è qui.
-  on(MSG.WALLET_REISSUE, async () => {
+  on(MSG.WALLET_REISSUE, filoOnly(async () => {
+    const idErr = await identityProblem();
+    if (idErr) return { ok: false, status: 'no_identity', message: idErr };
     let r;
     try {
       r = await callable('walletReissue', {});
     } catch (e) {
-      const status = /no_identity/.test(String(e?.message)) ? 'internal' : 'not_reachable';
-      return { ok: false, status, message: W.redeemMessage(status) };
+      return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
     }
     const status = (r && r.status) || 'internal';
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status === 'no_wallet' ? 'internal' : status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     return { ok: true, status, message: 'Nuova chiave pronta: i tuoi crediti si usano di nuovo da qui.', state: await readState() };
-  });
+  }));
+
+  // L'identità dell'installazione non si crea (provider anonimo spento su
+  // Firebase, rete assente): è un problema diverso da «il server dei crediti
+  // non risponde», e il messaggio deve dirlo, non mandare a guardare la rete.
+  async function identityProblem() {
+    try { await identity.getIdToken(); return null; } catch (e) {
+      return `Non riesco a preparare l'identità di questa installazione: ${String(e?.message || e)}.`;
+    }
+  }
 
   // Riscatto: { code } → { ok, status, message, state? }.
-  on(MSG.WALLET_REDEEM, async (msg) => {
+  on(MSG.WALLET_REDEEM, filoOnly(async (msg) => {
     const code = String((msg && msg.code) || '').trim();
     if (!code) return { ok: false, status: 'invalid_code', message: W.redeemMessage('invalid_code') };
+    const idErr = await identityProblem();
+    if (idErr) return { ok: false, status: 'no_identity', message: idErr };
     let r;
     try {
       r = await callable('walletRedeem', { code });
     } catch (e) {
-      const status = /no_identity/.test(String(e?.message)) ? 'internal' : 'not_reachable';
-      return { ok: false, status, message: W.redeemMessage(status) };
+      return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
     }
     const status = (r && r.status) || 'internal';
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
@@ -146,13 +175,13 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     const state = await readState();
     return { ok: true, status, message: W.redeemMessage('ok'), credits: r.credits, inviteCodes: r.inviteCodes, state };
-  });
+  }));
 
   // ── Owner ─────────────────────────────────────────────────────────────────
-  const ownerOnly = (fn) => async (msg) => {
+  const ownerOnly = (fn) => filoOnly(async (msg) => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
     try { return { ok: true, ...(await fn(msg)) }; } catch (e) { return { ok: false, error: String(e?.message || e) }; }
-  };
+  });
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
   on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => ({
     result: await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true }),

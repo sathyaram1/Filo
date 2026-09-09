@@ -157,6 +157,9 @@
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
     // === Crediti sul server e chiave personale (#598) =======================
+    // ORIGINE: tutti i WALLET_* sono riservati alle pagine filo:// e alla
+    // shell (leggono saldo e codici, riscattano, fanno emettere una chiave):
+    // da una pagina web rispondono { ok:false, error:'forbidden' }.
     // WALLET_STATE: stato del portafoglio dell'INSTALLAZIONE (identità anonima
     //   Firebase, non l'account Google): saldo letto dal server (tetto della
     //   chiave OpenRouter personale meno consumo), pseudonimo, codici d'invito

@@ -100,7 +100,7 @@
       id: 'crediti',
       kind: 'dire',
       label: 'I crediti, in due righe',
-      detail: 'Cosa sono, che si ricaricano ogni giorno, e che con l’accesso Google sopravvivono a una reinstallazione e le segnalazioni li fanno guadagnare. L’accesso è proposto, non obbligatorio.',
+      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare e per il red team, non per i crediti.',
     },
   ];
 

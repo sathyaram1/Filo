@@ -43,7 +43,13 @@ function load() {
 
 function save(wallet) {
   if (!wallet || !wallet.key) return false;
-  cache = { key: wallet.key, pseudonym: wallet.pseudonym || '', redeemedAt: wallet.redeemedAt || new Date().toISOString() };
+  cache = {
+    key: wallet.key, pseudonym: wallet.pseudonym || '', redeemedAt: wallet.redeemedAt || new Date().toISOString(),
+    // L'ultimo stato letto dal server (saldo, codici, quota): serve quando il
+    // server non risponde, per non mostrare a chi ha già i crediti il campo
+    // dell'invito e un saldo locale che non compra niente.
+    lastServer: wallet.lastServer || (cache && cache.lastServer) || null,
+  };
   if (!canEncrypt()) {
     console.warn('[wallet] safeStorage non disponibile: chiave personale tenuta solo in memoria');
     return false;
@@ -74,4 +80,15 @@ function pseudonym() {
   return w ? (w.pseudonym || '') : '';
 }
 
-module.exports = { load, save, clear, personalKey, pseudonym };
+function saveLastServer(server) {
+  const w = load();
+  if (!w) return false;
+  return save({ ...w, lastServer: server });
+}
+
+function lastServer() {
+  const w = load();
+  return w && w.lastServer ? w.lastServer : null;
+}
+
+module.exports = { load, save, clear, personalKey, pseudonym, saveLastServer, lastServer };

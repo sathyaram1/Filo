@@ -13,6 +13,7 @@ import { test, expect } from './fixtures/electron.mjs';
 let server;
 const seen = { redeems: [], states: 0, signups: 0, tokens: [] };
 let redeemed = false;
+let serverDown = false;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -39,6 +40,7 @@ test.beforeAll(async () => {
       }
 
       // Le funzioni wallet* vogliono il token dell'installazione.
+      if (serverDown) { res.destroy(); return; }
       if (auth !== 'Bearer anon-id-token') return json(res, 401, { error: { message: 'no auth' } });
       seen.tokens.push(auth);
 
@@ -135,4 +137,33 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   const source = await app.evaluate(() => globalThis.SN_WALLET_MAIN.keySource());
   expect(source).toBe('personal');
   expect(seen.redeems).toEqual(['ZZZZ-9999', 'abcd-efgh']);
+
+  // Una pagina web non legge saldo e codici né riscatta: forbidden. Da
+  // filo:// la stessa chiamata passa.
+  const gate = await app.evaluate(async () => {
+    const web = { tab: { id: 7, url: 'http://evil.example/' }, url: 'http://evil.example/' };
+    const filo = { tab: { id: 8, url: 'filo://credits/credits.html' }, url: 'filo://credits/credits.html' };
+    const out = {};
+    for (const type of ['wallet_state', 'wallet_redeem', 'wallet_reissue', 'wallet_owner_overview']) {
+      out[type] = await globalThis.SN_HANDLE_MESSAGE({ type, code: 'ABCD-EFGH' }, web);
+    }
+    out.filoState = await globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_state' }, filo);
+    return out;
+  });
+  for (const type of ['wallet_state', 'wallet_redeem', 'wallet_reissue', 'wallet_owner_overview']) {
+    expect(gate[type], type).toEqual({ ok: false, error: 'forbidden' });
+  }
+  expect(gate.filoState.ok).toBe(true);
+  expect(gate.filoState.server.hasWallet).toBe(true);
+
+  // Server muto: chi ha già il portafoglio vede l'ultimo saldo letto, non il
+  // campo dell'invito né il conteggio locale.
+  serverDown = true;
+  await page.reload();
+  await expect(page.locator('#hero')).toBeVisible();
+  await expect(page.locator('#balance')).toHaveText('4.990', { timeout: 15000 });
+  await expect(page.locator('#redeemForm')).toBeHidden();
+  await expect(page.locator('#walletNote')).toContainText('non risponde');
+  await expect(page.locator('#invites li')).toHaveCount(3);
+  serverDown = false;
 });

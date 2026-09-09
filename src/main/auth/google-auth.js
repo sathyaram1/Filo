@@ -96,7 +96,7 @@ async function exchangeCodeForGoogleToken(code, verifier, redirectUri) {
 // installazione) Firebase rifiuta il collegamento: allora si fa il login
 // normale, con due identità distinte — il portafoglio resta sull'installazione.
 async function signInWithFirebase(googleIdToken) {
-  const anonToken = currentInstallationToken();
+  const anonToken = await installationToken();
   const attempt = async (linkTo) => {
     const body = {
       postBody: `id_token=${googleIdToken}&providerId=google.com`,
@@ -125,10 +125,14 @@ async function signInWithFirebase(googleIdToken) {
   return attempt(null);
 }
 
-// L'idToken dell'identità anonima, se c'è ed è fresco (senza fare rete).
-function currentInstallationToken() {
+// L'idToken dell'identità anonima, rinnovato se scaduto (una chiamata di
+// rete, che il login sta già facendo comunque). Senza un'identità non c'è
+// niente da collegare; se non si riesce a rinnovarla si fa il login normale.
+async function installationToken() {
   try {
-    return require('./anon-auth').currentIdTokenSync();
+    const anon = require('./anon-auth');
+    if (!anon.hasIdentity()) return null;
+    return await anon.getIdToken();
   } catch (_) { return null; }
 }
 

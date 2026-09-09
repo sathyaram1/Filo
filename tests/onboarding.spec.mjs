@@ -117,7 +117,7 @@ test('senza un modello disponibile l’accoglienza aspetta invece di rompersi', 
   // l'intervista resta in attesa. Accoglierlo con una chat che non può
   // rispondere sarebbe peggio del silenzio.
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
-  await expect(page.locator('#homeMessage')).toContainText(/Accedi con un profilo/i, { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
   expect((await onbState(app)).done).toBe(false);
 });
 
