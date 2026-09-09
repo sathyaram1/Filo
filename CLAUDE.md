@@ -273,7 +273,12 @@ Quello che trovi lo correggi adesso, non lo lasci a chi verifica.
 Le prove di un **giro di verifica** non si cancellano: restano nel ramo, in
 `tests/verifica/<numero>/` (in locale, dove un numero non c'è, la cartella la
 dice il compito che riceve chi verifica). Chi corregge le rilancia prima di
-consegnare, per numero: `npx playwright test tests/verifica/<numero>`. La
+consegnare, per numero: `npx playwright test tests/verifica/<numero>`. Quel
+percorso va scritto **relativo alla radice del repo e con le barre normali**:
+con le barre di Windows (la forma che il completamento del terminale produce da
+solo) o per intero dalla radice del disco, la risposta è «No tests found» anche
+a cartella piena — la stessa che dà una cartella che non c'è. Prima di
+concludere che non c'era niente da rilanciare, guarda la cartella. La
 suite completa non le raccoglie (quelle di un solo feedback costano otto
 minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte.
 
