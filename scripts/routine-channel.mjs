@@ -591,10 +591,15 @@ if (isMain) {
     const passaAllaVerifica = intento === 'verdict' || intento === 'fixed'
       || (intento === 'status' && data.status === 'revision_capability');
     if (passaAllaVerifica) {
-      const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
-      if (sporchi.length) {
-        const cosa = intento === 'verdict' ? 'critica' : intento === 'fixed' ? 'consegna' : 'revisione';
-        console.error(dirtyTreeText(sporchi, cosa));
+      const cosa = intento === 'verdict' ? 'critica' : intento === 'fixed' ? 'consegna' : 'revisione';
+      const stato = statoDirectory(ROOT);
+      if (!stato.ok) {
+        console.error(statoIllegibileText(stato.motivo, cosa));
+        console.error('Niente è stato consegnato: senza lo stato della directory non so su quale commit varrebbe.');
+        process.exit(1);
+      }
+      if (stato.lines.length) {
+        console.error(dirtyTreeText(stato.lines, cosa));
         console.error('Niente è stato consegnato: porta la directory a un commit e rilancia lo stesso comando.');
         process.exit(1);
       }
