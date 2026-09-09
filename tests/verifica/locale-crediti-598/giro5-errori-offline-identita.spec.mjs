@@ -136,6 +136,7 @@ test('ogni esito del riscatto ha un testo chiaro, il campo torna usabile, gli in
 });
 
 test('riaperto senza rete, o col server dei crediti giù, chi ha il portafoglio vede l’ultimo saldo e nessuna promessa vuota', async () => {
+  test.setTimeout(240_000); // quattro avvii di Filo
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   const userData = filo.userData;
@@ -179,6 +180,7 @@ test('riaperto senza rete, o col server dei crediti giù, chi ha il portafoglio 
 });
 
 test('identità annullata sul server: la pagina lo dice, niente saldo finto, «Ricomincia» crea l’identità nuova e il riscatto riparte', async () => {
+  test.setTimeout(150_000); // due avvii di Filo
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   const userData = filo.userData;
@@ -215,6 +217,7 @@ test('identità annullata sul server: la pagina lo dice, niente saldo finto, «R
 });
 
 test('chiave personale sparita da questo computer: nota, «Richiedi una nuova chiave», la vecchia si spegne e il saldo resta', async () => {
+  test.setTimeout(180_000); // tre avvii di Filo
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   const userData = filo.userData;

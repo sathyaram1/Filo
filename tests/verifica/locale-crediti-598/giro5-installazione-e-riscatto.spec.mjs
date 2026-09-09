@@ -259,7 +259,10 @@ test('crediti finiti: con 402 la chiamata è una sola, la chat lo spiega, un 429
           return 'ok';
         } catch (e) { return String(e.message); }
       }, stream);
-      const n = (await chiamateOpenRouter(filo.app)).filter((c) => !c.url.endsWith('/models')).length;
+      // Si contano solo le chiamate di QUESTA catena: la home può avere
+      // chiamate sue in corso (il messaggio della dashboard) che finirebbero
+      // nello stesso elenco.
+      const n = (await chiamateOpenRouter(filo.app)).filter((c) => c.model === 'a/uno' || c.model === 'b/due').length;
       return { esito, n };
     };
     for (const stream of [false, true]) {
