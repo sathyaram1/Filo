@@ -34,9 +34,12 @@ export default defineConfig({
   // ma NON entrano nella suite completa: quelle di un solo feedback costano
   // otto minuti e mezzo (misurato il 9/09/2026 su #495), e la suite completa
   // è proprio l'ultimo passo prima del pass, quello che si voleva accorciare.
-  // Si lanciano per numero (`npx playwright test tests/verifica/<numero>`),
-  // oppure tutte con FILO_TEST_VERIFICA=1.
-  testIgnore: process.env.FILO_TEST_VERIFICA === '1' ? [] : [/[\\/]tests[\\/]verifica[\\/]/],
+  // Si lanciano per numero (`npx playwright test tests/verifica/<numero>`:
+  // il filtro si spegne da solo quando la cartella è nominata sulla riga di
+  // comando), oppure tutte con FILO_TEST_VERIFICA=1.
+  testIgnore: (process.env.FILO_TEST_VERIFICA === '1' || process.argv.some((a) => /tests[\\/]verifica/.test(a)))
+    ? []
+    : [/[\\/]tests[\\/]verifica[\\/]/],
   timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza
