@@ -240,13 +240,36 @@ test('crediti finiti: con 402 la chiamata è una sola, la chat lo spiega, un 429
       expect(toasts.length).toBeLessThanOrEqual(1);
     } finally { await sito.chiudi(); }
 
-    // 429: si passa al tentativo dopo (la catena di prova ha due modelli).
+    // Sulla catena di tentativi: un 429 passa al modello dopo, un 402 si ferma
+    // al primo, in streaming e no.
+    const conta = async (status, stream) => {
+      await impostaOpenRouter(filo.app, { status });
+      await filo.app.evaluate(() => { globalThis.__orCalls = []; });
+      const esito = await filo.app.evaluate(async ({}, s) => {
+        const P = globalThis.SN_PROVIDERS;
+        const attempts = [
+          { provider: 'openrouter', apiKey: 'k', model: 'a/uno' },
+          { provider: 'openrouter', apiKey: 'k', model: 'b/due' },
+        ];
+        const msgs = [{ role: 'user', content: 'ciao' }];
+        try {
+          if (s) await P.streamCompleteWithFallback({ attempts, messages: msgs, onDelta: () => {} });
+          else await P.completeWithFallback({ attempts, messages: msgs });
+          return 'ok';
+        } catch (e) { return String(e.message); }
+      }, stream);
+      const n = (await chiamateOpenRouter(filo.app)).filter((c) => !c.url.endsWith('/models')).length;
+      return { esito, n };
+    };
+    for (const stream of [false, true]) {
+      const r429 = await conta(429, stream);
+      expect(r429.n).toBe(2);
+      const r402 = await conta(402, stream);
+      expect(r402.n).toBe(1);
+      expect(r402.esito).toMatch(/402/);
+    }
     await impostaOpenRouter(filo.app, { status: 429 });
-    await filo.app.evaluate(() => { globalThis.__orCalls = []; });
     const b2 = await chiediInChat(dash, 'riprova');
-    const calls2 = (await chiamateOpenRouter(filo.app)).filter((c) => !c.url.endsWith('/models'));
-    expect(calls2.length).toBeGreaterThan(1);
-    expect(new Set(calls2.map((c) => c.model)).size).toBeGreaterThan(1);
     await expect(b2).toContainText(/sovraccarico|non disponibile/i);
   } finally { await chiudi(filo); }
 });
