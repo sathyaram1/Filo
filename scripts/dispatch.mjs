@@ -966,9 +966,12 @@ async function recordFixed(id, report = '', frase = '') {
   // dopo proverebbe il ramo senza di essa: un giro sprecato. In locale
   // «verify-local.mjs corretto» la respinge già; qui si respinge allo stesso
   // modo, PRIMA del server e con l'elenco.
-  const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
-  if (sporchi.length) {
-    return { rejected: true, formatRejected: true, message: dirtyTreeText(sporchi, 'consegna') };
+  const stato = statoDirectory(ROOT);
+  if (!stato.ok) {
+    return { rejected: true, formatRejected: true, message: statoIllegibileText(stato.motivo, 'consegna') };
+  }
+  if (stato.lines.length) {
+    return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'consegna') };
   }
   const next = applyFixed({ ...(guard.state || defaultState(id, '')), id });
   next.id = id;
