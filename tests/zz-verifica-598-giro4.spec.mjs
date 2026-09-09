@@ -5,7 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
-import { makeFake } from '../../../../../../../../AGENTI~1/AppData/Local/Temp/claude/C--Users-agenti-AI-Desktop-Filo-Filo/8c9145e1-79ed-474e-8c98-245fbdac334b/scratchpad/fake598.mjs';
+import { makeFake } from 'file:///C:/Users/agenti%20AI/AppData/Local/Temp/claude/C--Users-agenti-AI-Desktop-Filo-Filo/8c9145e1-79ed-474e-8c98-245fbdac334b/scratchpad/fake598.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
