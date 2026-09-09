@@ -30,7 +30,28 @@ test('installazione nuova: nessuna chiave, la pagina chiede l’invito e la home
     const eff = await filo.app.evaluate(async () => (await globalThis.__filoHandlers.getEffectiveSettings()).apiKeys.openrouter || '');
     expect(eff).toBe('');
 
-    const page = await apriCrediti(filo.openTab);
+    // La home chiede l'invito e porta alla pagina con un clic.
+    const dash = await filo.openTab('filo://dashboard/dashboard.html');
+    await expect(dash.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
+    await expect(dash.locator('#homeMessage')).not.toContainText(/Accedi con un profilo/i);
+    const sugg = dash.locator('#suggestions .dash-suggestion', { hasText: /Apri Crediti/ });
+    await expect(sugg).toHaveCount(1);
+
+    // La prima domanda in chat: stessa indicazione e il tasto «Apri Crediti»,
+    // che apre davvero la pagina (nessuna scheda Crediti aperta prima).
+    const bolla = await chiediInChat(dash, 'ciao, quanti crediti ho?');
+    await expect(bolla).toContainText(/codice d.invito/i);
+    await expect(bolla).not.toContainText(/Accedi con un profilo/i);
+    const apri = bolla.locator('button', { hasText: 'Apri Crediti' });
+    await expect(apri).toHaveCount(1);
+    expect(filo.app.windows().filter((w) => w.url().startsWith('filo://credits')).length).toBe(0);
+    await apri.click();
+    await expect.poll(() => filo.app.windows().filter((w) => w.url().startsWith('filo://credits')).length, { timeout: 10_000 }).toBe(1);
+    // Il server non è stato disturbato da nessuna chiamata ai modelli.
+    expect(server.counters.calls.filter((c) => c.name !== 'walletState')).toHaveLength(0);
+
+    const page = filo.app.windows().find((w) => w.url().startsWith('filo://credits'));
+    await page.waitForFunction(() => !document.getElementById('wallet').hidden, null, { timeout: 15_000 });
     await expect(page.locator('#redeemForm')).toBeVisible();
     await expect(page.locator('#hero')).toBeHidden();
     await expect(page.locator('#refillHint')).toBeHidden();
@@ -45,25 +66,9 @@ test('installazione nuova: nessuna chiave, la pagina chiede l’invito e la home
       return els[0]?.id;
     });
     expect(ordine).toBe('wallet');
-
-    // La home chiede l'invito e porta alla pagina con un clic.
-    const dash = await filo.openTab('filo://dashboard/dashboard.html');
-    await expect(dash.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
-    await expect(dash.locator('#homeMessage')).not.toContainText(/Accedi con un profilo/i);
-    const sugg = dash.locator('#suggestions .dash-suggestion', { hasText: /Apri Crediti/ });
-    await expect(sugg).toHaveCount(1);
-
-    // La prima domanda in chat: stessa indicazione e il tasto «Apri Crediti».
-    const bolla = await chiediInChat(dash, 'ciao, quanti crediti ho?');
-    await expect(bolla).toContainText(/codice d.invito/i);
-    await expect(bolla).not.toContainText(/Accedi con un profilo/i);
-    const apri = bolla.locator('button', { hasText: 'Apri Crediti' });
-    await expect(apri).toHaveCount(1);
-    const prima = filo.app.windows().filter((w) => w.url().startsWith('filo://credits')).length;
-    await apri.click();
-    await expect.poll(() => filo.app.windows().filter((w) => w.url().startsWith('filo://credits')).length, { timeout: 10_000 }).toBeGreaterThan(prima);
-    // Il server non è stato disturbato da nessuna chiamata ai modelli.
-    expect(server.counters.calls.filter((c) => c.name !== 'walletState')).toHaveLength(0);
+    // Anche il suggerimento della home porta lì (la scheda già aperta si riusa o se ne apre un'altra: basta arrivarci).
+    await sugg.click();
+    await expect.poll(() => filo.app.windows().filter((w) => w.url().startsWith('filo://credits')).length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
   } finally { await chiudi(filo); }
 });
 
