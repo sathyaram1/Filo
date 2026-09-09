@@ -426,7 +426,10 @@
     if (r && r.ok) {
       msg.textContent = r.message || 'Fatto.';
       msg.classList.add('is-ok');
-      // Il saldo grande e i codici arrivano dallo stato nuovo.
+      // Il saldo grande e i codici arrivano dallo stato nuovo. Se chi riscatta
+      // è l'owner, anche la sua tabella degli utenti ha una riga in più: la
+      // vista owner si rilegge invece di restare a quella dell'apertura.
+      overviewLoaded = false;
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
       return;
     }
