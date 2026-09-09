@@ -89,7 +89,10 @@ che sono la memoria di un giro, e le scrive chi verifica.
 Se il ramo ha già `tests/verifica/<numero>/` (un giro di verifica passato, un
 riallineamento, una ripresa), lancia quelle prove prima di consegnare —
 `npx playwright test tests/verifica/<numero>` — e una che diventa rossa è una
-regressione tua. Se quella cartella non c'è, non c'era niente da rilanciare.
+regressione tua. Se quella cartella non c'è, non c'era niente da rilanciare —
+ma guardala, non fidarti del messaggio: il comando risponde «No tests found»
+anche a cartella piena se il percorso è scritto in un'altra forma (solo quello
+relativo alla radice del repo, con le barre normali, viene riconosciuto).
 
 Quello che trovi lo correggi adesso, non lo lasci al verificatore.
 
