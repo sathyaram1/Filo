@@ -97,11 +97,12 @@
   // ABCD-EFGH», «il tuo invito è abcd efgh»): se il testo, ripulito, non è un
   // codice, si cerca dentro un blocco di otto caratteri (anche quattro più
   // quattro) staccato dal resto. Se non c'è, torna il testo com'era: sarà il
-  // server a dire «non esiste».
+  // server a dire «non esiste». Un testo che è già un codice passa com'è (il
+  // server tollera trattini, spazi e minuscole).
   function extractCode(raw) {
     const s = String(raw || '').trim();
     const norm = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (norm.length === 8) return norm;
+    if (norm.length === 8) return s;
     const m = s.toUpperCase().match(/(?<![A-Z0-9])([A-Z0-9]{4})[\s-]*([A-Z0-9]{4})(?![A-Z0-9])/);
     return m ? m[1] + m[2] : s;
   }
