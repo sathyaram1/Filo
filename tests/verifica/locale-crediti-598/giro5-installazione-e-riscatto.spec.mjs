@@ -57,7 +57,7 @@ test('installazione nuova: nessuna chiave, la pagina chiede l’invito e la home
     await expect(page.locator('#hero')).toBeHidden();
     await expect(page.locator('#refillHint')).toBeHidden();
     await expect(page.locator('#offlineHint')).toBeHidden();
-    await expect(page.locator('#ownerSection')).toBeHidden();
+    await expect(page.locator('#ownerLink')).toBeHidden();
     await expect(page.locator('#invitesSection')).toBeHidden();
     const testo = await page.locator('main').innerText();
     expect(testo).not.toMatch(/mezzanotte|Accedi col tuo account|1\.010/);

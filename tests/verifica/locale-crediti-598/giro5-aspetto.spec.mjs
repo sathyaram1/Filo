@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  avviaServer, avviaFilo, apriCrediti, cartellaFiloSecurity, simulaOwner, APP_ROOT,
+  avviaServer, avviaFilo, apriCrediti, apriOwner, cartellaFiloSecurity, simulaOwner, APP_ROOT,
 } from './helpers/banco.mjs';
 
 test.skip(!cartellaFiloSecurity(), 'filo-security non è accanto al repo: il server dei crediti non si può far girare');
@@ -72,12 +72,16 @@ test('tre stati, due temi: screenshot; il conteggio locale accanto al saldo del 
     await server.service.redeem('utente-aspetto', (await server.codiciOwner(1))[0], server.deps);
     await server.codiciOwner(3);
     expect((await simulaOwner(filo.app, server)).isAdmin).toBe(true);
+    const own = await apriOwner(filo);
     for (const t of ['light', 'dark']) {
       await tema(filo, page, t);
-      await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(2, { timeout: 15_000 });
-      await page.locator('#ownerUsers tbody tr.sn-wallet-user').first().click();
-      await page.screenshot({ path: join(SHOTS, `owner-${t}.png`), fullPage: true });
+      await own.reload();
+      await own.waitForFunction(() => !document.getElementById('ownerSection').hidden, null, { timeout: 15_000 });
+      await expect(own.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(2, { timeout: 15_000 });
+      await own.locator('#ownerUsers tbody tr.sn-wallet-user').first().click();
+      await own.screenshot({ path: join(SHOTS, `owner-${t}.png`), fullPage: true });
     }
+    expect(await own.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
     // Niente testo che esce dal contenitore in orizzontale.
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
     expect(overflow).toBe(false);

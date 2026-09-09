@@ -105,7 +105,7 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   await expect(page.locator('#hero')).toBeHidden();
   await expect(page.locator('#refillHint')).toBeHidden();
   await expect(page.locator('#offlineHint')).toBeHidden();
-  await expect(page.locator('#ownerSection')).toBeHidden();
+  await expect(page.locator('#ownerLink')).toBeHidden();
   const formBox = await form.boundingBox();
   expect(formBox.y).toBeLessThan(200);
   expect(seen.signups).toBeGreaterThan(0); // l'identità dell'installazione è nata

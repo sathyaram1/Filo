@@ -178,9 +178,17 @@ module.exports = function register(on, ctx) {
     if (!code) return { ok: false, status: 'invalid_code', message: W.redeemMessage('invalid_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
+    // I crediti del vecchio conteggio locale si portano sul server: chi li
+    // aveva guadagnati non deve perderli passando al portafoglio (entro un
+    // tetto che sta in configurazione lato server).
+    let localCredits = 0;
+    try {
+      const pub = await globalThis.SN_CREDITS?.getPublic?.();
+      localCredits = Number(pub && (pub.balanceExact != null ? pub.balanceExact : pub.balance)) || 0;
+    } catch (_) { localCredits = 0; }
     let r;
     try {
-      r = await callable('walletRedeem', { code });
+      r = await callable('walletRedeem', { code, localCredits });
     } catch (e) {
       return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
     }
@@ -200,9 +208,13 @@ module.exports = function register(on, ctx) {
     try { return { ok: true, ...(await fn(msg)) }; } catch (e) { return { ok: false, error: String(e?.message || e) }; }
   });
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
-  on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => ({
-    result: await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true }),
-  })));
+  on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => {
+    const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
+    // Se il regalo è alla propria installazione, la pagina Crediti aperta
+    // accanto deve muoversi: si avvisano le pagine, come a ogni cambio di saldo.
+    if (result && result.ok) { try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {} }
+    return { result };
+  }));
   on(MSG.WALLET_OWNER_INVITES, ownerOnly(async (msg) => ({
     codes: (await callable('walletCreateInvites', { count: msg.count || 1 }, { asOwner: true }))?.codes || [],
   })));

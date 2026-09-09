@@ -16,6 +16,13 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.225', date: '2026-09-10',
+      features: [
+        'Quando riscatti l\'invito, i crediti che avevi già li ritrovi sommati a quelli d\'ingresso: nessuno riparte da zero.',
+        'Il saldo dei crediti ora mostra anche il decimo: un uso leggero lo fa scendere, invece di restare fermo a un numero tondo.',
+      ],
+    },
+    {
       version: '0.2.223', date: '2026-09-08',
       features: [
         'I crediti di Filo ora sono veri: il saldo lo tiene il server, non il tuo computer, e vale come tetto di spesa di una chiave OpenRouter creata solo per te. Si entra con un codice d\'invito, nella pagina Crediti: ricevi i crediti d\'ingresso, una quota ogni giorno che si accumula, e tre codici da dare a chi vuoi.',

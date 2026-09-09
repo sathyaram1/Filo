@@ -6,7 +6,7 @@
 // In coda: la giornaliera del server e quello che l'utente vede dopo.
 import { test, expect } from '@playwright/test';
 import {
-  avviaServer, avviaFilo, apriCrediti, cartellaFiloSecurity, simulaOwner, OWNER_UID, RATE,
+  avviaServer, avviaFilo, apriCrediti, apriOwner, cartellaFiloSecurity, simulaOwner, OWNER_UID, RATE,
 } from './helpers/banco.mjs';
 
 test.skip(!cartellaFiloSecurity(), 'filo-security non è accanto al repo: il server dei crediti non si può far girare');
@@ -49,7 +49,10 @@ test('senza accesso i comandi dell’owner sono negati senza chiamare il server;
     }
     expect(server.counters.calls.filter((c) => c.name === 'walletRedeem' || c.name === 'walletReissue')).toHaveLength(0);
     const page = await apriCrediti(filo.openTab);
-    await expect(page.locator('#ownerSection')).toBeHidden();
+    await expect(page.locator('#ownerLink')).toBeHidden();
+    const own = await apriOwner(filo);
+    await expect(own.locator('#ownerSection')).toBeHidden();
+    await expect(own.locator('#ownerDenied')).toBeVisible();
   } finally { await chiudi(filo); }
 });
 
@@ -62,7 +65,7 @@ test('con l’accesso: totali, codici che restano, tabella con dettaglio, regalo
     expect(login.ok).toBe(true);
     expect(login.isAdmin).toBe(true);
 
-    const page = await apriCrediti(filo.openTab);
+    const page = await apriOwner(filo);
     await expect(page.locator('#ownerSection')).toBeVisible();
     await expect(page.locator('#ownerTotals')).toContainText(/1 utenti/, { timeout: 15_000 });
     await expect(page.locator('#ownerTotals')).toContainText(/su 50 \$ elargibili/);
@@ -83,7 +86,7 @@ test('con l’accesso: totali, codici che restano, tabella con dettaglio, regalo
     expect(chiamata.data.count).toBe(3);
     expect([...server.store.docs.invites.values()].filter((i) => i.fromOwner && !i.usedBy)).toHaveLength(3);
     await page.reload();
-    await page.waitForFunction(() => !document.getElementById('wallet').hidden);
+    await page.waitForFunction(() => !document.getElementById('ownerSection').hidden, null, { timeout: 15_000 });
     await expect(page.locator('#ownerCodes li')).toHaveCount(4, { timeout: 15_000 });
     await expect(page.locator('#ownerCodes li:not(.is-used)')).toHaveCount(3);
     await expect(page.locator('#ownerCodes li:not(.is-used) .sn-wallet-invite-state').first()).toHaveText('da dare');
@@ -171,26 +174,27 @@ test('l’owner con il portafoglio suo: il regalo alla propria installazione muo
   try {
     expect((await simulaOwner(filo.app, server)).isAdmin).toBe(true);
     const page = await apriCrediti(filo.openTab);
+    const own = await apriOwner(filo);
     // L'owner genera un codice e lo riscatta sulla sua installazione (identità
     // dell'installazione ≠ account Google).
-    await page.fill('#ownerInviteCount', '1');
-    await page.click('#ownerInvitesBtn');
-    await expect(page.locator('#ownerCodes li')).toHaveCount(1, { timeout: 15_000 });
-    const code = await page.locator('#ownerCodes li .sn-wallet-code').first().innerText();
+    await own.fill('#ownerInviteCount', '1');
+    await own.click('#ownerInvitesBtn');
+    await expect(own.locator('#ownerCodes li')).toHaveCount(1, { timeout: 15_000 });
+    const code = await own.locator('#ownerCodes li .sn-wallet-code').first().innerText();
     await page.fill('#inviteCode', code);
     await page.click('#redeemBtn');
     await expect(page.locator('#redeemMsg')).toContainText(/riscattato/i, { timeout: 15_000 });
     await expect(page.locator('#balance')).toHaveText('5.000');
     // La tabella degli utenti mostra la riga nuova (la sua) senza ricaricare:
     // rilievo di livello zero del quinto giro, corretto nello stesso giro.
-    await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
-    const mio = await page.locator('#ownerUsers tbody tr.sn-wallet-user td').first().innerText();
-    await page.fill('#ownerGrantPseudonym', mio);
-    await page.fill('#ownerGrantCredits', '100');
-    await page.click('#ownerGrantBtn');
-    await expect(page.locator('#ownerMsg')).toContainText(/\+100 crediti/, { timeout: 15_000 });
+    await expect(own.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
+    const mio = await own.locator('#ownerUsers tbody tr.sn-wallet-user td').first().innerText();
+    await own.fill('#ownerGrantPseudonym', mio);
+    await own.fill('#ownerGrantCredits', '100');
+    await own.click('#ownerGrantBtn');
+    await expect(own.locator('#ownerMsg')).toContainText(/\+100 crediti/, { timeout: 15_000 });
     await expect(page.locator('#balance')).toHaveText('5.100', { timeout: 15_000 });
-    await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user td').nth(1)).toHaveText('5.100');
+    await expect(own.locator('#ownerUsers tbody tr.sn-wallet-user td').nth(1)).toHaveText('5.100');
   } finally { await chiudi(filo); }
 });
 

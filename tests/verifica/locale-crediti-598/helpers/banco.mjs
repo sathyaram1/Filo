@@ -309,6 +309,31 @@ export async function paginaWeb(html = '<!doctype html><meta charset="utf-8"><ti
 
 // La pagina Crediti, con lo stato del portafoglio già letto (il modulo o il
 // saldo del server compaiono solo dopo la risposta del server).
+// La pagina dell'owner (inviti e utenti): pronta quando ha deciso se chi
+// guarda è l'owner (sezione) o no (riga «è del proprietario»).
+export async function apriOwner(filo) {
+  // Non passa da openTab: quello sceglie la finestra per host, e owner.html
+  // ha lo stesso host di credits.html (che spesso è già aperta). Si cerca
+  // la finestra per indirizzo intero.
+  const url = 'filo://credits/owner.html';
+  const shell = await filo.app.firstWindow();
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  const deadline = Date.now() + 10_000;
+  let page = null;
+  while (Date.now() < deadline && !page) {
+    page = filo.app.windows().find((w) => { try { return w.url().startsWith(url); } catch (_) { return false; } }) || null;
+    if (!page) await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!page) throw new Error('apriOwner: nessuna finestra per ' + url);
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForFunction(() => {
+    const s = document.getElementById('ownerSection');
+    const d = document.getElementById('ownerDenied');
+    return (s && !s.hidden) || (d && !d.hidden);
+  }, null, { timeout: 15_000 });
+  return page;
+}
+
 export async function apriCrediti(openTab) {
   const page = await openTab('filo://credits/credits.html');
   await page.waitForFunction(() => {

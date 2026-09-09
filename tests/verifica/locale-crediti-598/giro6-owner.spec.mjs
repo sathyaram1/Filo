@@ -4,7 +4,7 @@
 // bussa al server dei crediti.
 import { test, expect } from '@playwright/test';
 import {
-  avviaServer, avviaFilo, apriCrediti, simulaOwner, fintoOpenRouter, chiediInChat,
+  avviaServer, avviaFilo, apriCrediti, apriOwner, simulaOwner, fintoOpenRouter, chiediInChat,
   cartellaFiloSecurity, OWNER_UID,
 } from './helpers/banco.mjs';
 
@@ -24,7 +24,7 @@ test('un codice dell’owner ancora da dare si può ritirare (dato a chi non si 
   const filo = await avviaFilo({ env: server.env });
   try {
     expect((await simulaOwner(filo.app, server)).isAdmin).toBe(true);
-    const page = await apriCrediti(filo.openTab);
+    const page = await apriOwner(filo);
     await page.fill('#ownerInviteCount', '2');
     await page.click('#ownerInvitesBtn');
     await expect(page.locator('#ownerCodes li')).toHaveCount(2, { timeout: 15_000 });
@@ -54,7 +54,7 @@ test('regalo e codici con valori scritti male: decimali, pseudonimo con spazi o 
   const filo = await avviaFilo({ env: server.env });
   try {
     expect((await simulaOwner(filo.app, server)).isAdmin).toBe(true);
-    const page = await apriCrediti(filo.openTab);
+    const page = await apriOwner(filo);
     await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
 
     // Pseudonimo con spazi intorno e in maiuscolo (copiato da un messaggio).
