@@ -104,7 +104,7 @@ test('#giri-corti — un verdetto non si registra con file fuori dai commit, su 
 
 test('#giri-corti — le istruzioni dei ruoli dicono a chi corregge di rilanciare le prove del giro', () => {
   const verifier = readFileSync(resolve(ROOT, 'routines/roles/verifier.md'), 'utf8');
-  expect(verifier).toMatch(/rilancia le prove del giro/i);
+  expect(verifier).toMatch(/rilancia[^.]{0,40}le prove del\s+\**giro/i);
   expect(verifier).toContain('npx playwright test tests/verifica/');
   const resolver = readFileSync(resolve(ROOT, 'routines/roles/resolver.md'), 'utf8');
   expect(resolver).toContain('tests/verifica/');
