@@ -7,7 +7,9 @@
     "tests/verifier-stress-410",
     "tests/verify-495-avversariale",
     "tests/verify-495-vfx3",
-    "tests/verify-514-g11"
+    "tests/verify-514-g11",
+    "tests/options-home-models",
+    "tests/verify-509-giro4"
   ],
   "contenitore": {
     "nota": "Rossi a ogni giro di routine, su qualunque ramo, perché il contenitore non ha uno schermo vero né la rete aperta. Stavano nella memoria di chi verificava (le sue istruzioni ne facevano l'elenco a voce) e nessuno aveva una data di scadenza: un controllo spento senza un posto dove essere scritto è un controllo che nessuno rimetterà mai in piedi. Chi verifica confronta questo elenco con i rossi della sua corsa: quello che non è qui dentro è una regressione. Il primo elenco (feedback #563, terzo giro) ne contava sei; il settimo, «la finestra non compare sullo schermo», è uscito subito chiedendo la trasparenza solo dove il sistema sa darla e verificando sempre la posizione, che è la metà che conta. I quattro del tutto schermo sono usciti col #514, e la diagnosi scritta qui era sbagliata: non mancava il gestore di finestre, rientrava in se stesso il gestore che riparcheggia la finestra fuori schermo quando si esce dal tutto schermo (src/main/test-window-mode.js), finché il processo moriva per stack esaurito. Con la guardia i quattro casi girano nel contenitore così com'è, senza schermo e senza gestore di finestre — è il motivo per cui una voce va tolta appena si può, invece di credere alla sua spiegazione.",
@@ -67,6 +69,18 @@
       "spec": "tests/verify-514-g11",
       "caso": "quattro riquadri impilati",
       "perche": "rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/options-home-models",
+      "caso": "i modelli della Home (dashboard e chat) sono impostabili e persistono",
+      "perche": "rosso solo sotto il carico della suite intera (il valore salvato torna quello di serie), verde da solo in pochi secondi; visto dalla verifica del #598 (quarto giro, 2026-09-09). Da rendere stabile, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/verify-509-giro4",
+      "caso": "stessa azione, stessa scrittura: nessuna decisione cancellata",
+      "perche": "da solo impiega quasi tutto il tetto di 60 secondi e sotto il carico della suite lo sfora; visto dalla verifica del #598 (quarto giro, 2026-09-09). Da rendere stabile o alzare il tetto, poi togliere la voce.",
       "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
     }
   ]

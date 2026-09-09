@@ -79,7 +79,9 @@
     // conteggio locale non compra niente: saldo, ricarica a mezzanotte e
     // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
     // ancora una chiave di fabbrica o una propria.
-    const noKey = !has && w.keySource === 'none';
+    // Vale anche con la chiave personale ancora qui ma l'identità annullata
+    // sul server: quella chiave non compra più niente.
+    const noKey = !has && (w.keySource === 'none' || Boolean(w.identity && w.identity.lost));
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
     if (noKey) $('offlineHint').hidden = true;
@@ -375,7 +377,10 @@
       msg.textContent = `+${formatInt(res.credits)} crediti a ${pseudonym}.`;
       msg.classList.add('is-ok');
       $('ownerGrantCredits').value = '';
-      loadOverview().catch(() => {});
+      // Se il regalo è alla propria installazione, anche il saldo grande in
+      // cima deve muoversi: si rilegge tutto, non solo la tabella.
+      overviewLoaded = false;
+      load().catch(() => {});
       return;
     }
     const reason = (res && res.reason) || (r && r.error) || 'errore';
