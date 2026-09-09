@@ -453,7 +453,7 @@ test('crediti finiti (402): una sola chiamata, niente ripiego, avviso una volta 
       const prov = P.getProvider('openrouter');
       const orig = { complete: prov.complete, streamComplete: prov.streamComplete };
       const out = {};
-      const mk = (status) => { let n = 0; const fn = async ({ onDelta }) => { n += 1; if (onDelta && n === 1) onDelta('mezzo '); const e = new Error(`OpenRouter ${status}: {"error":{"message":"Key limit exceeded"}}`); e.status = status; throw e; }; fn.count = () => n; return fn; };
+      const mk = (status) => { let n = 0; const fn = async ({ onDelta }) => { n += 1; if (onDelta && n === 1) onDelta('mezzo '); const e = new Error(`OpenRouter ${status}: {"error":{"message":"${status === 402 ? "Key limit exceeded" : "Rate limit exceeded"}"}}`); e.status = status; throw e; }; fn.count = () => n; return fn; };
       const attempts = [{ provider: 'openrouter', model: 'a/uno', apiKey: 'k' }, { provider: 'openrouter', model: 'b/due', apiKey: 'k' }];
       for (const status of [402, 429]) {
         prov.complete = mk(status);
@@ -545,8 +545,13 @@ test('sezione owner della pagina Crediti (login simulato nel main)', async () =>
     await redeemOk(app, shell);
     // sessione Google finta: token-store + endpoint di rinnovo dirottato sul mock
     const ok = await app.evaluate(async ({ app }, base) => {
-      const req = process.mainModule && process.mainModule.require ? process.mainModule.require.bind(process.mainModule) : null;
-      if (!req) return { ok: false, why: 'no mainModule.require' };
+      let req = null;
+      try {
+        const Module = process.getBuiltinModule ? process.getBuiltinModule('module') : null;
+        const pathMod = process.getBuiltinModule ? process.getBuiltinModule('path') : null;
+        if (Module && pathMod) req = Module.createRequire(pathMod.join(app.getAppPath(), 'package.json'));
+      } catch (e) { return { ok: false, why: 'createRequire: ' + String(e && e.message || e) }; }
+      if (!req) return { ok: false, why: 'no getBuiltinModule' };
       try {
         const path = req('node:path');
         const root = app.getAppPath();
