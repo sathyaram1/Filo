@@ -16,8 +16,11 @@ tests/.smoke/
 tests/_audit*.spec.mjs
 # NIENTE regola per le prove dei verifier (prefisso _verify / _vcheck): erano
 # usa-e-getta, non lo sono più. Le prove di un giro di verifica restano nel ramo,
-# in tests/verifica/<numero>/, e dopo la fusione restano nella suite come test di
-# regressione. Escluderle di nuovo — anche solo per il nome vecchio — le farebbe
+# in tests/verifica/<numero>/, e si lanciano nominando quella cartella: chi
+# corregge prima di consegnare, il giro dopo per ritrovare le porte già chiuse.
+# La suite completa NON le raccoglie (playwright.config.js), nemmeno dopo la
+# fusione: il ramo è l'unico posto in cui esistono. Escluderle di nuovo — anche
+# solo per il nome vecchio — le farebbe
 # sparire in silenzio: non finirebbero in nessun commit e non comparirebbero
 # nemmeno nel controllo dei file non salvati, che i file esclusi non li vede.
 tests/.fb/*.png
