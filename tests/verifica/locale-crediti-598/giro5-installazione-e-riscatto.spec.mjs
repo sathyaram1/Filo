@@ -51,7 +51,8 @@ test('installazione nuova: nessuna chiave, la pagina chiede l’invito e la home
     expect(server.counters.calls.filter((c) => c.name !== 'walletState')).toHaveLength(0);
 
     const page = filo.app.windows().find((w) => w.url().startsWith('filo://credits'));
-    await page.waitForFunction(() => !document.getElementById('wallet').hidden, null, { timeout: 15_000 });
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    await page.waitForFunction(() => { const w = document.getElementById('wallet'); return w && !w.hidden; }, null, { timeout: 15_000 });
     await expect(page.locator('#redeemForm')).toBeVisible();
     await expect(page.locator('#hero')).toBeHidden();
     await expect(page.locator('#refillHint')).toBeHidden();
