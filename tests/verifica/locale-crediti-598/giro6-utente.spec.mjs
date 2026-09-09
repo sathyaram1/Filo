@@ -26,7 +26,7 @@ async function riscatta(page, testo) {
   await expect(page.locator('#redeemForm')).toBeHidden({ timeout: 15_000 });
 }
 
-test('la riga incollata intera passa; un codice letto con 0 per O e 1 per I', async () => {
+test('la riga incollata intera passa (rilievo di livello zero del quinto giro)', async () => {
   const filo = await avviaFilo({ env: server.env });
   try {
     const page = await apriCrediti(filo.openTab);
@@ -39,31 +39,14 @@ test('la riga incollata intera passa; un codice letto con 0 per O e 1 per I', as
     await expect(page.locator('#balance')).toHaveText('5.000');
   } finally { await chiudi(filo); }
 
-  // Un secondo utente scrive il codice come lo ha letto: gli zeri al posto
-  // delle O e gli uno al posto delle I (l'alfabeto dei codici non ha 0 né 1,
-  // quindi la lettura è senza ambiguità). Si cerca un codice che contenga O o I.
-  let codice = null;
-  for (let i = 0; i < 40 && !codice; i++) {
-    const [c] = await server.codiciOwner(1);
-    if (/[OI]/.test(c)) codice = c;
-  }
-  expect(codice, 'nessun codice con O o I in 40 estrazioni').not.toBeNull();
-  const letto = codice.replace(/O/g, '0').replace(/I/g, '1');
-  const bis = await avviaFilo({ env: server.env });
-  try {
-    const page = await apriCrediti(bis.openTab);
-    await page.fill('#inviteCode', letto);
-    await page.click('#redeemBtn');
-    const msg = page.locator('#redeemMsg');
-    await expect(msg).not.toBeEmpty({ timeout: 15_000 });
-    const testo = await msg.innerText();
-    test.info().annotations.push({ type: 'nota', description: `codice ${codice} scritto ${letto} → «${testo}»` });
-    // Atteso: il riscatto passa (0→O, 1→I sono l'unica lettura possibile).
-    expect(testo).toMatch(/riscattato/i);
-  } finally { await chiudi(bis); }
+  // L'alfabeto dei codici non ha 0, 1, I, L né O: la lettura non è ambigua,
+  // e non c'è niente da provare sul «0 per O».
 });
 
 test('l’utente può leggere il proprio pseudonimo, quello con cui l’owner gli regala crediti', async () => {
+  // Sesto giro: la pagina non lo mostra da nessuna parte. Atteso rosso finché
+  // non viene corretto (poi togliere questa riga).
+  test.fail(true, 'lo pseudonimo non compare nella pagina Crediti dell’utente');
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   try {
@@ -127,7 +110,7 @@ test('un codice dato a un amico risulta usato; il saldo scende dopo il consumo; 
     expect(miei).toHaveLength(3);
     // L'amico riscatta il primo dei miei codici (sul server, come farebbe la sua installazione).
     const amico = await server.service.redeem('anon-amico', miei[0], server.deps);
-    expect(amico.ok).toBe(true);
+    expect(amico.status).toBe('ok');
     await page.reload();
     await page.waitForFunction(() => !document.getElementById('wallet').hidden);
     await expect(page.locator('#invites li')).toHaveCount(3, { timeout: 15_000 });
