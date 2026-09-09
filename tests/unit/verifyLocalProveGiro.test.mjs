@@ -82,8 +82,11 @@ test('ovunque si dica di rilanciare le prove del giro, si dice anche come va scr
       codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/giri-corti' })],
   ];
   for (const [nome, testo] of superfici) {
-    const punti = [...testo.matchAll(/playwright\s+test\s+tests\/verifica/gi)];
-    assert.ok(punti.length > 0, `${nome} non nomina più il comando che rilancia le prove del giro: se la regola è cambiata, riscrivi questa sentinella`);
+    // L'ancora sono i due punti in cui si può sbagliare: il comando scritto per
+    // esteso, e la frase che insegna a leggere una risposta vuota come
+    // un'assenza.
+    const punti = [...testo.matchAll(/playwright\s+test\s+tests\/verifica|niente da rilanciare|No tests found/gi)];
+    assert.ok(punti.length > 0, `${nome} non parla più di rilanciare le prove del giro: se la regola è cambiata, riscrivi questa sentinella`);
     for (const m of punti) {
       const intorno = testo.slice(Math.max(0, m.index - 500), m.index + 500);
       assert.match(intorno, /percors|barre/i,
