@@ -78,14 +78,18 @@ fai tu»): strade equivalenti, i due temi, input limite, invarianti UX, una prov
 sul cammino segnalato. Non è ripetuto qui, ed è la stessa lista che segue chi
 lavora a mano in locale. Ogni giro di verifica in più è un agente intero.
 
-Qui cambia solo **dove finisce quella prova**, quando è una spec:
-`tests/verifica/<numero>/giro0-<cosa>.spec.mjs` (il numero del feedback senza
-cancelletto). Resta nel ramo: il verificatore la rilancia per numero (la suite
-completa non raccoglie quella cartella). Se il lavoro non ha niente da aprire,
-la cartella del giro resta vuota.
+**Dove finisce quella prova: dove la suite la rilancerà per sempre**, cioè
+accanto alle altre (`tests/<feature>.spec.mjs`, o `tests/unit/` per la logica
+pura), come dicono i minimi. È la guardia contro il ritorno del difetto: se
+finisse in `tests/verifica/<numero>/` sarebbe verde il giorno in cui la scrivi
+e non girerebbe mai più — quella cartella la suite completa non la raccoglie,
+nemmeno dopo la fusione. Lì dentro stanno solo le prove dei giri di verifica,
+che sono la memoria di un giro, e le scrive chi verifica.
 
-Se il ramo ha già `tests/verifica/<numero>/` (un riallineamento, o una
-ripresa), lancia quelle prove: una che diventa rossa è una regressione tua.
+Se il ramo ha già `tests/verifica/<numero>/` (un giro di verifica passato, un
+riallineamento, una ripresa), lancia quelle prove prima di consegnare —
+`npx playwright test tests/verifica/<numero>` — e una che diventa rossa è una
+regressione tua. Se quella cartella non c'è, non c'era niente da rilanciare.
 
 Quello che trovi lo correggi adesso, non lo lasci al verificatore.
 
