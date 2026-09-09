@@ -1,5 +1,5 @@
 // Verifica #598, sesto giro — porte nuove sul cammino dell'utente:
-// il codice letto male (0 per O, 1 per I), la riga incollata intera, lo
+// la riga incollata intera, lo
 // pseudonimo che l'utente dovrebbe poter dare all'owner, la chiave che arriva
 // alle schede già aperte senza riavvio, il codice dato a un amico che risulta
 // usato, il saldo che scende dopo il consumo, il deposito della chiave
@@ -125,7 +125,7 @@ test('un codice dato a un amico risulta usato; il saldo scende dopo il consumo; 
     await page.reload();
     await page.waitForFunction(() => !document.getElementById('wallet').hidden);
     const attesi = Math.floor((server.keys.keys.get(h).limitUsd - 0.7) / (0.0007 * RATE) + 1e-9);
-    await expect(page.locator('#balance')).toHaveText(new Intl.NumberFormat('it-IT').format(attesi), { timeout: 15_000 });
+    await expect(page.locator('#balance')).toHaveText(String(attesi).replace(/\B(?=(\d{3})+(?!\d))/g, '.'), { timeout: 15_000 });
     expect(attesi).toBeLessThan(5000);
   } finally { await chiudi(filo); }
 
