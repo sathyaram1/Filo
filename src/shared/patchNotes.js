@@ -21,6 +21,10 @@
         'I crediti di Filo ora sono veri: il saldo lo tiene il server, non il tuo computer, e vale come tetto di spesa di una chiave OpenRouter creata solo per te. Si entra con un codice d\'invito, nella pagina Crediti: ricevi i crediti d\'ingresso, una quota ogni giorno che si accumula, e tre codici da dare a chi vuoi.',
         'Quando i crediti finiscono Filo te lo dice chiaro e non riprova a vuoto: puoi aspettare quelli del giorno dopo o mettere una tua chiave OpenRouter nelle Opzioni, che da ora ha sempre la precedenza su quella di Filo.',
         'Le nuove versioni non portano più dentro una chiave condivisa: ognuno usa la sua.',
+        'Il codice d\'invito si può incollare com\'è arrivato, anche con la riga intorno («Codice: ABCD-EFGH»): Filo trova gli otto caratteri che contano.',
+      ],
+      fixes: [
+        'Il saldo non perde più un credito il giorno dopo la quota giornaliera: con certi cambi euro-dollaro chi aveva ricevuto 5.200 crediti ne vedeva 5.199 senza aver usato niente.',
       ],
     },
     {
