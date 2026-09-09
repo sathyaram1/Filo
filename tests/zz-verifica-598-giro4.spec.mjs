@@ -371,6 +371,11 @@ test('B. owner: sezione, codici che restano, regalo, dettaglio, niente uid', asy
     expect(txt).not.toContain(uid);
     expect(txt).not.toContain('owner-uid');
     await page.screenshot({ path: join(SHOTS, 'B-owner.png'), fullPage: true });
+    // Origine web: i messaggi del portafoglio sono negati
+    const web = await openTab(base + '/pagina-web');
+    await web.waitForTimeout(1500);
+    const fromWeb = await web.evaluate(async () => { const out = {}; for (const t of ['wallet_state', 'wallet_owner_overview', 'wallet_owner_invites']) { try { out[t] = await chrome.runtime.sendMessage({ type: t, count: 1 }); } catch (e) { out[t] = 'ERR ' + (e && e.message); } } return out; }).catch((e) => 'evaluate fallito: ' + e.message);
+    console.log('da pagina web:', JSON.stringify(fromWeb));
     // Tema scuro
     await page.evaluate(async () => { const s = await chrome.storage.local.get('settings'); const st = s.settings || {}; st.theme = 'dark'; await chrome.storage.local.set({ settings: st }); });
     await page.reload(); await page.waitForLoadState('domcontentloaded');
