@@ -68,6 +68,20 @@ const testiLocali = () => [
   ['la coda della fase di correzione', codaText({ findings: [{ level: 2, text: 'x' }], derived: [], budgets: null, branch: 'claude/giri-corti', instructions: '(coda)' })],
 ];
 
+test('#giri-corti — il compito locale dice quali passi della ricetta in locale non valgono', () => {
+  // La ricetta delle routine viene ricopiata per intero in fondo al compito, e
+  // finisce con due comandi che in locale non esistono (registrare la critica
+  // con lo strumento delle routine, rilasciare un biglietto). Chi legge fino in
+  // fondo obbedisce all'ultima cosa che ha letto: va detto prima.
+  const brief = buildVerifierBrief({ request: 'una richiesta', branch: 'claude/giri-corti', recipe: '(ricetta)' });
+  const i = brief.indexOf('recipe della verifica');
+  expect(i, 'il compito non contiene più la ricetta: se è cambiato, riscrivi questa prova').toBeGreaterThan(-1);
+  expect(brief.slice(0, i), 'la ricetta arriva senza dire che in locale la critica non si registra '
+    + 'con lo strumento delle routine e che non c\'è nessun biglietto da rilasciare')
+    .toMatch(/non valgono|non vale|in locale non/i);
+  expect(brief.slice(0, i)).toMatch(/bigliett/i);
+});
+
 for (const [nome, testo] of testiLocali()) {
   test(`#giri-corti — ${nome}: una risposta vuota non è per forza un'assenza`, () => {
     const finestre = attorno(testo);
