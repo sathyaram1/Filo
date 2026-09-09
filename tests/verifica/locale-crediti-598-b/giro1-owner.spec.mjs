@@ -65,10 +65,7 @@ test('owner: la pagina Crediti non ha più i comandi da proprietario, li rimanda
     await page.waitForFunction(() => !document.getElementById('wallet').hidden, null, { timeout: 15_000 });
 
     // Tema scuro della pagina owner.
-    await filo.app.evaluate(async () => {
-      const s = await globalThis.SN_STORAGE.getSettings();
-      await globalThis.SN_STORAGE.saveSettings({ ...s, theme: 'dark' });
-    });
+    await filo.app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
     const dark = await apriOwner(filo);
     await dark.waitForTimeout(500);
     await dark.screenshot({ path: join(SHOTS, 'verifica-598b-owner-scuro.png'), fullPage: true });
