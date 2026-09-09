@@ -409,7 +409,9 @@ export function codaText({ findings, derived, budgets, branch, instructions }) {
   righe.push(
     '',
     `Prima di consegnare rilancia le prove del giro (le tue e quelle dei giri prima): npx playwright test ${cartella}`,
-    'Una che diventa rossa è una regressione della correzione. Se quella cartella non c\'è, non c\'era niente da rilanciare.',
+    'Una che diventa rossa è una regressione della correzione. Se quella cartella non c\'è, non c\'era niente da rilanciare:',
+    'guardala però, non fidarti del messaggio — «No tests found» arriva anche a cartella piena se il percorso è scritto in',
+    'un\'altra forma (solo quello relativo alla radice del repo, con le barre normali, viene riconosciuto).',
     '',
     testo,
   );
