@@ -158,6 +158,7 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
   const flags = {
     salt, rate,
     frankDown: false,
+    delayMs: 0,          // le funzioni rispondono con ritardo
     walletDown: false,   // le funzioni rispondono 500
     walletHang: false,   // la connessione si chiude senza risposta
     signUpDown: false,   // l'identità non si crea (500)
