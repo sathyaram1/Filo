@@ -158,7 +158,7 @@ test('con l’accesso: totali, codici che restano, tabella con dettaglio, regalo
     await expect(page.locator('#ownerRuns')).toContainText(/riconciliazione/);
     await server.daily(Date.now() + 86_400_000);
     await page.reload();
-    await page.waitForFunction(() => !document.getElementById('wallet').hidden);
+    await page.waitForFunction(() => !document.getElementById('ownerSection').hidden, null, { timeout: 15_000 });
     await expect(page.locator('#ownerRuns')).toContainText(/giornaliera .*\(1 quote\)/, { timeout: 15_000 });
 
     // Nessun uid nella pagina: né dell'utente, né dell'owner.
