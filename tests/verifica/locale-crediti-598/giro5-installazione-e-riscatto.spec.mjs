@@ -225,18 +225,20 @@ test('crediti finiti: con 402 la chiamata è una sola, la chat lo spiega, un 429
     expect(calls.filter((c) => !c.url.endsWith('/models'))).toHaveLength(1);
 
     // Il toast in una pagina web, con la quota di domani, una volta sola.
-    const web = await filo.openTab('http://127.0.0.1:9/');
-    await web.waitForTimeout(500);
-    await filo.app.evaluate(async () => { globalThis.SN_WALLET_MAIN.outOfCreditsNotice(); });
-    const pagineWeb = filo.app.windows().filter((w) => w.url().startsWith('http://127.0.0.1'));
-    let toast = '';
-    for (const w of pagineWeb) {
-      toast = await w.evaluate(() => document.querySelector('.sn-toast')?.textContent || '').catch(() => '');
-      if (toast) break;
-    }
-    // La pagina su porta chiusa può non aver montato i content script: allora
-    // il toast non si vede lì, e non è un difetto dei crediti.
-    if (toast) expect(toast).toMatch(/finiti.*domani ne arrivano 100/);
+    const sito = await paginaWeb();
+    try {
+      const web = await filo.openTab(sito.url);
+      await web.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
+      // Il primo avviso è partito con la chiamata di prima, quando questa
+      // pagina non c'era; un secondo entro dieci minuti non parte (è voluto).
+      // Si controlla il testo che l'avviso porta, con la quota di domani.
+      const testo = await filo.app.evaluate(() => globalThis.SN_WALLET.outOfCreditsMessage({ usingOwnKey: false, dailyCredits: 100 }));
+      expect(testo).toMatch(/finiti.*domani ne arrivano 100/);
+      await filo.app.evaluate(async () => { globalThis.SN_WALLET_MAIN.outOfCreditsNotice(); });
+      await web.waitForTimeout(800);
+      const toasts = await web.evaluate(() => [...document.querySelectorAll('.sn-toast')].map((t) => t.textContent));
+      expect(toasts.length).toBeLessThanOrEqual(1);
+    } finally { await sito.chiudi(); }
 
     // 429: si passa al tentativo dopo (la catena di prova ha due modelli).
     await impostaOpenRouter(filo.app, { status: 429 });
