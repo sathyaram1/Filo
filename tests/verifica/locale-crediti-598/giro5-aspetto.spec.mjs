@@ -39,7 +39,9 @@ test('tre stati, due temi: screenshot; il conteggio locale accanto al saldo del 
     await page.click('#inviteCode');
     await page.keyboard.type('Codice: ABCD-EFGH');
     const valore = await page.inputValue('#inviteCode');
-    { const nota = `digitando «Codice: ABCD-EFGH» il campo tiene «${valore}» (${valore.length} caratteri)`; test.info().annotations.push({ type: 'nota', description: nota }); console.log('[nota]', nota); }
+    // Rilievo di livello zero del quinto giro, corretto nello stesso giro: il
+    // campo non tronca più a 16 caratteri.
+    expect(valore).toBe('Codice: ABCD-EFGH');
     await page.fill('#inviteCode', '');
 
     for (const t of ['light', 'dark']) {
