@@ -569,6 +569,8 @@ test('sezione owner della pagina Crediti (login simulato nel main)', async () =>
     console.log('LOGIN FINTO:', JSON.stringify(ok));
     if (!ok.ok || !ok.admin) { test.info().annotations.push({ type: 'skip', description: 'login owner non simulabile: ' + JSON.stringify(ok) }); return; }
     const page = await openTab(app, shell, CREDITS);
+    // la scheda Crediti aperta dal riscatto è ancora lì, col DOM di prima del login: si ricarica
+    await page.reload(); await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
     const probe = await page.evaluate(async () => {
       const w = await chrome.runtime.sendMessage({ type: 'wallet_state' });
