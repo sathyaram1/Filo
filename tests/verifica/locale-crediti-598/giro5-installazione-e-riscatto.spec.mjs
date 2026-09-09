@@ -74,6 +74,7 @@ test('installazione nuova: nessuna chiave, la pagina chiede l’invito e la home
 });
 
 test('riscatto: minuscole, spazi e trattini; saldo e tre codici; chiave cifrata; stessa identità al riavvio', async () => {
+  test.setTimeout(150_000); // due avvii di Filo
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   const userData = filo.userData;
