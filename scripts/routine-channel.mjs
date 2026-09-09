@@ -77,7 +77,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
-import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di

@@ -911,7 +911,7 @@ async function recordVerifier(id, critiqueText) {
 // della critica, e il rifiuto con l'elenco: stanno in lib/dirty-tree.mjs,
 // perché la stessa regola vale sulla strada locale (verify-local critica).
 // Ri-esportati da qui per chi li importava da dispatch.
-export { dirtyTreeLines, dirtyTreeText };
+export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 
 export function verifierReplyText(reply) {
   const r = reply && typeof reply === 'object' ? reply : {};

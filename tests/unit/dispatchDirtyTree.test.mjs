@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const { dirtyTreeLines, dirtyTreeText } = await import('../../scripts/dispatch.mjs');
-const { gitStatusPorcelain } = await import('../../scripts/lib/dirty-tree.mjs');
+const { gitStatusPorcelain, statoDirectory: statoDirectorySync } = await import('../../scripts/lib/dirty-tree.mjs');
 
 test('dirtyTreeText: il rimedio dice che dopo un rm dalla shell il salvataggio non arriva da solo, e che committare la pulizia va bene', () => {
   const t = dirtyTreeText(['tests/verify-1.spec.mjs']);
@@ -163,5 +163,42 @@ test('CLI --record-fixed: con modifiche non salvate respinge PRIMA del server, c
     assert.doesNotMatch(String(pulito.stderr), /consegna non registrata: ci sono modifiche/);
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
+  }
+});
+
+// Quando git NON risponde, il controllo non deve concludere «pulito»: prima
+// ingoiava l'errore e tornava una stringa vuota, cioè la registrazione passava
+// proprio nel caso in cui non si sa se la directory sia pulita (verifica del
+// giro 4 sul lavoro «giri corti»). Un controllo che tace quando non può
+// rispondere è peggio di uno assente.
+test('statoDirectory: fuori da un deposito dice che non lo sa, non che è pulito', async () => {
+  const { statoDirectory, statoIllegibileText } = await import('../../scripts/lib/dirty-tree.mjs');
+  const dir = cartellaTemporanea('filo-nonrepo-');
+  try {
+    const s = statoDirectory(dir);
+    assert.equal(s.ok, false, 'senza risposta di git non si può dire che sia pulita');
+    assert.equal(s.lines.length, 0);
+    assert.ok(s.motivo, 'e si dice perché');
+    for (const cosa of ['critica', 'consegna', 'revisione']) {
+      const t = statoIllegibileText(s.motivo, cosa);
+      assert.match(t, /non registrata/, `porta ${cosa}: è un rifiuto`);
+      assert.match(t, /non tratto il silenzio come/i, `porta ${cosa}: dice perché si ferma`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('statoDirectory: dentro un deposito elenca i file fuori dai commit, coi nomi veri', () => {
+  const dir = cartellaTemporanea('filo-stato-');
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    g(['init', '-q', '--initial-branch=main']);
+    writeFileSync(resolve(dir, 'con spazio è.spec.mjs'), 'x', 'utf8');
+    const s = statoDirectorySync(dir);
+    assert.equal(s.ok, true);
+    assert.deepEqual(s.lines, ['con spazio è.spec.mjs']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

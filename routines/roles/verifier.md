@@ -216,9 +216,9 @@ i giri sullo stesso lavoro si ritrovano); il resto della regola è identico.
 Non si cancellano: sono la memoria del giro. Chi corregge le rilancia prima
 di consegnare e il giro dopo le ritrova pronte. La suite completa NON le
 raccoglie (quelle di un feedback solo costano otto minuti e mezzo): si
-lanciano per numero, ed è così che girano di norma; `FILO_TEST_VERIFICA=1`
-le rimette tutte dentro alla suite, quando le si vuole tutte. Nei giri di agosto e
-settembre un giro su tre trovava una porta già chiusa dal giro prima e
+lanciano per numero, ed è così che girano di norma (`FILO_TEST_VERIFICA=1`
+le rimette tutte dentro alla suite, quando le si vuole tutte). Nei giri di
+agosto e settembre un giro su tre trovava una porta già chiusa dal giro prima e
 riaperta dalla correzione: le prove venivano cancellate a ogni giro, e nessuno
 le rilanciava. Se una prova era solo esplorazione e non vale come test
 (dipende dall'ambiente, o non asserisce niente), cancellala e basta.
