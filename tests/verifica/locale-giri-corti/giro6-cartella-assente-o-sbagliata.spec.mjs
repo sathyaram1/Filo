@@ -28,13 +28,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const leggi = (p) => readFileSync(resolve(ROOT, p), 'utf8');
 
 // La frase che insegna a leggere una risposta vuota come un'assenza.
-const ASSENZA = /(non c'era|non c’era) niente da rilanciare|No tests found/i;
-// Il modo di distinguere: dire che la stessa risposta arriva col percorso
-// scritto male, o mandare a guardare la cartella prima di concludere.
-const DISTINGUE = /percorso|scritt[oa] (male|così|diversamente)|sbagliat|guarda(re)? (prima )?(se |che )?la cartella|controlla(re)? (prima )?(se |che )?la cartella|elenca(re)? la cartella|dalla radice del repo/i;
+const ASSENZA = /niente da rilanciare|No tests found/i;
+// Il modo di distinguere: nominare la forma del percorso, o mandare a guardare
+// la cartella prima di concludere che non c'è.
+const DISTINGUE = /percorso|barre|(guarda|controlla|elenca|apri)[^.\n]{0,50}cartella|cartella[^.\n]{0,50}(esiste|c'è davvero|c’è davvero)/i;
 
 /** Le finestre di testo attorno a ogni frase che parla di assenza. */
-function attorno(testo, raggio = 600) {
+function attorno(testo, raggio = 350) {
   const out = [];
   const re = new RegExp(ASSENZA.source, 'gi');
   let m;
