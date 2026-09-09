@@ -59,7 +59,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirtyTreeLines, dirtyTreeText, gitStatusPorcelain } from './lib/dirty-tree.mjs';
+import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : resolve(__dirname, '..');
@@ -307,7 +307,7 @@ export function historyFromRounds(rounds) {
  * Rifiuta se non c'era niente in sospeso, o con modifiche non salvate: la
  * consegna vale per un commit, e la verifica dopo deve provare quello.
  */
-export function withFixed(state, branch, { report, sha, at, dirty = false }) {
+export function withFixed(state, branch, { report, sha, at, dirty = false, dirtyFiles = [] }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
@@ -318,8 +318,14 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
     }
     return { ok: false, reason: 'nessun giro aperto su questo ramo' };
   }
-  if (dirty) {
-    return { ok: false, reason: 'ci sono modifiche non salvate: la consegna vale per un commit, e la verifica dopo deve provare quello. Salva e rilancia.' };
+  // Stesso rifiuto della consegna in cloud, dalla stessa fonte: elenca i file
+  // rimasti fuori e avverte che dopo un rm dalla shell il salvataggio
+  // automatico non arriva da solo. Detto a metà («salva e rilancia») mandava ad
+  // aspettare un salvataggio che non parte (verifica del giro 2 su questo
+  // lavoro).
+  const sporchi = Array.isArray(dirtyFiles) ? dirtyFiles : [];
+  if (sporchi.length || dirty) {
+    return { ok: false, reason: dirtyTreeText(sporchi, 'consegna') };
   }
   const when = at || new Date().toISOString();
   const rounds = Array.isArray(prev.rounds) ? prev.rounds.slice() : [];
@@ -349,6 +355,30 @@ export function withFixed(state, branch, { report, sha, at, dirty = false }) {
   return { ok: true, state: s, outcome: 'fixed' };
 }
 
+/**
+ * La cartella dove restano le prove di un giro locale. PURA.
+ *
+ * In cloud la cartella si intitola al numero del feedback. In locale un numero
+ * non c'è, e finché nessuno diceva quale usare le prove non venivano scritte da
+ * nessuna parte: chi correggeva non aveva niente da rilanciare e il giro dopo
+ * ripagava tutto — cioè proprio la cosa che le prove nel ramo tolgono (verifica
+ * del giro 2 su questo lavoro). Il nome viene dal RAMO, perché è l'unica cosa
+ * stabile per tutta la vita del lavoro: lo stesso ramo dà sempre la stessa
+ * cartella, e i giri si ritrovano.
+ */
+export function cartellaProveGiro(branch) {
+  const slug = String(branch || '')
+    .replace(/^(claude|feature|fix)\//i, '')
+    // «però» deve restare «pero», non «per»: una lettera accentata è una
+    // lettera, e mangiarla cambia il nome della cartella.
+    .normalize('NFD').replace(/\p{M}/gu, '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+    .slice(0, 60) || 'giro';
+  return `tests/verifica/locale-${slug}`;
+}
+
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, budgets, branch, instructions }) {
   const fmt = (l) => (Array.isArray(l) && l.length ? ROUND.formatFindings(l) : '  (nessuno)');
@@ -362,17 +392,30 @@ export function codaText({ findings, derived, budgets, branch, instructions }) {
     'chiedila a chi guida. In ogni caso si correggono SOLO i rilievi dell\'elenco qui sopra, e si consegna con',
     '  node scripts/verify-local.mjs corretto "<report della correzione>"',
   ].join('\n');
-  return [
+  // Le prove del giro le rilancia CHI CORREGGE, prima di consegnare: è la metà
+  // che rende utile tenerle nel ramo. In cloud sta nelle istruzioni del ruolo;
+  // qui la coda arriva da un file fuori dal repo, che non le nomina — quindi la
+  // riga la mette lo strumento, che è la parte che vive nel repo.
+  const cartella = cartellaProveGiro(branch);
+  const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
     'Rilievi da correggere in questo giro (solo questi):',
     fmt(findings),
     'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     fmt(derived),
-    b ? `Bilanci: ${b}` : '',
+  ];
+  if (b) righe.push(`Bilanci: ${b}`);
+  righe.push(
+    '',
+    `Prima di consegnare rilancia le prove del giro (le tue e quelle dei giri prima): npx playwright test ${cartella}`,
+    'Una che diventa rossa è una regressione della correzione. Se quella cartella non c\'è, non c\'era niente da rilanciare:',
+    'guardala però, non fidarti del messaggio — «No tests found» arriva anche a cartella piena se il percorso è scritto in',
+    'un\'altra forma (solo quello relativo alla radice del repo, con le barre normali, viene riconosciuto).',
     '',
     testo,
-  ].filter((l, i) => l !== '' || i === 7).join('\n');
+  );
+  return righe.join('\n');
 }
 
 // ─── Riallineamento alla linea principale (caso #500) ───────────────────────
@@ -562,6 +605,17 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     'IL TUO COMPITO: prova a far fallire la cosa chiesta usandola davvero, come la',
     'userebbe l’owner. Non ti basta che i test passino: apri l’app e prova.',
     '',
+    '',
+    'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
+    `del giro è \`${cartellaProveGiro(branch)}\` — dove la recipe qui sotto dice`,
+    '`tests/verifica/<numero>/`, in locale si legge quella. Le spec si chiamano',
+    '`giro<k>-<cosa>.spec.mjs`, si committano prima di registrare la critica e non si',
+    'cancellano: sono la memoria del giro. Se ci sono già le prove dei giri passati,',
+    'lanciale per prime; se la cartella non c\'è, non c\'era niente da rilanciare — ma',
+    'guarda la cartella, non il messaggio: il comando risponde «No tests found» anche a',
+    'cartella piena se il percorso è scritto in un\'altra forma (solo quello relativo alla',
+    'radice del repo, con le barre normali, viene riconosciuto).',
+    '',
     'QUANDO HAI FINITO registra la critica: una riga per rilievo, col livello davanti',
     '(3 sicurezza/dati/Filo inutilizzabile · 2 la cosa chiesta non si ottiene o cammino',
     'principale · 1 cosmetica/attrito fuori cammino · 0 situazione rara; `[1?]` = chiede una',
@@ -576,6 +630,11 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     'Poi SEGUI la risposta stampata dal comando: dice cosa succede adesso.',
     'Boccia per ciò che non si ottiene, non per differenze di gusto: un trade-off vero',
     'si segna con `?` e lo decide l’owner.',
+    '',
+    'DUE PASSI DELLA RICETTA QUI SOTTO IN LOCALE NON VALGONO, e sono gli ultimi che',
+    'leggerai: la critica NON si registra con lo strumento delle routine (non c\'è un',
+    'numero di pratica: si usa `verify-local.mjs critica`, qui sopra), e non c\'è nessun',
+    'biglietto da rilasciare alla fine. Tutto il resto della ricetta vale.',
     '',
     '─── recipe della verifica (la stessa delle routine) ───',
     String(recipe || '(file-ruolo non trovato)'),
@@ -713,7 +772,9 @@ if (isMain) {
     }
     // Con una correzione in sospeso decide withCritique: la stessa identica
     // critica ristampa la risposta (persa), un'altra è respinta.
-    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS, dirtyFiles: dirtyTreeLines(gitStatusPorcelain(ROOT)) });
+    const stato = statoDirectory(ROOT);
+    if (!stato.ok) { console.error(statoIllegibileText(stato.motivo)); process.exit(1); }
+    const r = withCritique(readState(), branch, { critique: text, sha, caps: CAPS, dirtyFiles: stato.lines });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
@@ -751,7 +812,9 @@ if (isMain) {
       console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: da qui esce un esito, e un esito senza motivo non vale.');
       process.exit(1);
     }
-    const r = withFixed(readState(), branch, { report, sha, dirty: isDirty() });
+    const statoC = statoDirectory(ROOT);
+    if (!statoC.ok) { console.error(statoIllegibileText(statoC.motivo, 'consegna')); process.exit(1); }
+    const r = withFixed(readState(), branch, { report, sha, dirtyFiles: statoC.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
     if (r.outcome === 'stop') {

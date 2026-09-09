@@ -1,7 +1,7 @@
 // Verifica avversariale #495 — terzo giro: la lista dei risultati di ricerca
 // dice quante ne ha trovate, e le schede non mentono mentre si cerca.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect } from '../../fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 

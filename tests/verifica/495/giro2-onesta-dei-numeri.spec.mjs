@@ -1,7 +1,7 @@
 // Verifica avversariale #495 — secondo giro: onestà dei numeri quando il dato
 // non c'è, il tetto, e la superficie gemella (pagina dei feedback).
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect } from '../../fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const FEEDBACK = 'filo://feedback/feedback.html';

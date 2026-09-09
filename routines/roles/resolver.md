@@ -71,6 +71,31 @@ lavoro passi. Venticinque minuti di attesa a ogni consegna erano metà del costo
 di un giro. Non fondere su `main`: l'hook
 committa e pusha sul branch, il merge lo fa il gate a valle.
 
+## Prima di consegnare: la verifica la fai tu, per primo
+
+L'elenco è in **CLAUDE.md § Verifica** («Prima di consegnare, la verifica te la
+fai tu»): strade equivalenti, i due temi, input limite, invarianti UX, una prova
+sul cammino segnalato. Non è ripetuto qui, ed è la stessa lista che segue chi
+lavora a mano in locale. Ogni giro di verifica in più è un agente intero.
+
+**Dove finisce quella prova: dove la suite la rilancerà per sempre**, cioè
+accanto alle altre (`tests/<feature>.spec.mjs`, o `tests/unit/` per la logica
+pura), come dicono i minimi. È la guardia contro il ritorno del difetto: se
+finisse in `tests/verifica/<numero>/` sarebbe verde il giorno in cui la scrivi
+e non girerebbe mai più — quella cartella la suite completa non la raccoglie,
+nemmeno dopo la fusione. Lì dentro stanno solo le prove dei giri di verifica,
+che sono la memoria di un giro, e le scrive chi verifica.
+
+Se il ramo ha già `tests/verifica/<numero>/` (un giro di verifica passato, un
+riallineamento, una ripresa), lancia quelle prove prima di consegnare —
+`npx playwright test tests/verifica/<numero>` — e una che diventa rossa è una
+regressione tua. Se quella cartella non c'è, non c'era niente da rilanciare —
+ma guardala, non fidarti del messaggio: il comando risponde «No tests found»
+anche a cartella piena se il percorso è scritto in un'altra forma (solo quello
+relativo alla radice del repo, con le barre normali, viene riconosciuto).
+
+Quello che trovi lo correggi adesso, non lo lasci al verificatore.
+
 ## Consegna
 
 I TRE testi (report, frase, changelog) sono definiti in CLAUDE.md § Consegna.

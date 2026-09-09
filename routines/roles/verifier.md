@@ -42,7 +42,16 @@ interazioni tra i pezzi, con le parole originali del feedback come specifica.
    l'utente e cosa lamentava. Se `payload.history` non è vuoto, leggi anche le
    critiche dei giri passati: le porte già trovate vanno **ri-provate** (una
    regressione lì è un rilievo di livello 2), non ri-scoperte come rilievi
-   nuovi.
+   nuovi. Le prove dei giri passati sono già nel ramo, in
+   `tests/verifica/<numero>/`: lanciale per prime
+   (`npx playwright test tests/verifica/<numero>`), prima di scriverne di
+   nuove. Al primo giro quella cartella non esiste e il comando risponde
+   «No tests found» uscendo con un errore: è l'assenza di giri passati, non
+   un guasto del ramo. La stessa risposta però arriva anche a cartella piena,
+   se il percorso è scritto in un'altra forma: solo quello **relativo alla
+   radice del repo e con le barre normali** viene riconosciuto (le barre di
+   Windows e il percorso per intero dalla radice del disco danno zero test).
+   Prima di leggerci un'assenza, guarda se la cartella c'è: `ls tests/verifica`.
 2. **Sei già sul branch del lavoro: non cambiarlo, e non verificare `main`.**
    Se ti sposti una guardia ti ferma, e la tua critica verrebbe comunque
    **rifiutata** perché emessa da una versione diversa del codice.
@@ -201,17 +210,33 @@ parentesi quadre**. Le righe che seguono un rilievo senza livello davanti sono
 la sua continuazione (i passi per riprodurlo). Nessun rilievo = verifica
 superata.
 
-**Prima di registrare la critica, pulisci la directory**: togli le spec
-temporanee che hai scritto e porta la directory a un commit. Il salvataggio
-automatico parte solo a un Edit o a un Write: dopo un `rm` dalla shell non
-arriva da solo, e aspettarlo è aspettare niente — committa tu la pulizia
-(`git add -A && git commit -m "verifica: pulizia"`). Il pass vale per il
-commit di quel momento; con file non registrati in giro il salvataggio li
-committerebbe dopo, la punta del ramo si sposterebbe e il cancello di fusione
-respingerebbe il lavoro come non verificato. La registrazione rifiuta una
-directory sporca e ti stampa l'elenco (vale anche in locale, con
-`verify-local.mjs critica`): non è un rilievo, è da sistemare e riprovare con
-la stessa critica.
+**Le tue prove restano nel ramo.** Le spec con cui riproduci la lamentela e
+apri le porte vanno in `tests/verifica/<numero>/giro<k>-<cosa>.spec.mjs`
+(il numero del feedback senza cancelletto; con `FILO_TEST_SCALE` e le
+fixture del repo, come ogni altro spec) e si committano prima di registrare
+la critica. **In un giro locale** un numero di feedback non c'è: la cartella
+te la dice, per esteso, il compito che hai ricevuto (la ricava dal ramo, così
+i giri sullo stesso lavoro si ritrovano); il resto della regola è identico.
+Non si cancellano: sono la memoria del giro. Chi corregge le rilancia prima
+di consegnare e il giro dopo le ritrova pronte. La suite completa NON le
+raccoglie (quelle di un feedback solo costano otto minuti e mezzo): si
+lanciano per numero, ed è così che girano di norma (`FILO_TEST_VERIFICA=1`
+le rimette tutte dentro alla suite, quando le si vuole tutte). Nei giri di
+agosto e settembre un giro su tre trovava una porta già chiusa dal giro prima e
+riaperta dalla correzione: le prove venivano cancellate a ogni giro, e nessuno
+le rilanciava. Se una prova era solo esplorazione e non vale come test
+(dipende dall'ambiente, o non asserisce niente), cancellala e basta.
+
+**Prima di registrare la critica, porta la directory a un commit.** Il
+salvataggio automatico parte solo a un Edit o a un Write: dopo un `rm` o un
+`mv` dalla shell non arriva da solo, e aspettarlo è aspettare niente —
+committa tu (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`).
+Il pass vale per il commit di quel momento; con file non registrati in giro il
+salvataggio li committerebbe dopo, la punta del ramo si sposterebbe e il
+cancello di fusione respingerebbe il lavoro come non verificato. La
+registrazione rifiuta una directory sporca e ti stampa l'elenco (vale anche in
+locale, con `verify-local.mjs critica`): non è un rilievo, è da sistemare e
+riprovare con la stessa critica.
 
 **Le parentesi quadre con dentro un livello sono SEMPRE un rilievo**, dovunque
 stiano nella riga: nel riassunto un livello si cita **a parole** («il livello
@@ -251,7 +276,28 @@ esito in coda, niente di più.
 
 **Poi segui la risposta del server**, che il comando stampa: è lui che decide
 cosa succede ai tuoi rilievi, e te lo dice. Fai esattamente quello che dice,
-e niente di più. Alla fine, in ogni caso, **rilascia il claim**:
+e niente di più.
+
+**Se apre una fase di correzione, la correzione la fai tu** (dal 2026-09-05 non
+torna più a chi ha risolto), e prima di consegnarla **rilancia le prove del
+giro**: `npx playwright test tests/verifica/<numero>`, le tue di adesso e
+quelle dei giri prima (se quella cartella non c'è, non c'era niente da
+rilanciare — ma guarda la cartella, non il messaggio: col percorso scritto in
+un'altra forma la risposta è la stessa). Una che diventa rossa è una regressione della tua stessa
+correzione — la porta che il giro dopo ritroverebbe aperta, ed è per non
+ripagarlo che le prove restano nel ramo. «Niente di più» vale su quali rilievi
+si correggono, non su questa corsa.
+
+Correggendo vali chi risolve, minimi di verifica compresi (CLAUDE.md
+§ Verifica): la prova che tiene chiuso il difetto per il futuro va **dove la
+suite la rilancerà per sempre** — accanto alle altre (`tests/<feature>.spec.mjs`,
+o `tests/unit/` per la logica pura). **Non va in `tests/verifica/<numero>/`**:
+lì dentro c'è la memoria di un giro, che la suite completa non raccoglie
+nemmeno dopo la fusione, e una guardia messa lì nasce già spenta — verde il
+giorno in cui la scrivi e mai più rilanciata. Le tue prove del giro restano
+dove sono: sono un'altra cosa.
+
+Alla fine, in ogni caso, **rilascia il claim**:
 
 ```bash
 node scripts/routine-channel.mjs release <biglietto>

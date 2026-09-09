@@ -1,0 +1,95 @@
+// Prove del giro 6 (verifica locale) sul lavoro «giri corti».
+//
+// Le prove di un giro restano nel ramo e chi corregge le rilancia nominando la
+// cartella. Se la cartella non c'è, il comando risponde «No tests found» ed
+// esce con un errore, e i testi dicono — giustamente — che quello vuol dire
+// «non c'era niente da rilanciare».
+//
+// Il problema è che quella STESSA risposta arriva anche quando la cartella c'è
+// eccome, ma il percorso è scritto in una forma che il comando non riconosce.
+// Misurato su questa macchina, con la cartella piena di dieci prove:
+//   · `tests/verifica/locale-giri-corti`            → 13 prove trovate
+//   · `tests\verifica\locale-giri-corti` (PowerShell) → 0, esce con errore
+//   · lo stesso percorso scritto per intero dalla radice del disco → 0, errore
+// Chi corregge legge «niente da trovare», conclude «non c'era niente da
+// rilanciare» — è proprio quello che i testi gli hanno insegnato a concludere —
+// e le prove del giro non girano. Il guasto è silenzioso e nasconde
+// esattamente il meccanismo che questo lavoro esiste per costruire.
+//
+// Queste prove non aprono Filo: qui non c'è una schermata, c'è il meccanismo
+// del giro. Restano nel ramo: sono la memoria di questo giro.
+
+import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const leggi = (p) => readFileSync(resolve(ROOT, p), 'utf8');
+
+// La frase che insegna a leggere una risposta vuota come un'assenza.
+const ASSENZA = /niente da rilanciare|No tests found/i;
+// Il modo di distinguere: nominare la forma del percorso, o mandare a guardare
+// la cartella prima di concludere che non c'è.
+const DISTINGUE = /percors|barre/i;
+
+/** Le finestre di testo attorno a ogni frase che parla di assenza. */
+function attorno(testo, raggio = 350) {
+  const out = [];
+  const re = new RegExp(ASSENZA.source, 'gi');
+  let m;
+  while ((m = re.exec(testo)) !== null) {
+    out.push(testo.slice(Math.max(0, m.index - raggio), m.index + raggio));
+  }
+  return out;
+}
+
+for (const file of ['routines/roles/verifier.md', 'routines/roles/resolver.md']) {
+  test(`#giri-corti — ${file}: una risposta vuota non è per forza un'assenza`, () => {
+    const finestre = attorno(leggi(file));
+    expect(finestre.length, `${file} non parla più della cartella assente: se la regola è cambiata, riscrivi questa prova`).toBeGreaterThan(0);
+    for (const f of finestre) {
+      expect(f, `${file}: si dice che una risposta vuota vuol dire «niente da rilanciare», `
+        + 'ma non si dice che la stessa risposta arriva col percorso scritto in un\'altra forma '
+        + '(le barre di Windows, o il percorso per intero dalla radice del disco): '
+        + 'così le prove del giro restano ferme e nessuno se ne accorge')
+        .toMatch(DISTINGUE);
+    }
+  });
+}
+
+// Qui non si guarda il sorgente ma i DUE TESTI che chi verifica in locale legge
+// davvero: il compito che riceve all'apertura del giro e la coda della fase di
+// correzione. Sono funzioni pure, quindi si possono chiedere e leggere.
+const { buildVerifierBrief, codaText } = await import(pathToFileURL(resolve(ROOT, 'scripts/verify-local.mjs')).href);
+
+const testiLocali = () => [
+  ['il compito consegnato a chi verifica', buildVerifierBrief({ request: 'una richiesta', branch: 'claude/giri-corti', recipe: '(ricetta)' })],
+  ['la coda della fase di correzione', codaText({ findings: [{ level: 2, text: 'x' }], derived: [], budgets: null, branch: 'claude/giri-corti', instructions: '(coda)' })],
+];
+
+test('#giri-corti — il compito locale dice quali passi della ricetta in locale non valgono', () => {
+  // La ricetta delle routine viene ricopiata per intero in fondo al compito, e
+  // finisce con due comandi che in locale non esistono (registrare la critica
+  // con lo strumento delle routine, rilasciare un biglietto). Chi legge fino in
+  // fondo obbedisce all'ultima cosa che ha letto: va detto prima.
+  const brief = buildVerifierBrief({ request: 'una richiesta', branch: 'claude/giri-corti', recipe: '(ricetta)' });
+  const i = brief.indexOf('recipe della verifica');
+  expect(i, 'il compito non contiene più la ricetta: se è cambiato, riscrivi questa prova').toBeGreaterThan(-1);
+  expect(brief.slice(0, i), 'la ricetta arriva senza dire che in locale la critica non si registra '
+    + 'con lo strumento delle routine e che non c\'è nessun biglietto da rilasciare')
+    .toMatch(/non valgono|non vale|in locale non/i);
+  expect(brief.slice(0, i)).toMatch(/bigliett/i);
+});
+
+for (const [nome, testo] of testiLocali()) {
+  test(`#giri-corti — ${nome}: una risposta vuota non è per forza un'assenza`, () => {
+    const finestre = attorno(testo);
+    expect(finestre.length, `${nome} non parla più della cartella assente: se la regola è cambiata, riscrivi questa prova`).toBeGreaterThan(0);
+    for (const f of finestre) {
+      expect(f, `${nome}: insegna a leggere una risposta vuota come «non c'era niente da rilanciare», `
+        + 'senza avvertire che la stessa risposta arriva col percorso scritto in un\'altra forma')
+        .toMatch(DISTINGUE);
+    }
+  });
+}

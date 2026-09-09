@@ -14,12 +14,15 @@ tests/.smoke/
 # quindi diventano rosse appena il bug viene fixato). Non vanno mai committate —
 # l'hook auto-commit fa `git add -A`, quindi senza questa regola finivano su main.
 tests/_audit*.spec.mjs
-# Spec temporanee dei verifier/secaudit (prefisso _verify / _vcheck): usa-e-getta
-# per verificare un fix su un branch, ricreate fresche a ogni giro. Stessa ragione
-# delle _audit sopra: senza questa regola l'`git add -A` dell'hook le committa su
-# main, dove si accumulano e diventano flaky nella suite completa.
-tests/_verify*.spec.mjs
-tests/_vcheck*.spec.mjs
+# NIENTE regola per le prove dei verifier (prefisso _verify / _vcheck): erano
+# usa-e-getta, non lo sono più. Le prove di un giro di verifica restano nel ramo,
+# in tests/verifica/<numero>/, e si lanciano nominando quella cartella: chi
+# corregge prima di consegnare, il giro dopo per ritrovare le porte già chiuse.
+# La suite completa NON le raccoglie (playwright.config.js), nemmeno dopo la
+# fusione: il ramo è l'unico posto in cui esistono. Escluderle di nuovo — anche
+# solo per il nome vecchio — le farebbe
+# sparire in silenzio: non finirebbero in nessun commit e non comparirebbero
+# nemmeno nel controllo dei file non salvati, che i file esclusi non li vede.
 tests/.fb/*.png
 tests/agent/.env
 tests/agent/.out/

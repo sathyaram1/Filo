@@ -13,6 +13,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -679,6 +680,12 @@ test('CLI #565: un esito senza motivo non si registra (e «fail» da sola non pr
   const sandbox = cartellaTemporanea('filo-motivo-');
   const statoDir = resolve(sandbox, 'stato');
   try {
+    // La sandbox è un deposito vero: il controllo dei file fuori dai commit
+    // pretende una risposta da git, e «non l'ho potuta avere» adesso è un
+    // rifiuto, non un «è pulito» (verifica del giro 4 su «giri corti»). Qui si
+    // provano i controlli sul TESTO della critica, quindi il deposito dev'essere
+    // pulito e basta.
+    execFileSync('git', ['init', '-q', '--initial-branch=main'], { cwd: sandbox, stdio: 'ignore' });
     const env = {
       ...process.env,
       FILO_REPO_ROOT: sandbox,

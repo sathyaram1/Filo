@@ -248,6 +248,40 @@ modifica:
   sai cosa tocchi (~25 min: avvisa l'owner, gli occupi la macchina). Se temi
   una regressione precisa, verificala subito: non rimandarla.
 
+**Prima di consegnare, la verifica te la fai tu.** Vale nelle routine e in
+locale: da tutte e due le parti il lavoro passa poi da una verifica
+indipendente, che costa un agente intero. Nei giri di agosto e settembre il
+primo giro trovava un rilievo grave in 15 lavori su 17, quasi sempre su
+qualcosa che chi aveva lavorato poteva vedere da sé. Quindi, prima della
+consegna:
+
+- le **strade equivalenti** — menu, scorciatoia, tasto destro, chat, l'altra
+  pagina che ha la stessa funzione — fanno tutte la stessa cosa;
+- **tema scuro e tema chiaro**, se hai toccato qualcosa che si vede;
+- **input limite**: vuoto, soli spazi, 10.000 caratteri, caratteri speciali,
+  azioni ripetute in fretta;
+- le **invarianti UX** del § Iniziativa: se si può aggiungere si può togliere,
+  cammini equivalenti si comportano allo stesso modo;
+- una **prova sul cammino segnalato**, che asserisce il successo dal punto di
+  vista dell'utente. Quale prova lo dicono i minimi qui sopra: se non c'è
+  niente da aprire (logica pura, testi, strumenti da riga di comando) è il
+  controllo veloce in `tests/unit/`, non una spec che apre Filo per non
+  guardarci niente.
+
+Quello che trovi lo correggi adesso, non lo lasci a chi verifica.
+
+Le prove di un **giro di verifica** non si cancellano: restano nel ramo, in
+`tests/verifica/<numero>/` (in locale, dove un numero non c'è, la cartella la
+dice il compito che riceve chi verifica). Chi corregge le rilancia prima di
+consegnare, per numero: `npx playwright test tests/verifica/<numero>`. Quel
+percorso va scritto **relativo alla radice del repo e con le barre normali**:
+con le barre di Windows (la forma che il completamento del terminale produce da
+solo) o per intero dalla radice del disco, la risposta è «No tests found» anche
+a cartella piena — la stessa che dà una cartella che non c'è. Prima di
+concludere che non c'era niente da rilanciare, guarda la cartella. La
+suite completa non le raccoglie (quelle di un solo feedback costano otto
+minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte.
+
 Com'è fatto un test che vale: asserisce il **successo dal punto di vista
 dell'utente** (l'immagine arriva al destinatario), non l'assenza di un errore
 (il toast non compare); e **senza il fix deve essere rosso** — se non sai quale
