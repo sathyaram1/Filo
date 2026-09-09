@@ -9,6 +9,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const { cartellaProveGiro, codaText, withFixed, buildVerifierBrief, withRequest, withCritique } = await import('../../scripts/verify-local.mjs');
 
