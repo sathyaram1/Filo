@@ -80,7 +80,7 @@ import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import { readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
-import { dirtyTreeLines, dirtyTreeText, gitStatusPorcelain } from './lib/dirty-tree.mjs';
+import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -845,9 +845,12 @@ async function recordVerifier(id, critiqueText) {
   // sposterà e il cancello dirà «la verifica vale per un altro commit» (#256:
   // le spec tolte tredici secondi dopo il pass, e il lavoro fermo due giorni).
   // Si rifiuta PRIMA, con l'elenco: si pulisce e si riprova.
-  const sporchi = dirtyTreeLines(gitStatusPorcelain(ROOT));
-  if (sporchi.length) {
-    return { rejected: true, formatRejected: true, message: dirtyTreeText(sporchi) };
+  const stato = statoDirectory(ROOT);
+  if (!stato.ok) {
+    return { rejected: true, formatRejected: true, message: statoIllegibileText(stato.motivo) };
+  }
+  if (stato.lines.length) {
+    return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines) };
   }
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
