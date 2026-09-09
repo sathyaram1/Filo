@@ -282,7 +282,8 @@ e niente di più.
 torna più a chi ha risolto), e prima di consegnarla **rilancia le prove del
 giro**: `npx playwright test tests/verifica/<numero>`, le tue di adesso e
 quelle dei giri prima (se quella cartella non c'è, non c'era niente da
-rilanciare). Una che diventa rossa è una regressione della tua stessa
+rilanciare — ma guarda la cartella, non il messaggio: col percorso scritto in
+un'altra forma la risposta è la stessa). Una che diventa rossa è una regressione della tua stessa
 correzione — la porta che il giro dopo ritroverebbe aperta, ed è per non
 ripagarlo che le prove restano nel ramo. «Niente di più» vale su quali rilievi
 si correggono, non su questa corsa.
