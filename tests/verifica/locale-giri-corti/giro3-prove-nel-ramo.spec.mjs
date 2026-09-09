@@ -79,7 +79,7 @@ test('#giri-corti — chi verifica in locale riceve una cartella per le prove, r
   expect(brief).toContain('niente report o note di chi ha lavorato');
 });
 
-test('#giri-corti — la fase 2 dice a chi corregge di rilanciare le prove prima di consegnare', async () => {
+test('#giri-corti — a rilievi da correggere, il comando dice di rilanciare le prove del giro', async () => {
   const m = await import(new URL('file:///' + resolve(ROOT, 'scripts/verify-local.mjs').replace(/\\/g, '/')).href);
   const coda = m.codaText({
     findings: [{ level: 2, text: 'un rilievo' }], derived: [], budgets: null,
