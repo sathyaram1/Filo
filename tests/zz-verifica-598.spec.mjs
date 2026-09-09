@@ -569,6 +569,12 @@ test('sezione owner della pagina Crediti (login simulato nel main)', async () =>
     console.log('LOGIN FINTO:', JSON.stringify(ok));
     if (!ok.ok || !ok.admin) { test.info().annotations.push({ type: 'skip', description: 'login owner non simulabile: ' + JSON.stringify(ok) }); return; }
     const page = await openTab(app, shell, CREDITS);
+    await page.waitForTimeout(2000);
+    const probe = await page.evaluate(async () => {
+      const w = await chrome.runtime.sendMessage({ type: 'wallet_state' });
+      return { isOwner: w && w.isOwner, ok: w && w.ok, hasWallet: Boolean(w && w.server && w.server.hasWallet), walletHidden: document.getElementById('wallet').hidden, ownerHidden: document.getElementById('ownerSection').hidden, note: document.getElementById('walletNote').textContent };
+    });
+    console.log('PROBE PAGINA:', JSON.stringify(probe));
     await expect(page.locator('#ownerSection')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('#ownerTotals')).toContainText('utenti', { timeout: 15_000 });
     console.log('OWNER TOTALI:', await page.locator('#ownerTotals').textContent());
