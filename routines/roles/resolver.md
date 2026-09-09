@@ -73,33 +73,19 @@ committa e pusha sul branch, il merge lo fa il gate a valle.
 
 ## Prima di consegnare: la verifica la fai tu, per primo
 
-Nei giri di agosto e settembre il primo giro di verifica trovava un rilievo di
-livello 2 in 15 lavori su 17, quasi sempre su qualcosa che chi aveva risolto
-poteva vedere da sé: la strada gemella (il menu oltre alla scorciatoia, la chat
-della home oltre a quella dell'editor), il tema scuro, un input limite. Ogni
-giro in più è un agente intero. Quindi, prima della consegna, fai al tuo lavoro
-quello che gli farà il verificatore:
+L'elenco è in **CLAUDE.md § Verifica** («Prima di consegnare, la verifica te la
+fai tu»): strade equivalenti, i due temi, input limite, invarianti UX, una prova
+sul cammino segnalato. Non è ripetuto qui, ed è la stessa lista che segue chi
+lavora a mano in locale. Ogni giro di verifica in più è un agente intero.
 
-1. **Una prova sul cammino segnalato**, che asserisce il successo dal punto di
-   vista dell'utente, in `tests/verifica/<numero>/giro0-<cosa>.spec.mjs` (il
-   numero del feedback senza cancelletto). Resta nel ramo: il verificatore la
-   rilancia per numero (la suite completa non raccoglie quella cartella).
-   Quale prova, lo dicono i minimi di CLAUDE.md § Verifica, non questa cartella:
-   se il lavoro **non ha niente da aprire** (logica pura, testi, strumenti da
-   riga di comando) la prova è il controllo veloce in `tests/unit/`, e la
-   cartella del giro resta vuota. Una spec che apre Filo per non guardarci
-   niente non prova niente: la cartella serve a chi ha una schermata o un flusso
-   da ripercorrere.
-2. **Le strade equivalenti**: ogni altro modo con cui l'utente ottiene la
-   stessa cosa (menu, scorciatoia, tasto destro, chat, l'altra pagina che ha la
-   stessa funzione) fa la stessa cosa.
-3. **Tema scuro e tema chiaro**, se hai toccato qualcosa che si vede.
-4. **Input limite**: vuoto, soli spazi, 10.000 caratteri, caratteri speciali,
-   azioni ripetute in fretta.
-5. **Le invarianti UX** di CLAUDE.md § Iniziativa: se si può aggiungere si può
-   togliere; cammini equivalenti si comportano allo stesso modo.
-6. Se il ramo ha già `tests/verifica/<numero>/` (un riallineamento, o una
-   ripresa), lancia quelle prove: una che diventa rossa è una regressione tua.
+Qui cambia solo **dove finisce quella prova**, quando è una spec:
+`tests/verifica/<numero>/giro0-<cosa>.spec.mjs` (il numero del feedback senza
+cancelletto). Resta nel ramo: il verificatore la rilancia per numero (la suite
+completa non raccoglie quella cartella). Se il lavoro non ha niente da aprire,
+la cartella del giro resta vuota.
+
+Se il ramo ha già `tests/verifica/<numero>/` (un riallineamento, o una
+ripresa), lancia quelle prove: una che diventa rossa è una regressione tua.
 
 Quello che trovi lo correggi adesso, non lo lasci al verificatore.
 
