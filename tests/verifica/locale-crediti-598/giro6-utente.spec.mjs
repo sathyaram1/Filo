@@ -66,7 +66,7 @@ test('l’utente può leggere il proprio pseudonimo, quello con cui l’owner gl
       const bolla = await chiediInChat(dash, 'qual è il mio pseudonimo dei crediti?');
       return (await bolla.innerText()).includes(pseudonym);
     })();
-    test.info().annotations.push({ type: 'nota', description: `pseudonimo nella pagina: ${html.includes(pseudonym)}, in chat: ${inChat}` });
+    console.log('[nota]', `pseudonimo nella pagina: ${html.includes(pseudonym)}, in chat: ${inChat}`);
     expect(html.includes(pseudonym) || inChat).toBe(true);
   } finally { await chiudi(filo); }
 });
@@ -142,4 +142,27 @@ test('un codice dato a un amico risulta usato; il saldo scende dopo il consumo; 
     await expect(page.locator('#balance')).not.toHaveText('—');
     expect(await bis.app.evaluate(async () => globalThis.SN_WALLET_MAIN.keySource())).toBe('personal');
   } finally { await chiudi(bis); rmSync(userData, { recursive: true, force: true }); }
+});
+
+test('il codice incollato in chat, senza chiave: Filo lo riconosce e lo riscatta (la GUI è una scorciatoia, non l’unica strada)', async () => {
+  // Sesto giro: senza chiave la chat risponde solo «serve un codice d'invito,
+  // Apri Crediti», anche quando il codice è proprio lì nel messaggio. Il
+  // riconoscimento non ha bisogno di un modello. Atteso rosso finché non viene
+  // corretto (poi togliere questa riga).
+  test.fail(true, 'la chat non riscatta il codice scritto nel messaggio');
+  const [code] = await server.codiciOwner(1);
+  const filo = await avviaFilo({ env: server.env });
+  try {
+    const dash = await filo.openTab('filo://dashboard/dashboard.html');
+    await expect(dash.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
+    const bolla = await chiediInChat(dash, `ho un codice d'invito: ${code.slice(0, 4)}-${code.slice(4)}`);
+    const testo = await bolla.innerText();
+    console.log('[nota]', `codice in chat → «${testo.slice(0, 160)}»`);
+    // O il riscatto è fatto, o almeno il codice è stato passato alla pagina Crediti.
+    const riscattato = server.store.docs.invites.get(code)?.usedBy;
+    let precompilato = false;
+    const cred = filo.app.windows().find((w) => w.url().startsWith('filo://credits'));
+    if (cred) { await cred.waitForLoadState('domcontentloaded').catch(() => {}); precompilato = ((await cred.locator('#inviteCode').inputValue().catch(() => '')) || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === code; }
+    expect(Boolean(riscattato) || precompilato).toBe(true);
+  } finally { await chiudi(filo); }
 });

@@ -63,7 +63,7 @@ test('regalo e codici con valori scritti male: decimali, pseudonimo con spazi o 
     await page.click('#ownerGrantBtn');
     await expect(page.locator('#ownerMsg')).not.toBeEmpty({ timeout: 15_000 });
     const m1 = await page.locator('#ownerMsg').innerText();
-    test.info().annotations.push({ type: 'nota', description: `pseudonimo maiuscolo → «${m1}»` });
+    console.log('[nota]', `pseudonimo maiuscolo → «${m1}»`);
 
     // Decimali: 10,7 crediti → o 10 con la cifra detta, o un rifiuto chiaro; mai una cosa muta.
     await page.fill('#ownerGrantPseudonym', pseudonym);
@@ -72,7 +72,7 @@ test('regalo e codici con valori scritti male: decimali, pseudonimo con spazi o 
     await page.waitForTimeout(1500);
     const m2 = await page.locator('#ownerMsg').innerText();
     const granted = server.store.docs.wallets.get('anon-utente').creditsGranted;
-    test.info().annotations.push({ type: 'nota', description: `10.7 crediti → «${m2}», concessi ${granted}` });
+    console.log('[nota]', `10.7 crediti → «${m2}», concessi ${granted}`);
     if (granted > 5000) expect(m2).toMatch(new RegExp(`\\+${granted - 5000} crediti`));
 
     // Zero e negativo: niente parte, niente cambia.
@@ -90,14 +90,23 @@ test('regalo e codici con valori scritti male: decimali, pseudonimo con spazi o 
     await page.waitForTimeout(2000);
     const dopo = server.store.docs.invites.size;
     const m3 = await page.locator('#ownerMsg').innerText();
-    test.info().annotations.push({ type: 'nota', description: `1000 codici → creati ${dopo - prima}, «${m3}»` });
+    console.log('[nota]', `1000 codici → creati ${dopo - prima}, «${m3}»`);
     // O non parte (con il campo che lo dice) o crea quanti ne ha detto: mai un numero diverso in silenzio.
     if (dopo - prima > 0) expect(m3).toMatch(new RegExp(`${dopo - prima} codici`));
-    // Dal canale dei messaggi, aggirando il campo: il server non deve creare
-    // 500 codici in silenzio quando ne sono stati chiesti 1000.
+  } finally { await chiudi(filo); }
+});
+
+test('mille codici chiesti dal canale dei messaggi: o mille, o un rifiuto, mai cinquecento in silenzio', async () => {
+  // Sesto giro: il server taglia a 500 senza dirlo. Atteso rosso finché non
+  // viene corretto (poi togliere questa riga).
+  test.fail(true, 'il server crea 500 codici quando ne sono stati chiesti 1000, senza dirlo');
+  const filo = await avviaFilo({ env: server.env });
+  try {
+    expect((await simulaOwner(filo.app, server)).isAdmin).toBe(true);
     const r = await filo.app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_owner_invites', count: 1000 }, { isShell: true }, 'filo://credits'));
-    test.info().annotations.push({ type: 'nota', description: `messaggio count=1000 → ok=${r?.ok} codici=${r?.codes?.length}` });
+    console.log('[nota] messaggio count=1000 →', JSON.stringify({ ok: r?.ok, codici: r?.codes?.length, status: r?.status, message: r?.message }));
     if (r?.ok) expect(r.codes.length).toBe(1000);
+    else expect(String(r?.message || r?.status || '')).toMatch(/\d/);
   } finally { await chiudi(filo); }
 });
 
@@ -118,7 +127,7 @@ test('quante volte una sessione normale chiede lo stato al server: apertura, hom
     await page.waitForFunction(() => !document.getElementById('wallet').hidden);
     await expect(page.locator('#balance')).toHaveText('5.000', { timeout: 15_000 });
     const n = server.counters.calls.filter((c) => c.name === 'walletState').length;
-    test.info().annotations.push({ type: 'nota', description: `walletState chiamato ${n} volte (home + 3 domande + Crediti)` });
+    console.log('[nota]', `walletState chiamato ${n} volte (home + 3 domande + Crediti)`);
     // Un ordine di grandezza ragionevole: non una chiamata per ogni messaggio in chat.
     expect(n).toBeLessThanOrEqual(6);
     expect(OWNER_UID).toBeTruthy();
