@@ -474,6 +474,12 @@
       desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
       invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio e il grafico.',
     },
+    {
+      id: 'invites', title: 'Inviti e crediti di Filo', category: 'credits',
+      desc: 'Per usare i modelli con i crediti di Filo serve un codice d’invito: lo riscatti nella pagina Crediti e ricevi i crediti d’ingresso, più una quota ogni giorno che si accumula. Il saldo lo tiene il server: è il tetto di spesa di una chiave OpenRouter creata solo per te. Insieme ai crediti ricevi i tuoi codici d’invito, da dare a chi vuoi. Quando i crediti finiscono Filo te lo dice e non riprova: aspetti quelli del giorno dopo o metti una tua chiave OpenRouter nelle Opzioni, che ha la precedenza.',
+      invoke: 'Pagina Crediti (filo://credits/credits.html): campo «Hai un codice d’invito?», e sotto i tuoi codici da condividere.',
+      doesNot: 'I posti sono limitati: se un codice viene rifiutato perché i posti sono finiti, il codice resta valido per dopo. Il testo delle tue richieste ai modelli non passa dal server di Filo: va a OpenRouter direttamente, con la tua chiave. Sul server e su OpenRouter compari con uno pseudonimo, mai con nome o email.',
+    },
   ];
 
   // ── API ────────────────────────────────────────────────────────────────────

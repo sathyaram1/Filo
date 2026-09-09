@@ -244,9 +244,14 @@ function withDefaults(settings) {
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};
-  for (const k of ['openrouter', 'tavily']) {
-    apiKeys[k] = d.apiKeys[k] || userKeys[k] || '';
-  }
+  // OpenRouter (#598): prima la chiave che l'utente ha scritto lui (è il suo
+  // conto, e ha scelto di usarlo), poi la chiave PERSONALE che il server ha
+  // creato al riscatto dell'invito (il suo tetto sono i suoi crediti), e solo
+  // in coda la chiave di fabbrica, che non viene più incastonata nelle
+  // versioni nuove e resta come ripiego per le installazioni vecchie.
+  const personal = personalOpenrouterKey();
+  apiKeys.openrouter = userKeys.openrouter || personal || d.apiKeys.openrouter || '';
+  apiKeys.tavily = d.apiKeys.tavily || userKeys.tavily || '';
   return {
     ...settings,
     provider: d.provider,
@@ -258,6 +263,10 @@ function withDefaults(settings) {
     apiKeys,
     security,
   };
+}
+
+function personalOpenrouterKey() {
+  try { return require('../auth/wallet-store').personalKey(); } catch (_) { return ''; }
 }
 
 // Settings "effettivi" per servire una richiesta AI: come getSettings() ma con
@@ -2622,9 +2631,17 @@ function buildNoKeyDashboard(settings, saved) {
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  if (!settings.apiKeys?.openrouter) {
+    suggestions.unshift({
+      icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
+      action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
+      importance: 3,
+    });
+  }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Accedi con un profilo per attivare Filo: è gratis e non serve nessuna chiave (icona del profilo in alto a destra). In alternativa, se preferisci, puoi usare una tua chiave API dalle Opzioni. Intanto, le tue pagine salvate sono qui.';
+    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, puoi mettere una tua chiave OpenRouter nelle Opzioni. Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 
@@ -2803,6 +2820,7 @@ require('./handlers/ai')(on, handlerCtx);
 require('./handlers/filo')(on, handlerCtx);
 require('./handlers/auth')(on, handlerCtx);
 require('./handlers/credits')(on, handlerCtx);
+require('./handlers/wallet')(on, handlerCtx);   // #598 — chiave personale, inviti, registro d'uso
 require('./handlers/board')(on, handlerCtx);
 require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);
@@ -3255,6 +3273,7 @@ globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
 module.exports = {
   handleMessage,
   handleStream,
+  getEffectiveSettings,
   broadcastLiveUpdate,
   broadcastToTabs,
   broadcastToFiloPages,

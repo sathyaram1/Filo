@@ -178,6 +178,13 @@
   // riuso). È la sola prova che il prefisso immutabile dei prompt sta davvero
   // funzionando: senza questo numero "riuso a zero" e "riuso pieno" sono
   // indistinguibili.
+  // Il costo in dollari che il router dichiara (`usage.cost`, con
+  // `usage.include`). 0 se assente: chi lo legge sa che deve stimare.
+  function costUsdOf(usage) {
+    const c = usage && Number(usage.cost);
+    return Number.isFinite(c) && c > 0 ? c : 0;
+  }
+
   function cachedPromptTokens(usage) {
     if (!usage || typeof usage !== 'object') return 0;
     const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
@@ -214,7 +221,10 @@
   }
 
   async function complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
-    const body = { model, messages, stream: false, ...toolsFields(tools, toolChoice) };
+    // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
+    // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
+    // personale (#598). Senza, il costo si stima dal listino.
+    const body = { model, messages, stream: false, usage: { include: true }, ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting);
@@ -248,6 +258,8 @@
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
+        costUsd: costUsdOf(usage),
+        servedBy: extractServedBy(data),
       },
     };
   }
@@ -257,7 +269,7 @@
   // conosce il nome di una chiamata a uno strumento. Ritorna
   // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
   async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    const reqBody = { model, messages, stream: true, ...toolsFields(tools, toolChoice) };
+    const reqBody = { model, messages, stream: true, usage: { include: true }, ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
@@ -325,6 +337,8 @@
               promptTokens: obj.usage.prompt_tokens || 0,
               completionTokens: obj.usage.completion_tokens || 0,
               cachedPromptTokens: cachedPromptTokens(obj.usage),
+              costUsd: costUsdOf(obj.usage),
+              servedBy: servedBy || extractServedBy(obj),
             };
           }
         } catch (_) {

@@ -156,6 +156,38 @@
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
+    // === Crediti sul server e chiave personale (#598) =======================
+    // ORIGINE: tutti i WALLET_* sono riservati alle pagine filo:// e alla
+    // shell (leggono saldo e codici, riscattano, fanno emettere una chiave):
+    // da una pagina web rispondono { ok:false, error:'forbidden' }.
+    // WALLET_STATE: stato del portafoglio dell'INSTALLAZIONE (identità anonima
+    //   Firebase, non l'account Google): saldo letto dal server (tetto della
+    //   chiave OpenRouter personale meno consumo), pseudonimo, codici d'invito
+    //   propri, se c'è la chiave personale, se l'utente usa una chiave sua.
+    //   { } → { ok, identity:{ok,error?}, hasPersonalKey, pseudonym, usingOwnKey,
+    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits, … }|null, error? }
+    WALLET_STATE: 'wallet_state',
+    // WALLET_REDEEM: riscatta un codice d'invito. Il server crea la chiave
+    //   personale e la consegna UNA volta: il main la salva cifrata.
+    //   { code } → { ok, status, message, credits?, inviteCodes?, state? }
+    WALLET_REDEEM: 'wallet_redeem',
+    // WALLET_REISSUE: il portafoglio c'è sul server ma la chiave personale non
+    //   è su questo computer: il server ne emette un'altra (la vecchia si
+    //   spegne, il saldo resta). { } → { ok, status, message, state? }
+    WALLET_REISSUE: 'wallet_reissue',
+    // WALLET_RESET_IDENTITY: l'identità dell'installazione è stata annullata
+    //   sul server (il portafoglio legato a essa non si raggiunge più):
+    //   l'utente sceglie di ricominciare con un'identità nuova e un nuovo
+    //   invito. { } → { ok, state }
+    WALLET_RESET_IDENTITY: 'wallet_reset_identity',
+    // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
+    // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
+    //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).
+    WALLET_OWNER_OVERVIEW: 'wallet_owner_overview',
+    // WALLET_OWNER_GRANT: alza il tetto di un utente. { pseudonym, credits, why } → { ok, result }
+    WALLET_OWNER_GRANT: 'wallet_owner_grant',
+    // WALLET_OWNER_INVITES: genera codici d'invito dell'owner. { count } → { ok, codes }
+    WALLET_OWNER_INVITES: 'wallet_owner_invites',
     CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un

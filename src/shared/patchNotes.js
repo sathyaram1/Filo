@@ -16,6 +16,18 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.223', date: '2026-09-08',
+      features: [
+        'I crediti di Filo ora sono veri: il saldo lo tiene il server, non il tuo computer, e vale come tetto di spesa di una chiave OpenRouter creata solo per te. Si entra con un codice d\'invito, nella pagina Crediti: ricevi i crediti d\'ingresso, una quota ogni giorno che si accumula, e tre codici da dare a chi vuoi.',
+        'Quando i crediti finiscono Filo te lo dice chiaro e non riprova a vuoto: puoi aspettare quelli del giorno dopo o mettere una tua chiave OpenRouter nelle Opzioni, che da ora ha sempre la precedenza su quella di Filo.',
+        'Le nuove versioni non portano più dentro una chiave condivisa: ognuno usa la sua.',
+        'Il codice d\'invito si può incollare com\'è arrivato, anche con la riga intorno («Codice: ABCD-EFGH»): Filo trova gli otto caratteri che contano.',
+      ],
+      fixes: [
+        'Il saldo non perde più un credito il giorno dopo la quota giornaliera: con certi cambi euro-dollaro chi aveva ricevuto 5.200 crediti ne vedeva 5.199 senza aver usato niente.',
+      ],
+    },
+    {
       version: '0.2.222', date: '2026-09-08',
       fixes: [
         'Esc esce sempre dallo schermo intero. Prima restava senza effetto in tre casi, e da lì non si tornava più indietro: se avevi appena toccato la barra in alto di Filo, se eri passato a un\'altra scheda, o se avevi chiuso quella che il sito aveva messo a schermo pieno.',

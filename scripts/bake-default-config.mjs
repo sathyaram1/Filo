@@ -84,8 +84,13 @@ async function main() {
     return r || envKey(envName);
   };
 
+  // La chiave OpenRouter NON si incastona più (#598): ogni utente riceve una
+  // chiave personale dal server al riscatto di un invito, col tetto di spesa
+  // pari ai suoi crediti. Una chiave di fabbrica nell'installer la apriva
+  // chiunque scaricasse il pacchetto. Le installazioni vecchie continuano a
+  // usare la loro finché l'owner non la ruota dal pannello OpenRouter.
+  // Restano incastonate le chiavi dei servizi di contorno (ricerca web).
   const apiKeys = {
-    openrouter: pick('openrouter', 'FILO_DEFAULT_OPENROUTER_KEY'),
     gemini: pick('gemini', 'FILO_DEFAULT_GEMINI_KEY'),
     tavily: pick('tavily', 'FILO_DEFAULT_TAVILY_KEY'),
   };

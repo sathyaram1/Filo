@@ -45,7 +45,7 @@ test('la dashboard renderizza le tre zone + barra input', async ({ app, shell })
   await expect(page.locator('#threadView')).toBeHidden();
 });
 
-test('senza API key la home invita a registrarsi con un profilo (non a mettere una chiave)', async ({ app, shell }) => {
+test('senza API key la home indica il codice d\'invito (non una chiave da mettere)', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   // Il messaggio "Filo non è attivo" è quello prodotto dal main quando non c'è
@@ -59,13 +59,15 @@ test('senza API key la home invita a registrarsi con un profilo (non a mettere u
   expect(r?.ok).toBe(true);
   const txt = String(r.message || '');
   expect(txt.length).toBeGreaterThan(0);
-  // Feedback #356: l'opzione consigliata deve essere registrarsi con un profilo
-  // (gratis, senza chiavi), non "imposta una chiave API" come prima scelta. Il
-  // profilo deve comparire PRIMA di qualsiasi menzione della chiave.
-  expect(txt.toLowerCase()).toContain('profilo');
-  const iProfilo = txt.toLowerCase().indexOf('profilo');
+  // Feedback #356 e #598: la strada consigliata è quella che non costa niente
+  // all'utente — prima il login (fino al #598), ora il codice d'invito nella
+  // pagina Crediti — e va detta PRIMA di qualsiasi menzione della chiave API,
+  // che resta l'alternativa per chi ne ha una.
+  expect(txt.toLowerCase()).toContain('invito');
+  expect(txt).toContain('Crediti');
+  const iInvito = txt.toLowerCase().indexOf('invito');
   const iChiave = txt.toLowerCase().indexOf('chiave');
-  if (iChiave !== -1) expect(iProfilo).toBeLessThan(iChiave);
+  if (iChiave !== -1) expect(iInvito).toBeLessThan(iChiave);
   // La vecchia formulazione che spingeva la chiave come attivazione non deve tornare.
   expect(txt).not.toContain('Imposta una chiave API nelle Opzioni per attivare Filo');
 });
