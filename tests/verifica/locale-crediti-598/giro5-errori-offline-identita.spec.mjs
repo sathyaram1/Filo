@@ -20,9 +20,13 @@ const chiudi = async (filo) => { try { await filo.app.close(); } catch (_) {} };
 async function riscatta(page, code) {
   await page.fill('#inviteCode', code);
   await page.click('#redeemBtn');
-  await expect(page.locator('#redeemMsg')).not.toHaveText(/Un attimo/, { timeout: 20_000 });
-  await expect(page.locator('#redeemMsg')).toBeVisible();
-  return page.locator('#redeemMsg').innerText();
+  // A riscatto riuscito il modulo (e il messaggio dentro) sparisce subito:
+  // si legge il testo, non la visibilità.
+  await page.waitForFunction(() => {
+    const t = (document.getElementById('redeemMsg')?.textContent || '').trim();
+    return t && !/Un attimo/.test(t);
+  }, null, { timeout: 20_000 });
+  return page.locator('#redeemMsg').textContent();
 }
 
 test('ogni esito del riscatto ha un testo chiaro, il campo torna usabile, gli input limite non rompono niente', async () => {
