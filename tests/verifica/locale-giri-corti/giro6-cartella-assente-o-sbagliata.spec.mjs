@@ -58,14 +58,24 @@ for (const file of ['routines/roles/verifier.md', 'routines/roles/resolver.md'])
   });
 }
 
-test('#giri-corti — anche il compito consegnato a chi verifica in locale lo dice', () => {
-  const strumento = leggi('scripts/verify-local.mjs');
-  const finestre = attorno(strumento);
-  expect(finestre.length, 'lo strumento non parla più della cartella assente: se la regola è cambiata, riscrivi questa prova').toBeGreaterThan(0);
-  for (const f of finestre) {
-    expect(f, 'il testo che chi verifica in locale riceve (e la coda della fase di correzione) '
-      + 'insegna a leggere una risposta vuota come «non c\'era niente da rilanciare», senza avvertire '
-      + 'che la stessa risposta arriva col percorso scritto in un\'altra forma')
-      .toMatch(DISTINGUE);
-  }
-});
+// Qui non si guarda il sorgente ma i DUE TESTI che chi verifica in locale legge
+// davvero: il compito che riceve all'apertura del giro e la coda della fase di
+// correzione. Sono funzioni pure, quindi si possono chiedere e leggere.
+const { buildVerifierBrief, codaText } = await import(resolve(ROOT, 'scripts/verify-local.mjs'));
+
+const testiLocali = () => [
+  ['il compito consegnato a chi verifica', buildVerifierBrief({ request: 'una richiesta', branch: 'claude/giri-corti', recipe: '(ricetta)' })],
+  ['la coda della fase di correzione', codaText({ findings: [{ level: 2, text: 'x' }], derived: [], budgets: null, branch: 'claude/giri-corti', instructions: '(coda)' })],
+];
+
+for (const [nome, testo] of testiLocali()) {
+  test(`#giri-corti — ${nome}: una risposta vuota non è per forza un'assenza`, () => {
+    const finestre = attorno(testo);
+    expect(finestre.length, `${nome} non parla più della cartella assente: se la regola è cambiata, riscrivi questa prova`).toBeGreaterThan(0);
+    for (const f of finestre) {
+      expect(f, `${nome}: insegna a leggere una risposta vuota come «non c'era niente da rilanciare», `
+        + 'senza avvertire che la stessa risposta arriva col percorso scritto in un\'altra forma')
+        .toMatch(DISTINGUE);
+    }
+  });
+}
