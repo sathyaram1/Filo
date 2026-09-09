@@ -8,7 +8,7 @@ import { readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   avviaServer, avviaFilo, apriCrediti, fintoOpenRouter, impostaOpenRouter,
-  chiamateOpenRouter, commitFirestore, chiediInChat, cartellaFiloSecurity,
+  chiamateOpenRouter, commitFirestore, chiediInChat, cartellaFiloSecurity, paginaWeb,
 } from './helpers/banco.mjs';
 
 test.skip(!cartellaFiloSecurity(), 'filo-security non è accanto al repo: il server dei crediti non si può far girare');
