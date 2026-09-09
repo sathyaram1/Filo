@@ -172,7 +172,9 @@ module.exports = function register(on, ctx) {
 
   // Riscatto: { code } → { ok, status, message, state? }.
   on(MSG.WALLET_REDEEM, filoOnly(async (msg) => {
-    const code = String((msg && msg.code) || '').trim();
+    // Il codice si estrae da ciò che è stato incollato (la riga intera del
+    // messaggio va bene): niente tetto di caratteri sul campo, niente taglio.
+    const code = W.extractCode((msg && msg.code) || '');
     if (!code) return { ok: false, status: 'invalid_code', message: W.redeemMessage('invalid_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
