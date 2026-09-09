@@ -184,7 +184,7 @@ test('l’owner con il portafoglio suo: il regalo alla propria installazione muo
     // La tabella degli utenti non si aggiorna da sola dopo il riscatto (la
     // vista owner si legge una volta per apertura): si ricarica la pagina.
     const subito = await page.locator('#ownerUsers tbody tr.sn-wallet-user').count();
-    test.info().annotations.push({ type: 'nota', description: `righe utenti subito dopo il riscatto dell'owner, senza ricaricare: ${subito}` });
+    { const nota = `righe utenti subito dopo il riscatto dell'owner, senza ricaricare: ${subito}`; test.info().annotations.push({ type: 'nota', description: nota }); console.log('[nota]', nota); }
     await page.reload();
     await page.waitForFunction(() => !document.getElementById('wallet').hidden);
     await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });

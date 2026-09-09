@@ -39,7 +39,7 @@ test('tre stati, due temi: screenshot; il conteggio locale accanto al saldo del 
     await page.click('#inviteCode');
     await page.keyboard.type('Codice: ABCD-EFGH');
     const valore = await page.inputValue('#inviteCode');
-    test.info().annotations.push({ type: 'nota', description: `digitando «Codice: ABCD-EFGH» il campo tiene «${valore}» (${valore.length} caratteri)` });
+    { const nota = `digitando «Codice: ABCD-EFGH» il campo tiene «${valore}» (${valore.length} caratteri)`; test.info().annotations.push({ type: 'nota', description: nota }); console.log('[nota]', nota); }
     await page.fill('#inviteCode', '');
 
     for (const t of ['light', 'dark']) {
@@ -58,7 +58,7 @@ test('tre stati, due temi: screenshot; il conteggio locale accanto al saldo del 
       usage: !document.getElementById('usageSection').hidden,
       refill: document.getElementById('refillHint').textContent,
     }));
-    test.info().annotations.push({ type: 'nota', description: `con il portafoglio: ${JSON.stringify(resto)}` });
+    { const nota = `con il portafoglio: ${JSON.stringify(resto)}`; test.info().annotations.push({ type: 'nota', description: nota }); console.log('[nota]', nota); }
     for (const t of ['light', 'dark']) {
       await tema(filo, page, t);
       await page.screenshot({ path: join(SHOTS, `con-portafoglio-${t}.png`), fullPage: true });
