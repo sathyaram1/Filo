@@ -75,3 +75,16 @@ test('ogni esito del server ha una frase; uno sconosciuto cade su quella generic
   }
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
 });
+
+test('il codice si estrae da quello che si incolla: riga intera, spazi, minuscole; il resto torna com\'è', () => {
+  assert.equal(W.extractCode('ABCD-EFGH'), 'ABCDEFGH');
+  assert.equal(W.extractCode(' abcd - efgh '), 'ABCDEFGH');
+  assert.equal(W.extractCode('Codice: ABCD-EFGH'), 'ABCDEFGH');
+  assert.equal(W.extractCode('il tuo invito è abcd efgh, buon divertimento'), 'ABCDEFGH');
+  assert.equal(W.extractCode('https://filo.red/?invito=ABCD-EFGH'), 'ABCDEFGH');
+  // Niente codice dentro: si passa il testo com'è, e il server dirà «non esiste».
+  assert.equal(W.extractCode('A'.repeat(10000)), 'A'.repeat(10000));
+  assert.equal(W.extractCode('<script>alert(1)</script>'), '<script>alert(1)</script>');
+  assert.equal(W.extractCode('   '), '');
+  assert.equal(W.extractCode(''), '');
+});

@@ -9,7 +9,8 @@
     "tests/verify-495-vfx3",
     "tests/verify-514-g11",
     "tests/options-home-models",
-    "tests/verify-509-giro4"
+    "tests/verify-509-giro4",
+    "tests/verify-downloads-410"
   ],
   "contenitore": {
     "nota": "Rossi a ogni giro di routine, su qualunque ramo, perché il contenitore non ha uno schermo vero né la rete aperta. Stavano nella memoria di chi verificava (le sue istruzioni ne facevano l'elenco a voce) e nessuno aveva una data di scadenza: un controllo spento senza un posto dove essere scritto è un controllo che nessuno rimetterà mai in piedi. Chi verifica confronta questo elenco con i rossi della sua corsa: quello che non è qui dentro è una regressione. Il primo elenco (feedback #563, terzo giro) ne contava sei; il settimo, «la finestra non compare sullo schermo», è uscito subito chiedendo la trasparenza solo dove il sistema sa darla e verificando sempre la posizione, che è la metà che conta. I quattro del tutto schermo sono usciti col #514, e la diagnosi scritta qui era sbagliata: non mancava il gestore di finestre, rientrava in se stesso il gestore che riparcheggia la finestra fuori schermo quando si esce dal tutto schermo (src/main/test-window-mode.js), finché il processo moriva per stack esaurito. Con la guardia i quattro casi girano nel contenitore così com'è, senza schermo e senza gestore di finestre — è il motivo per cui una voce va tolta appena si può, invece di credere alla sua spiegazione.",
