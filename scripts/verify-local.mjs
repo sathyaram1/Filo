@@ -631,6 +631,11 @@ export function buildVerifierBrief({ request, branch, recipe, history }) {
     'Boccia per ciò che non si ottiene, non per differenze di gusto: un trade-off vero',
     'si segna con `?` e lo decide l’owner.',
     '',
+    'DUE PASSI DELLA RICETTA QUI SOTTO IN LOCALE NON VALGONO, e sono gli ultimi che',
+    'leggerai: la critica NON si registra con lo strumento delle routine (non c\'è un',
+    'numero di pratica: si usa `verify-local.mjs critica`, qui sopra), e non c\'è nessun',
+    'biglietto da rilasciare alla fine. Tutto il resto della ricetta vale.',
+    '',
     '─── recipe della verifica (la stessa delle routine) ───',
     String(recipe || '(file-ruolo non trovato)'),
   ].join('\n');
