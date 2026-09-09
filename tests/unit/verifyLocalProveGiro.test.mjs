@@ -55,3 +55,38 @@ test('consegnare una correzione con file non salvati: il rifiuto elenca i file e
   assert.equal(ok.ok, true);
   assert.equal(ok.outcome, 'fixed');
 });
+
+// Nominare la cartella del giro è l'unico modo in cui quelle prove girano, e
+// una risposta vuota vuol dire due cose opposte: la cartella non c'è, oppure
+// il percorso è scritto in una forma che il comando non riconosce (le barre di
+// Windows, che il completamento del terminale produce da solo; il percorso per
+// intero dalla radice del disco). Misurato a cartella piena: con le barre
+// normali diciotto prove, con le altre due forme zero e un'uscita con errore.
+// Chi legge «No tests found» e conclude «non c'era niente da rilanciare» lascia
+// ferme le prove del giro, e il giro dopo ritrova la porta aperta — cioè
+// esattamente il ripasso che tenerle nel ramo esiste per togliere.
+// Quindi: ovunque quel comando sia scritto per esteso, accanto ci dev'essere
+// come va scritto il percorso. Sono cinque posti, e ne è già mancato uno
+// (le regole generali del repo, verifica del giro 7).
+test('ovunque si dica di rilanciare le prove del giro, si dice anche come va scritto il percorso', () => {
+  const ROOT = new URL('../../', import.meta.url);
+  const leggi = (p) => readFileSync(new URL(p, ROOT), 'utf8');
+  const superfici = [
+    ['CLAUDE.md', leggi('CLAUDE.md')],
+    ['routines/roles/verifier.md', leggi('routines/roles/verifier.md')],
+    ['routines/roles/resolver.md', leggi('routines/roles/resolver.md')],
+    ['il compito consegnato a chi verifica in locale',
+      buildVerifierBrief({ request: 'fai X', branch: 'claude/giri-corti', recipe: 'RECIPE' })],
+    ['la coda della fase di correzione',
+      codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/giri-corti' })],
+  ];
+  for (const [nome, testo] of superfici) {
+    const punti = [...testo.matchAll(/playwright\s+test\s+tests\/verifica/gi)];
+    assert.ok(punti.length > 0, `${nome} non nomina più il comando che rilancia le prove del giro: se la regola è cambiata, riscrivi questa sentinella`);
+    for (const m of punti) {
+      const intorno = testo.slice(Math.max(0, m.index - 500), m.index + 500);
+      assert.match(intorno, /percors|barre/i,
+        `${nome}: il comando c'è, ma niente dice che il percorso va scritto relativo alla radice del repo e con le barre normali — «No tests found» arriva anche a cartella piena, e viene letto come «niente da rilanciare»`);
+    }
+  }
+});
