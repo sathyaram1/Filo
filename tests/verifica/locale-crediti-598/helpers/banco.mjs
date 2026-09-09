@@ -296,6 +296,15 @@ export async function avviaFilo({ userData = cartellaTemporanea('filo-598-'), en
   return { app, shell, openTab, userData };
 }
 
+// Una pagina web qualunque su 127.0.0.1 (i content script di Filo, e con loro
+// i toast, si montano solo su una pagina che risponde).
+export async function paginaWeb(html = '<!doctype html><meta charset="utf-8"><title>Pagina di prova</title><p>Ciao</p>') {
+  const srv = createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(html); });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${srv.address().port}/prova`;
+  return { url, async chiudi() { try { srv.closeAllConnections?.(); } catch (_) {} await new Promise((r) => srv.close(r)); } };
+}
+
 // La pagina Crediti, con lo stato del portafoglio già letto (il modulo o il
 // saldo del server compaiono solo dopo la risposta del server).
 export async function apriCrediti(openTab) {
