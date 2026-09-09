@@ -49,10 +49,12 @@ test('tre stati, due temi: screenshot; il conteggio locale accanto al saldo del 
       await page.screenshot({ path: join(SHOTS, `senza-portafoglio-${t}.png`), fullPage: true });
     }
 
+    // E la riga intera incollata com'è arrivata viene riscattata lo stesso.
     const [code] = await server.codiciOwner(1);
-    await page.fill('#inviteCode', code);
+    await page.fill('#inviteCode', `Codice: ${code.toLowerCase()} — buon divertimento`);
     await page.click('#redeemBtn');
     await expect(page.locator('#redeemForm')).toBeHidden({ timeout: 15_000 });
+    await expect(page.locator('#balance')).toHaveText('5.000');
     // Cosa resta del conteggio locale con il portafoglio attivo.
     const resto = await page.evaluate(() => ({
       usageEmpty: !document.getElementById('usageEmpty').hidden ? document.getElementById('usageEmpty').textContent : null,
