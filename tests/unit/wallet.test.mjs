@@ -77,8 +77,9 @@ test('ogni esito del server ha una frase; uno sconosciuto cade su quella generic
 });
 
 test('il codice si estrae da quello che si incolla: riga intera, spazi, minuscole; il resto torna com\'è', () => {
-  assert.equal(W.extractCode('ABCD-EFGH'), 'ABCDEFGH');
-  assert.equal(W.extractCode(' abcd - efgh '), 'ABCDEFGH');
+  // Un codice già pulito passa com'è: lo normalizza il server.
+  assert.equal(W.extractCode('ABCD-EFGH'), 'ABCD-EFGH');
+  assert.equal(W.extractCode(' abcd - efgh '), 'abcd - efgh');
   assert.equal(W.extractCode('Codice: ABCD-EFGH'), 'ABCDEFGH');
   assert.equal(W.extractCode('il tuo invito è abcd efgh, buon divertimento'), 'ABCDEFGH');
   assert.equal(W.extractCode('https://filo.red/?invito=ABCD-EFGH'), 'ABCDEFGH');
