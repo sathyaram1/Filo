@@ -39,7 +39,7 @@ async function launch(userData, extraEnv) {
 // Patch di fetch nel processo main: rinnovo Google → server finto; OpenRouter → 402 a comando.
 async function patchMain(app, base) {
   return app.evaluate(async ({ safeStorage, app: eapp }, { base }) => {
-    const r = process.mainModule ? process.mainModule.require : require;
+    const r = process.getBuiltinModule('module').createRequire(eapp.getAppPath() + '/package.json');
     if (globalThis.__fake) return 'già';
     const orig = globalThis.fetch;
     globalThis.__fake = { base, or402: false, orCalls: 0, orUrls: [] };
@@ -59,7 +59,7 @@ async function patchMain(app, base) {
 
 async function loginAsOwner(app) {
   return app.evaluate(async ({ safeStorage, app: eapp }, { email, appRoot }) => {
-    const r = process.mainModule ? process.mainModule.require : require;
+    const r = process.getBuiltinModule('module').createRequire(eapp.getAppPath() + '/package.json');
     const fs = r('fs'); const path = r('path');
     fs.writeFileSync(path.join(eapp.getPath('userData'), 'auth.bin'), safeStorage.encryptString(JSON.stringify({ refreshToken: 'owner-rt', email, name: 'Owner', picture: '' })));
     const ga = r(path.join(appRoot, 'src', 'main', 'auth', 'google-auth.js'));
@@ -96,7 +96,7 @@ test('A. installazione nuova: niente chiave, home e chat chiedono l\'invito, ris
     await home.locator('#input').fill('ciao, che ore sono?');
     await home.evaluate(() => document.getElementById('inputForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })));
     await expect(home.locator('.dash-bubble').last()).toContainText(/codice d.invito/, { timeout: 20_000 });
-    const apri = home.locator('button', { hasText: 'Apri Crediti' });
+    const apri = home.locator('button.dash-action-btn', { hasText: 'Apri Crediti' });
     await expect(apri).toBeVisible();
     await apri.click();
     const deadline = Date.now() + 10000; let credPage = null;
@@ -215,13 +215,17 @@ test('A. installazione nuova: niente chiave, home e chat chiedono l\'invito, ris
     await app.evaluate(() => { globalThis.__fake.or402 = false; });
 
     // Chiave propria: precedenza e nota
-    await page.evaluate(() => chrome.runtime.sendMessage({ type: 'wallet_state' }));
-    await opt.fill('#apiKey', 'sk-or-v1-mia-chiave');
-    await opt.waitForTimeout(2500);
+    await page.evaluate(async () => { const s = await window.SN_STORAGE.getSettings(); await window.SN_STORAGE.updateSettings({ apiKeys: { ...(s.apiKeys || {}), openrouter: 'sk-or-v1-mia-chiave' } }); });
+    await page.waitForTimeout(800);
     const stOwn = await walletState(page);
     console.log('con chiave propria keySource:', stOwn.keySource, stOwn.usingOwnKey);
+    expect(stOwn.keySource).toBe('own');
     await page.reload(); await page.waitForLoadState('domcontentloaded');
-    if (stOwn.keySource === 'own') await expect(page.locator('#walletNote')).toContainText(/tua chiave/, { timeout: 15_000 });
+    await expect(page.locator('#walletNote')).toContainText(/tua chiave/, { timeout: 15_000 });
+    console.log('nota chiave propria:', await page.locator('#walletNote').textContent());
+    await page.evaluate(async () => { const s = await window.SN_STORAGE.getSettings(); await window.SN_STORAGE.updateSettings({ apiKeys: { ...(s.apiKeys || {}), openrouter: '' } }); });
+    await page.waitForTimeout(800);
+    expect((await walletState(page)).keySource).toBe('personal');
 
     // Il riavvio: stessa identità (nessun nuovo signUp)
     fake.docs.usage.push({ pseudonym: fake.walletOf(uid).pseudonym, at: new Date().toISOString(), action: 'chat', costUsd: 0.01, credits: 13 });
