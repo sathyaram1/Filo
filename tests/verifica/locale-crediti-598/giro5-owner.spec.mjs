@@ -181,6 +181,13 @@ test('l’owner con il portafoglio suo: il regalo alla propria installazione muo
     await page.click('#redeemBtn');
     await expect(page.locator('#redeemMsg')).toContainText(/riscattato/i, { timeout: 15_000 });
     await expect(page.locator('#balance')).toHaveText('5.000');
+    // La tabella degli utenti non si aggiorna da sola dopo il riscatto (la
+    // vista owner si legge una volta per apertura): si ricarica la pagina.
+    const subito = await page.locator('#ownerUsers tbody tr.sn-wallet-user').count();
+    test.info().annotations.push({ type: 'nota', description: `righe utenti subito dopo il riscatto dell'owner, senza ricaricare: ${subito}` });
+    await page.reload();
+    await page.waitForFunction(() => !document.getElementById('wallet').hidden);
+    await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
     const mio = await page.locator('#ownerUsers tbody tr.sn-wallet-user td').first().innerText();
     await page.fill('#ownerGrantPseudonym', mio);
     await page.fill('#ownerGrantCredits', '100');
