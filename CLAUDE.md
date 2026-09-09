@@ -251,7 +251,9 @@ modifica:
 Le prove di un **giro di verifica** non si cancellano: restano nel ramo, in
 `tests/verifica/<numero>/` (in locale, dove un numero non c'è, la cartella la
 dice il compito che riceve chi verifica). Chi corregge le rilancia prima di
-consegnare, e dopo la fusione restano nella suite come test di regressione.
+consegnare, per numero: `npx playwright test tests/verifica/<numero>`. La
+suite completa non le raccoglie (quelle di un solo feedback costano otto
+minuti e mezzo); `FILO_TEST_VERIFICA=1` le include tutte.
 
 Com'è fatto un test che vale: asserisce il **successo dal punto di vista
 dell'utente** (l'immagine arriva al destinatario), non l'assenza di un errore
