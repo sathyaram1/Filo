@@ -81,6 +81,33 @@ test('ogni riga che porta un numero risponde al tasto destro', async ({ openTab 
   expect(riga, `menu: ${riga}`).toMatch(/Copia|contate/i);
 });
 
+test('la ripartizione di una tessera ripartisce il numero della tessera', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  await page.evaluate(() => {
+    const head = document.querySelector('[data-card="routine"] [data-card-toggle]');
+    if (head && head.getAttribute('aria-expanded') !== 'true') head.click();
+  });
+  await page.waitForTimeout(200);
+  const t = await page.evaluate(() => {
+    const card = document.querySelector('[data-card="routine"]');
+    return {
+      numero: Number(card.querySelector('.mg-st-card-value').textContent.replace('+', '')),
+      righe: Array.from(card.querySelectorAll('.mg-st-row')).map((r) => ({
+        label: r.querySelector('.mg-st-row-label').textContent,
+        n: Number(r.querySelector('.mg-st-row-n').textContent),
+        share: r.querySelector('.mg-st-row-share').textContent,
+      })),
+    };
+  });
+  const somma = t.righe.reduce((a, r) => a + r.n, 0);
+  // Le altre tre tessere si aprono sulla ripartizione del LORO numero: aprire
+  // «2 Prober lanciati» e leggere righe che fanno 4, con percentuali di un
+  // totale che la tessera non scrive da nessuna parte, è la stessa tessera che
+  // si legge in due modi.
+  expect(somma, JSON.stringify(t)).toBe(t.numero);
+});
+
 test('il grafico degli arrivi resta leggibile a finestra stretta', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
