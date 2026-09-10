@@ -14,7 +14,7 @@ import { test, expect } from './fixtures/electron.mjs';
 const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
 let server;
-const seen = { invites: [], grants: [] };
+const seen = { invites: [], grants: [], codes: [] };
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
