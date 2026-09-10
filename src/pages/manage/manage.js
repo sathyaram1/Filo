@@ -2060,7 +2060,7 @@
       if (soloCopia && !drill) {
         voci.push({
           label: 'Copia riga e numero',
-          run: () => statsCopia(soloCopia.textContent.replace(/\s+/g, ' ').trim()),
+          run: () => statsCopia(testoDaCopiare(soloCopia)),
         });
       }
       if (barra) {
