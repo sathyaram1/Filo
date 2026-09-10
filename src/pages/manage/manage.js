@@ -1713,9 +1713,12 @@
         box.appendChild(p);
       }
     }
-    // Sotto la riga (o sotto la voce di legenda), dove ci si aspetta.
-    const dopo = ancora.closest('li') || ancora;
-    dopo.insertAdjacentElement('afterend', box);
+    // Sotto la riga (o sotto la voce di legenda), dove ci si aspetta. Sotto il
+    // numero grande di una tessera l'elenco va in FONDO alla tessera: infilato
+    // subito dopo la testata separerebbe il numero dalla riga che lo spiega.
+    const tessera = ancora.dataset.cardToggle ? ancora.closest('.mg-st-card') : null;
+    if (tessera) tessera.appendChild(box);
+    else (ancora.closest('li') || ancora).insertAdjacentElement('afterend', box);
   }
 
   function statsTitolo(fb) {
