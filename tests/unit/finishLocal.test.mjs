@@ -65,7 +65,29 @@ describe('quali spec lanciare', () => {
       'tests/table-view.spec.mjs',
       'tests/verifica/locale-suite-locale/giro1-x.spec.mjs',
       'tests/editor-chat.spec.mjs',
+      'tests/adblock.spec.mjs',
+      'tests/downloads-page.spec.mjs',
+      'tests/download-image.spec.mjs',
+      'tests/geo-block-rules.spec.mjs',
+      'tests/popup-pose.spec.mjs',
     ];
+
+    // Giro 4 di suite-locale: le regole per cartella saltavano i servizi che
+    // stanno direttamente in src/main/services, gli stili, i preload e lo shim:
+    // 19 dei 39 servizi non lanciavano niente pur avendo uno spec col loro nome.
+    test('un servizio senza cartella sua trova lo spec col suo stesso nome e la sua famiglia', () => {
+      assert.ok(specsForChangedFiles(['src/main/services/adblock.js'], tracked).includes('tests/adblock'));
+      const out = specsForChangedFiles(['src/main/services/downloads.js'], tracked);
+      assert.deepEqual(out.sort(), ['tests/download-image', 'tests/downloads-page']);
+      const geo = specsForChangedFiles(['src/main/services/geoBlock.js'], tracked);
+      assert.deepEqual(geo, ['tests/geo-block-rules']);
+    });
+
+    test('uno stile, un preload o lo shim valgono come area col nome del file', () => {
+      assert.deepEqual(specsForChangedFiles(['src/styles/popup.css'], tracked), ['tests/popup-pose']);
+      assert.deepEqual(specsForChangedFiles(['src/preload/popup-preload.js'], tracked), ['tests/popup-pose']);
+      assert.deepEqual(specsForChangedFiles(['src/main/shim/tabs-shim.js'], tracked).sort(), ['tests/tab-archive', 'tests/tabs-bar']);
+    });
 
     test('una pagina toccata porta i suoi spec per prefisso, e niente di simile per caso', () => {
       const out = specsForChangedFiles(['src/pages/options/options.js'], tracked);
