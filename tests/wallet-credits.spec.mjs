@@ -200,6 +200,11 @@ test('il riscatto dice quanti crediti locali sono passati; si dichiarano una vol
   // La frase porta i numeri del server: ingresso e locali passati.
   await expect(page.locator('#redeemMsg')).toContainText('5.000 crediti', { timeout: 10000 });
   await expect(page.locator('#redeemMsg')).toContainText('1.010 che avevi già');
+  // Il modulo dell'invito sparisce: la frase resta nella nota, visibile, anche
+  // dopo il ridisegno che segue l'avviso di saldo cambiato.
+  await page.waitForTimeout(1200);
+  await expect(page.locator('#walletNote')).toBeVisible();
+  await expect(page.locator('#walletNote')).toContainText('1.010 che avevi già');
   // L'app ha dichiarato il conteggio locale (intero, positivo).
   expect(seen.localCredits).toHaveLength(1);
   expect(seen.localCredits[0]).toBeGreaterThan(0);

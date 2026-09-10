@@ -64,6 +64,12 @@ test('i crediti che avevo prima del riscatto si sommano a quelli d’ingresso (e
     // 5.000 d'ingresso + 1.234 miei = 6.234.
     await expect(page.locator('#balance')).toHaveText('6.234', { timeout: 15_000 });
     await expect(page.locator('#redeemForm')).toBeHidden();
+    // La frase con i numeri resta VISIBILE (il modulo dell'invito è sparito),
+    // anche dopo il ridisegno che segue l'avviso di saldo cambiato.
+    await page.waitForTimeout(1500);
+    await expect(page.locator('#walletNote')).toBeVisible();
+    await expect(page.locator('#walletNote')).toContainText('5.000 crediti');
+    await expect(page.locator('#walletNote')).toContainText('1.234 che avevi già');
     const w = [...server.store.docs.wallets.values()][0];
     expect(w.creditsGranted).toBe(6234);
     console.log('[nota]', 'errori della pagina durante il riscatto:', JSON.stringify(errori));
@@ -96,7 +102,8 @@ test('sopra il tetto dei crediti migrabili: o tutti, o lo si dice (mai un taglio
     await expect(page.locator('#redeemMsg')).toContainText(/riscattato/i, { timeout: 15_000 });
     await page.waitForTimeout(1500);
     const saldo = await page.locator('#balance').innerText();
-    const msg = await page.locator('#redeemMsg').innerText();
+    await expect(page.locator('#walletNote')).toBeVisible();
+    const msg = await page.locator('#walletNote').innerText();
     const w = [...server.store.docs.wallets.values()][0];
     console.log('[nota]', `12.000 locali → saldo «${saldo}», concessi ${w.creditsGranted}, messaggio «${msg}»`);
     if (w.creditsGranted < 17_000) {
@@ -119,14 +126,16 @@ test('il tetto globale basta per l’ingresso ma non per ingresso + miei crediti
     await page.fill('#inviteCode', code);
     await page.click('#redeemBtn');
     await page.waitForFunction(() => !/Un attimo/.test(document.getElementById('redeemMsg').textContent), null, { timeout: 15_000 });
-    const msg = await page.locator('#redeemMsg').innerText();
+    await page.waitForTimeout(1500);
+    const msg = await page.locator('#walletNote').innerText();
     const w = [...server.store.docs.wallets.values()][0];
     console.log('[nota]', `tetto 5 $ → portafoglio ${w ? w.creditsGranted : 'NESSUNO'}, messaggio «${msg}»`);
     // Con lo stesso codice e senza crediti locali l'utente entrerebbe: rifiutarlo
     // per i suoi crediti in più è un'entrata negata. Atteso: entra (almeno con i 5.000).
     expect(w && w.creditsGranted >= 5000).toBeTruthy();
     // E il messaggio dice quanti dei suoi sono passati.
-    expect(msg).toMatch(new RegExp(`${w.migratedLocal} dei 1\.234`));
+    const passati = String(w.migratedLocal).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    expect(msg).toContain(`${passati} dei 1.234`);
   } finally { await chiudi(filo); }
 });
 

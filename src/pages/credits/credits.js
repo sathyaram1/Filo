@@ -63,7 +63,26 @@
   }
 
   // ── Crediti sul server (#598) ──────────────────────────────────────────────
+  // Una conferma (riscatto riuscito, nuova chiave) deve restare leggibile: nello
+  // stesso istante arriva l'avviso di saldo cambiato e la pagina si ridisegna da
+  // sola, e un ridisegno che nasconde la nota cancellava la frase prima che
+  // l'utente la leggesse (primo giro di verifica del ramo -b). La conferma vive
+  // qui e vince su ogni ridisegno finché l'utente non fa un'altra azione.
+  let confirmation = null;
+  function showConfirmation(text) {
+    confirmation = text || null;
+    const note = $('walletNote');
+    if (confirmation) { note.textContent = confirmation; note.hidden = false; }
+  }
   function renderWallet(w) {
+    renderWalletState(w);
+    if (confirmation) {
+      const note = $('walletNote');
+      note.textContent = confirmation;
+      note.hidden = false;
+    }
+  }
+  function renderWalletState(w) {
     const box = $('wallet');
     const reissue = $('reissueBtn');
     const resetBtn = $('resetIdentityBtn');
@@ -178,18 +197,20 @@
   async function reissueKey() {
     const btn = $('reissueBtn');
     const note = $('walletNote');
+    confirmation = null;
     btn.disabled = true;
     note.textContent = 'Un attimo…';
+    note.hidden = false;
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_REISSUE }); } catch (_) { r = null; }
     btn.disabled = false;
     if (r && r.ok) {
+      showConfirmation(r.message || 'Fatto.');
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
-      $('walletNote').textContent = r.message || 'Fatto.';
-      $('walletNote').hidden = false;
       return;
     }
     note.textContent = (r && r.message) || 'Non ci sono riuscito: riprova.';
+    note.hidden = false;
   }
 
   async function resetIdentity() {
@@ -208,6 +229,7 @@
     const msg = $('redeemMsg');
     const code = String(input.value || '').trim();
     if (!code) { input.focus(); return; }
+    confirmation = null;
     btn.disabled = true;
     input.disabled = true;
     msg.hidden = false;
@@ -222,6 +244,9 @@
     if (r && r.ok) {
       msg.textContent = r.message || 'Fatto.';
       msg.classList.add('is-ok');
+      // Il modulo dell'invito sparisce col portafoglio: la frase (con quanti
+      // crediti sono passati) resta nella nota, fuori dal modulo.
+      showConfirmation(r.message || 'Fatto.');
       // Il saldo grande e i codici arrivano dallo stato nuovo. La vista owner
       // sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
