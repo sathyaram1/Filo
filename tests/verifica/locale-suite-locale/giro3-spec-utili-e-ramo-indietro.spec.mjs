@@ -45,9 +45,9 @@ test('la scelta resta mirata: nessuna area tira dentro la suite intera', async (
   for (const f of files) {
     const specs = m.specsForChangedFiles([f], tracked);
     expect(specs.length, `${f} sceglie ${specs.length} spec`).toBeLessThan(60);
-    if (specs.length) conSpec++;
+    if (specs.length && specs.every((s) => existsSync(join(ROOT, `${s}.spec.mjs`)))) conSpec++;
   }
-  // Più di un file sorgente su tre deve trovare almeno uno spec: prima erano 12 su 254.
+  // Più di un file sorgente su tre deve trovare almeno uno spec ESISTENTE: prima erano 12 su 254.
   expect(conSpec).toBeGreaterThan(files.length / 3);
 });
 
