@@ -202,6 +202,18 @@
     return TH().authorKind(fb && fb.clientId);
   }
 
+  /**
+   * Chi ha mandato questa segnalazione NON si legge su questo computer. PURA.
+   *
+   * `clientId` è uno dei campi che viaggiano cifrati: senza la chiave
+   * dell'owner resta ciphertext, e `authorKind` di un ciphertext risponde
+   * «Utente», che è il suo ripiego per «non lo riconosco». Contarlo come utente
+   * vuol dire rispondere «zero» a «solo le routine cloud» senza dire perché.
+   */
+  function creatorUnreadable(fb) {
+    return MR().valueUnreadable(fb && fb.clientId);
+  }
+
   // ── I giri di verifica, letti dalle note ──────────────────────────────────
   //
   // Il verbale di ogni giro finisce nella conversazione del feedback, scritto
