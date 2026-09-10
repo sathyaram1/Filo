@@ -412,7 +412,29 @@
     let passSegnalato = false;
     let fermato = false;
     const turni = TH().splitNotes(notes).filter((s) => s && s.role === 'model');
+    // ⚠️ CHI INCOLLA UN PEZZO DI CONVERSAZIONE INCOLLA ANCHE LA RIGA CHE NE
+    // SEPARA I TURNI, e quella riga apre un turno nuovo per chiunque la scriva.
+    // Due difese, tutte e due sulla ripetizione, che è quello che una citazione
+    // ha e un turno vero no:
+    //   1. il marcatore. Il server ne scrive uno per turno, con l'istante in
+    //      cui l'ha appeso: se lo stesso marcatore ricompare, il secondo è la
+    //      copia che qualcuno ha incollato.
+    //   2. il verbale. Lo stesso verbale, riga per riga, non lo si scrive due
+    //      volte: chi lo ripete lo sta citando (il report di chi corregge
+    //      riporta il verbale a cui risponde).
+    // Il prezzo è un conteggio in DIFETTO nei casi rari in cui due turni veri
+    // cadono nello stesso minuto: è il verso giusto in cui sbagliare, perché un
+    // giro inventato sposta il lavoro nella fetta sbagliata e chi guarda non ha
+    // modo di accorgersene (patterns/un-testo-scritto-da-qualcuno-si-legge-
+    // dalla-struttura.md).
+    const marcatoriVisti = new Set();
+    const verbaliVisti = new Set();
     for (const turno of turni) {
+      const marcatore = turno && turno.ts ? `model|${turno.ts}` : '';
+      if (marcatore) {
+        if (marcatoriVisti.has(marcatore)) continue;
+        marcatoriVisti.add(marcatore);
+      }
       const lines = String((turno && turno.body) || '').replace(/\r\n?/g, '\n').split('\n');
       let i = 0;
       while (i < lines.length && !lines[i].trim()) i += 1;
