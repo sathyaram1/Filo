@@ -544,8 +544,42 @@ test('il report di chi corregge non conta come un giro passato', () => {
   for (const corpo of [
     'Ho rilanciato le prove del giro.\nVerifica superata. Nessuna regressione.',
     'Ho rilanciato le prove del giro.\n\nVerifica superata. Nessuna regressione.',
+    // Chi corregge cita la frase vecchia raccontando il giro prima: prima
+    // inventava un giro bloccante che il server non aveva mai registrato.
+    'Ho corretto.\n\nControllo funzionalità NON superato era il verdetto del giro scorso.',
+    'Ho corretto.\n\nVerifica: 3 rilievi.',
   ]) {
     const notes = conversazione('Provato: tutto quanto.', `${TURNO_CORRETTORE}\n${corpo}`);
     assert.deepEqual(esito(notes), { kinds: ['fix', 'pass'], giri: 1 }, corpo);
+  }
+});
+
+test('il riassunto di un verbale SUPERATO non apre un secondo giro', () => {
+  // Un pass è una nota sola: apertura e riassunto sullo stesso capoverso, e
+  // tutto il resto è ancora riassunto. Una riga più giù che comincia come un
+  // verbale faceva uscire la lavorazione dalla torta e la dichiarava ferma.
+  const pass = (riassunto) => [
+    VR.roundNote({
+      summary: 'Provato: tutto quanto.',
+      findings: [{ level: 1, text: 'Manca l\'hover sull\'icona' }],
+      decision: { fix: [{ level: 1 }] },
+    }),
+    '',
+    `${TURNO_CORRETTORE}\nCorretto.`,
+    '',
+    TURNO_PASS,
+    `Verifica superata. ${riassunto}`,
+  ].join('\n');
+
+  const pulito = esito(pass('Provato tutto: adesso funziona.'));
+  assert.deepEqual(pulito, { kinds: ['fix', 'pass'], giri: 1 });
+
+  for (const riga of [
+    'Controllo funzionalità NON superato nel giro scorso, adesso sì.',
+    'Verifica: funziona, ma migliorabile — così diceva il giro scorso.',
+    'Verifica: 2 rilievi del giro scorso sono chiusi.',
+    'Il lavoro si ferma quando il registro non risponde: adesso non più.',
+  ]) {
+    assert.deepEqual(esito(pass(`Provato tutto.\n\n${riga}`)), pulito, riga);
   }
 });
