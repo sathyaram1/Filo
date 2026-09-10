@@ -493,14 +493,31 @@
     .mg-st-bar:hover { fill: var(--sn-fg); }
     /* La fetta della torta fa quello che fa la sua voce di legenda. */
     .mg-st-pie path, .mg-st-pie circle { cursor: pointer; }
+    /* Fette e barrette prendono il fuoco da tastiera: il contorno deve vedersi
+       anche dentro un SVG, dove `outline` non disegna niente in tutti i motori. */
+    .mg-st-pie path:focus-visible, .mg-st-pie circle:focus-visible, .mg-st-bar:focus-visible {
+      outline: 2px solid var(--sn-accent); outline-offset: 1px;
+      stroke: var(--sn-fg); stroke-width: 2;
+    }
     .mg-st-bar-axis { fill: var(--sn-muted); font-size: 10px; }
     .mg-st-more { list-style: none; margin: 0; padding: 0; max-width: 620px; }
     .mg-st-more li {
-      display: flex; align-items: baseline; gap: 12px;
-      font-size: 13px; padding: 7px 2px;
       border-bottom: 1px solid var(--sn-border);
     }
     .mg-st-more li:last-child { border-bottom: none; }
+    /* La riga è un tasto dove porta a qualcosa, e un <div> dove non porta: la
+       forma è la stessa, così l'elenco resta una colonna sola. */
+    .sn-page .mg-st-more-riga {
+      display: flex; align-items: baseline; gap: 12px; width: 100%;
+      font-size: 13px; padding: 7px 2px; margin: 0;
+      background: none; border: none; border-radius: 6px;
+      font-family: inherit; text-align: left; color: inherit;
+    }
+    .sn-page button.mg-st-more-riga { cursor: pointer; }
+    .sn-page button.mg-st-more-riga:hover { background: var(--sn-hover); }
+    .sn-page button.mg-st-more-riga:focus-visible {
+      outline: 2px solid var(--sn-accent); outline-offset: -2px;
+    }
     .mg-st-more-label { color: var(--sn-muted); }
     .mg-st-more-value { margin-left: auto; color: var(--sn-fg); font-variant-numeric: tabular-nums; }
 
