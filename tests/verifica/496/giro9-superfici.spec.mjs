@@ -12,11 +12,17 @@ const AG = '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---';
 
 function lavorazione(id, seq, giri, giorni) {
   const b = [];
+  let t = 0;
+  // Ogni nota è un turno suo: è così che Filo appende il verbale e il report di
+  // chi corregge.
+  const turno = () => `${AG} ${t += 1}`;
   for (let k = 0; k < giri; k += 1) {
+    if (k) b.push(turno());
     b.push('Verifica: 1 rilievo.', 'Provato: tutto.',
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
-      '- [1] Un rilievo', '', AG, 'Corretto.', '');
+      '- [1] Un rilievo', '', turno(), 'Corretto.', '');
   }
+  if (giri) b.push(turno());
   b.push('Verifica superata.');
   return {
     _id: id, seq, subSeq: 0, clientId: 'tester@example.com',
