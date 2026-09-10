@@ -1462,7 +1462,7 @@
         const q = statsPercent(bloccate, res.ricevuti.total);
         return q ? `${bloccate} · ${q}` : String(bloccate);
       })()],
-      ['Partenze delle routine, tutti i ruoli', statsNum(res.routine.total, res.routine.parziale)],
+      ['Partenze delle routine, tutti i ruoli', registro ? statsNum(res.routine.total, res.routine.parziale) : '—'],
     ];
     mgStMore.innerHTML = righe.map(([label, value]) => (
       `<li><span class="mg-st-more-label">${esc(label)}</span>`
