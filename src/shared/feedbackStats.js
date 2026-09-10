@@ -282,22 +282,28 @@
    * I giri di verifica di un feedback, dal più vecchio. PURA.
    *
    * ⚠️ QUI SI LEGGE PROSA SCRITTA DA QUALCUNO, E LA PROSA MENTE.
-   * Per tre giri di verifica di fila lo stesso danno è tornato da una porta
-   * nuova: una frase scritta dentro un rilievo, un commento di una persona, una
-   * riga del riassunto. Ogni volta il conto della torta cambiava — un lavoro
-   * costato cinque critiche finiva nella fetta verde «passata subito». La cura
-   * non è aggiungere un'eccezione per volta: è ancorarsi a COME il verbale è
-   * fatto, e fidarsi solo di quello. Tre àncore, tutte strutturali:
+   * Per quattro giri di verifica di fila lo stesso danno è tornato da una porta
+   * nuova: una frase dentro un rilievo, un commento di una persona, una riga
+   * del riassunto, il report di chi corregge. Ogni volta il conto della torta
+   * cambiava, e un lavoro costato cinque critiche finiva nella fetta verde
+   * «passata subito». Cercare la frase d'apertura in ogni capoverso è una
+   * rincorsa persa in partenza: le stesse parole le scrive anche chi racconta.
+   * L'unica cosa che distingue il verbale dal racconto è DOVE sta, e quello si
+   * sa con certezza. Due àncore, tutte e due strutturali:
    *
    *   1. SOLO I TURNI DI FILO. La conversazione dice già di chi è ogni turno
    *      (SN_FEEDBACK_THREAD.splitNotes): quello che scrive una persona non è
    *      mai un verbale di verifica, per quanto ne citi le parole.
-   *   2. UN VERBALE COMINCIA UN PARAGRAFO, e finché è aperto non se ne apre un
-   *      altro. Il server lo scrive dopo una riga vuota, mai in mezzo a una
-   *      frase; e non annida mai un verbale dentro un altro, quindi una riga
-   *      d'apertura che compare nel riassunto è il verificatore che racconta.
-   *   3. L'ESITO STA SU UNA RIGA SOLA, l'ultima prima dell'elenco dei rilievi
-   *      (vedi ROUND_OUTCOME_PHRASES).
+   *   2. UN VERBALE È UNA NOTA INTERA, E UNA NOTA È UN TURNO. Il server scrive
+   *      il verbale con SN_VERIFIER_ROUND.roundNote e lo appende con
+   *      SN_FEEDBACK_THREAD.appendModelTurn: marcatore, poi il testo della
+   *      nota. Quindi il verbale comincia alla PRIMA riga scritta del turno, e
+   *      un turno porta al più un verbale. Una riga d'apertura che compare più
+   *      giù è qualcuno che racconta: il report di chi corregge, o il riassunto
+   *      del verificatore.
+   *
+   * Dentro il verbale, l'esito sta su UNA RIGA SOLA, l'ultima prima dell'elenco
+   * dei rilievi (vedi ROUND_OUTCOME_PHRASES): il riassunto sta tutto sopra.
    *
    * @returns {Array<{kind:string, findings:Array}>}
    */
@@ -311,72 +317,35 @@
     const turni = TH().splitNotes(notes).filter((s) => s && s.role === 'model');
     for (const turno of turni) {
       const lines = String((turno && turno.body) || '').replace(/\r\n?/g, '\n').split('\n');
-      const delTurno = [];
-      let current = null;
-      // A inizio turno si è già a inizio paragrafo.
-      let inizioParagrafo = true;
-      const chiudi = () => {
-        if (!current) return;
-        const parsed = VR().parseFindings(current.lines.join('\n'));
-        let kind = current.kind;
-        if (!kind) {
-          const fine = current.lines.findIndex((l) => FINDING_LINE.test(l));
-          const testa = fine < 0 ? current.lines : current.lines.slice(0, fine);
-          // L'ultima riga scritta prima dei rilievi: è lì che il server mette
-          // l'esito, e il riassunto sta tutto sopra.
-          let ultima = '';
-          for (let i = testa.length - 1; i >= 0; i -= 1) {
-            if (testa[i].trim()) { ultima = testa[i]; break; }
-          }
-          const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(ultima));
-          if (phrase) kind = phrase.kind;
-          else {
-            // Verbale senza la frase d'esito (storico, o testo modificato a
-            // mano): lo dice il livello più alto — 2 e 3 sono "la cosa chiesta
-            // non si ottiene", e lì il lavoro non prosegue.
-            const max = VR().maxLevel(parsed.findings);
-            kind = max !== null && max >= 2 ? 'stop' : 'rimandati';
-          }
+      // La prima riga scritta del turno: è lì, e solo lì, che un verbale apre.
+      let i = 0;
+      while (i < lines.length && !lines[i].trim()) i += 1;
+      if (i >= lines.length) continue;
+      const opener = ROUND_OPENERS.find((o) => o.re.test(lines[i]));
+      if (!opener) continue;
+      const corpo = lines.slice(i);
+      const parsed = VR().parseFindings(corpo.join('\n'));
+      let kind = opener.kind;
+      if (!kind) {
+        const fine = corpo.findIndex((l) => FINDING_LINE.test(l));
+        const testa = fine < 0 ? corpo : corpo.slice(0, fine);
+        // L'ultima riga scritta prima dei rilievi: è lì che il server mette
+        // l'esito, e il riassunto sta tutto sopra.
+        let ultima = '';
+        for (let k = testa.length - 1; k >= 0; k -= 1) {
+          if (testa[k].trim()) { ultima = testa[k]; break; }
         }
-        delTurno.push({ kind, findings: parsed.findings, daPass: current.kind === 'pass' });
-        current = null;
-      };
-      for (const raw of lines) {
-        const vuota = !raw.trim();
-        if (current) {
-          // Il verbale finisce dove finisce il suo elenco di rilievi (o, per un
-          // pass, in fondo al suo paragrafo): da lì in poi un'apertura vale di
-          // nuovo.
-          if (vuota && (current.rilievi || current.kind === 'pass')) {
-            chiudi();
-            inizioParagrafo = true;
-            continue;
-          }
-          current.lines.push(raw);
-          if (FINDING_LINE.test(raw)) current.rilievi = true;
-          inizioParagrafo = vuota;
-          continue;
+        const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(ultima));
+        if (phrase) kind = phrase.kind;
+        else {
+          // Verbale senza la frase d'esito (storico, o testo modificato a
+          // mano): lo dice il livello più alto — 2 e 3 sono "la cosa chiesta
+          // non si ottiene", e lì il lavoro non prosegue.
+          const max = VR().maxLevel(parsed.findings);
+          kind = max !== null && max >= 2 ? 'stop' : 'rimandati';
         }
-        const opener = inizioParagrafo ? ROUND_OPENERS.find((o) => o.re.test(raw)) : null;
-        if (opener) {
-          current = { kind: opener.kind, lines: [raw], rilievi: false };
-          inizioParagrafo = false;
-          continue;
-        }
-        inizioParagrafo = vuota;
       }
-      chiudi();
-      // Filo scrive il verbale IN FONDO al turno, e un pass chiude l'iter:
-      // quindi un «Verifica superata.» con un altro verbale dopo, nello stesso
-      // turno, non è un verbale — è chi ha corretto che racconta di aver
-      // rilanciato le prove. Si scarta solo quello, mai un giro con dei
-      // rilievi: sbagliare per eccesso qui è ciò che dipinge di verde il lavoro
-      // più combattuto.
-      for (let i = 0; i < delTurno.length; i += 1) {
-        const r = delTurno[i];
-        if (r.daPass && !r.findings.length && i < delTurno.length - 1) continue;
-        rounds.push({ kind: r.kind, findings: r.findings });
-      }
+      rounds.push({ kind, findings: parsed.findings });
     }
     return rounds;
   }
