@@ -1302,6 +1302,13 @@
       fette.forEach((f) => {
         const li = document.createElement('li');
         li.dataset.group = String(f.giri);
+        // La voce di legenda apre i lavori che ha contato, come le righe delle
+        // ripartizioni: due elenchi disegnati uguali devono rispondere uguale.
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mg-st-legend-btn';
+        btn.dataset.drill = `giri:${f.giri}`;
+        btn.setAttribute('aria-expanded', 'false');
         const sw = document.createElement('span');
         sw.className = 'mg-st-swatch';
         sw.style.background = stPieColor(f.giri);
@@ -1311,7 +1318,8 @@
         const n = document.createElement('span');
         n.className = 'mg-st-legend-n';
         n.textContent = `${f.n} · ${statsPercent(f.n, totale)}`;
-        li.append(sw, label, n);
+        btn.append(sw, label, n);
+        li.appendChild(btn);
         mgStPieLegend.appendChild(li);
       });
     }
