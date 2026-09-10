@@ -2034,12 +2034,14 @@
         const key = drill.dataset.drill || drill.dataset.drillMenu || `giri:${drill.dataset.group}`;
         const quante = statsSegnalazioni(key).length;
         voci.push({
-          label: statsDrill === key ? 'Chiudi l’elenco' : `Mostra le ${quante === 1 ? 'segnalazione contata' : 'segnalazioni contate'}`,
+          label: statsDrill === key
+            ? 'Chiudi l’elenco'
+            : (quante === 1 ? 'Mostra la segnalazione contata' : 'Mostra le segnalazioni contate'),
           run: () => toggleStatsDrill(key, statsZonaDi(drill)),
         });
         voci.push({
           label: 'Copia riga e numero',
-          run: () => statsCopia(drill.textContent.replace(/\s+/g, ' ').trim()),
+          run: () => statsCopia(testoDaCopiare(drill)),
         });
       }
       if (finestra && !drill) {
