@@ -2,9 +2,9 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-«In coda: 12» non è una risposta: è mezza risposta. La domanda che segue è
-sempre la stessa — *quali dodici?* — e senza una strada per arrivarci si torna
-a mano su un'altra pagina a ricostruire il filtro a memoria. Sulla scheda
+«In coda: 12» è mezza risposta. La domanda che segue è sempre la stessa,
+*quali dodici?*, e senza una strada per arrivarci si torna a mano su un'altra
+pagina a ricostruire il filtro a memoria. Sulla scheda
 «Statistiche feedback» (#496) questa mancanza è stata trovata in quattro giri
 di verifica diversi, una superficie per giro: prima le righe di ripartizione,
 poi le priorità, poi la legenda di una torta, poi le fette e le barrette.
@@ -17,12 +17,12 @@ poi le priorità, poi la legenda di una torta, poi le fette e le barrette.
 - **Nessuna eccezione dentro la stessa schermata.** Due elenchi disegnati
   uguali devono rispondere uguale. Due torte affiancate di cui una si apre e
   l'altra no, o una legenda che si apre mentre la fetta gemella tace, sono
-  differenze che si scoprono solo cliccando e non ottenendo niente — ed è
-  esattamente lì che è nato il giro di verifica in più.
+  differenze che si scoprono solo cliccando e non ottenendo niente. È lì che
+  nasce il giro di verifica in più.
 - **Anche il tasto destro.** «Voglio fare qualcosa qui» su un numero vuol dire
   due cose: fammi vedere le segnalazioni contate, e portami via questo numero
   (copia riga e numero). Se sull'elemento il tasto destro apre il menu generale
-  della pagina — quello che esce anche su uno spazio bianco — la promessa del
+  della pagina, quello che esce anche su uno spazio bianco, la promessa del
   tasto destro di Filo lì non è mantenuta.
 - **L'elenco arriva fino all'oggetto vero.** Aprire una riga e trovare dodici
   titoli non basta se da un titolo non si arriva alla segnalazione: la catena
