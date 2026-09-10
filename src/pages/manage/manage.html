@@ -466,8 +466,12 @@
     .mg-st-legend-label { color: var(--sn-fg); }
     .mg-st-legend-n { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--sn-fg); }
     .mg-st-bars { width: 100%; height: 140px; display: block; }
-    .mg-st-bar { fill: var(--sn-accent); }
+    /* Anche la barretta porta da qualche parte (restringe la finestra a quel
+       periodo): il puntatore lo dice, come su ogni altro numero della scheda. */
+    .mg-st-bar { fill: var(--sn-accent); cursor: pointer; }
     .mg-st-bar:hover { fill: var(--sn-fg); }
+    /* La fetta della torta fa quello che fa la sua voce di legenda. */
+    .mg-st-pie path, .mg-st-pie circle { cursor: pointer; }
     .mg-st-bar-axis { fill: var(--sn-muted); font-size: 10px; }
     .mg-st-more { list-style: none; margin: 0; padding: 0; max-width: 620px; }
     .mg-st-more li {
