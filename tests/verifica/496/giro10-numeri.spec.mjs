@@ -56,9 +56,12 @@ test('una segnalazione con la data nel futuro non sparisce dal grafico in silenz
     nota: document.getElementById('mgStBarsNote').textContent,
   }));
   console.log('FUTURO:', JSON.stringify(stato, null, 1));
-  // O la segnalazione è nel grafico, o il grafico dice quante ne lascia fuori.
+  // O le colonne contengono tutte le segnalazioni della tessera, o la riga
+  // sotto il grafico dice quante ne lascia fuori (come fa per quelle senza
+  // data d'arrivo leggibile).
   const dichiara = /non (?:ha|hanno) una data|nel futuro|fuori dal grafico|non (?:è|sono) nel grafico/i.test(stato.nota);
-  expect(dichiara || stato.tessera === '3', `tessera ${stato.tessera}, nota «${stato.nota}»`).toBeTruthy();
+  expect(dichiara || stato.somma === Number(stato.tessera),
+    `tessera ${stato.tessera}, colonne ${stato.somma}, nota «${stato.nota}»`).toBeTruthy();
 });
 
 test('la riga di avviso porta dei numeri, quindi il tasto destro risponde', async ({ openTab }) => {
