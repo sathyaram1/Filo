@@ -91,6 +91,13 @@ test('ogni riga che porta un numero risponde al tasto destro', async ({ openTab 
     ['nota sotto il grafico', barre],
   ].filter(([, m]) => generale.test(m) || !/Copia|contate/i.test(m));
   expect(muti.map(([n]) => n).join(', '), JSON.stringify({ riga, nota, barre })).toBe('');
+
+  // Traccia visiva del giro, chiaro e scuro.
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: `${OUT}/496-giro9-chiaro.png`, fullPage: true });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${OUT}/496-giro9-scuro.png`, fullPage: true });
 });
 
 test('la ripartizione di una tessera ripartisce il numero della tessera', async ({ openTab }) => {
