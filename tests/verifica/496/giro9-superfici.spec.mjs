@@ -8,14 +8,14 @@ const URL = 'filo://manage/manage.html';
 const OUT = 'tests/.shots';
 const ora = Date.now();
 const iso = (g) => new Date(ora - g * 24 * 3600 * 1000).toISOString();
-const AG = '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---';
+const AG = (n) => `--- Aggiornamento dell'agente del 01/09/2026, ${n} ---`;
 
 function lavorazione(id, seq, giri, giorni) {
   const b = [];
   let t = 0;
   // Ogni nota è un turno suo: è così che Filo appende il verbale e il report di
   // chi corregge.
-  const turno = () => `${AG} ${t += 1}`;
+  const turno = () => AG(t += 1);
   for (let k = 0; k < giri; k += 1) {
     if (k) b.push(turno());
     b.push('Verifica: 1 rilievo.', 'Provato: tutto.',
