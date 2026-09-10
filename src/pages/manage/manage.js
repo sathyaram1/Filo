@@ -2090,6 +2090,19 @@
     renderStats();
   }
   if (mgStBars) {
+    // Il grafico si disegna in pixel veri, quindi va ridisegnato quando la
+    // finestra cambia larghezza. Ridisegnare non cambia l'altezza del riquadro
+    // (la fissa il CSS), quindi l'osservatore non si richiama da solo.
+    if (typeof ResizeObserver === 'function') {
+      let ultimaLarghezza = 0;
+      const osserva = new ResizeObserver(() => {
+        const w = Math.round(mgStBars.getBoundingClientRect().width || 0);
+        if (!w || w === ultimaLarghezza) return;
+        ultimaLarghezza = w;
+        if (statsActive()) renderStats();
+      });
+      osserva.observe(mgStBars);
+    }
     mgStBars.addEventListener('click', (e) => {
       const barra = e.target.closest('[data-bucket]');
       if (barra) statsRestringi(Number(barra.dataset.bucket), barra.dataset.fine);
