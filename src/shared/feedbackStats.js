@@ -238,7 +238,7 @@
 
   // ── Come si riconosce il verbale di un giro ───────────────────────────────
   //
-  // ⚠️ CINQUE GIRI DI VERIFICA DI FILA HANNO TROVATO LA STESSA PORTA DA UN LATO
+  // ⚠️ SEI GIRI DI VERIFICA DI FILA HANNO TROVATO LA STESSA PORTA DA UN LATO
   // NUOVO, e il motivo è sempre stato lo stesso: si cercavano PAROLE, e le
   // stesse parole le scrive anche chi racconta. Dentro un rilievo, in un
   // commento di una persona, nel riassunto, nella prima riga del report di chi
@@ -246,7 +246,7 @@
   // ricerca a un posto sempre più preciso è una rincorsa persa: la prima riga
   // di un turno la scrive anche chi non sta verbalizzando niente.
   //
-  // Quindi non si cerca più una frase: si chiede al verbale di ESIBIRE LA SUA
+  // Quindi non si cerca una frase: si chiede al verbale di ESIBIRE LA SUA
   // STRUTTURA. Il verbale con dei rilievi dichiara quanti sono («Verifica: 2
   // rilievi.»), li elenca, e prima dell'elenco scrive con quale decisione si
   // chiude. Tre cose che devono combaciare: il numero dichiarato è il numero
@@ -254,11 +254,23 @@
   // frase raccontata non combacia mai per caso, e da lì vengono TUTTI i numeri
   // che la scheda mostra.
   //
+  // ⚠️ MA UNA STRUTTURA SE LA PORTA DIETRO ANCHE CHI LA CITA, e citarla è quello
+  // che chi corregge fa tutti i giorni: riporta nel report il verbale a cui sta
+  // rispondendo, o elenca i rilievi che ha chiuso col livello davanti. Quindi
+  // alla struttura si aggiunge il POSTO, che una citazione non può occupare:
+  //   1. il verbale è UN TURNO INTERO. Il server lo appende da solo
+  //      (SN_FEEDBACK_THREAD.appendModelTurn), quindi comincia alla prima riga
+  //      scritta del turno e finisce con l'ultimo rilievo. Prosa prima o dopo
+  //      l'elenco vuol dire che quell'elenco è dentro il testo di qualcun altro.
+  //   2. la riga di decisione DEVE esserci. Indovinarla dal livello più alto
+  //      trasformava il report di chi corregge — che elenca i rilievi chiusi,
+  //      col livello davanti — in un giro bloccante mai successo.
+  //
   // Il verbale di un giro SUPERATO non ha struttura da esibire: è una riga di
-  // parole, indistinguibile da chi quelle parole le cita. Non lo si conta più
-  // come un giro: dice soltanto «questo lavoro è passato», che è un sì/no, e
-  // che una lavorazione chiusa dice già per conto suo. Ripetuto, non cambia
-  // niente; falsificato su un lavoro che ha davvero girato, nemmeno.
+  // parole, indistinguibile da chi quelle parole le cita. Non lo si conta come
+  // un giro: dice soltanto «questo lavoro è passato», che è un sì/no, e che una
+  // lavorazione chiusa dice già per conto suo. Ripetuto, non cambia niente;
+  // falsificato su un lavoro che ha davvero girato, nemmeno.
 
   // Il verbale con rilievi: riga intera, col numero che poi va verificato.
   const ROUND_HEAD_WITH_FINDINGS = /^\s*Verifica:\s*(\d+)\s+riliev(?:o|i)\.?\s*$/i;
