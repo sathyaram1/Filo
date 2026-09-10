@@ -1345,7 +1345,20 @@
     }
     if (g.ferme) frasi.push(`${g.ferme} ${g.ferme === 1 ? 'lavorazione chiusa' : 'lavorazioni chiuse'} senza un pass registrato`);
     if (g.senzaDati) frasi.push(`${g.senzaDati} senza verbale di verifica nelle note`);
-    if (mgStPieNote) mgStPieNote.textContent = frasi.join(' · ');
+    if (mgStPieNote) {
+      mgStPieNote.textContent = frasi.join(' · ');
+      // Le conversazioni tagliate dal tetto sono la coda della distribuzione,
+      // cioè proprio quello che questa torta esiste per mostrare: si dice
+      // quante sono, sempre, invece di lasciarle scivolare nella fetta verde.
+      if (g.tagliate) {
+        const p = document.createElement('span');
+        p.className = 'mg-st-avviso';
+        p.textContent = g.tagliate === 1
+          ? ' 1 lavorazione ha la conversazione tagliata perché troppo lunga: i suoi giri non ci sono più e non è in questi conti.'
+          : ` ${g.tagliate} lavorazioni hanno la conversazione tagliata perché troppo lunga: i loro giri non ci sono più e non sono in questi conti.`;
+        mgStPieNote.appendChild(p);
+      }
+    }
   }
 
   // ── L'andamento nel tempo ─────────────────────────────────────────────────
