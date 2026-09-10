@@ -49,6 +49,52 @@ describe('quali spec lanciare', () => {
     assert.deepEqual(specsForChangedFiles([]), []);
     assert.deepEqual(specsForChangedFiles(null), []);
   });
+
+  // Gli spec portano il nome di una funzionalità (`tab-archive`), non del
+  // modulo (`tabs`): col solo nome intero 12 file sorgente su 254 trovavano
+  // uno spec, e toccare le opzioni non lanciava nessun `options-*` (giro 3 di
+  // suite-locale).
+  describe('con l’elenco degli spec tracciati si prendono anche quelli dell’area (nome-trattino)', () => {
+    const tracked = [
+      'tests/options.spec.mjs',
+      'tests/options-default-models.spec.mjs',
+      'tests/options-model-chain.spec.mjs',
+      'tests/optionsx.spec.mjs',
+      'tests/tab-archive.spec.mjs',
+      'tests/tabs-bar.spec.mjs',
+      'tests/table-view.spec.mjs',
+      'tests/verifica/locale-suite-locale/giro1-x.spec.mjs',
+      'tests/editor-chat.spec.mjs',
+    ];
+
+    test('una pagina toccata porta i suoi spec per prefisso, e niente di simile per caso', () => {
+      const out = specsForChangedFiles(['src/pages/options/options.js'], tracked);
+      assert.deepEqual(out.sort(), ['tests/options', 'tests/options-default-models', 'tests/options-model-chain']);
+    });
+
+    test('un modulo al plurale trova gli spec al singolare (tabs → tab-*), non i falsi amici (table-*)', () => {
+      const out = specsForChangedFiles(['src/main/tabs.js'], tracked);
+      assert.deepEqual(out.sort(), ['tests/tab-archive', 'tests/tabs', 'tests/tabs-bar']);
+    });
+
+    test('un handler ha un nome suo e vale come area', () => {
+      const out = specsForChangedFiles(['src/main/services/handlers/editor.js'], tracked);
+      assert.ok(out.includes('tests/editor-chat'), out.join(','));
+    });
+
+    test('le prove dei giri (tests/verifica) non entrano per prefisso: si lanciano per numero', () => {
+      const out = specsForChangedFiles(['src/pages/giro1/giro1.js'], tracked);
+      assert.deepEqual(out, ['tests/giro1']);
+    });
+
+    test('senza l’elenco il comportamento resta quello di prima', () => {
+      assert.deepEqual(specsForChangedFiles(['src/pages/options/options.js']), ['tests/options']);
+    });
+
+    test('la chiamata vera passa l’elenco degli spec tracciati', () => {
+      assert.match(SORGENTE, /specsForChangedFiles\(changed, \[\.\.\.tracked\]\)/);
+    });
+  });
 });
 
 describe('la base del confronto è la linea principale REMOTA (feedback #508)', () => {
