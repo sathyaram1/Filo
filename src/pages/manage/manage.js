@@ -1676,8 +1676,12 @@
 
   function insertStatsDrill() {
     document.querySelectorAll('#panel-fbstats .mg-st-drill').forEach((el) => el.remove());
-    document.querySelectorAll('#panel-fbstats [data-drill]').forEach((el) => {
-      el.setAttribute('aria-expanded', el.dataset.drill === statsDrill ? 'true' : 'false');
+    document.querySelectorAll('#panel-fbstats [data-drill], #panel-fbstats [data-drill-menu]').forEach((el) => {
+      // La testata di una tessera ha già un `aria-expanded` suo (la
+      // ripartizione): quello dell'elenco non glielo può rubare.
+      if (el.dataset.cardToggle) return;
+      const k = el.dataset.drill || el.dataset.drillMenu;
+      el.setAttribute('aria-expanded', k === statsDrill ? 'true' : 'false');
     });
     if (!statsDrill) return;
     const k = cssSel(statsDrill);
