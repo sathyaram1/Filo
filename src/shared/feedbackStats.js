@@ -236,11 +236,21 @@
   ];
   // Cosa il server ha deciso di fare dei rilievi di quel giro: è scritto in
   // chiaro dentro il verbale, e vale più di qualsiasi deduzione dai livelli.
+  //
+  // ⚠️ SI CERCA SOLO NELLA TESTA DEL VERBALE, RIGA PER RIGA E DALL'INIZIO.
+  // Il server scrive queste frasi su una riga loro, PRIMA dell'elenco dei
+  // rilievi (verifierRound.roundNote). Cercarle in tutto il blocco vuol dire
+  // cercarle anche dentro il testo dei rilievi, dove il verificatore descrive
+  // cosa succede: «quando il registro non risponde il lavoro si ferma» è
+  // italiano normale, e trasformava un giro di correzione in un giro bloccante.
   const ROUND_OUTCOME_PHRASES = [
-    { re: /Il lavoro si ferma/i,                    kind: 'stop' },
-    { re: /La correzione riguarda/i,                kind: 'fix' },
-    { re: /Nessun rilievo da correggere adesso/i,   kind: 'rimandati' },
+    { re: /^\s*Il lavoro si ferma/i,                  kind: 'stop' },
+    { re: /^\s*La correzione riguarda/i,              kind: 'fix' },
+    { re: /^\s*Nessun rilievo da correggere adesso/i, kind: 'rimandati' },
   ];
+  // Dove finisce la testa del verbale: la prima riga di rilievo («- [2] …»).
+  // Stessa forma che legge SN_VERIFIER_ROUND.parseFindings.
+  const FINDING_LINE = /^\s*(?:[-*•]\s*)?(?:\*\*)?\[\s*[0-3]\s*\??\s*\]/;
   // Il marcatore di turno della conversazione: chiude il verbale in corso, così
   // un «[2]» scritto nel report di chi ha lavorato non finisce fra i rilievi
   // della verifica.
