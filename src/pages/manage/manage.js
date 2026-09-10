@@ -1802,6 +1802,12 @@
       if (drill) toggleStatsDrill(drill.dataset.drill);
     });
   }
+  if (mgStMore) {
+    mgStMore.addEventListener('click', (e) => {
+      const drill = e.target.closest('[data-drill]');
+      if (drill) toggleStatsDrill(drill.dataset.drill);
+    });
+  }
   // Le fette della torta rispondono come la loro voce di legenda: due disegni
   // che dicono la stessa cosa non possono comportarsi in due modi.
   if (mgStPie) {
