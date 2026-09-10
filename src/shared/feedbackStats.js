@@ -303,90 +303,113 @@
   }
 
   /**
+   * Un turno di Filo è il verbale di un giro CON RILIEVI? PURA.
+   *
+   * Lo è se esibisce la struttura che il server scrive (roundNote):
+   *   riga 1   «Verifica: N rilievi.», da sola;
+   *   riassunto (una o più righe);
+   *   la riga con cui il server dichiara cosa fa dei rilievi;
+   *   l'elenco dei rilievi, che devono essere esattamente N.
+   * Il numero dichiarato e quello elencato devono combaciare: è il patto che
+   * una frase raccontata non rispetta mai per caso.
+   *
+   * @returns {{kind:string, findings:Array}|null}
+   */
+  function verbaleConRilievi(corpo) {
+    const testa = ROUND_HEAD_WITH_FINDINGS.exec(corpo[0] || '');
+    if (!testa) return null;
+    const dichiarati = Number(testa[1]);
+    const parsed = VR().parseFindings(corpo.join('\n'));
+    // Il numero non combacia: non è un verbale, è qualcuno che ne parla.
+    if (!Number.isFinite(dichiarati) || parsed.findings.length !== dichiarati) return null;
+    if (!dichiarati) return null;
+    const fine = corpo.findIndex((l) => FINDING_LINE.test(l));
+    if (fine < 0) return null;
+    // L'ultima riga scritta prima dell'elenco: è lì, e solo lì, che il server
+    // dichiara la decisione. Il riassunto sta tutto sopra.
+    let ultima = '';
+    for (let k = fine - 1; k >= 0; k -= 1) {
+      if (corpo[k].trim()) { ultima = corpo[k]; break; }
+    }
+    const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(ultima));
+    if (phrase) return { kind: phrase.kind, findings: parsed.findings };
+    // Verbale senza la riga di decisione (storico, o testo modificato a mano):
+    // lo dice il livello più alto. 2 e 3 sono "la cosa chiesta non si ottiene",
+    // e lì il lavoro non prosegue.
+    const max = VR().maxLevel(parsed.findings);
+    return { kind: max !== null && max >= 2 ? 'stop' : 'rimandati', findings: parsed.findings };
+  }
+
+  /**
    * I giri di verifica di un feedback, dal più vecchio. PURA.
    *
-   * ⚠️ QUI SI LEGGE PROSA SCRITTA DA QUALCUNO, E LA PROSA MENTE.
-   * Per quattro giri di verifica di fila lo stesso danno è tornato da una porta
-   * nuova: una frase dentro un rilievo, un commento di una persona, una riga
-   * del riassunto, il report di chi corregge. Ogni volta il conto della torta
-   * cambiava, e un lavoro costato cinque critiche finiva nella fetta verde
-   * «passata subito». Cercare la frase d'apertura in ogni capoverso è una
-   * rincorsa persa in partenza: le stesse parole le scrive anche chi racconta.
-   * L'unica cosa che distingue il verbale dal racconto è DOVE sta, e quello si
-   * sa con certezza. Due àncore, tutte e due strutturali:
+   * Qui ci sono SOLO i giri che hanno prodotto dei rilievi, cioè quelli che
+   * portano la struttura con cui il server li scrive (vedi il commento sopra
+   * ROUND_HEAD_WITH_FINDINGS). Il fatto che un lavoro sia poi passato lo dice
+   * `passSegnalato`, che è un sì/no e non un conteggio.
    *
+   * Due àncore, tutte e due strutturali:
    *   1. SOLO I TURNI DI FILO. La conversazione dice già di chi è ogni turno
    *      (SN_FEEDBACK_THREAD.splitNotes): quello che scrive una persona non è
-   *      mai un verbale di verifica, per quanto ne citi le parole.
-   *   2. UN VERBALE È UNA NOTA INTERA, E UNA NOTA È UN TURNO. Il server scrive
-   *      il verbale con SN_VERIFIER_ROUND.roundNote e lo appende con
-   *      SN_FEEDBACK_THREAD.appendModelTurn: marcatore, poi il testo della
-   *      nota. Quindi il verbale comincia alla PRIMA riga scritta del turno, e
-   *      un turno porta al più un verbale. Una riga d'apertura che compare più
-   *      giù è qualcuno che racconta: il report di chi corregge, o il riassunto
-   *      del verificatore.
+   *      mai un verbale, per quanto ne citi le parole.
+   *   2. UN VERBALE È UNA NOTA INTERA, E UNA NOTA È UN TURNO. Il server lo
+   *      appende con SN_FEEDBACK_THREAD.appendModelTurn, quindi comincia alla
+   *      PRIMA riga scritta del turno.
    *
-   * Dentro il verbale, l'esito sta su UNA RIGA SOLA, l'ultima prima dell'elenco
-   * dei rilievi (vedi ROUND_OUTCOME_PHRASES): il riassunto sta tutto sopra.
-   *
-   * @returns {Array<{kind:string, findings:Array}>}
+   * @returns {{rounds:Array<{kind:string, findings:Array}>, passSegnalato:boolean, fermato:boolean}}
    */
-  function parseRounds(fb) {
+  function readRounds(fb) {
+    const vuoto = { rounds: [], passSegnalato: false, fermato: false };
     const notes = fb && fb.notes;
-    if (typeof notes !== 'string' || !notes) return [];
-    if (MR().valueUnreadable(notes)) return [];
+    if (typeof notes !== 'string' || !notes) return vuoto;
+    if (MR().valueUnreadable(notes)) return vuoto;
     const rounds = [];
-    // I turni di Filo, e basta: un commento dell'utente che cita «Verifica
-    // superata.» non è un giro (porta chiusa una volta e riaperta).
+    let passSegnalato = false;
+    let fermato = false;
     const turni = TH().splitNotes(notes).filter((s) => s && s.role === 'model');
     for (const turno of turni) {
       const lines = String((turno && turno.body) || '').replace(/\r\n?/g, '\n').split('\n');
-      // La prima riga scritta del turno: è lì, e solo lì, che un verbale apre.
       let i = 0;
       while (i < lines.length && !lines[i].trim()) i += 1;
       if (i >= lines.length) continue;
-      const opener = ROUND_OPENERS.find((o) => o.re.test(lines[i]));
-      if (!opener) continue;
       const corpo = lines.slice(i);
-      const parsed = VR().parseFindings(corpo.join('\n'));
-      let kind = opener.kind;
-      if (!kind) {
-        const fine = corpo.findIndex((l) => FINDING_LINE.test(l));
-        const testa = fine < 0 ? corpo : corpo.slice(0, fine);
-        // L'ultima riga scritta prima dei rilievi: è lì che il server mette
-        // l'esito, e il riassunto sta tutto sopra.
-        let ultima = '';
-        for (let k = testa.length - 1; k >= 0; k -= 1) {
-          if (testa[k].trim()) { ultima = testa[k]; break; }
-        }
-        const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(ultima));
-        if (phrase) kind = phrase.kind;
-        else {
-          // Verbale senza la frase d'esito (storico, o testo modificato a
-          // mano): lo dice il livello più alto — 2 e 3 sono "la cosa chiesta
-          // non si ottiene", e lì il lavoro non prosegue.
-          const max = VR().maxLevel(parsed.findings);
-          kind = max !== null && max >= 2 ? 'stop' : 'rimandati';
-        }
+      const conRilievi = verbaleConRilievi(corpo);
+      if (conRilievi) {
+        rounds.push(conRilievi);
+        if (conRilievi.kind === 'stop') fermato = true;
+        continue;
       }
-      rounds.push({ kind, findings: parsed.findings });
+      const piatta = ROUND_FLAT_FORMS.find((f) => f.re.test(corpo[0]));
+      if (!piatta) continue;
+      // Nessuna di queste porta un numero da contare: sono un sì/no.
+      if (piatta.kind === 'stop') fermato = true;
+      else passSegnalato = true;
     }
-    return rounds;
+    return { rounds, passSegnalato, fermato };
+  }
+
+  /** Solo i giri con rilievi, come li vedeva chi chiamava questa funzione. PURA. */
+  function parseRounds(fb) {
+    return readRounds(fb).rounds;
   }
 
   /**
    * Quanti giri è costato un lavoro prima di passare. PURA.
    * `null` = nelle note non c'è nessun verbale di verifica (niente da contare:
    * si conta a parte, non si finge uno zero).
-   * @returns {{rounds:Array, passata:boolean, giri:number}|null}
+   *
+   * I giri sono quelli che hanno RIMANDATO INDIETRO il lavoro, cioè le
+   * correzioni: un giro che chiude coi rilievi rimandati a un feedback derivato
+   * lascia proseguire, e non è un giro di attesa in più.
+   *
+   * @returns {{rounds:Array, passata:boolean, giri:number, passSegnalato:boolean}|null}
    */
   function loopsBeforePass(fb) {
-    const rounds = parseRounds(fb);
-    if (!rounds.length) return null;
-    const idx = rounds.findIndex((r) => ROUND_PASSING.includes(r.kind));
-    return idx < 0
-      ? { rounds, passata: false, giri: rounds.length }
-      : { rounds, passata: true, giri: idx };
+    const { rounds, passSegnalato, fermato } = readRounds(fb);
+    if (!rounds.length && !passSegnalato && !fermato) return null;
+    const giri = rounds.filter((r) => r.kind === 'fix').length;
+    const prosegue = rounds.some((r) => ROUND_PASSING.includes(r.kind));
+    return { rounds, passSegnalato, giri, passata: !fermato && (passSegnalato || prosegue) };
   }
 
   // ── Lavorazioni ───────────────────────────────────────────────────────────
