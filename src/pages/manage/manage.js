@@ -1256,6 +1256,41 @@
     return `M${cx} ${cy} L${x1.toFixed(2)} ${y1.toFixed(2)} `
       + `A${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
   }
+  // La frase al posto della torta quando non c'è nessun giro da disegnare.
+  //
+  // ⚠️ NON PUÒ DIRE «nessuna lavorazione chiusa» SE LA TESSERA SOPRA DICE 3.
+  // Una lavorazione che il verificatore ha fermato e che l'owner ha chiuso a
+  // mano è chiusa a tutti gli effetti, e giri da contare non ne ha: dire che in
+  // questa finestra non ce n'è nessuna è una frase smentita dal numero grande
+  // tre centimetri più su e dalla riga un centimetro più sotto.
+  function statsTortaVuota(res) {
+    if (!res.datiPronti) return ST_SENZA_DATI;
+    if (!res.statiLeggibili) return ST_SENZA_STATO;
+    const g = res.giri;
+    const chiuse = res.lavorati.total;
+    if (!chiuse) return 'Nessuna lavorazione chiusa in questa finestra.';
+    const motivi = [];
+    if (g.ferme) {
+      motivi.push(g.ferme === 1
+        ? '1 si è fermata alla verifica e l’ha decisa l’owner'
+        : `${g.ferme} si sono fermate alla verifica e le ha decise l’owner`);
+    }
+    if (g.tagliate) {
+      motivi.push(g.tagliate === 1
+        ? '1 ha la conversazione tagliata perché troppo lunga'
+        : `${g.tagliate} hanno la conversazione tagliata perché troppo lunga`);
+    }
+    if (g.senzaDati) {
+      motivi.push(g.senzaDati === 1
+        ? '1 non ha un verbale di verifica nelle note'
+        : `${g.senzaDati} non hanno un verbale di verifica nelle note`);
+    }
+    if (!motivi.length) return 'Nessuna lavorazione chiusa in questa finestra.';
+    return chiuse === 1
+      ? `L’unica lavorazione chiusa in questa finestra non ha giri da contare: ${motivi.join('; ')}.`
+      : `Nessuna delle ${chiuse} lavorazioni chiuse in questa finestra ha giri da contare: ${motivi.join('; ')}.`;
+  }
+
   function renderStatsPie(res) {
     if (!mgStPie || !mgStPieLegend) return;
     const NS = 'http://www.w3.org/2000/svg';
