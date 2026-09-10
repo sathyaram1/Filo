@@ -1582,6 +1582,33 @@
     if (tipo === 'adesso') {
       return base.filter(valore === 'coda' ? ST.isQueued : ST.isInProgress);
     }
+    // Il numero grande in cima a una tessera: tutte le segnalazioni che ha
+    // contato, non una sola riga della sua ripartizione.
+    if (tipo === 'tessera') {
+      if (valore === 'ricevuti') return base.filter((fb) => ST.inRange(ST.createdMs(fb), range));
+      if (valore === 'lavorati') return base.filter((fb) => ST.isWorked(fb) && ST.inRange(ST.movedMs(fb), range));
+      if (valore === 'adesso') return base.filter((fb) => ST.isQueued(fb) || ST.isInProgress(fb));
+      return [];
+    }
+    // La pastiglia di un creatore porta un numero, e quel numero è contato
+    // PRIMA del filtro per creatore: qui si guarda la lista intera, o
+    // l'elenco sarebbe vuoto ogni volta che il filtro esclude proprio lui.
+    if (tipo === 'creatore') {
+      return (dataLoaded ? allFeedbacks : [])
+        .filter((fb) => ST.inRange(ST.createdMs(fb), range) && ST.creatorOf(fb) === valore);
+    }
+    if (tipo === 'misura') {
+      const lavorate = base.filter((fb) => ST.isWorked(fb) && ST.inRange(ST.movedMs(fb), range));
+      if (valore === 'lavorate') return lavorate;
+      if (valore === 'congiri') {
+        return lavorate.filter((fb) => !ST.notesTruncated(fb) && !!ST.loopsBeforePass(fb));
+      }
+      if (valore === 'bloccate') {
+        return base.filter((fb) => ST.inRange(ST.createdMs(fb), range)
+          && ['attacco', 'spam'].includes(ST.categoryOf(fb)));
+      }
+      return [];
+    }
     if (tipo === 'giri') {
       const lavorati = base.filter((fb) => ST.isWorked(fb) && ST.inRange(ST.movedMs(fb), range));
       return lavorati.filter((fb) => {
