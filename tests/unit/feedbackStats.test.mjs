@@ -474,12 +474,13 @@ test('una riga d’apertura citata dentro un rilievo non apre un giro', () => {
 
 // ─── Il conto dei giri non si fida della prosa ───────────────────────────────
 //
-// Per tre giri di verifica di fila lo stesso danno è tornato da una porta
+// Per quattro giri di verifica di fila lo stesso danno è tornato da una porta
 // nuova: una frase dentro un rilievo, un commento di una persona, una riga del
-// riassunto. Ogni volta il lavoro più combattuto finiva nella fetta verde
-// «passata subito». Qui c'è una prova per porta, sul verbale COSÌ COME LO
-// SCRIVE IL SERVER (verifierRound.roundNote), perché quello che si prova sia
-// quello che succede davvero.
+// riassunto, il report di chi corregge. Ogni volta il lavoro più combattuto
+// finiva nella fetta verde «passata subito». Qui c'è una prova per porta, sul
+// verbale COSÌ COME LO SCRIVE IL SERVER (verifierRound.roundNote) e nella
+// conversazione così come la scrive Filo (una nota, un turno), perché quello
+// che si prova sia quello che succede davvero.
 
 const VR = globalThis.SN_VERIFIER_ROUND;
 const TURNO_CORRETTORE = '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---';
