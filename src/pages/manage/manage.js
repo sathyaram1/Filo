@@ -1655,11 +1655,131 @@
   }
   if (mgStCards) {
     mgStCards.addEventListener('click', (e) => {
+      const drill = e.target.closest('[data-drill]');
+      if (drill) { toggleStatsDrill(drill.dataset.drill); return; }
       const btn = e.target.closest('[data-card-toggle]');
       if (!btn) return;
       const id = btn.dataset.cardToggle;
       if (statsOpen.has(id)) statsOpen.delete(id); else statsOpen.add(id);
       renderStats();
+    });
+  }
+  if (mgStPieLegend) {
+    mgStPieLegend.addEventListener('click', (e) => {
+      const drill = e.target.closest('[data-drill]');
+      if (drill) toggleStatsDrill(drill.dataset.drill);
+    });
+  }
+  // Le fette della torta rispondono come la loro voce di legenda: due disegni
+  // che dicono la stessa cosa non possono comportarsi in due modi.
+  if (mgStPie) {
+    mgStPie.addEventListener('click', (e) => {
+      const fetta = e.target.closest('[data-group]');
+      if (fetta) toggleStatsDrill(`giri:${fetta.dataset.group}`);
+    });
+  }
+
+  // ── Il tasto destro sulla scheda ──────────────────────────────────────────
+  // «Voglio fare qualcosa QUI»: su un numero le domande sono due, quali sono le
+  // segnalazioni contate e portami via questo numero.
+  let statsMenu = null;
+  function closeStatsMenu() {
+    if (statsMenu) { statsMenu.remove(); statsMenu = null; }
+    document.removeEventListener('mousedown', onStatsMenuOutside, true);
+    document.removeEventListener('keydown', onStatsMenuKey, true);
+    window.removeEventListener('scroll', closeStatsMenu, true);
+    window.removeEventListener('resize', closeStatsMenu);
+  }
+  function onStatsMenuOutside(e) { if (statsMenu && !statsMenu.contains(e.target)) closeStatsMenu(); }
+  function onStatsMenuKey(e) { if (e.key === 'Escape') closeStatsMenu(); }
+  function openStatsMenu(x, y, voci) {
+    closeStatsMenu();
+    if (!voci.length) return;
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop mg-ctxmenu';
+    menu.setAttribute('role', 'menu');
+    for (const v of voci) {
+      const opt = document.createElement('div');
+      opt.className = 'sn-select-option';
+      opt.setAttribute('role', 'menuitem');
+      opt.textContent = v.label;
+      opt.addEventListener('click', () => { closeStatsMenu(); v.run(); });
+      menu.appendChild(opt);
+    }
+    document.body.appendChild(menu);
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
+    statsMenu = menu;
+    setTimeout(() => {
+      document.addEventListener('mousedown', onStatsMenuOutside, true);
+      document.addEventListener('keydown', onStatsMenuKey, true);
+      window.addEventListener('scroll', closeStatsMenu, true);
+      window.addEventListener('resize', closeStatsMenu);
+    }, 0);
+  }
+  function statsCopia(testo) {
+    try { navigator.clipboard.writeText(testo); } catch (_) { /* niente appunti */ }
+  }
+  const panelFbstats = document.getElementById('panel-fbstats');
+  if (panelFbstats) {
+    panelFbstats.addEventListener('contextmenu', (e) => {
+      const drill = e.target.closest('[data-drill], [data-group]');
+      const barra = e.target.closest('[data-bucket]');
+      if (!drill && !barra) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const voci = [];
+      if (drill) {
+        const key = drill.dataset.drill || `giri:${drill.dataset.group}`;
+        const quante = statsSegnalazioni(key).length;
+        voci.push({
+          label: statsDrill === key ? 'Chiudi l’elenco' : `Mostra le ${quante === 1 ? 'segnalazione contata' : 'segnalazioni contate'}`,
+          run: () => toggleStatsDrill(key),
+        });
+        voci.push({
+          label: 'Copia riga e numero',
+          run: () => statsCopia(drill.textContent.replace(/\s+/g, ' ').trim()),
+        });
+      }
+      if (barra) {
+        const start = Number(barra.dataset.bucket);
+        voci.push({
+          label: 'Restringi la finestra a questo periodo',
+          run: () => statsRestringi(start, barra.dataset.fine),
+        });
+        voci.push({
+          label: 'Copia periodo e numero',
+          run: () => statsCopia((barra.querySelector('title') || {}).textContent || ''),
+        });
+      }
+      openStatsMenu(e.clientX, e.clientY, voci);
+    });
+  }
+  // Una barretta del grafico porta alla sua finestra: il periodo è quello
+  // dichiarato dalla barretta, estremi compresi.
+  function statsRestringi(start, fine) {
+    if (!Number.isFinite(start)) return;
+    const g = (ms) => {
+      const d = new Date(ms);
+      const p = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    };
+    const ultimo = Number(fine);
+    statsSel = {
+      key: 'custom',
+      from: g(start),
+      // La barretta copre fino all'istante prima della successiva: la finestra
+      // scritta deve coprire lo stesso periodo, non un giorno solo.
+      to: g(Number.isFinite(ultimo) ? ultimo : start),
+    };
+    saveStatsPrefs();
+    renderStats();
+  }
+  if (mgStBars) {
+    mgStBars.addEventListener('click', (e) => {
+      const barra = e.target.closest('[data-bucket]');
+      if (barra) statsRestringi(Number(barra.dataset.bucket), barra.dataset.fine);
     });
   }
 
