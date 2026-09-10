@@ -1465,6 +1465,15 @@
     if (res.copertura.parziale) {
       frasi.push(`${FB.COUNT_CAP_HINT} Il più vecchio in pagina è del ${statsDate(res.copertura.piuVecchio)}. I numeri con il «+» sono minimi, non totali.`);
     }
+    // Le segnalazioni che una finestra con un estremo lascia fuori perché la
+    // loro data non si legge: un numero più piccolo del vero che non lo dice è
+    // lo stesso guaio di uno zero che sembra un dato.
+    const fuori = res.ricevuti.escluseSenzaData;
+    if (res.datiPronti && fuori) {
+      frasi.push(fuori === 1
+        ? '1 segnalazione non ha una data d’arrivo leggibile e resta fuori da questa finestra: si vede scegliendo «Sempre».'
+        : `${fuori} segnalazioni non hanno una data d’arrivo leggibile e restano fuori da questa finestra: si vedono scegliendo «Sempre».`);
+    }
     if (res.routine.parziale) {
       frasi.push(`Il registro delle partenze delle routine comincia il ${statsDate(res.routine.oldest)}. Prima di quella data non c’è traccia, quindi le partenze contate sono un minimo.`);
     }
