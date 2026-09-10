@@ -50,7 +50,15 @@ async function menuDopoTastoDestro(page, selettore) {
   await page.evaluate(() => {
     document.querySelectorAll('.mg-ctxmenu, .sn-select-pop, .sn-menu, [role="menu"]').forEach((m) => m.remove());
   });
-  await page.locator(selettore).first().click({ button: 'right' });
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) throw new Error(`manca ${sel}`);
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true,
+      clientX: Math.round(r.left + r.width / 2), clientY: Math.round(r.top + r.height / 2),
+    }));
+  }, selettore);
   await page.waitForTimeout(250);
   return page.evaluate(() => Array.from(document.querySelectorAll('[role="menu"], .mg-ctxmenu, .sn-select-pop'))
     .map((m) => m.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | '));
