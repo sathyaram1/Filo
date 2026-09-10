@@ -331,3 +331,103 @@ test('formatDuration: come lo direbbe una persona', () => {
   assert.equal(ST.formatDuration(3 * GIORNO + 4 * 3600 * 1000), '3 g 4 h');
   assert.equal(ST.formatDuration(null), '—');
 });
+
+// ─── Giro 7 di verifica: le porte che i conti devono tenere chiuse ───────────
+
+const TRIM = globalThis.SN_FEEDBACK_THREAD.TRIM_MARK;
+
+// Un verbale come lo scrive il server: `n` critiche, poi il pass.
+function verbale(n) {
+  const b = [];
+  for (let i = 0; i < n; i += 1) {
+    b.push(
+      'Verifica: 1 rilievo.',
+      'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+      '- [1] Un rilievo qualunque',
+      '',
+      `--- Aggiornamento dell'agente del 0${i + 1}/09/2026, 10:00 ---`,
+      'Corretto.',
+      '',
+    );
+  }
+  b.push('Verifica superata.');
+  return b.join('\n');
+}
+const chiuso = (over) => fb(Object.assign({
+  status: 'done',
+  createdAt: new Date(NOW - 9 * GIORNO).toISOString(),
+  _updateTime: new Date(NOW - 2 * GIORNO).toISOString(),
+}, over || {}));
+
+test('conversazione tagliata dal tetto: i giri non si contano, e si dice quante sono', () => {
+  const intera = ST.compute({ feedbacks: [chiuso({ notes: verbale(5) })], sel: { key: '30d' }, now: NOW });
+  assert.equal(intera.giri.media, 5);
+  assert.equal(intera.giri.tagliate, 0);
+
+  // La stessa lavorazione nella forma in cui è DAVVERO salvata dopo il taglio:
+  // i primi giri non ci sono più. Contare quello che resta la dichiarerebbe
+  // «passata subito», cioè il contrario del vero.
+  const tagliata = ST.compute({
+    feedbacks: [chiuso({ notes: `${TRIM}\n\nVerifica superata.` })],
+    sel: { key: '30d' }, now: NOW,
+  });
+  assert.equal(tagliata.giri.tagliate, 1);
+  assert.equal(tagliata.giri.conDati, 0);
+  assert.deepEqual(tagliata.giri.fette, []);
+  assert.equal(tagliata.giri.media, null);
+});
+
+test('le frasi d’esito si leggono solo nella testa del verbale, non dentro i rilievi', () => {
+  const corpo = (rilievo) => [
+    'Verifica: 1 rilievo.',
+    'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+    `- [1] ${rilievo}`,
+  ].join('\n');
+
+  const sano = ST.parseRounds(fb({ notes: corpo('Manca l\'hover sull\'icona') }));
+  assert.equal(sano[0].kind, 'fix');
+
+  // «il lavoro si ferma» dentro un rilievo è italiano normale, non un verdetto.
+  const conFrase = ST.parseRounds(fb({
+    notes: corpo('Quando il registro non risponde il lavoro si ferma e la scheda non lo dice'),
+  }));
+  assert.equal(conFrase[0].kind, 'fix');
+
+  // E la frase vera, che sta dove il server la scrive, continua a valere.
+  const stop = ST.parseRounds(fb({
+    notes: [
+      'Verifica: 1 rilievo.',
+      'Il lavoro si ferma: c\'è un rilievo di livello 2 o 3 che non si può correggere da soli.',
+      '- [3] I dati dell\'utente finiscono nei log',
+    ].join('\n'),
+  }));
+  assert.equal(stop[0].kind, 'stop');
+});
+
+test('«Sempre» comprende le segnalazioni senza data; le altre finestre dicono quante ne lasciano fuori', () => {
+  const lista = [
+    fb({ _id: 'a' }),
+    fb({ _id: 'b', createdAt: null }),
+    fb({ _id: 'c', createdAt: 'non-una-data' }),
+  ];
+  const sempre = ST.compute({ feedbacks: lista, sel: { key: 'all' }, now: NOW });
+  assert.equal(sempre.ricevuti.total, 3);
+  assert.equal(sempre.ricevuti.senzaData, 2);
+  assert.equal(sempre.ricevuti.escluseSenzaData, 0);
+
+  const settimana = ST.compute({ feedbacks: lista, sel: { key: '7d' }, now: NOW });
+  assert.equal(settimana.ricevuti.total, 1);
+  assert.equal(settimana.ricevuti.escluseSenzaData, 2);
+});
+
+test('una finestra molto più larga dei dati non manda in bianco il grafico', () => {
+  const lista = [
+    fb({ _id: 'a', createdAt: new Date(NOW - GIORNO).toISOString() }),
+    fb({ _id: 'b', createdAt: new Date(NOW - 2 * GIORNO).toISOString() }),
+  ];
+  const dal1900 = ST.timeline(lista, { from: new Date(1900, 0, 1).getTime(), to: NOW, valid: true }, NOW);
+  assert.ok(dal1900, 'il grafico deve esserci');
+  assert.ok(dal1900.buckets.length <= 66);
+  // Le due segnalazioni cadono davvero dentro una colonna disegnata.
+  assert.equal(dal1900.buckets.reduce((a, b) => a + b.n, 0), 2);
+});
