@@ -372,7 +372,9 @@ async function main() {
   //    questo passaggio c'è da sempre; qui mancava, e si pubblicava senza.
   {
     const v = verdictForCurrentBranch(ROOT);
-    if (!v.ok) {
+    const esito = esitoVerificaPerCheck({ checkOnly, ok: v.ok, reason: v.reason });
+    if (esito.nota) console.log(`\n${esito.nota}`);
+    if (esito.ferma) {
       console.error(`\n✗ Verifica mancante o non superata: ${v.reason}`);
       console.error('  Non pubblico. Per farla partire:');
       console.error('    node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"');
