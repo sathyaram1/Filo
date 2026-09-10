@@ -416,10 +416,20 @@
     const t = Number.isFinite(now) ? now : Date.now();
     const stamps = items.map(createdMs).filter(Number.isFinite);
     if (!stamps.length) return null;
-    const from = range.from !== null ? range.from : Math.min.apply(null, stamps);
+    const primo = Math.min.apply(null, stamps);
+    let from = range.from !== null ? range.from : primo;
     const to = range.to !== null ? Math.min(range.to, t) : t;
     if (!(to >= from)) return null;
-    const unit = chooseUnit(from, to);
+    let unit = chooseUnit(from, to);
+    // Una finestra molto più larga dei dati (l'anno d'inizio digitato male:
+    // «dal 1900») chiederebbe più colonne di quante se ne possano disegnare, e
+    // quelle in eccesso sparirebbero in silenzio — grafico bianco, asse fermo a
+    // un anno in cui non è successo niente. Il grafico è degli ARRIVI: si parte
+    // da dove gli arrivi cominciano davvero.
+    if (colonneNecessarie(unit, from, to) > MAX_COLONNE + 6 && primo > from) {
+      from = primo;
+      unit = chooseUnit(from, to);
+    }
     const buckets = [];
     const index = new Map();
     let cursor = bucketStart(unit, from);
