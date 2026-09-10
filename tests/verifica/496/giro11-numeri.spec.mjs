@@ -36,7 +36,7 @@ test('l’orologio avanti di poche ore: la riga sotto il grafico dice il vero', 
       { _id: 'f2', seq: 702, clientId: 'tester@example.com', text: 'poco fa', status: 'todo', createdAt: d[1] },
       { _id: 'f3', seq: 703, clientId: 'tester@example.com', text: 'orologio avanti', status: 'todo', createdAt: d[2] },
     ]);
-  }, [iso(30), iso(2), fraOre(3)]);
+  }, [iso(30), iso(2), futuroOggi]);
   await page.evaluate(() => window.__mgTest.setStatsWindow('all'));
   await page.waitForTimeout(150);
 
