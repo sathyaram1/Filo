@@ -92,6 +92,26 @@
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
   }
 
+  // La frase del riscatto riuscito, coi numeri che il server manda: quanti
+  // crediti d'ingresso, quanti del vecchio conteggio locale sono passati e,
+  // se non tutti, perché. Chi aveva 12.000 crediti e ne ritrova 10.000 deve
+  // leggerlo qui, non scoprirlo dal saldo (primo giro di verifica del ramo -b).
+  function fmtInt(n) {
+    return String(Math.max(0, Math.floor(Number(n) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function redeemOkMessage({ entryCredits, migrated, localRequested, cutReason } = {}) {
+    const entry = Math.max(0, Math.floor(Number(entryCredits) || 0));
+    const got = Math.max(0, Math.floor(Number(migrated) || 0));
+    const asked = Math.max(0, Math.floor(Number(localRequested) || 0));
+    if (!entry || !asked) return REDEEM_MESSAGES.ok;
+    if (got >= asked) return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più i ${fmtInt(got)} che avevi già.`;
+    const why = cutReason === 'global_cap'
+      ? 'oltre non c’è posto in questo periodo'
+      : 'oltre non si portano';
+    const passati = got > 0 ? `${fmtInt(got)} dei ${fmtInt(asked)} che avevi già` : `nessuno dei ${fmtInt(asked)} che avevi già`;
+    return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più ${passati} (${why}).`;
+  }
+
   // Il codice dentro quello che l'utente incolla. Il codice arriva per
   // messaggio e si ricopia com'è, spesso con la riga intorno («Codice:
   // ABCD-EFGH», «il tuo invito è abcd efgh»): se il testo, ripulito, non è un
@@ -107,5 +127,5 @@
     return m ? m[1] + m[2] : s;
   }
 
-  global.SN_WALLET = { USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, extractCode, REDEEM_MESSAGES };
+  global.SN_WALLET = { USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

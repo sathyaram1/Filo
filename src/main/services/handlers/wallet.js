@@ -30,6 +30,10 @@ module.exports = function register(on, ctx) {
   const W = globalThis.SN_WALLET;
   const FB = globalThis.SN_FEEDBACK;
 
+  // Il conteggio locale già dichiarato al server a un riscatto (per non
+  // portarlo due volte). Sopravvive al riscatto e all'annullamento dell'identità.
+  const DECLARED_KEY = 'walletLocalDeclared';
+
   // Ultimi parametri del server (euro per credito, cambio, quota): servono a
   // scalare i crediti nelle righe del registro e a comporre i messaggi.
   let lastServer = null;
@@ -181,10 +185,16 @@ module.exports = function register(on, ctx) {
     // I crediti del vecchio conteggio locale si portano sul server: chi li
     // aveva guadagnati non deve perderli passando al portafoglio (entro un
     // tetto che sta in configurazione lato server).
+    // Si dichiarano una volta sola: quanto è già stato dichiarato a un riscatto
+    // precedente (identità annullata e nuovo invito) non si ripresenta, il
+    // conteggio locale resta com'è e paga solo la parte guadagnata dopo.
     let localCredits = 0;
+    let balanceNow = 0;
     try {
       const pub = await globalThis.SN_CREDITS?.getPublic?.();
-      localCredits = Number(pub && (pub.balanceExact != null ? pub.balanceExact : pub.balance)) || 0;
+      balanceNow = Number(pub && (pub.balanceExact != null ? pub.balanceExact : pub.balance)) || 0;
+      const declared = Number(await globalThis.SN_STORAGE.getRaw(DECLARED_KEY, 0)) || 0;
+      localCredits = Math.max(0, Math.floor(balanceNow - declared));
     } catch (_) { localCredits = 0; }
     let r;
     try {
@@ -195,11 +205,12 @@ module.exports = function register(on, ctx) {
     const status = (r && r.status) || 'internal';
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
+    if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
     // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato.
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     const state = await readState();
-    return { ok: true, status, message: W.redeemMessage('ok'), credits: r.credits, inviteCodes: r.inviteCodes, state };
+    return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, state };
   }));
 
   // ── Owner ─────────────────────────────────────────────────────────────────

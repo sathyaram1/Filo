@@ -85,9 +85,7 @@ test('i crediti che avevo prima del riscatto si sommano a quelli d’ingresso (e
 });
 
 test('sopra il tetto dei crediti migrabili: o tutti, o lo si dice (mai un taglio muto)', async () => {
-  // Primo giro: 12.000 locali diventano 10.000 senza una parola. Atteso rosso
-  // finché non viene corretto (poi togliere questa riga).
-  test.fail(true, 'i crediti locali oltre il tetto vengono tagliati in silenzio');
+  // Primo giro: rosso; corretto nello stesso giro.
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   try {
@@ -102,16 +100,15 @@ test('sopra il tetto dei crediti migrabili: o tutti, o lo si dice (mai un taglio
     const w = [...server.store.docs.wallets.values()][0];
     console.log('[nota]', `12.000 locali → saldo «${saldo}», concessi ${w.creditsGranted}, messaggio «${msg}»`);
     if (w.creditsGranted < 17_000) {
-      // Tagliati: il messaggio deve dirlo con un numero.
-      expect(msg).toMatch(/\d/);
+      // Tagliati: il messaggio deve dirlo con i numeri (passati e dichiarati).
+      expect(msg).toMatch(/10\.000/);
+      expect(msg).toMatch(/12\.000/);
     }
   } finally { await chiudi(filo); }
 });
 
 test('il tetto globale basta per l’ingresso ma non per ingresso + miei crediti: cosa vede l’utente', async () => {
-  // Primo giro: l'utente viene rifiutato del tutto, con un messaggio che parla
-  // d'altro. Atteso rosso finché non viene corretto (poi togliere questa riga).
-  test.fail(true, 'con il tetto globale quasi pieno i crediti locali fanno rifiutare l’ingresso intero');
+  // Primo giro: rosso; corretto nello stesso giro.
   const [code] = await server.codiciOwner(1);
   // 5.000 crediti = 4,09 $; 6.234 = 5,10 $. Tetto globale 5 $.
   await server.store.patchConfig({ maxGrantUsd: 5 });
@@ -128,6 +125,8 @@ test('il tetto globale basta per l’ingresso ma non per ingresso + miei crediti
     // Con lo stesso codice e senza crediti locali l'utente entrerebbe: rifiutarlo
     // per i suoi crediti in più è un'entrata negata. Atteso: entra (almeno con i 5.000).
     expect(w && w.creditsGranted >= 5000).toBeTruthy();
+    // E il messaggio dice quanti dei suoi sono passati.
+    expect(msg).toMatch(new RegExp(`${w.migratedLocal} dei 1\.234`));
   } finally { await chiudi(filo); }
 });
 
@@ -200,15 +199,15 @@ test('identità annullata e nuovo invito: i crediti locali vengono sommati una s
     const wallets = [...server.store.docs.wallets.values()];
     const secondo = wallets[wallets.length - 1];
     console.log('[nota]', `secondo riscatto: migrati ${secondo.migratedLocal}, concessi ${secondo.creditsGranted}`);
-    // Traccia soltanto: il livello lo decide la critica.
     expect(wallets.length).toBe(2);
+    // Corretto nel primo giro: quanto già dichiarato al primo riscatto non ripassa.
+    expect(secondo.migratedLocal).toBe(0);
+    expect(secondo.creditsGranted).toBe(5000);
   } finally { await chiudi(filo); }
 });
 
 test('nuova chiave dopo un deposito rovinato: l’utente riceve una conferma, non un «Un attimo…» che sparisce', async () => {
-  // Primo giro: la conferma non compare più (porta chiusa nel quinto giro,
-  // riaperta). Atteso rosso finché non viene corretto (poi togliere questa riga).
-  test.fail(true, 'dopo «Richiedi una nuova chiave» nessuna conferma');
+  // Primo giro: rosso; corretto nello stesso giro.
   test.setTimeout(150_000);
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });

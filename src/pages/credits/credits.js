@@ -184,7 +184,6 @@
     try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_REISSUE }); } catch (_) { r = null; }
     btn.disabled = false;
     if (r && r.ok) {
-      overviewLoaded = false; // la vista owner (se c'è) si rilegge: il portafoglio è cambiato
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
       $('walletNote').textContent = r.message || 'Fatto.';
       $('walletNote').hidden = false;
@@ -223,10 +222,8 @@
     if (r && r.ok) {
       msg.textContent = r.message || 'Fatto.';
       msg.classList.add('is-ok');
-      // Il saldo grande e i codici arrivano dallo stato nuovo. Se chi riscatta
-      // è l'owner, anche la sua tabella degli utenti ha una riga in più: la
-      // vista owner si rilegge invece di restare a quella dell'apertura.
-      overviewLoaded = false;
+      // Il saldo grande e i codici arrivano dallo stato nuovo. La vista owner
+      // sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
       render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
       return;
     }

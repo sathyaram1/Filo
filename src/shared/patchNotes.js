@@ -20,6 +20,7 @@
       features: [
         'Quando riscatti l\'invito, i crediti che avevi già li ritrovi sommati a quelli d\'ingresso: nessuno riparte da zero.',
         'Il saldo dei crediti ora mostra anche il decimo: un uso leggero lo fa scendere, invece di restare fermo a un numero tondo.',
+        'Al riscatto Filo ti dice quanti dei crediti che avevi sono passati e, se non tutti, perché: niente sorprese dal saldo. Se il posto per tutti non c\'è, ne passano quanti ci stanno invece di rifiutare l\'invito.',
       ],
     },
     {
