@@ -248,11 +248,14 @@ test('parseRounds: note assenti o cifrate → nessun giro (non uno zero inventat
   assert.deepEqual(ST.parseRounds({ notes: 'FENC1:abcdef' }), []);
 });
 
-test('loopsBeforePass: i giri sono quelli PRIMA del primo esito che fa proseguire', () => {
+// I giri sono le CORREZIONI: quelle che hanno rimandato indietro il lavoro. Un
+// giro che chiude coi rilievi rimandati a un feedback derivato lascia
+// proseguire, quindi non è un'attesa in più.
+test('loopsBeforePass: i giri sono le correzioni chieste prima del pass', () => {
   assert.deepEqual(pick(ST.loopsBeforePass({ notes: NOTE_PASS_SUBITO })), { passata: true, giri: 0 });
   assert.deepEqual(pick(ST.loopsBeforePass({ notes: NOTE_DUE_GIRI })), { passata: true, giri: 1 });
   assert.deepEqual(pick(ST.loopsBeforePass({ notes: NOTE_RIMANDATI })), { passata: true, giri: 0 });
-  assert.deepEqual(pick(ST.loopsBeforePass({ notes: NOTE_BLOCCANTE })), { passata: false, giri: 1 });
+  assert.deepEqual(pick(ST.loopsBeforePass({ notes: NOTE_BLOCCANTE })), { passata: false, giri: 0 });
   assert.equal(ST.loopsBeforePass({ notes: 'nessun verbale qui' }), null);
   function pick(r) { return { passata: r.passata, giri: r.giri }; }
 });
