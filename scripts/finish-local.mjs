@@ -246,285 +246,55 @@ export function behindMainNota(behind) {
 export function specsForChangedFiles(changed, tracked) {
   const files = Array.isArray(changed) ? changed : [];
   const specs = new Set();
+  // Le aree toccate, nella forma in cui uno spec le nomina: minuscolo
+  // (`translatepage`), a trattini (`translate-page`) e la prima parola di un
+  // nome composto (`editorNotes` → `editor`: le note dell'Editor le provano
+  // gli spec `editor-*`). L'esatto per nome (`tests/<area>`) vale sempre;
+  // i prefissi solo con l'elenco degli spec tracciati.
+  const esatte = new Set();
   const aree = new Set();
+  const aggiungi = (nome) => {
+    const grezzo = String(nome || '');
+    if (!grezzo) return;
+    esatte.add(grezzo.toLowerCase());
+    aree.add(grezzo.toLowerCase());
+    const kebab = grezzo.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+    aree.add(kebab);
+    const prima = kebab.split('-')[0];
+    if (prima !== kebab && prima.length >= 4) aree.add(prima);
+  };
   for (const f of files) {
     const m = f.match(/^src\/pages\/([^/]+)\//);
-    if (m) aree.add(m[1].toLowerCase());
+    if (m) aggiungi(m[1]);
     const p = f.match(/^src\/(?:shared|content|renderer|main)\/([^/.]+)/);
-    if (p) aree.add(p[1].toLowerCase());
-    // Un handler o un provider ha un nome suo (chat, downloads…): vale come area.
+    if (p) aggiungi(p[1]);
+    // Un handler, un provider o un servizio in una cartella sua ha un nome
+    // suo (chat, downloads, safebrowse…): vale come area.
     const h = f.match(/^src\/main\/services\/(?:handlers|providers)\/([^/.]+)/);
-    if (h) aree.add(h[1].toLowerCase());
+    if (h) aggiungi(h[1]);
+    const d = f.match(/^src\/main\/services\/([^/.]+)\//);
+    if (d && !['handlers', 'providers'].includes(d[1])) aggiungi(d[1]);
     if (f.startsWith('tests/') && f.endsWith('.spec.mjs')) specs.add(f.replace(/\.spec\.mjs$/, ''));
   }
   const elenco = Array.isArray(tracked) ? tracked : [];
   const tracciati = new Set(elenco.map((t) => String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '')));
   // Senza elenco si risponde per nome (chi chiama filtra); con l'elenco si
   // rispondono solo spec che esistono davvero.
-  for (const area of aree) if (!elenco.length || tracciati.has(`tests/${area}`)) specs.add(`tests/${area}`);
+  for (const area of esatte) if (!elenco.length || tracciati.has(`tests/${area}`)) specs.add(`tests/${area}`);
   if (elenco.length && aree.size) {
-    const prefissi = [];
+    const prefissi = new Set();
     for (const area of aree) {
-      prefissi.push(`${area}-`);
+      if (tracciati.has(`tests/${area}`)) specs.add(`tests/${area}`);
+      prefissi.add(`${area}-`);
+      prefissi.add(`${area}s-`);
       const singolare = area.replace(/s$/, '');
-      if (singolare.length >= 3 && singolare !== area) prefissi.push(`${singolare}-`);
+      if (singolare.length >= 3 && singolare !== area) prefissi.add(`${singolare}-`);
     }
     for (const t of elenco) {
-      const b = String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '');
-      const nome = b.replace(/^tests\//, '');
+      const b = String(t).replace(/\/g, '/').replace(/.spec.mjs$/, '');
+      const nome = b.replace(/^tests//, '');
       if (nome.includes('/')) continue; // le prove dei giri (tests/verifica/…) si lanciano per numero
-      if (prefissi.some((p) => nome.startsWith(p))) specs.add(b);
-    }
-  }
-  return [...specs];
-}
-
-/**
- * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
- * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
- * #563): questi ultimi si lanciano e si mostrano, ma non fermano la
- * pubblicazione. Un rosso d'ambiente spacciato per regressione costa un giro
- * intero; l'elenco è tracciato nel repo, così ogni eccezione ha un nome e una
- * ragione, e svuotarlo è un lavoro con un numero. PURA.
- */
-export function splitKnownRed(specs, known) {
-  const set = new Set((Array.isArray(known) ? known : []).map((s) => String(s).replace(/\.spec\.mjs$/, '')));
-  const blocking = [];
-  const informative = [];
-  for (const s of specs || []) (set.has(s) ? informative : blocking).push(s);
-  return { blocking, informative };
-}
-
-/**
- * Cosa fa `--check` della verifica indipendente. PURA.
- *
- * `--check` promette «i controlli e basta»: unit test e spec mirati. Chi lo
- * lancia è spesso proprio l'istanza che sta verificando (la ricetta del
- * verificatore glielo indica al posto della suite intera), e per lei la
- * verifica non può che risultare «avviata senza esito»: è la sua. Farla finire
- * in rosso con «Non pubblico» — dopo controlli tutti verdi — diceva il falso a
- * chi leggeva. Con `--check` l'esito della verifica si STAMPA come nota e non
- * ferma; senza `--check` resta il cancello di sempre: senza verifica superata
- * non si chiede la fusione.
- */
-export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
-  if (ok) return { ferma: false, nota: '' };
-  if (!checkOnly) return { ferma: true, nota: '' };
-  return {
-    ferma: false,
-    nota: `▸ Verifica indipendente: ${reason || 'non ancora superata'}\n  (--check controlla solo unit test e spec: la verifica serve a \`npm run finish\`, non qui)`,
-  };
-}
-
-function readKnownRed(root) {
-  try {
-    const j = JSON.parse(readFileSync(resolve(root, 'tests', 'rossi-noti.json'), 'utf8'));
-    return Array.isArray(j.specs) ? j.specs : [];
-  } catch (_) { return []; }
-}
-
-async function main() {
-  const argv = process.argv.slice(2);
-  // Un aiuto vero: senza, QUALUNQUE argomento (`--help` compreso) faceva
-  // partire l'intera chiusura, e chi voleva solo sapere cosa fa lo strumento
-  // si ritrovava dentro la procedura (feedback #565).
-  const AIUTO = [
-    'Uso: npm run finish [-- --check]',
-    '',
-    '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
-    '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
-    '                       (con npm: `npm run finish -- --check`, oppure `npm run finish:check`)',
-    '  --help               questa schermata',
-  ].join('\n');
-  if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
-  // Un argomento che non conosciamo NON fa partire la chiusura: prima faceva
-  // girare tutto — controlli, verifica e, con la verifica già a posto, il
-  // ramo spedito e la fusione chiesta — per un errore di battitura
-  // (feedback #565).
-  // `npm run finish --check` non arriva qui: npm si prende `--check` come roba
-  // sua e lo strumento parte SENZA, cioè spedisce il ramo e chiede la fusione
-  // a chi voleva solo i controlli. L'opzione resta scritta nell'ambiente: da
-  // lì ce ne accorgiamo e ci fermiamo (feedback #565).
-  const { argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
-  const storpiata = opzioneStorpiata(process.env, ['--check']);
-  if (storpiata) {
-    console.error(`${storpiata}
-`);
-    console.error(AIUTO);
-    process.exit(1);
-  }
-  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check'] });
-  if (daNpm.nota) { console.error(daNpm.nota); argv.push(...daNpm.args); }
-  // Prima dell'elenco degli sconosciuti: a chi prova la vecchia scorciatoia
-  // serve il PERCHÉ, non «argomento sconosciuto» (feedback #565).
-  if (argv.includes('--no-verify')) {
-    console.error('La scorciatoia --no-verify non esiste più: i controlli e la verifica');
-    console.error('indipendente girano sempre (SPEC-RIDISEGNO-MAX.md §8).');
-    process.exit(1);
-  }
-  const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
-  if (ignoti.length) {
-    console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
-    console.error(AIUTO);
-    process.exit(1);
-  }
-  const checkOnly = argv.includes('--check');
-
-  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
-  if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
-  // Lavorare direttamente sul ramo principale non ha più senso: da questa
-  // macchina su main non scrive più nessuno, quindi un lavoro fatto lì non ha
-  // nessun modo di arrivare agli utenti. Meglio dirlo adesso che dopo mezz'ora
-  // di controlli verdi seguiti da un rifiuto.
-  const principale = defaultBranch();
-  if (isProtectedBranch(branch, principale)) {
-    console.error(`Sei su '${branch}', e da qui sul ramo principale non scrive più nessuno: la fusione`);
-    console.error('la fa il server, e fonde un RAMO. Sposta il lavoro in una cartella dedicata:');
-    console.error('  git worktree add .claude/worktrees/<nome> -b claude/<nome>');
-    process.exit(1);
-  }
-
-  if (!git(['diff', '--quiet']).ok || !git(['diff', '--cached', '--quiet']).ok) {
-    console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');
-    process.exit(1);
-  }
-
-  // La linea principale VERA è su origin: il ref locale può essere indietro di
-  // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
-  // la base del diff per gli spec mirati e la guardia sul ramo rimasto indietro.
-  const fetchOk = git(['fetch', 'origin', MAIN]).ok;
-  const remoteRefOk = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}`]).ok;
-  const { base, note } = resolveDiffBase({ fetchOk, remoteRefOk });
-  if (note) console.log(`\n${note}`);
-
-  {
-    const behind = Number(git(['rev-list', '--count', `HEAD..${base}`]).out);
-    const stop = behindMainStop(behind, { checkOnly });
-    if (stop) { console.error(`\n${stop}`); process.exit(1); }
-    const nota = checkOnly ? behindMainNota(behind) : '';
-    if (nota) console.log(`\n${nota}`);
-  }
-
-  {
-    // 1. Logica pura — veloce, nessuna finestra che si apre.
-    if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
-      console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
-      process.exit(1);
-    }
-    // 2. Spec mirati alle aree toccate. La suite completa gira nel cancello di
-    //    pubblicazione e nelle routine: qui serve il segnale rapido.
-    const changed = git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
-    // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
-    // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
-    // l'elenco degli spec tracciati e filtriamo in memoria.
-    const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
-    const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
-    if (blocking.length) {
-      const args = ['playwright', 'test', ...blocking.map((s) => `${s}.spec.mjs`)];
-      if (!run('npx', args, `Spec delle aree toccate (${blocking.length})`)) {
-        console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
-        process.exit(1);
-      }
-    }
-    if (informative.length) {
-      // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
-      // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
-      const args = ['playwright', 'test', ...informative.map((s) => `${s}.spec.mjs`)];
-      const ok = run('npx', args, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`);
-      console.log(ok
-        ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
-        : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
-    }
-    if (!specs.length) {
-      console.log('\n(nessuno spec mirato per le aree toccate: il lavoro verrà comunque ricontrollato prima della pubblicazione agli utenti)');
+      if ([...prefissi].some((p) => nome.startsWith(p))) specs.add(b);
     }
   }
 
-  // 3. La VERIFICA avversariale: un'istanza diversa da chi ha scritto il codice
-  //    ha provato a romperlo, senza vedere il diff. È l'unico controllo che
-  //    trova i lavori "verdi ma sbagliati": i test qui sopra li ha scritti chi
-  //    ha fatto il lavoro, quindi hanno i suoi stessi punti ciechi. In cloud
-  //    questo passaggio c'è da sempre; qui mancava, e si pubblicava senza.
-  {
-    const v = verdictForCurrentBranch(ROOT);
-    const esito = esitoVerificaPerCheck({ checkOnly, ok: v.ok, reason: v.reason });
-    if (esito.nota) console.log(`\n${esito.nota}`);
-    if (esito.ferma) {
-      console.error(`\n✗ Verifica mancante o non superata: ${v.reason}`);
-      console.error('  Non pubblico. Per farla partire:');
-      console.error('    node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"');
-      console.error('  poi consegna il testo stampato a un\'ISTANZA NUOVA (non a te stesso:');
-      console.error('  chi ha scritto il codice non può verificarlo), e lascia che registri');
-      console.error('  la critica. Un esito vale per il commit su cui è stato dato: se il');
-      console.error('  ramo cambia, serve un\'altra verifica (rilancia `start`, senza');
-      console.error('  argomenti).');
-      process.exit(1);
-    }
-    if (v.ok) console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
-  }
-
-  if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
-
-  // 4. Il ramo dev'essere SU ORIGIN: il server fonde ciò che vede lui, non ciò
-  //    che c'è su questo disco. L'hook di salvataggio di solito l'ha già
-  //    spedito, ma se per qualsiasi motivo non è andato, il server guarderebbe
-  //    una versione vecchia — o un ramo che per lui non esiste.
-  const cur = git(['rev-parse', 'HEAD']).out;
-  {
-    // Ultimo controllo prima dell'unica riga di questo script che scrive su
-    // origin: qualunque cosa sia successa sopra, quello che si spedisce non
-    // può essere il ramo principale. È una guardia doppia, e va bene così: è
-    // l'unico punto in cui questa macchina potrebbe scrivere sul ramo da cui
-    // si costruiscono le versioni degli utenti.
-    if (isProtectedBranch(branch, principale)) {
-      console.error(`\n✗ '${branch}' è il ramo principale: da qui non si spedisce.`);
-      process.exit(1);
-    }
-    // La DESTINAZIONE è dichiarata dentro pushArgs: non la sceglie la
-    // configurazione locale di git (vedi il commento lì sopra).
-    const pushed = git(pushArgs(branch));
-    if (!pushed.ok) {
-      console.error(`\n✗ Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`);
-      console.error('  Senza il ramo su origin il server non ha niente da fondere.');
-      process.exit(1);
-    }
-    // L'esito di questa lettura VA GUARDATO: se `origin/<ramo>` non si risolve,
-    // `out` è il testo dell'errore di git, e finiva stampato all'utente come se
-    // fosse uno sha ("è a origin/c"). Un ramo appena spedito che origin non
-    // mostra è un guasto vero, non un dettaglio: si ferma.
-    const rem = git(['rev-parse', `origin/${branch}`]);
-    if (!rem.ok) {
-      console.error(`\n✗ Ho spedito '${branch}' ma su origin non lo trovo:\n${rem.out.slice(0, 300)}`);
-      console.error('  Il server non avrebbe la versione appena controllata.');
-      process.exit(1);
-    }
-    if (rem.out !== cur) {
-      console.error(`\n✗ Su origin '${branch}' è a ${rem.out.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`);
-      console.error('  Il server fonderebbe una versione diversa da quella controllata.');
-      process.exit(1);
-    }
-  }
-
-  // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
-  //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato.
-  process.stdout.write('\n▸ Chiedo al server di fondere\n');
-  const reply = await askServerMerge({ branch, sha: cur });
-  // Il server ha aperto una richiesta: suona il campanello, così una finestra
-  // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
-  // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
-  // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
-  // di comparire soltanto a chi apre una scheda nuova.
-  if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
-  const code = exitCodeForOwnerMerge(reply);
-  const message = messageForOwnerMerge(reply, branch);
-  if (code === 0) console.log(`\n${message}`);
-  else console.error(`\n${message}`);
-  process.exit(code);
-}
-
-const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
-// Un guasto imprevisto deve FERMARE, non finire in un errore che nessuno legge:
-// senza questo, una promessa rifiutata uscirebbe con un codice che sembra un ok.
-if (isMainModule) main().catch((e) => { console.error(`\n✗ ${(e && e.message) || e}`); process.exit(1); });
