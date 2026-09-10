@@ -1697,8 +1697,10 @@
     const prov = ST.windowRange(sel, Date.now());
     const range = prov.valid ? prov : ST.windowRange({ key: 'all' }, Date.now());
     const scelti = statsCreators.length ? statsCreators : null;
+    // Stesso filtro dei conti: chi non dice da chi arriva non finisce in
+    // nessuna categoria, altrimenti l'elenco e il numero divergono.
     const base = (dataLoaded ? allFeedbacks : [])
-      .filter((fb) => !scelti || scelti.includes(ST.creatorOf(fb)));
+      .filter((fb) => !scelti || (!ST.creatorUnreadable(fb) && scelti.includes(ST.creatorOf(fb))));
     return { range, base };
   }
 
