@@ -1272,11 +1272,11 @@
         mgStPie.appendChild(circle);
       } else {
         let angle = -Math.PI / 2;  // parti da ore 12
-        fette.forEach((f, i) => {
+        fette.forEach((f) => {
           const next = angle + (f.n / totale) * Math.PI * 2;
           const path = document.createElementNS(NS, 'path');
           path.setAttribute('d', slicePath(cx, cy, r, angle, next));
-          path.setAttribute('fill', ST_PIE_COLORS[Math.min(i, ST_PIE_COLORS.length - 1)]);
+          path.setAttribute('fill', stPieColor(f.giri));
           path.dataset.group = String(f.giri);
           const t = document.createElementNS(NS, 'title');
           t.textContent = `${fettaLabel(f.giri)}: ${f.n}`;
@@ -1285,12 +1285,12 @@
           angle = next;
         });
       }
-      fette.forEach((f, i) => {
+      fette.forEach((f) => {
         const li = document.createElement('li');
         li.dataset.group = String(f.giri);
         const sw = document.createElement('span');
         sw.className = 'mg-st-swatch';
-        sw.style.background = ST_PIE_COLORS[Math.min(i, ST_PIE_COLORS.length - 1)];
+        sw.style.background = stPieColor(f.giri);
         const label = document.createElement('span');
         label.className = 'mg-st-legend-label';
         label.textContent = fettaLabel(f.giri);
@@ -1460,6 +1460,11 @@
       pageSize: FB.LIST_PAGE_SIZE,
     });
     res.range.valid = provvisoria.valid;
+    // I feedback non ci sono: né arrivati, né arrivati male. Nessun numero di
+    // questa scheda ha qualcosa sotto, e uno zero si leggerebbe come «in questa
+    // finestra non è arrivato niente» — il contrario di quello che è successo.
+    res.datiPronti = dataLoaded;
+    res.datiFalliti = loadFailed;
     renderStatsControls(res);
     renderStatsNote(res);
     renderStatsCards(res);
