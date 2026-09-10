@@ -82,4 +82,5 @@ sposta il lavoro nella fetta sbagliata, e chi guarda non ha modo di accorgersene
 `src/shared/feedbackStats.js`, che leggono i verbali scritti da
 `SN_VERIFIER_ROUND.roundNote` e appesi da `SN_FEEDBACK_THREAD.appendModelTurn`.
 Le prove per porta: `tests/unit/feedbackStats.test.mjs`, sezioni «Il conto dei
-giri non si fida della prosa» e «La quinta porta della stessa famiglia».
+giri non si fida della prosa» e «La quinta porta della stessa famiglia», più
+«il report di chi corregge non diventa un giro, per quanto citi il verbale».
