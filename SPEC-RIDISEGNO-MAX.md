@@ -272,8 +272,9 @@ incrociate sono responsabilità di chi le introduce, e scoperte subito, non un
 giro dopo in un mucchio anonimo. L'orchestratore NON lancia più la suite (un
 compito in meno: più cieco e più scemo, che è la direzione giusta). Il
 verificatore non rifà i test del worker: fa verifica avversariale, scrivendone
-di nuovi se serve. In locale la suite intera resta solo per modifiche
-trasversali (~25 min sulla macchina dell'owner: avvisare prima).
+di nuovi se serve. In locale la suite intera NON si lancia (decisione
+2026-09-10: quasi sette ore sulla macchina dell'owner, con un solo worker); al
+suo posto `npm run finish:check`, unit test più gli spec delle aree toccate.
 
 ## 12. Ritorno dei worker: niente canale di testo
 
