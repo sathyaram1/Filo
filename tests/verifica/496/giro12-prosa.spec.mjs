@@ -1,14 +1,16 @@
-// Verifica #496 — giro 12. La settima porta della stessa famiglia.
+// Verifica #496 — giro 12. La riga che separa i turni è testo come tutto il
+// resto, e chiunque la può scrivere.
 //
-// I giri dal 4 all'11 hanno chiuso, uno dopo l'altro, i modi in cui una frase
-// o una struttura CITATA diventava un giro di verifica. L'àncora di adesso è
-// doppia: il verbale deve esibire la sua struttura E stare da solo in un turno
-// che il programma ha scritto. Quello che una citazione non poteva portarsi
-// dietro era il MARCATORE del turno — ma il marcatore è una riga di testo come
-// le altre, e chi incolla un pezzo di conversazione incolla anche quella.
+// I giri dal 4 all'11 hanno chiuso, uno dopo l'altro, i modi in cui una frase o
+// una struttura CITATA diventava un giro di verifica. L'àncora di adesso è
+// doppia: il verbale deve esibire la sua struttura E stare da solo dentro un
+// turno del programma. Quello che una citazione non doveva potersi portare
+// dietro era il turno — ma un turno comincia da una RIGA DI TESTO nel blob
+// delle note, e quella riga la può scrivere anche una persona che incolla un
+// pezzo di conversazione, o un agente che la cita dentro il proprio verbale.
 //
-// Qui si prova quello: una risposta scritta da una persona che finisce con un
-// pezzo di conversazione incollato, riga di separazione compresa.
+// Quattro porte, una causa sola. Due aggiungono un giro che non c'è stato, due
+// fanno sparire un giro che c'è stato.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -86,4 +88,42 @@ test('un «Verifica superata.» incollato in una risposta non fa passare una lav
   const dopo = await leggi(page, conCitazione);
   expect(dopo.nota, dopo.nota).toContain('senza un pass registrato');
   expect(dopo.legenda, dopo.legenda).not.toContain('1 critica');
+});
+
+test('il turno di chi corregge, quando è solo il verbale citato, non raddoppia il giro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+
+  const conCitazione = [V, `${AG(2)}\n${V}`, `${AG(3)}\nVerifica superata.`].join('\n\n');
+  const dopo = await leggi(page, conCitazione);
+  expect(dopo.legenda, dopo.legenda).toContain('1 critica');
+  expect(dopo.legenda, dopo.legenda).not.toContain('2 critiche');
+});
+
+test('una riga di separazione citata dentro un verbale non fa sparire il giro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+
+  const prima = await leggi(page, UN_GIRO);
+  expect(prima.legenda, prima.legenda).toContain('1 critica');
+
+  // Il verificatore, nel riassunto, riporta la riga con cui la conversazione
+  // separa i turni: è quello che si fa descrivendo cosa si è letto.
+  for (const riga of [UT(3), AG(9)]) {
+    const spezzato = [
+      `${AG(1)}\n` + [
+        'Verifica: 2 rilievi.',
+        'Provato: tutto. Nella conversazione c’era questa riga:',
+        riga,
+        'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+        '- [2] rilievo 1',
+        '- [1] rilievo 2',
+      ].join('\n'),
+      `${AG(2)}\nCorretto.`,
+      `${AG(3)}\nVerifica superata.`,
+    ].join('\n\n');
+    const dopo = await leggi(page, spezzato);
+    expect(dopo.legenda, `${riga} → ${dopo.legenda}`).toContain('1 critica');
+    expect(dopo.legenda, `${riga} → ${dopo.legenda}`).not.toContain('Passata al primo giro');
+  }
 });
