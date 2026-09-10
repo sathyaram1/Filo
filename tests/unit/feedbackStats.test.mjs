@@ -431,3 +431,29 @@ test('una finestra molto più larga dei dati non manda in bianco il grafico', ()
   // Le due segnalazioni cadono davvero dentro una colonna disegnata.
   assert.equal(dal1900.buckets.reduce((a, b) => a + b.n, 0), 2);
 });
+
+test('una riga d’apertura citata dentro un rilievo non apre un giro', () => {
+  const notes = [
+    'Verifica: 2 rilievi.',
+    'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+    '- [2] La scheda non si aggiorna da sola',
+    '  Verifica superata. non mi pare: il numero resta fermo.',
+    '- [1] Manca l\'hover sull\'icona',
+    '  Controllo funzionalità NON superato è la frase vecchia, la cito qui.',
+    '',
+    '--- Aggiornamento dell\'agente del 08/09/2026, 10:00 ---',
+    'Corretto.',
+    '',
+    'Verifica superata.',
+  ].join('\n');
+  const rounds = ST.parseRounds(fb({ notes }));
+  // Due giri: quello con i due rilievi, e il pass. Non quattro.
+  assert.equal(rounds.length, 2);
+  assert.equal(rounds[0].kind, 'fix');
+  assert.equal(rounds[0].findings.length, 2);
+  assert.equal(rounds[1].kind, 'pass');
+
+  const r = ST.loopsBeforePass(fb({ notes }));
+  assert.equal(r.passata, true);
+  assert.equal(r.giri, 1);
+});
