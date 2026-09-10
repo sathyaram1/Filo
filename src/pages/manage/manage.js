@@ -1258,10 +1258,10 @@
         value: leggibile ? String(res.adesso.inCoda + res.adesso.inLavorazione) : '—',
         label: 'Aperte adesso',
         sub: 'quante ce ne sono adesso, non nella finestra',
-        rows: !leggibile ? [] : [
+        rows: !leggibile ? [] : statsQuote([
           { key: 'adesso:coda', label: 'In coda', n: res.adesso.inCoda },
           { key: 'adesso:lavorazione', label: 'In lavorazione', n: res.adesso.inLavorazione },
-        ],
+        ], res.adesso.inCoda + res.adesso.inLavorazione),
         empty: !pronti ? ST_SENZA_DATI
           : (res.statiLeggibili ? 'Niente in coda né in lavorazione.' : ST_SENZA_STATO),
       }),
