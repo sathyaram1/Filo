@@ -276,15 +276,22 @@
   const ROUND_HEAD_WITH_FINDINGS = /^\s*Verifica:\s*(\d+)\s+riliev(?:o|i)\.?\s*$/i;
 
   // Le forme che dichiarano soltanto l'esito, senza elencare niente. Le prime
-  // due sono di oggi; le altre sono lo storico (dispatch.verifierNoteText), che
-  // nelle conversazioni vecchie c'è ancora. La punteggiatura fa parte della
-  // forma: il server la scrive sempre, e senza di lei la frase è qualcuno che
-  // la sta citando («Controllo funzionalità NON superato era il verdetto del
-  // giro scorso» apriva un giro bloccante che non era mai successo).
+  // due sono di oggi; l'ultima è lo storico (dispatch.verifierNoteText), che
+  // nelle conversazioni vecchie c'è ancora.
+  //
+  // ⚠️ QUI NON C'È PIÙ LA FORMA CHE FERMAVA IL LAVORO («Controllo funzionalità
+  // NON superato»). Una riga di sole parole non si distingue da chi quelle
+  // parole le cita: il giro scorso aveva provato a chiederle la punteggiatura,
+  // e spostare i due punti di due parole riapriva la porta. Un lavoro passato
+  // che si legge come fermato esce del tutto dalla torta, che è il danno
+  // peggiore di tutta la scheda. Chi ferma davvero un lavoro lo scrive nel
+  // verbale coi rilievi, che la struttura ce l'ha: quello resta.
+  //
+  // Le forme rimaste dicono soltanto «è passato», che è la stessa cosa che dice
+  // una lavorazione chiusa: falsificarle non sposta né i giri né la media.
   const ROUND_FLAT_FORMS = [
     { re: /^\s*Verifica superata\./i,                                kind: 'pass' },
     { re: /^\s*Controllo funzionalità superato\./i,                  kind: 'pass' },
-    { re: /^\s*Controllo funzionalità NON superato\s*[:.]/i,         kind: 'stop' },
     { re: /^\s*Verifica:\s*funziona,\s*ma\s*migliorabile\s*[—–:.-]/i, kind: 'rimandati' },
   ];
   // Cosa il server ha deciso di fare dei rilievi di quel giro: è scritto in
