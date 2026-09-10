@@ -396,8 +396,10 @@ async function main() {
 
   {
     const behind = Number(git(['rev-list', '--count', `HEAD..${base}`]).out);
-    const stop = behindMainStop(behind);
+    const stop = behindMainStop(behind, { checkOnly });
     if (stop) { console.error(`\n${stop}`); process.exit(1); }
+    const nota = checkOnly ? behindMainNota(behind) : '';
+    if (nota) console.log(`\n${nota}`);
   }
 
   {
