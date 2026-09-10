@@ -1741,8 +1741,15 @@
     });
     if (!statsDrill) return;
     const k = cssSel(statsDrill);
-    const ancora = document.querySelector(
-      `#panel-fbstats [data-drill="${k}"], #panel-fbstats [data-drill-menu="${k}"]`);
+    const candidati = Array.from(document.querySelectorAll(
+      `#panel-fbstats [data-drill="${k}"], #panel-fbstats [data-drill-menu="${k}"]`));
+    // Un elemento dentro un riquadro chiuso non ha rettangoli: appenderci
+    // l'elenco vorrebbe dire aprirlo dove non si vede.
+    const inVista = (el) => el.getClientRects().length > 0;
+    const ancora = (statsDrillZona
+      && candidati.find((el) => el.closest(statsDrillZona) && inVista(el)))
+      || candidati.find(inVista)
+      || candidati[0];
     if (!ancora) { statsDrill = null; return; }
     const lista = statsSegnalazioni(statsDrill);
     // Sotto una voce di legenda l'elenco è un altro <li>: un <div> figlio di
