@@ -3,6 +3,8 @@
 // quelli d'ingresso; il saldo scende con i decimali quando si usano i modelli;
 // (la pagina owner sta in giro1-owner).
 import { test, expect } from '@playwright/test';
+import { writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   avviaServer, avviaFilo, apriCrediti, apriOwner, simulaOwner, fintoOpenRouter,
   chiediInChat, cartellaFiloSecurity, RATE,
@@ -28,8 +30,15 @@ async function saldoLocale(app, target) {
   }, target);
 }
 
+async function localeAttuale(app) {
+  return app.evaluate(async () => { const p = await globalThis.SN_CREDITS.getPublic(); return p.balanceExact != null ? p.balanceExact : p.balance; });
+}
+// Come lo scrive la pagina (it-IT): migliaia col punto, decimale con la virgola.
+// A mano: il Node dei test non ha per forza i dati della lingua italiana.
 function fmt(n) {
-  return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(Math.round(n * 10) / 10);
+  const v = Math.round(n * 10) / 10;
+  const [int, dec] = String(v).split('.');
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : '');
 }
 const USD_PER_CREDIT = 0.0007 * RATE;
 function creditiDaUsd(usd) { return Math.floor((usd / USD_PER_CREDIT) * 10 + 1e-6) / 10; }
@@ -76,6 +85,9 @@ test('i crediti che avevo prima del riscatto si sommano a quelli d’ingresso (e
 });
 
 test('sopra il tetto dei crediti migrabili: o tutti, o lo si dice (mai un taglio muto)', async () => {
+  // Primo giro: 12.000 locali diventano 10.000 senza una parola. Atteso rosso
+  // finché non viene corretto (poi togliere questa riga).
+  test.fail(true, 'i crediti locali oltre il tetto vengono tagliati in silenzio');
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   try {
@@ -97,6 +109,9 @@ test('sopra il tetto dei crediti migrabili: o tutti, o lo si dice (mai un taglio
 });
 
 test('il tetto globale basta per l’ingresso ma non per ingresso + miei crediti: cosa vede l’utente', async () => {
+  // Primo giro: l'utente viene rifiutato del tutto, con un messaggio che parla
+  // d'altro. Atteso rosso finché non viene corretto (poi togliere questa riga).
+  test.fail(true, 'con il tetto globale quasi pieno i crediti locali fanno rifiutare l’ingresso intero');
   const [code] = await server.codiciOwner(1);
   // 5.000 crediti = 4,09 $; 6.234 = 5,10 $. Tetto globale 5 $.
   await server.store.patchConfig({ maxGrantUsd: 5 });
@@ -122,11 +137,12 @@ test('il saldo scende con i decimali dopo l’uso dei modelli, nella pagina aper
   const filo = await avviaFilo({ env: server.env });
   try {
     const page = await apriCrediti(filo.openTab);
+    const locale = Math.floor(await localeAttuale(filo.app));
     await page.fill('#inviteCode', code);
     await page.click('#redeemBtn');
     await expect(page.locator('#redeemForm')).toBeHidden({ timeout: 15_000 });
-    // I 1.000 locali di benvenuto si sommano: 6.000.
-    await expect(page.locator('#balance')).toHaveText('6.000', { timeout: 15_000 });
+    // I locali di benvenuto si sommano ai 5.000.
+    await expect(page.locator('#balance')).toHaveText(fmt(5000 + locale), { timeout: 15_000 });
     const w = [...server.store.docs.wallets.values()][0];
     const key = server.keys.keys.get(w.keyHash);
     const limit = key.limitUsd;
@@ -165,10 +181,11 @@ test('identità annullata e nuovo invito: i crediti locali vengono sommati una s
   const filo = await avviaFilo({ env: server.env });
   try {
     const page = await apriCrediti(filo.openTab);
+    const locale = Math.floor(await localeAttuale(filo.app));
     await page.fill('#inviteCode', codes[0]);
     await page.click('#redeemBtn');
     await expect(page.locator('#redeemForm')).toBeHidden({ timeout: 15_000 });
-    await expect(page.locator('#balance')).toHaveText('6.000', { timeout: 15_000 });
+    await expect(page.locator('#balance')).toHaveText(fmt(5000 + locale), { timeout: 15_000 });
     // Il server annulla l'identità dell'installazione.
     for (const [rt, s] of server.sessions) if (rt.startsWith('rt-anon')) s.revoked = true;
     await filo.app.evaluate(() => globalThis.SN_WALLET_MAIN.expireIdentityForTest());
@@ -186,4 +203,36 @@ test('identità annullata e nuovo invito: i crediti locali vengono sommati una s
     // Traccia soltanto: il livello lo decide la critica.
     expect(wallets.length).toBe(2);
   } finally { await chiudi(filo); }
+});
+
+test('nuova chiave dopo un deposito rovinato: l’utente riceve una conferma, non un «Un attimo…» che sparisce', async () => {
+  // Primo giro: la conferma non compare più (porta chiusa nel quinto giro,
+  // riaperta). Atteso rosso finché non viene corretto (poi togliere questa riga).
+  test.fail(true, 'dopo «Richiedi una nuova chiave» nessuna conferma');
+  test.setTimeout(150_000);
+  const [code] = await server.codiciOwner(1);
+  const filo = await avviaFilo({ env: server.env });
+  const userData = filo.userData;
+  try {
+    const page = await apriCrediti(filo.openTab);
+    await page.fill('#inviteCode', code);
+    await page.click('#redeemBtn');
+    await expect(page.locator('#redeemForm')).toBeHidden({ timeout: 15_000 });
+    // Variabile che la pagina assegna dopo il riscatto: se non esiste, in modo
+    // stretto l'assegnazione lancia e il resto della funzione non gira.
+    console.log('[nota]', 'typeof overviewLoaded nella pagina Crediti:', await page.evaluate(() => typeof overviewLoaded));
+  } finally { await chiudi(filo); }
+  writeFileSync(join(userData, 'wallet.bin'), Buffer.from('spazzatura-non-cifrata-0123456789'));
+  const bis = await avviaFilo({ userData, env: server.env });
+  try {
+    const page = await apriCrediti(bis.openTab);
+    await expect(page.locator('#reissueBtn')).toBeVisible({ timeout: 15_000 });
+    await page.click('#reissueBtn');
+    await expect(page.locator('#reissueBtn')).toBeHidden({ timeout: 15_000 });
+    await page.waitForTimeout(1500);
+    const nota = page.locator('#walletNote');
+    const testo = (await nota.isHidden()) ? '(nascosta)' : await nota.innerText();
+    console.log('[nota]', `dopo «Richiedi una nuova chiave» la nota dice: «${testo}»`);
+    expect(testo).toMatch(/nuova chiave pronta|pronta/i);
+  } finally { await chiudi(bis); rmSync(userData, { recursive: true, force: true }); }
 });
