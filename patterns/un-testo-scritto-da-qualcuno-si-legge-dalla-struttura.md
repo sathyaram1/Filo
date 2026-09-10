@@ -23,7 +23,10 @@ chi non sta verbalizzando:
    chiede a un report di consegna («Verifica superata. Nessuna regressione.»);
    e in cima al campo note, che l'owner modifica per intero in una casella di
    testo, e in un pezzo di conversazione incollato dentro una risposta,
-   marcatore di turno compreso.
+   marcatore di turno compreso;
+6. nel report di chi corregge di nuovo, questa volta con la STRUTTURA e non con
+   una frase: riportando il verbale a cui sta rispondendo, oppure elencando i
+   rilievi chiusi col livello davanti, che è la forma in cui li ha ricevuti.
 
 Ogni giro chiudeva la porta trovata e ne lasciava aperta un'altra. Un lavoro
 costato cinque critiche finiva nella fetta verde «passata subito», che è il
