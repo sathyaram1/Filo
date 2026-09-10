@@ -1772,8 +1772,34 @@
       window.addEventListener('resize', closeStatsMenu);
     }, 0);
   }
+  // La conferma sta FUORI dal flusso della pagina (posizione fissa): un
+  // messaggio che entra nel flusso spinge giù tutto il resto per qualche
+  // secondo e poi lo riporta su, e la riga sotto il puntatore si sposta due
+  // volte mentre la si sta guardando.
+  let statsFlashTimer = null;
+  function statsFlash(testo) {
+    let el = document.getElementById('mgStFlash');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mgStFlash';
+      el.className = 'mg-st-flash';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = testo;
+    el.classList.add('mg-st-flash--on');
+    clearTimeout(statsFlashTimer);
+    statsFlashTimer = setTimeout(() => el.classList.remove('mg-st-flash--on'), 1800);
+  }
   function statsCopia(testo) {
-    try { navigator.clipboard.writeText(testo); } catch (_) { /* niente appunti */ }
+    const t = String(testo || '').trim();
+    if (!t) return;
+    try {
+      navigator.clipboard.writeText(t);
+      statsFlash('Copiato');
+    } catch (_) {
+      statsFlash('Gli appunti non sono disponibili');
+    }
   }
   const panelFbstats = document.getElementById('panel-fbstats');
   if (panelFbstats) {
