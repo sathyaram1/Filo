@@ -22,7 +22,9 @@
     <section id="ownerSection" class="sn-wallet-owner" hidden>
       <p class="sn-muted" id="ownerTotals"></p>
       <div class="sn-wallet-owner-row">
-        <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off">
+        <!-- novalidate: i controlli sui numeri li fa la pagina, con una frase
+             di Filo, non la bolla del browser. -->
+        <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off" novalidate>
           <label for="ownerInviteCount">Nuovi codici</label>
           <input type="number" id="ownerInviteCount" min="1" max="200" value="5" />
           <button type="submit" class="sn-btn" id="ownerInvitesBtn">Genera</button>
