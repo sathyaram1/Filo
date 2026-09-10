@@ -797,3 +797,21 @@ test('compute: una data d\'arrivo nel futuro entra nel totale e si dichiara', ()
   const dentro = r.ricevuti.timeline.buckets.reduce((a, b) => a + b.n, 0);
   assert.equal(dentro, 1);
 });
+
+// ⚠️ SI CONTA QUELLO CHE IL GRAFICO NON HA DISEGNATO, non tutto ciò che è
+// datato avanti. La colonna di oggi è larga un giorno: un orologio avanti di
+// tre ore cade lì dentro e viene disegnata, e la riga sotto il grafico diceva
+// lo stesso che era fuori. Due somme uguali con in mezzo una frase che le dice
+// diverse sono peggio di nessuna frase.
+test('compute: un orologio avanti di poche ore resta dentro il grafico, e nessuno dice il contrario', () => {
+  const mezzogiorno = new Date(NOW);
+  const lista = [
+    fb({ _id: 'a', createdAt: new Date(NOW - GIORNO).toISOString() }),
+    fb({ _id: 'b', createdAt: new Date(mezzogiorno.getTime() + 3 * 3600 * 1000).toISOString() }),
+  ];
+  const r = ST.compute({ feedbacks: lista, sel: { key: 'all' }, now: NOW });
+  const dentro = r.ricevuti.timeline.buckets.reduce((a, b) => a + b.n, 0);
+  assert.equal(r.ricevuti.total, 2);
+  assert.equal(dentro, 2, 'la colonna di oggi contiene anche l\'orologio avanti di tre ore');
+  assert.equal(r.ricevuti.nelFuturo, 0, 'niente resta fuori, quindi non si scrive che qualcosa è fuori');
+});
