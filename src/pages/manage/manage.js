@@ -1824,10 +1824,20 @@
   }
   // Le fette della torta rispondono come la loro voce di legenda: due disegni
   // che dicono la stessa cosa non possono comportarsi in due modi.
+  // Invio e barra spaziatrice valgono il clic: è la regola di ogni altro tasto
+  // della scheda, e un elemento SVG non se la porta dietro da solo.
+  const invioOSpazio = (e) => e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar';
   if (mgStPie) {
     mgStPie.addEventListener('click', (e) => {
       const fetta = e.target.closest('[data-group]');
       if (fetta) toggleStatsDrill(`giri:${fetta.dataset.group}`);
+    });
+    mgStPie.addEventListener('keydown', (e) => {
+      if (!invioOSpazio(e)) return;
+      const fetta = e.target.closest('[data-group]');
+      if (!fetta) return;
+      e.preventDefault();
+      toggleStatsDrill(`giri:${fetta.dataset.group}`);
     });
   }
 
