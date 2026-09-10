@@ -34,8 +34,10 @@ test('gli spec mirati raccolgono anche le prove dei giri committate nel ramo', a
 test('le istruzioni indicano una sola fonte per i rossi noti e un solo comando al posto della suite', () => {
   const testi = [readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8'), readFileSync(join(ROOT, 'routines', 'roles', 'verifier.md'), 'utf8')];
   // Il file locale sta fuori dal repo: si controlla solo dove esiste.
-  const locale = resolve(ROOT, '..', '..', '..', '..', 'LOCAL.md');
-  if (existsSync(locale)) testi.push(readFileSync(locale, 'utf8'));
+  // (sopra il repo; da una worktree in .claude/worktrees/<nome> sono quattro livelli)
+  for (const locale of [resolve(ROOT, '..', 'LOCAL.md'), resolve(ROOT, '..', '..', '..', '..', 'LOCAL.md')]) {
+    if (existsSync(locale)) { testi.push(readFileSync(locale, 'utf8')); break; }
+  }
   for (const t of testi) {
     expect(t).toContain('finish:check');
     expect(t).not.toMatch(/nella memoria di Claude/);
