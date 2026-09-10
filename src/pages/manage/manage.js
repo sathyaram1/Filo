@@ -1372,7 +1372,10 @@
     const n = t.buckets.length;
     const max = Math.max(1, ...t.buckets.map((b) => b.n));
     const passo = W / n;
-    const larghezza = Math.max(2, passo - Math.min(6, passo * 0.25));
+    // Il tetto sulla larghezza: con quattro colonne, senza, ognuna diventava un
+    // blocco largo un quarto di schermo e alto quanto il riquadro — due
+    // rettangoli buttati lì, non un andamento.
+    const larghezza = Math.min(48, Math.max(2, passo - Math.min(6, passo * 0.25)));
     t.buckets.forEach((b, i) => {
       const h = b.n ? Math.max(2, ((base - top) * b.n) / max) : 0;
       if (!h) return;
@@ -1383,6 +1386,10 @@
       rect.setAttribute('height', h.toFixed(2));
       rect.setAttribute('class', 'mg-st-bar');
       rect.dataset.bucket = String(b.start);
+      // Fin dove arriva davvero questa colonna: il tasto destro promette un
+      // periodo, e la finestra che applica dev'essere quello.
+      const prossima = t.buckets[i + 1];
+      rect.dataset.fine = String((prossima ? prossima.start : Date.now()) - 1);
       const title = document.createElementNS(NS, 'title');
       title.textContent = `${bucketLabel(t.unit, b.start)}: ${b.n}`;
       rect.appendChild(title);
