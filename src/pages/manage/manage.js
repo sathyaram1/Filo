@@ -4211,6 +4211,12 @@
   function liveTickIfDue(force) {
     if (!liveEnabled || document.hidden) return;
     if (!force && Date.now() - liveLastAt < LIVE.POLL_MS / 2) return;
+    // La scheda delle statistiche vive di DUE sorgenti: i feedback e il
+    // registro delle partenze delle routine. Se si rimette in pari solo la
+    // prima, due numeri della stessa riga si muovono e il terzo resta fermo
+    // senza dirlo — ed è proprio lasciandola aperta durante un giro che questa
+    // scheda serve.
+    if (statsActive() && !logLoading) loadWorkerLog();
     // Il primo caricamento è fallito? Il giro lo ritenta da solo, invece di
     // lasciare "Errore nel caricamento" finché l'owner non ricarica a mano.
     if (!dataLoaded) { loadData().catch(() => {}); return; }
