@@ -2014,6 +2014,19 @@
       statsFlash('Gli appunti non sono disponibili');
     }
   }
+  // Cosa finisce negli appunti da una superficie della scheda. La testata di
+  // una tessera ha anche la freccina che apre la ripartizione: copiarla
+  // insieme al numero («6 Feedback ricevuti ▾») è portarsi via un pezzo di
+  // disegno invece di un dato.
+  function testoDaCopiare(el) {
+    const valore = el.querySelector && el.querySelector('.mg-st-card-value');
+    const etichetta = el.querySelector && el.querySelector('.mg-st-card-label');
+    if (valore && etichetta) {
+      return `${etichetta.textContent.trim()}: ${valore.textContent.trim()}`;
+    }
+    return el.textContent.replace(/\s+/g, ' ').trim();
+  }
+
   const panelFbstats = document.getElementById('panel-fbstats');
   if (panelFbstats) {
     panelFbstats.addEventListener('contextmenu', (e) => {
