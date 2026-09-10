@@ -1597,7 +1597,11 @@
     const ancora = document.querySelector(`#panel-fbstats [data-drill="${cssSel(statsDrill)}"]`);
     if (!ancora) { statsDrill = null; return; }
     const lista = statsSegnalazioni(statsDrill);
-    const box = document.createElement('div');
+    // Sotto una voce di legenda l'elenco è un altro <li>: un <div> figlio di
+    // <ul> si vede lo stesso, ma è marcatura sbagliata e i lettori di schermo
+    // la leggono male.
+    const dentroLista = !!ancora.closest('li');
+    const box = document.createElement(dentroLista ? 'li' : 'div');
     box.className = 'mg-st-drill';
     if (!lista.length) {
       const p = document.createElement('div');
