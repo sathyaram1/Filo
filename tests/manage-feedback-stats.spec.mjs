@@ -459,19 +459,25 @@ test('in «Altre misure» il numero di una riga che si apre è quante voci ha l�
   await apriStatistiche(page);
   await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
 
-  const chiavi = await page.locator('#mgStMore [data-drill]').evaluateAll(
-    (els) => els.map((el) => el.dataset.drill));
-  expect(chiavi.length).toBeGreaterThan(0);
-
-  for (const chiave of chiavi) {
-    const riga = page.locator(`#mgStMore [data-drill="${chiave}"]`);
+  // Solo le righe il cui valore è un numero secco: «13 g» è una durata, e
+  // nessuno si aspetta tredici voci sotto una durata.
+  const righe = page.locator('#mgStMore .mg-st-more-riga--apre');
+  const quante = await righe.count();
+  expect(quante).toBeGreaterThan(0);
+  let provate = 0;
+  for (let i = 0; i < quante; i += 1) {
+    const riga = righe.nth(i);
+    const testo = (await riga.locator('.mg-st-more-value').textContent()).trim();
+    if (!/^\d+$/.test(testo)) continue;
+    provate += 1;
+    const etichetta = (await riga.locator('.mg-st-more-label').textContent()).trim();
     await riga.scrollIntoViewIfNeeded();
-    const numero = Number((await riga.locator('.mg-st-more-value').textContent()).trim());
     await riga.click();
     await expect(page.locator('#mgStMore .mg-st-drill')).toHaveCount(1);
-    await expect(page.locator('#mgStMore .mg-st-drill-item'), chiave).toHaveCount(numero);
+    await expect(page.locator('#mgStMore .mg-st-drill-item'), etichetta).toHaveCount(Number(testo));
     await riga.click();   // richiudi, o l'elenco resta sotto la riga dopo
   }
+  expect(provate, 'nessuna riga con un numero secco: la prova non ha provato niente').toBeGreaterThan(0);
 });
 
 test('anche le righe per ruolo e le frasi sotto i grafici si copiano', async ({ openTab }) => {
