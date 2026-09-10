@@ -1046,8 +1046,25 @@
   // fetta che capitava: in una finestra dove nessun lavoro era passato al primo
   // colpo, «5 critiche» usciva verde — la scala letta al contrario, e con una
   // fetta sola un cerchio pieno verde identico a «tutti passati subito».
-  const ST_PIE_COLORS = ['#3bbf7a', '#c9a13b', '#d1741f', '#c0392b', '#8a2b8a', '#5b6ee0'];
-  const stPieColor = (giri) => ST_PIE_COLORS[Math.min(Math.max(0, giri | 0), ST_PIE_COLORS.length - 1)];
+  //
+  // ⚠️ LA SCALA NON PUÒ RINFRESCARSI IN CODA. Prima finiva in viola e blu, i due
+  // colori più freddi della pagina, messi DOPO il rosso: la coda peggiore —
+  // cioè l'unica parte che questa torta esiste per mostrare — si leggeva come
+  // più tranquilla del centro. E oltre il quinto giro il colore finiva del
+  // tutto, quindi «5 critiche» e «7 critiche» uscivano identiche e nel disegno
+  // le due fette diventavano un unico spicchio. Adesso si scalda e basta: dal
+  // verde al rosso scuro, e i giri oltre il fondo scala restano distinti
+  // scurendosi ancora.
+  const ST_PIE_COLORS = ['#3bbf7a', '#a8b544', '#c9a13b', '#d1741f', '#c0392b', '#8f2119'];
+  // Oltre l'ultimo colore la scala non si ripete: si continua a scurire, così
+  // due code diverse restano due fette diverse.
+  const ST_PIE_CODA = ['#6d1811', '#4d100b', '#330906'];
+  const stPieColor = (giri) => {
+    const n = Math.max(0, giri | 0);
+    if (n < ST_PIE_COLORS.length) return ST_PIE_COLORS[n];
+    const oltre = n - ST_PIE_COLORS.length;
+    return ST_PIE_CODA[Math.min(oltre, ST_PIE_CODA.length - 1)];
+  };
   // Il nome corto sulla pastiglia del creatore: dodici pastiglie con scritto
   // "Claude (sessione locale)" sono una riga di rumore. L'icona più la parola
   // che distingue bastano; il nome intero resta nell'hover, che è dove si
