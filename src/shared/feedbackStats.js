@@ -257,6 +257,26 @@
   const TURN_MARKER = /^---\s.*\s---\s*$/;
 
   /**
+   * La conversazione di questo feedback è stata TAGLIATA dal tetto? PURA.
+   *
+   * Quando le note superano SN_FEEDBACK_THREAD.NOTES_MAX, Filo toglie i turni
+   * più vecchi e lascia al loro posto una riga che dichiara il taglio. Quei
+   * turni erano i primi giri di verifica: contare quello che resta darebbe
+   * «passata subito» al lavoro che di giri ne è costati cinque. E a essere
+   * tagliate sono soltanto le conversazioni lunghe, cioè le segnalazioni con
+   * molti giri: proprio la coda della distribuzione che la torta esiste per
+   * mostrare. Quindi non si contano affatto, e la pagina scrive quante sono.
+   */
+  function notesTruncated(fb) {
+    const notes = fb && fb.notes;
+    if (typeof notes !== 'string' || !notes) return false;
+    if (MR().valueUnreadable(notes)) return false;
+    const mark = String((TH().TRIM_MARK) || '').trim();
+    if (!mark) return false;
+    return notes.replace(/\r\n?/g, '\n').split('\n').some((l) => l.trim() === mark);
+  }
+
+  /**
    * I giri di verifica di un feedback, dal più vecchio. PURA.
    * @returns {Array<{kind:string, findings:Array}>}
    */
