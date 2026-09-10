@@ -521,12 +521,17 @@ function conversazione(riassunto, coda) {
 function esito(notes) {
   const rounds = ST.parseRounds(fb({ notes }));
   const loops = ST.loopsBeforePass(fb({ notes }));
-  return { kinds: rounds.map((r) => r.kind), giri: loops && loops.giri };
+  return {
+    kinds: rounds.map((r) => r.kind),
+    giri: loops && loops.giri,
+    passata: loops && loops.passata,
+  };
 }
+const UN_GIRO = { kinds: ['fix'], giri: 1, passata: true };
 
 test('il conto dei giri non cambia per una riga del RIASSUNTO che sembra un verbale', () => {
   const pulito = esito(conversazione('Provato: tutto quanto. Funziona.'));
-  assert.deepEqual(pulito, { kinds: ['fix', 'pass'], giri: 1 });
+  assert.deepEqual(pulito, UN_GIRO);
 
   for (const riga of [
     // Il verificatore riassume il giro prima: sono frasi normali.
