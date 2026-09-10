@@ -418,30 +418,37 @@
       while (i < lines.length && !lines[i].trim()) i += 1;
       if (i >= lines.length) continue;
       const corpo = lines.slice(i);
-      // Dove comincia il verbale dentro il turno. Di norma alla prima riga; ma
-      // il campo note si modifica per intero in una casella di testo, e una
-      // riga scritta a mano in cima al blob finisce nello stesso turno del
-      // primo verbale. Quindi si cerca la riga d'intestazione anche più giù,
-      // PURCHÉ stia prima dell'elenco dei rilievi: dopo l'elenco, una riga così
-      // è dentro il testo di un rilievo, cioè qualcuno che racconta. Fra più
-      // candidate vince l'ultima, che è quella attaccata al suo elenco.
-      const primoRilievo = corpo.findIndex((l) => FINDING_LINE.test(l));
-      const limite = primoRilievo < 0 ? corpo.length : primoRilievo;
-      let testa = -1;
-      for (let k = 0; k < limite; k += 1) {
-        if (ROUND_HEAD_WITH_FINDINGS.test(corpo[k])) testa = k;
+      // Il turno l'ha scritto Filo (ha il suo marcatore) o è la testa del campo
+      // note, che si modifica a mano?
+      const manuale = !turno.ts;
+      let conRilievi = null;
+      if (manuale) {
+        // Una riga scritta a mano in cima al blob finisce nello stesso segmento
+        // del primo verbale: qui l'intestazione si cerca anche più giù, purché
+        // stia prima dell'elenco dei rilievi. Vince la PRIMA candidata che è
+        // davvero un verbale, non l'ultima: con l'ultima, la testata di un
+        // altro verbale citata nel riassunto cancellava il giro vero.
+        const primoRilievo = corpo.findIndex((l) => FINDING_LINE.test(l));
+        const limite = primoRilievo < 0 ? corpo.length : primoRilievo;
+        for (let k = 0; k < limite && !conRilievi; k += 1) {
+          if (ROUND_HEAD_WITH_FINDINGS.test(corpo[k])) conRilievi = verbaleConRilievi(corpo.slice(k));
+        }
+      } else {
+        conRilievi = verbaleConRilievi(corpo);
       }
-      const conRilievi = testa >= 0 ? verbaleConRilievi(corpo.slice(testa)) : null;
       if (conRilievi) {
         rounds.push(conRilievi);
         if (conRilievi.kind === 'stop') fermato = true;
         continue;
       }
+      // Una riga di sole parole vale come esito solo se è tutto quello che c'è
+      // nella testa scritta a mano: «Verifica superata. Ho guardato io» seguita
+      // da altro è una nota, non il verbale che Filo appende da solo.
+      if (manuale && corpo.some((l) => !l.trim())) continue;
       const piatta = ROUND_FLAT_FORMS.find((f) => f.re.test(corpo[0]));
       if (!piatta) continue;
       // Nessuna di queste porta un numero da contare: sono un sì/no.
-      if (piatta.kind === 'stop') fermato = true;
-      else passSegnalato = true;
+      passSegnalato = true;
     }
     return { rounds, passSegnalato, fermato };
   }
