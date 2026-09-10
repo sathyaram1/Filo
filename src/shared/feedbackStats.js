@@ -444,6 +444,7 @@
       // note, che si modifica a mano?
       const manuale = !turno.ts;
       let conRilievi = null;
+      let blocco = corpo;
       if (manuale) {
         // Una riga scritta a mano in cima al blob finisce nello stesso segmento
         // del primo verbale: qui l'intestazione si cerca anche più giù, purché
