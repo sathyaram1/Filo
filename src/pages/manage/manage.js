@@ -1317,12 +1317,24 @@
     } else {
       statsMostra(mgStPie, true);
       const cx = 110, cy = 110, r = 100;
+      // Una fetta è un tasto come la sua voce di legenda: si clicca, prende il
+      // fuoco e risponde a Invio. Un elemento SVG non è focalizzabile da sé,
+      // quindi il `tabindex` va messo a mano, o l'unica strada resta il mouse.
+      const vestiFetta = (el, f) => {
+        el.dataset.group = String(f.giri);
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', `${fettaLabel(f.giri)}: ${f.n}`);
+        const t = document.createElementNS(NS, 'title');
+        t.textContent = `${fettaLabel(f.giri)}: ${f.n}`;
+        el.appendChild(t);
+      };
       if (fette.length === 1) {
         // Con una sola categoria l'arco da 0 a 2π collasserebbe: cerchio pieno.
         const circle = document.createElementNS(NS, 'circle');
         circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
         circle.setAttribute('fill', stPieColor(fette[0].giri));
-        circle.dataset.group = String(fette[0].giri);
+        vestiFetta(circle, fette[0]);
         mgStPie.appendChild(circle);
       } else {
         let angle = -Math.PI / 2;  // parti da ore 12
@@ -1331,10 +1343,7 @@
           const path = document.createElementNS(NS, 'path');
           path.setAttribute('d', slicePath(cx, cy, r, angle, next));
           path.setAttribute('fill', stPieColor(f.giri));
-          path.dataset.group = String(f.giri);
-          const t = document.createElementNS(NS, 'title');
-          t.textContent = `${fettaLabel(f.giri)}: ${f.n}`;
-          path.appendChild(t);
+          vestiFetta(path, f);
           mgStPie.appendChild(path);
           angle = next;
         });
