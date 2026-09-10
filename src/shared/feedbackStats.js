@@ -581,12 +581,19 @@
       buckets.push(b);
       cursor = nextBucket(unit, cursor);
     }
+    // Quante restano fuori dalle colonne disegnate, e quante di quelle sono
+    // datate nel futuro. Chi legge la riga sotto il grafico deve sapere se una
+    // segnalazione è nel disegno o no, e la risposta la sa solo il disegno: una
+    // data di poche ore avanti cade ancora nella colonna di oggi, che c'è.
+    let fuori = 0;
+    let fuoriFuturo = 0;
     for (const ms of stamps) {
-      const key = bucketStart(unit, ms);
-      const b = index.get(key);
-      if (b) b.n += 1;
+      const b = index.get(bucketStart(unit, ms));
+      if (b) { b.n += 1; continue; }
+      fuori += 1;
+      if (ms > t) fuoriFuturo += 1;
     }
-    return { unit, buckets };
+    return { unit, buckets, fuori, fuoriFuturo };
   }
 
   // ── Partenze delle routine (il registro dei worker) ───────────────────────
