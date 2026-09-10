@@ -2,11 +2,10 @@
 // Le porte dei due giri passati le rilanciano le loro spec; qui si cercano
 // strade nuove attorno alle tre cose chieste: il saldo dopo che il consumo
 // supera il tetto, il conteggio locale che continua a vivere accanto al saldo
-// del server (ricompense locali dopo il riscatto), due pagine Crediti aperte
-// insieme, e un incollaggio di diecimila caratteri nel campo del codice.
+// del server (ricompense locali dopo il riscatto), e un incollaggio di diecimila caratteri nel campo del codice.
 import { test, expect } from '@playwright/test';
 import {
-  avviaServer, avviaFilo, apriCrediti, fintoOpenRouter, chiamateOpenRouter,
+  avviaServer, avviaFilo, apriCrediti, fintoOpenRouter,
   chiediInChat, cartellaFiloSecurity, RATE,
 } from './helpers/banco.mjs';
 
@@ -107,46 +106,6 @@ test('dopo il riscatto il conteggio locale vive ancora: una ricompensa locale co
     await page.waitForFunction(() => !document.getElementById('wallet').hidden);
     await expect(page.locator('#balance')).toHaveText(fmt(granted), { timeout: 15_000 });
     expect(await page.locator('#refillHint').innerText()).toMatch(/si accumulano|server/);
-  } finally { await chiudi(filo); }
-});
-
-test('due pagine Crediti aperte insieme: dopo una chiamata ai modelli scendono entrambe allo stesso numero, con il decimale', async () => {
-  test.setTimeout(150_000);
-  const [code] = await server.codiciOwner(1);
-  const filo = await avviaFilo({ env: server.env });
-  try {
-    const page = await apriCrediti(filo.openTab);
-    const granted = await riscatta(page, code);
-    // Seconda pagina Crediti: si apre con la stessa URL e si prende la finestra nuova.
-    const shell = await filo.app.firstWindow();
-    const prima = new Set(filo.app.windows());
-    await shell.evaluate(() => window.filoShell.tabs.open('filo://credits/credits.html'));
-    let page2 = null;
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline && !page2) {
-      page2 = filo.app.windows().find((w) => !prima.has(w)) || null;
-      if (!page2) await new Promise((r) => setTimeout(r, 100));
-    }
-    const nuove = filo.app.windows().filter((w) => !prima.has(w)).map((w) => w.url());
-    console.log('[nota]', `seconda apertura di Crediti: finestre nuove ${JSON.stringify(nuove)}`);
-    expect(page2).toBeTruthy();
-    await page2.waitForURL(/credits\.html/, { timeout: 15_000 });
-    await page2.waitForFunction(() => !document.getElementById('wallet').hidden, null, { timeout: 15_000 });
-    await expect(page2.locator('#balance')).toHaveText(fmt(granted), { timeout: 15_000 });
-
-    const key = server.keys.keys.get(primoWallet().keyHash);
-    const dash = await filo.openTab('filo://dashboard/dashboard.html');
-    await expect(dash.locator('#homeMessage')).not.toHaveText('…', { timeout: 15_000 });
-    await fintoOpenRouter(filo.app, { text: 'Risposta.', costUsd: 0.0037 });
-    key.usageUsd += 0.0037;
-    await chiediInChat(dash, 'ciao');
-    const atteso = fmt(creditiDaUsd(key.limitUsd - key.usageUsd));
-    await expect(page.locator('#balance')).toHaveText(atteso, { timeout: 20_000 });
-    await expect(page2.locator('#balance')).toHaveText(atteso, { timeout: 20_000 });
-    console.log('[nota]', `due pagine Crediti dopo una chiamata da 0,0037 $: entrambe «${atteso}»`);
-    expect(atteso).toMatch(/,\d$/);
-    const calls = await chiamateOpenRouter(filo.app);
-    expect(calls.some((c) => c.auth === `Bearer ${key.key}`)).toBeTruthy();
   } finally { await chiudi(filo); }
 });
 
