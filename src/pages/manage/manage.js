@@ -1464,9 +1464,15 @@
   }
 
   // ── L'andamento nel tempo ─────────────────────────────────────────────────
+  // ⚠️ OGNI MISURA HA LA SUA ETICHETTA. Le colonne d'anno scrivevano il giorno
+  // in cui l'anno comincia, cioè «01/01» sotto ognuna: dodici colonne con la
+  // stessa data sotto, e l'asse non diceva più di che anno parlava. Ci si
+  // arriva con una finestra scritta a mano lunga più di sei anni (una cifra
+  // sbagliata nell'anno d'inizio).
   function bucketLabel(unit, start) {
     const d = new Date(start);
     const p = (n) => String(n).padStart(2, '0');
+    if (unit === 'anno') return String(d.getFullYear());
     if (unit === 'mese') return d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' });
     return `${p(d.getDate())}/${p(d.getMonth() + 1)}`;
   }
