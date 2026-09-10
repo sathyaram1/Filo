@@ -80,6 +80,18 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   chi. E quando una finestra temporale filtra su date DIVERSE a seconda della
   misura (l'arrivo per i ricevuti, l'ultimo movimento per i lavorati), accanto
   a ogni numero c'è scritto su quale data sta filtrando.
+- **Una FONTE incompleta si dichiara come si dichiara un tetto.** La stessa
+  regola del `312+` vale per ogni sorgente che arriva tagliata, e i tagli non
+  sono sempre in fondo. La conversazione di un feedback, oltre il tetto in byte,
+  perde i turni PIÙ VECCHI e lascia al loro posto una riga che lo dichiara: i
+  giri di verifica contati lì dentro diventavano meno del vero, e il lavoro
+  costato cinque critiche finiva nella fetta «passata subito» — la coda della
+  distribuzione, cioè l'unica parte che quel grafico esiste per mostrare, era
+  anche l'unica che il taglio toccava, perché a essere tagliate sono solo le
+  conversazioni lunghe. Lo stesso vale per una data che non si legge: «Sempre»
+  deve voler dire sempre, e una finestra con un estremo dice quante ne ha
+  lasciate fuori. Chi non può contare non conta e lo scrive; non ripiega su uno
+  zero, e non conta a metà facendo finta di niente.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende
   anche la lista dei RISULTATI DI RICERCA: "quanti ne ha trovati" è la domanda
   a cui la ricerca risponde, ed è la prima intestazione che ci si dimentica.
