@@ -366,6 +366,17 @@
         inizioParagrafo = vuota;
       }
       chiudi();
+      // Filo scrive il verbale IN FONDO al turno, e un pass chiude l'iter:
+      // quindi un «Verifica superata.» con un altro verbale dopo, nello stesso
+      // turno, non è un verbale — è chi ha corretto che racconta di aver
+      // rilanciato le prove. Si scarta solo quello, mai un giro con dei
+      // rilievi: sbagliare per eccesso qui è ciò che dipinge di verde il lavoro
+      // più combattuto.
+      for (let i = 0; i < delTurno.length; i += 1) {
+        const r = delTurno[i];
+        if (r.daPass && !r.findings.length && i < delTurno.length - 1) continue;
+        rounds.push({ kind: r.kind, findings: r.findings });
+      }
     }
     return rounds;
   }
