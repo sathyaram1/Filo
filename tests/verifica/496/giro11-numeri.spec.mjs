@@ -22,8 +22,14 @@ test('l’orologio avanti di poche ore: la riga sotto il grafico dice il vero', 
   const page = await openTab(URL);
   await apri(page);
 
-  // Tre segnalazioni, una col computer di chi segnala avanti di tre ore: cade
-  // ancora dentro la colonna di oggi, che il grafico disegna.
+  // Tre segnalazioni, una col computer di chi segnala avanti di qualche ora ma
+  // non abbastanza da scavalcare la mezzanotte: cade ancora dentro la colonna
+  // di oggi, che il grafico disegna. L'istante si sceglie sull'orologio della
+  // macchina, o alle 22 il "fra tre ore" finirebbe domani e la prova
+  // racconterebbe un altro caso.
+  const fineOggi = new Date();
+  fineOggi.setHours(23, 59, 0, 0);
+  const futuroOggi = new Date(Math.max(ora + 60 * 1000, fineOggi.getTime())).toISOString();
   await page.evaluate((d) => {
     window.__mgTest.setData([
       { _id: 'f1', seq: 701, clientId: 'tester@example.com', text: 'ieri', status: 'todo', createdAt: d[0] },
