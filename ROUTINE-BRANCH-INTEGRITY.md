@@ -335,8 +335,10 @@ non come ridondanza inutile: un automatismo che tenta e viene respinto **in
 silenzio** è un guasto invisibile, ed è già costato un ramo che non si salvava
 più da giorni senza che nessuno lo sapesse.
 
-La regola "non lanciare mai la suite completa in locale" è stata **rimossa** da
-`CLAUDE.md`: nasceva da quando il grosso del lavoro si faceva in locale. Oggi in
-locale si fanno poche cose critiche, quindi il tempo in più è accettabile — al
-peggio un controllo in più fa risparmiare tempo, al meglio trova ciò che
-sarebbe sfuggito.
+La regola "non lanciare mai la suite completa in locale" era stata **rimossa**
+da `CLAUDE.md` il 2026-08-20 (in locale si facevano poche cose critiche, e il
+tempo in più sembrava accettabile) ed è **tornata** il 2026-09-10: la suite è
+cresciuta a ~390 spec e ~1.600 casi, e sulla macchina di chi sviluppa Filo dura
+quasi sette ore con un solo worker. In locale si lancia `npm run finish:check`
+(unit test più gli spec delle aree toccate dal ramo); la suite intera gira nel
+cancello del server e nelle routine.
