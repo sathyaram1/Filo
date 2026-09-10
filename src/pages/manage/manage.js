@@ -1597,7 +1597,13 @@
     const righe = [
       ['Tempo mediano dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMediano) : '—', 'misura:lavorate'],
       ['Tempo medio dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMedio) : '—', 'misura:lavorate'],
-      ['Giri di verifica registrati', leggibile ? String(g.giriTotali) : '—', 'misura:congiri'],
+      // ⚠️ QUESTE DUE RIGHE CONTANO COSE DIVERSE, E SOLO UNA HA UN ELENCO.
+      // I giri sono giri: aprirli sulle lavorazioni su cui sono successi dava
+      // «5» sulla riga e due voci nell'elenco, mentre il tasto destro
+      // prometteva «le segnalazioni contate». Il numero delle lavorazioni ha
+      // una riga sua, ed è quella che si apre.
+      ['Giri di verifica registrati', leggibile ? String(g.giriTotali) : '—', ''],
+      ['Lavorazioni con un verbale di verifica', leggibile ? String(g.conDati) : '—', 'misura:congiri'],
       ['Rilievi per livello (3 · 2 · 1 · 0)', leggibile ? `${rilievi[3]} · ${rilievi[2]} · ${rilievi[1]} · ${rilievi[0]}` : '—', ''],
       ['Segnalazioni fermate dai giudici (attacchi + spam)', (() => {
         if (!leggibile) return '—';
