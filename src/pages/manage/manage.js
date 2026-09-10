@@ -1295,8 +1295,13 @@
   // Una fetta per "quanti giri è costato": 0 giri, 1 giro, 2 giri… Le fette
   // sono <path> con `data-group`, come la torta dei crediti, così uno spec può
   // asserire QUALI fette esistono e non solo che c'è un grafico.
+  // ⚠️ LA FETTA DEI ZERO GIRI NON PUÒ DIRE «0 CRITICHE».
+  // Un giro che chiude coi rilievi rimandati a un feedback derivato (il vecchio
+  // «migliorabile») lascia proseguire il lavoro: i giri di correzione sono
+  // zero, ma le critiche c'erano. La fetta diceva «Passata subito (0 critiche)»
+  // mentre due righe più giù «Rilievi per livello» ne contava tre.
   function fettaLabel(giri) {
-    if (giri === 0) return 'Passata subito (0 critiche)';
+    if (giri === 0) return 'Passata al primo giro';
     return giri === 1 ? '1 critica' : `${giri} critiche`;
   }
   function slicePath(cx, cy, r, start, end) {
