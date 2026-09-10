@@ -1040,7 +1040,14 @@
   // I colori delle fette: dal verde (passata al primo colpo) al rosso (tanti
   // giri). Non è una palette qualunque — la scala DICE se il numero è buono, ed
   // è la prima cosa che si legge in una torta.
+  //
+  // ⚠️ IL COLORE SEGUE IL NUMERO DI CRITICHE, MAI LA POSIZIONE NELL'ELENCO.
+  // Indicizzarla con la posizione dava il verde di «passata subito» alla prima
+  // fetta che capitava: in una finestra dove nessun lavoro era passato al primo
+  // colpo, «5 critiche» usciva verde — la scala letta al contrario, e con una
+  // fetta sola un cerchio pieno verde identico a «tutti passati subito».
   const ST_PIE_COLORS = ['#3bbf7a', '#c9a13b', '#d1741f', '#c0392b', '#8a2b8a', '#5b6ee0'];
+  const stPieColor = (giri) => ST_PIE_COLORS[Math.min(Math.max(0, giri | 0), ST_PIE_COLORS.length - 1)];
   // Il nome corto sulla pastiglia del creatore: dodici pastiglie con scritto
   // "Claude (sessione locale)" sono una riga di rumore. L'icona più la parola
   // che distingue bastano; il nome intero resta nell'hover, che è dove si
