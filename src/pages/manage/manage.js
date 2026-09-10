@@ -1454,11 +1454,23 @@
     mgStBars.setAttribute('preserveAspectRatio', 'none');
     const n = t.buckets.length;
     const max = Math.max(1, ...t.buckets.map((b) => b.n));
-    const passo = W / n;
     // Il tetto sulla larghezza: con quattro colonne, senza, ognuna diventava un
     // blocco largo un quarto di schermo e alto quanto il riquadro — due
     // rettangoli buttati lì, non un andamento.
+    // E il tetto sul PASSO: con due sole colonne, spalmate sulla larghezza
+    // intera, restavano due blocchetti lontanissimi in mezzo al bianco, uno a
+    // un quarto e uno a tre quarti. Poche colonne stanno vicine, a sinistra,
+    // e si leggono come un gruppo.
+    const passo = Math.min(W / n, 96);
+    const usata = passo * n;
     const larghezza = Math.min(48, Math.max(2, passo - Math.min(6, passo * 0.25)));
+    // La linea di base: senza, due colonne isolate non sembrano un grafico ma
+    // due rettangoli appoggiati sul niente.
+    const asse = document.createElementNS(NS, 'line');
+    asse.setAttribute('x1', '0'); asse.setAttribute('x2', usata.toFixed(2));
+    asse.setAttribute('y1', String(base)); asse.setAttribute('y2', String(base));
+    asse.setAttribute('class', 'mg-st-bar-base');
+    mgStBars.appendChild(asse);
     t.buckets.forEach((b, i) => {
       const h = b.n ? Math.max(2, ((base - top) * b.n) / max) : 0;
       if (!h) return;
