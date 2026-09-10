@@ -457,3 +457,78 @@ test('una riga d’apertura citata dentro un rilievo non apre un giro', () => {
   assert.equal(r.passata, true);
   assert.equal(r.giri, 1);
 });
+
+// ─── Il conto dei giri non si fida della prosa ───────────────────────────────
+//
+// Per tre giri di verifica di fila lo stesso danno è tornato da una porta
+// nuova: una frase dentro un rilievo, un commento di una persona, una riga del
+// riassunto. Ogni volta il lavoro più combattuto finiva nella fetta verde
+// «passata subito». Qui c'è una prova per porta, sul verbale COSÌ COME LO
+// SCRIVE IL SERVER (verifierRound.roundNote), perché quello che si prova sia
+// quello che succede davvero.
+
+const VR = globalThis.SN_VERIFIER_ROUND;
+const TURNO_CORRETTORE = '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---';
+
+// Un giro di correzione col riassunto che gli si vuole dare, poi la correzione,
+// poi il pass. Un giro solo prima del pass, sempre.
+function conversazione(riassunto, coda) {
+  const giro = VR.roundNote({
+    summary: riassunto,
+    findings: [{ level: 1, text: 'Manca l\'hover sull\'icona' }],
+    decision: { fix: [{ level: 1 }] },
+  });
+  return [giro, '', coda || `${TURNO_CORRETTORE}\nCorretto.`, '', 'Verifica superata.'].join('\n');
+}
+
+function esito(notes) {
+  const rounds = ST.parseRounds(fb({ notes }));
+  const loops = ST.loopsBeforePass(fb({ notes }));
+  return { kinds: rounds.map((r) => r.kind), giri: loops && loops.giri };
+}
+
+test('il conto dei giri non cambia per una riga del RIASSUNTO che sembra un verbale', () => {
+  const pulito = esito(conversazione('Provato: tutto quanto. Funziona.'));
+  assert.deepEqual(pulito, { kinds: ['fix', 'pass'], giri: 1 });
+
+  for (const riga of [
+    // Il verificatore riassume il giro prima: sono frasi normali.
+    'Verifica: 2 rilievi del giro scorso sono chiusi.',
+    'Verifica superata. Le porte del giro scorso sono chiuse.',
+    'Controllo funzionalità NON superato nel giro scorso, adesso sì.',
+  ]) {
+    // Attaccata al riassunto e in un paragrafo suo: due modi di scriverla.
+    assert.deepEqual(esito(conversazione(`Provato: tutto quanto.\n${riga}`)), pulito, riga);
+    assert.deepEqual(esito(conversazione(`Provato: tutto quanto.\n\n${riga}`)), pulito, riga);
+  }
+});
+
+test('la frase d’esito si legge dalla riga che il server scrive, non dal riassunto', () => {
+  // «Il lavoro si ferma quando…» è italiano normale dentro un riassunto, e
+  // trasformava un giro di correzione in un giro bloccante.
+  const notes = conversazione(
+    'Provato: tutto quanto.\nIl lavoro si ferma quando il registro non risponde, e la scheda non lo dice.',
+  );
+  const rounds = ST.parseRounds(fb({ notes }));
+  assert.equal(rounds[0].kind, 'fix');
+  assert.equal(rounds.filter((r) => r.kind === 'stop').length, 0);
+});
+
+test('quello che scrive una PERSONA nella conversazione non è mai un giro di verifica', () => {
+  const commento = [
+    '--- La tua risposta del 02/09/2026, 09:00 ---',
+    'Verifica superata. secondo me no, guarda meglio.',
+  ].join('\n');
+  const notes = conversazione('Provato: tutto quanto.', `${commento}\n\n${TURNO_CORRETTORE}\nCorretto.`);
+  assert.deepEqual(esito(notes), { kinds: ['fix', 'pass'], giri: 1 });
+});
+
+test('il report di chi corregge non conta come un giro passato', () => {
+  for (const corpo of [
+    'Ho rilanciato le prove del giro.\nVerifica superata. Nessuna regressione.',
+    'Ho rilanciato le prove del giro.\n\nVerifica superata. Nessuna regressione.',
+  ]) {
+    const notes = conversazione('Provato: tutto quanto.', `${TURNO_CORRETTORE}\n${corpo}`);
+    assert.deepEqual(esito(notes), { kinds: ['fix', 'pass'], giri: 1 }, corpo);
+  }
+});
