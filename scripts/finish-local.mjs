@@ -242,6 +242,27 @@ export function splitKnownRed(specs, known) {
   return { blocking, informative };
 }
 
+/**
+ * Cosa fa `--check` della verifica indipendente. PURA.
+ *
+ * `--check` promette «i controlli e basta»: unit test e spec mirati. Chi lo
+ * lancia è spesso proprio l'istanza che sta verificando (la ricetta del
+ * verificatore glielo indica al posto della suite intera), e per lei la
+ * verifica non può che risultare «avviata senza esito»: è la sua. Farla finire
+ * in rosso con «Non pubblico» — dopo controlli tutti verdi — diceva il falso a
+ * chi leggeva. Con `--check` l'esito della verifica si STAMPA come nota e non
+ * ferma; senza `--check` resta il cancello di sempre: senza verifica superata
+ * non si chiede la fusione.
+ */
+export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
+  if (ok) return { ferma: false, nota: '' };
+  if (!checkOnly) return { ferma: true, nota: '' };
+  return {
+    ferma: false,
+    nota: `▸ Verifica indipendente: ${reason || 'non ancora superata'}\n  (--check controlla solo unit test e spec: la verifica serve a \`npm run finish\`, non qui)`,
+  };
+}
+
 function readKnownRed(root) {
   try {
     const j = JSON.parse(readFileSync(resolve(root, 'tests', 'rossi-noti.json'), 'utf8'));
