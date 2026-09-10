@@ -1495,18 +1495,26 @@
       rect.appendChild(title);
       mgStBars.appendChild(rect);
     });
-    // Due sole etichette (prima e ultima colonna): con sessanta colonne
-    // un'etichetta per barra sarebbe illeggibile, e il dettaglio sta nell'hover.
-    const first = document.createElementNS(NS, 'text');
-    first.setAttribute('x', '2'); first.setAttribute('y', String(H - 4));
-    first.setAttribute('class', 'mg-st-bar-axis');
-    first.textContent = bucketLabel(t.unit, t.buckets[0].start);
-    const last = document.createElementNS(NS, 'text');
-    last.setAttribute('x', String(W - 2)); last.setAttribute('y', String(H - 4));
-    last.setAttribute('text-anchor', 'end');
-    last.setAttribute('class', 'mg-st-bar-axis');
-    last.textContent = bucketLabel(t.unit, t.buckets[n - 1].start);
-    mgStBars.append(first, last);
+    // Con poche colonne ognuna si scrive la sua data sotto: è quello che
+    // trasforma due rettangoli in un grafico che si legge. Con sessanta
+    // colonne un'etichetta per barra sarebbe illeggibile, quindi restano la
+    // prima e l'ultima e il dettaglio sta nell'hover.
+    const etichetta = (x, testo, ancora) => {
+      const el = document.createElementNS(NS, 'text');
+      el.setAttribute('x', String(x)); el.setAttribute('y', String(H - 4));
+      if (ancora) el.setAttribute('text-anchor', ancora);
+      el.setAttribute('class', 'mg-st-bar-axis');
+      el.textContent = testo;
+      mgStBars.appendChild(el);
+    };
+    if (n <= 12) {
+      t.buckets.forEach((b, i) => {
+        etichetta((i * passo + passo / 2).toFixed(2), bucketLabel(t.unit, b.start), 'middle');
+      });
+    } else {
+      etichetta(2, bucketLabel(t.unit, t.buckets[0].start));
+      etichetta((usata - 2).toFixed(2), bucketLabel(t.unit, t.buckets[n - 1].start), 'end');
+    }
     if (mgStBarsNote) {
       const UNITA = { giorno: 'giorno', settimana: 'settimana', mese: 'mese', anno: 'anno' };
       const parti = [`Una colonna per ${UNITA[t.unit] || t.unit}. La colonna più alta arriva a ${max}.`];
