@@ -370,6 +370,10 @@
     .mg-st-cards {
       display: grid; gap: 10px;
       grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      /* Ogni riquadro alto quanto serve a lui: senza, aprendo un elenco lungo
+         dentro uno, gli altri tre si stiravano alla stessa altezza e restavano
+         tre rettangoli vuoti. */
+      align-items: start;
       margin-bottom: 22px;
     }
     .mg-st-card {
