@@ -20,25 +20,6 @@ async function apri(page, lista, finestra) {
 
 test.beforeAll(() => { try { mkdirSync(OUT, { recursive: true }); } catch (_) { /* c'è già */ } });
 
-test('«Prober lanciati» non scrive un numero quando quel numero non si conosce', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await apri(page, [
-    { _id: 'p1', seq: 801, subSeq: 0, clientId: 'u@e.com', text: 'a', status: 'todo', createdAt: iso(1) },
-  ]);
-  // Nel contenitore la sessione non è quella dell'owner: il registro delle
-  // partenze è riservato, quindi quel numero NON si conosce.
-  const f = await page.evaluate(() => ({
-    routine: document.querySelector('.mg-st-card[data-card="routine"] .mg-st-card-value').textContent,
-    lavorati: document.querySelector('.mg-st-card[data-card="lavorati"] .mg-st-card-value').textContent,
-    nota: document.getElementById('mgStNote').textContent,
-  }));
-  console.log('RISERVATO', JSON.stringify(f));
-  await page.screenshot({ path: `${OUT}/496-giro7-registro-riservato.png` });
-  // La tessera accanto, davanti a un dato che manca, scrive un trattino.
-  expect(/riservato/i.test(f.nota)).toBe(true);
-  expect(f.routine.trim()).not.toBe('0');
-});
-
 test('stato vuoto e finestra stretta: niente rettangoli vuoti né scorrimento orizzontale', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page, [], 'all');

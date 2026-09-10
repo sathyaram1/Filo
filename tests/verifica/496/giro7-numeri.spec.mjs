@@ -98,3 +98,29 @@ test('dal 1900 a oggi: le segnalazioni contate si vedono anche nel grafico degli
   expect(f.ricevuti.trim()).toBe('2');
   expect(f.barre).toBeGreaterThan(0);
 });
+
+test('quando i feedback non si sono caricati la scheda non scrive zeri muti', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, [
+    seg('z1', 901, { createdAt: iso(1) }),
+    seg('z2', 902, { createdAt: iso(2) }),
+  ]);
+  await expect(page.locator('.mg-st-card[data-card="ricevuti"] .mg-st-card-value')).toHaveText('2');
+
+  // Il caricamento va male mentre la scheda è aperta e mostra i suoi numeri.
+  await page.evaluate(() => window.__mgTest.simulaCaricamentoFallito());
+  await page.waitForTimeout(200);
+
+  const f = await page.evaluate(() => ({
+    ricevuti: document.querySelector('.mg-st-card[data-card="ricevuti"] .mg-st-card-value').textContent,
+    nota: document.getElementById('mgStNote').textContent,
+    notaVisibile: !document.getElementById('mgStNote').hidden,
+    torta: document.getElementById('mgStPieLegend').textContent,
+  }));
+  // Uno zero senza spiegazione si legge come «non è arrivato niente», che è il
+  // contrario di quello che è successo. La barra delle schede, con lo stesso
+  // guasto, il numero non lo scrive affatto.
+  const dichiara = /non si sono caricat|non si è caricat|non sono arrivat|caricamento|riprova/i
+    .test(`${f.nota} ${f.torta}`);
+  expect(dichiara).toBe(true);
+});
