@@ -1727,7 +1727,8 @@
     // l'elenco sarebbe vuoto ogni volta che il filtro esclude proprio lui.
     if (tipo === 'creatore') {
       return (dataLoaded ? allFeedbacks : [])
-        .filter((fb) => ST.inRange(ST.createdMs(fb), range) && ST.creatorOf(fb) === valore);
+        .filter((fb) => ST.inRange(ST.createdMs(fb), range)
+          && !ST.creatorUnreadable(fb) && ST.creatorOf(fb) === valore);
     }
     if (tipo === 'misura') {
       const lavorate = base.filter((fb) => ST.isWorked(fb) && ST.inRange(ST.movedMs(fb), range));
