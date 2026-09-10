@@ -11,7 +11,7 @@ import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 
 let server;
-const seen = { redeems: [], states: 0, signups: 0, tokens: [] };
+const seen = { redeems: [], localCredits: [], reissues: 0, states: 0, signups: 0, tokens: [] };
 let redeemed = false;
 let serverDown = false;
 let identityDown = false;
@@ -65,16 +65,23 @@ test.beforeAll(async () => {
       if (url === '/walletRedeem') {
         const code = String((body.data && body.data.code) || '');
         seen.redeems.push(code);
+        seen.localCredits.push(Number(body.data && body.data.localCredits));
         if (code.replace(/[^A-Z0-9]/gi, '').toUpperCase() !== 'ABCDEFGH') {
           return json(res, 200, { result: { status: 'invalid_code' } });
         }
         redeemed = true;
         return json(res, 200, {
           result: {
-            status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 5000,
+            status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 6010,
+            // Il conteggio locale dichiarato dall'app (1.010: benvenuto più bonus), tutto passato.
+            entryCredits: 5000, migrated: 1010, localRequested: 1010, cutReason: null,
             inviteCodes: ['AAAA-2222', 'BBBB-3333', 'CCCC-4444'],
           },
         });
+      }
+      if (url === '/walletReissue') {
+        seen.reissues += 1;
+        return json(res, 200, { result: { status: 'ok', key: 'sk-or-v1-test-personal-2', pseudonym: 'abcdef0123456789' } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
     });
@@ -105,7 +112,7 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   await expect(page.locator('#hero')).toBeHidden();
   await expect(page.locator('#refillHint')).toBeHidden();
   await expect(page.locator('#offlineHint')).toBeHidden();
-  await expect(page.locator('#ownerSection')).toBeHidden();
+  await expect(page.locator('#ownerLink')).toBeHidden();
   const formBox = await form.boundingBox();
   expect(formBox.y).toBeLessThan(200);
   expect(seen.signups).toBeGreaterThan(0); // l'identità dell'installazione è nata
@@ -181,4 +188,50 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   await expect(page.locator('#offlineHint')).toBeHidden();
   await expect(page.locator('body')).not.toContainText('fetch failed');
   identityDown = false;
+});
+
+test('il riscatto dice quanti crediti locali sono passati; si dichiarano una volta sola; la nuova chiave conferma', async ({ app, openTab }) => {
+  redeemed = false;
+  seen.redeems.length = 0; seen.localCredits.length = 0; seen.reissues = 0;
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+  await page.fill('#inviteCode', 'ABCD-EFGH');
+  await page.click('#redeemBtn');
+  // La frase porta i numeri del server: ingresso e locali passati.
+  await expect(page.locator('#redeemMsg')).toContainText('5.000 crediti', { timeout: 10000 });
+  await expect(page.locator('#redeemMsg')).toContainText('1.010 che avevi già');
+  // Il modulo dell'invito sparisce: la frase resta nella nota, visibile, anche
+  // dopo il ridisegno che segue l'avviso di saldo cambiato.
+  await page.waitForTimeout(1200);
+  await expect(page.locator('#walletNote')).toBeVisible();
+  await expect(page.locator('#walletNote')).toContainText('1.010 che avevi già');
+  // L'app ha dichiarato il conteggio locale (intero, positivo).
+  expect(seen.localCredits).toHaveLength(1);
+  expect(seen.localCredits[0]).toBeGreaterThan(0);
+  expect(Number.isInteger(seen.localCredits[0])).toBe(true);
+
+  // Un secondo riscatto dalla stessa installazione (identità nuova dopo un
+  // annullamento) non ripresenta quello che è già passato.
+  const again = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_redeem', code: 'ABCD-EFGH' }, { tab: { id: 9, url: 'filo://credits/credits.html' }, url: 'filo://credits/credits.html' }));
+  expect(again.ok).toBe(true);
+  expect(seen.localCredits).toHaveLength(2);
+  expect(seen.localCredits[1]).toBe(0);
+
+  // La chiave personale sparisce da questo computer (deposito perso): la
+  // pagina offre «Richiedi una nuova chiave» e, premuto, CONFERMA. Nel ramo
+  // -b la conferma si perdeva per una variabile della vista owner rimasta
+  // nella pagina dopo il trasloco (primo giro di verifica).
+  await app.evaluate(() => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    req('./auth/wallet-store').clear();
+  });
+  await page.reload();
+  await expect(page.locator('#reissueBtn')).toBeVisible({ timeout: 15000 });
+  await page.click('#reissueBtn');
+  await expect(page.locator('#walletNote')).toContainText('Nuova chiave pronta', { timeout: 15000 });
+  await expect(page.locator('#reissueBtn')).toBeHidden();
+  expect(seen.reissues).toBe(1);
+  expect(await app.evaluate(() => globalThis.SN_WALLET_MAIN.keySource())).toBe('personal');
 });

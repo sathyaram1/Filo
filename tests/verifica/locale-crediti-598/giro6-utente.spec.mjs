@@ -124,9 +124,12 @@ test('un codice dato a un amico risulta usato; il saldo scende dopo il consumo; 
     server.keys.keys.get(h).usageUsd = 0.7;
     await page.reload();
     await page.waitForFunction(() => !document.getElementById('wallet').hidden);
-    const attesi = Math.floor((server.keys.keys.get(h).limitUsd - 0.7) / (0.0007 * RATE) + 1e-9);
-    await expect(page.locator('#balance')).toHaveText(String(attesi).replace(/\B(?=(\d{3})+(?!\d))/g, '.'), { timeout: 15_000 });
-    expect(attesi).toBeLessThan(5000);
+    // Dal ramo -b il saldo mostra il decimo (per difetto) e i 1.000 locali di
+    // benvenuto si sommano ai 5.000: si confronta col numero che il server dà.
+    const attesi = Math.floor((server.keys.keys.get(h).limitUsd - 0.7) / (0.0007 * RATE) * 10 + 1e-6) / 10;
+    const [intero, dec] = String(attesi).split('.');
+    await expect(page.locator('#balance')).toHaveText(intero.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : ''), { timeout: 15_000 });
+    expect(attesi).toBeLessThan(mia.creditsGranted);
   } finally { await chiudi(filo); }
 
   // Il deposito della chiave sul disco è rovinato: al riavvio la pagina offre

@@ -10,7 +10,8 @@
     "tests/verify-514-g11",
     "tests/options-home-models",
     "tests/verify-509-giro4",
-    "tests/verify-downloads-410"
+    "tests/verify-downloads-410",
+    "tests/editor-comments"
   ],
   "contenitore": {
     "nota": "Rossi a ogni giro di routine, su qualunque ramo, perché il contenitore non ha uno schermo vero né la rete aperta. Stavano nella memoria di chi verificava (le sue istruzioni ne facevano l'elenco a voce) e nessuno aveva una data di scadenza: un controllo spento senza un posto dove essere scritto è un controllo che nessuno rimetterà mai in piedi. Chi verifica confronta questo elenco con i rossi della sua corsa: quello che non è qui dentro è una regressione. Il primo elenco (feedback #563, terzo giro) ne contava sei; il settimo, «la finestra non compare sullo schermo», è uscito subito chiedendo la trasparenza solo dove il sistema sa darla e verificando sempre la posizione, che è la metà che conta. I quattro del tutto schermo sono usciti col #514, e la diagnosi scritta qui era sbagliata: non mancava il gestore di finestre, rientrava in se stesso il gestore che riparcheggia la finestra fuori schermo quando si esce dal tutto schermo (src/main/test-window-mode.js), finché il processo moriva per stack esaurito. Con la guardia i quattro casi girano nel contenitore così com'è, senza schermo e senza gestore di finestre — è il motivo per cui una voce va tolta appena si può, invece di credere alla sua spiegazione.",
@@ -88,6 +89,12 @@
       "spec": "tests/verify-downloads-410",
       "caso": "SUCCESSO: link a file → il file arriva, la barra avanza; STRESS: due download con lo STESSO nome in parallelo non si sovrascrivono",
       "perche": "rossi anche da soli e identici su main sulla macchina di chi sviluppa Filo (verifica del #598, quinto giro, 2026-09-09): la barra passa da 0% a 100% senza un valore intermedio (il server locale è troppo veloce per vederne uno), e i due download con lo stesso nome finiscono sullo stesso percorso. La causa non è stata indagata da quel ramo, che i download non li tocca: da risolvere o spiegare, poi togliere la voce.",
+      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
+    },
+    {
+      "spec": "tests/editor-comments",
+      "caso": "dalla lista si può aggiungere un SECONDO commento (bottone \"Nuovo commento\")",
+      "perche": "rosso solo sotto il carico della suite intera, in tutti e tre i tentativi (dopo il primo commento il campo del nuovo commento non compare entro 30 secondi), verde da solo in mezzo minuto sia sul ramo sia su main; visto dalla verifica del #598 sul ramo -b (secondo giro, 2026-09-10). Da rendere stabile, poi togliere la voce.",
       "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
     }
   ]

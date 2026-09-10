@@ -89,3 +89,23 @@ test('il codice si estrae da quello che si incolla: riga intera, spazi, minuscol
   assert.equal(W.extractCode('   '), '');
   assert.equal(W.extractCode(''), '');
 });
+
+test('la frase del riscatto riuscito dice quanti crediti locali sono passati e perché non tutti', () => {
+  // Nessun conteggio locale: la frase di sempre.
+  assert.equal(W.redeemOkMessage({ entryCredits: 5000, migrated: 0, localRequested: 0 }), W.REDEEM_MESSAGES.ok);
+  assert.equal(W.redeemOkMessage(), W.REDEEM_MESSAGES.ok);
+  // Tutti passati: i due numeri.
+  const tutti = W.redeemOkMessage({ entryCredits: 5000, migrated: 1234, localRequested: 1234, cutReason: null });
+  assert.match(tutti, /5\.000 crediti/);
+  assert.match(tutti, /i 1\.234 che avevi/);
+  // Tagliati dal tetto migrabile: passati, dichiarati, e il motivo.
+  const tetto = W.redeemOkMessage({ entryCredits: 5000, migrated: 10000, localRequested: 12000, cutReason: 'migrate_cap' });
+  assert.match(tetto, /10\.000 dei 12\.000/);
+  assert.match(tetto, /oltre non si portano/);
+  // Tagliati dal tetto globale: un motivo diverso.
+  const globale = W.redeemOkMessage({ entryCredits: 5000, migrated: 952, localRequested: 1500, cutReason: 'global_cap' });
+  assert.match(globale, /952 dei 1\.500/);
+  assert.match(globale, /posto/);
+  // Nessuno passato.
+  assert.match(W.redeemOkMessage({ entryCredits: 5000, migrated: 0, localRequested: 300, cutReason: 'global_cap' }), /nessuno dei 300/);
+});

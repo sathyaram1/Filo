@@ -1,3 +1,6 @@
+// Banco del giro sul ramo -b: copia del banco del quinto giro, con UNA differenza:
+// il riscatto passa al servizio i crediti locali dichiarati dall'app
+// (data.localCredits), come fa la funzione vera in filo-security/functions/index.js.
 // Banco di prova del quinto giro di verifica sui crediti (#598).
 //
 // Un server HTTP locale prende il posto di TRE cose che in produzione stanno
@@ -217,7 +220,7 @@ export async function avviaServer({ salt = 'sale-di-prova', rate = RATE } = {}) 
         let result;
         if (name === 'walletState') result = await service.state(uid, deps);
         else if (name === 'walletRedeem') {
-          try { result = await service.redeem(uid, String(data.code || ''), deps); } catch (e) {
+          try { result = await service.redeem(uid, String(data.code || ''), deps, { localCredits: Number(data.localCredits) || 0 }); } catch (e) {
             if (e && e.code === 'no_salt') result = { status: 'not_configured' }; else throw e;
           }
         } else if (name === 'walletReissue') result = await service.reissue(uid, deps);

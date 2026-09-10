@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Inviti e utenti</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <link rel="stylesheet" href="credits.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/storage.js"></script>
+</head>
+<body>
+  <main class="sn-page">
+    <h1 id="title">Inviti e utenti</h1>
+    <p class="sn-muted"><a href="credits.html">← Crediti</a></p>
+    <p class="sn-muted" id="ownerDenied" hidden>Questa pagina è del proprietario di Filo.</p>
+    <section id="ownerSection" class="sn-wallet-owner" hidden>
+      <p class="sn-muted" id="ownerTotals"></p>
+      <div class="sn-wallet-owner-row">
+        <!-- novalidate: i controlli sui numeri li fa la pagina, con una frase
+             di Filo, non la bolla del browser. -->
+        <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off" novalidate>
+          <label for="ownerInviteCount">Nuovi codici</label>
+          <input type="number" id="ownerInviteCount" min="1" max="200" value="5" />
+          <button type="submit" class="sn-btn" id="ownerInvitesBtn">Genera</button>
+        </form>
+        <form id="ownerGrantForm" class="sn-wallet-inline" autocomplete="off" novalidate>
+          <label for="ownerGrantPseudonym">Regala crediti a</label>
+          <input type="text" id="ownerGrantPseudonym" placeholder="pseudonimo" maxlength="16" spellcheck="false" />
+          <input type="number" id="ownerGrantCredits" min="1" placeholder="crediti" />
+          <button type="submit" class="sn-btn" id="ownerGrantBtn">Regala</button>
+        </form>
+      </div>
+      <p class="sn-wallet-msg" id="ownerMsg" role="status" hidden></p>
+      <h3 class="sn-wallet-sub" id="ownerCodesTitle" hidden>I tuoi codici</h3>
+      <ul id="ownerCodes" class="sn-wallet-invites"></ul>
+      <div class="sn-wallet-table-wrap">
+        <table class="sn-wallet-table" id="ownerUsers" hidden>
+          <thead><tr><th>Pseudonimo</th><th>Saldo</th><th>Ricevuti</th><th>Speso ($)</th><th>Registro</th><th>Invitato da</th><th>Dal</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="sn-muted" id="ownerRuns"></p>
+    </section>
+
+  </main>
+
+  <script src="owner.js"></script>
+</body>
+</html>

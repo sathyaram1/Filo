@@ -53,34 +53,9 @@
       <ul id="invites" class="sn-wallet-invites"></ul>
     </section>
 
-    <!-- Solo owner: codici da dare, elargizioni, chi ha cosa. -->
-    <section id="ownerSection" class="sn-wallet-section sn-wallet-owner" hidden>
-      <h2>Inviti e utenti</h2>
-      <p class="sn-muted" id="ownerTotals"></p>
-      <div class="sn-wallet-owner-row">
-        <form id="ownerInvitesForm" class="sn-wallet-inline" autocomplete="off">
-          <label for="ownerInviteCount">Nuovi codici</label>
-          <input type="number" id="ownerInviteCount" min="1" max="200" value="5" />
-          <button type="submit" class="sn-btn" id="ownerInvitesBtn">Genera</button>
-        </form>
-        <form id="ownerGrantForm" class="sn-wallet-inline" autocomplete="off">
-          <label for="ownerGrantPseudonym">Regala crediti a</label>
-          <input type="text" id="ownerGrantPseudonym" placeholder="pseudonimo" maxlength="16" spellcheck="false" />
-          <input type="number" id="ownerGrantCredits" min="1" placeholder="crediti" />
-          <button type="submit" class="sn-btn" id="ownerGrantBtn">Regala</button>
-        </form>
-      </div>
-      <p class="sn-wallet-msg" id="ownerMsg" role="status" hidden></p>
-      <h3 class="sn-wallet-sub" id="ownerCodesTitle" hidden>I tuoi codici</h3>
-      <ul id="ownerCodes" class="sn-wallet-invites"></ul>
-      <div class="sn-wallet-table-wrap">
-        <table class="sn-wallet-table" id="ownerUsers" hidden>
-          <thead><tr><th>Pseudonimo</th><th>Saldo</th><th>Ricevuti</th><th>Speso ($)</th><th>Registro</th><th>Invitato da</th><th>Dal</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p class="sn-muted" id="ownerRuns"></p>
-    </section>
+    <!-- Solo owner: la gestione (codici, regali, utenti) sta in una pagina
+         sua, owner.html. Qui resta il rimando. -->
+    <p class="sn-muted" id="ownerLink" hidden><a href="owner.html">Inviti e utenti →</a></p>
 
     <section class="sn-credits-usage" id="usageSection" hidden>
       <h2>Come hai usato i crediti</h2>

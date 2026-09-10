@@ -240,7 +240,13 @@ function withDefaults(settings) {
   const excludedProviders = SN_CONST.effectiveExcludedProviders(baseExcluded, openWeightsOnly);
 
   if (settings.useDefaultModels === false) {
-    return { ...settings, openWeightsOnly, excludedProviders, providerSort, security };
+    // Anche chi gestisce i modelli da sé usa la chiave personale (#598), se
+    // non ne ha scritta una sua: la scelta dei modelli e la chiave con cui
+    // pagarli sono due cose diverse.
+    const own = settings.apiKeys || {};
+    const personal = personalOpenrouterKey();
+    const apiKeys = own.openrouter || !personal ? own : { ...own, openrouter: personal };
+    return { ...settings, apiKeys, openWeightsOnly, excludedProviders, providerSort, security };
   }
   const userKeys = settings.apiKeys || {};
   const apiKeys = {};

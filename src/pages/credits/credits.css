@@ -118,10 +118,16 @@
 .sn-wallet-owner-row { display: flex; flex-wrap: wrap; gap: 18px 32px; margin-top: 10px; }
 .sn-wallet-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sn-wallet-inline label { font-weight: 600; }
-.sn-wallet-inline input {
+/* La regola generale delle pagine (`.sn-page input[type=...] { width: 100% }`)
+   è più specifica di `.sn-wallet-inline input` e vinceva: i campi prendevano
+   la colonna intera e il modulo si impilava su tre righe. Stessa specificità
+   più uno, e la riga resta una riga. */
+.sn-page .sn-wallet-inline input[type="text"],
+.sn-page .sn-wallet-inline input[type="number"] {
   padding: 6px 10px; border: 1px solid var(--sn-border); border-radius: 8px;
   background: var(--sn-bg-elev, var(--sn-bg)); color: var(--sn-fg); width: 9em;
 }
+.sn-page .sn-wallet-inline input#ownerInviteCount { width: 5em; }
 .sn-wallet-inline input:focus { outline: none; border-color: var(--sn-accent); }
 .sn-wallet-table-wrap { overflow-x: auto; margin-top: 12px; }
 .sn-wallet-table { border-collapse: collapse; width: 100%; font-size: 14px; }
