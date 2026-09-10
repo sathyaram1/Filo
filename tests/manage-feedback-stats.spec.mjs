@@ -395,11 +395,11 @@ test('il tasto destro su un numero offre le sue azioni, non il menu generale del
     .click({ button: 'right' });
   const menu = page.locator('.mg-ctxmenu');
   await expect(menu).toBeVisible();
-  await expect(menu).toContainText('Mostra le');
+  await expect(menu).toContainText(/Mostra l[ae] segnalazion/);
   await expect(menu).toContainText('Copia riga e numero');
 
   // La voce apre lo stesso elenco del clic sinistro.
-  await menu.locator('.sn-select-option', { hasText: 'Mostra le' }).click();
+  await menu.locator('.sn-select-option', { hasText: /Mostra l[ae] segnalazion/ }).click();
   await expect(page.locator('#panel-fbstats .mg-st-drill .mg-st-drill-item')).toHaveCount(1);
 
   // E la barretta del grafico offre la sua, che è restringere la finestra.
@@ -421,13 +421,13 @@ test('ogni superficie che porta un numero risponde al tasto destro', async ({ op
   // Il numero grande in cima a una tessera: è il numero più in vista della
   // pagina, e prima non offriva niente.
   await page.locator('.mg-st-card[data-card="ricevuti"] .mg-st-card-head').click({ button: 'right' });
-  await expect(menu).toContainText('Mostra le');
-  await menu.locator('.sn-select-option', { hasText: 'Mostra le' }).click();
+  await expect(menu).toContainText(/Mostra l[ae] segnalazion/);
+  await menu.locator('.sn-select-option', { hasText: /Mostra l[ae] segnalazion/ }).click();
   await expect(page.locator('.mg-st-card[data-card="ricevuti"] .mg-st-drill-item')).toHaveCount(3);
 
   // La pastiglia di un creatore porta il suo conteggio: il tasto destro dice quali.
   await page.locator('#mgStCreators .mg-st-chip[data-creator="prober"]').click({ button: 'right' });
-  await expect(menu).toContainText('Mostra le');
+  await expect(menu).toContainText(/Mostra l[ae] segnalazion/);
   await page.keyboard.press('Escape');
 
   // La pastiglia della finestra: si porta via il periodo vero, con le date.

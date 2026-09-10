@@ -37,7 +37,7 @@ test('l’elenco si apre dove è stato chiesto, e non dentro un riquadro chiuso'
   // Sotto la pastiglia di un creatore: prende la riga intera, non una
   // colonnina schiacciata fra le pastiglie.
   await page.locator('#mgStCreators .mg-st-chip[data-creator="prober"]').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Mostra le' }).click();
+  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: /Mostra l[ae] segnalazion/ }).click();
   const sottoChip = page.locator('#mgStCreators .mg-st-drill');
   await expect(sottoChip).toBeVisible();
   const largo = await sottoChip.evaluate((el) => el.getBoundingClientRect().width);
@@ -48,7 +48,7 @@ test('l’elenco si apre dove è stato chiesto, e non dentro un riquadro chiuso'
   // In fondo alla tessera: l'elenco non si infila fra il numero e la riga che
   // lo spiega.
   await page.locator('.mg-st-card[data-card="ricevuti"] .mg-st-card-head').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Mostra le' }).click();
+  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: /Mostra l[ae] segnalazion/ }).click();
   const dentroTessera = page.locator('.mg-st-card[data-card="ricevuti"] .mg-st-drill');
   await expect(dentroTessera).toBeVisible();
   const ordine = await page.evaluate(() => {
