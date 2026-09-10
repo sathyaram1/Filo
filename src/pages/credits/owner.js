@@ -192,8 +192,11 @@
     ev.preventDefault();
     const msg = $('ownerMsg');
     const pseudonym = String($('ownerGrantPseudonym').value || '').trim();
-    const credits = Math.floor(Number($('ownerGrantCredits').value) || 0);
-    if (!pseudonym || credits <= 0) { $('ownerGrantPseudonym').focus(); return; }
+    if (!pseudonym) return rifiuta(msg, $('ownerGrantPseudonym'), 'A chi? Serve lo pseudonimo (lo copi dalla tabella).');
+    const credits = numeroIntero($('ownerGrantCredits'));
+    if (credits == null || credits < 1) {
+      return rifiuta(msg, $('ownerGrantCredits'), 'Quanti crediti? Un numero intero, almeno 1.');
+    }
     $('ownerGrantBtn').disabled = true;
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_GRANT, pseudonym, credits, why: 'owner' }).catch(() => null);
     $('ownerGrantBtn').disabled = false;
