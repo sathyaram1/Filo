@@ -22,7 +22,7 @@ test('testi ostili ed enormi: niente esecuzione, niente NaN, niente sbordo', asy
   const lungo = 'A'.repeat(10000);
   await page.evaluate(({ cattivo, lungo, iso1, iso5 }) => window.__mgTest.setData([
     { _id: 'x1', seq: 1, subSeq: 0, clientId: cattivo, name: cattivo, text: cattivo, status: 'todo', createdAt: iso1 },
-    { _id: 'x2', seq: 2, subSeq: 0, clientId: 'u@e.com', name: lungo, text: lungo, status: 'done', createdAt: iso5, _updateTime: iso1, notes: `Verifica: 1 rilievo.\n${cattivo}\nLa correzione riguarda tutti i rilievi; poi un'altra verifica ricontrolla.\n- [1] ${lungo}\n\nVerifica superata.` },
+    { _id: 'x2', seq: 2, subSeq: 0, clientId: 'u@e.com', name: lungo, text: lungo, status: 'done', createdAt: iso5, _updateTime: iso1, notes: `Verifica: 1 rilievo.\n${cattivo}\nLa correzione riguarda tutti i rilievi; poi un'altra verifica ricontrolla.\n- [1] ${lungo}\n\n--- Aggiornamento dell'agente del 07/09/2026, 18:00 ---\nVerifica superata.` },
     { _id: 'x3', seq: 3, subSeq: 0, clientId: 'u@e.com', name: '🙂🙃 «virgolette» \u0000', text: 'e', status: 'spam', createdAt: 'non-una-data', priority: 99 },
   ]), { cattivo, lungo, iso1: iso(1), iso5: iso(5) });
   await page.locator('.mg-tab[data-tab="fbstats"]').click();
@@ -64,7 +64,7 @@ test('mille segnalazioni e venti cambi di finestra a raffica', async ({ openTab 
         name: `segnalazione ${i}`, text: `segnalazione ${i}`, status: s,
         createdAt: new Date(base - i * 3600 * 1000).toISOString(),
         _updateTime: new Date(base - (i % 50) * 3600 * 1000).toISOString(),
-        notes: s === 'done' ? `Verifica: 1 rilievo.\nLa correzione riguarda tutti i rilievi; poi un'altra verifica ricontrolla.\n- [1] x\n\nVerifica superata.` : '',
+        notes: s === 'done' ? `Verifica: 1 rilievo.\nLa correzione riguarda tutti i rilievi; poi un'altra verifica ricontrolla.\n- [1] x\n\n--- Aggiornamento dell'agente del 07/09/2026, 18:00 ---\nVerifica superata.` : '',
       });
     }
     window.__mgTest.setData(l);

@@ -16,17 +16,23 @@ import { test, expect } from './fixtures/electron.mjs';
 const URL = 'filo://manage/manage.html';
 
 // Verbali di verifica come li scrive il server nelle note del feedback.
-const PASS_SUBITO = 'Report del lavoro.\n\nVerifica superata.';
+// ⚠️ OGNI NOTA È UN TURNO. Filo appende una nota per volta, col suo
+// marcatore: il report di chi lavora e il verbale del verificatore non
+// stanno mai nello stesso turno.
+const TURNO = (h) => `--- Aggiornamento dell'agente del 07/09/2026, ${h}:00 ---`;
+const PASS_SUBITO = `Report del lavoro.\n\n${TURNO('09')}\nVerifica superata.`;
 const UN_GIRO = [
   'Report del lavoro.',
   '',
+  TURNO('09'),
   'Verifica: 1 rilievo.',
   'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
   '- [2] Il salvataggio non parte a titolo vuoto',
   '',
-  '--- Aggiornamento dell\'agente del 07/09/2026, 10:00 ---',
+  TURNO('10'),
   'Corretto.',
   '',
+  TURNO('11'),
   'Verifica superata.',
 ].join('\n');
 const RIMANDATI = [
@@ -256,16 +262,18 @@ const VERDE_DEL_PASS = 'rgb(59, 191, 122)';
 function verbaleConGiri(n) {
   const b = [];
   for (let i = 0; i < n; i += 1) {
+    if (i) b.push(TURNO(`0${i}`));
     b.push(
       'Verifica: 1 rilievo.',
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
       '- [1] Un rilievo qualunque',
       '',
-      `--- Aggiornamento dell'agente del 0${i + 1}/09/2026, 10:00 ---`,
+      TURNO(`1${i}`),
       'Corretto.',
       '',
     );
   }
+  if (n) b.push(TURNO('20'));
   b.push('Verifica superata.');
   return b.join('\n');
 }
@@ -496,9 +504,10 @@ test('la scala dei colori della torta si scalda e non riusa una tinta', async ({
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
       '- [1] Un rilievo',
       '',
-      '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---',
+      "--- Aggiornamento dell'agente del 01/09/2026, 10:00 ---",
       'Corretto.',
       '',
+      "--- Aggiornamento dell'agente del 01/09/2026, 12:00 ---",
       '',
     ].join('\n');
     const lista = [0, 1, 2, 3, 4, 5, 7].map((g, i) => ({
@@ -506,7 +515,7 @@ test('la scala dei colori della torta si scalda e non riusa una tinta', async ({
       status: 'done',
       createdAt: new Date(base - 5 * 24 * 3600 * 1000).toISOString(),
       _updateTime: new Date(base - 24 * 3600 * 1000).toISOString(),
-      notes: giro.repeat(g) + 'Verifica superata.',
+      notes: `${giro.repeat(g)}--- Aggiornamento dell'agente del 01/09/2026, 18:00 ---\nVerifica superata.`,
     }));
     window.__mgTest.setData(lista);
   }, { base: ora });
