@@ -221,14 +221,101 @@ test('parseRounds: distingue "il lavoro si ferma" da "i rilievi vanno in un feed
   assert.equal(ST.parseRounds({ notes: NOTE_RIMANDATI })[0].kind, 'rimandati');
 });
 
-test('readRounds: capisce anche i verbali vecchi (pass / fail / migliorabile)', () => {
+test('readRounds: capisce i verbali vecchi che dicono «è passato»', () => {
   const vecchio = (notes) => ST.readRounds({ notes });
   assert.equal(vecchio('Controllo funzionalità superato.').passSegnalato, true);
-  assert.equal(vecchio('Controllo funzionalità NON superato: non compare.').fermato, true);
   assert.equal(vecchio('Verifica: funziona, ma migliorabile — manca l\'hover.').passSegnalato, true);
-  // La punteggiatura fa parte della forma: senza, la frase è qualcuno che la
-  // cita raccontando il giro prima.
-  assert.equal(vecchio('Controllo funzionalità NON superato era il verdetto del giro scorso.').fermato, false);
+});
+
+// ⚠️ NESSUNA RIGA DI SOLE PAROLE FERMA UN LAVORO.
+// La forma vecchia «Controllo funzionalità NON superato» non si distingue da
+// chi la cita: due giri di verifica di fila l'hanno riaperta spostando la
+// punteggiatura, e ogni volta una lavorazione passata usciva dalla torta e si
+// leggeva come fermata. Chi ferma davvero un lavoro lo scrive nel verbale coi
+// rilievi, che una struttura ce l'ha.
+test('readRounds: una riga di sole parole non ferma un lavoro, nemmeno la frase vecchia', () => {
+  for (const riga of [
+    'Controllo funzionalità NON superato: non compare.',
+    'Controllo funzionalità NON superato: era il verdetto del giro scorso, adesso è chiuso.',
+    'Controllo funzionalità NON superato era il verdetto del giro scorso.',
+  ]) {
+    assert.equal(ST.readRounds({ notes: riga }).fermato, false, riga);
+  }
+  // Il verbale coi rilievi resta l'unico che può fermare.
+  assert.equal(ST.readRounds({ notes: NOTE_BLOCCANTE }).fermato, true);
+});
+
+// ⚠️ CHI CORREGGE CITA IL VERBALE A CUI RISPONDE, ED È NORMALE CHE LO FACCIA.
+// Il verbale non è più solo una struttura (testata, numero, elenco): è un TURNO
+// INTERO. Prosa prima o dopo l'elenco vuol dire che quell'elenco sta dentro il
+// testo di qualcun altro. Senza questo, il report di chi corregge sdoppiava il
+// giro, e quello che elencava i rilievi chiusi col livello davanti faceva
+// uscire dalla torta una lavorazione passata.
+test('il report di chi corregge non diventa un giro, per quanto citi il verbale', () => {
+  const verbale = [
+    'Verifica: 2 rilievi.',
+    'Provato: tutto quanto.',
+    'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+    '- [2] Il salvataggio non parte a titolo vuoto',
+    '- [1] Il bordo non segue il tema scuro',
+  ].join('\n');
+  const conReport = (report) => [
+    verbale, '', TURNO('10'), report, '', TURNO('11'), 'Verifica superata.',
+  ].join('\n');
+
+  const pulito = ST.loopsBeforePass({ notes: conReport('Corretto.') });
+  assert.equal(pulito.giri, 1);
+  assert.equal(pulito.passata, true);
+
+  for (const report of [
+    // Riporta il verbale a cui sta rispondendo, per dire a cosa risponde.
+    `Fatto. Il verbale a cui rispondo era questo:\n${verbale}\nTutti e due chiusi.`,
+    // Lo riporta per primo, e commenta sotto.
+    `${verbale}\nEcco cosa ho corretto, tutti e due.`,
+    // Elenca i rilievi chiusi nella forma in cui li ha ricevuti.
+    'Verifica: 2 rilievi.\nHo corretto tutti e due.\n- [2] il primo: chiuso.\n- [1] il secondo: chiuso.',
+    // La frase vecchia, con la punteggiatura spostata.
+    'Controllo funzionalità NON superato: era il verdetto del giro scorso, adesso è chiuso.',
+  ]) {
+    const r = ST.loopsBeforePass({ notes: conReport(report) });
+    assert.equal(r.giri, 1, report);
+    assert.equal(r.passata, true, report);
+    assert.equal(r.rounds.filter((x) => x.kind === 'stop').length, 0, report);
+  }
+});
+
+// ⚠️ LA TESTATA DI UN ALTRO VERBALE, CITATA NEL RIASSUNTO, NON CANCELLA IL GIRO.
+// Fra più righe che sembrano un'intestazione vince la PRIMA che è davvero un
+// verbale: con l'ultima, «Verifica: 3 rilievi.» riportata a capo dentro il
+// riassunto faceva sparire del tutto il giro vero.
+test('una testata citata nel riassunto non cancella il giro che la contiene', () => {
+  const notes = [
+    'Verifica: 2 rilievi.',
+    'Provato: tutto. Il giro scorso si apriva così:',
+    'Verifica: 3 rilievi.',
+    'e quei tre li ho riprovati, sono chiusi.',
+    'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+    '- [2] Il primo',
+    '- [1] Il secondo',
+    '',
+    TURNO('10'),
+    'Verifica superata.',
+  ].join('\n');
+  const r = ST.loopsBeforePass({ notes });
+  assert.equal(r.giri, 1);
+  assert.equal(r.rounds[0].findings.length, 2);
+});
+
+// ⚠️ LA TESTA DEL CAMPO NOTE SI SCRIVE A MANO, E NON È UN TURNO DI FILO.
+// Filo appende ogni nota col suo marcatore; quello che sta prima del primo
+// marcatore lo ha scritto qualcuno nella casella di testo della dashboard. Una
+// riga di sole parole lì dentro vale come esito solo se è tutto quello che c'è.
+test('una nota scritta a mano sopra altro testo non è un verbale', () => {
+  const aMano = 'Verifica superata. Ho guardato io, va bene.\n\nChiusa a mano.';
+  assert.equal(ST.loopsBeforePass({ notes: aMano }), null);
+  // Un verbale vero scritto lì sotto continua a contare.
+  const conVerbale = `Nota mia.\n\n${NOTE_RIMANDATI}`;
+  assert.equal(ST.parseRounds({ notes: conVerbale }).length, 1);
 });
 
 test('parseRounds: un livello scritto nel report di chi ha lavorato non diventa un rilievo della verifica', () => {
