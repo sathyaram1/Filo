@@ -415,7 +415,7 @@ async function main() {
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
     if (blocking.length) {
       const args = ['playwright', 'test', ...blocking.map((s) => `${s}.spec.mjs`)];
