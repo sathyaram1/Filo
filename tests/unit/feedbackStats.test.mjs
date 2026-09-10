@@ -483,16 +483,18 @@ test('una riga d’apertura citata dentro un rilievo non apre un giro', () => {
 
 const VR = globalThis.SN_VERIFIER_ROUND;
 const TURNO_CORRETTORE = '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---';
+const TURNO_PASS = '--- Aggiornamento dell\'agente del 01/09/2026, 18:00 ---';
 
 // Un giro di correzione col riassunto che gli si vuole dare, poi la correzione,
-// poi il pass. Un giro solo prima del pass, sempre.
+// poi il pass. Un giro solo prima del pass, sempre. Tre note, quindi tre turni:
+// Filo non scrive mai due note nello stesso turno.
 function conversazione(riassunto, coda) {
   const giro = VR.roundNote({
     summary: riassunto,
     findings: [{ level: 1, text: 'Manca l\'hover sull\'icona' }],
     decision: { fix: [{ level: 1 }] },
   });
-  return [giro, '', coda || `${TURNO_CORRETTORE}\nCorretto.`, '', 'Verifica superata.'].join('\n');
+  return [giro, '', coda || `${TURNO_CORRETTORE}\nCorretto.`, '', TURNO_PASS, 'Verifica superata.'].join('\n');
 }
 
 function esito(notes) {
