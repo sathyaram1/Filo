@@ -117,7 +117,7 @@ main. Così le pagine girano quasi invariate.
 - [x] Hotkey globali (Alt+E/T/S/H; su Mac Ctrl+Alt, perché Alt da solo è il tasto degli accenti)
 - [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
 - [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
-- [x] Test Playwright adattati a `_electron.launch` (~100 spec)
+- [x] Test Playwright adattati a `_electron.launch` (~390 spec, ~1.600 casi)
 - [x] Auto-update (electron-builder/NSIS, vedi `src/main/updater.js`)
 - [x] Packaging Windows (NSIS) e Mac (dmg universale, Intel + Apple Silicon); Linux non previsto per ora
 
