@@ -500,8 +500,12 @@
     const lines = String(notes || '').split('\n');
     const blocks = [];
     let current = [];
-    for (const line of lines) {
-      if (USER_TURN_RE.test(line) || MODEL_TURN_RE.test(line)) {
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i];
+      // Stessa regola di splitNotes: un marcatore citato in mezzo a un
+      // capoverso non è l'inizio di un turno, e il taglio non deve spezzare
+      // lì il messaggio di chi l'ha citato.
+      if (markerOpensTurn(lines, i) && (USER_TURN_RE.test(line) || MODEL_TURN_RE.test(line))) {
         blocks.push(current.join('\n'));
         current = [line];
       } else {
