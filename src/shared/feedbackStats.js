@@ -727,6 +727,14 @@
         // entrano nel totale ma non possono entrare nel grafico, e la pagina
         // lo scrive invece di farle sparire.
         senzaData: ricevuti.filter((fb) => !Number.isFinite(createdMs(fb))).length,
+        // Quante hanno una data d'arrivo NEL FUTURO (l'orologio storto sul
+        // computer di chi ha segnalato). Il grafico degli arrivi finisce a
+        // oggi, quindi restano fuori dalle colonne: entrano nel totale, e la
+        // pagina lo scrive invece di lasciar tornare due somme diverse.
+        nelFuturo: ricevuti.filter((fb) => {
+          const ms = createdMs(fb);
+          return Number.isFinite(ms) && ms > now;
+        }).length,
         // Quante ne ha lasciate fuori la finestra perché la loro data non si
         // legge (con «Sempre» è sempre zero: lì non si lascia fuori nessuno).
         escluseSenzaData: (range.from === null && range.to === null)
