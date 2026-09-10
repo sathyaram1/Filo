@@ -147,6 +147,21 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
     assert.equal(behindMainStop(undefined), '');
   });
 
+  // Con `--check` nessuna fusione segue: non c'è un conflitto da scoprire in
+  // anticipo, e chi verifica in locale ha quel comando al posto della suite.
+  // Fermarlo mentre la linea principale si muove lo mandava a far ripartire
+  // la verifica già in corso (giro 3 di suite-locale).
+  test('con --check il ramo indietro non ferma: diventa una nota', () => {
+    assert.equal(behindMainStop(31, { checkOnly: true }), '');
+    assert.match(behindMainStop(31, { checkOnly: false }), /31 commit/);
+    const nota = behindMainNota(31);
+    assert.match(nota, /31 commit/);
+    assert.match(nota, /npm run finish/, 'la nota dice dove quel ramo indietro fermerebbe davvero');
+    assert.equal(behindMainNota(0), '');
+    assert.equal(behindMainNota('fatal'), '');
+    assert.match(SORGENTE, /behindMainStop\(behind, \{ checkOnly \}\)/, 'la chiamata vera passa la modalità');
+  });
+
   test('la guardia sta PRIMA dei controlli, non dopo', () => {
     // Meglio 5 secondi di errore chiaro che 15 minuti di controlli seguiti da
     // un conflitto. lastIndexOf: si guarda la CHIAMATA, non la definizione.
