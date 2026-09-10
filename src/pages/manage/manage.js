@@ -1568,6 +1568,16 @@
           ? '1 segnalazione non ha una data d’arrivo leggibile: è nel totale, non nel grafico.'
           : `${senza} segnalazioni non hanno una data d’arrivo leggibile: sono nel totale, non nel grafico.`);
       }
+      // Le colonne finiscono a oggi. Una data d'arrivo nel futuro (l'orologio
+      // storto sul computer di chi ha segnalato) resta fuori: senza questa
+      // riga la somma delle colonne è più piccola della tessera e nessuno lo
+      // dice.
+      const futuri = res.ricevuti.nelFuturo || 0;
+      if (futuri) {
+        parti.push(futuri === 1
+          ? '1 segnalazione ha una data d’arrivo nel futuro: è nel totale, non nel grafico.'
+          : `${futuri} segnalazioni hanno una data d’arrivo nel futuro: sono nel totale, non nel grafico.`);
+      }
       mgStBarsNote.textContent = parti.join(' ');
     }
   }
