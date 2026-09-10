@@ -193,12 +193,27 @@ const NOTE_BLOCCANTE = [
   '- [3] I dati dell\'utente finiscono nei log',
 ].join('\n');
 
-test('parseRounds: legge il verbale di oggi, un giro per volta', () => {
+// ⚠️ SI CONTANO I GIRI CHE ESIBISCONO LA LORO STRUTTURA, NON LE FRASI.
+// Un verbale con rilievi dichiara quanti sono, li elenca, e prima dell'elenco
+// scrive con quale decisione si chiude: tre cose che devono combaciare. Il
+// verbale di un giro SUPERATO non ha niente da esibire (è una riga di parole,
+// identica a chi quelle parole le cita), quindi non è un giro da contare: dice
+// soltanto «questo lavoro è passato», ed è un sì/no.
+test('parseRounds: conta i giri con rilievi, non le righe che dicono «superata»', () => {
   const rounds = ST.parseRounds({ notes: NOTE_DUE_GIRI });
-  assert.equal(rounds.length, 2);
+  assert.equal(rounds.length, 1);
   assert.equal(rounds[0].kind, 'fix');
   assert.equal(rounds[0].findings.length, 2);
-  assert.equal(rounds[1].kind, 'pass');
+  assert.equal(ST.readRounds({ notes: NOTE_DUE_GIRI }).passSegnalato, true);
+});
+
+test('parseRounds: il numero dichiarato deve combaciare con i rilievi elencati', () => {
+  const finto = [
+    'Verifica: 2 rilievi.',
+    'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+    '- [1] uno solo',
+  ].join('\n');
+  assert.deepEqual(ST.parseRounds({ notes: finto }), [], 'due dichiarati, uno elencato: non è un verbale');
 });
 
 test('parseRounds: distingue "il lavoro si ferma" da "i rilievi vanno in un feedback derivato"', () => {
