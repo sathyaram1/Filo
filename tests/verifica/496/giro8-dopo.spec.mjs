@@ -108,6 +108,9 @@ test('poche colonne: il grafico ha la sua linea di base e ogni colonna la sua da
   }));
   await page.screenshot({ path: `${OUT}/496-giro8-dopo-24h.png`, fullPage: true });
   expect(g.base).toBe(1);
-  // Una data per colonna, non due etichette agli estremi di un vuoto.
-  expect(g.etichette.length).toBe(g.barre);
+  expect(g.barre).toBeGreaterThan(0);
+  // Una data per ogni posto-colonna (anche quelli vuoti), non due etichette
+  // agli estremi di un vuoto.
+  expect(g.etichette.length).toBeGreaterThanOrEqual(g.barre);
+  for (const e of g.etichette) expect(e).toMatch(/^\d{2}\/\d{2}$/);
 });
