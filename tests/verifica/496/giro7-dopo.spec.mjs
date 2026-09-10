@@ -11,18 +11,24 @@ const ora = Date.now();
 const iso = (g) => new Date(ora - g * 24 * 3600 * 1000).toISOString();
 
 function verbale(n) {
+  let t = 0;
+  const turno = () => `--- Aggiornamento dell'agente del 07/09/2026, ${++t} ---`;
   const b = [];
   for (let i = 0; i < n; i += 1) {
+    // Ogni nota è un turno suo: è così che Filo appende il verbale e il report
+    // di chi corregge.
+    if (i) b.push(turno());
     b.push(
       'Verifica: 1 rilievo.',
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
       '- [1] Un rilievo qualunque',
       '',
-      `--- Aggiornamento dell'agente del 0${i + 1}/09/2026, 10:00 ---`,
+      turno(),
       'Corretto.',
       '',
     );
   }
+  if (n) b.push(turno());
   b.push('Verifica superata.');
   return b.join('\n');
 }
