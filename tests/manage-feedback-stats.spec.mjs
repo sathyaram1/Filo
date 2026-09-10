@@ -495,8 +495,10 @@ test('la tessera delle partenze scrive il totale su cui sono calcolate le sue qu
   // Il numero grande conta i soli prober, la ripartizione tutti i ruoli: senza
   // il totale scritto, «1» in cima e «Verifica 1 · 50%» sotto sono la stessa
   // tessera letta in due modi.
-  await expect(valore(page, 'routine')).toHaveText('1');
-  await expect(page.locator('.mg-st-card[data-card="routine"] .mg-st-card-sub')).toContainText('2 in tutto');
+  // Il «+» dice che il registro comincia dopo l'inizio della finestra: il
+  // numero è un minimo, e resta un minimo anche nel totale.
+  await expect(valore(page, 'routine')).toHaveText('1+');
+  await expect(page.locator('.mg-st-card[data-card="routine"] .mg-st-card-sub')).toContainText('2+ in tutto');
 });
 
 test('il grafico degli arrivi non si deforma con la larghezza della finestra', async ({ openTab }) => {
