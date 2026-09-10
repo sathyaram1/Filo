@@ -1114,6 +1114,13 @@
     if (!tot) return '';
     return `${Math.round((n / tot) * 100)}%`;
   }
+  // La quota di ogni riga sul totale della sua tessera. Sta qui e non in tre
+  // posti perché tutte le tessere la scrivano: due tessere disegnate uguali,
+  // una con la colonna delle percentuali piena e una vuota, non si leggono più
+  // allo stesso modo.
+  function statsQuote(rows, totale) {
+    return rows.map((r) => Object.assign({}, r, { share: statsPercent(r.n, totale) }));
+  }
   // Un numero che potrebbe non essere un totale si scrive "24+", come le
   // schede: il "+" costa un carattere e dice la verità.
   function statsNum(n, parziale) {
