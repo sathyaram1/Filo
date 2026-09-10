@@ -112,6 +112,15 @@ passare): una corsa per feedback invece di una per consegna. Prima confronta
 gli spec toccati e gli unit test; la suite intera è l'ultimo passo, non il
 primo.
 
+**In locale, sulla macchina di chi sviluppa Filo, la suite intera NON si
+lancia** (decisione owner 2026-09-10: lì dura quasi sette ore con un solo
+worker e occupa la macchina; i rossi che trova sono quelli già scritti nei
+rossi noti). Al suo posto: `npm run finish:check`, che lancia gli unit test e
+gli spec delle aree toccate dal ramo, più le prove dei giri in
+`tests/verifica/<numero>/`. La suite intera gira nel cancello del server
+prima della pubblicazione. Come sai di essere in locale: il compito che hai
+ricevuto viene da `verify-local.mjs`, non dal canale delle routine.
+
 - Rossi **fuori dalla lista dei rossi noti** → rilievo di livello **2**, con
   l'elenco esatto degli spec rotti nella critica.
 - I rossi d'ambiente sono **scritti**, non a memoria: stanno in
