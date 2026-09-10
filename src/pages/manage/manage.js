@@ -1473,21 +1473,27 @@
       return;
     }
     statsMostra(mgStBars, true);
-    const W = 1000, H = 140, base = H - 18, top = 6;
+    // ⚠️ IL RIQUADRO È IN PIXEL VERI, NON IN UNITÀ DA STIRARE.
+    // Prima il disegno nasceva in un riquadro fisso di mille unità e poi veniva
+    // spalmato sulla larghezza vera senza conservare le proporzioni: le date
+    // sotto le colonne si allargavano o si schiacciavano con la finestra, e
+    // sotto i settecento pixel diventavano macchie. Anche le colonne cambiavano
+    // larghezza a parità di dati. Qui si misura la larghezza vera e si disegna
+    // in quella: un pixel del riquadro è un pixel dello schermo.
+    const H = 140, base = H - 18, top = 6;
+    const W = Math.max(240, Math.round(mgStBars.getBoundingClientRect().width || 0) || 1000);
     mgStBars.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    mgStBars.setAttribute('preserveAspectRatio', 'none');
+    mgStBars.removeAttribute('preserveAspectRatio');
     const n = t.buckets.length;
     const max = Math.max(1, ...t.buckets.map((b) => b.n));
-    // Il tetto sulla larghezza: con quattro colonne, senza, ognuna diventava un
-    // blocco largo un quarto di schermo e alto quanto il riquadro — due
-    // rettangoli buttati lì, non un andamento.
-    // E il tetto sul PASSO: con due sole colonne, spalmate sulla larghezza
-    // intera, restavano due blocchetti lontanissimi in mezzo al bianco, uno a
-    // un quarto e uno a tre quarti. Poche colonne stanno vicine, a sinistra,
-    // e si leggono come un gruppo.
-    const passo = Math.min(W / n, 160);
-    const usata = passo * n;
-    const larghezza = Math.min(48, Math.max(2, passo - Math.min(6, passo * 0.25)));
+    // Le colonne prendono tutta la larghezza: è la linea di base sotto e la
+    // data sotto ogni colonna a farne un andamento, non lo stare vicine. A
+    // tenerle strette in un angolo restavano due terzi di riquadro bianchi.
+    // Il tetto vale sulla LARGHEZZA della colonna: senza, con due colonne
+    // ognuna diventava un blocco largo mezzo schermo.
+    const passo = W / n;
+    const usata = W;
+    const larghezza = Math.min(56, Math.max(2, passo - Math.min(6, passo * 0.25)));
     // La linea di base: senza, due colonne isolate non sembrano un grafico ma
     // due rettangoli appoggiati sul niente.
     const asse = document.createElementNS(NS, 'line');
