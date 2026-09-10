@@ -338,7 +338,7 @@
             kind = max !== null && max >= 2 ? 'stop' : 'rimandati';
           }
         }
-        rounds.push({ kind, findings: parsed.findings });
+        delTurno.push({ kind, findings: parsed.findings, daPass: current.kind === 'pass' });
         current = null;
       };
       for (const raw of lines) {
