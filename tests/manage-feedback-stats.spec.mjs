@@ -518,9 +518,15 @@ test('la scala dei colori della torta si scalda e non riusa una tinta', async ({
   // Nessuna tinta ripetuta: due code diverse non possono diventare uno spicchio solo.
   expect(new Set(fette.map((f) => f.fill)).size).toBe(7);
   // E la scala si SCALDA: più critiche vuol dire meno verde, mai il contrario.
-  const verde = (hex) => parseInt(hex.slice(3, 5), 16) - parseInt(hex.slice(1, 3), 16);
+  // Prima finiva in viola e blu — i due colori più freddi — messi DOPO il
+  // rosso, e la coda peggiore si leggeva come più tranquilla del centro.
+  const quotaVerde = (hex) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    return c[1] / (c[0] + c[1] + c[2]);
+  };
   for (let i = 1; i < fette.length; i += 1) {
-    expect(verde(fette[i].fill), `${fette[i].giri} critiche`).toBeLessThan(verde(fette[i - 1].fill));
+    expect(quotaVerde(fette[i].fill), `${fette[i].giri} critiche`)
+      .toBeLessThan(quotaVerde(fette[i - 1].fill));
   }
 });
 
