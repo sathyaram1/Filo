@@ -137,7 +137,9 @@ test('owner con il suo portafoglio: la pagina Crediti tiene solo il rimando, e u
     await owner.click('#ownerGrantBtn');
     await expect(owner.locator('#ownerMsg')).toContainText(/\+25 crediti/, { timeout: 15_000 });
     const attesoNum = Number(saldo.replace(/\./g, '').replace(',', '.')) + 25;
-    const atteso = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(attesoNum);
+    const v = Math.round(attesoNum * 10) / 10;
+    const [int, dec] = String(v).split('.');
+    const atteso = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : '');
     await expect(crediti.locator('#balance')).toHaveText(atteso, { timeout: 15_000 });
     console.log('[nota]', `saldo owner ${saldo} → dopo il regalo a sé ${await crediti.locator('#balance').innerText()}`);
   } finally { await chiudi(filo); }
