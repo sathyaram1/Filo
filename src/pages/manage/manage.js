@@ -1427,7 +1427,8 @@
     const g = res.giri;
     const frasi = [];
     if (totale) {
-      frasi.push(`Media: ${ST.formatAvg(g.media)} giri prima del pass`);
+      const media = ST.formatAvg(g.media);
+      frasi.push(`Media: ${media} ${media === '1' ? 'giro' : 'giri'} prima del pass`);
       if (g.alPrimoColpo !== null) frasi.push(`al primo colpo ${Math.round(g.alPrimoColpo * 100)}%`);
     }
     if (g.giriTotali) {
