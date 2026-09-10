@@ -758,6 +758,10 @@
       .map(([giri, n]) => ({ giri, n }))
       .sort((a, b) => a.giri - b.giri);
 
+    // Il grafico degli arrivi si disegna una volta sola: la riga che dice cosa
+    // ne resta fuori deve guardare QUEL disegno, non ridedurlo.
+    const grafico = timeline(ricevuti, range, now);
+
     // ── Copertura: fin dove arrivano davvero i dati in pagina ───────────────
     const arrivi = all.map(createdMs).filter(Number.isFinite);
     const piuVecchio = arrivi.length ? Math.min.apply(null, arrivi) : null;
