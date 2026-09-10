@@ -119,6 +119,22 @@ test('la testata di un altro verbale citata nel riassunto non cancella il giro',
   expect(res.legenda, res.legenda).not.toContain('Passata al primo giro');
 });
 
+test('una lavorazione senza verbale non diventa «passata al primo giro»', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+
+  // Nessun giro di verifica nelle note: la scheda ha una casella apposta per
+  // dirlo («senza verbale di verifica nelle note»).
+  const senza = await leggi(page, 'Chiusa a mano dall’owner, senza passare da una verifica.');
+  console.log('SENZA VERBALE:', senza.legenda, '||', senza.nota);
+  expect(senza.legenda, senza.legenda).toContain('verbale');
+
+  // La stessa lavorazione, con in cima al campo note una riga scritta a mano.
+  const conNota = await leggi(page, 'Verifica superata. Ho guardato io, va bene.\n\nChiusa a mano.');
+  console.log('NOTA A MANO:', conNota.legenda, '||', conNota.nota);
+  expect(conNota.legenda, conNota.legenda).not.toContain('Passata al primo giro');
+});
+
 test('la frase vecchia coi due punti attaccati non inventa un giro bloccante', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
