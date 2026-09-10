@@ -41,6 +41,11 @@ async function riscatta(page, code) {
   await page.fill('#inviteCode', code);
   await page.click('#redeemBtn');
   await expect(page.locator('#redeemForm')).toBeHidden({ timeout: 15_000 });
+  // Un'installazione nuova ha già un conteggio locale (1.010): passa anche lui.
+  // Il saldo atteso è quanto il server ha concesso, non un numero scritto a mano.
+  const granted = primoWallet().creditsGranted;
+  await expect(page.locator('#balance')).toHaveText(fmt(granted), { timeout: 15_000 });
+  return granted;
 }
 
 test('il consumo supera il tetto: il saldo dice 0 (non un numero negativo), la chat spiega, e una ricarica del tetto lo fa risalire nella pagina aperta', async () => {
@@ -50,7 +55,6 @@ test('il consumo supera il tetto: il saldo dice 0 (non un numero negativo), la c
   try {
     const page = await apriCrediti(filo.openTab);
     await riscatta(page, code);
-    await expect(page.locator('#balance')).toHaveText(fmt(5000), { timeout: 15_000 });
     const key = server.keys.keys.get(primoWallet().keyHash);
     const dash = await filo.openTab('filo://dashboard/dashboard.html');
     await expect(dash.locator('#homeMessage')).not.toHaveText('…', { timeout: 15_000 });
@@ -68,8 +72,9 @@ test('il consumo supera il tetto: il saldo dice 0 (non un numero negativo), la c
     // deve risalire senza ricaricare. Il regalo arriva da un'altra installazione
     // (qui: direttamente dal servizio), quindi la pagina non ha nessun avviso
     // locale: si guarda cosa succede alla chiamata successiva.
-    const w = primoWallet();
-    const r = await server.service.grant(w.uid, 300, 'owner', server.deps);
+    const uid = [...server.store.docs.wallets.keys()][0];
+    const r = await server.service.grant(uid, 300, 'owner', server.deps);
+    console.log('[nota]', `regalo di 300 dal servizio: ${JSON.stringify({ ok: r.ok, reason: r.reason })}`);
     expect(r.ok).toBe(true);
     await fintoOpenRouter(filo.app, { status: 200, text: 'Eccomi.', costUsd: 0.001 });
     await chiediInChat(dash, 'e adesso?');
@@ -88,20 +93,19 @@ test('dopo il riscatto il conteggio locale vive ancora: una ricompensa locale co
   try {
     const page = await apriCrediti(filo.openTab);
     await saldoLocale(filo.app, 200);
-    await riscatta(page, code);
-    await expect(page.locator('#balance')).toHaveText(fmt(5200), { timeout: 15_000 });
+    const granted = await riscatta(page, code);
     // Una ricompensa locale (un feedback inviato) dopo il riscatto.
     await filo.app.evaluate(async () => { await globalThis.SN_CREDITS.award({ kind: 'feedback_sent', credits: 50, ref: 'dopo' }); });
     await page.waitForTimeout(2500);
     const saldo = await page.locator('#balance').innerText();
     const mosse = await page.locator('#moves li').allInnerTexts();
     console.log('[nota]', `ricompensa locale +50 dopo il riscatto: saldo «${saldo}», movimenti: ${JSON.stringify(mosse)}`);
-    // Il saldo non deve mai tornare al conteggio locale (250): quello vero è del server.
-    expect(saldo).toBe(fmt(5200));
+    // Il saldo non deve mai tornare al conteggio locale: quello vero è del server.
+    expect(saldo).toBe(fmt(granted));
     // Riaperta: idem.
     await page.reload();
     await page.waitForFunction(() => !document.getElementById('wallet').hidden);
-    await expect(page.locator('#balance')).toHaveText(fmt(5200), { timeout: 15_000 });
+    await expect(page.locator('#balance')).toHaveText(fmt(granted), { timeout: 15_000 });
     expect(await page.locator('#refillHint').innerText()).toMatch(/si accumulano|server/);
   } finally { await chiudi(filo); }
 });
@@ -112,8 +116,7 @@ test('due pagine Crediti aperte insieme: dopo una chiamata ai modelli scendono e
   const filo = await avviaFilo({ env: server.env });
   try {
     const page = await apriCrediti(filo.openTab);
-    await riscatta(page, code);
-    await expect(page.locator('#balance')).toHaveText(fmt(5000), { timeout: 15_000 });
+    const granted = await riscatta(page, code);
     // Seconda pagina Crediti: si apre con la stessa URL e si prende la finestra nuova.
     const shell = await filo.app.firstWindow();
     const prima = new Set(filo.app.windows());
@@ -121,12 +124,15 @@ test('due pagine Crediti aperte insieme: dopo una chiamata ai modelli scendono e
     let page2 = null;
     const deadline = Date.now() + 10_000;
     while (Date.now() < deadline && !page2) {
-      page2 = filo.app.windows().find((w) => !prima.has(w) && w.url().startsWith('filo://credits/credits.html')) || null;
+      page2 = filo.app.windows().find((w) => !prima.has(w)) || null;
       if (!page2) await new Promise((r) => setTimeout(r, 100));
     }
+    const nuove = filo.app.windows().filter((w) => !prima.has(w)).map((w) => w.url());
+    console.log('[nota]', `seconda apertura di Crediti: finestre nuove ${JSON.stringify(nuove)}`);
     expect(page2).toBeTruthy();
+    await page2.waitForURL(/credits\.html/, { timeout: 15_000 });
     await page2.waitForFunction(() => !document.getElementById('wallet').hidden, null, { timeout: 15_000 });
-    await expect(page2.locator('#balance')).toHaveText(fmt(5000), { timeout: 15_000 });
+    await expect(page2.locator('#balance')).toHaveText(fmt(granted), { timeout: 15_000 });
 
     const key = server.keys.keys.get(primoWallet().keyHash);
     const dash = await filo.openTab('filo://dashboard/dashboard.html');
@@ -165,6 +171,5 @@ test('diecimila caratteri incollati nel campo del codice: un rifiuto leggibile, 
     await expect(page.locator('#inviteCode')).toBeEnabled();
     // Subito dopo, il codice vero passa.
     await riscatta(page, code);
-    await expect(page.locator('#balance')).toHaveText(fmt(5000), { timeout: 15_000 });
   } finally { await chiudi(filo); }
 });

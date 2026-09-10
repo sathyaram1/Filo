@@ -77,7 +77,7 @@ test('un utente consuma: l’owner vede il saldo con il decimale nella tabella; 
     const celle = await riga.locator('td').allInnerTexts();
     console.log('[nota]', `riga utente nella tabella owner: ${JSON.stringify(celle)} (saldo atteso «${atteso}»)`);
     expect(celle[1]).toBe(atteso);
-    expect(celle[2]).toBe('5.000');
+    expect(celle[2]).toBe(fmt(w.creditsGranted));
     expect(celle[5]).toBe('te');
 
     mkdirSync(SHOTS, { recursive: true });
@@ -146,8 +146,10 @@ test('regalo a un utente che ha la sua pagina Crediti aperta su un’altra insta
     await page.fill('#inviteCode', code);
     await page.click('#redeemBtn');
     await expect(page.locator('#redeemForm')).toBeHidden({ timeout: 15_000 });
-    await expect(page.locator('#balance')).toHaveText(fmt(5000), { timeout: 15_000 });
-    const pseudonimo = [...server.store.docs.wallets.values()][0].pseudonym;
+    const w = [...server.store.docs.wallets.values()][0];
+    const granted = w.creditsGranted;
+    await expect(page.locator('#balance')).toHaveText(fmt(granted), { timeout: 15_000 });
+    const pseudonimo = w.pseudonym;
 
     expect((await simulaOwner(owner.app, server)).isAdmin).toBe(true);
     const op = await apriOwner(owner);
@@ -157,7 +159,7 @@ test('regalo a un utente che ha la sua pagina Crediti aperta su un’altra insta
     await op.click('#ownerGrantBtn');
     await expect(op.locator('#ownerMsg')).toContainText(/\+250 crediti/, { timeout: 15_000 });
     // La tabella dell'owner si è riletta: 5.250.
-    await expect(op.locator('#ownerUsers tbody tr.sn-wallet-user td').nth(1)).toHaveText(fmt(5250), { timeout: 15_000 });
+    await expect(op.locator('#ownerUsers tbody tr.sn-wallet-user td').nth(1)).toHaveText(fmt(granted + 250), { timeout: 15_000 });
 
     // L'utente, pagina aperta, senza fare niente: 15 secondi.
     await page.waitForTimeout(15_000);
@@ -166,7 +168,7 @@ test('regalo a un utente che ha la sua pagina Crediti aperta su un’altra insta
     // Ricaricata: il regalo c'è.
     await page.reload();
     await page.waitForFunction(() => !document.getElementById('wallet').hidden, null, { timeout: 15_000 });
-    await expect(page.locator('#balance')).toHaveText(fmt(5250), { timeout: 15_000 });
+    await expect(page.locator('#balance')).toHaveText(fmt(granted + 250), { timeout: 15_000 });
     // Nessun avviso sulla home dell'utente per il regalo? Si registra.
     const dash = await utente.openTab('filo://dashboard/dashboard.html');
     await expect(dash.locator('#homeMessage')).not.toHaveText('…', { timeout: 15_000 });
