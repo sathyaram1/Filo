@@ -671,6 +671,9 @@
           if (perLivello[f.level] !== undefined) perLivello[f.level] += 1;
         }
       }
+      // Il giro superato è al più uno per lavorazione: è un sì/no, non un
+      // conteggio, quindi ripetuto non gonfia niente.
+      if (r.passSegnalato) { perEsito.pass += 1; giriTotali += 1; }
       if (!r.passata) { ferme += 1; continue; }
       giriPerLavoro.push(r.giri);
       distribuzione.set(r.giri, (distribuzione.get(r.giri) || 0) + 1);
