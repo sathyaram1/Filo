@@ -126,7 +126,8 @@ test('owner, prima del primo utente: la riga dei totali ha tutti i numeri, i mod
     await expect(riga.locator('td').nth(2)).toHaveText('5.710', { timeout: 15_000 });
     const totaliDopo = await page.locator('#ownerTotals').innerText();
     console.log('[nota]', `totali con un utente: «${totaliDopo}»`);
-    expect(totaliDopo).toMatch(/1 utenti/);
+    // Il giro aveva letto «1 utenti» e lo ha segnato come rilievo: da allora si conta al singolare.
+    expect(totaliDopo).toMatch(/\b1 utente\b/);
     expect(totaliDopo).not.toMatch(/tetti 0 \$/);
   } finally { await chiudi(filo); }
 });
