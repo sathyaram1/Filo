@@ -40,8 +40,9 @@
     }
     const cfg = o.config || {};
     const tot = o.totals || {};
+    const nUsers = Number(tot.users) || 0;
     $('ownerTotals').textContent =
-      `${formatInt(tot.users || 0)} utenti · tetti ${fmtUsd(tot.totalLimitUsd)} su ${fmtUsd(tot.maxGrantUsd)} elargibili · `
+      `${formatInt(nUsers)} ${nUsers === 1 ? 'utente' : 'utenti'} · tetti ${fmtUsd(tot.totalLimitUsd)} su ${fmtUsd(tot.maxGrantUsd)} elargibili · `
       + `inviti riscattabili rimasti ${formatInt(cfg.invitesRemaining || 0)} · ingresso ${formatInt(cfg.entryCredits || 0)}, +${formatInt(cfg.dailyCredits || 0)}/giorno`
       + (cfg.eurUsd ? ` · cambio ${cfg.eurUsd} (${cfg.eurUsdAt || ''})` : ' · cambio mancante');
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
