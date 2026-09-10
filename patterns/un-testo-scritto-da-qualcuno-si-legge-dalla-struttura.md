@@ -8,9 +8,9 @@ cercare le parole. Le parole le scrive anche chi racconta.
 Sulla scheda «Statistiche feedback» (#496) la torta dei giri di verifica conta i
 verbali scritti nella conversazione del feedback. Il verbale comincia con
 `Verifica superata.` o `Verifica: 3 rilievi.`, quindi il primo lettore cercava
-quelle righe nel testo. Lo stesso difetto è tornato per **cinque giri di
-verifica di fila**, ogni volta da una porta nuova, perché quelle frasi le scrive
-anche chi non sta verbalizzando:
+quelle righe nel testo. Lo stesso difetto è tornato per **sei giri di verifica
+di fila**, ogni volta da una porta nuova, perché quelle frasi le scrive anche
+chi non sta verbalizzando:
 
 1. dentro il testo di un rilievo («…il lavoro si ferma quando il registro non
    risponde»);
