@@ -460,10 +460,15 @@ function verbale(n) {
   const b = [];
   for (let i = 0; i < n; i += 1) {
     if (i) b.push(turno());
+    // Ogni verbale è DIVERSO dal precedente, come lo sono quelli veri: il
+    // riassunto racconta un giro diverso e i rilievi sono altri. Due verbali
+    // identici, riga per riga, nella stessa conversazione non li scrive il
+    // server: li scrive chi ne cita uno, e la scheda li conta una volta sola.
     b.push(
       'Verifica: 1 rilievo.',
+      `Provato: il giro ${i + 1}, e le porte di prima.`,
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
-      '- [1] Un rilievo qualunque',
+      `- [1] Un rilievo qualunque, il numero ${i + 1}`,
       '',
       turno(),
       'Corretto.',
@@ -708,17 +713,20 @@ test('il riassunto di un verbale SUPERATO non apre un secondo giro', () => {
 
 // Due correzioni prima del pass, come le scrive Filo: una nota, un turno.
 function dueCorrezioni(reportCorrettore) {
-  const giro = () => VR.roundNote({
-    summary: 'Provato: tutto quanto.',
-    findings: [{ level: 1, text: 'Manca l\'hover sull\'icona' }],
+  // Due verbali DIVERSI, come li scrive il server: il riassunto di un giro non
+  // è mai quello del giro prima. Due verbali identici nella stessa
+  // conversazione sono una citazione, e la scheda li conta una volta sola.
+  const giro = (k) => VR.roundNote({
+    summary: `Provato: tutto quanto, giro ${k}.`,
+    findings: [{ level: 1, text: `Manca l'hover sull'icona, giro ${k}` }],
     decision: { fix: [{ level: 1 }] },
   });
   return [
-    giro(),
+    giro(1),
     '',
     `${TURNO_CORRETTORE}\n${reportCorrettore}`,
     '',
-    `--- Aggiornamento dell'agente del 02/09/2026, 10:00 ---\n${giro()}`,
+    `--- Aggiornamento dell'agente del 02/09/2026, 10:00 ---\n${giro(2)}`,
     '',
     `--- Aggiornamento dell'agente del 02/09/2026, 14:00 ---\n${reportCorrettore}`,
     '',
@@ -817,4 +825,79 @@ test('compute: un orologio avanti di poche ore resta dentro il grafico, e nessun
   assert.equal(r.ricevuti.total, 2);
   assert.equal(dentro, 2, 'la colonna di oggi contiene anche l\'orologio avanti di tre ore');
   assert.equal(r.ricevuti.nelFuturo, 0, 'niente resta fuori, quindi non si scrive che qualcosa è fuori');
+});
+
+// ─── La settima porta: la riga che separa i turni è testo come tutto il resto ─
+//
+// Il giro 11 aveva ancorato il verbale a due cose insieme: la sua struttura e
+// il turno che lo contiene. Ma un turno comincia da una RIGA nel blob delle
+// note, e quella riga la scrive anche chi incolla un pezzo di conversazione o
+// chi la cita descrivendo cosa ha letto. Quattro strade, una causa; qui restano
+// chiuse (verifica #496, giro 12).
+
+const G12_AG1 = '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---';
+const G12_AG2 = '--- Aggiornamento dell\'agente del 02/09/2026, 10:00 ---';
+const G12_UT = '--- La tua risposta del 03/09/2026, 11:00 ---';
+
+function g12Verbale(riassunto) {
+  return VR.roundNote({
+    summary: riassunto,
+    findings: [{ level: 2, text: 'Il tasto non salva' }, { level: 1, text: 'Manca l\'hover' }],
+    decision: { fix: [{ level: 2 }, { level: 1 }] },
+  });
+}
+const G12_V = g12Verbale('Provato: tutto quanto.');
+// Una lavorazione costata un giro di correzione, poi passata.
+const G12_UN_GIRO = [G12_V, '', `${G12_AG1}\nCorretto.`, '', `${G12_AG2}\nVerifica superata.`].join('\n');
+// La stessa, chiusa senza che nessun giro l'abbia fatta passare.
+const G12_FERMA = [G12_V, '', `${G12_AG1}\nCorretto.`].join('\n');
+
+test('un verbale incollato in una risposta, riga di separazione compresa, non aggiunge un giro', () => {
+  assert.deepEqual(esito(G12_UN_GIRO), { kinds: ['fix'], giri: 1, passata: true });
+  const citato = `${G12_UN_GIRO}\n\n${G12_UT}\nNon mi torna. Il giro diceva:\n\n${G12_AG1}\n${G12_V}`;
+  assert.deepEqual(esito(citato), { kinds: ['fix'], giri: 1, passata: true });
+});
+
+test('un «Verifica superata.» incollato in una risposta non fa passare una lavorazione ferma', () => {
+  assert.equal(esito(G12_FERMA).passata, false);
+  const citato = `${G12_FERMA}\n\n${G12_UT}\nRiporto quello che avevo letto:\n\n${G12_AG1}\nVerifica superata.`;
+  assert.equal(esito(citato).passata, false);
+});
+
+test('il turno di chi corregge, quando è solo il verbale citato, non raddoppia il giro', () => {
+  const citato = [G12_V, '', `${G12_AG1}\n${G12_V}`, '', `${G12_AG2}\nVerifica superata.`].join('\n');
+  assert.deepEqual(esito(citato), { kinds: ['fix'], giri: 1, passata: true });
+});
+
+test('una riga di separazione citata dentro un verbale non fa sparire il giro', () => {
+  for (const riga of [G12_UT, G12_AG2]) {
+    const conCitazione = [
+      'Verifica: 2 rilievi.',
+      'Provato: tutto. Nella conversazione c’era questa riga:',
+      riga,
+      'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+      '- [2] Il tasto non salva',
+      '- [1] Manca l\'hover',
+      '',
+      `${G12_AG1}\nCorretto.`,
+      '',
+      `${G12_AG2}\nVerifica superata.`,
+    ].join('\n');
+    assert.deepEqual(esito(conCitazione), { kinds: ['fix'], giri: 1, passata: true }, riga);
+  }
+});
+
+test('due verbali diversi restano due giri: la difesa sulla ripetizione non li fonde', () => {
+  const notes = [
+    g12Verbale('Provato: il primo giro.'),
+    '',
+    `${G12_AG1}\nCorretto.`,
+    '',
+    `${G12_AG2}\n${g12Verbale('Provato: il secondo giro, e la porta di prima.')}`,
+    '',
+    '--- Aggiornamento dell\'agente del 04/09/2026, 10:00 ---\nCorretto di nuovo.',
+    '',
+    '--- Aggiornamento dell\'agente del 05/09/2026, 10:00 ---\nVerifica superata.',
+  ].join('\n');
+  assert.deepEqual(esito(notes), { kinds: ['fix', 'fix'], giri: 2, passata: true });
 });

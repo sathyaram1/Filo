@@ -204,8 +204,10 @@ test('riapertura: nota di Filo + risposta dell’utente (storico "Riaperto il")'
 test('più turni alternati Filo/utente in ordine cronologico', () => {
   const notes = [
     'Prima risposta di Filo.',
+    '',
     '--- La tua risposta del 01/06/26, 10:00 ---',
     'Prima risposta utente.',
+    '',
     '--- Riaperto il 02/06/26, 11:00 ---',
     'Seconda risposta utente.',
   ].join('\n');
@@ -306,6 +308,7 @@ test('mergeModelReport: report vuoto lascia intatte le note esistenti', () => {
 test('splitNotes riconosce il marcatore del turno agente come lato modello', () => {
   const notes = [
     'Report iniziale di Filo.',
+    '',
     "--- Aggiornamento dell'agente del 17/06/26 ---",
     'Secondo report di Filo.',
   ].join('\n');
@@ -357,6 +360,7 @@ test('parse: ogni turno porta i SUOI allegati, separati dalla segnalazione', () 
   const notes = [
     'Nota di Filo con un file.',
     TH.serializeAttachment({ kind: 'file', url: 'https://x/log.txt', name: 'log.txt', type: 'text/plain' }),
+    '',
     '--- La tua risposta del 10/06/26 ---',
     'Ecco lo screenshot.',
     TH.serializeAttachment({ kind: 'img', url: 'https://x/shot.png' }),
@@ -417,4 +421,60 @@ test('composeNotes: senza allegati ritorna il testo invariato', () => {
   const onlyAtt = TH.composeNotes('', [{ kind: 'img', url: 'https://x/z.png' }]);
   assert.deepEqual(TH.stripAttachments(onlyAtt).attachments, [{ kind: 'img', url: 'https://x/z.png' }]);
   assert.equal(TH.stripAttachments(onlyAtt).text, '');
+});
+
+// ─── Un marcatore apre un turno solo dove chi appende lo mette (#496, giro 12) ─
+//
+// `appendUserTurn`/`appendModelTurn` uniscono sempre il blocco nuovo con una
+// riga vuota in mezzo, quindi un marcatore vero è la prima riga del blob oppure
+// ha sopra una riga vuota. Una riga di marcatore in mezzo a un capoverso è
+// invece una CITAZIONE: chi descrive una conversazione riporta anche la riga
+// che ne separa i turni. Spezzare lì spaccava in due il turno di chi scriveva.
+
+test('splitNotes: un marcatore citato in mezzo a un capoverso non apre un turno', () => {
+  const notes = [
+    'Report di Filo.',
+    'Nella conversazione c’era questa riga:',
+    '--- La tua risposta del 01/09/2026, 10:00 ---',
+    'e sotto c’era il resto del mio report.',
+  ].join('\n');
+  const segs = TH.splitNotes(notes);
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0].role, 'model');
+  assert.ok(segs[0].body.includes('e sotto c’era il resto del mio report.'));
+});
+
+test('splitNotes: lo stesso marcatore con una riga vuota sopra apre il turno', () => {
+  const notes = [
+    'Report di Filo.',
+    '',
+    '--- La tua risposta del 01/09/2026, 10:00 ---',
+    'La mia risposta.',
+  ].join('\n');
+  assert.deepEqual(TH.splitNotes(notes).map((s) => s.role), ['model', 'user']);
+});
+
+test('i turni appesi dai due writer si rileggono sempre come turni', () => {
+  let notes = 'Report di Filo.';
+  notes = TH.appendUserTurn(notes, 'La mia risposta.', { ts: '01/09/2026, 10:00' });
+  notes = TH.appendModelTurn(notes, 'Il secondo report.', { ts: '02/09/2026, 10:00' });
+  notes = TH.appendUserTurn(notes, 'Riapro.', { ts: '03/09/2026, 10:00', label: 'Riaperto il' });
+  assert.deepEqual(TH.splitNotes(notes).map((s) => `${s.role}:${s.body}`), [
+    'model:Report di Filo.',
+    'user:La mia risposta.',
+    'model:Il secondo report.',
+    'user:Riapro.',
+  ]);
+});
+
+test('capNotes taglia i turni interi anche quando un marcatore è citato dentro un turno', () => {
+  const lungo = 'x'.repeat(200);
+  let notes = `Report di Filo. ${lungo}`;
+  notes = TH.appendModelTurn(notes, `Cito una riga:\n--- La tua risposta del 01/09/2026, 10:00 ---\nfine. ${lungo}`, { ts: '02/09/2026, 10:00' });
+  notes = TH.appendModelTurn(notes, `Ultimo turno. ${lungo}`, { ts: '03/09/2026, 10:00' });
+  const tagliato = TH.capNotes(notes, 400);
+  assert.ok(tagliato.startsWith(TH.TRIM_MARK));
+  assert.ok(tagliato.includes('Ultimo turno.'));
+  // La citazione non è un turno: se lo fosse, il taglio la lascerebbe monca.
+  assert.ok(!tagliato.includes('fine.'));
 });

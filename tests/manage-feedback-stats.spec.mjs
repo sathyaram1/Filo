@@ -665,3 +665,24 @@ test('tutte le tessere scrivono la quota accanto al numero, non solo due', async
     })));
   for (const q of quote) expect(q.conQuota, `tessera ${q.id}`).toBe(q.righe);
 });
+
+// Una finestra scritta a mano lunga più di sei anni fa passare il grafico degli
+// arrivi a una colonna per ANNO. L'etichetta però era quella del giorno, cioè
+// «01/01» sotto ogni colonna: dodici date uguali, e l'asse non diceva più di
+// che anno parlava. Ci si arriva sbagliando una cifra nell'anno d'inizio.
+test('con una colonna per anno l’asse scrive l’anno, non «01/01» dodici volte', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  const oggi = new Date();
+  const a = `${oggi.getFullYear()}-${String(oggi.getMonth() + 1).padStart(2, '0')}-${String(oggi.getDate()).padStart(2, '0')}`;
+  await page.evaluate((fine) => window.__mgTest.setStatsWindow('custom', '2015-01-01', fine), a);
+
+  const letto = await page.evaluate(() => ({
+    nota: document.getElementById('mgStBarsNote').textContent.replace(/\s+/g, ' ').trim(),
+    etichette: Array.from(document.querySelectorAll('#mgStBars .mg-st-bar-axis')).map((t) => t.textContent),
+  }));
+  expect(letto.nota, letto.nota).toContain('Una colonna per anno');
+  expect(letto.etichette.length, letto.etichette.join(' ')).toBeGreaterThan(1);
+  expect(new Set(letto.etichette).size, letto.etichette.join(' ')).toBe(letto.etichette.length);
+  expect(letto.etichette[letto.etichette.length - 1]).toBe(String(oggi.getFullYear()));
+});

@@ -419,16 +419,18 @@
     //   1. il marcatore. Il server ne scrive uno per turno, con l'istante in
     //      cui l'ha appeso: se lo stesso marcatore ricompare, il secondo è la
     //      copia che qualcuno ha incollato.
-    //   2. il verbale. Lo stesso verbale, riga per riga, non lo si scrive due
-    //      volte: chi lo ripete lo sta citando (il report di chi corregge
-    //      riporta il verbale a cui risponde).
+    //   2. il verbale ripetuto SUBITO DOPO se stesso. Chi corregge risponde al
+    //      verbale che ha appena ricevuto, e a volte lo riporta per intero nel
+    //      proprio turno: due turni di fila con lo stesso identico verbale sono
+    //      un verbale e la sua citazione. Più avanti nella conversazione due
+    //      verbali possono invece coincidere per caso, e lì non si tocca niente.
     // Il prezzo è un conteggio in DIFETTO nei casi rari in cui due turni veri
     // cadono nello stesso minuto: è il verso giusto in cui sbagliare, perché un
     // giro inventato sposta il lavoro nella fetta sbagliata e chi guarda non ha
     // modo di accorgersene (patterns/un-testo-scritto-da-qualcuno-si-legge-
     // dalla-struttura.md).
     const marcatoriVisti = new Set();
-    const verbaliVisti = new Set();
+    let verbalePrecedente = '';
     for (const turno of turni) {
       const marcatore = turno && turno.ts ? `model|${turno.ts}` : '';
       if (marcatore) {
