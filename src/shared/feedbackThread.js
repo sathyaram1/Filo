@@ -284,15 +284,34 @@
   // Spezza il blob `notes` nei suoi turni. Ritorna una lista di
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
+  // ⚠️ UN MARCATORE APRE UN TURNO SOLO SE STA DOVE CHI APPENDE LO METTE.
+  // `appendUserTurn`/`appendModelTurn` uniscono sempre il blocco nuovo con una
+  // riga vuota in mezzo (`prev + '\n\n' + blocco`), e il blocco comincia col
+  // marcatore: quindi un marcatore vero è la PRIMA riga del blob, oppure ha
+  // sopra una riga vuota. Sempre, per costruzione, anche dopo il taglio del
+  // tetto (`capNotes` rimette la riga vuota).
+  //
+  // Una riga di marcatore in mezzo a un capoverso è invece testo che qualcuno
+  // ha CITATO: chi descrive una conversazione riporta anche la riga che ne
+  // separa i turni. Spezzare lì spaccava in due il turno di chi scriveva, e la
+  // scheda «Statistiche feedback» perdeva il giro di verifica che quel turno
+  // conteneva (#496, giro 12); nella chat del feedback la stessa citazione
+  // faceva nascere una bolla di Filo dentro il messaggio di una persona.
+  function markerOpensTurn(lines, i) {
+    return i === 0 || !String(lines[i - 1] || '').trim();
+  }
+
   function splitNotes(notes) {
     const lines = String(notes || '').split('\n');
     const segments = [];
     // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
     // domande scritte dalla routine).
     let current = { role: 'model', ts: null, lines: [], atts: [] };
-    for (const line of lines) {
-      const mu = USER_TURN_RE.exec(line);
-      const mm = mu ? null : MODEL_TURN_RE.exec(line);
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i];
+      const apre = markerOpensTurn(lines, i);
+      const mu = apre ? USER_TURN_RE.exec(line) : null;
+      const mm = (mu || !apre) ? null : MODEL_TURN_RE.exec(line);
       if (mu) {
         segments.push(current);
         current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [], atts: [] };
