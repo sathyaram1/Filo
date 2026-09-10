@@ -113,7 +113,14 @@ test('owner, prima del primo utente: la riga dei totali ha tutti i numeri, i mod
     // Il clic sullo pseudonimo lo mette nel campo del regalo.
     await riga.locator('td').first().click();
     await expect(page.locator('#ownerGrantPseudonym')).toHaveValue(pseudonym);
+    // Un decimale nel campo dei crediti: il browser lo segna non valido (passo 1) e non parte niente.
     await page.fill('#ownerGrantCredits', '10.7');
+    await page.click('#ownerGrantBtn');
+    await page.waitForTimeout(800);
+    const decimaleInvalido = await page.$eval('#ownerGrantCredits', (e) => e.matches(':invalid'));
+    console.log('[nota]', `10,7 crediti nel campo del regalo: campo non valido ${decimaleInvalido}, concessi ${server.store.docs.wallets.get('anon-utente').creditsGranted}`);
+    expect(server.store.docs.wallets.get('anon-utente').creditsGranted).toBe(5700);
+    await page.fill('#ownerGrantCredits', '10');
     await page.click('#ownerGrantBtn');
     await expect(page.locator('#ownerMsg')).toContainText(/\+10 crediti/, { timeout: 15_000 });
     await expect(riga.locator('td').nth(2)).toHaveText('5.710', { timeout: 15_000 });
