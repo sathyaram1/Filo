@@ -156,20 +156,28 @@ test('compute: l\'istantanea "adesso" non guarda la finestra', () => {
 
 // ─── I giri di verifica letti dalle note ─────────────────────────────────────
 
-const NOTE_PASS_SUBITO = 'Report del lavoro.\n\nVerifica superata. Le due strade funzionano.';
+// ⚠️ OGNI NOTA È UN TURNO. Filo appende una nota per volta, ognuna col suo
+// marcatore (SN_FEEDBACK_THREAD.appendModelTurn): il report di chi lavora e il
+// verbale del verificatore non stanno mai nello stesso turno. Le note finte
+// scritte in un blocco solo raccontavano una conversazione che Filo non scrive.
+const TURNO = (h) => `--- Aggiornamento dell'agente del 07/09/2026, ${h}:00 ---`;
+
+const NOTE_PASS_SUBITO = `Report del lavoro.\n\n${TURNO('09')}\nVerifica superata. Le due strade funzionano.`;
 
 const NOTE_DUE_GIRI = [
   'Report del lavoro.',
   '',
+  TURNO('09'),
   'Verifica: 2 rilievi.',
   'Il pulsante c\'è ma non salva.',
   'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
   '- [2] Il salvataggio non parte a titolo vuoto',
   '- [1] Il bordo non segue il tema scuro',
   '',
-  '--- Aggiornamento dell\'agente del 07/09/2026, 10:00 ---',
+  TURNO('10'),
   'Corretto.',
   '',
+  TURNO('11'),
   'Verifica superata.',
 ].join('\n');
 
