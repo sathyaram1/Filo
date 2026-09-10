@@ -449,6 +449,31 @@ test('ogni superficie che porta un numero risponde al tasto destro', async ({ op
   await expect(menu).toContainText('Copia riga e numero');
 });
 
+// ⚠️ UNA RIGA CHE SI APRE DEVE APRIRE QUELLO CHE HA CONTATO.
+// «Giri di verifica registrati» contava i giri e apriva le lavorazioni su cui
+// erano successi: la riga diceva 5 e l'elenco aveva due voci, mentre il tasto
+// destro prometteva «le segnalazioni contate». Il numero dei giri adesso ha una
+// riga sua, che si copia e basta.
+test('in «Altre misure» il numero di una riga che si apre è quante voci ha l’elenco', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('30d'));
+
+  const chiavi = await page.locator('#mgStMore [data-drill]').evaluateAll(
+    (els) => els.map((el) => el.dataset.drill));
+  expect(chiavi.length).toBeGreaterThan(0);
+
+  for (const chiave of chiavi) {
+    const riga = page.locator(`#mgStMore [data-drill="${chiave}"]`);
+    await riga.scrollIntoViewIfNeeded();
+    const numero = Number((await riga.locator('.mg-st-more-value').textContent()).trim());
+    await riga.click();
+    await expect(page.locator('#mgStMore .mg-st-drill')).toHaveCount(1);
+    await expect(page.locator('#mgStMore .mg-st-drill-item'), chiave).toHaveCount(numero);
+    await riga.click();   // richiudi, o l'elenco resta sotto la riga dopo
+  }
+});
+
 test('anche le righe per ruolo e le frasi sotto i grafici si copiano', async ({ openTab }) => {
   const page = await openTab(URL);
   await apriStatistiche(page);
