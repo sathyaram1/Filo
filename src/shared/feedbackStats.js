@@ -454,7 +454,9 @@
         const primoRilievo = corpo.findIndex((l) => FINDING_LINE.test(l));
         const limite = primoRilievo < 0 ? corpo.length : primoRilievo;
         for (let k = 0; k < limite && !conRilievi; k += 1) {
-          if (ROUND_HEAD_WITH_FINDINGS.test(corpo[k])) conRilievi = verbaleConRilievi(corpo.slice(k));
+          if (!ROUND_HEAD_WITH_FINDINGS.test(corpo[k])) continue;
+          conRilievi = verbaleConRilievi(corpo.slice(k));
+          if (conRilievi) blocco = corpo.slice(k);
         }
       } else {
         conRilievi = verbaleConRilievi(corpo);
