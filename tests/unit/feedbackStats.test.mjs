@@ -804,10 +804,13 @@ test('compute: una data d\'arrivo nel futuro entra nel totale e si dichiara', ()
 // lo stesso che era fuori. Due somme uguali con in mezzo una frase che le dice
 // diverse sono peggio di nessuna frase.
 test('compute: un orologio avanti di poche ore resta dentro il grafico, e nessuno dice il contrario', () => {
-  const mezzogiorno = new Date(NOW);
+  // Le 23 di oggi sull'orologio della macchina: avanti rispetto a «adesso», ma
+  // dentro la colonna di oggi qualunque sia il fuso di chi lancia la prova.
+  const staseraTardi = new Date(NOW);
+  staseraTardi.setHours(23, 0, 0, 0);
   const lista = [
     fb({ _id: 'a', createdAt: new Date(NOW - GIORNO).toISOString() }),
-    fb({ _id: 'b', createdAt: new Date(mezzogiorno.getTime() + 3 * 3600 * 1000).toISOString() }),
+    fb({ _id: 'b', createdAt: staseraTardi.toISOString() }),
   ];
   const r = ST.compute({ feedbacks: lista, sel: { key: 'all' }, now: NOW });
   const dentro = r.ricevuti.timeline.buckets.reduce((a, b) => a + b.n, 0);
