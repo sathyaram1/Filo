@@ -1149,11 +1149,16 @@
   function statsCard({ id, value, label, sub, rows, empty }) {
     const aperto = statsOpen.has(id);
     const righe = (rows || []).filter((r) => r && r.n > 0);
+    // Una riga che porta alle segnalazioni che ha contato è un TASTO: si apre
+    // col clic e col tasto Invio, e il tasto destro offre le stesse azioni.
+    // Un numero da cui non si arriva a «quali?» è metà risposta.
     const dettaglio = righe.length
       ? righe.map((r) => (
-        `<div class="mg-st-row"><span class="mg-st-row-label">${esc(r.label)}</span>`
+        `<${r.key ? 'button type="button"' : 'div'} class="mg-st-row${r.key ? ' mg-st-row--apre' : ''}"`
+        + (r.key ? ` data-drill="${esc(r.key)}" aria-expanded="false"` : '')
+        + `><span class="mg-st-row-label">${esc(r.label)}</span>`
         + `<span class="mg-st-row-n">${esc(String(r.n))}</span>`
-        + `<span class="mg-st-row-share">${esc(r.share || '')}</span></div>`
+        + `<span class="mg-st-row-share">${esc(r.share || '')}</span></${r.key ? 'button' : 'div'}>`
       )).join('')
       : `<div class="mg-st-empty">${esc(empty || 'Niente in questa finestra.')}</div>`;
     return `<div class="mg-st-card" data-card="${esc(id)}">`
