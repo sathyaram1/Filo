@@ -105,6 +105,7 @@ test('la ripartizione di una tessera ripartisce il numero della tessera', async 
     const card = document.querySelector('[data-card="routine"]');
     return {
       numero: Number(card.querySelector('.mg-st-card-value').textContent.replace('+', '')),
+      sub: card.querySelector('.mg-st-card-sub').textContent,
       righe: Array.from(card.querySelectorAll('.mg-st-row')).map((r) => ({
         label: r.querySelector('.mg-st-row-label').textContent,
         n: Number(r.querySelector('.mg-st-row-n').textContent),
@@ -113,11 +114,14 @@ test('la ripartizione di una tessera ripartisce il numero della tessera', async 
     };
   });
   const somma = t.righe.reduce((a, r) => a + r.n, 0);
-  // Le altre tre tessere si aprono sulla ripartizione del LORO numero: aprire
-  // «2 Prober lanciati» e leggere righe che fanno 4, con percentuali di un
-  // totale che la tessera non scrive da nessuna parte, è la stessa tessera che
-  // si legge in due modi.
-  expect(somma, JSON.stringify(t)).toBe(t.numero);
+  // Le altre tre tessere si aprono sulla ripartizione del LORO numero. Questa
+  // apre su tutti i ruoli, e le percentuali sono quote di quel totale: aprire
+  // «1 Prober lanciati» e leggere «Verifica 1 · 50%» senza che 2 sia scritto
+  // da nessuna parte è la stessa tessera che si legge in due modi.
+  expect(somma, JSON.stringify(t)).toBeGreaterThan(0);
+  expect(t.sub, JSON.stringify(t)).toContain(String(somma));
+  // E il numero grande dev'essere una delle righe, o non si vede da dove viene.
+  expect(t.righe.some((r) => r.n === t.numero), JSON.stringify(t)).toBe(true);
 });
 
 test('il grafico degli arrivi resta leggibile a finestra stretta', async ({ openTab }) => {
