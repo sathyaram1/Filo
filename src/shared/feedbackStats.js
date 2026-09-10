@@ -385,7 +385,20 @@
       while (i < lines.length && !lines[i].trim()) i += 1;
       if (i >= lines.length) continue;
       const corpo = lines.slice(i);
-      const conRilievi = verbaleConRilievi(corpo);
+      // Dove comincia il verbale dentro il turno. Di norma alla prima riga; ma
+      // il campo note si modifica per intero in una casella di testo, e una
+      // riga scritta a mano in cima al blob finisce nello stesso turno del
+      // primo verbale. Quindi si cerca la riga d'intestazione anche più giù,
+      // PURCHÉ stia prima dell'elenco dei rilievi: dopo l'elenco, una riga così
+      // è dentro il testo di un rilievo, cioè qualcuno che racconta. Fra più
+      // candidate vince l'ultima, che è quella attaccata al suo elenco.
+      const primoRilievo = corpo.findIndex((l) => FINDING_LINE.test(l));
+      const limite = primoRilievo < 0 ? corpo.length : primoRilievo;
+      let testa = -1;
+      for (let k = 0; k < limite; k += 1) {
+        if (ROUND_HEAD_WITH_FINDINGS.test(corpo[k])) testa = k;
+      }
+      const conRilievi = testa >= 0 ? verbaleConRilievi(corpo.slice(testa)) : null;
       if (conRilievi) {
         rounds.push(conRilievi);
         if (conRilievi.kind === 'stop') fermato = true;

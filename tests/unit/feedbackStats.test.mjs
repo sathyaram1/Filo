@@ -562,7 +562,7 @@ test('quello che scrive una PERSONA nella conversazione non è mai un giro di ve
     'Verifica superata. secondo me no, guarda meglio.',
   ].join('\n');
   const notes = conversazione('Provato: tutto quanto.', `${commento}\n\n${TURNO_CORRETTORE}\nCorretto.`);
-  assert.deepEqual(esito(notes), { kinds: ['fix', 'pass'], giri: 1 });
+  assert.deepEqual(esito(notes), UN_GIRO);
 });
 
 test('il report di chi corregge non conta come un giro passato', () => {
@@ -575,7 +575,7 @@ test('il report di chi corregge non conta come un giro passato', () => {
     'Ho corretto.\n\nVerifica: 3 rilievi.',
   ]) {
     const notes = conversazione('Provato: tutto quanto.', `${TURNO_CORRETTORE}\n${corpo}`);
-    assert.deepEqual(esito(notes), { kinds: ['fix', 'pass'], giri: 1 }, corpo);
+    assert.deepEqual(esito(notes), UN_GIRO, corpo);
   }
 });
 
@@ -597,7 +597,7 @@ test('il riassunto di un verbale SUPERATO non apre un secondo giro', () => {
   ].join('\n');
 
   const pulito = esito(pass('Provato tutto: adesso funziona.'));
-  assert.deepEqual(pulito, { kinds: ['fix', 'pass'], giri: 1 });
+  assert.deepEqual(pulito, UN_GIRO);
 
   for (const riga of [
     'Controllo funzionalità NON superato nel giro scorso, adesso sì.',
@@ -607,4 +607,106 @@ test('il riassunto di un verbale SUPERATO non apre un secondo giro', () => {
   ]) {
     assert.deepEqual(esito(pass(`Provato tutto.\n\n${riga}`)), pulito, riga);
   }
+});
+
+// ─── La quinta porta della stessa famiglia: la PRIMA riga di un turno ────────
+//
+// Il giro 9 aveva stretto la ricerca alla prima riga scritta di ogni turno di
+// Filo. Ma la prima riga di un turno la scrive anche chi non sta verbalizzando
+// niente: chi corregge apre il report con la conferma in una riga, chi risponde
+// incolla un pezzo di conversazione col suo marcatore dentro, l'owner scrive
+// una nota in cima al campo note. Quattro strade, una causa: si cercavano
+// parole. Adesso i numeri vengono dai verbali che esibiscono la loro struttura,
+// e la riga «superata» dice soltanto sì o no.
+
+// Due correzioni prima del pass, come le scrive Filo: una nota, un turno.
+function dueCorrezioni(reportCorrettore) {
+  const giro = () => VR.roundNote({
+    summary: 'Provato: tutto quanto.',
+    findings: [{ level: 1, text: 'Manca l\'hover sull\'icona' }],
+    decision: { fix: [{ level: 1 }] },
+  });
+  return [
+    giro(),
+    '',
+    `${TURNO_CORRETTORE}\n${reportCorrettore}`,
+    '',
+    `--- Aggiornamento dell'agente del 02/09/2026, 10:00 ---\n${giro()}`,
+    '',
+    `--- Aggiornamento dell'agente del 02/09/2026, 14:00 ---\n${reportCorrettore}`,
+    '',
+    `${TURNO_PASS}\nVerifica superata. Provato tutto: adesso funziona.`,
+  ].join('\n');
+}
+const DUE_GIRI_ATTESI = { kinds: ['fix', 'fix'], giri: 2, passata: true };
+
+test('la conferma in cima al report di chi corregge non toglie un giro', () => {
+  assert.deepEqual(esito(dueCorrezioni('Corretto. Ho rilanciato le prove del giro.')), DUE_GIRI_ATTESI);
+  // È la forma che il repo chiede a un report di consegna: conferma in una riga.
+  for (const report of [
+    'Verifica superata. Nessuna regressione: ho rilanciato le prove del giro.',
+    'Controllo funzionalità NON superato era il verdetto del giro scorso: adesso è chiuso.',
+    'Verifica: funziona, ma migliorabile, così diceva il giro scorso.',
+    'Verifica: 2 rilievi del giro scorso sono chiusi.',
+  ]) {
+    assert.deepEqual(esito(dueCorrezioni(report)), DUE_GIRI_ATTESI, report);
+  }
+});
+
+test('un pezzo di conversazione incollato in una risposta non diventa un turno di Filo', () => {
+  const citazione = [
+    '--- La tua risposta del 02/09/2026, 09:00 ---',
+    'Riporto quello che avevo letto:',
+    '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---',
+    'Verifica superata. secondo me non è così.',
+  ].join('\n');
+  const notes = dueCorrezioni('Corretto.').replace(
+    `${TURNO_CORRETTORE}\nCorretto.`,
+    `${TURNO_CORRETTORE}\nCorretto.\n\n${citazione}`,
+  );
+  assert.deepEqual(esito(notes), DUE_GIRI_ATTESI);
+});
+
+test('una nota scritta in cima al campo note non diventa un giro di verifica', () => {
+  // Il campo note della dashboard si modifica per intero in una casella di
+  // testo, e quello che sta prima del primo marcatore è, per il parser, un
+  // turno di Filo.
+  const notes = `Verifica superata. Ho guardato io, va bene.\n\n${dueCorrezioni('Corretto.')}`;
+  assert.deepEqual(esito(notes), DUE_GIRI_ATTESI);
+});
+
+// ─── Chi ha mandato la segnalazione, quando non si legge ────────────────────
+
+test('compute: un mittente cifrato non finisce sotto «Utente», si dichiara', () => {
+  const lista = [
+    fb({ _id: 'a', clientId: 'FENC1:aaaa' }),
+    fb({ _id: 'b', clientId: 'FENC1:bbbb' }),
+    fb({ _id: 'c', clientId: 'routine:prober' }),
+  ];
+  const r = ST.compute({ feedbacks: lista, sel: { key: '7d' }, now: NOW });
+  const per = Object.fromEntries(r.creatori.map((c) => [c.key, c.n]));
+  assert.equal(per.user, 0, 'il ciphertext non è un utente: è un mittente che non si legge');
+  assert.equal(per.prober, 1);
+  assert.equal(r.mittentiIllegibili, 2);
+  // E il filtro per creatore non se li porta dietro sotto una categoria a caso.
+  const soloProber = ST.compute({ feedbacks: lista, sel: { key: '7d' }, creators: ['prober'], now: NOW });
+  assert.equal(soloProber.ricevuti.total, 1);
+  const soloUtenti = ST.compute({ feedbacks: lista, sel: { key: '7d' }, creators: ['user'], now: NOW });
+  assert.equal(soloUtenti.ricevuti.total, 0);
+});
+
+// ─── Gli arrivi nel futuro ──────────────────────────────────────────────────
+
+test('compute: una data d\'arrivo nel futuro entra nel totale e si dichiara', () => {
+  const lista = [
+    fb({ _id: 'a', createdAt: new Date(NOW - GIORNO).toISOString() }),
+    fb({ _id: 'b', createdAt: new Date(NOW + 30 * GIORNO).toISOString() }),
+  ];
+  const r = ST.compute({ feedbacks: lista, sel: { key: 'all' }, now: NOW });
+  assert.equal(r.ricevuti.total, 2);
+  assert.equal(r.ricevuti.nelFuturo, 1);
+  // Il grafico finisce a oggi: la somma delle colonne è più piccola, e la
+  // pagina lo scrive invece di lasciare due numeri diversi senza spiegazione.
+  const dentro = r.ricevuti.timeline.buckets.reduce((a, b) => a + b.n, 0);
+  assert.equal(dentro, 1);
 });
