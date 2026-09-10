@@ -64,13 +64,20 @@ test('owner, prima del primo utente: la riga dei totali ha tutti i numeri, i mod
     expect(righeRegalo).toBe(1);
 
     // Input strani sul modulo dei codici: «abc» e 0 non mandano richieste assurde.
+    // Con 0 nel campo il modulo non parte: il campo è segnato non valido dal
+    // browser (min=1) e al server non arriva niente.
     await page.fill('#ownerInviteCount', '0');
     await page.click('#ownerInvitesBtn');
-    await expect(page.locator('#ownerMsg')).toContainText(/codici nuovi/, { timeout: 15_000 });
-    const generati = server.store.docs.invites.size;
-    console.log('[nota]', `con 0 nel campo: ${generati} codici generati`);
-    expect(generati).toBeGreaterThanOrEqual(1);
-    expect(generati).toBeLessThanOrEqual(5);
+    await page.waitForTimeout(800);
+    const invalido = await page.$eval('#ownerInviteCount', (e) => e.matches(':invalid'));
+    console.log('[nota]', `con 0 nel campo: ${server.store.docs.invites.size} codici generati, campo non valido: ${invalido}`);
+    expect(server.store.docs.invites.size).toBe(0);
+    expect(invalido).toBe(true);
+    // Con 2: due codici.
+    await page.fill('#ownerInviteCount', '2');
+    await page.click('#ownerInvitesBtn');
+    await expect(page.locator('#ownerMsg')).toContainText(/2 codici nuovi/, { timeout: 15_000 });
+    expect(server.store.docs.invites.size).toBe(2);
     // Doppio clic rapido: non due lotti.
     await page.fill('#ownerInviteCount', '1');
     const prima = server.store.docs.invites.size;
