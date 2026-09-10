@@ -449,6 +449,84 @@ test('ogni superficie che porta un numero risponde al tasto destro', async ({ op
   await expect(menu).toContainText('Copia riga e numero');
 });
 
+test('anche le righe per ruolo e le frasi sotto i grafici si copiano', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+  await page.evaluate(() => {
+    const iso = (gg) => new Date(Date.now() - gg * 24 * 3600 * 1000).toISOString();
+    window.__mgTest.renderWorkerLog([
+      { role: 'prober', startedAt: iso(1), num: '#1' },
+      { role: 'verifier', startedAt: iso(2), num: '#2' },
+    ]);
+  });
+  await page.locator('[data-card-toggle="routine"]').click();
+
+  const menu = page.locator('.mg-ctxmenu');
+  // Le righe della ripartizione per ruolo contano partenze, non segnalazioni:
+  // elenco non ne hanno, ma il tasto destro deve poterle copiare. Prima lì
+  // usciva il menu generale della pagina, quello che compare su uno spazio
+  // bianco.
+  for (const sel of [
+    '[data-card-detail="routine"] .mg-st-row',
+    '#mgStPieNote',
+    '#mgStBarsNote',
+  ]) {
+    const el = page.locator(sel).first();
+    await el.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(120);
+    await el.click({ button: 'right' });
+    await expect(menu, sel).toContainText('Copia riga e numero');
+    await page.keyboard.press('Escape');
+  }
+});
+
+test('la tessera delle partenze scrive il totale su cui sono calcolate le sue quote', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+  await page.evaluate(() => {
+    const iso = (gg) => new Date(Date.now() - gg * 24 * 3600 * 1000).toISOString();
+    window.__mgTest.renderWorkerLog([
+      { role: 'prober', startedAt: iso(1), num: '#1' },
+      { role: 'verifier', startedAt: iso(2), num: '#2' },
+    ]);
+  });
+  // Il numero grande conta i soli prober, la ripartizione tutti i ruoli: senza
+  // il totale scritto, «1» in cima e «Verifica 1 · 50%» sotto sono la stessa
+  // tessera letta in due modi.
+  await expect(valore(page, 'routine')).toHaveText('1');
+  await expect(page.locator('.mg-st-card[data-card="routine"] .mg-st-card-sub')).toContainText('2 in tutto');
+});
+
+test('il grafico degli arrivi non si deforma con la larghezza della finestra', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  const etichetta = () => page.evaluate(() => {
+    const svg = document.getElementById('mgStBars');
+    const t = svg && svg.querySelector('text.mg-st-bar-axis');
+    if (!t) return null;
+    const r = t.getBoundingClientRect();
+    return { larghezza: Math.round(r.width), testo: t.textContent };
+  });
+
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.waitForTimeout(250);
+  const largo = await etichetta();
+  await page.setViewportSize({ width: 620, height: 900 });
+  await page.waitForTimeout(300);
+  const stretto = await etichetta();
+
+  // Il disegno nasceva in un riquadro di misura fissa e veniva spalmato sulla
+  // larghezza vera: la stessa data passava da 34 pixel a 14 e diventava una
+  // macchia. Adesso il riquadro è in pixel veri e la scritta non cambia.
+  expect(stretto, JSON.stringify({ largo, stretto })).not.toBeNull();
+  expect(stretto.larghezza).toBeGreaterThan(largo.larghezza * 0.9);
+  expect(stretto.larghezza).toBeLessThan(largo.larghezza * 1.1);
+});
+
 test('le fette e le barrette si raggiungono da tastiera, non solo col mouse', async ({ openTab }) => {
   const page = await openTab(URL);
   await apriStatistiche(page);

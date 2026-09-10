@@ -19,7 +19,7 @@ test('l’elenco si apre dove è stato chiesto, e non dentro un riquadro chiuso'
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate((d) => window.__mgTest.setData([
     { _id: 'p1', seq: 1, subSeq: 0, clientId: 'routine:prober', name: 'da prober', text: 'a', status: 'todo', createdAt: d },
-    { _id: 'p2', seq: 2, subSeq: 0, clientId: 'utente@example.com', name: 'da utente', text: 'b', status: 'done', createdAt: d, _updateTime: d, notes: 'Report.\n\n--- Aggiornamento dell'agente del 07/09/2026, 18:00 ---\nVerifica superata.' },
+    { _id: 'p2', seq: 2, subSeq: 0, clientId: 'utente@example.com', name: 'da utente', text: 'b', status: 'done', createdAt: d, _updateTime: d, notes: "Report.\n\n--- Aggiornamento dell'agente del 07/09/2026, 18:00 ---\nVerifica superata." },
   ]), iso(1));
   await page.locator('.mg-tab[data-tab="fbstats"]').click();
   await page.evaluate(() => window.__mgTest.setStatsWindow('all'));
