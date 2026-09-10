@@ -1132,8 +1132,10 @@
     ];
     for (const key of ST.creatorKeys()) {
       const meta = AUTHOR_META[key] || AUTHOR_META.user;
+      // La pastiglia porta un numero, quindi il tasto destro deve poter dire
+      // QUALI: è la stessa regola delle righe di ripartizione.
       parti.push(chip(
-        `data-creator="${esc(key)}" title="${esc(meta.label)}"`,
+        `data-creator="${esc(key)}" data-drill-menu="creatore:${esc(key)}" title="${esc(meta.label)}"`,
         `${meta.icon} ${esc(ST_CREATOR_SHORT[key] || meta.label)}`,
         scelti.has(key),
         conteggi[key] || 0,
