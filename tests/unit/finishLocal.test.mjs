@@ -22,7 +22,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SORGENTE = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
@@ -74,7 +74,7 @@ describe('quali spec lanciare', () => {
 
     test('un modulo al plurale trova gli spec al singolare (tabs → tab-*), non i falsi amici (table-*)', () => {
       const out = specsForChangedFiles(['src/main/tabs.js'], tracked);
-      assert.deepEqual(out.sort(), ['tests/tab-archive', 'tests/tabs', 'tests/tabs-bar']);
+      assert.deepEqual(out.sort(), ['tests/tab-archive', 'tests/tabs-bar']);
     });
 
     test('un handler ha un nome suo e vale come area', () => {
@@ -82,9 +82,8 @@ describe('quali spec lanciare', () => {
       assert.ok(out.includes('tests/editor-chat'), out.join(','));
     });
 
-    test('le prove dei giri (tests/verifica) non entrano per prefisso: si lanciano per numero', () => {
-      const out = specsForChangedFiles(['src/pages/giro1/giro1.js'], tracked);
-      assert.deepEqual(out, ['tests/giro1']);
+    test('le prove dei giri (tests/verifica) non entrano per prefisso, e con l’elenco non si inventano nomi', () => {
+      assert.deepEqual(specsForChangedFiles(['src/pages/giro1/giro1.js'], tracked), []);
     });
 
     test('senza l’elenco il comportamento resta quello di prima', () => {

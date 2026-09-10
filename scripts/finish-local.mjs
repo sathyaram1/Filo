@@ -257,8 +257,11 @@ export function specsForChangedFiles(changed, tracked) {
     if (h) aree.add(h[1].toLowerCase());
     if (f.startsWith('tests/') && f.endsWith('.spec.mjs')) specs.add(f.replace(/\.spec\.mjs$/, ''));
   }
-  for (const area of aree) specs.add(`tests/${area}`);
   const elenco = Array.isArray(tracked) ? tracked : [];
+  const tracciati = new Set(elenco.map((t) => String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '')));
+  // Senza elenco si risponde per nome (chi chiama filtra); con l'elenco si
+  // rispondono solo spec che esistono davvero.
+  for (const area of aree) if (!elenco.length || tracciati.has(`tests/${area}`)) specs.add(`tests/${area}`);
   if (elenco.length && aree.size) {
     const prefissi = [];
     for (const area of aree) {
