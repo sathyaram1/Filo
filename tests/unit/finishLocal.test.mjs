@@ -345,8 +345,25 @@ describe('quale ramo NON si spedisce mai', () => {
 // Un rosso d'ambiente (rosso anche su main su questa macchina) spacciato per
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
-import { splitKnownRed } from '../../scripts/finish-local.mjs';
+import { splitKnownRed, esitoVerificaPerCheck } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+
+// `--check` promette solo i controlli: chi verifica lo lancia al posto della
+// suite intera (decisione owner 2026-09-10) e per lui la verifica è per forza
+// «avviata senza esito» — è la sua. Finire in rosso con «Non pubblico» dopo
+// controlli verdi era un esito falso (verifica locale di suite-locale, giro 1).
+test('--check non boccia per la verifica mancante: la stampa e prosegue', () => {
+  const r = esitoVerificaPerCheck({ checkOnly: true, ok: false, reason: 'verifica avviata ma senza esito' });
+  assert.equal(r.ferma, false);
+  assert.match(r.nota, /avviata ma senza esito/);
+  assert.match(r.nota, /npm run finish/);
+});
+
+test('senza --check la verifica mancante ferma la chiusura, come sempre', () => {
+  assert.equal(esitoVerificaPerCheck({ checkOnly: false, ok: false, reason: 'x' }).ferma, true);
+  assert.deepEqual(esitoVerificaPerCheck({ checkOnly: false, ok: true }), { ferma: false, nota: '' });
+  assert.deepEqual(esitoVerificaPerCheck({ checkOnly: true, ok: true }), { ferma: false, nota: '' });
+});
 
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
   const r = splitKnownRed(['tests/a', 'tests/decks-chat-stress', 'tests/b'], ['tests/decks-chat-stress', 'tests/altro.spec.mjs']);
