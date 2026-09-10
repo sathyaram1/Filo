@@ -168,8 +168,13 @@
     ev.preventDefault();
     const btn = $('ownerInvitesBtn');
     const msg = $('ownerMsg');
+    // Il controllo lo fa Filo, con una frase sua: la bolla del browser (min/max
+    // del campo) parlava al posto della pagina (verifica del ramo -b, secondo giro).
+    const count = numeroIntero($('ownerInviteCount'));
+    if (count == null || count < 1 || count > 200) {
+      return rifiuta(msg, $('ownerInviteCount'), 'Quanti codici? Un numero da 1 a 200.');
+    }
     btn.disabled = true;
-    const count = Math.max(1, Math.min(200, Number($('ownerInviteCount').value) || 1));
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_INVITES, count }).catch(() => null);
     btn.disabled = false;
     msg.hidden = false;
