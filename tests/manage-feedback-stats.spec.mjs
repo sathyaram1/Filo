@@ -377,3 +377,29 @@ test('una conversazione tagliata dal tetto non finisce nella fetta verde in sile
   await expect(page.locator('#mgStPieLegend')).not.toContainText('Passata subito');
   await expect(page.locator('#panel-fbstats')).toContainText('conversazione tagliata');
 });
+
+test('il tasto destro su un numero offre le sue azioni, non il menu generale della pagina', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  await page.locator('[data-card-detail="ricevuti"] [data-drill="categoria:attacco"]')
+    .click({ button: 'right' });
+  const menu = page.locator('.mg-ctxmenu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Mostra le');
+  await expect(menu).toContainText('Copia riga e numero');
+
+  // La voce apre lo stesso elenco del clic sinistro.
+  await menu.locator('.sn-select-option', { hasText: 'Mostra le' }).click();
+  await expect(page.locator('#panel-fbstats .mg-st-drill .mg-st-drill-item')).toHaveCount(1);
+
+  // E la barretta del grafico offre la sua, che è restringere la finestra.
+  // Il grafico sta sotto la piega: si porta in vista PRIMA, perché lo
+  // scorrimento chiude il menu (come chiuderebbe qualunque menu contestuale).
+  const barra = page.locator('#mgStBars rect.mg-st-bar').first();
+  await barra.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(150);
+  await barra.click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu')).toContainText('Restringi la finestra');
+});
