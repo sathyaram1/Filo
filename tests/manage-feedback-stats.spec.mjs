@@ -403,3 +403,138 @@ test('il tasto destro su un numero offre le sue azioni, non il menu generale del
   await barra.click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu')).toContainText('Restringi la finestra');
 });
+
+test('ogni superficie che porta un numero risponde al tasto destro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  const menu = page.locator('.mg-ctxmenu');
+  // Il numero grande in cima a una tessera: è il numero più in vista della
+  // pagina, e prima non offriva niente.
+  await page.locator('.mg-st-card[data-card="ricevuti"] .mg-st-card-head').click({ button: 'right' });
+  await expect(menu).toContainText('Mostra le');
+  await menu.locator('.sn-select-option', { hasText: 'Mostra le' }).click();
+  await expect(page.locator('.mg-st-card[data-card="ricevuti"] .mg-st-drill-item')).toHaveCount(3);
+
+  // La pastiglia di un creatore porta il suo conteggio: il tasto destro dice quali.
+  await page.locator('#mgStCreators .mg-st-chip[data-creator="prober"]').click({ button: 'right' });
+  await expect(menu).toContainText('Mostra le');
+  await page.keyboard.press('Escape');
+
+  // La pastiglia della finestra: si porta via il periodo vero, con le date.
+  await page.locator('#mgStWindows .mg-st-chip[data-window="7d"]').click({ button: 'right' });
+  await expect(menu).toContainText('Copia il periodo');
+  await page.keyboard.press('Escape');
+
+  // Una riga di «Altre misure» che conta segnalazioni: si apre come le altre.
+  const riga = page.locator('#mgStMore [data-drill="misura:bloccate"]');
+  await riga.scrollIntoViewIfNeeded();
+  await riga.click();
+  await expect(page.locator('#mgStMore .mg-st-drill-item')).toHaveCount(1);
+
+  // E una che conta altro (le durate) almeno si copia.
+  const durata = page.locator('#mgStMore [data-copia]').first();
+  await durata.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(150);
+  await durata.click({ button: 'right' });
+  await expect(menu).toContainText('Copia riga e numero');
+});
+
+test('le fette e le barrette si raggiungono da tastiera, non solo col mouse', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  // La fetta prende il fuoco e Invio apre i lavori che ha contato.
+  const fetta = page.locator('#mgStPie [data-group]').first();
+  await fetta.focus();
+  expect(await fetta.evaluate((el) => document.activeElement === el)).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#panel-fbstats .mg-st-drill')).toBeVisible();
+
+  // La barretta prende il fuoco e Invio restringe la finestra a quel periodo:
+  // era l'unica azione della scheda che si poteva fare solo col mouse.
+  const barra = page.locator('#mgStBars rect.mg-st-bar').first();
+  await barra.scrollIntoViewIfNeeded();
+  await barra.focus();
+  expect(await barra.evaluate((el) => document.activeElement === el)).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#mgStWindows .mg-st-chip--on')).toHaveAttribute('data-window', 'custom');
+});
+
+test('la torta non dice «nessuna lavorazione chiusa» se la tessera sopra ne conta una', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  // Una sola lavorazione chiusa, fermata alla verifica: giri da contare zero,
+  // ma chiusa lo è. Le due frasi non possono smentirsi a vicenda.
+  const ora = Date.now();
+  await page.evaluate(({ n, c, u }) => window.__mgTest.setData([{
+    _id: 'f1', seq: 1, subSeq: 0, clientId: 'u@e.com', text: 'ferma',
+    status: 'done', createdAt: c, _updateTime: u, notes: n,
+  }]), {
+    n: BLOCCANTE,
+    c: new Date(ora - 5 * 24 * 3600 * 1000).toISOString(),
+    u: new Date(ora - 24 * 3600 * 1000).toISOString(),
+  });
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  await expect(valore(page, 'lavorati')).toHaveText('1');
+  const legenda = page.locator('#mgStPieLegend');
+  await expect(legenda).not.toContainText('Nessuna lavorazione chiusa');
+  await expect(legenda).toContainText('si è fermata alla verifica');
+});
+
+test('la scala dei colori della torta si scalda e non riusa una tinta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  const ora = Date.now();
+  // Lavorazioni costate 0, 1, 2, 3, 4, 5 e 7 critiche: sette fette.
+  await page.evaluate(({ base }) => {
+    const giro = [
+      'Verifica: 1 rilievo.',
+      'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
+      '- [1] Un rilievo',
+      '',
+      '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---',
+      'Corretto.',
+      '',
+    ].join('\n');
+    const lista = [0, 1, 2, 3, 4, 5, 7].map((g, i) => ({
+      _id: `c${i}`, seq: 300 + i, subSeq: 0, clientId: 'u@e.com', text: `lavoro ${i}`,
+      status: 'done',
+      createdAt: new Date(base - 5 * 24 * 3600 * 1000).toISOString(),
+      _updateTime: new Date(base - 24 * 3600 * 1000).toISOString(),
+      notes: giro.repeat(g) + 'Verifica superata.',
+    }));
+    window.__mgTest.setData(lista);
+  }, { base: ora });
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  const fette = await page.locator('#mgStPie [data-group]').evaluateAll((els) =>
+    els.map((el) => ({ giri: Number(el.dataset.group), fill: el.getAttribute('fill') })));
+  expect(fette.length).toBe(7);
+  // Nessuna tinta ripetuta: due code diverse non possono diventare uno spicchio solo.
+  expect(new Set(fette.map((f) => f.fill)).size).toBe(7);
+  // E la scala si SCALDA: più critiche vuol dire meno verde, mai il contrario.
+  const verde = (hex) => parseInt(hex.slice(3, 5), 16) - parseInt(hex.slice(1, 3), 16);
+  for (let i = 1; i < fette.length; i += 1) {
+    expect(verde(fette[i].fill), `${fette[i].giri} critiche`).toBeLessThan(verde(fette[i - 1].fill));
+  }
+});
+
+test('tutte le tessere scrivono la quota accanto al numero, non solo due', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+  for (const card of ['lavorati', 'adesso']) {
+    await page.locator(`[data-card-toggle="${card}"]`).click();
+  }
+  const quote = await page.evaluate(() => Array.from(document.querySelectorAll('#mgStCards .mg-st-card'))
+    .map((c) => ({
+      id: c.dataset.card,
+      righe: c.querySelectorAll('.mg-st-row').length,
+      conQuota: Array.from(c.querySelectorAll('.mg-st-row-share')).filter((s) => s.textContent.trim()).length,
+    })));
+  for (const q of quote) expect(q.conQuota, `tessera ${q.id}`).toBe(q.righe);
+});

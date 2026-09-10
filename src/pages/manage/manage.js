@@ -1633,6 +1633,13 @@
   // arriva alla segnalazione vera. Le chiavi sono le stesse che le righe e le
   // voci di legenda si portano in `data-drill`.
   let statsDrill = null;   // la chiave aperta, o null
+  // DOVE l'utente l'ha chiesto. La stessa chiave sta su più superfici — «giri:0»
+  // è sia una riga della tessera «Feedback lavorati» sia una voce di legenda
+  // della torta — e l'elenco deve aprirsi dove si è cliccato. Senza, finiva
+  // sempre sulla prima superficie in ordine di pagina: se quella era una
+  // tessera chiusa, l'elenco nasceva dentro un riquadro nascosto e chi aveva
+  // cliccato la legenda non vedeva succedere niente.
+  let statsDrillZona = '';
 
   function statsInsieme() {
     const sel = { key: statsSel.key, from: statsSel.from, to: statsSel.to };
