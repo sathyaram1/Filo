@@ -223,6 +223,25 @@
     msg.classList.add('is-error');
   }
 
+  // Il numero intero scritto in un campo numerico, o null se non è un intero
+  // (vuoto, testo che il browser non traduce in numero, decimali: «10,7» non
+  // sono crediti). Niente arrotondamenti muti.
+  function numeroIntero(input) {
+    if (!input || (input.validity && input.validity.badInput)) return null;
+    const raw = String(input.value || '').trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
+    return n;
+  }
+  function rifiuta(msg, input, testo) {
+    msg.hidden = false;
+    msg.classList.remove('is-ok');
+    msg.classList.add('is-error');
+    msg.textContent = testo;
+    if (input) { input.focus(); if (typeof input.select === 'function') input.select(); }
+  }
+
   function fmtUsd(n) {
     const v = Number(n);
     if (!Number.isFinite(v)) return '—';
