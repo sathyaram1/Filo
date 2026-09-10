@@ -1233,13 +1233,15 @@
         value: leggibile ? statsNum(res.lavorati.total, parz) : '—',
         label: 'Feedback lavorati',
         sub: 'lavorazione chiusa, per data dell’ultimo movimento',
-        rows: !leggibile ? [] : [
+        // La quota è sul totale della tessera, come nelle altre: quattro
+        // tessere disegnate uguali non possono leggersi in due modi diversi.
+        rows: !leggibile ? [] : statsQuote([
           { key: 'giri:0', label: 'Passate alla prima verifica', n: res.giri.fette.find((f) => f.giri === 0)?.n || 0 },
           { key: 'giri:1+', label: 'Passate dopo almeno una correzione', n: res.giri.fette.filter((f) => f.giri > 0).reduce((a, f) => a + f.n, 0) },
           { key: 'giri:ferme', label: 'Verifica ferma, decide l’owner', n: res.giri.ferme },
           { key: 'giri:tagliate', label: 'Conversazione tagliata: i giri non si contano', n: res.giri.tagliate },
           { key: 'giri:senza', label: 'Senza verbale di verifica nelle note', n: res.giri.senzaDati },
-        ],
+        ], res.lavorati.total),
         empty: !pronti ? ST_SENZA_DATI
           : (res.statiLeggibili ? 'Nessuna lavorazione chiusa in questa finestra.' : ST_SENZA_STATO),
       }),
@@ -1461,7 +1463,7 @@
     // intera, restavano due blocchetti lontanissimi in mezzo al bianco, uno a
     // un quarto e uno a tre quarti. Poche colonne stanno vicine, a sinistra,
     // e si leggono come un gruppo.
-    const passo = Math.min(W / n, 96);
+    const passo = Math.min(W / n, 160);
     const usata = passo * n;
     const larghezza = Math.min(48, Math.max(2, passo - Math.min(6, passo * 0.25)));
     // La linea di base: senza, due colonne isolate non sembrano un grafico ma
