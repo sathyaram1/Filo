@@ -280,59 +280,92 @@
 
   /**
    * I giri di verifica di un feedback, dal più vecchio. PURA.
+   *
+   * ⚠️ QUI SI LEGGE PROSA SCRITTA DA QUALCUNO, E LA PROSA MENTE.
+   * Per tre giri di verifica di fila lo stesso danno è tornato da una porta
+   * nuova: una frase scritta dentro un rilievo, un commento di una persona, una
+   * riga del riassunto. Ogni volta il conto della torta cambiava — un lavoro
+   * costato cinque critiche finiva nella fetta verde «passata subito». La cura
+   * non è aggiungere un'eccezione per volta: è ancorarsi a COME il verbale è
+   * fatto, e fidarsi solo di quello. Tre àncore, tutte strutturali:
+   *
+   *   1. SOLO I TURNI DI FILO. La conversazione dice già di chi è ogni turno
+   *      (SN_FEEDBACK_THREAD.splitNotes): quello che scrive una persona non è
+   *      mai un verbale di verifica, per quanto ne citi le parole.
+   *   2. UN VERBALE COMINCIA UN PARAGRAFO, e finché è aperto non se ne apre un
+   *      altro. Il server lo scrive dopo una riga vuota, mai in mezzo a una
+   *      frase; e non annida mai un verbale dentro un altro, quindi una riga
+   *      d'apertura che compare nel riassunto è il verificatore che racconta.
+   *   3. L'ESITO STA SU UNA RIGA SOLA, l'ultima prima dell'elenco dei rilievi
+   *      (vedi ROUND_OUTCOME_PHRASES).
+   *
    * @returns {Array<{kind:string, findings:Array}>}
    */
   function parseRounds(fb) {
     const notes = fb && fb.notes;
     if (typeof notes !== 'string' || !notes) return [];
     if (MR().valueUnreadable(notes)) return [];
-    const lines = notes.replace(/\r\n?/g, '\n').split('\n');
     const rounds = [];
-    let current = null;
-    const chiudi = () => {
-      if (!current) return;
-      const testo = current.lines.join('\n');
-      const parsed = VR().parseFindings(testo);
-      let kind = current.kind;
-      if (!kind) {
-        // Solo la testa: dalla riga d'apertura al primo rilievo.
-        const fine = current.lines.findIndex((l) => FINDING_LINE.test(l));
-        const testa = fine < 0 ? current.lines : current.lines.slice(0, fine);
-        const phrase = ROUND_OUTCOME_PHRASES.find((p) => testa.some((l) => p.re.test(l)));
-        if (phrase) kind = phrase.kind;
-        else {
-          // Verbale senza la frase d'esito (storico, o testo modificato a mano):
-          // lo dice il livello più alto — 2 e 3 sono "la cosa chiesta non si
-          // ottiene", e lì il lavoro non prosegue.
-          const max = VR().maxLevel(parsed.findings);
-          kind = max !== null && max >= 2 ? 'stop' : 'rimandati';
+    // I turni di Filo, e basta: un commento dell'utente che cita «Verifica
+    // superata.» non è un giro (porta chiusa una volta e riaperta).
+    const turni = TH().splitNotes(notes).filter((s) => s && s.role === 'model');
+    for (const turno of turni) {
+      const lines = String((turno && turno.body) || '').replace(/\r\n?/g, '\n').split('\n');
+      let current = null;
+      // A inizio turno si è già a inizio paragrafo.
+      let inizioParagrafo = true;
+      const chiudi = () => {
+        if (!current) return;
+        const parsed = VR().parseFindings(current.lines.join('\n'));
+        let kind = current.kind;
+        if (!kind) {
+          const fine = current.lines.findIndex((l) => FINDING_LINE.test(l));
+          const testa = fine < 0 ? current.lines : current.lines.slice(0, fine);
+          // L'ultima riga scritta prima dei rilievi: è lì che il server mette
+          // l'esito, e il riassunto sta tutto sopra.
+          let ultima = '';
+          for (let i = testa.length - 1; i >= 0; i -= 1) {
+            if (testa[i].trim()) { ultima = testa[i]; break; }
+          }
+          const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(ultima));
+          if (phrase) kind = phrase.kind;
+          else {
+            // Verbale senza la frase d'esito (storico, o testo modificato a
+            // mano): lo dice il livello più alto — 2 e 3 sono "la cosa chiesta
+            // non si ottiene", e lì il lavoro non prosegue.
+            const max = VR().maxLevel(parsed.findings);
+            kind = max !== null && max >= 2 ? 'stop' : 'rimandati';
+          }
         }
-      }
-      rounds.push({ kind, findings: parsed.findings });
-      current = null;
-    };
-    for (const raw of lines) {
-      // Dentro l'elenco dei rilievi non si aprono giri. Il verbale mette i
-      // rilievi ULTIMI, e un giro nuovo comincia sempre dopo il turno di chi
-      // ha corretto: una riga di continuazione che dice «Verifica superata.»
-      // è il verificatore che racconta, non un giro che passa. Senza questa
-      // riga un giro con due rilievi finiva nella fetta «nessuna critica».
-      const dentroRilievi = !!(current && current.rilievi);
-      const opener = dentroRilievi ? null : ROUND_OPENERS.find((o) => o.re.test(raw));
-      if (opener) {
-        chiudi();
-        current = { kind: opener.kind, lines: [raw], rilievi: false };
-        continue;
-      }
-      if (current) {
-        if (TURN_MARKER.test(raw)) chiudi();
-        else {
+        rounds.push({ kind, findings: parsed.findings });
+        current = null;
+      };
+      for (const raw of lines) {
+        const vuota = !raw.trim();
+        if (current) {
+          // Il verbale finisce dove finisce il suo elenco di rilievi (o, per un
+          // pass, in fondo al suo paragrafo): da lì in poi un'apertura vale di
+          // nuovo.
+          if (vuota && (current.rilievi || current.kind === 'pass')) {
+            chiudi();
+            inizioParagrafo = true;
+            continue;
+          }
           current.lines.push(raw);
           if (FINDING_LINE.test(raw)) current.rilievi = true;
+          inizioParagrafo = vuota;
+          continue;
         }
+        const opener = inizioParagrafo ? ROUND_OPENERS.find((o) => o.re.test(raw)) : null;
+        if (opener) {
+          current = { kind: opener.kind, lines: [raw], rilievi: false };
+          inizioParagrafo = false;
+          continue;
+        }
+        inizioParagrafo = vuota;
       }
+      chiudi();
     }
-    chiudi();
     return rounds;
   }
 
