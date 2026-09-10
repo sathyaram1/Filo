@@ -227,22 +227,28 @@
   // Le righe che aprono il verbale di un giro. Le prime due sono la forma di
   // oggi (roundNote); le altre tre sono lo storico (dispatch.verifierNoteText),
   // che nelle conversazioni vecchie c'è ancora.
+  //
+  // ⚠️ LA FORMA È QUELLA ESATTA CHE SCRIVE IL SERVER, NON UN INIZIO QUALUNQUE.
+  // «Verifica: 2 rilievi.» è una riga intera e sola; «Verifica: 2 rilievi del
+  // giro scorso sono chiusi» è un verificatore che riassume, e apriva un giro
+  // finto che faceva sparire quello vero.
   const ROUND_OPENERS = [
-    { re: /^\s*Verifica superata\./i,                       kind: 'pass' },
-    { re: /^\s*Verifica:\s*funziona,\s*ma\s*migliorabile/i, kind: 'rimandati' },
-    { re: /^\s*Verifica:\s*\d+\s+riliev/i,                  kind: null },
-    { re: /^\s*Controllo funzionalità superato\./i,         kind: 'pass' },
-    { re: /^\s*Controllo funzionalità NON superato/i,       kind: 'stop' },
+    { re: /^\s*Verifica superata\./i,                        kind: 'pass' },
+    { re: /^\s*Verifica:\s*funziona,\s*ma\s*migliorabile/i,  kind: 'rimandati' },
+    { re: /^\s*Verifica:\s*\d+\s+riliev(?:o|i)\.?\s*$/i,     kind: null },
+    { re: /^\s*Controllo funzionalità superato\./i,          kind: 'pass' },
+    { re: /^\s*Controllo funzionalità NON superato/i,        kind: 'stop' },
   ];
   // Cosa il server ha deciso di fare dei rilievi di quel giro: è scritto in
   // chiaro dentro il verbale, e vale più di qualsiasi deduzione dai livelli.
   //
-  // ⚠️ SI CERCA SOLO NELLA TESTA DEL VERBALE, RIGA PER RIGA E DALL'INIZIO.
-  // Il server scrive queste frasi su una riga loro, PRIMA dell'elenco dei
-  // rilievi (verifierRound.roundNote). Cercarle in tutto il blocco vuol dire
-  // cercarle anche dentro il testo dei rilievi, dove il verificatore descrive
-  // cosa succede: «quando il registro non risponde il lavoro si ferma» è
-  // italiano normale, e trasformava un giro di correzione in un giro bloccante.
+  // ⚠️ SI GUARDA UNA RIGA SOLA: L'ULTIMA PRIMA DELL'ELENCO DEI RILIEVI.
+  // Il server la scrive lì e solo lì (verifierRound.roundNote: apertura,
+  // riassunto, riga d'esito, rilievi). Cercarla in tutta la testa vuol dire
+  // cercarla anche nel RIASSUNTO, che è la parte in cui il verificatore
+  // racconta cosa si rompe: «Il lavoro si ferma quando il registro non
+  // risponde» è italiano normale, e trasformava un giro di correzione in un
+  // giro bloccante.
   const ROUND_OUTCOME_PHRASES = [
     { re: /^\s*Il lavoro si ferma/i,                  kind: 'stop' },
     { re: /^\s*La correzione riguarda/i,              kind: 'fix' },
@@ -251,10 +257,6 @@
   // Dove finisce la testa del verbale: la prima riga di rilievo («- [2] …»).
   // Stessa forma che legge SN_VERIFIER_ROUND.parseFindings.
   const FINDING_LINE = /^\s*(?:[-*•]\s*)?(?:\*\*)?\[\s*[0-3]\s*\??\s*\]/;
-  // Il marcatore di turno della conversazione: chiude il verbale in corso, così
-  // un «[2]» scritto nel report di chi ha lavorato non finisce fra i rilievi
-  // della verifica.
-  const TURN_MARKER = /^---\s.*\s---\s*$/;
 
   /**
    * La conversazione di questo feedback è stata TAGLIATA dal tetto? PURA.
