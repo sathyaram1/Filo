@@ -645,6 +645,7 @@
       giri: {
         conDati,
         senzaDati,
+        tagliate,
         ferme,
         giriTotali,
         fette,
