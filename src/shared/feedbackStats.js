@@ -464,7 +464,7 @@
       if (conRilievi) {
         // Lo stesso verbale, riga per riga, il server non lo scrive due volte:
         // la copia è di chi lo cita.
-        const impronta = corpo.join('\n').trim();
+        const impronta = blocco.join('\n').trim();
         if (verbaliVisti.has(impronta)) continue;
         verbaliVisti.add(impronta);
         rounds.push(conRilievi);
