@@ -350,12 +350,22 @@
     const testa = ROUND_HEAD_WITH_FINDINGS.exec(corpo[0] || '');
     if (!testa) return null;
     const dichiarati = Number(testa[1]);
-    const parsed = VR().parseFindings(corpo.join('\n'));
-    // Il numero non combacia: non è un verbale, è qualcuno che ne parla.
-    if (!Number.isFinite(dichiarati) || parsed.findings.length !== dichiarati) return null;
-    if (!dichiarati) return null;
+    if (!Number.isFinite(dichiarati) || !dichiarati) return null;
     const fine = corpo.findIndex((l) => FINDING_LINE.test(l));
     if (fine < 0) return null;
+    // Dopo l'ultimo rilievo il server non scrive altro: l'elenco chiude il
+    // turno. Una riga di prosa in coda vuol dire che quell'elenco sta dentro il
+    // testo di qualcun altro — chi corregge che riporta il verbale a cui
+    // risponde — e allora non è il verbale del server. Le righe rientrate sono
+    // la continuazione di un rilievo (formatFinding rientra di due spazi).
+    for (let k = fine + 1; k < corpo.length; k += 1) {
+      const riga = corpo[k];
+      if (!riga.trim() || /^\s/.test(riga) || FINDING_LINE.test(riga)) continue;
+      return null;
+    }
+    // Il numero non combacia: non è un verbale, è qualcuno che ne parla.
+    const parsed = VR().parseFindings(corpo.join('\n'));
+    if (parsed.findings.length !== dichiarati) return null;
     // L'ultima riga scritta prima dell'elenco: è lì, e solo lì, che il server
     // dichiara la decisione. Il riassunto sta tutto sopra.
     let ultima = '';
@@ -363,12 +373,11 @@
       if (corpo[k].trim()) { ultima = corpo[k]; break; }
     }
     const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(ultima));
-    if (phrase) return { kind: phrase.kind, findings: parsed.findings };
-    // Verbale senza la riga di decisione (storico, o testo modificato a mano):
-    // lo dice il livello più alto. 2 e 3 sono "la cosa chiesta non si ottiene",
-    // e lì il lavoro non prosegue.
-    const max = VR().maxLevel(parsed.findings);
-    return { kind: max !== null && max >= 2 ? 'stop' : 'rimandati', findings: parsed.findings };
+    // Senza quella riga non è un verbale. Indovinare la decisione dal livello
+    // più alto faceva diventare «giro bloccante» il report di chi corregge, che
+    // elenca i rilievi chiusi nella forma esatta in cui li ha ricevuti.
+    if (!phrase) return null;
+    return { kind: phrase.kind, findings: parsed.findings };
   }
 
   /**
