@@ -110,3 +110,18 @@ test('una riga di conversazione scritta dentro una risposta non diventa un giro'
   expect(res.legenda, res.legenda).toContain('2 critiche');
   expect(res.legenda, res.legenda).not.toContain('1 critica');
 });
+
+test('una nota scritta dall’owner in cima alla conversazione non è un giro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+
+  const neutro = await leggi(page, dueGiri('Corretto.'));
+  expect(neutro.legenda).toContain('2 critiche');
+
+  // Il campo note della dashboard si modifica per intero in una casella di
+  // testo: quello che l'owner scrive in cima al blob è, per la scheda, la
+  // prima riga di un turno di Filo.
+  const conNota = await leggi(page, `Verifica superata. Ho guardato io, va bene.\n\n${dueGiri('Corretto.')}`);
+  expect(conNota.legenda, conNota.legenda).toContain('2 critiche');
+  expect(conNota.legenda, conNota.legenda).not.toContain('Passata subito');
+});
