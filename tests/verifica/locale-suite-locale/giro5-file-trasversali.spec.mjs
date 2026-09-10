@@ -25,6 +25,10 @@ async function mod() {
 }
 
 test('un file sotto a tutta l’app, toccato, lancia almeno lo spec di avvio', async () => {
+  // Rilievo con punto di domanda del quinto giro: quale pavimento dare ai
+  // file senza area è una scelta dell'owner. Atteso rosso finché non decide
+  // (poi togliere questa riga).
+  test.fail(true, 'i file trasversali non fanno partire nessuno spec: decisione owner aperta');
   const m = await mod();
   const trasversali = [
     'src/main/main.js',
