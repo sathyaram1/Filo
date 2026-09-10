@@ -1452,6 +1452,11 @@
       rect.setAttribute('height', h.toFixed(2));
       rect.setAttribute('class', 'mg-st-bar');
       rect.dataset.bucket = String(b.start);
+      // Come le fette: la barretta è un tasto, e «restringi la finestra a
+      // questo periodo» non può essere un'azione che si fa solo col mouse.
+      rect.setAttribute('tabindex', '0');
+      rect.setAttribute('role', 'button');
+      rect.setAttribute('aria-label', `${bucketLabel(t.unit, b.start)}: ${b.n}. Restringi la finestra a questo periodo`);
       // Fin dove arriva davvero questa colonna: il tasto destro promette un
       // periodo, e la finestra che applica dev'essere quello.
       const prossima = t.buckets[i + 1];
