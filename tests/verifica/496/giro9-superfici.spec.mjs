@@ -85,8 +85,12 @@ test('ogni riga che porta un numero risponde al tasto destro', async ({ openTab 
   console.log('MENU nota del grafico   :', JSON.stringify(barre));
 
   const generale = /Invia feedback|Invia attacco|Aiuto/i;
-  expect(riga, `menu: ${riga}`).not.toMatch(generale);
-  expect(riga, `menu: ${riga}`).toMatch(/Copia|contate/i);
+  const muti = [
+    ['riga di «Prober lanciati»', riga],
+    ['nota sotto la torta', nota],
+    ['nota sotto il grafico', barre],
+  ].filter(([, m]) => generale.test(m) || !/Copia|contate/i.test(m));
+  expect(muti.map(([n]) => n).join(', '), JSON.stringify({ riga, nota, barre })).toBe('');
 });
 
 test('la ripartizione di una tessera ripartisce il numero della tessera', async ({ openTab }) => {
