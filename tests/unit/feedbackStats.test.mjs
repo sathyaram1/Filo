@@ -457,6 +457,7 @@ test('una riga d’apertura citata dentro un rilievo non apre un giro', () => {
     '--- Aggiornamento dell\'agente del 08/09/2026, 10:00 ---',
     'Corretto.',
     '',
+    '--- Aggiornamento dell\'agente del 08/09/2026, 12:00 ---',
     'Verifica superata.',
   ].join('\n');
   const rounds = ST.parseRounds(fb({ notes }));
