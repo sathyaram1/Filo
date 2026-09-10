@@ -385,7 +385,7 @@ async function main() {
       console.error('  argomenti).');
       process.exit(1);
     }
-    console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
+    if (v.ok) console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
   }
 
   if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
