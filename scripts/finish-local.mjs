@@ -291,8 +291,8 @@ export function specsForChangedFiles(changed, tracked) {
       if (singolare.length >= 3 && singolare !== area) prefissi.add(`${singolare}-`);
     }
     for (const t of elenco) {
-      const b = String(t).replace(/\/g, '/').replace(/.spec.mjs$/, '');
-      const nome = b.replace(/^tests//, '');
+      const b = String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '');
+      const nome = b.replace(/^tests\//, '');
       if (nome.includes('/')) continue; // le prove dei giri (tests/verifica/…) si lanciano per numero
       if ([...prefissi].some((p) => nome.startsWith(p))) specs.add(b);
     }
