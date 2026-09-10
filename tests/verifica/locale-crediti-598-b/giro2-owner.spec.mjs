@@ -27,7 +27,9 @@ async function finestra(filo, w, h) {
 // Le righe (coordinata y) occupate dai figli visibili di un modulo.
 async function righeDelModulo(page, sel) {
   return page.$$eval(`${sel} > *`, (els) => {
-    const ys = els.filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().top / 4) * 4);
+    // Il centro verticale, non il bordo alto: etichetta e campo hanno altezze
+    // diverse e su una stessa riga (allineati al centro) i bordi alti differiscono.
+    const ys = els.filter((e) => e.offsetParent !== null).map((e) => { const r = e.getBoundingClientRect(); return Math.round((r.top + r.height / 2) / 10); });
     return [...new Set(ys)].length;
   });
 }
