@@ -1878,7 +1878,10 @@
     // il registro delle partenze delle routine.
     if (tab === 'fbstats') {
       renderStats();
-      if ((workerLogEntries === null || workerLogMissing) && !logLoading) loadWorkerLog();
+      // Ogni apertura rilegge: il registro è l'altra sorgente della stessa riga
+      // di tre numeri, e leggerlo una volta sola lasciava due numeri che si
+      // muovono da soli accanto a un terzo fermo a mezz'ora fa.
+      if (!logLoading) loadWorkerLog();
     }
   }
 
