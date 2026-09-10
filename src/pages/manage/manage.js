@@ -1666,7 +1666,9 @@
       el.setAttribute('aria-expanded', el.dataset.drill === statsDrill ? 'true' : 'false');
     });
     if (!statsDrill) return;
-    const ancora = document.querySelector(`#panel-fbstats [data-drill="${cssSel(statsDrill)}"]`);
+    const k = cssSel(statsDrill);
+    const ancora = document.querySelector(
+      `#panel-fbstats [data-drill="${k}"], #panel-fbstats [data-drill-menu="${k}"]`);
     if (!ancora) { statsDrill = null; return; }
     const lista = statsSegnalazioni(statsDrill);
     // Sotto una voce di legenda l'elenco è un altro <li>: un <div> figlio di
