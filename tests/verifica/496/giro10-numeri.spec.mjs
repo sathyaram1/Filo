@@ -51,8 +51,8 @@ test('una segnalazione con la data nel futuro non sparisce dal grafico in silenz
     tessera: document.querySelector('[data-card-toggle="ricevuti"] .mg-st-card-value').textContent.trim(),
     colonne: Array.from(document.querySelectorAll('#mgStBars [data-bucket] title'))
       .map((t) => t.textContent).join(' | '),
-    somma: Array.from(document.querySelectorAll('#mgStBars [data-bucket]'))
-      .reduce((a, b) => a + Number(b.dataset.n || 0), 0),
+    somma: Array.from(document.querySelectorAll('#mgStBars [data-bucket] title'))
+      .reduce((a, t) => a + (Number((t.textContent.split(':')[1] || '').trim()) || 0), 0),
     nota: document.getElementById('mgStBarsNote').textContent,
   }));
   console.log('FUTURO:', JSON.stringify(stato, null, 1));
