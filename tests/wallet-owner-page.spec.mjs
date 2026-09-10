@@ -48,7 +48,8 @@ test.beforeAll(async () => {
           result: {
             config: { invitesRemaining: 9, entryCredits: 5000, dailyCredits: 100, eurUsd: 1.2, eurUsdAt: '2026-09-10', maxGrantUsd: 50 },
             totals: { users: 1, totalLimitUsd: 4.2, maxGrantUsd: 50 },
-            ownerInvites: [],
+            // I codici generati fin qui: la pagina rilegge la vista dopo «Genera».
+            ownerInvites: seen.codes.map((code) => ({ code, used: false, createdAt: '2026-09-10T09:00:00.000Z' })),
             users: [{ pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0 }, invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z', usage: { rows: 0 } }],
           },
         });
