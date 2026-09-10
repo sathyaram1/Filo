@@ -197,10 +197,19 @@ export function resolveDiffBase({ fetchOk, remoteRefOk }) {
  * fusione scoperto dopo 15 minuti di spec, o dopo l'approvazione dell'owner,
  * costa un giro intero; scoperto adesso costa cinque secondi. Un conteggio
  * illeggibile non blocca: la guardia non inventa conflitti.
+ *
+ * Con `--check` non si ferma: nessuna fusione segue, quindi non c'è un
+ * conflitto da scoprire in anticipo — e chi verifica in locale ha proprio
+ * quel comando al posto della suite intera; fermarlo mentre la linea
+ * principale si muove (succede ogni giorno, con le fusioni del server) lo
+ * mandava a far ripartire la verifica che era già in corso (giro 3 di
+ * suite-locale). Il ramo indietro si dice comunque, come nota:
+ * `behindMainNota`.
  */
-export function behindMainStop(behind) {
+export function behindMainStop(behind, { checkOnly = false } = {}) {
   const n = Number(behind);
   if (!Number.isFinite(n) || n <= 0) return '';
+  if (checkOnly) return '';
   return [
     `Il ramo è indietro di ${n} commit rispetto alla linea principale: chiedere la fusione così`,
     'finisce in conflitto alla fine, a controlli già pagati.',
@@ -209,19 +218,60 @@ export function behindMainStop(behind) {
   ].join('\n');
 }
 
-/** Gli spec Playwright che toccano le aree modificate dal branch. Puro. */
-export function specsForChangedFiles(changed) {
+/** La stessa informazione, quando non ferma (`--check`). '' = ramo pari. PURA. */
+export function behindMainNota(behind) {
+  const n = Number(behind);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return [
+    `▸ Il ramo è indietro di ${n} commit rispetto alla linea principale. Coi soli controlli non importa`,
+    '  (nessuna fusione segue); `npm run finish` invece si fermerebbe qui. Lo riallinea la prossima',
+    '  verifica in partenza (node scripts/verify-local.mjs start).',
+  ].join('\n');
+}
+
+/**
+ * Gli spec Playwright che toccano le aree modificate dal branch. Puro.
+ *
+ * Gli spec della suite portano il nome di una FUNZIONALITÀ, non di un modulo:
+ * `tab-archive`, `options-default-models`, `feedback-attach-files`. Uno spec
+ * col nome intero dell'area (`tests/tabs`, `tests/options`) quasi mai esiste:
+ * col solo nome intero, 12 file sorgente su 254 trovavano uno spec (giro 3 di
+ * suite-locale), e toccare la pagina delle opzioni non lanciava nessuno dei
+ * nove `options-*`. Quindi, se si passa l'elenco degli spec tracciati, si
+ * prendono anche quelli il cui nome comincia con l'area seguita da un
+ * trattino (e col singolare: `tabs` → `tab-*`). Restano pochi: la mediana è
+ * quattro spec per area, il massimo una trentina — minuti, non le quasi
+ * sette ore della suite intera sulla macchina di chi sviluppa Filo.
+ */
+export function specsForChangedFiles(changed, tracked) {
   const files = Array.isArray(changed) ? changed : [];
   const specs = new Set();
+  const aree = new Set();
   for (const f of files) {
-    // Uno spec che porta il nome della cosa toccata è il candidato ovvio;
-    // meglio pochi mirati che l'intera suite (quasi sette ore sulla macchina
-    // di chi sviluppa Filo, con un solo worker; più di mezz'ora in cloud).
     const m = f.match(/^src\/pages\/([^/]+)\//);
-    if (m) specs.add(`tests/${m[1]}`);
+    if (m) aree.add(m[1].toLowerCase());
     const p = f.match(/^src\/(?:shared|content|renderer|main)\/([^/.]+)/);
-    if (p) specs.add(`tests/${p[1].toLowerCase()}`);
+    if (p) aree.add(p[1].toLowerCase());
+    // Un handler o un provider ha un nome suo (chat, downloads…): vale come area.
+    const h = f.match(/^src\/main\/services\/(?:handlers|providers)\/([^/.]+)/);
+    if (h) aree.add(h[1].toLowerCase());
     if (f.startsWith('tests/') && f.endsWith('.spec.mjs')) specs.add(f.replace(/\.spec\.mjs$/, ''));
+  }
+  for (const area of aree) specs.add(`tests/${area}`);
+  const elenco = Array.isArray(tracked) ? tracked : [];
+  if (elenco.length && aree.size) {
+    const prefissi = [];
+    for (const area of aree) {
+      prefissi.push(`${area}-`);
+      const singolare = area.replace(/s$/, '');
+      if (singolare.length >= 3 && singolare !== area) prefissi.push(`${singolare}-`);
+    }
+    for (const t of elenco) {
+      const b = String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '');
+      const nome = b.replace(/^tests\//, '');
+      if (nome.includes('/')) continue; // le prove dei giri (tests/verifica/…) si lanciano per numero
+      if (prefissi.some((p) => nome.startsWith(p))) specs.add(b);
+    }
   }
   return [...specs];
 }
