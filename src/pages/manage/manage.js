@@ -1425,8 +1425,17 @@
     last.textContent = bucketLabel(t.unit, t.buckets[n - 1].start);
     mgStBars.append(first, last);
     if (mgStBarsNote) {
-      const unitLabel = t.unit === 'giorno' ? 'giorno' : (t.unit === 'settimana' ? 'settimana' : 'mese');
-      mgStBarsNote.textContent = `Una colonna per ${unitLabel}. La colonna più alta arriva a ${max}.`;
+      const UNITA = { giorno: 'giorno', settimana: 'settimana', mese: 'mese', anno: 'anno' };
+      const parti = [`Una colonna per ${UNITA[t.unit] || t.unit}. La colonna più alta arriva a ${max}.`];
+      // Chi è nel totale ma non può stare su un asse del tempo si dichiara qui,
+      // altrimenti il grafico e la tessera raccontano due numeri diversi.
+      const senza = res.ricevuti.senzaData;
+      if (senza) {
+        parti.push(senza === 1
+          ? '1 segnalazione non ha una data d’arrivo leggibile: è nel totale, non nel grafico.'
+          : `${senza} segnalazioni non hanno una data d’arrivo leggibile: sono nel totale, non nel grafico.`);
+      }
+      mgStBarsNote.textContent = parti.join(' ');
     }
   }
 
