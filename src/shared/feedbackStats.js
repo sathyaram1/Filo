@@ -380,22 +380,32 @@
     const d = new Date(ms);
     return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
   }
+  function startOfYear(ms) {
+    return new Date(new Date(ms).getFullYear(), 0, 1).getTime();
+  }
   function nextBucket(unit, ms) {
     const d = new Date(ms);
     if (unit === 'giorno') { d.setDate(d.getDate() + 1); return d.getTime(); }
     if (unit === 'settimana') { d.setDate(d.getDate() + 7); return d.getTime(); }
+    if (unit === 'anno') return new Date(d.getFullYear() + 1, 0, 1).getTime();
     return new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
   }
   function bucketStart(unit, ms) {
     if (unit === 'giorno') return startOfDay(ms);
     if (unit === 'settimana') return startOfWeek(ms);
+    if (unit === 'anno') return startOfYear(ms);
     return startOfMonth(ms);
   }
+  const GIORNI_PER_UNITA = { giorno: 1, settimana: 7, mese: 30.44, anno: 365.25 };
   function chooseUnit(from, to) {
     const giorni = Math.max(1, Math.ceil((to - from) / GIORNO));
     if (giorni <= MAX_COLONNE) return 'giorno';
     if (giorni <= MAX_COLONNE * 7) return 'settimana';
-    return 'mese';
+    if (giorni <= MAX_COLONNE * 30) return 'mese';
+    return 'anno';
+  }
+  function colonneNecessarie(unit, from, to) {
+    return Math.ceil(((to - from) / GIORNO) / GIORNI_PER_UNITA[unit]) + 1;
   }
 
   /**
