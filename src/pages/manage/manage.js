@@ -1995,6 +1995,13 @@
       const barra = e.target.closest('[data-bucket]');
       if (barra) statsRestringi(Number(barra.dataset.bucket), barra.dataset.fine);
     });
+    mgStBars.addEventListener('keydown', (e) => {
+      if (!invioOSpazio(e)) return;
+      const barra = e.target.closest('[data-bucket]');
+      if (!barra) return;
+      e.preventDefault();
+      statsRestringi(Number(barra.dataset.bucket), barra.dataset.fine);
+    });
   }
 
   // ── Tab bar ───────────────────────────────────────────────────────────────
