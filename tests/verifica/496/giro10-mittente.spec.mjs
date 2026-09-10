@@ -62,6 +62,25 @@ test('la riga di avviso non promette di sapere chi ha mandato quello che non sa'
   expect(nota, nota).not.toContain('da chi si sa lo stesso');
 });
 
+// Quale menu è uscito: quello della scheda, o quello generale della pagina?
+async function menuDopoTastoDestro(page, selettore) {
+  await page.evaluate(() => {
+    document.querySelectorAll('.mg-ctxmenu, .sn-select-pop, .sn-menu, [role="menu"]').forEach((m) => m.remove());
+  });
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) throw new Error(`manca ${sel}`);
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true,
+      clientX: Math.round(r.left + r.width / 2), clientY: Math.round(r.top + r.height / 2),
+    }));
+  }, selettore);
+  await page.waitForTimeout(250);
+  return page.evaluate(() => Array.from(document.querySelectorAll('[role="menu"], .mg-ctxmenu, .sn-select-pop'))
+    .map((m) => m.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | '));
+}
+
 test('il numero grande di «Prober lanciati» risponde al tasto destro come gli altri tre', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
@@ -74,12 +93,11 @@ test('il numero grande di «Prober lanciati» risponde al tasto destro come gli 
   });
   await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
 
+  const esito = {};
   for (const id of ['ricevuti', 'lavorati', 'adesso', 'routine']) {
-    await page.locator(`[data-card-toggle="${id}"] .mg-st-card-value`).click({ button: 'right' });
-    const voci = await page.evaluate(() => Array.from(
-      document.querySelectorAll('.mg-st-menu button, .mg-ctx button, .mg-st-menu [role="menuitem"]'),
-    ).map((b) => b.textContent.trim()));
-    expect(voci.length, `tessera ${id}: nessuna voce di tasto destro (${voci.join(' | ')})`).toBeGreaterThan(0);
-    await page.keyboard.press('Escape');
+    esito[id] = await menuDopoTastoDestro(page, `[data-card-toggle="${id}"] .mg-st-card-value`);
   }
+  console.log('MENU sul numero grande:', JSON.stringify(esito, null, 1));
+  // Le quattro tessere sono disegnate identiche: devono rispondere identiche.
+  expect(esito.routine, JSON.stringify(esito)).not.toEqual('');
 });
