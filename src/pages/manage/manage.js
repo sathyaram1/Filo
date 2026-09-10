@@ -1200,7 +1200,13 @@
         + `<span class="mg-st-row-share">${esc(r.share || '')}</span></${r.key ? 'button' : 'div'}>`
       )).join('')
       : `<div class="mg-st-empty">${esc(empty || 'Niente in questa finestra.')}</div>`;
-    const drillTessera = ST_TESSERA_DRILL[id] ? ` data-drill-menu="${esc(ST_TESSERA_DRILL[id])}"` : '';
+    // Le tessere il cui numero grande NON conta segnalazioni (le partenze delle
+    // routine) non hanno un elenco da aprire, ma il tasto destro deve poterle
+    // copiare: quattro tessere disegnate identiche non possono rispondere in
+    // tre modi diversi, e su una di loro usciva il menu generale della pagina.
+    const drillTessera = ST_TESSERA_DRILL[id]
+      ? ` data-drill-menu="${esc(ST_TESSERA_DRILL[id])}"`
+      : ' data-copia="1"';
     return `<div class="mg-st-card" data-card="${esc(id)}">`
       + `<button type="button" class="mg-st-card-head" data-card-toggle="${esc(id)}"${drillTessera} aria-expanded="${aperto}">`
       + `<span class="mg-st-card-value">${esc(value)}</span>`
