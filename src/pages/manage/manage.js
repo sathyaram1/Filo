@@ -1880,14 +1880,21 @@
   const panelFbstats = document.getElementById('panel-fbstats');
   if (panelFbstats) {
     panelFbstats.addEventListener('contextmenu', (e) => {
-      const drill = e.target.closest('[data-drill], [data-group]');
+      // Ogni superficie della scheda che porta un numero risponde qui: le righe
+      // e le voci di legenda (`data-drill`), le fette (`data-group`), il numero
+      // grande di una tessera e le pastiglie del creatore (`data-drill-menu`),
+      // le barrette (`data-bucket`), e — con la sola copia — le righe che
+      // contano qualcosa che non è una segnalazione (`data-copia`).
+      const drill = e.target.closest('[data-drill], [data-drill-menu], [data-group]');
       const barra = e.target.closest('[data-bucket]');
-      if (!drill && !barra) return;
+      const finestra = e.target.closest('[data-window]');
+      const soloCopia = e.target.closest('[data-copia]');
+      if (!drill && !barra && !finestra && !soloCopia) return;
       e.preventDefault();
       e.stopPropagation();
       const voci = [];
       if (drill) {
-        const key = drill.dataset.drill || `giri:${drill.dataset.group}`;
+        const key = drill.dataset.drill || drill.dataset.drillMenu || `giri:${drill.dataset.group}`;
         const quante = statsSegnalazioni(key).length;
         voci.push({
           label: statsDrill === key ? 'Chiudi l’elenco' : `Mostra le ${quante === 1 ? 'segnalazione contata' : 'segnalazioni contate'}`,
@@ -1896,6 +1903,25 @@
         voci.push({
           label: 'Copia riga e numero',
           run: () => statsCopia(drill.textContent.replace(/\s+/g, ' ').trim()),
+        });
+      }
+      if (finestra && !drill) {
+        // Su una pastiglia della finestra la domanda è «di che periodo stiamo
+        // parlando»: si copia quello vero, con le date, non il nome del tasto.
+        voci.push({
+          label: 'Copia il periodo',
+          run: () => {
+            const r = ST.windowRange({ key: finestra.dataset.window, from: statsSel.from, to: statsSel.to }, Date.now());
+            const da = r.from !== null ? statsDate(r.from) : 'sempre';
+            const a = r.to !== null ? statsDate(r.to) : 'oggi';
+            statsCopia(`dal ${da} al ${a}`);
+          },
+        });
+      }
+      if (soloCopia && !drill) {
+        voci.push({
+          label: 'Copia riga e numero',
+          run: () => statsCopia(soloCopia.textContent.replace(/\s+/g, ' ').trim()),
         });
       }
       if (barra) {
