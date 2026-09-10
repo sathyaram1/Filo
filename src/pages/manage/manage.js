@@ -1187,9 +1187,13 @@
     // Una riga che porta alle segnalazioni che ha contato è un TASTO: si apre
     // col clic e col tasto Invio, e il tasto destro offre le stesse azioni.
     // Un numero da cui non si arriva a «quali?» è metà risposta.
+    // Le righe che contano qualcosa che non è una segnalazione (le partenze
+    // delle routine, per ruolo) non hanno un elenco da aprire, ma il tasto
+    // destro deve poterle copiare lo stesso: senza, l'unica cosa che esce lì è
+    // il menu generale della pagina, quello che compare su uno spazio bianco.
     const dettaglio = righe.length
       ? righe.map((r) => (
-        `<${r.key ? 'button type="button"' : 'div'} class="mg-st-row${r.key ? ' mg-st-row--apre' : ''}"`
+        `<${r.key ? 'button type="button"' : 'div data-copia="1"'} class="mg-st-row${r.key ? ' mg-st-row--apre' : ''}"`
         + (r.key ? ` data-drill="${esc(r.key)}" aria-expanded="false"` : '')
         + `><span class="mg-st-row-label">${esc(r.label)}</span>`
         + `<span class="mg-st-row-n">${esc(String(r.n))}</span>`
