@@ -668,7 +668,7 @@
     WINDOWS, DEFAULT_WINDOW, windowByKey, windowRange, parseDay, inRange,
     CATEGORIES, CATEGORY_LABELS, categoryOf,
     creatorKeys, creatorOf, CREATORS_ROUTINE, CREATORS_PEOPLE,
-    ROUND_KINDS, ROUND_PASSING, parseRounds, loopsBeforePass,
+    ROUND_KINDS, ROUND_PASSING, parseRounds, loopsBeforePass, notesTruncated,
     isWorked, isInProgress, isQueued,
     createdMs, movedMs, timeline, launches, roleLabel,
     median, average, formatDuration, formatAvg,
