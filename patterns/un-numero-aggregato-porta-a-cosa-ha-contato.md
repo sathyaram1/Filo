@@ -24,6 +24,19 @@ poi le priorità, poi la legenda di una torta, poi le fette e le barrette.
   (copia riga e numero). Se sull'elemento il tasto destro apre il menu generale
   della pagina, quello che esce anche su uno spazio bianco, la promessa del
   tasto destro di Filo lì non è mantenuta.
+- **Vale anche per i numeri che non sono in un elenco.** Il numero grande in
+  cima a un riquadro, il contatore su una pastiglia di filtro, la riga di una
+  tabella di misure: portano un numero, quindi rispondono. Se il clic sinistro
+  ha già un mestiere suo — la testata di un riquadro lo apre e lo chiude — la
+  strada resta il tasto destro, e ci deve essere. Dove il numero non conta
+  oggetti (una durata, una media), il tasto destro offre almeno di copiarlo:
+  un numero da cui non si può portare via niente è metà risposta lo stesso.
+- **L'elenco si apre DOVE si è cliccato.** La stessa chiave sta spesso su due
+  superfici (una riga del riquadro e la voce di legenda della torta contano la
+  stessa cosa). Cercare l'ancora con un `querySelector` prende la prima della
+  pagina: se quella sta in un riquadro chiuso, l'elenco nasce dentro qualcosa
+  di nascosto e chi ha cliccato non vede succedere niente. L'ancora è quella
+  della zona in cui si è agito, e comunque una che si vede.
 - **L'elenco arriva fino all'oggetto vero.** Aprire una riga e trovare dodici
   titoli non basta se da un titolo non si arriva alla segnalazione: la catena
   si chiude quando il clic porta alla scheda giusta, col dettaglio aperto.
