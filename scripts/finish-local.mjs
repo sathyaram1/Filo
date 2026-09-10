@@ -274,6 +274,14 @@ export function specsForChangedFiles(changed, tracked) {
     if (h) aggiungi(h[1]);
     const d = f.match(/^src\/main\/services\/([^/.]+)\//);
     if (d && !['handlers', 'providers'].includes(d[1])) aggiungi(d[1]);
+    // Il NOME del file, in qualunque cartella di src stia: i servizi che
+    // stanno direttamente in src/main/services (adblock, cookies, downloads,
+    // terminal, geoBlock…), i fogli di stile, i preload, lo shim di chrome, la
+    // config. Le regole per cartella qui sopra li saltavano tutti, e 19 dei 39
+    // servizi non lanciavano niente pur avendo uno spec col loro stesso nome
+    // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
+    const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
+    if (n) aggiungi(n[1]);
     if (f.startsWith('tests/') && f.endsWith('.spec.mjs')) specs.add(f.replace(/\.spec\.mjs$/, ''));
   }
   const elenco = Array.isArray(tracked) ? tracked : [];
