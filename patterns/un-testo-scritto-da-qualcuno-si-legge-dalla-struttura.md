@@ -55,10 +55,25 @@ che non ne ha.**
   turno, filtrare su quello toglie di mezzo tutto ciò che scrivono le persone.
   Resta una difesa utile, ma non è sufficiente da sola: il turno del programma
   lo scrivono anche gli agenti che non stanno verbalizzando.
-- **La punteggiatura è parte della forma.** `Controllo funzionalità NON
-  superato:` con i due punti è il programma; senza, è qualcuno che cita la
-  frase. Quando la forma vecchia non ha altro da esibire, la punteggiatura è
-  l'unica cosa che resta da chiedere.
+- **La struttura da sola non basta: serve anche il POSTO.** Una struttura se la
+  porta dietro anche chi la cita, e citarla è quello che chi corregge fa tutti i
+  giorni. Il verbale allora non è solo una forma, è un TURNO INTERO: comincia
+  alla prima riga scritta del turno e finisce con l'ultimo rilievo. Prosa prima
+  o dopo l'elenco vuol dire che quell'elenco sta dentro il testo di qualcun
+  altro. Con questa regola la porta 6 si chiude in tutte e due le versioni.
+- **Non indovinare il pezzo che manca.** Il verbale senza la riga di decisione
+  ripiegava sul livello più alto dei rilievi. Bastava che chi corregge elencasse
+  i rilievi chiusi perché una lavorazione passata uscisse dalla torta e si
+  leggesse come fermata. Se un pezzo della struttura non c'è, non è quel testo:
+  non è un verbale a cui manca qualcosa.
+- **Una riga di sole parole non può fare il danno grosso.** La forma vecchia
+  `Controllo funzionalità NON superato` non ha niente da esibire: il giro 10 ha
+  provato a chiederle la punteggiatura, e il giro 11 ha riaperto la porta
+  spostando i due punti di due parole. Non si conta più. Le forme piatte rimaste
+  dicono soltanto «è passato», che è la stessa cosa che dice una lavorazione
+  chiusa: falsificarle non sposta niente. Regola generale: a una riga senza
+  struttura si può concedere il sì/no innocuo, mai il verdetto che ribalta il
+  conteggio.
 
 Sbagliare per eccesso qui costa più che sbagliare per difetto: un giro inventato
 sposta il lavoro nella fetta sbagliata, e chi guarda non ha modo di accorgersene.
