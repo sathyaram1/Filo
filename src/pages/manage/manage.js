@@ -1146,6 +1146,12 @@
   }
 
   // ── I riquadri delle misure principali ────────────────────────────────────
+  // Le tessere il cui numero grande è un numero di SEGNALAZIONI: il tasto
+  // destro sul numero apre l'elenco di tutte quante. Sta in un attributo suo e
+  // non in `data-drill` perché il clic sinistro sulla testata ha già il suo
+  // mestiere (aprire la ripartizione), e le due cose non si devono rubare.
+  const ST_TESSERA_DRILL = { ricevuti: 'tessera:ricevuti', lavorati: 'tessera:lavorati', adesso: 'tessera:adesso' };
+
   function statsCard({ id, value, label, sub, rows, empty }) {
     const aperto = statsOpen.has(id);
     const righe = (rows || []).filter((r) => r && r.n > 0);
