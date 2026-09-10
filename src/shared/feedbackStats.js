@@ -580,9 +580,12 @@
     const distribuzione = new Map();
     const perEsito = { pass: 0, fix: 0, stop: 0, rimandati: 0 };
     const perLivello = { 0: 0, 1: 0, 2: 0, 3: 0 };
-    let conDati = 0, senzaDati = 0, ferme = 0, giriTotali = 0;
+    let conDati = 0, senzaDati = 0, ferme = 0, giriTotali = 0, tagliate = 0;
     const giriPerLavoro = [];
     for (const fb of lavorati) {
+      // Conversazione tagliata dal tetto: i primi giri non ci sono più. Contare
+      // quello che resta darebbe «passata subito» al lavoro più combattuto.
+      if (notesTruncated(fb)) { tagliate += 1; continue; }
       const r = loopsBeforePass(fb);
       if (!r) { senzaDati += 1; continue; }
       conDati += 1;
