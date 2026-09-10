@@ -224,20 +224,44 @@
   // I giri dopo i quali il lavoro VA AVANTI (non torna indietro).
   const ROUND_PASSING = ['pass', 'rimandati'];
 
-  // Le righe che aprono il verbale di un giro. Le prime due sono la forma di
-  // oggi (roundNote); le altre tre sono lo storico (dispatch.verifierNoteText),
-  // che nelle conversazioni vecchie c'è ancora.
+  // ── Come si riconosce il verbale di un giro ───────────────────────────────
   //
-  // ⚠️ LA FORMA È QUELLA ESATTA CHE SCRIVE IL SERVER, NON UN INIZIO QUALUNQUE.
-  // «Verifica: 2 rilievi.» è una riga intera e sola; «Verifica: 2 rilievi del
-  // giro scorso sono chiusi» è un verificatore che riassume, e apriva un giro
-  // finto che faceva sparire quello vero.
-  const ROUND_OPENERS = [
-    { re: /^\s*Verifica superata\./i,                        kind: 'pass' },
-    { re: /^\s*Verifica:\s*funziona,\s*ma\s*migliorabile/i,  kind: 'rimandati' },
-    { re: /^\s*Verifica:\s*\d+\s+riliev(?:o|i)\.?\s*$/i,     kind: null },
-    { re: /^\s*Controllo funzionalità superato\./i,          kind: 'pass' },
-    { re: /^\s*Controllo funzionalità NON superato/i,        kind: 'stop' },
+  // ⚠️ CINQUE GIRI DI VERIFICA DI FILA HANNO TROVATO LA STESSA PORTA DA UN LATO
+  // NUOVO, e il motivo è sempre stato lo stesso: si cercavano PAROLE, e le
+  // stesse parole le scrive anche chi racconta. Dentro un rilievo, in un
+  // commento di una persona, nel riassunto, nella prima riga del report di chi
+  // corregge, in una nota scritta a mano in cima al campo note. Stringere la
+  // ricerca a un posto sempre più preciso è una rincorsa persa: la prima riga
+  // di un turno la scrive anche chi non sta verbalizzando niente.
+  //
+  // Quindi non si cerca più una frase: si chiede al verbale di ESIBIRE LA SUA
+  // STRUTTURA. Il verbale con dei rilievi dichiara quanti sono («Verifica: 2
+  // rilievi.»), li elenca, e prima dell'elenco scrive con quale decisione si
+  // chiude. Tre cose che devono combaciare: il numero dichiarato è il numero
+  // elencato, e la riga di decisione è una delle tre che scrive il server. Una
+  // frase raccontata non combacia mai per caso, e da lì vengono TUTTI i numeri
+  // che la scheda mostra.
+  //
+  // Il verbale di un giro SUPERATO non ha struttura da esibire: è una riga di
+  // parole, indistinguibile da chi quelle parole le cita. Non lo si conta più
+  // come un giro: dice soltanto «questo lavoro è passato», che è un sì/no, e
+  // che una lavorazione chiusa dice già per conto suo. Ripetuto, non cambia
+  // niente; falsificato su un lavoro che ha davvero girato, nemmeno.
+
+  // Il verbale con rilievi: riga intera, col numero che poi va verificato.
+  const ROUND_HEAD_WITH_FINDINGS = /^\s*Verifica:\s*(\d+)\s+riliev(?:o|i)\.?\s*$/i;
+
+  // Le forme che dichiarano soltanto l'esito, senza elencare niente. Le prime
+  // due sono di oggi; le altre sono lo storico (dispatch.verifierNoteText), che
+  // nelle conversazioni vecchie c'è ancora. La punteggiatura fa parte della
+  // forma: il server la scrive sempre, e senza di lei la frase è qualcuno che
+  // la sta citando («Controllo funzionalità NON superato era il verdetto del
+  // giro scorso» apriva un giro bloccante che non era mai successo).
+  const ROUND_FLAT_FORMS = [
+    { re: /^\s*Verifica superata\./i,                                kind: 'pass' },
+    { re: /^\s*Controllo funzionalità superato\./i,                  kind: 'pass' },
+    { re: /^\s*Controllo funzionalità NON superato\s*[:.]/i,         kind: 'stop' },
+    { re: /^\s*Verifica:\s*funziona,\s*ma\s*migliorabile\s*[—–:.-]/i, kind: 'rimandati' },
   ];
   // Cosa il server ha deciso di fare dei rilievi di quel giro: è scritto in
   // chiaro dentro il verbale, e vale più di qualsiasi deduzione dai livelli.
