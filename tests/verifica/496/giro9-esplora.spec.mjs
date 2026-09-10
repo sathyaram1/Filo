@@ -113,7 +113,7 @@ test('esplorazione: tema scuro, stato vuoto, finestra stretta', async ({ openTab
   await page.screenshot({ path: `${OUT}/496-giro9-stretta.png`, fullPage: true });
 
   await page.setViewportSize({ width: 1200, height: 900 });
-  await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
+  await page.evaluate(() => document.documentElement.removeAttribute('data-sn-theme'));
   await page.evaluate(() => window.__mgTest.setData([]));
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/496-giro9-vuoto.png`, fullPage: true });
