@@ -311,6 +311,7 @@
     const turni = TH().splitNotes(notes).filter((s) => s && s.role === 'model');
     for (const turno of turni) {
       const lines = String((turno && turno.body) || '').replace(/\r\n?/g, '\n').split('\n');
+      const delTurno = [];
       let current = null;
       // A inizio turno si è già a inizio paragrafo.
       let inizioParagrafo = true;
