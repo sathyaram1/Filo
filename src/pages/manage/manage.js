@@ -1379,7 +1379,11 @@
     const t = res.ricevuti.timeline;
     if (!t || !t.buckets.length) {
       statsMostra(mgStBars, false);
-      if (mgStBarsNote) mgStBarsNote.textContent = 'Nessuna segnalazione da mettere in fila in questa finestra.';
+      if (mgStBarsNote) {
+        mgStBarsNote.textContent = res.datiPronti
+          ? 'Nessuna segnalazione da mettere in fila in questa finestra.'
+          : ST_SENZA_DATI;
+      }
       return;
     }
     statsMostra(mgStBars, true);
