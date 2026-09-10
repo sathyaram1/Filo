@@ -1263,7 +1263,15 @@
         id: 'routine',
         value: registro ? statsNum(rout.prober, rout.parziale) : '—',
         label: 'Prober lanciati',
-        sub: 'partenze registrate dal server, tutti i creatori',
+        // Il numero grande conta i soli prober; aprendo la tessera si vedono
+        // TUTTI i ruoli, e le percentuali sono quote di quel totale. Se il
+        // totale non è scritto, aprire «1 prober» e leggere «Verifica 1 · 50%»
+        // è una tessera che si legge in due modi: le altre tre si aprono sulla
+        // ripartizione del loro numero, e la differenza si scopre solo facendo
+        // la somma a mano.
+        sub: registro
+          ? `partenze registrate dal server, tutti i creatori · ${statsNum(rout.total, rout.parziale)} in tutto, qui sotto per ruolo`
+          : 'partenze registrate dal server, tutti i creatori',
         rows: !registro ? [] : rout.byRole.map((r) => ({ label: r.label, n: r.n, share: statsPercent(r.n, rout.total) })),
         empty: registro ? 'Nessuna partenza registrata in questa finestra.' : ST_SENZA_REGISTRO,
       }),
