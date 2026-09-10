@@ -397,15 +397,18 @@
     return startOfMonth(ms);
   }
   const GIORNI_PER_UNITA = { giorno: 1, settimana: 7, mese: 30.44, anno: 365.25 };
+  function colonneNecessarie(unit, from, to) {
+    return Math.ceil(Math.max(1, (to - from) / GIORNO) / GIORNI_PER_UNITA[unit]);
+  }
   function chooseUnit(from, to) {
     const giorni = Math.max(1, Math.ceil((to - from) / GIORNO));
     if (giorni <= MAX_COLONNE) return 'giorno';
     if (giorni <= MAX_COLONNE * 7) return 'settimana';
-    if (giorni <= MAX_COLONNE * 30) return 'mese';
+    // Oltre i mesi c'è l'anno: senza, una finestra di secoli chiedeva
+    // millecinquecento colonne, il disegno si fermava alla sessantaseiesima e
+    // le segnalazioni vere restavano fuori dal grafico senza dirlo.
+    if (colonneNecessarie('mese', from, to) <= MAX_COLONNE + 6) return 'mese';
     return 'anno';
-  }
-  function colonneNecessarie(unit, from, to) {
-    return Math.ceil(((to - from) / GIORNO) / GIORNI_PER_UNITA[unit]) + 1;
   }
 
   /**
