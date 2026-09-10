@@ -1267,7 +1267,7 @@
         // Con una sola categoria l'arco da 0 a 2π collasserebbe: cerchio pieno.
         const circle = document.createElementNS(NS, 'circle');
         circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', r);
-        circle.setAttribute('fill', ST_PIE_COLORS[0]);
+        circle.setAttribute('fill', stPieColor(fette[0].giri));
         circle.dataset.group = String(fette[0].giri);
         mgStPie.appendChild(circle);
       } else {
