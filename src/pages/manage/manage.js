@@ -1443,6 +1443,13 @@
   function renderStatsNote(res) {
     if (!mgStNote) return;
     const frasi = [];
+    // Prima di tutto: i feedback ci sono? Senza, ogni numero qui sotto è un
+    // trattino, e chi guarda deve sapere perché.
+    if (!res.datiPronti) {
+      frasi.push(res.datiFalliti
+        ? 'I feedback non si sono caricati, quindi qui non c’è nessun numero da mostrare. Riprova fra poco: la dashboard ci riprova da sola.'
+        : 'I feedback stanno ancora arrivando: i numeri compaiono appena la lista è in pagina.');
+    }
     if (!res.range.valid) {
       frasi.push('La finestra scelta non si legge: scrivi una data d’inizio e una di fine, con l’inizio prima della fine. Finché non è a posto, i numeri qui sotto sono quelli di TUTTO lo storico in pagina.');
     } else if (res.range.from !== null || res.range.to !== null) {
