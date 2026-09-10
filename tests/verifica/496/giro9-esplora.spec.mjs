@@ -99,7 +99,7 @@ test('esplorazione: chi risponde al tasto destro e chi no', async ({ openTab }) 
 test('esplorazione: tema scuro, stato vuoto, finestra stretta', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
   await page.waitForTimeout(150);
   await page.screenshot({ path: `${OUT}/496-giro9-scuro.png`, fullPage: true });
 
