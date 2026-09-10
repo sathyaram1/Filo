@@ -716,6 +716,9 @@
       statiLeggibili,
       copertura,
       creatori: creatorKeys().map((key) => ({ key, n: perCreatore.get(key) || 0 })),
+      // Quante, nella finestra, viaggiano col mittente cifrato: nessuna
+      // pastiglia le conta, e il filtro per creatore non le può trovare.
+      mittentiIllegibili,
       ricevuti: {
         total: ricevuti.length,
         perCategoria: CATEGORIES.map((c) => ({ key: c.key, label: c.label, n: perCategoria.get(c.key) || 0 })),
