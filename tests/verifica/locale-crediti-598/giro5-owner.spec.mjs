@@ -67,7 +67,8 @@ test('con l’accesso: totali, codici che restano, tabella con dettaglio, regalo
 
     const page = await apriOwner(filo);
     await expect(page.locator('#ownerSection')).toBeVisible();
-    await expect(page.locator('#ownerTotals')).toContainText(/1 utenti/, { timeout: 15_000 });
+    // Il secondo giro del ramo -b ha segnato «1 utenti» come rilievo: da allora si conta al singolare.
+    await expect(page.locator('#ownerTotals')).toContainText(/\b1 utente\b/, { timeout: 15_000 });
     await expect(page.locator('#ownerTotals')).toContainText(/su 50 \$ elargibili/);
     await expect(page.locator('#ownerTotals')).toContainText(/inviti riscattabili rimasti 9/);
     await expect(page.locator('#ownerTotals')).toContainText(new RegExp(`cambio ${String(RATE).replace('.', '[.,]')}`));
