@@ -1611,6 +1611,7 @@
     renderStatsPie(res);
     renderStatsBars(res);
     renderStatsMore(res);
+    insertStatsDrill();
   }
 
   // I click dei controlli e dei riquadri.
