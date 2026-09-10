@@ -239,9 +239,14 @@ export function behindMainNota(behind) {
  * suite-locale), e toccare la pagina delle opzioni non lanciava nessuno dei
  * nove `options-*`. Quindi, se si passa l'elenco degli spec tracciati, si
  * prendono anche quelli il cui nome comincia con l'area seguita da un
- * trattino (e col singolare: `tabs` → `tab-*`). Restano pochi: la mediana è
- * quattro spec per area, il massimo una trentina — minuti, non le quasi
- * sette ore della suite intera sulla macchina di chi sviluppa Filo.
+ * trattino (e col singolare: `tabs` → `tab-*`). L'area la dà sia la cartella
+ * (una pagina, un handler, un servizio con la cartella sua) sia il NOME del
+ * file, in qualunque cartella di src stia: senza il nome, i servizi che stanno
+ * direttamente in src/main/services, gli stili, i preload e lo shim non
+ * lanciavano niente (giro 4 di suite-locale: 36 file con spec e zero scelti).
+ * Restano pochi: la mediana è quattro spec per area, il massimo una trentina —
+ * minuti, non le quasi sette ore della suite intera sulla macchina di chi
+ * sviluppa Filo.
  */
 export function specsForChangedFiles(changed, tracked) {
   const files = Array.isArray(changed) ? changed : [];
