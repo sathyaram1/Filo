@@ -99,5 +99,8 @@ test('il numero grande di «Prober lanciati» risponde al tasto destro come gli 
   }
   console.log('MENU sul numero grande:', JSON.stringify(esito, null, 1));
   // Le quattro tessere sono disegnate identiche: devono rispondere identiche.
-  expect(esito.routine, JSON.stringify(esito)).not.toEqual('');
+  // Il menu generale della pagina — quello che esce anche su uno spazio bianco
+  // — non è una risposta (patterns/un-numero-aggregato-porta-a-cosa-ha-contato).
+  expect(esito.routine, JSON.stringify(esito)).not.toMatch(/Invia feedback|Invia attacco/);
+  expect(esito.routine, JSON.stringify(esito)).toMatch(/Copia/);
 });

@@ -56,7 +56,7 @@ test('traccia visiva della scheda, chiaro e scuro', async ({ openTab }) => {
   await expect(page.locator('#mgStPieLegend li')).not.toHaveCount(0);
 
   await page.screenshot({ path: `${OUT}/496-giro10-chiaro.png`, fullPage: true });
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/496-giro10-scuro.png`, fullPage: true });
 
