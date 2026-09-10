@@ -394,7 +394,12 @@
    *      mai un verbale, per quanto ne citi le parole.
    *   2. UN VERBALE È UNA NOTA INTERA, E UNA NOTA È UN TURNO. Il server lo
    *      appende con SN_FEEDBACK_THREAD.appendModelTurn, quindi comincia alla
-   *      PRIMA riga scritta del turno.
+   *      PRIMA riga scritta del turno e finisce con l'ultimo rilievo.
+   *   3. UN TURNO DI FILO PORTA IL SUO MARCATORE. Il testo prima del primo
+   *      marcatore è la testa del campo note, che dalla dashboard si modifica a
+   *      mano in una casella di testo: lì dentro il verbale si cerca più a
+   *      fondo (una riga scritta a mano può precederlo), ma una riga di sole
+   *      parole non vale come esito se il testo continua oltre.
    *
    * @returns {{rounds:Array<{kind:string, findings:Array}>, passSegnalato:boolean, fermato:boolean}}
    */
