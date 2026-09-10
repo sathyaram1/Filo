@@ -70,11 +70,11 @@ test('fotografie della scheda con dati verosimili', async ({ openTab }) => {
   mkdirSync('tests/.shots', { recursive: true });
   await page.screenshot({ path: 'tests/.shots/496-giro12-chiaro.png', fullPage: true });
 
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
   await page.waitForTimeout(200);
   await page.screenshot({ path: 'tests/.shots/496-giro12-scuro.png', fullPage: true });
 
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'light'));
   await page.setViewportSize({ width: 620, height: 900 });
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'tests/.shots/496-giro12-stretto.png', fullPage: true });
