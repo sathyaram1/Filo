@@ -786,7 +786,7 @@
       ricevuti: {
         total: ricevuti.length,
         perCategoria: CATEGORIES.map((c) => ({ key: c.key, label: c.label, n: perCategoria.get(c.key) || 0 })),
-        timeline: timeline(ricevuti, range, now),
+        timeline: grafico,
         // Quante, fra quelle contate, non hanno una data d'arrivo leggibile:
         // entrano nel totale ma non possono entrare nel grafico, e la pagina
         // lo scrive invece di farle sparire.
