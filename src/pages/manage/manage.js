@@ -1167,8 +1167,9 @@
         + `<span class="mg-st-row-share">${esc(r.share || '')}</span></${r.key ? 'button' : 'div'}>`
       )).join('')
       : `<div class="mg-st-empty">${esc(empty || 'Niente in questa finestra.')}</div>`;
+    const drillTessera = ST_TESSERA_DRILL[id] ? ` data-drill-menu="${esc(ST_TESSERA_DRILL[id])}"` : '';
     return `<div class="mg-st-card" data-card="${esc(id)}">`
-      + `<button type="button" class="mg-st-card-head" data-card-toggle="${esc(id)}" aria-expanded="${aperto}">`
+      + `<button type="button" class="mg-st-card-head" data-card-toggle="${esc(id)}"${drillTessera} aria-expanded="${aperto}">`
       + `<span class="mg-st-card-value">${esc(value)}</span>`
       + `<span class="mg-st-card-label">${esc(label)}</span>`
       + `<span class="mg-st-card-caret">${aperto ? '▾' : '▸'}</span>`
