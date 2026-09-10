@@ -1465,6 +1465,124 @@
     mgStNote.hidden = frasi.length === 0;
   }
 
+  // ── Da un numero alle segnalazioni che ha contato ─────────────────────────
+  // Ogni numero della scheda è una domanda: «in coda: 12» vuol dire "quali
+  // dodici?". Qui si risponde: la riga si apre sull'elenco, e da un elenco si
+  // arriva alla segnalazione vera. Le chiavi sono le stesse che le righe e le
+  // voci di legenda si portano in `data-drill`.
+  let statsDrill = null;   // la chiave aperta, o null
+
+  function statsInsieme() {
+    const sel = { key: statsSel.key, from: statsSel.from, to: statsSel.to };
+    const prov = ST.windowRange(sel, Date.now());
+    const range = prov.valid ? prov : ST.windowRange({ key: 'all' }, Date.now());
+    const scelti = statsCreators.length ? statsCreators : null;
+    const base = (dataLoaded ? allFeedbacks : [])
+      .filter((fb) => !scelti || scelti.includes(ST.creatorOf(fb)));
+    return { range, base };
+  }
+
+  function statsSegnalazioni(key) {
+    if (!ST || !key) return [];
+    const { range, base } = statsInsieme();
+    const [tipo, valore] = String(key).split(':');
+    if (tipo === 'categoria') {
+      return base.filter((fb) => ST.inRange(ST.createdMs(fb), range) && ST.categoryOf(fb) === valore);
+    }
+    if (tipo === 'adesso') {
+      return base.filter(valore === 'coda' ? ST.isQueued : ST.isInProgress);
+    }
+    if (tipo === 'giri') {
+      const lavorati = base.filter((fb) => ST.isWorked(fb) && ST.inRange(ST.movedMs(fb), range));
+      return lavorati.filter((fb) => {
+        if (ST.notesTruncated(fb)) return valore === 'tagliate';
+        const r = ST.loopsBeforePass(fb);
+        if (!r) return valore === 'senza';
+        if (valore === 'ferme') return !r.passata;
+        if (!r.passata) return false;
+        if (valore === '1+') return r.giri > 0;
+        return String(r.giri) === valore;
+      });
+    }
+    return [];
+  }
+
+  // In quale scheda-lista vive questa segnalazione: serve per portarcisi.
+  function statsTabDi(fb) {
+    for (const tab of ['inbox', 'queue', 'resolved', 'archived']) {
+      try {
+        const lista = tab === 'archived'
+          ? MR.listArchiveTab([fb], {})
+          : MR.listForManageTab([fb], tab, { releasedVersion });
+        if (lista && lista.length) return tab;
+      } catch (_) { /* la prossima */ }
+    }
+    return 'inbox';
+  }
+
+  function statsVaiA(fb) {
+    if (!fb || !fb._id) return;
+    selectTab(statsTabDi(fb));
+    openDetail(fb._id);
+    setTimeout(() => {
+      const card = mgList && mgList.querySelector(`.mg-item[data-id="${cssSel(fb._id)}"]`);
+      if (card) { try { card.scrollIntoView({ block: 'center' }); } catch (_) {} }
+    }, 0);
+  }
+
+  // Il tetto: un elenco lunghissimo si taglia, ma DICENDOLO e dicendo quanti
+  // ne restano (CLAUDE.md § Limiti: mai un troncamento muto).
+  const ST_DRILL_MAX = 200;
+
+  function insertStatsDrill() {
+    document.querySelectorAll('#panel-fbstats .mg-st-drill').forEach((el) => el.remove());
+    document.querySelectorAll('#panel-fbstats [data-drill]').forEach((el) => {
+      el.setAttribute('aria-expanded', el.dataset.drill === statsDrill ? 'true' : 'false');
+    });
+    if (!statsDrill) return;
+    const ancora = document.querySelector(`#panel-fbstats [data-drill="${cssSel(statsDrill)}"]`);
+    if (!ancora) { statsDrill = null; return; }
+    const lista = statsSegnalazioni(statsDrill);
+    const box = document.createElement('div');
+    box.className = 'mg-st-drill';
+    if (!lista.length) {
+      const p = document.createElement('div');
+      p.className = 'mg-st-empty';
+      p.textContent = 'Nessuna segnalazione dietro questo numero.';
+      box.appendChild(p);
+    } else {
+      for (const fb of lista.slice(0, ST_DRILL_MAX)) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'mg-st-drill-item';
+        b.textContent = `#${fb.seq || '?'}${fb.subSeq ? `.${fb.subSeq}` : ''} · ${statsTitolo(fb)}`;
+        b.title = 'Apri la segnalazione';
+        b.addEventListener('click', () => statsVaiA(fb));
+        box.appendChild(b);
+      }
+      if (lista.length > ST_DRILL_MAX) {
+        const p = document.createElement('div');
+        p.className = 'mg-st-empty';
+        p.textContent = `e altre ${lista.length - ST_DRILL_MAX}: restringi la finestra per aprirle.`;
+        box.appendChild(p);
+      }
+    }
+    // Sotto la riga (o sotto la voce di legenda), dove ci si aspetta.
+    const dopo = ancora.closest('li') || ancora;
+    dopo.insertAdjacentElement('afterend', box);
+  }
+
+  function statsTitolo(fb) {
+    const t = String((fb && (fb.name || fb.text)) || '').replace(/\s+/g, ' ').trim();
+    if (!t) return 'senza testo';
+    return t.length > 70 ? `${t.slice(0, 69)}…` : t;
+  }
+
+  function toggleStatsDrill(key) {
+    statsDrill = statsDrill === key ? null : key;
+    insertStatsDrill();
+  }
+
   function renderStats() {
     if (!ST || !mgStCards) return;
     // La finestra personalizzata scritta a metà non deve azzerare la pagina: si
