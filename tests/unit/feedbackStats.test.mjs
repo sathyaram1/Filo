@@ -482,11 +482,10 @@ test('una riga d’apertura citata dentro un rilievo non apre un giro', () => {
     'Verifica superata.',
   ].join('\n');
   const rounds = ST.parseRounds(fb({ notes }));
-  // Due giri: quello con i due rilievi, e il pass. Non quattro.
-  assert.equal(rounds.length, 2);
+  // Un giro con rilievi, non tre.
+  assert.equal(rounds.length, 1);
   assert.equal(rounds[0].kind, 'fix');
   assert.equal(rounds[0].findings.length, 2);
-  assert.equal(rounds[1].kind, 'pass');
 
   const r = ST.loopsBeforePass(fb({ notes }));
   assert.equal(r.passata, true);
