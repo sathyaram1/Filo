@@ -1055,10 +1055,13 @@
   // le due fette diventavano un unico spicchio. Adesso si scalda e basta: dal
   // verde al rosso scuro, e i giri oltre il fondo scala restano distinti
   // scurendosi ancora.
-  const ST_PIE_COLORS = ['#3bbf7a', '#a8b544', '#c9a13b', '#d1741f', '#c0392b', '#8f2119'];
+  // Fra il verde di «passata subito» e il giallo di «1 critica» il salto è
+  // largo apposta: sono le due fette che stanno sempre vicine, e sono anche la
+  // distinzione che conta di più.
+  const ST_PIE_COLORS = ['#3bbf7a', '#d4b13a', '#dd8427', '#c9432c', '#a02718', '#6d1811'];
   // Oltre l'ultimo colore la scala non si ripete: si continua a scurire, così
   // due code diverse restano due fette diverse.
-  const ST_PIE_CODA = ['#6d1811', '#4d100b', '#330906'];
+  const ST_PIE_CODA = ['#4d100b', '#330906', '#1f0503'];
   const stPieColor = (giri) => {
     const n = Math.max(0, giri | 0);
     if (n < ST_PIE_COLORS.length) return ST_PIE_COLORS[n];
