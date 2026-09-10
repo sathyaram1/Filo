@@ -1477,24 +1477,33 @@
     const rilievi = g.perLivello;
     const leggibile = res.statiLeggibili && res.datiPronti;
     const registro = !workerLogMissing && workerLogEntries !== null;
+    // La terza colonna è la CHIAVE delle segnalazioni che quel numero ha
+    // contato: le righe che ce l'hanno si aprono sull'elenco come tutte le
+    // altre della scheda. Le righe che contano altro (durate, livelli,
+    // partenze) non si aprono, ma il tasto destro le copia lo stesso: un
+    // numero da cui non si può portare via niente è metà risposta.
     const righe = [
-      ['Tempo mediano dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMediano) : '—'],
-      ['Tempo medio dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMedio) : '—'],
-      ['Giri di verifica registrati', leggibile ? String(g.giriTotali) : '—'],
-      ['Rilievi per livello (3 · 2 · 1 · 0)', leggibile ? `${rilievi[3]} · ${rilievi[2]} · ${rilievi[1]} · ${rilievi[0]}` : '—'],
+      ['Tempo mediano dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMediano) : '—', 'misura:lavorate'],
+      ['Tempo medio dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMedio) : '—', 'misura:lavorate'],
+      ['Giri di verifica registrati', leggibile ? String(g.giriTotali) : '—', 'misura:congiri'],
+      ['Rilievi per livello (3 · 2 · 1 · 0)', leggibile ? `${rilievi[3]} · ${rilievi[2]} · ${rilievi[1]} · ${rilievi[0]}` : '—', ''],
       ['Segnalazioni fermate dai giudici (attacchi + spam)', (() => {
         if (!leggibile) return '—';
         const per = Object.fromEntries(res.ricevuti.perCategoria.map((c) => [c.key, c.n]));
         const bloccate = (per.attacco || 0) + (per.spam || 0);
         const q = statsPercent(bloccate, res.ricevuti.total);
         return q ? `${bloccate} · ${q}` : String(bloccate);
-      })()],
-      ['Partenze delle routine, tutti i ruoli', registro ? statsNum(res.routine.total, res.routine.parziale) : '—'],
+      })(), 'misura:bloccate'],
+      ['Partenze delle routine, tutti i ruoli', registro ? statsNum(res.routine.total, res.routine.parziale) : '—', ''],
     ];
-    mgStMore.innerHTML = righe.map(([label, value]) => (
-      `<li><span class="mg-st-more-label">${esc(label)}</span>`
-      + `<span class="mg-st-more-value">${esc(value)}</span></li>`
-    )).join('');
+    mgStMore.innerHTML = righe.map(([label, value, key]) => {
+      const apre = !!key && value !== '—';
+      const dentro = `<span class="mg-st-more-label">${esc(label)}</span>`
+        + `<span class="mg-st-more-value">${esc(value)}</span>`;
+      return apre
+        ? `<li><button type="button" class="mg-st-more-riga mg-st-more-riga--apre" data-drill="${esc(key)}" aria-expanded="false">${dentro}</button></li>`
+        : `<li><div class="mg-st-more-riga" data-copia="1">${dentro}</div></li>`;
+    }).join('');
   }
 
   // ── Le frasi che dicono cosa questi numeri non possono dire ───────────────
