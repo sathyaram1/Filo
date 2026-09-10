@@ -1794,8 +1794,19 @@
     return t.length > 70 ? `${t.slice(0, 69)}…` : t;
   }
 
-  function toggleStatsDrill(key) {
+  // Le superfici che possono ospitare l'elenco: la zona è quella in cui
+  // l'utente ha chiesto «quali?».
+  const ST_ZONE = '#mgStCards, #mgStPieLegend, #mgStMore, #mgStCreators';
+  function statsZonaDi(el) {
+    // Una fetta di torta non ospita elenchi: la sua casa è la voce di legenda
+    // gemella, che dice la stessa cosa.
+    if (el && el.closest && el.closest('#mgStPie')) return '#mgStPieLegend';
+    const zona = el && el.closest ? el.closest(ST_ZONE) : null;
+    return zona && zona.id ? `#${zona.id}` : '';
+  }
+  function toggleStatsDrill(key, zona) {
     statsDrill = statsDrill === key ? null : key;
+    statsDrillZona = statsDrill ? (zona || '') : '';
     insertStatsDrill();
   }
 
