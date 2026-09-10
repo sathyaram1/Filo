@@ -25,6 +25,8 @@ function verbale(riassunto) {
     '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---',
     'Corretto.',
     '',
+    // Il pass è una nota a sé, quindi un turno a sé: è così che Filo la scrive.
+    '--- Aggiornamento dell\'agente del 01/09/2026, 18:00 ---',
     'Verifica superata.',
   ].join('\n');
 }
