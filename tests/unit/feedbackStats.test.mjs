@@ -344,20 +344,25 @@ test('formatDuration: come lo direbbe una persona', () => {
 
 const TRIM = globalThis.SN_FEEDBACK_THREAD.TRIM_MARK;
 
-// Un verbale come lo scrive il server: `n` critiche, poi il pass.
+// Una conversazione come la scrive il server: `n` critiche, poi il pass. Ogni
+// nota è un turno suo, col suo marcatore: è così che Filo le appende.
 function verbale(n) {
+  let t = 0;
+  const turno = () => `--- Aggiornamento dell'agente del 07/09/2026, ${++t} ---`;
   const b = [];
   for (let i = 0; i < n; i += 1) {
+    if (i) b.push(turno());
     b.push(
       'Verifica: 1 rilievo.',
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
       '- [1] Un rilievo qualunque',
       '',
-      `--- Aggiornamento dell'agente del 0${i + 1}/09/2026, 10:00 ---`,
+      turno(),
       'Corretto.',
       '',
     );
   }
+  if (n) b.push(turno());
   b.push('Verifica superata.');
   return b.join('\n');
 }
