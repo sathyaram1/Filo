@@ -118,8 +118,13 @@
     return { key: w.key, label: w.label, from: t - w.ms, to: t, valid: true };
   }
 
+  // Una data che non si legge non appartiene a nessun periodo — ma «Sempre» non
+  // è un periodo: è "tutto quello che c'è". Escluderla anche da lì vuol dire
+  // scrivere un numero più piccolo del vero in una finestra che promette il
+  // contrario. Le finestre con un estremo, invece, la lasciano fuori davvero, e
+  // `compute` ritorna quante ne ha lasciate fuori perché la pagina lo dica.
   function inRange(ms, range) {
-    if (!Number.isFinite(ms)) return false;
+    if (!Number.isFinite(ms)) return range.from === null && range.to === null;
     if (range.from !== null && ms < range.from) return false;
     if (range.to !== null && ms > range.to) return false;
     return true;
