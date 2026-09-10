@@ -221,10 +221,14 @@ test('parseRounds: distingue "il lavoro si ferma" da "i rilievi vanno in un feed
   assert.equal(ST.parseRounds({ notes: NOTE_RIMANDATI })[0].kind, 'rimandati');
 });
 
-test('parseRounds: capisce anche i verbali vecchi (pass / fail / migliorabile)', () => {
-  assert.equal(ST.parseRounds({ notes: 'Controllo funzionalità superato.' })[0].kind, 'pass');
-  assert.equal(ST.parseRounds({ notes: 'Controllo funzionalità NON superato: non compare.' })[0].kind, 'stop');
-  assert.equal(ST.parseRounds({ notes: 'Verifica: funziona, ma migliorabile — manca l\'hover.' })[0].kind, 'rimandati');
+test('readRounds: capisce anche i verbali vecchi (pass / fail / migliorabile)', () => {
+  const vecchio = (notes) => ST.readRounds({ notes });
+  assert.equal(vecchio('Controllo funzionalità superato.').passSegnalato, true);
+  assert.equal(vecchio('Controllo funzionalità NON superato: non compare.').fermato, true);
+  assert.equal(vecchio('Verifica: funziona, ma migliorabile — manca l\'hover.').passSegnalato, true);
+  // La punteggiatura fa parte della forma: senza, la frase è qualcuno che la
+  // cita raccontando il giro prima.
+  assert.equal(vecchio('Controllo funzionalità NON superato era il verdetto del giro scorso.').fermato, false);
 });
 
 test('parseRounds: un livello scritto nel report di chi ha lavorato non diventa un rilievo della verifica', () => {
@@ -234,9 +238,8 @@ test('parseRounds: un livello scritto nel report di chi ha lavorato non diventa 
     '--- Aggiornamento dell\'agente del 07/09/2026, 10:00 ---',
     '- [2] questo è un elenco del report, non un rilievo',
   ].join('\n');
-  const rounds = ST.parseRounds({ notes });
-  assert.equal(rounds.length, 1);
-  assert.equal(rounds[0].findings.length, 0);
+  assert.deepEqual(ST.parseRounds({ notes }), []);
+  assert.equal(ST.loopsBeforePass({ notes }).giri, 0);
 });
 
 test('parseRounds: note assenti o cifrate → nessun giro (non uno zero inventato)', () => {
