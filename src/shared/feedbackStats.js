@@ -293,7 +293,10 @@
       const parsed = VR().parseFindings(testo);
       let kind = current.kind;
       if (!kind) {
-        const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(testo));
+        // Solo la testa: dalla riga d'apertura al primo rilievo.
+        const fine = current.lines.findIndex((l) => FINDING_LINE.test(l));
+        const testa = fine < 0 ? current.lines : current.lines.slice(0, fine);
+        const phrase = ROUND_OUTCOME_PHRASES.find((p) => testa.some((l) => p.re.test(l)));
         if (phrase) kind = phrase.kind;
         else {
           // Verbale senza la frase d'esito (storico, o testo modificato a mano):
