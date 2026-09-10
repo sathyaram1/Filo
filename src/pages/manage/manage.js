@@ -1268,11 +1268,15 @@
       statsMostra(mgStPie, false);
       const li = document.createElement('li');
       li.className = 'mg-st-empty';
-      li.textContent = !res.statiLeggibili
-        ? ST_SENZA_STATO
-        : (res.giri.senzaDati
-          ? 'Nessuna lavorazione con un verbale di verifica leggibile in questa finestra.'
-          : 'Nessuna lavorazione chiusa in questa finestra.');
+      li.textContent = !res.datiPronti
+        ? ST_SENZA_DATI
+        : (!res.statiLeggibili
+          ? ST_SENZA_STATO
+          : (res.giri.tagliate
+            ? 'Nessun giro contabile in questa finestra: le lavorazioni che ci sono hanno la conversazione tagliata perché troppo lunga.'
+            : (res.giri.senzaDati
+              ? 'Nessuna lavorazione con un verbale di verifica leggibile in questa finestra.'
+              : 'Nessuna lavorazione chiusa in questa finestra.')));
       mgStPieLegend.appendChild(li);
     } else {
       statsMostra(mgStPie, true);
