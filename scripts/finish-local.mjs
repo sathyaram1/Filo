@@ -215,7 +215,8 @@ export function specsForChangedFiles(changed) {
   const specs = new Set();
   for (const f of files) {
     // Uno spec che porta il nome della cosa toccata è il candidato ovvio;
-    // meglio pochi mirati che l'intera suite (~25 minuti).
+    // meglio pochi mirati che l'intera suite (quasi sette ore sulla macchina
+    // di chi sviluppa Filo, con un solo worker; più di mezz'ora in cloud).
     const m = f.match(/^src\/pages\/([^/]+)\//);
     if (m) specs.add(`tests/${m[1]}`);
     const p = f.match(/^src\/(?:shared|content|renderer|main)\/([^/.]+)/);
