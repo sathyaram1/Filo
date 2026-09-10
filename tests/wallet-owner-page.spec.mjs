@@ -57,7 +57,9 @@ test.beforeAll(async () => {
       if (url === '/walletCreateInvites') {
         seen.invites.push(body.data);
         const n = Number(body.data && body.data.count) || 0;
-        return json(res, 200, { result: { codes: Array.from({ length: n }, (_, i) => `CODE-${String(i).padStart(4, '0')}`) } });
+        const codes = Array.from({ length: n }, (_, i) => `CODE-${String(seen.codes.length + i).padStart(4, '0')}`);
+        seen.codes.push(...codes);
+        return json(res, 200, { result: { codes } });
       }
       if (url === '/walletGrant') {
         seen.grants.push(body.data);
