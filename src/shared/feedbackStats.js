@@ -626,6 +626,15 @@
         total: ricevuti.length,
         perCategoria: CATEGORIES.map((c) => ({ key: c.key, label: c.label, n: perCategoria.get(c.key) || 0 })),
         timeline: timeline(ricevuti, range, now),
+        // Quante, fra quelle contate, non hanno una data d'arrivo leggibile:
+        // entrano nel totale ma non possono entrare nel grafico, e la pagina
+        // lo scrive invece di farle sparire.
+        senzaData: ricevuti.filter((fb) => !Number.isFinite(createdMs(fb))).length,
+        // Quante ne ha lasciate fuori la finestra perché la loro data non si
+        // legge (con «Sempre» è sempre zero: lì non si lascia fuori nessuno).
+        escluseSenzaData: (range.from === null && range.to === null)
+          ? 0
+          : daFiltro.filter((fb) => !Number.isFinite(createdMs(fb))).length,
       },
       lavorati: {
         total: lavorati.length,
