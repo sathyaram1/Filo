@@ -464,15 +464,16 @@
         conRilievi = verbaleConRilievi(corpo);
       }
       if (conRilievi) {
-        // Lo stesso verbale, riga per riga, il server non lo scrive due volte:
-        // la copia è di chi lo cita.
+        // Il verbale appena letto, ripetuto riga per riga nel turno dopo: è chi
+        // corregge che riporta quello a cui sta rispondendo.
         const impronta = blocco.join('\n').trim();
-        if (verbaliVisti.has(impronta)) continue;
-        verbaliVisti.add(impronta);
+        if (impronta && impronta === verbalePrecedente) continue;
+        verbalePrecedente = impronta;
         rounds.push(conRilievi);
         if (conRilievi.kind === 'stop') fermato = true;
         continue;
       }
+      verbalePrecedente = '';
       // Una riga di sole parole vale come esito solo se è tutto quello che c'è
       // nella testa scritta a mano: «Verifica superata. Ho guardato io» seguita
       // da altro è una nota, non il verbale che Filo appende da solo.
