@@ -117,7 +117,7 @@ main. Così le pagine girano quasi invariate.
 - [x] Hotkey globali (Alt+E/T/S/H; su Mac Ctrl+Alt, perché Alt da solo è il tasto degli accenti)
 - [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
 - [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
-- [x] Test Playwright adattati a `_electron.launch` (~100 spec)
+- [x] Test Playwright adattati a `_electron.launch` (~390 spec, ~1.600 casi)
 - [x] Auto-update (electron-builder/NSIS, vedi `src/main/updater.js`)
 - [x] Packaging Windows (NSIS) e Mac (dmg universale, Intel + Apple Silicon); Linux non previsto per ora
 
@@ -126,11 +126,14 @@ main. Così le pagine girano quasi invariate.
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~100 spec, ~25 min — solo in cloud)
+npm test               # suite Playwright completa (~390 spec, ~1.600 casi): solo nel cancello del server e nelle routine
+npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 
-In locale NON lanciare la suite completa: usa gli spec mirati della feature
-toccata (`npx playwright test tests/<feature>.spec.mjs`). Vedi CLAUDE.md.
+In locale NON lanciare la suite completa: sulla macchina di chi sviluppa Filo
+dura quasi sette ore con un solo worker. Si lancia `npm run finish:check`, più
+lo spec mirato della feature toccata (`npx playwright test
+tests/<feature>.spec.mjs`). Vedi CLAUDE.md § Verifica.
 
 ## Sviluppo
 

@@ -197,10 +197,19 @@ export function resolveDiffBase({ fetchOk, remoteRefOk }) {
  * fusione scoperto dopo 15 minuti di spec, o dopo l'approvazione dell'owner,
  * costa un giro intero; scoperto adesso costa cinque secondi. Un conteggio
  * illeggibile non blocca: la guardia non inventa conflitti.
+ *
+ * Con `--check` non si ferma: nessuna fusione segue, quindi non c'è un
+ * conflitto da scoprire in anticipo — e chi verifica in locale ha proprio
+ * quel comando al posto della suite intera; fermarlo mentre la linea
+ * principale si muove (succede ogni giorno, con le fusioni del server) lo
+ * mandava a far ripartire la verifica che era già in corso (giro 3 di
+ * suite-locale). Il ramo indietro si dice comunque, come nota:
+ * `behindMainNota`.
  */
-export function behindMainStop(behind) {
+export function behindMainStop(behind, { checkOnly = false } = {}) {
   const n = Number(behind);
   if (!Number.isFinite(n) || n <= 0) return '';
+  if (checkOnly) return '';
   return [
     `Il ramo è indietro di ${n} commit rispetto alla linea principale: chiedere la fusione così`,
     'finisce in conflitto alla fine, a controlli già pagati.',
@@ -209,18 +218,97 @@ export function behindMainStop(behind) {
   ].join('\n');
 }
 
-/** Gli spec Playwright che toccano le aree modificate dal branch. Puro. */
-export function specsForChangedFiles(changed) {
+/** La stessa informazione, quando non ferma (`--check`). '' = ramo pari. PURA. */
+export function behindMainNota(behind) {
+  const n = Number(behind);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return [
+    `▸ Il ramo è indietro di ${n} commit rispetto alla linea principale. Coi soli controlli non importa`,
+    '  (nessuna fusione segue); `npm run finish` invece si fermerebbe qui. Lo riallinea la prossima',
+    '  verifica in partenza (node scripts/verify-local.mjs start).',
+  ].join('\n');
+}
+
+/**
+ * Gli spec Playwright che toccano le aree modificate dal branch. Puro.
+ *
+ * Gli spec della suite portano il nome di una FUNZIONALITÀ, non di un modulo:
+ * `tab-archive`, `options-default-models`, `feedback-attach-files`. Uno spec
+ * col nome intero dell'area (`tests/tabs`, `tests/options`) quasi mai esiste:
+ * col solo nome intero, 12 file sorgente su 254 trovavano uno spec (giro 3 di
+ * suite-locale), e toccare la pagina delle opzioni non lanciava nessuno dei
+ * nove `options-*`. Quindi, se si passa l'elenco degli spec tracciati, si
+ * prendono anche quelli il cui nome comincia con l'area seguita da un
+ * trattino (e col singolare: `tabs` → `tab-*`). L'area la dà sia la cartella
+ * (una pagina, un handler, un servizio con la cartella sua) sia il NOME del
+ * file, in qualunque cartella di src stia: senza il nome, i servizi che stanno
+ * direttamente in src/main/services, gli stili, i preload e lo shim non
+ * lanciavano niente (giro 4 di suite-locale: 36 file con spec e zero scelti).
+ * Restano pochi: la mediana è quattro spec per area, il massimo una trentina —
+ * minuti, non le quasi sette ore della suite intera sulla macchina di chi
+ * sviluppa Filo.
+ */
+export function specsForChangedFiles(changed, tracked) {
   const files = Array.isArray(changed) ? changed : [];
   const specs = new Set();
+  // Le aree toccate, nella forma in cui uno spec le nomina: minuscolo
+  // (`translatepage`), a trattini (`translate-page`) e la prima parola di un
+  // nome composto (`editorNotes` → `editor`: le note dell'Editor le provano
+  // gli spec `editor-*`). L'esatto per nome (`tests/<area>`) vale sempre;
+  // i prefissi solo con l'elenco degli spec tracciati.
+  const esatte = new Set();
+  const aree = new Set();
+  const aggiungi = (nome) => {
+    const grezzo = String(nome || '');
+    if (!grezzo) return;
+    esatte.add(grezzo.toLowerCase());
+    aree.add(grezzo.toLowerCase());
+    const kebab = grezzo.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+    aree.add(kebab);
+    const prima = kebab.split('-')[0];
+    if (prima !== kebab && prima.length >= 4) aree.add(prima);
+  };
   for (const f of files) {
-    // Uno spec che porta il nome della cosa toccata è il candidato ovvio;
-    // meglio pochi mirati che l'intera suite (~25 minuti).
     const m = f.match(/^src\/pages\/([^/]+)\//);
-    if (m) specs.add(`tests/${m[1]}`);
+    if (m) aggiungi(m[1]);
     const p = f.match(/^src\/(?:shared|content|renderer|main)\/([^/.]+)/);
-    if (p) specs.add(`tests/${p[1].toLowerCase()}`);
+    if (p) aggiungi(p[1]);
+    // Un handler, un provider o un servizio in una cartella sua ha un nome
+    // suo (chat, downloads, safebrowse…): vale come area.
+    const h = f.match(/^src\/main\/services\/(?:handlers|providers)\/([^/.]+)/);
+    if (h) aggiungi(h[1]);
+    const d = f.match(/^src\/main\/services\/([^/.]+)\//);
+    if (d && !['handlers', 'providers'].includes(d[1])) aggiungi(d[1]);
+    // Il NOME del file, in qualunque cartella di src stia: i servizi che
+    // stanno direttamente in src/main/services (adblock, cookies, downloads,
+    // terminal, geoBlock…), i fogli di stile, i preload, lo shim di chrome, la
+    // config. Le regole per cartella qui sopra li saltavano tutti, e 19 dei 39
+    // servizi non lanciavano niente pur avendo uno spec col loro stesso nome
+    // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
+    const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
+    if (n) aggiungi(n[1]);
     if (f.startsWith('tests/') && f.endsWith('.spec.mjs')) specs.add(f.replace(/\.spec\.mjs$/, ''));
+  }
+  const elenco = Array.isArray(tracked) ? tracked : [];
+  const tracciati = new Set(elenco.map((t) => String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '')));
+  // Senza elenco si risponde per nome (chi chiama filtra); con l'elenco si
+  // rispondono solo spec che esistono davvero.
+  for (const area of esatte) if (!elenco.length || tracciati.has(`tests/${area}`)) specs.add(`tests/${area}`);
+  if (elenco.length && aree.size) {
+    const prefissi = new Set();
+    for (const area of aree) {
+      if (tracciati.has(`tests/${area}`)) specs.add(`tests/${area}`);
+      prefissi.add(`${area}-`);
+      prefissi.add(`${area}s-`);
+      const singolare = area.replace(/s$/, '');
+      if (singolare.length >= 3 && singolare !== area) prefissi.add(`${singolare}-`);
+    }
+    for (const t of elenco) {
+      const b = String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '');
+      const nome = b.replace(/^tests\//, '');
+      if (nome.includes('/')) continue; // le prove dei giri (tests/verifica/…) si lanciano per numero
+      if ([...prefissi].some((p) => nome.startsWith(p))) specs.add(b);
+    }
   }
   return [...specs];
 }
@@ -239,6 +327,27 @@ export function splitKnownRed(specs, known) {
   const informative = [];
   for (const s of specs || []) (set.has(s) ? informative : blocking).push(s);
   return { blocking, informative };
+}
+
+/**
+ * Cosa fa `--check` della verifica indipendente. PURA.
+ *
+ * `--check` promette «i controlli e basta»: unit test e spec mirati. Chi lo
+ * lancia è spesso proprio l'istanza che sta verificando (la ricetta del
+ * verificatore glielo indica al posto della suite intera), e per lei la
+ * verifica non può che risultare «avviata senza esito»: è la sua. Farla finire
+ * in rosso con «Non pubblico» — dopo controlli tutti verdi — diceva il falso a
+ * chi leggeva. Con `--check` l'esito della verifica si STAMPA come nota e non
+ * ferma; senza `--check` resta il cancello di sempre: senza verifica superata
+ * non si chiede la fusione.
+ */
+export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
+  if (ok) return { ferma: false, nota: '' };
+  if (!checkOnly) return { ferma: true, nota: '' };
+  return {
+    ferma: false,
+    nota: `▸ Verifica indipendente: ${reason || 'non ancora superata'}\n  (--check controlla solo unit test e spec: la verifica serve a \`npm run finish\`, non qui)`,
+  };
 }
 
 function readKnownRed(root) {
@@ -324,8 +433,10 @@ async function main() {
 
   {
     const behind = Number(git(['rev-list', '--count', `HEAD..${base}`]).out);
-    const stop = behindMainStop(behind);
+    const stop = behindMainStop(behind, { checkOnly });
     if (stop) { console.error(`\n${stop}`); process.exit(1); }
+    const nota = checkOnly ? behindMainNota(behind) : '';
+    if (nota) console.log(`\n${nota}`);
   }
 
   {
@@ -341,7 +452,7 @@ async function main() {
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
     if (blocking.length) {
       const args = ['playwright', 'test', ...blocking.map((s) => `${s}.spec.mjs`)];
@@ -371,7 +482,9 @@ async function main() {
   //    questo passaggio c'è da sempre; qui mancava, e si pubblicava senza.
   {
     const v = verdictForCurrentBranch(ROOT);
-    if (!v.ok) {
+    const esito = esitoVerificaPerCheck({ checkOnly, ok: v.ok, reason: v.reason });
+    if (esito.nota) console.log(`\n${esito.nota}`);
+    if (esito.ferma) {
       console.error(`\n✗ Verifica mancante o non superata: ${v.reason}`);
       console.error('  Non pubblico. Per farla partire:');
       console.error('    node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"');
@@ -382,7 +495,7 @@ async function main() {
       console.error('  argomenti).');
       process.exit(1);
     }
-    console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
+    if (v.ok) console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
   }
 
   if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }

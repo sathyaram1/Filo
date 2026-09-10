@@ -44,7 +44,9 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza
   workers: 1,
-  // La suite lancia+chiude Electron ~465 volte in serie (~11 min). Sotto questo
+  // La suite lancia+chiude Electron centinaia di volte in serie (~1.600 casi in
+  // ~390 spec: più di mezz'ora in cloud, quasi sette ore sulla macchina di chi
+  // sviluppa Filo, con un solo worker). Sotto questo
   // carico prolungato, una manciata di spec sensibili al timing falliscono in
   // modo NON deterministico (stile computato non ancora applicato, page chiusa
   // durante un evaluate, suggestion spellcheck lente): ogni spec passa quando

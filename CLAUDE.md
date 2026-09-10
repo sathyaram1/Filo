@@ -244,9 +244,13 @@ modifica:
   rosso fuori dalla lista dei rossi noti torna a chi risolve con l'elenco
   degli spec rotti. Le regressioni restano responsabilità di chi le
   introduce: i minimi qui sopra (unit + spec mirato) valgono sempre;
-- **in locale** → la suite completa solo per modifiche trasversali o se non
-  sai cosa tocchi (~25 min: avvisa l'owner, gli occupi la macchina). Se temi
-  una regressione precisa, verificala subito: non rimandarla.
+- **in locale** → la suite completa NON si lancia (decisione owner
+  2026-09-10): sulla sua macchina dura quasi sette ore con un solo worker e i
+  rossi che trova sono quelli già scritti nei rossi noti. Si lancia
+  `npm run finish:check`: unit test più gli spec delle aree toccate dal ramo
+  (è lo stesso controllo del cancello di `npm run finish`). Vale anche per
+  chi verifica in locale. Se temi una regressione precisa altrove, lancia
+  quello spec: non rimandarla, e non lanciare tutto per trovarla.
 
 **Prima di consegnare, la verifica te la fai tu.** Vale nelle routine e in
 locale: da tutte e due le parti il lavoro passa poi da una verifica
@@ -343,7 +347,9 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~100 spec, ~25 min)
+npm test                   # SUITE COMPLETA (~390 spec, ~1.600 casi): solo nel cancello del server e nelle routine.
+                           # Sulla macchina dell'owner dura ~7 ore: in locale NON si lancia (vedi § Verifica).
+npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 
 FILO_TEST_SCALE=1.25 npx playwright test tests/<spec>.spec.mjs   # schermo al 125%

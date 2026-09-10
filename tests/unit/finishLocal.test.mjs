@@ -22,7 +22,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SORGENTE = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
@@ -48,6 +48,73 @@ describe('quali spec lanciare', () => {
   test('lista vuota o non valida non esplode', () => {
     assert.deepEqual(specsForChangedFiles([]), []);
     assert.deepEqual(specsForChangedFiles(null), []);
+  });
+
+  // Gli spec portano il nome di una funzionalità (`tab-archive`), non del
+  // modulo (`tabs`): col solo nome intero 12 file sorgente su 254 trovavano
+  // uno spec, e toccare le opzioni non lanciava nessun `options-*` (giro 3 di
+  // suite-locale).
+  describe('con l’elenco degli spec tracciati si prendono anche quelli dell’area (nome-trattino)', () => {
+    const tracked = [
+      'tests/options.spec.mjs',
+      'tests/options-default-models.spec.mjs',
+      'tests/options-model-chain.spec.mjs',
+      'tests/optionsx.spec.mjs',
+      'tests/tab-archive.spec.mjs',
+      'tests/tabs-bar.spec.mjs',
+      'tests/table-view.spec.mjs',
+      'tests/verifica/locale-suite-locale/giro1-x.spec.mjs',
+      'tests/editor-chat.spec.mjs',
+      'tests/adblock.spec.mjs',
+      'tests/downloads-page.spec.mjs',
+      'tests/download-image.spec.mjs',
+      'tests/geo-block-rules.spec.mjs',
+      'tests/popup-pose.spec.mjs',
+    ];
+
+    // Giro 4 di suite-locale: le regole per cartella saltavano i servizi che
+    // stanno direttamente in src/main/services, gli stili, i preload e lo shim:
+    // 19 dei 39 servizi non lanciavano niente pur avendo uno spec col loro nome.
+    test('un servizio senza cartella sua trova lo spec col suo stesso nome e la sua famiglia', () => {
+      assert.ok(specsForChangedFiles(['src/main/services/adblock.js'], tracked).includes('tests/adblock'));
+      const out = specsForChangedFiles(['src/main/services/downloads.js'], tracked);
+      assert.deepEqual(out.sort(), ['tests/download-image', 'tests/downloads-page']);
+      const geo = specsForChangedFiles(['src/main/services/geoBlock.js'], tracked);
+      assert.deepEqual(geo, ['tests/geo-block-rules']);
+    });
+
+    test('uno stile, un preload o lo shim valgono come area col nome del file', () => {
+      assert.deepEqual(specsForChangedFiles(['src/styles/popup.css'], tracked), ['tests/popup-pose']);
+      assert.deepEqual(specsForChangedFiles(['src/preload/popup-preload.js'], tracked), ['tests/popup-pose']);
+      assert.deepEqual(specsForChangedFiles(['src/main/shim/tabs-shim.js'], tracked).sort(), ['tests/tab-archive', 'tests/tabs-bar']);
+    });
+
+    test('una pagina toccata porta i suoi spec per prefisso, e niente di simile per caso', () => {
+      const out = specsForChangedFiles(['src/pages/options/options.js'], tracked);
+      assert.deepEqual(out.sort(), ['tests/options', 'tests/options-default-models', 'tests/options-model-chain']);
+    });
+
+    test('un modulo al plurale trova gli spec al singolare (tabs → tab-*), non i falsi amici (table-*)', () => {
+      const out = specsForChangedFiles(['src/main/tabs.js'], tracked);
+      assert.deepEqual(out.sort(), ['tests/tab-archive', 'tests/tabs-bar']);
+    });
+
+    test('un handler ha un nome suo e vale come area', () => {
+      const out = specsForChangedFiles(['src/main/services/handlers/editor.js'], tracked);
+      assert.ok(out.includes('tests/editor-chat'), out.join(','));
+    });
+
+    test('le prove dei giri (tests/verifica) non entrano per prefisso, e con l’elenco non si inventano nomi', () => {
+      assert.deepEqual(specsForChangedFiles(['src/pages/giro1/giro1.js'], tracked), []);
+    });
+
+    test('senza l’elenco il comportamento resta quello di prima', () => {
+      assert.deepEqual(specsForChangedFiles(['src/pages/options/options.js']), ['tests/options']);
+    });
+
+    test('la chiamata vera passa l’elenco degli spec tracciati', () => {
+      assert.match(SORGENTE, /specsForChangedFiles\(changed, \[\.\.\.tracked\]\)/);
+    });
   });
 });
 
@@ -99,6 +166,21 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
     assert.equal(behindMainStop(NaN), '');
     assert.equal(behindMainStop('fatal: qualcosa'), '');
     assert.equal(behindMainStop(undefined), '');
+  });
+
+  // Con `--check` nessuna fusione segue: non c'è un conflitto da scoprire in
+  // anticipo, e chi verifica in locale ha quel comando al posto della suite.
+  // Fermarlo mentre la linea principale si muove lo mandava a far ripartire
+  // la verifica già in corso (giro 3 di suite-locale).
+  test('con --check il ramo indietro non ferma: diventa una nota', () => {
+    assert.equal(behindMainStop(31, { checkOnly: true }), '');
+    assert.match(behindMainStop(31, { checkOnly: false }), /31 commit/);
+    const nota = behindMainNota(31);
+    assert.match(nota, /31 commit/);
+    assert.match(nota, /npm run finish/, 'la nota dice dove quel ramo indietro fermerebbe davvero');
+    assert.equal(behindMainNota(0), '');
+    assert.equal(behindMainNota('fatal'), '');
+    assert.match(SORGENTE, /behindMainStop\(behind, \{ checkOnly \}\)/, 'la chiamata vera passa la modalità');
   });
 
   test('la guardia sta PRIMA dei controlli, non dopo', () => {
@@ -345,8 +427,25 @@ describe('quale ramo NON si spedisce mai', () => {
 // Un rosso d'ambiente (rosso anche su main su questa macchina) spacciato per
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
-import { splitKnownRed } from '../../scripts/finish-local.mjs';
+import { splitKnownRed, esitoVerificaPerCheck } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+
+// `--check` promette solo i controlli: chi verifica lo lancia al posto della
+// suite intera (decisione owner 2026-09-10) e per lui la verifica è per forza
+// «avviata senza esito» — è la sua. Finire in rosso con «Non pubblico» dopo
+// controlli verdi era un esito falso (verifica locale di suite-locale, giro 1).
+test('--check non boccia per la verifica mancante: la stampa e prosegue', () => {
+  const r = esitoVerificaPerCheck({ checkOnly: true, ok: false, reason: 'verifica avviata ma senza esito' });
+  assert.equal(r.ferma, false);
+  assert.match(r.nota, /avviata ma senza esito/);
+  assert.match(r.nota, /npm run finish/);
+});
+
+test('senza --check la verifica mancante ferma la chiusura, come sempre', () => {
+  assert.equal(esitoVerificaPerCheck({ checkOnly: false, ok: false, reason: 'x' }).ferma, true);
+  assert.deepEqual(esitoVerificaPerCheck({ checkOnly: false, ok: true }), { ferma: false, nota: '' });
+  assert.deepEqual(esitoVerificaPerCheck({ checkOnly: true, ok: true }), { ferma: false, nota: '' });
+});
 
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
   const r = splitKnownRed(['tests/a', 'tests/decks-chat-stress', 'tests/b'], ['tests/decks-chat-stress', 'tests/altro.spec.mjs']);
