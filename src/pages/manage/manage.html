@@ -496,6 +496,10 @@
     .mg-st-bar:hover { fill: var(--sn-fg); }
     /* La fetta della torta fa quello che fa la sua voce di legenda. */
     .mg-st-pie path, .mg-st-pie circle { cursor: pointer; }
+    /* Un filo del colore dello sfondo fra una fetta e l'altra: due fette
+       vicine restano due fette anche quando la scala dei colori, in coda, non
+       ha più tinte diverse da dare. */
+    .mg-st-pie path { stroke: var(--sn-bg); stroke-width: 1.5; }
     /* Fette e barrette prendono il fuoco da tastiera: il contorno deve vedersi
        anche dentro un SVG, dove `outline` non disegna niente in tutti i motori. */
     .mg-st-pie path:focus-visible, .mg-st-pie circle:focus-visible, .mg-st-bar:focus-visible {
