@@ -1629,7 +1629,18 @@
       frasi.push('Finestra: tutto lo storico in pagina.');
     }
     if (!res.statiLeggibili) {
-      frasi.push('Questo computer non può leggere lo stato delle segnalazioni, quindi categorie, lavorazioni e giri di verifica restano senza numero. Quante ne sono arrivate, quando e da chi si sa lo stesso.');
+      // ⚠️ NON PROMETTERE «DA CHI»: anche il mittente viaggia cifrato, e sulla
+      // stessa schermata senza chiave non si legge nemmeno lui.
+      frasi.push('Questo computer non può leggere lo stato delle segnalazioni, quindi categorie, lavorazioni e giri di verifica restano senza numero. Quante ne sono arrivate e quando si sa lo stesso.');
+    }
+    // Il mittente cifrato non si conta sotto «Utente»: la scheda dice quante
+    // non dicono chi le ha mandate, così il filtro per creatore non risponde
+    // «zero» senza spiegare perché.
+    const anonime = res.mittentiIllegibili || 0;
+    if (res.datiPronti && anonime) {
+      frasi.push(anonime === 1
+        ? '1 segnalazione di questa finestra non dice chi l’ha mandata, perché il mittente viaggia cifrato e questo computer non lo sa leggere: non è in nessuna categoria di creatore, e il filtro per creatore non la trova.'
+        : `${anonime} segnalazioni di questa finestra non dicono chi le ha mandate, perché il mittente viaggia cifrato e questo computer non lo sa leggere: non sono in nessuna categoria di creatore, e il filtro per creatore non le trova.`);
     }
     if (res.copertura.parziale) {
       frasi.push(`${FB.COUNT_CAP_HINT} Il più vecchio in pagina è del ${statsDate(res.copertura.piuVecchio)}. I numeri con il «+» sono minimi, non totali.`);
