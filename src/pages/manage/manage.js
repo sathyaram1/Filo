@@ -1883,7 +1883,7 @@
   if (mgStCards) {
     mgStCards.addEventListener('click', (e) => {
       const drill = e.target.closest('[data-drill]');
-      if (drill) { toggleStatsDrill(drill.dataset.drill); return; }
+      if (drill) { toggleStatsDrill(drill.dataset.drill, statsZonaDi(drill)); return; }
       const btn = e.target.closest('[data-card-toggle]');
       if (!btn) return;
       const id = btn.dataset.cardToggle;
@@ -1894,13 +1894,13 @@
   if (mgStPieLegend) {
     mgStPieLegend.addEventListener('click', (e) => {
       const drill = e.target.closest('[data-drill]');
-      if (drill) toggleStatsDrill(drill.dataset.drill);
+      if (drill) toggleStatsDrill(drill.dataset.drill, '#mgStPieLegend');
     });
   }
   if (mgStMore) {
     mgStMore.addEventListener('click', (e) => {
       const drill = e.target.closest('[data-drill]');
-      if (drill) toggleStatsDrill(drill.dataset.drill);
+      if (drill) toggleStatsDrill(drill.dataset.drill, '#mgStMore');
     });
   }
   // Le fette della torta rispondono come la loro voce di legenda: due disegni
@@ -1911,14 +1911,14 @@
   if (mgStPie) {
     mgStPie.addEventListener('click', (e) => {
       const fetta = e.target.closest('[data-group]');
-      if (fetta) toggleStatsDrill(`giri:${fetta.dataset.group}`);
+      if (fetta) toggleStatsDrill(`giri:${fetta.dataset.group}`, '#mgStPieLegend');
     });
     mgStPie.addEventListener('keydown', (e) => {
       if (!invioOSpazio(e)) return;
       const fetta = e.target.closest('[data-group]');
       if (!fetta) return;
       e.preventDefault();
-      toggleStatsDrill(`giri:${fetta.dataset.group}`);
+      toggleStatsDrill(`giri:${fetta.dataset.group}`, '#mgStPieLegend');
     });
   }
 
@@ -2011,7 +2011,7 @@
         const quante = statsSegnalazioni(key).length;
         voci.push({
           label: statsDrill === key ? 'Chiudi l’elenco' : `Mostra le ${quante === 1 ? 'segnalazione contata' : 'segnalazioni contate'}`,
-          run: () => toggleStatsDrill(key),
+          run: () => toggleStatsDrill(key, statsZonaDi(drill)),
         });
         voci.push({
           label: 'Copia riga e numero',

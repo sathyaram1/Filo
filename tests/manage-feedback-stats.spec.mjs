@@ -499,6 +499,7 @@ test('la scala dei colori della torta si scalda e non riusa una tinta', async ({
       '--- Aggiornamento dell\'agente del 01/09/2026, 10:00 ---',
       'Corretto.',
       '',
+      '',
     ].join('\n');
     const lista = [0, 1, 2, 3, 4, 5, 7].map((g, i) => ({
       _id: `c${i}`, seq: 300 + i, subSeq: 0, clientId: 'u@e.com', text: `lavoro ${i}`,
