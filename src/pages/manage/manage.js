@@ -1448,7 +1448,8 @@
     if (!mgStMore) return;
     const g = res.giri;
     const rilievi = g.perLivello;
-    const leggibile = res.statiLeggibili;
+    const leggibile = res.statiLeggibili && res.datiPronti;
+    const registro = !workerLogMissing && workerLogEntries !== null;
     const righe = [
       ['Tempo mediano dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMediano) : '—'],
       ['Tempo medio dalla segnalazione alla chiusura', leggibile && res.lavorati.total ? ST.formatDuration(res.lavorati.tempoMedio) : '—'],
