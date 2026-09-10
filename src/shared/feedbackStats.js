@@ -310,15 +310,24 @@
       current = null;
     };
     for (const raw of lines) {
-      const opener = ROUND_OPENERS.find((o) => o.re.test(raw));
+      // Dentro l'elenco dei rilievi non si aprono giri. Il verbale mette i
+      // rilievi ULTIMI, e un giro nuovo comincia sempre dopo il turno di chi
+      // ha corretto: una riga di continuazione che dice «Verifica superata.»
+      // è il verificatore che racconta, non un giro che passa. Senza questa
+      // riga un giro con due rilievi finiva nella fetta «nessuna critica».
+      const dentroRilievi = !!(current && current.rilievi);
+      const opener = dentroRilievi ? null : ROUND_OPENERS.find((o) => o.re.test(raw));
       if (opener) {
         chiudi();
-        current = { kind: opener.kind, lines: [raw] };
+        current = { kind: opener.kind, lines: [raw], rilievi: false };
         continue;
       }
       if (current) {
         if (TURN_MARKER.test(raw)) chiudi();
-        else current.lines.push(raw);
+        else {
+          current.lines.push(raw);
+          if (FINDING_LINE.test(raw)) current.rilievi = true;
+        }
       }
     }
     chiudi();
