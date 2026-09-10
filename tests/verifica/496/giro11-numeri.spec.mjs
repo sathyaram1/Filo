@@ -7,7 +7,6 @@ const URL = 'filo://manage/manage.html';
 const ora = Date.now();
 const ORA_MS = 3600 * 1000;
 const iso = (h) => new Date(ora - h * ORA_MS).toISOString();
-const fraOre = (h) => new Date(ora + h * ORA_MS).toISOString();
 const AG = (g) => `--- Aggiornamento dell'agente del 0${g}/09/2026, 10:00 ---`;
 
 async function apri(page) {
