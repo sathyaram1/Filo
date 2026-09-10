@@ -115,21 +115,21 @@ test('il grafico degli arrivi resta leggibile a finestra stretta', async ({ open
   expect(stretto.etichetta, `${largo.etichetta} → ${stretto.etichetta}`).toBeGreaterThan(largo.etichetta * 0.9);
 });
 
-test('il grafico con due sole colonne si legge come un andamento', async ({ openTab }) => {
+test('con poche colonne il grafico non lascia mezzo riquadro bianco', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
   await page.evaluate(() => window.__mgTest.setStatsWindow('24h'));
   await page.waitForTimeout(250);
   await page.locator('#mgStBarsBlock').screenshot({ path: `${OUT}/496-giro9-poche-colonne.png` });
-  const info = await page.evaluate(() => {
+  const uso = await page.evaluate(() => {
     const svg = document.getElementById('mgStBars');
-    return {
-      barre: Array.from(svg.querySelectorAll('rect.mg-st-bar')).map((r) => ({
-        x: r.getAttribute('x'), w: r.getAttribute('width'),
-      })),
-      etichette: Array.from(svg.querySelectorAll('text')).map((t) => t.textContent),
-      nota: document.getElementById('mgStBarsNote').textContent,
-    };
+    const box = svg.getBoundingClientRect();
+    const disegnato = Array.from(svg.querySelectorAll('rect.mg-st-bar, line.mg-st-bar-base, text'))
+      .map((el) => el.getBoundingClientRect())
+      .reduce((a, r) => Math.max(a, r.right - box.left), 0);
+    return { largo: Math.round(box.width), usato: Math.round(disegnato) };
   });
-  console.log('POCHE COLONNE:', JSON.stringify(info));
+  // Un grafico che si ferma a un terzo del suo riquadro non è un andamento:
+  // sono due rettangoli appoggiati a sinistra, col resto bianco.
+  expect(uso.usato, JSON.stringify(uso)).toBeGreaterThan(uso.largo * 0.6);
 });
