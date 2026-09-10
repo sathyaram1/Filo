@@ -1173,23 +1173,29 @@
   // dice-quante-cose-contiene-ogni-sezione.md). Restano i numeri che stanno in
   // chiaro: quante ne sono arrivate, quando, e da chi.
   const ST_SENZA_STATO = 'Senza la chiave dell’owner lo stato delle segnalazioni non si legge, e questo numero non si può sapere.';
+  const ST_SENZA_DATI = 'I feedback non sono in pagina, quindi questo numero non si può sapere.';
+  const ST_SENZA_REGISTRO = 'Il registro delle partenze delle routine non si legge da qui: questo numero non si può sapere.';
 
   function renderStatsCards(res) {
     if (!mgStCards) return;
     const parz = res.copertura.parziale;
     const ric = res.ricevuti;
     const rout = res.routine;
-    const leggibile = res.statiLeggibili;
+    const pronti = res.datiPronti;
+    const leggibile = res.statiLeggibili && pronti;
+    // Il registro è una sorgente sua: può mancare mentre i feedback ci sono.
+    const registro = !workerLogMissing && workerLogEntries !== null;
     const cards = [
       statsCard({
         id: 'ricevuti',
-        value: statsNum(ric.total, parz),
+        value: pronti ? statsNum(ric.total, parz) : '—',
         label: 'Feedback ricevuti',
         sub: 'per data d’arrivo',
-        rows: ric.perCategoria.map((c) => ({
+        rows: !pronti ? [] : ric.perCategoria.map((c) => ({
+          key: `categoria:${c.key}`,
           label: c.label, n: c.n, share: statsPercent(c.n, ric.total),
         })),
-        empty: 'Nessuna segnalazione arrivata in questa finestra.',
+        empty: pronti ? 'Nessuna segnalazione arrivata in questa finestra.' : ST_SENZA_DATI,
       }),
       statsCard({
         id: 'lavorati',
@@ -1197,20 +1203,22 @@
         label: 'Feedback lavorati',
         sub: 'lavorazione chiusa, per data dell’ultimo movimento',
         rows: !leggibile ? [] : [
-          { label: 'Passate alla prima verifica', n: res.giri.fette.find((f) => f.giri === 0)?.n || 0 },
-          { label: 'Passate dopo almeno una correzione', n: res.giri.fette.filter((f) => f.giri > 0).reduce((a, f) => a + f.n, 0) },
-          { label: 'Verifica ferma, decide l’owner', n: res.giri.ferme },
-          { label: 'Senza verbale di verifica nelle note', n: res.giri.senzaDati },
+          { key: 'giri:0', label: 'Passate alla prima verifica', n: res.giri.fette.find((f) => f.giri === 0)?.n || 0 },
+          { key: 'giri:1+', label: 'Passate dopo almeno una correzione', n: res.giri.fette.filter((f) => f.giri > 0).reduce((a, f) => a + f.n, 0) },
+          { key: 'giri:ferme', label: 'Verifica ferma, decide l’owner', n: res.giri.ferme },
+          { key: 'giri:tagliate', label: 'Conversazione tagliata: i giri non si contano', n: res.giri.tagliate },
+          { key: 'giri:senza', label: 'Senza verbale di verifica nelle note', n: res.giri.senzaDati },
         ],
-        empty: leggibile ? 'Nessuna lavorazione chiusa in questa finestra.' : ST_SENZA_STATO,
+        empty: !pronti ? ST_SENZA_DATI
+          : (res.statiLeggibili ? 'Nessuna lavorazione chiusa in questa finestra.' : ST_SENZA_STATO),
       }),
       statsCard({
         id: 'routine',
-        value: statsNum(rout.prober, rout.parziale),
+        value: registro ? statsNum(rout.prober, rout.parziale) : '—',
         label: 'Prober lanciati',
         sub: 'partenze registrate dal server, tutti i creatori',
-        rows: rout.byRole.map((r) => ({ label: r.label, n: r.n, share: statsPercent(r.n, rout.total) })),
-        empty: 'Nessuna partenza registrata in questa finestra.',
+        rows: !registro ? [] : rout.byRole.map((r) => ({ label: r.label, n: r.n, share: statsPercent(r.n, rout.total) })),
+        empty: registro ? 'Nessuna partenza registrata in questa finestra.' : ST_SENZA_REGISTRO,
       }),
       statsCard({
         id: 'adesso',
@@ -1218,10 +1226,11 @@
         label: 'Aperte adesso',
         sub: 'quante ce ne sono adesso, non nella finestra',
         rows: !leggibile ? [] : [
-          { label: 'In coda', n: res.adesso.inCoda },
-          { label: 'In lavorazione', n: res.adesso.inLavorazione },
+          { key: 'adesso:coda', label: 'In coda', n: res.adesso.inCoda },
+          { key: 'adesso:lavorazione', label: 'In lavorazione', n: res.adesso.inLavorazione },
         ],
-        empty: leggibile ? 'Niente in coda né in lavorazione.' : ST_SENZA_STATO,
+        empty: !pronti ? ST_SENZA_DATI
+          : (res.statiLeggibili ? 'Niente in coda né in lavorazione.' : ST_SENZA_STATO),
       }),
     ];
     mgStCards.innerHTML = cards.join('');
