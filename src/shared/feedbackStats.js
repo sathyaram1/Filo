@@ -639,13 +639,17 @@
     // prima del filtro, o le caselle direbbero sempre "0" tranne quella accesa.
     const perCreatore = new Map();
     for (const key of creatorKeys()) perCreatore.set(key, 0);
+    // Quante, nella finestra, non dicono chi le ha mandate: il mittente
+    // cifrato non si conta sotto «Utente», si dichiara.
+    let mittentiIllegibili = 0;
     for (const fb of all) {
       if (!inRange(createdMs(fb), range)) continue;
+      if (creatorUnreadable(fb)) { mittentiIllegibili += 1; continue; }
       const k = creatorOf(fb);
       perCreatore.set(k, (perCreatore.get(k) || 0) + 1);
     }
 
-    const passaCreatore = (fb) => !scelti || scelti.includes(creatorOf(fb));
+    const passaCreatore = (fb) => !scelti || (!creatorUnreadable(fb) && scelti.includes(creatorOf(fb)));
     const daFiltro = all.filter(passaCreatore);
 
     // ── Ricevuti (per data d'arrivo) ────────────────────────────────────────
