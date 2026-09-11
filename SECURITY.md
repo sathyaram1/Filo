@@ -305,5 +305,5 @@ segnalazioni di sicurezza con priorità.
 
 ---
 
-*Ultimo aggiornamento: 2026-05-29. Questo documento evolve insieme all'app;
+*Ultimo aggiornamento: 2026-09-11. Questo documento evolve insieme all'app;
 le voci 🔜 e 💭 verranno aggiornate a ✅ quando le misure entrano in funzione.*
