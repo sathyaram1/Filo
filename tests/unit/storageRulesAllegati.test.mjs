@@ -114,13 +114,14 @@ test('la lettura degli allegati NON è pubblica: la concede solo l’amministrat
   const letture = PERMESSI.filter((p) => p.verbi.some((v) => ['read', 'get', 'list'].includes(v)));
   assert.ok(letture.length >= 1, 'nessuna regola di lettura: gli allegati sarebbero illeggibili anche all’owner');
   for (const l of letture) {
-    assert.notMatch(l.cond, /^true$/, `lettura aperta a chiunque: allow ${l.verbi.join(',')}: if ${l.cond}`);
+    const cond = espandi(l.cond);
+    assert.doesNotMatch(cond, /^true$/, `lettura aperta a chiunque: allow ${l.verbi.join(',')}: if ${cond}`);
     // L'identità non si prova "essendo loggati" (la chiave web è pubblica e per
     // entrare basta un account Google qualunque): serve l'allowlist `admins`,
     // la stessa di firestore.rules.
-    assert.match(l.cond, /firestore\.exists\(/, `lettura senza allowlist admins: if ${l.cond}`);
-    assert.match(l.cond, /documents\/admins\//, `lettura non legata alla raccolta admins: if ${l.cond}`);
-    assert.match(l.cond, /email_verified/, `lettura senza email verificata: if ${l.cond}`);
+    assert.match(cond, /firestore\.exists\(/, `lettura senza allowlist admins: if ${cond}`);
+    assert.match(cond, /documents\/admins\//, `lettura non legata alla raccolta admins: if ${cond}`);
+    assert.match(cond, /email_verified/, `lettura senza email verificata: if ${cond}`);
   }
 });
 
