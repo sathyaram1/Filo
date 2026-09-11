@@ -41,10 +41,27 @@ test('un indirizzo corto si legge tutto, senza lo schema davanti', () => {
 });
 
 test('il posto vero si legge anche quando chi manda ha messo un’esca davanti alla chiocciola', () => {
-  const esca = 'https://filo.app/guida/aggiornamento-obbligatorio-per-i-tester-di-settembre-2026a@sito-di-un-estraneo.invalid/accedi';
+  // Tutto quello che sta prima della chiocciola non è il sito: sono
+  // credenziali, e qui servono solo a riempire gli 80 caratteri che si leggono.
+  // Con la scritta di prima si leggeva
+  //   https://filo.app-aggiornamento-obbligatorio-per-i-tester-di-settembre-2026-okay@
+  // e si finiva dall'estraneo.
+  const esca = 'https://filo.app-aggiornamento-obbligatorio-per-i-tester-di-settembre-2026-okay@sito-di-un-estraneo.invalid/accedi';
   const scritta = FB.linkLabel(esca);
   assert.ok(scritta.startsWith('sito-di-un-estraneo.invalid'), `la scritta non nomina il posto vero: ${scritta}`);
   assert.ok(!scritta.includes('filo.app'), `la scritta mostra ancora l'esca: ${scritta}`);
+});
+
+test('il posto vero si legge anche quando l’esca è fatta di sottodomini', () => {
+  // La stessa bugia senza chiocciola, e più credibile: il sito è davvero quello
+  // scritto in fondo, ma i primi 80 caratteri li riempiono i sottodomini. Con
+  // la scritta di prima si leggeva
+  //   https://filo.app.guida.aggiornamento-obbligatorio.per-i-tester.settembre-2026.si
+  // e il posto vero non compariva affatto.
+  const esca = 'https://filo.app.guida.aggiornamento-obbligatorio.per-i-tester.settembre-2026.sito-di-un-estraneo.invalid/accedi';
+  const scritta = FB.linkLabel(esca);
+  assert.ok(scritta.endsWith('sito-di-un-estraneo.invalid'), `la scritta non finisce sul posto vero: ${scritta}`);
+  assert.ok(scritta.startsWith(TAGLIO), `un sito tagliato deve dirlo: ${scritta}`);
 });
 
 test('quello che si taglia è la coda dell’indirizzo, mai la coda del sito', () => {
