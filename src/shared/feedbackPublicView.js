@@ -65,6 +65,14 @@
     'resolvedAt',        // data di chiusura (ISO)
     'clientIdTag',       // impronta di QUESTA scheda per chi l'ha segnalata (vedi sotto)
     'userNote',          // la frase per chi ha segnalato (l'unico dei due testi in chiaro)
+    // I crediti che spettano a chi ha mandato questo feedback. Stanno qui
+    // perché l'annuncio della ricompensa gira sul computer di chi ha segnalato,
+    // che dei feedback veri non legge più niente: senza questo numero ogni
+    // ricompensa scenderebbe in silenzio alla fascia più bassa (50 invece di
+    // 300), e non si rimedia dopo, perché un feedback premiato resta premiato.
+    // È la CIFRA, non la priorità: quanto contava la segnalazione resta un
+    // giudizio interno e fuori dalla scheda.
+    'reward',
     'publishedAt',       // quando questa scheda è stata scritta (diagnostica)
   ]);
 
