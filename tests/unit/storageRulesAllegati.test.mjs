@@ -29,6 +29,7 @@ import { dirname, join } from 'node:path';
 
 import '../../src/shared/feedbackAttachTypes.js';
 import '../../src/shared/feedback.js';
+import { mimeDiAllegato } from '../../scripts/claude-feedback.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
