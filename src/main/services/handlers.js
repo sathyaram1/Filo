@@ -2568,8 +2568,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           ultimoMotivo: verdetto.motivo,
         });
       } catch (_) {}
-      textReply = 'Ho la risposta pronta, ma il controllo di sicurezza non risponde: '
-        + 'te la mostro appena riesco a farlo.';
+      textReply = 'Ho la risposta pronta, ma il controllo di sicurezza non risponde. '
+        + 'Te la mostro appena riesco.';
     }
   }
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
