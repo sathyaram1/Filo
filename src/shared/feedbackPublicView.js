@@ -358,6 +358,7 @@
     USER_FIELDS,
     PUBLISHABLE_STATUSES,
     isFlagged,
+    rewardFor,
     cardFor,
     carryUserFields,
     sameCard,
