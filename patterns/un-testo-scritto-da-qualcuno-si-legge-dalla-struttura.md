@@ -31,7 +31,12 @@ chi non sta verbalizzando:
    TURNO, ma un turno comincia da una riga di testo dentro le note, e quella
    riga la scrive anche chi incolla un pezzo di conversazione o chi la cita
    raccontando cosa ha letto. Due strade aggiungevano un giro mai successo, due
-   ne facevano sparire uno vero.
+   ne facevano sparire uno vero;
+8. con la stessa riga, staccata da una riga vuota. Il giro 12 aveva chiesto al
+   marcatore di avere sopra una riga vuota, e questo chiude la citazione
+   infilata dentro un capoverso. Ma un blocco incollato lo si stacca proprio
+   con una riga vuota: sei strade, dal verbale di un'altra segnalazione
+   riportato in una risposta alla riga del taglio del tetto scritta a mano.
 
 Ogni giro chiudeva la porta trovata e ne lasciava aperta un'altra. Un lavoro
 costato cinque critiche finiva nella fetta verde «passata subito», che è il
