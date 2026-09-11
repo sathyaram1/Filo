@@ -114,6 +114,21 @@ async function controllaTesto({
   if (!_eseguiModello) {
     return { esito: 'in-attesa', motivo: 'guardiano non configurato', regola: '', causa: G.CAUSA.CONFIGURAZIONE };
   }
+  // Chi ha scritto il testo DEVE essere noto: è l'unica cosa che permette di
+  // escluderlo dalla catena del guardiano. Senza, il controllo girerebbe sul
+  // primo modello della lista — che può essere proprio quello che il testo l'ha
+  // scritto, e due contesti sullo stesso modello cadono insieme. È successo per
+  // davvero: una risposta rimessa in coda ripartiva senza questo dato e si
+  // faceva giudicare da sé. Un controllo che non si può fare non è un controllo
+  // superato: coda, mai «passa».
+  if (!String(produttore || '').trim()) {
+    return {
+      esito: 'in-attesa',
+      motivo: 'non si sa quale modello ha scritto il testo',
+      regola: '',
+      causa: G.CAUSA.CONFIGURAZIONE,
+    };
+  }
   const messaggi = G.messaggiGuardiano({ testo, fiducia, origine, richiestaUtente, regolaAutomazione });
   let ultimoErrore = '';
   // Perché non è riuscito: la rete che va e viene è una cosa, un modello che
