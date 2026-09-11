@@ -691,3 +691,64 @@ test('con una colonna per anno l’asse scrive l’anno, non «01/01» dodici vo
   expect(new Set(letto.etichette).size, letto.etichette.join(' ')).toBe(letto.etichette.length);
   expect(letto.etichette[letto.etichette.length - 1]).toBe(String(oggi.getFullYear()));
 });
+
+// I due campi «dal» e «al» li disegna il browser nella lingua del sistema: su
+// un computer non italiano scrivono mese/giorno, mentre tutte le altre date
+// della scheda scrivono giorno/mese. Chi sceglie «01/09» credendo di prendere
+// il primo settembre prende il nove gennaio, e i numeri cambiano senza che
+// niente lo dica. Accanto ai campi la finestra vera, col mese a parole.
+test('accanto ai campi data c’è la finestra scelta col mese a parole', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('custom', '2026-09-01', '2026-09-02'));
+  const eco = page.locator('#mgStCustomEco');
+  await expect(eco).toHaveText('dal 1 settembre 2026 al 2 settembre 2026');
+
+  // Con una sola data l'eco dice fin dove arriva davvero.
+  await page.evaluate(() => window.__mgTest.setStatsWindow('custom', '2026-09-01', ''));
+  await expect(eco).toHaveText('dal 1 settembre 2026 a oggi');
+
+  // Con le date al contrario la finestra non vale, e i numeri sono quelli di
+  // tutto lo storico: l'eco racconta QUELLO, non le due date scritte.
+  await page.evaluate(() => window.__mgTest.setStatsWindow('custom', '2026-09-05', '2026-09-01'));
+  await expect(eco).toHaveText('tutto lo storico in pagina');
+
+  // Su una finestra pronta i campi non ci sono, e nemmeno l'eco.
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+  await expect(eco).toHaveText('');
+});
+
+// Le tre scorciatoie del filtro per creatore sono pastiglie come le altre nove,
+// e portano la stessa domanda: quali sono queste segnalazioni? Senza una voce
+// loro, il tasto destro ci apriva il menu generale della pagina, lo stesso che
+// esce su uno spazio bianco.
+test('anche «Tutti», «Persone» e «Routine» rispondono al tasto destro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+  await page.evaluate(() => window.__mgTest.setStatsWindow('all'));
+
+  for (const sel of ['[data-creator-all]', '[data-creator-group="persone"]', '[data-creator-group="routine"]']) {
+    await page.evaluate(() => document.querySelectorAll('.mg-ctxmenu').forEach((m) => m.remove()));
+    const chip = page.locator(`#mgStCreators ${sel}`);
+    const box = await chip.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.up({ button: 'right' });
+    const voci = await page.evaluate(() => {
+      const menu = document.querySelector('.mg-ctxmenu');
+      return menu ? Array.from(menu.querySelectorAll('[role="menuitem"]')).map((b) => b.textContent.trim()) : [];
+    });
+    expect(voci.join(' / '), sel).toMatch(/Mostra/);
+    expect(voci.join(' / '), sel).toMatch(/Copia/);
+  }
+
+  // E la voce apre davvero le segnalazioni del gruppo.
+  await page.evaluate(() => document.querySelectorAll('.mg-ctxmenu').forEach((m) => m.remove()));
+  const routine = page.locator('#mgStCreators [data-creator-group="routine"]');
+  const box = await routine.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  await page.locator('.mg-ctxmenu [role="menuitem"]', { hasText: 'Mostra' }).first().click();
+  await expect(page.locator('#panel-fbstats .mg-st-drill')).toHaveCount(1);
+});
