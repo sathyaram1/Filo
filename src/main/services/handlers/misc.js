@@ -507,6 +507,12 @@ module.exports = function register(on, ctx) {
     });
   }
 
+  // Coda dei percorsi condivisi dell'Aiuto (#584). Ritarda apposta la scrittura
+  // perché l'ora in cui Firestore riceve un percorso è pubblica e, se fosse
+  // quella della sessione, ricucirebbe i percorsi di una persona su domini
+  // diversi. Qui si riprende quello che era rimasto in coda alla chiusura.
+  try { globalThis.SN_PATHS_COLLECTOR?.init?.(); } catch (_) {}
+
   on(MSG.SUBMIT_FEEDBACK, async (msg) => {
     try {
       if (!globalThis.SN_FEEDBACK?.submit) {
