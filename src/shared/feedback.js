@@ -216,6 +216,32 @@
     return null;
   }
 
+  // ── Chi legge la collezione vera, e come ci arriva (#583) ──────────────────
+  // Le regole ammettono solo l'owner (admin) e il server. L'ID token dell'owner
+  // vive nel main process e non deve mai arrivare in una pagina, quindi da una
+  // pagina filo:// la lettura si CHIEDE al main, che la esegue con il token e
+  // torna le righe già decodificate. Nel main (e negli script) la fetch è
+  // diretta, col token passato dal chiamante.
+  //
+  // Solo `window.filo` (il ponte delle pagine interne): un content script su una
+  // pagina web ha `chrome.runtime.sendMessage`, ma di feedback non ne legge — e
+  // il canale del main rifiuta comunque le origini che non sono filo://.
+  function pageBridge() {
+    const w = (typeof window !== 'undefined') ? window : null;
+    if (w && w.filo && typeof w.filo.message === 'function') return (m) => w.filo.message(m);
+    return null;
+  }
+
+  async function readViaMain(bridge, payload) {
+    // 'feedback_fetch' = MSG.FEEDBACK_FETCH (src/shared/messages.js). Qui il
+    // vocabolario non è caricato: questo modulo gira anche fuori dalle pagine.
+    const r = await bridge({ type: 'feedback_fetch', ...payload });
+    if (!r || r.ok !== true) {
+      throw new Error((r && r.error) || 'lettura dei feedback non riuscita');
+    }
+    return Array.isArray(r.rows) ? r.rows : [];
+  }
+
   function fsDocToObject(doc) {
     const out = {};
     for (const [k, v] of Object.entries(doc.fields || {})) out[k] = fromFsValue(v);
