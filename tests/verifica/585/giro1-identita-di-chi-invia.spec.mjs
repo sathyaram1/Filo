@@ -105,11 +105,29 @@ test("chi non ha fatto il login Google manda comunque un'identità che il server
   }
 });
 
-test("chi il login Google l'ha fatto manda il suo token", async () => {
+test("l'identità dell'installazione vale anche per chi il login Google l'ha fatto", async () => {
+  // Il login Google si collega all'identità dell'installazione, quindi è la
+  // stessa persona: quella dell'installazione però c'è sempre, e per un limite
+  // di frequenza conta avere un'identità sola e stabile.
   const vecchioGoogle = googleAuth.getIdToken;
   const vecchioAnon = anonAuth.getIdToken;
   googleAuth.getIdToken = async () => 'token-di-chi-e-loggato';
   anonAuth.getIdToken = async () => 'token-della-installazione';
+  try {
+    const inviato = await inviaUnPercorso();
+    expect(inviato).toBeTruthy();
+    expect(inviato.idToken).toBe('token-della-installazione');
+  } finally {
+    googleAuth.getIdToken = vecchioGoogle;
+    anonAuth.getIdToken = vecchioAnon;
+  }
+});
+
+test("se l'identità dell'installazione non risponde si ripiega sul login Google", async () => {
+  const vecchioGoogle = googleAuth.getIdToken;
+  const vecchioAnon = anonAuth.getIdToken;
+  googleAuth.getIdToken = async () => 'token-di-chi-e-loggato';
+  anonAuth.getIdToken = async () => { throw new Error("l'identità di questa installazione è stata annullata sul server"); };
   try {
     const inviato = await inviaUnPercorso();
     expect(inviato).toBeTruthy();
