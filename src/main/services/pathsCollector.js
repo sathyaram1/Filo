@@ -14,6 +14,12 @@
 // Se il judge dice ok, il documento viene scritto su Firestore con success
 // (true per 👍, false per 👎). I 👎 servono solo a noi per debug — non
 // vengono mandati come contesto ad altri agenti.
+//
+// Cosa NON viene passato a Firestore (audit pre-alpha, #584): niente clientId,
+// niente user agent. Non erano usati da chi legge i percorsi e bastavano a
+// ricucire i percorsi della stessa persona su domini diversi. La funzione qui
+// sotto non li accetta più nemmeno come argomento: così nessun chiamante può
+// rimetterli dentro per distrazione.
 
 (function (global) {
   'use strict';
