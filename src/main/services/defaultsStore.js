@@ -275,7 +275,7 @@ async function patchDoc(docPath, fields, mask, idToken) {
 
 // Scrive la config predefinita su Firestore. `partial` può contenere:
 //   provider, models, modelRegistry  → doc config/models
-//   apiKeys: { openrouter?, gemini?, tavily? }       → doc config/secrets
+//   apiKeys: { openrouter?, tavily? }, safeBrowsingKey → doc config/secrets
 // Richiede un Firebase ID token admin (le regole rifiutano i non-admin).
 // Le chiavi con valore '' o assenti NON vengono scritte (così "non toccare" è
 // diverso da "azzera": per azzerare passare esplicitamente null... ma per
