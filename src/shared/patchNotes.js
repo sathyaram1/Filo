@@ -16,6 +16,12 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.228', date: '2026-09-11',
+      fixes: [
+        'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
+      ],
+    },
+    {
       version: '0.2.225', date: '2026-09-10',
       features: [
         'Quando riscatti l\'invito, i crediti che avevi già li ritrovi sommati a quelli d\'ingresso: nessuno riparte da zero.',
