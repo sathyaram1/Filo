@@ -376,8 +376,48 @@
     'verification code', 'security code',
   ].join('|'), 'i');
   const CODICE_GENERICO = /(codic|\bpin\b|\btoken\b|password|passcode|parola d'ordine|\bpwd\b|passphrase)/i;
-  // Chi chiede di passare il codice a qualcuno: il verbo che fa la truffa.
-  const CHIEDE_DI_PASSARLO = /(comunic|inoltr|inseris|digit|fornis|invia|inviar|condivid|dett|riferis|manda|trasmett|copia|dimmi|dammi)/i;
+  // Chi chiede di passare il codice a QUALCUN ALTRO: il verbo che fa la truffa.
+  //
+  // Prima era un elenco di pezzi di parola senza confini — comunic, inoltr,
+  // dett, manda, digit, copia — e quei pezzi in italiano stanno dentro parole
+  // che non chiedono niente a nessuno: «dettagli» contiene dett, «domanda»
+  // contiene manda, «digitale» contiene digit, «fotocopia» contiene copia.
+  // Bastava una di quelle parole accanto a un codice perché la risposta
+  // sparisse, e sono fra le parole più frequenti della posta di chiunque: «il
+  // codice è nei dettagli della consegna» finiva nel registro degli avvisi
+  // fermati. Adesso si riconoscono FORME VERBALI INTERE, coi confini di parola.
+  //
+  // Due scelte, e sono quelle che tengono il rumore basso:
+  //
+  // 1. Solo i verbi che vogliono dire «fallo avere a qualcun altro».
+  //    Digitare, inserire e copiare dicono cosa fa la persona con il SUO
+  //    codice, ed è il coupon, la prenotazione, il portone di casa: non la
+  //    truffa. Chi attacca vuole che il codice arrivi a LUI.
+  //
+  // 2. Niente forme in -a nude («comunica», «manda», «invia»): in italiano sono
+  //    anche la terza persona, e «il portale invia il codice» è posta normale.
+  //    Restano l'infinito, l'imperativo col pronome attaccato («comunicalo»,
+  //    «mandamelo») e il voi col pronome: forme che si rivolgono a una persona e
+  //    basta. Quello che qui non passa non passa liscio: lo guarda il secondo
+  //    modello, che è il mestiere suo. Un blocco automatico in meno costa una
+  //    chiamata; un blocco automatico di troppo costa la risposta dell'utente.
+  const PASSARE_ARE = 'comunic|inoltr|mand|invi|pass|gir|dett';
+  const PRONOME = '(?:me|te|ce|ve|glie)?(?:lo|la|li|le|ne|mi|ti|ci|vi)';
+  const CHIEDE_DI_PASSARLO = new RegExp([
+    // infinito: «ti chiede di comunicare il codice»
+    `\\b(?:${PASSARE_ARE})are\\b`,
+    // infinito col pronome: «comunicarlo», «mandarcelo»
+    `\\b(?:${PASSARE_ARE})ar${PRONOME}\\b`,
+    // imperativo col pronome: «comunicalo», «inoltramelo», «mandaci»
+    `\\b(?:${PASSARE_ARE})a${PRONOME}\\b`,
+    // voi col pronome: «comunicatelo», «inoltratemelo»
+    `\\b(?:${PASSARE_ARE})ate${PRONOME}\\b`,
+    // -ire e -ere: fornire, condividere, trasmettere, riferire
+    `\\b(?:forni|condivid|trasmett|riferi)(?:re|r${PRONOME}|te|te${PRONOME})\\b`,
+    `\\b(?:fornisci|condividi|trasmetti|riferisci)(?:${PRONOME})?\\b`,
+    // dire e dare, che il codice se lo fanno dare: «dimmi il codice», «dammelo»
+    '\\b(?:dimmi|dimmelo|dimmeli|dammi|dammelo|dammeli|ditemi|diteci|ditemelo|dirmelo|dircelo|darmelo|darcelo)\\b',
+  ].join('|'), 'i');
   // Quello che «codice» qualifica quasi sempre, e che non apre niente.
   //
   // Il qualificatore va riconosciuto anche CON L'ARTICOLO in mezzo, che in
