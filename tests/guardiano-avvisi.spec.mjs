@@ -140,6 +140,7 @@ test('una mail normale diventa un avviso, col mittente e la destinazione vera de
     kind: 'info',
     fiducia: 'contaminato',
     origine: 'una mail di Marco Bianchi',
+    produttore: 'deepseek, gemma',
   }));
   const conFrase = home.locator('.dash-live-card', { hasText: 'apri le foto' });
   await expect(conFrase.locator('.dash-live-dest')).toHaveText('(album.esempio.it)', { timeout: 8_000 });

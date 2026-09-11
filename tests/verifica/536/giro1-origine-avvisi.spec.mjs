@@ -10,6 +10,10 @@
 //
 // Rosso finché la porta è aperta.
 
+// Nota del giro 2: chi propone un avviso contaminato dichiara anche QUALE
+// modello ne ha scritto il testo (`produttore`). Senza, il controllo non ha
+// nessuno da escludere dalla propria catena e l'avviso resta in coda: qui
+// serve solo a far arrivare l'avviso dove la prova lo aspetta.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const dispatch = (app, msg, sender) =>
@@ -24,11 +28,13 @@ test('un sito qualunque non deve poter leggere gli avvisi nati dalla posta', asy
     await TG.proponiNotifica({
       testo: 'Tre mail da Banca Esempio: il rendiconto trimestrale è pronto.',
       kind: 'info', fiducia: 'contaminato', origine: 'una mail di banca@esempio.it',
+      produttore: 'deepseek',
     });
     TG.configure({ eseguiModello: async () => { throw new Error('giu'); } });
     await TG.proponiNotifica({
       testo: 'Lo stipendio è stato accreditato.',
       kind: 'info', fiducia: 'contaminato', origine: 'una mail di paghe@azienda.it',
+      produttore: 'deepseek',
     });
   });
 

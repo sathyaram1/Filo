@@ -5,6 +5,10 @@
 // sezione «Avvisi fermati» delle Preferenze, in tema chiaro e in tema scuro.
 // Le immagini restano in tests/.shots/ come traccia del giro.
 
+// Nota del giro 2: chi propone un avviso contaminato dichiara anche QUALE
+// modello ne ha scritto il testo (`produttore`). Senza, il controllo non ha
+// nessuno da escludere dalla propria catena e l'avviso resta in coda: qui
+// serve solo a far arrivare l'avviso dove la prova lo aspetta.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function homePage(app) {
@@ -24,15 +28,18 @@ async function riempi(app) {
     await TG.proponiNotifica({
       testo: 'Marco ha caricato le foto del weekend: [apri le foto](https://album.esempio.it/weekend)',
       kind: 'info', fiducia: 'contaminato', origine: 'una mail di Marco Bianchi',
+      produttore: 'deepseek',
     });
     await TG.proponiNotifica({
       testo: 'Conferma il conto: [banca-esempio.it](https://banca-esempio.it.attacco.ru/login)',
       kind: 'alert', fiducia: 'contaminato', origine: 'una mail di Banca Esempio',
+      produttore: 'deepseek',
     });
     TG.configure({ eseguiModello: async () => { throw new Error('giu'); } });
     await TG.proponiNotifica({
       testo: 'Il rendiconto trimestrale è pronto.',
       kind: 'info', fiducia: 'contaminato', origine: 'una mail di banca@esempio.it',
+      produttore: 'deepseek',
     });
   });
 }

@@ -247,9 +247,17 @@ test('E â€” una risposta rimessa in coda non viene giudicata dal modello che lâ€
       provider: 'finto',
       results: [{ title: 'Portale', url: 'https://portale-esempio.it/', snippet: 'accedi al portale' }],
     });
+    // Solo le chiamate DEL CONTROLLO: il turno ne fa anche altre (le lezioni,
+    // per esempio), e quelle girano sul modello della chat di mestiere.
     globalThis.__modelliGuardiano = [];
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts }) => {
-      globalThis.__modelliGuardiano.push(String(attempts[0].model || ''));
+    globalThis.SN_PROVIDERS.completeWithFallback = async (opt) => {
+      const attempts = opt.attempts;
+      // Le istruzioni del controllo, non una frase che le nomina: la riga che
+      // l'utente legge cita il guardiano, e finisce nel prompt delle lezioni.
+      const sistema = String(((opt.messages || [])[0] || {}).content || '');
+      if (/^Sei il guardiano degli avvisi di Filo/.test(sistema)) {
+        globalThis.__modelliGuardiano.push(String(attempts[0].model || ''));
+      }
       return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: '{"esito":"passa"}' };
     };
     let giro = 0;
