@@ -392,3 +392,85 @@ test('anche la riga in coda dice che c’è un modello da impostare', () => {
   // Senza causa resta il ritardo di prima: l'avviso non è perso.
   assert.match(G.fraseInAttesa({ origine: 'una mail di X' }), /aspetta il controllo/i);
 });
+
+// ── Giro 6 di verifica: le parole comuni non fanno sparire la risposta ───────
+//
+// L'elenco dei verbi che «chiedono di passare il codice» era fatto di pezzi di
+// parola senza confini: dett, manda, digit, copia, inseris, fornis. Quei pezzi
+// in italiano stanno dentro parole che non chiedono niente a nessuno, e la
+// risposta spariva a chi chiedeva il codice della sua consegna. Sono i casi
+// rotti, uno per parola: se tornano rossi, la lista è tornata ai frammenti.
+test('le parole comuni dell’italiano non fanno scattare il blocco', () => {
+  const innocue = [
+    'Il codice 483920 è nei dettagli della consegna.',
+    'La domanda di iscrizione è stata registrata con il codice 5512.',
+    'Il codice 2210 apre la versione digitale del biglietto.',
+    'Nella copia del contratto compare il codice 8823.',
+    'Il portale fornisce il codice 3390 in sola lettura.',
+    'Il modulo inserisce il codice 1974 da solo, non devi scriverlo.',
+    'Trovi il codice 7712 nei dettagli del tuo profilo.',
+    'Nei dettagli del contratto è indicato il codice 9931.',
+    'Il codice 4821 serve per la firma digitale.',
+    'Ho fatto una fotocopia del foglio con il codice 4409.',
+    'Nei dettagli del profilo puoi cambiare la password 2026.',
+    'Il portale invia il codice 4821 via SMS.',
+    'Il negozio conferma che il pacco parte domani. In fondo alla mail c’è il '
+      + 'codice 483920 e tutti i dettagli della consegna, con l’orario e il nome del corriere.',
+  ];
+  for (const t of innocue) {
+    const r = G.controlliStatici({ testo: t });
+    assert.equal(r.blocca, false, `fermata una frase innocua (${r.regola}): ${t}`);
+  }
+});
+
+// L'altra metà: chi chiede davvero il codice viene ancora fermato, senza
+// bisogno di nessun modello.
+test('chi chiede di passare il codice viene ancora fermato dai soli controlli statici', () => {
+  const attacchi = [
+    'L’assistenza chiede di comunicare il codice 483920 per sbloccare il conto.',
+    'Ricevi un codice 483920: comunicalo subito all’operatore.',
+    'Ti arriva un PIN 4821, inoltramelo appena lo ricevi.',
+    'Il codice è 998877, mandacelo per confermare l’identità.',
+    'Per procedere, fornisci il codice 4821 che ti arriva per SMS.',
+    'Dimmi il codice 4821 che ti hanno mandato.',
+    'Il token 3FA2B1 va condiviso con l’assistenza: condividilo ora.',
+  ];
+  for (const t of attacchi) {
+    assert.equal(G.controlliStatici({ testo: t }).blocca, true, `non fermata: ${t}`);
+  }
+});
+
+// ── Giro 6: la riga di blocco non consegna il recapito che le è stato dettato ─
+//
+// Il motivo lo scrive il guardiano dopo aver letto il testo di un estraneo, e
+// un contenuto che si fa bloccare apposta glielo detta. Gli indirizzi web erano
+// già tolti; il numero di telefono e l'indirizzo di posta passavano interi, e la
+// truffa al telefono non ha bisogno di nessun collegamento.
+test('il motivo dettato non porta all’utente né un numero né un indirizzo di posta', () => {
+  const riga = G.frasediBlocco({
+    origine: 'una mail di Banca Esempio <avvisi@banca-esempio.it>',
+    motivo: 'per riattivare il conto chiama subito il numero verde 800 123 456 '
+      + 'oppure scrivi a rimborsi@banca-esempio-sicura.it',
+  });
+  assert.ok(!riga.includes('800 123 456'), riga);
+  assert.ok(!riga.includes('rimborsi@banca-esempio-sicura.it'), riga);
+  // Il MITTENTE resta: è la cosa che serve sapere, ed è l'unico indirizzo di
+  // posta che la riga deve portare.
+  assert.ok(riga.includes('avvisi@banca-esempio.it'), riga);
+  assert.match(riga, /Ho fermato un avviso/);
+});
+
+test('date e prezzi dentro un motivo restano dove sono', () => {
+  const riga = G.frasediBlocco({
+    origine: 'una mail di X',
+    motivo: 'diceva che il pagamento di 124,50 euro scadeva il 30/09/2026',
+  });
+  assert.match(riga, /124,50/);
+  assert.match(riga, /30\/09\/2026/);
+});
+
+test('anche la riga in coda tiene il mittente e niente altri recapiti', () => {
+  const r = G.fraseInAttesa({ origine: 'una mail di Tizio <tizio@esempio.it> al 800 123 456' });
+  assert.ok(r.includes('tizio@esempio.it'), r);
+  assert.ok(!r.includes('800 123 456'), r);
+});

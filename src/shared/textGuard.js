@@ -417,6 +417,15 @@
     `\\b(?:fornisci|condividi|trasmetti|riferisci)(?:${PRONOME})?\\b`,
     // dire e dare, che il codice se lo fanno dare: «dimmi il codice», «dammelo»
     '\\b(?:dimmi|dimmelo|dimmeli|dammi|dammelo|dammeli|ditemi|diteci|ditemelo|dirmelo|dircelo|darmelo|darcelo)\\b',
+    // Digitare e inserire dicono cosa fa la PERSONA col codice, e da soli sono
+    // il coupon e la prenotazione. Restano però la forma in cui si chiede di
+    // mettere una password dentro una pagina («digita la password qui»), che è
+    // inganno puro: entrano con le forme che si rivolgono a qualcuno, mai con
+    // quelle che raccontano cosa fa un portale. «Digitale» e «inserisce» non
+    // sono richieste di nessuno, e devono restare fuori: l'aggettivo e la terza
+    // persona facevano sparire la posta di un negozio.
+    '\\b(?:digita|digitare|digitarlo|digitarla|digitalo|digitala|digitate|digitatelo)\\b',
+    '\\b(?:inserisci|inseriscilo|inseriscila|inserire|inserirlo|inserirla|inserite|inseritelo)\\b',
   ].join('|'), 'i');
   // Quello che «codice» qualifica quasi sempre, e che non apre niente.
   //
