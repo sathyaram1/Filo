@@ -88,9 +88,9 @@ test('ogni superficie della scheda risponde al tasto destro', async ({ openTab }
     await el.click({ button: 'right' }).catch(() => {});
     await page.waitForTimeout(180);
     const voci = await page.evaluate(() => {
-      const menu = document.querySelector('.sn-ctx, .sn-context-menu, [data-sn-ctx], .sn-menu');
+      const menu = document.querySelector('.mg-ctxmenu');
       if (!menu || menu.hidden) return null;
-      return Array.from(menu.querySelectorAll('button, [role="menuitem"], .sn-ctx-item'))
+      return Array.from(menu.querySelectorAll('button, [role="menuitem"]'))
         .map((b) => b.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' / ');
     });
     esiti.push(`${nome}: ${voci === null ? 'NESSUN MENU' : voci}`);
