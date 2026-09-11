@@ -200,6 +200,9 @@ module.exports = function register(on, ctx) {
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
       Defaults.refresh().catch(() => {});
+      // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
+      // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
+      if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
       return { ok: true, profile, isAdmin: auth.isAdmin() };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
