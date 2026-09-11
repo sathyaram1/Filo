@@ -2996,10 +2996,21 @@ async function guardaLaHome({ message, suggestions, inputs }) {
     });
   } catch (_) {}
   // Niente bottoni: erano dello stesso blocco. Il saluto dice cosa è successo e
-  // dove si va a vedere, invece di sparire senza spiegazione.
-  const testo = verdetto.esito === 'blocca'
-    ? `${G.frasediBlocco({ origine, motivo: verdetto.motivo })} ${G.DOVE_SONO_I_BLOCCHI}`
-    : 'Filo è in ascolto.';
+  // dove si va a vedere, invece di sparire senza spiegazione. E se il controllo
+  // non si è potuto fare per come sono impostati i modelli, lo dice: la home
+  // resterebbe spoglia per sempre, e la sola persona che può sistemarlo non
+  // avrebbe modo di sapere che c'è qualcosa da sistemare.
+  let testo;
+  if (verdetto.esito === 'blocca') {
+    testo = `${G.frasediBlocco({ origine, motivo: verdetto.motivo })} ${G.DOVE_SONO_I_BLOCCHI}`;
+  } else if (verdetto.causa === G.CAUSA.PESI_APERTI) {
+    testo = `Filo è in ascolto. ${G.PERCHE_PESI_APERTI}`;
+  } else if (verdetto.causa === G.CAUSA.CONFIGURAZIONE) {
+    testo = 'Filo è in ascolto. Al controllo di sicurezza manca un modello suo, diverso da quello '
+      + `che scrive i testi, quindi qui resta solo l'essenziale. ${G.DOVE_SI_IMPOSTA}`;
+  } else {
+    testo = 'Filo è in ascolto.';
+  }
   return { message: testo, suggestions: [] };
 }
 

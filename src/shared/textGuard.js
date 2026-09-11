@@ -911,6 +911,8 @@
     FIDUCIA,
     CAUSA,
     DOVE_SONO_I_BLOCCHI,
+    DOVE_SI_IMPOSTA,
+    PERCHE_PESI_APERTI,
     fraseControlloFermo,
     ripulisci,
     REGOLE,
