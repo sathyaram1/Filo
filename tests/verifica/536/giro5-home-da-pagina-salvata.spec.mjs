@@ -32,7 +32,7 @@ test('il saluto della home nasce da un titolo scritto da altri e non passa da ne
     const page = await newtabPage(app);
     await expect(page.locator('#input')).toBeVisible();
 
-    const visto = await app.evaluate(async (_e, arg) => {
+    await app.evaluate(async (_e, arg) => {
       const C = globalThis.SN_CONST;
       await globalThis.SN_STORAGE.updateSettings({
         useDefaultModels: false,
