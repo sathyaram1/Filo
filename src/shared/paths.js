@@ -155,33 +155,55 @@
   // `paths/<dominio>`: non c'è nessun filtro `domain == …` da scrivere, ed è
   // questo che rende impossibile chiederli tutti.
   //
-  // L'esito (`success`) si filtra qui e non nella query: un `where` in più
-  // pretenderebbe un indice composto da deployare a parte, e finché non c'è la
-  // lettura fallisce in silenzio (l'errore è inghiottito dal chiamante, e
-  // l'agente perde i percorsi senza dirlo a nessuno).
-  async function listByDomain(domain, { pageSize = 50, onlySuccess = true } = {}) {
-    const dominio = segmentoDominio(domain);
-    if (!dominio) return [];
-    const limit = Math.max(1, Math.min(MAX_PAGE_SIZE, Number(pageSize) || 50));
-    const body = {
-      structuredQuery: {
-        from: [{ collectionId: SUBCOLLECTION }],
-        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
-        limit,
-      },
+  // L'esito (`success`) lo filtra IL SERVER. Filtrandolo qui, su una pagina di
+  // percorsi recenti, un sito con tanti pollice in giù recenti lasciava
+  // l'assistente senza niente da riusare pur avendo percorsi buoni più vecchi.
+  // Il `where` vuole un indice composto (`firestore.indexes.json`), e il timore
+  // era che senza indice la lettura fallisse in silenzio: per questo se la
+  // query filtrata fallisce si ritenta subito quella semplice, filtrando qui.
+  // Così l'indice mancante costa una richiesta in più, non la funzione.
+  function corpoQuery({ limit, onlySuccess }) {
+    const q = {
+      from: [{ collectionId: SUBCOLLECTION }],
+      orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+      limit,
     };
+    if (onlySuccess) {
+      q.where = { fieldFilter: { field: { fieldPath: 'success' }, op: 'EQUAL', value: { booleanValue: true } } };
+    }
+    return { structuredQuery: q };
+  }
+
+  async function chiedi(dominio, corpo) {
     const res = await fetch(`${urlQuery(dominio)}?key=${API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(corpo),
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore list paths fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
-    const arr = await res.json();
+    return res.json();
+  }
+
+  async function listByDomain(domain, { pageSize = 50, onlySuccess = true } = {}) {
+    const dominio = segmentoDominio(domain);
+    if (!dominio) return [];
+    const limit = Math.max(1, Math.min(MAX_PAGE_SIZE, Number(pageSize) || 50));
+
+    let arr;
+    try {
+      arr = await chiedi(dominio, corpoQuery({ limit, onlySuccess }));
+    } catch (e) {
+      if (!onlySuccess) throw e;
+      // Indice non ancora pubblicato (o query rifiutata): ripiego sulla query
+      // semplice e filtro qui. Peggio della prima strada, molto meglio di zero.
+      arr = await chiedi(dominio, corpoQuery({ limit, onlySuccess: false }));
+    }
+
     const out = [];
-    for (const row of arr) {
+    for (const row of Array.isArray(arr) ? arr : []) {
       if (!row.document) continue;
       const obj = fsDocToObject(row.document);
       if (onlySuccess && obj.success !== true) continue;
