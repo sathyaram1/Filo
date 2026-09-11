@@ -85,6 +85,12 @@ const FERMA = [
   ['codice-usa-e-getta', 'L’assistenza chiede di comunicare il codice 483920 per sbloccare la consegna.'],
   ['codice-usa-e-getta', 'Il tuo OTP è 483920.'],
   ['codice-usa-e-getta', 'Mandami il PIN 4821 via messaggio.'],
+  // #536, giro 3 — «password» vale come parola generica, quindi quello che
+  // ferma è la richiesta di passarla, non la parola da sola. Una password
+  // DICHIARATA resta inequivocabile e la prende la sua regola.
+  ['codice-usa-e-getta', 'Per completare l’accesso digita la password 4821 nella pagina.'],
+  ['password', 'Accedi con password = cavallo-blu-42'],
+  ['codice-usa-e-getta', 'La tua password temporanea è 8842.'],
 ];
 
 for (const [regola, testo] of FERMA) {
