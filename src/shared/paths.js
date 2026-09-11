@@ -73,33 +73,39 @@
     return out;
   }
 
-  // Crea un documento `paths`. I campi corrispondono allo schema di
-  // firestore.rules. `steps` è un array di {selector, action, retracted}.
-  async function submit({ domain, initialUrl, intent, steps, success, userAgent, clientId }) {
-    const doc = {
-      fields: {
-        domain: toFsValue(domain || ''),
-        initialUrl: toFsValue(initialUrl || ''),
-        intent: toFsValue(intent || ''),
-        steps: toFsValue(Array.isArray(steps) ? steps : []),
-        success: toFsValue(!!success),
-        userAgent: toFsValue(userAgent || ''),
-        clientId: toFsValue(clientId || ''),
-        createdAt: { timestampValue: new Date().toISOString() },
-      },
-    };
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
-    const res = await fetch(endpoint, {
+  // Invia un percorso al server, che lo ripulisce di nuovo e lo scrive.
+  // `clientId` NON finisce nel documento pubblico: viaggia nella richiesta come
+  // identità per i limiti di frequenza (vedi SN_PATHS_SAFETY.sanitizeSubmission).
+  // `idToken` è il Firebase ID token di chi è loggato, quando c'è: dà al server
+  // un'identità più forte del clientId. Chi non ha fatto login invia lo stesso —
+  // i mittenti restano anonimi, è la scrittura che non è più diretta.
+  async function submit({ domain, initialUrl, intent, steps, success, userAgent, clientId, idToken }) {
+    const Safety = global.SN_PATHS_SAFETY;
+    // La stessa pulizia che rifarà il server: quello che non passa di qui non
+    // vale la pena spedirlo.
+    const pulito = Safety
+      ? Safety.sanitizeSubmission({ domain, initialUrl, intent, steps, success, userAgent })
+      : { ok: true, doc: { domain, initialUrl, intent, steps, success: !!success, userAgent, clientId: '' } };
+    if (!pulito.ok) throw new Error(`percorso scartato prima dell'invio: ${pulito.reason}`);
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const res = await fetch(`${FUNCTIONS_BASE}/${SUBMIT_FUNCTION}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
+      headers,
+      body: JSON.stringify({ data: { ...pulito.doc, clientId: clientId || '' } }),
     });
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`firestore create paths fallito (${res.status}): ${errText.slice(0, 300)}`);
+      let detail = '';
+      try { detail = (await res.text()).slice(0, 300); } catch (_) {}
+      throw new Error(`pathSubmit ${res.status}${detail ? ': ' + detail : ''}`);
     }
-    const json = await res.json();
-    return { id: json.name?.split('/').pop() || '' };
+    const body = await res.json().catch(() => null);
+    const r = body && body.result;
+    if (!r || r.saved === false) {
+      throw new Error(`pathSubmit ha rifiutato il percorso: ${(r && r.reason) || 'motivo non dichiarato'}`);
+    }
+    return { id: (r && r.id) || '' };
   }
 
   // Lista i path di un dominio specifico, ordinati per recency. Usata in
