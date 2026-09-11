@@ -26,6 +26,7 @@
         'Un indirizzo che Filo ha trovato dentro quello che ha appena letto non si apre più da solo: prima te lo mostra e ti chiede se andare. Il resto della navigazione resta immediato come prima.',
         'Se hai acceso «solo modelli a pesi aperti» e quel controllo finirebbe sullo stesso modello che scrive le risposte, Filo si ferma e ti dice dove sistemarlo: un testo controllato da chi l\'ha scritto non è controllato.',
         'Passa dal controllo anche il saluto della nuova scheda e i bottoni che ci trovi accanto: li scrive Filo guardando le pagine che hai salvato, e il titolo di una pagina lo sceglie chi l\'ha scritta. I bottoni nati così ti chiedono conferma prima di aprire un indirizzo, dicendoti dove porta.',
+        'Filo sa quali schede hai aperte: prima, se glielo chiedevi, rispondeva che non ne vedeva nessuna. Le riconosce dal sito, così puoi dirgli «chiudi quella del giornale».',
       ],
     },
     {
