@@ -216,6 +216,8 @@ test('D — anche la risposta del messaggio dopo passa dal guardiano, e il trane
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo').last())
     .toContainText('Ho fermato un avviso', { timeout: 30_000 });
+  // E dice da dove veniva: la ricerca di due battute fa, non «un contenuto».
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('una ricerca sul web');
   await expect(page.locator('#bubbles')).not.toContainText('per non perdere l’accesso');
   expect(await app.evaluate(() => globalThis.__guardiano)).toBe(2);
 });
