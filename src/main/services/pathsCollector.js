@@ -250,7 +250,7 @@
   const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;    // un mese
 
   let coda = [];
-  let caricata = false;
+  let caricamento = null;   // la lettura del disco, una sola per tutti
   let sto = false;      // un giro alla volta
   let auto = true;      // spegnibile nei test
   let timer = null;
