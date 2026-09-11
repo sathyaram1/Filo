@@ -26,7 +26,10 @@ test('nel menu App ogni voce con icona mostra la sua icona SVG', async ({ shell,
 
   // Le voci del launcher che devono avere un'icona (le due nel mirino del
   // feedback + le altre come controllo che nessuna sia rimasta muta).
-  for (const label of ['Editor', 'Deck builder MTG', 'Feedback', 'Bacheca', 'Gestione']) {
+  // «Feedback» e «Gestione» non sono qui dal 2026-09 (#583): aprono superfici
+  // che legge solo chi gestisce le segnalazioni, quindi il menu le mostra solo
+  // all'owner, e negli spec non c'è nessuna sessione admin.
+  for (const label of ['Editor', 'Deck builder MTG', 'Bacheca']) {
     const item = popup.locator('.item', { hasText: label });
     await expect(item, `voce "${label}" assente nel menu App`).toBeVisible();
     await expect(
@@ -38,4 +41,12 @@ test('nel menu App ogni voce con icona mostra la sua icona SVG', async ({ shell,
   // La rinomina richiesta: "Mazzi" non compare più, "Deck builder MTG" sì.
   await expect(popup.locator('.item', { hasText: 'Deck builder MTG' })).toBeVisible();
   await expect(popup.getByText('Mazzi', { exact: true })).toHaveCount(0);
+
+  // #583: le superfici dell'owner non si annunciano a chi non le può aprire.
+  for (const riservata of ['Feedback', 'Gestione']) {
+    await expect(
+      popup.getByText(riservata, { exact: true }),
+      `«${riservata}» apre una pagina che a chi non è amministratore non mostra niente`,
+    ).toHaveCount(0);
+  }
 });
