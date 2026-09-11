@@ -610,9 +610,16 @@ module.exports = function register(on, ctx) {
         if (!settings.apiKeys?.[settings.provider]) return;
         const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
         const cid = msg.payload?.clientId || '';
+        // #585: il percorso non si scrive più dal client, lo scrive il server.
+        // Se chi naviga è loggato, gli diamo il suo ID token: è un'identità più
+        // forte del clientId per i limiti di frequenza. Sloggato si invia lo
+        // stesso (il mittente resta anonimo), e un token non recuperabile non
+        // deve far fallire la telemetria.
+        let idToken = '';
+        try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
         const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
         const r = await PathsCollector.collectAndSave({
-          session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid,
+          session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid, idToken,
         });
         if (r?.saved) console.info('[Filo] path salvato:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }
