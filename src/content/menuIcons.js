@@ -43,6 +43,28 @@
     return out;
   }
 
+  // #583 — «Feedback» fra le icone apre la POSTA delle segnalazioni, che da
+  // quando i feedback li legge solo chi li gestisce non ha niente da mostrare a
+  // un utente comune: una pagina vuota con un invito ad accedere come
+  // amministratore, cosa che accedendo non si diventa. L'icona compare quindi
+  // solo all'owner. Parte nascosta e si accende dopo la risposta del main:
+  // sbagliare per difetto fa perdere un'icona a una persona sola, sbagliare per
+  // eccesso manda tutti gli altri in un vicolo cieco.
+  let isOwner = false;
+  function refreshOwner() {
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }))
+        .then((r) => {
+          const now = !!(r && r.ok && r.signedIn && r.isAdmin);
+          if (now === isOwner) return;
+          isOwner = now;
+          // Il menu può essere già aperto: le icone si ridisegnano da sole.
+          try { redrawIconRows(); } catch (_) {}
+        })
+        .catch(() => {});
+    } catch (_) {}
+  }
+
   function runInTopFrame(iconId) {
     try {
       Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
