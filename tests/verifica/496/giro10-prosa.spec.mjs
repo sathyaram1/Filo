@@ -120,8 +120,17 @@ test('una nota scritta dall’owner in cima alla conversazione non è un giro', 
 
   // Il campo note della dashboard si modifica per intero in una casella di
   // testo: quello che l'owner scrive in cima al blob è, per la scheda, la
-  // prima riga di un turno di Filo.
+  // prima riga di un turno di Filo. Non aggiunge un giro e non fa leggere
+  // «Passata subito» una lavorazione che di giri ne è costati due.
+  //
+  // ⚠️ IL CONTO SCENDE DA DUE A UNO, ED È VOLUTO (giro 13). Il primo verbale di
+  // questa conversazione sta nella testa del campo note, senza marcatore; sotto
+  // una riga scritta a mano non si distingue più da un verbale INCOLLATO lì
+  // sotto da qualcuno, e contarlo faceva leggere «fermata alla verifica» una
+  // lavorazione passata, con un giro bloccante mai successo. Fra le due
+  // direzioni si sceglie quella che toglie: un giro inventato sposta il lavoro
+  // nella fetta sbagliata e chi guarda non ha modo di accorgersene.
   const conNota = await leggi(page, `Verifica superata. Ho guardato io, va bene.\n\n${dueGiri('Corretto.')}`);
-  expect(conNota.legenda, conNota.legenda).toContain('2 critiche');
+  expect(conNota.legenda, conNota.legenda).toContain('1 critica');
   expect(conNota.legenda, conNota.legenda).not.toContain('Passata subito');
 });
