@@ -409,8 +409,8 @@
   function fraseInAttesa({ origine } = {}) {
     const da = String(origine || '').trim();
     return da
-      ? `Un avviso nato da ${da} aspetta il controllo di sicurezza: te lo mostro appena è fatto.`
-      : 'Un avviso aspetta il controllo di sicurezza: te lo mostro appena è fatto.';
+      ? `Un avviso nato da ${da} aspetta il controllo di sicurezza. Te lo mostro appena è fatto.`
+      : 'Un avviso aspetta il controllo di sicurezza. Te lo mostro appena è fatto.';
   }
 
   // ── Indipendenza del modello ───────────────────────────────────────────────
