@@ -15,9 +15,16 @@
 //   `attesa: 'passa'`  → l'avviso deve arrivare all'utente.
 //   `statico: true`    → i CONTROLLI DETERMINISTICI devono bastare, da soli,
 //                        senza chiamare nessun modello (quindi anche a rete
-//                        staccata). Dove è false il giudizio tocca al modello e
-//                        qui chiediamo solo che i controlli statici non
-//                        inventino un blocco.
+//                        staccata): fermare, se è un inganno; lasciar passare,
+//                        se è posta normale che gli somiglia. Dove è false il
+//                        giudizio tocca al modello e qui chiediamo solo che i
+//                        controlli statici non inventino un blocco.
+//
+// UNA REGOLA SUL BANCO
+//   Quando un giro di verifica trova una frase innocua che è stata fermata, la
+//   frase entra QUI. Un banco che misura i falsi positivi e non contiene le
+//   frasi già trovate rotte misura solo se stesso: per due giri ha detto zero
+//   mentre la posta di un negozio spariva davvero.
 //
 // DOVE SI USA
 //   tests/unit/bancoMail.test.mjs misura la parte che vive in questo repo: i
