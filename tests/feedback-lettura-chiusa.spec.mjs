@@ -105,11 +105,16 @@ test('da una pagina di Filo la lettura passa dal main, che la nega a chi non è 
     const fetchVero = window.fetch;
     window.fetch = async (...a) => { toccataLaRete = true; return fetchVero(...a); };
     let errore = '';
+    let frase = '';
     try { await window.SN_FEEDBACK.list({ pageSize: 10 }); }
-    catch (e) { errore = String((e && e.message) || e); }
+    catch (e) {
+      errore = String((e && e.message) || e);
+      // Quello che l'utente legge davvero in pagina.
+      frase = window.SN_CHAT_ERRORS ? window.SN_CHAT_ERRORS.sentence(e) : errore;
+    }
     window.fetch = fetchVero;
     window.filo.message = vero;
-    return { tipi, toccataLaRete, errore };
+    return { tipi, toccataLaRete, errore, frase };
   });
 
   // La pagina ha CHIESTO al main, invece di andarsi a prendere i documenti.
@@ -117,6 +122,10 @@ test('da una pagina di Filo la lettura passa dal main, che la nega a chi non è 
   expect(esito.toccataLaRete).toBe(false);
   // E il main, senza un admin dietro, non legge niente per conto di nessuno.
   expect(esito.errore.toLowerCase()).toContain('amministrator');
+  // Chi non può leggere se lo sente dire com'è: non "controlla la
+  // connessione", che manderebbe a guardare la cosa sbagliata.
+  expect(esito.frase.toLowerCase()).toContain('amministrator');
+  expect(esito.frase.toLowerCase()).not.toContain('connessione');
 });
 
 test('inviare un feedback continua a funzionare senza credenziali', async ({ openTab }) => {
