@@ -303,11 +303,17 @@ module.exports = function register(on, ctx) {
       // quello vero anche dopo un cambio dispositivo) prima di premiare.
       await ensureAccountSync().catch(() => {});
       const id = await globalThis.SN_STORAGE?.getRaw?.('sn_feedback_client_id', null);
-      if (!id || !FB?.list) return empty;
+      if (!id || !FB?.listPublic) return empty;
 
+      // #583: si leggono le SCHEDE pubbliche, non i feedback. La collezione
+      // vera non si apre senza credenziali (e questa macchina non ne ha: il
+      // popup gira da chiunque abbia Filo). Nella scheda c'è tutto quello che
+      // serve qui — l'hash dell'installazione per riconoscere i propri, il
+      // titolo, il numero e la frase per chi ha segnalato — e niente dei
+      // feedback altrui.
       let all;
-      try { all = await FB.list({ pageSize: 200 }); }
-      catch (e) { console.warn('[credits] lista feedback non disponibile:', e?.message || e); return empty; }
+      try { all = await FB.listPublic({ pageSize: 200, timeoutMs: 15000 }); }
+      catch (e) { console.warn('[credits] schede dei feedback non disponibili:', e?.message || e); return empty; }
 
       // S1.F2.2: pre-calcola l'hash del clientId locale UNA VOLTA per tutti i confronti.
       // Stesso algoritmo di feedbackClientIdHash.js (SHA-256 troncato 32 hex).
