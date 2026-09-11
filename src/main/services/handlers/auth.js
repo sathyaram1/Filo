@@ -299,8 +299,14 @@ module.exports = function register(on, ctx) {
   // invariate (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
   on(MSG.FEEDBACK_DECRYPT_IMAGE, async (msg) => {
     try {
+      // Questo canale lo chiamano DUE pagine: la dashboard dell'owner e il
+      // riquadro dei feedback, dove un utente qualunque riapre le proprie
+      // segnalazioni. Chi non è amministratore l'immagine non la vedrà (è
+      // cifrata con la chiave di chi riceve le segnalazioni), ma `soloDestinatario`
+      // dice alla pagina che non è un guasto: l'allegato è partito, e il
+      // segnaposto lo scrive così invece di dire "non disponibile".
       if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori.' };
+        return { ok: false, soloDestinatario: true, error: attachmentNotForYouHelp() };
       }
       const url = String((msg && msg.url) || '');
       const FB = globalThis.SN_FEEDBACK;
