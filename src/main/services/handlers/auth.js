@@ -775,10 +775,13 @@ module.exports = function register(on, ctx) {
       await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
 
       const published = await publicCards({ fresh: true });
-      // `complete`: il caricamento non ha toccato il tetto, quindi questi sono
-      // TUTTI i feedback che esistono — solo allora una scheda senza feedback
-      // è un orfano (feedback cancellato) e si può togliere.
-      const complete = raw.length < FB.LIST_PAGE_SIZE;
+      // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto,
+      // quindi questi sono TUTTI i feedback che esistono, e solo allora una
+      // scheda senza feedback è un orfano (feedback cancellato) da togliere.
+      // Si guarda la pagina di partenza, non il totale: le segnalazioni pescate
+      // per data di chiusura sono un'aggiunta, e contarle direbbe «pagina
+      // piena» anche quando non lo era.
+      const complete = base.length < FB.LIST_PAGE_SIZE;
       const plan = V.planSync(published, feedbacks, { complete });
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
