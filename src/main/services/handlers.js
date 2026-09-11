@@ -154,8 +154,16 @@ async function buildMessages(action, payload) {
     }) }];
   }
   if (action === ACTIONS.HELP_INTENT_JUDGE) {
+    // initialUrl e steps NON sono decorazione: sono le due parti che la pulizia
+    // per forme non sa ripulire fino in fondo (un nome scritto a lettere è una
+    // parola come un'altra), e il giudice è l'unica cosa che le guarda prima
+    // che finiscano in una raccolta pubblica. Restavano fuori di qui mentre
+    // tutto il resto — il documento, le regole, la pagina che spiega la privacy
+    // — dava per scontato che le vedesse: il giudice riceveva «(nessuna)» e
+    // «(nessun elemento)» e approvava alla cieca (#584, terzo giro).
     return [{ role: 'user', content: PROMPTS.helpIntentJudge({
       proposedIntent: payload.proposedIntent, userMessages: payload.userMessages,
+      initialUrl: payload.initialUrl, steps: payload.steps,
     }) }];
   }
   if (action === ACTIONS.FILO_CHAT) {
