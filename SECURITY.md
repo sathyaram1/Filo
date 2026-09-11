@@ -225,7 +225,13 @@ rotazione è da rifare da capo.
 
 ## 8. I percorsi condivisi dell'Aiuto
 
-**Stato: ✅ (scrittura chiusa nelle regole; la callable `pathSubmit` va ancora deployata)**
+**Stato: 🔜 — la porta è chiusa, la strada nuova non è ancora aperta.** Le
+regole non lasciano più scrivere nessun client, e in lettura i percorsi sono
+già trattati come contenuto esterno. Manca la callable `pathSubmit`: oggi
+l'indirizzo risponde che non esiste, quindi nessun percorso entra più nella
+raccolta e ogni invio fallisce senza lasciare traccia fuori dalla console.
+Va sciolto prima di pubblicare una versione, o la raccolta resta ferma e non
+se ne accorge nessuno.
 
 Quando l'Aiuto ti accompagna passo passo su un sito e alla fine rispondi «ha
 funzionato», Filo può salvare la traccia di quella navigazione. Dentro ci sono
