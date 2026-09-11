@@ -719,7 +719,10 @@ module.exports = function register(on, ctx) {
       // feedback nuovo arriverebbe senza numero.
       const maxSeq = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
       if (maxSeq > 0) {
-        try { await FB.ensureSeqCounter(maxSeq, { idToken }); }
+        // `allowLower` solo con `complete`: sono TUTTI i feedback che esistono,
+        // quindi un contatore più alto del massimo `seq` è stato gonfiato da
+        // qualcuno e va riportato giù (chiunque lo può far avanzare di uno).
+        try { await FB.ensureSeqCounter(maxSeq, { idToken, allowLower: complete }); }
         catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
       }
 
