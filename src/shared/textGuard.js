@@ -512,7 +512,7 @@
   //    chiamata; un blocco automatico di troppo costa la risposta dell'utente.
   const PASSARE_ARE = 'comunic|inoltr|mand|invi|pass|gir|dett';
   const PRONOME = '(?:me|te|ce|ve|glie)?(?:lo|la|li|le|ne|mi|ti|ci|vi)';
-  const CHIEDE_DI_PASSARLO = new RegExp([
+  const CHIEDE_DI_PASSARLO_SRC = [
     // infinito: «ti chiede di comunicare il codice»
     `\\b(?:${PASSARE_ARE})are\\b`,
     // infinito col pronome: «comunicarlo», «mandarcelo»
@@ -535,7 +535,8 @@
     // persona facevano sparire la posta di un negozio.
     '\\b(?:digita|digitare|digitarlo|digitarla|digitalo|digitala|digitate|digitatelo)\\b',
     '\\b(?:inserisci|inseriscilo|inseriscila|inserire|inserirlo|inserirla|inserite|inseritelo)\\b',
-  ].join('|'), 'i');
+  ].join('|');
+  const CHIEDE_DI_PASSARLO = new RegExp(CHIEDE_DI_PASSARLO_SRC, 'i');
   // Quello che «codice» qualifica quasi sempre, e che non apre niente.
   //
   // Il qualificatore va riconosciuto anche CON L'ARTICOLO in mezzo, che in
@@ -560,7 +561,10 @@
     'postale', 'fiscale', 'iban', 'bic', 'swift', 'ean', 'isbn', 'sdi', 'meccanografico',
     'prodott[oi]', 'articol[oi]', 'lotto', 'seriale', 'commessa', 'cig', 'cup',
     'prenotazione', 'pratica', 'tracciamento', 'spedizione', 'consegna', 'ritiro',
-    'pacc[oh]i?', 'collo', 'corriere', 'bonific[oi]', 'pagament[oi]', 'rimbors[oi]',
+    // «pagamento» e «rimborso» NON ci stanno, per quanto compaiano in mille mail
+    // vere: sono anche le due parole con cui si apre metà delle truffe, e qui
+    // una parola sbagliata non fa sparire una risposta, spegne un controllo.
+    'pacc[oh]i?', 'collo', 'corriere', 'bonific[oi]',
     'fattura', 'contratto', 'bollettino', 'bollett[ae]', 'polizza', 'pagoPA',
     'avviso', 'tributo',
     'biglietto', 'abbonamento', 'tessera', 'iscrizione', 'cors[oi]', 'event[oi]',
@@ -630,8 +634,15 @@
     // a tutti gli effetti; tutto il resto vale come per «codice».
     `(?:password|\\bpin\\b|\\btoken\\b|passcode|parola d'ordine)\\s+${GETTONE_IN_MEZZO}`
       + `${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_COSA}|${COSA_FISICA})`,
-    // La cosa innocua prima della parola di codice, nella stessa frase.
-    `(?:${QUALIFICATORE_COSA}|${COSA_FISICA})\\b[^.;:!?]{0,30}?\\b${PAROLA_DI_CODICE}`,
+    // La cosa innocua PRIMA della parola di codice: «Per il reso serve il codice
+    // 4409», «Per il cancello automatico usa il codice 7788». Stretta due volte,
+    // perché la stessa inversione la usa anche la truffa («per riattivare
+    // l'ordine comunica il codice 219933»): serve l'attacco «per il/la», che
+    // introduce la cosa e non un'azione da fare, e fra la cosa e il codice non
+    // deve esserci nessuno che chiede di passarlo. Provato: senza questi due
+    // paletti la regola salvava le truffe invece delle mail del negozio.
+    `per\\s+(?:il|lo|la|l'|i|gli|le)\\s*(?:${QUALIFICATORE_COSA}|${COSA_FISICA})\\b`
+      + `(?:(?!${CHIEDE_DI_PASSARLO_SRC})[^.;:!?]){0,30}?\\b${PAROLA_DI_CODICE}`,
     'numero (?:di|d\')\\s*(?:serie|seriale|ordine|pratica|prenotazione|spedizione|tracciamento|fattura|cliente|biglietto)',
     // «Il codice di attivazione della SIM», «il codice di conferma della
     // prenotazione»: la cosa non sta attaccata a «codice», sta dopo la funzione.
