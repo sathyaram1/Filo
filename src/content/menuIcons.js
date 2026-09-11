@@ -136,8 +136,15 @@
       openOptions:   { id: 'openOptions',   icon: I('options'),     label: I18n.t('menu_open_options'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS }) },
       home:          { id: 'home',          icon: I('home'),        label: I18n.t('menu_open_home'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.GO_HOME }) },
       editorApp:     { id: 'editorApp',     icon: I('editor'),      label: I18n.t('menu_open_editor'),       onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }) },
-      feedbackApp:   { id: 'feedbackApp',   icon: I('feedback'),    label: I18n.t('menu_open_feedback'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) },
     };
+    // Solo all'owner (vedi refreshOwner sopra): a chiunque altro quella pagina
+    // non ha niente da mostrare. Un id assente dal registro sparisce da solo
+    // anche dai layout che l'utente si era salvato: i builder filtrano su
+    // `registry[id]`.
+    if (isOwner) {
+      registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
+    }
+    return registry;
   }
 
   // Layout di default: icone primarie nella riga, le altre nella griglia
