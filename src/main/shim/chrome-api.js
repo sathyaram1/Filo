@@ -73,7 +73,22 @@ const chromeShim = {
       }
       return null;
     },
-    async query() { return []; },
+    // Le schede aperte davvero. Prima qui c'era `return []`, e la sezione «TAB
+    // APERTE» del riassunto che Filo si porta in ogni conversazione diceva
+    // «(nessuna)» anche con dieci schede aperte: chi chiedeva «quali schede ho
+    // aperte?» parlava con un Filo che non ne vedeva una.
+    async query() {
+      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const mgr = win && win._filoTabs;
+      if (!mgr || !Array.isArray(mgr.tabs)) return [];
+      return mgr.tabs.map((t) => ({
+        id: t.id,
+        url: t.url || '',
+        title: t.title || '',
+        active: t.id === mgr.activeId,
+        lastAccessed: t.lastAccessed || null,
+      }));
+    },
     async remove(id) {
       const win = require('electron').BrowserWindow.getAllWindows()[0];
       if (win && win._filoTabs) win._filoTabs.closeTab(id);
