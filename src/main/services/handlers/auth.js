@@ -686,6 +686,55 @@ module.exports = function register(on, ctx) {
   let lastSyncAt = 0;
   const SYNC_MIN_GAP_MS = 60_000;
 
+  /**
+   * La scheda pubblica di UN feedback, per id: la scrive, l'aggiorna o la
+   * toglie secondo quello che dice il feedback adesso.
+   *
+   * Esiste perché il giro generale lavora su una pagina di caricamento (i 500
+   * più recenti per data d'invio) e i feedback più vecchi ne restano fuori: per
+   * loro la bacheca si congelava all'ultimo giro in cui erano dentro. Qui
+   * l'id lo sappiamo, quindi non serve cercarli.
+   *
+   * Best-effort: se fallisce non fa fallire il triage (la segnalazione è già
+   * cambiata sul server), ma lo scrive nei log. Il giro generale resta la rete
+   * di sicurezza per i feedback recenti.
+   */
+  async function syncOneCard(id, idToken) {
+    const FB = FEEDBACK();
+    const V = PUBLIC_VIEW();
+    const key = String(id || '');
+    if (!FB || !V || !key || !idToken) return;
+    try {
+      const priv = await getPrivateKey();
+      // Senza chiave lo status è un blob: pubblicare sarebbe alla cieca e
+      // togliere cancellerebbe una scheda buona. Stessa scelta del giro
+      // generale: fermarsi e dirlo.
+      if (!priv) {
+        console.warn('[feedback] scheda singola saltata: chiave privata non configurata');
+        return;
+      }
+      const rows = await FB.getMany([key], { idToken });
+      const row = rows && rows[0];
+      if (!row) return; // cancellato nel frattempo: se ne occupa il giro generale
+      const fb = await decryptFeedbackObject(row, priv);
+      const card = V.cardFor(fb);
+      if (!card) {
+        await FB.unpublishPublicCard(key, { idToken });
+      } else {
+        // I voti e le riaperture stanno sulla scheda: la maschera di
+        // publishPublicCard non li tocca, ma quelli rimasti sul documento vanno
+        // portati dentro come fa il giro generale.
+        let before = null;
+        try { before = await FB.getPublic(key, { idToken }); } catch (_) {}
+        const carry = V.carryUserFields(fb, before);
+        await FB.publishPublicCard(key, Object.keys(carry).length ? { ...card, ...carry } : card, { idToken });
+      }
+      cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
+    } catch (e) {
+      console.warn('[feedback] scheda singola non aggiornata:', e?.message || e);
+    }
+  }
+
   function scheduleViewSync({ delayMs = 2000, force = false, rows = null } = {}) {
     if (syncTimer) return;
     syncTimer = setTimeout(() => {
