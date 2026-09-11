@@ -1,10 +1,25 @@
-// Client Firestore REST per la collection `paths` (raccolta percorsi
-// dell'Aiuto). Stesso progetto Firebase usato dai feedback.
+// Client Firestore REST per i percorsi condivisi dell'Aiuto (collezione
+// `paths`). Stesso progetto Firebase usato dai feedback.
 //
 // Pattern uguale a SN_FEEDBACK ma molto più ridotto: niente upload immagini,
-// solo create + list. Funziona sia da service worker sia da pagina.
+// solo create + lettura per dominio.  Funziona sia da service worker sia da
+// pagina.
 //
-// Espone SN_PATHS = { submit, list }.
+// COSA C'È DENTRO UN PERCORSO, e cosa NON c'è (audit pre-alpha, #584).
+// Un documento dice: da che punto del sito si parte, qual è l'intento, quali
+// azioni portano a farlo, se è andata bene. Non dice CHI l'ha fatto: niente
+// clientId, niente user agent, e l'ora è arrotondata (vedi `oraArrotondata`).
+// Il motivo sta tutto in una riga: per riusare un percorso non serve sapere
+// chi l'ha percorso, e finché un identificativo del mittente c'è, qualcuno
+// può ricucire i percorsi della stessa persona su domini diversi.
+//
+// Per lo stesso motivo il DOMINIO è un segmento del percorso Firestore
+// (`paths/<dominio>/entries`) e non un campo: chiedere i percorsi vuol dire
+// nominare un dominio, e la collezione intera non è più una cosa che si possa
+// scaricare. Le regole (firestore.rules, blocco `match /paths/{domain}`) sono
+// l'altra metà: lì la vecchia forma piatta è chiusa in lettura.
+//
+// Espone SN_PATHS = { submit, listByDomain, formatForPrompt }.
 
 (function (global) {
   'use strict';
@@ -12,8 +27,18 @@
   const PROJECT_ID = 'filo-8b9cb';
   const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY';
   const COLLECTION = 'paths';
+  const SUBCOLLECTION = 'entries';
 
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+
+  // Tetto della `limit` accettato dalle regole per una lettura. Il client si
+  // ferma prima da solo invece di farsi rifiutare la query: una richiesta più
+  // grande viene ridotta a questo, non respinta.
+  const MAX_PAGE_SIZE = 200;
+
+  // Quanto testo di percorsi già riusciti può entrare nel prompt dell'agente
+  // di pagina.
+  const PROMPT_BUDGET_CHARS = 20 * 1024;
 
   function toFsValue(v) {
     if (v === null || v === undefined) return { nullValue: null };
@@ -58,22 +83,56 @@
     return out;
   }
 
-  // Crea un documento `paths`. I campi corrispondono allo schema di
+  // Il dominio diventa l'ID di un documento Firestore: deve essere un nome di
+  // host e nient'altro. Fuori da questo insieme (una barra, uno spazio, un ID
+  // riservato `__…__`) non si ripiega su qualcosa di simile: si torna stringa
+  // vuota e il chiamante non scrive/legge niente. Un dominio "quasi giusto"
+  // scriverebbe percorsi in un posto dove nessuno andrà mai a leggerli.
+  const DOMINIO_VALIDO = /^[a-z0-9._-]{1,253}$/;
+
+  function segmentoDominio(domain) {
+    const d = String(domain || '').trim().toLowerCase();
+    if (!DOMINIO_VALIDO.test(d)) return '';
+    if (d === '.' || d === '..') return '';
+    if (d.startsWith('__') && d.endsWith('__')) return '';
+    return d;
+  }
+
+  // L'ora del percorso, arrotondata all'ora piena. Al consumatore serve solo
+  // sapere quali percorsi sono recenti; al minuto e al secondo, invece, un
+  // orario diventa una chiave di join: due percorsi salvati su domini diversi
+  // a quaranta secondi di distanza sono quasi certamente della stessa persona.
+  function oraArrotondata(ms) {
+    const t = Number.isFinite(ms) ? ms : Date.now();
+    const ORA = 60 * 60 * 1000;
+    return new Date(Math.floor(t / ORA) * ORA).toISOString();
+  }
+
+  function urlCollezione(domain) {
+    return `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(domain)}/${SUBCOLLECTION}`;
+  }
+
+  function urlQuery(domain) {
+    return `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(domain)}:runQuery`;
+  }
+
+  // Crea un percorso sotto il suo dominio. I campi corrispondono allo schema di
   // firestore.rules. `steps` è un array di {selector, action, retracted}.
-  async function submit({ domain, initialUrl, intent, steps, success, userAgent, clientId }) {
+  // NON accetta identificativi del mittente: non è una dimenticanza, è il
+  // punto (vedi la testata).
+  async function submit({ domain, initialUrl, intent, steps, success, now }) {
+    const dominio = segmentoDominio(domain);
+    if (!dominio) throw new Error(`dominio non valido per un percorso: ${String(domain).slice(0, 80)}`);
     const doc = {
       fields: {
-        domain: toFsValue(domain || ''),
         initialUrl: toFsValue(initialUrl || ''),
         intent: toFsValue(intent || ''),
         steps: toFsValue(Array.isArray(steps) ? steps : []),
         success: toFsValue(!!success),
-        userAgent: toFsValue(userAgent || ''),
-        clientId: toFsValue(clientId || ''),
-        createdAt: { timestampValue: new Date().toISOString() },
+        createdAt: { timestampValue: oraArrotondata(now) },
       },
     };
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
+    const endpoint = `${urlCollezione(dominio)}?key=${API_KEY}`;
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,29 +146,26 @@
     return { id: json.name?.split('/').pop() || '' };
   }
 
-  // Lista i path di un dominio specifico, ordinati per recency. Usata in
-  // futuro dal consumer (sidebar Aiuto) per arricchire il prompt.
+  // Legge i percorsi di UN dominio, dal più recente. La query gira sotto
+  // `paths/<dominio>`: non c'è nessun filtro `domain == …` da scrivere, ed è
+  // questo che rende impossibile chiederli tutti.
+  //
+  // L'esito (`success`) si filtra qui e non nella query: un `where` in più
+  // pretenderebbe un indice composto da deployare a parte, e finché non c'è la
+  // lettura fallisce in silenzio (l'errore è inghiottito dal chiamante, e
+  // l'agente perde i percorsi senza dirlo a nessuno).
   async function listByDomain(domain, { pageSize = 50, onlySuccess = true } = {}) {
-    if (!domain) return [];
-    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
-    const filters = [
-      { fieldFilter: { field: { fieldPath: 'domain' }, op: 'EQUAL', value: { stringValue: domain } } },
-    ];
-    if (onlySuccess) {
-      filters.push({ fieldFilter: { field: { fieldPath: 'success' }, op: 'EQUAL', value: { booleanValue: true } } });
-    }
-    const where = filters.length === 1
-      ? filters[0]
-      : { compositeFilter: { op: 'AND', filters } };
+    const dominio = segmentoDominio(domain);
+    if (!dominio) return [];
+    const limit = Math.max(1, Math.min(MAX_PAGE_SIZE, Number(pageSize) || 50));
     const body = {
       structuredQuery: {
-        from: [{ collectionId: COLLECTION }],
-        where,
+        from: [{ collectionId: SUBCOLLECTION }],
         orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
-        limit: pageSize,
+        limit,
       },
     };
-    const res = await fetch(endpoint, {
+    const res = await fetch(`${urlQuery(dominio)}?key=${API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -122,14 +178,62 @@
     const out = [];
     for (const row of arr) {
       if (!row.document) continue;
-      out.push(fsDocToObject(row.document));
+      const obj = fsDocToObject(row.document);
+      if (onlySuccess && obj.success !== true) continue;
+      out.push(obj);
     }
     return out;
+  }
+
+  // ---------------------------------------------------------------------
+  // Dal documento al prompt: i "percorsi già riusciti" che l'agente di pagina
+  // si trova nel messaggio di sistema. Sta qui, accanto alla lettura, perché
+  // è l'altra metà dello stesso cammino — e perché così si prova con un unit
+  // test, senza accendere Electron.
+
+  function clusterKey(p) {
+    const init = (p && p.initialUrl) || '';
+    const steps = Array.isArray(p && p.steps) ? p.steps : [];
+    const sig = steps.map((s) => `${(s && s.action) || 'click'}|${(s && s.selector) || ''}`).join(',');
+    return init + '::' + sig;
+  }
+
+  function formatForPrompt(rawPaths, { budgetChars = PROMPT_BUDGET_CHARS } = {}) {
+    if (!Array.isArray(rawPaths) || !rawPaths.length) return '';
+    const seen = new Set();
+    const dedup = [];
+    for (const p of rawPaths) {
+      const k = clusterKey(p);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      dedup.push(p);
+    }
+    const lines = [];
+    let chars = 0;
+    for (const p of dedup) {
+      const intent = ((p && p.intent) || '').trim() || '(intento ignoto)';
+      const init = ((p && p.initialUrl) || '').trim() || '/';
+      const header = `## "${intent}" (da ${init})`;
+      const stepLines = ((p && p.steps) || []).map((s, i) => {
+        const a = (s && s.action) || 'click';
+        const sel = (s && s.selector) || '?';
+        const r = (s && s.retracted) ? ' [poi corretto]' : '';
+        return `  ${i + 1}. ${a} su ${sel}${r}`;
+      });
+      const block = [header, ...stepLines].join('\n');
+      if (chars + block.length + 2 > budgetChars) break;
+      lines.push(block);
+      chars += block.length + 2;
+    }
+    return lines.join('\n\n');
   }
 
   global.SN_PATHS = {
     submit,
     listByDomain,
-    configPublic: { projectId: PROJECT_ID, collection: COLLECTION },
+    formatForPrompt,
+    configPublic: { projectId: PROJECT_ID, collection: COLLECTION, subcollection: SUBCOLLECTION },
+    rest: { FIRESTORE_BASE, MAX_PAGE_SIZE, PROMPT_BUDGET_CHARS },
+    _internal: { segmentoDominio, oraArrotondata, clusterKey },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
