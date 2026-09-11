@@ -41,15 +41,26 @@ const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
 // (né fallire) niente.
 const CODICE = RULES.replace(/\/\/[^\n]*/g, '');
 
+// La graffa che APRE un blocco, a partire da `da`. Non tutte le graffe lo
+// fanno: `match /paths/{domain} {` ne ha una che è un jolly del percorso, e
+// contarla porterebbe a leggere come corpo del blocco la parola "domain".
+function apreBlocco(testo, da) {
+  for (let j = da; j < testo.length; j += 1) {
+    if (testo[j] !== '{') continue;
+    const chiusa = testo.indexOf('}', j);
+    const dentro = chiusa < 0 ? '' : testo.slice(j + 1, chiusa);
+    if (chiusa > j && /^[A-Za-z0-9_]+(=\*\*)?$/.test(dentro)) { j = chiusa; continue; }
+    return j;
+  }
+  return -1;
+}
+
 // Estrae il corpo di un blocco `match <percorso> {` bilanciando le graffe:
 // i blocchi dei percorsi sono annidati, una regex sola non basta.
 function corpoMatch(testo, percorso) {
-  const etichetta = `match ${percorso}`;
-  const i = testo.indexOf(etichetta);
+  const i = testo.indexOf(`match ${percorso}`);
   if (i < 0) return null;
-  // La graffa che apre il blocco, NON quella del carattere jolly nel percorso
-  // (`{domain}` ne ha una): si parte dopo l'etichetta.
-  const apre = testo.indexOf('{', i + etichetta.length);
+  const apre = apreBlocco(testo, i);
   if (apre < 0) return null;
   let livello = 0;
   for (let j = apre; j < testo.length; j += 1) {
