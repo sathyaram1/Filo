@@ -237,6 +237,40 @@
     return { upsert, remove };
   }
 
+  /**
+   * Riunisce ai feedback i campi che vivono sulla SCHEDA: i voti e le
+   * riaperture, che oggi si scrivono lì perché è l'unico documento che chi
+   * vota può aprire. PURA.
+   *
+   * Chi fa i conti dal lato dell'owner (la dashboard, l'archiviazione a
+   * punteggio) continua così a leggere `fb.votes` come ha sempre fatto. Quello
+   * che sta solo sul documento — i voti dati prima del passaggio — non si
+   * perde: la scheda vince chiave per chiave, non cancella il resto.
+   *
+   * @param {Array<object>} rows feedback (con `_id`)
+   * @param {Array<object>} cards schede pubbliche (con `_id`)
+   */
+  function mergeUserFields(rows, cards) {
+    if (!Array.isArray(rows) || rows.length === 0) return Array.isArray(rows) ? rows : [];
+    const byId = new Map();
+    for (const c of Array.isArray(cards) ? cards : []) {
+      if (c && c._id) byId.set(String(c._id), c);
+    }
+    if (byId.size === 0) return rows;
+    return rows.map((r) => {
+      const card = byId.get(String(r && r._id));
+      if (!card) return r;
+      const out = { ...r };
+      for (const f of USER_FIELDS) {
+        const fromDoc = (r && typeof r[f] === 'object' && r[f]) || {};
+        const fromCard = (typeof card[f] === 'object' && card[f]) || {};
+        const merged = { ...fromDoc, ...fromCard };
+        if (Object.keys(merged).length) out[f] = merged;
+      }
+      return out;
+    });
+  }
+
   global.SN_FEEDBACK_PUBLIC_VIEW = {
     COLLECTION,
     CARD_FIELDS,
