@@ -166,10 +166,12 @@ giri non si fida della prosa», «La quinta porta della stessa famiglia», «il
 report di chi corregge non diventa un giro, per quanto citi il verbale», «La
 settima porta: la riga che separa i turni è testo come tutto il resto» e
 «Ottava porta: il blocco incollato, staccato da una riga vuota», più
-`tests/unit/feedbackThread.test.mjs` per l'invariante del marcatore.
+`tests/unit/feedbackThread.test.mjs` per l'invariante del marcatore e per la
+neutralizzazione alla scrittura.
 
-**La cura vera non è qui.** Chi appende un turno sa di averlo appeso, e chi
-conta un giro lo ha contato: quel fatto è un DATO, e finché vive solo dentro
-una stringa di testo si può falsificare. Il posto giusto per i giri di verifica
-è un campo del feedback scritto dal server, come già fa per i bilanci. Finché
-non c'è, questo file racconta otto giri di rincorsa.
+**Resta una cosa da fare.** Le conversazioni salvate prima della
+neutralizzazione contengono già le citazioni che c'erano, e per quelle vale solo
+il ripiego di lettura. E chi conta un giro lo ha contato: quel fatto è un DATO,
+e finché vive dentro una stringa di testo si può falsificare a mano. Il posto
+giusto per i giri di verifica è un campo del feedback scritto dal server, come
+già fa per i bilanci.
