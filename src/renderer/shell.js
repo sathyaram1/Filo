@@ -180,7 +180,7 @@
   }
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
-  appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, APPS));
+  appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, buildApps()));
 
   // "Nuova finestra incognito" vive ora nel menu dell'account (icona profilo),
   // non più nel menu Impostazioni → apre la finestra incognito nel main.
