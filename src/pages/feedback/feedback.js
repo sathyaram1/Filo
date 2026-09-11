@@ -871,6 +871,12 @@
     listEl.innerHTML = items.map((f) => {
       const when = fmtTs(f.createdAt || f._createTime);
       const url = f.url || '';
+      // L'indirizzo della pagina segnalata: si apre (serve a chi guarda la
+      // segnalazione: è il posto dove il problema è successo), ma la scritta la
+      // compone SN_FEEDBACK.linkLabel, che mostra il sito vero e dichiara il
+      // taglio. Prima erano i primi 80 caratteri dell'indirizzo, tagliati senza
+      // nemmeno un puntino: e l'indirizzo lo scrive chi manda la segnalazione,
+      // che sceglieva così cosa si leggeva e dove si finiva (#582, giro 3).
       const safeUrl = safeHref(url);
       const ua = (f.userAgent || '').slice(0, 80);
       const cid = (f.clientId || '').slice(0, 12);
