@@ -142,6 +142,9 @@ async function prova(nomeProva, attesa, fn) {
 const carica = (ctx, percorso, byte = PNG, tipo = 'image/png') => () =>
   uploadBytes(ref(ctx.storage(), percorso), byte, { contentType: tipo });
 
+/** Quello che questo attrezzo non sa provare: si scrive, non si finge. */
+function nota(riga) { esiti.push(['NOTA ', riga]); }
+
 // ── La porta che la segnalazione voleva chiusa ──────────────────────────────
 await prova('allegato esistente — lettura fuori da ogni login: NEGATA', 'ko',
   () => getBytes(ref(fuori.storage(), ESISTENTE)));
