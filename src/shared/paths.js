@@ -259,6 +259,16 @@
   // filtro sul SENSO delle parole (quello non si fa a colpi di espressioni
   // regolari): è la garanzia che un percorso resti una riga di dati dentro il
   // blocco che lo dichiara non fidato.
+  //
+  // `unaRiga` sta nell'interfaccia pubblica del modulo, non fra gli helper dei
+  // test, perché serve alle DUE parti dello stesso cammino e per un pezzo è
+  // servita a una sola. Qui, in lettura, appiattisce un percorso che arriva
+  // dalla raccolta pubblica; in scrittura (pathsCollector.js) appiattisce i
+  // nomi degli elementi, che sono le etichette dei pulsanti del sito, prima che
+  // vadano davanti ai due modelli che decidono se un percorso è anonimo. Lì non
+  // c'era: un sito poteva scrivere in un'etichetta quella che al modello
+  // sembrava una riga di istruzioni, e farsi approvare un percorso col nome di
+  // una persona dentro (#584, quarto giro).
   const MAX_INTENT_PROMPT = 300;
   const MAX_SELECTOR_PROMPT = 500;
   const MAX_STEPS_PROMPT = 30;
