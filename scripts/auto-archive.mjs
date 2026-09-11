@@ -1,7 +1,9 @@
 // Applicatore sottile dell'archiviazione automatica a punteggio (DC3).
 //
 // COSA FA
-//   Legge i feedback da Firestore (FB.list, pubblica), calcola con la logica
+//   Legge i feedback da Firestore con le credenziali dell'owner (#583: la
+//   collezione non è più pubblica) e ci riunisce i voti, che vivono sulle
+//   schede pubbliche; calcola con la logica
 //   PURA di src/shared/boardArchive.js (SN_BOARD_ARCHIVE.applyAutoArchive)
 //   chi va archiviato e chi va solo segnalato come "gli utenti dicono che non
 //   va", e per ognuno da archiviare scrive `archived` DIRETTAMENTE, con le
@@ -32,6 +34,9 @@ import { createRequire } from 'node:module';
 // L'auto-archiviazione è una decisione dell'OWNER delegata a un punteggio, non
 // una consegna di routine: scrive con le sue credenziali, direttamente.
 import { scrivi } from './owner-feedback.mjs';
+// #583: leggere i feedback vuole le credenziali dell'owner (le stesse con cui
+// questo script scrive), e i voti stanno sulle schede pubbliche.
+import { acquireBearer } from './lib/firestore-auth.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -42,9 +47,11 @@ const require = createRequire(import.meta.url);
 require(resolve(ROOT, 'src', 'shared', 'feedback.js'));
 require(resolve(ROOT, 'src', 'shared', 'manageReview.js'));
 require(resolve(ROOT, 'src', 'shared', 'boardArchive.js'));
+require(resolve(ROOT, 'src', 'shared', 'feedbackPublicView.js'));
 
 const FB = globalThis.SN_FEEDBACK;
 const BA = globalThis.SN_BOARD_ARCHIVE;
+const PV = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
 
 function packageVersion() {
   try {
@@ -57,7 +64,13 @@ function packageVersion() {
 
 export async function runAutoArchive({ dryRun = false, now = Date.now(), releasedVersion } = {}) {
   const ver = releasedVersion || packageVersion();
-  const feedbacks = await FB.list({ pageSize: 500 });
+  const bearer = await acquireBearer();
+  const grezzi = await FB.list({ pageSize: 500, idToken: bearer });
+  // I voti (DB4) si scrivono sulla scheda pubblica: senza riunirli, il
+  // punteggio sarebbe quello dei soli voti storici e non archivierebbe più
+  // niente.
+  const cards = await FB.listPublic({ pageSize: 500 });
+  const feedbacks = PV.mergeUserFields(grezzi, cards);
   const { toArchive, toFlag } = BA.applyAutoArchive(feedbacks, { now, releasedVersion: ver });
 
   const archivedDetails = [];

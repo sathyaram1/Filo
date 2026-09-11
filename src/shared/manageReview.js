@@ -903,6 +903,12 @@
 
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
+    // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
+    // grezzi. Lo usa listBoardTab qui dentro, e lo usa feedbackPublicView.js
+    // (#583) per decidere se un feedback può avere una scheda pubblica: la
+    // stessa domanda, quindi la stessa funzione — una seconda copia sarebbe la
+    // copia che un giorno dice di sì dove questa dice di no.
+    classifyLegacyBlock,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
