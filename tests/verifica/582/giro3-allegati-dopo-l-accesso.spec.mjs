@@ -38,7 +38,7 @@ test('chi si fa riconoscere mentre guarda l’elenco vede gli allegati senza ria
   await page.locator('#refresh').click();
 
   // Prima dell'accesso: il segnaposto, che è il comportamento voluto.
-  await expect(page.locator('.fb-img-broken')).toHaveText('(allegato inviato)', { timeout: 10_000 });
+  await expect(page.locator('.fb-img-broken')).toHaveText('(allegato consegnato)', { timeout: 10_000 });
 
   // Adesso il riconoscimento arriva. Da qui in poi il canale risponde come
   // risponde a chi riceve le segnalazioni: l'allegato decifrato.

@@ -50,11 +50,14 @@ test('il mittente vede che il suo screenshot è partito, non un errore di permes
   await page.locator('#refresh').click();
 
   const segnaposto = page.locator('.fb-img-broken');
-  await expect(segnaposto).toHaveText('(allegato inviato)', { timeout: 10_000 });
+  // «consegnato» e non «inviato»: la stessa scritta compare anche davanti
+  // all'allegato di un altro, perché l'elenco mostra le segnalazioni di tutti
+  // (#582, giro 3).
+  await expect(segnaposto).toHaveText('(allegato consegnato)', { timeout: 10_000 });
 
   // L'hover dice perché, e non manda a cercare permessi di amministratore.
   const motivo = await segnaposto.getAttribute('title');
-  expect(motivo).toMatch(/inviat/i);
+  expect(motivo).toMatch(/consegnat/i);
   expect(motivo).not.toMatch(/amministrat/i);
   expect(motivo).not.toMatch(/riservata/i);
 });
@@ -89,8 +92,8 @@ test('il documento che il mittente ha allegato dice che è partito, invece di sc
   // Ma il collegamento non porta ai byte grezzi, che sono il testo cifrato.
   expect(await pillola.getAttribute('href')).not.toMatch(/firebasestorage\.googleapis\.com|storage\.googleapis\.com/);
   // E chi l'ha mandato lo legge senza doverci cliccare sopra.
-  await expect(pillola.locator('.fb-file-note')).toHaveText('(inviato)', { timeout: 10_000 });
-  expect(await pillola.getAttribute('title')).toMatch(/inviat/i);
+  await expect(pillola.locator('.fb-file-note')).toHaveText('(consegnato)', { timeout: 10_000 });
+  expect(await pillola.getAttribute('title')).toMatch(/consegnat/i);
 });
 
 test('chi riceve le segnalazioni l’allegato lo apre: il clic lo chiede decifrato, col suo tipo', async ({ app, openTab }) => {
