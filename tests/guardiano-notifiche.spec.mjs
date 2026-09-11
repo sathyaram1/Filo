@@ -67,7 +67,10 @@ async function installaGuardianoFinto(app) {
     globalThis.SN_GUARDIA_COMPLETE = async ({ messages }) => {
       globalThis.__guardiaChiamate++;
       if (globalThis.__guardiaGiu) throw new Error('fornitore fuori uso');
-      const testo = messages.map((m) => m.content).join('\n');
+      // Solo il messaggio utente: il prompt di sistema del guardiano NOMINA le
+      // credenziali fra le cose da bloccare, e guardarlo farebbe dire «blocca»
+      // a qualsiasi testo.
+      const testo = String(messages[messages.length - 1].content || '');
       if (/credenzial/i.test(testo)) {
         return '{"esito":"blocca","motivo":"sembrava spingerti a confermare le credenziali della banca"}';
       }
