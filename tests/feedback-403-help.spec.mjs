@@ -61,3 +61,30 @@ test('errori non-403 passano invariati (nessun falso positivo)', () => {
   const msg = permissionDeniedHelp(raw, { email: 'x@example.com', email_verified: true });
   expect(msg).toBe(raw); // invariato
 });
+
+// #582 — il 403 su un ALLEGATO. Da quando il deposito non è più pubblico, un
+// allegato si apre col download token che sta nel link o con le credenziali di
+// un amministratore: un 403 vuol dire che sono mancati entrambi. Le due cause
+// hanno cure opposte (rifare l'accesso / farsi mettere fra gli amministratori),
+// e il testo deve stare in UNA riga: finisce nell'hover del segnaposto
+// dell'immagine, dove un messaggio a più righe non si legge.
+test('403 su un allegato: dice quale delle due cause è, in una riga', () => {
+  const { attachmentForbiddenHelp } = require('../src/main/services/feedbackError.js');
+
+  const senzaSessione = attachmentForbiddenHelp({ conIdentita: false });
+  expect(senzaSessione).toMatch(/accedi/i);
+  expect(senzaSessione).not.toMatch(/\n/);
+
+  const conSessione = attachmentForbiddenHelp({ conIdentita: true });
+  expect(conSessione).toMatch(/amministratori/i);
+  expect(conSessione).not.toMatch(/\n/);
+
+  // Le due cause non si confondono: il messaggio di chi ha una sessione valida
+  // non manda a rifare l'accesso, ed è il caso in cui si perdeva tempo.
+  expect(conSessione).not.toMatch(/sessione è scaduta/i);
+  expect(conSessione).not.toEqual(senzaSessione);
+
+  // Nessun argomento = nessuna sessione: il default sbaglia dalla parte che non
+  // accusa l'account di non essere amministratore.
+  expect(attachmentForbiddenHelp()).toEqual(senzaSessione);
+});
