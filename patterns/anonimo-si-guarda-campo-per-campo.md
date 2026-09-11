@@ -45,7 +45,9 @@ stava per uscire.
   segmenti: i segmenti-parola dicono in che punto del sito sei e restano; tutto
   il resto è un segnaposto. Dopo un marcatore di persona (`/u/`, `/user/`,
   `/profilo/`) il segmento va sostituito comunque, perché lì il nome è scritto a
-  lettere e nessuna forma lo tradisce.
+  lettere e nessuna forma lo tradisce. Sui siti dove il nome utente è il PRIMO
+  pezzo dell'indirizzo, senza niente che lo annunci, il marcatore è il sito
+  stesso: lì il primo segmento è sempre una persona.
 - **Quello che le forme non prendono, gli occhi di un modello sì.** Un nome
   scritto a lettere («Profilo di Mario Rossi») è indistinguibile dal testo di un
   pulsante per qualunque espressione regolare. Se nella pipeline un modello gira
