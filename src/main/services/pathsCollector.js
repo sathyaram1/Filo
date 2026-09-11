@@ -314,7 +314,15 @@
   const RITARDO_MAX_MS = 24 * 60 * 60 * 1000;     // un giorno
   const PAUSA_MIN_MS = 2 * 60 * 1000;             // due minuti
   const PAUSA_MAX_MS = 20 * 60 * 1000;            // venti minuti
-  const MAX_IN_CODA = 100;
+  // Quanti percorsi può tenere la coda. Era cento, e il centunesimo faceva
+  // sparire il più vecchio senza dire niente: cioè proprio quello più vicino a
+  // partire, dopo che aveva già aspettato ore (#584, quarto giro). Adesso il
+  // tetto è dimensionato sul caso peggiore vero — chi usa l'Aiuto molte volte
+  // al giorno e tiene Filo chiuso per giorni, mentre la coda ne manda fuori uno
+  // ogni due-venti minuti e dopo trenta giorni un percorso scade da sé — e
+  // quando è pieno a restare fuori è quello NUOVO, con un motivo scritto nei
+  // log. Quello che è già in coda non si butta: è già stato accettato.
+  const MAX_IN_CODA = 500;
   const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;    // un mese
 
   let coda = [];
