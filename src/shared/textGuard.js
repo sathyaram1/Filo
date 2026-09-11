@@ -214,9 +214,18 @@
   const PAROLE_PASSWORD = /(password|parola d'ordine|parola chiave|pwd|passphrase)/i;
   const PAROLE_CHIAVE = /(chiave|key|secret|segreto|api[- ]?key|bearer)/i;
 
-  // Un codice usa e getta: 4-8 cifre isolate (niente separatori, non pezzo di un
-  // numero più lungo), oppure 6-8 alfanumerici maiuscoli isolati.
-  const FORMA_OTP = /(?<![\w.,-])(?:\d{4,8}|[A-Z0-9]{6,8})(?![\w.,-])/g;
+  // Un codice usa e getta: un gettone isolato di 4-8 caratteri. La forma da sola
+  // non basta — `codiceUsaEGetta` scarta quello che è solo una parola maiuscola
+  // (CODICE, URGENTE) e quello che è pezzo di una data o di un orario — e serve
+  // comunque una parola-spia vicino, altrimenti ogni numero d'ordine sarebbe un
+  // blocco.
+  const FORMA_OTP = /(?<![\w./:-])[A-Z0-9]{4,8}(?![\w/:-])/g;
+  function codiceUsaEGetta(tok) {
+    const t = String(tok || '');
+    if (/^\d{4,8}$/.test(t)) return true;           // 483920
+    // Misto lettere+cifre: un codice vero, non una parola gridata.
+    return t.length >= 6 && /\d/.test(t) && /[A-Z]/.test(t);
+  }
   // Codice di recupero: gruppi separati da trattino, tipo abcd-efgh-ijkl.
   const FORMA_RECUPERO = /(?<![\w-])[a-z0-9]{4,6}(?:-[a-z0-9]{4,6}){2,}(?![\w-])/gi;
   // Password dichiarata: «password: hunter2», «pwd = ...».
