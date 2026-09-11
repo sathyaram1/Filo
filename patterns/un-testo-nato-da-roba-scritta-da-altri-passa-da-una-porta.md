@@ -215,7 +215,12 @@ intorno alla regola.
 ## Dove vive
 
 - `src/shared/textGuard.js` — logica pura: classi di fiducia, controlli statici,
-  frasi di blocco, prompt e verdetto, regola di indipendenza del modello.
+  frasi di blocco, prompt e verdetto, regola di indipendenza del modello, e
+  `CAMPI_SORVEGLIATI`, cioè cosa ogni azione lascia scritto per dopo.
+- `src/shared/preferences.js` — quali preferenze sono testo libero
+  (`testoLibero`), le sole che paghino un secondo modello.
+- `tests/fixtures/bancoMail.mjs` — il banco su cui si misurano i falsi positivi;
+  ogni frase innocua trovata fermata da un giro di verifica entra qui.
 - `src/main/services/textGuardian.js` — la porta: ordine dei controlli, coda,
   registro dei blocchi.
 - `src/main/services/handlers.js` — il cablaggio (modello, segreti) e il punto in
