@@ -19,7 +19,7 @@
 //   npx firebase emulators:exec --only firestore --project filo-attacco-584 \
 //     "RULES_FILE=<repo>/firestore.rules node /tmp/emu584/giro1-regole-motore-vero.mjs"
 //
-// Esito del giro 1 (2026-09-11): 22 verdi, 0 rossi. Le regole reggono tutte e
+// Esito del giro 1 (2026-09-11): 25 verdi, 0 rossi (22 prima della correzione). Le regole reggono tutte e
 // 22 le strade provate — collezione intera, query di gruppo (con e senza
 // tetto), vecchio documento piatto, lista senza limite, campi del mittente
 // rimessi dentro, modifica e cancellazione.
@@ -28,7 +28,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, setDoc, getDoc, deleteDoc, updateDoc, getDocs, collection, collectionGroup,
-  query, limit, orderBy, addDoc, Timestamp,
+  query, limit, orderBy, addDoc, Timestamp, where,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -153,6 +153,31 @@ await prova('anonimo: cancellare un percorso → negato', async () => {
 });
 await prova('anonimo: scrivere sul vecchio percorso piatto → negato', async () => {
   await assertFails(setDoc(doc(anon, 'paths/nuovo-piatto'), buono));
+});
+
+
+console.log('\n— la lettura filtrata che usa l’assistente (correzione del giro 1) —');
+await prova('anonimo: chiedere SOLO i percorsi riusciti di un dominio → riesce', async () => {
+  const snap = await assertSucceeds(getDocs(query(
+    collection(anon, 'paths/esempio.it/entries'),
+    where('success', '==', true),
+    orderBy('createdAt', 'desc'),
+    limit(50),
+  )));
+  if (!snap.size) throw new Error('la query filtrata non ha restituito niente');
+});
+await prova('anonimo: la stessa query filtrata sopra il tetto → negata', async () => {
+  await assertFails(getDocs(query(
+    collection(anon, 'paths/esempio.it/entries'),
+    where('success', '==', true),
+    orderBy('createdAt', 'desc'),
+    limit(201),
+  )));
+});
+await prova('anonimo: query filtrata DI GRUPPO (tutti i domini) → negata', async () => {
+  await assertFails(getDocs(query(
+    collectionGroup(anon, 'entries'), where('success', '==', true), limit(50),
+  )));
 });
 
 console.log(`\n${ok} verdi, ${ko} rossi`);
