@@ -30,3 +30,35 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   stessa chiamata da `filo://` deve passare. Esempi:
   `tests/downloads-nav.spec.mjs`, `tests/clipboard-origin-gate.spec.mjs`,
   `tests/audit-quit-app-origin.spec.mjs`.
+
+## Il potere di proprietario passa da UNA porta, non da nove
+
+`isAdmin()` da solo non è un gate. Sul computer di chiunque altro la risposta è
+no e non succede niente; su quello dell'owner è sempre sì, ed è l'unico dove c'è
+qualcosa da prendere. Il controllo che conta è l'ORIGINE, e va chiesto **prima**
+dell'identità.
+
+Il caso (#583, tre giri di verifica). L'audit ha dato il controllo di
+provenienza alla porta che legge i feedback. Il secondo giro ha trovato che le
+porte che li SCRIVONO non ce l'avevano, e le ha chiuse. Il terzo giro ha trovato
+che nello stesso file restavano cinque porte con lo stesso potere e senza
+controllo: cambiare i modelli predefiniti (che valgono per tutte le
+installazioni di Filo), accendere e spegnere l'automazione, i bilanci dei giri
+di correzione, i modelli dei giudici, i registri del lavoro e delle routine. Tre
+giri, una porta alla volta.
+
+La cura non è ricordarsi il gate a ogni handler:
+
+- **Una funzione sola** che avvolge l'handler e fa i due controlli in ordine
+  (origine, poi amministratore), e **ogni** handler con potere di proprietario
+  ci passa. In Filo è `ownerOnly` in
+  `src/main/services/handlers/auth.js`. Un handler che non ci passa si vede a
+  occhio nell'elenco dei `on(MSG.…)`: `async (` invece di `ownerOnly(async (`.
+- **Il rifiuto per provenienza porta il motivo in una parola** (`code:
+  'forbidden'`), diverso da quello per identità (`code: 'not_admin'`). Senza,
+  una pagina di Filo traduce il rifiuto in «controlla la connessione» e manda a
+  guardare la cosa sbagliata.
+- **Una prova che bussa a TUTTE le porte della famiglia** da un sito visitato,
+  in un elenco solo: è lì che si aggiunge la porta nuova, e diventa rossa se una
+  risponde qualcosa di diverso.
+  (`tests/feedback-canali-origine.spec.mjs`.)
