@@ -45,7 +45,7 @@ import {
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
-const REGOLE = process.env.RULES_FILE || '/home/user/Filo/firestore.rules';
+const REGOLE = process.env.RULES_FILE || 'firestore.rules';
 
 const env = await initializeTestEnvironment({
   projectId: 'filo-prova-584',
