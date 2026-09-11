@@ -230,7 +230,8 @@
     // riclassificato non resta in bacheca perché nessuno l'ha cancellato.
     // Attenzione: si tolgono solo le schede dei feedback che abbiamo davvero
     // guardato — un caricamento parziale (tetto della pagina) non deve
-    // svuotare la bacheca dei feedback più vecchi.
+    // svuotare la bacheca dei feedback più vecchi. Con `complete` si toglie
+    // anche una scheda rimasta senza il suo feedback (cancellato).
     const seen = new Set(
       (Array.isArray(feedbacks) ? feedbacks : [])
         .map((f) => (f && f._id ? String(f._id) : ''))
@@ -238,7 +239,8 @@
     );
     const remove = [];
     for (const id of now.keys()) {
-      if (seen.has(id) && !wanted.has(id)) remove.push(id);
+      if (wanted.has(id)) continue;
+      if (complete || seen.has(id)) remove.push(id);
     }
     return { upsert, remove };
   }
