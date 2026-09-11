@@ -64,6 +64,42 @@
     return piuBassa([fiducia]) !== FIDUCIA.PULITO;
   }
 
+  // Quali AZIONI di Filo fanno entrare nel compito testo scritto da altri. È il
+  // ponte verso #530, che porterà il registro completo delle fonti: finché non
+  // c'è, la contaminazione di un turno di chat si legge dalle azioni che il
+  // modello ha davvero eseguito, non da quello che aveva in contesto.
+  //
+  // Fuori da questa tabella un'azione è PULITA, ed è una scelta: il contesto di
+  // un turno qualunque contiene già i titoli delle schede aperte, che vengono
+  // dai siti. Considerarli contaminanti vorrebbe dire un secondo modello a ogni
+  // «che ore sono» — lo spreco che il feedback dice espressamente di evitare.
+  // Quel confine lo sposterà #530, che sa dire quanto vale ogni singola fonte.
+  const FONTE_AZIONE = {
+    CERCA_WEB: { fiducia: FIDUCIA.CONTAMINATO, etichetta: 'una ricerca sul web' },
+    LEGGI_DOCUMENTO: { fiducia: FIDUCIA.CONTAMINATO, etichetta: 'un documento letto' },
+    // L'uscita di un comando può contenere qualunque cosa, compreso quello che
+    // un `curl` ha appena scaricato.
+    ESEGUI_COMANDO: { fiducia: FIDUCIA.CONTAMINATO, etichetta: 'l\'uscita di un comando' },
+  };
+
+  function fiduciaDellAzione(tipo) {
+    const v = FONTE_AZIONE[String(tipo || '').toUpperCase()];
+    return v ? v.fiducia : FIDUCIA.PULITO;
+  }
+
+  // Come si chiama la fonte, per la frase che l'utente legge.
+  function etichettaFonte(azione) {
+    const tipo = String((azione && (azione.type || azione)) || '').toUpperCase();
+    const v = FONTE_AZIONE[tipo];
+    if (!v) return '';
+    if (tipo === 'LEGGI_DOCUMENTO' && azione && typeof azione === 'object') {
+      const p = String(azione.percorso ?? azione.path ?? azione.file ?? azione.documento ?? '').trim();
+      const nome = p ? p.split(/[\\/]/).pop() : '';
+      if (nome) return `un documento letto (${nome})`;
+    }
+    return v.etichetta;
+  }
+
   // ── Link: dove porta davvero ───────────────────────────────────────────────
 
   function hostDi(url) {
