@@ -32,7 +32,10 @@ import '../../src/shared/feedback.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
-const RULES = readFileSync(join(ROOT, 'storage.rules'), 'utf8');
+// `STORAGE_RULES_FILE` serve a una cosa sola: puntare la sentinella alle regole
+// di PRIMA (`git show main:storage.rules > /tmp/vecchie.rules`) e vederla
+// diventare rossa. Un test che non si sa far fallire non prova niente.
+const RULES = readFileSync(process.env.STORAGE_RULES_FILE || join(ROOT, 'storage.rules'), 'utf8');
 
 const FB = globalThis.SN_FEEDBACK;
 const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
