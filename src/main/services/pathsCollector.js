@@ -541,6 +541,7 @@
     _internal: {
       redactSelector, redactPath, nomeInTesta, sanitizeSteps, sanitizeUserMessages, domainOf, normalizedPath,
       cleanGuessedIntent, parseJudgeOutput, accoda, sorteggia, RITARDO_MIN_MS, RITARDO_MAX_MS,
+      MAX_IN_CODA,
     },
     // ---- helper per i test (nessun effetto in produzione) ----
     _peek: () => coda.map((v) => ({ ...v })),
