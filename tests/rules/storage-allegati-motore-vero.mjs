@@ -51,6 +51,55 @@ import { randomUUID } from 'node:crypto';
 const REGOLE_STORAGE = process.env.STORAGE_RULES_FILE || 'storage.rules';
 const REGOLE_FIRESTORE = process.env.FIRESTORE_RULES_FILE || 'firestore.rules';
 
+// ── Prima di tutto: questo emulatore sa fare le regole CROSS-SERVICE? ───────
+// La lettura dell'owner si appoggia a `firestore.exists(...)` sull'allowlist
+// `admins`. In produzione è una funzione documentata di Cloud Storage; nel
+// motore che l'emulatore scarica (cloud-storage-rules-runtime v1.1.3, provato
+// il 2026-09-11) la chiamata non viene nemmeno inoltrata a Firestore: `exists`
+// torna sempre falso e `get` dà "Null value error". Se non si distingue quel
+// caso, l'unica riga che parla dell'owner sembra un difetto delle regole
+// mentre è un limite dell'attrezzo — e un rosso che si impara a ignorare vale
+// meno di zero. Quindi lo si MISURA, con un ruleset usa-e-getta, e poi lo si
+// dichiara.
+async function crossServiceDisponibile() {
+  const sonda = await initializeTestEnvironment({
+    projectId: 'filo-sonda-582',
+    firestore: {
+      host: '127.0.0.1',
+      port: 8089,
+      rules: "rules_version='2'; service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if false; } } }",
+    },
+    storage: {
+      host: '127.0.0.1',
+      port: 9199,
+      rules: `rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /sonda/{f} {
+      allow read: if firestore.exists(/databases/(default)/documents/admins/fisso);
+      allow write: if true;
+    }
+  }
+}`,
+    },
+  });
+  await sonda.clearFirestore();
+  await sonda.clearStorage();
+  await sonda.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'admins', 'fisso'), { added: true });
+    await uploadBytes(ref(ctx.storage(), 'sonda/x.png'), new Uint8Array([1]), { contentType: 'image/png' });
+  });
+  let ok = false;
+  try {
+    await getBytes(ref(sonda.authenticatedContext('u', { email: 'x@y.z' }).storage(), 'sonda/x.png'));
+    ok = true;
+  } catch (_) { ok = false; }
+  await sonda.cleanup();
+  return ok;
+}
+
+const CROSS_SERVICE = await crossServiceDisponibile();
+
 const env = await initializeTestEnvironment({
   projectId: 'filo-prova-582',
   firestore: { host: '127.0.0.1', port: 8089, rules: readFileSync(REGOLE_FIRESTORE, 'utf8') },
