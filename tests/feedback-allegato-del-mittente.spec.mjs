@@ -93,6 +93,36 @@ test('il documento che il mittente ha allegato dice che è partito, invece di sc
   expect(await pillola.getAttribute('title')).toMatch(/inviat/i);
 });
 
+test('chi riceve le segnalazioni l’allegato lo apre: il clic lo chiede decifrato, col suo tipo', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+
+  // Sessione admin finta lato pagina: qui interessa la strada che prende il
+  // clic, non la chiave privata (che vive nel main e nei test non c'è).
+  await page.evaluate(() => {
+    window.__richieste = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: true, profile: { email: 'owner@esempio.invalid' } };
+      if (msg && msg.type === 'feedback_decrypt_image') {
+        window.__richieste.push({ url: msg.url, mime: msg.mime || '' });
+        return { ok: true, dataUrl: 'data:application/pdf;base64,JVBERi0=' };
+      }
+      return orig(msg);
+    };
+  });
+  await page.locator('#refresh').click();
+
+  const pillola = await elencoCon(page, { url: DOCUMENTO, name: 'registro.pdf', type: 'application/pdf' });
+  // Per chi lo può aprire non c'è nessuna nota: l'allegato è suo.
+  await expect(pillola.locator('.fb-file-note')).toHaveCount(0);
+
+  await pillola.click();
+  await expect.poll(async () => page.evaluate(() => window.__richieste.length), { timeout: 10_000 }).toBeGreaterThan(0);
+  const richiesta = await page.evaluate(() => window.__richieste[window.__richieste.length - 1]);
+  expect(richiesta.url).toBe(DOCUMENTO);
+  expect(richiesta.mime).toBe('application/pdf');
+});
+
 test('un «allegato» che punta fuori dal deposito di Filo non porta da nessuna parte', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   const pillola = await elencoCon(page, { url: ESCA, name: 'schermata.png', type: 'image/png' });
