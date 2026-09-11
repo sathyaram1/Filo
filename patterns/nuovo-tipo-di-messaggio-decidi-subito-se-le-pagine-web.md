@@ -61,3 +61,20 @@ La cura non è ricordarsi il gate a ogni handler:
   in un elenco solo: è lì che si aggiunge la porta nuova, e diventa rossa se una
   risponde qualcosa di diverso.
   (`tests/feedback-canali-origine.spec.mjs`.)
+
+## La famiglia non è solo il proprietario
+
+Quarto giro dello stesso feedback: chiuse le nove porte del proprietario,
+restavano accanto quelle che chiedono soltanto **«hai una sessione aperta?»**.
+Sul computer di chiunque sia entrato la risposta è sempre sì, quindi valgono
+quanto le altre: votare in bacheca, ritirare il voto, riaprire un fix a
+pagamento (che spende i crediti e apre una segnalazione a nome suo), uscire
+dall'account. Quando cerchi le porte analoghe, non fermarti a `isAdmin()`:
+guarda anche `isSignedIn()`.
+
+**«Chi sei» si risponde a metà.** L'unica porta che DEVE rispondere anche a un
+content script è quella dello stato dell'accesso, perché pezzi di Filo girano
+dentro le pagine dei siti e da lì decidono cosa mostrare (la griglia del tasto
+destro nasconde l'icona Feedback a chi non gestisce i feedback). Rispondere non
+vuol dire dire tutto: di là dal confine passano i booleani che servono a
+disegnare, non l'identità (indirizzo email, nome, identificativo dell'account).
