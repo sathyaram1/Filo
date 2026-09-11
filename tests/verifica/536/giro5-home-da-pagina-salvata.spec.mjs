@@ -81,22 +81,13 @@ test('il saluto della home nasce da un titolo scritto da altri e non passa da ne
           }),
         };
       };
-
-      const r = await globalThis.SN_HANDLERS_TEST_DASHBOARD
-        ? null
-        : null;
-      return !!r;
     }, { trappola: TRAPPOLA });
-    void visto;
 
-    // La home si rigenera: è quello che succede a ogni scheda nuova quando gli
-    // ingredienti cambiano (una pagina salvata in più).
+    // La home si rigenera: è quello che succede quando gli ingredienti cambiano
+    // (una pagina salvata in più).
     await page.evaluate(async () => {
-      await new Promise((res) => {
-        chrome.runtime.sendMessage(
-          { type: window.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true, openTabsCount: 1 },
-          () => res(),
-        );
+      await chrome.runtime.sendMessage({
+        type: self.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true, openTabsCount: 1,
       });
     });
     await page.reload();
