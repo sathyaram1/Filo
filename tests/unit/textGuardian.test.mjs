@@ -390,3 +390,30 @@ test('la coda piena non butta via niente in silenzio: le più vecchie vanno nel 
     'il registro deve dire che nessuno l’ha controllata, non far credere a un blocco');
   errore = null;
 });
+
+test('il controllo porta con sé anche il MESTIERE del modello che ha scritto il testo', async () => {
+  // #536, giro 5. Sapere il nickname di chi ha scritto il testo non basta a
+  // ricostruire su quali modelli concreti sarebbe potuto girare: la catena la
+  // costruisce il mestiere (una risposta in chat, il saluto della home), e
+  // l'interruttore «solo modelli a pesi aperti» sceglie un sostituto diverso
+  // per mestieri diversi. Con il mestiere sbagliato il guardiano ricalcola la
+  // lista da cui deve stare alla larga e può finire proprio sul modello da
+  // escludere: è il danno del giro 3 da una porta nuova.
+  const visti = [];
+  TG.configure({
+    eseguiModello: async ({ produttore, produttoreAzione }) => {
+      visti.push({ produttore, produttoreAzione });
+      return '{"esito":"passa"}';
+    },
+  });
+  const esito = await TG.controllaTesto({
+    testo: 'Il saluto della home.',
+    fiducia: 'contaminato',
+    origine: 'una pagina che hai salvato',
+    produttore: 'un-modello',
+    produttoreAzione: 'filo_dashboard',
+  });
+  assert.equal(esito.esito, 'passa');
+  assert.deepEqual(visti, [{ produttore: 'un-modello', produttoreAzione: 'filo_dashboard' }]);
+  configuraModello();
+});
