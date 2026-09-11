@@ -72,7 +72,10 @@
   function friendly(e, opts) {
     const o = opts || {};
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
-    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED' || e.code === 'NO_MODEL_FOR_ACTION')) return raw;
+    // FEEDBACK_READ_DENIED (#583): i feedback li legge solo chi li gestisce.
+    // Non è un guasto e riprovare non serve: la frase dice cosa manca.
+    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED'
+      || e.code === 'NO_MODEL_FOR_ACTION' || e.code === 'FEEDBACK_READ_DENIED')) return raw;
 
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
