@@ -256,7 +256,8 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.FILO_DISMISS_NOTIFICATION, async (msg) => {
+  on(MSG.FILO_DISMISS_NOTIFICATION, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });
     broadcastLiveUpdate();
     return { ok: true, notifications: list.filter((n) => !n.dismissed) };
