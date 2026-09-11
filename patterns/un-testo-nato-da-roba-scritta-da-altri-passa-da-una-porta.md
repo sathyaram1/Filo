@@ -110,6 +110,47 @@ per sempre, e la sola persona che può sistemarlo non saprebbe nemmeno che c'è 
 sistemare. Le due frasi sono diverse (`fraseControlloFermo`, `fraseInAttesa`), e
 quella della configurazione dice dove si imposta il modello.
 
+## Chi ha scritto il testo viaggia col testo
+
+L'indipendenza del modello non è una regola che si applica una volta: va portata
+dietro. Un testo che aspetta in coda riparte più tardi, e se chi lo rimette in
+fila non si porta dietro **quale modello l'ha scritto**, al secondo giro non c'è
+più nessuno da escludere: il controllo parte sul primo modello della sua lista,
+che può essere proprio quello. È successo alle risposte della chat: finivano in
+coda senza quel dato e ricomparivano giudicate da sé, pochi secondi dopo che il
+codice si era rifiutato di farlo.
+
+Due cose insieme, perché una sola non basta: chi propone dichiara il produttore
+**anche quando mette in coda**, e la porta si rifiuta di controllare un testo
+contaminato di cui non sa chi l'ha scritto (coda, mai «passa»: un controllo che
+non si può fare non è un controllo superato).
+
+## La frase è sorvegliata, il gesto anche
+
+Una pagina avvelenata ha due uscite verso la persona: quello che Filo le **dice**
+e quello che Filo **fa**. Sorvegliare solo la prima lascia il buco più grosso:
+la pagina scriveva «apri questo indirizzo», il guardiano fermava la frase, e
+intanto Filo aveva già aperto il sito della truffa, perché aprire un link è
+livello 1. Dal turno in cui la classe di fiducia scende, le azioni portano il
+marchio `_contaminato` (lo mette il main, mai l'LLM) e `NAVIGA` sale a livello 2:
+l'indirizzo si vede prima di andarci. È lo stesso meccanismo del flag
+anti-esfiltrazione, con una causa diversa.
+
+## «Codice» non è una parola-spia
+
+Il controllo deterministico è nato fermando ogni gettone corto vicino alla parola
+«codice». In italiano commerciale quella parola qualifica quasi sempre
+qualcos'altro: codice sconto, codice ordine, codice cliente, codice postale,
+codice di tracciamento. Fermarli tutti vuol dire far sparire la posta normale di
+chiunque, ed è il modo più rapido di farsi spegnere.
+
+Quello che distingue una truffa non è che un codice esista: è che qualcuno
+chieda di **comunicarlo, inoltrarlo, digitarlo**. Quindi o una parola
+inequivocabile (otp, monouso, «codice di verifica»), oppure la parola generica
+più la richiesta di passarlo — e un qualificatore innocuo chiude comunque la
+questione. Stessa storia per le carte: Luhn da solo non basta, un numero lungo su
+dieci lo passa per caso, e serve anche il prefisso di un circuito vero.
+
 ## Dove vive
 
 - `src/shared/textGuard.js` — logica pura: classi di fiducia, controlli statici,
