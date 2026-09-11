@@ -676,7 +676,7 @@ module.exports = function register(on, ctx) {
     if (typeof syncTimer.unref === 'function') syncTimer.unref();
   }
 
-  async function syncPublicView({ force = false } = {}) {
+  async function syncPublicView({ force = false, rows = null } = {}) {
     const FB = FEEDBACK();
     const V = PUBLIC_VIEW();
     if (!FB || !V || syncing || !auth.isAdmin()) return { ok: false, skipped: true };
