@@ -101,6 +101,8 @@ test('la chat dell’editor risponde con le parole del documento e non passa da 
     const controlli = await app.evaluate(() => globalThis.__guardiano);
     await page.screenshot({ path: 'tests/.shots/536-giro9-chat-editor.png' });
 
+    console.log(`[giro9] documento arrivato al modello: ${visto} — chiamate al guardiano: ${controlli}`);
+
     expect(visto, 'il testo del documento non è arrivato al modello: lo spec non prova niente')
       .toBe(true);
 
