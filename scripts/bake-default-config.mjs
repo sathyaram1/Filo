@@ -12,6 +12,10 @@
 //   6h) le rilegge da Firestore e le incastona nel nuovo installer; l'auto-update
 //   le consegna a tutti.
 //
+//   Dal #581 è l'UNICA strada: `config/secrets` è leggibile solo dall'admin, e
+//   nessuna installazione lo apre più a runtime. Prima bastava un account Google
+//   qualsiasi per scaricarlo per intero con una GET REST.
+//
 // FONTI DELLE CHIAVI (in ordine di precedenza, per ciascuna chiave):
 //   1. il server di sicurezza      → l'override admin più recente, chiesto con
 //                                    FILO_BUILD_PASSPHRASE (un segreto che apre
