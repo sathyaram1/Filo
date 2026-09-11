@@ -76,6 +76,9 @@ beforeEach(() => {
 });
 
 const MAIL_BANCA = 'una mail di Banca Esempio';
+// Chi ha scritto il testo. Viaggia con ogni proposta contaminata: è l'unica cosa
+// che permette al guardiano di escluderlo dalla propria catena.
+const PRODUTTORE = 'modello-che-scrive';
 
 test('compito pulito: l’avviso compare e nessun modello viene chiamato', async () => {
   const r = await TG.proponiNotifica({
