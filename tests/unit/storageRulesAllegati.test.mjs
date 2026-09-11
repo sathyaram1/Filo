@@ -151,8 +151,8 @@ test('si può solo CREARE: niente sovrascrittura, niente cancellazione', () => {
 test('la creazione resta possibile senza login (l’invio anonimo è voluto)', () => {
   const create = PERMESSI.find((p) => p.verbi.includes('create'));
   assert.doesNotMatch(
-    create.cond,
-    /request\.auth\s*!=\s*null|eAmministratore\(\)/,
+    espandi(create.cond),
+    /request\.auth\s*!=\s*null/,
     'la creazione chiede un’identità: un tester anonimo non potrebbe più allegare uno screenshot',
   );
 });
