@@ -116,9 +116,13 @@ test('quello che un turno contaminato fissa nella memoria di Filo non passa da n
   const lezioni = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
   const inMemoria = lezioni.map((l) => String(l.text || '')).join('\n');
 
-  // Una conversazione NUOVA: niente di letto da nessuno, quindi compito pulito.
-  await page.reload();
-  await expect(page.locator('#input')).toBeVisible();
+  // Una conversazione NUOVA e vuota: niente di letto da nessuno, quindi compito
+  // pulito, e il secondo modello non ha ragione di girare.
+  await page.locator('#input').fill('/clear');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo')).toHaveCount(0, { timeout: 10_000 });
+  const guardianiPrima = await app.evaluate(() => globalThis.__guardiano.length);
+
   await page.locator('#input').fill('che ore sono?');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo').last()).toContainText('10:30', { timeout: 30_000 });
