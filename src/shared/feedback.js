@@ -673,6 +673,55 @@
     return out;
   }
 
+  // Il numero più alto MAI assegnato, chiesto al server con una query sua
+  // (ordinata per `seq`, un documento solo). Serve il token dell'owner: la
+  // collezione non si legge senza.
+  //
+  // Perché non basta il massimo dei feedback caricati: il caricamento si ferma
+  // ai 500 più recenti PER DATA, e Filo quel numero l'ha passato. Chi guardava
+  // solo quella pagina non poteva sapere se il contatore era più alto del
+  // dovuto o solo più alto di quello che aveva visto, e per prudenza non lo
+  // toccava: la cura scritta per un contatore gonfiato non è mai partita.
+  // Questa domanda costa UNA lettura e la risposta è esatta.
+  async function maxSeq({ idToken = '', timeoutMs = 0 } = {}) {
+    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const opts = {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: COLLECTION }],
+          orderBy: [{ field: { fieldPath: 'seq' }, direction: 'DESCENDING' }],
+          limit: 1,
+        },
+      }),
+    };
+    let timer = null;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try { res = await fetch(endpoint, opts); } finally { if (timer) clearTimeout(timer); }
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore maxSeq fallito (${res.status}): ${t.slice(0, 200)}`);
+    }
+    const arr = await res.json();
+    for (const row of Array.isArray(arr) ? arr : []) {
+      if (!row || !row.document) continue;
+      const n = Number(fromFsValue(row.document.fields?.seq));
+      if (Number.isInteger(n) && n >= 0) return n;
+    }
+    // Nessun feedback con un numero: il contatore non ha un massimo da
+    // rispettare. `null`, non 0: chi chiama deve poter distinguere «non lo so»
+    // da «zero», o riporterebbe il contatore a zero su un database vuoto.
+    return null;
+  }
+
   // Le sole "versioni" dei feedback: per ciascuno id + `_updateTime`, niente
   // campi. È la domanda che la dashboard fa a ogni giro per restare aggiornata
   // senza riscaricare tutto (≈130 KB invece di 5 MB per 500 feedback).
