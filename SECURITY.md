@@ -167,6 +167,25 @@ Questi dati vengono salvati su Google Firebase (Firestore + Storage) e ci
 servono solo per correggere bug e migliorare l'app. **Non includere in un
 feedback dati che non vuoi condividere.**
 
+### I percorsi dell'assistente di pagina
+
+**Stato: ✅ (attivo)**
+
+Quando l'assistente ti aiuta su un sito e alla fine rispondi «ha funzionato»,
+Filo salva il percorso che avete fatto insieme, così la volta dopo — a te o a
+chiunque altro — l'assistente sa già come si fa. Di quel percorso viene
+condiviso questo: **il sito**, la **pagina di partenza**, una frase che dice
+**cosa si voleva ottenere** e la **sequenza di elementi** su cui si è cliccato.
+La frase non la scrivi tu: la propone un modello che vede solo il sito e i
+clic, e un secondo modello la scarta se somiglia a qualcosa che hai scritto.
+
+Cosa **non** viene salvato: niente che dica chi sei. Nessun identificativo del
+dispositivo, nessuno user agent, e l'orario è arrotondato all'ora — perché
+anche solo un codice uguale su due percorsi diversi basterebbe a capire che
+sono della stessa persona. I percorsi si chiedono **un sito alla volta**: non
+esiste un elenco di tutti da scaricare, e quindi nemmeno l'elenco dei siti su
+cui qualcuno ha chiesto aiuto.
+
 ---
 
 ## 7. Permessi: chi può fare cosa sui feedback
