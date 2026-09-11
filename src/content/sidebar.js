@@ -1168,5 +1168,8 @@
     runFiloAction, filoActionLabel,
     runPageAction, parseAssistantOutput,
     resolveImageEl, resolveLinkEl, resolveActionText,
+    // Il riquadrino «Ha funzionato?»: da lì il percorso finisce in una raccolta
+    // che legge chiunque, quindi quello che c'è scritto è una promessa (#584).
+    renderFeedbackPrompt,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
