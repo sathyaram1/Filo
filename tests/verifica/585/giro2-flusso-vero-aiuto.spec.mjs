@@ -59,8 +59,11 @@ const ONESTO = [
 // elenco, oppure la parola 'esplode' per simulare la raccolta irraggiungibile.
 async function messaggioDiSistema(app, percorsi) {
   return app.evaluate(async ({ app: electronApp }, arg) => {
-    const path = require('node:path');
-    const handlers = require(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
+    // `require` non è in scope dentro evaluate (il codice arriva come stringa):
+    // si passa da quello del modulo principale, che è il main di Filo.
+    const carica = process.mainModule.require.bind(process.mainModule);
+    const path = carica('node:path');
+    const handlers = carica(path.join(electronApp.getAppPath(), 'src', 'main', 'services', 'handlers.js'));
     const Paths = globalThis.SN_PATHS;
     const Providers = globalThis.SN_PROVIDERS;
     const origList = Paths.listByDomain;
