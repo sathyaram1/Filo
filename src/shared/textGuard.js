@@ -247,7 +247,7 @@
     'codic[ei] (?:di |d\')?(?:verific|sicurezza|accesso|autentic|attivazione|sblocco|ingresso|conferma)',
     'verification code', 'security code', 'access code',
   ].join('|'), 'i');
-  const CODICE_GENERICO = /(codic|\bpin\b|\btoken\b|password|passcode)/i;
+  const CODICE_GENERICO = /(codic|\bpin\b|\btoken\b|password|passcode|parola d'ordine|\bpwd\b|passphrase)/i;
   // Chi chiede di passare il codice a qualcuno: il verbo che fa la truffa.
   const CHIEDE_DI_PASSARLO = /(comunic|inoltr|inseris|digit|fornis|invia|inviar|condivid|dett|riferis|manda|trasmett|copia|dimmi|dammi)/i;
   // Quello che «codice» qualifica quasi sempre, e che non apre niente.
