@@ -77,6 +77,29 @@ async function getPrivateKey() {
   return null;
 }
 
+// Questo indirizzo è un allegato di Filo? Il deposito è uno solo, e il nome lo
+// tiene il modulo condiviso dei feedback: qui si controlla che l'indirizzo
+// appartenga a QUELLO, non a un deposito qualunque di Google. Senza, il canale
+// che decifra un allegato diventa un modo per farsi scaricare altro.
+function allegatoDiFilo(url) {
+  const u = String(url || '');
+  const cfg = (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.configPublic) || null;
+  const bucket = cfg && cfg.bucket ? String(cfg.bucket) : '';
+  const progetto = cfg && cfg.projectId ? String(cfg.projectId) : '';
+  if (!bucket && !progetto) return false;
+  // Lo stesso deposito ha più nomi ufficiali (quello attuale e quello storico
+  // che finisce in appspot.com: gli allegati vecchi hanno ancora quello) e due
+  // indirizzi (Firebase Storage e il deposito diretto). Valgono quelli, e
+  // nessun altro.
+  const depositi = new Set([bucket, progetto ? `${progetto}.firebasestorage.app` : '', progetto ? `${progetto}.appspot.com` : '']);
+  depositi.delete('');
+  for (const b of depositi) {
+    if (u.startsWith(`https://firebasestorage.googleapis.com/v0/b/${b}/o/`)) return true;
+    if (u.startsWith(`https://storage.googleapis.com/${b}/`)) return true;
+  }
+  return false;
+}
+
 // Decifra i campi FENC1: di un oggetto con la chiave privata del main.
 // Retrocompatibile: i valori non cifrati passano invariati.
 // Senza chiave privata i campi cifrati diventano il placeholder leggibile.
@@ -296,7 +319,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // S1.2: decifratura di UN allegato immagine. Le immagini dei feedback sono
   // cifrate come byte opachi su Storage (octet-stream): un <img src=URL> diretto
@@ -304,15 +327,14 @@ module.exports = function register(on, ctx) {
   // privata (che NON esce mai dal main), ne indovina il MIME e torna un data URL
   // mostrabile. Owner-only. Retrocompat: immagini NON cifrate (storiche) passano
   // invariate (data URL dei byte grezzi). Fail-safe: ogni errore → { ok:false }.
-  on(MSG.FEEDBACK_DECRYPT_IMAGE, async (msg) => {
+  on(MSG.FEEDBACK_DECRYPT_IMAGE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori.' };
-      }
       const url = String((msg && msg.url) || '');
-      // Solo URL https del bucket feedback: evita che questo canale diventi un
-      // fetch arbitrario (SSRF) pilotato dal renderer.
-      if (!/^https:\/\/(firebasestorage\.googleapis\.com|storage\.googleapis\.com)\//.test(url)) {
+      // Solo gli allegati DI FILO: il deposito è uno solo, e il suo nome lo
+      // tiene il modulo condiviso che carica le immagini. Accettare qualunque
+      // indirizzo dei depositi di Google faceva di questo canale un modo per
+      // farsi scaricare altro, che non è quello che dice di fare.
+      if (!allegatoDiFilo(url)) {
         return { ok: false, error: 'url allegato non valido' };
       }
       const res = await fetch(url);
@@ -349,7 +371,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
   // NON espone le chiavi vere, solo se sono configurate. La scrittura è
@@ -789,11 +811,8 @@ module.exports = function register(on, ctx) {
   // Ri-valutazione dei feedback "non filtrati": la dashboard (che decifra i
   // pipeline e quindi sa quali sono bianchi) passa la lista degli id; il backend
   // ri-esegue SOLO i giudici mancanti di ciascuno. Owner-only.
-  on(MSG.FEEDBACK_REEVALUATE, async (msg) => {
+  on(MSG.FEEDBACK_REEVALUATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const feedbackIds = Array.isArray(msg.feedbackIds)
         ? msg.feedbackIds.map(String).filter(Boolean)
         : [];
@@ -803,7 +822,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   on(MSG.SUPPORT_MODELS_UPDATE, async (msg) => {
     try {
