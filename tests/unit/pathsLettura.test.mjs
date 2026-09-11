@@ -85,14 +85,14 @@ test('i percorsi si chiedono sotto il loro dominio, non alla collezione intera',
     assert.deepEqual(body.structuredQuery.from, [{ collectionId: 'entries' }]);
     assert.equal(body.structuredQuery.where, undefined,
       'non serve più nessun filtro `domain == …`: il dominio è nel percorso');
-    assert.ok(body.structuredQuery.limit <= P.rest.MAX_PAGE_SIZE);
+    assert.ok(body.structuredQuery.limit <= MAX_PAGE_SIZE);
   });
 });
 
 test('una richiesta più grande del tetto viene ridotta, non rifiutata dalle regole', async () => {
   await withFetch(() => [], async (calls) => {
     await P.listByDomain('esempio.it', { pageSize: 100000 });
-    assert.equal(calls[0].body.structuredQuery.limit, P.rest.MAX_PAGE_SIZE);
+    assert.equal(calls[0].body.structuredQuery.limit, MAX_PAGE_SIZE);
   });
 });
 
