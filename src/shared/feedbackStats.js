@@ -866,9 +866,19 @@
         perLivello,
       },
       // L'istantanea di adesso: non dipende dalla finestra, e la pagina lo dice.
+      //
+      // ⚠️ È UN MINIMO OGNI VOLTA CHE IL CARICAMENTO HA TOCCATO IL TETTO, non
+      // solo quando la finestra chiede più indietro dei dati in pagina. Le altre
+      // tre tessere contano DENTRO la finestra, quindi una finestra corta le
+      // rende esatte; questa guarda tutta la lista, e quello che il tetto lascia
+      // fuori sono le segnalazioni più vecchie — cioè proprio quelle rimaste in
+      // coda. Senza il «+» qui, tre tessere su quattro dicevano di essere minimi
+      // e la quarta, disegnata identica, si leggeva come un totale (#496,
+      // giro 14).
       adesso: {
         inCoda: daFiltro.filter(isQueued).length,
         inLavorazione: daFiltro.filter(isInProgress).length,
+        parziale: tetto,
       },
     };
   }
