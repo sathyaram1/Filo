@@ -328,7 +328,7 @@
     {
       id: 'feedback', title: 'Manda un feedback', category: 'assistant',
       desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche con immagini allegate. Quello che scrivi lo legge solo chi lavora i feedback; quando il tuo è risolto Filo te lo dice all’avvio, con una frase scritta per te e i crediti della ricompensa, e il miglioramento compare in bacheca (filo://board/). L’invio è immediato: se sei senza connessione Filo tiene da parte il feedback e lo spedisce da solo appena la rete torna, anche dopo aver chiuso e riaperto l’app. Puoi anche chiederlo a Filo in chat ("segnala che X non funziona") e ci pensa lui a scriverlo; e quando è Filo a dirti che una cosa non sa farla, che non ha un dato che gli hai chiesto, oppure quando ti spiega come fare a mano qualcosa che Filo sa fare ma che l’assistente non riesce ad azionare, la segnalazione compare già scritta e ti viene mostrata subito per intero in un riquadro di conferma (una volta per conversazione, e niente parte senza il tuo OK).',
-      invoke: 'Menu del tasto destro → "Feedback", oppure filo://feedback/feedback.html; in chat basta chiederlo a parole.',
+      invoke: 'Menu del tasto destro → "Invia feedback"; in chat basta chiederlo a parole.',
     },
     {
       id: 'transparency-docs', title: 'Perché Filo fa così (trasparenza)', category: 'assistant',

@@ -23,8 +23,10 @@ const CLIENT_ID = 'test-client-c5';
 
 // Stub delle SCHEDE pubbliche + clientId di questo install + reset del saldo a
 // uno stato fresco noto (1000). Va fatto DOPO il boot, poi si ricarica la home.
-// Una scheda con `mia: true` prende l'hash di QUESTA installazione: è così che
-// il popup riconosce i feedback di chi lo sta guardando.
+// Una scheda con `mia: true` prende l'impronta di QUELLA scheda per QUESTA
+// installazione: è così che il popup riconosce i feedback di chi lo sta
+// guardando, senza che la bacheca (pubblica) permetta a un estraneo di
+// raggruppare i fix per segnalatore (#583).
 async function seed(app, schede) {
   await app.evaluate(async (_electron, { clientId, schede }) => {
     await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
@@ -35,8 +37,12 @@ async function seed(app, schede) {
     // come già ricevuto oggi: qui misuriamo SOLO il premio per il feedback risolto.
     fresh.lastAutoFeedbackBonusDate = globalThis.SN_CREDITS.dateKey();
     await globalThis.SN_CREDITS.writeState(fresh);
-    const mioHash = await globalThis.SN_FEEDBACK_CLIENT_ID_HASH.hashClientId(clientId);
-    const cards = schede.map(({ mia, ...c }) => (mia ? { ...c, clientIdHash: mioHash } : c));
+    const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+    const mioHash = await H.hashClientId(clientId);
+    const cards = [];
+    for (const { mia, ...c } of schede) {
+      cards.push(mia ? { ...c, clientIdTag: await H.cardTag(c._id, mioHash) } : c);
+    }
     // Niente rete: le schede sono quelle che passiamo noi.
     globalThis.SN_FEEDBACK.listPublic = async () => cards;
   }, { clientId: CLIENT_ID, schede });
@@ -93,7 +99,7 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
     // pubblicata, ma il popup non deve fidarsi).
     { _id: 'fb3', mia: true, status: 'done', statusPublic: 'open', name: 'Tre', seq: 3, subSeq: 0, userNote: '' },
     // Non deve premiare: di un'altra installazione.
-    { _id: 'fb4', clientIdHash: 'b'.repeat(32), status: 'done', statusPublic: 'closed', name: 'Quattro', seq: 4, subSeq: 0, userNote: '' },
+    { _id: 'fb4', clientIdTag: 'b'.repeat(32), status: 'done', statusPublic: 'closed', name: 'Quattro', seq: 4, subSeq: 0, userNote: '' },
   ]);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');

@@ -271,10 +271,20 @@ test('ogni voce del menu «App» citata dal manifesto esiste davvero nel launche
   // Simmetrico al test precedente sul lato "positivo": il manifesto indica il
   // menu App come strada per alcune pagine (Scaricamenti, Aperti per dopo…).
   // Se quella voce non è nel launcher, l'indicazione è falsa.
+  //
+  // Dal 2026-09 (#583) il registro è una FUNZIONE, perché "Feedback" e
+  // "Gestione" compaiono solo all'owner: quelle due le teniamo fuori dalle
+  // etichette che il manifesto può citare, perché per un utente qualunque non
+  // sono una strada.
   const shell = readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
-  const appsBlock = shell.match(/const APPS\s*=\s*\[([\s\S]*?)\n  \];/)?.[1];
-  assert.ok(appsBlock, 'non trovo il registro APPS del launcher in shell.js');
-  const appLabels = new Set([...appsBlock.matchAll(/label:\s*'([^']+)'/g)].map((m) => m[1]));
+  const appsBlock = shell.match(/function buildApps\(\)\s*\{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(appsBlock, 'non trovo il registro delle App del launcher in shell.js');
+  const soloAdmin = appsBlock.slice(appsBlock.indexOf('if (isAdmin)'));
+  const perTutti = appsBlock.slice(0, appsBlock.indexOf('if (isAdmin)'));
+  const appLabels = new Set([...perTutti.matchAll(/label:\s*'([^']+)'/g)].map((m) => m[1]));
+  for (const m of soloAdmin.matchAll(/label:\s*'([^']+)'/g)) {
+    assert.ok(!appLabels.has(m[1]), `"${m[1]}" non può stare in entrambi i rami`);
+  }
   assert.ok(appLabels.size >= 5, `mi aspetto ≥5 voci nel menu App, trovate ${appLabels.size}`);
 
   let cited = 0;
