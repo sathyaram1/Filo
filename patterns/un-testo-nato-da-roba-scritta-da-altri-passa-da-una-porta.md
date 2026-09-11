@@ -103,6 +103,13 @@ svuota costa sessanta chiamate al minuto a chi non ha fatto niente di sbagliato)
 e la riga in attesa deve essere **togliibile**, altrimenti un guardiano che non
 torna lascia sullo schermo una riga che non si può levare in nessun modo.
 
+E «non risponde» non è una causa sola. La rete che va e viene si aggiusta
+aspettando; un modello che manca, o che è lo stesso che ha scritto la risposta,
+non si aggiusta aspettando — ogni risposta nata da una ricerca resterebbe in coda
+per sempre, e la sola persona che può sistemarlo non saprebbe nemmeno che c'è da
+sistemare. Le due frasi sono diverse (`fraseControlloFermo`, `fraseInAttesa`), e
+quella della configurazione dice dove si imposta il modello.
+
 ## Dove vive
 
 - `src/shared/textGuard.js` — logica pura: classi di fiducia, controlli statici,
