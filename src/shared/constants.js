@@ -361,6 +361,8 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
+    [ACTIONS.GUARD_TEXT]: 'Controlli di sicurezza',
+    [ACTIONS.SAFEBROWSE_JUDGE]: 'Controlli di sicurezza',
   };
 
   function creditUsageGroup(action) {
