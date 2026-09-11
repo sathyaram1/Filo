@@ -250,5 +250,5 @@ test('input limite: testo vuoto, soli spazi, e un testo enorme', async () => {
   assert.equal(r.esito, 'passa');
   const noti = await Mem.listNotifications();
   // Il testo NON viene tagliato di nascosto: quello che arriva è quello che c'era.
-  assert.equal(noti[noti.length - 1].text.length, lungo.length);
+  assert.equal(noti[0].text.length, lungo.length);
 });
