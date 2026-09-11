@@ -142,6 +142,20 @@ test('la vista pubblica ammette solo stati CHIUSI', () => {
   }
 });
 
+test('gli allegati dei feedback non si possono ELENCARE', () => {
+  // L'altra porta sulla stessa stanza: chiudere i documenti e lasciare il
+  // bucket elencabile vuol dire che chiunque si porta via i nomi di tutti gli
+  // allegati, e poi i file. Il singolo `get` resta aperto: i link della
+  // dashboard portano già il loro token di download.
+  const STORAGE = readFileSync(join(ROOT, 'storage.rules'), 'utf8');
+  const corpo = blocco(STORAGE, '/feedback/{file=**}');
+  assert.ok(corpo, 'blocco /feedback delle storage.rules non letto');
+  assert.ok(/allow\s+list\s*:\s*if\s+false/.test(corpo),
+    'gli allegati dei feedback non devono essere elencabili');
+  assert.ok(!/allow\s+read\s*:\s*if\s+true/.test(corpo),
+    '`read` comprende anche `list`: serve il solo `get`');
+});
+
 test('il contatore dei numeri: pubblico in lettura, e si può solo far avanzare di uno', () => {
   assert.deepEqual(letture(CONTATORI), ['true'],
     'chi invia un feedback non ha credenziali: il contatore deve potersi leggere');
