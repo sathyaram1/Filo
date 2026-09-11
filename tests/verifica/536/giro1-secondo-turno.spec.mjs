@@ -64,7 +64,15 @@ test('la risposta del turno DOPO nasce dalla stessa pagina e non passa da nessun
     globalThis.__guardiano = 0;
     globalThis.SN_TEXT_GUARDIAN.configure({
       pausaMs: 0,
-      eseguiModello: async () => { globalThis.__guardiano++; return '{"esito":"passa"}'; },
+      // Un guardiano che fa il suo mestiere: ferma il testo che spinge alle
+      // credenziali, lascia passare il resto.
+      eseguiModello: async ({ messaggi }) => {
+        globalThis.__guardiano++;
+        const visto = messaggi.map((m) => m.content).join('\n');
+        return /credenziali/i.test(visto)
+          ? '{"esito":"blocca","motivo":"chiedeva di confermare le credenziali del conto"}'
+          : '{"esito":"passa"}';
+      },
     });
     let giro = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
