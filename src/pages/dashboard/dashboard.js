@@ -1925,6 +1925,9 @@
           // diciamo, invece di lasciare la bolla ferma senza spiegazione.
           if (streamBubble) { streamBubble.remove(); streamBubble = null; }
           streamedText = '';
+          // Anche il ragionamento del turno se ne va: scorreva in diretta come
+          // la risposta, e come la risposta non l'ha guardato nessuno.
+          pending.dropReasoning();
           pending.working('Controllo quello che ho letto…');
           return;
         }
