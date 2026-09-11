@@ -658,7 +658,7 @@ class TabManager {
     if (!this.incognito) {
       try { require('./services/downloads').attachSession(view.webContents.session); } catch (_) {}
     }
-    installaPermessi(view.webContents.session);
+    Permessi.installaSuSessione(view.webContents.session);
     return view;
   }
 
