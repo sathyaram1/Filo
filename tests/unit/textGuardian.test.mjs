@@ -362,3 +362,31 @@ test('la coda si ricorda chi ha scritto il testo e lo esclude anche al secondo g
   assert.deepEqual(visti, [PRODUTTORE], 'il controllo è ripartito senza sapere chi aveva scritto il testo');
   configuraModello();
 });
+
+test('la coda piena non butta via niente in silenzio: le più vecchie vanno nel registro', async () => {
+  errore = new Error('fornitore non raggiungibile');
+  // Il tetto della coda è largo, ma esiste: quando si raggiunge, chi esce era
+  // una risposta PROMESSA all'utente («te la mostro appena riesco»). Farla
+  // sparire senza dirlo è il taglio muto che il repo vieta: deve restare
+  // leggibile nel registro degli avvisi fermati.
+  const CAP = 500;
+  for (let i = 0; i < CAP + 3; i++) {
+    await Mem.addPendingNotification({
+      testo: `Avviso numero ${i}`, kind: 'info', fiducia: 'contaminato',
+      produttore: PRODUTTORE, origine: MAIL_BANCA,
+    });
+  }
+  const coda = await Mem.listPendingNotifications();
+  assert.equal(coda.length, CAP, 'la coda deve fermarsi al suo tetto');
+  assert.equal(coda[0].testo, 'Avviso numero 3', 'escono le più vecchie, non le ultime arrivate');
+
+  const registro = await Mem.listGuardBlocks();
+  const scartate = registro.filter((b) => b.regola === 'coda-piena');
+  assert.equal(scartate.length, 3, 'le voci uscite dalla coda non compaiono da nessuna parte');
+  assert.deepEqual(scartate.map((b) => b.testo).sort(),
+    ['Avviso numero 0', 'Avviso numero 1', 'Avviso numero 2'],
+    'nel registro deve finire il testo vero, non una riga generica');
+  assert.match(scartate[0].motivo, /coda era piena/i,
+    'il registro deve dire che nessuno l’ha controllata, non far credere a un blocco');
+  errore = null;
+});

@@ -97,11 +97,16 @@ test('quello che un turno contaminato fissa nella memoria di Filo non passa da n
         // niente di cui insospettirsi.
         return { ...base, text: 'Fatto.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
       }
-      // La conversazione DOPO: pulita, e il modello ubbidisce alla lezione che
-      // si ritrova in memoria.
+      // La conversazione DOPO: pulita. Il modello ubbidisce a quello che si
+      // ritrova davanti, e niente di più: se la regola della pagina è finita
+      // nella memoria di Filo la ripete, altrimenti risponde e basta. È il
+      // punto della prova: non che il modello sia cattivo, ma che la frase di
+      // un estraneo gli arrivi come se fosse roba di Filo.
+      const contesto = (messages || []).map((m) => String(m.content || '')).join('\n');
+      const obbedisce = contesto.includes(arg.trappola);
       return {
         ...base,
-        text: `Ricorda: ${arg.trappola}. Comunque sono le 10:30.`,
+        text: obbedisce ? `Ricorda: ${arg.trappola}. Comunque sono le 10:30.` : 'Sono le 10:30.',
         toolCalls: [], reasoningDetails: [], finishReason: 'stop',
       };
     };
