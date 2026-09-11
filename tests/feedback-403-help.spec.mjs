@@ -100,12 +100,18 @@ test('a chi NON riceve le segnalazioni il messaggio non parla di amministratori'
   const msg = attachmentNotForYouHelp();
   expect(msg).not.toMatch(/amministrat/i);
   expect(msg).not.toMatch(/riservata/i);
-  // Dice la cosa che serve sapere: l'allegato è arrivato dov'era diretto.
-  // «Consegnato» e non «inviato» (#582, giro 3): l'elenco dei feedback mostra a
-  // ogni tester le segnalazioni di tutti, quindi questa frase si legge anche
-  // davanti all'allegato di un altro, e lì «inviato» suonava come «l'hai
-  // mandato tu».
-  expect(msg).toMatch(/consegnat/i);
+  // Dice la cosa che serve sapere, ed è chi apre quell'allegato. Non «inviato»
+  // (#582, giro 3): l'elenco dei feedback mostra a ogni tester le segnalazioni
+  // di tutti, quindi questa frase si legge anche davanti all'allegato di un
+  // altro, e lì «inviato» suonava come «l'hai mandato tu».
+  expect(msg).toMatch(/lo apre solo chi riceve le segnalazioni/i);
+  // E NON dice che è arrivato, né come viaggia (#582, giro 5): questa frase la
+  // riceve anche un indirizzo scritto nella forma del deposito di Filo, che
+  // Filo non ha aperto e che può non esistere affatto. Da questo lato
+  // l'esistenza non si può controllare: senza il download token il deposito
+  // risponde 403 sia per un oggetto che c'è sia per uno che non c'è.
+  expect(msg).not.toMatch(/consegnat|arrivat|ricevut/i);
+  expect(msg).not.toMatch(/cifrat/i);
   // Sta in un hover: una riga sola.
   expect(msg).not.toMatch(/\n/);
 });
