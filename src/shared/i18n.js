@@ -346,6 +346,7 @@
     options_action_filo_compact: 'Memoria di Filo — riordino dei ricordi',
     options_action_safebrowse_judge: 'Rilevamento siti pericolosi — giudizio',
     options_action_geoblock_classify: 'Riconoscimento dei blocchi geografici',
+    options_action_guard_text: 'Guardiano degli avvisi nati da mail e pagine',
     options_action_feedback_title: 'Titolo automatico dei feedback',
     options_action_editor_title: 'Editor — titolo automatico del documento',
     options_action_editor_summary: 'Editor — riassunto automatico del documento',
