@@ -320,7 +320,20 @@ module.exports = function register(on, ctx) {
       let idToken = '';
       try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
       const res = await fetch(url, { headers: FB.attachmentFetchHeaders(url, idToken) });
-      if (!res.ok) return { ok: false, error: `download allegato fallito (${res.status})` };
+      if (!res.ok) {
+        // Un 403 su un allegato ora ha una causa precisa e una cura precisa:
+        // dirla qui è la differenza fra un segnaposto muto e un problema che si
+        // risolve. (Il motivo finisce nell'hover del segnaposto, in dashboard.)
+        if (res.status === 403) {
+          return {
+            ok: false,
+            error: idToken
+              ? 'allegato non leggibile: il link non porta il token di download e questo account non è fra gli amministratori del progetto'
+              : 'allegato non leggibile: accedi con l’account amministratore (la sessione è scaduta)',
+          };
+        }
+        return { ok: false, error: `download allegato fallito (${res.status})` };
+      }
       const raw = new Uint8Array(await res.arrayBuffer());
 
       const C = globalThis.SN_FEEDBACK_CRYPTO;
