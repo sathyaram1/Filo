@@ -194,6 +194,20 @@
       </select>
     </section>
 
+    <!-- #536 — il registro degli avvisi fermati dal guardiano. Serve a una cosa
+         sola: capire se grida al lupo. Se blocca cose giuste è invisibile; se
+         blocca cose innocue lo si vede qui, con tanto di testo fermato. -->
+    <section id="sec-guard-blocks">
+      <h2>Avvisi fermati</h2>
+      <p class="sn-muted">Quando Filo legge una mail o una pagina scritta da altri e poi ti scrive qualcosa, un secondo modello guarda quel testo prima che compaia. Qui trovi quello che ha fermato: quando, da dove veniva e perché. Se vedi cose che non avrebbe dovuto fermare, dillo a Filo.</p>
+      <div id="guardBlocksList" class="guard-list"></div>
+      <p id="guardBlocksEmpty" class="sn-muted">Non è stato fermato nessun avviso.</p>
+      <div class="sn-row" style="margin-top:12px;">
+        <button class="sn-btn sn-btn-secondary" id="clearGuardBlocks" type="button">Svuota il registro</button>
+        <span id="guardBlocksHint" class="sn-saved-indicator">Svuotato</span>
+      </div>
+    </section>
+
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">
       <h2>Impostazioni avanzate</h2>
       <p class="sn-muted">Qui puoi modificare ogni aspetto estetico di Filo. Ricorda però che puoi sempre chiedere a Filo di fare le modifiche, se non ti va di cercare l'impostazione giusta.</p>
