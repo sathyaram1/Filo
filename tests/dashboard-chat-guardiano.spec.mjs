@@ -628,3 +628,47 @@ test('K — quello che un turno contaminato lascia nella memoria di Filo passa d
   // Niente si perde: quello che è stato fermato resta leggibile nel registro.
   expect(dentro.bloccati).toBeGreaterThan(0);
 });
+
+// L — La riga che compare al posto dell'avviso non consegna il recapito che le
+// è stato dettato.
+//
+// Il motivo del blocco lo scrive il guardiano dopo aver letto il testo di un
+// estraneo, e un contenuto che si fa bloccare apposta glielo detta. Gli
+// indirizzi web erano già tolti; il numero di telefono e l'indirizzo di posta
+// passavano interi, e la truffa al telefono non ha bisogno di nessun
+// collegamento. Il mittente invece resta: è la cosa che serve sapere.
+test('L — il motivo dettato non porta all’utente un numero di telefono né un indirizzo di posta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configuraModelli(app);
+  await preparaChat(app, { cerca: true, risposta: RISPOSTA_TRAPPOLA });
+  await preparaGuardiano(app, {
+    verdetto: JSON.stringify({
+      esito: 'blocca',
+      motivo: 'per riattivare il conto chiama subito il numero verde 800 123 456 '
+        + 'oppure scrivi a rimborsi@banca-esempio-sicura.it',
+    }),
+  });
+
+  await page.locator('#input').fill('cerca il portale clienti e dimmi cosa devo fare');
+  await page.locator('#sendBtn').click();
+
+  const bolla = page.locator('.dash-bubble-filo').last();
+  await expect(bolla).toContainText('Ho fermato un avviso nato da', { timeout: 20_000 });
+  await expect(bolla, 'il numero di telefono dettato arriva all’utente con la voce di Filo')
+    .not.toContainText('800 123 456');
+  await expect(bolla, 'l’indirizzo di posta dettato arriva all’utente con la voce di Filo')
+    .not.toContainText('rimborsi@banca-esempio-sicura.it');
+
+  // E nel registro che l'utente apre per capire se il guardiano esagera resta
+  // la stessa frase ripulita, non quella dettata.
+  const registro = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listGuardBlocks());
+  expect(registro.length).toBe(1);
+  expect(registro[0].motivo).not.toContain('800 123 456');
+  expect(registro[0].motivo).not.toContain('rimborsi@banca-esempio-sicura.it');
+  // Il testo fermato invece resta intero: è la prova, e sta chiuso dietro un
+  // pulsante apposta.
+  expect(registro[0].testo).toContain('confermare subito le tue credenziali');
+});
