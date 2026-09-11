@@ -181,6 +181,17 @@
       lines.push('');
     }
     // TAB APERTE
+    //
+    // Il SITO, non il titolo della pagina. Il titolo lo sceglie chi ha scritto
+    // la pagina, è lungo quanto vuole e arriverebbe qui come una frase in
+    // italiano, dentro il contesto di ogni conversazione: una pagina aperta in
+    // una scheda potrebbe dettare la risposta, e il guardiano degli avvisi
+    // (#536) non girerebbe, perché un turno che non ha letto niente di nessuno
+    // è pulito. Contare le schede aperte come fonte contaminata vorrebbe dire
+    // un secondo modello a ogni «che ore sono», che è lo spreco che #536 dice di
+    // evitare: finché quel confine non lo sposta #530, qui entra il solo nome
+    // del sito, che è anche quello con cui la persona chiama la sua scheda
+    // («chiudi quella del giornale»).
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
     else {
@@ -188,8 +199,8 @@
       top.forEach((t, i) => {
         const focus = t.active ? '[FOCUS] ' : '';
         const rel = t.lastAccessed ? ` (ultima attività: ${formatRelativeTime(new Date(t.lastAccessed))})` : '';
-        const title = (t.title || '').slice(0, 80) || '(senza titolo)';
-        lines.push(`${i + 1}. ${focus}${title}${rel}`);
+        const sito = t.host || '(sito sconosciuto)';
+        lines.push(`${i + 1}. ${focus}${sito}${rel}`);
       });
       if (state.tabs.length > 12) lines.push(`...altre ${state.tabs.length - 12} tab`);
     }
