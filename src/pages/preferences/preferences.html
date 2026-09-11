@@ -51,6 +51,12 @@
       flex-direction: column;
       gap: 6px;
     }
+    /* La voce che si stava cercando, arrivando qui dalla riga di un avviso
+       fermato: si fa riconoscere senza gridare. */
+    .guard-item-cercato {
+      border-color: var(--sn-accent, currentColor);
+      box-shadow: 0 0 0 2px rgba(var(--sn-accent-rgb, 196, 90, 59), 0.18);
+    }
     .guard-why { line-height: 1.45; }
     .guard-meta { font-size: 12px; opacity: 0.7; display: flex; gap: 10px; flex-wrap: wrap; }
     .guard-toggle {
