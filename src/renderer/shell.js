@@ -1486,6 +1486,88 @@
     });
   }
 
+  // ─── Pastiglia "il sito chiede un permesso" (#586) ──────────────────────
+  // Il main manda qui ogni richiesta che non sia innocua (fotocamera,
+  // microfono, posizione, notifiche, appunti, schermo…) e aspetta la risposta.
+  // Finché l'utente non sceglie il sito NON ha il permesso, e se la pagina se
+  // ne va o passano due minuti il main nega da solo (e chiude la pastiglia dal
+  // canale `permissions:closed`).
+  if (api.permissions && api.permissions.onRequest) {
+    const permHost = document.createElement('div');
+    permHost.id = 'permission-chips';
+    document.body.appendChild(permHost);
+    const aperte = new Map(); // id → nodo
+
+    function chiudiPastiglia(id) {
+      const nodo = aperte.get(String(id));
+      if (!nodo) return;
+      aperte.delete(String(id));
+      nodo.classList.add('uscita');
+      setTimeout(() => { try { nodo.remove(); } catch (_) {} }, 140);
+    }
+
+    api.permissions.onClosed((info) => { if (info && info.id) chiudiPastiglia(info.id); });
+
+    api.permissions.onRequest((info) => {
+      if (!info || !info.id) return;
+      const id = String(info.id);
+      if (aperte.has(id)) return;
+
+      const chip = document.createElement('div');
+      chip.className = 'perm-chip';
+      chip.setAttribute('role', 'alertdialog');
+      chip.dataset.id = id;
+
+      const testo = document.createElement('span');
+      testo.className = 'perm-chip-text';
+      const sito = document.createElement('strong');
+      sito.textContent = info.host || 'Questo sito';
+      testo.appendChild(sito);
+      testo.appendChild(document.createTextNode(` vuole ${info.testo || 'un permesso'}`));
+      chip.appendChild(testo);
+      chip.setAttribute('aria-label', `${info.host || 'Questo sito'} vuole ${info.testo || 'un permesso'}`);
+
+      const rispondi = (scelta) => {
+        chiudiPastiglia(id);
+        try { api.permissions.answer(id, scelta, true); } catch (_) {}
+      };
+
+      const consenti = document.createElement('button');
+      consenti.type = 'button';
+      consenti.className = 'perm-chip-btn perm-chip-allow';
+      consenti.textContent = 'Consenti';
+      consenti.dataset.tip = `Sempre per ${info.host || 'questo sito'}`;
+      consenti.addEventListener('click', () => rispondi('allow'));
+      chip.appendChild(consenti);
+
+      const nega = document.createElement('button');
+      nega.type = 'button';
+      nega.className = 'perm-chip-btn';
+      nega.textContent = 'Nega';
+      nega.dataset.tip = `Sempre per ${info.host || 'questo sito'}`;
+      nega.addEventListener('click', () => rispondi('deny'));
+      chip.appendChild(nega);
+
+      // La × chiude senza decidere per sempre: il permesso NON viene concesso
+      // (il default è negare) ma non resta scritto niente, così la prossima
+      // volta il sito richiede invece di trovarsi un no per sempre.
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'perm-chip-x';
+      x.textContent = '×';
+      x.setAttribute('aria-label', 'Chiudi senza decidere');
+      x.dataset.tip = 'Chiudi senza decidere';
+      x.addEventListener('click', () => {
+        chiudiPastiglia(id);
+        try { api.permissions.answer(id, 'deny', false); } catch (_) {}
+      });
+      chip.appendChild(x);
+
+      aperte.set(id, chip);
+      permHost.appendChild(chip);
+    });
+  }
+
   // ─── Chip "popup bloccato" ─────────────────────────────────────────────
   // Quando il main blocca un window.open() non richiesto invia
   // 'tabs:popup-blocked' con { tabId, url, host }. Mostriamo una chip ancorata
