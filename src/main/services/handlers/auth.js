@@ -835,16 +835,19 @@ module.exports = function register(on, ctx) {
       // Le schede già in bacheca si leggono una volta sola e servono due volte:
       // per pescare i feedback fuori pagina che ne hanno una, e per il piano.
       const published = await publicCards({ fresh: true });
-      const raw = await conLeSegnalazioniFuoriPagina(base, idToken, published);
-      const feedbacks = new Array(raw.length);
+      const { rows: raw, aggiunti } = await conLeSegnalazioniFuoriPagina(base, idToken, published);
+      const decifrati = new Array(raw.length);
       let next = 0;
       const worker = async () => {
         while (next < raw.length) {
           const i = next++;
-          feedbacks[i] = await decryptFeedbackObject(raw[i] || {}, priv);
+          decifrati[i] = await decryptFeedbackObject(raw[i] || {}, priv);
         }
       };
       await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
+      const feedbacks = decifrati.filter(
+        (f) => !aggiunti.has(String((f && f._id) || '')) || statusLeggibile(f),
+      );
 
       // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto,
       // quindi questi sono TUTTI i feedback che esistono, e solo allora una
