@@ -2035,28 +2035,45 @@ function fontiContaminantiInContesto(history) {
 // un promemoria chiamato «La banca chiede di confermare le credenziali su …»,
 // e avviare un timer non chiede conferma a nessuno.
 //
-// Quindi quelle etichette passano dallo stesso punto di passaggio della
-// risposta, PRIMA che l'azione parta. Se non passano — o se il controllo non si
-// può fare, che non è un controllo superato — l'azione si fa lo stesso senza le
-// parole di nessun altro: un timer che si chiama «Timer» resta un timer utile.
-// Il testo fermato non si perde: va nel registro degli avvisi fermati.
-const ETICHETTE_SORVEGLIATE = {
-  TIMER: ['label', 'etichetta'],
-  SVEGLIA: ['label', 'etichetta'],
-};
-
-async function sorvegliaEtichette(a, ctx) {
+// Quindi quel testo passa dallo stesso punto di passaggio della risposta, PRIMA
+// che l'azione parta. Se non passa — o se il controllo non si può fare, che non
+// è un controllo superato — l'azione perde quelle parole (`svuota`: un timer che
+// si chiama «Timer» resta un timer utile) o non si fa affatto (`annulla`: un
+// appunto senza testo e una regola senza regola non sono niente di utile). Il
+// testo fermato non si perde: va nel registro degli avvisi fermati.
+//
+// Quali campi, per quale azione, lo dice il registro in textGuard.js, che copre
+// ogni azione esistente ed è confrontato con l'elenco vero da una sentinella.
+// Prima quell'elenco si teneva qui a mano, con due voci sole: fuori restavano
+// l'appunto, la regola fissata nella memoria di Filo e lo stile con cui Filo
+// scrive, che è la porta peggiore — il testo di un estraneo entrava nelle
+// istruzioni di OGNI conversazione futura, dove il compito è pulito e il secondo
+// modello non gira nemmeno.
+async function sorvegliaTestiPersistenti(a, ctx) {
   const G = globalThis.SN_TEXT_GUARD;
-  const campi = ETICHETTE_SORVEGLIATE[String((a && a.type) || '').toUpperCase()];
-  if (!G || !campi) return;
+  if (!G || !a) return;
+  const { campi, seFermato, soloSeTestoLibero } = G.campiDaSorvegliare(a);
+  if (!campi.length) return;
+  // Le preferenze a interruttore o a parola scelta da un elenco non sono parole
+  // di nessuno: un secondo modello per «tema: scuro» è lo spreco che questo
+  // lavoro deve evitare. Sorvegliamo solo quelle che il registro delle
+  // preferenze dichiara a testo libero.
+  if (soloSeTestoLibero) {
+    let libera = false;
+    try {
+      const P = globalThis.SN_PREF;
+      const chiave = a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza;
+      const valore = a.valore ?? a.value ?? a.valoreNuovo ?? a.val;
+      libera = !!(P && P.buildPreferencePartial(chiave, valore) || {}).testoLibero;
+    } catch (_) { libera = true; }
+    if (!libera) return;
+  }
   const TG = globalThis.SN_TEXT_GUARDIAN || require('./textGuardian');
-  for (const campo of campi) {
-    const testo = String(a[campo] == null ? '' : a[campo]).trim();
-    if (!testo) continue;
+  for (const { nome, testo } of campi) {
     let verdetto;
     try {
       verdetto = await TG.controllaTesto({
-        testo,
+        testo: testo.trim(),
         fiducia: ctx.fiducia,
         origine: ctx.origine,
         richiestaUtente: ctx.richiestaUtente,
@@ -2069,10 +2086,11 @@ async function sorvegliaEtichette(a, ctx) {
     try {
       await FiloMem.addGuardBlock({
         origine: ctx.origine, motivo: verdetto.motivo, regola: verdetto.regola,
-        testo, fonte: ctx.richiestaUtente || '',
+        testo: testo.trim(), fonte: ctx.richiestaUtente || '',
       });
     } catch (_) {}
-    a[campo] = '';
+    a[nome] = '';
+    if (seFermato === 'annulla') { a._fermatoDalGuardiano = true; return; }
   }
 }
 
