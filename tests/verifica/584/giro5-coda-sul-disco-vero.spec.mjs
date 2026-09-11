@@ -72,14 +72,33 @@ test('un percorso finisce nella coda vera, sul disco vero, e non parte subito', 
   expect(JSON.stringify(voce).toLowerCase()).not.toContain('clientid');
 });
 
-test('la coda torna dal disco al riavvio del modulo, invece di ripartire vuota', async ({ app }) => {
+test('la coda torna dal disco a Filo riaperto, invece di ripartire vuota', async ({ app }) => {
+  // Ogni prova parte da un profilo suo: il percorso va messo in coda qui, e
+  // solo dopo si fa finta di riaprire Filo.
   const esito = await app.evaluate(async () => {
     const C = globalThis.SN_PATHS_COLLECTOR;
-    // simula la riapertura di Filo: il modulo dimentica tutto e rilegge
+    C._reset();
+    C._setAuto(false);
+    C._setSorteggio(() => 0.5);
+    await C.collectAndSave({
+      session: {
+        rawUrl: 'https://negozio.example/ordini',
+        rawSteps: [{ selector: '[aria-label="Ordini"]', action: 'click' }],
+        rawUserMessages: ['dove sono i miei ordini?'],
+        success: true,
+      },
+      invokeAI: async ({ action }) => (
+        action === 'help_intent_guess' ? { text: 'trovare gli ordini' } : { text: '{"ok": true}' }
+      ),
+    });
+    const primaDellaChiusura = C._peek().length;
+
+    // Filo si riapre: il modulo dimentica tutto e deve ritrovare la coda.
     C._reset();
     C._setAuto(false);
     await C.flush({ now: 0 });   // costringe la lettura dal disco
-    return { inCoda: C._peek().length };
+    return { primaDellaChiusura, dopoLaRiapertura: C._peek().length };
   });
-  expect(esito.inCoda).toBe(1);
+  expect(esito.primaDellaChiusura).toBe(1);
+  expect(esito.dopoLaRiapertura).toBe(1);
 });
