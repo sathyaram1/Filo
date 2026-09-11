@@ -365,11 +365,19 @@
   // invia, e non c'è modo di distinguerlo da chi lo alza a vuoto): senza questo,
   // un estraneo che lo spinge a diecimila lascerebbe i feedback nuovi con numeri
   // assurdi per sempre, e l'unica cura sarebbe la console. Si passa `true` SOLO
-  // quando si sono appena letti TUTTI i feedback: abbassarlo avendone visti solo
-  // una parte riassegnerebbe numeri già usati. Resta una finestra stretta (un
-  // invio proprio mentre l'owner guarda la dashboard) in cui un numero si può
-  // ripetere: il numero è un'etichetta, non una chiave, e ripeterne uno è meno
-  // peggio che perderli tutti.
+  // con il numero più alto VERO in mano (SN_FEEDBACK.maxSeq, che lo chiede al
+  // server): con il massimo dei soli feedback caricati si riassegnerebbero
+  // numeri già usati.
+  //
+  // Anche col massimo vero resta una corsa: un invio fra la nostra lettura e la
+  // nostra scrittura assegna un numero che noi non abbiamo visto, e abbassare
+  // lo farebbe riusare. Per questo si scende solo quando lo scarto è più largo
+  // di qualunque corsa realistica (SEQ_LOWER_MARGIN): uno scarto di uno o due è
+  // gente che sta inviando adesso, uno scarto di cento è un contatore gonfiato.
+  // Uno scarto piccolo resta com'è: sono numeri saltati, cioè un'etichetta con
+  // un buco, e vale meno del rischio di stamparne due uguali.
+  const SEQ_LOWER_MARGIN = 10;
+
   async function ensureSeqCounter(maxSeq, opts = {}) {
     const value = Math.max(0, Math.trunc(Number(maxSeq) || 0));
     const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
