@@ -48,7 +48,7 @@ test('fuori dalla pagina di caricamento la scheda non si aggiorna e non si togli
     const pianoSenzaVecchio = V.planSync([], caricati, { complete: false });
 
     return {
-      toltе: piano.remove,
+      tolte: piano.remove,
       scritte: piano.upsert.map((u) => u.id),
       scritteSenzaVecchio: pianoSenzaVecchio.upsert.map((u) => u.id),
     };
@@ -57,7 +57,7 @@ test('fuori dalla pagina di caricamento la scheda non si aggiorna e non si togli
   // La scheda del fix vecchio non viene toccata: né riscritta né tolta. Se
   // quel feedback nel frattempo è tornato in lavorazione, la bacheca continua
   // a mostrarlo come risolto.
-  expect(out.toltе).not.toContain('fb-vecchio');
+  expect(out.tolte).not.toContain('fb-vecchio');
   expect(out.scritte).not.toContain('fb-vecchio');
 
   // E un feedback fuori pagina non riceve mai una scheda, nemmeno appena
