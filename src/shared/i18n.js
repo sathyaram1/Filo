@@ -384,8 +384,9 @@
     admin_defaults_key_absent: 'non configurata',
     admin_defaults_safebrowse_key_desc:
       'Chiave gratuita di Google Safe Browsing per il rilevamento siti pericolosi: con questa chiave Filo ' +
-      'controlla la blacklist ufficiale di Google (phishing e malware) per TUTTI gli account. È condivisa: ' +
-      'la imposti una volta qui e vale per tutti. Senza chiave questo controllo viene saltato, gli altri restano attivi.',
+      'controlla la blacklist ufficiale di Google (phishing e malware) per TUTTI gli account, anche chi non ha fatto l\'accesso. ' +
+      'È condivisa: la imposti una volta qui e viaggia con la prossima versione pubblicata. ' +
+      'Senza chiave questo controllo viene saltato, gli altri restano attivi.',
     admin_defaults_reasoning: 'reasoning',
     admin_defaults_reasoning_desc:
       'Per ogni modello puoi forzare il livello di ragionamento, quando il modello lo supporta. «Auto» lascia decidere il modello (comportamento di prima); «Nessuno» chiede di non ragionare (risposte più rapide ed economiche); «Basso/Medio/Alto» chiedono uno sforzo di ragionamento crescente. I modelli che non ragionano ignorano l\'impostazione.',
