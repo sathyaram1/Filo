@@ -385,7 +385,8 @@
   // spesso di «il codice ordine». Tenere solo la forma secca lasciava fuori
   // proprio le frasi più comuni, e la risposta spariva a chi chiedeva il codice
   // del suo ordine o del suo coupon.
-  const PRIMA_DEL_QUALIFICATORE = '(?:(?:di|del|dello|della|dei|degli|delle|dell\'|d\'|al|alla|il|la|lo|un|una)\\s*)?';
+  const PRIMA_DEL_QUALIFICATORE = '(?:(?:di|del|dello|della|dei|degli|delle|dell\'|d\'|al|allo|alla|all\'|ai|agli|alle'
+    + '|nel|nello|nella|nell\'|il|la|lo|l\'|un|uno|una|un\')\\s*)?';
   const QUALIFICATORE_INNOCUO = [
     'sconti?', 'promo\\w*', 'coupon', 'buoni?', 'saldi',
     'ordin[ei]', 'client[ei]', 'utente', 'fornitore', 'negozio', 'carrello',
