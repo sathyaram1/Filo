@@ -561,6 +561,12 @@
   const REGOLE = {
     'segreto-di-filo': 'conteneva una chiave che Filo tiene da parte',
     'codice-usa-e-getta': 'conteneva un codice di verifica',
+    // Due motivi, perché sono due cose diverse e la riga che l'utente legge deve
+    // dire quella giusta. Il primo è la forma che si dichiara usa e getta; il
+    // secondo è un codice qualunque che la frase chiedeva di passare a qualcuno.
+    // Scriverli tutti e due «codice di verifica» voleva dire raccontare a chi
+    // apre il registro una cosa che nel testo non c'era.
+    'codice-da-comunicare': 'conteneva un codice che qualcuno chiedeva di comunicare',
     'codice-di-recupero': 'conteneva un codice di recupero',
     password: 'conteneva una password',
     chiave: 'conteneva una chiave di accesso',
