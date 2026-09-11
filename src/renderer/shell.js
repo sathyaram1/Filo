@@ -116,16 +116,29 @@
   // del menu del tasto destro è stata ritirata e l'icona Home porta alla nuova
   // scheda, non lì). È l'analogo di "Scaricamenti": una lista di cose messe da
   // parte, non un'azione.
-  const APPS = [
-    { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
-    { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
-    { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
-    { label: 'Scaricamenti', icon: 'download', url: 'filo://downloads/downloads.html' },
-    { type: 'separator' },
-    { label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' },
-    { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
-    { label: 'Gestione', icon: 'feedback', url: 'filo://manage/manage.html' },
-  ];
+  // "Feedback" (la posta delle segnalazioni) e "Gestione" sono superfici
+  // dell'owner: da quando i feedback li legge solo chi li gestisce (#583) a un
+  // utente comune aprirebbero una pagina che non ha niente da mostrare, con un
+  // invito ad accedere come amministratore che non porta da nessuna parte
+  // (amministratori non si diventa accedendo). Compaiono solo all'admin, come
+  // già fa "Modelli predefiniti" nel menu Impostazioni. Chi vuole MANDARE un
+  // feedback non passa di qui: passa dal menu del tasto destro, che il
+  // cambiamento non tocca.
+  function buildApps() {
+    const entries = [
+      { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
+      { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
+      { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
+      { label: 'Scaricamenti', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { type: 'separator' },
+      { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
+    ];
+    if (isAdmin) {
+      entries.push({ label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' });
+      entries.push({ label: 'Gestione', icon: 'feedback', url: 'filo://manage/manage.html' });
+    }
+    return entries;
+  }
   // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
   // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
   // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
