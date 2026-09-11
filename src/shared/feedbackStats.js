@@ -359,20 +359,24 @@
     if (!testa) return null;
     const dichiarati = Number(testa[1]);
     if (!Number.isFinite(dichiarati) || !dichiarati) return null;
-    const fine = corpo.findIndex((l) => FINDING_LINE.test(l));
-    if (fine < 0) return null;
-    // Dopo l'ultimo rilievo il server non scrive altro: l'elenco chiude il
-    // turno. Una riga di prosa in coda vuol dire che quell'elenco sta dentro il
-    // testo di qualcun altro — chi corregge che riporta il verbale a cui
-    // risponde — e allora non è il verbale del server. Le righe rientrate sono
-    // la continuazione di un rilievo (formatFinding rientra di due spazi).
-    for (let k = fine + 1; k < corpo.length; k += 1) {
-      const riga = corpo[k];
-      if (!riga.trim() || /^\s/.test(riga) || FINDING_LINE.test(riga)) continue;
-      return null;
+    // ⚠️ L'ELENCO DEI RILIEVI È IL BLOCCO IN FONDO AL TURNO, NON IL PRIMO CHE
+    // CAPITA. Il server lo scrive per ultimo e sotto non ci mette altro. Cercare
+    // il PRIMO rilievo vuol dire trovare quelli di un verbale CITATO dentro il
+    // riassunto, e allora il verbale vero smetteva di riconoscersi e il suo giro
+    // spariva dai conti (#496, giro 13).
+    // Una riga di prosa sotto l'elenco vuol dire che l'elenco sta dentro il
+    // testo di qualcun altro, e qui non c'è più nessun elenco in fondo da
+    // trovare. Le righe rientrate sono la continuazione di un rilievo
+    // (formatFinding rientra di due spazi).
+    let fine = -1;
+    let k = corpo.length - 1;
+    while (k >= 0 && (!corpo[k].trim() || /^\s/.test(corpo[k]) || FINDING_LINE.test(corpo[k]))) {
+      if (FINDING_LINE.test(corpo[k])) fine = k;
+      k -= 1;
     }
+    if (fine < 0) return null;
     // Il numero non combacia: non è un verbale, è qualcuno che ne parla.
-    const parsed = VR().parseFindings(corpo.join('\n'));
+    const parsed = VR().parseFindings(corpo.slice(fine).join('\n'));
     if (parsed.findings.length !== dichiarati) return null;
     // L'ultima riga scritta prima dell'elenco: è lì, e solo lì, che il server
     // dichiara la decisione. Il riassunto sta tutto sopra.

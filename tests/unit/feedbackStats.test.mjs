@@ -912,3 +912,130 @@ test('due verbali diversi restano due giri: la difesa sulla ripetizione non li f
   ].join('\n');
   assert.deepEqual(esito(notes), { kinds: ['fix', 'fix'], giri: 2, passata: true });
 });
+
+// ─── Ottava porta: il blocco incollato, staccato da una riga vuota ───────────
+//
+// Il giro 12 ha chiesto alla riga che separa i turni di avere sopra una riga
+// vuota, e così ha chiuso la citazione infilata dentro un capoverso. Ma un
+// blocco incollato lo si stacca proprio con una riga vuota. Quello che una
+// citazione non si porta dietro è l'ORDINE: i turni veri Filo li appende uno
+// dopo l'altro, quindi l'istante nel marcatore cresce sempre, mentre un turno
+// citato porta l'istante del giorno in cui fu scritto.
+
+const G13_FIX = 'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.';
+const G13_STOP = 'Il lavoro si ferma: c\'è un rilievo che non si può correggere da soli.';
+function g13Verbale(esitoRiga, livelli) {
+  const n = livelli.length;
+  return [
+    `Verifica: ${n} ${n === 1 ? 'rilievo' : 'rilievi'}.`,
+    'Provato: tutto quanto, e funziona.',
+    esitoRiga,
+    ...livelli.map((l, i) => `- [${l}] rilievo ${i + 1}`),
+  ].join('\n');
+}
+const G13_AG = (t) => `--- Aggiornamento dell'agente del ${t} ---`;
+const G13_UT = (t) => `--- La tua risposta del ${t} ---`;
+// Una lavorazione costata UN giro di correzione, poi passata.
+const G13_UN_GIRO = [
+  `${G13_AG('02/09/2026, 10:00')}\n${g13Verbale(G13_FIX, [2, 1])}`,
+  '',
+  `${G13_AG('03/09/2026, 10:00')}\nCorretto tutto.`,
+  '',
+  `${G13_AG('04/09/2026, 10:00')}\nVerifica superata. Adesso funziona.`,
+].join('\n');
+const G13_ATTESO = { kinds: ['fix'], giri: 1, passata: true };
+
+test('un verbale di un’altra segnalazione, incollato in una risposta, non aggiunge un giro', () => {
+  assert.deepEqual(esito(G13_UN_GIRO), G13_ATTESO);
+  const citato = [
+    G13_UN_GIRO,
+    '',
+    `${G13_UT('05/09/2026, 11:00')}\nNon mi torna. Sulla gemella il verbale diceva:`,
+    '',
+    `${G13_AG('11/07/2026, 09:00')}\n${g13Verbale(G13_FIX, [1])}`,
+  ].join('\n');
+  assert.deepEqual(esito(citato), G13_ATTESO);
+});
+
+test('un verbale citato che fermava il lavoro non fa uscire dalla torta una lavorazione passata', () => {
+  const citato = [
+    G13_UN_GIRO,
+    '',
+    `${G13_UT('05/09/2026, 11:00')}\nMi ricorda questo:`,
+    '',
+    `${G13_AG('11/07/2026, 09:00')}\n${g13Verbale(G13_STOP, [2])}`,
+  ].join('\n');
+  assert.deepEqual(esito(citato), G13_ATTESO);
+});
+
+test('il verificatore che cita il verbale del giro prima non fa sparire il proprio giro', () => {
+  const notes = [
+    `${G13_AG('02/09/2026, 10:00')}`,
+    'Verifica: 1 rilievo.',
+    'Provato: tutto. Il giro prima diceva:',
+    '',
+    G13_AG('01/09/2026, 08:00'),
+    g13Verbale(G13_FIX, [2, 1, 0]),
+    '',
+    G13_FIX,
+    '- [1] resta solo questo',
+    '',
+    `${G13_AG('03/09/2026, 10:00')}\nCorretto.`,
+    '',
+    `${G13_AG('04/09/2026, 10:00')}\nVerifica superata.`,
+  ].join('\n');
+  assert.deepEqual(esito(notes), G13_ATTESO);
+});
+
+test('chi corregge, citando il verbale di un’altra segnalazione, non aggiunge un giro', () => {
+  const notes = [
+    `${G13_AG('02/09/2026, 10:00')}\n${g13Verbale(G13_FIX, [2, 1])}`,
+    '',
+    `${G13_AG('03/09/2026, 10:00')}\nCorretto. Per riferimento, il verbale della gemella:`,
+    '',
+    `${G13_AG('11/07/2026, 09:00')}\n${g13Verbale(G13_FIX, [1])}`,
+    '',
+    `${G13_AG('04/09/2026, 10:00')}\nVerifica superata.`,
+  ].join('\n');
+  assert.deepEqual(esito(notes), G13_ATTESO);
+});
+
+test('un verbale incollato nella testa del campo note non inventa un giro bloccante', () => {
+  const notes = [
+    'Ho guardato io, il verbale era:',
+    '',
+    g13Verbale(G13_STOP, [2]),
+    '',
+    `${G13_AG('03/09/2026, 10:00')}\nCorretto.`,
+    '',
+    `${G13_AG('04/09/2026, 10:00')}\nVerifica superata.`,
+  ].join('\n');
+  const r = ST.loopsBeforePass(fb({ notes }));
+  assert.equal(r.rounds.length, 0, 'un verbale incollato non è un giro');
+  assert.equal(r.passata, true, 'la lavorazione resta passata, non «fermata alla verifica»');
+});
+
+test('la riga del taglio, scritta da qualcuno, non toglie la lavorazione dai conti', () => {
+  const marca = globalThis.SN_FEEDBACK_THREAD.TRIM_MARK;
+  assert.equal(ST.notesTruncated({ notes: `${marca}\n\n${G13_UN_GIRO}` }), true,
+    'in cima è il taglio vero');
+  const citata = `${G13_UN_GIRO}\n\n${G13_UT('05/09/2026, 11:00')}\nHo letto questa riga:\n${marca}`;
+  assert.equal(ST.notesTruncated({ notes: citata }), false);
+  assert.deepEqual(esito(citata), G13_ATTESO);
+});
+
+test('un orologio avanti sul computer di chi risponde non fa sparire i turni di Filo', () => {
+  // Le due catene non si confrontano: il turno dell'utente porta l'istante del
+  // suo computer, e se è avanti di giorni i turni di Filo che vengono dopo
+  // devono restare al loro posto.
+  const notes = [
+    `${G13_AG('02/09/2026, 10:00')}\n${g13Verbale(G13_FIX, [2, 1])}`,
+    '',
+    `${G13_UT('20/12/2027, 11:00')}\nOrologio storto, ma è una risposta vera.`,
+    '',
+    `${G13_AG('03/09/2026, 10:00')}\nCorretto.`,
+    '',
+    `${G13_AG('04/09/2026, 10:00')}\nVerifica superata.`,
+  ].join('\n');
+  assert.deepEqual(esito(notes), G13_ATTESO);
+});
