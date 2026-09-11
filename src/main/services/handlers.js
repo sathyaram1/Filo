@@ -2379,6 +2379,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // del compito è quella della sua fonte peggiore.
   let fiduciaTurno = globalThis.SN_TEXT_GUARD.FIDUCIA.PULITO;
   const fontiTurno = [];
+  // …e non riparte pulita a ogni messaggio: quello che il turno prima ha letto è
+  // ancora nella conversazione, e continua a parlare al modello.
+  for (const et of fontiContaminantiInContesto(cleanHistory)) {
+    fiduciaTurno = globalThis.SN_TEXT_GUARD.FIDUCIA.CONTAMINATO;
+    if (!fontiTurno.includes(et)) fontiTurno.push(et);
+  }
   let holdInviato = false;
   // #420 — la risposta scorre in diretta: inoltriamo alla scheda i delta del
   // testo (o il segnale di reset dopo un fallback provider). #536 — appena il
