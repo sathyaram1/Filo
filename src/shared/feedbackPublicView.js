@@ -44,6 +44,7 @@
   // l'HTML prima di questo file.
   if (typeof require === 'function') {
     try {
+      if (!global.SN_CONST) require('./constants.js');
       if (!global.SN_FB_STATUS) require('./feedbackStatus.js');
       if (!global.SN_MANAGE_REVIEW) require('./manageReview.js');
       if (!global.SN_FEEDBACK_CLIENT_ID_HASH) require('./feedbackClientIdHash.js');
