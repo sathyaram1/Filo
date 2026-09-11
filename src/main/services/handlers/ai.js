@@ -2,6 +2,9 @@
 // provider/modelli dalle Opzioni, ricerca web e raccolta dei path "Aiuto".
 
 const auth = require('../../auth/google-auth');
+// L'identità dell'INSTALLAZIONE (l'account anonimo di crediti e portafoglio).
+// Serve a chi manda un percorso condiviso: vedi MSG.SAVE_PATH più sotto.
+const identity = require('../../auth/anon-auth');
 
 module.exports = function register(on, ctx) {
   const {
