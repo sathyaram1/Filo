@@ -88,6 +88,25 @@ che non ne ha.**
   nel turno SUBITO DOPO è chi corregge che riporta quello a cui risponde. Il
   prezzo è un conteggio in difetto nei casi rari (due turni veri nello stesso
   minuto), che è il verso giusto in cui sbagliare.
+- **E quello che torna INDIETRO nel tempo è una citazione.** È l'unica cosa che
+  chi incolla non si porta dietro: i turni veri vengono appesi uno dopo l'altro,
+  quindi l'istante scritto nel marcatore cresce sempre, mentre un turno citato
+  porta l'istante del giorno in cui fu scritto. Un marcatore più vecchio del
+  turno prima è una copia. Due accortezze: le catene sono DUE, una per i turni
+  del programma e una per quelli dell'utente, perché le scrivono due orologi
+  diversi e uno solo avanti farebbe sparire tutti i turni veri che vengono dopo;
+  e ci vuole una tolleranza di qualche minuto, che assorbe lo scarto fra due
+  scritture della stessa parte.
+- **L'elenco sta IN FONDO, e si cerca da lì.** Cercando il primo rilievo si
+  trovano quelli di un verbale citato dentro il riassunto, e il verbale vero non
+  si riconosce più: il suo giro spariva. Il server l'elenco lo scrive per ultimo
+  e sotto non ci mette niente, quindi l'elenco è il blocco finale del turno e il
+  conto dei rilievi si fa su quello soltanto.
+- **Una riga che dichiara un fatto del sistema vale solo dove il sistema la
+  scrive.** La riga che annuncia il taglio della conversazione troppo lunga sta
+  in cima al blob, sempre e solo lì. Cercarla ovunque vuol dire trovarla anche
+  quando è qualcuno ad averla incollata raccontando una conversazione tagliata,
+  e allora una lavorazione buona esce dai conti per una riga di prosa.
 - **Una riga di sole parole non può fare il danno grosso.** La forma vecchia
   `Controllo funzionalità NON superato` non ha niente da esibire: il giro 10 ha
   provato a chiederle la punteggiatura, e il giro 11 ha riaperto la porta
