@@ -38,7 +38,8 @@
         "spec": "tests/verify-514-g11",
         "caso": "home: quattro riquadri impilati — nessuno dei quattro Esc porta via la modalità",
         "perche": "stesso caso già elencato fra i rossi della macchina di chi sviluppa Filo, ma è rosso anche qui, e i due elenchi sono separati apposta: tenuto solo di là, questo file mentiva a chi verifica dal contenitore (secondo giro di verifica del #581). Con tre riquadri impilati la prova passa, col quarto no: è il tetto che il main si dà sulle rivendicazioni dell’Esc. Da risolvere o spiegare meglio, poi togliere la voce da entrambi gli elenchi.",
-        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581",
+        "ancheSullaMacchinaDellOwner": true
       }
     ]
   },
