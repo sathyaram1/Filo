@@ -203,7 +203,16 @@ async function probeServerAdmin(claims) {
 }
 
 module.exports = function register(on, ctx) {
-  const { MSG, broadcastToTabs } = ctx;
+  const { MSG } = ctx;
+  // L'avviso «l'accesso è cambiato» porta con sé il profilo, cioè l'indirizzo
+  // email di chi sta usando Filo: va SOLO alle superfici di Filo. Mandarlo a
+  // tutte le schede vorrebbe dire consegnarlo anche ai content script dei siti
+  // visitati, ed è la stessa porta chiusa un attimo fa vista dal verso opposto:
+  // se un sito non lo può chiedere, non glielo si manda da soli.
+  const avvisaLeSuperficiDiFilo = (m) => {
+    if (typeof ctx.broadcastToFiloPages === 'function') ctx.broadcastToFiloPages(m);
+    else ctx.broadcastToTabs(m);
+  };
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico
   // + se l'utente è admin (può triagiare i feedback). `uid` è il claim
