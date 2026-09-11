@@ -113,7 +113,7 @@ test('un rifiuto del server su ogni documento non lascia Filo senza chiavi', asy
       viste,
       openrouter: (eff.apiKeys && eff.apiKeys.openrouter) || '',
       tavily: (eff.apiKeys && eff.apiKeys.tavily) || '',
-      safeBrowsing: eff.safeBrowsingKey || '',
+      safeBrowsing: (eff.security && eff.security.safeBrowse && eff.security.safeBrowse.safeBrowsingKey) || '',
     };
   });
 
