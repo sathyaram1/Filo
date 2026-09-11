@@ -100,7 +100,67 @@
       etichetta: 'l\'uscita di un comando',
       portaDentro: (out) => !!String(out.stdout || '').trim() || !!String(out.stderr || '').trim(),
     },
+    // Un documento dell'editor non è per forza roba scritta dall'utente: ci si
+    // incolla una mail, il testo di una pagina, un contratto ricevuto. Un PDF
+    // sul disco sporcava il compito e lo stesso identico testo, incollato in un
+    // documento, no: l'unica differenza era dove stava il foglio. Filo ne legge
+    // il testo INTERO quando gli serve, quindi porta dentro quanto e più di una
+    // ricerca.
+    LEGGI_FILE: {
+      fiducia: FIDUCIA.CONTAMINATO,
+      etichetta: 'un tuo documento',
+      portaDentro: (out) => !!out.found && !!String(out.text || '').trim(),
+    },
   };
+
+  // ── Gli INGREDIENTI del contesto ───────────────────────────────────────────
+  //
+  // Un compito non si sporca solo con le azioni che esegue: certe cose stanno
+  // nel contesto PRIMA che il modello apra bocca. I documenti dell'editor ci
+  // stanno sempre, una riga a testa, e per un documento corto quella riga è
+  // l'inizio del testo così com'è: se dentro c'è una mail incollata, le parole
+  // di chi l'ha scritta parlano al modello già da «che ore sono». Le pagine
+  // salvate ci arrivano col titolo, e il titolo lo sceglie chi ha scritto la
+  // pagina.
+  //
+  // La tabella è UNA e la usano tutte le superfici che costruiscono un contesto
+  // (la chat e il saluto della nuova scheda). Finché ognuna teneva il suo
+  // elenco, la stessa domanda aveva due risposte: la home contava i documenti
+  // dell'editor fra le fonti sporche, la chat no, e la chat quei documenti li
+  // legge anche per intero.
+  const INGREDIENTE_CONTESTO = {
+    pagineSalvate: 'una pagina che hai salvato',
+    documenti: 'un tuo documento',
+  };
+
+  // Quante cose ci sono di quell'ingrediente: un elenco, un numero, o un
+  // «c'è / non c'è».
+  function quantiIngredienti(v) {
+    if (Array.isArray(v)) return v.length;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+    if (typeof v === 'string') return v.trim() ? 1 : 0;
+    return v ? 1 : 0;
+  }
+
+  // Le fonti scritte da altri che stanno negli ingredienti di un contesto.
+  // Un nome che la tabella non conosce vale come contaminante: una superficie
+  // nuova sbaglia per eccesso di prudenza, mai lasciando passare testo non
+  // controllato.
+  function fontiDegliIngredienti(ingredienti) {
+    const o = ingredienti && typeof ingredienti === 'object' ? ingredienti : {};
+    const fonti = [];
+    for (const nome of Object.keys(INGREDIENTE_CONTESTO)) {
+      if (!quantiIngredienti(o[nome])) continue;
+      const et = INGREDIENTE_CONTESTO[nome];
+      if (!fonti.includes(et)) fonti.push(et);
+    }
+    for (const nome of Object.keys(o)) {
+      if (Object.prototype.hasOwnProperty.call(INGREDIENTE_CONTESTO, nome)) continue;
+      if (!quantiIngredienti(o[nome])) continue;
+      if (!fonti.includes('un contenuto non fidato')) fonti.push('un contenuto non fidato');
+    }
+    return fonti;
+  }
 
   function fiduciaDellAzione(tipo) {
     const v = FONTE_AZIONE[String(tipo || '').toUpperCase()];
