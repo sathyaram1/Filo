@@ -343,7 +343,12 @@ module.exports = function register(on, ctx) {
           if (f.clientIdHash && localIdHash) {
             return f.clientIdHash === localIdHash;
           }
-          // Fallback per feedback storici senza clientIdHash: confronto raw clientId.
+          // Fallback per feedback storici senza clientIdHash: confronto raw
+          // clientId. Dalla vista pubblica (#583) il clientId non arriva —
+          // è l'identificativo di chi ha mandato il feedback, e la scheda
+          // porta solo il suo hash — quindi qui il confronto cade su chi non
+          // ha nemmeno l'hash: i feedback anteriori a giugno 2026, che non
+          // producono più una ricompensa.
           return baseClientId(f.clientId) === id;
         })();
         if (!matched) continue; // solo i feedback DI questo install
