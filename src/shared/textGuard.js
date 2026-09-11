@@ -622,6 +622,10 @@
 
   global.SN_TEXT_GUARD = {
     FIDUCIA,
+    CAUSA,
+    DOVE_SONO_I_BLOCCHI,
+    fraseControlloFermo,
+    ripulisci,
     REGOLE,
     FONTE_AZIONE,
     SISTEMA_GUARDIANO,
