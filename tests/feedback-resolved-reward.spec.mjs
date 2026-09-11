@@ -80,10 +80,40 @@ test('feedback risolto: popup di ringraziamento + ricompensa', async ({ app, ope
   await expect(page.locator('.dash-thanks-item-body'))
     .toHaveText('Ora puoi incollare un’immagine direttamente nel box e arriva intera.');
 
-  // +50 crediti, la ricompensa di base (mostrati nel totale e accreditati sul
-  // saldo): la priorità non esce dalla collezione dei feedback.
+  // +50 crediti, la fascia di base: questa scheda non porta la cifra, ed è il
+  // caso delle schede pubblicate prima che il campo esistesse.
   await expect(page.locator('.dash-thanks-total')).toContainText('+50');
   await expect.poll(() => balanceOf(app)).toBe(1050);
+});
+
+test('la ricompensa segue quanto contava la segnalazione, non la fascia minima', async ({ app, openTab }) => {
+  // Una segnalazione che l'owner aveva messo in cima vale 300 crediti, non 50.
+  // La sua macchina la priorità non la vede (è cifrata, e la scheda pubblica
+  // non la porta): la cifra gliela dice la scheda. Senza quel campo il popup
+  // annuncia 50 a tutti, in silenzio, e non si rimedia dopo — un feedback
+  // premiato resta premiato (#583, giro 2 di verifica).
+  const page = await openTab('filo://newtab/');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+
+  // La cifra non è scritta a mano: è quella che il publisher mette sulla scheda
+  // di un feedback di priorità 3, cioè la stessa tabella del portafoglio.
+  const attesa = await app.evaluate(async () => globalThis.SN_FEEDBACK_PUBLIC_VIEW.rewardFor(3));
+  expect(attesa).toBeGreaterThan(50);
+
+  await seed(app, [
+    {
+      _id: 'fbGrosso', mia: true, status: 'done', statusPublic: 'closed',
+      name: 'Filo non si apriva più', seq: 7, subSeq: 0,
+      userNote: 'Adesso si apre.', reward: attesa,
+    },
+  ]);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('#thanksOverlay')).toBeVisible();
+  await expect(page.locator('.dash-thanks-total')).toContainText(`+${attesa}`);
+  await expect.poll(() => balanceOf(app)).toBe(1000 + attesa);
 });
 
 test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTab }) => {
