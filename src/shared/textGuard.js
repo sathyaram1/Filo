@@ -298,10 +298,29 @@
   // Carta: 13-19 cifre, eventualmente a gruppi. Il controllo di Luhn decide.
   const FORMA_CARTA = /\b(?:\d[ -]?){13,19}\b/g;
 
-  // Un numero di 13 cifre su dieci passa Luhn per caso, e i codici ISBN dei
-  // libri sono tutti di 13 cifre: senza questo, «il codice ISBN è
-  // 9788804707231» diventava «conteneva un numero di carta». L'ISBN ha una sua
-  // cifra di controllo e un suo prefisso, quindi si riconosce con certezza.
+  // Luhn da solo non basta: un numero lungo su dieci lo passa per caso, e i
+  // numeri lunghi nella posta di una persona sono ISBN, codici di spedizione,
+  // numeri di pratica. Una carta vera però comincia sempre in uno dei modi
+  // assegnati ai circuiti, e quelli sono pochi: chiedere anche il prefisso
+  // toglie di mezzo i sosia senza indebolire di niente il riconoscimento delle
+  // carte vere (il 4111 1111 1111 1111 dei banchi di prova resta preso).
+  const PREFISSI_CARTA = new RegExp('^(?:'
+    + '4'                                             // Visa
+    + '|5[1-5]|2(?:22[1-9]|2[3-9]\\d|[3-6]\\d\\d|7[01]\\d|720)' // Mastercard
+    + '|3[47]'                                        // American Express
+    + '|3(?:0[0-5]|[68])'                             // Diners
+    + '|6(?:011|5|4[4-9]|22)'                         // Discover
+    + '|35(?:2[89]|[3-8]\\d)'                         // JCB
+    + '|62'                                           // UnionPay
+    + '|(?:5018|5020|5038|56|57|58|6304|6759|676[1-3])' // Maestro
+    + ')');
+  function formaDiCarta(raw) {
+    const s = String(raw || '').replace(/[^\d]/g, '');
+    return PREFISSI_CARTA.test(s);
+  }
+
+  // I codici ISBN dei libri sono tutti di 13 cifre e hanno una loro cifra di
+  // controllo: si riconoscono con certezza e non sono mai una carta.
   function isbnValido(raw) {
     const s = String(raw || '').replace(/[^\d]/g, '');
     if (s.length !== 13 || !/^97[89]/.test(s)) return false;
