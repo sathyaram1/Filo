@@ -727,6 +727,77 @@
     return list;
   }
 
+  // ===== Guardiano degli avvisi (#536) =====
+  //
+  // Due elenchi, tenuti qui accanto alle notifiche perché è la stessa roba a uno
+  // stadio diverso: quelli FERMATI (registro che l'utente legge in Preferenze
+  // per capire se il guardiano grida al lupo) e quelli IN ATTESA del controllo
+  // (guardiano irraggiungibile: l'avviso non compare e non si perde).
+
+  async function listGuardBlocks() {
+    const l = await getRaw(KEYS.FILO_GUARD_BLOCKS, []);
+    return Array.isArray(l) ? l : [];
+  }
+
+  async function addGuardBlock({ origine, motivo, regola, testo, fonte }) {
+    const list = await listGuardBlocks();
+    const entry = {
+      id: uuid(),
+      ts: new Date().toISOString(),
+      origine: String(origine || ''),
+      motivo: String(motivo || ''),
+      // 'statico' quando l'ha fermato un controllo deterministico, altrimenti la
+      // regola del guardiano: serve a leggere il registro senza indovinare.
+      regola: String(regola || ''),
+      testo: String(testo || ''),
+      fonte: String(fonte || ''),
+    };
+    list.unshift(entry);
+    if (list.length > GUARD_BLOCKS_CAP) list.length = GUARD_BLOCKS_CAP;
+    await setRaw(KEYS.FILO_GUARD_BLOCKS, list);
+    return entry;
+  }
+
+  async function clearGuardBlocks() {
+    await setRaw(KEYS.FILO_GUARD_BLOCKS, []);
+    return [];
+  }
+
+  async function listPendingNotifications() {
+    const l = await getRaw(KEYS.FILO_GUARD_PENDING, []);
+    return Array.isArray(l) ? l : [];
+  }
+
+  async function addPendingNotification(proposta) {
+    const list = await listPendingNotifications();
+    const entry = {
+      id: uuid(),
+      ts: new Date().toISOString(),
+      tentativi: 0,
+      ...(proposta && typeof proposta === 'object' ? proposta : {}),
+    };
+    list.push(entry);
+    if (list.length > NOTIFICATIONS_CAP) list.splice(0, list.length - NOTIFICATIONS_CAP);
+    await setRaw(KEYS.FILO_GUARD_PENDING, list);
+    return entry;
+  }
+
+  async function updatePendingNotification(id, patch) {
+    const list = await listPendingNotifications();
+    const idx = list.findIndex((n) => n.id === id);
+    if (idx < 0) return null;
+    list[idx] = { ...list[idx], ...(patch || {}) };
+    await setRaw(KEYS.FILO_GUARD_PENDING, list);
+    return list[idx];
+  }
+
+  async function removePendingNotification(id) {
+    const list = await listPendingNotifications();
+    const next = list.filter((n) => n.id !== id);
+    await setRaw(KEYS.FILO_GUARD_PENDING, next);
+    return next;
+  }
+
   // ===== Dashboard cache =====
 
   async function getDashboardCache() {
