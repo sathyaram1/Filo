@@ -352,6 +352,21 @@ test('la frase del controllo fermo distingue la rete dalla configurazione', () =
   assert.match(conf, /Opzioni/);
 });
 
+// #536, giro 3 — e c'è un terzo caso, che a chi legge sembra il secondo ma non
+// si aggiusta nello stesso posto: l'interruttore «solo modelli a pesi aperti»
+// fa ripiegare il guardiano sullo stesso modello della chat. Nelle Opzioni i
+// due nomi restano diversi, quindi mandare l'utente a cercarne un terzo senza
+// nominare l'interruttore è mandarlo a cercare per sempre.
+test('quando è l’interruttore dei pesi aperti a farli coincidere, la frase lo nomina', () => {
+  const f = G.fraseControlloFermo({ causa: G.CAUSA.PESI_APERTI });
+  assert.match(f, /pesi aperti/i);
+  assert.match(f, /Opzioni/);
+  // Non è la frase della rete: aspettare non aggiusta niente.
+  assert.ok(!/appena riesco/i.test(f), f);
+  const r = G.fraseInAttesa({ origine: 'una mail di X', causa: G.CAUSA.PESI_APERTI });
+  assert.match(r, /pesi aperti/i);
+});
+
 test('anche la riga in coda dice che c’è un modello da impostare', () => {
   const r = G.fraseInAttesa({ origine: 'una mail di X', causa: G.CAUSA.CONFIGURAZIONE });
   assert.match(r, /modello/i);
