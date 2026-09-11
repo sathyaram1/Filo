@@ -341,9 +341,16 @@ test('una pagina web NON può chiedere se c’è una fusione in attesa, né appr
       discard: await send(MSG.MERGE_APPROVAL_DISCARD),
     };
   });
-  expect(out.get).toEqual({ ok: false, error: 'forbidden' });
-  expect(out.approve).toEqual({ ok: false, error: 'forbidden' });
-  expect(out.discard).toEqual({ ok: false, error: 'forbidden' });
+  // Il confronto resta ESATTO: nella risposta a un sito non deve comparire
+  // nient'altro, nemmeno un campo che sembra innocuo (quante fusioni ci sono,
+  // se c'è un owner su questa macchina). `code` è il motivo in una parola, e
+  // serve a chi deve DIRE all'utente cosa è successo: senza, un rifiuto arriva
+  // a una pagina come un errore qualunque e finisce tradotto in «controlla la
+  // connessione», che manda a guardare la cosa sbagliata.
+  const rifiuto = { ok: false, code: 'forbidden', error: 'forbidden' };
+  expect(out.get).toEqual(rifiuto);
+  expect(out.approve).toEqual(rifiuto);
+  expect(out.discard).toEqual(rifiuto);
 });
 
 test('l’avviso NON arriva alle schede su siti qualunque', async ({ app, openTab, testServer }) => {
