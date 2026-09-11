@@ -51,6 +51,12 @@ function attendi(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// La colonna della home si aggiorna subito, come per i timer: un avviso che
+// compare (o che esce dalla coda) non deve aspettare il prossimo giro.
+function avvisaLaHome() {
+  try { globalThis.SN_BROADCAST_LIVE?.(); } catch (_) {}
+}
+
 // I segreti che Filo custodisce: se uno finisce dentro un testo in uscita, è
 // esfiltrazione e nessun modello deve poter decidere che va bene. Il getter è
 // sostituibile (test) e non deve mai far fallire un controllo.
@@ -165,6 +171,7 @@ async function proponiNotifica(richiesta = {}, deps = {}) {
     const notifica = await M.addNotification({
       kind, text, action, color, classe, fonte, _guardia: VARCO,
     });
+    avvisaLaHome();
     return { esito: 'passa', notifica };
   }
 
@@ -178,6 +185,7 @@ async function proponiNotifica(richiesta = {}, deps = {}) {
       kind: 'alert', text: esitoControllo.frase, action: null, color: null,
       classe: (Gd ? Gd.CLASSI.SISTEMA : 'sistema'),
     });
+    avvisaLaHome();
     return { esito: 'blocca', frase: esitoControllo.frase, notifica };
   }
 
@@ -185,6 +193,7 @@ async function proponiNotifica(richiesta = {}, deps = {}) {
   const inCoda = await M.pushGuardQueue({
     kind, text, action, color, classe, fonte, richiestaUtente, regolaAutomazione,
   });
+  avvisaLaHome();
   return { esito: 'attesa', inCoda };
 }
 
@@ -280,6 +289,7 @@ async function giroCoda(deps = {}) {
       } catch (_) {}
     }
   }
+  if (trattati) avvisaLaHome();
   return { trattati };
 }
 

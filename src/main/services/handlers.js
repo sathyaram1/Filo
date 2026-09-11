@@ -3438,6 +3438,10 @@ globalThis.SN_HANDLE_MESSAGE = handleMessage;
 // e qui la cosa da verificare è proprio CHI riceve (una scheda su un sito
 // qualunque non deve vedere passare i rami dell'owner).
 globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
+// #536 — il varco dei testi (services/guardiaTesti.js) è caricato prima di
+// questo file e non può richiederlo: quando scrive una notifica (o la toglie
+// dalla coda) la colonna della home deve aggiornarsi subito, come per i timer.
+globalThis.SN_BROADCAST_LIVE = broadcastLiveUpdate;
 
 module.exports = {
   handleMessage,
