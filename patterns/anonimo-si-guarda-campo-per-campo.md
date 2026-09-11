@@ -53,7 +53,10 @@ stava per uscire.
   pulsante per qualunque espressione regolare. Se nella pipeline un modello gira
   già, fagli vedere IL DOCUMENTO CHE STA PER USCIRE e lascia che dica no: non
   costa una chiamata in più, e la frase «ci pensano i modelli» smette di essere
-  un'illusione.
+  un'illusione. E controlla che lo veda DAVVERO, nel testo che parte: qui i due
+  campi si perdevano fra chi li mandava e chi scriveva la domanda, con un test
+  verde per parte (vedi
+  [Due estremi verdi non fanno un filo](due-estremi-verdi-non-fanno-un-filo.md)).
 - **Il testo che l'utente legge nel momento della scelta** dice cosa viene
   pubblicato. «Ha funzionato? Aiutami a migliorare» sembra un parere privato a
   chi scrive l'app; la pagina che spiega la privacy non la apre nessuno prima di
