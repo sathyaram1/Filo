@@ -31,7 +31,6 @@ const FiloState = globalThis.SN_FILO_STATE;
 const Onboarding = globalThis.SN_ONBOARDING;
 const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
 
-const KNOWN_PATHS_BUDGET_CHARS = 20 * 1024;
 // #155 — intervallo minimo tra due ricalcoli in background della home: la nuova
 // scheda serve sempre la cache all'istante; il ricalcolo (costoso, con l'LLM)
 // avviene al massimo una volta ogni 2 minuti, accorpando le modifiche.
