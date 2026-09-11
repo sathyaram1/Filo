@@ -134,7 +134,7 @@
         intent: toFsValue(intent || ''),
         steps: toFsValue(Array.isArray(steps) ? steps : []),
         success: toFsValue(!!success),
-        createdAt: { timestampValue: oraArrotondata(now) },
+        createdAt: { timestampValue: giornoArrotondato(now) },
       },
     };
     const endpoint = `${urlCollezione(dominio)}?key=${API_KEY}`;
