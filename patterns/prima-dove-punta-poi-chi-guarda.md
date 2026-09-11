@@ -42,6 +42,17 @@ arriva da fuori e che Filo tratta come proprio. Tolto il clic (giro 2) e
 sistemata la scritta del collegamento (giro 3), restava la PAROLA: Filo che
 avvalora un pezzo di interfaccia costruito da chi ha mandato la segnalazione.
 
+**Giro 5: metà misura.** Spostare il controllo davanti non bastava, perché
+guarda la FORMA dell'indirizzo e non se quell'oggetto sia mai arrivato. Un
+indirizzo scritto come quelli del deposito di Filo — che non richiede di
+caricare niente, né di avere un account — si riprendeva la frase intera:
+«consegnato», e «viaggia cifrato con la chiave di chi riceve le segnalazioni».
+Da quel lato l'esistenza non è controllabile e non deve esserlo: senza il
+download token il deposito risponde 403 sia per un oggetto che c'è sia per uno
+che non c'è (misurato col motore vero delle regole). Quindi la frase è scesa a
+ciò che regge in ogni caso, «questo allegato lo apre solo chi riceve le
+segnalazioni», e il segnaposto dice «riservato» invece di «consegnato».
+
 ## I tentativi sbagliati
 
 - **Cambiare la frase.** Ammorbidirla («l'allegato potrebbe essere stato
