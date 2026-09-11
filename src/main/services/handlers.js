@@ -2582,16 +2582,23 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           a._contaminato = true;
           // …e quello che l'azione lascia scritto per comparire più tardi passa
           // dal controllo adesso, prima che l'azione parta.
-          await sorvegliaEtichette(a, {
+          await sorvegliaTestiPersistenti(a, {
             fiducia: fiduciaTurno,
             origine: origineTurno(),
             richiestaUtente: internal ? '' : String(userMessage || ''),
             produttore: await produttoreDellaChat(),
           });
         } else delete a._contaminato;
-        const res = a._argsError
-          ? { executed: false, kept: false, rejected: true, error: a._argsError }
-          : await executeFiloAction(a, { sender });
+        // Il controllo ha fermato le parole che erano tutto il senso dell'azione
+        // (l'appunto, la regola da fissare, lo stile con cui Filo scriverà): la
+        // si lascia perdere invece di eseguirne un guscio vuoto. Il testo è già
+        // nel registro degli avvisi fermati, e la riga del diario dice che non è
+        // stata fatta.
+        const res = a._fermatoDalGuardiano
+          ? { executed: false, kept: false, error: 'fermato dal controllo di sicurezza' }
+          : (a._argsError
+            ? { executed: false, kept: false, rejected: true, error: a._argsError }
+            : await executeFiloAction(a, { sender }));
         const rendered = { ...a };
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
