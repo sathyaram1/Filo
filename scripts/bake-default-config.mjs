@@ -218,9 +218,10 @@ main().catch((e) => {
   console.warn('[bake] errore non fatale:', e.message);
   try {
     mkdirSync(dirname(OUT_PATH), { recursive: true });
+    const vuote = Object.fromEntries(CHIAVI_DEL_PACCHETTO.map((c) => [c.nome, '']));
     writeFileSync(
       OUT_PATH,
-      JSON.stringify({ apiKeys: { openrouter: '', gemini: '', tavily: '' }, safeBrowsingKey: '', bakedAt: new Date().toISOString() }, null, 2) + '\n',
+      JSON.stringify({ apiKeys: vuote, safeBrowsingKey: '', bakedAt: new Date().toISOString() }, null, 2) + '\n',
       'utf8'
     );
   } catch (_) {}
