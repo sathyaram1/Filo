@@ -377,17 +377,14 @@ module.exports = function register(on, ctx) {
   // NON espone le chiavi vere, solo se sono configurate. La scrittura è
   // riservata agli admin (Firebase ID token come Bearer): le regole Firestore
   // rifiutano i non-admin. La modifica si propaga a tutti gli utenti.
-  on(MSG.DEFAULTS_GET, async () => {
+  on(MSG.DEFAULTS_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       await Defaults.refresh().catch(() => {});
       return { ok: true, config: Defaults.getPublicForAdmin() };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Versione LEGGIBILE DA TUTTI della config modelli: solo i nomi (registry e
   // modello per funzione), mai una chiave. La pagina Opzioni la usa per elencare
@@ -403,11 +400,8 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  on(MSG.DEFAULTS_UPDATE, async (msg) => {
+  on(MSG.DEFAULTS_UPDATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const config = await Defaults.update(msg.config || {}, idToken);
@@ -415,17 +409,14 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Interruttore master dell'auto-miglioramento (config/automation). Owner-only.
   // Default OFF (autonomia spenta): mentre è OFF anche i feedback "sicuri"
   // richiedono verifica umana. Vedi filo-security DESIGN §2. La scrittura passa
   // dal main con l'ID token admin; le regole Firestore sono la garanzia forte.
-  on(MSG.AUTOMATION_GET, async () => {
+  on(MSG.AUTOMATION_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
@@ -436,16 +427,13 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa dei mittenti
   // ammessi all'auto-approvazione, #446), e tocca SOLO ciò che riceve: la vecchia
   // pagina feedback manda ancora il solo `enabled` e non deve azzerare la mappa.
-  on(MSG.AUTOMATION_SET, async (msg) => {
+  on(MSG.AUTOMATION_SET, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       let enabled;
@@ -470,33 +458,27 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // I tre bilanci dei giri di correzione e il testo della fase 2
   // (config/routines, campi `cap2`, `cap1`, `cap0`, `fixInstructions` —
   // feedback #561). Owner-only. È la fonte di verità che il server applica
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
   const capsReply = (caps) => ({ ok: true, cap2: caps.cap2, cap1: caps.cap1, cap0: caps.cap0, fixInstructions: caps.fixInstructions });
-  on(MSG.AUTOMATION_CAPS_GET, async () => {
+  on(MSG.AUTOMATION_CAPS_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       return capsReply(await Defaults.getRoutineCaps(idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Tocca SOLO i campi che riceve (come AUTOMATION_SET): salvare un bilancio
   // non deve riscrivere gli altri.
-  on(MSG.AUTOMATION_CAPS_SET, async (msg) => {
+  on(MSG.AUTOMATION_CAPS_SET, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       return capsReply(await Defaults.setRoutineCaps({
@@ -505,17 +487,14 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
   // "Log" della dashboard.
-  on(MSG.WORKER_LOG_GET, async () => {
+  on(MSG.WORKER_LOG_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const entries = await Defaults.getWorkerLog(idToken);
@@ -523,7 +502,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Registri del canale autenticato delle routine. Owner-only, sola lettura.
   //
@@ -531,18 +510,15 @@ module.exports = function register(on, ctx) {
   // nessun client le può leggere: un registro dei rifiuti leggibile da chiunque
   // direbbe a chi sta provando ad abusare del canale quanto è stato notato.
   // Perciò si passa dalla callable, che chiede le credenziali dell'owner.
-  on(MSG.ROUTINE_LOG_GET, async (msg) => {
+  on(MSG.ROUTINE_LOG_GET, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const limit = Number(msg && msg.limit);
       const r = await callSecurityFunction('routineLog', Number.isFinite(limit) ? { limit } : {});
       return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [] };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // ── Fusioni bloccate, in attesa dell'owner (SPEC-RIDISEGNO-MAX.md §10) ─────
   //
@@ -796,17 +772,14 @@ module.exports = function register(on, ctx) {
 
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
   // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
-  on(MSG.SUPPORT_MODELS_GET, async () => {
+  on(MSG.SUPPORT_MODELS_GET, ownerOnly(async () => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const models = await SupportModels.get();
       return { ok: true, models };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Ri-valutazione dei feedback "non filtrati": la dashboard (che decifra i
   // pipeline e quindi sa quali sono bianchi) passa la lista degli id; il backend
@@ -824,11 +797,8 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  on(MSG.SUPPORT_MODELS_UPDATE, async (msg) => {
+  on(MSG.SUPPORT_MODELS_UPDATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       // Slot + registro giudici + (eventuale) chiave OpenRouter dei giudici.
@@ -842,5 +812,5 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 };

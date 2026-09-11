@@ -14,6 +14,13 @@
 //
 // Senza il controllo di provenienza questo spec è rosso su tutte le porte
 // tranne la lettura.
+//
+// Il secondo test guarda le ALTRE porte del proprietario che vivono nello
+// stesso canale: i modelli predefiniti (che valgono per tutte le installazioni
+// di Filo), l'automazione, i bilanci dei giri, i modelli dei giudici, i
+// registri del lavoro e delle routine. Sono la stessa famiglia e vanno chiuse
+// insieme: una difesa messa su quattro porte su nove è una porta aperta con
+// accanto un cartello che dice dove.
 
 import { test, expect } from './fixtures/electron.mjs';
 
