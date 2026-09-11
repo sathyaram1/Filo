@@ -71,6 +71,18 @@ che non ne ha.**
   i rilievi chiusi perché una lavorazione passata uscisse dalla torta e si
   leggesse come fermata. Se un pezzo della struttura non c'è, non è quel testo:
   non è un verbale a cui manca qualcosa.
+- **Anche il CONTENITORE è testo: chiedigli la sua struttura.** Il turno non è
+  un dato, è una riga nel blob delle note, e chi cita la copia. Ma chi APPENDE
+  un turno lo fa sempre allo stesso modo, e quel modo si può pretendere: il
+  marcatore sta all'inizio del blob, oppure ha sopra una riga vuota (o un altro
+  marcatore). Una riga di marcatore in mezzo a un capoverso è una citazione, e
+  non spezza più il turno di chi l'ha scritta.
+- **Quello che si ripete è una citazione.** Il server scrive un marcatore per
+  turno, con l'istante in cui l'ha appeso: se lo stesso marcatore ricompare, il
+  secondo è la copia incollata da qualcuno. E il verbale ripetuto riga per riga
+  nel turno SUBITO DOPO è chi corregge che riporta quello a cui risponde. Il
+  prezzo è un conteggio in difetto nei casi rari (due turni veri nello stesso
+  minuto), che è il verso giusto in cui sbagliare.
 - **Una riga di sole parole non può fare il danno grosso.** La forma vecchia
   `Controllo funzionalità NON superato` non ha niente da esibire: il giro 10 ha
   provato a chiederle la punteggiatura, e il giro 11 ha riaperto la porta
