@@ -78,6 +78,12 @@ service firebase.storage {
         || request.resource.contentType == 'text/csv'
         || request.resource.contentType == 'application/pdf'
         || request.resource.contentType == 'application/json'
+        // `.tsv` e `.yaml`: li dichiara così `npm run feedback:apri` (scripts/
+        // claude-feedback.mjs), che diceva di usare "la stessa allowlist" e non
+        // era vero — un allegato .yaml partiva dall'app e veniva respinto qui.
+        // Sono passivi quanto il CSV: il browser li scarica, non li esegue.
+        || request.resource.contentType == 'text/tab-separated-values'
+        || request.resource.contentType == 'application/x-yaml'
         // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
         || request.resource.contentType == 'application/octet-stream';
     }
