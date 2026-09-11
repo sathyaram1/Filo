@@ -110,7 +110,18 @@ test('chi riceve le segnalazioni l’allegato lo apre: il clic lo chiede decifra
       return orig(msg);
     };
   });
-  await page.locator('#refresh').click();
+  // La pagina impara di essere admin dall'avviso del main, non dalla risposta
+  // che ha già ricevuto all'avvio: senza questo resterebbe in sola lettura.
+  await app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let url = '';
+      try { url = wc.getURL(); } catch (_) {}
+      if (url.includes('feedback')) {
+        wc.send('filo:broadcast', { type: 'auth_changed', signedIn: true, isAdmin: true, profile: { email: 'owner@esempio.invalid' } });
+      }
+    }
+  });
+  await expect(page.locator('#adminBanner')).toBeHidden({ timeout: 8_000 });
 
   const pillola = await elencoCon(page, { url: DOCUMENTO, name: 'registro.pdf', type: 'application/pdf' });
   // Per chi lo può aprire non c'è nessuna nota: l'allegato è suo.
