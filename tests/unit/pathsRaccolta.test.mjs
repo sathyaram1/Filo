@@ -180,6 +180,9 @@ test('la sezione del sito resta leggibile: si toglie chi sei, non dove sei', () 
     'dopo un marcatore di persona il nome è scritto a lettere: lì non c’è forma che lo tradisca');
   assert.equal(redactPath('/messaggi/a/mario.rossi@posta.it'), '/messaggi/a/[EMAIL]');
   assert.equal(redactPath('/ordine/9f2c1b7a4e5d6c8b9a0f1e2d'), '/ordine/[ID]');
+  assert.equal(redactPath('/impostazioni/privacit%C3%A0'), '/impostazioni/privacità',
+    'una parola accentata arriva codificata: guardarla codificata la scambia per un codice');
+  assert.equal(redactPath('/a/b%2Fc'), '/a/[ID]', 'un segmento che nasconde una barra non si tiene');
 });
 
 test('il giudice vede quello che verrebbe pubblicato, non solo la frase', async () => {
