@@ -2521,6 +2521,49 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     textReply = notes.pop();
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
+
+  // #536 — IL VARCO. Il turno ha letto roba di altri: la risposta non è più
+  // solo di Filo, e passa da un secondo giudizio su un modello diverso prima di
+  // arrivare all'utente. Controlli statici prima (a rete staccata), guardiano
+  // poi. Tre esiti: passa (il testo è quello), blocca (al suo posto la riga che
+  // dice cosa ha visto), non risponde (il testo non compare e l'utente sa che
+  // può richiedere). Un errore qui non fa passare niente: il caso peggiore è
+  // una risposta trattenuta, mai una mostrata senza controllo.
+  let guardia = null;
+  if (contaminato && textReply && textReply !== '(vuoto)') {
+    const Guardia = globalThis.SN_GUARDIA;
+    const Gd = globalThis.SN_GUARDIANO;
+    const fonte = fontiTurno[fontiTurno.length - 1] || null;
+    let esito;
+    try {
+      esito = Guardia
+        ? await Guardia.controlla({
+          testo: textReply,
+          classe: Gd ? Gd.CLASSI.TERZI : 'terzi',
+          fonte,
+          richiestaUtente: String(userMessage || ''),
+        })
+        : { esito: 'attesa', motivo: 'il controllo di sicurezza non è disponibile' };
+    } catch (e) {
+      esito = { esito: 'attesa', motivo: (e && e.message) || 'il controllo di sicurezza non ha risposto' };
+    }
+    if (esito.esito === 'blocca') {
+      try {
+        await FiloMem.addGuardBlock({
+          testo: textReply, fonte, motivo: esito.motivo, regola: esito.regola,
+          classe: Gd ? Gd.CLASSI.TERZI : 'terzi',
+        });
+      } catch (_) {}
+      textReply = esito.frase;
+      guardia = { esito: 'blocca', motivo: esito.motivo, regola: esito.regola };
+    } else if (esito.esito === 'attesa') {
+      textReply = `Non sono riuscito a far controllare questa risposta, e ${Gd ? Gd.descriviFonte(fonte) : 'il contenuto letto'} non è roba mia: preferisco non mostrartela senza controllo. Riprova fra poco.`;
+      guardia = { esito: 'attesa', motivo: esito.motivo };
+    } else {
+      guardia = { esito: 'passa' };
+    }
+  }
+
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
