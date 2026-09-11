@@ -175,7 +175,12 @@
       resolvedInVersion: str(fb.resolvedInVersion, 40),
       createdAt: str(fb.createdAt, 40),
       resolvedAt: str(fb.resolvedAt, 40),
-      clientIdHash: str(fb.clientIdHash, 64),
+      // L'impronta è di QUESTA scheda, non dell'installazione: la stessa
+      // persona ne ha una diversa su ogni fix, quindi chi legge la bacheca non
+      // può raggruppare i suoi. Chi l'ha segnalato la ricalcola lo stesso (sa
+      // l'id della scheda e l'impronta del proprio clientId) ed è così che il
+      // popup delle ricompense riconosce i propri.
+      clientIdTag: CIH().cardTagSync(fb._id, fb.clientIdHash),
       userNote: str(fb.userNote, 500),
     };
     // Un titolo che è rimasto cifrato (chiave assente su quel campo) non si
