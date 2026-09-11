@@ -11,81 +11,90 @@
 // Nella stessa scheda, due righe sopra la pillola, c'è l'indirizzo della PAGINA
 // da cui la segnalazione è partita. Quello è ancora un collegamento cliccabile
 // verso un indirizzo scelto da chi manda — e qui c'è qualcosa in più: la scritta
-// del collegamento è l'indirizzo TAGLIATO agli 80 caratteri, senza puntini né
-// altro segno che dica che continua. Un indirizzo costruito apposta mostra
-// ottanta caratteri d'aspetto innocuo e porta altrove.
+// del collegamento era l'indirizzo TAGLIATO agli 80 caratteri, senza puntini né
+// altro segno che dicesse che continuava. Chi lo costruisce apposta sceglie cosa
+// cade dentro quegli 80 caratteri.
 //
-// Cosa deve restare vero: o il collegamento non c'è, o quello che si legge dice
-// dove si va davvero (il posto vero compare nella scritta, o c'è un segno che
-// l'indirizzo è tagliato).
+// ⚠️ Nota per chi legge la critica del giro 3: l'indirizzo d'esempio scritto lì
+// (la chiocciola DOPO la prima barra) non è un'esca — la chiocciola finisce nel
+// percorso e il sito resta filo.app. Le due forme che funzionano davvero sono
+// quelle provate qui sotto, e sono quelle che la correzione chiude.
+//
+// Cosa deve restare vero: quello che si legge dice dove si va.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const FEEDBACK_URL = 'filo://feedback/feedback.html';
-
-// I primi 80 caratteri sono esattamente «https://filo.app/guida/…-2026a»: quello
-// che si legge. Il posto vero è quello dopo la chiocciola.
-const ESCA = 'https://filo.app/guida/aggiornamento-obbligatorio-per-i-tester-di-settembre-2026a@sito-di-un-estraneo.invalid/accedi';
 const VERO_POSTO = 'sito-di-un-estraneo.invalid';
 
-test('l’indirizzo della pagina scritto da chi manda non diventa un collegamento che mente sulla destinazione', async ({ openTab }) => {
-  const page = await openTab(FEEDBACK_URL);
+// Due modi di riempire gli 80 caratteri che si leggono, tutti e due veri.
+const ESCHE = [
+  // 1. Sottodomini: il sito è davvero quello scritto in fondo, ma in fondo non
+  //    ci si arriva. I primi 80 caratteri dicono «filo.app.guida…».
+  ['sottodomini', `https://filo.app.guida.aggiornamento-obbligatorio.per-i-tester.settembre-2026.${VERO_POSTO}/accedi`],
+  // 2. Credenziali davanti alla chiocciola: non sono il sito, e riempiono la
+  //    scritta fino a nascondere anche la chiocciola.
+  ['chiocciola', `https://filo.app-aggiornamento-obbligatorio-per-i-tester-di-settembre-2026-okay@${VERO_POSTO}/accedi`],
+];
 
-  await page.evaluate((url) => {
+async function schedaCon(page, url) {
+  await page.evaluate((u) => {
     window.SN_FEEDBACK.list = async () => [{
       _id: 'esca-pagina-582',
       status: 'open',
       text: 'la pagina non si apre',
-      url,
+      url: u,
       images: [],
       files: [],
       createdAt: new Date().toISOString(),
     }];
-  }, ESCA);
-
+  }, url);
   await page.locator('#refresh').click();
   await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 10_000 });
-  await page.screenshot({ path: 'tests/.shots/582-giro3-esca-pagina.png' });
+}
 
-  // Il collegamento che porta fuori, se c'è.
-  const link = page.locator(`.fb-meta a[href*="${VERO_POSTO}"]`);
-  const quanti = await link.count();
-  if (quanti === 0) return; // nessun collegamento: la porta è chiusa.
+for (const [nome, esca] of ESCHE) {
+  test(`l’indirizzo della pagina (esca «${nome}») non diventa un collegamento che mente sulla destinazione`, async ({ openTab }) => {
+    const page = await openTab(FEEDBACK_URL);
+    await schedaCon(page, esca);
+    await page.screenshot({ path: `tests/.shots/582-giro3-esca-${nome}.png` });
 
-  const scritta = (await link.first().textContent()) || '';
-  expect(
-    scritta,
-    `il riquadro dei feedback offre un collegamento verso «${VERO_POSTO}» mostrando la scritta «${scritta}», che quel posto non lo nomina e non dice nemmeno di essere tagliata`,
-  ).toContain(VERO_POSTO);
-});
+    const link = page.locator('.fb-meta a[href^="http"]');
+    if ((await link.count()) === 0) return; // nessun collegamento: porta chiusa.
+
+    const scritta = (await link.first().textContent()) || '';
+    const href = (await link.first().getAttribute('href')) || '';
+    const dove = new URL(href).host;
+
+    expect(
+      scritta,
+      `il riquadro dei feedback porta su «${dove}» mostrando la scritta «${scritta}», che quel posto non lo nomina`,
+    ).toContain(VERO_POSTO);
+    // E le credenziali, che servono solo a mentire, non si mostrano mai.
+    expect(scritta, `la scritta mostra ancora l’esca: «${scritta}»`).not.toContain('filo.app');
+  });
+}
 
 // La seconda metà: non è solo una scritta che mente, il clic ci porta davvero.
-test('il clic su quel collegamento apre l’indirizzo dell’estraneo dentro Filo', async ({ app, openTab }) => {
+test('il clic su quel collegamento porta Filo sul sito dell’estraneo', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
+  await schedaCon(page, ESCHE[0][1]);
 
-  await page.evaluate((url) => {
-    window.SN_FEEDBACK.list = async () => [{
-      _id: 'esca-pagina-582b',
-      status: 'open',
-      text: 'la pagina non si apre',
-      url,
-      images: [],
-      files: [],
-      createdAt: new Date().toISOString(),
-    }];
-  }, ESCA);
-
-  await page.locator('#refresh').click();
-  const link = page.locator(`.fb-meta a[href*="${VERO_POSTO}"]`);
+  const link = page.locator('.fb-meta a[href^="http"]');
   if ((await link.count()) === 0) return; // porta chiusa: niente da misurare.
 
+  // Il collegamento resta (serve: è il posto dove il problema è successo). Qui
+  // si misura solo che chi lo preme sa dove sta andando: la scritta lo dice.
+  const scritta = (await link.first().textContent()) || '';
   await link.first().click();
   await page.waitForTimeout(2500);
   const aperte = await app.evaluate(async ({ webContents }) => webContents.getAllWebContents().map((w) => {
     try { return w.getURL(); } catch (_) { return ''; }
   }));
+  const andata = aperte.some((u) => u.includes(VERO_POSTO));
+  if (!andata) return; // non ci ha portato: niente da dire.
   expect(
-    aperte.join(' '),
-    'il clic sulla scritta che dice «filo.app» ha portato Filo sull’indirizzo di un estraneo',
-  ).not.toContain('sito-di-un-estraneo');
+    scritta,
+    `Filo è andato su «${VERO_POSTO}» e la scritta su cui si è cliccato («${scritta}») non lo nominava`,
+  ).toContain(VERO_POSTO);
 });
