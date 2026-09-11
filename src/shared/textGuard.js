@@ -812,7 +812,12 @@
   //
   //   { testo, segreti? }  →  { blocca, regola, motivo, prova }
   function controlliStatici({ testo, segreti } = {}) {
-    const s = String(testo || '');
+    // L'apostrofo tipografico vale quanto quello da tastiera. Un modello scrive
+    // «il codice dell’ordine» con la virgoletta curva e una mail pure: con due
+    // apostrofi diversi la stessa frase si salvava o spariva a seconda di come
+    // era stata battuta. La sostituzione è carattere per carattere, quindi le
+    // posizioni nel testo restano quelle.
+    const s = String(testo || '').replace(/[‘’ʼ′]/g, '\'');
     const no = { blocca: false, regola: '', motivo: '', prova: '' };
     if (!s.trim()) return no;
 
