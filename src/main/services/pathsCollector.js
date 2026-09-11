@@ -165,6 +165,153 @@
     }
   }
 
+  // ------------------------ La coda che stacca l'orologio --------------------
+  //
+  // Perché esista, vedi la testata. Qui i numeri e le regole:
+  //
+  // - RITARDO: un percorso esce fra mezz'ora e ventiquattr'ore dopo, sorteggiato
+  //   per ciascuno a parte. Due percorsi della stessa sessione finiscono quasi
+  //   sempre a ore di distanza, e l'ordine in cui escono non è quello in cui
+  //   sono stati percorsi.
+  // - UNO ALLA VOLTA: ogni giro manda fuori un solo percorso, anche se ne sono
+  //   maturati dieci. Serve per il caso "app chiusa per una settimana", dove
+  //   svuotare tutto insieme rimetterebbe i percorsi in fila nell'ordine della
+  //   sessione, a millisecondi l'uno dall'altro: la ricucitura di prima.
+  // - PAUSA fra un giro e l'altro: fra due e venti minuti, sorteggiata.
+  // - Se la scrittura fallisce (niente rete) il percorso resta in coda e si
+  //   riprova al giro dopo. Dopo trenta giorni si rinuncia: un percorso vecchio
+  //   di un mese non serve più a nessuno.
+
+  const CHIAVE_CODA = (global.SN_CONST && global.SN_CONST.STORAGE_KEYS
+    && global.SN_CONST.STORAGE_KEYS.PATHS_OUTBOX) || 'pathsOutbox';
+
+  const RITARDO_MIN_MS = 30 * 60 * 1000;          // mezz'ora
+  const RITARDO_MAX_MS = 24 * 60 * 60 * 1000;     // un giorno
+  const PAUSA_MIN_MS = 2 * 60 * 1000;             // due minuti
+  const PAUSA_MAX_MS = 20 * 60 * 1000;            // venti minuti
+  const MAX_IN_CODA = 100;
+  const MAX_ETA_MS = 30 * 24 * 60 * 60 * 1000;    // un mese
+
+  let coda = [];
+  let caricata = false;
+  let sto = false;      // un giro alla volta
+  let auto = true;      // spegnibile nei test
+  let timer = null;
+  let sorteggio = Math.random;
+
+  function sorteggia(min, max) {
+    return Math.round(min + sorteggio() * (max - min));
+  }
+
+  function deposito() { return global.SN_STORAGE; }
+
+  async function salva() {
+    try { await deposito()?.setRaw?.(CHIAVE_CODA, coda); }
+    catch (e) { console.warn('[Filo] coda percorsi: salvataggio fallito', e?.message || e); }
+  }
+
+  async function carica() {
+    if (caricata) return;
+    caricata = true;
+    try {
+      const raw = await deposito()?.getRaw?.(CHIAVE_CODA, []);
+      if (Array.isArray(raw)) {
+        coda = raw
+          .filter((v) => v && typeof v === 'object' && v.domain)
+          .map((v) => ({
+            id: String(v.id || `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+            domain: String(v.domain),
+            initialUrl: String(v.initialUrl || ''),
+            intent: String(v.intent || ''),
+            steps: Array.isArray(v.steps) ? v.steps : [],
+            success: !!v.success,
+            accodatoIl: Number(v.accodatoIl) || Date.now(),
+            nonPrimaDi: Number(v.nonPrimaDi) || Date.now(),
+          }));
+      }
+    } catch (e) {
+      console.warn('[Filo] coda percorsi: lettura fallita', e?.message || e);
+    }
+  }
+
+  function pianifica(fra) {
+    if (!auto || timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      flush().catch(() => {});
+    }, Math.max(0, fra | 0));
+    if (timer && typeof timer.unref === 'function') timer.unref();
+  }
+
+  async function accoda(percorso) {
+    await carica();
+    const ora = Date.now();
+    const voce = {
+      id: `p_${ora}_${Math.random().toString(36).slice(2, 8)}`,
+      domain: percorso.domain,
+      initialUrl: percorso.initialUrl,
+      intent: percorso.intent,
+      steps: percorso.steps,
+      success: !!percorso.success,
+      accodatoIl: ora,
+      nonPrimaDi: ora + sorteggia(RITARDO_MIN_MS, RITARDO_MAX_MS),
+    };
+    coda.push(voce);
+    if (coda.length > MAX_IN_CODA) coda = coda.slice(-MAX_IN_CODA);
+    await salva();
+    pianifica(sorteggia(PAUSA_MIN_MS, PAUSA_MAX_MS));
+    return { id: voce.id };
+  }
+
+  // Un giro: butta via gli scaduti, manda fuori UN percorso maturo, ripianifica.
+  // Torna il numero di percorsi rimasti in coda.
+  async function flush({ now = Date.now() } = {}) {
+    if (sto) return coda.length;
+    sto = true;
+    try {
+      await carica();
+      const prima = coda.length;
+      coda = coda.filter((v) => now - v.accodatoIl <= MAX_ETA_MS);
+
+      // Fra i maturi si sceglie A CASO, non il più vecchio: l'ordine di uscita
+      // non deve rifare l'ordine della sessione.
+      const maturi = coda.filter((v) => v.nonPrimaDi <= now);
+      let scritto = false;
+      if (maturi.length) {
+        const voce = maturi[Math.min(maturi.length - 1, Math.floor(sorteggio() * maturi.length))];
+        try {
+          await Paths.submit({
+            domain: voce.domain,
+            initialUrl: voce.initialUrl,
+            intent: voce.intent,
+            steps: voce.steps,
+            success: voce.success,
+            now,
+          });
+          coda = coda.filter((v) => v.id !== voce.id);
+          scritto = true;
+        } catch (e) {
+          console.warn('[Filo] coda percorsi: scrittura fallita, riprovo', e?.message || e);
+        }
+      }
+      if (scritto || coda.length !== prima) await salva();
+    } finally {
+      sto = false;
+    }
+    if (coda.length) pianifica(sorteggia(PAUSA_MIN_MS, PAUSA_MAX_MS));
+    return coda.length;
+  }
+
+  function inCoda() { return coda.length; }
+
+  // All'avvio: se sul disco è rimasto qualcosa, si riparte (con una pausa, non
+  // subito: un lampo di scritture all'apertura sarebbe di nuovo un orario).
+  function init() {
+    carica().then(() => {
+      if (coda.length) pianifica(sorteggia(PAUSA_MIN_MS, PAUSA_MAX_MS));
+    }).catch(() => {});
+  }
+
   // ------------------------ Orchestratore --------------------------
   //
   // Ritorna { saved: bool, reason: string }. Non lancia: i fallimenti sono
