@@ -148,3 +148,61 @@ test('il giudice vede i messaggi grezzi, chi propone l’intento no', async () =
     assert.deepEqual(judge.payload.userMessages, ['come disdico?']);
   });
 });
+
+// ── La pagina di partenza (#584, terzo giro) ────────────────────────────────
+//
+// Senza queste guardie il percorso condiviso torna a dire chi l'ha fatto: un
+// nome utente dentro l'indirizzo è lo stesso su più siti, quindi rimette
+// insieme i percorsi di una persona meglio di quanto facesse il codice del
+// mittente, e per di più le dà un nome.
+
+test('dall’indirizzo di partenza spariscono nome utente e numero di conto', async () => {
+  await withFetch(async (calls) => {
+    await Collector.collectAndSave({
+      session: { ...SESSIONE, rawUrl: 'https://forum-esempio.it/u/mario.rossi/ordini/847362' },
+      invokeAI: invokeAIFinto(),
+    });
+    await spedisci();
+    const partenza = calls[0].body.fields.initialUrl.stringValue;
+    assert.equal(partenza, '/u/[ID]/ordini/[ID]');
+    const grezzo = JSON.stringify(calls[0].body);
+    assert.ok(!grezzo.includes('mario.rossi'), 'un nome utente è finito nel percorso condiviso');
+    assert.ok(!grezzo.includes('847362'), 'un numero di conto è finito nel percorso condiviso');
+  });
+});
+
+test('la sezione del sito resta leggibile: si toglie chi sei, non dove sei', () => {
+  const { redactPath } = Collector._internal;
+  assert.equal(redactPath('/account/ordini'), '/account/ordini');
+  assert.equal(redactPath('/it/impostazioni/privacy'), '/it/impostazioni/privacy');
+  assert.equal(redactPath('/'), '/');
+  assert.equal(redactPath('/profilo/MarioRossi'), '/profilo/[ID]',
+    'dopo un marcatore di persona il nome è scritto a lettere: lì non c’è forma che lo tradisca');
+  assert.equal(redactPath('/messaggi/a/mario.rossi@posta.it'), '/messaggi/a/[EMAIL]');
+  assert.equal(redactPath('/ordine/9f2c1b7a4e5d6c8b9a0f1e2d'), '/ordine/[ID]');
+});
+
+test('il giudice vede quello che verrebbe pubblicato, non solo la frase', async () => {
+  await withFetch(async () => {
+    const invoke = invokeAIFinto();
+    await Collector.collectAndSave({ session: SESSIONE, invokeAI: invoke });
+    const judge = invoke.visti.find((v) => v.action === ACTIONS.HELP_INTENT_JUDGE);
+    assert.equal(judge.payload.initialUrl, '/account/ordini',
+      'senza l’indirizzo davanti, il giudice approva un percorso che dice chi sei');
+    assert.ok(Array.isArray(judge.payload.steps) && judge.payload.steps.length,
+      'un nome di persona dentro l’etichetta di un pulsante lo ferma solo il giudice');
+  });
+});
+
+test('nel prompt del giudice finiscono davvero indirizzo e selettori', () => {
+  const p = globalThis.SN_CONST.PROMPTS.helpIntentJudge({
+    proposedIntent: 'disdire l’abbonamento',
+    userMessages: ['come disdico?'],
+    initialUrl: '/u/[ID]/ordini',
+    steps: [{ selector: '[aria-label="Profilo di Mario Rossi"]', action: 'click' }],
+  });
+  assert.ok(p.includes('/u/[ID]/ordini'), 'il giudice deve vedere la pagina di partenza');
+  assert.ok(p.includes('Profilo di Mario Rossi'), 'il giudice deve vedere i nomi degli elementi');
+  assert.match(p, /\[EMAIL\], \[NUMERO\] e \[ID\]/,
+    'i segnaposto vanno dichiarati, o il giudice scarta i percorsi già ripuliti');
+});
