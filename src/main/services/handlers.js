@@ -2344,9 +2344,30 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     try { wc.send(channel, { reqId: reasoningReqId, ...payload }); } catch (_) {}
   };
   const onReasoning = canPush ? (text) => push('filo:reasoning', { text }) : null;
+  // #536 — la fiducia di QUESTO turno. Parte pulita e scende appena il modello
+  // esegue un'azione che porta dentro testo scritto da altri (una ricerca, un
+  // documento, l'uscita di un comando). Una volta scesa non risale: la classe
+  // del compito è quella della sua fonte peggiore.
+  let fiduciaTurno = globalThis.SN_TEXT_GUARD.FIDUCIA.PULITO;
+  const fontiTurno = [];
+  let holdInviato = false;
   // #420 — la risposta scorre in diretta: inoltriamo alla scheda i delta del
-  // testo (o il segnale di reset dopo un fallback provider).
-  const onText = canPush ? (payload) => push('filo:answer', payload) : null;
+  // testo (o il segnale di reset dopo un fallback provider). #536 — appena il
+  // turno è contaminato lo scorrimento SI FERMA: mostrare in diretta un testo
+  // che il guardiano non ha ancora visto sarebbe mostrarlo senza controllo. La
+  // scheda riceve un `reset` (butta il parziale) e un `hold` (sta controllando),
+  // poi la risposta vera arriva a fine turno come sempre.
+  const onText = canPush ? (payload) => {
+    if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno)) {
+      if (!holdInviato) {
+        holdInviato = true;
+        push('filo:answer', { reset: true });
+        push('filo:answer', { hold: true });
+      }
+      return;
+    }
+    push('filo:answer', payload);
+  } : null;
   // Un'azione appena il modello ne pronuncia il nome, prima ancora degli
   // argomenti: la scheda dice subito «Cerco sul web…».
   const onToolCall = canPush
