@@ -23,11 +23,13 @@
 // generato. Così, ad ogni release (ogni 6h), le chiavi ruotate dall'admin si
 // propagano a TUTTI gli utenti — anche quelli senza login.
 //
-// A runtime l'admin loggato può comunque ruotare queste chiavi dalla pagina
-// "Modelli predefiniti" (override via Firestore, vedi defaultsStore.js): in quel
-// caso l'override remoto ha la precedenza sulle chiavi baked, ma è leggibile
-// solo dagli utenti loggati. Gli utenti non loggati ricadono su queste chiavi
-// baked, che il prossimo build CI riallinea.
+// A runtime l'admin ruota queste chiavi dalla pagina "Modelli predefiniti"
+// (scrive il doc Firestore config/secrets, vedi defaultsStore.js). Dal #581 quel
+// documento è leggibile SOLO dall'admin: per tutti gli altri la strada verso le
+// chiavi ruotate è questa, cioè il prossimo build CI. Prima la leggeva anche
+// qualunque utente loggato — e siccome il login è aperto a qualsiasi account
+// Google e la chiave web di Firebase sta in un repo pubblico, "loggato" non era
+// una barriera: bastava una GET REST per portarsi via le chiavi di tutti.
 
 const fs = require('fs');
 const path = require('path');
