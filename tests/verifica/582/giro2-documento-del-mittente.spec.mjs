@@ -49,12 +49,15 @@ test('il documento che il mittente ha allegato non lo lascia con un file rotto i
   await expect(link).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: 'tests/.shots/582-giro2-documento.png' });
 
+  // Il collegamento non porta più ai byte grezzi: quelli sono il testo cifrato.
   const href = (await link.getAttribute('href')) || '';
-  const spiegazione = `${(await link.getAttribute('title')) || ''} ${(await link.textContent()) || ''}`;
-  const puntaAiByteGrezzi = /firebasestorage\.googleapis\.com|storage\.googleapis\.com/.test(href);
+  expect(href, 'il collegamento porta ancora ai byte cifrati sul deposito')
+    .not.toMatch(/firebasestorage\.googleapis\.com|storage\.googleapis\.com/);
 
-  expect(
-    !puntaAiByteGrezzi || /inviat|cifrat|riceve/i.test(spiegazione),
-    `il documento allegato si scarica cifrato e nessuno lo dice: href=${href.slice(0, 90)} — «${spiegazione.trim()}»`,
-  ).toBe(true);
+  // E chi l'ha mandato lo legge senza doverci cliccare sopra, come già succede
+  // per lo screenshot nella stessa bolla.
+  await expect(link.locator('.fb-file-note')).toHaveText('(inviato)', { timeout: 10_000 });
+  const motivo = (await link.getAttribute('title')) || '';
+  expect(motivo).toMatch(/inviat/i);
+  expect(motivo).not.toMatch(/amministrat/i);
 });
