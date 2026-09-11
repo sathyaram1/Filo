@@ -58,3 +58,34 @@ test('l’indirizzo della pagina scritto da chi manda non diventa un collegament
     `il riquadro dei feedback offre un collegamento verso «${VERO_POSTO}» mostrando la scritta «${scritta}», che quel posto non lo nomina e non dice nemmeno di essere tagliata`,
   ).toContain(VERO_POSTO);
 });
+
+// La seconda metà: non è solo una scritta che mente, il clic ci porta davvero.
+test('il clic su quel collegamento apre l’indirizzo dell’estraneo dentro Filo', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+
+  await page.evaluate((url) => {
+    window.SN_FEEDBACK.list = async () => [{
+      _id: 'esca-pagina-582b',
+      status: 'open',
+      text: 'la pagina non si apre',
+      url,
+      images: [],
+      files: [],
+      createdAt: new Date().toISOString(),
+    }];
+  }, ESCA);
+
+  await page.locator('#refresh').click();
+  const link = page.locator(`.fb-meta a[href*="${VERO_POSTO}"]`);
+  if ((await link.count()) === 0) return; // porta chiusa: niente da misurare.
+
+  await link.first().click();
+  await page.waitForTimeout(2500);
+  const aperte = await app.evaluate(async ({ webContents }) => webContents.getAllWebContents().map((w) => {
+    try { return w.getURL(); } catch (_) { return ''; }
+  }));
+  expect(
+    aperte.join(' '),
+    'il clic sulla scritta che dice «filo.app» ha portato Filo sull’indirizzo di un estraneo',
+  ).not.toContain('sito-di-un-estraneo');
+});
