@@ -833,7 +833,7 @@
   // ritardo — a meno che ad aspettare non sia una configurazione che nessuno
   // aggiusterà da sola.
   function fraseInAttesa({ origine, causa } = {}) {
-    const da = ripulisci(origine);
+    const da = ripulisci(origine, { tieniPosta: true });
     const chi = da ? `Un avviso nato da ${da}` : 'Un avviso';
     if (causa === CAUSA.PESI_APERTI) {
       return `${chi} non ti viene mostrato. ${PERCHE_PESI_APERTI}`;
