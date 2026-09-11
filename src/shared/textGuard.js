@@ -167,7 +167,15 @@
     while ((m = nudo.exec(s))) {
       // Salta gli URL già catturati dentro una forma con etichetta.
       const dentro = out.some((l) => m.index >= l.inizio && m.index < l.fine);
-      if (!dentro) push(m[0], m[0], m.index, nudo.lastIndex);
+      if (dentro) continue;
+      // Il dominio di un INDIRIZZO DI POSTA non è un collegamento: in
+      // `avvisi@www.truffa.it` quel `www.truffa.it` è il mittente, e chi manda
+      // la mail il proprio indirizzo se lo sceglie. Renderlo cliccabile
+      // significa consegnare a chi attacca un link vivo dentro la riga che
+      // dovrebbe rassicurare (e, nel prompt del guardiano, un collegamento che
+      // non esiste). Basta guardare il carattere prima.
+      if (m.index > 0 && s[m.index - 1] === '@') continue;
+      push(m[0], m[0], m.index, nudo.lastIndex);
     }
     return out.sort((a, b) => a.inizio - b.inizio);
   }
