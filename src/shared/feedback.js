@@ -960,6 +960,12 @@
     castReopenRequest,
     uploadImage,
     uploadAttachment,
+    // #582 — il confine degli allegati: la forma del nome (che storage.rules
+    // pretende), il riconoscimento di un URL del bucket e le intestazioni con
+    // cui l'owner lo scarica. Pure, e usate anche dal main.
+    attachmentPath,
+    isAttachmentUrl,
+    attachmentFetchHeaders,
     formatNum,
     fallbackName,
     // Plumbing REST riutilizzabile (es. dal motore crediti): encoder Value
