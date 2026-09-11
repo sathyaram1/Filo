@@ -131,11 +131,11 @@ test('la lettura con credenziali le allega; la vista pubblica no (non ne ha)', a
 // modo di riportarlo giù, un estraneo lascerebbe i feedback nuovi con numeri
 // assurdi per sempre, e l'unica cura sarebbe la console Firebase.
 
-test('il contatore più alto di ogni numero esistente torna in pari, ma solo avendo letto tutto', async () => {
+test('il contatore più alto di ogni numero esistente torna in pari, ma solo col massimo vero in mano', async () => {
   const gonfiato = { fields: { value: { integerValue: '90000' } }, updateTime: 'T1' };
 
-  // Senza `allowLower` (caricamento parziale): non si tocca. Abbassarlo avendo
-  // visto solo una parte dei feedback riassegnerebbe numeri già usati.
+  // Senza `allowLower`: non si tocca. Abbassarlo col massimo dei soli feedback
+  // caricati riassegnerebbe numeri già usati.
   await withFetch((call) => okJson(gonfiato), async (calls) => {
     const v = await FB.ensureSeqCounter(584, { idToken: 'tok' });
     assert.equal(v, 90000);
