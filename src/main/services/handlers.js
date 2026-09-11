@@ -2344,9 +2344,27 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     try { wc.send(channel, { reqId: reasoningReqId, ...payload }); } catch (_) {}
   };
   const onReasoning = canPush ? (text) => push('filo:reasoning', { text }) : null;
+  // #536 — le fonti non fidate lette in questo turno (una ricerca sul web, un
+  // documento). Appena ce n'è una, il compito è contaminato: la risposta dovrà
+  // passare dal guardiano PRIMA di comparire.
+  const fontiTurno = [];
+  let contaminato = false;
   // #420 — la risposta scorre in diretta: inoltriamo alla scheda i delta del
   // testo (o il segnale di reset dopo un fallback provider).
-  const onText = canPush ? (payload) => push('filo:answer', payload) : null;
+  //
+  // #536 — ma un testo contaminato non può scorrere: se comparisse mentre
+  // scorre, il guardiano arriverebbe dopo che l'utente l'ha già letto. Appena
+  // il turno è contaminato si manda un reset (la scheda butta quello che
+  // stava mostrando) e i delta smettono di partire: il testo arriva tutto
+  // insieme a fine turno, controllato.
+  let resetContaminazioneInviato = false;
+  const onText = canPush ? (payload) => {
+    if (!contaminato) { push('filo:answer', payload); return; }
+    if (!resetContaminazioneInviato) {
+      resetContaminazioneInviato = true;
+      push('filo:answer', { reset: true });
+    }
+  } : null;
   // Un'azione appena il modello ne pronuncia il nome, prima ancora degli
   // argomenti: la scheda dice subito «Cerco sul web…».
   const onToolCall = canPush
