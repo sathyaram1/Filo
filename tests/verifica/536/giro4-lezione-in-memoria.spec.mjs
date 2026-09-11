@@ -127,4 +127,9 @@ test('quello che un turno contaminato fissa nella memoria di Filo non passa da n
     page.locator('#bubbles'),
     'la frase della pagina è arrivata all’utente in una conversazione pulita, con la voce di Filo',
   ).not.toContainText('confermare le credenziali');
+
+  expect(
+    inMemoria,
+    'la frase della pagina è entrata nella memoria di Filo senza passare da nessun controllo',
+  ).not.toContain('confermare le credenziali');
 });
