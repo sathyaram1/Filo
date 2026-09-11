@@ -39,7 +39,8 @@ const VIEW = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
 function blocco(testo, percorso) {
   const apre = testo.indexOf(`match ${percorso} {`);
   if (apre < 0) return null;
-  let i = testo.indexOf('{', apre);
+  // La graffa del blocco, non quella del segnaposto nel percorso (`{doc}`).
+  const i = testo.indexOf('{', apre + `match ${percorso}`.length);
   let livello = 0;
   for (let j = i; j < testo.length; j++) {
     if (testo[j] === '{') livello++;
