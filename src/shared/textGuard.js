@@ -561,10 +561,22 @@
   // Il controllo non si è potuto fare. Due cause, due frasi: se è la rete
   // aspettare basta, se è la configurazione aspettare non serve a niente e
   // l'unica persona che può sistemarla deve sapere che c'è da sistemare.
-  const CAUSA = { RETE: 'rete', CONFIGURAZIONE: 'configurazione' };
+  // Tre cause, tre frasi. Se è la rete, aspettare basta. Se è la
+  // configurazione, aspettare non serve a niente e chi può sistemarla deve
+  // saperlo. E se a farli coincidere è stato l'interruttore dei pesi aperti,
+  // va detto quello: l'utente ha in mente una scelta sui modelli, non sul
+  // controllo di sicurezza, e senza questa riga cercherebbe per sempre due
+  // nomi che sulla sua schermata sono già diversi.
+  const CAUSA = { RETE: 'rete', CONFIGURAZIONE: 'configurazione', PESI_APERTI: 'pesi-aperti' };
   const DOVE_SI_IMPOSTA = 'Si imposta in Opzioni → Modelli, alla voce «Guardiano degli avvisi nati da mail e pagine».';
+  const PERCHE_PESI_APERTI = 'Con «solo modelli a pesi aperti» acceso il guardiano ripiega sullo stesso modello '
+    + 'che scrive le risposte, e due controlli sullo stesso modello non valgono. Scegline un altro in '
+    + 'Opzioni → Modelli, oppure spegni quell\'interruttore.';
 
   function fraseControlloFermo({ causa } = {}) {
+    if (causa === CAUSA.PESI_APERTI) {
+      return `Ho la risposta pronta, ma il controllo di sicurezza non può partire. ${PERCHE_PESI_APERTI}`;
+    }
     return causa === CAUSA.CONFIGURAZIONE
       ? `Ho la risposta pronta, ma il controllo di sicurezza non può partire: gli manca un modello suo, diverso da quello che scrive le risposte. ${DOVE_SI_IMPOSTA}`
       : 'Ho la risposta pronta, ma il controllo di sicurezza non risponde. Te la mostro appena riesco.';
