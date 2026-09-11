@@ -18,6 +18,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -219,8 +220,7 @@ test('il registro in Preferenze → Sicurezza dice cosa è stato fermato, e si s
 
   // Se si può aggiungere si può togliere: lo svuotamento c'è ed è confermato.
   await sec.locator('#sec-guard-clear').click();
-  const conferma = sec.locator('.sn-confirm-ok, button:has-text("Svuota")').last();
-  await conferma.click();
+  await clickConfirm(sec, 'ok', { timeout: 10_000 });
   await expect(sec.locator('#sec-guard-list .sn-guard-block')).toHaveCount(0, { timeout: 10_000 });
   await expect(sec.locator('#sec-guard-empty')).toBeVisible();
 });
