@@ -35,8 +35,10 @@ Le tre condizioni reggono **insieme**, e vanno scritte insieme:
   non far scaricare tutto in una volta, ma chi conosce i domini li chiede uno
   per uno. La fetta regge solo se dentro non c'è niente da ricucire: via
   `clientId` e user agent (nessuno dei due serviva a chi RIUSA un percorso), e
-  l'ora arrotondata, perché due scritture a quaranta secondi di distanza su
-  domini diversi sono quasi una firma.
+  la data arrotondata al giorno, perché due scritture ravvicinate su domini
+  diversi sono quasi una firma. Attenzione: **togliere i campi non basta**, il
+  server ne aggiunge di suoi — vedi
+  [Quello che il server scrive da sé esce comunque](quello-che-il-server-scrive-da-se-esce-comunque.md).
 
 La regola vale anche a rovescio: **se la fetta non basta** — cioè se il
 documento contiene qualcosa che chi legge non deve vedere — il percorso non è
