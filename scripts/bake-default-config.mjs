@@ -103,6 +103,28 @@ function envKey(name) {
   return typeof v === 'string' ? v.trim() : '';
 }
 
+// Le chiavi dei provider che l'applicazione legge DAVVERO dal file generato,
+// cioè quelle che `src/main/config/default-keys.js` va a cercare. Stanno in una
+// lista sola, e non sparse in un oggetto scritto a mano, perché il controllo
+// «questa versione ha almeno una chiave?» più sotto conta proprio queste: una
+// chiave incastonata che nessuno legge non è neutra, mente a quel controllo.
+//
+// Chi non c'è, e perché.
+//   · OpenRouter (#598): ogni utente riceve la sua chiave dal server quando
+//     riscatta un invito, col tetto di spesa pari ai suoi crediti. Una chiave
+//     di fabbrica nell'installer la apriva a chiunque scaricasse il pacchetto.
+//   · Gemini (#581, secondo giro): il collegamento a Gemini in Filo non esiste
+//     più e default-keys.js non la legge. Finiva dentro l'installer, che
+//     chiunque può scaricare e aprire, senza servire a niente; e siccome il
+//     controllo la contava, da sola bastava a far passare una pubblicazione da
+//     cui l'applicazione non ricavava nessuna chiave.
+// Se un giorno l'applicazione torna a leggere una chiave nuova, va aggiunta
+// qui: la sentinella `tests/unit/bakeChiaviLette.test.mjs` diventa rossa se le
+// due parti divergono.
+const CHIAVI_DEL_PACCHETTO = [
+  { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY' },
+];
+
 async function main() {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
   if (!passphrase) {
