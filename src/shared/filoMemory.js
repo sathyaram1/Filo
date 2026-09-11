@@ -761,13 +761,28 @@
     return Array.isArray(l) ? l : [];
   }
 
+  // Il MOTIVO lo scrive il guardiano dopo aver letto il testo di un estraneo, e
+  // un contenuto che si fa bloccare apposta può dettarglielo. In chat e nella
+  // colonna degli avvisi quel motivo viene ripulito; qui dentro entrava com'era
+  // e il registro lo mostrava sempre in chiaro, nella pagina in cui la persona
+  // va proprio per capire se il controllo esagera. Si ripulisce all'ingresso,
+  // così quello che il registro conserva è la stessa frase che la persona ha
+  // letto. Il TESTO fermato resta invece intero: è la prova, e sta chiuso
+  // dietro un pulsante apposta.
+  function motivoPulito(motivo) {
+    const s = String(motivo || '');
+    const G = global.SN_TEXT_GUARD;
+    if (!G || typeof G.ripulisci !== 'function') return s;
+    try { return G.ripulisci(s); } catch (_) { return s; }
+  }
+
   async function addGuardBlock({ origine, motivo, regola, testo, fonte }) {
     const list = await listGuardBlocks();
     const entry = {
       id: uuid(),
       ts: new Date().toISOString(),
       origine: String(origine || ''),
-      motivo: String(motivo || ''),
+      motivo: motivoPulito(motivo),
       // 'statico' quando l'ha fermato un controllo deterministico, altrimenti la
       // regola del guardiano: serve a leggere il registro senza indovinare.
       regola: String(regola || ''),
