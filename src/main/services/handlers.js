@@ -2015,8 +2015,7 @@ function fontiContaminantiInContesto(history) {
   for (const m of history) {
     if (!m || !Array.isArray(m.actions)) continue;
     for (const a of m.actions) {
-      if (!a || !a._output) continue;
-      if (!G.vaControllato(G.fiduciaDellAzione(a.type))) continue;
+      if (!G.haPortatoTestoDiAltri({ type: a.type, output: a._output })) continue;
       const et = G.etichettaFonte(a);
       if (et && !fonti.includes(et)) fonti.push(et);
     }
