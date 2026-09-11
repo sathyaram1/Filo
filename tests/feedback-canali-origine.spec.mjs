@@ -21,6 +21,19 @@
 // registri del lavoro e delle routine. Sono la stessa famiglia e vanno chiuse
 // insieme: una difesa messa su quattro porte su nove è una porta aperta con
 // accanto un cartello che dice dove.
+//
+// Il terzo guarda le porte VICINE, che non sono del proprietario ma di
+// chiunque abbia fatto l'accesso: uscire dall'account, votare in bacheca,
+// ritirare il voto, riaprire un fix a pagamento. Su una macchina con una
+// sessione aperta «hai una sessione?» è sempre sì, quindi un sito visitato
+// votava al posto dell'utente, gli cancellava il voto e gli spendeva i crediti
+// aprendo a suo nome una segnalazione col testo che voleva.
+//
+// Il quarto guarda l'identità: la porta che dice chi sta usando Filo risponde
+// anche a un content script (la griglia del tasto destro deve sapere se questa
+// è l'installazione di chi gestisce i feedback, il pannello del red-team se
+// c'è una sessione), ma di là dal confine non passano né l'indirizzo email né
+// l'identificativo dell'account.
 
 import { test, expect } from './fixtures/electron.mjs';
 
