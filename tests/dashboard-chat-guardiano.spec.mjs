@@ -149,6 +149,7 @@ test('C — col guardiano irraggiungibile la risposta non si mostra e non si per
 
   const bolla = page.locator('.dash-bubble-filo').last();
   await expect(bolla).toContainText('il controllo di sicurezza non risponde', { timeout: 20_000 });
+  await expect(bolla).toContainText('Te la mostro appena riesco');
   await expect(page.locator('.dash-bubble-filo')).not.toContainText('Il portale clienti si trova');
 
   // La risposta è in coda, non buttata.
