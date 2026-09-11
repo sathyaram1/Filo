@@ -3261,6 +3261,61 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   return Classifier.classify(input, { complete, cache: geoClassifierCache });
 };
 
+// ── Il guardiano degli avvisi (#536) ────────────────────────────────────────
+//
+// Il punto di passaggio unico vive in services/textGuardian.js; qui gli si dà
+// quello che da solo non può avere: come si chiama un modello, e quali segreti
+// Filo custodisce (per il controllo statico «questo testo contiene una mia
+// chiave»).
+//
+// Il modello del guardiano DEVE essere diverso da quello che ha scritto il
+// testo: `catenaGuardiano` toglie dalla sua catena i nickname del produttore, e
+// se non resta niente la chiamata fallisce con un codice che il guardiano
+// riconosce — l'avviso finisce in coda, MAI mostrato senza controllo.
+async function runGuardiano({ messaggi, produttore }) {
+  const s = await getEffectiveSettings();
+  const G = globalThis.SN_TEXT_GUARD;
+  const catena = modelForAction(s, ACTIONS.GUARD_TEXT);
+  const { refs, scartati } = G.catenaGuardiano(catena, produttore);
+  if (!refs.length) {
+    const e = new Error(scartati.length
+      ? `Il guardiano degli avvisi è impostato sullo stesso modello che scrive i testi (${scartati.join(', ')}): serve un modello diverso.`
+      : 'Il guardiano degli avvisi non ha un modello impostato.');
+    e.code = 'GUARDIANO_NON_INDIPENDENTE';
+    throw e;
+  }
+  const attempts = await applyLimitToChain(s, buildAttemptChain(s, refs.join(', '), ACTIONS.GUARD_TEXT));
+  const r = await Providers.completeWithFallback({ attempts, messages: messaggi });
+  const usedProvider = r.provider || attempts[0].provider;
+  const concreteModel = r.model || attempts[0].model;
+  try {
+    await Costs.record({
+      action: ACTIONS.GUARD_TEXT, provider: usedProvider, model: concreteModel,
+      usage: r.usage, pricing: s.pricing?.[concreteModel], usdToEur: s.usdToEur,
+    });
+  } catch (_) {}
+  return r.text || '';
+}
+
+// I segreti che Filo custodisce e che non devono MAI comparire in un testo verso
+// l'utente: le chiavi dei fornitori. Lette al momento, mai tenute in giro.
+async function segretiCustoditi() {
+  try {
+    const s = await getEffectiveSettings();
+    return Object.values(s.apiKeys || {}).filter((v) => typeof v === 'string' && v.trim().length >= 8);
+  } catch (_) { return []; }
+}
+
+function wireTextGuardian() {
+  const TG = require('./textGuardian');
+  TG.configure({ eseguiModello: runGuardiano, segreti: segretiCustoditi });
+  globalThis.SN_TEXT_GUARDIAN = TG;
+  return TG;
+}
+// Disponibile subito (anche prima del boot completo) così chiunque proponga un
+// avviso trova la porta aperta invece di scrivere la notifica per conto suo.
+wireTextGuardian();
+
 // Esposto su globalThis per i test Playwright (app.evaluate non ha require):
 // è il dispatch con il gate dei livelli di sicurezza (#146.2).
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
