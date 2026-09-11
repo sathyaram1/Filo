@@ -19,7 +19,8 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
-        'Lo screenshot che alleghi a una segnalazione, riaprendola, risulta «allegato inviato» invece di sembrare un\'immagine rotta: parte cifrato e lo apre solo chi riceve le segnalazioni.',
+        'Gli allegati che mandi con una segnalazione, quando la riapri, dicono «inviato» invece di sembrare rotti. Partono cifrati e li apre solo chi riceve le segnalazioni, e vale sia per gli screenshot sia per i file.',
+        'Nell\'elenco dei feedback si aprono solo gli allegati veri. Prima una segnalazione poteva dichiarare un finto allegato e mandarti sul sito scelto da chi l\'aveva scritta.',
       ],
     },
     {
