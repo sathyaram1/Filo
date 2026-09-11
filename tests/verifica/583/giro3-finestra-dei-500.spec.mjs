@@ -12,9 +12,16 @@
 //     produce nessun annuncio per chi l'aveva mandato: la sua scheda non viene
 //     mai scritta.
 //
-// La prova è VERDE oggi: fotografa il comportamento attuale. Diventa rossa
-// quando la pubblicazione smetterà di dipendere da una sola pagina di
-// caricamento.
+// La correzione dello stesso giro NON ha allargato il caricamento (costerebbe
+// letture a ogni giro, e i feedback vecchi cambiano una volta ogni mai): ha
+// aggiunto la strada che serviva davvero. Quando chi gestisce i feedback ne
+// cambia uno, l'id ce l'ha in mano, quindi la scheda di QUEL feedback si scrive
+// o si toglie subito, e l'età non conta più. La guardia permanente è
+// `tests/feedback-scheda-fuori-pagina.spec.mjs`.
+//
+// Questa prova resta com'è, e resta verde: descrive il limite del giro generale,
+// che è il motivo per cui quella strada esiste. Diventa rossa il giorno in cui
+// qualcuno cambierà il giro generale credendo che copra tutto.
 
 import { test, expect } from './../../fixtures/electron.mjs';
 
