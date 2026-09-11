@@ -95,6 +95,7 @@ test('un comando finito male porta dentro le parole di un estraneo e la risposta
         // non sta provando niente e deve dirlo.
         const ctx = messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
         globalThis.__uscita = /ISTRUZIONI PER FILO/.test(ctx);
+        globalThis.__ctx = ctx.slice(-1500);
         const testo = arg.trappola;
         for (const pezzo of testo.match(/.{1,24}/gs) || []) {
           try { onDelta && onDelta(pezzo); } catch (_) {}
