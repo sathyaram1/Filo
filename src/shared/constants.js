@@ -361,6 +361,12 @@
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
+    // #536 — il secondo modello che controlla gli avvisi nati da contenuto di
+    // terzi. Ha una voce sua perché l'utente deve vedere quanto costa essere
+    // protetto, non trovarselo dentro «Altro».
+    [ACTIONS.GUARDIAN_CHECK]: 'Controlli di sicurezza',
+    [ACTIONS.SAFEBROWSE_JUDGE]: 'Controlli di sicurezza',
+    [ACTIONS.GEOBLOCK_CLASSIFY]: 'Controlli di sicurezza',
   };
 
   function creditUsageGroup(action) {
@@ -403,6 +409,7 @@
     [ACTIONS.DECKS_SEARCH_FILTER]: 'Mazzi — filtro ricerca',
     [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
+    [ACTIONS.GUARDIAN_CHECK]: 'Controllo di sicurezza degli avvisi',
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
     [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
@@ -473,6 +480,7 @@
     [ACTIONS.TTS]: '',
     [ACTIONS.SAFEBROWSE_JUDGE]: '',
     [ACTIONS.GEOBLOCK_CLASSIFY]: '',
+    [ACTIONS.GUARDIAN_CHECK]: '',
     [ACTIONS.FEEDBACK_TITLE]: '',
     [ACTIONS.EDITOR_TITLE]: '',
     [ACTIONS.EDITOR_SUMMARY]: '',
