@@ -202,9 +202,15 @@
    *
    * @param {Array<object>} published schede già in `feedback-public` (con `_id`)
    * @param {Array<object>} feedbacks feedback veri, decifrati (con `_id`)
+   * @param {{complete?: boolean}} [opts] `complete`: i feedback passati sono
+   *   TUTTI quelli che esistono (il caricamento non ha toccato il tetto). Solo
+   *   allora una scheda senza feedback è un orfano da togliere — altrimenti
+   *   sarebbe un feedback più vecchio del tetto, e toglierlo svuoterebbe la
+   *   bacheca a ogni giro.
    * @returns {{ upsert: Array<{id:string, card:object}>, remove: string[] }}
    */
-  function planSync(published, feedbacks) {
+  function planSync(published, feedbacks, opts) {
+    const complete = !!(opts && opts.complete);
     const now = new Map();
     for (const row of Array.isArray(published) ? published : []) {
       if (row && row._id) now.set(String(row._id), row);
