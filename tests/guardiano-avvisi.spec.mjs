@@ -15,6 +15,7 @@
 // blocco, la coda, e cosa finisce davanti all'utente.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 
 // Il finto Gmail: due mail, una che imita la banca e una qualunque.
 const POSTA = `<!doctype html><meta charset="utf-8"><title>Posta</title>
