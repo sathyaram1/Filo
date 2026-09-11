@@ -31,6 +31,10 @@
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
   // Cap difensivo per le notifiche.
   const NOTIFICATIONS_CAP = 100;
+  // Registro dei blocchi del guardiano (#536): serve a giudicare se grida al
+  // lupo, quindi deve tenere abbastanza storia da vedere una tendenza. 500 voci
+  // sono mesi di uso e pesano pochi KB; oltre, le più vecchie escono.
+  const GUARD_BLOCKS_CAP = 500;
 
   function uuid() {
     if (global.crypto?.randomUUID) return global.crypto.randomUUID();
