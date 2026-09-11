@@ -1039,3 +1039,42 @@ test('un orologio avanti sul computer di chi risponde non fa sparire i turni di 
   ].join('\n');
   assert.deepEqual(esito(notes), G13_ATTESO);
 });
+
+// ── #496, giro 14 ─────────────────────────────────────────────────────────
+// «Aperte adesso» non conta dentro la finestra: guarda tutta la lista in
+// pagina. Quindi il tetto del caricamento la tocca SEMPRE, anche quando la
+// finestra scelta è coperta per intero, e quello che il tetto lascia fuori
+// sono le segnalazioni più vecchie, cioè quelle rimaste in coda.
+
+test('«Aperte adesso» si dichiara un minimo ogni volta che il caricamento ha toccato il tetto', () => {
+  const vecchia = new Date(NOW - 300 * GIORNO).toISOString();
+  const fresca = new Date(NOW - 1 * GIORNO).toISOString();
+  const fbs = [
+    { _id: 'a', clientId: 'u@x', status: 'todo', createdAt: vecchia, _updateTime: vecchia },
+    { _id: 'b', clientId: 'u@x', status: 'working', createdAt: fresca, _updateTime: fresca },
+    { _id: 'c', clientId: 'u@x', status: 'done', resolvedInVersion: '1.0.0', createdAt: fresca, _updateTime: fresca },
+  ];
+  // Finestra corta: i ricevuti e i lavorati della finestra sono esatti…
+  const corta = ST.compute({ feedbacks: fbs, sel: { key: '7d' }, now: NOW, pageSize: 3 });
+  assert.equal(corta.copertura.parziale, false);
+  assert.equal(corta.copertura.tetto, true);
+  // …ma «Aperte adesso» guarda tutta la lista, e lì il tetto morde.
+  assert.equal(corta.adesso.parziale, true);
+  assert.equal(corta.adesso.inCoda + corta.adesso.inLavorazione, 2);
+  // Col caricamento sotto il tetto non c'è niente da dichiarare.
+  const intero = ST.compute({ feedbacks: fbs, sel: { key: '7d' }, now: NOW, pageSize: 50 });
+  assert.equal(intero.adesso.parziale, false);
+});
+
+test('una partenza senza ruolo si chiama «Sconosciuto», come nella scheda Log', () => {
+  assert.equal(ST.roleLabel(''), 'Sconosciuto');
+  assert.equal(ST.roleLabel('sconosciuto'), 'Sconosciuto');
+  assert.equal(ST.roleLabel('prober'), 'Esplorazione');
+  // Un ruolo nuovo che la scheda non conosce resta col suo nome.
+  assert.equal(ST.roleLabel('giudice'), 'giudice');
+  const r = ST.launches(
+    [{ role: '', startedAt: new Date(NOW - 3600 * 1000).toISOString() }],
+    ST.windowRange({ key: '24h' }, NOW),
+  );
+  assert.deepEqual(r.byRole.map((x) => x.label), ['Sconosciuto']);
+});

@@ -425,17 +425,15 @@
       cand[chi].push({ i, ms: markerMs((m[1] || '').trim() || null) });
     }
     for (const chi of ['user', 'model']) {
-      const lista = cand[chi];
-      // Un turno vero porta sempre un istante che si legge: lo scrivono i due
-      // `*TurnMarker`, e chi appende dal server passa una data vera. Una riga
-      // che ne porta uno illeggibile — «ieri mattina» — l'ha scritta una
-      // persona raccontando, e senza istante non entrerebbe in nessun
-      // confronto: passerebbe sempre (#496, giro 14, porta 3). Se però NESSUNO
-      // si legge, la conversazione è di un formato che non conosciamo e si
-      // tengono tutti: meglio dei turni in più che una chat che sparisce.
-      const leggibili = lista.filter((c) => Number.isFinite(c.ms));
-      const usati = leggibili.length ? catenaVera(leggibili) : lista;
-      for (const c of usati) apre[c.i] = true;
+      // Un marcatore il cui istante non si legge («ieri mattina», o una data
+      // scritta in un formato che non conosciamo) non entra nella catena: non
+      // c'è niente da ordinare. Resta però un turno, perché toglierlo vuol dire
+      // far sparire dalla conversazione dei turni veri scritti in un formato
+      // vecchio, e sarebbe un danno peggiore di quello che evita. Quella porta
+      // la chiude la scrittura, non la lettura.
+      for (const c of cand[chi]) if (!Number.isFinite(c.ms)) apre[c.i] = true;
+      const leggibili = cand[chi].filter((c) => Number.isFinite(c.ms));
+      for (const c of catenaVera(leggibili)) apre[c.i] = true;
     }
     return apre;
   }
