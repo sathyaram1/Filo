@@ -112,6 +112,21 @@
     return m;
   }
 
+  /**
+   * I crediti che spettano a chi ha segnalato, dalla fascia di priorità. PURA.
+   * La tabella è una sola (`SN_CONST.CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY`),
+   * la stessa che il portafoglio usa per accreditarli: qui la si legge per
+   * scriverla sulla scheda, perché la macchina di chi ha segnalato la priorità
+   * non la vede.
+   */
+  function rewardFor(priority) {
+    const C = global.SN_CONST && global.SN_CONST.CREDIT;
+    const table = (C && C.FEEDBACK_RESOLVE_BY_PRIORITY) || null;
+    if (!table) throw new Error('SN_CONST mancante: carica shared/constants.js prima di feedbackPublicView.js');
+    const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
+    return Number(table[p]) || Number(table[0]) || 0;
+  }
+
   function str(v, max) {
     const s = typeof v === 'string' ? v : (v == null ? '' : String(v));
     return s.length > max ? s.slice(0, max) : s;
