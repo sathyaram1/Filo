@@ -3210,7 +3210,12 @@
       loadFailed = true;
       mgListLoading.hidden = true;
       mgListEmpty.hidden = false;
-      mgListEmpty.textContent = 'Errore nel caricamento dei feedback.';
+      // #583: un permesso che manca non è un guasto. Chiamarlo "errore" manda a
+      // controllare la rete e a premere Aggiorna, e nessuna delle due cose
+      // cambierà qualcosa: i feedback li legge solo chi li gestisce.
+      mgListEmpty.textContent = (err && err.code === 'FEEDBACK_READ_DENIED')
+        ? 'I feedback li vede chi li gestisce: accedi con un account amministratore.'
+        : 'Errore nel caricamento dei feedback.';
       console.error('[manage] errore caricamento:', err);
       return;
     }
