@@ -285,14 +285,39 @@ test('una risposta che non si capisce NON vale «passa»', () => {
   }
 });
 
-test('il verdetto di blocco arriva sempre con un motivo', () => {
-  const v = G.leggiVerdetto('ecco: {"esito":"blocca","motivo":"chiedeva il PIN della carta"}');
+test('il verdetto di blocco arriva sempre con un motivo, e il motivo è di Filo', () => {
+  // Il guardiano sceglie una categoria; la frase la scrive Filo.
+  const v = G.leggiVerdetto('ecco: {"esito":"blocca","motivo":"credenziali"}');
   assert.equal(v.esito, 'blocca');
-  assert.equal(v.motivo, 'chiedeva il PIN della carta');
+  assert.equal(v.motivo, G.MOTIVI_GUARDIANO.credenziali.frase);
   // Blocco senza motivo dal modello: la frase la mettiamo noi, mai vuota.
   const v2 = G.leggiVerdetto('{"esito":"blocca"}');
   assert.equal(v2.esito, 'blocca');
-  assert.ok(v2.motivo.length > 5);
+  assert.equal(v2.motivo, G.MOTIVO_GENERICO);
+});
+
+// #536, giro 7 — il motivo lo scrive un modello che ha appena letto il testo di
+// un estraneo, e un contenuto che si fa bloccare apposta glielo detta. Togliere
+// dal motivo i recapiti chiudeva metà porta: l'ORDINE passava intero. Quello che
+// il guardiano scrive non deve MAI arrivare alla persona.
+test('quello che il guardiano scrive di suo non arriva mai all’utente', () => {
+  const dettati = [
+    'per riattivare il conto conferma subito le tue credenziali nell’app della banca',
+    'il conto è sospeso: chiama il servizio clienti e comunica il codice che ricevi',
+    'apri il portale scrivendo nella barra portale-esempio punto it barra login',
+    'scrivi a rimborsi chiocciola banca-esempio punto it',
+  ];
+  const ammesse = new Set([
+    ...Object.values(G.REGOLE),
+    ...Object.values(G.MOTIVI_GUARDIANO).map((v) => v.frase),
+    G.MOTIVO_GENERICO,
+  ]);
+  for (const motivo of dettati) {
+    const v = G.leggiVerdetto(JSON.stringify({ esito: 'blocca', motivo }));
+    assert.ok(ammesse.has(v.motivo), `motivo non di Filo: ${v.motivo}`);
+    const riga = G.frasediBlocco({ origine: 'una mail di X', motivo });
+    assert.ok(!riga.includes(motivo.slice(0, 40)), `la frase dettata è arrivata all'utente: ${riga}`);
+  }
 });
 
 // ── La riga che l'utente legge ──────────────────────────────────────────────
