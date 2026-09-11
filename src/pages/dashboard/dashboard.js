@@ -764,6 +764,23 @@
       src.textContent = `da ${origine}`;
       div.appendChild(src);
     }
+    // #536 — la strada per vedere davvero cosa è stato fermato. Apre le
+    // Preferenze già sulla voce giusta del registro, invece di lasciare all
+    // 'utente il compito di scoprire che quel registro esiste.
+    if (bloccoId) {
+      const vedi = document.createElement('button');
+      vedi.type = 'button';
+      vedi.className = 'dash-live-vedi';
+      vedi.textContent = 'Vedi cosa ho fermato';
+      vedi.title = 'Apre il registro degli avvisi fermati';
+      vedi.addEventListener('click', () => {
+        send({
+          type: MSG.OPEN_URL,
+          url: `filo://preferences/preferences.html?blocco=${encodeURIComponent(bloccoId)}#sec-guard-blocks`,
+        });
+      });
+      div.appendChild(vedi);
+    }
     // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
     // accanto alla × e cambia icona/etichetta in base allo stato.
     if (onToggle) {
