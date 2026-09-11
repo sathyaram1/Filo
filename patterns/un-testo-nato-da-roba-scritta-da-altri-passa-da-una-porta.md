@@ -71,6 +71,48 @@ destinazione non è quella che l'etichetta promette — si fermano in locale, se
 modello, e quindi anche a rete staccata. Costano zero e non hanno un fornitore
 che possa essere giù.
 
+## La frase di adesso non è l'unica uscita: c'è quello che resta scritto
+
+Un turno che ha letto roba di altri non deve dire niente all'utente per fargli
+arrivare la frase dell'estraneo. Gli basta **lasciarla nello stato di Filo** e
+aspettare. Il nome di un timer parla quando il timer suona; un appunto parla
+quando l'utente apre l'editor; una regola fissata nella memoria e lo «stile
+dell'agente» parlano in **ogni conversazione successiva**, che è pulita, dove il
+secondo modello non gira e non avrebbe ragione di girare. Il contenuto di un
+estraneo, passando per lo stato di Filo, è diventato roba di Filo: lavato.
+
+Le tre porte sono uscite nell'ordine, un giro di verifica per porta, e la ragione
+è sempre stata la stessa: l'elenco dei campi da sorvegliare si teneva **a mano**,
+e a mano arrivava fino al campo che qualcuno si era ricordato. Adesso quell'elenco
+sta in `CAMPI_SORVEGLIATI` (`src/shared/textGuard.js`) e copre **ogni azione del
+registro**, comprese quelle che non hanno niente da sorvegliare: una sentinella lo
+confronta con il registro vero e diventa rossa appena nasce un'azione che non ha
+dichiarato cosa lascia scritto. Un tipo che la tabella non conosce non vale
+«niente da sorvegliare»: vale «sorveglia tutte le stringhe», che sbaglia per
+eccesso di prudenza.
+
+Quando il controllo non dà il via libera, due esiti diversi e dichiarati:
+`svuota` toglie le parole e lascia vivere l'azione (un timer che si chiama
+«Timer» resta un timer utile), `annulla` la lascia perdere (un appunto senza
+testo, una regola senza regola, uno stile senza stile non sono niente di utile).
+In tutti e due i casi il testo finisce nel registro degli avvisi fermati, e al
+modello torna scritto che il controllo l'ha fermato e di non riscriverlo in altre
+parole: al secondo tentativo la frase sarebbe la stessa, dettata dalla stessa
+pagina.
+
+Il caso delle **preferenze** merita una riga a parte. Quasi tutte sono un
+interruttore o una parola scelta da un elenco, e chiamare un secondo modello per
+un «tema: scuro» è lo spreco che questo lavoro deve evitare. Ma «stile
+dell'agente» è testo libero, e quel testo entra nelle **istruzioni** di ogni
+conversazione futura: è la porta peggiore delle tre. Quindi il registro delle
+preferenze dichiara `testoLibero` (`src/shared/preferences.js`) e solo quelle
+passano dal guardiano. Anche qui la garanzia non è la buona volontà: una
+sentinella prova ogni preferenza con una stringa riconoscibile e, se quella
+stringa arriva intera dentro l'impostazione, pretende che `testoLibero` sia
+dichiarato — `true` per guardarlo, `false` per dire che non sono parole (una
+chiave API non compare mai in chiaro, e ogni controllo statico la fermerebbe: lì
+la difesa è la conferma di livello 2, non il guardiano del testo).
+
 ## I due modi di sbagliare, e solo uno si vede
 
 Se il guardiano lascia passare un inganno, nessuno se ne accorge finché non fa
