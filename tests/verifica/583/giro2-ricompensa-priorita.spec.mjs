@@ -38,23 +38,27 @@ test('la ricompensa segue l\'importanza della segnalazione', async ({ app, shell
     S.getRaw = async (k, d) => (k === 'sn_feedback_client_id' ? mio : veroGetRaw(k, d));
     const mioHash = await H.hashClientId(mio);
 
-    const scheda = async (id, priority) => ({
+    // La scheda NON se la inventa la prova: la costruisce lo stesso codice che
+    // la pubblica davvero, a partire dal feedback vero. È l'unico modo di
+    // vedere cosa arriva sul computer di chi ha segnalato.
+    const V = globalThis.SN_FEEDBACK_PUBLIC_VIEW;
+    const feedbackVero = (id, priority) => ({
       _id: id,
       name: `Segnalazione ${id}`,
+      text: 'testo della segnalazione',
       seq: 900, subSeq: 0,
       status: 'done',
-      statusPublic: 'closed',
+      priority,
       resolvedInVersion: '0.2.228',
       createdAt: '2026-09-01T10:00:00Z',
       resolvedAt: '2026-09-10T10:00:00Z',
-      publishedAt: '2026-09-10T10:05:00Z',
       userNote: 'Sistemato: ora funziona.',
-      clientIdTag: await H.cardTag(id, mioHash),
-      // Come una scheda pubblica la porterebbe, se la portasse.
-      priority,
+      clientIdHash: mioHash,
     });
-
-    const schede = [await scheda('fb-importante', 3), await scheda('fb-minore', 0)];
+    const schede = [
+      { _id: 'fb-importante', ...V.cardFor(feedbackVero('fb-importante', 3)) },
+      { _id: 'fb-minore', ...V.cardFor(feedbackVero('fb-minore', 0)) },
+    ];
     const veroListPublic = FB.listPublic;
     FB.listPublic = async () => schede;
     try {
