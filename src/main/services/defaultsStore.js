@@ -46,7 +46,9 @@ const ROUTINES_DOC = 'config/routines';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
-let remoteSecrets = null; // { apiKeys?: { openrouter?, gemini?, tavily? }, safeBrowsingKey? }
+// Popolato SOLO quando chi usa Filo è admin (#581): per tutti gli altri resta
+// null e le chiavi effettive sono quelle del build.
+let remoteSecrets = null; // { apiKeys?: { openrouter?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
