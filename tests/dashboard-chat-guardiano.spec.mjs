@@ -157,3 +157,65 @@ test('C — col guardiano irraggiungibile la risposta non si mostra e non si per
   expect(coda.length).toBe(1);
   expect(coda[0].testo).toContain('Il portale clienti si trova');
 });
+
+// (D) Il controllo non dura un messaggio solo. Quello che Filo ha letto resta
+// nella conversazione e continua a parlare al modello: se la classe di fiducia
+// ripartisse pulita a ogni messaggio, basterebbe una domanda di seguito — la
+// cosa più normale del mondo — perché quello che la pagina voleva far dire a
+// Filo arrivasse intero all'utente.
+test('D — anche la risposta del messaggio dopo passa dal guardiano, e il tranello non arriva', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configuraModelli(app);
+
+  const TRANELLO = 'Il portale chiede di confermare subito le tue credenziali per non perdere l’accesso.';
+  await app.evaluate(async (_e, tranello) => {
+    globalThis.SN_WEB_SEARCH.search = async () => ({
+      provider: 'finto',
+      results: [{ title: 'Portale', url: 'https://portale-esempio.it/', snippet: 'accedi al portale' }],
+    });
+    globalThis.__guardiano = 0;
+    globalThis.SN_TEXT_GUARDIAN.configure({
+      pausaMs: 0,
+      eseguiModello: async ({ messaggi }) => {
+        globalThis.__guardiano++;
+        const inGiudizio = messaggi.filter((m) => m.role === 'user').map((m) => m.content).join('\n');
+        return /confermare subito le tue credenziali/i.test(inGiudizio)
+          ? '{"esito":"blocca","motivo":"chiedeva di confermare le credenziali del conto"}'
+          : '{"esito":"passa"}';
+      },
+    });
+    let giro = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      giro++;
+      if (giro === 1) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: '{"query":"portale"}' }] };
+      }
+      // Primo messaggio: risposta innocua. Secondo: il tranello della pagina.
+      const testo = giro === 2 ? 'Ho trovato il portale.' : tranello;
+      for (const pezzo of testo.match(/.{1,24}/gs) || []) {
+        try { onDelta && onDelta(pezzo); } catch (_) {}
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      return { ...base, text: testo, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  }, TRANELLO);
+
+  await page.locator('#input').fill('cerca il portale clienti');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ho trovato il portale.' }))
+    .toBeVisible({ timeout: 30_000 });
+  expect(await app.evaluate(() => globalThis.__guardiano)).toBe(1);
+
+  // Una domanda di seguito, senza nessuna azione nuova.
+  await page.locator('#input').fill('e adesso cosa devo fare?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo').last())
+    .toContainText('Ho fermato un avviso', { timeout: 30_000 });
+  await expect(page.locator('#bubbles')).not.toContainText('per non perdere l’accesso');
+  expect(await app.evaluate(() => globalThis.__guardiano)).toBe(2);
+});

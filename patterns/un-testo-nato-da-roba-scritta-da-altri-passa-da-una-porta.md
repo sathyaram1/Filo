@@ -41,6 +41,30 @@ guardiano i nickname del modello che ha scritto il testo
 lascia passare: mette l'avviso in coda. Un controllo che non si può fare non è
 un controllo superato.
 
+**La fiducia è del compito, non del messaggio.** È l'errore che il primo giro di
+verifica ha trovato, ed è quello che rende il resto decorativo: legare il
+controllo al messaggio in cui la ricerca è avvenuta protegge la prima risposta e
+nessun'altra. Quello che Filo ha letto **resta nella conversazione** — è
+`observationsForPrompt` che ce lo rimette — e continua a parlare al modello,
+quindi basta una domanda di seguito («e adesso cosa devo fare?») perché la frase
+che la pagina voleva far dire a Filo arrivi intera, e per giunta scorrendo in
+diretta. Il conto si fa sulle azioni che hanno davvero prodotto un'osservazione
+(`fontiContaminantiInContesto`): quando lo storico viene tagliato e quella pagina
+esce dal contesto, il compito torna pulito, perché il testo di altri non c'è più.
+
+**Quello che Filo scrive DI SUO va ripulito lo stesso.** La riga di blocco si
+compone con due pezzi che vengono da fuori: il motivo, scritto dal modello
+guardiano *dopo* aver letto il testo dell'estraneo, e la fonte, che per una mail
+è il mittente — e il mittente se lo sceglie chi manda la mail. Un contenuto che
+si fa bloccare apposta e detta il motivo si farebbe consegnare l'indirizzo della
+truffa dalla voce di Filo, proprio nella riga che dovrebbe rassicurare, e per di
+più come collegamento cliccabile. `ripulisci` toglie da quei pezzi tutto ciò che
+porta da qualche parte (resta detto che un indirizzo c'era), tiene l'indirizzo di
+posta del mittente, che è la cosa che serve sapere, e butta il pezzo intero se
+dopo la pulizia fa ancora scattare un controllo statico o se è lungo come una
+pagina. La regola generale: **il testo che Filo scrive attorno a contenuto non
+fidato è contenuto non fidato anche lui.**
+
 **I controlli statici prima.** Le forme riconoscibili — codici usa e getta,
 codici di recupero, password, chiavi, coordinate bancarie, collegamenti la cui
 destinazione non è quella che l'etichetta promette — si fermano in locale, senza
