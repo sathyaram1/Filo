@@ -210,3 +210,36 @@ test('il collegamento dentro un avviso ha un colore suo anche sul tema scuro', (
   assert.match(scuro.slice(0, 600), /--dash-link:/,
     'sul tema scuro il collegamento torna blu scuro su fondo scuro');
 });
+
+// #536 — dalla bolla di una risposta fermata si arriva a quello che è stato
+// fermato, con lo stesso pulsante della colonna degli avvisi. Le due strade
+// portano allo stesso posto e devono comportarsi allo stesso modo: prima in
+// chat c'era solo una frase che diceva di cercarsi la sezione nelle Preferenze.
+test('dalla bolla in chat si apre quello che è stato fermato, come dalla colonna', () => {
+  const js = readFileSync(join(SRC, 'pages', 'dashboard', 'dashboard.js'), 'utf8');
+  assert.match(js, /function bottoneVediBlocco\(/,
+    'il pulsante non è più uno solo per le due strade');
+  assert.match(js, /r\.guardBlockId[\s\S]{0,160}bottoneVediBlocco/,
+    'la bolla della chat non porta più al registro degli avvisi fermati');
+  const css = readFileSync(join(SRC, 'pages', 'dashboard', 'dashboard.css'), 'utf8');
+  assert.match(css, /\.dash-bubble-vedi[\s\S]{0,300}color:\s*var\(--dash-link\)/,
+    'il pulsante nella bolla non usa il colore dei collegamenti, che è l’unico definito nei due temi');
+});
+
+// #536 — le fonti che sporcano un compito stanno in UNA tabella sola, e le
+// superfici che costruiscono un contesto la chiedono a lei. Finché ognuna
+// teneva il suo elenco, i documenti dell'editor sporcavano il saluto della
+// nuova scheda e non la chat, che quegli stessi documenti li legge per intero.
+test('chat e home chiedono alla stessa tabella cosa, nel contesto, l’ha scritto un estraneo', () => {
+  const h = readFileSync(join(SRC, 'main', 'services', 'handlers.js'), 'utf8');
+  const G = globalThis.SN_TEXT_GUARD;
+  const usi = h.match(/fontiDegliIngredienti\(/g) || [];
+  assert.ok(usi.length >= 2,
+    'una delle due superfici si è rifatta il suo elenco di fonti contaminate');
+  assert.ok(G.FONTE_AZIONE.LEGGI_FILE && G.vaControllato(G.FONTE_AZIONE.LEGGI_FILE.fiducia),
+    'leggere un documento dell’editor non sporca il compito: un PDF sul disco sì, e il testo è lo stesso');
+  assert.ok(G.fontiDegliIngredienti({ documenti: ['- [f1] Appunti: …'] }).length,
+    'un documento nel contesto non conta come roba scritta da altri');
+  assert.equal(G.fontiDegliIngredienti({ documenti: [], pagineSalvate: [] }).length, 0,
+    'senza documenti né pagine salvate il contesto è pulito: il controllo non deve diventare una tassa');
+});
