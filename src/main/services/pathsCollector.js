@@ -459,7 +459,7 @@
     inCoda,
     // Esposti per test/debug e per riuso in altri moduli.
     _internal: {
-      redactSelector, sanitizeSteps, sanitizeUserMessages, domainOf, normalizedPath,
+      redactSelector, redactPath, sanitizeSteps, sanitizeUserMessages, domainOf, normalizedPath,
       cleanGuessedIntent, parseJudgeOutput, accoda, sorteggia, RITARDO_MIN_MS, RITARDO_MAX_MS,
     },
     // ---- helper per i test (nessun effetto in produzione) ----
