@@ -128,6 +128,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // #536 — il registro degli avvisi fermati dal guardiano (Preferenze).
     FILO_GET_GUARD_BLOCKS: 'guard-notifications',
     FILO_CLEAR_GUARD_BLOCKS: 'guard-notifications',
+    FILO_DISMISS_PENDING_GUARD: 'guard-notifications',
     FILO_GET_ONBOARDING: 'onboarding',
     FILO_RESTART_ONBOARDING: 'onboarding',
     FILO_CLOSE_ONBOARDING: 'onboarding',
