@@ -157,7 +157,7 @@ function consumaUnaTantum(wc, chiavi) {
 // Nega subito se non c'è nessuna shell a cui chiedere (finestra isolata del
 // safebrowse, finestre di servizio): una richiesta che nessuno può vedere non
 // può essere concessa.
-function chiedi({ wc, win, tab, origine, chiavi }) {
+function chiedi({ wc, win, tab, origine, chiavi, salvaScelta }) {
   return new Promise((resolve) => {
     const shell = win && !win.isDestroyed() ? win.webContents : null;
     if (!shell || shell.isDestroyed()) { resolve(false); return; }
@@ -168,11 +168,11 @@ function chiedi({ wc, win, tab, origine, chiavi }) {
     }
 
     const id = String(prossimoId++);
-    const att = { chiave: chiaveAttesa, callbacks: [resolve], chiudi: null };
+    const att = { chiave: chiaveAttesa, callbacks: [resolve], chiudi: null, salva: salvaScelta };
     attese.set(id, att);
 
     let finito = false;
-    const finisci = (ok, scelta) => {
+    const finisci = (ok) => {
       if (finito) return;
       finito = true;
       attese.delete(id);
@@ -183,7 +183,6 @@ function chiedi({ wc, win, tab, origine, chiavi }) {
         if (shell && !shell.isDestroyed()) shell.send('permissions:closed', { id });
       } catch (_) {}
       for (const cb of att.callbacks) { try { cb(ok); } catch (_) {} }
-      if (scelta) att.scelta = scelta;
     };
     att.chiudi = finisci;
 
