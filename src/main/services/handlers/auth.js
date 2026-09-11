@@ -270,11 +270,8 @@ module.exports = function register(on, ctx) {
   // Modalità batch:    { list: [{…}, …] }         → { ok, list: [{…decifrati}, …] }
   // (Il path singolo esiste per retrocompat; il batch serve alle dashboard che
   //  caricano centinaia di feedback — una sola IPC invece di N.)
-  on(MSG.FEEDBACK_DECRYPT_FIELDS, async (msg) => {
+  on(MSG.FEEDBACK_DECRYPT_FIELDS, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori.' };
-      }
       // Batch: array di oggetti feedback. La chiave si legge UNA volta e i
       // documenti si decifrano a gruppi in parallelo: la crittografia gira nel
       // pool di thread di Node, quindi in sequenza si usava un solo core e
