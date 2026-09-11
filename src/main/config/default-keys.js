@@ -50,7 +50,19 @@ function fromGeneratedFile() {
       ? j.apiKeys
       : j;
     const pick = (k) => (typeof keys[k] === 'string' ? keys[k].trim() : '');
-    return { openrouter: pick('openrouter'), tavily: pick('tavily') };
+    // La chiave Safe Browsing non è una chiave di modelli: nel file generato sta
+    // accanto ad `apiKeys`, non dentro. Si accetta anche la forma annidata,
+    // perché un file scritto da un bake vecchio non deve far sparire la chiave
+    // in silenzio.
+    const sbRaw = (typeof j?.safeBrowsingKey === 'string' && j.safeBrowsingKey)
+      || (typeof keys.safeBrowsingKey === 'string' && keys.safeBrowsingKey)
+      || (typeof keys.safeBrowsing === 'string' && keys.safeBrowsing)
+      || '';
+    return {
+      openrouter: pick('openrouter'),
+      tavily: pick('tavily'),
+      safeBrowsingKey: String(sbRaw).trim(),
+    };
   } catch (_) {
     return null; // file assente o malformato → nessun contributo
   }
@@ -62,13 +74,23 @@ function readSnapshot() {
   return {
     openrouter: gen.openrouter || fromEnv('FILO_DEFAULT_OPENROUTER_KEY'),
     tavily: gen.tavily || fromEnv('FILO_DEFAULT_TAVILY_KEY'),
+    safeBrowsingKey: gen.safeBrowsingKey || fromEnv('FILO_DEFAULT_SAFEBROWSING_KEY'),
   };
 }
 
 const DEFAULT_KEYS = readSnapshot();
 
+// Solo le chiavi dei PROVIDER di modelli/ricerca: è il contratto che
+// defaultsStore fonde in `apiKeys`, e la chiave Safe Browsing non va lì dentro
+// (finirebbe fra le chiavi passate a un provider).
 function getBuildKeys() {
-  return { ...DEFAULT_KEYS };
+  return { openrouter: DEFAULT_KEYS.openrouter, tavily: DEFAULT_KEYS.tavily };
+}
+
+// Chiave Google Safe Browsing incastonata dal build (#581): è l'unica strada
+// verso un'installazione non-admin, da quando config/secrets è admin-only.
+function getBuildSafeBrowsingKey() {
+  return DEFAULT_KEYS.safeBrowsingKey || '';
 }
 
 // True se almeno una chiave di default è disponibile (file generato o env).
@@ -76,4 +98,4 @@ function hasAnyBuildKey() {
   return Boolean(DEFAULT_KEYS.openrouter || DEFAULT_KEYS.tavily);
 }
 
-module.exports = { getBuildKeys, hasAnyBuildKey };
+module.exports = { getBuildKeys, getBuildSafeBrowsingKey, hasAnyBuildKey };
