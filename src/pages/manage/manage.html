@@ -1477,6 +1477,13 @@
               <input type="date" id="mgStFrom" class="mg-st-date" />
               <label for="mgStTo">al</label>
               <input type="date" id="mgStTo" class="mg-st-date" />
+              <!-- I due campi scrivono la data nell'ordine della lingua del
+                   sistema: su un computer non italiano «01/09» è il nove
+                   gennaio, il contrario di tutte le altre date della scheda.
+                   Qui accanto la finestra scelta è riscritta col mese a parole,
+                   dove l'ordine non conta. Porta una data, quindi il tasto
+                   destro deve poterla copiare come le altre. -->
+              <span class="mg-st-custom-eco" id="mgStCustomEco" data-copia="1"></span>
             </div>
           </div>
           <div class="mg-st-ctl">
