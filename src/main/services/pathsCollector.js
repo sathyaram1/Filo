@@ -373,6 +373,7 @@
 
   global.SN_PATHS_COLLECTOR = {
     collectAndSave,
+    init,
     flush,
     inCoda,
     // Esposti per test/debug e per riuso in altri moduli.
