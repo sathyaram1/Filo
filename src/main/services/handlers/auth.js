@@ -563,6 +563,169 @@ module.exports = function register(on, ctx) {
 
   on(MSG.MERGE_APPROVALS_GET, ownerOnly(listMergeApprovals));
 
+  // ── #583: leggere i feedback, e tenere aggiornata la vista pubblica ───────
+  //
+  // La collezione `feedback` non si legge più senza credenziali. Le due
+  // superfici dell'owner (Gestione e la pagina dei feedback) girano in una
+  // pagina filo://, dove l'ID token non deve arrivare: chiedono la lettura
+  // qui, e qui la si fa col token. Stessi due cancelli delle approvazioni di
+  // fusione (`ownerOnly`): sei l'admin, e lo stai chiedendo da una superficie
+  // di Filo — un sito visitato non deve poter domandare al main cosa c'è nella
+  // posta dell'owner.
+  const PUBLIC_VIEW = () => globalThis.SN_FEEDBACK_PUBLIC_VIEW;
+  const FEEDBACK = () => globalThis.SN_FEEDBACK;
+
+  // I voti e le riaperture si scrivono sulla SCHEDA pubblica (è l'unico
+  // documento che chi vota può aprire), quindi chi legge il feedback dal main
+  // se li ritrova riuniti: la dashboard e l'archiviazione a punteggio
+  // continuano a leggere `fb.votes` come hanno sempre fatto. I voti storici,
+  // rimasti sul documento, non si perdono: la scheda vince solo dove ha
+  // qualcosa da dire.
+  let cardsCache = { at: 0, rows: [] };
+  const CARDS_TTL_MS = 30_000;
+
+  async function publicCards({ fresh = false } = {}) {
+    const FB = FEEDBACK();
+    if (!FB) return [];
+    if (!fresh && Date.now() - cardsCache.at < CARDS_TTL_MS) return cardsCache.rows;
+    const rows = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+    cardsCache = { at: Date.now(), rows };
+    return rows;
+  }
+
+  async function mergeCardFields(rows) {
+    const V = PUBLIC_VIEW();
+    if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
+    let cards;
+    try { cards = await publicCards(); }
+    catch (e) {
+      console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
+      return rows; // meglio i voti storici che nessun feedback
+    }
+    const byId = new Map(cards.map((c) => [String(c._id || ''), c]));
+    return rows.map((r) => {
+      const card = byId.get(String(r && r._id));
+      if (!card) return r;
+      const out = { ...r };
+      for (const f of V.USER_FIELDS) {
+        const fromDoc = (r && typeof r[f] === 'object' && r[f]) || {};
+        const fromCard = (typeof card[f] === 'object' && card[f]) || {};
+        const merged = { ...fromDoc, ...fromCard };
+        if (Object.keys(merged).length) out[f] = merged;
+      }
+      return out;
+    });
+  }
+
+  on(MSG.FEEDBACK_FETCH, ownerOnly(async (msg) => {
+    const FB = FEEDBACK();
+    if (!FB) throw new Error('SN_FEEDBACK non caricato nel main process');
+    const idToken = await auth.getIdToken();
+    if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+    const op = String((msg && msg.op) || 'list');
+    const timeoutMs = Number(msg && msg.timeoutMs) || 0;
+
+    if (op === 'getMany') {
+      const ids = Array.isArray(msg.ids) ? msg.ids : [];
+      const rows = await FB.getMany(ids, { timeoutMs, idToken });
+      return { ok: true, rows: await mergeCardFields(rows) };
+    }
+    if (op !== 'list') return { ok: false, error: `lettura non prevista: ${op}` };
+
+    const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+    const pageSize = Math.max(1, Math.min(FB.LIST_PAGE_SIZE, Number(msg.pageSize) || FB.LIST_PAGE_SIZE));
+    const rows = await FB.list({ pageSize, timeoutMs, fields, idToken });
+    // Una PROIEZIONE (il giro leggero che chiede solo "cosa è cambiato") non
+    // porta campi da riunire, e non deve pagare la lettura delle schede a ogni
+    // battito. La lista intera invece sì — ed è anche il momento buono per
+    // rimettere in pari la vista pubblica.
+    if (fields) return { ok: true, rows };
+    scheduleViewSync();
+    return { ok: true, rows: await mergeCardFields(rows) };
+  }));
+
+  // ── Chi pubblica la vista, e quando ──────────────────────────────────────
+  //
+  // La scheda pubblica di un feedback la può scrivere solo chi ha due cose che
+  // un utente non ha: l'autorità (le regole ammettono owner e server) e la
+  // CHIAVE per leggere lo status vero, che viaggia cifrato — senza la quale
+  // "questo fix è chiuso e pulito" non è una frase che si possa dire. Le ha il
+  // main dell'owner, ed è per questo che il lavoro sta qui.
+  //
+  // Gira dopo un caricamento della dashboard e dopo ogni triage, mai più di
+  // una volta al minuto (a meno che non sia appena cambiato qualcosa), e non
+  // fa niente se la chiave privata non è configurata: senza, ogni status
+  // sarebbe illeggibile e la sincronizzazione svuoterebbe la bacheca.
+  let syncTimer = null;
+  let syncing = false;
+  let lastSyncAt = 0;
+  const SYNC_MIN_GAP_MS = 60_000;
+
+  function scheduleViewSync({ delayMs = 2000, force = false } = {}) {
+    if (syncTimer) return;
+    syncTimer = setTimeout(() => {
+      syncTimer = null;
+      syncPublicView({ force }).catch(() => {});
+    }, delayMs);
+    if (typeof syncTimer.unref === 'function') syncTimer.unref();
+  }
+
+  async function syncPublicView({ force = false } = {}) {
+    const FB = FEEDBACK();
+    const V = PUBLIC_VIEW();
+    if (!FB || !V || syncing || !auth.isAdmin()) return { ok: false, skipped: true };
+    if (!force && Date.now() - lastSyncAt < SYNC_MIN_GAP_MS) return { ok: false, skipped: true };
+    syncing = true;
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, skipped: true };
+      const priv = await getPrivateKey();
+      if (!priv) {
+        // Senza chiave ogni status è un blob: pubblicare sarebbe alla cieca e
+        // TOGLIERE cancellerebbe la bacheca. Si sta fermi e lo si dice.
+        console.warn('[feedback] vista pubblica: chiave privata non configurata, sincronizzazione saltata');
+        return { ok: false, skipped: true };
+      }
+      const raw = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken });
+      const feedbacks = new Array(raw.length);
+      let next = 0;
+      const worker = async () => {
+        while (next < raw.length) {
+          const i = next++;
+          feedbacks[i] = await decryptFeedbackObject(raw[i] || {}, priv);
+        }
+      };
+      await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
+
+      const published = await publicCards({ fresh: true });
+      const plan = V.planSync(published, feedbacks);
+      for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
+      for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
+
+      // Il contatore dei numeri: lo crea e lo rimette in pari l'app
+      // dell'owner, che è l'unica a poterlo scrivere a piacere. Senza, un
+      // feedback nuovo arriverebbe senza numero.
+      const maxSeq = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
+      if (maxSeq > 0) {
+        try { await FB.ensureSeqCounter(maxSeq, { idToken }); }
+        catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
+      }
+
+      lastSyncAt = Date.now();
+      if (plan.upsert.length || plan.remove.length) {
+        cardsCache = { at: 0, rows: [] }; // la prossima lettura rilegge davvero
+        console.log('[feedback] vista pubblica aggiornata:',
+          `${plan.upsert.length} schede scritte, ${plan.remove.length} tolte`);
+      }
+      return { ok: true, published: plan.upsert.length, removed: plan.remove.length };
+    } catch (e) {
+      console.warn('[feedback] sincronizzazione della vista pubblica non riuscita:', e?.message || e);
+      return { ok: false, error: e?.message || String(e) };
+    } finally {
+      syncing = false;
+    }
+  }
+
   // Una pagina di gestione GIÀ APERTA deve accorgersi di una richiesta nuova.
   // Prima l'elenco si leggeva solo all'apertura di una pagina: il terminale
   // diceva "approvala da Filo" e sulla pagina aperta non compariva niente.
