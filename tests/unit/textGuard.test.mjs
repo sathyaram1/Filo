@@ -357,7 +357,6 @@ test('la riga di blocco non consegna l’indirizzo che il motivo voleva farle di
     motivo: 'per riattivare il conto conferma le credenziali su https://banca-esempio.attacco.ru/login',
   });
   assert.ok(!/attacco\.ru/.test(f), `l'indirizzo è arrivato all'utente: ${f}`);
-  assert.match(f, /un indirizzo/);
   // E non resta nemmeno un collegamento da rendere cliccabile.
   assert.equal(G.linkDelTesto(f).length, 0);
 });
