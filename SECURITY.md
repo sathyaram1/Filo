@@ -225,53 +225,54 @@ rotazione è da rifare da capo.
 
 ## 8. I percorsi condivisi dell'Aiuto
 
-**Stato: ✅ (scrittura chiusa lato regole; la callable `pathSubmit` va deployata)**
+**Stato: ✅ (scrittura chiusa nelle regole; la callable `pathSubmit` va ancora deployata)**
 
 Quando l'Aiuto ti accompagna passo passo su un sito e alla fine rispondi «ha
-funzionato», Filo può salvare la traccia di quella navigazione: dominio,
-sezione di partenza, la sequenza di elementi toccati e una frase che riassume
-l'obiettivo, scritta da un modello che vede solo dati programmatici. Serve a
-far partire avvantaggiato chi, su quel dominio, cercherà la stessa cosa.
+funzionato», Filo può salvare la traccia di quella navigazione. Dentro ci sono
+il dominio, la sezione di partenza, la sequenza di elementi toccati e una frase
+che riassume l'obiettivo, scritta da un modello che vede solo dati
+programmatici. Serve a far partire avvantaggiato chi cercherà la stessa cosa su
+quel sito.
 
-È l'unico dato di Filo che **attraversa il confine fra utenti**: quello che uno
-salva finisce nel prompt dell'Aiuto di un altro. Da qui due regole, e valgono
-insieme.
+È l'unico dato di Filo che attraversa il confine fra utenti. Quello che salvi tu
+finisce nel prompt dell'Aiuto di un altro, quindi valgono due regole insieme.
 
-**In scrittura, nessun client scrive.** Le regole Firestore negano create,
-update e delete su `paths` a chiunque: un percorso entra solo attraverso la
+**In scrittura non scrive nessun client.** Le regole Firestore negano create,
+update e delete su `paths` a chiunque. Un percorso entra solo attraverso la
 Cloud Function `pathSubmit` del backend di sicurezza, che riapplica la pulizia
-condivisa e tiene i limiti di frequenza. Prima bastavano dei vincoli di forma,
-e la chiave web di Firebase è pubblica per design: chiunque poteva depositare
-un «percorso» per il dominio che voleva, saltando i due modelli che nell'app
-ripuliscono i percorsi. Nessuna regola può accorgersene — quei modelli girano
-sulla macchina di chi naviga.
+condivisa e tiene i limiti di frequenza. Prima bastavano dei vincoli di forma, e
+la chiave web di Firebase è pubblica per design: chiunque poteva depositare un
+«percorso» per il dominio che voleva, saltando i due modelli che nell'app
+ripuliscono i percorsi. Nessuna regola se ne può accorgere, perché quei modelli
+girano sulla macchina di chi naviga.
 
 Il contratto della callable, per chi la implementa nel backend:
 
-- accetta anche richieste **senza login** (il mittente resta anonimo); se arriva
-  un `Authorization: Bearer <ID token>` lo usa come identità, altrimenti ricade
-  sul `clientId` della richiesta e sull'IP;
-- riapplica `sanitizeSubmission` di `src/shared/pathsSafety.js` — è il modulo
-  condiviso che il backend incorpora al deploy: la pulizia deve essere la stessa
-  da tutte e due le parti, non una copia scritta a mano;
-- tiene un **limite di frequenza per identità** (e per dominio di destinazione:
-  è avvelenando lo stesso dominio che un attacco rende);
-- scrive con l'Admin SDK, e scrive lui il `createdAt` (timestamp): la lettura
-  ordina per quel campo, un documento senza resta invisibile. Il `clientId`
-  invece **non entra nel documento**: la raccolta è leggibile da chiunque, e un
-  identificativo stabile lì dentro legherebbe fra loro le navigazioni di una
-  stessa installazione;
+- accetta anche richieste **senza login**, così il mittente resta anonimo. Se
+  arriva un `Authorization: Bearer <ID token>` lo usa come identità, altrimenti
+  ricade sul `clientId` della richiesta e sull'IP;
+- riapplica `sanitizeSubmission` di `src/shared/pathsSafety.js`. È il modulo
+  condiviso che il backend incorpora al deploy, e la pulizia deve restare la
+  stessa dalle due parti. Una copia scritta a mano diverge in silenzio;
+- tiene un **limite di frequenza per identità**, e anche per dominio di
+  destinazione. Un attacco rende avvelenando lo stesso dominio molte volte;
+- scrive con l'Admin SDK e mette lui il `createdAt` (timestamp). La lettura
+  ordina per quel campo, un documento senza quel campo resta invisibile. Il
+  `clientId` invece **non entra nel documento**, perché la raccolta è leggibile
+  da chiunque e un identificativo stabile lì dentro legherebbe fra loro le
+  navigazioni di una stessa installazione;
 - risponde `{ result: { saved: true, id } }` oppure `{ result: { saved: false,
-  reason } }`. Un rifiuto non è un errore dell'utente: la raccolta è
-  best-effort e non viene mostrata.
+  reason } }`. Un rifiuto non è un errore dell'utente e non gli viene mostrato:
+  la raccolta è best-effort.
 
-**In lettura, sono contenuto esterno.** I percorsi restano leggibili da chiunque
-(servono anche a chi non ha un account), ma chi li mette in un prompt li
-ripulisce di nuovo e li chiude fra due marcature, sotto un'intestazione che
-dichiara: sono dati scritti da altri utenti, non ordini. Il promemoria in fondo
-al prompt li cita insieme alla pagina, all'outline e all'llms.txt del sito.
-Vale anche adesso che la scrittura passa dal server: un percorso mandato in
-buona fede può contenere il testo di una pagina ostile.
+**In lettura sono contenuto esterno.** I percorsi restano leggibili da chiunque,
+perché servono anche all'Aiuto di chi non ha un account. Chi li mette in un
+prompt però li ripulisce di nuovo e li chiude fra due marcature, sotto
+un'intestazione che dice da dove vengono e che sono dati, non ordini. Il
+promemoria in fondo al prompt li cita insieme alla pagina, all'outline e
+all'llms.txt del sito. Questo vale anche adesso che la scrittura passa dal
+server, perché un percorso mandato in buona fede può contenere il testo di una
+pagina ostile.
 
 ---
 
