@@ -98,14 +98,19 @@
     return d;
   }
 
-  // L'ora del percorso, arrotondata all'ora piena. Al consumatore serve solo
-  // sapere quali percorsi sono recenti; al minuto e al secondo, invece, un
-  // orario diventa una chiave di join: due percorsi salvati su domini diversi
-  // a quaranta secondi di distanza sono quasi certamente della stessa persona.
-  function oraArrotondata(ms) {
+  // La data del percorso, arrotondata al GIORNO. A chi riusa un percorso serve
+  // sapere se è fresco, perché i siti cambiano e i selettori invecchiano: il
+  // giorno risponde a quella domanda. L'ora, il minuto e il secondo rispondono
+  // a un'altra, che non deve avere risposta — due percorsi salvati su domini
+  // diversi nello stesso momento sono della stessa persona.
+  //
+  // Era l'ora piena (#584, primo giro) e non bastava: con pochi utenti una
+  // fascia oraria contiene spesso i percorsi di una persona sola, e quella da
+  // sola ricuce. Il giorno mette nello stesso mucchio tutti quelli di tutti.
+  function giornoArrotondato(ms) {
     const t = Number.isFinite(ms) ? ms : Date.now();
-    const ORA = 60 * 60 * 1000;
-    return new Date(Math.floor(t / ORA) * ORA).toISOString();
+    const GIORNO = 24 * 60 * 60 * 1000;
+    return new Date(Math.floor(t / GIORNO) * GIORNO).toISOString();
   }
 
   function urlCollezione(domain) {
