@@ -96,15 +96,42 @@ che non ne ha.**
   nel turno SUBITO DOPO è chi corregge che riporta quello a cui risponde. Il
   prezzo è un conteggio in difetto nei casi rari (due turni veri nello stesso
   minuto), che è il verso giusto in cui sbagliare.
-- **E quello che torna INDIETRO nel tempo è una citazione.** È l'unica cosa che
-  chi incolla non si porta dietro: i turni veri vengono appesi uno dopo l'altro,
-  quindi l'istante scritto nel marcatore cresce sempre, mentre un turno citato
-  porta l'istante del giorno in cui fu scritto. Un marcatore più vecchio del
-  turno prima è una copia. Due accortezze: le catene sono DUE, una per i turni
-  del programma e una per quelli dell'utente, perché le scrivono due orologi
-  diversi e uno solo avanti farebbe sparire tutti i turni veri che vengono dopo;
-  e ci vuole una tolleranza di qualche minuto, che assorbe lo scarto fra due
-  scritture della stessa parte.
+- **E quello che rompe l'ORDINE è una citazione.** I turni veri vengono appesi
+  uno dopo l'altro, quindi l'istante scritto nel marcatore cresce sempre. Un
+  marcatore che rompe quella crescita è una copia. Tre accortezze, tutte pagate
+  con un giro di verifica: le catene sono DUE, una per i turni del programma e
+  una per quelli dell'utente, perché le scrivono due orologi diversi e uno solo
+  avanti farebbe sparire tutti i turni veri che vengono dopo; ci vuole una
+  tolleranza di qualche minuto, che assorbe lo scarto fra due scritture della
+  stessa parte; e il confronto si fa sulla CATENA INTERA, non sul vicino di
+  prima. Confrontare ogni marcatore con quello che lo precede sembra la stessa
+  cosa e non lo è: una citazione datata avanti diventa il metro di paragone, e
+  da lì in poi tutti i turni veri risultano «più vecchi del turno prima» e
+  spariscono. La catena vera è la più lunga che non torna mai indietro; quello
+  che ne resta fuori è la citazione, datata prima o dopo che sia.
+- **Ma l'ordine non dice niente su una citazione che cade IN MEZZO.** Se il
+  pezzo incollato è più recente dell'ultimo turno vero e più vecchio di quello
+  dopo — cioè ogni volta che si risponde a una segnalazione ferma da giorni
+  riportando un pezzo di una lavorata ieri — l'ordine cresce lo stesso, e non
+  c'è niente da leggere che distingua la copia dall'originale. Dopo nove giri
+  di rincorsa, questa è la riga che chiude il discorso: **leggendo non si può
+  fare meglio.**
+
+**La regola vera: quello che fa da struttura non dev'essere scrivibile da chi
+compone il testo.** La riga che separa i turni la mette chi APPENDE un turno, e
+nessun altro. Quindi si neutralizza alla porta: quando un testo entra nelle note
+— la risposta scritta dalla dashboard, la riapertura, il report che una routine
+appende, la testa del campo note modificata a mano — ogni riga che somigli a una
+separazione (o alla riga del taglio) diventa una citazione dichiarata, `> …`.
+Resta leggibile e non apre più niente. È la stessa idea con cui si scrive un
+`'` dentro una query o un `<` dentro una pagina: il contenuto non deve poter
+diventare sintassi.
+
+Le difese di lettura restano, ma cambiano nome: sono il ripiego per le
+conversazioni scritte PRIMA, che nessuno riscrive. Chiudono le citazioni più
+vecchie del turno prima e quelle che rompono l'ordine dall'altro lato; contro
+una citazione che cade in mezzo non possono niente, ed è esattamente la ragione
+per cui la difesa vera sta alla scrittura.
 - **L'elenco sta IN FONDO, e si cerca da lì.** Cercando il primo rilievo si
   trovano quelli di un verbale citato dentro il riassunto, e il verbale vero non
   si riconosce più: il suo giro spariva. Il server l'elenco lo scrive per ultimo
