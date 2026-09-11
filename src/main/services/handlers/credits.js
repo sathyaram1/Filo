@@ -242,13 +242,19 @@ module.exports = function register(on, ctx) {
   });
 
   // ── Comandi proprietario (#210): /users e /gift ─────────────────────────────
-  on(MSG.OWNER_LIST_USERS, async () => {
+  //
+  // #583 — «sei il proprietario?» da solo non basta: sul suo computer la
+  // risposta è sempre sì, ed è l'unico dove c'è qualcosa da prendere. Questi
+  // due comandi si scrivono nella chat della dashboard, che è una pagina di
+  // Filo; un sito visitato non deve poter chiedere l'elenco di chi usa Filo né
+  // regalare crediti a un indirizzo che sceglie lui.
+  on(MSG.OWNER_LIST_USERS, soloFilo(async () => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     try { return { ok: true, users: await adminListUsers() }; }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  });
+  }));
 
-  on(MSG.OWNER_GIFT_CREDITS, async (msg) => {
+  on(MSG.OWNER_GIFT_CREDITS, soloFilo(async (msg) => {
     if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
     const amount = Math.round(Number(msg?.amount));
     const email = String(msg?.email || '').trim().toLowerCase();

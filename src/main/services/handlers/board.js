@@ -27,7 +27,7 @@ module.exports = function register(on, ctx) {
   const FB = globalThis.SN_FEEDBACK;
   const { SN_CONST } = globalThis;
 
-  on(MSG.BOARD_CAST_VOTE, async (msg) => {
+  on(MSG.BOARD_CAST_VOTE, soloFilo(async (msg) => {
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, error: 'Accedi per votare i miglioramenti.' };
@@ -69,7 +69,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Riapertura a pagamento (DC4): l'utente loggato segnala che un fix
   // "Risolti" è ancora rotto. Passi atomici-quanto-possibile:
@@ -94,7 +94,7 @@ module.exports = function register(on, ctx) {
   // blocca comunque ogni tentativo successivo → al più UN feedback figlio per
   // utente, mai duplicati. In entrambi i rami di fallimento dopo aver scalato,
   // restituiamo i crediti (compensazione best-effort).
-  on(MSG.BOARD_REOPEN, async (msg) => {
+  on(MSG.BOARD_REOPEN, soloFilo(async (msg) => {
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, error: 'Accedi per segnalare che un fix è ancora rotto.' };
@@ -166,9 +166,9 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
-  on(MSG.BOARD_CLEAR_VOTE, async (msg) => {
+  on(MSG.BOARD_CLEAR_VOTE, soloFilo(async (msg) => {
     try {
       if (!auth.isSignedIn()) {
         return { ok: false, error: 'Accedi per votare i miglioramenti.' };
@@ -189,7 +189,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Legge la SCHEDA PUBBLICA del fix (`feedback-public/{id}`, #583): serve a
   // BOARD_REOPEN per verificare l'idoneità con i dati FRESCHI dal server
