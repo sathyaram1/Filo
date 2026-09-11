@@ -124,13 +124,14 @@ test('porta 2 — un verbale citato che ferma non fa uscire la lavorazione dalla
   expect(d2.legenda, tutto).toContain('1 critica');
 });
 
-// Porta 3: un marcatore citato la cui data non si legge («ieri mattina»). Qui
-// il confronto sull'ordine non parte nemmeno, quindi vale anche sulle note già
-// salvate: si prova sul blob grezzo.
+// Porta 3: un marcatore citato la cui data non si legge («ieri mattina»). Su un
+// istante che non si legge il confronto sull'ordine non parte nemmeno, quindi
+// qui la difesa è tutta nella scrittura.
 test('porta 3 — un marcatore citato con la data illeggibile non apre un turno', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-  const p3 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nRiporto:\n\n${AG('ieri mattina')}\n${verbale(FIX, [1])}`;
+  const testo = `Riporto:\n\n${AG('ieri mattina')}\n${verbale(FIX, [1])}`;
+  const p3 = await rispondi(page, UN_GIRO, testo, '11/09/2026, 11:00');
   const d3 = await leggi(page, p3);
   expect(d3.legenda, d3.legenda).toContain('1 critica');
   expect(d3.legenda, d3.legenda).not.toContain('2 critiche');
