@@ -1016,6 +1016,7 @@
     piuBassa,
     vaControllato,
     fiduciaDellAzione,
+    haPortatoTestoDiAltri,
     etichettaFonte,
     controlliStatici,
     segretoNelTesto,
