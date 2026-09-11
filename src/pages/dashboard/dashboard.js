@@ -702,7 +702,7 @@
     return div;
   }
 
-  function renderLiveCard({ kind, text, paused, onToggle, onDismiss }) {
+  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, link }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
     div.dataset.kind = kind;
@@ -710,6 +710,21 @@
     t.className = 'dash-live-text';
     t.textContent = text;
     div.appendChild(t);
+    // #536 — i collegamenti di un avviso dicono dove portano prima di aprirsi.
+    // Il dominio vero, non l'etichetta che il testo gli ha dato.
+    if (Array.isArray(link) && link.length) {
+      const box = document.createElement('div');
+      box.className = 'dash-live-links';
+      for (const l of link) {
+        const riga = document.createElement('div');
+        riga.className = 'dash-live-link';
+        riga.dataset.host = l.host || '';
+        riga.title = l.href || '';
+        riga.textContent = `apre ${l.dove || l.host || 'destinazione non leggibile'}`;
+        box.appendChild(riga);
+      }
+      div.appendChild(box);
+    }
     // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
     // accanto alla × e cambia icona/etichetta in base allo stato.
     if (onToggle) {
