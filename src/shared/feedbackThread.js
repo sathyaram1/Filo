@@ -364,13 +364,31 @@
     return a < b - MARKER_SKEW_MS;
   }
 
+  // ⚠️ QUESTE SONO DIFESE PER LE NOTE GIÀ SALVATE, NON LA REGOLA.
+  // Da `neutralizzaMarcatori` in poi una riga di separazione la scrive soltanto
+  // chi appende un turno, quindi qui non arriva più niente da indovinare. Ma le
+  // conversazioni scritte PRIMA restano come sono, e una citazione lì dentro
+  // sposta ancora i numeri della scheda «Statistiche feedback». Quello che
+  // segue è il meglio che si può fare leggendo: chiude le citazioni più vecchie
+  // del turno prima e quelle datate oltre i turni veri che le seguono. Contro
+  // una citazione datata in mezzo (più recente dell'ultimo turno vero e più
+  // vecchia di quello dopo) la lettura non può niente, ed è esattamente la
+  // ragione per cui la difesa vera sta alla scrittura.
+  //
   // Quali righe del blob aprono davvero un turno. Una sola risposta per tutti
   // quelli che spezzano le note (la chat a bolle, il taglio del tetto, i conti
   // della scheda delle statistiche): se divergessero, una citazione sarebbe un
   // turno per uno e prosa per l'altro.
   function turnOpeners(lines) {
     const apre = new Array(lines.length).fill(false);
+    // Prima passata, in avanti: l'istante di un turno vero non torna indietro.
+    const candidati = [];
     const ultimoTs = { user: null, model: null };
+    // Un turno vero porta sempre un istante che si legge (lo scrivono i due
+    // `*TurnMarker`, e chi appende dal server passa una data vera). Una riga
+    // che ne porta uno illeggibile — «ieri mattina» — l'ha scritta una persona
+    // raccontando: senza istante il confronto sull'ordine non partirebbe
+    // nemmeno, e la citazione passerebbe sempre (#496, giro 14).
     for (let i = 0; i < lines.length; i += 1) {
       const mu = USER_TURN_RE.exec(lines[i]);
       const mm = mu ? null : MODEL_TURN_RE.exec(lines[i]);
@@ -379,9 +397,24 @@
       if (!markerOpensTurn(lines, i)) continue;
       const chi = mu ? 'user' : 'model';
       const ts = (m[1] || '').trim() || null;
+      const ms = markerMs(ts);
+      if (!Number.isFinite(ms) && Number.isFinite(markerMs(ultimoTs[chi]))) continue;
       if (markerIsQuoted(ts, ultimoTs[chi])) continue;
-      apre[i] = true;
+      candidati.push({ i, chi, ms });
       if (ts) ultimoTs[chi] = ts;
+    }
+    // Seconda passata, all'indietro: un turno vero non è mai più recente di
+    // quelli che gli vengono DOPO. Un pezzo di conversazione datato avanti —
+    // incollato da chi l'ha copiato da un computer con l'orologio storto — si
+    // prendeva l'istante di riferimento e faceva sparire tutti i turni veri
+    // successivi, pass compreso (#496, giro 14, porta 5).
+    const successivoMs = { user: NaN, model: NaN };
+    for (let k = candidati.length - 1; k >= 0; k -= 1) {
+      const c = candidati[k];
+      const dopo = successivoMs[c.chi];
+      if (Number.isFinite(c.ms) && Number.isFinite(dopo) && c.ms > dopo + MARKER_SKEW_MS) continue;
+      apre[c.i] = true;
+      if (Number.isFinite(c.ms)) successivoMs[c.chi] = c.ms;
     }
     return apre;
   }
