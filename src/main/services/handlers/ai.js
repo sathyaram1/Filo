@@ -608,11 +608,11 @@ module.exports = function register(on, ctx) {
       try {
         const settings = await getEffectiveSettings();
         if (!settings.apiKeys?.[settings.provider]) return;
-        const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
-        const cid = msg.payload?.clientId || '';
         const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        // Niente user agent e niente clientId nel percorso condiviso (#584):
+        // a chi riusa il percorso non servono, e insieme dicevano chi è stato.
         const r = await PathsCollector.collectAndSave({
-          session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid,
+          session: msg.payload?.session, invokeAI,
         });
         if (r?.saved) console.info('[Filo] path salvato:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }
