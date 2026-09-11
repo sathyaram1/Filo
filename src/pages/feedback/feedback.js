@@ -1602,10 +1602,10 @@
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
-      isAdmin = Boolean(r?.isAdmin);
+      setIsAdmin(r?.isAdmin);
       renderAuthState(r?.profile);
     } catch (_) {
-      isAdmin = false;
+      setIsAdmin(false);
       renderAuthState(null);
     }
   }
@@ -1615,7 +1615,7 @@
       adminSignInBtn.disabled = true;
       try {
         const r = await sendToMain({ type: 'auth_signin' });
-        isAdmin = Boolean(r?.isAdmin);
+        setIsAdmin(r?.isAdmin);
         renderAuthState(r?.profile);
         applyFilter(); // ridisegna con/senza controlli admin
         if (r?.ok === false) alert('Accesso non riuscito: ' + (r.error || 'errore sconosciuto'));
@@ -1669,7 +1669,7 @@
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
       if (m?.type === 'auth_changed') {
-        isAdmin = Boolean(m.isAdmin);
+        setIsAdmin(m.isAdmin);
         renderAuthState(m.profile);
         applyFilter();
       }
@@ -1683,7 +1683,7 @@
   // sovrascrivere i dati finti. È lo stesso rimedio che tiene stabile manage.
   window.__fbTest = {
     setAdmin(v, profile) {
-      isAdmin = !!v;
+      setIsAdmin(v);
       renderAuthState(profile || null);
       applyFilter();
     },
