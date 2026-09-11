@@ -30,14 +30,14 @@ async function fingiOwner(app, acceso) {
       const vero = mappa.get('filo:message');
       mappa.set('filo:message', async (e, ...args) => {
         const msg = args[0];
+        const res = await vero(e, ...args);
         if (globalThis.__fingiOwner && msg && msg.type === 'auth_status') {
-          e._reply({
+          return {
             ok: true, signedIn: true, isAdmin: true,
             profile: { email: 'owner@filo.test', name: 'Owner' }, uid: 'uid-owner',
-          });
-          return;
+          };
         }
-        return vero(e, ...args);
+        return res;
       });
       globalThis.__fingiOwnerInstallato = true;
     }
