@@ -791,12 +791,27 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: var(--dash-ink-mute);
 }
 .dash-live-card .dash-live-link {
-  color: var(--dash-blue);
+  color: var(--dash-link);
   text-decoration: underline;
   cursor: pointer;
   transition: opacity 120ms ease;
 }
 .dash-live-card .dash-live-link:hover { opacity: 0.75; }
+/* La strada dalla riga «ho fermato un avviso» a quello che è stato fermato. */
+.dash-live-card .dash-live-vedi {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 2px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dash-link);
+  text-decoration: underline;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+.dash-live-card .dash-live-vedi:hover { opacity: 0.7; }
 .dash-live-card .dash-live-dest {
   font-size: 11px;
   color: var(--dash-ink-mute);
