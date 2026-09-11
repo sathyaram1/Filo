@@ -68,8 +68,10 @@ test('la risposta del turno DOPO nasce dalla stessa pagina e non passa da nessun
       // credenziali, lascia passare il resto.
       eseguiModello: async ({ messaggi }) => {
         globalThis.__guardiano++;
-        const visto = messaggi.map((m) => m.content).join('\n');
-        return /credenziali/i.test(visto)
+        // Solo il testo in giudizio, non le istruzioni del guardiano (che la
+        // parola «credenziali» ce l'hanno per mestiere).
+        const visto = messaggi.filter((m) => m.role === 'user').map((m) => m.content).join('\n');
+        return /confermare subito le tue credenziali/i.test(visto)
           ? '{"esito":"blocca","motivo":"chiedeva di confermare le credenziali del conto"}'
           : '{"esito":"passa"}';
       },
