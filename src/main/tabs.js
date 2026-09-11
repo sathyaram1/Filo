@@ -1050,7 +1050,7 @@ class TabManager {
     // Niente prefisso persist: → la session proxata è effimera (in RAM): i suoi
     // cookie non sopravvivono alla chiusura dell'app. setProxy va applicato e
     // ATTESO prima di creare la view, o le prime richieste partirebbero dirette.
-    const ses = session.fromPartition(partition);
+    const ses = sessioneDiPartizione(partition);
     try {
       await ses.setProxy({
         proxyRules: resolved.proxyRules,
