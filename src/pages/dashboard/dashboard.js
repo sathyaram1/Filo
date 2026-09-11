@@ -1062,6 +1062,18 @@
         const last = notes[notes.length - 1];
         if (last && (last.textContent || '').trim() === t) { last.remove(); items -= 1; }
       },
+      // #536 — il turno ha letto roba scritta da altri: quello che il modello
+      // stava ragionando a voce alta non è più roba sua, e nessuno l'ha
+      // guardato. Si butta quello che è già a schermo e non se ne scrive altro,
+      // né qui né nella cronologia del thread.
+      dropReasoning() {
+        turnReasoning = '';
+        if (reasoningEl) {
+          if (reasoningEl.isConnected) { reasoningEl.remove(); items = Math.max(0, items - 1); }
+          reasoningEl = null;
+        }
+        lastTurn = { text: '', ms: 0 };
+      },
       // Fine di un turno: chiude il ragionamento del turno e lo restituisce
       // (per lo storico del thread).
       endTurn() {
