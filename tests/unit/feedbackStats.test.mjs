@@ -730,7 +730,10 @@ function dueCorrezioni(reportCorrettore) {
     '',
     `--- Aggiornamento dell'agente del 02/09/2026, 14:00 ---\n${reportCorrettore}`,
     '',
-    `${TURNO_PASS}\nVerifica superata. Provato tutto: adesso funziona.`,
+    // Filo appende in ordine: l'ultimo turno porta l'istante più recente di
+    // tutti. Un marcatore più vecchio del turno prima è una citazione (#496,
+    // giro 13), quindi qui le date devono crescere come crescono davvero.
+    `--- Aggiornamento dell'agente del 02/09/2026, 18:00 ---\nVerifica superata. Provato tutto: adesso funziona.`,
   ].join('\n');
 }
 const DUE_GIRI_ATTESI = { kinds: ['fix', 'fix'], giri: 2, passata: true };
