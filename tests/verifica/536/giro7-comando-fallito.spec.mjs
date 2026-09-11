@@ -87,7 +87,7 @@ test('un comando finito male porta dentro le parole di un estraneo e la risposta
             toolCalls: [{
               id: 'c1',
               name: 'ESEGUI_COMANDO',
-              arguments: JSON.stringify({ comando: `cat ${arg.esca} ${arg.mancante}` }),
+              arguments: JSON.stringify({ comando: `cat "${arg.esca}" "${arg.mancante}"` }),
             }],
           };
         }
