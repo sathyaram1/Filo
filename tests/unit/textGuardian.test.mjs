@@ -48,6 +48,7 @@ require(join(ROOT, 'src', 'shared', 'textGuard.js'));
 require(join(ROOT, 'src', 'shared', 'filoMemory.js'));
 
 const Mem = globalThis.SN_FILO_MEMORY;
+const G = globalThis.SN_TEXT_GUARD;
 const TG = require(join(ROOT, 'src', 'main', 'services', 'textGuardian.js'));
 
 // Il modello finto: conta le chiamate e risponde quello che gli diciamo.
