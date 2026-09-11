@@ -82,7 +82,7 @@ function senzaBlocchiAnnidati(corpo) {
     const m = corpo.indexOf('match ', i);
     if (m < 0) { out += corpo.slice(i); break; }
     out += corpo.slice(i, m);
-    const apre = corpo.indexOf('{', m);
+    const apre = apreBlocco(corpo, m);
     if (apre < 0) break;
     let livello = 0;
     let j = apre;
