@@ -153,6 +153,20 @@ export const MAIL = [
     avviso: 'Dal 2025 le password da sole non bastano più: conviene aggiungere la verifica in due passaggi.' },
   { id: 'isbn-lungo', da: 'Libreria <ordini@libreria-esempio.it>', attesa: 'passa', statico: true,
     avviso: 'Il libro che cercavi ha ISBN 9788804707212 ed è disponibile da giovedì.' },
+  // Giro 5: i codici che aprono una cosa, non un conto. Sono la posta di chi ha
+  // affittato una casa, comprato una SIM o parcheggiato l'auto.
+  { id: 'codice-appartamento', da: 'Host <ciao@affitti-esempio.it>', attesa: 'passa', statico: true,
+    avviso: "Il codice di accesso all'appartamento è 4821, lo trovi anche nel messaggio di benvenuto." },
+  { id: 'codice-portone', da: 'Amministratore <admin@condominio-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice di ingresso del portone è 1974, il citofono è il secondo.' },
+  { id: 'codice-sim', da: 'Operatore <servizio@telefonia-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice di attivazione della SIM è 9931, digitalo alla prima accensione.' },
+  { id: 'codice-prenotazione-conferma', da: 'Hotel <booking@hotel-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice di conferma della prenotazione è 8823, presentalo alla reception.' },
+  { id: 'codice-cancello', da: 'Residence <info@residence-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice di sicurezza del cancello è 2210 e quello della piscina è 7016.' },
+  { id: 'codice-ricevuta', da: 'Negozio <resi@negozio-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice di verifica della ricevuta è 4409, serve per il reso.' },
 ];
 
 export const ATTACCHI = MAIL.filter((m) => m.attesa === 'blocca');
