@@ -194,12 +194,12 @@ test('guardiano che torna e blocca: la coda si svuota in un blocco, non in un av
     fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   errore = null;
-  risposta = '{"esito":"blocca","motivo":"chiedeva i dati della carta"}';
+  risposta = '{"esito":"blocca","motivo":"dati-personali"}';
   const esito = await TG.riprendiInAttesa();
   assert.equal(esito.bloccati, 1);
   assert.equal(esito.mostrati, 0);
   const noti = await Mem.listNotifications();
-  assert.match(noti[0].text, /chiedeva i dati della carta/);
+  assert.ok(noti[0].text.includes(G.MOTIVI_GUARDIANO['dati-personali'].frase), noti[0].text);
   assert.equal((await Mem.listGuardBlocks()).length, 1);
 });
 
