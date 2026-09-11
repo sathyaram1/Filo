@@ -24,7 +24,9 @@
 // di firestoreRulesConfigSecrets.test.mjs — il motore vero vuole l'emulatore
 // (Java, centinaia di MB), il rischio qui non è che il motore sbagli ma che
 // qualcuno riapra la porta scrivendo una riga. Questo test la vede in
-// millisecondi. La prova col motore vero sta in tests/verifica/584/.
+// millisecondi. La prova col motore vero sta nel file accanto,
+// `pathsRegole.motore-vero.mjs` (19 righe verdi con queste regole; con quelle
+// di `main` un anonimo si portava via tutto).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
