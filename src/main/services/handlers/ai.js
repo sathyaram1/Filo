@@ -615,13 +615,30 @@ module.exports = function register(on, ctx) {
         if (!settings.apiKeys?.[settings.provider]) return;
         const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
         const cid = msg.payload?.clientId || '';
-        // #585: il percorso non si scrive più dal client, lo scrive il server.
-        // Se chi naviga è loggato, gli diamo il suo ID token: è un'identità più
-        // forte del clientId per i limiti di frequenza. Sloggato si invia lo
-        // stesso (il mittente resta anonimo), e un token non recuperabile non
-        // deve far fallire la telemetria.
+        // #585: il percorso non si scrive più dal client, lo scrive il server,
+        // che per limitarne la frequenza deve sapere DA CHI arriva.
+        //
+        // L'identità da allegare è quella dell'INSTALLAZIONE: ogni copia di
+        // Filo ne ha una (è quella su cui poggiano crediti e portafoglio), il
+        // server la verifica, e resta la stessa anche dopo un login Google,
+        // che a quell'identità si collega. Il login Google invece è opzionale:
+        // chiedere quello voleva dire mandare quasi sempre una richiesta senza
+        // mittente, e lasciare al server il solo indirizzo IP — cioè il limite
+        // per identità chiesto dal feedback senza niente sotto.
+        //
+        // Il mittente resta ANONIMO lo stesso: l'identità viaggia accanto al
+        // documento e non ci entra (vedi sanitizeSubmission), perché la
+        // raccolta la legge chiunque.
+        //
+        // Un'identità irraggiungibile (offline, oppure annullata sul server)
+        // non deve far saltare la raccolta, che è telemetria best-effort: si
+        // ripiega sul login Google se c'è, altrimenti si invia senza e il
+        // server si arrangia con quello che ha.
         let idToken = '';
-        try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
+        try { idToken = (await identity.getIdToken()) || ''; } catch (_) { idToken = ''; }
+        if (!idToken) {
+          try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
+        }
         const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
         const r = await PathsCollector.collectAndSave({
           session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid, idToken,
