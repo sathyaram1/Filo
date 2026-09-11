@@ -88,3 +88,20 @@ test('403 su un allegato: dice quale delle due cause è, in una riga', () => {
   // accusa l'account di non essere amministratore.
   expect(attachmentForbiddenHelp()).toEqual(senzaSessione);
 });
+
+test('a chi NON riceve le segnalazioni il messaggio non parla di amministratori', () => {
+  // Verifica #582, giro 1. Un utente qualunque riapre le proprie segnalazioni e
+  // ritrova lo screenshot che ha mandato: non lo rivedrà (è cifrato con la
+  // chiave di chi riceve le segnalazioni) e va bene così. Quello che non andava
+  // era il messaggio, che gli parlava di permessi di amministratore e lo
+  // mandava a cercare un problema suo dove non c'era niente da risolvere.
+  const { attachmentNotForYouHelp } = require('../src/main/services/feedbackError.js');
+
+  const msg = attachmentNotForYouHelp();
+  expect(msg).not.toMatch(/amministrat/i);
+  expect(msg).not.toMatch(/riservata/i);
+  // Dice la cosa che serve sapere: l'allegato è partito.
+  expect(msg).toMatch(/inviat/i);
+  // Sta in un hover: una riga sola.
+  expect(msg).not.toMatch(/\n/);
+});
