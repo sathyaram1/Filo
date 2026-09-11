@@ -56,12 +56,14 @@ test('il documento che il mittente ha allegato non lo lascia con un file rotto i
 
   // E chi l'ha mandato lo legge senza doverci cliccare sopra, come già succede
   // per lo screenshot nella stessa bolla.
-  // «consegnato» e non «inviato»: l'elenco mostra a ogni tester le segnalazioni
-  // di tutti, quindi la stessa pillola compare anche sull'allegato di un altro
-  // (#582, giro 3). L'intento della prova non cambia: chi guarda deve capire che
-  // l'allegato è arrivato, non che gli manca un permesso.
-  await expect(link.locator('.fb-file-note')).toHaveText('(consegnato)', { timeout: 10_000 });
+  // Non «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti,
+  // quindi la stessa pillola compare anche sull'allegato di un altro (#582,
+  // giro 3). E non «consegnato»: Filo quell'allegato non l'ha aperto (#582,
+  // giro 5). L'intento della prova non cambia, ed è quello di allora: chi
+  // guarda deve capire che quel file lui non lo apre, non che gli manca un
+  // permesso, e non deve ritrovarsi in mano un file rotto.
+  await expect(link.locator('.fb-file-note')).toHaveText('(riservato)', { timeout: 10_000 });
   const motivo = (await link.getAttribute('title')) || '';
-  expect(motivo).toMatch(/consegnat/i);
+  expect(motivo).toMatch(/lo apre solo chi riceve le segnalazioni/i);
   expect(motivo).not.toMatch(/amministrat/i);
 });
