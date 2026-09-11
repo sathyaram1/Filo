@@ -119,7 +119,10 @@ globalThis.SN_MANAGE_REVIEW = {
 const registerBoard = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers', 'board.js'));
 const handlers = new Map();
 registerBoard((type, fn) => handlers.set(type, fn), { MSG });
-const reopen = (msg) => handlers.get(MSG.BOARD_REOPEN)(msg);
+// #583: l'handler guarda anche DA DOVE arriva la richiesta. La bacheca è una
+// pagina di Filo, e questi test sono la bacheca.
+const BACHECA = 'filo://board/board.html';
+const reopen = (msg, origin = BACHECA) => handlers.get(MSG.BOARD_REOPEN)(msg, null, origin);
 
 const msgFor = () => ({ type: MSG.BOARD_REOPEN, id: ORIGINAL_ID, text: 'Ancora rotto, ho riprovato e si spacca uguale.' });
 
