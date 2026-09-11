@@ -520,34 +520,31 @@ service cloud.firestore {
     // Percorsi di navigazione raccolti dalla sidebar "Aiuto" (Fase 2).
     // Tupla anonima (sito, posizione iniziale, intento, azioni, esito) usata
     // per insegnare globalmente all'AI come muoversi su un dominio.
-    // Lo schema è validato a monte dal client: la raccolta passa per due LLM
-    // distinti (intent guess + judge) che impediscono che dati raw dell'utente
-    // finiscano qui dentro. Le regole sotto fanno solo il check di forma.
+    //
+    // SERVER-AUTHORITATIVE dal #585 (audit pre-alpha). È l'unica collezione che
+    // attraversa il confine fra utenti: quello che uno scrive qui finisce nel
+    // messaggio di sistema dell'agente Aiuto di un ALTRO, presentato come
+    // percorso già riuscito. Finché il create chiedeva solo dei vincoli di
+    // forma, con la chiave web del repo pubblico chiunque depositava un
+    // "percorso" per il dominio che voleva, saltando i due LLM che nell'app
+    // ripuliscono i percorsi prima di salvarli — e le regole non hanno modo di
+    // provare che quei due LLM siano passati: girano sulla macchina di chi
+    // naviga.
+    //
+    // Quindi il client NON scrive più: invia alla callable `pathSubmit` di
+    // filo-security, che riapplica la pulizia condivisa
+    // (src/shared/pathsSafety.js → sanitizeSubmission), tiene i limiti di
+    // frequenza per identità e scrive con l'Admin SDK, che bypassa queste
+    // regole. Il mittente resta anonimo: a cambiare è la strada, non il login.
+    //
+    // La lettura resta pubblica — serve all'Aiuto di chiunque, anche sloggato —
+    // ma quello che si legge qui è CONTENUTO ESTERNO: chi lo mette in un prompt
+    // lo incapsula e lo dichiara dati, mai ordini (src/shared/pathsSafety.js →
+    // formatKnownPathsForPrompt, e il blocco "Percorsi condivisi" del prompt
+    // Aiuto in src/shared/constants.js).
     match /paths/{doc} {
       allow read: if true;
-
-      allow create: if
-        request.resource.data.keys().hasOnly(
-          ['domain', 'initialUrl', 'intent', 'steps', 'success',
-           'userAgent', 'clientId', 'createdAt']
-        )
-        && request.resource.data.domain is string
-        && request.resource.data.domain.size() > 0
-        && request.resource.data.domain.size() <= 253
-        && request.resource.data.initialUrl is string
-        && request.resource.data.initialUrl.size() <= 2000
-        && request.resource.data.intent is string
-        && request.resource.data.intent.size() <= 500
-        && request.resource.data.steps is list
-        && request.resource.data.steps.size() <= 30
-        && request.resource.data.success is bool
-        && request.resource.data.get('userAgent', '') is string
-        && request.resource.data.get('userAgent', '').size() <= 500
-        && request.resource.data.get('clientId', '') is string
-        && request.resource.data.get('clientId', '').size() <= 100;
-
-      allow update: if false;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Collezioni del backend di sicurezza (filo-security, DESIGN §13) ──────
