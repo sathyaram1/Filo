@@ -39,6 +39,18 @@ try {
 require('./shim/chrome-api');
 require('./services/loader');
 
+// #586 — OGNI sessione nasce col gestore dei permessi addosso. Questo evento
+// scatta per tutte, comprese quelle che Electron crea da sé quando una vista
+// dichiara `webPreferences.partition` (incognito, jar per-sito della modalità
+// privacy, schede aperte da un altro paese, finestra isolata del safebrowse):
+// nessuna partizione nuova può nascere aperta perché qualcuno si è scordato di
+// chiamare qualcosa. Va registrato PRIMA di whenReady, cioè prima che esista
+// una qualsiasi sessione. Vedi src/main/sessioni.js e services/permessiSito.js.
+try {
+  const { proteggi } = require('./sessioni');
+  app.on('session-created', (ses) => proteggi(ses));
+} catch (_) {}
+
 // Solo in test: esponi i singleton di handlers/defaults su globalThis così i
 // test Playwright (che girano nel main via app.evaluate, dove `require` non è
 // iniettato) possono esercitare la catena reale chiave-condivisa → motore. Va
