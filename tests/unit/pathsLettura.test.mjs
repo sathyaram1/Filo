@@ -83,7 +83,7 @@ test('i percorsi si chiedono sotto il loro dominio, non alla collezione intera',
     assert.equal(url.split('?')[0], `${BASE}/paths/esempio.it:runQuery`,
       'la query deve avere come radice il documento del dominio: è quello che rende impossibile chiederli tutti');
     assert.deepEqual(body.structuredQuery.from, [{ collectionId: 'entries' }]);
-    assert.equal(body.structuredQuery.where, undefined,
+    assert.ok(!JSON.stringify(body).includes('domain'),
       'non serve più nessun filtro `domain == …`: il dominio è nel percorso');
     assert.ok(body.structuredQuery.limit <= MAX_PAGE_SIZE);
   });

@@ -100,6 +100,7 @@ test('quello che parte è il percorso e basta: nessun identificativo del mittent
 test('della pagina esce il percorso, non la query: token e frammento restano a casa', async () => {
   await withFetch(async (calls) => {
     await Collector.collectAndSave({ session: SESSIONE, invokeAI: invokeAIFinto() });
+    await spedisci();
     const { body } = calls[0];
     assert.equal(body.fields.initialUrl.stringValue, '/account/ordini');
     assert.ok(!JSON.stringify(body).includes('segreto'));
@@ -109,6 +110,7 @@ test('della pagina esce il percorso, non la query: token e frammento restano a c
 test('i selettori che portano dati personali arrivano redatti', async () => {
   await withFetch(async (calls) => {
     await Collector.collectAndSave({ session: SESSIONE, invokeAI: invokeAIFinto() });
+    await spedisci();
     const grezzo = JSON.stringify(calls[0].body);
     assert.ok(!grezzo.includes('mario.rossi@x.it'), 'un indirizzo email è finito nel percorso condiviso');
     assert.ok(grezzo.includes('[EMAIL]'));
