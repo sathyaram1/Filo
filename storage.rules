@@ -53,9 +53,16 @@ service firebase.storage {
     // firestore.rules. Cross-service: se la lettura non riesce la regola nega
     // (e l'owner vede comunque gli allegati dai link col token: si degrada
     // verso il chiuso, non verso l'aperto).
+    // `email_verified` si chiede con `get(…, false)` e non col punto: il motore
+    // di Storage (a differenza di quello di Firestore) non espone quel claim
+    // come proprietà, e `request.auth.token.email_verified` lì non è «falso», è
+    // un ERRORE di valutazione — cioè una regola che smette di funzionare. Con
+    // `get` il claim assente vale false e la lettura resta negata: il default
+    // sbaglia dalla parte chiusa. Verificato sul motore vero
+    // (tests/rules/storage-allegati-motore-vero.mjs).
     function eAmministratore() {
       return request.auth != null
-        && request.auth.token.email_verified == true
+        && request.auth.token.get('email_verified', false) == true
         && firestore.exists(/databases/(default)/documents/admins/$(request.auth.token.email));
     }
 
