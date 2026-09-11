@@ -13,7 +13,10 @@
 // un giro in più, una lavorazione passata che si legge come fermata, e — nel
 // verso opposto — i turni veri che vengono dopo la citazione inghiottiti.
 //
-// Sei porte, una causa sola.
+// Sei porte, una causa sola. Quattro passano dalla SCRITTURA (si risponde
+// dalla dashboard, si modifica la testa del campo note): quelle si provano
+// facendo scrivere davvero, con le stesse funzioni che scrivono in produzione.
+// Due si vedono anche su note già salvate, e si provano sul blob grezzo.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -69,8 +72,19 @@ async function leggi(page, notes) {
   return page.evaluate(() => ({
     legenda: Array.from(document.querySelectorAll('#mgStPieLegend li')).map((li) => li.textContent.replace(/\s+/g, ' ').trim()).join(' | '),
     nota: document.getElementById('mgStPieNote').textContent.replace(/\s+/g, ' ').trim(),
-    vuota: (document.getElementById('mgStPieEmpty') || {}).textContent || '',
   }));
+}
+
+// La risposta scritta dalla dashboard passa di qui, come in produzione.
+function rispondi(page, notes, testo, ts) {
+  return page.evaluate(([n, t, q]) => window.SN_FEEDBACK_THREAD.appendUserTurn(n, t, { ts: q }), [notes, testo, ts]);
+}
+// La testa del campo note, che si modifica a mano in una casella di testo.
+function testaNote(page, testo, coda) {
+  return page.evaluate(([t, c]) => {
+    const head = window.SN_FEEDBACK_THREAD.composeNotes(t, []);
+    return c ? `${head}\n\n${c}` : head;
+  }, [testo, coda]);
 }
 
 test('la conversazione intatta si conta bene (riferimento)', async ({ openTab }) => {
@@ -81,14 +95,15 @@ test('la conversazione intatta si conta bene (riferimento)', async ({ openTab })
   expect(prima.nota, prima.nota).toContain('1 giro di correzione');
 });
 
-// Porta 1: l'owner risponde citando il verbale di un'ALTRA segnalazione,
-// lavorata più tardi di questa. Il marcatore citato è più RECENTE dell'ultimo
-// turno vero, quindi l'ordine cresce e la difesa del giro 13 non morde.
+// Porta 1: si risponde citando il verbale di un'ALTRA segnalazione, lavorata
+// più tardi di questa. Il pezzo citato porta un marcatore più RECENTE
+// dell'ultimo turno vero, quindi l'ordine cresce e la difesa del giro 13 non
+// morde.
 test('porta 1 — un verbale citato, datato dopo, non aggiunge un giro', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-  await leggi(page, UN_GIRO);
-  const p1 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nSull'altra segnalazione il verbale diceva:\n\n${AG('10/09/2026, 09:00')}\n${verbale(FIX, [1])}`;
+  const testo = `Sull'altra segnalazione il verbale diceva:\n\n${AG('10/09/2026, 09:00')}\n${verbale(FIX, [1])}`;
+  const p1 = await rispondi(page, UN_GIRO, testo, '11/09/2026, 11:00');
   const d1 = await leggi(page, p1);
   expect(d1.legenda, d1.legenda).toContain('1 critica');
   expect(d1.legenda, d1.legenda).not.toContain('2 critiche');
@@ -101,40 +116,39 @@ test('porta 1 — un verbale citato, datato dopo, non aggiunge un giro', async (
 test('porta 2 — un verbale citato che ferma non fa uscire la lavorazione dalla torta', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-  await leggi(page, UN_GIRO);
-  const p2 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nSull'altra segnalazione il verbale diceva:\n\n${AG('10/09/2026, 09:00')}\n${verbale(STOP, [3])}`;
+  const testo = `Sull'altra segnalazione il verbale diceva:\n\n${AG('10/09/2026, 09:00')}\n${verbale(STOP, [3])}`;
+  const p2 = await rispondi(page, UN_GIRO, testo, '11/09/2026, 11:00');
   const d2 = await leggi(page, p2);
-  const tutto = `${d2.legenda} / ${d2.nota} / ${d2.vuota}`;
+  const tutto = `${d2.legenda} / ${d2.nota}`;
   expect(tutto, tutto).not.toContain('si è fermata alla verifica');
   expect(d2.legenda, tutto).toContain('1 critica');
 });
 
-// Porta 3: la stessa citazione con la data scritta in un'altra forma. L'istante
-// non si legge, e la difesa sull'ordine non parte affatto.
+// Porta 3: un marcatore citato la cui data non si legge («ieri mattina»). Qui
+// il confronto sull'ordine non parte nemmeno, quindi vale anche sulle note già
+// salvate: si prova sul blob grezzo.
 test('porta 3 — un marcatore citato con la data illeggibile non apre un turno', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-  await leggi(page, UN_GIRO);
   const p3 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nRiporto:\n\n${AG('ieri mattina')}\n${verbale(FIX, [1])}`;
   const d3 = await leggi(page, p3);
   expect(d3.legenda, d3.legenda).toContain('1 critica');
   expect(d3.legenda, d3.legenda).not.toContain('2 critiche');
 });
 
-// Porta 4: l'altra forma del marcatore di Filo, datata dopo.
+// Porta 4: l'altra forma della riga di separazione di Filo, citata e datata dopo.
 test('porta 4 — l\'altra forma del marcatore, citata e datata dopo, non aggiunge un giro', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-  await leggi(page, UN_GIRO);
-  const p4 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nRiporto:\n\n${FILO('10/09/2026, 09:00')}\n${verbale(FIX, [1])}`;
+  const testo = `Riporto:\n\n${FILO('10/09/2026, 09:00')}\n${verbale(FIX, [1])}`;
+  const p4 = await rispondi(page, UN_GIRO, testo, '11/09/2026, 11:00');
   const d4 = await leggi(page, p4);
   expect(d4.legenda, d4.legenda).toContain('1 critica');
   expect(d4.legenda, d4.legenda).not.toContain('2 critiche');
 });
 
-// Porta 5, nel verso opposto: la citazione datata DOPO sta in mezzo alla
-// conversazione, e i turni veri che la seguono — il secondo giro e il pass —
-// portano un istante più vecchio del marcatore citato. Spariscono.
+// Porta 5, nel verso opposto: la citazione datata più avanti dei turni veri che
+// la seguono se li porta via. Vale anche sulle note già salvate.
 test('porta 5 — una citazione datata nel futuro non inghiotte i giri veri che seguono', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
@@ -149,13 +163,25 @@ test('porta 5 — una citazione datata nel futuro non inghiotte i giri veri che 
 });
 
 // Porta 6: la testa del campo note, che dalla dashboard si modifica a mano in
-// una casella di testo, comincia con un pezzo di conversazione incollato —
-// riga di separazione compresa.
+// una casella di testo, con dentro un pezzo di conversazione incollato.
 test('porta 6 — un verbale incollato in cima al campo note non inventa un giro', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-  const p6 = `${AG('01/09/2026, 08:00')}\n${verbale(FIX, [1])}\n\n${AG('04/09/2026, 10:00')}\nVerifica superata. Adesso funziona.`;
+  const testa = `${AG('01/09/2026, 08:00')}\n${verbale(FIX, [1])}`;
+  const coda = `${AG('04/09/2026, 10:00')}\nVerifica superata. Adesso funziona.`;
+  const p6 = await testaNote(page, testa, coda);
   const d6 = await leggi(page, p6);
-  const tutto = `${d6.legenda} / ${d6.vuota} / ${d6.nota}`;
+  const tutto = `${d6.legenda} / ${d6.nota}`;
   expect(d6.legenda, tutto).not.toContain('1 critica');
+});
+
+// Quello che si incolla resta leggibile: la riga citata non sparisce, diventa
+// una citazione dichiarata.
+test('la riga citata resta nel testo, marcata come citazione', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  const testo = `Riporto:\n\n${AG('10/09/2026, 09:00')}\nun turno qualunque.`;
+  const notes = await rispondi(page, UN_GIRO, testo, '11/09/2026, 11:00');
+  expect(notes, notes).toContain("> --- Aggiornamento dell'agente del 10/09/2026, 09:00 ---");
+  expect(notes, notes).toContain('un turno qualunque.');
 });
