@@ -77,7 +77,10 @@ test('installazione appena fatta: le chiavi con cui parte una richiesta ci sono'
     return {
       openrouter: (s.apiKeys && s.apiKeys.openrouter) || '',
       tavily: (s.apiKeys && s.apiKeys.tavily) || '',
-      safeBrowsing: s.safeBrowsingKey || '',
+      // La chiave del rilevamento siti pericolosi arriva dentro le impostazioni
+      // di sicurezza, non accanto alle chiavi dei modelli: è lì che la cerca chi
+      // fa il controllo.
+      safeBrowsing: (s.security && s.security.safeBrowse && s.security.safeBrowse.safeBrowsingKey) || '',
     };
   });
   expect(eff.openrouter).toBe(FABBRICA.openrouter);
