@@ -537,6 +537,17 @@ module.exports = function register(on, ctx) {
   //     scoprire su cosa sta lavorando l'owner) o provare a farla approvare
   //     mentre lui guarda altrove. Il gesto che vale è quello fatto sulla
   //     superficie di Filo: è tutto il senso di questa superficie.
+  //
+  // `ownerOnly` NON è delle sole fusioni: è la porta unica di OGNI canale con
+  // potere di proprietario di questo file. Ogni `on(MSG.…)` qui dentro che
+  // richieda l'amministratore ci passa — i feedback, i modelli predefiniti (che
+  // valgono per tutte le installazioni di Filo), l'automazione, i bilanci dei
+  // giri, i modelli dei giudici, i registri del lavoro e delle routine, le
+  // fusioni. Non è una regola di stile: il #583 ha chiuso quattro porte su
+  // nove, e le cinque rimaste erano quelle che cambiano la configurazione di
+  // tutti. `tests/feedback-canali-origine.spec.mjs` bussa a tutte da un sito
+  // visitato e diventa rossa se una risponde qualcosa di diverso da
+  // «rifiutato per provenienza»: è il posto dove aggiungere una porta nuova.
   const isFiloOrigin = (origin, sender) => String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
 
   function ownerOnly(handler) {

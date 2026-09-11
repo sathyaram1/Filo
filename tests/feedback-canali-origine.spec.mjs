@@ -80,3 +80,62 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
   }
 });
+
+test('anche le altre porte del proprietario rifiutano per provenienza', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const porte = () => ({
+      modelliPredefinitiLettura: { type: MSG.DEFAULTS_GET },
+      modelliPredefinitiScrittura: { type: MSG.DEFAULTS_UPDATE, config: { models: {} } },
+      automazioneLettura: { type: MSG.AUTOMATION_GET },
+      automazioneScrittura: { type: MSG.AUTOMATION_SET, enabled: true },
+      bilanciLettura: { type: MSG.AUTOMATION_CAPS_GET },
+      bilanciScrittura: { type: MSG.AUTOMATION_CAPS_SET, cap2: 99 },
+      registroWorker: { type: MSG.WORKER_LOG_GET },
+      registroRoutine: { type: MSG.ROUTINE_LOG_GET, limit: 5 },
+      giudiciLettura: { type: MSG.SUPPORT_MODELS_GET },
+      giudiciScrittura: { type: MSG.SUPPORT_MODELS_UPDATE, models: {} },
+      fusioniElenco: { type: MSG.MERGE_APPROVALS_GET },
+      fusioniApprova: { type: MSG.MERGE_APPROVAL_APPROVE, id: 'ab12cd34ef56ab12cd34ef56' },
+      fusioniScarta: { type: MSG.MERGE_APPROVAL_DISCARD, id: 'ab12cd34ef56ab12cd34ef56' },
+    });
+    const esegui = async (mittente) => {
+      const res = {};
+      for (const [nome, msg] of Object.entries(porte())) {
+        res[nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+      }
+      return res;
+    };
+    return {
+      sito: await esegui(mittenti.sito),
+      sitoConScheda: await esegui(mittenti.sitoConScheda),
+      filo: await esegui(mittenti.filo),
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    for (const [porta, r] of Object.entries(out[provenienza])) {
+      expect(r, `${provenienza}/${porta}: nessuna risposta`).toBeTruthy();
+      expect(r.ok, `${provenienza}/${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+      expect(
+        String(r.code || ''),
+        `${provenienza}/${porta}: rifiutato per il motivo sbagliato — su una macchina dove c'è la sessione di chi gestisce Filo la richiesta passerebbe`,
+      ).toBe('forbidden');
+      // E il rifiuto non porta con sé niente: nemmeno un campo che sembra
+      // innocuo dice a un sito cosa c'è dietro la porta.
+      expect(Object.keys(r).sort(), `${provenienza}/${porta}: il rifiuto porta dati`)
+        .toEqual(['code', 'error', 'ok']);
+    }
+  }
+
+  // Da una pagina di Filo la porta esiste: qui non c'è nessuna sessione di chi
+  // gestisce Filo, quindi il rifiuto è un PERMESSO che manca, non la
+  // provenienza. È la differenza che permette alla pagina di dire la cosa
+  // giusta invece di mandare a controllare la connessione.
+  for (const [porta, r] of Object.entries(out.filo)) {
+    expect(r.ok, `filo/${porta}`).toBe(false);
+    expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
+  }
+});
