@@ -60,13 +60,26 @@ function withFetch(fn) {
       text: async () => '{}',
     };
   };
-  return fn(calls).finally(() => { globalThis.fetch = orig; });
+  Collector._reset();
+  Collector._setAuto(false);
+  return fn(calls).finally(() => { globalThis.fetch = orig; Collector._reset(); });
+}
+
+// Un percorso non parte più nel momento in cui lo fai: entra in una coda e ne
+// esce a un'ora sorteggiata più tardi (#584, vedi pathsRitardo.test.mjs). Qui
+// interessa COSA parte, non quando: si porta l'orologio avanti oltre il
+// ritardo massimo e si fa girare un giro di coda.
+const OLTRE_IL_RITARDO = Collector._internal.RITARDO_MAX_MS + 60_000;
+async function spedisci() {
+  await Collector.flush({ now: Date.now() + OLTRE_IL_RITARDO });
 }
 
 test('quello che parte è il percorso e basta: nessun identificativo del mittente', async () => {
   await withFetch(async (calls) => {
     const r = await Collector.collectAndSave({ session: SESSIONE, invokeAI: invokeAIFinto() });
     assert.equal(r.saved, true, r.reason);
+    assert.equal(calls.length, 0, 'il percorso non deve partire nell’istante in cui viene raccolto');
+    await spedisci();
     assert.equal(calls.length, 1);
 
     const { url, body } = calls[0];
