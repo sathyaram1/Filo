@@ -116,13 +116,13 @@ test('un comando finito male porta dentro le parole di un estraneo e la risposta
       `l’uscita del comando non è arrivata al modello: lo spec non prova niente\n---\n${await app.evaluate(() => globalThis.__ctx)}`,
     ).toBe(true);
 
-    await expect(
-      page.locator('#bubbles'),
-      'la frase dettata dal file letto da un comando finito male è arrivata all’utente con la voce di Filo',
-    ).not.toContainText('per non perdere l’accesso');
-
     expect(
       await app.evaluate(() => globalThis.__guardiano),
       'la risposta nata dall’uscita di un comando finito male non è passata dal guardiano',
     ).toBeGreaterThan(0);
+
+    await expect(
+      page.locator('#bubbles'),
+      'la frase dettata dal file letto da un comando finito male è arrivata all’utente con la voce di Filo',
+    ).not.toContainText('per non perdere l’accesso');
   });
