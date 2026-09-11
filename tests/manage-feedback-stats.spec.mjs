@@ -259,21 +259,28 @@ test('le partenze delle routine arrivano dal registro dei worker, con la riparti
 
 const VERDE_DEL_PASS = 'rgb(59, 191, 122)';
 
+// ⚠️ LE ORE CRESCONO, COME CRESCONO DAVVERO. Filo appende un turno dopo
+// l'altro, quindi l'istante nel marcatore non torna mai indietro; un marcatore
+// più vecchio del turno prima è la copia che qualcuno ha incollato, e la scheda
+// lo tratta da citazione (#496, giro 13). Una conversazione finta con le ore
+// mescolate raccontava una conversazione che Filo non scrive.
 function verbaleConGiri(n) {
   const b = [];
+  let ora = 0;
+  const prossimoTurno = () => TURNO(String((ora += 1)).padStart(2, '0'));
   for (let i = 0; i < n; i += 1) {
-    if (i) b.push(TURNO(`0${i}`));
+    if (i) b.push(prossimoTurno());
     b.push(
       'Verifica: 1 rilievo.',
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
       '- [1] Un rilievo qualunque',
       '',
-      TURNO(`1${i}`),
+      prossimoTurno(),
       'Corretto.',
       '',
     );
   }
-  if (n) b.push(TURNO('20'));
+  if (n) b.push(prossimoTurno());
   b.push('Verifica superata.');
   return b.join('\n');
 }
