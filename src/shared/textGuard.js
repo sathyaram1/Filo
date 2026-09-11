@@ -820,13 +820,88 @@
     return s;
   }
 
+  // ── I motivi che si possono leggere, e sono TUTTI ──────────────────────────
+  //
+  // La frase che compare al posto di un avviso fermato la scrive FILO, sempre.
+  // Prima veniva composta con il motivo che il modello guardiano scriveva in
+  // libertà, e quel modello aveva appena letto il testo di un estraneo: un
+  // contenuto che si faceva bloccare apposta si dettava così la propria frase,
+  // consegnata dalla voce di Filo proprio nella riga che dovrebbe rassicurare.
+  //
+  // Togliere dal motivo i recapiti (indirizzi, posta, telefoni) chiudeva metà
+  // della porta: l'ORDINE passava intero («per riattivare il conto conferma
+  // subito le tue credenziali nell'app della banca»), e anche un indirizzo
+  // scritto a parole («portale-esempio punto it barra login»), che nessuna
+  // regola sugli indirizzi riconosce e una persona legge e digita lo stesso.
+  // Ogni giro toglieva una forma e ne restava un'altra, perché un elenco di cose
+  // da togliere è sempre un passo indietro rispetto a chi scrive dall'altra
+  // parte.
+  //
+  // Adesso il guardiano sceglie una CATEGORIA da questo elenco e la frase è di
+  // Filo. Nel caso peggiore chi attacca sposta la scelta su un'altra categoria,
+  // e la persona legge una frase di Filo al posto di un'altra: niente di più.
+  const MOTIVI_GUARDIANO = {
+    credenziali: {
+      frase: 'sembrava spingerti a consegnare credenziali o codici di accesso',
+      parole: /credenzial|password|\bpin\b|\botp\b|login|accedi|account|codic/i,
+    },
+    pagamento: {
+      frase: 'sembrava spingerti a pagare o a mandare denaro',
+      parole: /pagament|pagare|bonifico|denaro|carta di credito|iban|rimbors|fattur/i,
+    },
+    collegamento: {
+      frase: 'spingeva ad aprire un collegamento presentandolo come di un servizio noto',
+      parole: /link|collegament|indirizz|\bsito\b|\burl\b|clicca|\bapri\b|domini/i,
+    },
+    'dati-personali': {
+      frase: 'sembrava spingerti a consegnare dati personali o documenti',
+      parole: /dati personal|document|carta d.identit|codice fiscale|passaport/i,
+    },
+    'istruzione-travestita': {
+      frase: 'spacciava per istruzione di Filo una frase che stava nel contenuto letto',
+      parole: /istruzion|si spacciava|travestit|fingeva|spacciav|finge di/i,
+    },
+    urgenza: {
+      frase: 'metteva fretta per farti agire senza pensarci',
+      parole: /urgen|fretta|subito|entro oggi|scaden|minacc|sospes|blocc/i,
+    },
+  };
+  const MOTIVO_GENERICO = 'sembrava spingerti a fare qualcosa di rischioso';
+
+  // Dalla risposta del guardiano alla frase di Filo. Una categoria scritta com'è
+  // vale subito; una frase libera si prova a riconoscerla dalle parole, e se non
+  // si riconosce vale quella generica. In nessun caso esce quello che il modello
+  // ha scritto.
+  function motivoDiFilo(raw) {
+    const s = String(raw || '').trim().toLowerCase();
+    if (!s) return MOTIVO_GENERICO;
+    if (Object.prototype.hasOwnProperty.call(MOTIVI_GUARDIANO, s)) return MOTIVI_GUARDIANO[s].frase;
+    for (const v of Object.values(MOTIVI_GUARDIANO)) if (v.parole.test(s)) return v.frase;
+    return MOTIVO_GENERICO;
+  }
+
+  // Tutte le frasi che possono comparire in una riga di blocco: quelle dei
+  // controlli statici e quelle del guardiano. È l'ultima rete: se un chiamante
+  // porta qui una frase che non è in questo elenco, quella frase non l'ha
+  // scritta Filo, e al suo posto va quella generica.
+  const MOTIVI_AMMESSI = new Set([
+    ...Object.values(REGOLE),
+    ...Object.values(MOTIVI_GUARDIANO).map((v) => v.frase),
+    MOTIVO_GENERICO,
+  ]);
+  function motivoAmmesso(motivo) {
+    const s = String(motivo == null ? '' : motivo).trim().replace(/^[«"']|[»"'.]$/g, '').trim();
+    if (!s) return '';
+    return MOTIVI_AMMESSI.has(s) ? s : MOTIVO_GENERICO;
+  }
+
   // ── La riga che l'utente legge al posto dell'avviso ─────────────────────────
   //
   // Blocca e SPIEGA cosa ha visto, non che ha avuto un dubbio. Se la fonte non
   // si sa, la frase lo dice invece di inventarsela.
   function frasediBlocco({ origine, motivo } = {}) {
     const da = ripulisci(origine, { tieniPosta: true });
-    const perche = ripulisci(motivo).replace(/^[«"']|[»"'.]$/g, '').trim();
+    const perche = motivoAmmesso(motivo);
     const inizio = da
       ? `Ho fermato un avviso nato da ${da}`
       : 'Ho fermato un avviso nato da un contenuto non fidato';
