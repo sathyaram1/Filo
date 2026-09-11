@@ -771,7 +771,26 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-live-card[data-kind="background"]::before { background: var(--dash-blue); }
 .dash-live-card[data-kind="info"]::before { background: var(--dash-green); }
 
+/* #536 — un avviso in attesa del controllo di sicurezza: c'è, si vede che c'è,
+   e non mostra il testo che non è stato ancora controllato. */
+.dash-live-card[data-kind="attesa"]::before { background: var(--dash-ink-mute); }
+.dash-live-card[data-kind="attesa"] { color: var(--dash-ink-mute); }
+
 .dash-live-card .dash-live-text { white-space: pre-wrap; }
+/* Dove porta davvero ogni collegamento dell'avviso. Testo, non link: il clic
+   resta dove l'utente se lo aspetta (l'azione dell'avviso), qui c'è la verità
+   sulla destinazione. */
+.dash-live-card .dash-live-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+.dash-live-card .dash-live-link {
+  font-size: 11px;
+  color: var(--dash-ink-mute);
+  word-break: break-all;
+}
 .dash-live-card .dash-live-meta {
   font-size: 11px;
   color: var(--dash-ink-mute);
