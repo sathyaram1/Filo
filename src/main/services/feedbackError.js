@@ -86,4 +86,17 @@ function attachmentForbiddenHelp(opts) {
     : 'allegato non leggibile: accedi con l’account amministratore (la sessione è scaduta)';
 }
 
-module.exports = { permissionDeniedHelp, attachmentForbiddenHelp };
+// #582 — e poi c'è chi NON è l'owner: un utente qualunque che riapre le proprie
+// segnalazioni e ritrova lo screenshot che ha mandato. Quell'immagine non la
+// rivedrà: viaggia cifrata con la chiave di chi riceve le segnalazioni, ed è
+// voluto. Quello che non va è mandargli un messaggio sui permessi di
+// amministratore, che lo spedisce a cercare un problema suo dove non c'è niente
+// da risolvere. Qui si dice invece l'unica cosa che gli serve sapere: l'allegato
+// è partito.
+//
+// @returns {string} una riga, senza a capo (finisce in un hover).
+function attachmentNotForYouHelp() {
+  return 'allegato inviato: lo apre solo chi riceve le segnalazioni, perché viaggia cifrato con la sua chiave';
+}
+
+module.exports = { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp };
