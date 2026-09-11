@@ -2468,6 +2468,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           renderedActions.push(rendered);
           roundRendered.push(rendered);
         }
+        // #536 — se l'azione è appena andata a prendere testo scritto da altri
+        // (una ricerca, un documento, l'uscita di un comando), da qui in poi la
+        // risposta di questo turno passa dal guardiano prima di comparire.
+        if (res.executed && !res.rejected) {
+          const G = globalThis.SN_TEXT_GUARD;
+          if (G.vaControllato(G.fiduciaDellAzione(a.type))) {
+            fiduciaTurno = G.FIDUCIA.CONTAMINATO;
+            const et = G.etichettaFonte(a);
+            if (et && !fontiTurno.includes(et)) fontiTurno.push(et);
+          }
+        }
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         results.push({ action: a, res, rendered });
       }
