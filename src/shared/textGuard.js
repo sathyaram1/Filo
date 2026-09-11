@@ -501,8 +501,26 @@
   // stanno in mezzo fra «codice» e la cosa.
   const FUNZIONE_DEL_CODICE = 'verific\\w*|sicurezz\\w*|autentic\\w*|access\\w*|ingress\\w*'
     + '|sblocc\\w*|attivazion\\w*|conferm\\w*|identificazion\\w*|apertur\\w*';
+  // La chiave di casa: «il codice DEL portone», «il codice DELLA bici», «il pin
+  // DELLA sim». Il giro 5 aveva insegnato al controllo la forma lunga («il codice
+  // di accesso al portone»), dove la cosa fisica sta dopo la FUNZIONE del codice.
+  // La forma corta, che in italiano è anche la più comune, era rimasta fuori: lì
+  // la cosa sta attaccata alla parola «codice», dove l'elenco delle cose innocue
+  // conosceva sconti, ordini e prenotazioni ma non portoni, citofoni e cancelli.
+  // Bastava allora un verbo qualunque di quelli che chiedono di passare il codice
+  // (e in una mail di casa c'è quasi sempre, perché il codice di casa serve
+  // proprio a darlo a qualcun altro) perché la risposta sparisse.
+  //
+  // Il gettone in mezzo («il codice 3390 del cancello») è ammesso e resta stretto:
+  // dopo il gettone deve venire l'articolo del qualificatore, quindi «codice
+  // 483920 per riattivare il conto» non diventa innocuo.
+  const GETTONE_IN_MEZZO = '(?:[A-Za-z0-9-]{3,12}\\s+)?';
   const CODICE_INNOCUO = new RegExp([
-    `codic[ei]\\s+${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_INNOCUO})`,
+    `codic[ei]\\s+${GETTONE_IN_MEZZO}${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_INNOCUO}|${COSA_FISICA})`,
+    // Una chiave che apre una COSA, non un'identità: «la password del wifi», «il
+    // pin della sim». Qui non entra l'elenco dei qualificatori generici, perché
+    // «password cliente» e «password utente» sono credenziali a tutti gli effetti.
+    `(?:password|\\bpin\\b|parola d'ordine)\\s+${GETTONE_IN_MEZZO}${PRIMA_DEL_QUALIFICATORE}(?:${COSA_FISICA})`,
     'numero (?:di|d\')\\s*(?:serie|seriale|ordine|pratica|prenotazione|spedizione|tracciamento|fattura|cliente|biglietto)',
     // «Il codice di attivazione della SIM», «il codice di conferma della
     // prenotazione»: la cosa non sta attaccata a «codice», sta dopo la funzione.
