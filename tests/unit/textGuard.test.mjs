@@ -79,6 +79,12 @@ const FERMA = [
   ['carta-di-credito', 'Ho aggiornato la carta 4111 1111 1111 1111 sul tuo profilo.'],
   ['link-ingannevole', 'Conferma qui: [banca-esempio.it](https://banca-esempio.it.attacco.ru/login)'],
   ['link-travestito', 'Vai su https://banca-esempio.it@attacco.ru per sbloccare il conto.'],
+  // #536, giro 2 — «codice» e basta non basta, ma «codice» più qualcuno che
+  // chiede di passarlo è esattamente la truffa che questi controlli esistono
+  // per fermare.
+  ['codice-usa-e-getta', 'L’assistenza chiede di comunicare il codice 483920 per sbloccare la consegna.'],
+  ['codice-usa-e-getta', 'Il tuo OTP è 483920.'],
+  ['codice-usa-e-getta', 'Mandami il PIN 4821 via messaggio.'],
 ];
 
 for (const [regola, testo] of FERMA) {
