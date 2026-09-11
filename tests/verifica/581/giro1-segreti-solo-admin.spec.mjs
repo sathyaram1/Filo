@@ -165,11 +165,22 @@ function bloccoRegola(testo, percorso) {
   return null;
 }
 
+// Le condizioni di lettura del blocco, una per ogni `allow`. Attenzione: una
+// regola può stare su PIÙ RIGHE, ed è la forma in cui era scritta quella di
+// prima. Leggere riga per riga la lascerebbe passare, quindi prima si tolgono i
+// commenti, si uniscono le righe e solo dopo si separano le regole sul
+// punto e virgola.
 function condizioneDiLettura(blocco) {
-  const righe = blocco.split('\n')
-    .map((r) => r.replace(/\/\/.*$/, '').trim())
-    .filter((r) => /^allow\b/.test(r) && /\bread\b/.test(r));
-  return righe.map((r) => (r.match(/:\s*if\s+(.*?);\s*$/) || [, ''])[1].trim());
+  const piatto = blocco
+    .split('\n')
+    .map((r) => r.replace(/\/\/.*$/, ''))
+    .join(' ')
+    .replace(/\s+/g, ' ');
+  return piatto
+    .split(';')
+    .map((r) => r.trim())
+    .filter((r) => /^allow\b/.test(r) && /\b(read|get|list)\b/.test(r.split(':')[0] || ''))
+    .map((r) => (r.match(/:\s*if\s+(.*)$/) || [, ''])[1].trim());
 }
 
 test('le regole: il documento delle chiavi si legge solo da amministratore, come il suo gemello', async () => {
