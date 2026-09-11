@@ -44,6 +44,16 @@
     }
   }
 
+  // Il sito di una scheda, senza «www.» e senza il resto dell'indirizzo.
+  function hostDi(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return '';
+    if (raw.startsWith('filo://')) return 'Filo';
+    try {
+      return (new URL(raw).hostname || '').toLowerCase().replace(/^www\./, '');
+    } catch (_) { return ''; }
+  }
+
   function formatRelativeTime(date) {
     const now = Date.now();
     const ms = now - new Date(date).getTime();
