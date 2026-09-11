@@ -196,8 +196,9 @@ module.exports = function register(on, ctx) {
     try {
       const profile = await auth.signIn();
       broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
-      // Da loggati possiamo leggere eventuali chiavi default ruotate
-      // dall'admin (doc Firestore config/secrets): rinfresca in background.
+      // Rinfresca la config condivisa in background. Le chiavi ruotate
+      // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
+      // le chiavi arrivano col build); resta utile per config/models.
       Defaults.refresh().catch(() => {});
       return { ok: true, profile, isAdmin: auth.isAdmin() };
     } catch (e) {
