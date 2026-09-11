@@ -43,10 +43,14 @@ let _segreti = null;
 let _avvisaCambio = null;
 let _pausaMs = PAUSA_MS;
 
+// Quello che non si nomina resta com'è (`undefined` = non toccare); passare
+// `null` invece stacca esplicitamente quel pezzo. Serve a chi vuole sostituire
+// solo il modello — uno spec, una diagnosi — senza staccare per sbaglio
+// l'aggiornamento della colonna o la lista dei segreti.
 function configure({ eseguiModello, segreti, pausaMs, avvisaCambio } = {}) {
-  _eseguiModello = typeof eseguiModello === 'function' ? eseguiModello : null;
-  _segreti = typeof segreti === 'function' ? segreti : null;
-  _avvisaCambio = typeof avvisaCambio === 'function' ? avvisaCambio : null;
+  if (eseguiModello !== undefined) _eseguiModello = typeof eseguiModello === 'function' ? eseguiModello : null;
+  if (segreti !== undefined) _segreti = typeof segreti === 'function' ? segreti : null;
+  if (avvisaCambio !== undefined) _avvisaCambio = typeof avvisaCambio === 'function' ? avvisaCambio : null;
   if (Number.isFinite(pausaMs)) _pausaMs = Math.max(0, pausaMs);
 }
 
@@ -143,6 +147,7 @@ async function proponiNotifica(proposta = {}) {
       kind, text: testo, action, color, origine,
       guardiano: G.vaControllato(fiducia) ? 'passato' : 'pulito',
     });
+    cambiato();
     return { esito: 'passa', notifica };
   }
 
@@ -159,6 +164,7 @@ async function proponiNotifica(proposta = {}) {
       origine,
       guardiano: 'blocco',
     });
+    cambiato();
     return { esito: 'blocca', blocco, notifica };
   }
 
@@ -166,6 +172,7 @@ async function proponiNotifica(proposta = {}) {
     testo, kind, action, color, fiducia, origine, richiestaUtente, regolaAutomazione, produttore,
     ultimoMotivo: verdetto.motivo,
   });
+  cambiato();
   return { esito: 'in-attesa', inAttesa };
 }
 
@@ -224,6 +231,7 @@ async function riprendiInAttesa() {
       }
     }
     const restano = (await M.listPendingNotifications()).length;
+    if (mostrati || bloccati) cambiato();
     return { mostrati, bloccati, restano };
   })();
   try { return await _giroInCorso; } finally { _giroInCorso = null; }
