@@ -397,11 +397,28 @@
     'errore', 'colore', 'sorgente', 'civico', 'paese', 'destinatario', 'univoco',
     'identificativo', 'a barre', 'catastale', 'ateco', 'stazione', 'aeroporto',
     'iata', 'icao', 'vol[oi]', 'stanza', 'camera', 'avviamento', 'condominio',
-    'filiale', 'agenzia', 'magazzino', 'deposito',
+    'filiale', 'agenzia', 'magazzino', 'deposito', 'ricevut[ae]', 'reso', 'garanzia',
   ].join('|');
+  // La COSA che un codice apre, quando è una cosa e non un'identità: un portone,
+  // una bici, una SIM, il wifi di casa. Un codice che apre una porta non è una
+  // credenziale, per quanto la frase lo chiami «codice di accesso».
+  const COSA_FISICA = [
+    'porton[ei]', 'cancell[oi]', 'port[ae]', 'serratur[ae]', 'lucchett[oi]',
+    'appartament[oi]', 'cas[ae]', 'allogg[io]', 'b&b', 'hotel', 'albergo', 'reception',
+    'box', 'garage', 'cantin[ae]', 'citofon[oi]', 'ascensor[ei]', 'tornell[oi]', 'varc[oi]',
+    'armadiett[oi]', 'cassett[ae]', 'bici\\w*', 'monopattin[oi]', 'aut[oa]', 'parcheggi[oi]',
+    'piscin[ae]', 'palestr[ae]', 'residence', 'uffici[oi]', 'cassaforte',
+    'wi-?fi', 'router', 'sim', 'modem', 'tastierin[oi]', 'keypad', 'accensione',
+  ].join('|');
+  // Cosa dice, lì intorno, a che serve quel codice. Non deve stare attaccato alla
+  // parola «codice»: in italiano la cosa arriva dopo la funzione («il codice di
+  // attivazione della SIM»), e pretendere che venisse subito dopo è già costato
+  // due giri di correzioni.
   const CODICE_INNOCUO = new RegExp([
     `codic[ei]\\s+${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_INNOCUO})`,
     'numero (?:di|d\')\\s*(?:serie|seriale|ordine|pratica|prenotazione|spedizione|tracciamento|fattura|cliente|biglietto)',
+    `\\b(?:${COSA_FISICA})\\b`,
+    `\\b(?:${QUALIFICATORE_INNOCUO})\\b`,
   ].join('|'), 'i');
   const PAROLE_RECUPERO = /(recuper|recovery|backup code|codici di ripristino|ripristin)/i;
   // «password» e i suoi sinonimi stanno già in CODICE_GENERICO: valgono come
