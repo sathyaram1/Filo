@@ -531,6 +531,12 @@
     `codic[ei]\\s+(?:(?:di|d')\\s*)?(?:${FUNZIONE_DEL_CODICE})\\s+${PRIMA_DEL_QUALIFICATORE}(?:${COSA_NON_IDENTITA})`,
   ].join('|'), 'i');
   const PAROLE_RECUPERO = /(recuper|recovery|backup code|codici di ripristino|ripristin)/i;
+  // Il wifi. «Rete CasaMare, digita la password OSPITI24» è la mail di chi
+  // affitta casa, non una credenziale da rubare: una chiave del wifi non apre
+  // niente che appartenga alla persona. La parola che lo dice sta spesso lontana
+  // dalla chiave, quindi non basta il qualificatore attaccato: si guarda la
+  // frase intorno.
+  const PAROLE_WIFI = /(wi-?fi|hotspot|\bssid\b|rete wireless|rete di casa|rete ospiti)/i;
   // «password» e i suoi sinonimi stanno già in CODICE_GENERICO: valgono come
   // parola generica, e da soli non fermano niente. Le forme inequivocabili
   // («password temporanea», «password: hunter2») le prendono CODICE_FORTE e
