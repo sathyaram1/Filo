@@ -17,6 +17,13 @@ const PARTENZA = '/mariorossi/ordini';
 
 async function promptDelGiudice(app, payload) {
   return app.evaluate(async ({ app: _a }, { payload }) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.HELP_INTENT_JUDGE]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
     const H = globalThis.__filoHandlers;
     const P = globalThis.SN_PROVIDERS;
     const veroC = P.completeWithFallback;
