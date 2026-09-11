@@ -24,25 +24,24 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 // esiste un modo di ottenere un token admin vero in un test); tutto il resto —
 // la domanda che parte dal menu, il disegno delle voci — è il codice vero.
 async function fingiOwner(app, acceso) {
-  await app.evaluate(async ({ app: electronApp }, on) => {
-    const path = require('path');
-    const mod = require(path.join(electronApp.getAppPath(), 'src', 'main', 'auth', 'google-auth.js'));
-    if (!mod.__veri) {
-      mod.__veri = {
-        isAdmin: mod.isAdmin,
-        isSignedIn: mod.isSignedIn,
-        getProfile: mod.getProfile,
-        getUid: mod.getUid,
-      };
+  await app.evaluate(async ({ ipcMain }, on) => {
+    if (!globalThis.__fingiOwnerInstallato) {
+      const mappa = ipcMain._invokeHandlers;
+      const vero = mappa.get('filo:message');
+      mappa.set('filo:message', async (e, ...args) => {
+        const msg = args[0];
+        if (globalThis.__fingiOwner && msg && msg.type === 'auth_status') {
+          e._reply({
+            ok: true, signedIn: true, isAdmin: true,
+            profile: { email: 'owner@filo.test', name: 'Owner' }, uid: 'uid-owner',
+          });
+          return;
+        }
+        return vero(e, ...args);
+      });
+      globalThis.__fingiOwnerInstallato = true;
     }
-    if (on) {
-      mod.isAdmin = () => true;
-      mod.isSignedIn = () => true;
-      mod.getProfile = () => ({ email: 'owner@filo.test', name: 'Owner' });
-      mod.getUid = async () => 'uid-owner';
-    } else {
-      Object.assign(mod, mod.__veri);
-    }
+    globalThis.__fingiOwner = !!on;
   }, acceso);
 }
 
