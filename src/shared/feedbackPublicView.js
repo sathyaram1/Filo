@@ -61,7 +61,7 @@
     'resolvedInVersion', // versione in cui il fix è uscito (gate "in produzione", DB3)
     'createdAt',         // data d'invio (ISO), l'ordinamento della bacheca
     'resolvedAt',        // data di chiusura (ISO)
-    'clientIdHash',      // hash dell'installazione: il popup ricompense riconosce i propri
+    'clientIdTag',       // impronta di QUESTA scheda per chi l'ha segnalata (vedi sotto)
     'userNote',          // la frase per chi ha segnalato (l'unico dei due testi in chiaro)
     'publishedAt',       // quando questa scheda è stata scritta (diagnostica)
   ]);
