@@ -395,6 +395,7 @@
     }
     if (current === value) return current;
     if (current > value && !opts.allowLower) return current;
+    if (current > value && current - value < SEQ_LOWER_MARGIN) return current;
     const w = await fetch(`${docUrl}?updateMask.fieldPaths=value&key=${API_KEY}`, {
       method: 'PATCH',
       headers,
