@@ -31,6 +31,7 @@
   --dash-ink-mute: #7e7567;
   --dash-line: rgba(236, 230, 218, 0.10);
   --dash-line-strong: rgba(236, 230, 218, 0.20);
+  --dash-link: #8ec7ef;
 }
 
 html, body {
