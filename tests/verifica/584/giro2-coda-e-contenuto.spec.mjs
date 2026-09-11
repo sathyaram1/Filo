@@ -151,6 +151,23 @@ test('RILIEVO: la pagina di partenza entra nella raccolta pubblica senza nessuna
   } finally { rete.smonta(); }
 });
 
+test('RILIEVO: nei selettori la redazione conosce solo email e numeri lunghi, un nome passa', async () => {
+  const rete = montaRete();
+  try {
+    await raccogli(
+      'https://esempio.it/area',
+      'aprire il profilo',
+      [{ selector: '[aria-label="Profilo di Mario Rossi"]', action: 'click' },
+        { selector: 'button[title="Esci, Mario"]', action: 'click' }],
+    );
+    await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
+    const passi = rete.scritture[0].body.fields.steps.arrayValue.values
+      .map((v) => v.mapValue.fields.selector.stringValue);
+    expect(passi[0]).toContain('Mario Rossi');
+    expect(passi[1]).toContain('Mario');
+  } finally { rete.smonta(); }
+});
+
 test('il documento che parte non porta nessun identificativo del mittente', async () => {
   const rete = montaRete();
   try {
