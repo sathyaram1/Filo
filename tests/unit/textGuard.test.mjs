@@ -508,3 +508,57 @@ test('anche la riga in coda tiene il mittente e niente altri recapiti', () => {
   assert.ok(r.includes('tizio@esempio.it'), r);
   assert.ok(!r.includes('800 123 456'), r);
 });
+
+// ── Giro 7 di verifica: la chiave di casa, e quando un'azione sporca il turno ─
+
+// La forma lunga («il codice di accesso al portone») era già riconosciuta dal
+// giro 5. Quella corta, che in italiano è la più comune, no: lì la cosa che il
+// codice apre sta attaccata alla parola «codice», e l'elenco delle cose innocue
+// conosceva sconti e ordini ma non portoni, citofoni e cancelli. Bastava allora
+// un verbo di quelli che chiedono di passare il codice — e in una mail di casa
+// c'è quasi sempre, perché il codice di casa serve proprio a darlo a qualcuno —
+// perché la risposta sparisse.
+test('il codice di casa non fa sparire la risposta, nemmeno quando va passato a qualcuno', () => {
+  const innocue = [
+    'Il codice del portone è 4821, comunicalo anche a chi arriva con te.',
+    'Ti lascio il codice 3390 del cancello: passalo pure a tua sorella.',
+    'Il codice 7788 della cassetta delle chiavi: comunicalo all’idraulico.',
+    'Il codice 2210 del citofono, comunicalo al corriere.',
+    'Il codice 4409 della bici, dimmelo appena la prendi.',
+    'Il wifi di casa: rete CasaMare, digita la password OSPITI24.',
+    'Per collegarti al wifi digita la password OSPITI24.',
+    'Il pin della sim è 9931, comunicalo al negozio se serve.',
+  ];
+  for (const t of innocue) {
+    const r = G.controlliStatici({ testo: t });
+    assert.equal(r.blocca, false, `fermata una frase innocua (${r.regola}): ${t}`);
+  }
+  // La chiave di un CONTO resta una credenziale: l'elenco delle cose fisiche non
+  // deve diventare un lasciapassare per tutto.
+  assert.equal(
+    G.controlliStatici({ testo: 'Il codice di accesso al conto è 5512, comunicalo per la verifica.' }).blocca,
+    true,
+  );
+});
+
+// Un'azione porta dentro parole di altri quando ha prodotto un'USCITA, non
+// quando è andata bene. Bastava un comando finito male (`cat c-e non-c-e`
+// stampa il primo e poi esce con un errore) o interrotto perché ci metteva
+// troppo per lasciare il turno pulito: la risposta scorreva in diretta e
+// arrivava intera, col secondo modello mai chiamato.
+test('un’azione che finisce male ha portato dentro le stesse parole di una riuscita', () => {
+  const uscita = { command: 'cat a b', stdout: 'roba scritta da altri', code: 1 };
+  assert.equal(G.haPortatoTestoDiAltri({ type: 'ESEGUI_COMANDO', output: uscita }), true);
+  assert.equal(
+    G.haPortatoTestoDiAltri({ type: 'ESEGUI_COMANDO', output: { ...uscita, code: 124, timedOut: true } }),
+    true,
+  );
+  assert.equal(G.haPortatoTestoDiAltri({ type: 'CERCA_WEB', output: { search: 'x', results: [] } }), true);
+  // Il comando non è nemmeno partito (terminale spento): non c'è niente di
+  // nessuno, e infatti non entra nemmeno nel contesto del modello.
+  assert.equal(G.haPortatoTestoDiAltri({ type: 'ESEGUI_COMANDO', output: { blocked: 'disabled' } }), false);
+  // Azione fuori registro, o che non legge niente di altri.
+  assert.equal(G.haPortatoTestoDiAltri({ type: 'ESEGUI_COMANDO', output: uscita, rejected: true }), false);
+  assert.equal(G.haPortatoTestoDiAltri({ type: 'TIMER', output: { ok: true } }), false);
+  assert.equal(G.haPortatoTestoDiAltri({ type: 'CERCA_WEB' }), false);
+});
