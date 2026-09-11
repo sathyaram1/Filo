@@ -73,48 +73,71 @@ async function leggi(page, notes) {
   }));
 }
 
-test('una citazione datata DOPO l\'ultimo turno vero non inventa un giro', async ({ openTab }) => {
+test('la conversazione intatta si conta bene (riferimento)', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page);
-
   const prima = await leggi(page, UN_GIRO);
   expect(prima.legenda, prima.legenda).toContain('1 critica');
   expect(prima.nota, prima.nota).toContain('1 giro di correzione');
+});
 
-  // Porta 1: l'owner risponde citando il verbale di un'ALTRA segnalazione,
-  // lavorata più tardi di questa. Il marcatore citato è più RECENTE
-  // dell'ultimo turno vero.
+// Porta 1: l'owner risponde citando il verbale di un'ALTRA segnalazione,
+// lavorata più tardi di questa. Il marcatore citato è più RECENTE dell'ultimo
+// turno vero, quindi l'ordine cresce e la difesa del giro 13 non morde.
+test('porta 1 — un verbale citato, datato dopo, non aggiunge un giro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  await leggi(page, UN_GIRO);
   const p1 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nSull'altra segnalazione il verbale diceva:\n\n${AG('10/09/2026, 09:00')}\n${verbale(FIX, [1])}`;
   const d1 = await leggi(page, p1);
-  expect(d1.legenda, `porta 1: ${d1.legenda}`).toContain('1 critica');
-  expect(d1.legenda, `porta 1: ${d1.legenda}`).not.toContain('2 critiche');
-  expect(d1.nota, `porta 1: ${d1.nota}`).toContain('1 giro di correzione');
+  expect(d1.legenda, d1.legenda).toContain('1 critica');
+  expect(d1.legenda, d1.legenda).not.toContain('2 critiche');
+  expect(d1.nota, d1.nota).toContain('1 giro di correzione');
+});
 
-  // Porta 2, la peggiore: lo stesso, quando il verbale citato è di un giro che
-  // aveva FERMATO il lavoro. Una lavorazione passata non deve leggersi come
-  // ferma in attesa di una decisione dell'owner.
+// Porta 2, la peggiore: lo stesso, quando il verbale citato è di un giro che
+// aveva FERMATO il lavoro. Una lavorazione passata non deve leggersi come
+// ferma in attesa di una decisione dell'owner.
+test('porta 2 — un verbale citato che ferma non fa uscire la lavorazione dalla torta', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  await leggi(page, UN_GIRO);
   const p2 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nSull'altra segnalazione il verbale diceva:\n\n${AG('10/09/2026, 09:00')}\n${verbale(STOP, [3])}`;
   const d2 = await leggi(page, p2);
-  expect(d2.legenda + d2.vuota + d2.nota, `porta 2: ${d2.legenda} / ${d2.nota} / ${d2.vuota}`)
-    .not.toContain('si è fermata alla verifica');
-  expect(d2.legenda, `porta 2: ${d2.legenda}`).toContain('1 critica');
+  const tutto = `${d2.legenda} / ${d2.nota} / ${d2.vuota}`;
+  expect(tutto, tutto).not.toContain('si è fermata alla verifica');
+  expect(d2.legenda, tutto).toContain('1 critica');
+});
 
-  // Porta 3: la stessa citazione con la data scritta in un'altra forma (ISO,
-  // o a parole): l'istante non si legge, e la difesa sull'ordine non parte.
+// Porta 3: la stessa citazione con la data scritta in un'altra forma. L'istante
+// non si legge, e la difesa sull'ordine non parte affatto.
+test('porta 3 — un marcatore citato con la data illeggibile non apre un turno', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  await leggi(page, UN_GIRO);
   const p3 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nRiporto:\n\n${AG('ieri mattina')}\n${verbale(FIX, [1])}`;
   const d3 = await leggi(page, p3);
-  expect(d3.legenda, `porta 3: ${d3.legenda}`).toContain('1 critica');
-  expect(d3.legenda, `porta 3: ${d3.legenda}`).not.toContain('2 critiche');
+  expect(d3.legenda, d3.legenda).toContain('1 critica');
+  expect(d3.legenda, d3.legenda).not.toContain('2 critiche');
+});
 
-  // Porta 4: l'altra forma del marcatore di Filo, datata dopo.
+// Porta 4: l'altra forma del marcatore di Filo, datata dopo.
+test('porta 4 — l\'altra forma del marcatore, citata e datata dopo, non aggiunge un giro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  await leggi(page, UN_GIRO);
   const p4 = `${UN_GIRO}\n\n${UT('11/09/2026, 11:00')}\nRiporto:\n\n${FILO('10/09/2026, 09:00')}\n${verbale(FIX, [1])}`;
   const d4 = await leggi(page, p4);
-  expect(d4.legenda, `porta 4: ${d4.legenda}`).toContain('1 critica');
-  expect(d4.legenda, `porta 4: ${d4.legenda}`).not.toContain('2 critiche');
+  expect(d4.legenda, d4.legenda).toContain('1 critica');
+  expect(d4.legenda, d4.legenda).not.toContain('2 critiche');
+});
 
-  // Porta 5, nel verso opposto: la citazione datata DOPO sta in mezzo alla
-  // conversazione, e i turni veri che la seguono — il secondo giro e il pass —
-  // portano un istante più vecchio del marcatore citato. Spariscono.
+// Porta 5, nel verso opposto: la citazione datata DOPO sta in mezzo alla
+// conversazione, e i turni veri che la seguono — il secondo giro e il pass —
+// portano un istante più vecchio del marcatore citato. Spariscono.
+test('porta 5 — una citazione datata nel futuro non inghiotte i giri veri che seguono', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
   const p5 = [
     `${AG('02/09/2026, 10:00')}\n${V}`,
     `${UT('02/09/2026, 11:00')}\nGuarda l'altra segnalazione:\n\n${AG('31/12/2027, 09:00')}\nUn turno qualunque.`,
@@ -122,11 +145,17 @@ test('una citazione datata DOPO l\'ultimo turno vero non inventa un giro', async
     `${AG('04/09/2026, 10:00')}\nVerifica superata. Adesso funziona.`,
   ].join('\n\n');
   const d5 = await leggi(page, p5);
-  expect(d5.legenda, `porta 5: ${d5.legenda}`).toContain('2 critiche');
+  expect(d5.legenda, `${d5.legenda} / ${d5.nota}`).toContain('2 critiche');
+});
 
-  // Porta 6: la testa del campo note, che dalla dashboard si modifica a mano,
-  // comincia con un pezzo di conversazione incollato — marcatore compreso.
+// Porta 6: la testa del campo note, che dalla dashboard si modifica a mano in
+// una casella di testo, comincia con un pezzo di conversazione incollato —
+// riga di separazione compresa.
+test('porta 6 — un verbale incollato in cima al campo note non inventa un giro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
   const p6 = `${AG('01/09/2026, 08:00')}\n${verbale(FIX, [1])}\n\n${AG('04/09/2026, 10:00')}\nVerifica superata. Adesso funziona.`;
   const d6 = await leggi(page, p6);
-  expect(d6.legenda + d6.vuota, `porta 6: ${d6.legenda} / ${d6.vuota}`).not.toContain('1 critica');
+  const tutto = `${d6.legenda} / ${d6.vuota} / ${d6.nota}`;
+  expect(d6.legenda, tutto).not.toContain('1 critica');
 });
