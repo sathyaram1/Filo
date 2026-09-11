@@ -500,7 +500,17 @@
     }
 
     try {
-      allFeedbacks = await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
+      // #583: la bacheca legge la VISTA pubblica (`feedback-public`), non i
+      // feedback. Prima scaricava i documenti interi — testo, URL, user agent,
+      // link agli screenshot — e decideva qui cosa disegnare: ma "filtrato in
+      // pagina" vuol dire solo "non disegnato", il resto era già arrivato.
+      // Adesso ogni scheda contiene SOLO i campi pubblici, e le schede
+      // esistono solo per i fix chiusi e mai segnalati dalla sicurezza (la
+      // decisione sta in src/shared/feedbackPublicView.js, dove lo status si
+      // può leggere davvero). I filtri qui sotto restano: sono la seconda
+      // rete, e il gate "uscito in produzione" (DB3) dipende dalla versione
+      // che gira su QUESTA macchina, quindi va applicato qui.
+      allFeedbacks = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: LOAD_TIMEOUT_MS });
       dataLoaded = true;
       lastLoadError = null;
     } catch (err) {
