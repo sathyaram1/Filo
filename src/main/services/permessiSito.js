@@ -254,23 +254,14 @@ async function decidi(wc, permesso, dettagli) {
   if (gia === 'allow') return true;
   if (gia === 'deny') return false;
 
-  const ok = await new Promise((resolve) => {
-    const p = chiedi({ wc, win, tab, origine, chiavi });
-    // La scrittura della memoria la fa `rispondi` attraverso questo aggancio,
-    // così una risposta "solo per stavolta" (la × della pastiglia) non lascia
-    // niente nello storage.
-    for (const [, att] of attese) {
-      if (att.chiave === `${wc.id}|${origine}|${chiavi.slice().sort().join(',')}` && !att.salva) {
-        att.salva = (scelta) => {
-          try {
-            scriviMappa(ses, incognito, Pp.conScelta(mappaDi(ses, incognito), origine, chiavi, scelta));
-          } catch (_) {}
-        };
-      }
-    }
-    p.then(resolve, () => resolve(false));
-  });
-  return ok;
+  // La scrittura della memoria passa da qui: una risposta "solo per stavolta"
+  // (la × della pastiglia, o l'attesa scaduta) non lascia niente nello storage.
+  const salvaScelta = (scelta) => {
+    try {
+      scriviMappa(ses, incognito, Pp.conScelta(mappaDi(ses, incognito), origine, chiavi, scelta));
+    } catch (_) {}
+  };
+  return chiedi({ wc, win, tab, origine, chiavi, salvaScelta });
 }
 
 // Controllo SINCRONO (navigator.permissions.query, Notification.permission,
