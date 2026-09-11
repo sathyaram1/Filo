@@ -56,11 +56,23 @@
 
   const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
   const LONG_NUM_RE = /\b\d{6,}\b/g;
+  // Un nome utente scritto con la chiocciola (@mario.rossi) e i codici lunghi
+  // (uuid, token, hash) sono identificativi quanto un'email: stessa forma
+  // riconoscibile, stessa sostituzione (#584, terzo giro). Un nome scritto a
+  // lettere dentro un'etichetta ("Profilo di Mario Rossi") nessuna regola lo
+  // distingue dal testo di un pulsante: quello lo ferma il giudice, che adesso
+  // guarda anche i selettori (vedi collectAndSave).
+  const HANDLE_RE = /@[A-Za-z0-9._-]{2,}/g;
+  const CODICE_RE = /\b[0-9a-f]{16,}\b/gi;
+  const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
   function redactSelector(selector) {
     if (typeof selector !== 'string' || !selector) return '';
     return selector
       .replace(EMAIL_RE, '[EMAIL]')
+      .replace(UUID_RE, '[ID]')
+      .replace(CODICE_RE, '[ID]')
+      .replace(HANDLE_RE, '[ID]')
       .replace(LONG_NUM_RE, '[NUMERO]');
   }
 
