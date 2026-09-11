@@ -200,6 +200,31 @@ test('guardiano irraggiungibile: l\'avviso resta in attesa, e compare quando il 
   }
 });
 
+test('il registro in Preferenze → Sicurezza dice cosa è stato fermato, e si svuota', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await installaGuardianoFinto(app);
+  const esito = await proponi(app, {
+    mittente: MAIL_BANCA.mittente,
+    testo: `${MAIL_BANCA.oggetto}: ${MAIL_BANCA.corpo}`,
+  });
+  expect(esito.esito).toBe('blocca');
+
+  const sec = await openTab('filo://security/');
+  const voce = sec.locator('#sec-guard-list .sn-guard-block').first();
+  await expect(voce).toBeVisible({ timeout: 15_000 });
+  await expect(voce).toContainText(MAIL_BANCA.mittente);
+  await expect(voce).toContainText('sembrava spingerti a confermare le credenziali');
+  // l'estratto si legge, ma resta testo inerte: nessun link da cliccare
+  await expect(voce.locator('a')).toHaveCount(0);
+
+  // Se si può aggiungere si può togliere: lo svuotamento c'è ed è confermato.
+  await sec.locator('#sec-guard-clear').click();
+  const conferma = sec.locator('.sn-confirm-ok, button:has-text("Svuota")').last();
+  await conferma.click();
+  await expect(sec.locator('#sec-guard-list .sn-guard-block')).toHaveCount(0, { timeout: 10_000 });
+  await expect(sec.locator('#sec-guard-empty')).toBeVisible();
+});
+
 test('nessuna superficie mostra un avviso contaminato saltando il guardiano', async ({ app }) => {
   test.setTimeout(60_000);
   const esito = await app.evaluate(async () => {

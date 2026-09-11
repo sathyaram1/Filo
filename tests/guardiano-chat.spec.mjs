@@ -44,7 +44,9 @@ async function configuraModelli(app) {
 // secondo risponde col testo dato. La ricerca è finta ma ESEGUITA davvero:
 // è quello che contamina il turno.
 async function finteRisposte(app, { cerca, risposta }) {
-  await app.evaluate(async (cfg) => {
+  // NB: app.evaluate passa i moduli di Electron come PRIMO argomento; il
+  // nostro è il secondo.
+  await app.evaluate(async (_e, cfg) => {
     globalThis.SN_WEB_SEARCH.search = async ({ query }) => ({
       provider: 'finto',
       results: [{ title: 'Avviso urgente', url: 'https://banca-x.verifica.test/login', snippet: 'conferma le tue credenziali' }],
