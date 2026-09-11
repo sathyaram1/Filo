@@ -521,8 +521,12 @@ service cloud.firestore {
     // Tupla anonima (sito, posizione iniziale, intento, azioni, esito) usata
     // per insegnare globalmente all'AI come muoversi su un dominio.
     // Lo schema è validato a monte dal client: la raccolta passa per due LLM
-    // distinti (intent guess + judge) che impediscono che dati raw dell'utente
-    // finiscano qui dentro. Le regole sotto fanno solo il check di forma.
+    // distinti (intent guess + judge) e per una pulizia per forme (email,
+    // codici, soprannomi, numeri lunghi) che tocca TUTTO quello che esce —
+    // frase, pagina di partenza e nomi degli elementi. Il giudice vede quello
+    // che verrebbe pubblicato, non solo la frase: prima guardava la sola frase
+    // e l'indirizzo passava intero, nome utente compreso (#584, terzo giro).
+    // Le regole sotto fanno solo il check di forma.
     //
     // IL DOMINIO È UN SEGMENTO DEL PERCORSO (audit pre-alpha, #584). Prima i
     // documenti stavano tutti in `paths/{doc}` con `allow read: if true`: con
