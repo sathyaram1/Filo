@@ -370,9 +370,9 @@ test('anche la fonte viene ripulita: il mittente se lo sceglie chi manda la mail
   assert.equal(G.linkDelTesto(f).length, 0);
 });
 
-test('un motivo lungo una pagina si butta intero, non si taglia a metà', () => {
+test('un motivo lungo una pagina non diventa un megafono', () => {
   const f = G.frasediBlocco({ origine: 'una mail di X', motivo: 'a'.repeat(400) });
-  assert.equal(f, 'Ho fermato un avviso nato da una mail di X.');
+  assert.equal(f, `Ho fermato un avviso nato da una mail di X: ${G.MOTIVO_GENERICO}.`);
 });
 
 test('l’indirizzo di posta del mittente resta: è la cosa che serve sapere', () => {
