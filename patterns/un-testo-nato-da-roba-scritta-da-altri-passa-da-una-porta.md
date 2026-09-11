@@ -152,6 +152,14 @@ per sempre, e la sola persona che può sistemarlo non saprebbe nemmeno che c'è 
 sistemare. Le due frasi sono diverse (`fraseControlloFermo`, `fraseInAttesa`), e
 quella della configurazione dice dove si imposta il modello.
 
+La coda ha un tetto, e il tetto va **largo**: qui dentro finisce ogni risposta
+nata da una ricerca finché il guardiano non torna, e con un modello del guardiano
+mai impostato non ne esce nessuna. Cento voci erano pochi giorni d'uso. E quando
+il tetto si raggiunge davvero, la voce più vecchia **non sparisce in silenzio**:
+chi esce era una cosa promessa («te la mostro appena riesco»), quindi va nel
+registro degli avvisi fermati con scritto che nessuno l'ha mai controllata. Un
+taglio muto su una promessa lo si scopre settimane dopo, e non lo si scopre mai.
+
 ## Chi ha scritto il testo viaggia col testo
 
 L'indipendenza del modello non è una regola che si applica una volta: va portata
