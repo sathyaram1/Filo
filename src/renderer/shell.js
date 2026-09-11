@@ -538,6 +538,17 @@
   // Stato proxy per il menu (lazy, richiesto a ogni apertura: la config può
   // cambiare dalle impostazioni mentre l'app è aperta).
   let ctxProxyStatus = null;
+  // Permessi già dati/negati al sito della scheda (#586): letti a ogni
+  // apertura del menu, perché l'utente può averli cambiati altrove.
+  let ctxPerms = { origine: null, voci: [] };
+
+  // Origine (schema://host) dell'indirizzo di una scheda; null per le pagine
+  // interne di Filo e per tutto ciò che non è web.
+  function origineDi(url) {
+    const s = String(url || '');
+    if (!/^https?:\/\//i.test(s)) return null;
+    try { return new URL(s).origin; } catch (_) { return null; }
+  }
   async function openTabContextMenu(t, x, y) {
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
@@ -567,11 +578,54 @@
         });
       }
     }
+    // "Permessi del sito": compare solo se per questo sito c'è qualcosa da
+    // cambiare — una voce che non ha niente da mostrare è rumore. Il click
+    // diretto apre l'elenco, da cui si toglie una scelta o tutte.
+    ctxPerms = { origine: origineDi(t.url), voci: [] };
+    if (ctxPerms.origine && api.permissions && api.permissions.forOrigin) {
+      try {
+        const res = await api.permissions.forOrigin(ctxPerms.origine);
+        ctxPerms.voci = (res && res.voci) || [];
+      } catch (_) { ctxPerms.voci = []; }
+    }
+    if (ctxPerms.voci.length) {
+      entries.push({
+        label: 'Permessi del sito', icon: 'lock', action: 'tab-perms-pick',
+      });
+    }
     entries.push(
       { type: 'separator' },
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
     );
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  // Secondo livello di "Permessi del sito": una riga per permesso ricordato,
+  // con lo stato e cosa succede cliccando (si toglie: la volta dopo il sito
+  // richiede). In fondo, "Togli tutti".
+  function openPermsMenu() {
+    const voci = ctxPerms.voci || [];
+    if (!voci.length) return;
+    const entries = voci.map((v) => ({
+      label: `${v.nome}: ${v.scelta === 'allow' ? 'consentito' : 'negato'} — togli`,
+      action: 'tab-perm-revoke:' + v.chiave,
+    }));
+    if (voci.length > 1) {
+      entries.push({ type: 'separator' });
+      entries.push({ label: 'Togli tutti', action: 'tab-perm-revoke-all' });
+    }
+    api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  async function revocaPermesso(chiave) {
+    const origine = ctxPerms.origine;
+    if (!origine || !api.permissions) return;
+    try { await api.permissions.revoke(origine, chiave || null); } catch (_) { return; }
+    let host = origine;
+    try { host = new URL(origine).host; } catch (_) {}
+    showToast(chiave
+      ? `Permesso tolto per ${host}: te lo richiederà`
+      : `Permessi tolti per ${host}: te li richiederà`);
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
@@ -616,6 +670,9 @@
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
+      else if (action === 'tab-perms-pick') openPermsMenu();
+      else if (action === 'tab-perm-revoke-all') revocaPermesso(null);
+      else if (action.startsWith('tab-perm-revoke:')) revocaPermesso(action.slice('tab-perm-revoke:'.length));
     });
   }
 
@@ -1596,9 +1653,11 @@
       const { url, host } = info;
       const chip = document.createElement('div');
       chip.className = 'popup-chip';
-      chip.style.background = 'var(--sn-surface, #fff)';
-      chip.style.color = 'var(--sn-text, #222)';
-      chip.style.border = '1px solid var(--sn-border, #d0d0d0)';
+      // Token della shell (non quelli delle pagine filo://, che qui non
+      // esistono): senza, in tema scuro la chip restava bianca su fondo scuro.
+      chip.style.background = 'var(--tab-active, #fff)';
+      chip.style.color = 'var(--fg, #222)';
+      chip.style.border = '1px solid var(--border, #d0d0d0)';
       chip.style.borderRadius = '999px';
       chip.style.padding = '6px 10px';
       chip.style.font = '12px system-ui, sans-serif';

@@ -713,3 +713,79 @@ html[data-feedback-dim="1"] .shell {
    il nome barrato) così si vede prima ancora di cliccare. */
 .dl-row[data-missing="1"] .dl-row-name { color: var(--fg-soft); text-decoration: line-through; }
 .dl-row[data-missing="1"] .dl-row-meta { opacity: 0.8; }
+
+/* ── Pastiglia "il sito chiede un permesso" (#586) ─────────────────────────
+   Vive nella fascia della barra indirizzi, dove Filo segnala già le altre cose
+   della scheda (il popup bloccato). Resta finché non si risponde: il permesso
+   NON è concesso mentre è lì. Colori dai token della shell, quindi segue tema
+   chiaro e scuro senza un secondo blocco di regole. */
+#permission-chips {
+  position: fixed;
+  top: 50px;
+  right: 12px;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+  max-width: calc(100vw - 24px);
+}
+.perm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, calc(100vw - 24px));
+  padding: 5px 6px 5px 12px;
+  background: var(--tab-active);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 12.5px;
+  pointer-events: auto;
+  animation: permChipIn 0.16s ease-out;
+}
+.perm-chip.uscita { opacity: 0; transform: translateY(-4px); transition: opacity 0.14s ease, transform 0.14s ease; }
+@keyframes permChipIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.perm-chip-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.perm-chip-btn {
+  flex: none;
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font: inherit;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.perm-chip-btn:hover { background: var(--bg-deep); }
+.perm-chip-allow {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.perm-chip-allow:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.perm-chip-x {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-soft);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.perm-chip-x:hover { background: var(--border); color: var(--fg); }
