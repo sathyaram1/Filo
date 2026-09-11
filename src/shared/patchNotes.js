@@ -18,9 +18,9 @@
     {
       version: '0.2.228', date: '2026-09-11',
       features: [
-        'Quando Filo legge una mail o una pagina scritta da altri e poi ti scrive qualcosa, quel testo passa prima da un secondo modello, diverso da quello che l\'ha scritto: se cerca di farti dare credenziali, codici o soldi, o di mandarti su un sito che non è quello che dice, l\'avviso non compare. Al suo posto trovi una riga che dice cosa è stato fermato e da dove veniva.',
+        'Quando Filo legge una mail o una pagina scritta da altri e poi ti scrive qualcosa, un secondo modello guarda quel testo prima che compaia. Se cerca di farti dare credenziali, codici o soldi, o di mandarti su un sito diverso da quello che dice, l\'avviso non compare. Al suo posto trovi una riga che dice cosa ha fermato e da chi veniva.',
         'I collegamenti dentro un avviso mostrano sempre il dominio a cui portano davvero, prima che tu li apra.',
-        'In Preferenze c\'è "Avvisi fermati": l\'elenco di quello che il controllo ha bloccato, con quando, da dove e perché. Se ferma cose che non doveva, lo vedi lì.',
+        'In Preferenze trovi «Avvisi fermati», l\'elenco di quello che il controllo ha fermato, con quando, da dove e perché. Se ferma cose che non doveva, lo vedi lì.',
       ],
     },
     {
