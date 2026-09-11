@@ -57,6 +57,11 @@ stava per uscire.
   campi si perdevano fra chi li mandava e chi scriveva la domanda, con un test
   verde per parte (vedi
   [Due estremi verdi non fanno un filo](due-estremi-verdi-non-fanno-un-filo.md)).
+  E ricordati che da quel momento quel modello è l'UNICA difesa per quella
+  categoria di dati: il testo che gli metti davanti lo scrive il sito, quindi va
+  appiattito e dichiarato prima di entrare nella domanda, o la guardia si
+  convince a parole (vedi
+  [Un modello che fa da guardia legge testo di terzi](un-modello-che-fa-da-guardia-legge-testo-di-terzi.md)).
 - **Il testo che l'utente legge nel momento della scelta** dice cosa viene
   pubblicato. «Ha funzionato? Aiutami a migliorare» sembra un parere privato a
   chi scrive l'app; la pagina che spiega la privacy non la apre nessuno prima di
