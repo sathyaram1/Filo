@@ -553,13 +553,25 @@
   // Il gettone in mezzo («il codice 3390 del cancello») è ammesso e resta stretto:
   // dopo il gettone deve venire l'articolo del qualificatore, quindi «codice
   // 483920 per riattivare il conto» non diventa innocuo.
+  //
+  // E la cosa può stare anche PRIMA: «Per il reso serve il codice 4409», «Per il
+  // cancello automatico usa il codice 7788». Sono le stesse frasi di sopra con
+  // l'ordine delle parole invertito, che in italiano è normale quanto l'altro,
+  // e finché si guardava solo dopo la risposta spariva. Il tratto in mezzo resta
+  // corto e non scavalca la punteggiatura: deve restare la stessa frase, così
+  // «Il tuo ordine è pronto: conferma il codice 219933» non diventa innocuo.
+  const PAROLA_DI_CODICE = '(?:codic[ei]|\\bpin\\b|\\btoken\\b|password|passcode|parola d\'ordine)';
   const GETTONE_IN_MEZZO = '(?:[A-Za-z0-9-]{3,12}\\s+)?';
   const CODICE_INNOCUO = new RegExp([
     `codic[ei]\\s+${GETTONE_IN_MEZZO}${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_INNOCUO}|${COSA_FISICA})`,
     // Una chiave che apre una COSA, non un'identità: «la password del wifi», «il
-    // pin della sim». Qui non entra l'elenco dei qualificatori generici, perché
-    // «password cliente» e «password utente» sono credenziali a tutti gli effetti.
-    `(?:password|\\bpin\\b|parola d'ordine)\\s+${GETTONE_IN_MEZZO}${PRIMA_DEL_QUALIFICATORE}(?:${COSA_FISICA})`,
+    // pin della sim», «il token del parcheggio». Qui non entrano i qualificatori
+    // di IDENTITÀ, perché «password cliente» e «password utente» sono credenziali
+    // a tutti gli effetti; tutto il resto vale come per «codice».
+    `(?:password|\\bpin\\b|\\btoken\\b|passcode|parola d'ordine)\\s+${GETTONE_IN_MEZZO}`
+      + `${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_COSA}|${COSA_FISICA})`,
+    // La cosa innocua prima della parola di codice, nella stessa frase.
+    `(?:${QUALIFICATORE_COSA}|${COSA_FISICA})\\b[^.;:!?]{0,30}?\\b${PAROLA_DI_CODICE}`,
     'numero (?:di|d\')\\s*(?:serie|seriale|ordine|pratica|prenotazione|spedizione|tracciamento|fattura|cliente|biglietto)',
     // «Il codice di attivazione della SIM», «il codice di conferma della
     // prenotazione»: la cosa non sta attaccata a «codice», sta dopo la funzione.
