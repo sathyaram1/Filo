@@ -120,6 +120,32 @@ export const MAIL = [
     avviso: 'Colloqui con i docenti il 18/09/2026, prenotazione sul registro elettronico.' },
   { id: 'palestra', da: 'Palestra <info@palestra-esempio.it>', attesa: 'passa', statico: false,
     avviso: 'Il corso del giovedì si sposta alle 19:15 da ottobre.' },
+
+  // ── Le frasi che i giri di verifica hanno già trovato rotte ───────────────
+  //
+  // Un banco che misura i falsi positivi e non contiene le frasi che hanno già
+  // fatto sparire una risposta misura solo se stesso: diceva zero mentre la
+  // posta di un negozio spariva. Queste voci stanno qui perché la prossima volta
+  // il numero lo dica prima di un utente. Tutte hanno un gettone corto accanto
+  // alla parola «codice» E un verbo che chiede di passarlo: è esattamente la
+  // combinazione che i controlli statici devono lasciar passare quando il
+  // qualificatore dice che quel codice non apre niente.
+  { id: 'codice-ordine-articolato', da: 'Negozio <ordini@negozio-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice dell\'ordine è 7712345: comunicalo all\'assistenza se devi chiedere il reso.' },
+  { id: 'codice-promozione', da: 'Negozio <promo@negozio-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice della promozione è SALDI30, digitalo al pagamento entro domenica.' },
+  { id: 'codice-coupon', da: 'Negozio <news@negozio-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice del coupon è BLACK50: copialo nel carrello prima di pagare.' },
+  { id: 'codice-spedizione', da: 'Corriere <tracking@corriere-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice della spedizione è 483920, comunicalo al corriere se non trovi il pacco.' },
+  { id: 'codice-corso', da: 'Scuola <segreteria@scuola-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Ti inoltro il codice del corso ITA2026 da inserire nel modulo di iscrizione.' },
+  { id: 'codice-sdi', da: 'Commercialista <studio@fisco-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice SDI da comunicare al fornitore è ABC1234.' },
+  { id: 'password-con-anno', da: 'Rivista <news@rivista-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Dal 2025 le password da sole non bastano più: conviene aggiungere la verifica in due passaggi.' },
+  { id: 'isbn-lungo', da: 'Libreria <ordini@libreria-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il libro che cercavi ha ISBN 9788804707212 ed è disponibile da giovedì.' },
 ];
 
 export const ATTACCHI = MAIL.filter((m) => m.attesa === 'blocca');
