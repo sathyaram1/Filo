@@ -100,6 +100,42 @@
     return { Authorization: `Bearer ${t}` };
   }
 
+  // Etichetta con cui si MOSTRA un indirizzo che arriva da fuori. PURA.
+  //
+  // Un indirizzo dentro una segnalazione non lo sceglie Filo: lo scrive chi
+  // manda, e una segnalazione la manda chiunque, anche senza account. Quando
+  // quell'indirizzo diventa qualcosa su cui si clicca, la scritta che si legge
+  // deve dire dove si va — altrimenti è un'esca dentro una pagina di Filo.
+  //
+  // Cosa mangiava la vecchia scritta (i primi 80 caratteri dell'indirizzo,
+  // tagliati senza nemmeno un puntino): chi lo costruisce apposta sceglie cosa
+  // cade dentro quegli 80 caratteri, e `https://filo.app/guida/…@sito-di-un-
+  // estraneo.invalid/accedi` si leggeva come un indirizzo di Filo.
+  //
+  // Le tre regole, in ordine di importanza:
+  // 1. la parte prima della chiocciola NON si mostra mai: è lì solo per mentire
+  //    (`u.host` non la contiene);
+  // 2. l'host non si taglia MAI dalla coda, perché la coda è il posto vero
+  //    (`aggiornamento.filo.app.qualcosa.sito-di-un-estraneo.invalid` sarebbe la
+  //    stessa bugia un piano più sotto). Se è l'host a non entrare, si taglia da
+  //    DAVANTI e il puntino va all'inizio;
+  // 3. un indirizzo tagliato lo dice, con un carattere di troncamento.
+  // Fuori si passa l'indirizzo già normalizzato da `new URL` (in pagina:
+  // l'uscita di safeHref), così l'etichetta e la destinazione parlano dello
+  // stesso indirizzo. Se non si parsa, torna stringa vuota: chi chiama mostrerà
+  // l'indirizzo crudo, che però non è un collegamento.
+  const LINK_LABEL_MAX = 80;
+  function linkLabel(rawUrl, max) {
+    const limite = Number.isFinite(max) && max >= 8 ? Math.floor(max) : LINK_LABEL_MAX;
+    let u;
+    try { u = new URL(String(rawUrl || '')); } catch (_) { return ''; }
+    const host = u.host; // host = dominio + porta, senza credenziali davanti
+    const resto = `${u.pathname}${u.search}${u.hash}`;
+    if (host.length >= limite) return `…${host.slice(host.length - (limite - 1))}`;
+    if (host.length + resto.length <= limite) return `${host}${resto}`;
+    return `${host}${resto.slice(0, limite - host.length - 1)}…`;
+  }
+
   // Anti-duplicati (#370): id documento STABILE per una singola composizione di
   // feedback. Se il chiamante fornisce un submissionId, il documento viene creato
   // con quell'id; un secondo invio con lo stesso id (es. un tentativo andato in
