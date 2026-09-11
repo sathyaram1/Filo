@@ -72,7 +72,10 @@ export async function publishPublicView({ dryRun = false } = {}) {
   // Il contatore dei numeri: se manca lo crea, se è indietro lo allinea.
   const maxSeq = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
   let counter = null;
-  if (maxSeq > 0 && !dryRun) counter = await FB.ensureSeqCounter(maxSeq, { idToken: bearer });
+  // `allowLower` solo se abbiamo letto TUTTI i feedback: un contatore più alto
+  // del massimo `seq` esistente l'ha gonfiato qualcuno (farlo avanzare di uno è
+  // alla portata di chiunque) e va riportato in pari.
+  if (maxSeq > 0 && !dryRun) counter = await FB.ensureSeqCounter(maxSeq, { idToken: bearer, allowLower: complete });
 
   return { letti: feedbacks.length, complete, plan, maxSeq, counter, dryRun };
 }
