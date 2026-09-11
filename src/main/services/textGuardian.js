@@ -190,6 +190,7 @@ async function proponiNotifica(proposta = {}) {
   const inAttesa = await M.addPendingNotification({
     testo, kind, action, color, fiducia, origine, richiestaUtente, regolaAutomazione, produttore,
     ultimoMotivo: verdetto.motivo,
+    ultimaCausa: verdetto.causa || '',
   });
   cambiato();
   return { esito: 'in-attesa', inAttesa };
