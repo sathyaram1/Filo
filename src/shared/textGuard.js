@@ -122,14 +122,18 @@
   // e tenerne due diversi voleva dire proteggere la seconda risposta e non la
   // prima — quella che porta le parole dell'estraneo.
   //
-  // `blocked` è l'unica uscita che non contiene niente di nessuno: il comando
-  // non è nemmeno partito (terminale spento), e infatti non entra nel contesto.
+  // `blocked` è l'uscita di un comando che non è nemmeno partito (terminale
+  // spento): non contiene niente di nessuno e non entra nel contesto. Per il
+  // resto la risposta la dà `portaDentro` della fonte; una fonte nuova che non
+  // lo dichiara conta come se portasse dentro tutto, che è la direzione sicura.
   function haPortatoTestoDiAltri({ type, output, rejected } = {}) {
     if (rejected) return false;
-    if (!vaControllato(fiduciaDellAzione(type))) return false;
+    const fonte = FONTE_AZIONE[String(type || '').toUpperCase()];
+    if (!fonte || !vaControllato(fonte.fiducia)) return false;
     if (!output || typeof output !== 'object') return false;
     if (output.blocked) return false;
-    return true;
+    if (typeof fonte.portaDentro !== 'function') return true;
+    try { return !!fonte.portaDentro(output); } catch (_) { return true; }
   }
 
   // Come si chiama la fonte, per la frase che l'utente legge.
