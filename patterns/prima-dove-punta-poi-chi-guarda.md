@@ -8,6 +8,12 @@ Un indirizzo che non è di Filo riceve la stessa risposta per tutti — «non è
 roba mia» — e la riceve senza che Filo dica altro su di lui: non che è
 arrivato, non che è al sicuro, non che è cifrato.
 
+E la seconda metà, che vale anche quando l'indirizzo È di Filo: **Filo dice
+solo ciò che ha guardato**. Riconoscere la forma di un indirizzo non è aver
+visto il file. Se il canale non ha scaricato e decifrato quei byte, la risposta
+dice l'unica cosa vera in ogni caso — chi lo apre — e non che è arrivato né come
+viaggia.
+
 Con l'identità davanti nascono due risposte diverse per la stessa domanda: chi
 ha i permessi si vede controllare l'indirizzo, chi non li ha riceve una frase
 scritta per il caso normale — e quella frase, davanti a un indirizzo
