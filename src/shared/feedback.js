@@ -217,8 +217,9 @@
 
   // Carica un allegato (immagine O file) su Storage e lo classifica per la UI.
   // Usata dalla dashboard per allegare immagini/file ai COMMENTI dei feedback
-  // (#190.3). Lo storage path feedback/* è scrivibile da chiunque (storage.rules),
-  // quindi non serve token. Ritorna { kind:'img'|'file', url, name, type }.
+  // (#190.3). Su feedback/* chiunque può CREARE un allegato nuovo senza login
+  // (storage.rules), ma nessuno può sovrascriverne uno: niente token da passare
+  // di qui. Ritorna { kind:'img'|'file', url, name, type }.
   async function uploadAttachment(blob, name) {
     const u = await uploadImage(blob); // upload generico (usa blob.type)
     const type = (blob && blob.type) || '';
