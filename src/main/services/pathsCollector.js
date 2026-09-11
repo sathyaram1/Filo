@@ -117,12 +117,19 @@
     return out;
   }
 
+  // I messaggi dell'utente non vengono pubblicati: servono solo al modello che
+  // giudica, per capire se l'intento proposto dice davvero quello che l'utente
+  // voleva. Anche loro però entrano in quella domanda, e anche loro vanno su
+  // una riga: un messaggio a più righe apre nella domanda blocchi che il
+  // modello legge come sezioni, e il confine fra i dati e le regole si sfuma
+  // (#584, quarto giro).
   function sanitizeUserMessages(raws) {
     if (!Array.isArray(raws)) return [];
     return raws
       .filter((m) => typeof m === 'string' && m.trim())
       .slice(0, MAX_USER_MSGS)
-      .map((m) => m.length > MAX_USER_MSG_LEN ? m.slice(0, MAX_USER_MSG_LEN) : m);
+      .map((m) => Paths.unaRiga(m, MAX_USER_MSG_LEN))
+      .filter(Boolean);
   }
 
   // ------------------------ Normalizzazione URL --------------------------
