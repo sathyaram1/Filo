@@ -720,6 +720,8 @@
       // Un qualificatore innocuo («codice sconto») chiude la questione prima di
       // ogni altra considerazione.
       if (vicino(s, m.index, CODICE_INNOCUO)) continue;
+      // Una chiave del wifi nominata nella stessa frase: non è una credenziale.
+      if (vicino(s, m.index, PAROLE_WIFI, 80)) continue;
       // «Password» vale come la parola generica, non come parola forte. È la
       // metà gemella della lezione di «codice», e costa uguale: accanto a
       // «password» un gruppo di quattro cifre qualunque è quasi sempre un anno
