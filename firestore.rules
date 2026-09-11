@@ -523,31 +523,60 @@ service cloud.firestore {
     // Lo schema è validato a monte dal client: la raccolta passa per due LLM
     // distinti (intent guess + judge) che impediscono che dati raw dell'utente
     // finiscano qui dentro. Le regole sotto fanno solo il check di forma.
-    match /paths/{doc} {
-      allow read: if true;
+    //
+    // IL DOMINIO È UN SEGMENTO DEL PERCORSO (audit pre-alpha, #584). Prima i
+    // documenti stavano tutti in `paths/{doc}` con `allow read: if true`: con
+    // la chiave web — che sta nel repo pubblico ed è pubblica per design — una
+    // sola query scaricava la collezione INTERA, e in ogni documento c'era un
+    // `clientId` in chiaro. Da lì si ricucivano i percorsi della stessa persona
+    // su domini diversi: il profilo di navigazione che tutto il resto dell'app
+    // si sforza di non far uscire.
+    //
+    // Ora i percorsi stanno in `paths/<dominio>/entries`: si chiede un dominio
+    // alla volta e si riceve solo quello. L'elenco completo non è più un
+    // oggetto leggibile, e questo poggia su TRE cose insieme — toccarne una
+    // sola riapre la porta:
+    //   1. `paths/{domain}` (dove stanno anche i vecchi documenti piatti) è
+    //      chiuso in lettura: né i documenti di prima, né l'elenco dei domini
+    //      raccolti (che da solo direbbe chi frequenta cosa);
+    //   2. `entries` si legge solo sotto un dominio NOMINATO;
+    //   3. una collection group query su `entries` è negata perché in questo
+    //      file non esiste nessun match ricorsivo `/{p=**}/entries/{doc}`:
+    //      senza quello il motore rifiuta le query di gruppo. Aggiungerlo
+    //      significherebbe rimettere in piedi il download dell'intera raccolta.
+    //
+    // E il documento non porta più NULLA del mittente: niente `clientId`,
+    // niente `userAgent` — per riusare un percorso non serve sapere chi l'ha
+    // fatto. Anche `createdAt` arriva arrotondato all'ora (lo fa il client),
+    // così due percorsi su domini diversi non si ricuciono nemmeno per orario.
+    match /paths/{domain} {
+      // Vecchia forma piatta + elenco dei domini: chiusi, per sempre.
+      allow read, write: if false;
 
-      allow create: if
-        request.resource.data.keys().hasOnly(
-          ['domain', 'initialUrl', 'intent', 'steps', 'success',
-           'userAgent', 'clientId', 'createdAt']
-        )
-        && request.resource.data.domain is string
-        && request.resource.data.domain.size() > 0
-        && request.resource.data.domain.size() <= 253
-        && request.resource.data.initialUrl is string
-        && request.resource.data.initialUrl.size() <= 2000
-        && request.resource.data.intent is string
-        && request.resource.data.intent.size() <= 500
-        && request.resource.data.steps is list
-        && request.resource.data.steps.size() <= 30
-        && request.resource.data.success is bool
-        && request.resource.data.get('userAgent', '') is string
-        && request.resource.data.get('userAgent', '').size() <= 500
-        && request.resource.data.get('clientId', '') is string
-        && request.resource.data.get('clientId', '').size() <= 100;
+      match /entries/{doc} {
+        // Lettura per dominio. Il tetto sulla `limit` non protegge un segreto
+        // (questi dati sono condivisi per progetto): tiene solo la singola
+        // richiesta a una manciata di percorsi, quanti ne consuma il prompt.
+        allow get: if true;
+        allow list: if request.query.limit <= 200;
 
-      allow update: if false;
-      allow delete: if false;
+        allow create: if
+          request.resource.data.keys().hasOnly(
+            ['initialUrl', 'intent', 'steps', 'success', 'createdAt']
+          )
+          && domain.size() > 0
+          && domain.size() <= 253
+          && request.resource.data.initialUrl is string
+          && request.resource.data.initialUrl.size() <= 2000
+          && request.resource.data.intent is string
+          && request.resource.data.intent.size() <= 500
+          && request.resource.data.steps is list
+          && request.resource.data.steps.size() <= 30
+          && request.resource.data.success is bool
+          && request.resource.data.createdAt is timestamp;
+
+        allow update, delete: if false;
+      }
     }
 
     // ── Collezioni del backend di sicurezza (filo-security, DESIGN §13) ──────
