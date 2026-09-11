@@ -83,8 +83,8 @@ test('la pagina avvelenata fa aprire il suo indirizzo anche quando la frase vien
   const aperte = await app.evaluate(async () => {
     const { BrowserWindow } = require('electron');
     const win = BrowserWindow.getAllWindows()[0];
-    const tabs = win && win._filoTabs && win._filoTabs.listTabs ? win._filoTabs.listTabs() : [];
-    return tabs.map((t) => String(t.url || ''));
+    const snap = win && win._filoTabs ? win._filoTabs.snapshot() : { tabs: [] };
+    return (snap.tabs || []).map((t) => String(t.url || ''));
   });
   expect(
     aperte.filter((u) => u.includes('attacco.ru')),
