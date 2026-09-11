@@ -485,19 +485,34 @@
   // del suo ordine o del suo coupon.
   const PRIMA_DEL_QUALIFICATORE = '(?:(?:di|del|dello|della|dei|degli|delle|dell\'|d\'|al|allo|alla|all\'|ai|agli|alle'
     + '|nel|nello|nella|nell\'|il|la|lo|l\'|un|uno|una|un\')\\s*)?';
-  const QUALIFICATORE_INNOCUO = [
+  //
+  // L'elenco è diviso in due. Le COSE («sconto», «ordine», «bonifico») sono
+  // oggetti, pratiche, documenti: un codice che le riguarda non apre niente che
+  // appartenga alla persona, e vale per qualunque parola si usi per dire codice.
+  // Le IDENTITÀ («cliente», «utente», «destinatario») invece qualificano anche
+  // le credenziali vere: «password cliente» è una password, e quelle restano
+  // fuori dal salvataggio per pin, token e password. Finché l'elenco era uno
+  // solo, il salvataggio valeva per «codice» e basta, e la stessa frase con
+  // «token» al posto di «codice» faceva sparire la risposta.
+  const QUALIFICATORE_COSA = [
     'sconti?', 'promo\\w*', 'coupon', 'buoni?', 'saldi',
-    'ordin[ei]', 'client[ei]', 'utente', 'fornitore', 'negozio', 'carrello',
+    'ordin[ei]', 'negozio', 'carrello',
     'postale', 'fiscale', 'iban', 'bic', 'swift', 'ean', 'isbn', 'sdi', 'meccanografico',
-    'prodott[oi]', 'articol[oi]', 'lotto', 'seriale',
+    'prodott[oi]', 'articol[oi]', 'lotto', 'seriale', 'commessa', 'cig', 'cup',
     'prenotazione', 'pratica', 'tracciamento', 'spedizione', 'consegna', 'ritiro',
-    'fattura', 'contratto', 'bollettino', 'pagoPA', 'avviso', 'tributo',
+    'pacc[oh]i?', 'collo', 'corriere', 'bonific[oi]', 'pagament[oi]', 'rimbors[oi]',
+    'fattura', 'contratto', 'bollettino', 'bollett[ae]', 'polizza', 'pagoPA',
+    'avviso', 'tributo',
     'biglietto', 'abbonamento', 'tessera', 'iscrizione', 'cors[oi]', 'event[oi]',
-    'errore', 'colore', 'sorgente', 'civico', 'paese', 'destinatario', 'univoco',
-    'identificativo', 'a barre', 'catastale', 'ateco', 'stazione', 'aeroporto',
+    'errore', 'colore', 'sorgente', 'civico', 'paese',
+    'a barre', 'catastale', 'ateco', 'stazione', 'aeroporto',
     'iata', 'icao', 'vol[oi]', 'stanza', 'camera', 'avviamento', 'condominio',
     'filiale', 'agenzia', 'magazzino', 'deposito', 'ricevut[ae]', 'reso', 'garanzia',
   ].join('|');
+  const QUALIFICATORE_IDENTITA = [
+    'client[ei]', 'utente', 'fornitore', 'destinatario', 'univoco', 'identificativo',
+  ].join('|');
+  const QUALIFICATORE_INNOCUO = `${QUALIFICATORE_COSA}|${QUALIFICATORE_IDENTITA}`;
   // La COSA che un codice apre, quando è una cosa e non un'identità: un portone,
   // una bici, una SIM, il wifi di casa. Un codice che apre una porta non è una
   // credenziale, per quanto la frase lo chiami «codice di accesso».
