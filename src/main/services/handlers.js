@@ -2475,6 +2475,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // del compito è quella della sua fonte peggiore.
   let fiduciaTurno = globalThis.SN_TEXT_GUARD.FIDUCIA.PULITO;
   const fontiTurno = [];
+  // Gli ingredienti che stanno nel contesto prima di ogni azione (i documenti
+  // dell'editor): se ci sono, il turno nasce già contaminato.
+  for (const et of fontiIngredienti) {
+    fiduciaTurno = globalThis.SN_TEXT_GUARD.FIDUCIA.CONTAMINATO;
+    if (!fontiTurno.includes(et)) fontiTurno.push(et);
+  }
   // …e non riparte pulita a ogni messaggio: quello che il turno prima ha letto è
   // ancora nella conversazione, e continua a parlare al modello.
   for (const et of fontiContaminantiInContesto(cleanHistory)) {
