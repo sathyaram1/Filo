@@ -196,7 +196,14 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // era a un click dalla home ma non compariva affatto nel manifesto, così
   // l'agente diceva di non saperlo fare.
   const dash = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard.js'), 'utf8');
-  const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)].map((m) => m[1]);
+  // Le pagine dell'OWNER non stanno nel manifesto, e non devono starci: il
+  // manifesto dice a un utente qualunque cosa sa fare Filo, e la posta delle
+  // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
+  // admin, per questo l'indirizzo compare ancora nel file.
+  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
+  const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)]
+    .map((m) => m[1])
+    .filter((u) => !SOLO_OWNER.has(u));
   assert.ok(urls.length >= 2, `mi aspetto ≥2 icone della home con url filo://, trovate ${urls.length}`);
   const manifestText = CAP.CAPABILITIES.map((c) => `${c.invoke} ${c.desc}`).join('\n');
   for (const url of urls) {
