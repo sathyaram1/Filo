@@ -99,7 +99,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
     resolvedInVersion: '1.2.3',
     createdAt: '2026-01-01T00:00:00.000Z',
     resolvedAt: '2026-02-01T00:00:00.000Z',
-    clientIdHash: 'a'.repeat(32),
+    clientIdTag: 'a'.repeat(32),
     userNote: 'Adesso il bottone risponde al primo clic.',
     publishedAt: '2026-02-01T00:00:00.000Z',
     votes: {},
@@ -167,7 +167,7 @@ await prova('anonimo: elenca le schede pubbliche', () =>
 await prova('nella scheda NON c\'è il testo, l\'URL, lo user agent, gli screenshot, le note', async () => {
   const snap = await getDoc(doc(anon, 'feedback-public', 'FB1'));
   const d = snap.data() || {};
-  for (const campo of ['text', 'url', 'title', 'userAgent', 'images', 'files', 'notes', 'clientId', 'priority', 'pipeline']) {
+  for (const campo of ['text', 'url', 'title', 'userAgent', 'images', 'files', 'notes', 'clientId', 'clientIdHash', 'priority', 'pipeline']) {
     if (campo in d) throw new Error(`la scheda pubblica porta "${campo}"`);
   }
 });
@@ -190,13 +190,13 @@ await prova('owner: NON pubblica la scheda di un feedback APERTO', () =>
 await prova('owner: pubblica una scheda regolare', () =>
   assertSucceeds(setDoc(doc(admin, 'feedback-public', 'FB6'), {
     name: 'x', seq: 6, subSeq: 0, status: 'done', statusPublic: 'closed',
-    resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdHash: 'c',
+    resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdTag: 'c',
     userNote: 'u', publishedAt: 'p',
   })));
 await prova('routine: pubblica una scheda regolare', () =>
   assertSucceeds(setDoc(doc(routine, 'feedback-public', 'FB7'), {
     name: 'y', seq: 7, subSeq: 0, status: 'done', statusPublic: 'closed',
-    resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdHash: 'c',
+    resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdTag: 'c',
     userNote: 'u', publishedAt: 'p',
   })));
 
@@ -221,6 +221,43 @@ await prova('utente loggato: NON cambia il titolo col pretesto del voto', () =>
 await prova('utente loggato: segnala la riapertura (solo la sua chiave)', () =>
   assertSucceeds(updateDoc(doc(estraneo, 'feedback-public', 'FB1'), {
     'reopenRequests.u-estraneo': { at: '2026-09-11T00:00:00.000Z' },
+  })));
+
+
+console.log('\n— l\'impronta sulla scheda non raggruppa i fix per segnalatore —');
+await prova('owner: NON può mettere sulla scheda l\'impronta dell\'installazione', () =>
+  assertFails(setDoc(doc(admin, 'feedback-public', 'FB8'), {
+    name: 'x', seq: 8, status: 'done', clientIdHash: 'a'.repeat(32),
+  })));
+
+console.log('\n— i voti storici si possono travasare nella scheda —');
+await prova('owner: scrive i voti sulla scheda (il travaso dal documento)', () =>
+  assertSucceeds(setDoc(doc(admin, 'feedback-public', 'FB6'), {
+    name: 'x', seq: 6, subSeq: 0, status: 'done', statusPublic: 'closed',
+    resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdTag: 'c',
+    userNote: 'u', publishedAt: 'p',
+    votes: { 'uid-a': { vote: 'works', at: 'x', credibilitySnapshot: 1 } },
+    reopenRequests: { 'uid-b': { at: 'y' } },
+  })));
+
+console.log('\n— i percorsi: conoscenza condivisa, senza chi era —');
+await prova('anonimo: scrive un percorso senza identificativo', () =>
+  assertSucceeds(setDoc(doc(anon, 'paths', 'P1'), {
+    domain: 'esempio.test', initialUrl: '/carrello', intent: 'svuotare il carrello',
+    steps: [{ selector: '#a', action: 'click' }], success: true,
+    createdAt: new Date().toISOString(),
+  })));
+await prova('anonimo: NON ci può più attaccare il clientId', () =>
+  assertFails(setDoc(doc(anon, 'paths', 'P2'), {
+    domain: 'esempio.test', initialUrl: '/carrello', intent: 'svuotare il carrello',
+    steps: [], success: true, createdAt: new Date().toISOString(),
+    clientId: 'installazione-di-mario',
+  })));
+await prova('anonimo: NON ci può più attaccare lo user agent', () =>
+  assertFails(setDoc(doc(anon, 'paths', 'P3'), {
+    domain: 'esempio.test', initialUrl: '/carrello', intent: 'svuotare il carrello',
+    steps: [], success: true, createdAt: new Date().toISOString(),
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0)',
   })));
 
 console.log('\n— gli allegati: un file sì, l\'elenco no —');
