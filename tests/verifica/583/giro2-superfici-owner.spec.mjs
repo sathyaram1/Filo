@@ -142,10 +142,16 @@ test('nel menu App le voci riservate tornano a chi gestisce, e spariscono quando
       `«${voce}» non c'è più nemmeno per chi gestisce i feedback`,
     ).toBeVisible({ timeout: 5000 });
   }
-  const primo = popup;
-  await shell.evaluate(() => document.getElementById('nav-apps')?.click());
   // Il menu vive in una finestra a parte: finché quella di prima è ancora
   // aperta, riaprire darebbe la vecchia lista (o una finestra che sta morendo).
+  const primo = popup;
+  await app.evaluate(async ({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      let url = '';
+      try { url = w.webContents.getURL(); } catch (_) {}
+      if (url.startsWith('data:text/html')) { try { w.close(); } catch (_) {} }
+    }
+  });
   const chiusa = Date.now() + 5000;
   while (Date.now() < chiusa && !primo.isClosed()) {
     await new Promise((r) => setTimeout(r, 100));
