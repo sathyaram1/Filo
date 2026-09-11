@@ -997,7 +997,7 @@
     };
     const fieldPath = `votes.\`${uid}\``;
     const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
     const body = { fields: { votes: { mapValue: { fields: { [uid]: toFsValue(entry) } } } } };
@@ -1017,7 +1017,7 @@
     if (!uid) throw new Error('uid mancante');
     const fieldPath = `votes.\`${uid}\``;
     const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
     const res = await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields: {} }) });
@@ -1042,7 +1042,7 @@
     const entry = { at: new Date().toISOString() };
     const fieldPath = `reopenRequests.\`${uid}\``;
     const qs = `updateMask.fieldPaths=${encodeURIComponent(fieldPath)}`;
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    const endpoint = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
     const body = { fields: { reopenRequests: { mapValue: { fields: { [uid]: toFsValue(entry) } } } } };
