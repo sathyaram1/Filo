@@ -1280,6 +1280,14 @@
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
+  // Di una riga del diario tiene solo la parte che ha scritto Filo: il nome
+  // dell'azione, fino al primo separatore. Tutto quello che viene dopo è il
+  // pezzo che il modello ha riempito.
+  function soloParoleDiFilo(text) {
+    const s = String(text || '');
+    const i = s.search(/\s·\s|:\s/);
+    return (i < 0 ? s : s.slice(0, i)).trim();
+  }
   function activityRowFor(a) {
     if (!a) return null;
     // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
