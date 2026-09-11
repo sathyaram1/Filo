@@ -626,16 +626,30 @@
     return listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken });
   }
 
+  // I feedback CHIUSI più di recente (data di chiusura decrescente), non i più
+  // recenti per data d'invio. Serve a chi tiene aggiornata la bacheca: una
+  // segnalazione vecchia chiusa oggi sta in fondo alla lista per data d'invio,
+  // cioè fuori dalla pagina che si carica, e senza questa domanda la sua scheda
+  // non verrebbe scritta mai (niente bacheca, niente annuncio e niente crediti
+  // per chi l'aveva mandata). Qui invece è in cima. La data di chiusura è in
+  // chiaro sul documento, quindi si può ordinare; i feedback che non sono mai
+  // stati chiusi non ce l'hanno e Firestore li lascia fuori da sé.
+  // Serve il token dell'owner: la collezione non si legge senza.
+  async function listResolved({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '' } = {}) {
+    return listDirect(COLLECTION, { pageSize, timeoutMs, idToken, orderField: 'resolvedAt' });
+  }
+
   // La query vera e propria, senza ponti: la usano il main (col token
   // dell'owner), gli script e la vista pubblica (che non ha bisogno di token).
-  async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '' } = {}) {
-    // structuredQuery via runQuery, ordinamento per createdAt DESC.
+  async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '', orderField = 'createdAt' } = {}) {
+    // structuredQuery via runQuery, ordinamento decrescente sul campo chiesto
+    // (per data d'invio salvo che il chiamante ne chieda un altro).
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const body = {
       structuredQuery: {
         from: [{ collectionId }],
         orderBy: [
-          { field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' },
+          { field: { fieldPath: String(orderField || 'createdAt') }, direction: 'DESCENDING' },
         ],
         limit: pageSize,
       },
