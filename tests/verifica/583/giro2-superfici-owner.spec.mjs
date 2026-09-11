@@ -74,11 +74,13 @@ async function apriGriglia(page) {
   return grid;
 }
 
-async function apriMenuApp(shell, app) {
+async function apriMenuApp(shell, app, escludi) {
   await shell.evaluate(() => document.getElementById('nav-apps')?.click());
-  const scadenza = Date.now() + 5000;
+  const scadenza = Date.now() + 8000;
   while (Date.now() < scadenza) {
-    const win = app.windows().find((w) => w.url().startsWith('data:text/html'));
+    const win = app.windows().find((w) => (
+      !w.isClosed() && w !== escludi && w.url().startsWith('data:text/html')
+    ));
     if (win) {
       await win.waitForSelector('.item, .row', { timeout: 2000 }).catch(() => {});
       return win;
