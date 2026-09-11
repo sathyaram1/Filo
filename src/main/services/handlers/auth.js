@@ -238,6 +238,10 @@ module.exports = function register(on, ctx) {
         { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride },
         { idToken },
       );
+      // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
+      // entra, uno riaperto esce, la frase per chi ha segnalato cambia): la
+      // vista pubblica si rifà subito, non al prossimo caricamento.
+      scheduleViewSync({ delayMs: 1500, force: true });
       return { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
