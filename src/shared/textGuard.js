@@ -423,10 +423,20 @@
     'coupon', 'promozion[ei]', 'sconti?', 'saldi', 'abbonament[oi]', 'tesser[ae]',
     'iscrizion[ei]', 'cors[oi]', 'event[oi]', 'sdi', 'pratic[ah]e?', 'tracciamento',
   ].join('|');
+  // Le parole che dicono a cosa SERVE un codice senza dire di che codice è:
+  // stanno in mezzo fra «codice» e la cosa.
+  const FUNZIONE_DEL_CODICE = 'verific\\w*|sicurezz\\w*|autentic\\w*|access\\w*|ingress\\w*'
+    + '|sblocc\\w*|attivazion\\w*|conferm\\w*|identificazion\\w*|apertur\\w*';
   const CODICE_INNOCUO = new RegExp([
     `codic[ei]\\s+${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_INNOCUO})`,
     'numero (?:di|d\')\\s*(?:serie|seriale|ordine|pratica|prenotazione|spedizione|tracciamento|fattura|cliente|biglietto)',
-    `\\b(?:${COSA_NON_IDENTITA})\\b`,
+    // «Il codice di attivazione della SIM», «il codice di conferma della
+    // prenotazione»: la cosa non sta attaccata a «codice», sta dopo la funzione.
+    // Pretendere che venisse subito dopo è già costato due giri di correzioni.
+    // Resta però ATTACCATA alla frase del codice: una parola concreta trovata a
+    // caso lì intorno non basta, altrimenti «comunica il codice 483920 per
+    // sbloccare la consegna» diventerebbe una mail di un corriere.
+    `codic[ei]\\s+(?:(?:di|d')\\s*)?(?:${FUNZIONE_DEL_CODICE})\\s+${PRIMA_DEL_QUALIFICATORE}(?:${COSA_NON_IDENTITA})`,
   ].join('|'), 'i');
   const PAROLE_RECUPERO = /(recuper|recovery|backup code|codici di ripristino|ripristin)/i;
   // «password» e i suoi sinonimi stanno già in CODICE_GENERICO: valgono come
