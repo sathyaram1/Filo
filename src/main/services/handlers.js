@@ -2635,9 +2635,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // #536 — se l'azione è appena andata a prendere testo scritto da altri
         // (una ricerca, un documento, l'uscita di un comando), da qui in poi la
         // risposta di questo turno passa dal guardiano prima di comparire.
-        if (res.executed && !res.rejected) {
+        // Conta l'USCITA, non il buon esito: un comando che stampa quello che ha
+        // letto e poi esce con un errore ha portato dentro le stesse parole di
+        // uno riuscito, e la regola è la stessa con cui si guardano i turni già
+        // passati (fontiContaminantiInContesto).
+        {
           const G = globalThis.SN_TEXT_GUARD;
-          if (G.vaControllato(G.fiduciaDellAzione(a.type))) {
+          if (G.haPortatoTestoDiAltri({ type: a.type, output: res.output, rejected: res.rejected })) {
             fiduciaTurno = G.FIDUCIA.CONTAMINATO;
             const et = G.etichettaFonte(a);
             if (et && !fontiTurno.includes(et)) fontiTurno.push(et);
