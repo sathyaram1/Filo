@@ -1,5 +1,10 @@
 // Bacheca utente di Filo (filo://board/, DC1 + DC2).
 //
+// DA DOVE VENGONO I DATI (#583): dalla vista pubblica `feedback-public`, una
+// scheda per fix chiuso con i soli campi pubblici (titolo, numero, versione,
+// voti). La collezione dei feedback non si legge senza credenziali: qui non ne
+// arriva più niente, nemmeno per essere scartato.
+//
 // Superficie a PERMESSI RIDOTTI, NON owner-gated: gli anonimi leggono, per
 // votare serve il login. Mostra SOLO i miglioramenti già IN PRODUZIONE (fix
 // chiusi e usciti in una versione rilasciata, DB3) in chiave POSITIVA. Il
