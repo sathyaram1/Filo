@@ -364,9 +364,9 @@
   }
 
   // Lo dice sulla pillola, non solo nell'hover: chi ha mandato la segnalazione
-  // deve poter capire a colpo d'occhio che l'allegato è partito ed è illeggibile
-  // per lui, come già succede per lo screenshot lì accanto.
-  function markFileClosed(a, motivo, consegnato) {
+  // deve poter capire a colpo d'occhio che quell'allegato lui non lo apre, come
+  // già succede per lo screenshot lì accanto.
+  function markFileClosed(a, motivo, soloDestinatario) {
     a.title = motivo || '';
     a.classList.add('fb-file--closed');
     let nota = a.querySelector('.fb-file-note');
@@ -375,10 +375,11 @@
       nota.className = 'fb-file-note';
       a.appendChild(nota);
     }
-    // «Consegnato», non «inviato»: l'elenco mostra a ogni tester le
-    // segnalazioni di tutti, quindi questa pillola compare anche davanti
-    // all'allegato di un altro (#582, giro 3).
-    nota.textContent = consegnato ? '(consegnato)' : '(non disponibile)';
+    // Non «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti,
+    // quindi questa pillola compare anche davanti all'allegato di un altro
+    // (#582, giro 3). E non «consegnato» (#582, giro 5): se sia arrivato Filo
+    // non l'ha guardato. Dice chi lo apre, che è vero in ogni caso.
+    nota.textContent = soloDestinatario ? '(riservato)' : '(non disponibile)';
   }
 
   // Il clic su un allegato: scarica e decifra dal main, poi salva col nome vero.
