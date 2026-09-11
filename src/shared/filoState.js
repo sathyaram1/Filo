@@ -32,8 +32,10 @@
         return (b.id || 0) - (a.id || 0);
       });
       return sorted.map((t) => ({
+        id: t.id,
         url: t.url || '',
         title: t.title || '',
+        host: hostDi(t.url),
         active: !!t.active,
         lastAccessed: t.lastAccessed || null,
       }));
