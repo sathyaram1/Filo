@@ -152,3 +152,39 @@ test('un «allegato» che punta fuori dal deposito di Filo non porta da nessuna 
   }));
   expect(aperte.join(' '), 'il clic sull’esca ha aperto l’indirizzo di un estraneo').not.toContain('sito-di-un-estraneo');
 });
+
+// La coda della stessa famiglia (trovata nella verifica #582, giro 4): tolto il
+// clic, restava la PAROLA. Filo dichiarava consegnato — e cifrato con la chiave
+// di chi riceve le segnalazioni — un «allegato» che nel suo deposito non era
+// mai entrato, perché guardava prima CHI sta guardando e solo dopo DOVE punta
+// l'indirizzo. La pillola finta di chi metteva l'esca diventava così
+// indistinguibile da una vera, avvalorata da Filo.
+//
+// Senza il fix queste due diventano rosse: dicevano «(consegnato)» e
+// «(allegato consegnato)».
+test('un «allegato» che punta fuori dal deposito di Filo non si dichiara consegnato', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  const pillola = await elencoCon(page, { url: ESCA, name: 'schermata.png', type: 'image/png' });
+
+  // La nota arriva dal main: si aspetta che compaia, poi la si legge.
+  await expect(pillola.locator('.fb-file-note')).toHaveText('(non disponibile)', { timeout: 10_000 });
+  expect(await pillola.getAttribute('title')).not.toMatch(/consegnat/i);
+});
+
+test('uno screenshot che punta fuori dal deposito di Filo non si dichiara consegnato', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  await page.evaluate((url) => {
+    window.SN_FEEDBACK.list = async () => [{
+      _id: 'esca-img-582',
+      status: 'open',
+      text: 'guarda la schermata',
+      images: [url],
+      createdAt: new Date().toISOString(),
+    }];
+  }, 'https://sito-di-un-estraneo.invalid/schermata.png');
+  await page.locator('#refresh').click();
+
+  const segnaposto = page.locator('.fb-img-broken');
+  await expect(segnaposto).toHaveText('(immagine non disponibile)', { timeout: 10_000 });
+  expect(await segnaposto.getAttribute('title')).not.toMatch(/consegnat/i);
+});
