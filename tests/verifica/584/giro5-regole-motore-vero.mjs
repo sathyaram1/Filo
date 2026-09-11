@@ -156,9 +156,27 @@ await prova('anonimo: prendere sei percorsi di DUE domini in una sola richiesta 
   riuscita(r, 'batchGet coi nomi in mano');
 });
 
-await prova('anonimo: chiedere i nomi dei documenti di un dominio senza leggerli → negato', async () => {
-  const r = await get('/paths/esempio.it/entries?pageSize=300&mask.fieldPaths=__name__');
-  negato(r, 'listDocuments con maschera');
+// `listDocuments` è l'unica strada che NON dichiara una `limit` sua: il tetto
+// glielo mette il server (150 documenti per pagina nel motore vero, sotto il
+// tetto delle regole). Passa, ed è come dev'essere: è una lettura di UN dominio
+// nominato, la stessa che fa Filo, e la paginazione dentro un dominio i giri
+// passati l'avevano già trovata aperta per scelta. Quello che conta è che da
+// qui non si esca dal dominio — le due prove sotto.
+await prova('anonimo: i nomi dei documenti di un dominio nominato → passa, e resta dentro il tetto', async () => {
+  const r = await get('/paths/esempio.it/entries?pageSize=1000&mask.fieldPaths=__name__');
+  riuscita(r, 'listDocuments su un dominio');
+  const quanti = (JSON.parse(r.testo).documents || []).length;
+  if (quanti > 200) throw new Error(`una pagina sola ha reso ${quanti} documenti: il tetto non tiene`);
+});
+
+await prova('anonimo: la stessa strada sulla raccolta dei domini → negata', async () => {
+  const r = await get('/paths?pageSize=1000&mask.fieldPaths=__name__');
+  negato(r, 'listDocuments sui domini');
+});
+
+await prova('anonimo: la stessa strada coi documenti mancanti in chiaro → negata', async () => {
+  const r = await get('/paths?showMissing=true&pageSize=1000');
+  negato(r, 'listDocuments showMissing sui domini');
 });
 
 await prova('anonimo: chiedere le raccolte figlie di un singolo percorso → negato', async () => {
