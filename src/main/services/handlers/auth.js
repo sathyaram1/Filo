@@ -693,7 +693,11 @@ module.exports = function register(on, ctx) {
       await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
 
       const published = await publicCards({ fresh: true });
-      const plan = V.planSync(published, feedbacks);
+      // `complete`: il caricamento non ha toccato il tetto, quindi questi sono
+      // TUTTI i feedback che esistono — solo allora una scheda senza feedback
+      // è un orfano (feedback cancellato) e si può togliere.
+      const complete = raw.length < FB.LIST_PAGE_SIZE;
+      const plan = V.planSync(published, feedbacks, { complete });
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
 
