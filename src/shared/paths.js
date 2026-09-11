@@ -30,24 +30,6 @@
     || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
   const SUBMIT_FUNCTION = 'pathSubmit';
 
-  function toFsValue(v) {
-    if (v === null || v === undefined) return { nullValue: null };
-    if (typeof v === 'string') return { stringValue: v };
-    if (typeof v === 'boolean') return { booleanValue: v };
-    if (typeof v === 'number') {
-      return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-    }
-    if (Array.isArray(v)) {
-      return { arrayValue: { values: v.map(toFsValue) } };
-    }
-    if (typeof v === 'object') {
-      const fields = {};
-      for (const [k, vv] of Object.entries(v)) fields[k] = toFsValue(vv);
-      return { mapValue: { fields } };
-    }
-    return { stringValue: String(v) };
-  }
-
   function fromFsValue(val) {
     if (!val) return null;
     if ('stringValue' in val) return val.stringValue;
