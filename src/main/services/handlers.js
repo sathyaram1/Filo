@@ -2571,15 +2571,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const G = globalThis.SN_TEXT_GUARD;
     const TG = globalThis.SN_TEXT_GUARDIAN || require('./textGuardian');
     const origine = fontiTurno.join(' e ') || 'un contenuto non fidato';
+    // Chi ha scritto questa risposta. Viaggia con il controllo E con la coda: un
+    // controllo che riparte più tardi senza sapere chi ha scritto il testo non
+    // ha più nessuno da escludere, e finirebbe per farlo giudicare dallo stesso
+    // modello che l'ha prodotto.
+    let produttore = '';
     let verdetto;
     try {
       const s = await getEffectiveSettings();
+      produttore = modelForAction(s, ACTIONS.FILO_CHAT);
       verdetto = await TG.controllaTesto({
         testo: textReply,
         fiducia: fiduciaTurno,
         origine,
         richiestaUtente: internal ? '' : String(userMessage || ''),
-        produttore: modelForAction(s, ACTIONS.FILO_CHAT),
+        produttore,
       });
     } catch (_) {
       verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
