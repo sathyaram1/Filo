@@ -73,6 +73,10 @@ test('una segnalazione vecchia risolta oggi paga chi l\'ha mandata', async ({ ap
     }
     // La mia: mandata a maggio, cioè più vecchia di tutte quelle sopra.
     schede.push(scheda('la-mia-vecchia', '2026-05-20', mioHash));
+    // Un'altra mia, mandata di recente: è il controllo. Se anche questa non
+    // pagasse, il rosso non direbbe niente sulla finestra — direbbe che
+    // l'annuncio non funziona più per nessuno.
+    schede.push(scheda('la-mia-recente', '2026-08-30', mioHash));
 
     // Ordinamento e taglio come li fa Firestore: data d'invio decrescente,
     // `limit` = pageSize. La mia scheda esiste, ma è la 251esima.
