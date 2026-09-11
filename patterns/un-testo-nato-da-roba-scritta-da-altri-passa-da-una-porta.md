@@ -193,6 +193,17 @@ più la richiesta di passarlo — e un qualificatore innocuo chiude comunque la
 questione. Stessa storia per le carte: Luhn da solo non basta, un numero lungo su
 dieci lo passa per caso, e serve anche il prefisso di un circuito vero.
 
+Il qualificatore innocuo va riconosciuto **con l'articolo in mezzo**, che in
+italiano è la forma normale: si scrive «il codice dell'ordine» molto più spesso
+di «il codice ordine». La prima versione conosceva solo la forma secca, e la
+risposta continuava a sparire a chi chiedeva il codice del suo ordine, della
+promozione, del coupon. Un elenco di qualificatori che si allunga a mano è un
+elenco che sbaglia: quello che lo tiene onesto è il **banco delle mail simulate**,
+con la regola che **ogni frase innocua trovata fermata da un giro di verifica
+entra nel banco**. Per due giri il banco ha detto zero falsi positivi mentre la
+posta di un negozio spariva davvero, perché conteneva solo frasi che giravano
+intorno alla regola.
+
 ## Dove vive
 
 - `src/shared/textGuard.js` — logica pura: classi di fiducia, controlli statici,
