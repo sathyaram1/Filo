@@ -63,6 +63,25 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('shell:download', wrapped);
     },
   },
+  // Permessi che i siti chiedono (#586): il main manda la richiesta, la shell
+  // mostra la pastiglia "<sito> vuole usare la fotocamera" e risponde. Il main
+  // chiude la pastiglia da solo (canale `permissions:closed`) quando la pagina
+  // se ne va, la scheda muore o l'attesa scade — in tutti quei casi NEGA.
+  permissions: {
+    onRequest: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:request', wrapped);
+      return () => ipcRenderer.removeListener('permissions:request', wrapped);
+    },
+    onClosed: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:closed', wrapped);
+      return () => ipcRenderer.removeListener('permissions:closed', wrapped);
+    },
+    answer: (id, scelta, ricorda) => ipcRenderer.invoke('permissions:answer', { id, scelta, ricorda }),
+    forOrigin: (origine) => ipcRenderer.invoke('permissions:for-origin', { origine }),
+    revoke: (origine, chiave) => ipcRenderer.invoke('permissions:revoke', { origine, chiave }),
+  },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
   onMenuAction: (fn) => {
