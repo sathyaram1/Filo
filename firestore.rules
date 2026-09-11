@@ -455,7 +455,8 @@ service cloud.firestore {
     // solo i campi che possono stare sotto gli occhi di chiunque, e solo per i
     // feedback CHIUSI e mai segnalati dalla sicurezza. È ciò che la bacheca
     // (filo://board/) mostra e ciò su cui il popup delle ricompense riconosce i
-    // feedback di chi lo apre (per `clientIdHash`, che resta un hash).
+    // feedback di chi lo apre (per `clientIdTag`, un'impronta diversa su ogni
+    // scheda: chi legge la bacheca non può raggruppare i fix per segnalatore).
     //
     // Perché una vista e non una regola più furba sulla collezione vera: le
     // regole di Firestore decidono SE un documento si legge, non QUALI campi
@@ -481,7 +482,7 @@ service cloud.firestore {
       allow create, update: if (isAdmin() || isRoutine())
         && request.resource.data.keys().hasOnly(
              ['name', 'seq', 'subSeq', 'status', 'statusPublic', 'resolvedInVersion',
-              'createdAt', 'resolvedAt', 'clientIdHash', 'userNote', 'publishedAt',
+              'createdAt', 'resolvedAt', 'clientIdTag', 'userNote', 'publishedAt',
               'votes', 'reopenRequests'])
         // `status` solo fra quelli CHIUSI: un feedback aperto (e a maggior
         // ragione uno fermato dalla sicurezza) non ha una scheda pubblica.
@@ -496,8 +497,12 @@ service cloud.firestore {
         && request.resource.data.get('userNote', '').size() <= 500
         && request.resource.data.get('resolvedInVersion', '') is string
         && request.resource.data.get('resolvedInVersion', '').size() <= 40
-        && request.resource.data.get('clientIdHash', '') is string
-        && request.resource.data.get('clientIdHash', '').size() <= 64
+        // `clientIdTag` è l'impronta di QUESTA scheda per chi l'ha segnalata,
+        // non dell'installazione: cambia da una scheda all'altra, quindi chi
+        // legge la bacheca non può raggruppare i fix per segnalatore.
+        // `clientIdHash` (uguale su tutte le sue schede) NON è ammesso qui.
+        && request.resource.data.get('clientIdTag', '') is string
+        && request.resource.data.get('clientIdTag', '').size() <= 64
         && request.resource.data.get('createdAt', '') is string
         && request.resource.data.get('createdAt', '').size() <= 40
         && request.resource.data.get('resolvedAt', '') is string

@@ -274,13 +274,6 @@ module.exports = function register(on, ctx) {
   });
 
   // ── Ricompensa alla risoluzione di un feedback (C5) ─────────────────────────
-  // base(clientId): toglie il prefisso "owner:" applicato agli invii dell'admin,
-  // così l'install riconosce come "suoi" sia i feedback inviati da sloggato sia
-  // quelli marcati owner quando era loggato (stesso clientId di base).
-  function baseClientId(c) {
-    const s = String(c || '');
-    return s.startsWith('owner:') ? s.slice(6) : s;
-  }
 
   // Cosa legge chi ha mandato il feedback, quando gli viene detto che è risolto.
   // La scelta (la frase in chiaro sì, il report cifrato mai) sta nella logica
