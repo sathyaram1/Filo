@@ -3341,6 +3341,7 @@ module.exports = {
   handleAIRequest,
   maybeCategorizeAsync,
   wireSafebrowse,
+  wireTextGuardian,
   runTabTriageDecision,
   executeFiloAction,
 };
