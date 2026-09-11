@@ -551,7 +551,10 @@ service cloud.firestore {
     //
     // E il documento non porta più NULLA del mittente: niente `clientId`,
     // niente `userAgent` — per riusare un percorso non serve sapere chi l'ha
-    // fatto. `createdAt` arriva arrotondato al GIORNO (lo fa il client).
+    // fatto. `createdAt` arriva arrotondato al GIORNO (lo fa il client), e
+    // l'indirizzo di partenza arriva a segmenti ripuliti: `/u/[ID]/ordini/[ID]`
+    // e non `/u/mario.rossi/ordini/847362`, perché un nome utente è lo stesso
+    // su più siti e da solo rimetteva insieme i percorsi di una persona.
     //
     // L'OROLOGIO NON LO CHIUDONO QUESTE REGOLE, e vale la pena saperlo qui.
     // Su ogni documento Firestore scrive da sé `createTime`, al microsecondo, e
