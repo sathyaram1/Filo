@@ -303,12 +303,22 @@ module.exports = function register(on, ctx) {
         return { ok: false, error: 'Operazione riservata agli amministratori.' };
       }
       const url = String((msg && msg.url) || '');
+      const FB = globalThis.SN_FEEDBACK;
       // Solo URL https del bucket feedback: evita che questo canale diventi un
       // fetch arbitrario (SSRF) pilotato dal renderer.
-      if (!/^https:\/\/(firebasestorage\.googleapis\.com|storage\.googleapis\.com)\//.test(url)) {
+      if (!FB.isAttachmentUrl(url)) {
         return { ok: false, error: 'url allegato non valido' };
       }
-      const res = await fetch(url);
+      // #582: la lettura del bucket è riservata agli amministratori. L'URL
+      // salvato nel feedback porta il download token e da solo basterebbe, ma
+      // quel token può mancare (allegati storici) o essere revocato: qui siamo
+      // già dentro il ramo owner, quindi la richiesta va firmata con la sua
+      // identità. Se la sessione è scaduta si prosegue senza: con il token
+      // nell'URL l'allegato si vede lo stesso, e un allegato in meno è meglio
+      // di un errore al posto della dashboard.
+      let idToken = '';
+      try { idToken = (await auth.getIdToken()) || ''; } catch (_) { idToken = ''; }
+      const res = await fetch(url, { headers: FB.attachmentFetchHeaders(url, idToken) });
       if (!res.ok) return { ok: false, error: `download allegato fallito (${res.status})` };
       const raw = new Uint8Array(await res.arrayBuffer());
 
