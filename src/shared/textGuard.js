@@ -447,7 +447,7 @@
 
     FORMA_CARTA.lastIndex = 0;
     while ((m = FORMA_CARTA.exec(s))) {
-      if (isbnValido(m[0])) continue;
+      if (isbnValido(m[0]) || !formaDiCarta(m[0])) continue;
       if (luhnValido(m[0])) return esito('carta-di-credito', m[0].trim());
     }
 
