@@ -11,61 +11,30 @@
 //   2. INTENT_JUDGE   — vede l'intento proposto + i messaggi raw dell'utente.
 //                       Risponde {ok: true|false}. Solo 1 bit esce da qui.
 //
-// Se il judge dice ok, il documento viene scritto su Firestore con success
-// (true per 👍, false per 👎). I 👎 servono solo a noi per debug — non
-// vengono mandati come contesto ad altri agenti.
+// Se il judge dice ok, il percorso viene INVIATO AL SERVER (callable
+// `pathSubmit`), che riapplica la stessa pulizia deterministica e scrive lui.
+// Nessun client scrive più nella raccolta (firestore.rules → match /paths):
+// i due LLM qui sopra vivono sulla macchina di chi naviga e nessuna regola
+// poteva provare che fossero passati.
+//
+// La pulizia deterministica (redaction dei selettori, tetti, forma del dominio
+// e dell'URL, intento su una riga) NON sta più qui: è in
+// `src/shared/pathsSafety.js`, da dove la incorpora anche il server. Qui resta
+// la parte che può vivere solo sul client: i due LLM e i messaggi raw
+// dell'utente, che non escono dalla sua macchina.
 
 (function (global) {
   'use strict';
 
   const { ACTIONS } = global.SN_CONST;
   const Paths = global.SN_PATHS;
+  const Safety = global.SN_PATHS_SAFETY;
 
-  // ------------------------ Sanitizzazione selettori --------------------------
-  //
-  // I selettori prodotti dall'LLM possono contenere stringhe sensibili (es.
-  // [aria-label="Profilo di mario.rossi@x.it"]). Le redaction sotto sostituiscono
-  // i pattern sensibili con placeholder generici, in modo che il selettore
-  // resti "leggibile" per l'LLM consumer ma non porti dati identificabili.
-  //
-  // Dopo la redaction lasciamo che il chiamante (sidebar) verifichi sul DOM se
-  // il selettore redatto è ancora univoco; qui ci occupiamo solo della stringa.
-
-  const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-  const LONG_NUM_RE = /\b\d{6,}\b/g;
-
-  function redactSelector(selector) {
-    if (typeof selector !== 'string' || !selector) return '';
-    return selector
-      .replace(EMAIL_RE, '[EMAIL]')
-      .replace(LONG_NUM_RE, '[NUMERO]');
-  }
-
-  // Limiti difensivi per non far esplodere il documento Firestore.
-  const MAX_STEPS = 30;
-  const MAX_SELECTOR_LEN = 500;
+  // Limiti difensivi sui messaggi raw dell'utente: non escono dalla macchina
+  // (li vede solo il judge, che risponde 1 bit), ma un prompt non deve poter
+  // esplodere.
   const MAX_USER_MSG_LEN = 1000;
   const MAX_USER_MSGS = 20;
-
-  function sanitizeSteps(rawSteps) {
-    if (!Array.isArray(rawSteps)) return [];
-    const out = [];
-    for (const s of rawSteps) {
-      if (!s || typeof s !== 'object') continue;
-      const action = (s.action === 'fill' || s.action === 'reveal' || s.action === 'hover')
-        ? s.action : 'click';
-      let selector = redactSelector(s.selector);
-      if (!selector) continue;
-      if (selector.length > MAX_SELECTOR_LEN) selector = selector.slice(0, MAX_SELECTOR_LEN);
-      out.push({
-        selector,
-        action,
-        retracted: !!s.retracted,
-      });
-      if (out.length >= MAX_STEPS) break;
-    }
-    return out;
-  }
 
   function sanitizeUserMessages(raws) {
     if (!Array.isArray(raws)) return [];
@@ -75,54 +44,13 @@
       .map((m) => m.length > MAX_USER_MSG_LEN ? m.slice(0, MAX_USER_MSG_LEN) : m);
   }
 
-  // ------------------------ Normalizzazione URL --------------------------
-  //
-  // Per il matching futuro vogliamo URL "stabili": teniamo path (no query/hash)
-  // perché query e fragment di solito contengono parametri specifici dell'utente
-  // o stato di UI. Manteniamo invece il path completo perché spesso identifica
-  // la sezione del sito (es. /account/orders).
-
-  function parseUrl(rawUrl) {
-    if (!rawUrl || typeof rawUrl !== 'string') return null;
-    try {
-      return new URL(rawUrl);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function domainOf(rawUrl) {
-    const u = parseUrl(rawUrl);
-    if (!u) return '';
-    // hostname senza porta. Non strippiamo "www." per restare letterali:
-    // chi consuma può fare il matching come preferisce.
-    return (u.hostname || '').toLowerCase().slice(0, 253);
-  }
-
-  function normalizedPath(rawUrl) {
-    const u = parseUrl(rawUrl);
-    if (!u) return '';
-    let path = u.pathname || '/';
-    if (path.length > 2000) path = path.slice(0, 2000);
-    return path;
-  }
-
   // ------------------------ Estrazione output LLM --------------------------
 
-  // L'intent-guess produce una sola riga di testo. Difese:
-  // - tagliamo a 200 char,
-  // - togliamo virgolette/backtick/asterischi,
-  // - se vuoto o "intento non chiaro" → null.
+  // L'intent-guess produce una sola riga di testo. La ripuliamo con la pulizia
+  // condivisa (una riga, niente marcature, tetto ai caratteri) e in più
+  // riconosciamo la risposta "intento non chiaro", che significa: non salvare.
   function cleanGuessedIntent(text) {
-    if (typeof text !== 'string') return null;
-    let s = text.trim();
-    if (!s) return null;
-    // toglie eventuale wrapping markdown / quoting
-    s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
-    s = s.replace(/^[*_]+|[*_]+$/g, '').trim();
-    // prendi solo la prima linea (alcuni modelli sbordano)
-    s = s.split(/\r?\n/)[0].trim();
-    if (s.length > 200) s = s.slice(0, 200);
+    const s = Safety._internal.sanitizeIntent(typeof text === 'string' ? text : '');
     if (!s) return null;
     if (/^intento non chiaro\.?$/i.test(s)) return null;
     return s;
@@ -147,14 +75,14 @@
   // Ritorna { saved: bool, reason: string }. Non lancia: i fallimenti sono
   // reportati come reason testuale così il chiamante può loggare senza che
   // l'utente veda errori (è una pipeline best-effort di telemetria).
-  async function collectAndSave({ session, invokeAI, userAgent, clientId }) {
+  async function collectAndSave({ session, invokeAI, userAgent, clientId, idToken }) {
     if (!session || typeof session !== 'object') {
       return { saved: false, reason: 'session vuota' };
     }
-    const domain = domainOf(session.rawUrl);
+    const domain = Safety._internal.domainOf(session.rawUrl);
     if (!domain) return { saved: false, reason: 'dominio non valido' };
-    const initialUrl = normalizedPath(session.rawUrl);
-    const sanitizedSteps = sanitizeSteps(session.rawSteps);
+    const initialUrl = Safety._internal.normalizedPath(session.rawUrl);
+    const sanitizedSteps = Safety._internal.sanitizeSteps(session.rawSteps);
     if (!sanitizedSteps.length) return { saved: false, reason: 'nessuno step utile dopo sanitizzazione' };
 
     const rawUserMessages = sanitizeUserMessages(session.rawUserMessages);
@@ -186,7 +114,7 @@
     }
     if (!ok) return { saved: false, reason: 'judge ha rifiutato l\'intento' };
 
-    // 3. write
+    // 3. invio al server, che ripulisce di nuovo e scrive.
     try {
       const { id } = await Paths.submit({
         domain,
@@ -196,16 +124,25 @@
         success: !!session.success,
         userAgent: userAgent || '',
         clientId: clientId || '',
+        idToken: idToken || '',
       });
       return { saved: true, id, intent: guessedIntent };
     } catch (e) {
-      return { saved: false, reason: `firestore write fallito: ${e.message || e}` };
+      return { saved: false, reason: `invio al server fallito: ${e.message || e}` };
     }
   }
 
   global.SN_PATHS_COLLECTOR = {
     collectAndSave,
-    // Esposti per test/debug e per riuso in altri moduli.
-    _internal: { redactSelector, sanitizeSteps, sanitizeUserMessages, domainOf, normalizedPath, cleanGuessedIntent, parseJudgeOutput },
+    // Esposti per test/debug e per riuso in altri moduli. La pulizia
+    // deterministica è quella condivisa col server: qui è solo ri-esportata,
+    // non riscritta.
+    _internal: {
+      sanitizeUserMessages, cleanGuessedIntent, parseJudgeOutput,
+      redactSelector: Safety._internal.redactSelector,
+      sanitizeSteps: Safety._internal.sanitizeSteps,
+      domainOf: Safety._internal.domainOf,
+      normalizedPath: Safety._internal.normalizedPath,
+    },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
