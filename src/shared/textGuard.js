@@ -624,7 +624,8 @@
       // Il raggio è più largo perché la richiesta sta spesso nella frase dopo.
       const generico = vicino(s, m.index, CODICE_GENERICO)
         && vicino(s, m.index, CHIEDE_DI_PASSARLO, 100);
-      if (forte || generico) return esito('codice-usa-e-getta', m[0]);
+      if (forte) return esito('codice-usa-e-getta', m[0]);
+      if (generico) return esito('codice-da-comunicare', m[0]);
     }
 
     FORMA_IBAN.lastIndex = 0;
