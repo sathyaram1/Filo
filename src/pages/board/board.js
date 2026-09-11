@@ -558,7 +558,7 @@
     // loadData usa: su pagine filo:// `window.SN_FEEDBACK` può essere una vista
     // diversa da quella catturata qui, quindi i test non possono affidarsi a
     // rimpiazzare `window.SN_FEEDBACK.list`.
-    setList(fn) { if (typeof fn === 'function') FB.list = fn; },
+    setList(fn) { if (typeof fn === 'function') { FB.listPublic = fn; FB.list = fn; } },
   };
 
   if (document.readyState === 'loading') {
