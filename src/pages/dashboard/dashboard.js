@@ -1820,6 +1820,15 @@
           if (streamBubble) streamBubble.textContent = '';
           return;
         }
+        if (data.hold) {
+          // #536 — il turno ha letto roba scritta da altri: lo scorrimento in
+          // diretta si ferma qui e la risposta arriva a controllo fatto. Lo
+          // diciamo, invece di lasciare la bolla ferma senza spiegazione.
+          if (streamBubble) { streamBubble.remove(); streamBubble = null; }
+          streamedText = '';
+          pending.working('Controllo quello che ho letto…');
+          return;
+        }
         if (!data.delta) return;
         if (!streamBubble) {
           pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
