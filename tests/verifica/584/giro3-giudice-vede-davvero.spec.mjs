@@ -17,8 +17,8 @@ const PARTENZA = '/mariorossi/ordini';
 
 async function promptDelGiudice(app, payload) {
   return app.evaluate(async ({ app: _a }, { payload }) => {
-    const path = require('node:path');
-    const H = require(path.join(process.cwd(), 'src', 'main', 'services', 'handlers.js'));
+    const req = process.mainModule.require.bind(process.mainModule);
+    const H = req('./services/handlers');
     const P = globalThis.SN_PROVIDERS;
     const veroC = P.completeWithFallback;
     const veroS = P.streamCompleteWithFallback;
