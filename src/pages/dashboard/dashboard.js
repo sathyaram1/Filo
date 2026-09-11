@@ -729,7 +729,7 @@
       a.title = l.url;
       el.appendChild(a);
       const dest = G.destinazioneVisibile(l.url);
-      if (dest && dest !== l.etichetta) {
+      if (dest && !G.destinazioneGiaVisibile(l.etichetta, l.url)) {
         const chip = document.createElement('span');
         chip.className = 'dash-live-dest';
         chip.textContent = ` (${dest})`;
