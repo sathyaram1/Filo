@@ -96,7 +96,7 @@ async function segretiCorrenti() {
 // catena resta vuota, l'esito è 'in-attesa' — MAI 'passa': un controllo che non
 // si può fare non è un controllo superato.
 async function controllaTesto({
-  testo, fiducia, origine, richiestaUtente, regolaAutomazione, produttore,
+  testo, fiducia, origine, richiestaUtente, regolaAutomazione, produttore, produttoreAzione,
 } = {}) {
   const G = TG();
   if (!G) return { esito: 'in-attesa', motivo: 'controllo non disponibile', regola: '' };
@@ -139,7 +139,12 @@ async function controllaTesto({
   let causa = G.CAUSA.RETE;
   for (let i = 0; i < TENTATIVI_MAX; i++) {
     try {
-      const raw = await _eseguiModello({ messaggi, produttore });
+      // `produttoreAzione` dice con QUALE mestiere è stata costruita la catena di
+      // chi ha scritto il testo. Serve a ricostruirla uguale per sapere su quali
+      // modelli concreti sarebbe potuto girare: con il mestiere sbagliato
+      // l'interruttore dei pesi aperti sceglie un sostituto diverso, e il
+      // guardiano finirebbe proprio sul modello da cui doveva stare alla larga.
+      const raw = await _eseguiModello({ messaggi, produttore, produttoreAzione });
       const verdetto = G.leggiVerdetto(raw);
       if (verdetto) {
         if (verdetto.esito === 'passa') return { esito: 'passa', motivo: '', regola: '' };
@@ -176,11 +181,11 @@ async function proponiNotifica(proposta = {}) {
   if (!M || !G) return { esito: 'in-attesa' };
   const {
     testo, kind, action, color,
-    fiducia, origine, richiestaUtente, regolaAutomazione, produttore,
+    fiducia, origine, richiestaUtente, regolaAutomazione, produttore, produttoreAzione,
   } = proposta;
 
   const verdetto = await controllaTesto({
-    testo, fiducia, origine, richiestaUtente, regolaAutomazione, produttore,
+    testo, fiducia, origine, richiestaUtente, regolaAutomazione, produttore, produttoreAzione,
   });
 
   if (verdetto.esito === 'passa') {
@@ -210,7 +215,8 @@ async function proponiNotifica(proposta = {}) {
   }
 
   const inAttesa = await M.addPendingNotification({
-    testo, kind, action, color, fiducia, origine, richiestaUtente, regolaAutomazione, produttore,
+    testo, kind, action, color, fiducia, origine, richiestaUtente, regolaAutomazione,
+    produttore, produttoreAzione,
     ultimoMotivo: verdetto.motivo,
     ultimaCausa: verdetto.causa || '',
   });
@@ -251,6 +257,7 @@ async function riprendiInAttesa({ force = false } = {}) {
         richiestaUtente: voce.richiestaUtente,
         regolaAutomazione: voce.regolaAutomazione,
         produttore: voce.produttore,
+        produttoreAzione: voce.produttoreAzione,
       });
       if (verdetto.esito === 'in-attesa') {
         await M.updatePendingNotification(voce.id, {

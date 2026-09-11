@@ -2078,6 +2078,7 @@ async function sorvegliaTestiPersistenti(a, ctx) {
         origine: ctx.origine,
         richiestaUtente: ctx.richiestaUtente,
         produttore: ctx.produttore,
+        produttoreAzione: ACTIONS.FILO_CHAT,
       });
     } catch (_) {
       verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
@@ -2714,6 +2715,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         origine,
         richiestaUtente: internal ? '' : String(userMessage || ''),
         produttore,
+        produttoreAzione: ACTIONS.FILO_CHAT,
       });
     } catch (_) {
       verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
@@ -2738,6 +2740,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           testo: textReply, kind: 'info', fiducia: fiduciaTurno, origine,
           richiestaUtente: internal ? '' : String(userMessage || ''),
           produttore,
+          produttoreAzione: ACTIONS.FILO_CHAT,
           ultimoMotivo: verdetto.motivo,
           ultimaCausa: verdetto.causa || '',
         });
@@ -2972,6 +2975,7 @@ async function guardaLaHome({ message, suggestions, inputs }) {
       fiducia: inputs.fiducia,
       origine,
       produttore: modelForAction(inputs.settings, ACTIONS.FILO_DASHBOARD),
+      produttoreAzione: ACTIONS.FILO_DASHBOARD,
     });
   } catch (_) {
     verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
@@ -3599,7 +3603,7 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 // fanno lo stesso danno. Quindi si guarda DUE volte: sui nomi, per poter dire
 // all'utente quale voce ha sbagliato, e poi sui modelli concreti, che è l'unica
 // verifica che conta.
-async function runGuardiano({ messaggi, produttore }) {
+async function runGuardiano({ messaggi, produttore, produttoreAzione }) {
   const s = await getEffectiveSettings();
   const G = globalThis.SN_TEXT_GUARD;
   const catena = modelForAction(s, ACTIONS.GUARD_TEXT);
@@ -3617,7 +3621,7 @@ async function runGuardiano({ messaggi, produttore }) {
   // cui il guardiano deve stare alla larga.
   const suoi = new Set();
   try {
-    for (const t of buildAttemptChain(s, produttore, ACTIONS.FILO_CHAT)) {
+    for (const t of buildAttemptChain(s, produttore, produttoreAzione || ACTIONS.FILO_CHAT)) {
       const m = String(t.model || '').trim().toLowerCase();
       if (m) suoi.add(m);
     }
