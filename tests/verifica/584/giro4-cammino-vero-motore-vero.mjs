@@ -140,8 +140,16 @@ console.log('\n— tutta la pipeline: dalla sessione alla raccolta pubblica —'
   });
   esito(r.saved === true && r.queued === true, `la sessione entra in coda, non parte subito → ${r.reason || 'in coda'}`);
 
-  const { RITARDO_MAX_MS } = Collector._internal;
-  await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
+  // Si fa maturare la coda invece di spostare l'orologio in avanti: la data che
+  // il percorso si porta dentro è quella dell'istante in cui ESCE, e le regole
+  // rifiutano una data nel futuro (giustamente: è la riga che ha chiuso il
+  // percorso datato 2099 del terzo giro). Fingere che siano passate ventiquattro
+  // ore proverebbe un caso che nella vita non esiste.
+  const attesa = Collector._peek().map((v) => ({ ...v, nonPrimaDi: Date.now() - 1000 }));
+  disco.set('pathsOutbox', attesa);
+  Collector._reset();
+  Collector._setAuto(false);
+  await Collector.flush();
 
   const letti = await Paths.listByDomain(DOMINIO, { pageSize: 50, onlySuccess: true });
   const nuovo = letti.find((p) => p.intent === 'trovare gli ordini passati');
