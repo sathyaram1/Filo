@@ -765,8 +765,8 @@
       div.appendChild(src);
     }
     // #536 — la strada per vedere davvero cosa è stato fermato. Apre le
-    // Preferenze già sulla voce giusta del registro, invece di lasciare all
-    // 'utente il compito di scoprire che quel registro esiste.
+    // Preferenze già sulla voce giusta del registro, invece di lasciare a chi
+    // legge il compito di scoprire che quel registro esiste.
     if (bloccoId) {
       const vedi = document.createElement('button');
       vedi.type = 'button';
