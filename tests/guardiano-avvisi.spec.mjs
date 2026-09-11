@@ -159,6 +159,8 @@ test('col guardiano irraggiungibile l’avviso aspetta, e compare quando torna',
   await expect(attesa).toHaveCount(1, { timeout: 8_000 });
   await expect(attesa).toContainText('aspetta il controllo');
   await expect(home.locator('.dash-live-card')).not.toContainText('Foto del weekend');
+  // Si può anche togliere: un avviso in attesa non è una riga inamovibile.
+  await expect(attesa.locator('.dash-live-dismiss')).toHaveCount(1);
 
   // Il guardiano torna: l'avviso arriva, per intero, e l'attesa sparisce.
   await app.evaluate(async () => {
