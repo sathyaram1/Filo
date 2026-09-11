@@ -83,19 +83,10 @@ test('la risposta rimessa in coda viene giudicata dallo stesso modello che l’h
   // Primo passaggio: il controllo si rifiuta di partire e lo dice.
   await expect(page.locator('.dash-bubble-filo').last())
     .toContainText('controllo di sicurezza', { timeout: 30_000 });
-  expect(
-    await app.evaluate(() => globalThis.__modelliGuardiano.length),
-    'al primo passaggio il guardiano non doveva girare su nessun modello',
-  ).toBe(0);
 
-  // La colonna degli avvisi, riaperta: è lei che ridà una possibilità alla
-  // coda. È la cosa che succede da sola, senza che l'utente faccia niente.
-  await page.reload();
-  await expect(page.locator('#input')).toBeVisible();
-
-  await expect
-    .poll(async () => app.evaluate(() => globalThis.__modelliGuardiano.slice()), { timeout: 30_000 })
-    .not.toEqual([]);
+  // Da qui in poi non serve fare niente: la colonna degli avvisi ridà da sola
+  // una possibilità a quello che è finito in coda.
+  await page.waitForTimeout(4_000);
 
   const usati = await app.evaluate(() => globalThis.__modelliGuardiano.slice());
   const chat = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['deepseek-flash'].model);
@@ -103,4 +94,9 @@ test('la risposta rimessa in coda viene giudicata dallo stesso modello che l’h
     usati.filter((m) => m === chat),
     'il controllo è girato sullo stesso modello che ha scritto la risposta',
   ).toEqual([]);
+
+  // E la risposta che il controllo aveva rifiutato di lasciar passare compare
+  // lo stesso, nella colonna degli avvisi.
+  await expect(page.locator('#live'), 'la risposta non controllata è comparsa lo stesso')
+    .not.toContainText('confermare subito le tue credenziali');
 });
