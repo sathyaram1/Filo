@@ -182,6 +182,99 @@ test('un rifiuto del server non passa per un salvataggio riuscito', async () => 
   }
 });
 
+// Chi manda un percorso deve presentarsi, se no il limite di frequenza per
+// identità non ha su cosa appoggiarsi (#585, giro 1). L'identità è quella
+// dell'INSTALLAZIONE: c'è in ogni copia di Filo, il server la verifica, e non
+// chiede nessun login. Il token del login Google, che quasi nessuno ha fatto,
+// lasciava partire richieste senza mittente.
+const googleAuth = require(join(ROOT, 'src', 'main', 'auth', 'google-auth.js'));
+const anonAuth = require(join(ROOT, 'src', 'main', 'auth', 'anon-auth.js'));
+require(join(ROOT, 'src', 'shared', 'messages.js'));
+
+// Fa partire il solo handler SAVE_PATH, con tutto il resto finto, e restituisce
+// quello che è arrivato alla pipeline di invio.
+async function inviaUnPercorso() {
+  const handlers = new Map();
+  let ricevuto = null;
+  globalThis.SN_PATHS_COLLECTOR = {
+    collectAndSave: async (args) => { ricevuto = args; return { saved: true, id: 'x' }; },
+  };
+  globalThis.SN_PROVIDERS = globalThis.SN_PROVIDERS || {};
+  globalThis.SN_COSTS = globalThis.SN_COSTS || {};
+  globalThis.SN_WEB_SEARCH = globalThis.SN_WEB_SEARCH || {};
+
+  const { MSG } = globalThis.SN_MSG;
+  const register = require(join(ROOT, 'src', 'main', 'services', 'handlers', 'ai.js'));
+  register((tipo, fn) => handlers.set(tipo, fn), {
+    MSG,
+    handleAIRequest: async () => ({ text: 'ok' }),
+    getEffectiveSettings: async () => ({ provider: 'openrouter', apiKeys: { openrouter: 'k' } }),
+    modelForAction: () => '', buildAttemptChain: () => [], providerRouting: () => ({}),
+    openWeightsBlockReason: () => null, auditServedByLater: () => {}, applyLimitToChain: (c) => c,
+    Defaults: {}, isAdmin: () => false, broadcastToTabs: () => {},
+  });
+
+  await handlers.get(MSG.SAVE_PATH)({
+    type: MSG.SAVE_PATH,
+    payload: {
+      clientId: '',
+      session: {
+        rawUrl: 'https://esempio.it/conto',
+        rawSteps: [{ selector: '#fatture', action: 'click' }],
+        rawUserMessages: ['dove sono le fatture?'],
+        success: true,
+      },
+    },
+  }, {}, 'filo://sidebar');
+
+  // L'handler non aspetta: la raccolta è telemetria best-effort.
+  for (let i = 0; i < 200 && !ricevuto; i++) await new Promise((r) => setTimeout(r, 10));
+  return ricevuto;
+}
+
+async function conIdentita({ google, anonima }, fn) {
+  const vecchioGoogle = googleAuth.getIdToken;
+  const vecchioAnon = anonAuth.getIdToken;
+  googleAuth.getIdToken = google;
+  anonAuth.getIdToken = anonima;
+  try { return await fn(); } finally {
+    googleAuth.getIdToken = vecchioGoogle;
+    anonAuth.getIdToken = vecchioAnon;
+  }
+}
+
+test('un percorso parte con l’identità dell’installazione, anche senza login Google', async () => {
+  const inviato = await conIdentita({
+    google: async () => null,
+    anonima: async () => 'token-della-installazione',
+  }, inviaUnPercorso);
+  assert.ok(inviato, 'il percorso non è arrivato alla pipeline di invio');
+  assert.equal(inviato.idToken, 'token-della-installazione',
+    'senza identità il server può limitare solo per IP: il limite per identità chiesto da #585 resta senza niente sotto');
+});
+
+test('il login Google non cambia identità: è la stessa, collegata all’installazione', async () => {
+  const inviato = await conIdentita({
+    google: async () => 'token-di-chi-e-loggato',
+    anonima: async () => 'token-della-installazione',
+  }, inviaUnPercorso);
+  assert.equal(inviato.idToken, 'token-della-installazione');
+});
+
+test('identità dell’installazione irraggiungibile: si ripiega, e la raccolta non salta', async () => {
+  const conGoogle = await conIdentita({
+    google: async () => 'token-di-chi-e-loggato',
+    anonima: async () => { throw new Error('identità annullata sul server'); },
+  }, inviaUnPercorso);
+  assert.equal(conGoogle.idToken, 'token-di-chi-e-loggato');
+
+  const senzaNiente = await conIdentita({
+    google: async () => { throw new Error('offline'); },
+    anonima: async () => { throw new Error('nessuna connessione a internet'); },
+  }, inviaUnPercorso);
+  assert.ok(senzaNiente, 'un errore di identità ha fermato tutta la pipeline');
+});
+
 test('quello che la pulizia scarta non parte nemmeno', async () => {
   const vecchioFetch = globalThis.fetch;
   let chiamato = false;
