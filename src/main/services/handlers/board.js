@@ -179,31 +179,30 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Legge il documento feedback intero via REST (GET singolo, no proiezione):
-  // serve a BOARD_REOPEN per verificare idoneità con i dati FRESCHI dal server
+  // Legge la SCHEDA PUBBLICA del fix (`feedback-public/{id}`, #583): serve a
+  // BOARD_REOPEN per verificare l'idoneità con i dati FRESCHI dal server
   // (status/resolvedInVersion/reopenRequests), non con quanto il renderer ha in
-  // cache. Ritorna null se non trovato o in caso d'errore di rete.
+  // cache. È la scheda e non il documento perché il documento, da quando la
+  // collezione non è più pubblica, questa macchina non lo può aprire — e non
+  // deve: il testo e l'URL di quel feedback sono di chi l'ha mandato.
+  // Ritorna null se non trovato o in caso d'errore di rete.
   async function fetchFeedback(id) {
-    if (!FB?.rest) return null;
+    if (!FB?.getPublic) return null;
     try {
-      const url = `${FB.rest.FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?key=${FB.rest.API_KEY}`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      const doc = await res.json();
-      return FB.fsDocToObject(doc);
+      return await FB.getPublic(id);
     } catch (_) {
       return null;
     }
   }
 
-  // Legge SOLO il campo `votes` del documento feedback via REST (GET singolo,
-  // proiezione mask) — più leggero di un FB.list({pageSize:500}) per un solo
-  // documento. Ritorna {} se il documento non ha ancora voti o in caso d'errore
-  // (best-effort: il chiamante ha comunque appena scritto il proprio voto).
+  // Legge SOLO il campo `votes` della scheda pubblica (GET singolo, proiezione
+  // mask) — più leggero di una lista intera per un solo documento. Ritorna {}
+  // se la scheda non ha ancora voti o in caso d'errore (best-effort: il
+  // chiamante ha comunque appena scritto il proprio voto).
   async function fetchVotes(id) {
     if (!FB?.rest) return {};
     try {
-      const url = `${FB.rest.FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}` +
+      const url = `${FB.rest.FIRESTORE_BASE}/${FB.rest.VIEW_COLLECTION}/${encodeURIComponent(id)}` +
         `?mask.fieldPaths=votes&key=${FB.rest.API_KEY}`;
       const res = await fetch(url);
       if (!res.ok) return {};
