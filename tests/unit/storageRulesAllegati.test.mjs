@@ -44,8 +44,12 @@ const VIVO = RULES.replace(/\/\/[^\n]*/g, ' ');
 function bloccoFeedback(testo) {
   const i = testo.indexOf('match /feedback/');
   assert.notEqual(i, -1, 'manca il blocco match /feedback/…');
+  // Il corpo comincia dall'ULTIMA graffa della riga del match: le prime sono i
+  // segnaposto del percorso (`{file}`), e contarle sarebbe un blocco vuoto.
+  const fineRiga = testo.indexOf('\n', i);
+  const apertura = testo.lastIndexOf('{', fineRiga);
   let liv = 0;
-  for (let j = testo.indexOf('{', i); j < testo.length; j++) {
+  for (let j = apertura; j < testo.length; j++) {
     if (testo[j] === '{') liv++;
     else if (testo[j] === '}') {
       liv--;
