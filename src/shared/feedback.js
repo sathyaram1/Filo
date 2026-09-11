@@ -385,7 +385,8 @@
     } else if (res.status !== 404) {
       throw new Error(`firestore contatore non leggibile (${res.status})`);
     }
-    if (current >= value) return current;
+    if (current === value) return current;
+    if (current > value && !opts.allowLower) return current;
     const w = await fetch(`${docUrl}?updateMask.fieldPaths=value&key=${API_KEY}`, {
       method: 'PATCH',
       headers,
