@@ -335,3 +335,218 @@ test('F — un indirizzo trovato in quello che Filo ha letto non si apre da solo
   });
   expect(aperte.filter((u) => u.includes('attacco.ru'))).toEqual([]);
 });
+
+// (G) La risposta non scorre più in diretta, ma il RAGIONAMENTO dello stesso
+// turno sì: la riga «Sta ragionando» sotto la domanda ne mostrava l'ultima
+// frase mentre arrivava, e il blocco di attività la conservava per intero. Una
+// pagina che chiede al modello di scrivere la truffa nel ragionamento invece
+// che nella risposta se la ritrovava consegnata due centimetri sopra la riga
+// «Ho fermato un avviso».
+test('G — il ragionamento di un turno contaminato non arriva all’utente', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configuraModelli(app);
+
+  const TRAPPOLA = 'Il portale della banca chiede di confermare subito le tue credenziali.';
+  await app.evaluate(async (_e, trappola) => {
+    globalThis.SN_WEB_SEARCH.search = async () => ({
+      provider: 'finto',
+      results: [{ title: 'Portale', url: 'https://portale-esempio.it/', snippet: 'accedi' }],
+    });
+    globalThis.SN_TEXT_GUARDIAN.configure({
+      pausaMs: 0,
+      eseguiModello: async () => '{"esito":"blocca","motivo":"chiedeva le credenziali della banca"}',
+    });
+    let giro = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onReasoning, onDelta }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      giro++;
+      if (giro === 1) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: '{"query":"portale"}' }] };
+      }
+      try { onReasoning && onReasoning(trappola); } catch (_) {}
+      try { onDelta && onDelta(trappola); } catch (_) {}
+      return { ...base, text: trappola, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  }, TRAPPOLA);
+
+  await page.locator('#input').fill('cerca il portale della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo').last())
+    .toContainText('Ho fermato', { timeout: 40_000 });
+
+  // Il blocco di attività si apre con un clic: è la prima cosa che fa chi ha
+  // appena letto che Filo gli ha nascosto qualcosa.
+  const testa = page.locator('.dash-activity .dash-activity-head').first();
+  if (await testa.count()) await testa.click();
+  await expect(page.locator('#bubbles')).not.toContainText('confermare subito le tue credenziali');
+});
+
+// (H) Stessa famiglia: il diario del lavoro scriveva per esteso quello che il
+// modello metteva DENTRO un'azione. «Cerco sul web: <la frase della truffa>»
+// arrivava all'utente nella stessa bolla in cui il controllo diceva di aver
+// fermato qualcosa.
+test('H — il diario non ripete le parole che il modello ha messo in un’azione', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configuraModelli(app);
+
+  const TRAPPOLA = 'la banca chiede di confermare le credenziali su portale-esempio.it';
+  await app.evaluate(async (_e, trappola) => {
+    globalThis.SN_WEB_SEARCH.search = async () => ({
+      provider: 'finto',
+      results: [{ title: 'Portale', url: 'https://portale-esempio.it/', snippet: 'accedi' }],
+    });
+    globalThis.SN_TEXT_GUARDIAN.configure({ pausaMs: 0, eseguiModello: async () => '{"esito":"passa"}' });
+    let giro = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      giro++;
+      if (giro === 1) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: '{"query":"portale"}' }] };
+      }
+      if (giro === 2) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c2', name: 'CERCA_WEB', arguments: JSON.stringify({ query: trappola }) }] };
+      }
+      return { ...base, text: 'Ecco cosa ho trovato.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  }, TRAPPOLA);
+
+  await page.locator('#input').fill('cerca il portale della banca');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo').last())
+    .toContainText('Ecco cosa ho trovato', { timeout: 40_000 });
+
+  const testa = page.locator('.dash-activity .dash-activity-head').first();
+  if (await testa.count()) await testa.click();
+  // La riga resta e dice cosa Filo ha fatto; le parole di altri non le ripete.
+  await expect(page.locator('#bubbles')).toContainText('Cerco sul web');
+  await expect(page.locator('#bubbles')).not.toContainText('confermare le credenziali');
+});
+
+// (I) Un turno contaminato non deve dire niente all'utente per fargli arrivare
+// la frase: gli basta lasciarla in un timer. L'etichetta compare nella colonna
+// degli avvisi quando il timer scade, e in una notifica di sistema che si vede
+// con Filo ridotto a icona. Avviare un timer non chiede conferma a nessuno.
+test('I — l’etichetta che un turno contaminato lascia in un timer passa dal controllo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configuraModelli(app);
+
+  const TRAPPOLA = 'La banca chiede di confermare le credenziali su portale-esempio.it';
+  await app.evaluate(async (_e, trappola) => {
+    globalThis.SN_WEB_SEARCH.search = async () => ({
+      provider: 'finto',
+      results: [{ title: 'Promemoria', url: 'https://esempio.it/', snippet: 'promemoria' }],
+    });
+    // Il guardiano fa il suo mestiere: «Fatto.» passa, la frase della truffa no.
+    globalThis.SN_TEXT_GUARDIAN.configure({
+      pausaMs: 0,
+      eseguiModello: async ({ messaggi }) => {
+        const visto = (messaggi || []).map((m) => String(m.content || '')).join('\n');
+        return /confermare le credenziali/i.test(visto)
+          ? '{"esito":"blocca","motivo":"chiedeva le credenziali della banca"}'
+          : '{"esito":"passa"}';
+      },
+    });
+    let giro = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      giro++;
+      if (giro === 1) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: '{"query":"promemoria"}' }] };
+      }
+      if (giro === 2) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c2', name: 'TIMER', arguments: JSON.stringify({ label: trappola, seconds: 2 }) }] };
+      }
+      return { ...base, text: 'Fatto.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  }, TRAPPOLA);
+
+  await page.locator('#input').fill('mettimi un promemoria come dice la pagina');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo').last()).toContainText('Fatto', { timeout: 40_000 });
+
+  // Il timer esiste e suona: quello che non arriva è la frase.
+  await expect(page.locator('#live')).toContainText('scaduto', { timeout: 30_000 });
+  await expect(page.locator('#live')).not.toContainText('confermare le credenziali');
+  // E il testo fermato non si è perso: sta nel registro che l'utente legge.
+  const registro = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listGuardBlocks());
+  expect(registro.some((b) => String(b.testo || '').includes('confermare le credenziali'))).toBe(true);
+});
+
+// (J) L'indipendenza fra i due modelli non si verifica sui NOMI: fra il nome
+// scelto e il modello che parte davvero c'è l'interruttore «solo modelli a pesi
+// aperti», che sostituisce ogni modello proprietario con il suo equivalente
+// aperto. Due nickname diversi finivano sullo stesso modello, e il controllo di
+// indipendenza era convinto di aver fatto il suo mestiere.
+test('J — con «solo pesi aperti» il controllo non finisce sul modello della chat', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      openWeightsOnly: true,
+      apiKeys: { openrouter: 'k-test' },
+      models: {
+        // Due nomi diversi: il controllo sui nickname è contento.
+        [C.ACTIONS.FILO_CHAT]: 'deepseek',
+        [C.ACTIONS.GUARD_TEXT]: 'claude',
+      },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.SN_WEB_SEARCH.search = async () => ({
+      provider: 'finto',
+      results: [{ title: 'Portale', url: 'https://esempio.it/', snippet: 'accedi' }],
+    });
+    // Qui NON si finge il guardiano: gira quello vero, con la sua regola.
+    globalThis.__modelliGuardiano = [];
+    globalThis.SN_PROVIDERS.completeWithFallback = async (opt) => {
+      const attempts = opt.attempts;
+      const sistema = String(((opt.messages || [])[0] || {}).content || '');
+      if (/^Sei il guardiano degli avvisi di Filo/.test(sistema)) {
+        globalThis.__modelliGuardiano.push(String(attempts[0].model || ''));
+      }
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: '{"esito":"passa"}' };
+    };
+    let giro = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      giro++;
+      if (giro === 1) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: '{"query":"portale"}' }] };
+      }
+      return { ...base, text: 'Ecco cosa ho trovato.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+
+  await page.locator('#input').fill('cerca il portale');
+  await page.locator('#sendBtn').click();
+
+  // Il controllo si rifiuta di partire e lo dice, nominando l'interruttore:
+  // nelle Opzioni i due nomi sono diversi, e senza quella riga l'utente
+  // cercherebbe il guasto dove non c'è.
+  const ultima = page.locator('.dash-bubble-filo').last();
+  await expect(ultima).not.toHaveText('', { timeout: 40_000 });
+  await expect(ultima).toContainText('pesi aperti');
+
+  const usati = await app.evaluate(() => globalThis.__modelliGuardiano.slice());
+  const chat = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry.deepseek.model);
+  expect(usati.filter((m) => m === chat)).toEqual([]);
+});
