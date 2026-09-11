@@ -257,8 +257,10 @@
     'numero di serie', 'numero d\'ordine', 'numero di pratica',
   ].join('|'), 'i');
   const PAROLE_RECUPERO = /(recuper|recovery|backup code|codici di ripristino|ripristin)/i;
-  const PAROLE_PASSWORD = /(password|parola d'ordine|parola chiave|pwd|passphrase)/i;
-  const PAROLE_CHIAVE = /(chiave|key|secret|segreto|api[- ]?key|bearer)/i;
+  // «password» e i suoi sinonimi stanno già in CODICE_GENERICO: valgono come
+  // parola generica, e da soli non fermano niente. Le forme inequivocabili
+  // («password temporanea», «password: hunter2») le prendono CODICE_FORTE e
+  // FORMA_PASSWORD_ESPLICITA.
 
   // Un codice usa e getta: un gettone isolato di 4-8 caratteri. La forma da sola
   // non basta — `codiceUsaEGetta` scarta quello che è solo una parola maiuscola
