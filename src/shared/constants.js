@@ -1377,8 +1377,10 @@
       `Dominio: ${domain}\n` +
       `Pagina di partenza: ${initialUrl}\n\n` +
       `Sequenza di azioni eseguite (in ordine):\n` +
+      // Una riga per azione, e una riga vuol dire una riga: il nome
+      // dell'elemento lo scrive il sito (#584, quarto giro).
       (Array.isArray(steps) && steps.length
-        ? steps.map((s, i) => `  ${i + 1}. ${s.action || 'click'} su ${s.selector || '(selettore mancante)'}${s.retracted ? ' [poi corretto]' : ''}`).join('\n')
+        ? steps.map((s, i) => `  ${i + 1}. ${unaRigaDiDati(s.action || 'click', 40)} su ${unaRigaDiDati(s.selector, 500) || '(selettore mancante)'}${s.retracted ? ' [poi corretto]' : ''}`).join('\n')
         : '  (nessuna azione)') +
       `\n\nRegole:\n` +
       `- Rispondi con UNA frase breve (max 80 caratteri) in italiano, in forma infinitiva (es. "trovare gli ordini passati", "modificare la lingua dell'account", "annullare un abbonamento").\n` +
