@@ -1157,6 +1157,7 @@
     // Il contatore dei numeri (l'owner lo crea e lo rimette in pari).
     ensureSeqCounter,
     nextSeq,
+    maxSeq,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     listHitCap,
