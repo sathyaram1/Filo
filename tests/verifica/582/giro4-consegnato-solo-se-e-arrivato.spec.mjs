@@ -26,24 +26,14 @@ const DENTRO = 'https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebases
 test('il canale degli allegati guarda l’indirizzo prima di dire che è consegnato', async ({ openTab }) => {
   const page = await openTab(RIQUADRO);
   const risposte = await page.evaluate(async ({ fuori, dentro }) => {
-    const chiedi = (url) => new Promise((res) => {
-      const id = `p${Math.random()}`;
-      const on = (ev) => {
-        const m = ev.data;
-        if (!m || m.__id !== id) return;
-        window.removeEventListener('message', on);
-        res(m.payload);
-      };
-      window.addEventListener('message', on);
-      window.postMessage({ __id: id, payload: null }, '*');
-      res(null);
-    });
-    void chiedi;
     // La pagina ha già la sua porta verso il main: la si usa com'è.
-    const inviaChrome = (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, res));
+    const invia = (msg) => {
+      if (window.filo?.message) return window.filo.message(msg);
+      return new Promise((res) => window.chrome.runtime.sendMessage(msg, res));
+    };
     return {
-      fuori: await inviaChrome({ type: 'feedback_decrypt_image', url: fuori, mime: 'text/plain' }),
-      dentro: await inviaChrome({ type: 'feedback_decrypt_image', url: dentro, mime: 'text/plain' }),
+      fuori: await invia({ type: 'feedback_decrypt_image', url: fuori, mime: 'text/plain' }),
+      dentro: await invia({ type: 'feedback_decrypt_image', url: dentro, mime: 'text/plain' }),
     };
   }, { fuori: ESTRANEO, dentro: DENTRO });
 
