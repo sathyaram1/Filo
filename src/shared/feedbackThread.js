@@ -505,7 +505,7 @@
   // questo turno (serializzati come righe-marcatore subito sotto al testo).
   function appendUserTurn(oldNotes, replyText, opts) {
     const o = opts || {};
-    const reply = String(replyText || '').trim();
+    const reply = neutralizzaMarcatori(String(replyText || '').trim());
     const attBlock = attachmentsBlock(o.attachments);
     // Una risposta fatta di soli allegati (senza parole) è valida.
     if (!reply && !attBlock) return String(oldNotes || '');
