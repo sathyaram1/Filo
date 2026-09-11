@@ -24,6 +24,8 @@
     "feedback:backfill": "node scripts/backfill-feedback-numbers.mjs",
     "feedback:auto-archive": "node scripts/auto-archive.mjs",
     "feedback:login": "node scripts/admin-login.mjs",
+    "deploy:regole": "firebase deploy --only firestore:rules,firestore:indexes",
+    "purga:percorsi-vecchi": "firebase firestore:delete paths --shallow",
     "build": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always",
     "build:mac": "electron-builder --mac --publish never",
