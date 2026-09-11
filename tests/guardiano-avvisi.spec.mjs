@@ -126,9 +126,22 @@ test('una mail normale diventa un avviso, col mittente e la destinazione vera de
   await expect(carta).toContainText('Foto del weekend');
   // Da chi viene: l'utente deve sapere di chi si sta fidando.
   await expect(carta.locator('.dash-live-origin')).toContainText('Marco Bianchi');
-  // Dove porta davvero il collegamento, scritto, prima che si apra.
-  await expect(carta.locator('.dash-live-dest')).toHaveText('(album.esempio.it)');
+  // Dove porta davvero il collegamento: qui l'etichetta È già il dominio, e si
+  // legge sulla carta; l'indirizzo completo è quello del link, non un altro.
+  await expect(carta).toContainText('album.esempio.it');
   await expect(carta.locator('a.dash-live-link')).toHaveAttribute('href', 'https://album.esempio.it/weekend');
+
+  // Quando invece l'etichetta è una frase («apri le foto») il dominio non si
+  // vedrebbe: allora viene scritto accanto. È il caso che conta davvero, perché
+  // è la forma con cui un link travestito arriva all'utente.
+  await app.evaluate(async () => globalThis.SN_TEXT_GUARDIAN.proponiNotifica({
+    testo: 'Marco ha caricato le foto: [apri le foto](https://album.esempio.it/weekend)',
+    kind: 'info',
+    fiducia: 'contaminato',
+    origine: 'una mail di Marco Bianchi',
+  }));
+  const conFrase = home.locator('.dash-live-card', { hasText: 'apri le foto' });
+  await expect(conFrase.locator('.dash-live-dest')).toHaveText('(album.esempio.it)', { timeout: 8_000 });
 });
 
 test('col guardiano irraggiungibile l’avviso aspetta, e compare quando torna', async ({ app, openTab, testServer }) => {
