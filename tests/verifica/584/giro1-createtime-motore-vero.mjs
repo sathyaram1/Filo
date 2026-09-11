@@ -1,6 +1,21 @@
-// Verifica #584 — il canale che resta: `createTime`, la marca temporale che
-// Firestore mette da sé su ogni documento e restituisce a chiunque legga.
-// Si parla REST esattamente come fa SN_PATHS.listByDomain.
+// Verifica #584 giro 1 — il canale che resta: `createTime`, la marca temporale
+// che Firestore mette da sé su ogni documento e restituisce a chiunque legga.
+// Si parla REST esattamente come fa SN_PATHS.listByDomain, senza credenziali.
+//
+// È la PROVA DEL RILIEVO del giro: `createdAt` viene arrotondato all'ora dal
+// client proprio perché un orario al secondo è una chiave di join fra domini
+// diversi — ma `createTime` torna al lettore al microsecondo, e il client non
+// può né scriverlo né sopprimerlo finché la lettura è diretta.
+//
+// Come sopra, vuole Java e l'emulatore: stessa cartella usa-e-getta del file
+// accanto, poi
+//   npx firebase emulators:exec --only firestore --project filo-createtime-584 \
+//     "node /tmp/emu584/giro1-createtime-motore-vero.mjs"
+//
+// Esito del giro 1 (2026-09-11): due percorsi su due domini diversi, scritti a
+// meno di un secondo l'uno dall'altro, hanno `createdAt` identico e
+// arrotondato (2026-09-11T17:00:00Z) e `createTime` distanti 0,967 s — mentre
+// un terzo percorso, di ore dopo, dista 2,5 s. Il join regge.
 const HOST = 'http://127.0.0.1:8089';
 const P = 'filo-createtime-584';
 const BASE = `${HOST}/v1/projects/${P}/databases/(default)/documents`;
