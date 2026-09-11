@@ -518,13 +518,14 @@
 
     // 3. in coda. NON si scrive adesso: vedi la testata.
     try {
-      const { id } = await accoda({
+      const { id, piena } = await accoda({
         domain,
         initialUrl,
         intent: guessedIntent,
         steps: sanitizedSteps,
         success: !!session.success,
       });
+      if (piena) return { saved: false, reason: 'coda dei percorsi piena' };
       return { saved: true, queued: true, id, intent: guessedIntent };
     } catch (e) {
       return { saved: false, reason: `coda percorsi fallita: ${e.message || e}` };
