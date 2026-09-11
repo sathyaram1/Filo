@@ -3399,6 +3399,16 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 // testo: `catenaGuardiano` toglie dalla sua catena i nickname del produttore, e
 // se non resta niente la chiamata fallisce con un codice che il guardiano
 // riconosce — l'avviso finisce in coda, MAI mostrato senza controllo.
+//
+// I NOMI NON BASTANO. Fra il nome scelto e il modello che parte davvero c'è chi
+// lo riscrive: l'interruttore «solo modelli a pesi aperti» sostituisce ogni
+// modello proprietario con il suo equivalente aperto, e quell'equivalente può
+// essere proprio il modello della chat. Due nickname diversi finivano così
+// sullo stesso modello, con il controllo di indipendenza convinto di aver fatto
+// il suo mestiere. Anche due nickname diversi che puntano allo stesso modello
+// fanno lo stesso danno. Quindi si guarda DUE volte: sui nomi, per poter dire
+// all'utente quale voce ha sbagliato, e poi sui modelli concreti, che è l'unica
+// verifica che conta.
 async function runGuardiano({ messaggi, produttore }) {
   const s = await getEffectiveSettings();
   const G = globalThis.SN_TEXT_GUARD;
@@ -3411,7 +3421,27 @@ async function runGuardiano({ messaggi, produttore }) {
     e.code = 'GUARDIANO_NON_INDIPENDENTE';
     throw e;
   }
-  const attempts = await applyLimitToChain(s, buildAttemptChain(s, refs.join(', '), ACTIONS.GUARD_TEXT));
+  const tutti = await applyLimitToChain(s, buildAttemptChain(s, refs.join(', '), ACTIONS.GUARD_TEXT));
+  // I modelli concreti su cui il PRODUTTORE sarebbe potuto girare, costruiti con
+  // le stesse regole (stesso interruttore, stesse sostituzioni): è la lista da
+  // cui il guardiano deve stare alla larga.
+  const suoi = new Set();
+  try {
+    for (const t of buildAttemptChain(s, produttore, ACTIONS.FILO_CHAT)) {
+      const m = String(t.model || '').trim().toLowerCase();
+      if (m) suoi.add(m);
+    }
+  } catch (_) { /* catena del produttore inservibile: non toglie niente */ }
+  const attempts = tutti.filter((t) => !suoi.has(String(t.model || '').trim().toLowerCase()));
+  if (!attempts.length) {
+    const e = new Error('Il guardiano degli avvisi finirebbe sullo stesso modello che ha scritto il testo: '
+      + 'serve un modello davvero diverso.');
+    e.code = 'GUARDIANO_NON_INDIPENDENTE';
+    // Con l'interruttore acceso la colpa è della sostituzione, non della voce
+    // nelle Opzioni: l'utente vede due nomi diversi e non capirebbe mai.
+    e.causa = s.openWeightsOnly === true ? G.CAUSA.PESI_APERTI : G.CAUSA.CONFIGURAZIONE;
+    throw e;
+  }
   const r = await Providers.completeWithFallback({ attempts, messages: messaggi });
   const usedProvider = r.provider || attempts[0].provider;
   const concreteModel = r.model || attempts[0].model;
