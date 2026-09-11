@@ -163,6 +163,40 @@ test('un contatore già in pari non si riscrive, nemmeno con allowLower', async 
   });
 });
 
+// Il massimo vero lo dice il server, non i feedback caricati: quelli sono i 500
+// più recenti PER DATA, e il numero più alto può stare fuori da quella pagina.
+test('il numero più alto si chiede al server, ordinando per numero', async () => {
+  const risposta = [{ document: { name: 'x/feedback/abc', fields: { seq: { integerValue: '731' } } } }];
+  await withFetch(() => okJson(risposta), async (calls) => {
+    assert.equal(await FB.maxSeq({ idToken: 'tok' }), 731);
+    const q = calls[0].body.structuredQuery;
+    assert.equal(q.from[0].collectionId, 'feedback');
+    assert.equal(q.orderBy[0].field.fieldPath, 'seq');
+    assert.equal(q.orderBy[0].direction, 'DESCENDING');
+    assert.equal(q.limit, 1);
+    assert.match(String(calls[0].headers.Authorization || ''), /^Bearer /,
+      'la collezione non si legge senza le credenziali di chi gestisce i feedback');
+  });
+});
+
+test('nessun feedback numerato: il massimo è «non lo so», non zero', async () => {
+  await withFetch(() => okJson([{ readTime: 'T1' }]), async () => {
+    assert.equal(await FB.maxSeq({ idToken: 'tok' }), null,
+      'con zero il chiamante riporterebbe il contatore a zero su un database vuoto');
+  });
+});
+
+// Uno scarto piccolo è gente che sta inviando in questo momento, non un
+// contatore gonfiato: abbassarlo stamperebbe due volte lo stesso numero.
+test('un contatore avanti di poco non si abbassa, nemmeno con allowLower', async () => {
+  const avantiDiPoco = { fields: { value: { integerValue: '586' } }, updateTime: 'T1' };
+  await withFetch(() => okJson(avantiDiPoco), async (calls) => {
+    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', allowLower: true });
+    assert.equal(v, 586);
+    assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0);
+  });
+});
+
 test('un contatore INDIETRO si alza sempre, allowLower o no', async () => {
   const indietro = { fields: { value: { integerValue: '10' } }, updateTime: 'T1' };
   await withFetch((call) => (call.method === 'PATCH' ? okJson({}) : okJson(indietro)), async (calls) => {
