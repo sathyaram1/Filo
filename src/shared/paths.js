@@ -56,11 +56,17 @@
   }
 
   // Invia un percorso al server, che lo ripulisce di nuovo e lo scrive.
-  // `clientId` NON finisce nel documento pubblico: viaggia nella richiesta come
-  // identità per i limiti di frequenza (vedi SN_PATHS_SAFETY.sanitizeSubmission).
-  // `idToken` è il Firebase ID token di chi è loggato, quando c'è: dà al server
-  // un'identità più forte del clientId. Chi non ha fatto login invia lo stesso —
-  // i mittenti restano anonimi, è la scrittura che non è più diretta.
+  //
+  // `idToken` è l'identità su cui il server tiene i limiti di frequenza, e la
+  // manda OGNI installazione: è il token dell'account anonimo che Filo si crea
+  // da sé (quello di crediti e portafoglio), non quello del login Google, che
+  // è opzionale. Il mittente resta anonimo lo stesso: l'identità viaggia
+  // ACCANTO al documento e non ci entra, perché la raccolta la legge chiunque.
+  //
+  // `clientId` è il ripiego dichiarato nel contratto della callable (vedi
+  // SECURITY.md §8) per una richiesta che arrivasse senza token: oggi Filo non
+  // ne genera uno e lo manda vuoto, perché un identificativo che si dichiara
+  // da solo non regge un limite di frequenza — chi attacca ne scrive un altro.
   async function submit({ domain, initialUrl, intent, steps, success, userAgent, clientId, idToken }) {
     const Safety = global.SN_PATHS_SAFETY;
     // Senza il modulo di pulizia non si spedisce: un ripiego che manda il
