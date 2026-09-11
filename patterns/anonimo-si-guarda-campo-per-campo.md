@@ -1,5 +1,7 @@
 # Anonimo si guarda campo per campo, non a colpo d'occhio
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Quando un documento diventa pubblico, la domanda «dice chi è stato?»
 si fa a OGNI campo, uno alla volta, e la pulizia si applica a tutti quelli che
 vengono dalla pagina o dall'utente. Un campo che nessuno ha guardato è il campo
