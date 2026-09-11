@@ -453,9 +453,9 @@
   }
 
   const api = {
-    CLASSI, ORDINE, REGOLE,
+    CLASSI, ORDINE, REGOLE, AZIONI_CONTAMINANTI,
     normalizzaClasse, piuBassa, contaminata, deveControllare,
-    descriviFonte,
+    descriviFonte, fonteDiAzione, fontiDelTurno,
     hostVisibile, etichettaComeHost, stessoDominio, linkIngannevole, estraiLink, linkPerUtente,
     controlliStatici,
     costruisciPrompt, interpretaVerdetto,
