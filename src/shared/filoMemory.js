@@ -933,6 +933,9 @@
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
     listNotifications, addNotification, dismissNotification,
+    // guardiano dei testi (#536): registro dei blocchi + coda d'attesa
+    listGuardBlocks, addGuardBlock, clearGuardBlocks,
+    listGuardQueue, pushGuardQueue, touchGuardQueue, removeGuardQueue,
     // dashboard cache
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)
