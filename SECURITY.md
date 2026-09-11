@@ -177,6 +177,16 @@ I server applicano regole precise (Firebase Security Rules):
 
 - **Chiunque** può **inviare** un nuovo feedback (in forma anonima). Non serve
   loggarsi: vogliamo abbassare al massimo l'attrito per ricevere segnalazioni.
+- **Nessuno può LEGGERE i feedback**, a parte chi li gestisce: gli
+  amministratori e il server che li lavora. Quello che invii non è consultabile
+  da un altro utente, e nemmeno da chi conoscesse l'indirizzo del documento.
+- Quello che tutti possono vedere è la **bacheca dei miglioramenti**, e sono
+  solo i campi pensati per stare lì: il titolo breve di un problema già
+  risolto, il suo numero, la versione in cui è uscito, la frase scritta per chi
+  l'aveva segnalato, i voti. Non il testo, non l'indirizzo della pagina, non
+  gli screenshot, non le note di lavorazione. Quei campi vivono in una raccolta
+  separata — una vetrina — riempita da chi gestisce i feedback: la raccolta
+  vera resta chiusa.
 - **Solo gli amministratori** (un elenco ristretto di email autorizzate)
   possono **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
   cancellarli. Un utente normale non può toccare i feedback altrui né mettere
