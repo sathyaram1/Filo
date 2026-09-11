@@ -1010,6 +1010,11 @@
     if (onbBtn) onbBtn.addEventListener('click', restartOnboarding);
     loadOnboardingArchive();
 
+    // #536 — registro degli avvisi fermati dal guardiano.
+    const clearGuardBtn = $('clearGuardBlocks');
+    if (clearGuardBtn) clearGuardBtn.addEventListener('click', clearGuardBlocks);
+    loadGuardBlocks();
+
     // Con tema "Come il sistema", il tema risolto può cambiare quando l'OS passa
     // chiaro↔scuro: ridisegna le righe così i default mostrati restano corretti.
     if (window.matchMedia) {
