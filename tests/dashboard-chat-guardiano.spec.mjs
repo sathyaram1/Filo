@@ -98,7 +98,7 @@ test('A — una risposta nata dal web che spinge alle credenziali viene fermata,
   await configuraModelli(app);
   await preparaChat(app, { cerca: true, risposta: RISPOSTA_TRAPPOLA });
   await preparaGuardiano(app, {
-    verdetto: '{"esito":"blocca","motivo":"chiedeva di confermare le credenziali del conto"}',
+    verdetto: '{"esito":"blocca","motivo":"credenziali"}',
   });
 
   await page.locator('#input').fill('cerca il portale clienti e dimmi cosa devo fare');
@@ -106,7 +106,8 @@ test('A — una risposta nata dal web che spinge alle credenziali viene fermata,
 
   const bolla = page.locator('.dash-bubble-filo').last();
   await expect(bolla).toContainText('Ho fermato un avviso nato da', { timeout: 20_000 });
-  await expect(bolla).toContainText('chiedeva di confermare le credenziali del conto');
+  // #536, giro 7: il guardiano sceglie una categoria, la frase la scrive Filo.
+  await expect(bolla).toContainText('credenziali o codici di accesso');
   // La risposta pericolosa non è arrivata: né a fine turno, né scorrendo.
   await expect(page.locator('.dash-bubble-filo')).not.toContainText('per non perdere l’accesso');
   expect(await app.evaluate(() => globalThis.__guardiano)).toBe(1);
@@ -183,7 +184,7 @@ test('D — anche la risposta del messaggio dopo passa dal guardiano, e il trane
         globalThis.__guardiano++;
         const inGiudizio = messaggi.filter((m) => m.role === 'user').map((m) => m.content).join('\n');
         return /confermare subito le tue credenziali/i.test(inGiudizio)
-          ? '{"esito":"blocca","motivo":"chiedeva di confermare le credenziali del conto"}'
+          ? '{"esito":"blocca","motivo":"credenziali"}'
           : '{"esito":"passa"}';
       },
     });
