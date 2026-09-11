@@ -20,6 +20,7 @@
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
         'Quello che scrivi in un feedback lo leggono solo Filo e chi lo lavora: testo, indirizzo della pagina e screenshot non sono raggiungibili da nessun altro. Pubblici restano i miglioramenti già usciti, che vedi in bacheca: il titolo, la versione e la frase scritta per chi li aveva segnalati.',
+        'Quando l\'assistente ti aiuta a fare qualcosa su un sito, quello che Filo impara e condivide con le altre installazioni non porta più nessun segno di chi eri: né un identificativo, né il browser.',
       ],
     },
     {
