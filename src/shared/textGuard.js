@@ -511,9 +511,12 @@
   global.SN_TEXT_GUARD = {
     FIDUCIA,
     REGOLE,
+    FONTE_AZIONE,
     SISTEMA_GUARDIANO,
     piuBassa,
     vaControllato,
+    fiduciaDellAzione,
+    etichettaFonte,
     controlliStatici,
     segretoNelTesto,
     ibanValido,
