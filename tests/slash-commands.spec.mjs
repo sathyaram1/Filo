@@ -89,7 +89,7 @@ test('"/clear all" chiude tutte le schede e lascia una sola newtab', async ({ ap
   expect(urls[0].startsWith('filo://newtab')).toBe(true);
 });
 
-test('i nuovi comandi /sicurezza /preferenze /editor /feedback aprono le pagine giuste (#0)', async ({ app, shell }) => {
+test('i nuovi comandi /sicurezza /preferenze /editor aprono le pagine giuste (#0)', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   // Anche con la finestra figlia presente i comandi devono funzionare.
@@ -99,7 +99,6 @@ test('i nuovi comandi /sicurezza /preferenze /editor /feedback aprono le pagine 
     ['/sicurezza', 'filo://security/'],
     ['/preferenze', 'filo://preferences/'],
     ['/editor', 'filo://editor/'],
-    ['/feedback', 'filo://feedback/'],
   ];
 
   for (const [cmd, urlPrefix] of cases) {
@@ -108,4 +107,18 @@ test('i nuovi comandi /sicurezza /preferenze /editor /feedback aprono le pagine 
       .poll(async () => (await tabUrls(app)).some((u) => u.startsWith(urlPrefix)), { timeout: 8_000 })
       .toBe(true);
   }
+});
+
+// #583 — `/feedback` apre la POSTA delle segnalazioni, che legge solo chi le
+// gestisce. A chiunque altro apriva una pagina senza niente dentro: adesso
+// risponde in chat e dice la strada che funziona, che è mandare un feedback.
+// Il comportamento completo sta in tests/feedback-superfici-owner.spec.mjs.
+test('#583 /feedback non apre la posta a chi non gestisce i feedback', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await runSlash(page, '/feedback');
+
+  await expect(page.locator('body')).toContainText(/Invia feedback/i, { timeout: 8_000 });
+  const urls = await tabUrls(app);
+  expect(urls.some((u) => u.startsWith('filo://feedback/'))).toBe(false);
 });
