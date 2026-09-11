@@ -755,7 +755,7 @@ module.exports = function register(on, ctx) {
    * Best-effort: se una delle due domande non riesce, il giro prosegue con
    * quello che ha invece di fermarsi.
    */
-  async function conLeSegnalazioniFuoriPagina(base, idToken) {
+  async function conLeSegnalazioniFuoriPagina(base, idToken, schede) {
     const FB = FEEDBACK();
     const rows = Array.isArray(base) ? base.slice() : [];
     if (!FB || !idToken) return rows;
