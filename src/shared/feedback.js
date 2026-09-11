@@ -299,29 +299,84 @@
     return words.length > maxWords ? out + '…' : out;
   }
 
-  // Prossimo numero progressivo libero: max(seq) + 1. I documenti senza `seq`
-  // (storici, mai backfillati) non compaiono nella query: partono da 1.
-  // Best-effort: una race fra due invii simultanei può duplicare un numero,
-  // accettabile per il volume dell'alpha (il numero è un'etichetta, non una key).
+  // ── Il numero progressivo (#583) ──────────────────────────────────────────
+  // Prima si ricavava con una query sulla collezione feedback ordinata per
+  // `seq`: una LETTURA, e dal 2026-09 la collezione non si legge senza
+  // credenziali — mentre l'invio resta anonimo per scelta. Il numero adesso
+  // viene da un contatore suo, `counters/feedbackSeq`: dentro c'è un intero e
+  // niente altro, chiunque può farlo avanzare di uno, nessuno può farlo tornare
+  // indietro (firestore.rules).
+  //
+  // Avanzamento con controllo di versione (`currentDocument.updateTime`): se
+  // due invii partono insieme, il secondo si accorge che il contatore è
+  // cambiato sotto e rilegge invece di sovrascrivere. Prima la race
+  // DUPLICAVA un numero; adesso non può.
+  //
+  // Torna `null` (invece di lanciare) quando il contatore non c'è ancora o la
+  // concorrenza non si risolve: il feedback parte SENZA numero, come già
+  // faceva quando la query falliva. Il contatore lo crea e lo rimette in pari
+  // l'app dell'owner (che è l'unica a poterlo scrivere a piacere).
+  const SEQ_RETRIES = 5;
+
   async function nextSeq() {
-    const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
-    const body = {
-      structuredQuery: {
-        from: [{ collectionId: COLLECTION }],
-        orderBy: [{ field: { fieldPath: 'seq' }, direction: 'DESCENDING' }],
-        limit: 1,
-      },
-    };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
+    for (let attempt = 0; attempt < SEQ_RETRIES; attempt++) {
+      const res = await fetch(`${docUrl}?key=${API_KEY}`);
+      if (res.status === 404) return null;      // contatore non ancora creato
+      if (!res.ok) throw new Error(`firestore nextSeq fallito (${res.status})`);
+      const doc = await res.json();
+      const current = Number(fromFsValue(doc.fields?.value));
+      const base = Number.isInteger(current) && current > 0 ? current : 0;
+      const next = base + 1;
+      const qs = [
+        'updateMask.fieldPaths=value',
+        `currentDocument.updateTime=${encodeURIComponent(doc.updateTime || '')}`,
+        `key=${API_KEY}`,
+      ].join('&');
+      const w = await fetch(`${docUrl}?${qs}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { value: { integerValue: String(next) } } }),
+      });
+      if (w.ok) return next;
+      // 400/409/412: qualcun altro ha scritto nel frattempo (precondizione
+      // fallita). Si rilegge e si riprova.
+      if (w.status === 400 || w.status === 409 || w.status === 412) continue;
+      throw new Error(`firestore nextSeq fallito (${w.status})`);
+    }
+    return null;
+  }
+
+  // Rimette il contatore in pari: lo crea se manca, lo alza se un `seq` più
+  // alto è già in giro (backfill, migrazioni, numeri assegnati a mano). Solo
+  // owner: serve il token admin. Torna il valore in vigore alla fine.
+  async function ensureSeqCounter(maxSeq, opts = {}) {
+    const value = Math.max(0, Math.trunc(Number(maxSeq) || 0));
+    const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const res = await fetch(`${docUrl}?key=${API_KEY}`, {
+      headers: opts.idToken ? { Authorization: headers.Authorization } : undefined,
     });
-    if (!res.ok) throw new Error(`firestore nextSeq fallito (${res.status})`);
-    const arr = await res.json();
-    const top = arr.find((r) => r.document);
-    const max = top ? Number(fromFsValue(top.document.fields?.seq)) : 0;
-    return (Number.isInteger(max) && max > 0 ? max : 0) + 1;
+    let current = -1;
+    if (res.ok) {
+      const doc = await res.json();
+      const v = Number(fromFsValue(doc.fields?.value));
+      current = Number.isInteger(v) ? v : -1;
+    } else if (res.status !== 404) {
+      throw new Error(`firestore contatore non leggibile (${res.status})`);
+    }
+    if (current >= value) return current;
+    const w = await fetch(`${docUrl}?updateMask.fieldPaths=value&key=${API_KEY}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ fields: { value: { integerValue: String(value) } } }),
+    });
+    if (!w.ok) {
+      const t = await w.text().catch(() => '');
+      throw new Error(`firestore contatore non scritto (${w.status}): ${t.slice(0, 200)}`);
+    }
+    return value;
   }
 
   // Invia un feedback. images: array di { dataUrl } (max ~5).
