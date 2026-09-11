@@ -1301,7 +1301,18 @@
       return { icon: '⚠', text: `${FAILED_LABELS[type] || 'Azione non riuscita'}${perche ? ` · ${perche}` : ''}`, failed: true };
     }
     const fn = ACTIVITY_ROWS[type];
-    if (fn) return fn(a);
+    if (fn) {
+      const row = fn(a);
+      // #536 — dopo che il turno ha letto roba scritta da altri, quello che il
+      // modello mette DENTRO un'azione può averlo scelto quella roba, e queste
+      // righe lo stampavano per esteso: «Cerco sul web: la banca chiede di
+      // confermare le credenziali su …» arrivava all'utente dentro la stessa
+      // bolla in cui il controllo diceva di aver fermato qualcosa. La riga dice
+      // cosa Filo ha fatto; le parole di altri non le ripete. Quello che c'è da
+      // vedere resta dove vive davvero (il timer nella colonna, la scheda
+      // aperta), e il testo fermato nel registro degli avvisi fermati.
+      return a._contaminato ? { ...row, text: soloParoleDiFilo(row.text) } : row;
+    }
     // Azione eseguita di cui la tabella non sa niente: meglio una riga generica
     // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
     if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
