@@ -256,6 +256,44 @@ test('SENTINELLA: una notifica contaminata scritta senza passare dal varco viene
   });
 });
 
+test('SENTINELLA: chi scrive una notifica è in elenco, e il timbro del varco non si scrive a mano', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const file = [];
+  (function cammina(dir) {
+    for (const n of readdirSync(dir)) {
+      const p = join(dir, n);
+      if (statSync(p).isDirectory()) cammina(p);
+      else if (p.endsWith('.js')) file.push(p);
+    }
+  })(join(RADICE, 'src'));
+
+  // Chi può scrivere una notifica. Aggiungere un nome qui vuol dire aver
+  // deciso la classe di fiducia di quella notifica: se nasce da roba letta da
+  // altri passa da SN_GUARDIA.proponiNotifica, altrimenti è testo di Filo.
+  const AMMESSI = new Set([
+    join('src', 'shared', 'filoMemory.js'),          // la definizione
+    join('src', 'main', 'services', 'guardiaTesti.js'), // il varco
+    join('src', 'main', 'updater.js'),               // aggiornamenti: testo di Filo
+  ]);
+  const fuoriElenco = file
+    .filter((p) => /\baddNotification\s*\(/.test(readFileSync(p, 'utf8')))
+    .map((p) => p.slice(RADICE.length + 1))
+    .filter((p) => !AMMESSI.has(p));
+  assert.deepEqual(fuoriElenco, [], `scrivono notifiche senza essere in elenco: ${fuoriElenco.join(', ')}`);
+
+  // Il timbro del varco si legge solo da SN_GUARDIA: scriverlo altrove
+  // significherebbe aggirare il controllo.
+  const TIMBRO_OK = new Set([
+    join('src', 'shared', 'filoMemory.js'),
+    join('src', 'main', 'services', 'guardiaTesti.js'),
+  ]);
+  const timbroFuori = file
+    .filter((p) => /_guardia\b/.test(readFileSync(p, 'utf8')))
+    .map((p) => p.slice(RADICE.length + 1))
+    .filter((p) => !TIMBRO_OK.has(p));
+  assert.deepEqual(timbroFuori, [], `citano il timbro del varco: ${timbroFuori.join(', ')}`);
+});
+
 test('SENTINELLA: il timbro del varco non è indovinabile e non è scritto da nessuna parte', () => {
   const t = Varco.timbro();
   assert.ok(typeof t === 'string' && t.length >= 24);
