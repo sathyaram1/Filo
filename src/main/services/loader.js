@@ -43,6 +43,10 @@ require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e get
 require(path.join(SHARED, 'paths.js'));
 // Elenco e stato della micro-intervista di benvenuto (#524): logica pura, va
 // PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
+// #536 — il guardiano dei testi verso l'utente: classi di fiducia, controlli
+// statici, prompt e verdetto. Logica pura, e va PRIMA di filoMemory, che lo
+// interroga per rifiutare una notifica contaminata senza controllo.
+require(path.join(SHARED, 'guardiano.js'));
 require(path.join(SHARED, 'onboarding.js'));
 require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
@@ -116,6 +120,9 @@ require(path.join(SVC, 'safebrowse', 'index.js'));
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));
 require(path.join(SVC, 'geoBlockRules.js'));
+// #536 — il varco: applica guardiano.js ai testi veri (modello, tentativi,
+// coda, registro dei blocchi). Dipende da SN_GUARDIANO e SN_FILO_MEMORY.
+require(path.join(SVC, 'guardiaTesti.js'));
 
 module.exports = {
   // Esponiamo gli oggetti popolati su globalThis per chi vuole un riferimento
@@ -139,4 +146,6 @@ module.exports = {
   get SN_FILO_MEMORY() { return globalThis.SN_FILO_MEMORY; },
   get SN_FILO_STATE() { return globalThis.SN_FILO_STATE; },
   get SN_MANAGE_REVIEW() { return globalThis.SN_MANAGE_REVIEW; },
+  get SN_GUARDIANO() { return globalThis.SN_GUARDIANO; },
+  get SN_GUARDIA() { return globalThis.SN_GUARDIA; },
 };

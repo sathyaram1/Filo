@@ -3261,6 +3261,92 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   return Classifier.classify(input, { complete, cache: geoClassifierCache });
 };
 
+// ── Il guardiano dei testi (#536): il modello, e che sia un ALTRO ────────────
+//
+// Il guardiano deve girare su un modello DIVERSO da quello che ha scritto il
+// testo: due contesti sullo stesso modello condividono le stesse debolezze e
+// cadono insieme. Qui si costruisce la sua catena e le si tolgono i nickname
+// del produttore (src/shared/guardiano.js → catenaGuardiano).
+//
+// Finché lo slot del guardiano non è configurato, il ripiego NON è «lo stesso
+// modello della chat»: è il primo nickname DIVERSO fra quelli che la
+// configurazione usa già per altre funzioni. Se non ne esiste nemmeno uno, il
+// guardiano non può essere indipendente e il testo va in coda (mai mostrato
+// senza controllo).
+function ripiegoIndipendente(settings, catenaProduttore) {
+  const G = globalThis.SN_GUARDIANO;
+  const vietati = new Set(String(catenaProduttore || '').split(',').map((x) => x.trim()).filter(Boolean));
+  const registry = settings.modelRegistry || {};
+  const candidati = [];
+  // Ordine di preferenza: le funzioni testuali economiche prima — un giudizio
+  // corto non ha bisogno del modello più caro in casa.
+  const preferite = [
+    ACTIONS.CATEGORIZE, ACTIONS.SPELLCHECK_WORD, ACTIONS.SAFEBROWSE_JUDGE,
+    ACTIONS.GEOBLOCK_CLASSIFY, ACTIONS.EXPLAIN, ACTIONS.HELP,
+  ];
+  const azioni = [...preferite, ...Object.keys(settings.models || {})];
+  for (const a of azioni) {
+    for (const nick of SN_CONST.parseModelRefs(modelForAction(settings, a))) {
+      if (vietati.has(nick) || candidati.includes(nick)) continue;
+      if (!registry[nick]) continue;
+      candidati.push(nick);
+    }
+    if (candidati.length >= 3) break;
+  }
+  void G;
+  return candidati.slice(0, 3).join(', ');
+}
+
+// La chiamata al guardiano. `produttore` è l'azione che ha SCRITTO il testo
+// (la chat, di norma): la sua catena è quella da escludere.
+globalThis.SN_GUARDIA_COMPLETE = async function guardiaComplete({ messages, produttore } = {}) {
+  const G = globalThis.SN_GUARDIANO;
+  if (!G) throw new Error('guardiano non caricato');
+  const settings = await getEffectiveSettings();
+  const catenaProduttore = modelForAction(settings, produttore || ACTIONS.FILO_CHAT);
+  const scelta = G.catenaGuardiano({
+    catenaConfigurata: modelForAction(settings, ACTIONS.GUARDIAN_CHECK),
+    catenaProduttore,
+    catenaRipiego: ripiegoIndipendente(settings, catenaProduttore),
+  });
+  if (!scelta.indipendente) {
+    // Nessun modello diverso da quello che ha scritto il testo: un secondo
+    // giudizio sullo stesso modello non è un secondo giudizio.
+    throw new Error('nessun modello indipendente disponibile per il guardiano');
+  }
+  const attempts = buildAttemptChain(settings, scelta.catena, ACTIONS.GUARDIAN_CHECK);
+  const r = await Providers.completeWithFallback({ attempts, messages });
+  // Il costo finisce sotto la voce crediti «Controlli di sicurezza»: l'utente
+  // deve vedere cosa costa essere protetto.
+  try {
+    const concreteModel = r.model || attempts[0].model;
+    await Costs.record({
+      action: ACTIONS.GUARDIAN_CHECK,
+      provider: r.provider || attempts[0].provider,
+      model: concreteModel,
+      usage: r.usage,
+      pricing: settings.pricing?.[concreteModel],
+      usdToEur: settings.usdToEur,
+    });
+  } catch (_) {}
+  return r.text;
+};
+
+// I segreti che Filo custodisce: se uno compare in un testo in uscita è
+// esfiltrazione, e i controlli statici bloccano senza chiamare nessun modello.
+globalThis.SN_GUARDIA_SEGRETI = async function guardiaSegreti() {
+  try {
+    const settings = await getEffectiveSettings();
+    const out = [];
+    for (const v of Object.values(settings.apiKeys || {})) {
+      if (typeof v === 'string' && v.trim().length >= 8) out.push(v.trim());
+    }
+    const sb = settings.security?.safeBrowse?.safeBrowsingKey;
+    if (typeof sb === 'string' && sb.trim().length >= 8) out.push(sb.trim());
+    return out;
+  } catch (_) { return []; }
+};
+
 // Esposto su globalThis per i test Playwright (app.evaluate non ha require):
 // è il dispatch con il gate dei livelli di sicurezza (#146.2).
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
