@@ -19,11 +19,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+// La cartella temporanea si chiede sempre a questo aiuto: costruirsela a mano
+// significa provare su un percorso che sulla macchina di chi sviluppa Filo non
+// esiste (vedi CLAUDE.md § Run / test), e una sentinella lo impedisce.
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RADICE = resolve(__dirname, '..', '..');
