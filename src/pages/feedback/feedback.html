@@ -58,6 +58,12 @@
     .fb-file:hover { border-color: var(--sn-accent, var(--sn-border)); }
     .fb-file svg { flex: 0 0 auto; color: var(--sn-muted); }
     .fb-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Un allegato che chi guarda non può aprire (parte cifrato con la chiave di
+       chi riceve le segnalazioni): lo dice sulla pillola, come il segnaposto
+       dell'immagine qui accanto, invece di consegnare un file rotto. */
+    .fb-file-note { flex: 0 0 auto; color: var(--sn-muted); font-style: italic; }
+    .fb-file--closed { border-style: dashed; }
+    .fb-file--loading { opacity: 0.6; }
     .fb-empty { color: var(--sn-muted); text-align: center; padding: 60px 0; }
     /* Stato d'errore del caricamento: frase per l'utente (mai il messaggio grezzo
        dell'eccezione) + un modo per riprovare, invece di "Errore: Failed to fetch". */
