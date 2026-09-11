@@ -129,6 +129,68 @@ test('gli avvisi non si leggono, né si tolgono, da una pagina web', () => {
   }
 });
 
+// ── Quello che un turno lascia scritto per DOPO (giro 4) ────────────────────
+//
+// Il guardiano sorveglia il testo che compare adesso, e un elenco di campi che
+// un turno contaminato lascia scritti perché parlino più tardi. Finché
+// quell'elenco si teneva a mano restavano fuori l'appunto, la regola fissata
+// nella memoria di Filo e lo stile con cui Filo scrive: il testo di un estraneo
+// entrava nello stato di Filo e usciva, con la voce di Filo, in conversazioni
+// pulite dove il secondo modello non gira nemmeno.
+
+test('ogni azione dice cosa lascia scritto: l’elenco copre il registro intero', () => {
+  require(join(ROOT, 'src', 'shared', 'theme-tokens.js'));
+  require(join(ROOT, 'src', 'shared', 'preferences.js'));
+  require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
+  require(join(ROOT, 'src', 'shared', 'textGuard.js'));
+  const azioni = Object.keys(globalThis.SN_ACTION_LEVELS.REGISTRY);
+  const tabella = globalThis.SN_TEXT_GUARD.CAMPI_SORVEGLIATI;
+  const mancanti = azioni.filter((t) => !Object.prototype.hasOwnProperty.call(tabella, t));
+  assert.deepEqual(mancanti, [],
+    'queste azioni non dicono quali parole lasciano scritte per dopo (#536): ' + mancanti.join(', '));
+  const inventate = Object.keys(tabella).filter((t) => !azioni.includes(t));
+  assert.deepEqual(inventate, [],
+    'queste voci non corrispondono a nessuna azione vera: ' + inventate.join(', '));
+});
+
+test('la regola fissata in memoria, l’appunto e lo stile di Filo sono sorvegliati', () => {
+  require(join(ROOT, 'src', 'shared', 'textGuard.js'));
+  const G = globalThis.SN_TEXT_GUARD;
+  const lezione = G.campiDaSorvegliare({ type: 'SALVA_LEZIONE', testo: 'una regola' });
+  assert.deepEqual(lezione.campi.map((c) => c.nome), ['testo']);
+  assert.equal(lezione.seFermato, 'annulla', 'una regola senza regola non va fissata lo stesso');
+  const appunto = G.campiDaSorvegliare({ type: 'SALVA_APPUNTO', testo: 'ciao', contesto: 'banca' });
+  assert.deepEqual(appunto.campi.map((c) => c.nome), ['testo', 'contesto']);
+  const stile = G.campiDaSorvegliare({ type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'asciutto' });
+  assert.deepEqual(stile.campi.map((c) => c.nome), ['valore']);
+  assert.equal(stile.soloSeTestoLibero, true, 'un «tema: scuro» non deve pagare un secondo modello');
+  // Un'azione che il registro non conosce non è «niente da sorvegliare».
+  const ignota = G.campiDaSorvegliare({ type: 'AZIONE_NUOVA', frase: 'parole' });
+  assert.deepEqual(ignota.campi.map((c) => c.nome), ['frase']);
+  assert.equal(ignota.seFermato, 'annulla');
+});
+
+test('una preferenza a testo libero lo dichiara, altrimenti nessuno la sorveglia', () => {
+  require(join(ROOT, 'src', 'shared', 'theme-tokens.js'));
+  require(join(ROOT, 'src', 'shared', 'preferences.js'));
+  const P = globalThis.SN_PREF;
+  // La sonda: una stringa che nessun setter può produrre da sé. Se riesce ad
+  // arrivare INTERA dentro l'impostazione, quel valore è testo libero, e dopo
+  // una pagina avvelenata lo sceglie la pagina.
+  const SONDA = 'zqxsonda-testo-libero-536';
+  const scoperte = [];
+  for (const setter of P.PREF_SETTERS) {
+    let built = null;
+    try { built = setter.build(SONDA); } catch (_) { built = null; }
+    if (!built) continue;
+    if (!JSON.stringify(built.partial || {}).includes(SONDA)) continue;
+    if (!built.testoLibero) scoperte.push(setter.keys[0]);
+  }
+  assert.deepEqual(scoperte, [],
+    'queste preferenze scrivono testo libero senza dichiararlo, quindi il guardiano non le guarda (#536): '
+    + scoperte.join(', '));
+});
+
 test('il collegamento dentro un avviso ha un colore suo anche sul tema scuro', () => {
   const css = readFileSync(join(SRC, 'pages', 'dashboard', 'dashboard.css'), 'utf8');
   assert.match(css, /\.dash-live-link[\s\S]{0,200}color:\s*var\(--dash-link\)/,
