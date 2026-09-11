@@ -641,9 +641,15 @@
     secaudit:   'Audit sicurezza',
     prober:     'Esplorazione',
   };
+  // ⚠️ «sconosciuto» è la chiave di ripiego che `launches` dà a una partenza
+  // senza ruolo scritto: l'etichetta deve restare «Sconosciuto», come la
+  // scrive la scheda Log che legge lo stesso registro. Senza questa riga
+  // finiva minuscola in mezzo a «Esplorazione» e «Verifica» (#496, giro 14).
   function roleLabel(role) {
     const r = String(role || '').trim();
-    return ROLE_LABELS[r] || (r || 'Sconosciuto');
+    if (ROLE_LABELS[r]) return ROLE_LABELS[r];
+    if (!r || r.toLowerCase() === 'sconosciuto') return 'Sconosciuto';
+    return r;
   }
 
   /**
