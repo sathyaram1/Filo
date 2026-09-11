@@ -225,10 +225,37 @@
 
   // ── Controlli statici: le forme ────────────────────────────────────────────
 
-  // Parole che trasformano un numero qualunque in «il tuo codice». Senza una di
-  // queste vicino, 123456 è un numero d'ordine e non blocca niente: i blocchi
-  // devono restare rari, un guardiano che grida al lupo viene spento.
-  const PAROLE_CODICE = /(codic|code|otp|pin\b|2fa|token|verific|autentic|one[- ]time|usa e getta|monouso|conferma\b|password temporane)/i;
+  // Cosa trasforma un gettone qualunque in «il tuo codice».
+  //
+  // «Codice» da sola non basta, ed è la lezione più cara di questa funzione: in
+  // italiano quella parola sta quasi sempre accanto a qualcosa che con
+  // l'accesso non c'entra niente. Codice sconto, codice ordine, codice cliente,
+  // codice postale, codice di tracciamento: fermarli tutti vuol dire far
+  // sparire la posta normale di chiunque, e un guardiano che grida al lupo
+  // viene spento.
+  //
+  // Servono due cose diverse, e ne basta una:
+  //   • una parola INEQUIVOCABILE (otp, monouso, «codice di verifica»…);
+  //   • oppure la parola generica PIÙ la richiesta di farne qualcosa
+  //     (comunicarlo, inoltrarlo, digitarlo). È quello che distingue una truffa:
+  //     non che un codice esista, ma che qualcuno chieda di passarlo.
+  // E in ogni caso un qualificatore innocuo («codice sconto») chiude la
+  // questione: quello non è mai un codice d'accesso.
+  const CODICE_FORTE = new RegExp([
+    '\\botp\\b', '\\b2fa\\b', 'one[- ]time', 'usa e getta', 'monouso',
+    'password temporane', 'codice temporane', 'codice segreto',
+    'codic[ei] (?:di |d\')?(?:verific|sicurezza|accesso|autentic|attivazione|sblocco|ingresso|conferma)',
+    'verification code', 'security code', 'access code',
+  ].join('|'), 'i');
+  const CODICE_GENERICO = /(codic|\bpin\b|\btoken\b|password|passcode)/i;
+  // Chi chiede di passare il codice a qualcuno: il verbo che fa la truffa.
+  const CHIEDE_DI_PASSARLO = /(comunic|inoltr|inseris|digit|fornis|invia|inviar|condivid|dett|riferis|manda|trasmett|copia|dimmi|dammi)/i;
+  // Quello che «codice» qualifica quasi sempre, e che non apre niente.
+  const CODICE_INNOCUO = new RegExp([
+    'codic[ei]\\s+(?:sconto|promo\\w*|ordine|cliente|utente|postale|fiscale|iban|bic|swift|ean|isbn|prodotto|articolo|prenotazione|pratica|tracciamento|spedizione|errore|colore|sorgente|civico|paese|tributo|destinatario|univoco|identificativo|a barre|catastale|ateco|stazione|aeroporto|iata|icao)',
+    'codic[ei]\\s+(?:di|del|della|dello)\\s+(?:tracciamento|spedizione|prenotazione|avviso|sconto|ordine|errore|volo|stanza|camera|paese|avviamento)',
+    'numero di serie', 'numero d\'ordine', 'numero di pratica',
+  ].join('|'), 'i');
   const PAROLE_RECUPERO = /(recuper|recovery|backup code|codici di ripristino|ripristin)/i;
   const PAROLE_PASSWORD = /(password|parola d'ordine|parola chiave|pwd|passphrase)/i;
   const PAROLE_CHIAVE = /(chiave|key|secret|segreto|api[- ]?key|bearer)/i;
