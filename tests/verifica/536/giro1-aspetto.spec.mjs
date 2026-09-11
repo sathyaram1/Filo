@@ -53,7 +53,8 @@ for (const tema of ['light', 'dark']) {
     await home.screenshot({ path: `tests/.shots/verifica-536-home-${tema}.png` });
 
     const pref = await openTab('filo://preferences/preferences.html');
-    await expect(pref.locator('#guardBlocksList .guard-item')).toHaveCount(0, { timeout: 8_000 });
+    await expect(pref.locator('#guardBlocksList .guard-item')).toHaveCount(1, { timeout: 8_000 });
+    await pref.locator('.guard-toggle').first().click();
     await pref.locator('#sec-guard-blocks').screenshot({ path: `tests/.shots/verifica-536-pref-${tema}.png` });
   });
 }
