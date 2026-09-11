@@ -8,10 +8,20 @@ test('esplora', async ({ openTab }) => {
   const page = await openTab(EDITOR);
   await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('#doc')).toBeVisible();
-  const mods = await page.locator('.ed-module').evaluateAll(
-    (els) => els.map((e) => ({ type: e.dataset.type, z: e.dataset.z, cls: e.className, txt: e.textContent.slice(0, 30) })),
+  const sw = page.locator('.ed-module[data-type="switch"]');
+  console.log('SWITCH HTML', await sw.evaluate((e) => e.outerHTML));
+  await sw.locator('button, .ed-sw-next, *').last().click({ force: true }).catch(() => {});
+  await page.waitForTimeout(500);
+  let mods = await page.locator('.ed-module').evaluateAll(
+    (els) => els.map((e) => ({ type: e.dataset.type, cls: e.className })),
   );
-  console.log('MODULI', JSON.stringify(mods, null, 1));
-  const html = await page.locator('#grid, .ed-grid, body').first().evaluate((e) => e.outerHTML.slice(0, 3000));
-  console.log('HTML', html);
+  console.log('DOPO CLICK', JSON.stringify(mods));
+  const chat = page.locator('.ed-module[data-type="chat"]');
+  if (await chat.count()) {
+    console.log('CHAT HTML', await chat.evaluate((e) => e.outerHTML.slice(0, 800)));
+    await chat.click();
+    await page.waitForTimeout(400);
+    console.log('PAD', await page.locator('.ed-mod-pad').count(),
+      await page.locator('.ed-chat').count());
+  }
 });
