@@ -57,6 +57,11 @@ test('riquadro dei feedback: a chi non riceve le segnalazioni l’allegato dice 
 
   const segnaposto = page.locator('.fb-img-broken').first();
   await expect(segnaposto).toBeVisible({ timeout: 10_000 });
+  // Tema chiaro: la stessa scheda che il giro 4 ha guardato in scuro, con le
+  // parole di adesso. Serve per confrontarla con quella di Gestione.
+  await page.waitForTimeout(1200);
+  mkdirSync('tests/.shots', { recursive: true });
+  await page.screenshot({ path: 'tests/.shots/582-giro6-riquadro-non-admin.png' });
   const scritta = ((await segnaposto.textContent()) || '').trim();
   const hover = (await segnaposto.getAttribute('title')) || '';
   expect(`${scritta} ${hover}`, `il riquadro parla di amministratori: «${scritta}» / «${hover}»`).not.toMatch(VIETATE);
