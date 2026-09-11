@@ -60,15 +60,22 @@ test('quello che un turno contaminato lascia scritto per dopo non passa da nessu
         try { return show.apply(this, arguments); } catch (_) {}
       };
     } catch (_) {}
-    // Il guardiano lavora davvero e la frase finale, che è innocua, la lascia
-    // passare: non c'è niente da bloccare in «Fatto».
+    // Il guardiano fa il suo mestiere: la frase finale è «Fatto.» e passa, la
+    // frase della truffa la blocca. Il punto della prova è se qualcuno gliela
+    // fa mai vedere.
     globalThis.SN_PROVIDERS.completeWithFallback = async (opt) => {
       const attempts = opt.attempts;
-      const sistema = String(((opt.messages || [])[0] || {}).content || '');
-      return {
-        model: attempts[0].model, provider: attempts[0].provider, usage: {},
-        text: /^Sei il guardiano degli avvisi di Filo/.test(sistema) ? '{"esito":"passa","motivo":""}' : '',
-      };
+      const msgs = opt.messages || [];
+      const sistema = String((msgs[0] || {}).content || '');
+      const guardiano = /^Sei il guardiano degli avvisi di Filo/.test(sistema);
+      const visto = msgs.map((m) => String(m.content || '')).join('\n');
+      let text = '';
+      if (guardiano) {
+        text = /confermare le credenziali/i.test(visto)
+          ? '{"esito":"blocca","motivo":"chiedeva le credenziali della banca"}'
+          : '{"esito":"passa","motivo":""}';
+      }
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text };
     };
     let giro = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
