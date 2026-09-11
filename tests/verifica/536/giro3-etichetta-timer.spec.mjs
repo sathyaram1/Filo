@@ -100,12 +100,18 @@ test('quello che un turno contaminato lascia scritto per dopo non passa da nessu
   // Il timer scade: da qui in poi la frase della pagina parla con la voce di Filo.
   await page.waitForTimeout(8_000);
 
-  await expect.soft(page.locator('#live'), 'la frase della pagina è arrivata all’utente dalla colonna degli avvisi')
-    .not.toContainText('confermare le credenziali');
-
+  // La seconda uscita — la notifica di SISTEMA — in questo contenitore senza
+  // schermo non si può osservare: `Notification.isSupported()` è falso e la
+  // spia resta vuota anche a porta aperta. Quindi qui si guarda solo se è
+  // uscita qualcosa; l'asserzione che conta è quella della colonna.
   const sistema = await app.evaluate(() => globalThis.__notificheSistema.slice());
-  expect.soft(
-    sistema.filter((b) => b.includes('confermare le credenziali')),
-    'la frase della pagina è uscita in una notifica di sistema, fuori da Filo',
-  ).toEqual([]);
+  if (sistema.length) {
+    expect(
+      sistema.filter((b) => b.includes('confermare le credenziali')),
+      'la frase della pagina è uscita in una notifica di sistema, fuori da Filo',
+    ).toEqual([]);
+  }
+
+  await expect(page.locator('#live'), 'la frase della pagina è arrivata all’utente dalla colonna degli avvisi')
+    .not.toContainText('confermare le credenziali');
 });
