@@ -572,15 +572,14 @@ module.exports = function register(on, ctx) {
   // tutti. `tests/feedback-canali-origine.spec.mjs` bussa a tutte da un sito
   // visitato e diventa rossa se una risponde qualcosa di diverso da
   // «rifiutato per provenienza»: è il posto dove aggiungere una porta nuova.
-  const isFiloOrigin = (origin, sender) => String(origin || '').startsWith('filo://') || !!(sender && sender.isShell);
-
   function ownerOnly(handler) {
     return async (msg, sender, origin) => {
-      // `code`: il motivo in una parola, per chi deve DIRE all'utente cosa
-      // succede. Senza, il rifiuto arriva a una pagina come un errore
+      // La provenienza la decide la porta unica del confine (handlers/origine.js),
+      // che è la stessa di ogni altra porta con potere e porta con sé il motivo
+      // in una parola: senza, il rifiuto arriva a una pagina come un errore
       // qualunque e finisce tradotto in "controlla la connessione", che non è
       // vero e manda a controllare la cosa sbagliata.
-      if (!isFiloOrigin(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+      if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
       if (!auth.isAdmin()) {
         return {
           ok: false,
