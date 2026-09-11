@@ -147,7 +147,7 @@
   // Ritorna { saved: bool, reason: string }. Non lancia: i fallimenti sono
   // reportati come reason testuale così il chiamante può loggare senza che
   // l'utente veda errori (è una pipeline best-effort di telemetria).
-  async function collectAndSave({ session, invokeAI, userAgent, clientId }) {
+  async function collectAndSave({ session, invokeAI }) {
     if (!session || typeof session !== 'object') {
       return { saved: false, reason: 'session vuota' };
     }
