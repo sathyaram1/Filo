@@ -323,10 +323,19 @@ test('quello che il guardiano scrive di suo non arriva mai all’utente', () => 
 // ── La riga che l'utente legge ──────────────────────────────────────────────
 
 test('la riga di blocco dice da dove veniva e cosa ha visto', () => {
-  const f = G.frasediBlocco({ origine: 'una mail di Banca Esempio', motivo: 'chiedeva le tue credenziali' });
-  assert.equal(f, 'Ho fermato un avviso nato da una mail di Banca Esempio: chiedeva le tue credenziali.');
+  const credenziali = G.MOTIVI_GUARDIANO.credenziali.frase;
+  const f = G.frasediBlocco({ origine: 'una mail di Banca Esempio', motivo: credenziali });
+  assert.equal(f, `Ho fermato un avviso nato da una mail di Banca Esempio: ${credenziali}.`);
   // Niente «ho avuto un dubbio»: senza fonte lo dice, non se la inventa.
-  assert.match(G.frasediBlocco({ motivo: 'chiedeva un pagamento' }), /contenuto non fidato: chiedeva un pagamento\./);
+  assert.match(
+    G.frasediBlocco({ motivo: G.MOTIVI_GUARDIANO.pagamento.frase }),
+    /contenuto non fidato: sembrava spingerti a pagare/,
+  );
+  // I motivi dei controlli statici sono già frasi di Filo: arrivano com'erano.
+  assert.match(
+    G.frasediBlocco({ origine: 'una ricerca sul web', motivo: G.REGOLE['codice-usa-e-getta'] }),
+    /conteneva un codice di verifica\.$/,
+  );
 });
 
 test('la riga di attesa dice che l’avviso non è perso', () => {
