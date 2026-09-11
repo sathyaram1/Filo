@@ -88,15 +88,15 @@ test('la risposta rimessa in coda viene giudicata dallo stesso modello che l’h
   // una possibilità a quello che è finito in coda.
   await page.waitForTimeout(4_000);
 
+  // Quello che l'utente vede: la risposta che il controllo aveva rifiutato di
+  // lasciar passare compare lo stesso, nella colonna degli avvisi.
+  await expect(page.locator('#live'), 'la risposta non controllata è comparsa lo stesso')
+    .not.toContainText('confermare subito le tue credenziali');
+
   const usati = await app.evaluate(() => globalThis.__modelliGuardiano.slice());
   const chat = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['deepseek-flash'].model);
   expect(
     usati.filter((m) => m === chat),
     'il controllo è girato sullo stesso modello che ha scritto la risposta',
   ).toEqual([]);
-
-  // E la risposta che il controllo aveva rifiutato di lasciar passare compare
-  // lo stesso, nella colonna degli avvisi.
-  await expect(page.locator('#live'), 'la risposta non controllata è comparsa lo stesso')
-    .not.toContainText('confermare subito le tue credenziali');
 });
