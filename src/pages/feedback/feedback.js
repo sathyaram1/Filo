@@ -300,8 +300,9 @@
   // url → { dataUrl, error }. Su fallimento `error` porta il MOTIVO preciso
   // (dal main) così il segnaposto lo spiega in hover invece di restare muto.
   // `soloDestinatario`: non è un guasto, è che l'allegato lo apre solo chi
-  // riceve le segnalazioni (viaggia cifrato con la sua chiave). Il segnaposto
-  // allora dice che l'allegato è partito, invece di dire che manca qualcosa.
+  // riceve le segnalazioni. Il segnaposto allora lo dice, invece di far
+  // sembrare che manchi qualcosa. Quello che NON dice è che l'allegato sia
+  // arrivato: da qui Filo non l'ha aperto (#582, giro 5).
   const fbImgCache = new Map();
   async function resolveImageSrc(url) {
     if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
