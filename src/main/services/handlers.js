@@ -957,6 +957,10 @@ async function applySettingsUpdate(partial) {
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
+  // #586 — permessi ricordati per sito: la copia in memoria del gestore segue
+  // le impostazioni, così una revoca fatta in Impostazioni → Sicurezza vale
+  // sulla richiesta successiva senza riavviare Filo.
+  try { require('./permessiSito').configureFromSettings(merged); } catch (_) {}
   wireSafebrowse(withDefaults(merged)).catch(() => {});
   try {
     const Cookies = require('./cookies');

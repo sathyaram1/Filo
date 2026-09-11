@@ -562,7 +562,7 @@ function attachSession(ses) {
 
 async function init() {
   await loadHistory();
-  try { attachSession(electron().session.defaultSession); } catch (_) {}
+  try { attachSession(require('../sessioni').sessionePredefinita()); } catch (_) {}
 }
 
 // ─── API per gli handler IPC (comandi dalla shell) ─────────────────────────

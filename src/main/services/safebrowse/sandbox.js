@@ -34,7 +34,11 @@ async function detonate(url, evaluateFinal) {
   if (!el || !el.BrowserWindow || !el.session) return null;
 
   const partition = `filo-detonate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const ses = el.session.fromPartition(partition, { cache: false });
+  // La finestra di detonazione non ha una shell a cui chiedere niente: il
+  // gestore dei permessi (installato qui come su ogni altra sessione) nega
+  // tutto ciò che non è innocuo, che è esattamente ciò che serve a una pagina
+  // sospetta fatta esplodere al buio.
+  const ses = require('../../sessioni').sessioneDiPartizione(partition, { cache: false });
 
   let downloadStarted = false;
   let downloadName = '';

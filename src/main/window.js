@@ -2,11 +2,12 @@
 // (tab bar + barra indirizzi + pulsanti) e una serie di WebContentsView,
 // una per ogni tab aperto.
 
-const { BrowserWindow, session } = require('electron');
+const { BrowserWindow } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { TabManager } = require('./tabs');
 const { registerFiloProtocolForSession } = require('./protocol');
+const { sessioneDiPartizione } = require('./sessioni');
 
 const SHELL_HEIGHT = 88;
 
@@ -132,7 +133,7 @@ function createIncognitoWindow() {
   // Partizione unica e SENZA prefisso 'persist:' → sessione in memoria, isolata
   // da quella normale e da eventuali altre finestre incognito.
   const partition = 'filo-incognito-' + randomUUID();
-  const ses = session.fromPartition(partition);
+  const ses = sessioneDiPartizione(partition);
   // filo:// è registrato globalmente solo sulla sessione di default: i tab di
   // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);

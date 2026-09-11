@@ -25,7 +25,7 @@
 
 'use strict';
 
-const { session } = require('electron');
+
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -232,7 +232,7 @@ const siteSessions = new Map(); // partition name → session
 function ensureSiteSession(partition, { gpc } = {}) {
   let ses = siteSessions.get(partition);
   if (!ses) {
-    ses = session.fromPartition(partition);
+    ses = require('../sessioni').sessioneDiPartizione(partition);
     try { registerFiloProtocolForSession(ses); } catch (_) {}
     siteSessions.set(partition, ses);
   }
@@ -274,8 +274,9 @@ function partitionForTab(url, { mode, incognito, trusted } = {}) {
 // è spento.
 function configureForMode(mode) {
   const on = mode !== MODES.MANUAL;
-  applyGpc(session.defaultSession, on);
-  applyTrackerBlocking(session.defaultSession, on);
+  const predefinita = require('../sessioni').sessionePredefinita();
+  applyGpc(predefinita, on);
+  applyTrackerBlocking(predefinita, on);
   for (const ses of siteSessions.values()) {
     applyGpc(ses, on);
     applyTrackerBlocking(ses, on);
@@ -307,7 +308,7 @@ function wipeOnExit() {
 // nulla.
 async function wipeTrackerCookies(settings) {
   if (getMode(settings) !== MODES.DEFAULT) return { removed: 0, skipped: true };
-  const ses = session.defaultSession;
+  const ses = require('../sessioni').sessionePredefinita();
   let cookies = [];
   try { cookies = await ses.cookies.get({}); } catch (_) { return { removed: 0 }; }
   let removed = 0;
