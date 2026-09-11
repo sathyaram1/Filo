@@ -25,7 +25,7 @@ const ESCA = {
   seq: 9582,
   subSeq: 0,
   number: 9582,
-  status: 'todo',
+  status: 'open',
   name: 'Aggiornamento obbligatorio per i tester',
   text: `La pagina non si apre. Vedi https://filo.app.${ESTRANEO}/accedi`,
   url: `https://filo.app.guida.aggiornamento-obbligatorio.per-i-tester.settembre-2026.${ESTRANEO}/accedi`,
