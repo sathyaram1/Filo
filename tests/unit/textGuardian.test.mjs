@@ -234,9 +234,9 @@ test('la coda non raddoppia le chiamate se due giri partono insieme', async () =
   errore = null;
   risposta = '{"esito":"passa"}';
   chiamate = 0;
-  const [a, b] = await Promise.all([TG.riprendiInAttesa(), TG.riprendiInAttesa()]);
-  assert.equal(a.mostrati + b.mostrati, 1, 'l’avviso deve comparire una volta sola');
-  assert.equal(chiamate, 1);
+  await Promise.all([TG.riprendiInAttesa(), TG.riprendiInAttesa()]);
+  assert.equal((await Mem.listNotifications()).length, 1, 'l’avviso deve comparire una volta sola');
+  assert.equal(chiamate, 1, 'due giri insieme non devono raddoppiare la spesa');
 });
 
 test('input limite: testo vuoto, soli spazi, e un testo enorme', async () => {
