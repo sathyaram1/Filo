@@ -101,7 +101,7 @@ test('la risposta del turno DOPO nasce dalla stessa pagina e non passa da nessun
     .toContainText('cosa devo fare', { timeout: 30_000 })
     .catch(() => {});
 
-  const bolle = page.locator('.dash-bubble-filo');
+  const bolle = page.locator('#bubbles');
   // Quello che l'utente NON deve poter leggere: il messaggio della pagina,
   // consegnato da Filo con la sua voce.
   await expect(bolle, 'la trappola del turno prima è arrivata all’utente senza controllo')
