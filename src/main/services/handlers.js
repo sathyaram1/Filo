@@ -2939,8 +2939,64 @@ async function generateDashboardFromInputs(inputs) {
     }
   }
   if (!message) message = 'Filo è in ascolto.';
+  ({ message, suggestions } = await guardaLaHome({ message, suggestions, inputs }));
   await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
+}
+
+// #536 — la home passa dallo STESSO punto di passaggio delle risposte e degli
+// avvisi. Il saluto e i bottoni li ha scritti un modello che aveva davanti i
+// titoli delle pagine salvate, cioè parole di estranei: senza questo passaggio
+// una pagina salvata una volta detta il saluto che l'utente legge a ogni scheda
+// nuova, e per giunta l'etichetta e l'indirizzo di un bottone che si apre con un
+// clic solo.
+//
+// Una chiamata sola per tutta la home, non una per riga: il saluto e i
+// suggerimenti sono un blocco unico, e se uno dei pezzi non va bene non è il
+// caso di mostrarne metà. Il testo giudicato contiene anche DOVE porta ogni
+// bottone, perché è la parte che fa il danno.
+async function guardaLaHome({ message, suggestions, inputs }) {
+  const G = globalThis.SN_TEXT_GUARD;
+  const TG = globalThis.SN_TEXT_GUARDIAN || require('./textGuardian');
+  if (!G || !G.vaControllato(inputs.fiducia)) return { message, suggestions };
+  const origine = inputs.origine || 'un contenuto non fidato';
+  const righe = [message];
+  for (const s of suggestions) {
+    const dove = s.action && (s.action.url || s.action.path || s.action.prompt || '');
+    righe.push(dove ? `${s.text}\n${dove}` : s.text);
+  }
+  let verdetto;
+  try {
+    verdetto = await TG.controllaTesto({
+      testo: righe.join('\n\n'),
+      fiducia: inputs.fiducia,
+      origine,
+      produttore: modelForAction(inputs.settings, ACTIONS.FILO_DASHBOARD),
+    });
+  } catch (_) {
+    verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
+  }
+  if (verdetto.esito === 'passa') {
+    // Gli indirizzi li ha scelti un turno che aveva letto roba di altri: il
+    // bottone resta, ma il clic chiede conferma mostrando dove porta, come già
+    // fa un link aperto da Filo dopo una pagina avvelenata.
+    return { message, suggestions: suggestions.map((s) => ({ ...s, _contaminato: true })) };
+  }
+  try {
+    await FiloMem.addGuardBlock({
+      origine,
+      motivo: verdetto.esito === 'blocca' ? verdetto.motivo : 'il controllo di sicurezza non si è potuto fare',
+      regola: verdetto.regola || 'home',
+      testo: righe.join('\n\n'),
+      fonte: '',
+    });
+  } catch (_) {}
+  // Niente bottoni: erano dello stesso blocco. Il saluto dice cosa è successo e
+  // dove si va a vedere, invece di sparire senza spiegazione.
+  const testo = verdetto.esito === 'blocca'
+    ? `${G.frasediBlocco({ origine, motivo: verdetto.motivo })} ${G.DOVE_SONO_I_BLOCCHI}`
+    : 'Filo è in ascolto.';
+  return { message: testo, suggestions: [] };
 }
 
 // Scheduler throttle+coalesce per il ricalcolo in background (#155): al massimo
