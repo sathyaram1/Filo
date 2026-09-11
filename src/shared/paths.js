@@ -225,6 +225,27 @@
     return init + '::' + sig;
   }
 
+  // Un percorso condiviso lo scrive CHIUNQUE, senza login, e questo testo
+  // finisce nel messaggio di sistema di un agente che poi clicca da solo sulla
+  // pagina di qualcun altro. Quindi prima di entrare nel prompt va reso inerte
+  // come struttura: niente a capo (con cui si forgiano blocchi e turni finti),
+  // niente caratteri di controllo, e una lunghezza massima per campo. Non è un
+  // filtro sul SENSO delle parole (quello non si fa a colpi di espressioni
+  // regolari): è la garanzia che un percorso resti una riga di dati dentro il
+  // blocco che lo dichiara non fidato.
+  const MAX_INTENT_PROMPT = 300;
+  const MAX_SELECTOR_PROMPT = 500;
+  const MAX_STEPS_PROMPT = 30;
+
+  function unaRiga(testo, max) {
+    return String(testo == null ? '' : testo)
+      // a capo, tabulazioni e caratteri di controllo → uno spazio
+      .replace(/[ -  ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, max);
+  }
+
   function formatForPrompt(rawPaths, { budgetChars = PROMPT_BUDGET_CHARS } = {}) {
     if (!Array.isArray(rawPaths) || !rawPaths.length) return '';
     const seen = new Set();
@@ -238,12 +259,13 @@
     const lines = [];
     let chars = 0;
     for (const p of dedup) {
-      const intent = ((p && p.intent) || '').trim() || '(intento ignoto)';
-      const init = ((p && p.initialUrl) || '').trim() || '/';
+      const intent = unaRiga((p && p.intent) || '', MAX_INTENT_PROMPT) || '(intento ignoto)';
+      const init = unaRiga((p && p.initialUrl) || '', MAX_SELECTOR_PROMPT) || '/';
       const header = `## "${intent}" (da ${init})`;
-      const stepLines = ((p && p.steps) || []).map((s, i) => {
-        const a = (s && s.action) || 'click';
-        const sel = (s && s.selector) || '?';
+      const passi = Array.isArray(p && p.steps) ? p.steps.slice(0, MAX_STEPS_PROMPT) : [];
+      const stepLines = passi.map((s, i) => {
+        const a = unaRiga((s && s.action) || 'click', 40) || 'click';
+        const sel = unaRiga((s && s.selector) || '?', MAX_SELECTOR_PROMPT) || '?';
         const r = (s && s.retracted) ? ' [poi corretto]' : '';
         return `  ${i + 1}. ${a} su ${sel}${r}`;
       });
