@@ -35,6 +35,14 @@
   // lupo, quindi deve tenere abbastanza storia da vedere una tendenza. 500 voci
   // sono mesi di uso e pesano pochi KB; oltre, le più vecchie escono.
   const GUARD_BLOCKS_CAP = 500;
+  // Coda «in attesa del controllo» (#536). Il tetto è largo apposta: qui dentro
+  // finisce OGNI risposta nata da una ricerca finché il guardiano non risponde,
+  // e con un modello del guardiano mai impostato non ne esce nessuna. Cento voci
+  // erano pochi giorni d'uso. E quando il tetto si raggiunge davvero, la voce
+  // più vecchia non sparisce in silenzio: va nel registro degli avvisi fermati,
+  // dove si legge, perché a chi aveva letto «te lo mostro appena riesco» si deve
+  // almeno dire dov'è finito.
+  const GUARD_PENDING_CAP = 500;
 
   function uuid() {
     if (global.crypto?.randomUUID) return global.crypto.randomUUID();
