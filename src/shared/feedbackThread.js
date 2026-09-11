@@ -528,7 +528,7 @@
   // opts.attachments come in appendUserTurn (simmetria tra i due cammini).
   function appendModelTurn(oldNotes, reportText, opts) {
     const o = opts || {};
-    const report = String(reportText || '').trim();
+    const report = neutralizzaMarcatori(String(reportText || '').trim());
     const attBlock = attachmentsBlock(o.attachments);
     if (!report && !attBlock) return String(oldNotes || '');
     const parts = [modelTurnMarker(o.ts, o.label)];
