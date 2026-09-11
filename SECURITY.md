@@ -254,9 +254,13 @@ girano sulla macchina di chi naviga.
 
 Il contratto della callable, per chi la implementa nel backend:
 
-- accetta anche richieste **senza login**, così il mittente resta anonimo. Se
-  arriva un `Authorization: Bearer <ID token>` lo usa come identità, altrimenti
-  ricade sul `clientId` della richiesta e sull'IP;
+- accetta anche richieste **senza login**, così il mittente resta anonimo.
+  L'identità arriva come `Authorization: Bearer <ID token>` e c'è sempre: è
+  quella dell'installazione, l'account anonimo che Filo si crea da sé (lo
+  stesso di crediti e portafoglio), non il login Google, che è opzionale. Il
+  server la verifica. Se per un guasto non arrivasse, restano il `clientId`
+  della richiesta e l'IP, ma sono ripieghi: il primo se lo dichiara il
+  mittente, il secondo cambia da solo;
 - riapplica `sanitizeSubmission` di `src/shared/pathsSafety.js`. È il modulo
   condiviso che il backend incorpora al deploy, e la pulizia deve restare la
   stessa dalle due parti. Una copia scritta a mano diverge in silenzio;
