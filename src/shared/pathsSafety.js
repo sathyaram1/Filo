@@ -202,10 +202,14 @@
     const blocchi = [];
     let chars = 0;
     for (const p of dedup) {
+      const steps = sanitizeSteps(p.steps);
+      // Un percorso senza passi non insegna niente: sarebbe solo una frase di
+      // ignoto autore dentro il prompt di qualcun altro.
+      if (!steps.length) continue;
       const intent = sanitizeIntent(p.intent) || '(intento ignoto)';
       const init = sanitizeInitialUrl(p.initialUrl);
       const header = `## "${intent}" (da ${init})`;
-      const stepLines = sanitizeSteps(p.steps).map((s, i) =>
+      const stepLines = steps.map((s, i) =>
         `  ${i + 1}. ${s.action} su ${s.selector}${s.retracted ? ' [poi corretto]' : ''}`);
       const block = [header, ...stepLines].join('\n');
       if (chars + block.length + 2 > KNOWN_PATHS_BUDGET_CHARS) break;
