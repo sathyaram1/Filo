@@ -210,12 +210,15 @@
     return chiaro;
   }
 
-  function redactPath(path) {
+  function redactPath(path, { nomeInTesta: primoENome = false } = {}) {
     const pezzi = String(path || '').split('/');
     const out = [];
     let precedente = '';
+    let primoVisto = false;
     for (const pezzo of pezzi) {
       if (!pezzo) { out.push(pezzo); continue; }
+      if (!primoVisto && primoENome) { out.push('[ID]'); primoVisto = true; precedente = pezzo; continue; }
+      primoVisto = true;
       out.push(redactPathSegment(pezzo, precedente));
       precedente = pezzo;
     }
@@ -225,7 +228,7 @@
   function normalizedPath(rawUrl) {
     const u = parseUrl(rawUrl);
     if (!u) return '';
-    let path = redactPath(u.pathname || '/');
+    let path = redactPath(u.pathname || '/', { nomeInTesta: nomeInTesta(u.hostname) });
     if (path.length > 2000) path = path.slice(0, 2000);
     return path;
   }
