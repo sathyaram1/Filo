@@ -124,7 +124,13 @@
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
-        return { partial: { agentStyle: s }, label: "Stile dell'agente aggiornato" };
+        // #536 — testo libero, e per giunta testo che entra nelle istruzioni di
+        // ogni conversazione futura. Dopo che un turno ha letto una pagina
+        // scritta da altri questo valore lo sceglie quella pagina, quindi passa
+        // dal guardiano prima di essere scritto. Una sentinella negli unit test
+        // prova ogni preferenza con una stringa riconoscibile: se il valore
+        // arriva intero nell'impostazione, `testoLibero` è obbligatorio.
+        return { partial: { agentStyle: s }, label: "Stile dell'agente aggiornato", testoLibero: true };
       },
     },
     {
