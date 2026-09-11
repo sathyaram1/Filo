@@ -2104,6 +2104,7 @@
     injectAgentStyle,
     SISTEMI,
     descriviSistema,
+    unaRigaDiDati,
     PROMPTS,
     HISTORY_LIMIT_BYTES,
     HISTORY_ITEMS_HARD_CAP,
