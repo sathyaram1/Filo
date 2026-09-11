@@ -136,4 +136,10 @@ test('quello che un turno contaminato fissa nella memoria di Filo non passa da n
     inMemoria,
     'la frase della pagina è entrata nella memoria di Filo senza passare da nessun controllo',
   ).not.toContain('confermare le credenziali');
+
+  const guardianiDopo = await app.evaluate(() => globalThis.__guardiano.length);
+  expect(
+    guardianiDopo - guardianiPrima,
+    'nella conversazione pulita il secondo modello non è stato chiamato: la frase di un estraneo è stata lavata dalla memoria',
+  ).toBeGreaterThan(0);
 });
