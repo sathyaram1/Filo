@@ -572,8 +572,16 @@
     FILO_PAUSE_TIMER: 'filo_pause_timer',          // { id } — mette in pausa un timer (congela il conto alla rovescia)
     FILO_RESUME_TIMER: 'filo_resume_timer',        // { id } — riprende un timer in pausa
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
+    // Risposta: { ok, notifications, pending } — `pending` sono le righe «in
+    // attesa del controllo» del guardiano (#536): l'avviso esiste, non è ancora
+    // stato controllato, e il suo testo NON viaggia finché non lo è.
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // #536 — il registro degli avvisi FERMATI dal guardiano, che l'utente legge
+    // in Preferenze per capire se grida al lupo. Contiene il testo bloccato:
+    // solo pagine filo://.
+    FILO_GET_GUARD_BLOCKS: 'filo_get_guard_blocks',     // → { ok, blocks }
+    FILO_CLEAR_GUARD_BLOCKS: 'filo_clear_guard_blocks', // → { ok, blocks: [] }
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
