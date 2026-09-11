@@ -16,6 +16,14 @@
 // Firestore da sé, al microsecondo. È la chiave di join che l'arrotondamento
 // all'ora di `createdAt` voleva togliere, e non si può sopprimere finché la
 // lettura è diretta.
+//
+// COM'È STATO CHIUSO, nella correzione dello stesso giro. Quella marca esce
+// comunque, quindi si è fatto in modo che non dica più niente: un percorso non
+// parte più quando lo fai, entra in una coda sul disco e ne esce a un'ora
+// sorteggiata nelle ventiquattro ore dopo, uno alla volta. L'ultimo caso resta
+// com'era, perché continua a descrivere il vero: la marca arriva al lettore. A
+// cambiare è cosa significa. La guardia sempre accesa sul rimedio sta dove la
+// suite la rilancerà per sempre, in `tests/unit/pathsRitardo.test.mjs`.
 
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
