@@ -486,6 +486,7 @@
     normalizzaClasse, piuBassa, contaminata, deveControllare,
     descriviFonte, fonteDiAzione, fontiDelTurno,
     hostVisibile, etichettaComeHost, stessoDominio, linkIngannevole, estraiLink, linkPerUtente,
+    promesseNelTesto,
     controlliStatici,
     costruisciPrompt, interpretaVerdetto,
     frasePerBlocco, fraseInAttesa,
