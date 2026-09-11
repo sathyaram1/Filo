@@ -325,12 +325,7 @@ module.exports = function register(on, ctx) {
         // dirla qui è la differenza fra un segnaposto muto e un problema che si
         // risolve. (Il motivo finisce nell'hover del segnaposto, in dashboard.)
         if (res.status === 403) {
-          return {
-            ok: false,
-            error: idToken
-              ? 'allegato non leggibile: il link non porta il token di download e questo account non è fra gli amministratori del progetto'
-              : 'allegato non leggibile: accedi con l’account amministratore (la sessione è scaduta)',
-          };
+          return { ok: false, error: attachmentForbiddenHelp({ conIdentita: !!idToken }) };
         }
         return { ok: false, error: `download allegato fallito (${res.status})` };
       }
