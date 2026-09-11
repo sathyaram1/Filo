@@ -72,8 +72,14 @@ test('la risposta della chat passa dal guardiano quando il turno è contaminato'
     'la chat non controlla più la fiducia del turno prima di rispondere');
   assert.match(h, /controllaTesto\(/,
     'la risposta della chat non passa più dal guardiano');
-  assert.match(h, /fiduciaDellAzione\(/,
+  assert.match(h, /haPortatoTestoDiAltri\(/,
     'nessuno segna più il turno come contaminato quando un’azione legge roba di altri');
+  // #536, giro 7: il marchio si accendeva solo se l'azione era RIUSCITA, e
+  // bastava un comando finito male (o interrotto perché ci metteva troppo) per
+  // portare dentro le parole di un estraneo lasciando il turno pulito. La
+  // domanda giusta è se l'azione ha prodotto un'uscita, non se è andata bene.
+  assert.ok(!/if \(res\.executed && !res\.rejected\) \{/.test(h),
+    'la contaminazione del turno dipende di nuovo dal buon esito dell’azione');
 });
 
 test('il guardiano gira su un modello impostabile, mai scelto dal codice', () => {
