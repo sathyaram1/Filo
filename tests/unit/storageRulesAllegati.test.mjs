@@ -296,6 +296,37 @@ test('l’owner scarica un allegato firmando la richiesta; il token non esce alt
   assert.equal(FB.isAttachmentUrl(dentro), true);
 });
 
+test('il token dell’owner non esce verso un bucket che non è quello di Filo', () => {
+  // Il caso che l'ha fatta nascere (verifica #582, giro 1). Fermarsi all'HOST
+  // non basta: l'URL dell'allegato non lo sceglie l'owner, sta dentro il
+  // documento del feedback, e un feedback lo crea CHIUNQUE senza login (le
+  // firestore.rules validano `images` solo come lista di al più 5 elementi, non
+  // il contenuto). Bastava indicare un bucket qualunque ospitato da Google e la
+  // dashboard, aprendo quel feedback, ci portava l'id token dell'owner — la
+  // credenziale che vale su tutto il progetto per un'ora.
+  const estranei = [
+    'https://firebasestorage.googleapis.com/v0/b/bucket-di-un-estraneo.appspot.com/o/x.png?alt=media',
+    'https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app.di-un-estraneo.app/o/x.png',
+    'https://storage.googleapis.com/bucket-di-un-estraneo/x.png',
+    'https://storage.googleapis.com/filo-8b9cb.firebasestorage.app-di-un-estraneo/x.png',
+    // Le forme su cui una regex si fa fregare e `new URL` no.
+    'https://firebasestorage.googleapis.com@esempio.invalid/v0/b/filo-8b9cb.firebasestorage.app/o/x.png',
+  ];
+  for (const url of estranei) {
+    assert.equal(FB.isAttachmentUrl(url), false, `riconosciuto come allegato di Filo: ${url}`);
+    assert.deepEqual(FB.attachmentFetchHeaders(url, 'ID-TOKEN'), {}, `token spedito a ${url}`);
+  }
+  // E il bucket vero resta riconosciuto nelle due forme in cui può arrivare.
+  for (const url of [
+    'https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2Fx.png?alt=media&token=abc',
+    'https://storage.googleapis.com/filo-8b9cb.firebasestorage.app/feedback/x.png',
+    // L'host è case-insensitive: non è un bucket diverso.
+    'https://FirebaseStorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2Fx.png',
+  ]) {
+    assert.equal(FB.isAttachmentUrl(url), true, `allegato vero non riconosciuto: ${url}`);
+  }
+});
+
 test('tutto ciò che non è feedback/<file> resta chiuso', () => {
   const i = VIVO.indexOf('match /{path=**}');
   assert.notEqual(i, -1, 'manca il blocco che chiude tutto il resto');
