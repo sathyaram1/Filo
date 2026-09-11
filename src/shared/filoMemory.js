@@ -799,7 +799,24 @@
       ...(proposta && typeof proposta === 'object' ? proposta : {}),
     };
     list.push(entry);
-    if (list.length > NOTIFICATIONS_CAP) list.splice(0, list.length - NOTIFICATIONS_CAP);
+    // Oltre il tetto: le più vecchie escono dalla coda, ma non dal mondo. Un
+    // taglio muto qui è un taglio su una cosa promessa («te lo mostro appena
+    // riesco»), quindi finiscono nel registro degli avvisi fermati con scritto
+    // che nessuno le ha mai controllate.
+    if (list.length > GUARD_PENDING_CAP) {
+      const scartate = list.splice(0, list.length - GUARD_PENDING_CAP);
+      for (const v of scartate) {
+        try {
+          await addGuardBlock({
+            origine: v.origine,
+            motivo: 'aspettava il controllo di sicurezza da troppo tempo e la coda era piena',
+            regola: 'coda-piena',
+            testo: v.testo,
+            fonte: v.regolaAutomazione || v.richiestaUtente || '',
+          });
+        } catch (_) { /* il registro è pieno o non scrive: meglio perdere la traccia che la coda */ }
+      }
+    }
     await setRaw(KEYS.FILO_GUARD_PENDING, list);
     return entry;
   }
