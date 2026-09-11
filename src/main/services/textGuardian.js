@@ -58,6 +58,9 @@ function configure({ eseguiModello, segreti, pausaMs, avvisaCambio } = {}) {
   if (segreti !== undefined) _segreti = typeof segreti === 'function' ? segreti : null;
   if (avvisaCambio !== undefined) _avvisaCambio = typeof avvisaCambio === 'function' ? avvisaCambio : null;
   if (Number.isFinite(pausaMs)) _pausaMs = Math.max(0, pausaMs);
+  // Cambiare il modello (o ricablare il guardiano) è una ragione per riprovare
+  // subito quello che era rimasto in coda: il freno del minuto riparte da zero.
+  _ultimoGiro = 0;
 }
 
 // La colonna live deve accorgersene subito, non al giro dopo.
