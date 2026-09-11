@@ -60,41 +60,12 @@ function winOf(sender) {
 
 // ─── helpers (identici al background.js originale) ──────────────────────────
 
-function clusterKey(p) {
-  const init = p.initialUrl || '';
-  const steps = Array.isArray(p.steps) ? p.steps : [];
-  const sig = steps.map((s) => `${s.action || 'click'}|${s.selector || ''}`).join(',');
-  return init + '::' + sig;
-}
-
+// I "percorsi già riusciti" che finiscono nel prompt dell'agente di pagina:
+// deduplica, formattazione e tetto di caratteri stanno in SN_PATHS, accanto
+// alla lettura che li produce, così l'intero cammino si prova con un unit test
+// (tests/unit/pathsLettura.test.mjs) senza accendere Electron.
 function formatKnownPathsForPrompt(rawPaths) {
-  if (!Array.isArray(rawPaths) || !rawPaths.length) return '';
-  const seen = new Set();
-  const dedup = [];
-  for (const p of rawPaths) {
-    const k = clusterKey(p);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    dedup.push(p);
-  }
-  const lines = [];
-  let chars = 0;
-  for (const p of dedup) {
-    const intent = (p.intent || '').trim() || '(intento ignoto)';
-    const init = (p.initialUrl || '').trim() || '/';
-    const header = `## "${intent}" (da ${init})`;
-    const stepLines = (p.steps || []).map((s, i) => {
-      const a = s.action || 'click';
-      const sel = s.selector || '?';
-      const r = s.retracted ? ' [poi corretto]' : '';
-      return `  ${i + 1}. ${a} su ${sel}${r}`;
-    });
-    const block = [header, ...stepLines].join('\n');
-    if (chars + block.length + 2 > KNOWN_PATHS_BUDGET_CHARS) break;
-    lines.push(block);
-    chars += block.length + 2;
-  }
-  return lines.join('\n\n');
+  return Paths.formatForPrompt(rawPaths, { budgetChars: KNOWN_PATHS_BUDGET_CHARS });
 }
 
 async function buildMessages(action, payload) {
