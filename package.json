@@ -19,6 +19,7 @@
     "test:explore": "node tests/agent/explore.mjs",
     "test:daily": "node tests/agent/daily.mjs",
     "test:shoot": "node tests/agent/shoot.mjs",
+    "banco:guardiano": "node scripts/banco-guardiano.mjs",
     "finish": "node scripts/finish-local.mjs",
     "finish:check": "node scripts/finish-local.mjs --check",
     "feedback:backfill": "node scripts/backfill-feedback-numbers.mjs",
