@@ -397,6 +397,16 @@
   }
 
   async function clearGuardBlocks() {
+    // Svuotare il registro cancella la sola prova che il guardiano stia
+    // sbagliando: si chiede prima, come per ogni altra cosa che non si annulla.
+    const Ui = window.SN_CONFIRM_UI;
+    const text = 'Cancella l’elenco degli avvisi che Filo ha fermato. '
+      + 'È quello che serve a capire se ferma cose che non dovrebbe. '
+      + 'L’operazione non si può annullare.';
+    const ok = Ui
+      ? await Ui.confirm({ title: 'Svuota il registro', text, okLabel: 'Svuota' })
+      : window.confirm(`${text} Procedo?`);
+    if (!ok) return;
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CLEAR_GUARD_BLOCKS });
       if (r?.ok) { renderGuardBlocks(r.blocks); flashSaved('guardBlocksHint'); }
