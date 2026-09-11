@@ -1068,8 +1068,11 @@
     const esito = String(obj && obj.esito || '').trim().toLowerCase();
     if (esito === 'passa') return { esito: 'passa', motivo: '' };
     if (esito === 'blocca') {
-      const motivo = String(obj.motivo || '').trim();
-      return { esito: 'blocca', motivo: motivo || 'sembrava spingerti a fare qualcosa di rischioso' };
+      // Quello che il guardiano ha scritto NON esce da qui: diventa una delle
+      // frasi di Filo. Il modello ha appena letto il testo di un estraneo, e un
+      // contenuto che si fa bloccare apposta gli detterebbe la riga che la
+      // persona legge.
+      return { esito: 'blocca', motivo: motivoDiFilo(obj.motivo) };
     }
     return null;
   }
