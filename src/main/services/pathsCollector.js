@@ -267,9 +267,18 @@
     catch (e) { console.warn('[Filo] coda percorsi: salvataggio fallito', e?.message || e); }
   }
 
-  async function carica() {
-    if (caricata) return;
-    caricata = true;
+  // Una sola lettura del disco, e chi arriva mentre è in corso ASPETTA QUELLA.
+  // Con un semplice "già fatta?" chi accodava un percorso nei millisecondi fra
+  // l'avvio e la fine della lettura scriveva sulla coda ancora vuota, e poi la
+  // lettura gli passava sopra: la coda di prima spariva dal disco senza dire
+  // niente (#584, terzo giro).
+  function carica() {
+    if (caricamento) return caricamento;
+    caricamento = leggiDaDisco();
+    return caricamento;
+  }
+
+  async function leggiDaDisco() {
     try {
       const raw = await deposito()?.getRaw?.(CHIAVE_CODA, []);
       if (Array.isArray(raw)) {
