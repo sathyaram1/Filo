@@ -1229,6 +1229,8 @@
     motivoDiFilo,
     motivoAmmesso,
     FONTE_AZIONE,
+    INGREDIENTE_CONTESTO,
+    fontiDegliIngredienti,
     SISTEMA_GUARDIANO,
     CAMPI_SORVEGLIATI,
     sorveglianzaDellAzione,
