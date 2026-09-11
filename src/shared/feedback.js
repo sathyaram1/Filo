@@ -359,6 +359,17 @@
   // Rimette il contatore in pari: lo crea se manca, lo alza se un `seq` più
   // alto è già in giro (backfill, migrazioni, numeri assegnati a mano). Solo
   // owner: serve il token admin. Torna il valore in vigore alla fine.
+  //
+  // `allowLower` lo RIPORTA GIÙ quando è più alto di qualunque `seq` esistente.
+  // Serve perché farlo avanzare di uno lo può fare chiunque (è ciò che fa chi
+  // invia, e non c'è modo di distinguerlo da chi lo alza a vuoto): senza questo,
+  // un estraneo che lo spinge a diecimila lascerebbe i feedback nuovi con numeri
+  // assurdi per sempre, e l'unica cura sarebbe la console. Si passa `true` SOLO
+  // quando si sono appena letti TUTTI i feedback: abbassarlo avendone visti solo
+  // una parte riassegnerebbe numeri già usati. Resta una finestra stretta (un
+  // invio proprio mentre l'owner guarda la dashboard) in cui un numero si può
+  // ripetere: il numero è un'etichetta, non una chiave, e ripeterne uno è meno
+  // peggio che perderli tutti.
   async function ensureSeqCounter(maxSeq, opts = {}) {
     const value = Math.max(0, Math.trunc(Number(maxSeq) || 0));
     const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
