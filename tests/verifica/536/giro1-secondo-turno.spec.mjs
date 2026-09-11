@@ -106,14 +106,15 @@ test('la risposta del turno DOPO nasce dalla stessa pagina e non passa da nessun
   await page.locator('#input').fill('e adesso cosa devo fare?');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo').last())
-    .toContainText('cosa devo fare', { timeout: 30_000 })
-    .catch(() => {});
+    .toContainText('Ho fermato un avviso', { timeout: 30_000 });
 
   const bolle = page.locator('#bubbles');
   // Quello che l'utente NON deve poter leggere: il messaggio della pagina,
   // consegnato da Filo con la sua voce.
   await expect(bolle, 'la trappola del turno prima è arrivata all’utente senza controllo')
-    .not.toContainText('per non perdere l’accesso', { timeout: 30_000 });
+    .not.toContainText('per non perdere l’accesso');
+  await expect(bolle, 'la riga del blocco non dice cosa è stato visto')
+    .toContainText('confermare le credenziali del conto');
   expect(
     await app.evaluate(() => globalThis.__guardiano),
     'il secondo turno, nato dalla stessa pagina, non è stato controllato',
