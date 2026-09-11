@@ -112,7 +112,7 @@ test('un comando finito male porta dentro le parole di un estraneo e la risposta
 
     expect(
       await app.evaluate(() => globalThis.__uscita),
-      `l’uscita del comando non è arrivata al modello: lo spec non prova niente\n---\n${await app.evaluate(() => globalThis.__ctx)}`,
+      'l’uscita del comando non è arrivata al modello: lo spec non prova niente',
     ).toBe(true);
 
     expect(
