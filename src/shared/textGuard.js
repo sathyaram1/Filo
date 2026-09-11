@@ -691,6 +691,7 @@
     segretoNelTesto,
     ibanValido,
     luhnValido,
+    isbnValido,
     linkDelTesto,
     linkIngannevole,
     urlTravestito,
