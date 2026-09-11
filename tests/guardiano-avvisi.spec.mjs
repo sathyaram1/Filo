@@ -199,8 +199,15 @@ test('il registro degli avvisi fermati si legge, e si svuota, dalle Preferenze',
   await expect(testo).toContainText('attacco.ru');
   await expect(testo.locator('a')).toHaveCount(0);
 
-  // Se si può aggiungere si può togliere.
+  // Se si può aggiungere si può togliere. E siccome togliere qui vuol dire
+  // buttare la sola prova che il guardiano stia sbagliando, prima si chiede.
   await pref.locator('#clearGuardBlocks').click();
+  expect(await confirmText(pref)).toContain('non si può annullare');
+  await clickConfirm(pref, 'cancel');
+  await expect(voci).toHaveCount(1, 'annullare non deve cancellare niente');
+
+  await pref.locator('#clearGuardBlocks').click();
+  await clickConfirm(pref, 'ok');
   await expect(voci).toHaveCount(0, { timeout: 8_000 });
   await expect(pref.locator('#guardBlocksEmpty')).toBeVisible();
 });
