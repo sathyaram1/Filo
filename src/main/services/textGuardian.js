@@ -111,9 +111,17 @@ async function controllaTesto({
   }
 
   // 3. il guardiano.
-  if (!_eseguiModello) return { esito: 'in-attesa', motivo: 'guardiano non configurato', regola: '' };
+  if (!_eseguiModello) {
+    return { esito: 'in-attesa', motivo: 'guardiano non configurato', regola: '', causa: G.CAUSA.CONFIGURAZIONE };
+  }
   const messaggi = G.messaggiGuardiano({ testo, fiducia, origine, richiestaUtente, regolaAutomazione });
   let ultimoErrore = '';
+  // Perché non è riuscito: la rete che va e viene è una cosa, un modello che
+  // manca (o che è lo stesso che ha scritto il testo) è un'altra. Aspettare
+  // aggiusta la prima e non aggiusta la seconda, e chi legge deve poterle
+  // distinguere: una frase sola per due guasti diversi manda l'utente ad
+  // aspettare per sempre una cosa che solo lui può sistemare.
+  let causa = G.CAUSA.RETE;
   for (let i = 0; i < TENTATIVI_MAX; i++) {
     try {
       const raw = await _eseguiModello({ messaggi, produttore });
@@ -127,11 +135,11 @@ async function controllaTesto({
       ultimoErrore = (e && (e.message || e.code)) || 'errore';
       // Il guardiano non ha un modello indipendente su cui girare: ritentare non
       // cambia niente, e lasciar passare sarebbe peggio. Coda subito.
-      if (e && e.code === 'GUARDIANO_NON_INDIPENDENTE') break;
+      if (e && e.code === 'GUARDIANO_NON_INDIPENDENTE') { causa = G.CAUSA.CONFIGURAZIONE; break; }
     }
     if (i + 1 < TENTATIVI_MAX && _pausaMs) await dormi(_pausaMs);
   }
-  return { esito: 'in-attesa', motivo: ultimoErrore, regola: '' };
+  return { esito: 'in-attesa', motivo: ultimoErrore, regola: '', causa };
 }
 
 // ── Proporre un avviso ──────────────────────────────────────────────────────
