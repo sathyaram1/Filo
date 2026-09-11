@@ -11,6 +11,12 @@
   const BUCKET = 'filo-8b9cb.firebasestorage.app';
   const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY';
   const COLLECTION = 'feedback';
+  // #583: la vista pubblica (un documento per feedback, stesso id, solo i campi
+  // sicuri) e il contatore dei numeri. La collezione vera non si legge più
+  // senza credenziali: vedi firestore.rules e src/shared/feedbackPublicView.js.
+  const VIEW_COLLECTION = 'feedback-public';
+  const COUNTERS_COLLECTION = 'counters';
+  const SEQ_COUNTER = 'feedbackSeq';
 
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
