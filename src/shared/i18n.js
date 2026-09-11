@@ -375,7 +375,7 @@
     // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_title: 'Modelli predefiniti',
     admin_defaults_intro:
-      'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Le modifiche si propagano a tutte le installazioni.',
+      'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Provider e modelli arrivano a tutte le installazioni subito. Le chiavi no: nessuna installazione le legge da qui — le incastona la prossima versione pubblicata, ed è l\'aggiornamento a consegnarle.',
     admin_defaults_denied: 'Sezione riservata agli amministratori. Accedi con un account autorizzato dall\'icona account in alto.',
     admin_defaults_keys: 'Chiavi API predefinite',
     admin_defaults_keys_desc:
