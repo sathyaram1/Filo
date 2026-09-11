@@ -12,6 +12,14 @@
 // quanto il renderer vede di sé via AUTH_STATUS.
 
 const auth = require('../../auth/google-auth');
+// #583 — queste tre porte non sono del proprietario: valgono per chiunque
+// abbia fatto l'accesso, e su una macchina con una sessione aperta «hai una
+// sessione?» è sempre sì. Senza guardare da dove arriva la richiesta, una
+// pagina di un sito visitato votava al posto dell'utente, gli cancellava il
+// voto e gli spendeva i crediti per riaprire un fix, aprendo a suo nome una
+// segnalazione col testo che voleva. Il voto e la riapertura sono gesti che si
+// fanno in bacheca, che è una pagina di Filo.
+const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
