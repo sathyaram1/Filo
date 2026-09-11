@@ -159,12 +159,22 @@
     'usuario', 'usuarios', 'benutzer', 'utilisateur',
   ]);
 
+  // Un segmento accentato arriva codificato (`privacit%C3%A0`): si guarda la
+  // forma decodificata, se no una parola come «privacità» finirebbe fra i
+  // codici. Quello che si tiene è la forma decodificata, che è anche la più
+  // leggibile per chi riusa il percorso; se il decodificato contiene una barra
+  // o altro, la prova della parola lo scarta da sé.
+  function decodi(segmento) {
+    try { return decodeURIComponent(segmento); } catch (_) { return segmento; }
+  }
+
   function redactPathSegment(segmento, precedente) {
     if (!segmento) return segmento;
-    if (segmento.includes('@')) return '[EMAIL]';
-    if (MARCATORI_PERSONA.has(String(precedente || '').toLowerCase())) return '[ID]';
-    if (!SEGMENTO_PAROLA.test(segmento)) return '[ID]';
-    return segmento;
+    const chiaro = decodi(segmento);
+    if (chiaro.includes('@')) return '[EMAIL]';
+    if (MARCATORI_PERSONA.has(decodi(String(precedente || '')).toLowerCase())) return '[ID]';
+    if (!SEGMENTO_PAROLA.test(chiaro)) return '[ID]';
+    return chiaro;
   }
 
   function redactPath(path) {
