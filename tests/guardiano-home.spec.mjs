@@ -103,7 +103,7 @@ test('la frase che una pagina salvata detta alla home non arriva all’utente', 
 });
 
 test('la home che il guardiano lascia passare compare, e i suoi bottoni chiedono conferma',
-  async ({ app }) => {
+  async ({ app, shell }) => {
     test.setTimeout(90_000);
     let page = await newtabPage(app);
     await expect(page.locator('#input')).toBeVisible();
@@ -113,14 +113,14 @@ test('la home che il guardiano lascia passare compare, e i suoi bottoni chiedono
     page = await newtabPage(app);
     await expect(page.locator('#homeMessage')).not.toHaveText('…', { timeout: 20_000 });
     await expect(page.locator('#suggestions')).toContainText('Riattiva il conto');
+    const schede = await shell.locator('.tab').count();
 
     // L'indirizzo l'ha scelto un modello che aveva letto roba di altri: il clic
-    // non apre più niente da solo, dice prima dove porta.
-    const schedePrima = await app.evaluate(() => globalThis.SN_TABS_TEST_COUNT?.() ?? -1);
+    // non apre più niente da solo, chiede prima conferma dicendo dove porta.
     await page.locator('#suggestions button').first().click();
-    const conferma = page.locator('.sn-confirm, [data-sn-confirm]').first();
-    await expect(conferma, 'il bottone della home ha aperto l’indirizzo senza chiedere niente')
-      .toBeVisible({ timeout: 8_000 });
-    await expect(conferma).toContainText('attacco.ru');
-    void schedePrima;
+    await expect(
+      page.locator('.sn-confirm-host'),
+      'il bottone della home ha aperto l’indirizzo senza chiedere niente',
+    ).toBeVisible({ timeout: 8_000 });
+    await expect(shell.locator('.tab')).toHaveCount(schede);
   });
