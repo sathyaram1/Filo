@@ -1048,7 +1048,9 @@
   // una riga di istruzioni (#584, quarto giro).
   function unaRigaDiDati(testo, max) {
     return String(testo == null ? '' : testo)
-      .replace(/[ --​-‏  ‪-‮⁠-⁤⁦-⁩﻿]+/g, ' ')
+      // a capo, tabulazioni, caratteri di controllo e segni invisibili di
+      // direzione del testo (con cui si nasconde del testo a occhio) -> spazio
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, Number.isFinite(max) && max > 0 ? max : 4000);

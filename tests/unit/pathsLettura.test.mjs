@@ -24,6 +24,10 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// constants.js prima: è il modulo base, e da lì paths.js prende la funzione che
+// rende inerte come struttura un pezzo di testo scritto da uno sconosciuto
+// (una definizione sola per la lettura e per la scrittura, #584 quarto giro).
+require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'paths.js'));
 const P = globalThis.SN_PATHS;
 
