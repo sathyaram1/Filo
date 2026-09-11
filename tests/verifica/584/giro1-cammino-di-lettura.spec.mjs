@@ -33,12 +33,20 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..', '..');
 
+// Il modulo della lettura, dentro una scatola sua, con la rete finta.
+// Prima c'è constants.js, che è il modulo base: da lì paths.js prende la
+// funzione che appiattisce un pezzo di testo scritto da uno sconosciuto prima
+// di metterlo in un prompt. Sta li' dal quarto giro, perché la stessa serve
+// anche dalla parte della scrittura e una definizione sola vale per tutte e
+// due; caricare paths.js da solo, da qui in poi, è caricarlo senza le sue basi.
 function caricaPaths() {
-  const src = readFileSync(resolve(APP_ROOT, 'src', 'shared', 'paths.js'), 'utf8');
   const g = {};
-  new Function('globalThis', 'self', 'fetch', `${src}`).call(
-    g, g, g, (...a) => g.__fetch(...a),
-  );
+  for (const modulo of ['constants.js', 'paths.js']) {
+    const src = readFileSync(resolve(APP_ROOT, 'src', 'shared', modulo), 'utf8');
+    new Function('globalThis', 'self', 'fetch', `${src}`).call(
+      g, g, g, (...a) => g.__fetch(...a),
+    );
+  }
   return g;
 }
 
