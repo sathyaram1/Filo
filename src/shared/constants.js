@@ -241,6 +241,12 @@
     SAFEBROWSE_JUDGE: 'safebrowse_judge',
     // Classificatore della coda ambigua del rilevamento geo-block.
     GEOBLOCK_CLASSIFY: 'geoblock_classify',
+    // #536 — il guardiano degli avvisi: un SECONDO modello guarda il testo che
+    // Filo sta per mostrare, quando quel testo nasce da contenuto scritto da
+    // altri (mail, pagine). Deve essere un modello DIVERSO da quello che ha
+    // scritto il testo: due contesti sullo stesso modello cadono insieme, e il
+    // codice rifiuta i nickname in comune (src/shared/textGuard.js).
+    GUARD_TEXT: 'guard_text',
     // Titolo breve generato all'invio di un feedback.
     FEEDBACK_TITLE: 'feedback_title',
     // === Editor ===
