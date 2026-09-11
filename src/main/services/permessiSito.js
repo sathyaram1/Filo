@@ -218,9 +218,7 @@ function rispondi(id, scelta, { ricorda = true } = {}) {
   const att = attese.get(String(id));
   if (!att) return { ok: false, error: 'scaduta' };
   const ok = scelta === 'allow';
-  if (ricorda) att.ricorda = ok ? 'allow' : 'deny';
-  const salvaScelta = att.salva;
-  if (ricorda && typeof salvaScelta === 'function') salvaScelta(ok ? 'allow' : 'deny');
+  if (ricorda && typeof att.salva === 'function') att.salva(ok ? 'allow' : 'deny');
   att.chiudi(ok);
   return { ok: true };
 }
