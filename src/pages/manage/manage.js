@@ -1312,7 +1312,7 @@
       }),
       statsCard({
         id: 'adesso',
-        value: leggibile ? String(res.adesso.inCoda + res.adesso.inLavorazione) : '—',
+        value: leggibile ? statsNum(res.adesso.inCoda + res.adesso.inLavorazione, res.adesso.parziale) : '—',
         label: 'Aperte adesso',
         sub: 'quante ce ne sono adesso, non nella finestra',
         rows: !leggibile ? [] : statsQuote([
