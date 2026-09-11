@@ -282,19 +282,23 @@
   // Decifratura lazy degli allegati immagine (S1.2), con cache
   // url → { dataUrl, error }. Su fallimento `error` porta il MOTIVO preciso
   // (dal main) così il segnaposto lo spiega in hover invece di restare muto.
+  // `soloDestinatario`: non è un guasto, è che l'allegato lo apre solo chi
+  // riceve le segnalazioni (viaggia cifrato con la sua chiave). Il segnaposto
+  // allora dice che l'allegato è partito, invece di dire che manca qualcosa.
   const fbImgCache = new Map();
   async function resolveImageSrc(url) {
-    if (!url) return { dataUrl: null, error: '' };
+    if (!url) return { dataUrl: null, error: '', soloDestinatario: false };
     if (fbImgCache.has(url)) return fbImgCache.get(url);
     let dataUrl = null;
     let error = '';
+    let soloDestinatario = false;
     try {
       const r = await sendToMain({ type: 'feedback_decrypt_image', url });
       if (r && r.ok && r.dataUrl) dataUrl = r.dataUrl;
-      else if (r && r.error) error = String(r.error);
+      else if (r && r.error) { error = String(r.error); soloDestinatario = !!r.soloDestinatario; }
       else error = 'immagine non disponibile';
     } catch (_) { error = 'immagine non raggiungibile'; }
-    const res = { dataUrl, error };
+    const res = { dataUrl, error, soloDestinatario };
     fbImgCache.set(url, res);
     return res;
   }
