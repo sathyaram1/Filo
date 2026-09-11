@@ -256,9 +256,11 @@ Il contratto della callable, per chi la implementa nel backend:
   da tutte e due le parti, non una copia scritta a mano;
 - tiene un **limite di frequenza per identità** (e per dominio di destinazione:
   è avvelenando lo stesso dominio che un attacco rende);
-- scrive con l'Admin SDK. Il `clientId` **non entra nel documento**: la raccolta
-  è leggibile da chiunque, e un identificativo stabile lì dentro legherebbe fra
-  loro le navigazioni di una stessa installazione;
+- scrive con l'Admin SDK, e scrive lui il `createdAt` (timestamp): la lettura
+  ordina per quel campo, un documento senza resta invisibile. Il `clientId`
+  invece **non entra nel documento**: la raccolta è leggibile da chiunque, e un
+  identificativo stabile lì dentro legherebbe fra loro le navigazioni di una
+  stessa installazione;
 - risponde `{ result: { saved: true, id } }` oppure `{ result: { saved: false,
   reason } }`. Un rifiuto non è un errore dell'utente: la raccolta è
   best-effort e non viene mostrata.
