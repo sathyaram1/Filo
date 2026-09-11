@@ -348,9 +348,16 @@
     box.textContent = '';
     const list = Array.isArray(blocks) ? blocks : [];
     if (empty) empty.hidden = list.length > 0;
+    // Chi arriva qui da un avviso fermato ha chiesto DI VEDERE quello: la sua
+    // voce si apre già aperta e si fa trovare, invece di lasciarlo cercare in
+    // un elenco.
+    let cercato = '';
+    try { cercato = new URLSearchParams(location.search).get('blocco') || ''; } catch (_) {}
+    let daMostrare = null;
     for (const b of list) {
       const item = document.createElement('div');
       item.className = 'guard-item';
+      if (cercato && b.id === cercato) { item.classList.add('guard-item-cercato'); daMostrare = item; }
 
       const why = document.createElement('div');
       why.className = 'guard-why';
