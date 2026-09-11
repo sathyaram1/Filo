@@ -46,6 +46,7 @@
     try {
       if (!global.SN_FB_STATUS) require('./feedbackStatus.js');
       if (!global.SN_MANAGE_REVIEW) require('./manageReview.js');
+      if (!global.SN_FEEDBACK_CLIENT_ID_HASH) require('./feedbackClientIdHash.js');
     } catch (_) { /* in pagina: già inclusi dall'HTML */ }
   }
 
