@@ -270,6 +270,16 @@ module.exports = function register(on, ctx) {
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
       // entra, uno riaperto esce, la frase per chi ha segnalato cambia): la
       // vista pubblica si rifà subito, non al prossimo caricamento.
+      //
+      // Prima la scheda di QUESTO feedback, poi il giro generale. Non è un
+      // doppione: il giro generale guarda solo i 500 feedback più recenti per
+      // data d'invio, e Filo quel numero l'ha passato. Chiudere oggi una
+      // segnalazione vecchia non le scriveva nessuna scheda (niente bacheca,
+      // niente annuncio e niente crediti per chi l'aveva mandata) e riaprirne
+      // una vecchia non le toglieva la sua (restava in bacheca come risolta,
+      // votabile e riapribile a pagamento). Qui l'id ce l'abbiamo: si va
+      // dritti su quello, e l'età non conta più.
+      await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
       return { ok: true };
     } catch (e) {
