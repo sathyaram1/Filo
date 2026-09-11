@@ -298,6 +298,18 @@
   // Carta: 13-19 cifre, eventualmente a gruppi. Il controllo di Luhn decide.
   const FORMA_CARTA = /\b(?:\d[ -]?){13,19}\b/g;
 
+  // Un numero di 13 cifre su dieci passa Luhn per caso, e i codici ISBN dei
+  // libri sono tutti di 13 cifre: senza questo, «il codice ISBN è
+  // 9788804707231» diventava «conteneva un numero di carta». L'ISBN ha una sua
+  // cifra di controllo e un suo prefisso, quindi si riconosce con certezza.
+  function isbnValido(raw) {
+    const s = String(raw || '').replace(/[^\d]/g, '');
+    if (s.length !== 13 || !/^97[89]/.test(s)) return false;
+    let somma = 0;
+    for (let i = 0; i < 13; i++) somma += Number(s[i]) * (i % 2 === 0 ? 1 : 3);
+    return somma % 10 === 0;
+  }
+
   function ibanValido(raw) {
     const s = String(raw || '').replace(/\s+/g, '').toUpperCase();
     if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
