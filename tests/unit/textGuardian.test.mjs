@@ -132,7 +132,9 @@ test('un segreto di Filo nel testo lo ferma senza discutere', async () => {
 });
 
 test('il guardiano blocca: la riga dice cosa ha visto, e il blocco resta nel registro', async () => {
-  risposta = '{"esito":"blocca","motivo":"chiedeva di confermare le credenziali della banca"}';
+  // Il guardiano sceglie una CATEGORIA; la frase che la persona legge la scrive
+  // Filo, perché quel modello ha appena letto il testo di un estraneo.
+  risposta = '{"esito":"blocca","motivo":"credenziali"}';
   const r = await TG.proponiNotifica({
     testo: 'La tua banca chiede di confermare le credenziali, apri il portale.',
     kind: 'alert', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
