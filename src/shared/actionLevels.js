@@ -99,13 +99,24 @@
       // esfiltrazione da origine non fidata (fallback strutturale), sale a
       // livello 2 → conferma con l'URL mostrato. Il flag `_exfil` lo calcola il
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
-      level: (a) => (a && a._exfil ? 2 : 1),
+      // SECONDA ECCEZIONE (#536): il turno ha letto una mail, una pagina o
+      // l'uscita di un comando, e l'indirizzo può essere stato scelto da lì. Un
+      // secondo modello guarda la FRASE prima che compaia, ma il gesto usciva
+      // libero: la pagina scriveva «apri questo indirizzo» e Filo lo apriva da
+      // solo, portando la persona sul sito della truffa mentre le nascondeva la
+      // frase che glielo chiedeva. Anche qui il marchio lo mette il main
+      // (handlers.js, sulla classe di fiducia del turno), mai l'LLM.
+      level: (a) => (a && (a._exfil || a._contaminato) ? 2 : 1),
       describe: (a) => {
         const url = a.url || a.href || a.link || 'una pagina';
         if (a && a._exfil) {
           const why = a._exfilReason ? ` (${a._exfilReason})` : '';
           return `Filo sta per aprire un link che${why}:\n${url}\n\n`
             + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
+        }
+        if (a && a._contaminato) {
+          return `Filo sta per aprire un indirizzo che ha trovato in quello che ha appena letto:\n${url}\n\n`
+            + 'Guarda dove porta prima di aprirlo.';
         }
         return `Aprire ${url}`;
       },
