@@ -138,6 +138,10 @@ async function controlla(richiesta = {}, deps = {}) {
       ultimoErrore = 'risposta fuori formato';
     } catch (e) {
       ultimoErrore = (e && e.message) || String(e);
+      // Un guasto PERMANENTE non si cura riprovando: nessun modello
+      // indipendente, o nessun modello configurato. Riprovare tre volte con le
+      // pause in mezzo tiene ferma la chat per un secondo e mezzo per niente.
+      if (e && e.permanente) break;
     }
     if (tentativi < TENTATIVI_MAX) await attendi(ATTESA_FRA_TENTATIVI_MS * tentativi);
   }

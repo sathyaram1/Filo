@@ -109,6 +109,24 @@ test('guardiano irraggiungibile: si riprova, e poi è ATTESA — mai un passa', 
   assert.equal(chiamate, Varco.TENTATIVI_MAX);
 });
 
+test('un guasto permanente (nessun modello indipendente) non si ritenta: attesa subito', async () => {
+  let chiamate = 0;
+  const r = await Varco.controlla(
+    { testo: 'avviso qualunque', classe: G.CLASSI.TERZI, fonte: MAIL },
+    {
+      complete: async () => {
+        chiamate++;
+        const e = new Error('nessun modello indipendente disponibile per il guardiano');
+        e.permanente = true;
+        throw e;
+      },
+      segreti: async () => [],
+    },
+  );
+  assert.equal(r.esito, 'attesa');
+  assert.equal(chiamate, 1, 'riprovare non cura una configurazione mancante');
+});
+
 test('risposta fuori formato (modello dirottato): non passa, va in attesa', async () => {
   const r = await Varco.controlla(
     { testo: 'avviso qualunque', classe: G.CLASSI.TERZI, fonte: MAIL },

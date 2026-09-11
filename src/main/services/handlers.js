@@ -3388,10 +3388,20 @@ globalThis.SN_GUARDIA_COMPLETE = async function guardiaComplete({ messages, prod
   });
   if (!scelta.indipendente) {
     // Nessun modello diverso da quello che ha scritto il testo: un secondo
-    // giudizio sullo stesso modello non è un secondo giudizio.
-    throw new Error('nessun modello indipendente disponibile per il guardiano');
+    // giudizio sullo stesso modello non è un secondo giudizio. È un guasto
+    // permanente finché la configurazione non cambia: riprovare non serve.
+    const e = new Error('nessun modello indipendente disponibile per il guardiano');
+    e.permanente = true;
+    throw e;
   }
-  const attempts = buildAttemptChain(settings, scelta.catena, ACTIONS.GUARDIAN_CHECK);
+  let attempts;
+  try {
+    attempts = buildAttemptChain(settings, scelta.catena, ACTIONS.GUARDIAN_CHECK);
+  } catch (e) {
+    // Modelli non configurati: anche questo non si cura riprovando.
+    try { e.permanente = true; } catch (_) {}
+    throw e;
+  }
   const r = await Providers.completeWithFallback({ attempts, messages });
   // Il costo finisce sotto la voce crediti «Controlli di sicurezza»: l'utente
   // deve vedere cosa costa essere protetto.
