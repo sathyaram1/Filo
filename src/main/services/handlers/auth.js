@@ -774,15 +774,13 @@ module.exports = function register(on, ctx) {
       catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
     }
 
-    try {
-      const schede = await publicCards({ fresh: true });
-      const mancanti = (Array.isArray(schede) ? schede : [])
-        .map((c) => String((c && c._id) || ''))
-        .filter((id) => id && !visti.has(id))
-        .slice(0, FB.LIST_PAGE_SIZE);
-      if (mancanti.length) aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 }));
-    } catch (e) {
-      console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e);
+    const mancanti = (Array.isArray(schede) ? schede : [])
+      .map((c) => String((c && c._id) || ''))
+      .filter((id) => id && !visti.has(id))
+      .slice(0, FB.LIST_PAGE_SIZE);
+    if (mancanti.length) {
+      try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 })); }
+      catch (e) { console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e); }
     }
     return rows;
   }
