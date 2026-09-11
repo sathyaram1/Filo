@@ -225,7 +225,7 @@
       somma += n;
       doppio = !doppio;
     }
-    return somma % 97 !== -1 && somma % 10 === 0;
+    return somma % 10 === 0;
   }
 
   // Una parola-spia entro ~60 caratteri dal ritrovamento: è quello che separa
