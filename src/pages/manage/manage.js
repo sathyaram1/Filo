@@ -308,18 +308,34 @@
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
+  // Chi guarda cambia: unica porta, e unico posto dove si buttano via le
+  // risposte tenute da parte. Un allegato si chiede una volta per indirizzo e
+  // la risposta resta in memoria anche quando è un no — ma quel no dipende da
+  // CHI sta guardando, e il pulsante per farsi riconoscere è in questa pagina.
+  // Senza svuotare, chi lo premeva continuava a vedere segnaposti al posto
+  // degli allegati finché non riapriva Gestione (#582, giro 3: stesso danno,
+  // stessa cura, l'altra superficie).
+  function setIsAdmin(v) {
+    const nuovo = !!v;
+    if (nuovo === isAdmin) return;
+    isAdmin = nuovo;
+    imgCache.clear();
+  }
+
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
-      isAdmin = !!(r && r.isAdmin);
+      setIsAdmin(!!(r && r.isAdmin));
     } catch (_) {
-      isAdmin = false;
+      setIsAdmin(false);
     }
     mgBanner.hidden = isAdmin;
   }
 
   mgSignInBtn.addEventListener('click', () => {
-    sendToMain({ type: 'auth_signin' }).catch(() => {});
+    // Finito l'accesso si richiede lo stato: è quello che toglie l'avviso di
+    // sola lettura e svuota le risposte di quando non eravamo nessuno.
+    sendToMain({ type: 'auth_signin' }).then(() => refreshAuth()).catch(() => {});
   });
 
   // ── Switch "Routine autonome" (interruttore master) ───────────────────────
@@ -3423,7 +3439,7 @@
     rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
     setLiveSources(src) { Object.assign(liveSources, src || {}); },
     isLiveOn() { return liveEnabled; },
-    setAdmin(v) { isAdmin = !!v; applyAutoModeGate(); },
+    setAdmin(v) { setIsAdmin(!!v); applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.

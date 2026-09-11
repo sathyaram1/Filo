@@ -366,7 +366,7 @@
   // Lo dice sulla pillola, non solo nell'hover: chi ha mandato la segnalazione
   // deve poter capire a colpo d'occhio che l'allegato è partito ed è illeggibile
   // per lui, come già succede per lo screenshot lì accanto.
-  function markFileClosed(a, motivo, inviato) {
+  function markFileClosed(a, motivo, consegnato) {
     a.title = motivo || '';
     a.classList.add('fb-file--closed');
     let nota = a.querySelector('.fb-file-note');
@@ -375,7 +375,10 @@
       nota.className = 'fb-file-note';
       a.appendChild(nota);
     }
-    nota.textContent = inviato ? '(inviato)' : '(non disponibile)';
+    // «Consegnato», non «inviato»: l'elenco mostra a ogni tester le
+    // segnalazioni di tutti, quindi questa pillola compare anche davanti
+    // all'allegato di un altro (#582, giro 3).
+    nota.textContent = consegnato ? '(consegnato)' : '(non disponibile)';
   }
 
   // Il clic su un allegato: scarica e decifra dal main, poi salva col nome vero.
@@ -1071,8 +1074,11 @@
           ph.className = 'fb-img-broken';
           // Chi ha mandato la segnalazione non rivedrà il proprio screenshot:
           // l'allegato è cifrato con la chiave di chi lo riceve. Non è un
-          // guasto e il segnaposto non deve farlo sembrare tale.
-          ph.textContent = soloDestinatario ? '(allegato inviato)' : '(immagine non disponibile)';
+          // guasto e il segnaposto non deve farlo sembrare tale. «Consegnato»
+          // e non «inviato» perché l'elenco mostra a ogni tester le
+          // segnalazioni di tutti: lo stesso segnaposto compare anche davanti
+          // all'allegato di un altro, che chi guarda non ha mandato.
+          ph.textContent = soloDestinatario ? '(allegato consegnato)' : '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
           ph.title = error || img.dataset.url || '';
           img.replaceWith(ph);
