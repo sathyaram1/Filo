@@ -216,10 +216,11 @@ module.exports = function register(on, ctx) {
   // anche il momento buono per ridare una possibilità alla coda: se il guardiano
   // è tornato raggiungibile, l'avviso rimasto indietro compare adesso.
   on(MSG.FILO_GET_NOTIFICATIONS, async () => {
+    // Senza aspettarlo: la colonna non deve restare ferma mentre il guardiano
+    // ci prova. Quando finisce, se qualcosa è cambiato, la colonna si aggiorna
+    // da sé (broadcastLiveUpdate).
     const TG = globalThis.SN_TEXT_GUARDIAN;
-    if (TG) {
-      try { await TG.riprendiInAttesa(); } catch (_) {}
-    }
+    if (TG) TG.riprendiInAttesa().catch(() => {});
     return {
       ok: true,
       notifications: await FiloMem.listNotifications(),
