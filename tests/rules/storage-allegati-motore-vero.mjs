@@ -34,7 +34,7 @@
 //     "node storage-allegati-motore-vero.mjs"
 //
 // Esito atteso: tutte le righe verdi, uscita 0, più la riga NOTA sulla lettura
-// dell'owner. Al primo passaggio (2026-09-11) è stato così: 23/23.
+// dell'owner. Al primo passaggio (2026-09-11) è stato così: 25/25.
 //
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
 // PRIMA (`git show main:storage.rules > vecchie.rules`, poi

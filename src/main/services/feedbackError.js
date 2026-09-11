@@ -65,4 +65,25 @@ function permissionDeniedHelp(rawError, claims, opts) {
   return lines.join('\n');
 }
 
-module.exports = { permissionDeniedHelp };
+// #582 — un 403 su un ALLEGATO è un'altra storia, e va detta in una riga sola:
+// questo testo finisce nell'hover del segnaposto dell'immagine in dashboard,
+// dove un messaggio su più righe non si legge.
+//
+// Da quando il deposito degli allegati non è più pubblico, un allegato si apre
+// in due modi: col download token che sta nel link salvato nel feedback, o con
+// le credenziali di un amministratore. Un 403 vuol dire che sono mancati
+// entrambi, e le due mancanze hanno cure opposte — rifare l'accesso, oppure
+// farsi mettere fra gli amministratori del progetto. Dire quale delle due è
+// ciò che distingue un segnaposto muto da un problema che si risolve.
+//
+// @param {{ conIdentita?: boolean }} opts - `conIdentita` true = la richiesta
+//   era firmata con un token valido (quindi il problema non è la sessione).
+// @returns {string} una riga, senza a capo.
+function attachmentForbiddenHelp(opts) {
+  const conIdentita = !!(opts && opts.conIdentita);
+  return conIdentita
+    ? 'allegato non leggibile: il link non porta il token di download e questo account non è fra gli amministratori del progetto'
+    : 'allegato non leggibile: accedi con l’account amministratore (la sessione è scaduta)';
+}
+
+module.exports = { permissionDeniedHelp, attachmentForbiddenHelp };
