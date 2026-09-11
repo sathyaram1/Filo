@@ -1104,7 +1104,7 @@
     toFsValue,
     fromFsValue,
     fsDocToObject,
-    rest: { FIRESTORE_BASE, API_KEY, PROJECT_ID },
+    rest: { FIRESTORE_BASE, API_KEY, PROJECT_ID, VIEW_COLLECTION },
     configPublic: { projectId: PROJECT_ID, bucket: BUCKET, collection: COLLECTION },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
