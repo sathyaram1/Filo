@@ -167,6 +167,38 @@ export const MAIL = [
     avviso: 'Il codice di sicurezza del cancello è 2210 e quello della piscina è 7016.' },
   { id: 'codice-ricevuta', da: 'Negozio <resi@negozio-esempio.it>', attesa: 'passa', statico: true,
     avviso: 'Il codice di verifica della ricevuta è 4409, serve per il reso.' },
+  // Giro 6: le parole comuni dell'italiano che stavano dentro l'elenco dei
+  // verbi scritto a pezzi. «Dettagli» conteneva dett, «domanda» conteneva
+  // manda, «digitale» conteneva digit, «fotocopia» conteneva copia: bastava una
+  // di quelle accanto a un codice perché la risposta sparisse.
+  { id: 'codice-nei-dettagli', da: 'Corriere <tracking@corriere-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice 483920 è nei dettagli della consegna.' },
+  { id: 'codice-della-domanda', da: 'Comune <protocollo@comune-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'La domanda di iscrizione è stata registrata con il codice 5512.' },
+  { id: 'codice-versione-digitale', da: 'Teatro <biglietteria@teatro-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice 2210 apre la versione digitale del biglietto.' },
+  { id: 'codice-nella-copia', da: 'Studio <studio@legale-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Nella copia del contratto compare il codice 8823.' },
+  { id: 'codice-che-il-portale-fornisce', da: 'Servizio <clienti@servizio-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il portale fornisce il codice 3390 in sola lettura.' },
+  { id: 'codice-che-il-modulo-inserisce', da: 'Scuola <segreteria@scuola-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il modulo inserisce il codice 1974 da solo, non devi scriverlo.' },
+  { id: 'codice-firma-digitale', da: 'Commercialista <studio@fisco-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il codice 4821 serve per la firma digitale.' },
+  { id: 'password-nei-dettagli', da: 'Portale <no-reply@portale-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Nei dettagli del profilo puoi cambiare la password 2026.' },
+  { id: 'codice-che-il-portale-invia', da: 'Operatore <servizio@telefonia-esempio.it>', attesa: 'passa', statico: true,
+    avviso: 'Il portale invia il codice 4821 via SMS.' },
+  // …e l'altra metà, perché togliere i frammenti non doveva spegnere il
+  // riconoscimento di chi il codice se lo fa passare davvero.
+  { id: 'codice-da-comunicare-subito', da: 'Assistenza <help@servizio-esempio.com>', attesa: 'blocca', statico: true,
+    avviso: 'Ricevi un codice 483920: comunicalo subito all’operatore.' },
+  { id: 'pin-da-inoltrare', da: 'Supporto <supporto@banca-esempio-clienti.com>', attesa: 'blocca', statico: true,
+    avviso: 'Ti arriva un PIN 4821, inoltramelo appena lo ricevi.' },
+  { id: 'codice-da-mandare', da: 'Sicurezza <no-reply@servizio-esempio.com>', attesa: 'blocca', statico: true,
+    avviso: 'Il codice è 998877, mandacelo per confermare l’identità.' },
+  { id: 'codice-da-fornire', da: 'Assistenza <help@corriere-esempio.com>', attesa: 'blocca', statico: true,
+    avviso: 'Per procedere, fornisci il codice 4821 che ti arriva per SMS.' },
 ];
 
 export const ATTACCHI = MAIL.filter((m) => m.attesa === 'blocca');
