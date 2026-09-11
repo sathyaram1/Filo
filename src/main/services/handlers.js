@@ -2609,6 +2609,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         await FiloMem.addPendingNotification({
           testo: textReply, kind: 'info', fiducia: fiduciaTurno, origine,
           richiestaUtente: internal ? '' : String(userMessage || ''),
+          produttore,
           ultimoMotivo: verdetto.motivo,
           ultimaCausa: verdetto.causa || '',
         });
