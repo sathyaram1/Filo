@@ -22,7 +22,13 @@
 //                    "ui": { "enabled": false } } }
 //   FINE
 //   npx firebase emulators:exec --only firestore --project filo-prova-581 \
-//     "node <repo>/tests/verifica/581/giro2-regole-col-motore-vero.mjs"
+//     "node --experimental-import-meta-resolve /tmp/emu/lancia.mjs"
+//
+// dove `lancia.mjs` è una riga sola —
+//   `await import('<repo>/tests/verifica/581/giro2-regole-col-motore-vero.mjs')`
+// — oppure, più semplice, si copia questo file dentro /tmp/emu e si lancia lì:
+// stando nel repo, Node cerca i pacchetti nel node_modules del repo, dove
+// l'emulatore non c'è (ed è giusto che non ci sia).
 //
 // Esito atteso: 18 righe verdi, uscita 0. Al giro 2 (2026-09-11) è stato così.
 //
