@@ -347,8 +347,15 @@ module.exports = function register(on, ctx) {
         if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
-        const priority = Math.max(0, Math.min(3, Math.round(Number(f.priority) || 0)));
-        const credits = Credits.rewardForPriority(priority);
+        // #583 — quanto vale la segnalazione lo dice la SCHEDA (`reward`), non
+        // il feedback: la priorità è un giudizio interno e sulla scheda non
+        // c'è. Letta dal feedback, qui sarebbe sempre assente e ogni
+        // ricompensa scenderebbe in silenzio alla fascia più bassa. Le schede
+        // pubblicate prima che il campo esistesse non ce l'hanno: per quelle
+        // resta la fascia minima, che è quello che davano comunque.
+        const credits = Number.isFinite(Number(f.reward)) && Number(f.reward) > 0
+          ? Math.round(Number(f.reward))
+          : Credits.rewardForPriority(0);
         // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
         // così alla prossima apertura non ricompare.
         await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
