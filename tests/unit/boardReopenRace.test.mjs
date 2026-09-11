@@ -181,3 +181,17 @@ test('guard riuscito ma creazione feedback fallita: il ritentativo è bloccato (
   assert.equal(server.feedbacks.length, 0, 'ancora nessun feedback figlio');
   assert.equal(spends.length, spendsBefore, 'nessun credito scalato al ritentativo bloccato');
 });
+
+// #583 — la stessa riapertura chiesta da una pagina di un SITO VISITATO.
+// Senza il confine d'origine bastava una sessione aperta: il sito spendeva i
+// crediti di chi sta usando Filo e gli apriva a suo nome una segnalazione col
+// testo che voleva. Il rifiuto arriva prima di toccare qualunque cosa, e porta
+// il motivo in una parola.
+test('da un sito visitato la riapertura non scala crediti e non scrive niente', async () => {
+  const r = await reopen(msgFor(), 'https://evil.example/pagina');
+  assert.equal(r.ok, false);
+  assert.equal(r.code, 'forbidden', 'rifiutato per provenienza, non per la sessione');
+  assert.equal(spends.length, 0, 'nessun credito scalato');
+  assert.equal(server.feedbacks.length, 0, 'nessuna segnalazione aperta a nome dell\'utente');
+  assert.deepEqual(server.reopenRequests, {}, 'nessun segnale scritto sul fix');
+});
