@@ -115,8 +115,11 @@ test('la risposta del turno DOPO nasce dalla stessa pagina e non passa da nessun
   // consegnato da Filo con la sua voce.
   await expect(bolle, 'la trappola del turno prima è arrivata all’utente senza controllo')
     .not.toContainText('per non perdere l’accesso');
+  // La riga dice ancora COSA è stato visto, ma con parole di Filo: dal giro 7 il
+  // guardiano sceglie una categoria e la frase la scrive Filo, perché quel
+  // modello ha appena letto il testo di un estraneo e se la faceva dettare.
   await expect(bolle, 'la riga del blocco non dice cosa è stato visto')
-    .toContainText('confermare le credenziali del conto');
+    .toContainText('credenziali o codici di accesso');
   expect(
     await app.evaluate(() => globalThis.__guardiano),
     'il secondo turno, nato dalla stessa pagina, non è stato controllato',
