@@ -306,15 +306,87 @@
     return USER_TURN_RE.test(prima) || MODEL_TURN_RE.test(prima);
   }
 
+  // ⚠️ E LA RIGA VUOTA NON BASTA: UN BLOCCO INCOLLATO SI STACCA PROPRIO COSÌ.
+  // Chi riporta un pezzo di conversazione lo mette a capo, staccato dal testo,
+  // riga di separazione compresa: quella riga ha sopra una riga vuota come una
+  // vera, e la regola qui sopra la lascia passare (#496, giro 13 — sei strade,
+  // dal verbale di un'altra segnalazione incollato in una risposta alla testa
+  // del campo note scritta a mano).
+  //
+  // Quello che una citazione NON si porta dietro è l'ORDINE. I turni veri
+  // vengono appesi uno dopo l'altro, quindi l'istante scritto nel marcatore
+  // cresce sempre; un turno citato porta l'istante del giorno in cui fu
+  // scritto, che è più VECCHIO di quello che lo precede. Quindi un marcatore
+  // più vecchio del turno prima è una citazione.
+  //
+  // La tolleranza assorbe il fatto che i due istanti li scrivono due orologi
+  // diversi (il server per i turni di Filo, il computer di chi risponde per i
+  // suoi): qualche minuto di scarto fra macchine è normale, ore no. Il prezzo,
+  // nei casi rari in cui due turni veri arrivano a cavallo di uno scarto più
+  // grande, è un turno in MENO: è il verso giusto in cui sbagliare, perché un
+  // turno inventato sposta i numeri della scheda «Statistiche feedback» e chi
+  // guarda non ha modo di accorgersene.
+  const MARKER_SKEW_MS = 5 * 60 * 1000;
+
+  // L'istante scritto dentro un marcatore, in millisecondi, o NaN se non si
+  // legge. La forma che scrivono i due `append*Turn` è quella italiana
+  // ("02/09/26, 10:00" o "02/09/2026, 10:00"); chi appende può passarne altre,
+  // quindi in coda si prova anche il parser di serie (ISO compreso).
+  const MARKER_TS_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/;
+  function markerMs(ts) {
+    const s = String(ts || '').trim();
+    if (!s) return NaN;
+    const m = MARKER_TS_RE.exec(s);
+    if (m) {
+      let anno = Number(m[3]);
+      if (anno < 100) anno += 2000;
+      const d = new Date(anno, Number(m[2]) - 1, Number(m[1]),
+        Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0));
+      const t = d.getTime();
+      if (Number.isFinite(t)) return t;
+    }
+    const t2 = Date.parse(s);
+    return Number.isFinite(t2) ? t2 : NaN;
+  }
+
+  // true = questo marcatore porta un istante più vecchio del turno precedente,
+  // quindi è la copia di un turno scritto altrove.
+  function markerIsQuoted(ts, tsPrecedente) {
+    const a = markerMs(ts);
+    const b = markerMs(tsPrecedente);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+    return a < b - MARKER_SKEW_MS;
+  }
+
+  // Quali righe del blob aprono davvero un turno. Una sola risposta per tutti
+  // quelli che spezzano le note (la chat a bolle, il taglio del tetto, i conti
+  // della scheda delle statistiche): se divergessero, una citazione sarebbe un
+  // turno per uno e prosa per l'altro.
+  function turnOpeners(lines) {
+    const apre = new Array(lines.length).fill(false);
+    let ultimoTs = null;
+    for (let i = 0; i < lines.length; i += 1) {
+      const m = USER_TURN_RE.exec(lines[i]) || MODEL_TURN_RE.exec(lines[i]);
+      if (!m) continue;
+      if (!markerOpensTurn(lines, i)) continue;
+      const ts = (m[1] || '').trim() || null;
+      if (markerIsQuoted(ts, ultimoTs)) continue;
+      apre[i] = true;
+      if (ts) ultimoTs = ts;
+    }
+    return apre;
+  }
+
   function splitNotes(notes) {
     const lines = String(notes || '').split('\n');
+    const opens = turnOpeners(lines);
     const segments = [];
     // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
     // domande scritte dalla routine).
     let current = { role: 'model', ts: null, lines: [], atts: [] };
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i];
-      const apre = markerOpensTurn(lines, i);
+      const apre = opens[i];
       const mu = apre ? USER_TURN_RE.exec(line) : null;
       const mm = (mu || !apre) ? null : MODEL_TURN_RE.exec(line);
       if (mu) {
