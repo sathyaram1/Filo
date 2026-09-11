@@ -514,7 +514,14 @@ service cloud.firestore {
         && request.resource.data.get('seq', 0) <= 1000000
         && request.resource.data.get('subSeq', 0) is int
         && request.resource.data.get('subSeq', 0) >= 0
-        && request.resource.data.get('subSeq', 0) <= 100000;
+        && request.resource.data.get('subSeq', 0) <= 100000
+        // `reward`: i crediti che spettano a chi ha mandato il feedback. La sua
+        // macchina non legge più i feedback veri, quindi la fascia la trova
+        // qui. Il tetto è largo ma finito: una scheda non può promettere una
+        // cifra arbitraria.
+        && request.resource.data.get('reward', 0) is int
+        && request.resource.data.get('reward', 0) >= 0
+        && request.resource.data.get('reward', 0) <= 1000;
 
       // Voto della bacheca: stesso identico pattern della collezione vera —
       // un utente LOGGATO scrive SOLO la propria chiave nel map `votes`.
