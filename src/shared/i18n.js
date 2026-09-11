@@ -384,7 +384,7 @@
     admin_defaults_key_absent: 'non configurata',
     admin_defaults_safebrowse_key_desc:
       'Chiave gratuita di Google Safe Browsing per il rilevamento siti pericolosi: con questa chiave Filo ' +
-      'controlla la blacklist ufficiale di Google (phishing e malware) per TUTTI gli account, anche chi non ha fatto l\'accesso. ' +
+      'controlla la blacklist ufficiale di Google (phishing e malware) per TUTTI, anche per chi non ha fatto l\'accesso. ' +
       'È condivisa: la imposti una volta qui e viaggia con la prossima versione pubblicata. ' +
       'Senza chiave questo controllo viene saltato, gli altri restano attivi.',
     admin_defaults_reasoning: 'reasoning',
