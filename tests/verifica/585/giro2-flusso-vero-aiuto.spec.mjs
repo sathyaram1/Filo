@@ -54,8 +54,30 @@ const ONESTO = [
   },
 ];
 
-const PAGINA = `<!doctype html><meta charset="utf-8"><title>Conti</title>
-<body><button id="accedi">Accedi</button></body>`;
+// Si gira su una pagina interna di Filo (contextIsolation spenta: un mondo
+// solo), così dal test si può mandare il messaggio esattamente come lo manda
+// l'Aiuto, senza reinventare il ponte.
+const PAGINA_INTERNA = 'filo://newtab/';
+
+async function apriPagina(openTab) {
+  const page = await openTab(PAGINA_INTERNA);
+  await page.waitForFunction(() => typeof window.chrome?.runtime?.sendMessage === 'function', null, { timeout: 10_000 });
+  return page;
+}
+
+// Un modello configurato per l'Aiuto: senza, la richiesta si ferma prima
+// ancora che il prompt venga composto (serve una chiave o un invito).
+async function configuraModello(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+}
 
 // Mette la raccolta e il provider sotto controllo, DENTRO il main: la raccolta
 // risponde quello che diciamo noi (o esplode), e il provider, invece di
@@ -119,9 +141,10 @@ async function sistemaCatturato(app) {
   });
 }
 
-test('il veleno della raccolta arriva al modello dentro il recinto, e il recinto non lo chiude lui', async ({ app, openTab, testServer }) => {
+test('il veleno della raccolta arriva al modello dentro il recinto, e il recinto non lo chiude lui', async ({ app, openTab }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, PAGINA);
+  const page = await apriPagina(openTab);
+  await configuraModello(app);
   await preparaBanco(app, VELENO);
   const esito = await chiediAiuto(page);
   expect(esito.error).toBe('');
@@ -174,9 +197,10 @@ test('il veleno della raccolta arriva al modello dentro il recinto, e il recinto
   expect(promemoria).toBeGreaterThan(fine);
 });
 
-test('un percorso onesto arriva al modello e gli insegna la strada', async ({ app, openTab, testServer }) => {
+test('un percorso onesto arriva al modello e gli insegna la strada', async ({ app, openTab }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, PAGINA);
+  const page = await apriPagina(openTab);
+  await configuraModello(app);
   await preparaBanco(app, ONESTO);
   const esito = await chiediAiuto(page);
   expect(esito.error).toBe('');
@@ -189,9 +213,10 @@ test('un percorso onesto arriva al modello e gli insegna la strada', async ({ ap
   expect(dentro).toContain('/area-clienti');
 });
 
-test('se la raccolta non risponde, l\'Aiuto risponde lo stesso', async ({ app, openTab, testServer }) => {
+test('se la raccolta non risponde, l\'Aiuto risponde lo stesso', async ({ app, openTab }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, PAGINA);
+  const page = await apriPagina(openTab);
+  await configuraModello(app);
   await preparaBanco(app, 'esplode');
   const esito = await chiediAiuto(page);
   expect(esito.error).toBe('');
