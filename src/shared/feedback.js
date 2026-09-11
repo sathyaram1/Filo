@@ -364,9 +364,8 @@
     const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
-    const res = await fetch(`${docUrl}?key=${API_KEY}`, {
-      headers: opts.idToken ? { Authorization: headers.Authorization } : undefined,
-    });
+    // La lettura del contatore è pubblica: qui il token non serve.
+    const res = await fetch(`${docUrl}?key=${API_KEY}`);
     let current = -1;
     if (res.ok) {
       const doc = await res.json();
