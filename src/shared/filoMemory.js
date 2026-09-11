@@ -748,6 +748,86 @@
     return list;
   }
 
+  // ===== Guardiano dei testi (#536): registro dei blocchi e coda d'attesa ====
+  //
+  // Il REGISTRO serve a capire se il guardiano grida al lupo: cosa ha fermato,
+  // quando, da quale fonte, con che motivo. Si legge in Preferenze → Sicurezza.
+  // Del testo fermato si tiene solo un estratto, e resta testo inerte: non
+  // viene mai mostrato come avviso.
+  //
+  // La CODA è la risposta al guardiano che non risponde (rete giù, fornitore
+  // fuori uso, tetto dei tentativi esaurito): l'avviso non compare e non si
+  // perde. Riparte al giro dopo. Un avviso che arriva dieci minuti dopo non ha
+  // fatto danno; uno che arriva senza controllo sì.
+
+  const GUARD_BLOCKS_CAP = 200;
+  const GUARD_QUEUE_CAP = 100;
+
+  async function listGuardBlocks() {
+    return getRaw(KEYS.FILO_GUARD_BLOCKS, []);
+  }
+
+  async function addGuardBlock({ testo, fonte, motivo, regola, classe }) {
+    const list = await getRaw(KEYS.FILO_GUARD_BLOCKS, []);
+    const entry = {
+      id: uuid(),
+      ts: new Date().toISOString(),
+      // Estratto, non il testo intero: serve a riconoscere il caso, non a
+      // riproporlo.
+      estratto: truncateSafe(String(testo || ''), 300),
+      fonte: fonte || null,
+      motivo: String(motivo || ''),
+      regola: regola || null, // null = l'ha fermato il guardiano, non una regola statica
+      classe: classe || null,
+    };
+    list.unshift(entry);
+    if (list.length > GUARD_BLOCKS_CAP) list.length = GUARD_BLOCKS_CAP;
+    await setRaw(KEYS.FILO_GUARD_BLOCKS, list);
+    return entry;
+  }
+
+  async function clearGuardBlocks() {
+    await setRaw(KEYS.FILO_GUARD_BLOCKS, []);
+    return [];
+  }
+
+  async function listGuardQueue() {
+    return getRaw(KEYS.FILO_GUARD_QUEUE, []);
+  }
+
+  async function pushGuardQueue(richiesta) {
+    const list = await getRaw(KEYS.FILO_GUARD_QUEUE, []);
+    const entry = {
+      id: uuid(),
+      ts: new Date().toISOString(),
+      ultimoTentativo: new Date().toISOString(),
+      tentativi: 1,
+      richiesta: richiesta || {},
+    };
+    list.push(entry);
+    if (list.length > GUARD_QUEUE_CAP) list.splice(0, list.length - GUARD_QUEUE_CAP);
+    await setRaw(KEYS.FILO_GUARD_QUEUE, list);
+    return entry;
+  }
+
+  async function touchGuardQueue(id) {
+    const list = await getRaw(KEYS.FILO_GUARD_QUEUE, []);
+    const e = list.find((x) => x.id === id);
+    if (e) {
+      e.tentativi = (e.tentativi || 0) + 1;
+      e.ultimoTentativo = new Date().toISOString();
+      await setRaw(KEYS.FILO_GUARD_QUEUE, list);
+    }
+    return list;
+  }
+
+  async function removeGuardQueue(id) {
+    const list = await getRaw(KEYS.FILO_GUARD_QUEUE, []);
+    const next = list.filter((x) => x.id !== id);
+    await setRaw(KEYS.FILO_GUARD_QUEUE, next);
+    return next;
+  }
+
   // ===== Dashboard cache =====
 
   async function getDashboardCache() {
