@@ -34,6 +34,15 @@ remoto, come la Safe Browsing, darle quella strada è parte del lavoro:
 altrimenti la funzione si spegne in silenzio, e un rilevamento che non trova
 niente somiglia molto a uno che funziona.
 
+**Una regola stretta nel repo non è una porta chiusa.** Le regole le pubblica
+una mano, non un automatismo: finché non gira `firebase deploy --only
+firestore:rules` il confine in produzione è ancora quello di prima, e il lavoro
+sembra finito mentre non lo è. E l'ordine conta: **prima si pubblicano le
+regole, poi si ruotano le chiavi**. Al contrario le chiavi nuove nascono dentro
+un documento che chiunque legge ancora, e la rotazione è da rifare. Chi chiude
+una porta così scrive nel report tutti e due i passi, con l'ordine: sono
+dell'owner, e nessuno li farà al posto suo.
+
 Dove vive: `firestore.rules` (i blocchi `match /config/…`),
 `src/main/services/defaultsStore.js` (legge il documento solo da admin),
 `src/main/config/default-keys.js` e `scripts/bake-default-config.mjs` (la strada
