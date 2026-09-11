@@ -54,6 +54,18 @@ test('NAVIGA con flag anti-esfiltrazione sale a livello 2 (conferma)', () => {
   assert.ok(d.includes('contiene un tuo dato'));
 });
 
+test('NAVIGA in un turno che ha letto roba di altri chiede conferma (#536)', () => {
+  // Una pagina avvelenata ha due uscite verso la persona: la frase, che un
+  // secondo modello guarda prima che compaia, e il GESTO. Senza questo, la
+  // pagina scriveva «apri questo indirizzo» e Filo lo apriva da solo, portando
+  // la persona sul sito della truffa mentre le nascondeva la frase che glielo
+  // chiedeva. Il marchio lo mette il main sulla classe di fiducia del turno.
+  assert.equal(AL.levelFor({ type: 'NAVIGA', url: 'https://x.it' }), 1);
+  assert.equal(AL.levelFor({ type: 'NAVIGA', url: 'https://x.it', _contaminato: true }), 2);
+  const d = AL.describe({ type: 'NAVIGA', url: 'https://portale.it.attacco.ru/login', _contaminato: true });
+  assert.ok(d.includes('https://portale.it.attacco.ru/login'), d);
+});
+
 test('PULISCI_TAB è livello 2, CANCELLA_ARCHIVIO è livello 3', () => {
   assert.equal(AL.levelFor({ type: 'PULISCI_TAB' }), 2);
   assert.equal(AL.levelFor({ type: 'CANCELLA_ARCHIVIO', query: 'ricette' }), 3);
