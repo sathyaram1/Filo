@@ -2901,10 +2901,10 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   // file. Il titolo di una pagina lo sceglie chi l'ha scritta, quindi la home è
   // testo nato da roba scritta da altri esattamente come una risposta dopo una
   // ricerca: passa dal guardiano prima di comparire.
-  const fonti = [];
-  if (saved.length) fonti.push('una pagina che hai salvato');
-  if (filesList.length) fonti.push('un tuo file');
+  // La stessa tabella che usa la chat: una sola risposta alla domanda «cosa, in
+  // questo contesto, l'ha scritto un estraneo».
   const G536 = globalThis.SN_TEXT_GUARD;
+  const fonti = G536.fontiDegliIngredienti({ pagineSalvate: saved, documenti: filesList });
   const fiducia = fonti.length ? G536.FIDUCIA.CONTAMINATO : G536.FIDUCIA.PULITO;
 
   return { settings, hasKey, payload, signature, saved, fiducia, origine: fonti.join(' e ') };
