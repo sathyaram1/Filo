@@ -34,6 +34,12 @@ const TENTATIVI_MAX = 3;
 // Attesa fra un giro e l'altro: corta, perché un avviso in coda costa comunque
 // solo ritardo, e chi è giù di norma torna in fretta.
 const PAUSA_MS = 700;
+// Ogni quanto la coda può riprovare. La colonna della home chiede le notifiche
+// anche una volta al secondo (quando c'è un timer che scorre): senza questo
+// freno, una coda che non si svuota chiamerebbe il modello sessanta volte al
+// minuto. Un minuto di ritardo su un avviso non fa danno; una chiamata al
+// secondo sì — e il costo lo paga chi non ha fatto niente di sbagliato.
+const RIPRESA_MIN_MS = 60 * 1000;
 
 // Iniettati dal main (src/main/services/handlers.js → wireTextGuardian):
 //   eseguiModello({ messaggi, produttore }) → testo della risposta
