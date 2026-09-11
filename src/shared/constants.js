@@ -1364,21 +1364,27 @@
     // E deve decidere se il primo intento è una rappresentazione fedele di ciò
     // che l'utente voleva fare. L'output è solo {ok: true|false}: nessun dato
     // raw può uscire da questo turno verso il salvataggio.
-    helpIntentJudge: ({ proposedIntent, userMessages }) =>
-      `Sei un giudice di sicurezza. Devi decidere se una frase di intento generata automaticamente è una rappresentazione fedele e SAFE di ciò che un utente voleva fare su un sito web.\n\n` +
+    helpIntentJudge: ({ proposedIntent, userMessages, initialUrl, steps }) =>
+      `Sei un giudice di sicurezza. Sta per essere pubblicato, in una raccolta che chiunque può leggere, un percorso di navigazione: serve a insegnare ad altri come si fa una cosa su un sito. Devi decidere se quello che sta per uscire è fedele a ciò che l'utente voleva fare e se è ANONIMO.\n\n` +
       `Intento proposto: "${proposedIntent}"\n\n` +
-      `Messaggi originali dell'utente (in ordine):\n` +
+      `Pagina di partenza che verrebbe pubblicata: ${initialUrl || '(nessuna)'}\n\n` +
+      `Elementi su cui si è cliccato, come verrebbero pubblicati:\n` +
+      (Array.isArray(steps) && steps.length
+        ? steps.map((s, i) => `  ${i + 1}. ${(s && s.action) || 'click'} su ${(s && s.selector) || '(selettore mancante)'}`).join('\n')
+        : '  (nessun elemento)') +
+      `\n\nMessaggi originali dell'utente (in ordine):\n` +
       (Array.isArray(userMessages) && userMessages.length
         ? userMessages.map((m, i) => `  ${i + 1}. ${m}`).join('\n')
         : '  (nessun messaggio)') +
-      `\n\nL'intento è VALIDO (ok=true) se:\n` +
-      `- descrive in modo riconoscibile la stessa attività che l'utente ha richiesto;\n` +
-      `- NON contiene nomi propri, email, indirizzi, numeri di telefono, importi, codici, password, token, query private o altri dati personali/sensibili;\n` +
-      `- è generico abbastanza da poter valere per qualunque altro utente che voglia fare la stessa cosa.\n\n` +
-      `L'intento è NON VALIDO (ok=false) se:\n` +
-      `- è scollegato da quello che l'utente ha realmente chiesto;\n` +
-      `- contiene QUALSIASI dato specifico dell'utente (anche solo un nome, un numero, un'email);\n` +
-      `- è troppo vago al punto da non descrivere niente (es. "intento non chiaro", "fare qualcosa", "navigare il sito").\n\n` +
+      `\n\nIl percorso è VALIDO (ok=true) se:\n` +
+      `- l'intento descrive in modo riconoscibile la stessa attività che l'utente ha richiesto;\n` +
+      `- NIENTE di ciò che verrebbe pubblicato (intento, pagina di partenza, elementi) contiene nomi di persona, soprannomi, email, indirizzi, numeri di telefono, importi, codici, password, token o altri dati che dicano CHI è l'utente;\n` +
+      `- vale per qualunque altro utente che voglia fare la stessa cosa.\n\n` +
+      `Il percorso è NON VALIDO (ok=false) se:\n` +
+      `- l'intento è scollegato da quello che l'utente ha realmente chiesto;\n` +
+      `- in una qualsiasi delle tre parti compare un dato specifico di una persona (anche solo un nome dentro l'etichetta di un pulsante, come "Profilo di Mario Rossi", o un soprannome dentro l'indirizzo);\n` +
+      `- l'intento è troppo vago al punto da non descrivere niente (es. "intento non chiaro", "fare qualcosa", "navigare il sito").\n\n` +
+      `I segnaposto [EMAIL], [NUMERO] e [ID] sono dati già rimossi: non sono un motivo per rifiutare.\n\n` +
       `Rispondi SOLO con un JSON valido (nessun preambolo, nessun markdown):\n` +
       `{"ok": true|false}`,
 
