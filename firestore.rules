@@ -449,6 +449,147 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── La VISTA pubblica dei feedback (#583) ────────────────────────────────
+    //
+    // `feedback-public/{id}` è una PROIEZIONE del feedback con lo stesso id:
+    // solo i campi che possono stare sotto gli occhi di chiunque, e solo per i
+    // feedback CHIUSI e mai segnalati dalla sicurezza. È ciò che la bacheca
+    // (filo://board/) mostra e ciò su cui il popup delle ricompense riconosce i
+    // feedback di chi lo apre (per `clientIdHash`, che resta un hash).
+    //
+    // Perché una vista e non una regola più furba sulla collezione vera: le
+    // regole di Firestore decidono SE un documento si legge, non QUALI campi
+    // tornano. Finché la bacheca leggeva il documento intero e filtrava in
+    // pagina, "filtrato" voleva dire solo "non disegnato": il testo, l'URL e le
+    // note erano già arrivati sul computer di chi guardava.
+    //
+    // La scrive chi ha l'autorità di chiudere un feedback (owner o server) e
+    // deve poter escludere ciò che va escluso: la decisione su cosa pubblicare
+    // sta in src/shared/feedbackPublicView.js, che vede lo status VERO
+    // (decifrato) e scarta tutto quello che ha passato le mani della sicurezza.
+    // Le regole qui sotto sono la rete: elencano i campi ammessi, così un
+    // giorno in cui quel codice sbaglia il testo di un feedback non finisce
+    // comunque in una collezione pubblica.
+    match /feedback-public/{doc} {
+      allow read: if true;
+
+      // Pubblicazione/aggiornamento della scheda: owner o server, e SOLO i
+      // campi dell'elenco (`hasOnly`), che è la lista di ciò che è pubblico
+      // per costruzione. `text`, `url`, `userAgent`, `images`, `files`,
+      // `notes`, `clientId`, `pipeline`, `priority` non sono qui dentro: se
+      // qualcuno provasse a scriverli, la regola respinge tutto il documento.
+      allow create, update: if (isAdmin() || isRoutine())
+        && request.resource.data.keys().hasOnly(
+             ['name', 'seq', 'subSeq', 'status', 'statusPublic', 'resolvedInVersion',
+              'createdAt', 'resolvedAt', 'clientIdHash', 'userNote', 'publishedAt',
+              'votes', 'reopenRequests'])
+        // `status` solo fra quelli CHIUSI: un feedback aperto (e a maggior
+        // ragione uno fermato dalla sicurezza) non ha una scheda pubblica.
+        && request.resource.data.get('status', 'done') in ['done', 'verified', 'archived', 'ignored']
+        && request.resource.data.get('statusPublic', 'closed') in ['open', 'closed', 'pending-approval']
+        && request.resource.data.get('name', '') is string
+        && request.resource.data.get('name', '').size() <= 200
+        // La frase per chi ha segnalato: è l'unico dei due testi in chiaro
+        // (il report per l'owner viaggia cifrato e non entra qui), e il tetto
+        // è lo stesso della collezione vera.
+        && request.resource.data.get('userNote', '') is string
+        && request.resource.data.get('userNote', '').size() <= 500
+        && request.resource.data.get('resolvedInVersion', '') is string
+        && request.resource.data.get('resolvedInVersion', '').size() <= 40
+        && request.resource.data.get('clientIdHash', '') is string
+        && request.resource.data.get('clientIdHash', '').size() <= 64
+        && request.resource.data.get('createdAt', '') is string
+        && request.resource.data.get('createdAt', '').size() <= 40
+        && request.resource.data.get('resolvedAt', '') is string
+        && request.resource.data.get('resolvedAt', '').size() <= 40
+        && request.resource.data.get('publishedAt', '') is string
+        && request.resource.data.get('publishedAt', '').size() <= 40
+        && request.resource.data.get('seq', 0) is int
+        && request.resource.data.get('seq', 0) >= 0
+        && request.resource.data.get('seq', 0) <= 1000000
+        && request.resource.data.get('subSeq', 0) is int
+        && request.resource.data.get('subSeq', 0) >= 0
+        && request.resource.data.get('subSeq', 0) <= 100000;
+
+      // Voto della bacheca: stesso identico pattern della collezione vera —
+      // un utente LOGGATO scrive SOLO la propria chiave nel map `votes`.
+      // I voti vivono anche qui perché è qui che la bacheca li legge: il
+      // documento vero non lo può più aprire.
+      allow update: if
+        request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
+        && request.resource.data.get('votes', {}) is map
+        && request.resource.data.get('votes', {})
+             .diff(resource.data.get('votes', {})).affectedKeys()
+             .hasOnly([request.auth.uid])
+        && (
+             !(request.auth.uid in request.resource.data.get('votes', {}))
+             || (
+                  request.resource.data.votes[request.auth.uid].keys()
+                    .hasOnly(['vote', 'at', 'credibilitySnapshot'])
+                  && request.resource.data.votes[request.auth.uid].vote in ['works', 'broken']
+                  && request.resource.data.votes[request.auth.uid].at is string
+                  && request.resource.data.votes[request.auth.uid].at.size() <= 40
+                  && request.resource.data.votes[request.auth.uid].credibilitySnapshot is number
+                  && request.resource.data.votes[request.auth.uid].credibilitySnapshot >= 0
+                )
+           );
+
+      // Riapertura a pagamento: stesso pattern, sul map `reopenRequests`. È il
+      // segnale che fa USCIRE la scheda dalla bacheca (DC4).
+      allow update: if
+        request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reopenRequests'])
+        && request.resource.data.get('reopenRequests', {}) is map
+        && request.resource.data.get('reopenRequests', {})
+             .diff(resource.data.get('reopenRequests', {})).affectedKeys()
+             .hasOnly([request.auth.uid])
+        && (
+             !(request.auth.uid in request.resource.data.get('reopenRequests', {}))
+             || (
+                  request.resource.data.reopenRequests[request.auth.uid].keys()
+                    .hasOnly(['at'])
+                  && request.resource.data.reopenRequests[request.auth.uid].at is string
+                  && request.resource.data.reopenRequests[request.auth.uid].at.size() <= 40
+                )
+           );
+
+      // Spubblicazione: owner o server. Un fix che torna in lavorazione esce
+      // dalla bacheca togliendo la sua scheda, non nascondendola in pagina.
+      allow delete: if isAdmin() || isRoutine();
+    }
+
+    // ── Il contatore dei numeri dei feedback (#583) ──────────────────────────
+    //
+    // `counters/feedbackSeq` tiene il numero progressivo (#583, #584…). Prima
+    // lo si ricavava con una query sulla collezione feedback ordinata per
+    // `seq`: una LETTURA, e l'invio di un feedback è anonimo per scelta. Con la
+    // lettura chiusa quella strada non c'è più, e senza numero un feedback
+    // nuovo arriverebbe senza il suo nome in dashboard e nelle routine.
+    //
+    // Qui dentro c'è un intero e niente altro: quanti feedback sono arrivati.
+    // Chiunque può farlo avanzare DI UNO — è ciò che fa chi invia — e nessuno
+    // può farlo tornare indietro o riempirlo d'altro. Il caso peggiore è un
+    // numero saltato, che è un'etichetta, non una chiave; l'owner può
+    // rimetterlo in pari (ramo admin) e la dashboard lo fa da sola quando vede
+    // un `seq` più alto del contatore.
+    match /counters/{name} {
+      allow read: if true;
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['value'])
+        && request.resource.data.value is int
+        && request.resource.data.value >= 0;
+      allow update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['value'])
+        && request.resource.data.value is int
+        && request.resource.data.value >= 0;
+      allow update: if request.resource.data.keys().hasOnly(['value'])
+        && request.resource.data.value is int
+        && request.resource.data.value == resource.data.value + 1
+        && request.resource.data.value <= 1000000;
+      allow delete: if false;
+    }
+
     // Crediti (gamification): un documento per utente, ID = uid Firebase.
     // Ogni utente legge/scrive SOLO il proprio doc. È client-authoritative:
     // l'app desktop calcola saldo/consumo nel main e sincronizza qui. In alpha
