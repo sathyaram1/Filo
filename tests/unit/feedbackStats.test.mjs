@@ -313,9 +313,15 @@ test('una testata citata nel riassunto non cancella il giro che la contiene', ()
 test('una nota scritta a mano sopra altro testo non è un verbale', () => {
   const aMano = 'Verifica superata. Ho guardato io, va bene.\n\nChiusa a mano.';
   assert.equal(ST.loopsBeforePass({ notes: aMano }), null);
-  // Un verbale vero scritto lì sotto continua a contare.
+  // ⚠️ E NEMMENO QUELLO CHE STA SOTTO LA NOTA SCRITTA A MANO.
+  // Un verbale sotto una riga di qualcuno e un verbale INCOLLATO da qualcuno
+  // sotto la propria riga sono lo stesso testo: nessuno dei due si distingue
+  // dall'altro. Contarli faceva leggere «fermata alla verifica» una lavorazione
+  // passata, con un giro bloccante mai successo (#496, giro 13). Qui il verbale
+  // conta solo se è tutto quello che c'è nella testa del campo note; il prezzo
+  // è un giro in meno quando qualcuno gli scrive sopra.
   const conVerbale = `Nota mia.\n\n${NOTE_RIMANDATI}`;
-  assert.equal(ST.parseRounds({ notes: conVerbale }).length, 1);
+  assert.equal(ST.parseRounds({ notes: conVerbale }).length, 0);
 });
 
 test('parseRounds: un livello scritto nel report di chi ha lavorato non diventa un rilievo della verifica', () => {
