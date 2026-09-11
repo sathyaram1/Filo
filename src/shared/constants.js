@@ -54,6 +54,13 @@
     // background finché riescono; persistiti così sopravvivono al riavvio.
     // Array di { id, payload, name, prepared, queuedAt, attempts }.
     FEEDBACK_OUTBOX: 'feedbackOutbox',
+    // Percorsi condivisi dell'Aiuto in attesa di essere spediti (#584). Non è
+    // una coda per la rete come quella sopra: è una coda che RITARDA apposta,
+    // perché l'ora in cui Firestore riceve un percorso torna a chiunque legga
+    // e, se coincidesse con la sessione, ricucirebbe i percorsi di una persona
+    // su domini diversi. Array di
+    // { id, domain, initialUrl, intent, steps, success, accodatoIl, nonPrimaDi }.
+    PATHS_OUTBOX: 'pathsOutbox',
     CATEGORIES: 'categories',
     BLOCKLIST: 'blocklist',
     AI_CACHE: 'aiCache',
