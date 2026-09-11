@@ -1169,6 +1169,9 @@
   global.SN_FEEDBACK = {
     submit,
     list,
+    // I chiusi più di recente: è così che una segnalazione vecchia chiusa oggi
+    // arriva in bacheca, senza allargare il caricamento per data d'invio.
+    listResolved,
     listVersions,
     getMany,
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
