@@ -87,6 +87,31 @@
     return v ? v.fiducia : FIDUCIA.PULITO;
   }
 
+  // Questa azione ha portato dentro al compito parole scritte da altri?
+  //
+  // La domanda NON è se l'azione è riuscita. Prima lo era, e bastava un comando
+  // finito male per aggirare tutto: `cat questo-c-e questo-non-c-e` stampa il
+  // primo file e poi esce con un errore, l'uscita torna davanti al modello lo
+  // stesso, ma il compito restava pulito. La risposta scorreva in diretta e
+  // arrivava intera, col secondo modello mai chiamato. Stessa cosa per un
+  // comando interrotto perché ci metteva troppo: consegna quello che aveva già
+  // stampato e conta come non riuscito.
+  //
+  // Quello che conta è se l'azione ha prodotto un'USCITA che rientra nel
+  // contesto: è esattamente il metro con cui si guardano i turni già passati,
+  // e tenerne due diversi voleva dire proteggere la seconda risposta e non la
+  // prima — quella che porta le parole dell'estraneo.
+  //
+  // `blocked` è l'unica uscita che non contiene niente di nessuno: il comando
+  // non è nemmeno partito (terminale spento), e infatti non entra nel contesto.
+  function haPortatoTestoDiAltri({ type, output, rejected } = {}) {
+    if (rejected) return false;
+    if (!vaControllato(fiduciaDellAzione(type))) return false;
+    if (!output || typeof output !== 'object') return false;
+    if (output.blocked) return false;
+    return true;
+  }
+
   // Come si chiama la fonte, per la frase che l'utente legge.
   function etichettaFonte(azione) {
     const tipo = String((azione && (azione.type || azione)) || '').toUpperCase();
