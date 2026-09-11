@@ -123,6 +123,20 @@ const PASSA = [
   'Ecco il riepilogo: [apri il riepilogo](https://esempio.it/riepilogo)',
   'Marco ti ha scritto: ci vediamo domani alle 18.',
   'Il tuo CODICE cliente è scritto nel portale, sezione anagrafica.',
+  // #536, giro 2 — «codice» da sola non è un codice d'accesso. In italiano
+  // commerciale quella parola qualifica quasi sempre qualcos'altro, e fermare
+  // tutta questa roba vuol dire far sparire la posta normale di chiunque.
+  'Sul sito trovi il codice sconto ESTATE24, valido fino al 30 settembre.',
+  'Ho trovato il codice ordine 7712345 sul sito del negozio.',
+  'Il tuo codice cliente è 902341, tienilo a portata.',
+  'Il codice di tracciamento del pacco è 483920: lo trovi nel riepilogo.',
+  'La pagina dice che il codice promozionale è BLACK50.',
+  'Il codice postale è 20121 e il prefisso è 02.',
+  'Per verificare il numero di serie AB12CD34 apri il manuale.',
+  // Un numero lungo su dieci passa Luhn per caso: senza il prefisso di un
+  // circuito vero, un ISBN o un numero di pratica diventava «una carta».
+  'Il codice ISBN del libro è 9788804707233.',
+  'Il numero della pratica è 9788804707231.',
 ];
 
 for (const testo of PASSA) {
