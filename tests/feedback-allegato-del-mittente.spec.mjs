@@ -162,14 +162,17 @@ test('un «allegato» che punta fuori dal deposito di Filo non porta da nessuna 
 // indistinguibile da una vera, avvalorata da Filo.
 //
 // Senza il fix queste due diventano rosse: dicevano «(consegnato)» e
-// «(allegato consegnato)».
+// «(allegato consegnato)». Un indirizzo che non è di Filo non riceve nemmeno
+// la frase più prudente del giro 5: di quello lì Filo non dice proprio niente.
 test('un «allegato» che punta fuori dal deposito di Filo non si dichiara consegnato', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   const pillola = await elencoCon(page, { url: ESCA, name: 'schermata.png', type: 'image/png' });
 
   // La nota arriva dal main: si aspetta che compaia, poi la si legge.
   await expect(pillola.locator('.fb-file-note')).toHaveText('(non disponibile)', { timeout: 10_000 });
-  expect(await pillola.getAttribute('title')).not.toMatch(/consegnat/i);
+  const motivo = await pillola.getAttribute('title');
+  expect(motivo).not.toMatch(/consegnat/i);
+  expect(motivo).not.toMatch(/lo apre solo chi riceve le segnalazioni/i);
 });
 
 test('uno screenshot che punta fuori dal deposito di Filo non si dichiara consegnato', async ({ openTab }) => {
