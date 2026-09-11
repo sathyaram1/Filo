@@ -493,13 +493,14 @@ test('il motivo dettato non porta all’utente né un numero né un indirizzo di
   assert.match(riga, /Ho fermato un avviso/);
 });
 
-test('date e prezzi dentro un motivo restano dove sono', () => {
-  const riga = G.frasediBlocco({
-    origine: 'una mail di X',
-    motivo: 'diceva che il pagamento di 124,50 euro scadeva il 30/09/2026',
-  });
-  assert.match(riga, /124,50/);
-  assert.match(riga, /30\/09\/2026/);
+// La pulizia dei recapiti vale ancora per la FONTE (il mittente se lo sceglie
+// chi manda la mail). Un numero di telefono se ne va; una data e un prezzo no,
+// altrimenti la riga direbbe «un numero di telefono» al posto di una scadenza.
+test('date e prezzi non vengono scambiati per recapiti', () => {
+  const pulito = G.ripulisci('il pagamento di 124,50 euro scadeva il 30/09/2026');
+  assert.match(pulito, /124,50/);
+  assert.match(pulito, /30\/09\/2026/);
+  assert.ok(!G.ripulisci('chiama il numero verde 800 123 456').includes('800 123 456'));
 });
 
 test('anche la riga in coda tiene il mittente e niente altri recapiti', () => {
