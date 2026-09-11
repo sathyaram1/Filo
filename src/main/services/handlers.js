@@ -2595,7 +2595,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // nel registro degli avvisi fermati, e la riga del diario dice che non è
         // stata fatta.
         const res = a._fermatoDalGuardiano
-          ? { executed: false, kept: false, error: 'fermato dal controllo di sicurezza' }
+          ? {
+            executed: false,
+            kept: false,
+            output: { ok: false, detail: 'fermata dal controllo di sicurezza' },
+          }
           : (a._argsError
             ? { executed: false, kept: false, rejected: true, error: a._argsError }
             : await executeFiloAction(a, { sender }));
