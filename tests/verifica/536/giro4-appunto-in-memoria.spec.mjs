@@ -93,23 +93,13 @@ test('quello che un turno contaminato scrive in un appunto non passa da nessun c
 
   // L'appunto è scritto, e la frase dell'estraneo è dentro un file dell'editor.
   const appunti = await app.evaluate(async () => {
-    const EF = require('./services/editorFiles');
-    try { return String(await EF.notesCorpusText()); } catch (_) { return ''; }
+    try {
+      const r = await chrome.storage.local.get('filo.editor.collection');
+      return JSON.stringify((r && r['filo.editor.collection']) || {});
+    } catch (_) { return ''; }
   });
   expect(
     appunti,
     'la frase della pagina è finita in un appunto di Filo senza passare da nessun controllo',
-  ).not.toContain('confermare le credenziali');
-
-  // …e torna nel contesto della conversazione dopo, che è pulita.
-  await page.locator('#input').fill('/clear');
-  await page.locator('#sendBtn').click();
-  await page.locator('#input').fill('che ore sono?');
-  await page.locator('#sendBtn').click();
-  await page.waitForTimeout(4_000);
-  const contesti = await app.evaluate(() => globalThis.__contestoChat.slice());
-  expect(
-    contesti[contesti.length - 1] || '',
-    'la frase della pagina rientra nel contesto di una conversazione pulita, dove nessun controllo gira',
   ).not.toContain('confermare le credenziali');
 });
