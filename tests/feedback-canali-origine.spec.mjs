@@ -9,8 +9,12 @@
 // Chiedere solo «sei l'amministratore?» non basta: sul computer di chi gestisce
 // i feedback la risposta è sempre sì, ed è l'unico dove c'è qualcosa da
 // prendere. Prima si guarda DA DOVE arriva la richiesta: una pagina di un sito
-// visitato non ottiene niente, e non scopre nemmeno se su quella macchina c'è
-// un amministratore (la risposta è identica in ogni caso).
+// visitato non ottiene niente, e da queste porte la risposta è identica che su
+// quella macchina ci sia o no un amministratore. (Che ci sia si può sapere da
+// un'altra porta, quella che dice lo stato dell'accesso: la griglia del tasto
+// destro gira dentro le pagine dei siti e senza quel bit perderebbe l'icona
+// Feedback di chi li gestisce. Quello che da lì non passa è l'identità: vedi
+// l'ultimo test.)
 //
 // Senza il controllo di provenienza questo spec è rosso su tutte le porte
 // tranne la lettura.
@@ -151,4 +155,84 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
     expect(r.ok, `filo/${porta}`).toBe(false);
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
   }
+});
+
+test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const porte = () => ({
+      esci: { type: MSG.AUTH_SIGNOUT },
+      vota: { type: MSG.BOARD_CAST_VOTE, id: 'fb-uno', vote: 'works' },
+      ritiraIlVoto: { type: MSG.BOARD_CLEAR_VOTE, id: 'fb-uno' },
+      riapriAPagamento: { type: MSG.BOARD_REOPEN, id: 'fb-uno', text: 'scritto da un sito' },
+      elencoDiChiUsaFilo: { type: MSG.OWNER_LIST_USERS },
+      regaloDiCrediti: { type: MSG.OWNER_GIFT_CREDITS, email: 'chiunque@example.com', amount: 1000 },
+    });
+    const esegui = async (mittente) => {
+      const res = {};
+      for (const [nome, msg] of Object.entries(porte())) {
+        res[nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+      }
+      return res;
+    };
+    return {
+      sito: await esegui(mittenti.sito),
+      sitoConScheda: await esegui(mittenti.sitoConScheda),
+      filo: await esegui(mittenti.filo),
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    for (const [porta, r] of Object.entries(out[provenienza])) {
+      expect(r, `${provenienza}/${porta}: nessuna risposta`).toBeTruthy();
+      expect(r.ok, `${provenienza}/${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+      expect(
+        String(r.code || ''),
+        `${provenienza}/${porta}: rifiutato per il motivo sbagliato — su una macchina dove qualcuno è entrato la richiesta passerebbe`,
+      ).toBe('forbidden');
+    }
+  }
+
+  // Da una pagina di Filo le porte esistono: qui non c'è nessuna sessione,
+  // quindi il rifiuto parla di quello e non della provenienza. Uscire senza
+  // essere entrati non è un errore.
+  expect(out.filo.esci.ok).toBe(true);
+  for (const porta of ['vota', 'ritiraIlVoto', 'riapriAPagamento']) {
+    expect(out.filo[porta].ok, `filo/${porta}`).toBe(false);
+    expect(String(out.filo[porta].code || ''), `filo/${porta}: non è la provenienza a mancare`).not.toBe('forbidden');
+  }
+});
+
+test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const chiSei = (m) => globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_STATUS }, m);
+    return {
+      sito: await chiSei(mittenti.sito),
+      sitoConScheda: await chiSei(mittenti.sitoConScheda),
+      filo: await chiSei(mittenti.filo),
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    const r = out[provenienza];
+    // La porta risponde: la griglia del tasto destro gira dentro le pagine dei
+    // siti e senza risposta perderebbe l'icona Feedback di chi li gestisce.
+    expect(r.ok, `${provenienza}: la risposta serve ai pezzi di Filo che girano nelle pagine`).toBe(true);
+    expect(typeof r.signedIn).toBe('boolean');
+    expect(typeof r.isAdmin).toBe('boolean');
+    // Ma l'identità no.
+    expect(r.profile, `${provenienza}: il profilo di chi usa Filo è finito a un sito visitato`).toBeUndefined();
+    expect(r.uid, `${provenienza}: l'identificativo dell'account è finito a un sito visitato`).toBeUndefined();
+    expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+  }
+
+  // Da una pagina di Filo la risposta resta intera: è di lì che le pagine
+  // mostrano chi è entrato.
+  expect(out.filo.ok).toBe(true);
+  expect(Object.keys(out.filo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
 });
