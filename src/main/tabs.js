@@ -66,25 +66,6 @@ const ESC_ATTESA_PAGINA_CHE_RISPONDE_MS = 2500;
 // gesto, quindi in mano a chi usa Filo il tetto non si tocca mai.
 const ESC_RIVENDICAZIONI_MAX = 3;
 
-// #514 — la scheda a cui appartiene una WebContents, in qualunque finestra. La
-// sessione è condivisa fra finestre e schede, mentre "l'ultimo tasto era l'Esc"
-// è una cosa della singola scheda: il gestore dei permessi deve poter risalire
-// dall'una all'altra.
-function tabDiWebContents(wc) {
-  try {
-    for (const w of BrowserWindow.getAllWindows()) {
-      const tm = w._filoTabs;
-      if (!tm || !Array.isArray(tm.tabs)) continue;
-      const t = tm.tabs.find((x) => {
-        const c = x && x.view && x.view.webContents;
-        return c && !c.isDestroyed() && c.id === wc.id;
-      });
-      if (t) return t;
-    }
-  } catch (_) {}
-  return null;
-}
-
 // Il gestore dei permessi (schermo pieno compreso, con la regola dell'Esc del
 // #514) vive in src/main/services/permessiSito.js: da lì passa OGNI richiesta
 // di un sito, e la sua installazione su ogni sessione la fa
