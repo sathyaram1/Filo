@@ -405,6 +405,7 @@
     [ACTIONS.DECKS_SEARCH_FILTER]: 'Mazzi — filtro ricerca',
     [ACTIONS.SAFEBROWSE_JUDGE]: 'Siti pericolosi — giudizio',
     [ACTIONS.GEOBLOCK_CLASSIFY]: 'Blocco geografico — riconoscimento',
+    [ACTIONS.GUARD_TEXT]: 'Guardiano degli avvisi',
     [ACTIONS.FEEDBACK_TITLE]: 'Titolo del feedback',
     [ACTIONS.EDITOR_TITLE]: 'Editor — titolo del documento',
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
