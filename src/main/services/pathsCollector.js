@@ -122,10 +122,55 @@
     return (u.hostname || '').toLowerCase().slice(0, 253);
   }
 
+  // La pagina di partenza va nella raccolta pubblica, quindi passa per la
+  // stessa pulizia dei selettori — anzi per una più severa, perché in un
+  // indirizzo un pezzo che dice CHI si riconosce dalla forma (#584, terzo giro).
+  //
+  // Prima qui si teneva il percorso intero: `/u/mario.rossi/ordini/847362`
+  // usciva così com'era, e un nome utente è lo stesso su più siti — la
+  // ricucitura che tutto questo lavoro toglie di mezzo, rifatta con una chiave
+  // più forte dell'orologio. A chi riusa il percorso serve sapere in CHE PUNTO
+  // del sito si parte, non su quale conto: `/u/[ID]/ordini/[ID]` risponde alla
+  // prima domanda e non alla seconda.
+  //
+  // La regola è per segmenti e tiene solo quelli che sono parole: lettere ed
+  // eventuali trattini. Tutto il resto — cifre, punti, chiocciole, percentuali,
+  // codici — diventa un segnaposto. E il segmento che segue un marcatore di
+  // persona (`/u/`, `/user/`, `/profilo/`…) diventa un segnaposto comunque,
+  // perché lì un nome è scritto a lettere e nessuna forma lo tradirebbe.
+  // Si perde qualche indirizzo utile (`/blog/2024/titolo` diventa
+  // `/blog/[ID]/titolo`): è il prezzo, ed è dalla parte giusta.
+  const SEGMENTO_PAROLA = /^[\p{L}][\p{L}\p{M}-]{0,39}$/u;
+  const MARCATORI_PERSONA = new Set([
+    'u', 'user', 'users', 'utente', 'utenti', 'profile', 'profil', 'profilo',
+    'profili', 'member', 'members', 'membro', 'membri', 'people', 'persone',
+    'usuario', 'usuarios', 'benutzer', 'utilisateur',
+  ]);
+
+  function redactPathSegment(segmento, precedente) {
+    if (!segmento) return segmento;
+    if (segmento.includes('@')) return '[EMAIL]';
+    if (MARCATORI_PERSONA.has(String(precedente || '').toLowerCase())) return '[ID]';
+    if (!SEGMENTO_PAROLA.test(segmento)) return '[ID]';
+    return segmento;
+  }
+
+  function redactPath(path) {
+    const pezzi = String(path || '').split('/');
+    const out = [];
+    let precedente = '';
+    for (const pezzo of pezzi) {
+      if (!pezzo) { out.push(pezzo); continue; }
+      out.push(redactPathSegment(pezzo, precedente));
+      precedente = pezzo;
+    }
+    return out.join('/');
+  }
+
   function normalizedPath(rawUrl) {
     const u = parseUrl(rawUrl);
     if (!u) return '';
-    let path = u.pathname || '/';
+    let path = redactPath(u.pathname || '/');
     if (path.length > 2000) path = path.slice(0, 2000);
     return path;
   }
