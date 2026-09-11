@@ -225,11 +225,17 @@ arrivano sul progetto Firebase, non quando il file cambia nel repo. Nessun
 automatismo le pubblica: si fa a mano, con
 
 ```bash
-firebase deploy --only firestore:rules     # e --only storage:rules per storage.rules
+npm run deploy:regole                      # regole + indici di Firestore
+firebase deploy --only storage:rules       # le regole dello storage, a parte
 ```
 
 Finché quel comando non gira, una regola stretta nel repo è una porta ancora
 aperta in produzione, e il lavoro sembra finito mentre non lo è.
+
+Gli **indici** viaggiano con le regole nello stesso comando apposta. Una query
+che si appoggia a un indice non ancora pubblicato viene rifiutata dal server, e
+la funzione che dipende da quella query smette di dare risultati senza che si
+rompa niente di visibile: il caso peggiore, perché nessuno se ne accorge.
 
 **L'ordine conta**, e sbagliarlo costa il lavoro due volte. Prima si pubblicano
 le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
