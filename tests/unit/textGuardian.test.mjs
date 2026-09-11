@@ -145,7 +145,7 @@ test('il guardiano blocca: la riga dice cosa ha visto, e il blocco resta nel reg
   assert.equal(noti.length, 1);
   assert.equal(
     noti[0].text,
-    'Ho fermato un avviso nato da una mail di Banca Esempio: chiedeva di confermare le credenziali della banca.');
+    `Ho fermato un avviso nato da una mail di Banca Esempio: ${G.MOTIVI_GUARDIANO.credenziali.frase}.`);
   const registro = await Mem.listGuardBlocks();
   assert.equal(registro.length, 1);
   assert.equal(registro[0].origine, MAIL_BANCA);
