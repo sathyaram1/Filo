@@ -34,6 +34,10 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
 - **I feedback che invii** (testo + eventuali screenshot) vengono salvati sui
   nostri server per permetterci di correggere i bug. Non includere in un
   feedback informazioni che non vuoi condividere.
+- **Quando l'Aiuto ti guida su un sito** e alla fine dici che ha funzionato,
+  salviamo la traccia della navigazione (il sito, i passaggi, una frase
+  sull'obiettivo) perché aiuti anche gli altri. Non ci finiscono i tuoi
+  messaggi, né niente che ti identifichi.
 - **Trasparenza:** questa pagina elenca esattamente cosa raccogliamo e cosa
   no. Se qualcosa cambia, cambia anche qui.
 
