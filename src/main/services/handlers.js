@@ -2448,6 +2448,19 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     fiduciaTurno = globalThis.SN_TEXT_GUARD.FIDUCIA.CONTAMINATO;
     if (!fontiTurno.includes(et)) fontiTurno.push(et);
   }
+  // Chi scrive le risposte di questa chat. Serve al guardiano, che da quel
+  // modello deve stare alla larga, e serve più volte nello stesso turno: si
+  // chiede una volta sola.
+  let _produttoreChat;
+  const produttoreDellaChat = async () => {
+    if (_produttoreChat !== undefined) return _produttoreChat;
+    try {
+      const s = await getEffectiveSettings();
+      _produttoreChat = modelForAction(s, ACTIONS.FILO_CHAT);
+    } catch (_) { _produttoreChat = ''; }
+    return _produttoreChat;
+  };
+  const origineTurno = () => fontiTurno.join(' e ') || 'un contenuto non fidato';
   // Lo scorrimento in diretta si ferma qui, e vale per TUTTO quello che
   // scorreva: la risposta e il ragionamento. La scheda riceve un `reset` (butta
   // il parziale, di qualunque dei due) e un `hold` (sta controllando); la
