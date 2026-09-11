@@ -759,3 +759,38 @@ test('anche «Tutti», «Persone» e «Routine» rispondono al tasto destro', as
   await page.locator('.mg-ctxmenu [role="menuitem"]', { hasText: 'Mostra' }).first().click();
   await expect(page.locator('#panel-fbstats .mg-st-drill')).toHaveCount(1);
 });
+
+// La dashboard carica le 500 segnalazioni più recenti. Tre tessere contano
+// DENTRO la finestra, quindi una finestra corta le rende esatte; «Aperte
+// adesso» guarda invece tutta la lista in pagina, e quello che il tetto lascia
+// fuori sono le segnalazioni più vecchie, cioè quelle rimaste in coda. Senza il
+// «+» qui, tre tessere dicevano di essere minimi e la quarta, disegnata
+// identica, si leggeva come un totale (#496, giro 14).
+test('«Aperte adesso» porta il «+» quando il caricamento ha toccato il tetto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apriStatistiche(page);
+
+  const ora = Date.now();
+  const iso = (g) => new Date(ora - g * 24 * 3600 * 1000).toISOString();
+  const lista = [];
+  for (let i = 0; i < 500; i += 1) {
+    const vecchia = i < 5;
+    lista.push({
+      _id: `t${i}`, seq: 2000 + i, subSeq: 0, clientId: 'tester@example.com',
+      text: `segnalazione ${i}`, status: vecchia ? 'todo' : 'done',
+      resolvedInVersion: vecchia ? undefined : '1.0.0',
+      createdAt: iso(vecchia ? 300 + i : 1), _updateTime: iso(vecchia ? 300 + i : 1),
+    });
+  }
+  await page.evaluate((l) => window.__mgTest.setData(l), lista);
+  // Finestra corta: i numeri della finestra sono esatti, «Aperte adesso» no.
+  await page.evaluate(() => window.__mgTest.setStatsWindow('7d'));
+
+  const letto = await page.evaluate(() => ({
+    adesso: document.querySelector('[data-card="adesso"] .mg-st-card-value').textContent.trim(),
+    nota: document.getElementById('mgStNote').textContent.replace(/\s+/g, ' ').trim(),
+  }));
+  expect(letto.adesso, `${letto.adesso} | ${letto.nota}`).toContain('+');
+  // E il «+» è spiegato: un segno senza didascalia non dice niente.
+  expect(letto.nota, letto.nota).toContain('«Aperte adesso»');
+});

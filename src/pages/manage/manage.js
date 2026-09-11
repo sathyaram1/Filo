@@ -1699,7 +1699,7 @@
       // La finestra scelta è tutta in pagina, quindi i suoi numeri sono esatti.
       // «Aperte adesso» però guarda tutta la lista, e lì il tetto morde sempre:
       // il «+» va spiegato anche qui, o è un segno senza didascalia.
-      frasi.push(`${FB.COUNT_CAP_HINT} La finestra scelta è tutta in pagina, quindi i suoi numeri sono esatti. «Aperte adesso» guarda invece tutta la lista: porta il «+» perché è un minimo.`);
+      frasi.push(`${FB.COUNT_CAP_HINT} La finestra scelta ci sta tutta, quindi i suoi numeri sono esatti; «Aperte adesso» guarda invece tutta la lista, e per questo porta il «+».`);
     }
     // Le segnalazioni che una finestra con un estremo lascia fuori perché la
     // loro data non si legge: un numero più piccolo del vero che non lo dice è
