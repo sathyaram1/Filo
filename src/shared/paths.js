@@ -8,8 +8,10 @@
 // COSA C'È DENTRO UN PERCORSO, e cosa NON c'è (audit pre-alpha, #584).
 // Un documento dice: da che punto del sito si parte, qual è l'intento, quali
 // azioni portano a farlo, se è andata bene. Non dice CHI l'ha fatto: niente
-// clientId, niente user agent, e la data è arrotondata al giorno (vedi
-// `giornoArrotondato`). E il momento in cui il percorso viene SCRITTO non è
+// clientId, niente user agent, la data è arrotondata al giorno (vedi
+// `giornoArrotondato`) e dal punto di partenza e dai nomi degli elementi la
+// pulizia in pathsCollector.js toglie email, codici, soprannomi e numeri
+// lunghi — `/u/mario.rossi/ordini/847362` esce come `/u/[ID]/ordini/[ID]`. E il momento in cui il percorso viene SCRITTO non è
 // quello in cui è stato percorso: lo ritarda a caso chi lo raccoglie, perché
 // la marca che Firestore mette da sé su ogni documento torna a chiunque legga,
 // al microsecondo, e due percorsi nati nello stesso istante su domini diversi
