@@ -62,6 +62,9 @@ test('l’assistente laterale risponde con le parole della pagina e non passa da
       };
     }, { trappola: TRAPPOLA });
 
+    await page.waitForFunction(
+      () => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 10_000 },
+    );
     await page.evaluate(() => window.SN_SIDEBAR.open());
     const input = page.locator('.sn-sidebar-input textarea');
     await expect(input).toBeVisible({ timeout: 10_000 });
