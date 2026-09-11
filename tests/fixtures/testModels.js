@@ -156,6 +156,10 @@
     [A.TTS]: 'kokoro',
     [A.SAFEBROWSE_JUDGE]: 'deepseek-flash',
     [A.GEOBLOCK_CLASSIFY]: 'deepseek-flash',
+    // #536 — il guardiano degli avvisi gira su una FAMIGLIA diversa da quella
+    // della chat (`FILO_CHAT`: deepseek, gemma): due contesti sullo stesso
+    // modello cadono insieme, e `catenaGuardiano` scarta i nickname in comune.
+    [A.GUARD_TEXT]: 'glm, claude',
     [A.FEEDBACK_TITLE]: 'deepseek-flash',
     [A.EDITOR_TITLE]: 'deepseek-flash, gemma-lite',
     [A.EDITOR_SUMMARY]: 'deepseek-flash, gemma-lite',
