@@ -80,12 +80,17 @@ test('con «solo pesi aperti» il controllo finisce sullo stesso modello della c
 
   await page.locator('#input').fill('cerca il portale');
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo').last())
-    .toContainText('Ecco cosa ho trovato', { timeout: 30_000 });
+
+  // Quello che deve succedere: il controllo si rifiuta di partire e lo DICE,
+  // nominando l'interruttore. A porta aperta invece la risposta arriva come se
+  // niente fosse, controllata da sé stessa.
+  const ultima = page.locator('.dash-bubble-filo').last();
+  await expect(ultima).not.toHaveText('', { timeout: 30_000 });
+  await expect(ultima, 'all’utente non viene detto perché il controllo non può partire')
+    .toContainText('pesi aperti');
 
   const usati = await app.evaluate(() => globalThis.__modelliGuardiano.slice());
   const chat = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry.deepseek.model);
-  expect(usati.length, 'il controllo non è nemmeno partito').toBeGreaterThan(0);
   expect(
     usati.filter((m) => m === chat),
     'il controllo è girato sullo stesso modello che ha scritto la risposta',
