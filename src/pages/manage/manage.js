@@ -1177,10 +1177,14 @@
       `<button type="button" class="mg-st-chip${on ? ' mg-st-chip--on' : ''}" ${attrs}>${label}`
       + (count === null || count === undefined ? '' : ` <span class="mg-st-chip-count">${count}</span>`)
       + '</button>';
+    // Le tre scorciatoie di gruppo sono pastiglie come le altre e portano lo
+    // stesso tipo di domanda («quali sono le segnalazioni delle routine?»):
+    // senza `data-drill-menu` il tasto destro ci apriva il menu generale della
+    // pagina, quello che esce anche su uno spazio bianco (#496, giro 13).
     const parti = [
-      chip('data-creator-all="1"', 'Tutti', scelti.size === 0, null),
-      chip('data-creator-group="persone"', 'Persone', gruppoAcceso(ST.CREATORS_PEOPLE, scelti), null),
-      chip('data-creator-group="routine"', 'Routine', gruppoAcceso(ST.CREATORS_ROUTINE, scelti), null),
+      chip('data-creator-all="1" data-drill-menu="gruppo:tutti"', 'Tutti', scelti.size === 0, null),
+      chip('data-creator-group="persone" data-drill-menu="gruppo:persone"', 'Persone', gruppoAcceso(ST.CREATORS_PEOPLE, scelti), null),
+      chip('data-creator-group="routine" data-drill-menu="gruppo:routine"', 'Routine', gruppoAcceso(ST.CREATORS_ROUTINE, scelti), null),
     ];
     for (const key of ST.creatorKeys()) {
       const meta = AUTHOR_META[key] || AUTHOR_META.user;
