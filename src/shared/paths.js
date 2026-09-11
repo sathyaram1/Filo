@@ -8,7 +8,12 @@
 // COSA C'È DENTRO UN PERCORSO, e cosa NON c'è (audit pre-alpha, #584).
 // Un documento dice: da che punto del sito si parte, qual è l'intento, quali
 // azioni portano a farlo, se è andata bene. Non dice CHI l'ha fatto: niente
-// clientId, niente user agent, e l'ora è arrotondata (vedi `oraArrotondata`).
+// clientId, niente user agent, e la data è arrotondata al giorno (vedi
+// `giornoArrotondato`). E il momento in cui il percorso viene SCRITTO non è
+// quello in cui è stato percorso: lo ritarda a caso chi lo raccoglie, perché
+// la marca che Firestore mette da sé su ogni documento torna a chiunque legga,
+// al microsecondo, e due percorsi nati nello stesso istante su domini diversi
+// erano della stessa persona (#584, secondo giro).
 // Il motivo sta tutto in una riga: per riusare un percorso non serve sapere
 // chi l'ha percorso, e finché un identificativo del mittente c'è, qualcuno
 // può ricucire i percorsi della stessa persona su domini diversi.
@@ -239,8 +244,9 @@
 
   function unaRiga(testo, max) {
     return String(testo == null ? '' : testo)
-      // a capo, tabulazioni e caratteri di controllo → uno spazio
-      .replace(/[ -  ]+/g, ' ')
+      // a capo, tabulazioni, caratteri di controllo e segni invisibili di
+      // direzione del testo (con cui si nasconde del testo a occhio) -> spazio
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, max);
@@ -283,6 +289,6 @@
     formatForPrompt,
     configPublic: { projectId: PROJECT_ID, collection: COLLECTION, subcollection: SUBCOLLECTION },
     rest: { FIRESTORE_BASE, MAX_PAGE_SIZE, PROMPT_BUDGET_CHARS },
-    _internal: { segmentoDominio, oraArrotondata, clusterKey },
+    _internal: { segmentoDominio, giornoArrotondato, clusterKey, unaRiga },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

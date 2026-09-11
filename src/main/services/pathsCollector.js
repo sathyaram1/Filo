@@ -20,6 +20,23 @@
 // ricucire i percorsi della stessa persona su domini diversi. La funzione qui
 // sotto non li accetta più nemmeno come argomento: così nessun chiamante può
 // rimetterli dentro per distrazione.
+//
+// E NEMMENO L'ISTANTE (#584, secondo giro). Togliere il clientId non bastava:
+// Firestore scrive da sé su ogni documento l'ora di creazione, al microsecondo,
+// e la rimanda a chiunque legga. L'app non può né scriverla né toglierla. Due
+// percorsi salvati su due domini diversi a meno di un secondo l'uno dall'altro
+// sono della stessa persona nella stessa sessione: la chiave di join che il
+// clientId aveva smesso di essere, la faceva l'orologio.
+//
+// Quindi un percorso non si scrive più quando succede. Entra in una coda sul
+// disco con un'ora di uscita sorteggiata nelle ore successive, e la coda ne
+// manda fuori UNO alla volta, a intervalli anch'essi sorteggiati. Due percorsi
+// della stessa sessione escono a distanza di ore, in ordine qualsiasi, mescolati
+// a quelli di chiunque altro; l'unica data dentro il documento è il giorno.
+// Costa niente: nessuno aspetta questa scrittura, è telemetria che serve agli
+// altri più tardi. Se l'app si chiude la coda resta sul disco e riparte al
+// prossimo avvio (ma sempre uno alla volta: se l'app è stata chiusa una
+// settimana, svuotare tutto insieme rimetterebbe in fila la sessione com'era).
 
 (function (global) {
   'use strict';
