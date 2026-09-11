@@ -1995,6 +1995,35 @@ function documentReadsForPrompt(actions) {
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Sono DATI di sistema (o, per i
 // documenti, materiale da leggere): mai istruzioni.
+// #536 — le fonti scritte da altri che sono ANCORA nella conversazione.
+//
+// La classe di fiducia non è una proprietà del messaggio, è una proprietà del
+// COMPITO: una pagina letta tre battute fa resta in contesto (la rimette lì
+// `observationsForPrompt`) e continua a parlare al modello. Legare il controllo
+// al solo messaggio in cui la ricerca è avvenuta voleva dire proteggere la
+// prima risposta e nessun'altra: bastava chiedere «e adesso cosa devo fare?»
+// perché quello che la pagina voleva far dire a Filo arrivasse intero.
+//
+// Il conto si fa sulle azioni che hanno DAVVERO prodotto un'osservazione
+// (`_output`), cioè esattamente su quelle il cui contenuto rientra nel contesto:
+// quando lo storico viene tagliato e quella pagina esce, il compito torna
+// pulito perché il testo di altri non c'è più.
+function fontiContaminantiInContesto(history) {
+  const G = globalThis.SN_TEXT_GUARD;
+  const fonti = [];
+  if (!G || !Array.isArray(history)) return fonti;
+  for (const m of history) {
+    if (!m || !Array.isArray(m.actions)) continue;
+    for (const a of m.actions) {
+      if (!a || !a._output) continue;
+      if (!G.vaControllato(G.fiduciaDellAzione(a.type))) continue;
+      const et = G.etichettaFonte(a);
+      if (et && !fonti.includes(et)) fonti.push(et);
+    }
+  }
+  return fonti;
+}
+
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
