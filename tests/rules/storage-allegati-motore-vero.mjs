@@ -152,8 +152,17 @@ await prova('allegato esistente — lettura da account Google qualunque: NEGATA'
   () => getBytes(ref(googleQualunque.storage(), ESISTENTE)));
 await prova('allegato esistente — lettura da login anonimo: NEGATA', 'ko',
   () => getBytes(ref(anonimo.storage(), ESISTENTE)));
-await prova('allegato esistente — lettura dell’owner (allowlist admins): OK', 'ok',
-  () => getBytes(ref(owner.storage(), ESISTENTE)));
+if (CROSS_SERVICE) {
+  await prova('allegato esistente — lettura dell’owner (allowlist admins): OK', 'ok',
+    () => getBytes(ref(owner.storage(), ESISTENTE)));
+} else {
+  // Fail-closed: senza cross-service la regola dell'owner nega, non apre. La
+  // dashboard continua a vedere gli allegati perché li apre con il download
+  // token che sta nell'URL salvato nel feedback.
+  await prova('allegato esistente — senza cross-service la regola dell’owner NEGA (mai apre)', 'ko',
+    () => getBytes(ref(owner.storage(), ESISTENTE)));
+  nota('lettura dell’owner: NON PROVATA — questo emulatore non inoltra le regole cross-service a Firestore (firestore.exists torna sempre falso). In produzione è la strada autenticata dell’owner; qui si prova solo che, se non funzionasse, nega.');
+}
 
 // ── Elencare il bucket: per nessuno, owner compreso ─────────────────────────
 await prova('elenco di feedback/ senza login: NEGATO', 'ko',
