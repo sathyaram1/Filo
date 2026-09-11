@@ -1,22 +1,31 @@
-// Verifica #581, giro 1 — il documento con le chiavi condivise non si apre più
-// a chi ha soltanto fatto login.
+// Verifica #581, giro 1 — le chiavi condivise non si scaricano più con un
+// account qualunque, e Filo appena installato funziona lo stesso.
 //
 // Il sintomo. Le chiavi che pagano le chiamate di tutti stavano in un documento
 // che si leggeva con la sola condizione «account Google con email verificata».
 // Iscriversi costa zero e la chiave web del progetto sta in un repo pubblico:
 // chiunque, senza nemmeno installare Filo, se le portava via.
 //
-// Perché queste prove e non quelle che già esistono. La prova che accompagna il
-// lavoro guarda un'installazione SLEGATA (nessun login): lì il documento non si
-// chiede comunque, perché manca il gettone — quindi passerebbe anche se il
-// controllo «sei un amministratore» non ci fosse. Il caso del feedback è un
-// altro: uno che il login LO HA FATTO, con un account qualunque. È quello che
-// si prova qui, insieme alle due cose che chiudere la porta non deve rompere:
-// l'amministratore deve ancora poter ruotare le chiavi, e quando l'owner esce
-// dall'installazione le chiavi che aveva letto non devono restare in uso.
+// COSA PROVA QUESTO FILE, e cosa no. Qui si prova il lato APP: un'installazione
+// normale non chiede quel documento e funziona comunque. Il lato REGOLE — cioè
+// la barriera vera, quella che risponde «permesso negato» a chi prova lo stesso
+// da fuori Filo — non si può provare da dentro Electron: serve il motore delle
+// regole Firestore. Al giro 1 è stato provato con l'emulatore ufficiale e le
+// regole di questo ramo, verificando che un account Google verificato qualunque
+// e un account anonimo ricevono «permesso negato», che l'amministratore legge
+// ancora (le chiavi si possono ancora ruotare) e che con la regola di prima lo
+// stesso account leggeva il documento per intero. Quella prova non entra qui
+// perché ha bisogno dell'emulatore e di Java, che nella suite non ci sono: la
+// sentinella che resta accesa sulle regole è negli unit test.
+//
+// Un limite dichiarato: il controllo lato app «sei un amministratore» si può
+// esercitare solo con una sessione vera, e questo contenitore non ha un
+// portachiavi di sistema, quindi una sessione non si può seminare. Le prove qui
+// sotto coprono l'installazione slegata; per il caso «loggato ma non
+// amministratore» la garanzia verificata è quella delle regole.
 
 import { test, expect, _electron as electron } from '@playwright/test';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
@@ -32,12 +41,6 @@ const FABBRICA = {
   openrouter: 'or-fabbrica-581-giro1',
   tavily: 'tav-fabbrica-581-giro1',
   safeBrowsing: 'gsb-fabbrica-581-giro1',
-};
-
-// Le chiavi che un amministratore avrebbe scritto nel documento remoto.
-const REMOTE = {
-  openrouter: 'or-remoto-581-giro1',
-  tavily: 'tav-remoto-581-giro1',
 };
 
 let app;
@@ -66,149 +69,140 @@ test.afterAll(async () => {
   try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
 });
 
-// Fa finta che qualcuno sia entrato, con o senza i poteri dell'owner, e guarda
-// quali documenti l'app va a chiedere. Ritorna gli indirizzi visti e le chiavi
-// che a quel punto partirebbero davvero verso il servizio AI.
-async function giroDiAggiornamento(app, { admin }) {
-  return app.evaluate(async (_electron, { admin, REMOTE }) => {
-    const req = (typeof require !== 'undefined') ? require : process.mainModule.require;
-    const auth = req(process.cwd() + '/src/main/auth/google-auth.js');
-    const Defaults = globalThis.__filoDefaults;
-
-    const veroToken = auth.getIdToken;
-    const veroAdmin = auth.isAdmin;
-    const veraFetch = global.fetch;
-    const viste = [];
-
-    // Un gettone c'è: chi prova a portarsi via le chiavi ce l'ha sempre, basta
-    // un account Google qualunque.
-    auth.getIdToken = async () => 'gettone-finto-581';
-    auth.isAdmin = () => admin;
-    global.fetch = async (u) => {
-      const url = String(u);
-      viste.push(url);
-      // Il server risponde col documento solo a chi ha il diritto di leggerlo:
-      // è quello che fanno le regole vere, qui riprodotto per vedere cosa l'app
-      // farebbe di una risposta piena.
-      if (url.includes('config/secrets')) {
-        if (!admin) {
-          return { ok: false, status: 403, async json() { return { error: { status: 'PERMISSION_DENIED' } }; }, async text() { return 'PERMISSION_DENIED'; } };
-        }
-        return {
-          ok: true,
-          status: 200,
-          async json() {
-            return {
-              fields: {
-                apiKeys: { mapValue: { fields: {
-                  openrouter: { stringValue: REMOTE.openrouter },
-                  tavily: { stringValue: REMOTE.tavily },
-                } } },
-              },
-            };
-          },
-          async text() { return ''; },
-        };
-      }
-      return { ok: false, status: 404, async json() { return {}; }, async text() { return ''; } };
+test('installazione appena fatta: le chiavi con cui parte una richiesta ci sono', async () => {
+  // Se qui comparisse una stringa vuota, in chat il tester vedrebbe «configura
+  // una chiave» — cioè proprio quello che chiudere la porta non doveva causare.
+  const eff = await app.evaluate(async () => {
+    const s = await globalThis.__filoHandlers.getEffectiveSettings();
+    return {
+      openrouter: (s.apiKeys && s.apiKeys.openrouter) || '',
+      tavily: (s.apiKeys && s.apiKeys.tavily) || '',
+      safeBrowsing: s.safeBrowsingKey || '',
     };
+  });
+  expect(eff.openrouter).toBe(FABBRICA.openrouter);
+  expect(eff.tavily).toBe(FABBRICA.tavily);
+  // La chiave del rilevamento siti pericolosi viveva SOLO nel documento remoto:
+  // se non viaggiasse con la costruzione, chiudere la porta avrebbe spento in
+  // silenzio il primo stadio per tutti.
+  expect(eff.safeBrowsing).toBe(FABBRICA.safeBrowsing);
+});
 
-    try {
-      await Defaults.refresh();
-    } finally {
-      global.fetch = veraFetch;
-      auth.getIdToken = veroToken;
-      auth.isAdmin = veroAdmin;
-    }
-
+test('un rifiuto del server su ogni documento non lascia Filo senza chiavi', async () => {
+  // Il caso in cui la barriera dice no a tutti (allowlist cambiata, documento
+  // cancellato, rete ostile che risponde 403): le chiavi della costruzione sono
+  // il pavimento sotto ogni caso, e nessun percorso deve azzerarle.
+  const r = await app.evaluate(async () => {
+    const Defaults = globalThis.__filoDefaults;
+    const vera = global.fetch;
+    const viste = [];
+    global.fetch = async (u) => {
+      viste.push(String(u));
+      return {
+        ok: false, status: 403,
+        async json() { return { error: { status: 'PERMISSION_DENIED' } }; },
+        async text() { return 'PERMISSION_DENIED'; },
+      };
+    };
+    try { await Defaults.refresh(); } finally { global.fetch = vera; }
     const eff = await globalThis.__filoHandlers.getEffectiveSettings();
     return {
       viste,
-      chiaviEffettive: {
-        openrouter: (eff.apiKeys && eff.apiKeys.openrouter) || '',
-        tavily: (eff.apiKeys && eff.apiKeys.tavily) || '',
-      },
-    };
-  }, { admin, REMOTE });
-}
-
-test('chi ha fatto login con un account qualunque non chiede nemmeno il documento delle chiavi', async () => {
-  const r = await giroDiAggiornamento(app, { admin: false });
-
-  // Il cuore del feedback: con un gettone valido in mano, l'app NON va a
-  // chiedere il documento dei segreti.
-  expect(r.viste.some((u) => u.includes('config/secrets'))).toBe(false);
-  // E non è che l'aggiornamento sia stato spento in blocco: la config che non è
-  // segreta si continua a leggere.
-  expect(r.viste.some((u) => u.includes('config/models'))).toBe(true);
-  // Le chiavi con cui parte una richiesta restano quelle della costruzione:
-  // niente di ciò che il documento remoto contiene è finito qui.
-  expect(r.chiaviEffettive.openrouter).toBe(FABBRICA.openrouter);
-  expect(r.chiaviEffettive.tavily).toBe(FABBRICA.tavily);
-});
-
-test('l’amministratore continua a leggere il documento, altrimenti non potrebbe più ruotare le chiavi', async () => {
-  const r = await giroDiAggiornamento(app, { admin: true });
-
-  // Chiudere la porta non deve togliere all'owner la schermata da cui le chiavi
-  // si cambiano: se questo diventasse rosso, la rotazione chiesta dal feedback
-  // non sarebbe più possibile da dentro Filo.
-  expect(r.viste.some((u) => u.includes('config/secrets'))).toBe(true);
-  expect(r.chiaviEffettive.openrouter).toBe(REMOTE.openrouter);
-  expect(r.chiaviEffettive.tavily).toBe(REMOTE.tavily);
-});
-
-test('quando l’owner esce dall’installazione, le chiavi che aveva letto non restano in uso', async () => {
-  // Ordine voluto: prima entra l'owner (e le chiavi remote finiscono in
-  // memoria), poi esce e resta un account qualunque. Se la memoria non si
-  // azzerasse, quelle chiavi continuerebbero a partire per un utente che non ha
-  // più il diritto di leggerle.
-  const conOwner = await giroDiAggiornamento(app, { admin: true });
-  expect(conOwner.chiaviEffettive.openrouter).toBe(REMOTE.openrouter);
-
-  const dopoUscita = await giroDiAggiornamento(app, { admin: false });
-  expect(dopoUscita.chiaviEffettive.openrouter).toBe(FABBRICA.openrouter);
-  expect(dopoUscita.chiaviEffettive.tavily).toBe(FABBRICA.tavily);
-});
-
-test('un rifiuto del server non lascia Filo senza chiavi', async () => {
-  // Se un domani la regola dicesse di no anche all'owner (allowlist cambiata,
-  // documento cancellato), l'app non deve restare muta: le chiavi della
-  // costruzione sono il pavimento sotto ogni caso.
-  const r = await app.evaluate(async () => {
-    const req = (typeof require !== 'undefined') ? require : process.mainModule.require;
-    const auth = req(process.cwd() + '/src/main/auth/google-auth.js');
-    const Defaults = globalThis.__filoDefaults;
-    const veroToken = auth.getIdToken;
-    const veroAdmin = auth.isAdmin;
-    const veraFetch = global.fetch;
-
-    auth.getIdToken = async () => 'gettone-finto-581';
-    auth.isAdmin = () => true;
-    global.fetch = async () => ({
-      ok: false, status: 403,
-      async json() { return { error: { status: 'PERMISSION_DENIED' } }; },
-      async text() { return 'PERMISSION_DENIED'; },
-    });
-    try {
-      await Defaults.refresh();
-    } finally {
-      global.fetch = veraFetch;
-      auth.getIdToken = veroToken;
-      auth.isAdmin = veroAdmin;
-    }
-    const eff = await globalThis.__filoHandlers.getEffectiveSettings();
-    return {
       openrouter: (eff.apiKeys && eff.apiKeys.openrouter) || '',
       tavily: (eff.apiKeys && eff.apiKeys.tavily) || '',
       safeBrowsing: eff.safeBrowsingKey || '',
     };
   });
 
+  expect(r.viste.some((u) => u.includes('config/secrets'))).toBe(false);
   expect(r.openrouter).toBe(FABBRICA.openrouter);
   expect(r.tavily).toBe(FABBRICA.tavily);
-  // La chiave del rilevamento siti pericolosi viveva SOLO nel documento remoto:
-  // se non viaggiasse con la costruzione, chiudere la porta spegnerebbe in
-  // silenzio il primo stadio per tutti.
   expect(r.safeBrowsing).toBe(FABBRICA.safeBrowsing);
+});
+
+test('un aggiornamento ripetuto in fretta non apre il documento dei segreti', async () => {
+  // Azioni rapide in sequenza: dieci aggiornamenti lanciati insieme. Una corsa
+  // fra due giri non deve far sfuggire una richiesta al documento chiuso, né
+  // lasciare le chiavi a metà.
+  const r = await app.evaluate(async () => {
+    const Defaults = globalThis.__filoDefaults;
+    const vera = global.fetch;
+    const viste = [];
+    global.fetch = async (u) => {
+      viste.push(String(u));
+      return { ok: false, status: 404, async json() { return {}; }, async text() { return ''; } };
+    };
+    try {
+      await Promise.all(Array.from({ length: 10 }, () => Defaults.refresh()));
+    } finally { global.fetch = vera; }
+    const eff = await globalThis.__filoHandlers.getEffectiveSettings();
+    return { viste, openrouter: (eff.apiKeys && eff.apiKeys.openrouter) || '' };
+  });
+
+  expect(r.viste.some((u) => u.includes('config/secrets'))).toBe(false);
+  expect(r.openrouter).toBe(FABBRICA.openrouter);
+});
+
+// ── Le regole, lette in proprio ──────────────────────────────────────────────
+// Una lettura indipendente del file delle regole: se la sentinella degli unit
+// test un giorno leggesse male il file, questa resterebbe a dirlo. Ritaglia il
+// blocco di un documento contando le parentesi, invece di fidarsi di una riga.
+function bloccoRegola(testo, percorso) {
+  const apri = testo.indexOf(`match /${percorso} {`);
+  if (apri < 0) return null;
+  let i = testo.indexOf('{', apri);
+  let livello = 0;
+  for (let j = i; j < testo.length; j++) {
+    if (testo[j] === '{') livello++;
+    else if (testo[j] === '}') {
+      livello--;
+      if (livello === 0) return testo.slice(i + 1, j);
+    }
+  }
+  return null;
+}
+
+function condizioneDiLettura(blocco) {
+  const righe = blocco.split('\n')
+    .map((r) => r.replace(/\/\/.*$/, '').trim())
+    .filter((r) => /^allow\b/.test(r) && /\bread\b/.test(r));
+  return righe.map((r) => (r.match(/:\s*if\s+(.*?);\s*$/) || [, ''])[1].trim());
+}
+
+test('le regole: il documento delle chiavi si legge solo da amministratore, come il suo gemello', async () => {
+  const regole = readFileSync(resolve(APP_ROOT, 'firestore.rules'), 'utf8');
+
+  const segreti = bloccoRegola(regole, 'config/secrets');
+  const giudici = bloccoRegola(regole, 'config/judgeSecrets');
+  expect(segreti, 'il blocco config/secrets deve esistere').toBeTruthy();
+  expect(giudici, 'il blocco config/judgeSecrets deve esistere').toBeTruthy();
+
+  // L'asimmetria fra due documenti che contengono la stessa cosa era la spia:
+  // ora le due condizioni di lettura devono coincidere.
+  expect(condizioneDiLettura(segreti)).toEqual(['isAdmin()']);
+  expect(condizioneDiLettura(giudici)).toEqual(['isAdmin()']);
+
+  // E la condizione di prima non deve poter tornare, nemmeno riscritta a mano.
+  expect(/request\.auth\s*!=\s*null/.test(segreti)).toBe(false);
+  expect(/email_verified/.test(segreti)).toBe(false);
+});
+
+test('le regole: nessun documento di configurazione si apre sulla sola condizione «sei entrato»', async () => {
+  // Da quando l'identità dell'installazione è un account anonimo, «autenticato»
+  // lo è chiunque abbia la chiave web pubblica: non serve nemmeno un account
+  // Google. Una regola che chiede solo quello non è una barriera.
+  const regole = readFileSync(resolve(APP_ROOT, 'firestore.rules'), 'utf8');
+  const nomi = [...regole.matchAll(/match \/(config\/[A-Za-z0-9_]+) \{/g)].map((m) => m[1]);
+  expect(nomi.length).toBeGreaterThan(3);
+
+  const colpevoli = [];
+  for (const nome of nomi) {
+    for (const cond of condizioneDiLettura(bloccoRegola(regole, nome) || '')) {
+      const soloEntrato = /request\.auth\s*!=\s*null/.test(cond)
+        && !/isAdmin\(\)/.test(cond)
+        && !/request\.auth\.uid\s*==/.test(cond);
+      if (soloEntrato) colpevoli.push(`${nome}: ${cond}`);
+    }
+  }
+  expect(colpevoli, 'documenti di configurazione leggibili da chiunque sia entrato').toEqual([]);
 });
