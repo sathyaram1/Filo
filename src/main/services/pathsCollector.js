@@ -467,7 +467,7 @@
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _setSorteggio: (fn) => { sorteggio = typeof fn === 'function' ? fn : Math.random; },
     _reset: () => {
-      coda = []; caricata = false; sto = false; auto = true; sorteggio = Math.random;
+      coda = []; caricamento = null; sto = false; auto = true; sorteggio = Math.random;
       if (timer) { clearTimeout(timer); timer = null; }
     },
   };
