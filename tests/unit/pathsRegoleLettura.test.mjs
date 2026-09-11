@@ -44,9 +44,12 @@ const CODICE = RULES.replace(/\/\/[^\n]*/g, '');
 // Estrae il corpo di un blocco `match <percorso> {` bilanciando le graffe:
 // i blocchi dei percorsi sono annidati, una regex sola non basta.
 function corpoMatch(testo, percorso) {
-  const i = testo.indexOf(`match ${percorso}`);
+  const etichetta = `match ${percorso}`;
+  const i = testo.indexOf(etichetta);
   if (i < 0) return null;
-  const apre = testo.indexOf('{', i);
+  // La graffa che apre il blocco, NON quella del carattere jolly nel percorso
+  // (`{domain}` ne ha una): si parte dopo l'etichetta.
+  const apre = testo.indexOf('{', i + etichetta.length);
   if (apre < 0) return null;
   let livello = 0;
   for (let j = apre; j < testo.length; j += 1) {
