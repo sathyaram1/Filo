@@ -634,8 +634,13 @@
     const incoming = String(incomingReport || '').trim();
     const existing = String(existingNotes || '');
     if (!incoming) return existing;
-    if (!existing.trim()) return incoming;
-    if (existing.includes(incoming)) return existing;
+    // Anche il primo report entra neutralizzato: se dentro ci fosse una riga di
+    // separazione, aprirebbe un turno che nessuno ha appeso.
+    if (!existing.trim()) return neutralizzaMarcatori(incoming);
+    // Il confronto per la ri-applicazione si fa sulla forma in cui il report
+    // viene SALVATO: cercare il testo grezzo non lo ritroverebbe più, e un
+    // secondo tentativo duplicherebbe il turno.
+    if (existing.includes(incoming) || existing.includes(neutralizzaMarcatori(incoming))) return existing;
     return appendModelTurn(existing, incoming, opts);
   }
 
