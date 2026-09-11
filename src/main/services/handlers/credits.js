@@ -337,19 +337,19 @@ module.exports = function register(on, ctx) {
           ? FBS.isResolvedForUser(f)
           : f.statusPublic === 'closed';
         if (!f || !isResolved) continue;
-        // S1.F2.2: match via clientIdHash (in chiaro, disponibile anche se clientId è cifrato).
-        // RETROCOMPAT: se il feedback non ha clientIdHash (storico), ricadi sul confronto raw.
-        const matched = (() => {
-          if (f.clientIdHash && localIdHash) {
-            return f.clientIdHash === localIdHash;
-          }
-          // Fallback per feedback storici senza clientIdHash: confronto raw
-          // clientId. Dalla vista pubblica (#583) il clientId non arriva —
-          // è l'identificativo di chi ha mandato il feedback, e la scheda
-          // porta solo il suo hash — quindi qui il confronto cade su chi non
-          // ha nemmeno l'hash: i feedback anteriori a giugno 2026, che non
-          // producono più una ricompensa.
-          return baseClientId(f.clientId) === id;
+        // #583: l'impronta sulla scheda è di QUELLA scheda, non
+        // dell'installazione, così chi legge la bacheca non può raggruppare i
+        // fix per segnalatore. Qui la si ricalcola scheda per scheda: sappiamo
+        // l'id e sappiamo l'impronta del nostro clientId, che è tutto quello
+        // che serve. I feedback anteriori a giugno 2026 non hanno nemmeno
+        // quella, e non producono più una ricompensa.
+        const matched = await (async () => {
+          if (!f.clientIdTag || !localIdHash) return false;
+          try {
+            const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+            if (!H || !H.cardTag) return false;
+            return f.clientIdTag === await H.cardTag(f._id, localIdHash);
+          } catch (_) { return false; }
         })();
         if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;

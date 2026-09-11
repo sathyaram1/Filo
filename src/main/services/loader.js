@@ -53,6 +53,7 @@ require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a s
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
 require(path.join(SHARED, 'manageReview.js'));
+require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
 require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback hanno una scheda pubblica, e con quali campi (dopo manageReview: la usa)
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
@@ -84,7 +85,6 @@ require(path.join(SHARED, 'autoFeedback.js'));  // F4 — dipende da capabilitie
 require(path.join(SHARED, 'feedbackPublicKey.js'));
 require(path.join(SHARED, 'feedbackCrypto.js'));
 require(path.join(SHARED, 'feedbackImage.js')); // S1.2: sniff MIME + data URL per immagini decifrate
-require(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2: hash deterministico clientId
 require(path.join(SHARED, 'userCredibility.js'));
 require(path.join(SHARED, 'spellLanguages.js'));
 require(path.join(SHARED, 'decks.js'));
