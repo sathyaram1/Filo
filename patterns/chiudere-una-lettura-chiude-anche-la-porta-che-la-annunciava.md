@@ -21,7 +21,7 @@ accedere come amministratore. Amministratori non si diventa accedendo: l'elenco
 sta nella console.
 
 Il segnale c'era già, due funzioni più in alto nello stesso file: il menu
-Impostazioni mostra «Modelli predefiniti` solo agli admin. **Due menu della
+Impostazioni mostra «Modelli predefiniti» solo agli admin. **Due menu della
 stessa shell che trattano due pagine dell'owner in modo diverso è la spia.**
 
 ## La regola
