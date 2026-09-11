@@ -374,8 +374,15 @@
       // link-ingannevole» davanti a chi sta valutando se il controllo esagera è
       // solo codice uscito allo scoperto.
       if (b.regola) {
+        const CHI = {
+          guardiano: 'fermato dal secondo modello',
+          // Non l'ha fermato nessun controllo: aspettava il suo turno da troppo
+          // tempo e la coda era piena. Dirlo com'è, invece di far credere a un
+          // blocco che non c'è stato.
+          'coda-piena': 'mai controllato: aspettava da troppo tempo',
+        };
         meta.appendChild(Object.assign(document.createElement('span'), {
-          textContent: b.regola === 'guardiano' ? 'fermato dal secondo modello' : 'fermato da un controllo automatico',
+          textContent: CHI[b.regola] || 'fermato da un controllo automatico',
         }));
       }
       item.appendChild(meta);
