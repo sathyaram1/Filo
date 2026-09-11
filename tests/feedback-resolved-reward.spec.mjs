@@ -1,7 +1,7 @@
 // Ricompensa alla risoluzione di un feedback (C5): all'avvio, se un feedback
 // INVIATO DA QUESTO UTENTE è passato a "risolto", la home mostra un popup di
-// ringraziamento con la spiegazione non tecnica e accredita crediti in base alla
-// priorità (50/100/200/300), UNA VOLTA SOLA per feedback.
+// ringraziamento con la spiegazione non tecnica e accredita crediti UNA VOLTA
+// SOLA per feedback.
 //
 // Asserisce il SUCCESSO della feature: compare il popup #thanksOverlay con il
 // titolo del feedback + la spiegazione, e il saldo crediti cresce dell'importo
@@ -46,7 +46,7 @@ function balanceOf(app) {
   return app.evaluate(async () => (await globalThis.SN_CREDITS.getPublic()).balance);
 }
 
-test('feedback risolto: popup di ringraziamento + ricompensa per priorità', async ({ app, openTab }) => {
+test('feedback risolto: popup di ringraziamento + ricompensa', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForLoadState('domcontentloaded');
   // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
