@@ -16,13 +16,64 @@
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
   // ---- helpers ----
+  // L'uuid non serve solo a non far collidere due nomi: da #582 è ANCHE il
+  // segreto del percorso di un allegato (storage.rules concede la creazione
+  // solo su un nome che lo contiene, e mai la sovrascrittura). Quindi i bit
+  // vengono dal generatore crittografico quando c'è; `Math.random()` resta
+  // l'ultima spiaggia per non rompere ambienti senza `crypto`, mai la prima.
   function uuid() {
-    if (global.crypto?.randomUUID) return global.crypto.randomUUID();
-    return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const c = global.crypto;
+    if (c?.randomUUID) return c.randomUUID();
+    if (c?.getRandomValues) {
+      const b = c.getRandomValues(new Uint8Array(16));
+      b[6] = (b[6] & 0x0f) | 0x40;
+      b[8] = (b[8] & 0x3f) | 0x80;
+      const hex = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+    return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
       const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      const v = ch === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
+  }
+
+  // Percorso di un allegato dentro il bucket. FONTE UNICA della forma del nome:
+  // `storage.rules` concede la creazione SOLO su un nome fatto così, e una
+  // sentinella (tests/unit/storageRulesAllegati.test.mjs) confronta quello che
+  // esce di qui con l'espressione scritta nelle regole. Cambiare la forma qui
+  // senza cambiarla là vuol dire che dal giorno del deploy nessun allegato si
+  // carica più: il test lo dice prima.
+  //
+  // Forma: feedback/<etichetta_>?<millisecondi>_<uuid>.<estensione>
+  // L'etichetta facoltativa dice la provenienza (`agent` per i ritrovamenti
+  // dell'agente esploratore); i millisecondi servono a leggere a occhio quando
+  // è arrivato; l'uuid è la parte che non si indovina.
+  function attachmentPath(mimeOrExt, label) {
+    const raw = String(mimeOrExt || '');
+    const ext = (raw.includes('/') ? raw.split('/')[1] : raw).replace(/[^a-z0-9]/gi, '').slice(0, 12) || 'bin';
+    const et = String(label || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 16);
+    return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ext}`;
+  }
+
+  // Un URL è un allegato del bucket dei feedback? PURA. Serve a due cose che
+  // devono dare la stessa risposta: il guard anti-SSRF del main (che non deve
+  // trasformare la decifratura allegati in una fetch arbitraria) e la decisione
+  // di allegare o no il token dell'owner alla richiesta.
+  function isAttachmentUrl(url) {
+    return /^https:\/\/(firebasestorage\.googleapis\.com|storage\.googleapis\.com)\//.test(String(url || ''));
+  }
+
+  // Intestazioni con cui l'owner scarica un allegato. PURA.
+  // Dal #582 la lettura del bucket è riservata agli amministratori: senza
+  // identità si passa solo col download token dentro l'URL. Chi ce l'ha,
+  // l'identità, la manda — così la dashboard vede gli allegati anche quando il
+  // token non c'è (allegati storici) o viene revocato. Il token dell'owner esce
+  // SOLO verso il bucket: su qualunque altro URL queste intestazioni sono vuote.
+  function attachmentFetchHeaders(url, idToken) {
+    const t = String(idToken || '');
+    if (!t || !isAttachmentUrl(url)) return {};
+    return { Authorization: `Bearer ${t}` };
   }
 
   // Anti-duplicati (#370): id documento STABILE per una singola composizione di
