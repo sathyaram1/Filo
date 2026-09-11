@@ -61,9 +61,31 @@ function corpoMatch(testo, percorso) {
 
 // Le condizioni di lettura dichiarate in un corpo, SENZA scendere nei blocchi
 // annidati: servono le regole di QUEL livello.
+function senzaBlocchiAnnidati(corpo) {
+  let out = '';
+  let i = 0;
+  while (i < corpo.length) {
+    const m = corpo.indexOf('match ', i);
+    if (m < 0) { out += corpo.slice(i); break; }
+    out += corpo.slice(i, m);
+    const apre = corpo.indexOf('{', m);
+    if (apre < 0) break;
+    let livello = 0;
+    let j = apre;
+    for (; j < corpo.length; j += 1) {
+      if (corpo[j] === '{') livello += 1;
+      else if (corpo[j] === '}') {
+        livello -= 1;
+        if (livello === 0) break;
+      }
+    }
+    i = j + 1;
+  }
+  return out;
+}
+
 function lettureDirette(corpo) {
-  const primoAnnidato = corpo.indexOf('match ');
-  const senzaAnnidati = primoAnnidato < 0 ? corpo : corpo.slice(0, primoAnnidato);
+  const senzaAnnidati = senzaBlocchiAnnidati(corpo);
   const out = [];
   const re = /allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g;
   let m;
