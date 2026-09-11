@@ -1026,6 +1026,10 @@
     attachmentPath,
     isAttachmentUrl,
     attachmentFetchHeaders,
+    // #582 giro 3 — la scritta di un collegamento verso un indirizzo che arriva
+    // da fuori: dice dove si va, e lo dice anche quando è tagliata.
+    linkLabel,
+    LINK_LABEL_MAX,
     formatNum,
     fallbackName,
     // Plumbing REST riutilizzabile (es. dal motore crediti): encoder Value
