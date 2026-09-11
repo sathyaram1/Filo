@@ -566,6 +566,10 @@
         text: n.text,
         origine: n.origine || '',
         guardiano: n.guardiano || '',
+        // #536 — dalla riga «ho fermato un avviso» a quello che è stato
+        // fermato: chi legge che Filo gli ha nascosto qualcosa vuole vedere
+        // cos'era, ed è la prima cosa che prova a fare.
+        bloccoId: n.action?.tipo === 'guardiano-blocco' ? n.action.bloccoId : '',
         onDismiss: () => send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(refreshLive),
       }));
     }
