@@ -300,7 +300,9 @@
   function fmtQuando(ts) {
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleString();
+    // Come nelle altre pagine di Filo: la data si scrive in italiano, non nel
+    // formato del sistema (che su una macchina in inglese darebbe 9/11/2026).
+    return d.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
   function descriviFonte(fonte) {

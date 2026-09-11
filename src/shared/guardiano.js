@@ -440,7 +440,10 @@
 
   // ── La riga che l'utente legge al posto dell'avviso ───────────────────────
   function frasePerBlocco({ fonte, motivo } = {}) {
-    const m = String(motivo || '').trim() || 'sembrava spingerti a fare qualcosa che non avevi chiesto';
+    let m = String(motivo || '').trim() || 'sembrava spingerti a fare qualcosa che non avevi chiesto';
+    // Il motivo lo scrive un modello: può arrivare senza punto finale, e una
+    // riga che si interrompe sembra tagliata.
+    if (!/[.!?…]$/.test(m)) m += '.';
     return `Ho fermato un avviso nato da ${descriviFonte(fonte)}: ${m}`;
   }
 
