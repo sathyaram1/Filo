@@ -209,10 +209,19 @@ module.exports = function register(on, ctx) {
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
-  on(MSG.AUTH_STATUS, async () => {
+  // Da un sito visitato questa porta risponde, ma senza IDENTITÀ: niente
+  // indirizzo email, niente nome, niente identificativo dell'account. Un
+  // content script gira anche dentro le pagine dei siti, e di sé deve sapere
+  // solo due cose: se c'è una sessione (il pannello del red-team invita ad
+  // accedere) e se questa è l'installazione di chi gestisce i feedback (la
+  // griglia del tasto destro mostra l'icona Feedback solo a lui, #583 giro 2).
+  // Chi è, e con che indirizzo, lo chiede una superficie di Filo.
+  on(MSG.AUTH_STATUS, async (msg, sender, origin) => {
     const signedIn = auth.isSignedIn();
+    const isAdmin = auth.isAdmin();
+    if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
     const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin: auth.isAdmin(), profile: auth.getProfile(), uid };
+    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid };
   });
 
   on(MSG.AUTH_SIGNIN, async () => {
