@@ -815,7 +815,10 @@ module.exports = function register(on, ctx) {
       const base = (Array.isArray(rows) && rows.length)
         ? rows
         : await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken });
-      const raw = await conLeSegnalazioniFuoriPagina(base, idToken);
+      // Le schede già in bacheca si leggono una volta sola e servono due volte:
+      // per pescare i feedback fuori pagina che ne hanno una, e per il piano.
+      const published = await publicCards({ fresh: true });
+      const raw = await conLeSegnalazioniFuoriPagina(base, idToken, published);
       const feedbacks = new Array(raw.length);
       let next = 0;
       const worker = async () => {
