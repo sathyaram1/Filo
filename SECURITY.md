@@ -180,11 +180,20 @@ La frase non la scrivi tu: la propone un modello che vede solo il sito e i
 clic, e un secondo modello la scarta se somiglia a qualcosa che hai scritto.
 
 Cosa **non** viene salvato: niente che dica chi sei. Nessun identificativo del
-dispositivo, nessuno user agent, e l'orario è arrotondato all'ora — perché
-anche solo un codice uguale su due percorsi diversi basterebbe a capire che
-sono della stessa persona. I percorsi si chiedono **un sito alla volta**: non
-esiste un elenco di tutti da scaricare, e quindi nemmeno l'elenco dei siti su
-cui qualcuno ha chiesto aiuto.
+dispositivo, nessuno user agent, e l'unica data nel percorso è il **giorno**,
+senza ora. Bastava un codice uguale su due percorsi per capire che erano della
+stessa persona, e bastava l'orologio: Filo quindi **non spedisce un percorso
+quando lo fai**. Lo tiene sul tuo computer e lo manda più tardi, a un'ora
+sorteggiata nelle ventiquattro ore successive, uno alla volta. Due percorsi
+della stessa sessione partono a ore di distanza e in ordine qualsiasi, mescolati
+a quelli di tutti gli altri.
+
+I percorsi si chiedono **un sito alla volta**: non esiste un elenco di tutti da
+scaricare, e quindi nemmeno l'elenco dei siti su cui qualcuno ha chiesto aiuto.
+
+Una cosa da sapere, perché è il prezzo dell'anonimato: siccome il percorso non
+porta niente che dica chi l'ha fatto, **non è possibile ritrovare i tuoi e
+cancellarli**. Nessuno può farlo, noi compresi.
 
 ---
 
