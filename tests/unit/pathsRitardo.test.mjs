@@ -188,12 +188,48 @@ test('la coda sopravvive alla chiusura dell’app: quello che c’era sul disco 
   }
 });
 
+// Il tetto della coda, e chi resta fuori quando è pieno.
+//
+// Prima il tetto era cento e il centunesimo faceva sparire il PIÙ VECCHIO,
+// senza dire niente: cioè quello che aveva già aspettato ore ed era il più
+// vicino a partire (#584, quarto giro). Adesso il tetto è più largo, e quando è
+// pieno a restare fuori è quello nuovo, che lo dichiara al chiamante.
+//
+// Senza il fix il secondo test è rosso: i primi della coda sparivano e
+// `collectAndSave` diceva lo stesso di averli salvati.
 test('la coda ha un tetto: un utente che chiede aiuto tutto il giorno non riempie il disco', async () => {
   Collector._setSorteggio(() => 0.5);
-  for (let i = 0; i < 130; i += 1) {
-    await raccogli(`https://esempio${i}.it/x`, 'una cosa');
+  const { MAX_IN_CODA } = Collector._internal;
+  for (let i = 0; i < MAX_IN_CODA + 30; i += 1) {
+    await Collector.collectAndSave({
+      session: sessione(`https://esempio${i}.it/x`, 'una cosa'),
+      invokeAI: invokeAIFinto('una cosa'),
+    });
   }
-  assert.ok(Collector.inCoda() <= 100, `in coda ce ne sono ${Collector.inCoda()}`);
+  assert.ok(Collector.inCoda() <= MAX_IN_CODA, `in coda ce ne sono ${Collector.inCoda()}`);
+});
+
+test('a coda piena non sparisce quello che aspettava: resta fuori quello nuovo, e si sa', async () => {
+  Collector._setSorteggio(() => 0.5);
+  const { MAX_IN_CODA } = Collector._internal;
+  for (let i = 0; i < MAX_IN_CODA; i += 1) {
+    await raccogli(`https://pieno${i}.it/x`, 'una cosa');
+  }
+  const primo = Collector._peek()[0];
+  assert.equal(Collector.inCoda(), MAX_IN_CODA);
+
+  const r = await Collector.collectAndSave({
+    session: sessione('https://uno-di-troppo.it/x', 'una cosa'),
+    invokeAI: invokeAIFinto('una cosa'),
+  });
+  assert.equal(r.saved, false, 'a coda piena non si può dire di aver salvato');
+  assert.match(String(r.reason), /piena/i);
+  assert.equal(Collector.inCoda(), MAX_IN_CODA);
+  assert.equal(Collector._peek()[0].id, primo.id, 'il più vecchio è ancora lì');
+  assert.ok(
+    !Collector._peek().some((v) => v.domain === 'uno-di-troppo.it'),
+    'quello nuovo non è entrato al posto di nessuno',
+  );
 });
 
 test('un percorso salvato mentre la coda si sta ancora leggendo dal disco non la cancella', async () => {
