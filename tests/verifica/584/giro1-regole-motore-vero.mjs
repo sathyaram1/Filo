@@ -19,10 +19,12 @@
 //   npx firebase emulators:exec --only firestore --project filo-attacco-584 \
 //     "RULES_FILE=<repo>/firestore.rules node /tmp/emu584/giro1-regole-motore-vero.mjs"
 //
-// Esito del giro 1 (2026-09-11): 25 verdi, 0 rossi (22 prima della correzione). Le regole reggono tutte e
-// 22 le strade provate — collezione intera, query di gruppo (con e senza
-// tetto), vecchio documento piatto, lista senza limite, campi del mittente
-// rimessi dentro, modifica e cancellazione.
+// Esito del giro 1 (2026-09-11): 25 verdi, 0 rossi. Le regole reggono tutte le
+// strade provate — collezione intera, query di gruppo (con e senza tetto e con
+// e senza filtro), vecchio documento piatto, lista senza limite, campi del
+// mittente rimessi dentro, modifica e cancellazione. Le prime 22 sono del giro
+// di verifica; le ultime tre sono state aggiunte con la correzione, che fa
+// filtrare al server i soli percorsi riusciti.
 import {
   initializeTestEnvironment, assertFails, assertSucceeds,
 } from '@firebase/rules-unit-testing';
