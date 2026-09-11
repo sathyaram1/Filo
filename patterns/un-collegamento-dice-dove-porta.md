@@ -1,5 +1,7 @@
 # Un collegamento dice dove porta
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Quando Filo trasforma in collegamento un indirizzo che arriva da
 fuori, la scritta che si legge deve nominare il sito dove si finisce. Un
 indirizzo si accorcia sempre dal lato del percorso, mai dal lato del sito; se è
