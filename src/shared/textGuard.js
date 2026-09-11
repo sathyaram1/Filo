@@ -791,7 +791,7 @@
   // Blocca e SPIEGA cosa ha visto, non che ha avuto un dubbio. Se la fonte non
   // si sa, la frase lo dice invece di inventarsela.
   function frasediBlocco({ origine, motivo } = {}) {
-    const da = ripulisci(origine);
+    const da = ripulisci(origine, { tieniPosta: true });
     const perche = ripulisci(motivo).replace(/^[«"']|[»"'.]$/g, '').trim();
     const inizio = da
       ? `Ho fermato un avviso nato da ${da}`
