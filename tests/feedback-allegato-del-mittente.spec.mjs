@@ -93,7 +93,7 @@ test('il documento che il mittente ha allegato dice che è partito, invece di sc
   expect(await pillola.getAttribute('title')).toMatch(/inviat/i);
 });
 
-test('chi riceve le segnalazioni l’allegato lo apre: il clic lo chiede decifrato, col suo tipo', async ({ openTab }) => {
+test('chi riceve le segnalazioni l’allegato lo apre: il clic lo chiede decifrato, col suo tipo', async ({ app, openTab }) => {
   const page = await openTab(FEEDBACK_URL);
 
   // Sessione admin finta lato pagina: qui interessa la strada che prende il
