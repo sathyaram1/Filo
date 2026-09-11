@@ -217,9 +217,13 @@ async function buildMessages(action, payload) {
 // gestisce tutto dalle Opzioni e usiamo i suoi settings così come sono.
 function withDefaults(settings) {
   const d = Defaults.get();
-  // La chiave Google Safe Browsing è SEMPRE condivisa (gestita dall'admin in
-  // "Modelli predefiniti" e propagata via Firestore): va iniettata anche quando
-  // l'utente usa i propri modelli, perché non esiste più un campo per-utente.
+  // La chiave Google Safe Browsing è SEMPRE condivisa: va iniettata anche
+  // quando l'utente usa i propri modelli, perché non esiste più un campo
+  // per-utente. Da dove arriva, dal #581: l'admin la scrive in "Modelli
+  // predefiniti" (doc Firestore config/secrets), ma quel documento è ora
+  // admin-only, quindi a un'installazione normale la chiave arriva INCASTONATA
+  // DAL BUILD (default-keys.js), non da Firestore. Chi passa di qui non tolga
+  // la strada del build credendola un doppione: è l'unica che serve tutti.
   const sec = settings.security || {};
   const security = d.safeBrowsingKey
     ? { ...sec, safeBrowse: { ...(sec.safeBrowse || {}), safeBrowsingKey: d.safeBrowsingKey } }
