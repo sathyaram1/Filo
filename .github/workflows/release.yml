@@ -159,7 +159,10 @@ jobs:
         # FILO_DEFAULT_* del job, e scrive il file
         # generato che finisce dentro l'eseguibile. La chiave OpenRouter NON
         # c'è più (#598): ogni utente riceve la sua dal server, col tetto pari
-        # ai suoi crediti; qui restano solo i servizi di contorno. Così la rotazione chiavi
+        # ai suoi crediti. Nemmeno quella di Gemini (#581): l'applicazione non
+        # la legge, quindi finiva nell'installer senza servire a niente e per
+        # giunta bastava lei a far passare il cancello qui sotto. Qui restano
+        # solo i servizi di contorno. Così la rotazione chiavi
         # dell'admin si propaga a TUTTI gli utenti al prossimo build, anche senza
         # login. Non stampa mai i valori (solo presente/assente).
         #
@@ -175,7 +178,6 @@ jobs:
           # Prima qui c'era il token dell'account robot: una credenziale piena,
           # con cui si arrivava alle chiavi API a pagamento dell'owner.
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
-          FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
           # #581: da quando config/secrets e' leggibile solo dall'admin, questa
           # e' l'unica strada per far arrivare la chiave Safe Browsing agli
@@ -320,7 +322,6 @@ jobs:
       - name: Incastona le chiavi di default nel build (bake)
         env:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
-          FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
           # #581: da quando config/secrets e' leggibile solo dall'admin, questa
           # e' l'unica strada per far arrivare la chiave Safe Browsing agli
