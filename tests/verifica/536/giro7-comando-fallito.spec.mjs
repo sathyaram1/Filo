@@ -110,14 +110,26 @@ test('un comando finito male porta dentro le parole di un estraneo e la risposta
     // Lascia finire il turno (il guardiano è asincrono).
     await page.waitForTimeout(1500);
 
+    const uscitaVista = await app.evaluate(() => globalThis.__uscita);
+    const controlliPrimoTurno = await app.evaluate(() => globalThis.__guardiano);
+
+    // L'asimmetria, per scritto: al MESSAGGIO DOPO lo stesso identico comando
+    // conta come fonte contaminata, e il controllo parte. Protetta la seconda
+    // risposta, non la prima — quella che porta le parole dell'estraneo.
+    await page.locator('#input').fill('e adesso cosa devo fare?');
+    await page.locator('#sendBtn').click();
+    await page.waitForTimeout(3000);
+    const controlliSecondoTurno = await app.evaluate(() => globalThis.__guardiano);
+
     expect(
-      await app.evaluate(() => globalThis.__uscita),
+      uscitaVista,
       'l’uscita del comando non è arrivata al modello: lo spec non prova niente',
     ).toBe(true);
 
     expect(
-      await app.evaluate(() => globalThis.__guardiano),
-      'la risposta nata dall’uscita di un comando finito male non è passata dal guardiano',
+      controlliPrimoTurno,
+      'la risposta nata dall’uscita di un comando finito male non è passata dal guardiano '
+      + `(controlli al primo turno: ${controlliPrimoTurno}, al secondo: ${controlliSecondoTurno})`,
     ).toBeGreaterThan(0);
 
     await expect(
