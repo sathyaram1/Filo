@@ -1030,6 +1030,30 @@
     return SISTEMI[platform] || SISTEMI.win32;
   }
 
+  // Un pezzo di testo scritto da un terzo, reso inerte come STRUTTURA prima di
+  // entrare in un prompt: una riga sola, niente caratteri di controllo, niente
+  // segni invisibili di direzione (con cui si nasconde del testo a occhio), una
+  // lunghezza massima. Non è un filtro sul SENSO delle parole, che a colpi di
+  // espressioni regolari non si fa: è la garanzia che quel testo resti una riga
+  // di dati e non possa aprire sezioni, turni o blocchi finti dentro la domanda
+  // che lo contiene.
+  //
+  // Sta QUI, nel modulo che tutti hanno già, perché serve alle due parti dello
+  // stesso cammino e per un pezzo è servita a una sola. In lettura appiattisce
+  // un percorso condiviso prima di metterlo nelle istruzioni dell'assistente di
+  // pagina (src/shared/paths.js). In scrittura appiattisce i nomi degli
+  // elementi — che sono le etichette dei pulsanti del sito — prima che vadano
+  // davanti ai due modelli che decidono se un percorso è anonimo: lì non c'era,
+  // e un sito poteva scrivere in un'etichetta quella che al modello sembrava
+  // una riga di istruzioni (#584, quarto giro).
+  function unaRigaDiDati(testo, max) {
+    return String(testo == null ? '' : testo)
+      .replace(/[ --​-‏  ‪-‮⁠-⁤⁦-⁩﻿]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, Number.isFinite(max) && max > 0 ? max : 4000);
+  }
+
   // Prompt di sistema. Tutti centralizzati qui per evitare prompt sparsi nel codice.
   const PROMPTS = {
     explain: ({ selection, sentence, fxLine }) =>
