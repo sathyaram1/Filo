@@ -389,14 +389,19 @@
         toggle.type = 'button';
         toggle.className = 'guard-toggle';
         toggle.textContent = 'Mostra il testo fermato';
-        toggle.addEventListener('click', () => {
-          pre.hidden = !pre.hidden;
-          toggle.textContent = pre.hidden ? 'Mostra il testo fermato' : 'Nascondi il testo fermato';
-        });
+        const mostra = (aperto) => {
+          pre.hidden = !aperto;
+          toggle.textContent = aperto ? 'Nascondi il testo fermato' : 'Mostra il testo fermato';
+        };
+        toggle.addEventListener('click', () => mostra(pre.hidden));
+        if (cercato && b.id === cercato) mostra(true);
         item.appendChild(toggle);
         item.appendChild(pre);
       }
       box.appendChild(item);
+    }
+    if (daMostrare) {
+      try { daMostrare.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) { daMostrare.scrollIntoView(); }
     }
   }
 
