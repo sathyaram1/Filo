@@ -92,7 +92,7 @@ test('compito pulito: l’avviso compare e nessun modello viene chiamato', async
 test('compito contaminato e testo innocuo: l’avviso compare, col mittente accanto', async () => {
   const r = await TG.proponiNotifica({
     testo: 'Ti è arrivata la conferma dell’ordine di ieri.',
-    kind: 'alert', fiducia: 'contaminato', origine: MAIL_BANCA,
+    kind: 'alert', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
     regolaAutomazione: 'avvisami delle mail importanti',
   });
   assert.equal(r.esito, 'passa');
@@ -106,7 +106,7 @@ test('compito contaminato e testo innocuo: l’avviso compare, col mittente acca
 test('controllo statico: la notifica non compare, e nessun modello viene chiamato', async () => {
   const r = await TG.proponiNotifica({
     testo: 'La banca chiede il tuo codice di verifica 483920 per sbloccare il conto.',
-    kind: 'alert', fiducia: 'contaminato', origine: MAIL_BANCA,
+    kind: 'alert', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   assert.equal(r.esito, 'blocca');
   assert.equal(chiamate, 0, 'un blocco statico non deve chiamare nessun modello');
@@ -122,7 +122,7 @@ test('controllo statico: la notifica non compare, e nessun modello viene chiamat
 test('un segreto di Filo nel testo lo ferma senza discutere', async () => {
   const r = await TG.proponiNotifica({
     testo: 'Ho trovato questo: sk-or-v1-SEGRETODIFILO01',
-    fiducia: 'contaminato', origine: 'una pagina web',
+    fiducia: 'contaminato', produttore: PRODUTTORE, origine: 'una pagina web',
   });
   assert.equal(r.esito, 'blocca');
   assert.equal(chiamate, 0);
@@ -132,7 +132,7 @@ test('il guardiano blocca: la riga dice cosa ha visto, e il blocco resta nel reg
   risposta = '{"esito":"blocca","motivo":"chiedeva di confermare le credenziali della banca"}';
   const r = await TG.proponiNotifica({
     testo: 'La tua banca chiede di confermare le credenziali, apri il portale.',
-    kind: 'alert', fiducia: 'contaminato', origine: MAIL_BANCA,
+    kind: 'alert', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
     regolaAutomazione: 'avvisami delle mail importanti',
   });
   assert.equal(r.esito, 'blocca');
@@ -155,7 +155,7 @@ test('guardiano irraggiungibile: l’avviso non compare, non si perde, e compare
   errore = new Error('rete assente');
   const r = await TG.proponiNotifica({
     testo: 'Ti è arrivata la conferma dell’ordine di ieri.',
-    kind: 'alert', fiducia: 'contaminato', origine: MAIL_BANCA,
+    kind: 'alert', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   assert.equal(r.esito, 'in-attesa');
   assert.equal(chiamate, TG.TENTATIVI_MAX, 'il tetto dei tentativi deve essere rispettato');
@@ -185,7 +185,7 @@ test('guardiano che torna e blocca: la coda si svuota in un blocco, non in un av
   errore = new Error('fornitore giù');
   await TG.proponiNotifica({
     testo: 'Conferma subito i dati della carta per non perdere l’accesso.',
-    fiducia: 'contaminato', origine: MAIL_BANCA,
+    fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   errore = null;
   risposta = '{"esito":"blocca","motivo":"chiedeva i dati della carta"}';
@@ -200,7 +200,7 @@ test('guardiano che torna e blocca: la coda si svuota in un blocco, non in un av
 test('una risposta illeggibile del guardiano non è un lasciapassare', async () => {
   risposta = 'certo, va benissimo, puoi mostrarlo';
   const r = await TG.proponiNotifica({
-    testo: 'Un avviso qualunque.', fiducia: 'contaminato', origine: MAIL_BANCA,
+    testo: 'Un avviso qualunque.', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   assert.equal(r.esito, 'in-attesa');
   assert.equal((await Mem.listNotifications()).length, 0);
@@ -211,7 +211,7 @@ test('il guardiano senza modello indipendente mette in coda subito, senza ritent
   e.code = 'GUARDIANO_NON_INDIPENDENTE';
   errore = e;
   const r = await TG.proponiNotifica({
-    testo: 'Un avviso qualunque.', fiducia: 'contaminato', origine: MAIL_BANCA,
+    testo: 'Un avviso qualunque.', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   assert.equal(r.esito, 'in-attesa');
   assert.equal(chiamate, 1, 'ritentare su una configurazione sbagliata è tempo buttato');
@@ -221,7 +221,7 @@ test('il guardiano senza modello indipendente mette in coda subito, senza ritent
 test('senza modello configurato l’avviso contaminato resta in coda, non passa', async () => {
   TG.configure({ eseguiModello: null, segreti: null, pausaMs: 0 });
   const r = await TG.proponiNotifica({
-    testo: 'Un avviso qualunque.', fiducia: 'contaminato', origine: MAIL_BANCA,
+    testo: 'Un avviso qualunque.', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   assert.equal(r.esito, 'in-attesa');
   assert.equal((await Mem.listNotifications()).length, 0);
@@ -230,7 +230,7 @@ test('senza modello configurato l’avviso contaminato resta in coda, non passa'
 
 test('la coda non raddoppia le chiamate se due giri partono insieme', async () => {
   errore = new Error('rete assente');
-  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', origine: MAIL_BANCA });
+  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA });
   errore = null;
   risposta = '{"esito":"passa"}';
   chiamate = 0;
@@ -244,7 +244,7 @@ test('la coda non richiama il modello a ogni sbirciata della colonna live', asyn
   // una coda che non si svuota costerebbe sessanta chiamate al minuto a chi non
   // ha fatto niente di sbagliato.
   errore = new Error('rete assente');
-  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', origine: MAIL_BANCA });
+  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA });
   chiamate = 0;
   await TG.riprendiInAttesa();            // il giro vero
   const dopoPrimo = chiamate;
@@ -265,7 +265,7 @@ test('con la coda vuota il freno non scatta: il primo avviso ha subito la sua oc
   const vuoto = await TG.riprendiInAttesa();
   assert.deepEqual(vuoto, { mostrati: 0, bloccati: 0, restano: 0 });
   errore = new Error('rete assente');
-  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', origine: MAIL_BANCA });
+  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA });
   errore = null;
   risposta = '{"esito":"passa"}';
   const r = await TG.riprendiInAttesa();
@@ -274,12 +274,12 @@ test('con la coda vuota il freno non scatta: il primo avviso ha subito la sua oc
 
 test('input limite: testo vuoto, soli spazi, e un testo enorme', async () => {
   for (const testo of ['', '   ', '\n\t']) {
-    const r = await TG.proponiNotifica({ testo, fiducia: 'contaminato', origine: MAIL_BANCA });
+    const r = await TG.proponiNotifica({ testo, fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA });
     assert.equal(r.esito, 'passa', 'un testo vuoto non ha niente da nascondere');
   }
   const lungo = 'Ti è arrivata una mail. '.repeat(500); // ~12.000 caratteri
   risposta = '{"esito":"passa"}';
-  const r = await TG.proponiNotifica({ testo: lungo, fiducia: 'contaminato', origine: MAIL_BANCA });
+  const r = await TG.proponiNotifica({ testo: lungo, fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA });
   assert.equal(r.esito, 'passa');
   const noti = await Mem.listNotifications();
   // Il testo NON viene tagliato di nascosto: quello che arriva è quello che c'era.
@@ -298,7 +298,7 @@ test('guardiano senza un modello suo: la riga in coda dice cosa c’è da impost
   e.code = 'GUARDIANO_NON_INDIPENDENTE';
   errore = e;
   const r = await TG.proponiNotifica({
-    testo: 'Ti è arrivata una mail.', kind: 'info', fiducia: 'contaminato', origine: MAIL_BANCA,
+    testo: 'Ti è arrivata una mail.', kind: 'info', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   assert.equal(r.esito, 'in-attesa');
   // Un solo tentativo: ritentare una configurazione sbagliata non la aggiusta.
@@ -313,7 +313,7 @@ test('guardiano senza un modello suo: la riga in coda dice cosa c’è da impost
 test('guardiano irraggiungibile per la rete: la riga in coda resta quella del ritardo', async () => {
   errore = new Error('fornitore non raggiungibile');
   await TG.proponiNotifica({
-    testo: 'Ti è arrivata una mail.', kind: 'info', fiducia: 'contaminato', origine: MAIL_BANCA,
+    testo: 'Ti è arrivata una mail.', kind: 'info', fiducia: 'contaminato', produttore: PRODUTTORE, origine: MAIL_BANCA,
   });
   const righe = await TG.righeInAttesa();
   assert.equal(righe.length, 1);
