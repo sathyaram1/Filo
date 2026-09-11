@@ -237,6 +237,15 @@
     // vocabolario non è caricato: questo modulo gira anche fuori dalle pagine.
     const r = await bridge({ type: 'feedback_fetch', ...payload });
     if (!r || r.ok !== true) {
+      const code = r && r.code;
+      if (code === 'not_admin' || code === 'forbidden') {
+        // Non è un guasto: è un permesso che manca. Va detto con parole sue —
+        // tradotto in "controlla la connessione" manderebbe a guardare la cosa
+        // sbagliata, e riprovare non servirebbe a niente.
+        const e = new Error('i feedback li legge solo chi li gestisce: accedi con l\'account amministratore per vederli.');
+        e.code = 'FEEDBACK_READ_DENIED';
+        throw e;
+      }
       throw new Error((r && r.error) || 'lettura dei feedback non riuscita');
     }
     return Array.isArray(r.rows) ? r.rows : [];
