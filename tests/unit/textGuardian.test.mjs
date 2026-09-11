@@ -323,3 +323,42 @@ test('guardiano irraggiungibile per la rete: la riga in coda resta quella del ri
   assert.match(righe[0].text, /aspetta il controllo/i);
   assert.ok(!/Opzioni/.test(righe[0].text), righe[0].text);
 });
+
+// ── L'indipendenza non si perde per strada (#536, giro 2) ───────────────────
+//
+// Il controllo si rifiuta di girare sullo stesso modello che ha scritto il
+// testo. Ma un testo che aspetta in coda riparte più tardi, e se chi lo rimette
+// in fila non si porta dietro CHI l'ha scritto, al secondo giro non c'è più
+// nessuno da escludere: il controllo parte sul primo modello della lista, che
+// può essere proprio quello. È successo alle risposte della chat, che finivano
+// in coda senza quel dato e ricomparivano giudicate da sé.
+
+test('un testo contaminato senza il modello che l’ha scritto non passa mai', async () => {
+  const r = await TG.controllaTesto({
+    testo: 'Ti è arrivata una mail.',
+    fiducia: 'contaminato',
+    origine: MAIL_BANCA,
+    // produttore mancante: non si sa chi ha scritto il testo.
+  });
+  assert.equal(r.esito, 'in-attesa', 'senza sapere chi ha scritto il testo non si può controllare');
+  assert.equal(chiamate, 0, 'nessun modello deve girare: non si sa chi escludere');
+  assert.equal(r.causa, globalThis.SN_TEXT_GUARD.CAUSA.CONFIGURAZIONE);
+});
+
+test('la coda si ricorda chi ha scritto il testo e lo esclude anche al secondo giro', async () => {
+  errore = new Error('fornitore non raggiungibile');
+  await TG.proponiNotifica({
+    testo: 'Ti è arrivata una mail.', kind: 'info', fiducia: 'contaminato',
+    produttore: PRODUTTORE, origine: MAIL_BANCA,
+  });
+  // Il guardiano torna: al secondo giro deve ancora sapere chi escludere.
+  errore = null;
+  const visti = [];
+  TG.configure({
+    eseguiModello: async ({ produttore }) => { visti.push(produttore); return '{"esito":"passa"}'; },
+  });
+  const esito = await TG.riprendiInAttesa({ force: true });
+  assert.equal(esito.mostrati, 1);
+  assert.deepEqual(visti, [PRODUTTORE], 'il controllo è ripartito senza sapere chi aveva scritto il testo');
+  configuraModello();
+});
