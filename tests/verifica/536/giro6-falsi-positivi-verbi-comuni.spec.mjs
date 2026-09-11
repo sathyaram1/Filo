@@ -54,7 +54,7 @@ test('i controlli automatici non fermano le parole comuni dell’italiano', asyn
     .toEqual([]);
 });
 
-test('la risposta con il codice della spedizione non deve sparire', async ({ app, shell }) => {
+test('la risposta con il codice della consegna non deve sparire', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
