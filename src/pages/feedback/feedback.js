@@ -1073,12 +1073,16 @@
           const ph = document.createElement('div');
           ph.className = 'fb-img-broken';
           // Chi ha mandato la segnalazione non rivedrà il proprio screenshot:
-          // l'allegato è cifrato con la chiave di chi lo riceve. Non è un
-          // guasto e il segnaposto non deve farlo sembrare tale. «Consegnato»
-          // e non «inviato» perché l'elenco mostra a ogni tester le
-          // segnalazioni di tutti: lo stesso segnaposto compare anche davanti
-          // all'allegato di un altro, che chi guarda non ha mandato.
-          ph.textContent = soloDestinatario ? '(allegato consegnato)' : '(immagine non disponibile)';
+          // quell'allegato lo apre solo chi riceve le segnalazioni. Non è un
+          // guasto e il segnaposto non deve farlo sembrare tale. Non è nemmeno
+          // «inviato»: l'elenco mostra a ogni tester le segnalazioni di tutti,
+          // quindi lo stesso segnaposto compare davanti all'allegato di un
+          // altro, che chi guarda non ha mandato.
+          // «Riservato», non «consegnato» (#582, giro 5): che sia arrivato Filo
+          // non l'ha guardato, e bastava un indirizzo scritto nella forma del
+          // deposito perché lo dichiarasse di un file mai caricato. Il motivo
+          // per esteso lo dà il main, una fonte sola per quella frase.
+          ph.textContent = soloDestinatario ? '(allegato riservato)' : '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
           ph.title = error || img.dataset.url || '';
           img.replaceWith(ph);
