@@ -100,6 +100,124 @@
     return v.etichetta;
   }
 
+  // ── Quello che un turno lascia scritto per DOPO ────────────────────────────
+  //
+  // Il guardiano sorveglia il testo che compare adesso. Ma un turno che ha letto
+  // roba di altri può anche lasciarne in giro perché parli più tardi, quando non
+  // lo sta guardando nessuno: l'etichetta di un timer che suona stanotte, un
+  // appunto nell'editor, una regola fissata nella memoria di Filo, lo stile con
+  // cui Filo scriverà da domani. Quelle parole arrivano all'utente con la voce
+  // di Filo in una conversazione che non ha letto niente di nessuno, dove il
+  // secondo modello non gira e non avrebbe ragione di girare: il contenuto di un
+  // estraneo, passando per lo stato di Filo, è diventato roba di Filo.
+  //
+  // Quindi ogni campo qui sotto passa dal controllo PRIMA che l'azione parta.
+  // La tabella copre TUTTE le azioni del registro, anche quelle che non hanno
+  // niente da sorvegliare (`campi: []`): una sentinella negli unit test la
+  // confronta col registro e diventa rossa se ne compare una nuova. È la parte
+  // che mancava quando la lista si teneva a mano: allora bastava aggiungere
+  // un'azione perché nessuno si accorgesse del campo nuovo.
+  //
+  // `seFermato` dice cosa resta quando il controllo non dà il via libera:
+  //   'svuota'  → il campo se ne va e l'azione si fa lo stesso (un timer che si
+  //               chiama «Timer» resta un timer utile);
+  //   'annulla' → l'azione non si fa (un appunto senza testo, una regola senza
+  //               regola, uno stile senza stile non sono niente di utile).
+  // In tutti e due i casi il testo fermato finisce nel registro degli avvisi
+  // fermati: non si perde, e si vede se il controllo sta esagerando.
+  const NIENTE_DA_SORVEGLIARE = { campi: [], seFermato: 'svuota' };
+  const CAMPI_SORVEGLIATI = {
+    // Suonano più tardi, e la loro etichetta esce anche in una notifica di
+    // sistema, con Filo ridotto a icona.
+    TIMER: { campi: ['label', 'etichetta'], seFermato: 'svuota' },
+    SVEGLIA: { campi: ['label', 'etichetta'], seFermato: 'svuota' },
+    // Resta scritto in un file dell'editor, dove l'utente lo legge come una cosa
+    // che Filo ha scritto per lui. Il contesto diventa il TITOLO del file.
+    SALVA_APPUNTO: {
+      campi: ['testo', 'text', 'contesto', 'context', 'argomento'],
+      seFermato: 'annulla',
+    },
+    // La peggiore: vale in TUTTE le conversazioni dopo, sopravvive alla chiusura
+    // dell'app, e quando la memoria viene compattata entra nei moduli permanenti.
+    SALVA_LEZIONE: { campi: ['testo', 'text', 'lezione'], seFermato: 'annulla' },
+    // Il valore di una preferenza di solito è un interruttore o una parola da un
+    // elenco, e non c'è niente da sorvegliare. Per quelle a TESTO LIBERO invece
+    // sì: «stile dell'agente» finisce nelle istruzioni di ogni conversazione
+    // futura. Chi sorveglia chiede alle preferenze quali sono (`testoLibero`),
+    // così le altre non pagano un secondo modello per un «tema: scuro».
+    IMPOSTA_PREFERENZA: {
+      campi: ['valore', 'value', 'v'], seFermato: 'annulla', soloSeTestoLibero: true,
+    },
+    // Il bottone in chat porta il titolo e i dettagli scelti dal modello, e
+    // l'evento resta nel calendario dell'utente.
+    EVENTO_CALENDARIO: {
+      campi: ['titolo', 'title', 'dettagli', 'details', 'descrizione'], seFermato: 'annulla',
+    },
+    // Etichette dei bottoni: le legge l'utente, e le sceglie il modello.
+    NAVIGA: { campi: ['label', 'etichetta'], seFermato: 'svuota' },
+    APRI_FILE: { campi: ['etichetta', 'label'], seFermato: 'svuota' },
+
+    // ── Niente da sorvegliare, e non per dimenticanza ────────────────────────
+    // Riferimenti a cose che esistono già (l'etichetta serve a TROVARE la
+    // sveglia, non a darle un nome nuovo), parametri che non sono parole, o
+    // azioni il cui testo l'utente legge e approva prima che parta.
+    CANCELLA_SVEGLIA: NIENTE_DA_SORVEGLIARE,
+    MODIFICA_SVEGLIA: NIENTE_DA_SORVEGLIARE,
+    // Il testo lo legge l'utente nel popup di conferma, per intero, prima che
+    // parta: sorvegliarlo due volte non aggiunge niente.
+    INVIA_FEEDBACK: NIENTE_DA_SORVEGLIARE,
+    // La richiesta di una ricerca non resta scritta da nessuna parte: la riga
+    // del diario di un turno contaminato non la ripete già più.
+    CERCA_WEB: NIENTE_DA_SORVEGLIARE,
+    ONBOARDING: NIENTE_DA_SORVEGLIARE,
+    CAPACITA_DETTAGLIO: NIENTE_DA_SORVEGLIARE,
+    LEGGI_FILE: NIENTE_DA_SORVEGLIARE,
+    LEGGI_DOCUMENTO: NIENTE_DA_SORVEGLIARE,
+    LEGGI_TRASPARENZA: NIENTE_DA_SORVEGLIARE,
+    PULISCI_TAB: NIENTE_DA_SORVEGLIARE,
+    CANCELLA_ARCHIVIO: NIENTE_DA_SORVEGLIARE,
+    CANCELLA_MEMORIA: NIENTE_DA_SORVEGLIARE,
+    IMPOSTA_ESTETICA: NIENTE_DA_SORVEGLIARE,
+    ESEGUI_COMANDO: NIENTE_DA_SORVEGLIARE,
+    PROXY_TAB: NIENTE_DA_SORVEGLIARE,
+    RIMUOVI_PROXY: NIENTE_DA_SORVEGLIARE,
+    RIMUOVI_PROXY_TUTTE: NIENTE_DA_SORVEGLIARE,
+    REGOLA_PROXY_DOMINIO: NIENTE_DA_SORVEGLIARE,
+    RIMUOVI_REGOLA_PROXY: NIENTE_DA_SORVEGLIARE,
+    COMANDO_FINESTRA: NIENTE_DA_SORVEGLIARE,
+    STILE_PAGINA: NIENTE_DA_SORVEGLIARE,
+    RIPRISTINA_STILE_PAGINA: NIENTE_DA_SORVEGLIARE,
+  };
+
+  // La regola di sorveglianza di un'azione. Un tipo che la tabella non conosce
+  // NON è «niente da sorvegliare»: è un'azione nuova, e finché nessuno ha deciso
+  // cosa lascia scritto la si tratta come se lasciasse scritto tutto. Sbagliare
+  // per eccesso di prudenza costa un secondo modello; sbagliare dall'altra parte
+  // costa la frase di un estraneo con la voce di Filo.
+  function sorveglianzaDellAzione(tipo) {
+    const t = String(tipo || '').toUpperCase();
+    if (Object.prototype.hasOwnProperty.call(CAMPI_SORVEGLIATI, t)) return CAMPI_SORVEGLIATI[t];
+    return { campi: null, seFermato: 'annulla', sconosciuta: true };
+  }
+
+  // I campi di QUESTA azione da far passare dal controllo, col loro valore.
+  // `campi: null` (azione sconosciuta) vuol dire ogni stringa che porta parole:
+  // niente elenco da tenere aggiornato per una cosa che ancora non esiste.
+  function campiDaSorvegliare(azione) {
+    const a = azione && typeof azione === 'object' ? azione : {};
+    const regola = sorveglianzaDellAzione(a.type);
+    const nomi = regola.campi === null
+      ? Object.keys(a).filter((k) => !k.startsWith('_') && k !== 'type' && typeof a[k] === 'string')
+      : regola.campi;
+    const out = [];
+    for (const nome of nomi) {
+      const v = a[nome];
+      if (typeof v !== 'string' || !v.trim()) continue;
+      out.push({ nome, testo: v });
+    }
+    return { campi: out, seFermato: regola.seFermato, soloSeTestoLibero: !!regola.soloSeTestoLibero };
+  }
+
   // ── Link: dove porta davvero ───────────────────────────────────────────────
 
   function hostDi(url) {
