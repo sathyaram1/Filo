@@ -728,33 +728,51 @@
   const RE_DOMINIO_NUDO = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,24}(?:\/\S*)?/gi;
   const RE_SCHEMA_NUDO = /\b[a-z][a-z0-9+.-]*:[^\s]+/gi;
 
+  // Un recapito telefonico. La truffa al telefono non ha bisogno di nessun
+  // collegamento — «chiama subito il numero verde…» è la forma più diffusa che
+  // esista — e passava intera nella riga che dovrebbe rassicurare. Contano le
+  // cifre, non la punteggiatura: nove o più, così le date (11/09/2026, otto
+  // cifre) e i prezzi restano dove sono.
+  const RE_NUMERO_LUNGO = /\+?\d[\d\s.\-()/]{6,}\d/g;
+  const RE_DATA = /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/;
+  function togliTelefoni(pezzo) {
+    return String(pezzo).replace(RE_NUMERO_LUNGO, (raw) => {
+      const t = raw.trim();
+      if (RE_DATA.test(t)) return raw;
+      return t.replace(/\D/g, '').length >= 9 ? 'un numero di telefono' : raw;
+    });
+  }
+
   // Toglie da un pezzo di frase tutto ciò che porta da qualche parte: forme con
-  // etichetta, indirizzi nudi, domini scritti senza schema. Resta detto che un
-  // indirizzo c'era.
+  // etichetta, indirizzi nudi, domini scritti senza schema, numeri di telefono.
+  // Resta detto che un recapito c'era.
   function togliIndirizzi(pezzo) {
-    return String(pezzo)
+    return togliTelefoni(String(pezzo)
       .replace(RE_LINK_MD, 'un indirizzo')
       .replace(RE_LINK_HTML, 'un indirizzo')
       .replace(RE_URL, 'un indirizzo')
       .replace(RE_DOMINIO_NUDO, 'un indirizzo')
-      .replace(RE_SCHEMA_NUDO, 'un indirizzo');
+      .replace(RE_SCHEMA_NUDO, 'un indirizzo'));
   }
 
-  function ripulisci(pezzo) {
+  // `tieniPosta` vale per la FONTE, e solo per quella: lì l'indirizzo di posta è
+  // il mittente, cioè la cosa che serve sapere, e nessuna superficie lo rende
+  // cliccabile. Dentro il MOTIVO un indirizzo di posta non è il mittente: è la
+  // destinazione scelta da chi ha dettato il motivo, e «scrivi a rimborsi@…»
+  // arrivava alla persona con la voce di Filo. Prima la regola valeva per tutti
+  // e due i pezzi, perché era stata scritta guardando solo la fonte.
+  function ripulisci(pezzo, { tieniPosta = false } = {}) {
     const grezzo = String(pezzo == null ? '' : pezzo).replace(/\s+/g, ' ').trim();
     if (!grezzo) return '';
     // Un «motivo» lungo una pagina non è un motivo: è qualcuno che sta usando
     // questa riga come megafono. Si butta intero, non si taglia a metà.
     if (grezzo.length > LIMITE_PEZZO) return '';
-    // L'indirizzo di POSTA del mittente si tiene — è la cosa che serve sapere,
-    // e nessuna superficie lo rende cliccabile — quindi la pulizia gira solo
-    // sui pezzi di frase che stanno fuori da un indirizzo di posta.
     const fuori = [];
     let da = 0;
     let m;
     RE_EMAIL.lastIndex = 0;
     while ((m = RE_EMAIL.exec(grezzo))) {
-      fuori.push(togliIndirizzi(grezzo.slice(da, m.index)), m[0]);
+      fuori.push(togliIndirizzi(grezzo.slice(da, m.index)), tieniPosta ? m[0] : 'un indirizzo di posta');
       da = m.index + m[0].length;
     }
     fuori.push(togliIndirizzi(grezzo.slice(da)));
