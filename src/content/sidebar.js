@@ -386,6 +386,13 @@
     q.className = 'sn-sidebar-feedback-q';
     q.textContent = 'Ha funzionato? Aiutami a migliorare:';
     wrap.appendChild(q);
+    // La domanda da sola sembrava un parere privato a chi scrive Filo, e
+    // invece il sì pubblica i passi dove li legge chiunque: dirlo dove si
+    // sceglie, non solo nella pagina che spiega la privacy (#584).
+    const nota = document.createElement('div');
+    nota.className = 'sn-sidebar-feedback-nota';
+    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Senza il tuo nome, senza l’ora e senza i dati della pagina.';
+    wrap.appendChild(nota);
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
 
