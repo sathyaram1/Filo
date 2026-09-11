@@ -80,8 +80,7 @@ test('la pagina avvelenata fa aprire il suo indirizzo anche quando la frase vien
     .toContainText('Ho fermato un avviso', { timeout: 40_000 });
 
   // La frase è stata fermata. E la scheda?
-  const aperte = await app.evaluate(async () => {
-    const { BrowserWindow } = require('electron');
+  const aperte = await app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
     const snap = win && win._filoTabs ? win._filoTabs.snapshot() : { tabs: [] };
     return (snap.tabs || []).map((t) => String(t.url || ''));
