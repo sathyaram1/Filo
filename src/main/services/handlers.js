@@ -2567,8 +2567,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
-  const proposal = internal
-    ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
+  const proposal = (internal || (guardia && guardia.esito !== 'passa'))
+    // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro.
+    // #536 — e se il guardiano ha fermato la risposta, il testo che resta è il
+    // suo: leggerlo come «Filo ha ammesso una mancanza» proporrebbe una
+    // segnalazione su un buco che non c'è.
+    ? null
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   if (proposal) {
     const res = await executeFiloAction(proposal, { sender });
@@ -2604,9 +2608,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
   // Se in questo turno abbiamo già proposto la segnalazione all'utente (#360),
   // quella anonima non parte: una sola segnalazione per lo stesso buco.
-  maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
+  if (!guardia || guardia.esito === 'passa') {
+    maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
+  }
   return {
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
+    // #536 — com'è andato il controllo del guardiano su questo turno (assente
+    // se il turno non era contaminato): la scheda lo usa per marcare la bolla.
+    ...(guardia ? { guardia } : {}),
     // Le note scritte a metà lavoro e il ragionamento strutturato dell'ultimo
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.

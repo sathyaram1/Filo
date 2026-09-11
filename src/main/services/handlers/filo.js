@@ -212,12 +212,50 @@ module.exports = function register(on, ctx) {
     return { ok: true, timers: list };
   });
 
-  on(MSG.FILO_GET_NOTIFICATIONS, async () => ({ ok: true, notifications: await FiloMem.listNotifications() }));
+  // #536 — insieme alle notifiche arrivano gli avvisi «in attesa del
+  // controllo»: quelli che il guardiano non è riuscito a giudicare. Sono
+  // VISIBILI (l'utente sa che c'è qualcosa che non gli è stato mostrato) ma non
+  // portano il testo in attesa, che è esattamente il testo non controllato.
+  // Ogni giro ripassa la coda: chi nel frattempo può essere giudicato diventa
+  // una notifica vera o un blocco.
+  on(MSG.FILO_GET_NOTIFICATIONS, async () => {
+    const Guardia = globalThis.SN_GUARDIA;
+    if (Guardia) Guardia.riprocessaCoda().catch(() => {});
+    const [notifications, inAttesa] = await Promise.all([
+      FiloMem.listNotifications(),
+      Guardia ? Guardia.carteInAttesa().catch(() => []) : Promise.resolve([]),
+    ]);
+    return { ok: true, notifications: [...inAttesa, ...notifications] };
+  });
 
   on(MSG.FILO_DISMISS_NOTIFICATION, async (msg) => {
+    // La × su una carta «in attesa» non archivia una notifica che non esiste:
+    // toglie l'avviso dalla coda. Se si può togliere, si deve poter togliere
+    // anche questo.
+    const coda = await FiloMem.listGuardQueue();
+    if (coda.some((e) => e.id === msg.id)) {
+      await FiloMem.removeGuardQueue(msg.id);
+      broadcastLiveUpdate();
+      const Guardia = globalThis.SN_GUARDIA;
+      const [list, inAttesa] = await Promise.all([
+        FiloMem.listNotifications(),
+        Guardia ? Guardia.carteInAttesa().catch(() => []) : Promise.resolve([]),
+      ]);
+      return { ok: true, notifications: [...inAttesa, ...list] };
+    }
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });
     broadcastLiveUpdate();
     return { ok: true, notifications: list.filter((n) => !n.dismissed) };
+  });
+
+  // #536 — il registro dei blocchi (Preferenze → Sicurezza): cosa il guardiano
+  // ha fermato, quando, da quale fonte, con che motivo. Serve a capire se
+  // grida al lupo: un guardiano che blocca troppo viene spento.
+  on(MSG.GUARD_LIST_BLOCKS, async () => ({ ok: true, blocchi: await FiloMem.listGuardBlocks() }));
+
+  on(MSG.GUARD_CLEAR_BLOCKS, async () => {
+    await FiloMem.clearGuardBlocks();
+    return { ok: true, blocchi: [] };
   });
 
   // F4 — Annulla un auto-feedback appena inviato (undo dal toast).
