@@ -2528,6 +2528,50 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     textReply = notes.pop();
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
+  // #536 — IL PUNTO DI PASSAGGIO. Il turno ha letto roba scritta da altri: la
+  // risposta non arriva all'utente finché un SECONDO modello non l'ha guardata.
+  // Passa dallo stesso guardiano delle notifiche, che applica prima i controlli
+  // statici (a rete staccata bastano quelli) e poi il giudizio indipendente.
+  if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno) && textReply) {
+    const G = globalThis.SN_TEXT_GUARD;
+    const TG = globalThis.SN_TEXT_GUARDIAN || require('./textGuardian');
+    const origine = fontiTurno.join(' e ') || 'un contenuto non fidato';
+    let verdetto;
+    try {
+      const s = await getEffectiveSettings();
+      verdetto = await TG.controllaTesto({
+        testo: textReply,
+        fiducia: fiduciaTurno,
+        origine,
+        richiestaUtente: internal ? '' : String(userMessage || ''),
+        produttore: modelForAction(s, ACTIONS.FILO_CHAT),
+      });
+    } catch (_) {
+      verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
+    }
+    if (verdetto.esito === 'blocca') {
+      try {
+        await FiloMem.addGuardBlock({
+          origine, motivo: verdetto.motivo, regola: verdetto.regola,
+          testo: textReply, fonte: internal ? '' : String(userMessage || ''),
+        });
+      } catch (_) {}
+      textReply = G.frasediBlocco({ origine, motivo: verdetto.motivo });
+    } else if (verdetto.esito === 'in-attesa') {
+      // Il controllo non si è potuto fare: la risposta NON si mostra e NON si
+      // perde. Va nella stessa coda degli avvisi e ricompare, come notifica,
+      // appena il guardiano torna.
+      try {
+        await FiloMem.addPendingNotification({
+          testo: textReply, kind: 'info', fiducia: fiduciaTurno, origine,
+          richiestaUtente: internal ? '' : String(userMessage || ''),
+          ultimoMotivo: verdetto.motivo,
+        });
+      } catch (_) {}
+      textReply = 'Ho la risposta pronta, ma il controllo di sicurezza non risponde: '
+        + 'te la mostro appena riesco a farlo.';
+    }
+  }
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
