@@ -88,13 +88,16 @@ test('Gestione: davanti allo stesso allegato dice la stessa cosa del riquadro', 
   mkdirSync('tests/.shots', { recursive: true });
   await page.screenshot({ path: 'tests/.shots/582-giro6-gestione-non-admin.png', fullPage: true });
 
-  // Lo screenshot: quello che si legge (alt) e quello che si legge passandoci
-  // sopra (title) davanti a un allegato che chi guarda non apre.
+  // Lo screenshot. Quello che si LEGGE senza passarci sopra (alt) è la frase
+  // che il giro 5 ha sostituito nel riquadro: «non disponibile» fa sembrare un
+  // guasto un allegato che è semplicemente di qualcun altro. Nel riquadro oggi
+  // si legge «(allegato riservato)»; qui è rimasta la vecchia.
   const img = page.locator('.mg-bubble-imgs img').first();
   await expect(img).toBeVisible();
   const alt = (await img.getAttribute('alt')) || '';
   const titleImg = (await img.getAttribute('title')) || '';
   expect(`${alt} ${titleImg}`, `Gestione parla di amministratori: «${alt}» / «${titleImg}»`).not.toMatch(VIETATE);
+  expect(alt, `in Gestione si legge ancora la frase che il riquadro ha smesso di dire: «${alt}»`).not.toMatch(/non disponibile/i);
   expect(`${alt} ${titleImg}`, `Gestione non dice chi apre l’allegato: «${alt}» / «${titleImg}»`).toMatch(RICHIESTA);
 
   // La pillola del documento: come nel riquadro, lo dice PRIMA del clic.
