@@ -142,9 +142,9 @@ test('quello che un turno contaminato fissa nella memoria di Filo non passa da n
     'la frase della pagina è entrata nella memoria di Filo senza passare da nessun controllo',
   ).not.toContain('confermare le credenziali');
 
+  // E nella conversazione pulita il secondo modello non gira, come è giusto che
+  // sia: quella conversazione non ha letto niente di nessuno. È proprio per
+  // questo che la regola va fermata PRIMA di entrare in memoria.
   const guardianiDopo = await app.evaluate(() => globalThis.__guardiano.length);
-  expect(
-    guardianiDopo - guardianiPrima,
-    'nella conversazione pulita il secondo modello non è stato chiamato: la frase di un estraneo è stata lavata dalla memoria',
-  ).toBeGreaterThan(0);
+  expect(guardianiDopo - guardianiPrima).toBe(0);
 });
