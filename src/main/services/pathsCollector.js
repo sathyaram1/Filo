@@ -403,7 +403,6 @@
       nonPrimaDi: ora + sorteggia(RITARDO_MIN_MS, RITARDO_MAX_MS),
     };
     coda.push(voce);
-    if (coda.length > MAX_IN_CODA) coda = coda.slice(-MAX_IN_CODA);
     await salva();
     pianifica(sorteggia(PAUSA_MIN_MS, PAUSA_MAX_MS));
     return { id: voce.id };
