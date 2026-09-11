@@ -92,11 +92,17 @@ function attachmentForbiddenHelp(opts) {
 // voluto. Quello che non va è mandargli un messaggio sui permessi di
 // amministratore, che lo spedisce a cercare un problema suo dove non c'è niente
 // da risolvere. Qui si dice invece l'unica cosa che gli serve sapere: l'allegato
-// è partito.
+// è arrivato dov'era diretto.
+//
+// La frase vale anche davanti all'allegato di UN ALTRO, e serve che valga:
+// l'elenco dei feedback mostra a ogni tester le segnalazioni di tutti, quindi lo
+// stesso segnaposto compare su roba che chi guarda non ha mandato. «Inviato»
+// lì si leggeva come «l'hai mandato tu» (#582, giro 3): «consegnato» dice come
+// sta l'allegato, non chi l'ha spedito.
 //
 // @returns {string} una riga, senza a capo (finisce in un hover).
 function attachmentNotForYouHelp() {
-  return 'allegato inviato: lo apre solo chi riceve le segnalazioni, perché viaggia cifrato con la sua chiave';
+  return 'allegato consegnato: lo apre solo chi riceve le segnalazioni, perché viaggia cifrato con la sua chiave';
 }
 
 module.exports = { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp };
