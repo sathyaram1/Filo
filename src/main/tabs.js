@@ -1657,7 +1657,7 @@ class TabManager {
     // non copriva davvero lo schermo. Riusiamo la stessa modalità del menu
     // (view a tutta finestra + fullscreen OS), marcandola come page-initiated.
     // Qui la richiesta è già passata: chi non doveva ottenerla si ferma prima,
-    // nel gestore dei permessi della sessione (#514, `installaPermessi`). Non
+    // nel gestore dei permessi della sessione (#514, services/permessiSito). Non
     // si rifiuta da qui perché quando questo evento arriva la finestra è già a
     // tutto schermo e la modalità è già stata adottata.
     wc.on('enter-html-full-screen', () => {
