@@ -239,6 +239,16 @@ module.exports = function register(on, ctx) {
     return { ok: true, blocks: await FiloMem.clearGuardBlocks() };
   });
 
+  // «Non mi interessa»: toglie dalla coda un avviso che aspetta il controllo.
+  // Senza questo, un guardiano che non torna lascerebbe una riga che non si può
+  // togliere in nessun modo.
+  on(MSG.FILO_DISMISS_PENDING_GUARD, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    await FiloMem.removePendingNotification(String(msg && msg.id || ''));
+    broadcastLiveUpdate();
+    return { ok: true };
+  });
+
   on(MSG.FILO_DISMISS_NOTIFICATION, async (msg) => {
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });
     broadcastLiveUpdate();
