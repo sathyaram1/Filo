@@ -177,11 +177,16 @@ chiunque altro — l'assistente sa già come si fa. Di quel percorso viene
 condiviso questo: **il sito**, la **pagina di partenza**, una frase che dice
 **cosa si voleva ottenere** e la **sequenza di elementi** su cui si è cliccato.
 La frase non la scrivi tu: la propone un modello che vede solo il sito e i
-clic, e un secondo modello la scarta se somiglia a qualcosa che hai scritto.
+clic, e un secondo modello scarta tutto il percorso se in quello che sta per
+uscire riconosce una persona.
 
 Cosa **non** viene salvato: niente che dica chi sei. Nessun identificativo del
 dispositivo, nessuno user agent, e l'unica data nel percorso è il **giorno**,
-senza ora. Bastava un codice uguale su due percorsi per capire che erano della
+senza ora. Dalla pagina di partenza e dai nomi degli elementi spariscono prima
+email, codici, soprannomi e numeri lunghi: di `/u/mario.rossi/ordini/847362`
+resta `/u/[ID]/ordini/[ID]`, che dice in che punto del sito si parte e non dice
+su quale conto. Un nome utente è lo stesso su più siti, e sarebbe bastato lui a
+rimettere insieme i tuoi percorsi. Bastava un codice uguale su due percorsi per capire che erano della
 stessa persona, e bastava l'orologio: Filo quindi **non spedisce un percorso
 quando lo fai**. Lo tiene sul tuo computer e lo manda più tardi, a un'ora
 sorteggiata nelle ventiquattro ore successive, uno alla volta. Due percorsi
