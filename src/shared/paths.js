@@ -63,11 +63,13 @@
   // i mittenti restano anonimi, è la scrittura che non è più diretta.
   async function submit({ domain, initialUrl, intent, steps, success, userAgent, clientId, idToken }) {
     const Safety = global.SN_PATHS_SAFETY;
+    // Senza il modulo di pulizia non si spedisce: un ripiego che manda il
+    // percorso così com'è sarebbe la porta di prima, aperta da un errore di
+    // caricamento invece che da una regola.
+    if (!Safety) throw new Error('SN_PATHS_SAFETY non caricato: percorso non inviato');
     // La stessa pulizia che rifarà il server: quello che non passa di qui non
     // vale la pena spedirlo.
-    const pulito = Safety
-      ? Safety.sanitizeSubmission({ domain, initialUrl, intent, steps, success, userAgent })
-      : { ok: true, doc: { domain, initialUrl, intent, steps, success: !!success, userAgent, clientId: '' } };
+    const pulito = Safety.sanitizeSubmission({ domain, initialUrl, intent, steps, success, userAgent });
     if (!pulito.ok) throw new Error(`percorso scartato prima dell'invio: ${pulito.reason}`);
 
     const headers = { 'Content-Type': 'application/json' };
