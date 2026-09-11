@@ -2713,6 +2713,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // risposta non arriva all'utente finché un SECONDO modello non l'ha guardata.
   // Passa dallo stesso guardiano delle notifiche, che applica prima i controlli
   // statici (a rete staccata bastano quelli) e poi il giudizio indipendente.
+  let guardBlockId = '';
   if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno) && textReply) {
     const G = globalThis.SN_TEXT_GUARD;
     const TG = globalThis.SN_TEXT_GUARDIAN || require('./textGuardian');
@@ -2816,6 +2817,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.
     notes, reasoningDetails,
+    // #536 — la voce del registro degli avvisi fermati che corrisponde a questa
+    // bolla: la scheda ci mette sopra il pulsante «Vedi cosa ho fermato».
+    ...(guardBlockId ? { guardBlockId } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),

@@ -1351,3 +1351,20 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: var(--dash-ink-soft);
   white-space: pre-wrap;
 }
+
+/* #536 — dalla bolla di una risposta fermata a quello che è stato fermato: lo
+   stesso pulsante della colonna degli avvisi, con l'aria della chat. */
+.dash-bubble .dash-bubble-vedi {
+  display: block;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dash-link);
+  text-decoration: underline;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+.dash-bubble .dash-bubble-vedi:hover { opacity: 0.7; }

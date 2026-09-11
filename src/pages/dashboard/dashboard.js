@@ -764,6 +764,26 @@
     if (cursore < s.length) el.appendChild(document.createTextNode(s.slice(cursore)));
   }
 
+  // #536 — il pulsante che porta a quello che il controllo ha fermato. È lo
+  // stesso da tutte e due le strade: la riga nella colonna degli avvisi e la
+  // bolla in chat. Finché ce l'aveva solo la colonna, chi leggeva in chat che
+  // Filo gli aveva nascosto qualcosa doveva aprirsi le Preferenze da solo e
+  // cercare la sezione.
+  function bottoneVediBlocco(bloccoId, cls) {
+    const vedi = document.createElement('button');
+    vedi.type = 'button';
+    vedi.className = cls;
+    vedi.textContent = 'Vedi cosa ho fermato';
+    vedi.title = 'Apre il registro degli avvisi fermati';
+    vedi.addEventListener('click', () => {
+      send({
+        type: MSG.OPEN_URL,
+        url: `filo://preferences/preferences.html?blocco=${encodeURIComponent(bloccoId)}#sec-guard-blocks`,
+      });
+    });
+    return vedi;
+  }
+
   function renderLiveCard({ kind, text, paused, onToggle, onDismiss, origine, guardiano, bloccoId }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
@@ -783,20 +803,7 @@
     // #536 — la strada per vedere davvero cosa è stato fermato. Apre le
     // Preferenze già sulla voce giusta del registro, invece di lasciare a chi
     // legge il compito di scoprire che quel registro esiste.
-    if (bloccoId) {
-      const vedi = document.createElement('button');
-      vedi.type = 'button';
-      vedi.className = 'dash-live-vedi';
-      vedi.textContent = 'Vedi cosa ho fermato';
-      vedi.title = 'Apre il registro degli avvisi fermati';
-      vedi.addEventListener('click', () => {
-        send({
-          type: MSG.OPEN_URL,
-          url: `filo://preferences/preferences.html?blocco=${encodeURIComponent(bloccoId)}#sec-guard-blocks`,
-        });
-      });
-      div.appendChild(vedi);
-    }
+    if (bloccoId) div.appendChild(bottoneVediBlocco(bloccoId, 'dash-live-vedi'));
     // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
     // accanto alla × e cambia icona/etichetta in base allo stato.
     if (onToggle) {
@@ -2098,6 +2105,10 @@
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
       renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending, shown });
+      // #536 — la risposta è stata fermata dal controllo: da qui si arriva a
+      // quello che è stato fermato, con lo stesso pulsante della colonna degli
+      // avvisi.
+      if (r.guardBlockId) filoBubble.appendChild(bottoneVediBlocco(r.guardBlockId, 'dash-bubble-vedi'));
       // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
       // niente da dire) non lascia una bolla vuota sotto.
       if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
