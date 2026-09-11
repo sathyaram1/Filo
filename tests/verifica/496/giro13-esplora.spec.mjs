@@ -85,8 +85,14 @@ test('ogni superficie della scheda risponde al tasto destro', async ({ openTab }
   for (const [nome, sel] of superfici) {
     const el = page.locator(sel).first();
     if (!(await el.count())) { esiti.push(`${nome}: ASSENTE`); continue; }
-    await el.click({ button: 'right' }).catch(() => {});
-    await page.waitForTimeout(180);
+    await page.evaluate(() => document.querySelectorAll('.mg-ctxmenu').forEach((m) => m.remove()));
+    await el.scrollIntoViewIfNeeded().catch(() => {});
+    const box = await el.boundingBox();
+    if (!box) { esiti.push(`${nome}: INVISIBILE`); continue; }
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.up({ button: 'right' });
+    await page.waitForTimeout(250);
     const voci = await page.evaluate(() => {
       const menu = document.querySelector('.mg-ctxmenu');
       if (!menu || menu.hidden) return null;
