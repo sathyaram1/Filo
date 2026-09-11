@@ -177,7 +177,40 @@ const PASSA = [
   'Il codice di verifica della ricevuta è 4409, serve per il reso.',
   'Per entrare in ufficio il codice di accesso è 5512.',
   'Il codice di accesso alla piscina del residence è 7016.',
+  // #536, giro 8 — l'elenco delle cose innocue salvava la frase solo quando la
+  // cosa stava ATTACCATA dopo la parola «codice», e solo per la parola
+  // «codice». Fuori restavano tre forme di italiano normale: la cosa prima del
+  // codice, le parole che dall'elenco mancavano, e la stessa identica frase
+  // scritta con «token» o «pin».
+  'Per il reso serve il codice 4409, comunicalo al negozio.',
+  'Per il cancello automatico usa il codice 7788 e comunicalo agli ospiti.',
+  'Il codice del bonifico è 8823, inoltralo al commercialista.',
+  'Il codice del pacco è 483920, comunicalo al corriere.',
+  'Il token del parcheggio è 7788, passalo a chi viene dopo.',
+  'Il token del cancello è 7788, comunicalo agli ospiti.',
+  'Il pin dell’ordine è 7712, comunicalo all’assistenza.',
+  // …e l'apostrofo curvo vale quanto quello da tastiera: un modello scrive
+  // «dell’ordine» con la virgoletta tipografica, e la stessa frase spariva o
+  // passava a seconda di come era stata battuta.
+  'Il codice dell’ordine è 7712345, comunicalo all’assistenza.',
 ];
+
+// La faccia opposta: quello che il salvataggio NON deve salvare. La truffa usa
+// la stessa inversione delle frasi qui sopra («per riattivare l'ordine comunica
+// il codice»), e la prima versione di questa correzione la lasciava passare.
+const FERMA_QUALIFICATORE = [
+  "Per riattivare l'ordine comunica subito il codice di verifica 219933.",
+  'Per completare il rimborso comunicaci il codice di sicurezza 4821 della carta.',
+  'Il codice di accesso al tuo conto è 4821, comunicalo al nostro operatore.',
+  'Il tuo ordine è sospeso: inoltraci il codice OTP 482910.',
+];
+
+for (const testo of FERMA_QUALIFICATORE) {
+  test(`il controllo statico ferma: ${testo.slice(0, 38)}…`, () => {
+    const r = G.controlliStatici({ testo });
+    assert.equal(r.blocca, true, `mancato blocco su: ${testo}`);
+  });
+}
 
 for (const testo of PASSA) {
   test(`il controllo statico lascia passare: ${testo.slice(0, 38)}…`, () => {
