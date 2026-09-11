@@ -1144,6 +1144,12 @@
     if (mgStCustom) mgStCustom.hidden = statsSel.key !== 'custom';
     if (mgStFrom && mgStFrom.value !== statsSel.from) mgStFrom.value = statsSel.from;
     if (mgStTo && mgStTo.value !== statsSel.to) mgStTo.value = statsSel.to;
+    // I due campi data li disegna il browser nella lingua del sistema, quindi
+    // su un computer non italiano scrivono mese/giorno mentre il resto della
+    // scheda scrive giorno/mese. Qui accanto la finestra VERA, col mese a
+    // parole: è la stessa che i numeri stanno usando, già raddrizzata se le due
+    // date sono al contrario.
+    if (mgStCustomEco) mgStCustomEco.textContent = statsSel.key === 'custom' ? ecoFinestra(res.range) : '';
 
     if (!mgStCreators) return;
     const conteggi = Object.fromEntries((res.creatori || []).map((c) => [c.key, c.n]));
