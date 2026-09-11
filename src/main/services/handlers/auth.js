@@ -609,19 +609,7 @@ module.exports = function register(on, ctx) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
     }
-    const byId = new Map(cards.map((c) => [String(c._id || ''), c]));
-    return rows.map((r) => {
-      const card = byId.get(String(r && r._id));
-      if (!card) return r;
-      const out = { ...r };
-      for (const f of V.USER_FIELDS) {
-        const fromDoc = (r && typeof r[f] === 'object' && r[f]) || {};
-        const fromCard = (typeof card[f] === 'object' && card[f]) || {};
-        const merged = { ...fromDoc, ...fromCard };
-        if (Object.keys(merged).length) out[f] = merged;
-      }
-      return out;
-    });
+    return V.mergeUserFields(rows, cards);
   }
 
   on(MSG.FEEDBACK_FETCH, ownerOnly(async (msg) => {
