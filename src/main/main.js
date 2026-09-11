@@ -122,6 +122,10 @@ app.whenReady().then(async () => {
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
+    // #586 — le scelte sui permessi già date ai siti (fotocamera, microfono,
+    // posizione…) tornano in memoria PRIMA che si apra una scheda: il gestore
+    // di controllo di Electron è sincrono e non può aspettare lo storage.
+    try { require('./services/permessiSito').configureFromSettings(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
     try { await require('./services/fingerprint').init(s); } catch (_) {}
