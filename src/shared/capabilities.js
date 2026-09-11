@@ -445,6 +445,12 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'guard-notifications', title: 'Un secondo modello controlla gli avvisi', category: 'settings',
+      desc: 'Quando Filo legge qualcosa scritto da altri — una mail, una pagina, un documento — e poi ti scrive un avviso o una risposta, quel testo passa prima da un secondo modello, diverso da quello che l\'ha scritto. Se il testo cerca di farti dare credenziali, codici o pagamenti, o di farti aprire un collegamento che porta altrove da dove dice, l\'avviso non compare: al suo posto trovi una riga che dice cosa è stato fermato e da dove veniva. I collegamenti dentro un avviso mostrano sempre il dominio a cui portano davvero, prima che tu li apra. Quello che è stato fermato resta scritto nel registro "Avvisi fermati" delle Preferenze.',
+      invoke: 'Funziona da solo. Il registro sta in Preferenze → "Avvisi fermati"; il modello che fa il controllo si sceglie in Opzioni → Modelli → "Guardiano degli avvisi nati da mail e pagine" e il suo consumo compare nei crediti sotto "Controlli di sicurezza".',
+      doesNot: 'Non controlla le risposte a domande che non hanno letto niente di altri: su "che ore sono" non si scomoda. Se il controllo non riesce (rete giù, fornitore non raggiungibile) l\'avviso non viene mostrato senza controllo: aspetta in coda, visibile, e compare appena il controllo riesce.',
+    },
+    {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',
       desc: 'Salva tutto quello che Filo sa di te (memorie degli agenti, pagine salvate, cronologia, appunti copiati, costi e impostazioni) in un unico file .zip, e lo ricarica quando vuoi — sullo stesso computer come backup, o su un altro per portarti dietro il tuo Filo. Le immagini copiate finiscono nell\'archivio come file veri, sfogliabili, e al ritorno tornano al loro posto. Prima di scrivere qualsiasi cosa, l\'importazione ti dice cosa contiene il file scelto (di quando è il backup, quante sezioni e quante immagini) e chiede conferma: quello che hai già non viene cancellato, le liste si uniscono senza duplicati e, dove lo stesso dato esiste da entrambe le parti, vince quello del backup. Le impostazioni ripristinate (tema, sicurezza, cookie) diventano attive subito, senza riavviare.',
       invoke: 'Impostazioni → Sicurezza, in fondo: "Esporta dati (.zip)" e "Importa dati (.zip)".',
