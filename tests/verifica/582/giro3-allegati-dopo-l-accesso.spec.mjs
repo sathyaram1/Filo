@@ -38,7 +38,11 @@ test('chi si fa riconoscere mentre guarda l’elenco vede gli allegati senza ria
   await page.locator('#refresh').click();
 
   // Prima dell'accesso: il segnaposto, che è il comportamento voluto.
-  await expect(page.locator('.fb-img-broken')).toHaveText('(allegato consegnato)', { timeout: 10_000 });
+  // La scritta è passata da «(allegato consegnato)» a «(allegato riservato)»
+  // nel giro 5, perché di un allegato che non ha aperto Filo non dichiara che
+  // sia arrivato. Quello che questa prova guarda non cambia: prima dell'accesso
+  // il segnaposto c'è, dopo l'accesso sparisce senza riaprire la pagina.
+  await expect(page.locator('.fb-img-broken')).toHaveText('(allegato riservato)', { timeout: 10_000 });
 
   // Adesso il riconoscimento arriva. Da qui in poi il canale risponde come
   // risponde a chi riceve le segnalazioni: l'allegato decifrato.
