@@ -216,3 +216,36 @@ test('un voto già sulla scheda e cancellato da chi l\'aveva dato non torna dal 
   const daPortare = plan.upsert.filter((u) => u.card.votes);
   assert.equal(daPortare.length, 0, 'la chiave c\'è già sulla scheda: niente da portare');
 });
+
+// ── La ricompensa di chi ha segnalato (#583, giro 2 di verifica) ─────────────
+//
+// L'annuncio della ricompensa gira sul computer di chi ha mandato il feedback,
+// che dei feedback veri non legge più niente. La priorità resta un giudizio
+// interno e fuori dalla scheda; la CIFRA che ne discende no, o ogni ricompensa
+// scenderebbe in silenzio alla fascia più bassa — e non si rimedia dopo,
+// perché un feedback premiato resta premiato.
+
+test('la scheda porta i crediti che spettano a chi ha segnalato, non la priorità', () => {
+  const grosso = V.cardFor({ ...PULITO, priority: 3 });
+  const minore = V.cardFor({ ...PULITO, priority: 0 });
+  assert.ok(!('priority' in grosso), 'la priorità resta fuori dalla scheda');
+  assert.equal(typeof grosso.reward, 'number');
+  assert.ok(grosso.reward > minore.reward,
+    'due segnalazioni di peso diverso non possono valere lo stesso');
+  // Una sola tabella: quella con cui il portafoglio accredita.
+  const table = globalThis.SN_CONST.CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY;
+  assert.equal(grosso.reward, table[3]);
+  assert.equal(minore.reward, table[0]);
+});
+
+test('una priorità assente o illeggibile vale la fascia di base', () => {
+  const table = globalThis.SN_CONST.CREDIT.FEEDBACK_RESOLVE_BY_PRIORITY;
+  for (const p of [undefined, null, -5, 'FENC1:ancora-cifrata', NaN]) {
+    const { priority, ...senza } = PULITO;
+    assert.equal(V.cardFor({ ...senza, priority: p }).reward, table[0],
+      `priorità "${String(p)}" deve valere la fascia di base`);
+  }
+  // Fuori scala verso l'alto si ferma alla fascia più alta, esattamente come fa
+  // il portafoglio quando accredita: una cifra fuori tabella non deve esistere.
+  assert.equal(V.cardFor({ ...PULITO, priority: 99 }).reward, table[3]);
+});
