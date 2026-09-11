@@ -304,6 +304,7 @@ module.exports = function register(on, ctx) {
       }
       const url = String((msg && msg.url) || '');
       const FB = globalThis.SN_FEEDBACK;
+      if (!FB?.isAttachmentUrl) throw new Error('SN_FEEDBACK non caricato nel main process');
       // Solo URL https del bucket feedback: evita che questo canale diventi un
       // fetch arbitrario (SSRF) pilotato dal renderer.
       if (!FB.isAttachmentUrl(url)) {
