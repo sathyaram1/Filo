@@ -323,6 +323,7 @@
     PUBLISHABLE_STATUSES,
     isFlagged,
     cardFor,
+    carryUserFields,
     sameCard,
     planSync,
     mergeUserFields,
