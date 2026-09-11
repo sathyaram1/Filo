@@ -219,10 +219,15 @@
   // (CODICE, URGENTE) e quello che è pezzo di una data o di un orario — e serve
   // comunque una parola-spia vicino, altrimenti ogni numero d'ordine sarebbe un
   // blocco.
-  const FORMA_OTP = /(?<![\w./:-])[A-Z0-9]{4,8}(?![\w/:-])/g;
-  function codiceUsaEGetta(tok) {
+  // Il lookbehind e il lookahead tengono fuori date e orari (`11/09/2026`,
+  // `2026-09-11`), dove l'anno avrebbe la stessa forma di un codice; i due punti
+  // dopo il gettone invece restano ammessi, perché «il codice è 483920:
+  // inseriscilo» è italiano normale.
+  const FORMA_OTP = /(?<![\w./:-])[A-Z0-9]{4,8}(?![\w-])/g;
+  function codiceUsaEGetta(tok, dopo) {
     const t = String(tok || '');
-    if (/^\d{4,8}$/.test(t)) return true;           // 483920
+    if (/^\//.test(String(dopo || ''))) return false; // 2026/09/11
+    if (/^\d{4,8}$/.test(t)) return true;             // 483920
     // Misto lettere+cifre: un codice vero, non una parola gridata.
     return t.length >= 6 && /\d/.test(t) && /[A-Z]/.test(t);
   }
