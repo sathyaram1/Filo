@@ -253,7 +253,15 @@
       if (!card) continue;
       wanted.add(id);
       const before = now.get(id);
-      if (!before || !sameCard(before, card)) upsert.push({ id, card });
+      // I voti e le riaperture rimasti sul documento vanno portati nella
+      // scheda: è l'unico posto da cui la bacheca li legge (vedi
+      // carryUserFields). Sono un motivo per riscrivere la scheda anche quando
+      // i campi della scheda non sono cambiati.
+      const carry = carryUserFields(fb, before);
+      const daPortare = Object.keys(carry).length > 0;
+      if (!before || !sameCard(before, card) || daPortare) {
+        upsert.push({ id, card: daPortare ? { ...card, ...carry } : card });
+      }
     }
     // Una scheda che non deve più esserci si TOGLIE: un fix riaperto o
     // riclassificato non resta in bacheca perché nessuno l'ha cancellato.
