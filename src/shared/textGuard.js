@@ -588,6 +588,9 @@
   function fraseInAttesa({ origine, causa } = {}) {
     const da = ripulisci(origine);
     const chi = da ? `Un avviso nato da ${da}` : 'Un avviso';
+    if (causa === CAUSA.PESI_APERTI) {
+      return `${chi} non ti viene mostrato. ${PERCHE_PESI_APERTI}`;
+    }
     if (causa === CAUSA.CONFIGURAZIONE) {
       return `${chi} non ti viene mostrato: al controllo di sicurezza manca un modello suo, diverso da quello che scrive le risposte. ${DOVE_SI_IMPOSTA}`;
     }
