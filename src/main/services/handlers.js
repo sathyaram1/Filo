@@ -2393,6 +2393,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
   const fileSummaries = await editorFileSummaries();
+  // #536 — e per questo i documenti sono un INGREDIENTE contaminante: quella
+  // riga per un documento corto è l'inizio del testo così com'è, quindi le
+  // parole di una mail incollata nell'editor sono davanti al modello già da
+  // «che ore sono», senza che nessuna azione le sia andate a prendere.
+  const fontiIngredienti = globalThis.SN_TEXT_GUARD.fontiDegliIngredienti({
+    documenti: fileSummaries,
+  });
   // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
   // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
   // chat normale: nessuna schermata a passi, nessun modulo.
