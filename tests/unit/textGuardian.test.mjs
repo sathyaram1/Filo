@@ -239,6 +239,39 @@ test('la coda non raddoppia le chiamate se due giri partono insieme', async () =
   assert.equal(chiamate, 1, 'due giri insieme non devono raddoppiare la spesa');
 });
 
+test('la coda non richiama il modello a ogni sbirciata della colonna live', async () => {
+  // La home chiede le notifiche anche una volta al secondo: senza un freno,
+  // una coda che non si svuota costerebbe sessanta chiamate al minuto a chi non
+  // ha fatto niente di sbagliato.
+  errore = new Error('rete assente');
+  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', origine: MAIL_BANCA });
+  chiamate = 0;
+  await TG.riprendiInAttesa();            // il giro vero
+  const dopoPrimo = chiamate;
+  assert.ok(dopoPrimo > 0);
+  const r = await TG.riprendiInAttesa();  // subito dopo: rimandato
+  assert.equal(r.rimandato, true);
+  assert.equal(chiamate, dopoPrimo, 'ha richiamato il modello prima del tempo');
+  assert.equal(r.restano, 1, 'l’avviso deve restare in coda, non sparire');
+  // Chi ha davvero una ragione per riprovare (il modello è cambiato, o lo chiede
+  // espressamente) non aspetta.
+  errore = null;
+  risposta = '{"esito":"passa"}';
+  const forzato = await TG.riprendiInAttesa({ force: true });
+  assert.equal(forzato.mostrati, 1);
+});
+
+test('con la coda vuota il freno non scatta: il primo avviso ha subito la sua occasione', async () => {
+  const vuoto = await TG.riprendiInAttesa();
+  assert.deepEqual(vuoto, { mostrati: 0, bloccati: 0, restano: 0 });
+  errore = new Error('rete assente');
+  await TG.proponiNotifica({ testo: 'Avviso.', fiducia: 'contaminato', origine: MAIL_BANCA });
+  errore = null;
+  risposta = '{"esito":"passa"}';
+  const r = await TG.riprendiInAttesa();
+  assert.equal(r.mostrati, 1, 'il giro a vuoto aveva consumato l’unica occasione');
+});
+
 test('input limite: testo vuoto, soli spazi, e un testo enorme', async () => {
   for (const testo of ['', '   ', '\n\t']) {
     const r = await TG.proponiNotifica({ testo, fiducia: 'contaminato', origine: MAIL_BANCA });
