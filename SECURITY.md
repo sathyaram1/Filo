@@ -202,8 +202,7 @@ interrogativo) e una riga che riassume l'obiettivo, riscritta da un modello e
 scartata se non è generica. Serve a tutte le installazioni, che la rileggono per
 il sito che hanno davanti, e per questo si legge senza credenziali. Da settembre
 2026 lì dentro non c'è più niente che dica da quale installazione arriva: né un
-identificativo, né il browser. Se preferisci che Filo non ci scriva affatto,
-l'assistente si può usare senza che il percorso venga tenuto da parte.
+identificativo, né il browser.
 
 La sicurezza qui non sta nel nascondere la chiave API di Firebase (che, come in
 tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
