@@ -400,12 +400,27 @@
     }
     if (!guessedIntent) return { saved: false, reason: 'intento non chiaro' };
 
-    // 2. judge: vede l'intento proposto + messaggi raw. Output: solo 1 bit.
+    // 2. judge: vede l'intento proposto + messaggi raw + QUELLO CHE VERREBBE
+    // PUBBLICATO (indirizzo di partenza e selettori, già ripuliti). Output:
+    // solo 1 bit.
+    //
+    // Prima guardava il solo intento, e il documento diceva di appoggiarsi a
+    // «due modelli che impediscono che dati raw finiscano qui dentro»: non era
+    // vero per l'indirizzo e per i selettori, che non passavano da nessuno dei
+    // due (#584, terzo giro). La pulizia per forme prende email, codici,
+    // chiocciole e numeri; un nome di persona scritto a lettere lo vede solo un
+    // modello, e questo qui girava già: guardare anche loro non costa una
+    // chiamata in più.
     let ok = false;
     try {
       const r = await invokeAI({
         action: ACTIONS.HELP_INTENT_JUDGE,
-        payload: { proposedIntent: guessedIntent, userMessages: rawUserMessages },
+        payload: {
+          proposedIntent: guessedIntent,
+          userMessages: rawUserMessages,
+          initialUrl,
+          steps: sanitizedSteps,
+        },
       });
       ok = parseJudgeOutput(r?.text);
     } catch (e) {
