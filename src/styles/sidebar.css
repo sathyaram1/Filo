@@ -302,6 +302,14 @@
   color: var(--sn-fg);
 }
 
+/* Cosa succede se rispondi di sì. Sta qui, accanto al pulsante, perché è qui
+   che l'utente sceglie: la pagina che lo spiega non l'ha mai aperta (#584). */
+.sn-sidebar-feedback-nota {
+  color: var(--sn-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .sn-sidebar-feedback-row {
   display: flex;
   gap: 6px;
