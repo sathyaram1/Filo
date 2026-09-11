@@ -125,7 +125,11 @@ test('un percorso maturo esce col giorno del giorno in cui ESCE, senza ora', asy
 // ─────────────────────────────────────────────────────────────────────────────
 // Cosa resta dentro il documento
 
-test('RILIEVO: la pagina di partenza entra nella raccolta pubblica senza nessuna redazione', async () => {
+// Era il rilievo di livello tre di questo giro: la pagina di partenza usciva
+// intera, nome utente e numero di conto compresi, mentre la stessa email e lo
+// stesso numero dentro l'elemento cliccato venivano sostituiti. Corretto nello
+// stesso giro; adesso questo test è la guardia.
+test('la pagina di partenza esce ripulita come i nomi degli elementi, non intera', async () => {
   const rete = montaRete();
   try {
     // stessa informazione in due posti: dentro il selettore e dentro l'URL
@@ -138,16 +142,15 @@ test('RILIEVO: la pagina di partenza entra nella raccolta pubblica senza nessuna
     expect(rete.scritture.length).toBe(1);
     const campi = rete.scritture[0].body.fields;
 
-    // nel selettore la redazione c'è, ed è quella che il repo dichiara
     const selettore = campi.steps.arrayValue.values[0].mapValue.fields.selector.stringValue;
     expect(selettore).toContain('[EMAIL]');
     expect(selettore).toContain('[NUMERO]');
     expect(selettore).not.toContain('847362');
 
-    // nell'URL di partenza no: nome dell'utente e numero di conto passano interi
-    const partenza = campi.initialUrl.stringValue;
-    expect(partenza, 'la pagina di partenza arriva così com’è nella raccolta pubblica')
-      .toBe('/u/mario.rossi/ordini/847362');
+    expect(campi.initialUrl.stringValue).toBe('/u/[ID]/ordini/[ID]');
+    const grezzo = JSON.stringify(rete.scritture[0].body);
+    expect(grezzo).not.toContain('mario.rossi');
+    expect(grezzo).not.toContain('847362');
   } finally { rete.smonta(); }
 });
 

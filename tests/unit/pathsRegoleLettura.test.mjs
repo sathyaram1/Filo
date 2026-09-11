@@ -167,3 +167,8 @@ test('un percorso non si modifica né si cancella dal client', () => {
   assert.match(ENTRIES.replace(/\s+/g, ' '), /allow update, delete: if false;/,
     'update e delete sui percorsi devono restare chiusi');
 });
+
+test('la data di un percorso non può stare nel futuro', () => {
+  assert.match(ENTRIES.replace(/\s+/g, ' '), /createdAt <= request\.time/,
+    'la data la scrive chi manda e decide chi sta in cima ai «percorsi già riusciti» che l’assistente si mette nelle istruzioni: senza questo tetto un percorso datato 2099 resta primo per sempre, ed è una postazione fissa per un testo messo lì apposta');
+});

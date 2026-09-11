@@ -286,3 +286,26 @@ test('un errore di Firestore in lettura si vede: non torna una lista vuota', asy
     globalThis.fetch = orig;
   }
 });
+
+// Un percorso lo scrive chiunque, e le regole contano i passi ma non li pesano:
+// trenta passi da trentamila caratteri stanno in un documento solo, e chi legge
+// se lo scarica (#584, terzo giro). Chi legge lo scarta invece di portarselo nel
+// prompt: un selettore di quella lunghezza non clicca niente, e chi l'ha scritto
+// non stava insegnando un percorso.
+test('un percorso gonfiato apposta non entra fra quelli da riusare', async () => {
+  const gonfio = fsDoc('gonfio', {
+    initialUrl: '/x', intent: 'cosa enorme', success: true,
+    steps: [{ selector: 'a'.repeat(30000), action: 'click' }],
+  });
+  const buono = fsDoc('buono', {
+    initialUrl: '/ordini', intent: 'vedere gli ordini', success: true,
+    steps: [{ selector: 'a#ordini', action: 'click' }],
+  });
+  await withFetch(() => [gonfio, buono], async () => {
+    const percorsi = await P.listByDomain('esempio.it');
+    assert.deepEqual(percorsi.map((p) => p.intent), ['vedere gli ordini'],
+      'il percorso gonfiato va scartato, gli altri restano');
+    const prompt = P.formatForPrompt(percorsi);
+    assert.ok(!prompt.includes('a'.repeat(600)));
+  });
+});

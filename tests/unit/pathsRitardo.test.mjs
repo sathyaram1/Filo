@@ -195,3 +195,31 @@ test('la coda ha un tetto: un utente che chiede aiuto tutto il giorno non riempi
   }
   assert.ok(Collector.inCoda() <= 100, `in coda ce ne sono ${Collector.inCoda()}`);
 });
+
+test('un percorso salvato mentre la coda si sta ancora leggendo dal disco non la cancella', async () => {
+  const disco = new Map();
+  disco.set('pathsOutbox', [{
+    id: 'vecchio', domain: 'vecchio-esempio.it', initialUrl: '/a', intent: 'una cosa di ieri',
+    steps: [], success: true, accodatoIl: Date.now(), nonPrimaDi: Date.now() + 60_000,
+  }]);
+  globalThis.SN_STORAGE = {
+    // il disco vero non risponde nello stesso istante: è in quella finestra che
+    // il percorso di ieri spariva
+    getRaw: async (k, d) => { await new Promise((r) => setTimeout(r, 30)); return disco.has(k) ? disco.get(k) : d; },
+    setRaw: async (k, v) => { disco.set(k, JSON.parse(JSON.stringify(v))); },
+  };
+  try {
+    Collector._reset();
+    Collector._setAuto(false);
+    Collector.init();                       // avvio: la lettura è partita
+    await raccogli('https://nuovo-esempio.it/x', 'una cosa di adesso');
+    await new Promise((r) => setTimeout(r, 60));
+
+    const domini = Collector._peek().map((v) => v.domain).sort();
+    assert.deepEqual(domini, ['nuovo-esempio.it', 'vecchio-esempio.it'],
+      'il percorso che aspettava sul disco è sparito senza dire niente');
+    assert.equal(disco.get('pathsOutbox').length, 2, 'e sul disco deve restare anche lui');
+  } finally {
+    delete globalThis.SN_STORAGE;
+  }
+});
