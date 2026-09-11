@@ -551,6 +551,7 @@
     linkIngannevole,
     urlTravestito,
     destinazioneVisibile,
+    destinazioneGiaVisibile,
     dominioRegistrabile,
     frasediBlocco,
     fraseInAttesa,
