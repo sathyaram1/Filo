@@ -279,7 +279,7 @@ async function righeInAttesa() {
     id: v.id,
     ts: v.ts,
     kind: 'attesa',
-    text: G.fraseInAttesa({ origine: v.origine }),
+    text: G.fraseInAttesa({ origine: v.origine, causa: v.ultimaCausa }),
     origine: v.origine || '',
   }));
 }
