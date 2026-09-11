@@ -588,12 +588,23 @@
   // rimandare i campi pesanti che servono solo nel dettaglio, e — con il solo
   // `__name__` — per chiedere a Firestore "cosa è cambiato?" pagando pochi
   // byte: ogni riga porta comunque `updateTime`.
-  async function list({ pageSize = 200, timeoutMs = 0, fields = null } = {}) {
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '' } = {}) {
+    // Da una pagina filo:// la lettura passa dal main, che ha il token admin
+    // (#583): qui non c'è nessuna credenziale, e la collezione non è più
+    // pubblica. Il main torna le righe già decodificate.
+    const bridge = pageBridge();
+    if (bridge) return readViaMain(bridge, { op: 'list', pageSize, timeoutMs, fields });
+    return listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken });
+  }
+
+  // La query vera e propria, senza ponti: la usano il main (col token
+  // dell'owner), gli script e la vista pubblica (che non ha bisogno di token).
+  async function listDirect(collectionId, { pageSize = 200, timeoutMs = 0, fields = null, idToken = '' } = {}) {
     // structuredQuery via runQuery, ordinamento per createdAt DESC.
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const body = {
       structuredQuery: {
-        from: [{ collectionId: COLLECTION }],
+        from: [{ collectionId }],
         orderBy: [
           { field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' },
         ],
@@ -603,9 +614,11 @@
     if (Array.isArray(fields) && fields.length > 0) {
       body.structuredQuery.select = { fields: fields.map((f) => ({ fieldPath: String(f) })) };
     }
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const opts = {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     };
     // Timeout opzionale via AbortController. Se scatta, rilanciamo un errore con
