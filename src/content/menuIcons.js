@@ -315,6 +315,9 @@
   // a redrawIconRows() per i rebuild post-drag.
   function buildGlobalIconRow(navState) {
     lastNavState = navState || null;
+    // Chi apre il menu può essere entrato (o uscito) da quando la pagina è
+    // stata caricata: si richiede, e se cambia le icone si ridisegnano.
+    refreshOwner();
     return {
       type: 'row',
       dropTarget: 'primary',
