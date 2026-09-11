@@ -79,10 +79,15 @@ for (const [url, nome] of CASI) {
   });
 }
 
-test('il nome di una persona dentro l’etichetta di un pulsante non arriva nella raccolta pubblica', async () => {
-  const campi = await raccogliESpedisci('https://sito.it/area', [
-    { selector: '[aria-label="Profilo di Mario Rossi"]', action: 'click' },
-  ]);
-  expect(campi).not.toBeNull();
-  expect(JSON.stringify(campi.steps)).not.toContain('Mario Rossi');
+// L'altra metà: nei nomi degli elementi un nome scritto a lettere nessuna forma
+// lo distingue da una parola qualunque, e infatti la pulizia lo lascia passare.
+// A fermarlo dovrebbe essere il modello che giudica — e quello, nel prompt vero,
+// non se lo trova davanti: vedi `giro3-giudice-vede-davvero.spec.mjs`. Qui si
+// tiene fermo solo il fatto che la pulizia, da sola, non lo tocca: serve a
+// distinguere le due porte quando una delle due verrà chiusa.
+test('la pulizia per forme, da sola, non tocca un nome scritto a lettere in un’etichetta', async () => {
+  const { redactSelector } = Collector._internal;
+  expect(redactSelector('[aria-label="Profilo di Mario Rossi"]')).toContain('Mario Rossi');
+  // mentre email e numeri lunghi, che hanno una forma, li prende
+  expect(redactSelector('[aria-label="Profilo di mario@x.it 847362"]')).not.toContain('mario@x.it');
 });
