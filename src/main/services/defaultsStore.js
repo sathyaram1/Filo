@@ -28,7 +28,7 @@
 // come Bearer): le regole Firestore accettano la PATCH solo se è un admin.
 
 const auth = require('../auth/google-auth');
-const { getBuildKeys } = require('../config/default-keys');
+const { getBuildKeys, getBuildSafeBrowsingKey } = require('../config/default-keys');
 // Registra SN_FEEDBACK_THREAD su globalThis: da lì viene l'elenco dei gruppi di
 // mittente dell'auto-approvazione, che deve restare uno solo (#446).
 require('../../shared/feedbackThread.js');
