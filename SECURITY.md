@@ -189,14 +189,14 @@ La sicurezza qui non sta nel nascondere la chiave API di Firebase (che, come in
 tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
 **interamente nelle regole** descritte sopra, che sono il vero confine.
 
-E proprio perché quella chiave è pubblica e l'accesso è aperto a qualunque
-account Google, **"aver fatto il login" non è un permesso**: registrarsi non
-costa niente, quindi una regola che chiede solo di essere autenticati lascia
-passare chiunque. I documenti che contengono credenziali condivise — le chiavi
-dei servizi AI che Filo usa per conto tuo — sono leggibili **solo dagli
-amministratori**. Le chiavi che fanno funzionare Filo appena installato non
-vengono scaricate dal tuo computer: arrivano già dentro l'applicazione, messe
-lì quando la versione viene costruita, e si aggiornano con l'aggiornamento
+Da qui segue una cosa che non è ovvia: **aver fatto il login non è un
+permesso**. La chiave è pubblica e per entrare basta un account Google
+qualunque, quindi una regola che chiede solo di essere autenticati lascia
+passare chiunque, anche chi Filo non l'ha mai installato. Le credenziali
+condivise, cioè le chiavi dei servizi AI che Filo usa per conto tuo, le legge
+**solo un amministratore**. Le chiavi che fanno funzionare Filo appena
+installato non le scarica il tuo computer. Arrivano già dentro l'applicazione,
+messe lì quando la versione viene costruita, e si rinnovano con l'aggiornamento
 automatico.
 
 ---
