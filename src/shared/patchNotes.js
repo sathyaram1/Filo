@@ -19,7 +19,7 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
-        'Quando dici all\'assistente di pagina che ha funzionato, il percorso che Filo condivide non porta più niente che dica chi l\'ha fatto: né un codice, né l\'ora, e dall\'indirizzo della pagina spariscono email, numeri di conto e nome utente. Su quel che resta — indirizzo e nomi dei pulsanti — decide un modello: se ci riconosce una persona, il percorso non parte. Filo lo tiene sul tuo computer e lo manda più tardi, a un\'ora sorteggiata, e chi legge può chiedere solo i percorsi di un sito per volta. Prima bastava una richiesta per scaricarli tutti e rimettere in fila quelli della stessa persona su siti diversi.',
+        'Quando dici all\'assistente di pagina che ha funzionato, il percorso che Filo condivide non porta più niente che dica chi l\'ha fatto: né un codice, né l\'ora, e dall\'indirizzo della pagina spariscono email, numeri di conto e nome utente. Su quello che resta, l\'indirizzo e i nomi dei pulsanti, decide un modello. Se ci riconosce una persona, il percorso non parte. Filo lo tiene sul tuo computer e lo manda più tardi, a un\'ora sorteggiata, e chi legge può chiedere solo i percorsi di un sito per volta. Prima bastava una richiesta per scaricarli tutti e rimettere in fila quelli della stessa persona su siti diversi.',
         'Sotto la domanda «Ha funzionato?» ora c\'è scritto cosa succede se rispondi: i passi di quel percorso aiutano chi userà Filo sullo stesso sito.',
       ],
     },
