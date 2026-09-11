@@ -62,9 +62,11 @@ test('l’assistente laterale risponde con le parole della pagina e non passa da
       };
     }, { trappola: TRAPPOLA });
 
-    // Come lo apre l'utente: Alt+H sulla pagina.
-    await page.locator('#paragraph').click();
-    await page.keyboard.press('Alt+h');
+    // Come lo apre l'utente: tasto destro sulla pagina → «Aiuto».
+    await page.locator('h1').click({ button: 'right' });
+    await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
+    await page.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+    await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
     const input = page.locator('.sn-sidebar-input textarea');
     await expect(input).toBeVisible({ timeout: 10_000 });
     await input.fill('cosa dice questa pagina?');
