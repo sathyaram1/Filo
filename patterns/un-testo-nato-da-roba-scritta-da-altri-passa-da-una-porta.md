@@ -113,6 +113,42 @@ dichiarato — `true` per guardarlo, `false` per dire che non sono parole (una
 chiave API non compare mai in chiaro, e ogni controllo statico la fermerebbe: lì
 la difesa è la conferma di livello 2, non il guardiano del testo).
 
+## «Avviso» e «risposta» non sono i posti, sono due dei posti
+
+Il quinto giro di verifica ha trovato la porta dove nessuno guardava, e non era
+un campo dimenticato: era una superficie intera. Il **saluto della nuova scheda**
+e i **suggerimenti** accanto li scrive un modello a cui diamo, fra gli altri
+ingredienti, i titoli delle pagine che l'utente ha salvato e i riassunti dei suoi
+file. Il titolo di una pagina lo sceglie chi l'ha scritta. Bastava salvare quella
+pagina una volta perché dettasse la prima cosa che l'utente legge a ogni scheda
+nuova, con la voce di Filo, due centimetri sopra la riga «ho fermato un avviso».
+E il suggerimento è peggio della frase: è un bottone di cui lo stesso modello
+sceglie etichetta e indirizzo, e si apriva con un clic solo.
+
+La lezione non è «aggiungere la home all'elenco». È che l'elenco va scritto al
+contrario: non «quali superfici controllo», ma **quali testi verso l'utente
+nascono da un modello che aveva davanti parole di estranei**. Quando ci si
+chiede quello, la home è ovvia. Regola pratica per la prossima superficie: se un
+modello riceve nel prompt un titolo, un riassunto o un testo che viene da fuori,
+e quello che scrive finisce sotto gli occhi dell'utente, passa da qui.
+
+Due scelte concrete che valgono per chi aggiunge la prossima superficie:
+
+- **una chiamata sola per tutto il blocco**, non una per riga. Saluto e bottoni
+  sono la stessa cosa, e mostrarne metà dopo un blocco è peggio che non mostrarne
+  niente. Il testo che il guardiano giudica contiene anche **dove porta** ogni
+  bottone: è la parte che fa il danno.
+- **il mestiere del produttore viaggia col controllo**, non solo il suo nome.
+  L'interruttore «solo modelli a pesi aperti» sceglie un sostituto diverso a
+  seconda del mestiere, quindi ricostruire la catena del produttore col mestiere
+  sbagliato dà la lista sbagliata da escludere, e il guardiano può finire proprio
+  sul modello da cui doveva stare alla larga. È il danno del terzo giro, che
+  rientrerebbe da qui.
+
+Non passano ancora da questa porta «spiega», «traduci» e i riassunti di una
+scheda: il feedback che ha creato il guardiano li mette per iscritto fra le cose
+che verranno dopo. Sono testo nato da una pagina, quindi prima o poi ci passano.
+
 ## I due modi di sbagliare, e solo uno si vede
 
 Se il guardiano lascia passare un inganno, nessuno se ne accorge finché non fa
@@ -196,9 +232,21 @@ chiunque, ed è il modo più rapido di farsi spegnere.
 
 Quello che distingue una truffa non è che un codice esista: è che qualcuno
 chieda di **comunicarlo, inoltrarlo, digitarlo**. Quindi o una parola
-inequivocabile (otp, monouso, «codice di verifica»), oppure la parola generica
+inequivocabile (otp, monouso, usa e getta), oppure la parola generica
 più la richiesta di passarlo — e un qualificatore innocuo chiude comunque la
-questione. Stessa storia per le carte: Luhn da solo non basta, un numero lungo su
+questione.
+
+E «inequivocabile» va preso alla lettera: vuol dire che la parola nomina la
+**natura** del codice, non la sua funzione. «Di accesso», «di ingresso», «di
+sblocco», «di attivazione», «di conferma» nominano una funzione, e in italiano
+quella funzione ce l'hanno soprattutto le cose fisiche: il portone, il cancello,
+la cassetta delle chiavi, la SIM, la prenotazione. Tenerle fra le parole forti
+faceva sparire la mail di chi affitta casa, cioè una delle mail per cui il
+guardiano esiste. E la cosa che il codice apre non sta attaccata alla parola
+«codice»: sta dopo la funzione («il codice di attivazione della SIM»). Attaccata
+alla frase del codice, però — una parola concreta trovata a caso lì intorno non
+basta, o «comunica il codice 483920 per sbloccare la consegna» diventerebbe la
+mail di un corriere. Stessa storia per le carte: Luhn da solo non basta, un numero lungo su
 dieci lo passa per caso, e serve anche il prefisso di un circuito vero.
 
 Il qualificatore innocuo va riconosciuto **con l'articolo in mezzo**, che in

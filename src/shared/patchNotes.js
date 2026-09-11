@@ -25,6 +25,7 @@
         'E vale anche per quello che quel turno lascia scritto per dopo: il nome di un timer, un appunto, una cosa che Filo memorizza, lo stile con cui ti scrive. Una pagina non può più far entrare le proprie frasi nella memoria di Filo e fartele ripetere domani, in una conversazione che non ha letto niente di nessuno.',
         'Un indirizzo che Filo ha trovato dentro quello che ha appena letto non si apre più da solo: prima te lo mostra e ti chiede se andare. Il resto della navigazione resta immediato come prima.',
         'Se hai acceso «solo modelli a pesi aperti» e quel controllo finirebbe sullo stesso modello che scrive le risposte, Filo si ferma e ti dice dove sistemarlo: un testo controllato da chi l\'ha scritto non è controllato.',
+        'Passa dal controllo anche il saluto della nuova scheda e i bottoni che ci trovi accanto: li scrive Filo guardando le pagine che hai salvato, e il titolo di una pagina lo sceglie chi l\'ha scritta. I bottoni nati così ti chiedono conferma prima di aprire un indirizzo, dicendoti dove porta.',
       ],
     },
     {
