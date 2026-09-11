@@ -19,6 +19,7 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
+        'Quello che scrivi in un feedback lo leggono solo Filo e chi lo lavora: testo, indirizzo della pagina e screenshot non sono raggiungibili da nessun altro. Pubblici restano i miglioramenti già usciti, che vedi in bacheca: il titolo, la versione e la frase scritta per chi li aveva segnalati.',
       ],
     },
     {
