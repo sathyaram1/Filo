@@ -154,20 +154,31 @@ test('la pagina di partenza esce ripulita come i nomi degli elementi, non intera
   } finally { rete.smonta(); }
 });
 
-test('RILIEVO: nei selettori la redazione conosce solo email e numeri lunghi, un nome passa', async () => {
+// L'altra porta dello stesso rilievo: nei nomi degli elementi la pulizia per
+// forme prende email, codici, chiocciole e numeri lunghi, ma un nome scritto a
+// lettere («Profilo di Mario Rossi») nessuna regola lo distingue dal testo di un
+// pulsante. Quello lo ferma il giudice, che adesso guarda anche i selettori e
+// l'indirizzo: qui si controlla che se li trovi davvero davanti.
+test('il giudice vede i nomi degli elementi e la pagina di partenza, non solo la frase', async () => {
   const rete = montaRete();
+  const visti = [];
   try {
-    await raccogli(
-      'https://esempio.it/area',
-      'aprire il profilo',
-      [{ selector: '[aria-label="Profilo di Mario Rossi"]', action: 'click' },
-        { selector: 'button[title="Esci, Mario"]', action: 'click' }],
-    );
-    await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
-    const passi = rete.scritture[0].body.fields.steps.arrayValue.values
-      .map((v) => v.mapValue.fields.selector.stringValue);
-    expect(passi[0]).toContain('Mario Rossi');
-    expect(passi[1]).toContain('Mario');
+    await Collector.collectAndSave({
+      session: {
+        rawUrl: 'https://esempio.it/area',
+        rawSteps: [{ selector: '[aria-label="Profilo di Mario Rossi"]', action: 'click' }],
+        rawUserMessages: ['aprimi il profilo'],
+        success: true,
+      },
+      invokeAI: async ({ action, payload }) => {
+        visti.push({ action, payload });
+        if (action === ACTIONS.HELP_INTENT_GUESS) return { text: 'aprire il profilo' };
+        return { text: '{"ok":true}' };
+      },
+    });
+    const giudice = visti.find((v) => v.action === ACTIONS.HELP_INTENT_JUDGE);
+    expect(giudice.payload.initialUrl).toBe('/area');
+    expect(JSON.stringify(giudice.payload.steps)).toContain('Profilo di Mario Rossi');
   } finally { rete.smonta(); }
 });
 
