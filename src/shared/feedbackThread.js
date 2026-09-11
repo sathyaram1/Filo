@@ -319,13 +319,19 @@
   // scritto, che è più VECCHIO di quello che lo precede. Quindi un marcatore
   // più vecchio del turno prima è una citazione.
   //
-  // La tolleranza assorbe il fatto che i due istanti li scrivono due orologi
-  // diversi (il server per i turni di Filo, il computer di chi risponde per i
-  // suoi): qualche minuto di scarto fra macchine è normale, ore no. Il prezzo,
-  // nei casi rari in cui due turni veri arrivano a cavallo di uno scarto più
-  // grande, è un turno in MENO: è il verso giusto in cui sbagliare, perché un
-  // turno inventato sposta i numeri della scheda «Statistiche feedback» e chi
-  // guarda non ha modo di accorgersene.
+  // ⚠️ I DUE TIPI DI TURNO LI SCRIVONO DUE OROLOGI DIVERSI, E NON SI CONFRONTANO.
+  // I turni di Filo li appende il server; quelli dell'utente il computer di chi
+  // risponde, che può avere l'orologio storto di giorni (succede: una
+  // segnalazione su questo stesso ramo arriva datata nel futuro). Mescolare le
+  // due catene vorrebbe dire che un solo orologio avanti fa sparire tutti i
+  // turni veri che vengono dopo. Quindi ogni tipo si confronta con l'ultimo
+  // della SUA specie: dentro ciascuna l'ordine è garantito da chi appende.
+  //
+  // La tolleranza assorbe i pochi minuti di scarto fra due scritture della
+  // stessa parte. Il prezzo, quando due turni veri arrivano a cavallo di uno
+  // scarto più grande, è un turno in MENO: è il verso giusto in cui sbagliare,
+  // perché un turno inventato sposta i numeri della scheda «Statistiche
+  // feedback» e chi guarda non ha modo di accorgersene.
   const MARKER_SKEW_MS = 5 * 60 * 1000;
 
   // L'istante scritto dentro un marcatore, in millisecondi, o NaN se non si
