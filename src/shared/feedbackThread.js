@@ -575,14 +575,15 @@
   // allegati restano dove sono) perché il risultato torna su Firestore.
   function rawBlocks(notes) {
     const lines = String(notes || '').split('\n');
+    const opens = turnOpeners(lines);
     const blocks = [];
     let current = [];
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i];
-      // Stessa regola di splitNotes: un marcatore citato in mezzo a un
-      // capoverso non è l'inizio di un turno, e il taglio non deve spezzare
-      // lì il messaggio di chi l'ha citato.
-      if (markerOpensTurn(lines, i) && (USER_TURN_RE.test(line) || MODEL_TURN_RE.test(line))) {
+      // Stessa regola di splitNotes: un marcatore citato non è l'inizio di un
+      // turno, e il taglio non deve spezzare lì il messaggio di chi l'ha
+      // citato.
+      if (opens[i]) {
         blocks.push(current.join('\n'));
         current = [line];
       } else {
