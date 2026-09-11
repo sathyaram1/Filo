@@ -143,6 +143,16 @@ const PASSA = [
   // circuito vero, un ISBN o un numero di pratica diventava «una carta».
   'Il codice ISBN del libro è 9788804707233.',
   'Il numero della pratica è 9788804707231.',
+  // #536, giro 3 — la metà gemella della lezione di «codice». Accanto alla
+  // parola «password» un gruppo di quattro cifre è quasi sempre un anno, un
+  // prezzo o un'ora, e ogni articolo su come scegliere una password ne cita
+  // uno: bloccarli voleva dire far sparire la risposta a una delle ricerche
+  // più comuni che esistano.
+  'Dal 2025 le password da sole non bastano più: conviene la verifica in due passaggi.',
+  'Nel 2024 sono trapelate milioni di password da un forum.',
+  'Articolo del 2023: come scegliere una password sicura.',
+  'Il gestore di password che consigliano costa 3990 lire al mese.',
+  'Entro il 2026 dovrai cambiare la password del portale.',
 ];
 
 for (const testo of PASSA) {
