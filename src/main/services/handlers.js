@@ -2591,7 +2591,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           testo: textReply, fonte: internal ? '' : String(userMessage || ''),
         });
       } catch (_) {}
-      textReply = G.frasediBlocco({ origine, motivo: verdetto.motivo });
+      // Nella colonna degli avvisi al registro ci si arriva con un pulsante; qui
+      // no, quindi la strada si dice a parole: chi ha appena letto che Filo gli
+      // ha nascosto qualcosa vorrà vedere cos'era.
+      textReply = `${G.frasediBlocco({ origine, motivo: verdetto.motivo })}\n\n${G.DOVE_SONO_I_BLOCCHI}`;
     } else if (verdetto.esito === 'in-attesa') {
       // Il controllo non si è potuto fare: la risposta NON si mostra e NON si
       // perde. Va nella stessa coda degli avvisi e ricompare, come notifica,
@@ -2601,10 +2604,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           testo: textReply, kind: 'info', fiducia: fiduciaTurno, origine,
           richiestaUtente: internal ? '' : String(userMessage || ''),
           ultimoMotivo: verdetto.motivo,
+          ultimaCausa: verdetto.causa || '',
         });
       } catch (_) {}
-      textReply = 'Ho la risposta pronta, ma il controllo di sicurezza non risponde. '
-        + 'Te la mostro appena riesco.';
+      textReply = G.fraseControlloFermo({ causa: verdetto.causa });
     }
   }
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
