@@ -132,8 +132,12 @@ test('un comando finito male porta dentro le parole di un estraneo e la risposta
       + `(controlli al primo turno: ${controlliPrimoTurno}, al secondo: ${controlliSecondoTurno})`,
     ).toBeGreaterThan(0);
 
+    // Le bolle di Filo, non il blocco delle attività: lì dentro c'è l'uscita del
+    // comando così com'è, ed è giusto che ci sia (l'ha chiesta l'utente, e si
+    // legge come uscita di un comando, non come una frase di Filo). Quello che
+    // non deve arrivare è la stessa frase DETTA DA FILO.
     await expect(
-      page.locator('#bubbles'),
+      page.locator('.dash-bubble-filo'),
       'la frase dettata dal file letto da un comando finito male è arrivata all’utente con la voce di Filo',
     ).not.toContainText('per non perdere l’accesso');
   });
