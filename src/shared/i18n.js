@@ -523,6 +523,12 @@
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato: in "Privacy massima" dovrai rifare il login a ogni avvio.',
+    // #536 — registro dei blocchi del guardiano.
+    options_guard_title: 'Avvisi fermati',
+    options_guard_desc: 'Quando Filo legge una mail o una pagina e poi ti scrive qualcosa, un secondo modello guarda quel testo prima che tu lo veda. Qui trovi quello che ha fermato: se ferma cose che andavano bene, dimmelo.',
+    options_guard_empty: 'Niente da mostrare: nessun avviso è stato fermato.',
+    options_guard_clear: 'Svuota l\u2019elenco',
+    options_guard_clear_confirm: 'Tolgo tutte le voci da questo elenco. Gli avvisi fermati restano fermati: sparisce solo lo storico.',
     options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:

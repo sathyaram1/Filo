@@ -805,3 +805,30 @@ section:has(#dictList) .sn-spell-add-row {
   font-size: 12px;
   padding: 2px 8px;
 }
+
+/* #536 — registro degli avvisi fermati dal guardiano (pagina Sicurezza).
+   Ogni voce è testo inerte: quando, da dove, perché, e un estratto di quello
+   che stava per comparire. Niente link e niente pulsanti dentro la voce —
+   quella roba è stata fermata, non va riproposta con un clic. */
+.sn-page .sn-guard-block {
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sn-page .sn-guard-block-head {
+  font-size: 12px;
+  color: var(--sn-text-muted, var(--sn-text));
+  opacity: 0.75;
+}
+.sn-page .sn-guard-block-reason { font-size: 13px; }
+.sn-page .sn-guard-block-excerpt {
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 2px solid var(--sn-border);
+  padding-left: 8px;
+}

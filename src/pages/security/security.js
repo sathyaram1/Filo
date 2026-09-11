@@ -49,6 +49,10 @@
     $('sec-safebrowse-sandbox-label').textContent = I18n.t('options_security_safebrowse_sandbox');
     $('sec-safebrowse-sandbox-desc').textContent = I18n.t('options_security_safebrowse_sandbox_desc');
     $('sec-safebrowse-key-managed').textContent = I18n.t('options_security_safebrowse_key_managed');
+    $('sec-guard-title').textContent = I18n.t('options_guard_title');
+    $('sec-guard-desc').textContent = I18n.t('options_guard_desc');
+    $('sec-guard-empty').textContent = I18n.t('options_guard_empty');
+    $('sec-guard-clear').textContent = I18n.t('options_guard_clear');
     $('sec-cookies-title').textContent = I18n.t('options_cookies_title');
     $('sec-cookies-desc').textContent = I18n.t('options_cookies_desc');
     $('cookie-mode-manual-label').textContent = I18n.t('options_cookies_mode_manual');
@@ -287,6 +291,68 @@
     return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
   }
 
+  // ── #536: registro dei blocchi del guardiano ─────────────────────────────
+  // Cosa Filo ha fermato prima che arrivasse all'utente, quando, da quale
+  // fonte e perché. L'estratto del testo fermato resta TESTO INERTE: si legge,
+  // non si clicca e non si riapre — è la roba che il guardiano ha fermato.
+  let guardBlocks = [];
+
+  function fmtQuando(ts) {
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString();
+  }
+
+  function descriviFonte(fonte) {
+    const G = window.SN_GUARDIANO;
+    if (G) return G.descriviFonte(fonte);
+    return (fonte && fonte.nome) || 'una fonte esterna';
+  }
+
+  function renderGuardBlocks() {
+    const list = $('sec-guard-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const vuoto = !guardBlocks.length;
+    $('sec-guard-empty').style.display = vuoto ? '' : 'none';
+    $('sec-guard-clear').style.display = vuoto ? 'none' : '';
+    for (const b of guardBlocks) {
+      const li = document.createElement('li');
+      li.className = 'sn-guard-block';
+      li.dataset.regola = b.regola || 'guardiano';
+      const testa = document.createElement('div');
+      testa.className = 'sn-guard-block-head';
+      testa.textContent = `${fmtQuando(b.ts)} — ${descriviFonte(b.fonte)}`;
+      const motivo = document.createElement('div');
+      motivo.className = 'sn-guard-block-reason';
+      motivo.textContent = b.motivo || '';
+      const estratto = document.createElement('div');
+      estratto.className = 'sn-guard-block-excerpt sn-muted';
+      estratto.textContent = b.estratto || '';
+      li.append(testa, motivo, estratto);
+      list.appendChild(li);
+    }
+  }
+
+  async function loadGuardBlocks() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.GUARD_LIST_BLOCKS });
+      guardBlocks = (r && r.ok && Array.isArray(r.blocchi)) ? r.blocchi : [];
+    } catch (_) { guardBlocks = []; }
+    renderGuardBlocks();
+  }
+
+  async function clearGuardBlocks() {
+    const testo = I18n.t('options_guard_clear_confirm');
+    const ok = window.SN_CONFIRM_UI
+      ? await window.SN_CONFIRM_UI.confirm({ title: I18n.t('options_guard_title'), text: testo, okLabel: I18n.t('options_guard_clear') })
+      : window.confirm(testo);
+    if (!ok) return;
+    try { await chrome.runtime.sendMessage({ type: MSG.GUARD_CLEAR_BLOCKS }); } catch (_) {}
+    guardBlocks = [];
+    renderGuardBlocks();
+  }
+
   function renderWhitelist() {
     const list = $('cookie-wl-list');
     list.innerHTML = '';
@@ -451,6 +517,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    loadGuardBlocks();
+    $('sec-guard-clear').addEventListener('click', clearGuardBlocks);
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);

@@ -156,6 +156,10 @@
     [A.TTS]: 'kokoro',
     [A.SAFEBROWSE_JUDGE]: 'deepseek-flash',
     [A.GEOBLOCK_CLASSIFY]: 'deepseek-flash',
+    // #536 — il guardiano gira su un modello DIVERSO da quello della chat
+    // (`FILO_CHAT` qui sopra è deepseek/gemma): non è un dettaglio della
+    // fixture, è il senso della funzione, e una sentinella lo verifica.
+    [A.GUARDIAN_CHECK]: 'gemma-lite, deepseek-flash',
     [A.FEEDBACK_TITLE]: 'deepseek-flash',
     [A.EDITOR_TITLE]: 'deepseek-flash, gemma-lite',
     [A.EDITOR_SUMMARY]: 'deepseek-flash, gemma-lite',
