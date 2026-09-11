@@ -101,6 +101,13 @@
   }
 
   // Upload diretto a Firebase Storage. Ritorna { url, name }.
+  //
+  // L'upload è una CREAZIONE e basta: dal #582 le regole non concedono la
+  // sovrascrittura, quindi un nome già esistente (che l'uuid rende comunque
+  // improbabile) torna 403 invece di calpestare l'allegato di qualcun altro.
+  // L'URL che torna porta il download token: da quando la lettura del bucket è
+  // riservata all'owner, quel token È il permesso di leggere l'allegato — va
+  // trattato come il contenuto, non come un indirizzo qualunque.
   async function uploadImage(blob) {
     const name = attachmentPath(blob.type || 'png');
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
