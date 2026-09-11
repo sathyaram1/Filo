@@ -846,6 +846,18 @@
     send({ type: MSG.OPEN_URL, url });
   });
 
+  // #536 — stessa cosa per i collegamenti dentro un avviso della colonna live:
+  // aprono una scheda nuova, e accanto hanno sempre scritto dove portano.
+  liveEl.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a.dash-live-link');
+    if (!a || !liveEl.contains(a)) return;
+    const url = a.getAttribute('href');
+    if (!url) return;
+    e.preventDefault();
+    e.stopPropagation();
+    send({ type: MSG.OPEN_URL, url });
+  });
+
   // ===== Blocco di attività della domanda (#521) =====
   // UNO per messaggio dell'utente, sopra la risposta finale. Raccoglie tutto
   // ciò che Filo fa prima di rispondere, anche su più turni automatici
