@@ -185,8 +185,13 @@ dispositivo, nessuno user agent, e l'unica data nel percorso è il **giorno**,
 senza ora. Dalla pagina di partenza e dai nomi degli elementi spariscono prima
 email, codici, soprannomi e numeri lunghi: di `/u/mario.rossi/ordini/847362`
 resta `/u/[ID]/ordini/[ID]`, che dice in che punto del sito si parte e non dice
-su quale conto. Un nome utente è lo stesso su più siti, e sarebbe bastato lui a
-rimettere insieme i tuoi percorsi. Bastava un codice uguale su due percorsi per capire che erano della
+su quale conto. Sparisce anche il nome utente scritto a lettere quando si
+riconosce da dove sta — dopo una parola come `/utente/` o `/in/`, o in testa
+all'indirizzo sui siti dove lì ci va sempre una persona — e quello che nessuna
+di queste regole vede lo guarda il secondo modello, che davanti ha l'indirizzo
+e i nomi degli elementi come uscirebbero e blocca tutto il percorso se ci
+riconosce qualcuno. Un nome utente è lo stesso su più siti, e sarebbe bastato
+lui a rimettere insieme i tuoi percorsi. Bastava un codice uguale su due percorsi per capire che erano della
 stessa persona, e bastava l'orologio: Filo quindi **non spedisce un percorso
 quando lo fai**. Lo tiene sul tuo computer e lo manda più tardi, a un'ora
 sorteggiata nelle ventiquattro ore successive, uno alla volta. Due percorsi
