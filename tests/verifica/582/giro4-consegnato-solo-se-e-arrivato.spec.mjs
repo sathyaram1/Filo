@@ -72,3 +72,32 @@ test('la pillola di un allegato che punta fuori non dice «consegnato»', async 
     `la pillola di un allegato che sta fuori dal deposito di Filo si dichiara «${nota}»`,
   ).not.toContain('consegnato');
 });
+
+// La seconda porta della stessa causa: due righe più in alto, nella stessa
+// bolla, c'è lo screenshot. Anche quello è un indirizzo scritto da chi ha
+// mandato la segnalazione, e anche lì il segnaposto lo dichiara consegnato
+// senza aver mai guardato dove punta.
+test('il segnaposto di uno screenshot che punta fuori non dice «consegnato»', async ({ openTab }) => {
+  const page = await openTab(RIQUADRO);
+  await page.evaluate((fuori) => {
+    window.SN_FEEDBACK.list = async () => [{
+      _id: 'consegnato-img-582',
+      status: 'open',
+      name: 'Aggiornamento per i tester',
+      text: 'la schermata del problema',
+      url: 'https://esempio.invalid/x',
+      images: [fuori],
+      files: [],
+      createdAt: '2026-09-11T10:00:00Z',
+    }];
+  }, 'https://sito-di-un-estraneo.invalid/schermata.png');
+  await page.locator('#refresh').click();
+  await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 10_000 });
+  const segnaposto = page.locator('.fb-img-broken').first();
+  await expect(segnaposto).toBeVisible({ timeout: 10_000 });
+  const scritta = ((await segnaposto.textContent()) || '').trim();
+  expect(
+    scritta,
+    `il segnaposto di uno screenshot che sta fuori dal deposito di Filo si dichiara «${scritta}»`,
+  ).not.toContain('consegnato');
+});
