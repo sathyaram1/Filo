@@ -4,55 +4,57 @@
 // quelle porte un controllo di provenienza: una pagina di un sito visitato
 // bussa e si sente dire di no prima ancora che si guardi chi è loggato. Il
 // giro 2 l'ha esteso alle porte che scrivono, il giro 3 alle altre porte del
-// proprietario.
+// proprietario. Restavano, nello stesso canale, porte senza quel controllo:
 //
-// Nello STESSO canale, e per due di loro nello stesso file, restano porte senza
-// quel controllo:
+//   · chi sei, che rispondeva con l'indirizzo email e l'identificativo
+//     dell'account di chi sta usando Filo;
+//   · esci, con cui un sito visitato faceva uscire dall'account chi sta usando
+//     Filo (da lì in poi la posta delle segnalazioni non si apre e la bacheca
+//     di tutti smette di aggiornarsi);
+//   · vota, ritira il voto e riapri a pagamento, che non sono del proprietario
+//     ma di chiunque abbia fatto l'accesso: con una sessione aperta un sito
+//     visitato votava al posto suo, gli cancellava il voto e gli spendeva i
+//     crediti per riaprire un fix, aprendo a suo nome una segnalazione col
+//     testo che voleva;
+//   · l'elenco di chi usa Filo e il regalo di crediti, i due comandi del
+//     proprietario che vivono nella chat della dashboard.
 //
-//   · chi sei — un sito visitato chiede lo stato dell'accesso e riceve
-//     ok: true con l'indirizzo email, l'identificativo e il «sì, qui c'è un
-//     amministratore». È esattamente la domanda a cui le porte chiuse si
-//     rifiutano di rispondere (rispondono identico che l'amministratore ci sia
-//     o no): la risposta la dà la porta accanto, e senza credenziali;
-//   · esci — un sito visitato fa uscire dall'account chi sta usando Filo. Su
-//     quella macchina la posta delle segnalazioni smette di aprirsi e la
-//     bacheca di tutti smette di aggiornarsi finché non rientra;
-//   · vota, ritira il voto, riapri a pagamento — le tre porte della bacheca.
-//     Sono quelle di un utente qualunque, non del proprietario: chiedono solo
-//     «hai una sessione?», e con una sessione aperta un sito visitato vota al
-//     posto suo, gli cancella il voto e gli spende i crediti per riaprire un
-//     fix, aprendo a suo nome una segnalazione col testo che vuole.
+// Dopo la correzione del giro 4: uscire, votare, ritirare, riaprire, elencare e
+// regalare rispondono «rifiutato per provenienza». «Chi sei» invece risponde
+// ancora, perché serve a due pezzi di Filo che girano DENTRO le pagine dei siti
+// (la griglia del tasto destro, che mostra l'icona Feedback solo a chi i
+// feedback li gestisce, e il pannello del red-team, che invita ad accedere), ma
+// senza identità: niente email, niente nome, niente identificativo.
 //
-// La prova è ROSSA oggi: dice cosa dovrebbe rispondere ognuna di quelle porte a
-// un sito visitato. Diventa verde quando il controllo di provenienza arriva
-// anche lì. La guardia permanente delle porte già chiuse resta
-// `tests/feedback-canali-origine.spec.mjs`.
+// La guardia permanente è `tests/feedback-canali-origine.spec.mjs`.
 
 import { test, expect } from './../../fixtures/electron.mjs';
 
 const SITO = { tab: { id: 1, url: 'https://evil.example/pagina' }, url: 'https://evil.example/pagina' };
+const PAGINA_DI_FILO = { url: 'filo://board/board.html' };
 
-test('un sito visitato non scopre chi sta usando Filo, e non lo fa uscire', async ({ app, shell }) => {
+test('un sito visitato non scopre CHI sta usando Filo, e non lo fa uscire', async ({ app, shell }) => {
   void shell; // attende il boot: il dispatcher dev'essere montato
 
-  const out = await app.evaluate(async (_electron, S) => {
+  const out = await app.evaluate(async (_electron, { sito, filo }) => {
     const MSG = globalThis.SN_MSG.MSG;
-    const bussa = (m) => globalThis.SN_HANDLE_MESSAGE(m, S);
     return {
-      chiSei: await bussa({ type: MSG.AUTH_STATUS }),
-      esci: await bussa({ type: MSG.AUTH_SIGNOUT }),
+      chiSeiDalSito: await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_STATUS }, sito),
+      chiSeiDaFilo: await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_STATUS }, filo),
+      esci: await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_SIGNOUT }, sito),
     };
-  }, SITO);
+  }, { sito: SITO, filo: PAGINA_DI_FILO });
 
-  // La porta che dice chi sei non deve rispondere a un sito visitato: la sua
-  // risposta contiene l'email, l'identificativo Firebase e se su questa
-  // macchina c'è chi gestisce i feedback — cioè la mappa per sapere dove
-  // bussare.
-  expect(out.chiSei.ok, 'un sito visitato riceve lo stato dell\'accesso').toBe(false);
-  expect(String(out.chiSei.code || '')).toBe('forbidden');
-  expect(out.chiSei.profile, 'il profilo non deve nemmeno comparire').toBeUndefined();
-  expect(out.chiSei.isAdmin, 'un sito non deve sapere se qui c\'è un amministratore').toBeUndefined();
-  expect(out.chiSei.uid).toBeUndefined();
+  // L'identità non attraversa il confine: un sito visitato non impara né
+  // l'indirizzo email né l'identificativo dell'account.
+  expect(out.chiSeiDalSito.profile, 'il profilo di chi usa Filo finisce a un sito visitato').toBeUndefined();
+  expect(out.chiSeiDalSito.uid, 'l\'identificativo dell\'account finisce a un sito visitato').toBeUndefined();
+  expect(Object.keys(out.chiSeiDalSito).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+
+  // Da una pagina di Filo la risposta resta intera: è da lì che le pagine
+  // mostrano chi è entrato.
+  expect(out.chiSeiDaFilo.ok).toBe(true);
+  expect(Object.keys(out.chiSeiDaFilo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
 
   expect(out.esci.ok, 'un sito visitato fa uscire dall\'account chi sta usando Filo').toBe(false);
   expect(String(out.esci.code || '')).toBe('forbidden');
@@ -68,6 +70,8 @@ test('un sito visitato non vota, non ritira voti e non spende i crediti di chi u
       vota: await bussa({ type: MSG.BOARD_CAST_VOTE, id: 'fb-uno', vote: 'works' }),
       ritira: await bussa({ type: MSG.BOARD_CLEAR_VOTE, id: 'fb-uno' }),
       riapri: await bussa({ type: MSG.BOARD_REOPEN, id: 'fb-uno', text: 'scritto da un sito' }),
+      elencoUtenti: await bussa({ type: MSG.OWNER_LIST_USERS }),
+      regalaCrediti: await bussa({ type: MSG.OWNER_GIFT_CREDITS, email: 'chiunque@example.com', amount: 1000 }),
     };
   }, SITO);
 
@@ -75,7 +79,7 @@ test('un sito visitato non vota, non ritira voti e non spende i crediti di chi u
     expect(r.ok, `${porta}: un sito visitato non deve ottenere niente`).toBe(false);
     expect(
       String(r.code || ''),
-      `${porta}: il rifiuto arriva perché qui non c'è nessuna sessione, non per la provenienza — su una macchina dove qualcuno è entrato la richiesta passerebbe`,
+      `${porta}: il rifiuto deve arrivare per PROVENIENZA, non perché qui manca una sessione o un amministratore`,
     ).toBe('forbidden');
   }
 });
