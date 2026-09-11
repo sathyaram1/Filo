@@ -149,8 +149,15 @@ async function controllaTesto({
     } catch (e) {
       ultimoErrore = (e && (e.message || e.code)) || 'errore';
       // Il guardiano non ha un modello indipendente su cui girare: ritentare non
-      // cambia niente, e lasciar passare sarebbe peggio. Coda subito.
-      if (e && e.code === 'GUARDIANO_NON_INDIPENDENTE') { causa = G.CAUSA.CONFIGURAZIONE; break; }
+      // cambia niente, e lasciar passare sarebbe peggio. Coda subito. Il perché
+      // lo dice chi ha provato a chiamarlo: «manca un modello» e «l'interruttore
+      // dei pesi aperti li ha fatti coincidere» si aggiustano in due posti
+      // diversi, e una frase sola per tutt'e due manda l'utente a cercare il
+      // guasto dove non c'è.
+      if (e && e.code === 'GUARDIANO_NON_INDIPENDENTE') {
+        causa = e.causa || G.CAUSA.CONFIGURAZIONE;
+        break;
+      }
     }
     if (i + 1 < TENTATIVI_MAX && _pausaMs) await dormi(_pausaMs);
   }
