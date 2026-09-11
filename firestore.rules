@@ -482,8 +482,8 @@ service cloud.firestore {
       allow create, update: if (isAdmin() || isRoutine())
         && request.resource.data.keys().hasOnly(
              ['name', 'seq', 'subSeq', 'status', 'statusPublic', 'resolvedInVersion',
-              'createdAt', 'resolvedAt', 'clientIdTag', 'userNote', 'publishedAt',
-              'votes', 'reopenRequests'])
+              'createdAt', 'resolvedAt', 'clientIdTag', 'userNote', 'reward',
+              'publishedAt', 'votes', 'reopenRequests'])
         // `status` solo fra quelli CHIUSI: un feedback aperto (e a maggior
         // ragione uno fermato dalla sicurezza) non ha una scheda pubblica.
         && request.resource.data.get('status', 'done') in ['done', 'verified', 'archived', 'ignored']
