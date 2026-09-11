@@ -199,6 +199,11 @@ await prova('documento passivo (application/pdf): OK', 'ok',
   carica(fuori, nome().replace(/\.png$/, '.pdf'), PNG, 'application/pdf'));
 await prova('blob cifrato (application/octet-stream): OK', 'ok',
   carica(fuori, nome().replace(/\.png$/, '.bin'), PNG, 'application/octet-stream'));
+// I due tipi che `npm run feedback:apri` dichiara e che il bucket respingeva.
+await prova('tabella .tsv (text/tab-separated-values): OK', 'ok',
+  carica(fuori, nome().replace(/\.png$/, '.tsv'), PNG, 'text/tab-separated-values'));
+await prova('configurazione .yaml (application/x-yaml): OK', 'ok',
+  carica(fuori, nome().replace(/\.png$/, '.yaml'), PNG, 'application/x-yaml'));
 await prova('allegato da 4 MB tondi, cifrato (col preambolo sfora di poco): OK', 'ok',
   carica(fuori, nome().replace(/\.png$/, '.bin'), new Uint8Array(4 * 1024 * 1024 + 90), 'application/octet-stream'));
 
