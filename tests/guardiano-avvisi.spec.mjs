@@ -190,6 +190,9 @@ test('il registro degli avvisi fermati si legge, e si svuota, dalle Preferenze',
   await expect(voci).toHaveCount(1, { timeout: 8_000 });
   await expect(voci.first()).toContainText('collegamento');
   await expect(voci.first().locator('.guard-meta')).toContainText('Banca Esempio');
+  // Chi l'ha fermato si legge in italiano: le sigle interne restano nel codice.
+  await expect(voci.first().locator('.guard-meta')).toContainText('fermato da un controllo automatico');
+  await expect(voci.first()).not.toContainText('link-ingannevole');
 
   // Il testo fermato si può leggere — è l'unico modo di capire se il guardiano
   // grida al lupo — ma parte chiuso e non è cliccabile.

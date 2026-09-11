@@ -285,3 +285,38 @@ test('input limite: testo vuoto, soli spazi, e un testo enorme', async () => {
   // Il testo NON viene tagliato di nascosto: quello che arriva è quello che c'era.
   assert.equal(noti[0].text.length, lungo.length);
 });
+
+// ── Un modello che manca non è la rete che va e viene (#536, giro 1) ────────
+//
+// Il guardiano rifiuta di girare sullo stesso modello che ha scritto il testo,
+// ed è giusto. Ma allora la riga che l'utente legge deve dirlo: se è la rete
+// aspettare basta, se è la configurazione aspettare non serve a niente e ogni
+// risposta nata da una ricerca resta in coda per sempre.
+
+test('guardiano senza un modello suo: la riga in coda dice cosa c’è da impostare', async () => {
+  const e = new Error('Il guardiano degli avvisi è impostato sullo stesso modello che scrive i testi.');
+  e.code = 'GUARDIANO_NON_INDIPENDENTE';
+  errore = e;
+  const r = await TG.proponiNotifica({
+    testo: 'Ti è arrivata una mail.', kind: 'info', fiducia: 'contaminato', origine: MAIL_BANCA,
+  });
+  assert.equal(r.esito, 'in-attesa');
+  // Un solo tentativo: ritentare una configurazione sbagliata non la aggiusta.
+  assert.equal(chiamate, 1);
+
+  const righe = await TG.righeInAttesa();
+  assert.equal(righe.length, 1);
+  assert.match(righe[0].text, /modello/i, righe[0].text);
+  assert.match(righe[0].text, /Opzioni/, righe[0].text);
+});
+
+test('guardiano irraggiungibile per la rete: la riga in coda resta quella del ritardo', async () => {
+  errore = new Error('fornitore non raggiungibile');
+  await TG.proponiNotifica({
+    testo: 'Ti è arrivata una mail.', kind: 'info', fiducia: 'contaminato', origine: MAIL_BANCA,
+  });
+  const righe = await TG.righeInAttesa();
+  assert.equal(righe.length, 1);
+  assert.match(righe[0].text, /aspetta il controllo/i);
+  assert.ok(!/Opzioni/.test(righe[0].text), righe[0].text);
+});

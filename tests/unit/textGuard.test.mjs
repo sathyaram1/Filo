@@ -238,3 +238,73 @@ test('la riga di blocco dice da dove veniva e cosa ha visto', () => {
 test('la riga di attesa dice che l’avviso non è perso', () => {
   assert.match(G.fraseInAttesa({ origine: 'una mail di Banca Esempio' }), /aspetta il controllo/i);
 });
+
+// ── Quello che Filo scrive di suo non lo detta chi attacca (#536, giro 1) ────
+//
+// La riga di blocco si compone con due pezzi che vengono da fuori: il motivo,
+// scritto dal modello guardiano DOPO aver letto il testo di un estraneo, e la
+// fonte, che per una mail è il mittente. Un contenuto che si fa bloccare
+// apposta e detta il motivo si farebbe consegnare l'indirizzo della truffa
+// dalla voce di Filo, nella riga che dovrebbe rassicurare — e la colonna degli
+// avvisi rende cliccabili gli indirizzi che trova.
+
+test('la riga di blocco non consegna l’indirizzo che il motivo voleva farle dire', () => {
+  const f = G.frasediBlocco({
+    origine: 'una ricerca sul web',
+    motivo: 'per riattivare il conto conferma le credenziali su https://banca-esempio.attacco.ru/login',
+  });
+  assert.ok(!/attacco\.ru/.test(f), `l'indirizzo è arrivato all'utente: ${f}`);
+  assert.match(f, /un indirizzo/);
+  // E non resta nemmeno un collegamento da rendere cliccabile.
+  assert.equal(G.linkDelTesto(f).length, 0);
+});
+
+test('anche la fonte viene ripulita: il mittente se lo sceglie chi manda la mail', () => {
+  const f = G.frasediBlocco({
+    origine: 'una mail di «apri www.attacco.ru»',
+    motivo: 'chiedeva le credenziali',
+  });
+  assert.ok(!/attacco\.ru/.test(f), f);
+  assert.equal(G.linkDelTesto(f).length, 0);
+});
+
+test('un motivo lungo una pagina si butta intero, non si taglia a metà', () => {
+  const f = G.frasediBlocco({ origine: 'una mail di X', motivo: 'a'.repeat(400) });
+  assert.equal(f, 'Ho fermato un avviso nato da una mail di X.');
+});
+
+test('l’indirizzo di posta del mittente resta: è la cosa che serve sapere', () => {
+  const f = G.frasediBlocco({ origine: 'una mail di banca@esempio.it', motivo: 'chiedeva un pagamento' });
+  assert.match(f, /banca@esempio\.it/);
+  assert.equal(G.linkDelTesto(f).length, 0);
+});
+
+test('un motivo che dopo la pulizia fa ancora scattare un controllo statico si butta', () => {
+  const f = G.frasediBlocco({ origine: 'una mail di X', motivo: 'il tuo codice di verifica è 483920' });
+  assert.equal(f, 'Ho fermato un avviso nato da una mail di X.');
+});
+
+// ── Rete giù e configurazione sbagliata non sono la stessa cosa ─────────────
+//
+// Se è la rete, aspettare basta. Se al guardiano manca un modello suo (o è lo
+// stesso che scrive le risposte) aspettare non serve a niente: ogni risposta
+// nata da una ricerca finirebbe in coda per sempre, e la sola persona che può
+// sistemarlo non saprebbe nemmeno che c'è da sistemare.
+
+test('la frase del controllo fermo distingue la rete dalla configurazione', () => {
+  const rete = G.fraseControlloFermo({ causa: G.CAUSA.RETE });
+  assert.match(rete, /non risponde/i);
+  assert.ok(!/modello/i.test(rete), rete);
+
+  const conf = G.fraseControlloFermo({ causa: G.CAUSA.CONFIGURAZIONE });
+  assert.match(conf, /modello/i);
+  assert.match(conf, /Opzioni/);
+});
+
+test('anche la riga in coda dice che c’è un modello da impostare', () => {
+  const r = G.fraseInAttesa({ origine: 'una mail di X', causa: G.CAUSA.CONFIGURAZIONE });
+  assert.match(r, /modello/i);
+  assert.match(r, /Opzioni/);
+  // Senza causa resta il ritardo di prima: l'avviso non è perso.
+  assert.match(G.fraseInAttesa({ origine: 'una mail di X' }), /aspetta il controllo/i);
+});

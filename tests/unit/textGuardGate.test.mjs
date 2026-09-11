@@ -106,3 +106,34 @@ test('il registro dei blocchi ha i suoi messaggi, e non sono aperti alle pagine 
   assert.match(blocco.slice(0, 400), /isFilo\(origin\)/,
     'il registro dei blocchi è leggibile da una pagina web');
 });
+
+// ── Le porte richiuse al giro 1 di verifica (#536) ──────────────────────────
+
+test('la fiducia del turno guarda anche quello che è ancora in conversazione', () => {
+  const h = readFileSync(join(SRC, 'main', 'services', 'handlers.js'), 'utf8');
+  assert.match(h, /fontiContaminantiInContesto\(/,
+    'la chat torna a considerare pulito un messaggio nato da una pagina letta prima');
+  // La funzione deve contare sulle azioni che hanno DAVVERO prodotto
+  // un'osservazione: sono quelle il cui contenuto rientra nel contesto.
+  const corpo = h.slice(h.indexOf('function fontiContaminantiInContesto'));
+  assert.match(corpo.slice(0, 800), /_output/,
+    'la contaminazione non è più legata al contenuto che rientra nel contesto');
+});
+
+test('gli avvisi non si leggono, né si tolgono, da una pagina web', () => {
+  const f = readFileSync(join(SRC, 'main', 'services', 'handlers', 'filo.js'), 'utf8');
+  for (const msg of ['FILO_GET_NOTIFICATIONS', 'FILO_DISMISS_NOTIFICATION']) {
+    const blocco = f.slice(f.indexOf(`MSG.${msg}`));
+    assert.match(blocco.slice(0, 300), /isFilo\(origin\)/,
+      `${msg} è aperto alle pagine web: gli avvisi sono roba dell'utente`);
+  }
+});
+
+test('il collegamento dentro un avviso ha un colore suo anche sul tema scuro', () => {
+  const css = readFileSync(join(SRC, 'pages', 'dashboard', 'dashboard.css'), 'utf8');
+  assert.match(css, /\.dash-live-link[\s\S]{0,200}color:\s*var\(--dash-link\)/,
+    'il collegamento di un avviso non usa più il colore dedicato');
+  const scuro = css.slice(css.indexOf('[data-sn-theme="dark"]'));
+  assert.match(scuro.slice(0, 600), /--dash-link:/,
+    'sul tema scuro il collegamento torna blu scuro su fondo scuro');
+});
