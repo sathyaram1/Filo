@@ -215,7 +215,13 @@ module.exports = function register(on, ctx) {
   // Le notifiche, più le righe «in attesa del controllo» (#536). Leggerle è
   // anche il momento buono per ridare una possibilità alla coda: se il guardiano
   // è tornato raggiungibile, l'avviso rimasto indietro compare adesso.
-  on(MSG.FILO_GET_NOTIFICATIONS, async () => {
+  // Gli avvisi sono roba dell'utente — con il giro della posta saranno i
+  // riassunti delle sue mail e l'indirizzo di chi gliele manda — e li legge solo
+  // Filo: un sito che sta visitando non deve poterli chiedere, né poterli
+  // togliere di mezzo. Il canale è lo stesso che usano i content script delle
+  // pagine web, quindi senza questa riga bastava chiederli.
+  on(MSG.FILO_GET_NOTIFICATIONS, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     // Senza aspettarlo: la colonna non deve restare ferma mentre il guardiano
     // ci prova. Quando finisce, se qualcosa è cambiato, la colonna si aggiorna
     // da sé (broadcastLiveUpdate).
