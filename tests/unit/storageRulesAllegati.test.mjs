@@ -196,6 +196,20 @@ test('i content-type ammessi sono solo quelli passivi, allineati al gate del cli
     const sotto = tipo.split('/')[1];
     assert.match(corpo, new RegExp(`image/\\([^)]*\\b${sotto}\\b`), `il client accetta ${tipo} ma le regole no`);
   }
+
+  // Stessa simmetria con l'altro mittente: `npm run feedback:apri` dichiara il
+  // tipo dall'estensione, e diceva di usare «la stessa allowlist delle
+  // storage.rules». Non era vero: `.tsv` e `.yaml` partivano e venivano
+  // respinti dal bucket, con l'allegato perso e il feedback aperto lo stesso.
+  for (const nomeFile of ['a.txt', 'a.log', 'a.md', 'a.markdown', 'a.json', 'a.csv', 'a.tsv', 'a.yaml', 'a.yml', 'a.pdf']) {
+    const tipo = mimeDiAllegato(nomeFile);
+    assert.ok(tipo, `${nomeFile}: lo script non gli dà un tipo`);
+    assert.ok(corpo.includes(`'${tipo}'`), `feedback:apri manda ${nomeFile} come ${tipo}, ma le regole lo rifiutano`);
+  }
+  for (const nomeImmagine of ['a.png', 'a.jpg', 'a.jpeg', 'a.gif', 'a.webp', 'a.bmp']) {
+    const sotto = mimeDiAllegato(nomeImmagine).split('/')[1];
+    assert.match(corpo, new RegExp(`image/\\([^)]*\\b${sotto}\\b`), `feedback:apri manda ${nomeImmagine} come image/${sotto}, ma le regole lo rifiutano`);
+  }
 });
 
 // ── Il nome dell'allegato: le regole e l'app devono dire la stessa cosa ──────
