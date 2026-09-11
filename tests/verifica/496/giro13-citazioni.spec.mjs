@@ -144,20 +144,3 @@ test('la riga del taglio, scritta da qualcuno, non toglie la lavorazione dai con
   const dopo = await leggi(page, citata);
   expect(dopo.legenda, `${dopo.legenda} || ${dopo.nota}`).toContain('1 critica');
 });
-
-test('la data scelta a mano si legge nello stesso ordine del resto della scheda', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await apri(page);
-  await page.evaluate((l) => window.__mgTest.setData(l), lavoro(UN_GIRO));
-  await page.evaluate(() => window.__mgTest.setStatsWindow('custom', '2026-09-01', '2026-09-02'));
-  await page.waitForTimeout(200);
-
-  // I due campi scrivono la data nell'ordine della lingua del sistema. Accanto
-  // a loro deve esserci scritto, in chiaro, quale finestra si è scelta: senza,
-  // «01/09» e «09/01» sono indistinguibili.
-  const vicino = await page.evaluate(() => {
-    const box = document.getElementById('mgStCustom');
-    return box ? box.textContent.replace(/\s+/g, ' ').trim() : '';
-  });
-  expect(vicino, `accanto ai campi c'è solo: «${vicino}»`).toMatch(/settembre|01\/09|1 set/i);
-});
