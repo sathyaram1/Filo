@@ -365,7 +365,6 @@ module.exports = function register(on, ctx) {
           name: String(f.name || '').slice(0, 200),
           explanation: resolutionExplanation(f),
           credits,
-          priority,
         });
       }
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
