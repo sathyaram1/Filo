@@ -927,9 +927,17 @@
   // ---- voti di verifica (DB4) ----
   // Substrato dei voti "funziona / non funziona" che la board utente (DC*) e
   // l'archiviazione automatica a punteggio (DC3) leggono. I voti vivono in un
-  // campo `votes` (map) SUL documento feedback: chiave = uid del votante, valore
-  // = { vote, at, credibilitySnapshot }. Un voto per utente, cambiabile.
+  // campo `votes` (map): chiave = uid del votante, valore = { vote, at,
+  // credibilitySnapshot }. Un voto per utente, cambiabile.
   // Le Firestore rules vincolano ogni utente a scrivere SOLO la propria chiave.
+  //
+  // #583: stanno sulla SCHEDA PUBBLICA (`feedback-public/{id}`), non più sul
+  // documento feedback. È lì che la bacheca li legge — il documento vero, da
+  // quando non è più pubblico, chi vota non lo può nemmeno aprire — e tenerli in
+  // due posti avrebbe voluto dire due copie che divergono. Chi fa i conti dal
+  // lato dell'owner (archiviazione a punteggio) li riceve dal main, che unisce
+  // la scheda al documento quando lo legge. I voti storici già scritti sul
+  // documento restano leggibili da lì.
   const VOTE_WORKS = 'works';
   const VOTE_BROKEN = 'broken';
   const VOTE_VALUES = [VOTE_WORKS, VOTE_BROKEN];
