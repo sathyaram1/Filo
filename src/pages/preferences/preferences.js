@@ -327,6 +327,82 @@
     } catch (_) {}
   }
 
+  // ── Sezione "Avvisi fermati" (#536) ──────────────────────────────────────
+  // Il registro dei blocchi del guardiano. Esiste per una ragione sola: capire
+  // se grida al lupo. Per questo mostra anche il TESTO fermato — senza, un
+  // falso positivo è indistinguibile da un blocco giusto — ma lo mostra chiuso
+  // (chi apre le Preferenze non deve inciampare in un tentativo di truffa) e
+  // inerte: nessun collegamento cliccabile in un testo scritto per ingannare.
+  function fmtQuando(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('it-IT', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  function renderGuardBlocks(blocks) {
+    const box = $('guardBlocksList');
+    const empty = $('guardBlocksEmpty');
+    if (!box) return;
+    box.textContent = '';
+    const list = Array.isArray(blocks) ? blocks : [];
+    if (empty) empty.hidden = list.length > 0;
+    for (const b of list) {
+      const item = document.createElement('div');
+      item.className = 'guard-item';
+
+      const why = document.createElement('div');
+      why.className = 'guard-why';
+      why.textContent = b.motivo || 'Fermato da un controllo di sicurezza.';
+      item.appendChild(why);
+
+      const meta = document.createElement('div');
+      meta.className = 'guard-meta';
+      const quando = fmtQuando(b.ts);
+      if (quando) meta.appendChild(Object.assign(document.createElement('span'), { textContent: quando }));
+      if (b.origine) meta.appendChild(Object.assign(document.createElement('span'), { textContent: `da ${b.origine}` }));
+      if (b.regola) {
+        meta.appendChild(Object.assign(document.createElement('span'), {
+          textContent: b.regola === 'guardiano' ? 'controllo del modello' : `controllo automatico: ${b.regola}`,
+        }));
+      }
+      item.appendChild(meta);
+
+      if (b.testo) {
+        const pre = document.createElement('pre');
+        pre.className = 'guard-text';
+        pre.textContent = b.testo;
+        pre.hidden = true;
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'guard-toggle';
+        toggle.textContent = 'Mostra il testo fermato';
+        toggle.addEventListener('click', () => {
+          pre.hidden = !pre.hidden;
+          toggle.textContent = pre.hidden ? 'Mostra il testo fermato' : 'Nascondi il testo fermato';
+        });
+        item.appendChild(toggle);
+        item.appendChild(pre);
+      }
+      box.appendChild(item);
+    }
+  }
+
+  async function loadGuardBlocks() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_GET_GUARD_BLOCKS });
+      if (r?.ok) renderGuardBlocks(r.blocks);
+    } catch (_) {}
+  }
+
+  async function clearGuardBlocks() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CLEAR_GUARD_BLOCKS });
+      if (r?.ok) { renderGuardBlocks(r.blocks); flashSaved('guardBlocksHint'); }
+    } catch (_) {}
+  }
+
   // ── Sezione "colore identità delle tab" (Preferenze avanzate) ────────────
   // Stessa estetica "a codice" dei token: una riga per ognuno dei sei parametri
   // di src/shared/tabColor.js, con nome, valore numerico editabile, intervallo
