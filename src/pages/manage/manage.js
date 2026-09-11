@@ -1695,6 +1695,11 @@
     }
     if (res.copertura.parziale) {
       frasi.push(`${FB.COUNT_CAP_HINT} Il più vecchio in pagina è del ${statsDate(res.copertura.piuVecchio)}. I numeri con il «+» sono minimi, non totali.`);
+    } else if (res.copertura.tetto) {
+      // La finestra scelta è tutta in pagina, quindi i suoi numeri sono esatti.
+      // «Aperte adesso» però guarda tutta la lista, e lì il tetto morde sempre:
+      // il «+» va spiegato anche qui, o è un segno senza didascalia.
+      frasi.push(`${FB.COUNT_CAP_HINT} La finestra scelta è tutta in pagina, quindi i suoi numeri sono esatti. «Aperte adesso» guarda invece tutta la lista: porta il «+» perché è un minimo.`);
     }
     // Le segnalazioni che una finestra con un estremo lascia fuori perché la
     // loro data non si legge: un numero più piccolo del vero che non lo dice è
