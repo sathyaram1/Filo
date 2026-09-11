@@ -667,11 +667,11 @@ module.exports = function register(on, ctx) {
   let lastSyncAt = 0;
   const SYNC_MIN_GAP_MS = 60_000;
 
-  function scheduleViewSync({ delayMs = 2000, force = false } = {}) {
+  function scheduleViewSync({ delayMs = 2000, force = false, rows = null } = {}) {
     if (syncTimer) return;
     syncTimer = setTimeout(() => {
       syncTimer = null;
-      syncPublicView({ force }).catch(() => {});
+      syncPublicView({ force, rows }).catch(() => {});
     }, delayMs);
     if (typeof syncTimer.unref === 'function') syncTimer.unref();
   }
