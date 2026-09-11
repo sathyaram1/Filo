@@ -209,24 +209,37 @@
     }
     if (!ok) return { saved: false, reason: 'judge ha rifiutato l\'intento' };
 
-    // 3. write
+    // 3. in coda. NON si scrive adesso: vedi la testata.
     try {
-      const { id } = await Paths.submit({
+      const { id } = await accoda({
         domain,
         initialUrl,
         intent: guessedIntent,
         steps: sanitizedSteps,
         success: !!session.success,
       });
-      return { saved: true, id, intent: guessedIntent };
+      return { saved: true, queued: true, id, intent: guessedIntent };
     } catch (e) {
-      return { saved: false, reason: `firestore write fallito: ${e.message || e}` };
+      return { saved: false, reason: `coda percorsi fallita: ${e.message || e}` };
     }
   }
 
   global.SN_PATHS_COLLECTOR = {
     collectAndSave,
+    flush,
+    inCoda,
     // Esposti per test/debug e per riuso in altri moduli.
-    _internal: { redactSelector, sanitizeSteps, sanitizeUserMessages, domainOf, normalizedPath, cleanGuessedIntent, parseJudgeOutput },
+    _internal: {
+      redactSelector, sanitizeSteps, sanitizeUserMessages, domainOf, normalizedPath,
+      cleanGuessedIntent, parseJudgeOutput, accoda, sorteggia, RITARDO_MIN_MS, RITARDO_MAX_MS,
+    },
+    // ---- helper per i test (nessun effetto in produzione) ----
+    _peek: () => coda.map((v) => ({ ...v })),
+    _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
+    _setSorteggio: (fn) => { sorteggio = typeof fn === 'function' ? fn : Math.random; },
+    _reset: () => {
+      coda = []; caricata = false; sto = false; auto = true; sorteggio = Math.random;
+      if (timer) { clearTimeout(timer); timer = null; }
+    },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
