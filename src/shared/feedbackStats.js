@@ -453,24 +453,16 @@
       // Il turno l'ha scritto Filo (ha il suo marcatore) o è la testa del campo
       // note, che si modifica a mano?
       const manuale = !turno.ts;
-      let conRilievi = null;
-      let blocco = corpo;
-      if (manuale) {
-        // Una riga scritta a mano in cima al blob finisce nello stesso segmento
-        // del primo verbale: qui l'intestazione si cerca anche più giù, purché
-        // stia prima dell'elenco dei rilievi. Vince la PRIMA candidata che è
-        // davvero un verbale, non l'ultima: con l'ultima, la testata di un
-        // altro verbale citata nel riassunto cancellava il giro vero.
-        const primoRilievo = corpo.findIndex((l) => FINDING_LINE.test(l));
-        const limite = primoRilievo < 0 ? corpo.length : primoRilievo;
-        for (let k = 0; k < limite && !conRilievi; k += 1) {
-          if (!ROUND_HEAD_WITH_FINDINGS.test(corpo[k])) continue;
-          conRilievi = verbaleConRilievi(corpo.slice(k));
-          if (conRilievi) blocco = corpo.slice(k);
-        }
-      } else {
-        conRilievi = verbaleConRilievi(corpo);
-      }
+      // ⚠️ ANCHE NELLA TESTA SCRITTA A MANO IL VERBALE COMINCIA ALLA PRIMA RIGA.
+      // Qui l'intestazione si cercava più a fondo, per non perdere un verbale
+      // sotto una riga scritta a mano sopra di lui. Ma quel campo si modifica
+      // per intero in una casella di testo, e cercare più a fondo vuol dire
+      // trovare un verbale che qualcuno ci ha INCOLLATO: un lavoro passato si
+      // leggeva «fermato alla verifica», con un giro bloccante mai successo
+      // (#496, giro 13). Il prezzo è un verbale in meno quando qualcuno gli
+      // scrive sopra: è il verso giusto in cui sbagliare.
+      const conRilievi = verbaleConRilievi(corpo);
+      const blocco = corpo;
       if (conRilievi) {
         // Il verbale appena letto, ripetuto riga per riga nel turno dopo: è chi
         // corregge che riporta quello a cui sta rispondendo.
