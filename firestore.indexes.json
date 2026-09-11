@@ -8,7 +8,6 @@
         { "fieldPath": "clientId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
-    }
     },
     {
       "//": "Percorsi condivisi dell'Aiuto (#584): l'assistente chiede al server SOLO i percorsi riusciti di un sito, dal più recente (where success == true and orderBy createdAt desc). Uguaglianza su un campo più ordinamento su un altro vuole un indice composto. Senza questo indice la lettura filtrata viene rifiutata e il client ripiega sulla query semplice, filtrando in casa: funziona lo stesso, ma su un sito con tanti pollice in giù recenti l'assistente resta senza percorsi da riusare. Si pubblica insieme alle regole: npm run deploy:regole.",
