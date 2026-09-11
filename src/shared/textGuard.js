@@ -416,22 +416,42 @@
   const RE_DOMINIO_NUDO = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,24}(?:\/\S*)?/gi;
   const RE_SCHEMA_NUDO = /\b[a-z][a-z0-9+.-]*:[^\s]+/gi;
 
+  // Toglie da un pezzo di frase tutto ciò che porta da qualche parte: forme con
+  // etichetta, indirizzi nudi, domini scritti senza schema. Resta detto che un
+  // indirizzo c'era.
+  function togliIndirizzi(pezzo) {
+    return String(pezzo)
+      .replace(RE_LINK_MD, 'un indirizzo')
+      .replace(RE_LINK_HTML, 'un indirizzo')
+      .replace(RE_URL, 'un indirizzo')
+      .replace(RE_DOMINIO_NUDO, 'un indirizzo')
+      .replace(RE_SCHEMA_NUDO, 'un indirizzo');
+  }
+
   function ripulisci(pezzo) {
     const grezzo = String(pezzo == null ? '' : pezzo).replace(/\s+/g, ' ').trim();
     if (!grezzo) return '';
     // Un «motivo» lungo una pagina non è un motivo: è qualcuno che sta usando
     // questa riga come megafono. Si butta intero, non si taglia a metà.
     if (grezzo.length > LIMITE_PEZZO) return '';
-    const email = [];
-    let s = grezzo.replace(RE_EMAIL, (m) => ` ${email.push(m) - 1} `);
-    s = s.replace(RE_LINK_MD, 'un indirizzo')
-      .replace(RE_LINK_HTML, 'un indirizzo')
-      .replace(RE_URL, 'un indirizzo')
-      .replace(RE_DOMINIO_NUDO, 'un indirizzo')
-      .replace(RE_SCHEMA_NUDO, 'un indirizzo');
+    // L'indirizzo di POSTA del mittente si tiene — è la cosa che serve sapere,
+    // e nessuna superficie lo rende cliccabile — quindi la pulizia gira solo
+    // sui pezzi di frase che stanno fuori da un indirizzo di posta.
+    const fuori = [];
+    let da = 0;
+    let m;
+    RE_EMAIL.lastIndex = 0;
+    while ((m = RE_EMAIL.exec(grezzo))) {
+      fuori.push(togliIndirizzi(grezzo.slice(da, m.index)), m[0]);
+      da = m.index + m[0].length;
+    }
+    fuori.push(togliIndirizzi(grezzo.slice(da)));
+    let s = fuori.join('');
     s = s.replace(/(?:\bun indirizzo\b[\s,;]*){2,}/g, 'un indirizzo ').replace(/\s+/g, ' ').trim();
-    s = s.replace(/ (\d+) /g, (_, i) => email[Number(i)] || '');
     if (!s) return '';
+    // Ultimo filtro: se quello che resta fa ancora scattare un controllo
+    // statico, il pezzo si butta. Una frase generica è meglio di una frase
+    // dettata da chi attacca.
     if (controlliStatici({ testo: s }).blocca) return '';
     return s;
   }
