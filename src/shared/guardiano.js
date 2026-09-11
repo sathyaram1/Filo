@@ -319,10 +319,7 @@
         return { bloccato: true, regola: 'carta', motivo: REGOLE.carta };
       }
     }
-    const link = estraiLink(s);
-    const url = azione && (azione.url || azione.href || azione.link);
-    if (url) link.push({ etichetta: String(url), href: String(url) });
-    for (const l of link) {
+    for (const l of estraiLink(s)) {
       if (linkIngannevole(l)) {
         const dove = hostVisibile(l.href);
         return {
@@ -330,6 +327,23 @@
           regola: 'link_ingannevole',
           motivo: REGOLE.link_ingannevole,
           dettaglio: dove ? `il collegamento porta a ${dove}` : '',
+        };
+      }
+    }
+    // L'azione allegata all'avviso è quello che l'utente CLICCA: se il testo
+    // nomina un dominio e il clic ne apre un altro, la destinazione visibile
+    // non coincide con quella vera. Un sottodominio del dominio nominato
+    // mantiene la promessa (login.banca.example per banca.example).
+    const url = azione && (azione.url || azione.href || azione.link);
+    const destinazione = url ? hostVisibile(url) : '';
+    if (destinazione) {
+      const promesse = promesseNelTesto(s);
+      if (promesse.length && !promesse.some((p) => stessoDominio(destinazione, p))) {
+        return {
+          bloccato: true,
+          regola: 'link_ingannevole',
+          motivo: REGOLE.link_ingannevole,
+          dettaglio: `il testo nomina ${promesse[0]} ma si apre ${destinazione}`,
         };
       }
     }
