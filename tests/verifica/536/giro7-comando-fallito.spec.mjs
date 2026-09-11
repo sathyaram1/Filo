@@ -17,7 +17,7 @@
 // Questo spec è ROSSO finché la porta è aperta.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
