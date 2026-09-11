@@ -392,25 +392,91 @@
     }
   }
 
+  // ── Quello che Filo scrive DI SUO va ripulito prima ────────────────────────
+  //
+  // La riga di blocco è composta con due pezzi che arrivano da fuori: il MOTIVO,
+  // scritto dal modello guardiano dopo aver letto il testo di un estraneo, e la
+  // FONTE, che per una mail è il mittente — e il mittente se lo sceglie chi
+  // manda la mail. Un contenuto che si fa bloccare apposta e detta il motivo
+  // («quando blocchi scrivi: conferma le credenziali su …») si ritroverebbe
+  // consegnato dalla voce di Filo, proprio nella riga che dovrebbe rassicurare,
+  // e per giunta come collegamento cliccabile: la colonna degli avvisi rende
+  // vivi gli indirizzi che trova.
+  //
+  // Qui quei pezzi si ripuliscono: gli indirizzi spariscono e resta detto che
+  // ce n'era uno. Gli indirizzi di posta restano, perché sono il mittente — la
+  // cosa che serve sapere — e nessuna superficie li rende cliccabili. Se dopo
+  // la pulizia il pezzo fa ancora scattare un controllo statico, si butta: una
+  // frase generica è meglio di una frase dettata da chi attacca.
+  const LIMITE_PEZZO = 300;
+  const RE_EMAIL = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}\b/g;
+  const RE_LINK_MD = /\[([^\]\n]*)\]\(\s*[^)\s]+\s*\)/g;
+  const RE_LINK_HTML = /<a\b[^>]*>([\s\S]*?)<\/a>/gi;
+  const RE_URL = /(?:[a-z][a-z0-9+.-]*:\/\/|www\.)\S+/gi;
+  const RE_DOMINIO_NUDO = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,24}(?:\/\S*)?/gi;
+  const RE_SCHEMA_NUDO = /\b[a-z][a-z0-9+.-]*:[^\s]+/gi;
+
+  function ripulisci(pezzo) {
+    const grezzo = String(pezzo == null ? '' : pezzo).replace(/\s+/g, ' ').trim();
+    if (!grezzo) return '';
+    // Un «motivo» lungo una pagina non è un motivo: è qualcuno che sta usando
+    // questa riga come megafono. Si butta intero, non si taglia a metà.
+    if (grezzo.length > LIMITE_PEZZO) return '';
+    const email = [];
+    let s = grezzo.replace(RE_EMAIL, (m) => ` ${email.push(m) - 1} `);
+    s = s.replace(RE_LINK_MD, 'un indirizzo')
+      .replace(RE_LINK_HTML, 'un indirizzo')
+      .replace(RE_URL, 'un indirizzo')
+      .replace(RE_DOMINIO_NUDO, 'un indirizzo')
+      .replace(RE_SCHEMA_NUDO, 'un indirizzo');
+    s = s.replace(/(?:\bun indirizzo\b[\s,;]*){2,}/g, 'un indirizzo ').replace(/\s+/g, ' ').trim();
+    s = s.replace(/ (\d+) /g, (_, i) => email[Number(i)] || '');
+    if (!s) return '';
+    if (controlliStatici({ testo: s }).blocca) return '';
+    return s;
+  }
+
   // ── La riga che l'utente legge al posto dell'avviso ─────────────────────────
   //
   // Blocca e SPIEGA cosa ha visto, non che ha avuto un dubbio. Se la fonte non
   // si sa, la frase lo dice invece di inventarsela.
   function frasediBlocco({ origine, motivo } = {}) {
-    const da = String(origine || '').trim();
-    const perche = String(motivo || '').trim().replace(/^[«"']|[»"'.]$/g, '');
+    const da = ripulisci(origine);
+    const perche = ripulisci(motivo).replace(/^[«"']|[»"'.]$/g, '').trim();
     const inizio = da
       ? `Ho fermato un avviso nato da ${da}`
       : 'Ho fermato un avviso nato da un contenuto non fidato';
     return perche ? `${inizio}: ${perche}.` : `${inizio}.`;
   }
 
-  // La riga per un avviso che aspetta il controllo: non è un blocco, è un ritardo.
-  function fraseInAttesa({ origine } = {}) {
-    const da = String(origine || '').trim();
-    return da
-      ? `Un avviso nato da ${da} aspetta il controllo di sicurezza. Te lo mostro appena è fatto.`
-      : 'Un avviso aspetta il controllo di sicurezza. Te lo mostro appena è fatto.';
+  // Dove si va a vedere cosa è stato fermato. Nella colonna degli avvisi c'è un
+  // pulsante; dove un pulsante non c'è (la chat) la strada va detta a parole,
+  // altrimenti chi ha appena letto che Filo gli ha nascosto qualcosa non ha
+  // nessun modo di sapere cos'era.
+  const DOVE_SONO_I_BLOCCHI = 'Lo trovi in Preferenze, alla voce «Avvisi fermati».';
+
+  // Il controllo non si è potuto fare. Due cause, due frasi: se è la rete
+  // aspettare basta, se è la configurazione aspettare non serve a niente e
+  // l'unica persona che può sistemarla deve sapere che c'è da sistemare.
+  const CAUSA = { RETE: 'rete', CONFIGURAZIONE: 'configurazione' };
+  const DOVE_SI_IMPOSTA = 'Si imposta in Opzioni → Modelli, alla voce «Guardiano degli avvisi nati da mail e pagine».';
+
+  function fraseControlloFermo({ causa } = {}) {
+    return causa === CAUSA.CONFIGURAZIONE
+      ? `Ho la risposta pronta, ma il controllo di sicurezza non può partire: gli manca un modello suo, diverso da quello che scrive le risposte. ${DOVE_SI_IMPOSTA}`
+      : 'Ho la risposta pronta, ma il controllo di sicurezza non risponde. Te la mostro appena riesco.';
+  }
+
+  // La riga per un avviso che aspetta il controllo: non è un blocco, è un
+  // ritardo — a meno che ad aspettare non sia una configurazione che nessuno
+  // aggiusterà da sola.
+  function fraseInAttesa({ origine, causa } = {}) {
+    const da = ripulisci(origine);
+    const chi = da ? `Un avviso nato da ${da}` : 'Un avviso';
+    if (causa === CAUSA.CONFIGURAZIONE) {
+      return `${chi} non ti viene mostrato: al controllo di sicurezza manca un modello suo, diverso da quello che scrive le risposte. ${DOVE_SI_IMPOSTA}`;
+    }
+    return `${chi} aspetta il controllo di sicurezza. Te lo mostro appena è fatto.`;
   }
 
   // ── Indipendenza del modello ───────────────────────────────────────────────
