@@ -146,7 +146,7 @@
     // futura. Chi sorveglia chiede alle preferenze quali sono (`testoLibero`),
     // così le altre non pagano un secondo modello per un «tema: scuro».
     IMPOSTA_PREFERENZA: {
-      campi: ['valore', 'value', 'v'], seFermato: 'annulla', soloSeTestoLibero: true,
+      campi: ['valore', 'value', 'valoreNuovo', 'val'], seFermato: 'annulla', soloSeTestoLibero: true,
     },
     // Il bottone in chat porta il titolo e i dettagli scelti dal modello, e
     // l'evento resta nel calendario dell'utente.
