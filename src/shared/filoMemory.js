@@ -907,6 +907,10 @@
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
     listNotifications, addNotification, dismissNotification,
+    // guardiano degli avvisi (#536)
+    listGuardBlocks, addGuardBlock, clearGuardBlocks,
+    listPendingNotifications, addPendingNotification,
+    updatePendingNotification, removePendingNotification,
     // dashboard cache
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)
