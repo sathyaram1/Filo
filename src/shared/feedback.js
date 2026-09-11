@@ -1067,6 +1067,15 @@
     list,
     listVersions,
     getMany,
+    // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
+    // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
+    listPublic,
+    getPublic,
+    publishPublicCard,
+    unpublishPublicCard,
+    // Il contatore dei numeri (l'owner lo crea e lo rimette in pari).
+    ensureSeqCounter,
+    nextSeq,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     listHitCap,
