@@ -1016,6 +1016,7 @@
   const ST = window.SN_FEEDBACK_STATS;
   const mgStWindows   = document.getElementById('mgStWindows');
   const mgStCustom    = document.getElementById('mgStCustom');
+  const mgStCustomEco = document.getElementById('mgStCustomEco');
   const mgStFrom      = document.getElementById('mgStFrom');
   const mgStTo        = document.getElementById('mgStTo');
   const mgStCreators  = document.getElementById('mgStCreators');
