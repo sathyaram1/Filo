@@ -663,14 +663,18 @@
 
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
   // solo quelli trovati: un id cancellato nel frattempo non compare. Vuoto → [].
-  async function getMany(ids, { timeoutMs = 0 } = {}) {
+  async function getMany(ids, { timeoutMs = 0, idToken = '' } = {}) {
     const wanted = (Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean);
     if (wanted.length === 0) return [];
+    const bridge = pageBridge();
+    if (bridge) return readViaMain(bridge, { op: 'getMany', ids: wanted, timeoutMs });
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
     const prefix = `${FIRESTORE_BASE}/${COLLECTION}/`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const opts = {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ documents: wanted.map((id) => prefix + id) }),
     };
     let timer = null;
