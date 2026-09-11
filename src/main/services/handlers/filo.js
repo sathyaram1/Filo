@@ -212,7 +212,32 @@ module.exports = function register(on, ctx) {
     return { ok: true, timers: list };
   });
 
-  on(MSG.FILO_GET_NOTIFICATIONS, async () => ({ ok: true, notifications: await FiloMem.listNotifications() }));
+  // Le notifiche, più le righe «in attesa del controllo» (#536). Leggerle è
+  // anche il momento buono per ridare una possibilità alla coda: se il guardiano
+  // è tornato raggiungibile, l'avviso rimasto indietro compare adesso.
+  on(MSG.FILO_GET_NOTIFICATIONS, async () => {
+    const TG = globalThis.SN_TEXT_GUARDIAN;
+    if (TG) {
+      try { await TG.riprendiInAttesa(); } catch (_) {}
+    }
+    return {
+      ok: true,
+      notifications: await FiloMem.listNotifications(),
+      pending: TG ? await TG.righeInAttesa() : [],
+    };
+  });
+
+  // #536 — registro degli avvisi fermati (Preferenze → «Avvisi fermati»).
+  // Contiene il testo bloccato: mai verso una pagina web.
+  on(MSG.FILO_GET_GUARD_BLOCKS, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, blocks: await FiloMem.listGuardBlocks() };
+  });
+
+  on(MSG.FILO_CLEAR_GUARD_BLOCKS, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, blocks: await FiloMem.clearGuardBlocks() };
+  });
 
   on(MSG.FILO_DISMISS_NOTIFICATION, async (msg) => {
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });
