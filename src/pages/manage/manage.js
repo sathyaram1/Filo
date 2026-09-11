@@ -1133,6 +1133,24 @@
     if (!Number.isFinite(ms)) return '';
     return new Date(ms).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
+  // La stessa data col mese a parole: «1 settembre 2026». Serve accanto ai due
+  // campi data, dove l'ordine giorno/mese lo decide la lingua del sistema e non
+  // Filo: col mese scritto non c'è ordine da indovinare.
+  function statsDateParole(ms) {
+    if (!Number.isFinite(ms)) return '';
+    return new Date(ms).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  // Che finestra stanno chiedendo i due campi, detta a parole.
+  function ecoFinestra(range) {
+    if (!range) return '';
+    if (range.from === null && range.to === null) return 'tutto lo storico in pagina';
+    if (range.from !== null && range.to !== null) {
+      return `dal ${statsDateParole(range.from)} al ${statsDateParole(range.to)}`;
+    }
+    return range.from !== null
+      ? `dal ${statsDateParole(range.from)} a oggi`
+      : `fino al ${statsDateParole(range.to)}`;
+  }
 
   // ── I due controlli ───────────────────────────────────────────────────────
   function renderStatsControls(res) {
