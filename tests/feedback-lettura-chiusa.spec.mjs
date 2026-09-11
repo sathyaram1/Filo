@@ -50,9 +50,11 @@ const SCHEDA = {
 // solo cosa si vede, ma COSA SI CHIEDE al server.
 async function spiaFetch(page, payload) {
   await page.evaluate((rows) => {
-    window.__urlChiesti = [];
-    window.fetch = async (url) => {
-      window.__urlChiesti.push(String(url));
+    window.__chieste = [];
+    window.fetch = async (url, opts) => {
+      // Con runQuery la collezione sta nel CORPO, non nell'indirizzo: guardare
+      // solo l'URL non distinguerebbe una vista da una raccolta intera.
+      window.__chieste.push({ url: String(url), body: (opts && opts.body) ? String(opts.body) : '' });
       return {
         ok: true,
         status: 200,
@@ -79,39 +81,14 @@ test('la bacheca mostra i miglioramenti leggendo la vista pubblica, mai la colle
   await expect(page.locator('.bd-card')).toHaveCount(1);
   await expect(page.locator('.bd-card-title')).toHaveText('Migliorata la cattura schermo');
 
-  const urls = await page.evaluate(() => window.__urlChiesti);
-  expect(urls.length).toBeGreaterThan(0);
-  const chiesto = JSON.stringify(urls);
-  expect(chiesto).toContain('feedback-public');
-  // E soprattutto: nessuna richiesta alla collezione vera.
-  for (const url of urls) {
-    expect(url).not.toMatch(/documents\/feedback(\?|\/|$)/);
-    expect(url).not.toMatch(/documents:batchGet/);
-  }
-  const corpi = await page.evaluate(() => window.__urlChiesti.length);
-  expect(corpi).toBe(urls.length);
-});
-
-test('la bacheca chiede la vista pubblica, non la collezione, anche nel corpo della query', async ({ openTab }) => {
-  const page = await openTab(BOARD);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__boardTest && window.SN_FEEDBACK);
-  await page.locator('#bdLoading').waitFor({ state: 'hidden' });
-
-  await page.evaluate(() => {
-    window.__corpiChiesti = [];
-    window.fetch = async (url, opts) => {
-      window.__corpiChiesti.push(opts && opts.body ? String(opts.body) : '');
-      return { ok: true, status: 200, json: async () => [], text: async () => '[]' };
-    };
-    return window.__boardTest.reload();
-  });
-
-  const corpi = await page.evaluate(() => window.__corpiChiesti);
-  expect(corpi.length).toBeGreaterThan(0);
-  for (const corpo of corpi) {
-    expect(corpo).toContain('feedback-public');
-    expect(corpo).not.toMatch(/"collectionId"\s*:\s*"feedback"/);
+  const chieste = await page.evaluate(() => window.__chieste);
+  expect(chieste.length).toBeGreaterThan(0);
+  // Quello che la bacheca chiede è la VISTA, e solo quella.
+  expect(chieste.some((c) => c.body.includes('feedback-public'))).toBe(true);
+  for (const c of chieste) {
+    expect(c.body).not.toMatch(/"collectionId"\s*:\s*"feedback"/);
+    expect(c.url).not.toMatch(/documents\/feedback(\?|\/|$)/);
+    expect(c.url).not.toMatch(/documents:batchGet/);
   }
 });
 

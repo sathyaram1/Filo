@@ -543,9 +543,17 @@ module.exports = function register(on, ctx) {
 
   function ownerOnly(handler) {
     return async (msg, sender, origin) => {
-      if (!isFiloOrigin(origin, sender)) return { ok: false, error: 'forbidden' };
+      // `code`: il motivo in una parola, per chi deve DIRE all'utente cosa
+      // succede. Senza, il rifiuto arriva a una pagina come un errore
+      // qualunque e finisce tradotto in "controlla la connessione", che non è
+      // vero e manda a controllare la cosa sbagliata.
+      if (!isFiloOrigin(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
       if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+        return {
+          ok: false,
+          code: 'not_admin',
+          error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.',
+        };
       }
       try {
         return await handler(msg);
