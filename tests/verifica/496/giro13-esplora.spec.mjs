@@ -103,6 +103,29 @@ test('ogni superficie della scheda risponde al tasto destro', async ({ openTab }
     await page.keyboard.press('Escape').catch(() => {});
     await page.waitForTimeout(100);
   }
+  // La fetta è un tracciato SVG: il centro del suo rettangolo può cadere fuori.
+  // Qui si prende un punto che sta DAVVERO sulla fetta.
+  const punto = await page.evaluate(() => {
+    const p = document.querySelector('#mgStPie [data-group]');
+    if (!p) return null;
+    const pt = p.getPointAtLength(p.getTotalLength() * 0.5);
+    const m = p.getScreenCTM();
+    const s = new DOMPoint(pt.x, pt.y).matrixTransform(m);
+    const dentro = document.elementFromPoint(s.x, s.y);
+    return { x: s.x, y: s.y, sopra: dentro ? (dentro.getAttribute('data-group') || dentro.tagName) : null };
+  });
+  if (punto) {
+    await page.evaluate(() => document.querySelectorAll('.mg-ctxmenu').forEach((m) => m.remove()));
+    await page.mouse.move(punto.x, punto.y);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.up({ button: 'right' });
+    await page.waitForTimeout(250);
+    const voci = await page.evaluate(() => {
+      const menu = document.querySelector('.mg-ctxmenu');
+      return menu ? Array.from(menu.querySelectorAll('button')).map((b) => b.textContent.trim()).join(' / ') : null;
+    });
+    esiti.push(`fetta (punto vero, sopra=${punto.sopra}): ${voci === null ? 'NESSUN MENU' : voci}`);
+  }
   console.log('TASTO DESTRO\n' + esiti.join('\n'));
 });
 
