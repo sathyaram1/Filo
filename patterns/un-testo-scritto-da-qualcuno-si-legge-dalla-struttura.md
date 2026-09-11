@@ -26,7 +26,12 @@ chi non sta verbalizzando:
    marcatore di turno compreso;
 6. nel report di chi corregge di nuovo, questa volta con la STRUTTURA e non con
    una frase: riportando il verbale a cui sta rispondendo, oppure elencando i
-   rilievi chiusi col livello davanti, che è la forma in cui li ha ricevuti.
+   rilievi chiusi col livello davanti, che è la forma in cui li ha ricevuti;
+7. con la riga che separa un turno dall'altro. Il verbale era ormai ancorato al
+   TURNO, ma un turno comincia da una riga di testo dentro le note, e quella
+   riga la scrive anche chi incolla un pezzo di conversazione o chi la cita
+   raccontando cosa ha letto. Due strade aggiungevano un giro mai successo, due
+   ne facevano sparire uno vero.
 
 Ogni giro chiudeva la porta trovata e ne lasciava aperta un'altra. Un lavoro
 costato cinque critiche finiva nella fetta verde «passata subito», che è il
