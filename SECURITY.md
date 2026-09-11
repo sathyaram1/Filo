@@ -199,6 +199,24 @@ installato non le scarica il tuo computer. Arrivano già dentro l'applicazione,
 messe lì quando la versione viene costruita, e si rinnovano con l'aggiornamento
 automatico.
 
+### Le regole cambiano solo quando le pubblichi
+
+Se le regole sono l'unico confine, il confine si sposta quando le regole
+arrivano sul progetto Firebase, non quando il file cambia nel repo. Nessun
+automatismo le pubblica: si fa a mano, con
+
+```bash
+firebase deploy --only firestore:rules     # e --only storage:rules per storage.rules
+```
+
+Finché quel comando non gira, una regola stretta nel repo è una porta ancora
+aperta in produzione, e il lavoro sembra finito mentre non lo è.
+
+**L'ordine conta**, e sbagliarlo costa il lavoro due volte. Prima si pubblicano
+le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
+chiavi nuove finiscono in un documento che chiunque legge ancora, e la
+rotazione è da rifare da capo.
+
 ---
 
 ## 8. Aggiornamenti automatici
