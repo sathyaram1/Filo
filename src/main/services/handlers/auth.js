@@ -222,11 +222,14 @@ module.exports = function register(on, ctx) {
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
   // Firestore rules; questo è il gate applicativo + il trasporto autenticato.
-  on(MSG.FEEDBACK_UPDATE, async (msg) => {
+  // `ownerOnly`: prima di chiedersi CHI è, si chiede DA DOVE arriva. Il triage
+  // scrive sul feedback e sulla frase che finisce in bacheca sotto gli occhi di
+  // tutti: è un gesto che si fa sulle superfici di Filo, non una cosa che una
+  // pagina di un sito visitato possa chiedere. Sul computer di chiunque altro
+  // «sei l'amministratore?» basta, perché la risposta è no; su quello di chi i
+  // feedback li gestisce è sempre sì, ed è l'unico dove c'è qualcosa da fare.
+  on(MSG.FEEDBACK_UPDATE, ownerOnly(async (msg) => {
     try {
-      if (!auth.isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
       if (!globalThis.SN_FEEDBACK?.updateStatus) {
         throw new Error('SN_FEEDBACK non caricato nel main process');
       }
