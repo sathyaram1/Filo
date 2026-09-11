@@ -950,7 +950,7 @@
         }
       });
       // Decifra e riempi il src (o mostra il segnaposto testuale se non arriva).
-      resolveImageSrc(img.dataset.url || '').then(({ dataUrl, error }) => {
+      resolveImageSrc(img.dataset.url || '').then(({ dataUrl, error, soloDestinatario }) => {
         img.classList.remove('fb-img-loading');
         if (dataUrl) {
           img.src = dataUrl;
@@ -958,7 +958,10 @@
         } else {
           const ph = document.createElement('div');
           ph.className = 'fb-img-broken';
-          ph.textContent = '(immagine non disponibile)';
+          // Chi ha mandato la segnalazione non rivedrà il proprio screenshot:
+          // l'allegato è cifrato con la chiave di chi lo riceve. Non è un
+          // guasto e il segnaposto non deve farlo sembrare tale.
+          ph.textContent = soloDestinatario ? '(allegato inviato)' : '(immagine non disponibile)';
           // Hover col MOTIVO preciso del fallimento (ripiega sull'URL cifrato).
           ph.title = error || img.dataset.url || '';
           img.replaceWith(ph);
