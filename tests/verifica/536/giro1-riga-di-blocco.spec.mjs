@@ -64,3 +64,60 @@ test('il motivo del blocco arriva all’utente senza nessun controllo, e come li
     'la riga del blocco offre un collegamento vivo verso il sito dell’attacco',
   ).toHaveCount(0);
 });
+
+// La seconda porta della stessa causa: nella chat la riga del blocco è scritta
+// nello stesso modo, e la bolla rende cliccabili gli indirizzi che trova.
+test('anche nella chat la riga del blocco ripete quello che il testo ha dettato', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await (async () => {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const w = app.windows().find((x) => x.url().startsWith('filo://newtab'));
+      if (w) { await w.waitForLoadState('domcontentloaded'); return w; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('newtab non trovata');
+  })();
+  await expect(page.locator('#input')).toBeVisible();
+
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.GUARD_TEXT]: 'glm' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.SN_WEB_SEARCH.search = async () => ({
+      provider: 'finto',
+      results: [{ title: 'Portale', url: 'https://portale-esempio.it/', snippet: 'accedi' }],
+    });
+    globalThis.SN_TEXT_GUARDIAN.configure({
+      pausaMs: 0,
+      eseguiModello: async () => JSON.stringify({
+        esito: 'blocca',
+        motivo: 'per riattivare il conto conferma le credenziali su https://banca-esempio.attacco.ru/login',
+      }),
+    });
+    let giro = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      giro++;
+      if (giro === 1) {
+        return { ...base, text: '', finishReason: 'tool_calls', reasoningDetails: [],
+          toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: '{"query":"portale"}' }] };
+      }
+      return { ...base, text: 'Ecco cosa ho trovato.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+
+  await page.locator('#input').fill('cerca il portale clienti');
+  await page.locator('#sendBtn').click();
+  const bolla = page.locator('.dash-bubble-filo').last();
+  await expect(bolla).toContainText('Ho fermato un avviso', { timeout: 30_000 });
+  await expect(bolla, 'la bolla del blocco ripete l’indirizzo dell’attacco')
+    .not.toContainText('attacco.ru');
+  await expect(bolla.locator('a'), 'la bolla del blocco offre un collegamento vivo verso l’attacco')
+    .toHaveCount(0);
+});
