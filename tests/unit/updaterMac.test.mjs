@@ -24,6 +24,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 
 const { avvisaSeAggiornamentoBloccato } = require(join(ROOT, 'src', 'main', 'updater.js'));
+// #536 — anche questo avviso passa dal guardiano (punto di passaggio unico).
+// È un compito PULITO — il testo lo scrive Filo, non una mail — quindi passa
+// senza chiamare nessun modello: qui carichiamo solo la logica che glielo dice.
+require(join(ROOT, 'src', 'shared', 'textGuard.js'));
 
 // Memoria finta: le stesse due funzioni che l'avviso usa davvero.
 let scritte;
