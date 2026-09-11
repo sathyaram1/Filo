@@ -105,6 +105,16 @@ test('ogni superficie che porta un numero si apre, col clic e col tasto destro',
     await page.waitForTimeout(30);
   }
   console.log('TASTO DESTRO ' + JSON.stringify(esiti, null, 1));
+  // L'invariante che questo lavoro ha scritto: su una superficie della scheda
+  // che porta un numero il tasto destro offre qualcosa DI SUO. Dove esce il
+  // menu generale della pagina (quello con «Aiuto», «Invia feedback») qui
+  // `voci` è null, ed è il segno che la superficie è stata dimenticata.
+  const mute = esiti.filter((e) => e.voci === null);
+  expect(mute.map((e) => e.testo)).toEqual([]);
+  // Chi porta a delle segnalazioni offre di aprirle; tutti offrono di copiarsi.
+  for (const e of esiti) {
+    if (Array.isArray(e.voci)) expect(e.voci.length).toBeGreaterThan(0);
+  }
 });
 
 test('il clic apre l’elenco, e l’elenco dice chi ha contato', async ({ openTab }) => {
