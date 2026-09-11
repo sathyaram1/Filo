@@ -100,8 +100,12 @@ test('a chi NON riceve le segnalazioni il messaggio non parla di amministratori'
   const msg = attachmentNotForYouHelp();
   expect(msg).not.toMatch(/amministrat/i);
   expect(msg).not.toMatch(/riservata/i);
-  // Dice la cosa che serve sapere: l'allegato è partito.
-  expect(msg).toMatch(/inviat/i);
+  // Dice la cosa che serve sapere: l'allegato è arrivato dov'era diretto.
+  // «Consegnato» e non «inviato» (#582, giro 3): l'elenco dei feedback mostra a
+  // ogni tester le segnalazioni di tutti, quindi questa frase si legge anche
+  // davanti all'allegato di un altro, e lì «inviato» suonava come «l'hai
+  // mandato tu».
+  expect(msg).toMatch(/consegnat/i);
   // Sta in un hover: una riga sola.
   expect(msg).not.toMatch(/\n/);
 });
