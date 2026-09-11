@@ -22,6 +22,7 @@
         'I collegamenti dentro un avviso mostrano sempre il dominio a cui portano davvero, prima che tu li apra.',
         'In Preferenze trovi «Avvisi fermati», l\'elenco di quello che il controllo ha fermato, con quando, da dove e perché. Se ferma cose che non doveva, lo vedi lì. Dalla riga dell\'avviso fermato ci arrivi con un clic, già aperta sulla voce giusta.',
         'Il controllo vale per tutta la conversazione, non solo per la prima risposta: se Filo ha letto una pagina, anche le risposte alle domande che fai dopo passano di lì.',
+        'E vale anche per quello che quel turno lascia scritto per dopo: il nome di un timer, un appunto, una cosa che Filo memorizza, lo stile con cui ti scrive. Una pagina non può più far entrare le proprie frasi nella memoria di Filo e fartele ripetere domani, in una conversazione che non ha letto niente di nessuno.',
         'Un indirizzo che Filo ha trovato dentro quello che ha appena letto non si apre più da solo: prima te lo mostra e ti chiede se andare. Il resto della navigazione resta immediato come prima.',
         'Se hai acceso «solo modelli a pesi aperti» e quel controllo finirebbe sullo stesso modello che scrive le risposte, Filo si ferma e ti dice dove sistemarlo: un testo controllato da chi l\'ha scritto non è controllato.',
       ],
