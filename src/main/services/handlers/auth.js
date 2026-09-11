@@ -760,9 +760,10 @@ module.exports = function register(on, ctx) {
         console.warn('[feedback] vista pubblica: chiave privata non configurata, sincronizzazione saltata');
         return { ok: false, skipped: true };
       }
-      const raw = (Array.isArray(rows) && rows.length)
+      const base = (Array.isArray(rows) && rows.length)
         ? rows
         : await FB.list({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken });
+      const raw = await conLeSegnalazioniFuoriPagina(base, idToken);
       const feedbacks = new Array(raw.length);
       let next = 0;
       const worker = async () => {
