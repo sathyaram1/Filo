@@ -45,8 +45,9 @@
   const automationToggle = document.getElementById('automationToggle');
   const automationDesc = document.getElementById('automationDesc');
 
-  // Gestione feedback (sposta di stato, priorità, note) è riservata agli
-  // amministratori: senza account autorizzato la pagina resta in sola lettura.
+  // La gestione dei feedback (stato, priorità, note) è riservata agli
+  // amministratori, e dal 2026-09 (#583) anche la LETTURA: senza un account
+  // autorizzato questa pagina non ha niente da mostrare.
   // La garanzia forte è server-side (Firestore rules): qui è solo il gate UX,
   // e ogni scrittura passa comunque dal main process che rifiuta i non-admin.
   let isAdmin = false;
@@ -1470,10 +1471,13 @@
       // Distingui "non loggato" da "loggato ma non admin": il secondo non può
       // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
       if (profile?.email) {
-        adminBannerText.textContent = `Sei in sola lettura: l'account ${profile.email} non è un amministratore.`;
+        // #583: "sola lettura" non è più vero — i feedback non si leggono
+        // affatto senza essere admin. Dirlo com'è vale più di un invito che
+        // non porta da nessuna parte.
+        adminBannerText.textContent = `L'account ${profile.email} non è un amministratore: i feedback li vede chi li gestisce.`;
         if (adminSignInBtn) adminSignInBtn.hidden = true;
       } else {
-        adminBannerText.textContent = 'Sei in sola lettura. Accedi con un account amministratore per gestire i feedback (spostare di stato, priorità, note).';
+        adminBannerText.textContent = 'I feedback li vede chi li gestisce: accedi con un account amministratore.';
         if (adminSignInBtn) adminSignInBtn.hidden = false;
       }
     }
