@@ -379,7 +379,7 @@
     admin_defaults_denied: 'Sezione riservata agli amministratori. Accedi con un account autorizzato dall\'icona account in alto.',
     admin_defaults_keys: 'Chiavi API predefinite',
     admin_defaults_keys_desc:
-      'Le chiavi restano sul server e non sono mai esposte alle pagine: qui vedi solo se ciascuna è configurata. Lascia un campo vuoto per non modificarlo. Una chiave nuova entra in funzione con la prossima versione pubblicata: solo tu puoi leggere questo elenco, e alle installazioni le chiavi arrivano dentro l\'aggiornamento.',
+      'Le chiavi restano sul server e non sono mai esposte alle pagine: qui vedi solo se ciascuna è configurata. Lascia un campo vuoto per non modificarlo. Una chiave nuova entra in funzione con la prossima versione pubblicata. Questo elenco lo leggi solo tu; alle installazioni le chiavi arrivano dentro l\'aggiornamento.',
     admin_defaults_key_present: 'configurata',
     admin_defaults_key_absent: 'non configurata',
     admin_defaults_safebrowse_key_desc:
