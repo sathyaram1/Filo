@@ -212,9 +212,28 @@
       if (!row.document) continue;
       const obj = fsDocToObject(row.document);
       if (onlySuccess && obj.success !== true) continue;
+      if (troppoGrosso(obj)) continue;
       out.push(obj);
     }
     return out;
+  }
+
+  // Un percorso lo scrive chiunque, e le regole contano i passi ma non possono
+  // pesarli: trenta passi da trentamila caratteri l'uno stanno in un documento
+  // solo, e chi legge se li scarica tutti (#584, terzo giro). Il tetto qui è
+  // abbondante — un percorso vero ha selettori da poche decine di caratteri, e
+  // duemila ne tengono anche i più contorti — e scarta il percorso intero
+  // invece di tagliarlo: un selettore mozzato non clicca niente, e chi ha
+  // scritto un passo da trentamila caratteri non stava insegnando un percorso.
+  const MAX_SELETTORE_LETTO = 2000;
+
+  function troppoGrosso(p) {
+    const steps = Array.isArray(p && p.steps) ? p.steps : [];
+    for (const s of steps) {
+      const sel = s && typeof s.selector === 'string' ? s.selector : '';
+      if (sel.length > MAX_SELETTORE_LETTO) return true;
+    }
+    return String((p && p.intent) || '').length > 2000;
   }
 
   // ---------------------------------------------------------------------
