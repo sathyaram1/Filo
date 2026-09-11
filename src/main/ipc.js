@@ -375,6 +375,30 @@ function registerIpcHandlers() {
     };
   });
 
+  // ─── permessi chiesti dai siti (#586) ────────────────────────────────────
+  // La pastiglia della shell risponde qui. `ricorda:false` = "solo per questa
+  // volta": è la × della pastiglia, che chiude senza decidere per sempre.
+  ipcMain.handle('permissions:answer', (event, { id, scelta, ricorda } = {}) => {
+    void event;
+    try {
+      return require('./services/permessiSito').rispondi(id, scelta, { ricorda: ricorda !== false });
+    } catch (_) { return { ok: false }; }
+  });
+  // Cosa si è già deciso per un sito: serve al menu del tasto destro sulla
+  // scheda, che mostra le voci solo se c'è qualcosa da revocare.
+  ipcMain.handle('permissions:for-origin', (event, { origine } = {}) => {
+    void event;
+    try { return { ok: true, voci: require('./services/permessiSito').perOrigine(origine) }; }
+    catch (_) { return { ok: false, voci: [] }; }
+  });
+  // Revoca una scelta ricordata (o tutte quelle del sito): la prossima volta il
+  // sito richiede e l'utente risceglie.
+  ipcMain.handle('permissions:revoke', (event, { origine, chiave } = {}) => {
+    void event;
+    try { return { ok: require('./services/permessiSito').revoca(origine, chiave || null) }; }
+    catch (_) { return { ok: false }; }
+  });
+
   // ─── popup menu custom (sopra le WebContentsView) ────────────────────────
   ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
     const win = winFor(event);
