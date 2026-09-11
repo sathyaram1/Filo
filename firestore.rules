@@ -4,9 +4,19 @@ rules_version = '2';
 //
 // Modello di sicurezza (vedi Filo/SECURITY.md):
 // - Chiunque può CREARE un feedback (anonimo, nessun login).
-// - La LETTURA è pubblica (serve alla dashboard e alla futura pagina pubblica
-//   dei feedback). NB: per questo le `notes` sono leggibili da tutti — non
-//   metterci dentro segreti.
+// - La LETTURA dei documenti feedback NON è pubblica (audit pre-alpha, #583).
+//   Fino ad agosto 2026 era `allow read: if true`: testo e URL erano cifrati
+//   per l'owner, ma tutto il resto no — titolo, user agent, link agli
+//   screenshot, numero, data — e i documenti anteriori al cutover della
+//   cifratura (25 giugno 2026) erano in chiaro per intero, note di lavorazione
+//   comprese. Con la sola chiave web del repo un estraneo ricostruiva cosa
+//   stanno provando i tester e su quali pagine. Ora leggono solo l'owner
+//   (admin) e il server dei giudici/routine (identità propria o Admin SDK, che
+//   bypassa queste regole).
+// - Chi ha bisogno dei soli campi PUBBLICI — la bacheca degli utenti e il
+//   popup delle ricompense — legge `feedback-public`, la VISTA qui sotto:
+//   una proiezione con i soli campi sicuri dei feedback chiusi e non
+//   segnalati dalla sicurezza. La collezione vera resta chiusa.
 // - Solo gli ADMIN (email nella collezione `admins`) possono fare triage
 //   (update di stato/note/priorità) o cancellare. L'identità admin è provata
 //   da un token Google verificato inviato come `Authorization: Bearer <idToken>`.
