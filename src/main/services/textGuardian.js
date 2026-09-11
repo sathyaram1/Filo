@@ -194,20 +194,22 @@ async function proponiNotifica(proposta = {}) {
 let _giroInCorso = null;
 
 async function riprendiInAttesa({ force = false } = {}) {
+  // La guardia dev'essere SINCRONA: se si aspettasse anche solo una lettura
+  // prima di piantare la bandierina, due giri partiti insieme passerebbero
+  // entrambi e il modello verrebbe pagato due volte.
   if (_giroInCorso) return _giroInCorso;
-  const Mem0 = Mem();
-  const coda = Mem0 ? await Mem0.listPendingNotifications() : [];
-  // Coda vuota: niente da fare, e niente che consumi il freno — così il primo
-  // avviso che finisce in coda ha subito la sua occasione.
-  if (!coda.length) return { mostrati: 0, bloccati: 0, restano: 0 };
-  if (!force && _ultimoGiro && Date.now() - _ultimoGiro < RIPRESA_MIN_MS) {
-    return { mostrati: 0, bloccati: 0, restano: coda.length, rimandato: true };
-  }
-  _ultimoGiro = Date.now();
   _giroInCorso = (async () => {
     const M = Mem();
     const G = TG();
     if (!M || !G) return { mostrati: 0, bloccati: 0, restano: 0 };
+    const coda = await M.listPendingNotifications();
+    // Coda vuota: niente da fare, e niente che consumi il freno — così il primo
+    // avviso che ci finisce ha subito la sua occasione.
+    if (!coda.length) return { mostrati: 0, bloccati: 0, restano: 0 };
+    if (!force && _ultimoGiro && Date.now() - _ultimoGiro < RIPRESA_MIN_MS) {
+      return { mostrati: 0, bloccati: 0, restano: coda.length, rimandato: true };
+    }
+    _ultimoGiro = Date.now();
     let mostrati = 0;
     let bloccati = 0;
     for (const voce of coda) {
