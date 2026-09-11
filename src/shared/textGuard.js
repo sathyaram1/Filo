@@ -346,6 +346,7 @@
 
     FORMA_OTP.lastIndex = 0;
     while ((m = FORMA_OTP.exec(s))) {
+      if (!codiceUsaEGetta(m[0])) continue;
       if (vicino(s, m.index, PAROLE_CODICE) || vicino(s, m.index, PAROLE_PASSWORD)) {
         return esito('codice-usa-e-getta', m[0]);
       }
