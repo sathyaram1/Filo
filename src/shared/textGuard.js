@@ -369,10 +369,29 @@
   // Chi chiede di passare il codice a qualcuno: il verbo che fa la truffa.
   const CHIEDE_DI_PASSARLO = /(comunic|inoltr|inseris|digit|fornis|invia|inviar|condivid|dett|riferis|manda|trasmett|copia|dimmi|dammi)/i;
   // Quello che «codice» qualifica quasi sempre, e che non apre niente.
+  //
+  // Il qualificatore va riconosciuto anche CON L'ARTICOLO in mezzo, che in
+  // italiano è la forma normale: si scrive «il codice dell'ordine» molto più
+  // spesso di «il codice ordine». Tenere solo la forma secca lasciava fuori
+  // proprio le frasi più comuni, e la risposta spariva a chi chiedeva il codice
+  // del suo ordine o del suo coupon.
+  const PRIMA_DEL_QUALIFICATORE = '(?:(?:di|del|dello|della|dei|degli|delle|dell\'|d\'|al|alla|il|la|lo|un|una)\\s*)?';
+  const QUALIFICATORE_INNOCUO = [
+    'sconti?', 'promo\\w*', 'coupon', 'buoni?', 'saldi',
+    'ordin[ei]', 'client[ei]', 'utente', 'fornitore', 'negozio', 'carrello',
+    'postale', 'fiscale', 'iban', 'bic', 'swift', 'ean', 'isbn', 'sdi', 'meccanografico',
+    'prodott[oi]', 'articol[oi]', 'lotto', 'seriale',
+    'prenotazione', 'pratica', 'tracciamento', 'spedizione', 'consegna', 'ritiro',
+    'fattura', 'contratto', 'bollettino', 'pagoPA', 'avviso', 'tributo',
+    'biglietto', 'abbonamento', 'tessera', 'iscrizione', 'cors[oi]', 'event[oi]',
+    'errore', 'colore', 'sorgente', 'civico', 'paese', 'destinatario', 'univoco',
+    'identificativo', 'a barre', 'catastale', 'ateco', 'stazione', 'aeroporto',
+    'iata', 'icao', 'vol[oi]', 'stanza', 'camera', 'avviamento', 'condominio',
+    'filiale', 'agenzia', 'magazzino', 'deposito',
+  ].join('|');
   const CODICE_INNOCUO = new RegExp([
-    'codic[ei]\\s+(?:sconto|promo\\w*|ordine|cliente|utente|postale|fiscale|iban|bic|swift|ean|isbn|prodotto|articolo|prenotazione|pratica|tracciamento|spedizione|errore|colore|sorgente|civico|paese|tributo|destinatario|univoco|identificativo|a barre|catastale|ateco|stazione|aeroporto|iata|icao)',
-    'codic[ei]\\s+(?:di|del|della|dello)\\s+(?:tracciamento|spedizione|prenotazione|avviso|sconto|ordine|errore|volo|stanza|camera|paese|avviamento)',
-    'numero di serie', 'numero d\'ordine', 'numero di pratica',
+    `codic[ei]\\s+${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_INNOCUO})`,
+    'numero (?:di|d\')\\s*(?:serie|seriale|ordine|pratica|prenotazione|spedizione|tracciamento|fattura|cliente|biglietto)',
   ].join('|'), 'i');
   const PAROLE_RECUPERO = /(recuper|recovery|backup code|codici di ripristino|ripristin)/i;
   // «password» e i suoi sinonimi stanno già in CODICE_GENERICO: valgono come

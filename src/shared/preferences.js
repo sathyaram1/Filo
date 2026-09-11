@@ -219,7 +219,9 @@
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
-        return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"` };
+        // #536 — testo libero che l'utente rilegge nelle Preferenze: passa dal
+        // guardiano se a sceglierlo è stato un turno che aveva letto roba di altri.
+        return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"`, testoLibero: true };
       },
     },
     {
@@ -244,7 +246,7 @@
           if (!hit) return null;
           return { partial: { tts: { modelVoice: hit.id } }, label: `Voce naturale → ${hit.label} (${Voices.LANG_LABELS[hit.lang] || hit.lang})` };
         }
-        return { partial: { tts: { modelVoice: s } }, label: `Voce naturale → "${s}"` };
+        return { partial: { tts: { modelVoice: s } }, label: `Voce naturale → "${s}"`, testoLibero: true };
       },
     },
 
@@ -403,7 +405,11 @@
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
-        return { partial: { apiKeys: { openrouter: s } }, label: `Chiave OpenRouter → ${maskKey(s)}` };
+        // #536 — una chiave non è parole per l'utente: non compare mai in chiaro
+        // (l'etichetta la maschera) e ogni controllo statico la fermerebbe, perché
+        // ha esattamente la forma di una credenziale. Qui la difesa è il livello 2,
+        // cioè la conferma con il rischio scritto, non il guardiano del testo.
+        return { partial: { apiKeys: { openrouter: s } }, label: `Chiave OpenRouter → ${maskKey(s)}`, testoLibero: false };
       },
     },
 
@@ -415,7 +421,8 @@
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
-        return { partial: { apiKeys: { tavily: s } }, label: `Chiave Tavily → ${maskKey(s)}` };
+        // Come la chiave OpenRouter: non è testo per l'utente (vedi lì).
+        return { partial: { apiKeys: { tavily: s } }, label: `Chiave Tavily → ${maskKey(s)}`, testoLibero: false };
       },
     },
     {
