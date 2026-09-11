@@ -177,6 +177,10 @@ jobs:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
+          # #581: da quando config/secrets e' leggibile solo dall'admin, questa
+          # e' l'unica strada per far arrivare la chiave Safe Browsing agli
+          # utenti. Se il server la restituisce gia', questo secret non serve.
+          FILO_DEFAULT_SAFEBROWSING_KEY: ${{ secrets.FILO_DEFAULT_SAFEBROWSING_KEY }}
         run: node scripts/bake-default-config.mjs
 
       # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────
@@ -318,6 +322,10 @@ jobs:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           FILO_DEFAULT_GEMINI_KEY: ${{ secrets.FILO_DEFAULT_GEMINI_KEY }}
           FILO_DEFAULT_TAVILY_KEY: ${{ secrets.FILO_DEFAULT_TAVILY_KEY }}
+          # #581: da quando config/secrets e' leggibile solo dall'admin, questa
+          # e' l'unica strada per far arrivare la chiave Safe Browsing agli
+          # utenti. Se il server la restituisce gia', questo secret non serve.
+          FILO_DEFAULT_SAFEBROWSING_KEY: ${{ secrets.FILO_DEFAULT_SAFEBROWSING_KEY }}
         run: node scripts/bake-default-config.mjs
 
       # Senza certificato Apple lo strumento di impacchettamento salta la firma
