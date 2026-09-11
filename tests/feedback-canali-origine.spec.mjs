@@ -38,6 +38,10 @@
 // è l'installazione di chi gestisce i feedback, il pannello del red-team se
 // c'è una sessione), ma di là dal confine non passano né l'indirizzo email né
 // l'identificativo dell'account.
+//
+// Il quinto guarda la stessa porta dal verso opposto: l'avviso «l'accesso è
+// cambiato» porta il profilo, quindi va alle sole superfici di Filo. Se un sito
+// non lo può chiedere, non glielo si manda da soli.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -235,4 +239,38 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
   // mostrano chi è entrato.
   expect(out.filo.ok).toBe(true);
   expect(Object.keys(out.filo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
+});
+
+test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
+  // La stessa porta vista dal verso opposto: se un sito non può CHIEDERE chi
+  // sta usando Filo, non glielo si manda nemmeno da soli. L'avviso di cambio
+  // accesso porta il profilo, cioè l'indirizzo email.
+  await openTab('filo://board/board.html');
+  await testServer.openReady(openTab, '<html><body><p>sito qualunque</p></body></html>');
+
+  const conteggi = await app.evaluate(async ({ BrowserWindow }) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const spie = [];
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win._filoTabs) continue;
+      for (const t of win._filoTabs.tabs) {
+        const wc = t.view.webContents;
+        const spia = { url: String(wc.getURL() || ''), ricevuti: [] };
+        const orig = wc.send.bind(wc);
+        wc.send = (canale, m) => { spia.ricevuti.push({ canale, tipo: m && m.type, haProfilo: !!(m && 'profile' in m) }); return orig(canale, m); };
+        spie.push(spia);
+      }
+    }
+    await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_SIGNOUT }, { url: 'filo://options/options.html' });
+    return spie.map((s) => ({ url: s.url, avvisi: s.ricevuti.filter((r) => r.tipo === 'auth_changed') }));
+  });
+
+  const filo = conteggi.filter((c) => c.url.startsWith('filo://'));
+  const web = conteggi.filter((c) => c.url.startsWith('http://'));
+  expect(filo.length, 'serve almeno una pagina filo:// aperta').toBeGreaterThan(0);
+  expect(web.length, 'serve almeno una scheda su un sito qualunque').toBeGreaterThan(0);
+  for (const c of filo) expect(c.avvisi.length, `${c.url}: le pagine di Filo devono saperlo`).toBeGreaterThan(0);
+  for (const c of web) {
+    expect(c.avvisi.length, `${c.url}: l'avviso con dentro il profilo è arrivato a un sito visitato`).toBe(0);
+  }
 });

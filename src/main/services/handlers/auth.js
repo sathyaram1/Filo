@@ -237,7 +237,7 @@ module.exports = function register(on, ctx) {
   on(MSG.AUTH_SIGNIN, async () => {
     try {
       const profile = await auth.signIn();
-      broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
+      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile });
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
       // le chiavi arrivano col build); resta utile per config/models.
@@ -258,7 +258,7 @@ module.exports = function register(on, ctx) {
   on(MSG.AUTH_SIGNOUT, soloFilo(async () => {
     try {
       auth.signOut();
-      broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
+      avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
