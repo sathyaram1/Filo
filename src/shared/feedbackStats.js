@@ -381,8 +381,8 @@
     // L'ultima riga scritta prima dell'elenco: è lì, e solo lì, che il server
     // dichiara la decisione. Il riassunto sta tutto sopra.
     let ultima = '';
-    for (let k = fine - 1; k >= 0; k -= 1) {
-      if (corpo[k].trim()) { ultima = corpo[k]; break; }
+    for (let j = fine - 1; j >= 0; j -= 1) {
+      if (corpo[j].trim()) { ultima = corpo[j]; break; }
     }
     const phrase = ROUND_OUTCOME_PHRASES.find((p) => p.re.test(ultima));
     // Senza quella riga non è un verbale. Indovinare la decisione dal livello
