@@ -41,9 +41,32 @@ garanzia che mancava, e metterla costava un confronto. **Una garanzia che costa
 una riga si mette anche senza un exploit in mano**, perché l'exploit lo trova
 chi arriva dopo.
 
+## La credenziale non è l'unica cosa che si attacca a un indirizzo
+
+Il giro 2 della stessa verifica ha trovato la seconda porta, e vale la pena
+tenerla accanto alla prima perché la causa è identica e il sintomo no. Lo stesso
+indirizzo scritto da chi manda la segnalazione diventava, nel riquadro dei
+feedback, un **collegamento cliccabile**: pillola col nome scelto dal mittente
+(`schermata.png`), `href` verso l'indirizzo scritto da lui. Bastava mandare una
+segnalazione, senza account e senza avere Filo, per mettere un'esca dentro una
+pagina di Filo davanti a ogni tester che apre l'elenco. Nessuna credenziale
+partiva: partiva l'utente.
+
+La dashboard lo stesso indirizzo lo controllava già, perché lì l'allegato passa
+dal canale del main. Due strade per la stessa cosa, e una non guardava niente:
+**quando un dato che arriva da fuori ha due consumatori, il controllo va nel
+punto che li serve entrambi**, non nel primo che lo ha chiesto.
+
+**La regola, allargata: un indirizzo che arriva da fuori non si usa mai com'è.**
+Non ci si firma una richiesta, e non se ne fa un `href`. Se il posto giusto dove
+portare l'utente è un contenuto di Filo, il clic passa dal canale che sa
+verificare l'indirizzo e restituire il contenuto; l'`href` resta `#`.
+
 Dove vive: `isAttachmentUrl` e `attachmentFetchHeaders` in
 `src/shared/feedback.js` (pure, una fonte sola per il main e per le pagine),
-con la guardia in `tests/unit/storageRulesAllegati.test.mjs`.
+con la guardia in `tests/unit/storageRulesAllegati.test.mjs`; il lato pagina in
+`filesListHtml`/`resolveFileLinks` di `src/pages/feedback/feedback.js`, con la
+guardia in `tests/feedback-allegato-del-mittente.spec.mjs`.
 
 Vicino:
 [Un permesso si concede col verbo stretto](un-permesso-si-concede-col-verbo-stretto-read-e-anche-list.md)
