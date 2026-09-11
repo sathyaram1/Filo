@@ -40,12 +40,20 @@ const PAUSA_MS = 700;
 //   segreti() → string[] dei segreti che Filo custodisce
 let _eseguiModello = null;
 let _segreti = null;
+let _avvisaCambio = null;
 let _pausaMs = PAUSA_MS;
 
-function configure({ eseguiModello, segreti, pausaMs } = {}) {
+function configure({ eseguiModello, segreti, pausaMs, avvisaCambio } = {}) {
   _eseguiModello = typeof eseguiModello === 'function' ? eseguiModello : null;
   _segreti = typeof segreti === 'function' ? segreti : null;
+  _avvisaCambio = typeof avvisaCambio === 'function' ? avvisaCambio : null;
   if (Number.isFinite(pausaMs)) _pausaMs = Math.max(0, pausaMs);
+}
+
+// La colonna live deve accorgersene subito, non al giro dopo.
+function cambiato() {
+  if (!_avvisaCambio) return;
+  try { _avvisaCambio(); } catch (_) {}
 }
 
 function TG() { return globalThis.SN_TEXT_GUARD; }
