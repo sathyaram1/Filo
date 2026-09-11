@@ -34,8 +34,8 @@ async function newtabPage(app) {
 
 // Frasi innocue, una per parola che tradisce.
 const INNOCUE = [
-  'Il codice della spedizione è 483920 e nei dettagli trovi l’orario di consegna.',
-  'La tua domanda è stata registrata con il codice 5512.',
+  'Il codice 483920 è nei dettagli della consegna.',
+  'La domanda di iscrizione è stata registrata con il codice 5512.',
   'Il codice 2210 apre la versione digitale del biglietto.',
   'Nella copia del contratto compare il codice 8823.',
   'Il portale fornisce il codice 3390 in sola lettura.',
