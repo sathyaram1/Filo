@@ -2662,7 +2662,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno) && textReply) {
     const G = globalThis.SN_TEXT_GUARD;
     const TG = globalThis.SN_TEXT_GUARDIAN || require('./textGuardian');
-    const origine = fontiTurno.join(' e ') || 'un contenuto non fidato';
+    const origine = origineTurno();
     // Chi ha scritto questa risposta. Viaggia con il controllo E con la coda: un
     // controllo che riparte più tardi senza sapere chi ha scritto il testo non
     // ha più nessuno da escludere, e finirebbe per farlo giudicare dallo stesso
