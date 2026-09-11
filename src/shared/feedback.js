@@ -102,8 +102,7 @@
 
   // Upload diretto a Firebase Storage. Ritorna { url, name }.
   async function uploadImage(blob) {
-    const ext = (blob.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
-    const name = `${COLLECTION}/${Date.now()}_${uuid()}.${ext}`;
+    const name = attachmentPath(blob.type || 'png');
     const url = `${STORAGE_BASE}?uploadType=media&name=${encodeURIComponent(name)}`;
     const res = await fetch(url, {
       method: 'POST',
