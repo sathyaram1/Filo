@@ -112,8 +112,17 @@ async function fetchDoc(docPath, idToken) {
 
 // ── API ──────────────────────────────────────────────────────────────────────
 
-// Aggiorna la cache leggendo da Firestore. `config/models` pubblico; i segreti
-// solo se l'utente è loggato (richiede un ID token).
+// Vero se chi sta usando Filo è nell'allowlist admin. È solo il gate LOCALE che
+// evita di bussare a un documento che non ci riguarda: la garanzia forte è la
+// regola Firestore (`config/secrets` → `allow read: if isAdmin()`), che risponde
+// permission denied a chiunque altro anche se questa funzione mentisse.
+function isAdminUser() {
+  try { return Boolean(auth.isAdmin()); } catch (_) { return false; }
+}
+
+// Aggiorna la cache leggendo da Firestore. `config/models` è pubblico;
+// `config/secrets` si legge SOLO da admin (#581): per tutti gli altri le chiavi
+// sono quelle incastonate dal build, e questo documento non si tocca affatto.
 async function refresh() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
@@ -121,9 +130,15 @@ async function refresh() {
   const models = await fetchDoc(MODELS_DOC, idToken);
   if (models) remoteModels = models;
 
-  if (idToken) {
+  if (idToken && isAdminUser()) {
     const secrets = await fetchDoc(SECRETS_DOC, idToken);
     if (secrets) remoteSecrets = secrets;
+  } else {
+    // Chi non è admin non ha override: azzerare invece di lasciare la cache
+    // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
+    // stessa installazione (altrimenti le chiavi lette da admin resterebbero in
+    // uso per un account che non può più leggerle).
+    remoteSecrets = null;
   }
   lastFetchTs = Date.now();
   return get();
