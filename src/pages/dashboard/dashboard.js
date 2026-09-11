@@ -531,6 +531,22 @@
       send({ type: MSG.RUN_TAB_TRIAGE });
       return;
     }
+    // #536 — questo bottone l'ha scritto un modello che aveva davanti i titoli
+    // delle pagine salvate, cioè parole di estranei: l'etichetta e l'indirizzo
+    // può averli scelti chi ha scritto quella pagina. Il testo l'ha già guardato
+    // il guardiano; il gesto no, e aprire un indirizzo con un clic solo era la
+    // metà peggiore. Stessa regola di un link aperto da Filo dopo una pagina
+    // avvelenata: si conferma, con scritto dove porta davvero.
+    if (s._contaminato && (type === 'NAVIGA' || type === 'APRI_FILE') && (a.url || a.path)) {
+      const url = a.url || a.path;
+      const dove = window.SN_TEXT_GUARD ? window.SN_TEXT_GUARD.destinazioneVisibile(url) : url;
+      const text = `Filo sta per aprire un indirizzo che ha trovato in quello che ha letto:\n${url}\n\n`
+        + `Porta a ${dove}. Aprilo solo se te lo aspettavi.`;
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({ title: 'Aprire questo indirizzo?', text, okLabel: 'Apri' })
+        : window.confirm(text);
+      if (!ok) return;
+    }
     if (type === 'NAVIGA' && a.url) {
       chrome.tabs.create({ url: a.url });
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
