@@ -97,6 +97,11 @@
     if (!m) throw new Error('SN_MANAGE_REVIEW mancante: carica shared/manageReview.js prima di feedbackPublicView.js');
     return m;
   }
+  function CIH() {
+    const m = global.SN_FEEDBACK_CLIENT_ID_HASH;
+    if (!m) throw new Error('SN_FEEDBACK_CLIENT_ID_HASH mancante: carica shared/feedbackClientIdHash.js prima di feedbackPublicView.js');
+    return m;
+  }
 
   function str(v, max) {
     const s = typeof v === 'string' ? v : (v == null ? '' : String(v));
