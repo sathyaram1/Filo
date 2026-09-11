@@ -62,10 +62,9 @@ test('l’assistente laterale risponde con le parole della pagina e non passa da
       };
     }, { trappola: TRAPPOLA });
 
-    await page.waitForFunction(
-      () => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 10_000 },
-    );
-    await page.evaluate(() => window.SN_SIDEBAR.open());
+    // Come lo apre l'utente: Alt+H sulla pagina.
+    await page.locator('#paragraph').click();
+    await page.keyboard.press('Alt+h');
     const input = page.locator('.sn-sidebar-input textarea');
     await expect(input).toBeVisible({ timeout: 10_000 });
     await input.fill('cosa dice questa pagina?');
