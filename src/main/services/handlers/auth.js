@@ -767,6 +767,7 @@ module.exports = function register(on, ctx) {
         const id = String((r && r._id) || '');
         if (!id || visti.has(id)) continue;
         visti.add(id);
+        aggiunti.add(id);
         rows.push(r);
       }
     };
