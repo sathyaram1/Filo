@@ -104,6 +104,9 @@
     // Sicurezza e navigazione
     user('safebrowse-judge', 'Giudizio sui siti pericolosi', 'Sicurezza', A.SAFEBROWSE_JUDGE),
     user('geoblock-classify', 'Riconoscimento dei blocchi geografici', 'Sicurezza', A.GEOBLOCK_CLASSIFY),
+    user('guard-text', 'Guardiano degli avvisi nati da mail e pagine', 'Sicurezza', A.GUARD_TEXT,
+      'Deve essere un modello DIVERSO da quello della chat: se coincide, il controllo non parte '
+      + 'e l\'avviso resta in attesa invece di comparire senza controllo.'),
 
     // Feedback
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),
