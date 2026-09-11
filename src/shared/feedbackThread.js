@@ -370,15 +370,18 @@
   // turno per uno e prosa per l'altro.
   function turnOpeners(lines) {
     const apre = new Array(lines.length).fill(false);
-    let ultimoTs = null;
+    const ultimoTs = { user: null, model: null };
     for (let i = 0; i < lines.length; i += 1) {
-      const m = USER_TURN_RE.exec(lines[i]) || MODEL_TURN_RE.exec(lines[i]);
+      const mu = USER_TURN_RE.exec(lines[i]);
+      const mm = mu ? null : MODEL_TURN_RE.exec(lines[i]);
+      const m = mu || mm;
       if (!m) continue;
       if (!markerOpensTurn(lines, i)) continue;
+      const chi = mu ? 'user' : 'model';
       const ts = (m[1] || '').trim() || null;
-      if (markerIsQuoted(ts, ultimoTs)) continue;
+      if (markerIsQuoted(ts, ultimoTs[chi])) continue;
       apre[i] = true;
-      if (ts) ultimoTs = ts;
+      if (ts) ultimoTs[chi] = ts;
     }
     return apre;
   }
