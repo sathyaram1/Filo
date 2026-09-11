@@ -785,7 +785,23 @@ module.exports = function register(on, ctx) {
       try { aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 })); }
       catch (e) { console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e); }
     }
-    return rows;
+    return { rows, aggiunti };
+  }
+
+  /**
+   * Lo stato di questo feedback si è potuto leggere davvero? Un campo cifrato
+   * che non si apre torna come segnaposto, e uno stato illeggibile non è
+   * «questo feedback non merita una scheda»: pubblicare o togliere basandosi
+   * su quello vorrebbe dire far sparire dalla bacheca un fix buono. Sulle
+   * segnalazioni pescate fuori pagina, che prima questo giro non guardava
+   * nemmeno, in quel caso si sta fermi.
+   */
+  function statusLeggibile(fb) {
+    const MR = globalThis.SN_MANAGE_REVIEW;
+    const v = fb && fb.status;
+    if (!v) return true; // uno stato assente è il vecchio «da lavorare»: non è illeggibile
+    if (MR && typeof MR.valueUnreadable === 'function') return !MR.valueUnreadable(v);
+    return !String(v).startsWith('FENC');
   }
 
   function scheduleViewSync({ delayMs = 2000, force = false, rows = null } = {}) {
