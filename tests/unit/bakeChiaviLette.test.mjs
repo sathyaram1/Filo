@@ -39,7 +39,7 @@ const FILE_VERO = join(RADICE, 'src', 'main', 'config', 'default-keys.generated.
 // non tocca la rete) più le chiavi passate. Ritorna il codice d'uscita e il file
 // scritto, se c'è.
 function costruisci(chiavi) {
-  const cartella = mkdtempSync(join(tmpdir(), 'filo-bake-'));
+  const cartella = cartellaTemporanea('filo-bake-');
   const out = join(cartella, 'generato.json');
   const env = { ...process.env, FILO_BAKE_OUT: out };
   for (const n of ['FILO_BUILD_PASSPHRASE', 'FILO_DEFAULT_OPENROUTER_KEY', 'FILO_DEFAULT_GEMINI_KEY',
