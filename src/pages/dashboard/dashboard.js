@@ -748,7 +748,7 @@
     if (cursore < s.length) el.appendChild(document.createTextNode(s.slice(cursore)));
   }
 
-  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, origine, guardiano }) {
+  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, origine, guardiano, bloccoId }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
     div.dataset.kind = kind;
