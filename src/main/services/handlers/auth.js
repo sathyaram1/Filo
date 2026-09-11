@@ -753,12 +753,14 @@ module.exports = function register(on, ctx) {
    *     restare «risolto», votabile e riapribile a pagamento.
    *
    * Best-effort: se una delle due domande non riesce, il giro prosegue con
-   * quello che ha invece di fermarsi.
+   * quello che ha invece di fermarsi. Torna anche gli id aggiunti, perché su
+   * quelli chi pubblica è più prudente (vedi `statusLeggibile`).
    */
   async function conLeSegnalazioniFuoriPagina(base, idToken, schede) {
     const FB = FEEDBACK();
     const rows = Array.isArray(base) ? base.slice() : [];
-    if (!FB || !idToken) return rows;
+    const aggiunti = new Set();
+    if (!FB || !idToken) return { rows, aggiunti };
     const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
     const aggiungi = (arr) => {
       for (const r of Array.isArray(arr) ? arr : []) {
