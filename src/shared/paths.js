@@ -318,6 +318,7 @@
     submit,
     listByDomain,
     formatForPrompt,
+    unaRiga,
     configPublic: { projectId: PROJECT_ID, collection: COLLECTION, subcollection: SUBCOLLECTION },
     rest: { FIRESTORE_BASE, MAX_PAGE_SIZE, PROMPT_BUDGET_CHARS },
     _internal: { segmentoDominio, giornoArrotondato, clusterKey, unaRiga },
