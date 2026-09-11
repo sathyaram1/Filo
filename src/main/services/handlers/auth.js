@@ -241,7 +241,11 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  on(MSG.AUTH_SIGNOUT, async () => {
+  // Uscire dall'account lo chiede solo la finestra di Filo. Da un sito
+  // visitato era un modo per buttare fuori chi sta usando Filo: da lì in poi
+  // la posta delle segnalazioni non si apre e la bacheca di tutti smette di
+  // aggiornarsi, finché non rientra.
+  on(MSG.AUTH_SIGNOUT, soloFilo(async () => {
     try {
       auth.signOut();
       broadcastToTabs({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
