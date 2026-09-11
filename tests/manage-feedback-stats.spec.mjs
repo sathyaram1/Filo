@@ -610,15 +610,20 @@ test('la scala dei colori della torta si scalda e non riusa una tinta', async ({
   const ora = Date.now();
   // Lavorazioni costate 0, 1, 2, 3, 4, 5 e 7 critiche: sette fette.
   await page.evaluate(({ base }) => {
-    const giro = [
+    // Ogni giro ha il SUO verbale e il SUO marcatore, come nelle conversazioni
+    // vere: un verbale ripetuto identico sotto un marcatore ripetuto identico
+    // non è un secondo giro, è qualcuno che cita il primo (#496, giro 12).
+    const ora2 = (k) => String(8 + k).padStart(2, '0');
+    const giro = (k) => [
       'Verifica: 1 rilievo.',
+      `Provato: il giro ${k}.`,
       'La correzione riguarda tutti i rilievi; poi un\'altra verifica ricontrolla.',
-      '- [1] Un rilievo',
+      `- [1] Un rilievo, il numero ${k}`,
       '',
-      "--- Aggiornamento dell'agente del 01/09/2026, 10:00 ---",
+      `--- Aggiornamento dell'agente del 0${k}/09/2026, ${ora2(k)}:00 ---`,
       'Corretto.',
       '',
-      "--- Aggiornamento dell'agente del 01/09/2026, 12:00 ---",
+      `--- Aggiornamento dell'agente del 0${k}/09/2026, ${ora2(k)}:30 ---`,
       '',
     ].join('\n');
     const lista = [0, 1, 2, 3, 4, 5, 7].map((g, i) => ({
@@ -626,7 +631,7 @@ test('la scala dei colori della torta si scalda e non riusa una tinta', async ({
       status: 'done',
       createdAt: new Date(base - 5 * 24 * 3600 * 1000).toISOString(),
       _updateTime: new Date(base - 24 * 3600 * 1000).toISOString(),
-      notes: `${giro.repeat(g)}--- Aggiornamento dell'agente del 01/09/2026, 18:00 ---\nVerifica superata.`,
+      notes: `${Array.from({ length: g }, (_, k) => giro(k + 1)).join('')}--- Aggiornamento dell'agente del 09/09/2026, 18:00 ---\nVerifica superata.`,
     }));
     window.__mgTest.setData(lista);
   }, { base: ora });
