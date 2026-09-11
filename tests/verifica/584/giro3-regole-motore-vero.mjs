@@ -70,7 +70,7 @@ console.log('\n— la strada REST, quella vera di Filo —');
   // La lettura "a elenco" senza passare da runQuery: qui NON c'è nessuna
   // `request.query.limit`, quindi la regola del tetto decide da sola.
   const r = await rest('/paths?pageSize=300');
-  esito(r.status !== 200, `anonimo: elencare la raccolta `paths` via REST → ${r.status}`);
+  esito(r.status !== 200, `anonimo: elencare la raccolta paths via REST → ${r.status}`);
 }
 {
   const r = await rest('/paths/esempio.it');
