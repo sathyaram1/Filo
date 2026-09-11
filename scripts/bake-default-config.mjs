@@ -150,13 +150,25 @@ async function main() {
   }
 
   mkdirSync(dirname(OUT_PATH), { recursive: true });
-  writeFileSync(OUT_PATH, JSON.stringify({ apiKeys, bakedAt: new Date().toISOString() }, null, 2) + '\n', 'utf8');
+  writeFileSync(
+    OUT_PATH,
+    JSON.stringify({ apiKeys, safeBrowsingKey, bakedAt: new Date().toISOString() }, null, 2) + '\n',
+    'utf8'
+  );
 
   // Log SENZA valori: solo presenza/assenza, così la CI non espone segreti.
   const summary = Object.fromEntries(
-    Object.entries(apiKeys).map(([k, v]) => [k, v ? 'presente' : 'assente'])
+    Object.entries({ ...apiKeys, safeBrowsing: safeBrowsingKey })
+      .map(([k, v]) => [k, v ? 'presente' : 'assente'])
   );
   console.log(`[bake] scritto ${OUT_PATH}:`, JSON.stringify(summary));
+  // La Safe Browsing assente non ferma la pubblicazione (è un contorno: senza,
+  // il primo stadio si salta e restano giudice LLM, sandbox e segnali di rete),
+  // ma NON deve sparire in silenzio: da quando il documento dei segreti è
+  // admin-only, questa è l'unica strada che porta la chiave agli utenti.
+  if (!safeBrowsingKey) {
+    console.warn('::warning::Nessuna chiave Google Safe Browsing: il primo stadio del rilevamento siti pericolosi resterà spento in questa versione.');
+  }
 }
 
 /** Apre un feedback quando la costruzione sta per produrre una versione monca. */
