@@ -50,16 +50,17 @@ test('il mittente vede che il suo screenshot è partito, non un errore di permes
   await page.locator('#refresh').click();
 
   const segnaposto = page.locator('.fb-img-broken');
-  // «consegnato» e non «inviato»: la stessa scritta compare anche davanti
-  // all'allegato di un altro, perché l'elenco mostra le segnalazioni di tutti
-  // (#582, giro 3).
-  await expect(segnaposto).toHaveText('(allegato consegnato)', { timeout: 10_000 });
+  // Non «inviato»: la stessa scritta compare anche davanti all'allegato di un
+  // altro, perché l'elenco mostra le segnalazioni di tutti (#582, giro 3). E
+  // non «consegnato»: Filo non ha guardato se quei byte siano mai arrivati
+  // (#582, giro 5).
+  await expect(segnaposto).toHaveText('(allegato riservato)', { timeout: 10_000 });
 
-  // L'hover dice perché, e non manda a cercare permessi di amministratore.
+  // L'hover dice chi lo apre, e non manda a cercare permessi di amministratore.
   const motivo = await segnaposto.getAttribute('title');
-  expect(motivo).toMatch(/consegnat/i);
+  expect(motivo).toMatch(/lo apre solo chi riceve le segnalazioni/i);
   expect(motivo).not.toMatch(/amministrat/i);
-  expect(motivo).not.toMatch(/riservata/i);
+  expect(motivo).not.toMatch(/riservata agli/i);
 });
 
 const DOCUMENTO = 'https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1788891497001_3f2a1b0c-2222-4222-8333-444455556666.pdf?alt=media&token=def';
