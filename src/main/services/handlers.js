@@ -2876,7 +2876,19 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     openTabsCount, partOfDay, dayType, dateKey,
   });
 
-  return { settings, hasKey, payload, signature, saved };
+  // #536 — DA DOVE NASCE LA HOME. Il saluto al centro e i bottoni della colonna
+  // di sinistra li scrive un modello, e fra gli ingredienti che gli diamo ci
+  // sono i TITOLI delle pagine che l'utente ha salvato e i riassunti dei suoi
+  // file. Il titolo di una pagina lo sceglie chi l'ha scritta, quindi la home è
+  // testo nato da roba scritta da altri esattamente come una risposta dopo una
+  // ricerca: passa dal guardiano prima di comparire.
+  const fonti = [];
+  if (saved.length) fonti.push('una pagina che hai salvato');
+  if (filesList.length) fonti.push('un tuo file');
+  const G536 = globalThis.SN_TEXT_GUARD;
+  const fiducia = fonti.length ? G536.FIDUCIA.CONTAMINATO : G536.FIDUCIA.PULITO;
+
+  return { settings, hasKey, payload, signature, saved, fiducia, origine: fonti.join(' e ') };
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
