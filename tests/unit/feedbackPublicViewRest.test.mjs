@@ -123,3 +123,84 @@ test('la lettura con credenziali le allega; la vista pubblica no (non ne ha)', a
     assert.equal(calls[1].body.structuredQuery.from[0].collectionId, 'feedback-public');
   });
 });
+
+// ── Il contatore gonfiato si rimette in pari (#583, giro 1 di verifica) ─────
+//
+// Farlo avanzare di uno lo può fare chiunque: è quello che fa chi invia un
+// feedback, e nessuna regola sa distinguerlo da chi lo alza a vuoto. Senza un
+// modo di riportarlo giù, un estraneo lascerebbe i feedback nuovi con numeri
+// assurdi per sempre, e l'unica cura sarebbe la console Firebase.
+
+test('il contatore più alto di ogni numero esistente torna in pari, ma solo avendo letto tutto', async () => {
+  const gonfiato = { fields: { value: { integerValue: '90000' } }, updateTime: 'T1' };
+
+  // Senza `allowLower` (caricamento parziale): non si tocca. Abbassarlo avendo
+  // visto solo una parte dei feedback riassegnerebbe numeri già usati.
+  await withFetch((call) => okJson(gonfiato), async (calls) => {
+    const v = await FB.ensureSeqCounter(584, { idToken: 'tok' });
+    assert.equal(v, 90000);
+    assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0);
+  });
+
+  // Con `allowLower` (li abbiamo letti tutti): torna al massimo `seq` vero.
+  await withFetch((call) => (call.method === 'PATCH' ? okJson({}) : okJson(gonfiato)), async (calls) => {
+    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', allowLower: true });
+    assert.equal(v, 584);
+    const patch = calls.find((c) => c.method === 'PATCH');
+    assert.ok(patch, 'il contatore va riscritto');
+    assert.equal(patch.body.fields.value.integerValue, '584');
+    assert.match(String(patch.headers.Authorization || ''), /^Bearer /,
+      'riportarlo giù è cosa da owner: senza token le regole lo rifiutano');
+  });
+});
+
+test('un contatore già in pari non si riscrive, nemmeno con allowLower', async () => {
+  const inPari = { fields: { value: { integerValue: '584' } }, updateTime: 'T1' };
+  await withFetch(() => okJson(inPari), async (calls) => {
+    const v = await FB.ensureSeqCounter(584, { idToken: 'tok', allowLower: true });
+    assert.equal(v, 584);
+    assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0);
+  });
+});
+
+test('un contatore INDIETRO si alza sempre, allowLower o no', async () => {
+  const indietro = { fields: { value: { integerValue: '10' } }, updateTime: 'T1' };
+  await withFetch((call) => (call.method === 'PATCH' ? okJson({}) : okJson(indietro)), async (calls) => {
+    assert.equal(await FB.ensureSeqCounter(584, { idToken: 'tok' }), 584);
+    assert.equal(calls.filter((c) => c.method === 'PATCH').length, 1);
+  });
+});
+
+// ── Il travaso dei voti passa davvero per la rete ───────────────────────────
+
+test('la scheda che porta i voti storici li scrive, e la maschera li include', async () => {
+  const card = {
+    name: 'Fix', seq: 1, subSeq: 0, status: 'done', statusPublic: 'closed',
+    resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdTag: 'c',
+    userNote: 'u',
+    votes: { 'uid-a': { vote: 'works', at: 'x', credibilitySnapshot: 1 } },
+    reopenRequests: { 'uid-b': { at: 'y' } },
+  };
+  await withFetch(() => okJson({}), async (calls) => {
+    await FB.publishPublicCard('fb-1', card, { idToken: 'tok' });
+    const call = calls[0];
+    assert.match(call.url, /updateMask\.fieldPaths=votes/);
+    assert.match(call.url, /updateMask\.fieldPaths=reopenRequests/);
+    assert.ok(call.body.fields.votes, 'i voti devono arrivare nel documento');
+    assert.ok(call.body.fields.reopenRequests);
+  });
+});
+
+test('una scheda senza voti da portare non li nomina: una ripubblicazione non li cancella', async () => {
+  const card = {
+    name: 'Fix', seq: 1, subSeq: 0, status: 'done', statusPublic: 'closed',
+    resolvedInVersion: '1.0.0', createdAt: 'a', resolvedAt: 'b', clientIdTag: 'c', userNote: 'u',
+  };
+  await withFetch(() => okJson({}), async (calls) => {
+    await FB.publishPublicCard('fb-1', card, { idToken: 'tok' });
+    const call = calls[0];
+    assert.ok(!/updateMask\.fieldPaths=votes/.test(call.url));
+    assert.ok(!/updateMask\.fieldPaths=reopenRequests/.test(call.url));
+    assert.ok(!('votes' in call.body.fields));
+  });
+});
