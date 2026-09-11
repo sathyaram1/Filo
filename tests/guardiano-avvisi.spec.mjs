@@ -241,15 +241,7 @@ test('dalla riga dell’avviso fermato si arriva a vedere cosa è stato fermato'
   // sta lì, non nascosta in un menu delle Preferenze da scoprire da soli.
   await riga.locator('.dash-live-vedi').click();
 
-  const pref = await shell.waitForFunction(() => true).then(async () => {
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      const w = app.windows().find((x) => x.url().startsWith('filo://preferences'));
-      if (w) { await w.waitForLoadState('domcontentloaded'); return w; }
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    throw new Error('le Preferenze non si sono aperte');
-  });
+  const pref = await paginaPreferenze(app);
 
   const voce = pref.locator('#guardBlocksList .guard-item.guard-item-cercato');
   await expect(voce).toHaveCount(1, { timeout: 8_000 });
