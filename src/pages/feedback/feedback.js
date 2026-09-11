@@ -303,11 +303,99 @@
     return res;
   }
 
-  // Lista di allegati non-immagine come link scaricabili (nome originale).
+  // Lista di allegati non-immagine.
+  //
+  // L'indirizzo di un allegato NON diventa mai un href, e il motivo è che non lo
+  // sceglie Filo (#582): sta scritto dentro la segnalazione, e una segnalazione
+  // la manda chiunque, anche senza account e senza avere Filo installato. Le
+  // regole del database contano gli allegati, non guardano dove puntano. Con un
+  // href diretto bastava mandare una segnalazione con un finto allegato
+  // «schermata.png» che punta al proprio sito per mettere un'esca dentro una
+  // pagina di Filo, davanti a tutti quelli che aprono l'elenco: la pillola è
+  // identica a quella di un allegato vero, il nome lo sceglie chi manda, e il
+  // clic portava fuori.
+  //
+  // Il clic passa dal canale del main, che l'indirizzo lo confronta col deposito
+  // di Filo e i byte li decifra. È la stessa strada della dashboard, che questo
+  // controllo ce l'aveva già: erano due strade per la stessa cosa e una non
+  // guardava niente.
   function filesListHtml(files) {
     const fs = (files || []).filter((x) => x && typeof x.url === 'string' && x.url);
     if (!fs.length) return '';
-    return `<div class="fb-files">${fs.map((x) => `<a class="fb-file" href="${escapeHtml(safeHref(x.url) || '#')}" target="_blank" rel="noopener" download="${escapeHtml(x.name || '')}">${FILE_SVG}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`;
+    return `<div class="fb-files">${fs.map((x) => `<a class="fb-file" href="#" data-url="${escapeHtml(x.url)}" data-name="${escapeHtml(x.name || 'allegato')}" data-type="${escapeHtml(x.type || '')}">${FILE_SVG}<span class="fb-file-name">${escapeHtml(x.name || 'allegato')}</span></a>`).join('')}</div>`;
+  }
+
+  // Perché un allegato non si apre, con le parole del main (una sola fonte per
+  // quella frase). Lo si chiede solo quando chi guarda NON riceve le
+  // segnalazioni: in quel caso il main risponde subito, senza toccare la rete.
+  // Cache url → { error, soloDestinatario } | null (null = si apre).
+  const fbFileWhyCache = new Map();
+  async function fileClosedReason(url) {
+    if (!url) return null;
+    if (fbFileWhyCache.has(url)) return fbFileWhyCache.get(url);
+    let res = null;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_image', url });
+      if (!r || !r.ok) {
+        res = { error: String((r && r.error) || 'allegato non disponibile'), soloDestinatario: !!(r && r.soloDestinatario) };
+      }
+    } catch (_) {
+      res = { error: 'allegato non raggiungibile', soloDestinatario: false };
+    }
+    fbFileWhyCache.set(url, res);
+    return res;
+  }
+
+  // Lo dice sulla pillola, non solo nell'hover: chi ha mandato la segnalazione
+  // deve poter capire a colpo d'occhio che l'allegato è partito ed è illeggibile
+  // per lui, come già succede per lo screenshot lì accanto.
+  function markFileClosed(a, motivo, inviato) {
+    a.title = motivo || '';
+    a.classList.add('fb-file--closed');
+    let nota = a.querySelector('.fb-file-note');
+    if (!nota) {
+      nota = document.createElement('span');
+      nota.className = 'fb-file-note';
+      a.appendChild(nota);
+    }
+    nota.textContent = inviato ? '(inviato)' : '(non disponibile)';
+  }
+
+  // Il clic su un allegato: scarica e decifra dal main, poi salva col nome vero.
+  // Se non si può aprire, lo dice invece di consegnare un file rotto in silenzio
+  // (prima il collegamento portava ai byte cifrati: arrivava un .pdf col nome
+  // giusto che non si apriva, e nessuno spiegava perché).
+  function resolveFileLinks(root) {
+    root.querySelectorAll('a.fb-file').forEach((a) => {
+      const url = a.dataset.url || '';
+      const name = a.dataset.name || 'allegato';
+      const mime = a.dataset.type || 'application/octet-stream';
+      if (!isAdmin) {
+        fileClosedReason(url).then((r) => { if (r) markFileClosed(a, r.error, r.soloDestinatario); });
+      }
+      a.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        if (a.classList.contains('fb-file--loading')) return;
+        a.classList.add('fb-file--loading');
+        try {
+          const r = await sendToMain({ type: 'feedback_decrypt_image', url, mime });
+          if (r && r.ok && r.dataUrl) {
+            const dl = document.createElement('a');
+            dl.href = r.dataUrl;
+            dl.download = name;
+            document.body.appendChild(dl);
+            dl.click();
+            dl.remove();
+          } else {
+            markFileClosed(a, (r && r.error) || 'allegato non disponibile', !!(r && r.soloDestinatario));
+          }
+        } catch (_) {
+          markFileClosed(a, 'allegato non raggiungibile', false);
+        } finally {
+          a.classList.remove('fb-file--loading');
+        }
+      });
+    });
   }
 
   function humanSize(n) {
