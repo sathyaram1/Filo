@@ -197,7 +197,7 @@ main().catch((e) => {
     mkdirSync(dirname(OUT_PATH), { recursive: true });
     writeFileSync(
       OUT_PATH,
-      JSON.stringify({ apiKeys: { openrouter: '', gemini: '', tavily: '' }, bakedAt: new Date().toISOString() }, null, 2) + '\n',
+      JSON.stringify({ apiKeys: { openrouter: '', gemini: '', tavily: '' }, safeBrowsingKey: '', bakedAt: new Date().toISOString() }, null, 2) + '\n',
       'utf8'
     );
   } catch (_) {}
