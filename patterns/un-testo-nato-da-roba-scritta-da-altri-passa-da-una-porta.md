@@ -260,6 +260,34 @@ entra nel banco**. Per due giri il banco ha detto zero falsi positivi mentre la
 posta di un negozio spariva davvero, perché conteneva solo frasi che giravano
 intorno alla regola.
 
+E una regola che decide da sola guarda **parole intere, mai pezzi di parola**.
+L'elenco dei verbi che chiedono di passare il codice era scritto a frammenti:
+`dett`, `manda`, `digit`, `copia`, `inseris`, `fornis`. In italiano quei
+frammenti stanno dentro parole che non chiedono niente a nessuno — «dettagli»,
+«domanda», «digitale», «fotocopia», «inserisce», «fornisce» — e bastava una di
+quelle accanto a un codice perché la risposta sparisse: «il codice è nei dettagli
+della consegna» finiva nel registro degli avvisi fermati. Il frammento sembra
+generoso (prende tutte le coniugazioni) e invece è la scorciatoia che costa più
+cara, perché è invisibile finché qualcuno non prova le frasi vere.
+
+Nella stessa famiglia sta la scelta di **quali** verbi contano. Digitare,
+inserire e copiare dicono cosa fa la persona con il SUO codice, e sono il coupon,
+la prenotazione, il portone di casa. Chi attacca vuole che il codice arrivi a
+LUI: comunicare, inoltrare, mandare, fornire, condividere. Un blocco automatico
+in meno costa una chiamata al secondo modello, che quel testo lo guarda comunque;
+un blocco automatico di troppo costa la risposta alla persona, e la fiducia in
+tutta la funzione.
+
+La stessa pulizia vale sui **recapiti**, non solo sugli indirizzi web. Nella riga
+che Filo scrive al posto di un avviso fermato erano già tolti i link, ma un
+numero di telefono e un indirizzo di posta passavano interi: la truffa al
+telefono non ha bisogno di nessun collegamento. Gli indirizzi di posta si tengono
+nella FONTE, dove sono il mittente e dicono di chi ci si sta fidando; dentro il
+MOTIVO no, perché lì un indirizzo di posta è la destinazione scelta da chi ha
+dettato il motivo. E la frase ripulita è anche quella che finisce nel registro:
+il registro conserva la stessa riga che la persona ha letto, mentre il testo
+fermato resta intero dietro un pulsante, perché quello è la prova.
+
 ## Dove vive
 
 - `src/shared/textGuard.js` — logica pura: classi di fiducia, controlli statici,
