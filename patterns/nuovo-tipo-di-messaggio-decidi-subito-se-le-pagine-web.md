@@ -11,13 +11,12 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   qualsiasi lo chiami?"*. Se la risposta è no — e lo è per tutto ciò che legge
   dati dell'utente, tocca il disco, o aziona il sistema operativo — gattalo:
   ```js
-  const isFilo = (origin) => String(origin || '').startsWith('filo://');
-  on(MSG.X, async (msg, sender, origin) => {
-    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    …
-  });
+  const { soloFilo } = require('./origine');
+  on(MSG.X, soloFilo(async (msg) => { … }));
   ```
-  (`origin` è il terzo argomento dell'handler; la shell è `filo://shell/shell.html`.)
+  (`origine.js` è la porta unica del confine: risponde `code: 'forbidden'`, così
+  chi deve dirlo all'utente sa che è la provenienza e non la rete. `origin` è il
+  terzo argomento dell'handler; la shell è `filo://shell/shell.html`.)
 - **Due bandiere rosse** che rendono il gate non negoziabile: la risposta
   contiene **percorsi assoluti su disco** (rivelano lo username e la struttura
   del computer), oppure il comando fa **aprire/eseguire qualcosa** al sistema

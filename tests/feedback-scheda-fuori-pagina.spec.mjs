@@ -133,3 +133,119 @@ test('un feedback fermato dalla sicurezza non entra in bacheca nemmeno per quest
   expect(out.pubblicate.find((p) => p.docId === VECCHIO), 'materiale segnalato dalla sicurezza pubblicato in bacheca').toBeFalsy();
   expect(out.tolte).toContain(VECCHIO);
 });
+
+// ── La segnalazione vecchia che NON chiude il triage ─────────────────────────
+//
+// Il triage fatto dentro l'app ha l'id in mano, ma non è l'unico modo in cui una
+// segnalazione si chiude: nel giro delle routine la chiude il server quando il
+// lavoro viene fuso, e dal terminale la chiude un comando. In quei casi l'unico
+// che può scrivere la scheda è il giro generale dell'app di chi gestisce i
+// feedback, che guarda i più recenti PER DATA D'INVIO: una segnalazione vecchia
+// chiusa oggi sta fuori da quella pagina e la sua scheda non veniva scritta mai
+// (niente bacheca, niente annuncio e niente crediti per chi l'aveva mandata).
+// Adesso il giro chiede anche i CHIUSI più di recente, ed è lì che sta.
+//
+// Speculare: un fix vecchio che torna in lavorazione. La sua scheda c'è già, e
+// il giro rilegge i feedback delle schede che non sono in pagina, quindi gliela
+// toglie invece di lasciarlo in bacheca come risolto, votabile e riapribile a
+// pagamento.
+
+async function bancoDelGiroGenerale(app) {
+  await app.evaluate(async () => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    const ga = req('./auth/google-auth');
+    ga.isAdmin = () => true;
+    ga.getIdToken = async () => 'tok-di-prova';
+    process.env.FILO_FEEDBACK_PRIVKEY = 'chiave-di-prova';
+
+    globalThis.__scheda = { pubblicate: [], tolte: [] };
+    globalThis.__chiusiDiRecente = [];
+    globalThis.__schedePubbliche = [];
+    globalThis.__perId = {};
+    const FB = globalThis.SN_FEEDBACK;
+    // La pagina per data d'invio: PIENA, e senza il nostro feedback vecchio.
+    FB.list = async () => Array.from({ length: FB.LIST_PAGE_SIZE }, (_, i) => ({
+      _id: `recente-${i}`, name: `Fix recente ${i}`, status: 'todo',
+      createdAt: new Date(Date.now() - i * 1000).toISOString(),
+    }));
+    FB.listResolved = async () => globalThis.__chiusiDiRecente;
+    FB.listPublic = async () => globalThis.__schedePubbliche;
+    FB.getPublic = async (id) => globalThis.__schedePubbliche.find((c) => c._id === id) || null;
+    FB.getMany = async (ids) => ids.map((id) => globalThis.__perId[id]).filter(Boolean);
+    FB.maxSeq = async () => null;
+    FB.ensureSeqCounter = async () => 0;
+    FB.publishPublicCard = async (docId, card) => { globalThis.__scheda.pubblicate.push({ docId, card }); return true; };
+    FB.unpublishPublicCard = async (docId) => { globalThis.__scheda.tolte.push(docId); return true; };
+  });
+}
+
+// Fa partire il giro generale come quando la dashboard si carica, e aspetta che
+// abbia finito.
+function giroGenerale(app) {
+  return app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    // Un triage su un id che non esiste: la scheda singola si ferma da sé
+    // (nessun documento), il giro generale parte lo stesso. È la strada che
+    // esiste per lanciarlo dall'esterno.
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: MSG.FEEDBACK_UPDATE, id: 'non-esiste', status: 'todo' },
+      { url: 'filo://manage/manage.html' },
+    );
+    await new Promise((r) => setTimeout(r, 3000));
+    return globalThis.__scheda;
+  });
+}
+
+test('una segnalazione vecchia chiusa fuori dall\'app entra comunque in bacheca', async ({ app, shell }) => {
+  void shell;
+  await bancoDelGiroGenerale(app);
+  await app.evaluate(() => {
+    globalThis.SN_FEEDBACK.updateStatus = async () => true;
+    globalThis.__chiusiDiRecente = [{
+      _id: 'fb-chiuso-dal-server',
+      name: 'Un fix di un anno fa',
+      seq: 12, subSeq: 0, priority: 3,
+      status: 'done',
+      resolvedInVersion: '0.0.1',
+      createdAt: '2025-09-01T00:00:00Z',
+      resolvedAt: new Date().toISOString(),
+      clientIdHash: 'a'.repeat(32),
+      userNote: 'sistemato',
+    }];
+  });
+
+  const out = await giroGenerale(app);
+  const mia = out.pubblicate.find((p) => p.docId === 'fb-chiuso-dal-server');
+  expect(mia, 'la scheda non è stata scritta: in bacheca non comparirà mai e chi l\'aveva mandata non riceve niente').toBeTruthy();
+  expect(mia.card.name).toBe('Un fix di un anno fa');
+  expect(mia.card.status).toBe('done');
+  expect(mia.card.reward).toBe(300);
+});
+
+test('un fix vecchio che torna in lavorazione esce dalla bacheca anche senza triage dall\'app', async ({ app, shell }) => {
+  void shell;
+  await bancoDelGiroGenerale(app);
+  await app.evaluate(() => {
+    globalThis.SN_FEEDBACK.updateStatus = async () => true;
+    // La scheda c'è già in bacheca...
+    globalThis.__schedePubbliche = [{
+      _id: 'fb-riaperto', name: 'Un fix di un anno fa', seq: 12, subSeq: 0,
+      status: 'done', statusPublic: 'closed', resolvedInVersion: '0.0.1',
+      createdAt: '2025-09-01T00:00:00Z', resolvedAt: '2025-09-10T00:00:00Z',
+      clientIdTag: '', userNote: '', reward: 50,
+    }];
+    // ...ma il feedback vero è tornato in lavorazione, ed è fuori pagina.
+    globalThis.__perId = {
+      'fb-riaperto': {
+        _id: 'fb-riaperto', name: 'Un fix di un anno fa', seq: 12, subSeq: 0,
+        status: 'todo', createdAt: '2025-09-01T00:00:00Z',
+      },
+    };
+  });
+
+  const out = await giroGenerale(app);
+  expect(out.tolte, 'la scheda resta in bacheca: il fix continua a risultare risolto, votabile e riapribile a pagamento')
+    .toContain('fb-riaperto');
+});
