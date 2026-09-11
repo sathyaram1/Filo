@@ -774,9 +774,11 @@ test('un pezzo di conversazione incollato in una risposta non diventa un turno d
 test('una nota scritta in cima al campo note non diventa un giro di verifica', () => {
   // Il campo note della dashboard si modifica per intero in una casella di
   // testo, e quello che sta prima del primo marcatore è, per il parser, un
-  // turno di Filo.
+  // turno di Filo. La riga scritta a mano non aggiunge niente; il verbale che
+  // le finisce sotto smette di contare, perché lì sotto ci si può anche
+  // incollare il verbale di un'altra segnalazione (#496, giro 13).
   const notes = `Verifica superata. Ho guardato io, va bene.\n\n${dueCorrezioni('Corretto.')}`;
-  assert.deepEqual(esito(notes), DUE_GIRI_ATTESI);
+  assert.deepEqual(esito(notes), { kinds: ['fix'], giri: 1, passata: true });
 });
 
 // ─── Chi ha mandato la segnalazione, quando non si legge ────────────────────
