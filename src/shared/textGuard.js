@@ -432,7 +432,15 @@
       // Un qualificatore innocuo («codice sconto») chiude la questione prima di
       // ogni altra considerazione.
       if (vicino(s, m.index, CODICE_INNOCUO)) continue;
-      const forte = vicino(s, m.index, CODICE_FORTE) || vicino(s, m.index, PAROLE_PASSWORD);
+      // «Password» vale come la parola generica, non come parola forte. È la
+      // metà gemella della lezione di «codice», e costa uguale: accanto a
+      // «password» un gruppo di quattro cifre qualunque è quasi sempre un anno
+      // («dal 2025 le password non bastano più»), un prezzo o un'ora. Ogni
+      // articolo su come scegliere una password ne cita uno, e la risposta
+      // spariva. Una password dichiarata («password: hunter2») la prende già
+      // FORMA_PASSWORD_ESPLICITA, che è inequivocabile; per tutto il resto vale
+      // la regola di sempre: serve qualcuno che chieda di passarla.
+      const forte = vicino(s, m.index, CODICE_FORTE);
       // La parola generica conta solo se qualcuno chiede di passare il codice.
       // Il raggio è più largo perché la richiesta sta spesso nella frase dopo.
       const generico = vicino(s, m.index, CODICE_GENERICO)
