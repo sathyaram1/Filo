@@ -1,6 +1,8 @@
 // Handler di dominio: richieste AI one-shot, sintesi vocale, test dei
 // provider/modelli dalle Opzioni, ricerca web e raccolta dei path "Aiuto".
 
+const auth = require('../../auth/google-auth');
+
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
