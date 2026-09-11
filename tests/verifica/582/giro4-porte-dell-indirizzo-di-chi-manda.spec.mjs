@@ -48,8 +48,13 @@ async function collegamentiCheMentono(page) {
       if (!/^https?:/i.test(href)) continue;
       let host = '';
       try { host = new URL(href).host; } catch (_) { host = href; }
+      // Il posto vero è la coda del nome: è quella che dice di chi è il sito.
+      // Un indirizzo lungo la scritta lo taglia — va bene — purché il posto
+      // vero resti leggibile.
+      const pezzi = host.split('.');
+      const postoVero = pezzi.slice(-2).join('.');
       const scritta = (a.textContent || '').trim();
-      if (!scritta.includes(host)) bugie.push({ href, host, scritta });
+      if (!scritta.includes(postoVero)) bugie.push({ href, postoVero, scritta });
     }
     return bugie;
   });
