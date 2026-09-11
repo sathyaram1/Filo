@@ -183,6 +183,17 @@
     return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/\S*)?$/i.test(e);
   }
 
+  // «Il dominio si vede, sempre»: quando l'etichetta È già l'indirizzo giusto
+  // (`album.esempio.it` che porta ad album.esempio.it) la destinazione è sotto
+  // gli occhi e ripeterla accanto sarebbe solo rumore. In ogni altro caso — una
+  // frase, un'etichetta che dice un dominio diverso — va scritta.
+  function destinazioneGiaVisibile(etichetta, url) {
+    if (!etichettaSembraIndirizzo(etichetta)) return false;
+    const dichiarato = dominioRegistrabile(hostDi(etichetta));
+    const vero = dominioRegistrabile(hostDi(url));
+    return !!dichiarato && dichiarato === vero;
+  }
+
   function linkIngannevole(etichetta, url) {
     if (!etichettaSembraIndirizzo(etichetta)) return false;
     const dichiarato = dominioRegistrabile(hostDi(etichetta));
