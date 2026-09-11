@@ -97,12 +97,28 @@ function attachmentForbiddenHelp(opts) {
 // La frase vale anche davanti all'allegato di UN ALTRO, e serve che valga:
 // l'elenco dei feedback mostra a ogni tester le segnalazioni di tutti, quindi lo
 // stesso segnaposto compare su roba che chi guarda non ha mandato. «Inviato»
-// lì si leggeva come «l'hai mandato tu» (#582, giro 3): «consegnato» dice come
-// sta l'allegato, non chi l'ha spedito.
+// lì si leggeva come «l'hai mandato tu» (#582, giro 3).
+//
+// ⚠️ E NON dice che l'allegato è arrivato, né che viaggia cifrato (#582, giro
+// 5). Le diceva, e non le aveva guardate. L'indirizzo di un allegato non lo
+// sceglie Filo: sta dentro la segnalazione, e una segnalazione la manda
+// chiunque, anche senza account. Il giro 4 ha tolto la parola agli indirizzi
+// FUORI dal deposito di Filo; restava che bastasse scriverne uno nella FORMA
+// del deposito — senza caricare niente — perché Filo dichiarasse consegnato, e
+// cifrato con la chiave di chi riceve le segnalazioni, un file che non era mai
+// entrato. Un allegato inventato diventava indistinguibile da uno vero, con la
+// firma di Filo sopra.
+//
+// Da questo lato l'esistenza non si può controllare, e va bene così: senza il
+// download token il deposito risponde 403 sia per un oggetto che c'è sia per uno
+// che non c'è (verificato col motore vero delle regole). Quindi la cura non è
+// indovinare: è dire soltanto ciò che è vero in ogni caso — chi apre quel file.
+// Questo resta vero davanti a un allegato vero, a uno inventato e a quello di un
+// altro, e non rimanda a nessun permesso da chiedere.
 //
 // @returns {string} una riga, senza a capo (finisce in un hover).
 function attachmentNotForYouHelp() {
-  return 'allegato consegnato: lo apre solo chi riceve le segnalazioni, perché viaggia cifrato con la sua chiave';
+  return 'questo allegato lo apre solo chi riceve le segnalazioni';
 }
 
 module.exports = { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp };
