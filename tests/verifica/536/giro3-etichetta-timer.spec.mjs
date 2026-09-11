@@ -100,11 +100,11 @@ test('quello che un turno contaminato lascia scritto per dopo non passa da nessu
   // Il timer scade: da qui in poi la frase della pagina parla con la voce di Filo.
   await page.waitForTimeout(8_000);
 
-  await expect(page.locator('#live'), 'la frase della pagina è arrivata all’utente dalla colonna degli avvisi')
+  await expect.soft(page.locator('#live'), 'la frase della pagina è arrivata all’utente dalla colonna degli avvisi')
     .not.toContainText('confermare le credenziali');
 
   const sistema = await app.evaluate(() => globalThis.__notificheSistema.slice());
-  expect(
+  expect.soft(
     sistema.filter((b) => b.includes('confermare le credenziali')),
     'la frase della pagina è uscita in una notifica di sistema, fuori da Filo',
   ).toEqual([]);
