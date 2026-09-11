@@ -189,6 +189,34 @@ La sicurezza qui non sta nel nascondere la chiave API di Firebase (che, come in
 tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
 **interamente nelle regole** descritte sopra, che sono il vero confine.
 
+Da qui segue una cosa che non è ovvia: **aver fatto il login non è un
+permesso**. La chiave è pubblica e per entrare basta un account Google
+qualunque, quindi una regola che chiede solo di essere autenticati lascia
+passare chiunque, anche chi Filo non l'ha mai installato. Le credenziali
+condivise, cioè le chiavi dei servizi AI che Filo usa per conto tuo, le legge
+**solo un amministratore**. Le chiavi che fanno funzionare Filo appena
+installato non le scarica il tuo computer. Arrivano già dentro l'applicazione,
+messe lì quando la versione viene costruita, e si rinnovano con l'aggiornamento
+automatico.
+
+### Le regole cambiano solo quando le pubblichi
+
+Se le regole sono l'unico confine, il confine si sposta quando le regole
+arrivano sul progetto Firebase, non quando il file cambia nel repo. Nessun
+automatismo le pubblica: si fa a mano, con
+
+```bash
+firebase deploy --only firestore:rules     # e --only storage:rules per storage.rules
+```
+
+Finché quel comando non gira, una regola stretta nel repo è una porta ancora
+aperta in produzione, e il lavoro sembra finito mentre non lo è.
+
+**L'ordine conta**, e sbagliarlo costa il lavoro due volte. Prima si pubblicano
+le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
+chiavi nuove finiscono in un documento che chiunque legge ancora, e la
+rotazione è da rifare da capo.
+
 ---
 
 ## 8. Aggiornamenti automatici

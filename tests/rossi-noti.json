@@ -27,6 +27,19 @@
         "caso": "un link a una fonte apre una scheda e non porta via la pagina interna",
         "perche": "apre un sito vero su internet, che dal contenitore non si raggiunge.",
         "feedback": "#563"
+      },
+      {
+        "spec": "tests/wallet-owner-page",
+        "caso": "i moduli dell’owner rifiutano con parole di Filo zero codici, crediti con la virgola e pseudonimo vuoto; un utente si conta al singolare",
+        "perche": "la prova finge di essere l’owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema operativo. Nel contenitore delle routine quel portachiavi non c’è: misurato nel secondo giro di verifica del #581, isEncryptionAvailable() risponde false, il salvataggio torna false senza scrivere, la rilettura dà null e l’owner non viene riconosciuto, quindi la prova muore alla prima riga. Succede sempre, su qualunque ramo. Da risolvere (una via per simulare l’owner che non passi dal disco) e poi togliere la voce.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
+      },
+      {
+        "spec": "tests/verify-514-g11",
+        "caso": "home: quattro riquadri impilati — nessuno dei quattro Esc porta via la modalità",
+        "perche": "stesso caso già elencato fra i rossi della macchina di chi sviluppa Filo, ma è rosso anche qui, e i due elenchi sono separati apposta: tenuto solo di là, questo file mentiva a chi verifica dal contenitore (secondo giro di verifica del #581). Con tre riquadri impilati la prova passa, col quarto no: è il tetto che il main si dà sulle rivendicazioni dell’Esc. Da risolvere o spiegare meglio, poi togliere la voce da entrambi gli elenchi.",
+        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581",
+        "ancheSullaMacchinaDellOwner": true
       }
     ]
   },

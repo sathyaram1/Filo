@@ -483,6 +483,17 @@ test('i rossi del contenitore hanno nome, caso, motivo e un feedback', () => {
     assert.ok(v.caso && v.caso.length > 3, `${v.spec}: manca il caso preciso che è rosso`);
     assert.ok(v.perche && v.perche.length > 20, `${v.spec}: manca il motivo, e senza motivo non si toglierà mai`);
     assert.match(String(v.feedback || ''), /#\d+/, `${v.spec}: manca il feedback che lo farà togliere`);
-    assert.ok(!bloccanti.has(v.spec), `${v.spec} sta in tutti e due gli elenchi: decidi quale`);
+    // Di norma un rosso appartiene a UN ambiente, e trovarlo in tutti e due gli
+    // elenchi è distrazione. Ma un rosso può esserlo davvero in tutti e due (il
+    // caso dei quattro riquadri impilati: non dipende dall'ambiente, è il tetto
+    // che il main si dà sulle rivendicazioni dell'Esc), e allora tenerlo in un
+    // elenco solo fa mentire il file a chi consulta l'altro: nel secondo giro di
+    // verifica del #581 stava fra i rossi della macchina di chi sviluppa Filo, e
+    // chi verificava dal contenitore se lo ritrovava come regressione. La
+    // doppia presenza si può fare, ma DICHIARATA: così resta una scelta e non
+    // una svista.
+    assert.ok(
+      !bloccanti.has(v.spec) || v.ancheSullaMacchinaDellOwner === true,
+      `${v.spec} sta in tutti e due gli elenchi: se è voluto scrivilo (ancheSullaMacchinaDellOwner: true), altrimenti decidi quale`);
   }
 });

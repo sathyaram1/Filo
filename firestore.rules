@@ -65,17 +65,31 @@ service cloud.firestore {
     // config/models  → provider/models/modelRegistry. NON è segreto
     //   (sono solo nomi di modelli): lettura PUBBLICA, così anche un utente non
     //   loggato riceve la config predefinita.
-    // config/secrets → apiKeys predefinite (openrouter/gemini/tavily). SONO
-    //   segrete: lettura solo per utenti loggati (consumate esclusivamente nel
-    //   main process, mai inviate alle pagine). Chi non è loggato ricade sulle
-    //   chiavi di build.
+    // config/secrets → apiKeys predefinite (openrouter/tavily) e chiave Google
+    //   Safe Browsing. SONO segrete: lettura e scrittura SOLO admin, esattamente
+    //   come config/judgeSecrets.
+    //
+    //   Perché non basta "loggato con email verificata" (audit pre-alpha, #581):
+    //   il login è aperto a qualunque account Google e la chiave web di Firebase
+    //   sta in un repo pubblico. Chiunque, senza nemmeno installare Filo, si
+    //   autenticava con quella chiave e con una GET REST si portava via le
+    //   chiavi che pagano le chiamate di TUTTI. La condizione "sei loggato" non
+    //   è una barriera quando registrarsi costa zero.
+    //
+    //   Come arrivano allora le chiavi a un utente normale: dalla DISTRIBUZIONE
+    //   DEL BUILD. L'admin le scrive qui; la CI (scripts/bake-default-config.mjs,
+    //   che le chiede al server con la parola d'ordine di costruzione) le
+    //   incastona nell'installer a ogni release; l'auto-update le consegna. È lo
+    //   stesso cammino che serviva già gli utenti non loggati, cioè la
+    //   maggioranza. Nessuna installazione ha più bisogno di leggere questo
+    //   documento: solo la pagina "Modelli predefiniti" dell'admin lo fa, per
+    //   scrivere e per dire "configurata / non configurata".
     match /config/models {
       allow read: if true;
       allow write: if isAdmin();
     }
     match /config/secrets {
-      allow read: if request.auth != null
-        && request.auth.token.email_verified == true;
+      allow read: if isAdmin();
       allow write: if isAdmin();
     }
 

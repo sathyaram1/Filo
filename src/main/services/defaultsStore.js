@@ -5,21 +5,30 @@
 //     → NON sono segreti (sono solo nomi di modelli): vivono nel doc Firestore
 //       `config/models`, leggibile da TUTTI (anche utenti non loggati), così la
 //       modifica fatta dall'admin si propaga a ogni installazione.
-//   - apiKeys (openrouter/gemini/tavily) → SONO segreti. La fonte sicura e
-//     zero-login sono le chiavi di build (default-keys.js, iniettate dalla CI).
-//     L'admin può però ruotarle a runtime: l'override sta nel doc Firestore
-//     `config/secrets`, leggibile SOLO dagli utenti loggati (request.auth!=null)
-//     e consumato SOLO qui nel main (mai inviato alle pagine). Chi non è loggato
-//     ricade sulle chiavi di build.
+//   - apiKeys (openrouter/tavily) e chiave Google Safe Browsing → SONO segreti.
+//     L'UNICA fonte per un'installazione normale sono le chiavi di build
+//     (default-keys.js, incastonate dalla CI a ogni release e consegnate
+//     dall'auto-update). L'admin le ruota scrivendo il doc Firestore
+//     `config/secrets`, che il bake rilegge al build successivo.
 //
-// Catena di precedenza (per le chiavi):  Firestore config/secrets  >  build env.
-// Per la config modelli:                 Firestore config/models    >  costanti.
+// #581 — perché l'app non legge più `config/secrets` a runtime. Quel documento
+// era leggibile da "qualunque utente loggato con email verificata". Ma il login
+// è aperto a qualsiasi account Google e la chiave web di Firebase sta in un repo
+// pubblico: chiunque, senza installare Filo, si autenticava e con una GET REST
+// si portava via le chiavi che pagano le chiamate di tutti. La regola ora è
+// admin-only (come `config/judgeSecrets`), e qui il documento si legge SOLO se
+// chi usa Filo è admin — cioè per la pagina "Modelli predefiniti", che lo scrive
+// e mostra "configurata / non configurata". Per tutti gli altri la rotazione
+// arriva dal build, che è la strada che serviva già chi non faceva login.
+//
+// Catena di precedenza (per le chiavi):  config/secrets (solo admin)  >  build.
+// Per la config modelli:                 Firestore config/models       >  costanti.
 //
 // L'admin scrive tramite l'handler DEFAULTS_UPDATE (main, con Firebase ID token
 // come Bearer): le regole Firestore accettano la PATCH solo se è un admin.
 
 const auth = require('../auth/google-auth');
-const { getBuildKeys } = require('../config/default-keys');
+const { getBuildKeys, getBuildSafeBrowsingKey } = require('../config/default-keys');
 // Registra SN_FEEDBACK_THREAD su globalThis: da lì viene l'elenco dei gruppi di
 // mittente dell'auto-approvazione, che deve restare uno solo (#446).
 require('../../shared/feedbackThread.js');
@@ -37,7 +46,9 @@ const ROUTINES_DOC = 'config/routines';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
-let remoteSecrets = null; // { apiKeys?: { openrouter?, gemini?, tavily? }, safeBrowsingKey? }
+// Popolato SOLO quando chi usa Filo è admin (#581): per tutti gli altri resta
+// null e le chiavi effettive sono quelle del build.
+let remoteSecrets = null; // { apiKeys?: { openrouter?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
@@ -103,8 +114,17 @@ async function fetchDoc(docPath, idToken) {
 
 // ── API ──────────────────────────────────────────────────────────────────────
 
-// Aggiorna la cache leggendo da Firestore. `config/models` pubblico; i segreti
-// solo se l'utente è loggato (richiede un ID token).
+// Vero se chi sta usando Filo è nell'allowlist admin. È solo il gate LOCALE che
+// evita di bussare a un documento che non ci riguarda: la garanzia forte è la
+// regola Firestore (`config/secrets` → `allow read: if isAdmin()`), che risponde
+// permission denied a chiunque altro anche se questa funzione mentisse.
+function isAdminUser() {
+  try { return Boolean(auth.isAdmin()); } catch (_) { return false; }
+}
+
+// Aggiorna la cache leggendo da Firestore. `config/models` è pubblico;
+// `config/secrets` si legge SOLO da admin (#581): per tutti gli altri le chiavi
+// sono quelle incastonate dal build, e questo documento non si tocca affatto.
 async function refresh() {
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
@@ -112,9 +132,15 @@ async function refresh() {
   const models = await fetchDoc(MODELS_DOC, idToken);
   if (models) remoteModels = models;
 
-  if (idToken) {
+  if (idToken && isAdminUser()) {
     const secrets = await fetchDoc(SECRETS_DOC, idToken);
     if (secrets) remoteSecrets = secrets;
+  } else {
+    // Chi non è admin non ha override: azzerare invece di lasciare la cache
+    // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
+    // stessa installazione (altrimenti le chiavi lette da admin resterebbero in
+    // uso per un account che non può più leggerle).
+    remoteSecrets = null;
   }
   lastFetchTs = Date.now();
   return get();
@@ -150,8 +176,12 @@ function get() {
     providerSort: '',
     apiKeys: getBuildKeys(),
     // Chiave Google Safe Browsing condivisa (rilevamento siti pericolosi).
-    // Non è una chiave di build: l'unica fonte è l'override admin via Firestore.
-    safeBrowsingKey: '',
+    // Viaggia col build come le altre (#581): prima l'unica fonte era l'override
+    // Firestore, che però imponeva di tenere aperto a chiunque avesse un account
+    // Google il documento con dentro TUTTE le chiavi. Ora il documento è
+    // admin-only e la chiave arriva incastonata nell'installer, quindi la
+    // protezione si accende anche per chi non fa login — prima restava spenta.
+    safeBrowsingKey: getBuildSafeBrowsingKey(),
   };
 
   if (remoteModels) {
@@ -247,7 +277,7 @@ async function patchDoc(docPath, fields, mask, idToken) {
 
 // Scrive la config predefinita su Firestore. `partial` può contenere:
 //   provider, models, modelRegistry  → doc config/models
-//   apiKeys: { openrouter?, gemini?, tavily? }       → doc config/secrets
+//   apiKeys: { openrouter?, tavily? }, safeBrowsingKey → doc config/secrets
 // Richiede un Firebase ID token admin (le regole rifiutano i non-admin).
 // Le chiavi con valore '' o assenti NON vengono scritte (così "non toccare" è
 // diverso da "azzera": per azzerare passare esplicitamente null... ma per

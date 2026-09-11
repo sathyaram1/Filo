@@ -375,17 +375,18 @@
     // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_title: 'Modelli predefiniti',
     admin_defaults_intro:
-      'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Le modifiche si propagano a tutte le installazioni.',
+      'Questa configurazione è condivisa con TUTTI gli utenti di Filo: provider, modelli e chiavi predefiniti che vengono usati quando l\'utente lascia attivo "Usa modelli predefiniti". Provider e modelli arrivano subito a tutte le installazioni. Le chiavi no. Nessuna installazione le legge da qui: le incastona la prossima versione pubblicata, e l\'aggiornamento le consegna.',
     admin_defaults_denied: 'Sezione riservata agli amministratori. Accedi con un account autorizzato dall\'icona account in alto.',
     admin_defaults_keys: 'Chiavi API predefinite',
     admin_defaults_keys_desc:
-      'Le chiavi restano sul server e non sono mai esposte alle pagine: qui vedi solo se ciascuna è configurata. Lascia un campo vuoto per non modificarlo.',
+      'Le chiavi restano sul server e non sono mai esposte alle pagine: qui vedi solo se ciascuna è configurata. Lascia un campo vuoto per non modificarlo. Una chiave nuova entra in funzione con la prossima versione pubblicata. Questo elenco lo leggi solo tu; alle installazioni le chiavi arrivano dentro l\'aggiornamento.',
     admin_defaults_key_present: 'configurata',
     admin_defaults_key_absent: 'non configurata',
     admin_defaults_safebrowse_key_desc:
       'Chiave gratuita di Google Safe Browsing per il rilevamento siti pericolosi: con questa chiave Filo ' +
-      'controlla la blacklist ufficiale di Google (phishing e malware) per TUTTI gli account. È condivisa: ' +
-      'la imposti una volta qui e vale per tutti. Senza chiave questo controllo viene saltato, gli altri restano attivi.',
+      'controlla la blacklist ufficiale di Google (phishing e malware) per TUTTI, anche per chi non ha fatto l\'accesso. ' +
+      'È condivisa: la imposti una volta qui e viaggia con la prossima versione pubblicata. ' +
+      'Senza chiave questo controllo viene saltato, gli altri restano attivi.',
     admin_defaults_reasoning: 'reasoning',
     admin_defaults_reasoning_desc:
       'Per ogni modello puoi forzare il livello di ragionamento, quando il modello lo supporta. «Auto» lascia decidere il modello (comportamento di prima); «Nessuno» chiede di non ragionare (risposte più rapide ed economiche); «Basso/Medio/Alto» chiedono uno sforzo di ragionamento crescente. I modelli che non ragionano ignorano l\'impostazione.',

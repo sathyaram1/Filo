@@ -12,6 +12,10 @@
 //   6h) le rilegge da Firestore e le incastona nel nuovo installer; l'auto-update
 //   le consegna a tutti.
 //
+//   Dal #581 è l'UNICA strada: `config/secrets` è leggibile solo dall'admin, e
+//   nessuna installazione lo apre più a runtime. Prima bastava un account Google
+//   qualsiasi per scaricarlo per intero con una GET REST.
+//
 // FONTI DELLE CHIAVI (in ordine di precedenza, per ciascuna chiave):
 //   1. il server di sicurezza      → l'override admin più recente, chiesto con
 //                                    FILO_BUILD_PASSPHRASE (un segreto che apre
@@ -37,14 +41,39 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const OUT_PATH = resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
+// `FILO_BAKE_OUT` esiste SOLO per gli unit test (che scrivono in una cartella
+// usa-e-getta invece di calpestare il file vero), come `FILO_UNIT_DIR` per il
+// lanciatore dei test: non è un'opzione d'uso, e la CI non la passa mai.
+const OUT_PATH = process.env.FILO_BAKE_OUT
+  ? resolve(process.env.FILO_BAKE_OUT)
+  : resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
-// Chiede al server le chiavi di default. Ritorna { openrouter?, gemini?, tavily? }
-// oppure {} se non disponibili. Non lancia: in caso di problemi degrada ai
-// segreti del job, perché una versione con quelle chiavi è meglio di nessuna
-// versione. Se non resta nemmeno quello, decide main — e si ferma.
+// Chiede al server le chiavi di default. Ritorna
+// { openrouter?, gemini?, tavily?, safeBrowsing? } oppure {} se non disponibili.
+// Non lancia: in caso di problemi degrada ai segreti del job, perché una
+// versione con quelle chiavi è meglio di nessuna versione. Se non resta nemmeno
+// quello, decide main — e si ferma.
 const CANALE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
+
+// La chiave Safe Browsing sta in `config/secrets` FUORI dalla mappa `apiKeys`
+// (campo `safeBrowsingKey`). La risposta del server può quindi portarla in due
+// posti a seconda di come la funzione è fatta: accettiamo entrambi invece di
+// scommettere su uno solo — sbagliare significherebbe spegnere in silenzio il
+// primo stadio del rilevamento siti pericolosi per tutti.
+function pickSafeBrowsing(json) {
+  if (!json || typeof json !== 'object') return '';
+  const candidati = [
+    json.safeBrowsingKey,
+    json.safeBrowsing,
+    json.apiKeys && json.apiKeys.safeBrowsingKey,
+    json.apiKeys && json.apiKeys.safeBrowsing,
+  ];
+  for (const c of candidati) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+  }
+  return '';
+}
 
 async function fetchRemoteKeys(passphrase) {
   if (!passphrase) return {};
@@ -59,7 +88,10 @@ async function fetchRemoteKeys(passphrase) {
       return {};
     }
     const j = await res.json();
-    return (j && j.apiKeys && typeof j.apiKeys === 'object') ? j.apiKeys : {};
+    const apiKeys = (j && j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
+    const sb = pickSafeBrowsing(j);
+    if (sb) apiKeys.safeBrowsing = sb;
+    return apiKeys;
   } catch (e) {
     console.warn(`[bake] server non raggiungibile (${e.message}); uso i secret d'ambiente.`);
     return {};
@@ -70,6 +102,28 @@ function envKey(name) {
   const v = process.env[name];
   return typeof v === 'string' ? v.trim() : '';
 }
+
+// Le chiavi dei provider che l'applicazione legge DAVVERO dal file generato,
+// cioè quelle che `src/main/config/default-keys.js` va a cercare. Stanno in una
+// lista sola, e non sparse in un oggetto scritto a mano, perché il controllo
+// «questa versione ha almeno una chiave?» più sotto conta proprio queste: una
+// chiave incastonata che nessuno legge non è neutra, mente a quel controllo.
+//
+// Chi non c'è, e perché.
+//   · OpenRouter (#598): ogni utente riceve la sua chiave dal server quando
+//     riscatta un invito, col tetto di spesa pari ai suoi crediti. Una chiave
+//     di fabbrica nell'installer la apriva a chiunque scaricasse il pacchetto.
+//   · Gemini (#581, secondo giro): il collegamento a Gemini in Filo non esiste
+//     più e default-keys.js non la legge. Finiva dentro l'installer, che
+//     chiunque può scaricare e aprire, senza servire a niente; e siccome il
+//     controllo la contava, da sola bastava a far passare una pubblicazione da
+//     cui l'applicazione non ricavava nessuna chiave.
+// Se un giorno l'applicazione torna a leggere una chiave nuova, va aggiunta
+// qui: la sentinella `tests/unit/bakeChiaviLette.test.mjs` diventa rossa se le
+// due parti divergono.
+const CHIAVI_DEL_PACCHETTO = [
+  { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY' },
+];
 
 async function main() {
   const passphrase = process.env.FILO_BUILD_PASSPHRASE;
@@ -84,16 +138,16 @@ async function main() {
     return r || envKey(envName);
   };
 
-  // La chiave OpenRouter NON si incastona più (#598): ogni utente riceve una
-  // chiave personale dal server al riscatto di un invito, col tetto di spesa
-  // pari ai suoi crediti. Una chiave di fabbrica nell'installer la apriva
-  // chiunque scaricasse il pacchetto. Le installazioni vecchie continuano a
-  // usare la loro finché l'owner non la ruota dal pannello OpenRouter.
-  // Restano incastonate le chiavi dei servizi di contorno (ricerca web).
-  const apiKeys = {
-    gemini: pick('gemini', 'FILO_DEFAULT_GEMINI_KEY'),
-    tavily: pick('tavily', 'FILO_DEFAULT_TAVILY_KEY'),
-  };
+  const apiKeys = {};
+  for (const c of CHIAVI_DEL_PACCHETTO) apiKeys[c.nome] = pick(c.nome, c.env);
+
+  // Chiave Google Safe Browsing (#581). Non è una chiave di modelli, quindi sta
+  // fuori da `apiKeys`, ma viaggia per la stessa strada: finché la leggeva a
+  // runtime chi era loggato, il documento dei segreti doveva restare aperto a
+  // qualunque account Google. Ora la lettura del documento è solo admin e
+  // l'unica via verso gli utenti è questa — la stessa che serviva già chi non
+  // faceva login, cioè la maggioranza.
+  const safeBrowsingKey = pick('safeBrowsing', 'FILO_DEFAULT_SAFEBROWSING_KEY');
 
   // ⚠️ La domanda "resta qualcosa?" si fa PRIMA di scrivere.
   //
@@ -119,13 +173,25 @@ async function main() {
   }
 
   mkdirSync(dirname(OUT_PATH), { recursive: true });
-  writeFileSync(OUT_PATH, JSON.stringify({ apiKeys, bakedAt: new Date().toISOString() }, null, 2) + '\n', 'utf8');
+  writeFileSync(
+    OUT_PATH,
+    JSON.stringify({ apiKeys, safeBrowsingKey, bakedAt: new Date().toISOString() }, null, 2) + '\n',
+    'utf8'
+  );
 
   // Log SENZA valori: solo presenza/assenza, così la CI non espone segreti.
   const summary = Object.fromEntries(
-    Object.entries(apiKeys).map(([k, v]) => [k, v ? 'presente' : 'assente'])
+    Object.entries({ ...apiKeys, safeBrowsing: safeBrowsingKey })
+      .map(([k, v]) => [k, v ? 'presente' : 'assente'])
   );
   console.log(`[bake] scritto ${OUT_PATH}:`, JSON.stringify(summary));
+  // La Safe Browsing assente non ferma la pubblicazione (è un contorno: senza,
+  // il primo stadio si salta e restano giudice LLM, sandbox e segnali di rete),
+  // ma NON deve sparire in silenzio: da quando il documento dei segreti è
+  // admin-only, questa è l'unica strada che porta la chiave agli utenti.
+  if (!safeBrowsingKey) {
+    console.warn('::warning::Nessuna chiave Google Safe Browsing: il primo stadio del rilevamento siti pericolosi resterà spento in questa versione.');
+  }
 }
 
 /** Apre un feedback quando la costruzione sta per produrre una versione monca. */
@@ -152,9 +218,10 @@ main().catch((e) => {
   console.warn('[bake] errore non fatale:', e.message);
   try {
     mkdirSync(dirname(OUT_PATH), { recursive: true });
+    const vuote = Object.fromEntries(CHIAVI_DEL_PACCHETTO.map((c) => [c.nome, '']));
     writeFileSync(
       OUT_PATH,
-      JSON.stringify({ apiKeys: { openrouter: '', gemini: '', tavily: '' }, bakedAt: new Date().toISOString() }, null, 2) + '\n',
+      JSON.stringify({ apiKeys: vuote, safeBrowsingKey: '', bakedAt: new Date().toISOString() }, null, 2) + '\n',
       'utf8'
     );
   } catch (_) {}
