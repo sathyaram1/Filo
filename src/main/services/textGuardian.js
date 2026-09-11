@@ -48,6 +48,8 @@ let _eseguiModello = null;
 let _segreti = null;
 let _avvisaCambio = null;
 let _pausaMs = PAUSA_MS;
+// Quando la coda ha provato l'ultima volta (freno di RIPRESA_MIN_MS).
+let _ultimoGiro = 0;
 
 // Quello che non si nomina resta com'è (`undefined` = non toccare); passare
 // `null` invece stacca esplicitamente quel pezzo. Serve a chi vuole sostituire
