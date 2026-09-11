@@ -56,12 +56,35 @@
     return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ext}`;
   }
 
+  // I due modi in cui si può nominare un oggetto del bucket di Filo: il
+  // percorso REST di Firebase e quello diretto di Google Storage. Host → inizio
+  // obbligatorio del percorso, BUCKET compreso.
+  const PREFISSI_ALLEGATO = {
+    'firebasestorage.googleapis.com': `/v0/b/${BUCKET}/o/`,
+    'storage.googleapis.com': `/${BUCKET}/`,
+  };
+
   // Un URL è un allegato del bucket dei feedback? PURA. Serve a due cose che
   // devono dare la stessa risposta: il guard anti-SSRF del main (che non deve
   // trasformare la decifratura allegati in una fetch arbitraria) e la decisione
   // di allegare o no il token dell'owner alla richiesta.
+  //
+  // ⚠️ Il confronto è sul BUCKET, non sull'host. Fermarsi all'host sembrava
+  // bastare finché questa risposta serviva solo a non fare fetch arbitrarie:
+  // da quando decide anche se firmare la richiesta con l'identità dell'owner,
+  // l'host da solo è una porta aperta. L'indirizzo dell'allegato non lo sceglie
+  // l'owner — sta dentro il documento del feedback, e un feedback lo crea
+  // chiunque, anche senza account: bastava indicare un bucket qualsiasi ospitato
+  // da Google e la dashboard ci portava il token dell'owner.
+  // L'URL si PARSA, non si confronta a colpi di regex: `new URL` normalizza i
+  // casi in cui una regex si fa fregare (host in maiuscolo, `@`, `..`), e un
+  // indirizzo che non si parsa vale "no".
   function isAttachmentUrl(url) {
-    return /^https:\/\/(firebasestorage\.googleapis\.com|storage\.googleapis\.com)\//.test(String(url || ''));
+    let u;
+    try { u = new URL(String(url || '')); } catch (_) { return false; }
+    if (u.protocol !== 'https:') return false;
+    const prefisso = PREFISSI_ALLEGATO[u.hostname];
+    return !!prefisso && u.pathname.startsWith(prefisso);
   }
 
   // Intestazioni con cui l'owner scarica un allegato. PURA.
