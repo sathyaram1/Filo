@@ -2396,7 +2396,6 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     fiduciaTurno = globalThis.SN_TEXT_GUARD.FIDUCIA.CONTAMINATO;
     if (!fontiTurno.includes(et)) fontiTurno.push(et);
   }
-  let holdInviato = false;
   // #420 — la risposta scorre in diretta: inoltriamo alla scheda i delta del
   // testo (o il segnale di reset dopo un fallback provider). #536 — appena il
   // turno è contaminato lo scorrimento SI FERMA: mostrare in diretta un testo
@@ -2404,14 +2403,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // scheda riceve un `reset` (butta il parziale) e un `hold` (sta controllando),
   // poi la risposta vera arriva a fine turno come sempre.
   const onText = canPush ? (payload) => {
-    if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno)) {
-      if (!holdInviato) {
-        holdInviato = true;
-        push('filo:answer', { reset: true });
-        push('filo:answer', { hold: true });
-      }
-      return;
-    }
+    if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno)) { fermaScorrimento(); return; }
     push('filo:answer', payload);
   } : null;
   // Un'azione appena il modello ne pronuncia il nome, prima ancora degli
