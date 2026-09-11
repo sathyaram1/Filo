@@ -735,6 +735,58 @@ module.exports = function register(on, ctx) {
     }
   }
 
+  /**
+   * Il caricamento generale guarda i feedback più recenti PER DATA D'INVIO, e
+   * Filo quel tetto l'ha passato: le segnalazioni più vecchie restano fuori, e
+   * quello che succede a loro non arriva in bacheca. Il triage fatto dentro
+   * l'app ha l'id in mano e scrive la scheda da sé, ma non è l'unico modo in
+   * cui una segnalazione si chiude: nel giro delle routine la chiude il server
+   * quando il lavoro viene fuso, e dal terminale la chiude un comando. In quei
+   * casi l'unico a poter scrivere la scheda è questo giro, che però non le
+   * vedeva.
+   *
+   * Due aggiunte, tutte e due limitate e a costo fisso:
+   *   · le segnalazioni CHIUSE più di recente (una query ordinata per data di
+   *     chiusura): è lì che sta una segnalazione vecchia chiusa oggi;
+   *   · i feedback delle schede già in bacheca che non sono nella pagina: così
+   *     un fix vecchio che torna in lavorazione perde la scheda, invece di
+   *     restare «risolto», votabile e riapribile a pagamento.
+   *
+   * Best-effort: se una delle due domande non riesce, il giro prosegue con
+   * quello che ha invece di fermarsi.
+   */
+  async function conLeSegnalazioniFuoriPagina(base, idToken) {
+    const FB = FEEDBACK();
+    const rows = Array.isArray(base) ? base.slice() : [];
+    if (!FB || !idToken) return rows;
+    const visti = new Set(rows.map((r) => String((r && r._id) || '')).filter(Boolean));
+    const aggiungi = (arr) => {
+      for (const r of Array.isArray(arr) ? arr : []) {
+        const id = String((r && r._id) || '');
+        if (!id || visti.has(id)) continue;
+        visti.add(id);
+        rows.push(r);
+      }
+    };
+
+    if (typeof FB.listResolved === 'function') {
+      try { aggiungi(await FB.listResolved({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 30000, idToken })); }
+      catch (e) { console.warn('[feedback] chiusi di recente non letti:', e?.message || e); }
+    }
+
+    try {
+      const schede = await publicCards({ fresh: true });
+      const mancanti = (Array.isArray(schede) ? schede : [])
+        .map((c) => String((c && c._id) || ''))
+        .filter((id) => id && !visti.has(id))
+        .slice(0, FB.LIST_PAGE_SIZE);
+      if (mancanti.length) aggiungi(await FB.getMany(mancanti, { idToken, timeoutMs: 30000 }));
+    } catch (e) {
+      console.warn('[feedback] feedback delle schede fuori pagina non letti:', e?.message || e);
+    }
+    return rows;
+  }
+
   function scheduleViewSync({ delayMs = 2000, force = false, rows = null } = {}) {
     if (syncTimer) return;
     syncTimer = setTimeout(() => {
