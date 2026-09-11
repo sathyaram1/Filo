@@ -268,7 +268,7 @@ module.exports = function register(on, ctx) {
       const r = await adminGift(email, amount);
       return { ok: true, email, amount, balance: r.balance };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  });
+  }));
 
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
