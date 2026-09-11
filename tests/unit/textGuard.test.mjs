@@ -176,6 +176,21 @@ test('i collegamenti si estraggono con etichetta e destinazione vera', () => {
   assert.equal(G.destinazioneVisibile(link[1].url), 'altro.example');
 });
 
+test('il dominio dentro un indirizzo di posta non è un collegamento', () => {
+  // #536, giro 2 — il mittente resta scritto nella riga «ho fermato un avviso»,
+  // ed è giusto. Ma chi manda la mail sceglie il proprio indirizzo: se comincia
+  // per «www.», quel pezzo diventava un collegamento vivo dentro la riga che
+  // dovrebbe rassicurare.
+  const riga = G.frasediBlocco({
+    origine: 'Banca Esempio <avvisi@www.truffa-esempio.it>',
+    motivo: 'chiedeva le credenziali del conto',
+  });
+  assert.match(riga, /avvisi@www\.truffa-esempio\.it/, 'il mittente deve restare leggibile');
+  assert.deepEqual(G.linkDelTesto(riga), [], 'il mittente non deve diventare un collegamento');
+  // Un indirizzo vero, fuori da una mail, resta un collegamento.
+  assert.equal(G.linkDelTesto('vai su www.esempio.it').length, 1);
+});
+
 test('un’etichetta che è una frase non conta come inganno (lo giudica il modello)', () => {
   assert.equal(G.linkIngannevole('apri il riepilogo', 'https://qualsiasi.example/x'), false);
   assert.equal(G.linkIngannevole('banca.it', 'https://banca.it/login'), false);
