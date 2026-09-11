@@ -33,8 +33,8 @@
 //   npx firebase emulators:exec --only firestore,storage --project filo-prova-582 \
 //     "node storage-allegati-motore-vero.mjs"
 //
-// Esito atteso: tutte le righe verdi, uscita 0. Al primo passaggio (2026-09-11)
-// è stato così.
+// Esito atteso: tutte le righe verdi, uscita 0, più la riga NOTA sulla lettura
+// dell'owner. Al primo passaggio (2026-09-11) è stato così: 23/23.
 //
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
 // `main` (`git show main:storage.rules`, via STORAGE_RULES_FILE). Lì l'anonimo
