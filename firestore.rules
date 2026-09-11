@@ -547,8 +547,18 @@ service cloud.firestore {
     //
     // E il documento non porta più NULLA del mittente: niente `clientId`,
     // niente `userAgent` — per riusare un percorso non serve sapere chi l'ha
-    // fatto. Anche `createdAt` arriva arrotondato all'ora (lo fa il client),
-    // così due percorsi su domini diversi non si ricuciono nemmeno per orario.
+    // fatto. `createdAt` arriva arrotondato al GIORNO (lo fa il client).
+    //
+    // L'OROLOGIO NON LO CHIUDONO QUESTE REGOLE, e vale la pena saperlo qui.
+    // Su ogni documento Firestore scrive da sé `createTime`, al microsecondo, e
+    // lo rimanda a chiunque legga: non c'è regola che lo tolga. Finché un
+    // percorso partiva nell'istante in cui veniva fatto, due percorsi su domini
+    // diversi nati a meno di un secondo l'uno dall'altro erano della stessa
+    // persona — la ricucitura che togliere il `clientId` doveva impedire
+    // (#584, secondo giro). La difesa sta nel client, in pathsCollector.js: il
+    // percorso entra in una coda e parte ore dopo, da solo. Se un giorno la
+    // lettura passasse da una funzione del server, quella coda diventerebbe
+    // superflua; finché la lettura è diretta, è l'unica cosa che tiene.
     match /paths/{domain} {
       // Vecchia forma piatta + elenco dei domini: chiusi, per sempre.
       allow read, write: if false;
