@@ -20,7 +20,8 @@
       features: [
         'Quando Filo legge una mail o una pagina scritta da altri e poi ti scrive qualcosa, un secondo modello guarda quel testo prima che compaia. Se cerca di farti dare credenziali, codici o soldi, o di mandarti su un sito diverso da quello che dice, l\'avviso non compare. Al suo posto trovi una riga che dice cosa ha fermato e da chi veniva.',
         'I collegamenti dentro un avviso mostrano sempre il dominio a cui portano davvero, prima che tu li apra.',
-        'In Preferenze trovi «Avvisi fermati», l\'elenco di quello che il controllo ha fermato, con quando, da dove e perché. Se ferma cose che non doveva, lo vedi lì.',
+        'In Preferenze trovi «Avvisi fermati», l\'elenco di quello che il controllo ha fermato, con quando, da dove e perché. Se ferma cose che non doveva, lo vedi lì. Dalla riga dell\'avviso fermato ci arrivi con un clic, già aperta sulla voce giusta.',
+        'Il controllo vale per tutta la conversazione, non solo per la prima risposta: se Filo ha letto una pagina, anche le risposte alle domande che fai dopo passano di lì.',
       ],
     },
     {
