@@ -11,9 +11,11 @@
 // (`feedback-public`), non dai documenti — che ora non si leggono senza le
 // credenziali dell'owner, e questa è la macchina di chi ha mandato la
 // segnalazione. Nella scheda c'è quello che serve qui: l'hash
-// dell'installazione (per riconoscere i propri), il titolo, il numero e la
-// FRASE per chi ha segnalato. Non c'è la priorità — che viaggia cifrata e non
-// è cosa da collezione pubblica — quindi la ricompensa è quella di base.
+// dell'installazione (per riconoscere i propri), il titolo, il numero, la
+// FRASE per chi ha segnalato e i CREDITI che gli spettano. La priorità no:
+// viaggia cifrata e non è cosa da collezione pubblica, quindi sulla scheda si
+// scrive la cifra, non il giudizio che l'ha decisa. Una scheda senza quella
+// cifra (pubblicata prima che il campo esistesse) vale la fascia di base.
 // La lista (normalmente da Firestore via rete) è stubbata nel main così il
 // test è deterministico e offline.
 
