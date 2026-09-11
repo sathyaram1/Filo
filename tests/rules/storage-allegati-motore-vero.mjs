@@ -10,7 +10,10 @@
 //
 // Servono DUE emulatori, non uno: le regole riconoscono l'owner leggendo
 // l'allowlist `admins` di Firestore (regole cross-service), quindi il motore di
-// Storage deve poter interrogare quello di Firestore.
+// Storage deve poter interrogare quello di Firestore. Quel pezzo l'emulatore
+// non lo sa fare (vedi `crossServiceDisponibile` qui sotto): la prova lo
+// misura e lo DICHIARA come riga «NOTA», invece di lasciare un rosso che non
+// vuol dire niente.
 //
 // COME SI LANCIA (fuori dal repo, in una cartella usa-e-getta: stando nel repo
 // Node cerca i pacchetti nel node_modules del repo, dove l'emulatore non c'è —
@@ -215,9 +218,12 @@ await prova('allegato oltre il tetto (5 MB): NEGATO', 'ko',
 await env.cleanup();
 
 let rossi = 0;
+let note = 0;
 for (const [stato, riga] of esiti) {
   if (stato.trim() === 'ROSSO') rossi++;
+  if (stato.trim() === 'NOTA') note++;
   console.log(`${stato} ${riga}`);
 }
-console.log(`\n${esiti.length - rossi}/${esiti.length} verdi`);
+const prove = esiti.length - note;
+console.log(`\n${prove - rossi}/${prove} verdi${note ? ` — ${note} cosa/e che questo attrezzo non sa provare, scritte qui sopra` : ''}`);
 process.exit(rossi ? 1 : 0);
