@@ -698,7 +698,22 @@
     return includeDismissed ? list : list.filter((n) => !n.dismissed);
   }
 
-  async function addNotification({ kind, text, action, color }) {
+  // #536 — IL PUNTO DI PASSAGGIO. Una notifica nata da contenuto NON FIDATO
+  // (una mail, una pagina, un documento) non entra qui se non è già passata dal
+  // guardiano: chi la propone deve usare `SN_GUARDIA.proponiNotifica`, che
+  // applica i controlli statici e poi il secondo modello e timbra l'esito.
+  // Il controllo è a RUNTIME, non solo una sentinella nei test: una superficie
+  // nuova che dimenticasse il guardiano si ferma qui invece di mostrare il
+  // testo. Le notifiche di Filo su se stesso (aggiornamenti, timer) hanno
+  // classe `sistema` e passano come sempre.
+  async function addNotification({ kind, text, action, color, classe, fonte, stato, _guardia }) {
+    const G = global.SN_GUARDIANO;
+    if (G && G.deveControllare(classe)) {
+      const varco = global.SN_GUARDIA && global.SN_GUARDIA.timbro && global.SN_GUARDIA.timbro();
+      if (!varco || _guardia !== varco) {
+        throw new Error('notifica da fonte non fidata senza il controllo del guardiano (#536)');
+      }
+    }
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     const entry = {
       id: uuid(),
@@ -708,6 +723,12 @@
       action: action || null,
       color: color || null, // override del colore della barra laterale
       dismissed: false,
+      // Dove porta DAVVERO ogni collegamento dell'avviso: la scheda lo mostra
+      // sotto il testo, sempre, prima che l'utente clicchi.
+      link: (G ? G.linkPerUtente(text, action) : []),
+      ...(classe ? { classe } : {}),
+      ...(fonte ? { fonte } : {}),
+      ...(stato ? { stato } : {}),
     };
     list.unshift(entry);
     if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
