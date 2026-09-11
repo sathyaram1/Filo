@@ -772,6 +772,30 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-live-card[data-kind="info"]::before { background: var(--dash-green); }
 
 .dash-live-card .dash-live-text { white-space: pre-wrap; }
+
+/* #536 — guardiano degli avvisi.
+   Un avviso FERMATO si distingue a colpo d'occhio da uno passato, e uno che
+   aspetta il controllo dice che sta aspettando. I collegamenti mostrano sempre
+   il dominio vero accanto all'etichetta: è quello che l'inganno nasconde. */
+.dash-live-card[data-guardiano="blocco"]::before { background: var(--dash-accent); }
+.dash-live-card[data-guardiano="attesa"] { opacity: 0.82; }
+.dash-live-card[data-guardiano="attesa"]::before { background: var(--dash-ink-mute); }
+.dash-live-card .dash-live-origin {
+  font-size: 11px;
+  color: var(--dash-ink-mute);
+}
+.dash-live-card .dash-live-link {
+  color: var(--dash-blue);
+  text-decoration: underline;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+.dash-live-card .dash-live-link:hover { opacity: 0.75; }
+.dash-live-card .dash-live-dest {
+  font-size: 11px;
+  color: var(--dash-ink-mute);
+  white-space: nowrap;
+}
 .dash-live-card .dash-live-meta {
   font-size: 11px;
   color: var(--dash-ink-mute);
