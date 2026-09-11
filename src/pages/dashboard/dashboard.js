@@ -698,14 +698,53 @@
     return div;
   }
 
-  function renderLiveCard({ kind, text, paused, onToggle, onDismiss }) {
+  // #536 — il testo di un avviso, con i collegamenti che dicono DOVE PORTANO
+  // DAVVERO prima di aprirsi. Un avviso nasce spesso da una mail: «clicca qui»
+  // senza il dominio accanto è esattamente la forma che l'inganno preferisce.
+  // Il dominio si vede sempre, non solo al passaggio del mouse.
+  function riempiTestoAvviso(el, text) {
+    const G = window.SN_TEXT_GUARD;
+    const s = String(text || '');
+    const link = G ? G.linkDelTesto(s) : [];
+    if (!link.length) { el.textContent = s; return; }
+    let cursore = 0;
+    for (const l of link) {
+      if (l.inizio > cursore) el.appendChild(document.createTextNode(s.slice(cursore, l.inizio)));
+      const a = document.createElement('a');
+      a.className = 'dash-live-link';
+      a.href = l.url;
+      a.textContent = l.etichetta;
+      a.title = l.url;
+      el.appendChild(a);
+      const dest = G.destinazioneVisibile(l.url);
+      if (dest && dest !== l.etichetta) {
+        const chip = document.createElement('span');
+        chip.className = 'dash-live-dest';
+        chip.textContent = ` (${dest})`;
+        chip.title = l.url;
+        el.appendChild(chip);
+      }
+      cursore = l.fine;
+    }
+    if (cursore < s.length) el.appendChild(document.createTextNode(s.slice(cursore)));
+  }
+
+  function renderLiveCard({ kind, text, paused, onToggle, onDismiss, origine, guardiano }) {
     const div = document.createElement('div');
     div.className = 'dash-live-card';
     div.dataset.kind = kind;
+    if (guardiano) div.dataset.guardiano = guardiano;
     const t = document.createElement('div');
     t.className = 'dash-live-text';
-    t.textContent = text;
+    riempiTestoAvviso(t, text);
     div.appendChild(t);
+    // Da chi viene: un avviso nato da una mail dice di chi ci si sta fidando.
+    if (origine) {
+      const src = document.createElement('div');
+      src.className = 'dash-live-origin';
+      src.textContent = `da ${origine}`;
+      div.appendChild(src);
+    }
     // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
     // accanto alla × e cambia icona/etichetta in base allo stato.
     if (onToggle) {
