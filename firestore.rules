@@ -169,7 +169,17 @@ service cloud.firestore {
     }
 
     match /feedback/{doc} {
-      allow read: if true;
+      // #583 — LA LETTURA NON È PUBBLICA. I lettori legittimi sono due, e
+      // hanno ciascuno la sua strada:
+      //   · l'owner, dalla dashboard di Gestione, autenticato come admin (il
+      //     main process allega il suo ID token: src/main/services/handlers/auth.js);
+      //   · il server dei giudici e delle routine, con identità propria
+      //     (`routines/<email>`) oppure via Admin SDK, che bypassa le regole.
+      // Tutti gli altri bisogni passano dalla vista `feedback-public` sotto.
+      // `get` e `list` insieme: chiudere solo la lista lascerebbe leggibile
+      // qualunque documento di cui si conosca l'id — e gli id storici sono
+      // finiti in link e log.
+      allow get, list: if isAdmin() || isRoutine();
 
       // Creazione admin: senza vincoli di forma. Serve all'applier locale
       // dell'owner (npm run feedback:apply col token admin) per creare i
