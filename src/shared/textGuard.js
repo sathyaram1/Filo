@@ -410,15 +410,22 @@
     'piscin[ae]', 'palestr[ae]', 'residence', 'uffici[oi]', 'cassaforte',
     'wi-?fi', 'router', 'sim', 'modem', 'tastierin[oi]', 'keypad', 'accensione',
   ].join('|');
-  // Cosa dice, lì intorno, a che serve quel codice. Non deve stare attaccato alla
-  // parola «codice»: in italiano la cosa arriva dopo la funzione («il codice di
-  // attivazione della SIM»), e pretendere che venisse subito dopo è già costato
-  // due giri di correzioni.
+  // A cosa serve quel codice, quando la cosa non arriva subito dopo la parola
+  // «codice» ma dopo la funzione: «il codice di attivazione della SIM», «il
+  // codice di conferma della prenotazione». Qui dentro vanno solo nomi CONCRETI,
+  // mai un appellativo come «utente» o «cliente»: quelli aprono metà delle mail
+  // di truffa, e basterebbero a spegnere il controllo.
+  const COSA_NON_IDENTITA = [
+    COSA_FISICA,
+    'ordin[ei]', 'prenotazion[ei]', 'spedizion[ei]', 'consegn[ae]', 'ritiro', 'pacc[oh]i?',
+    'ricevut[ae]', 'fattur[ae]', 'resi?', 'garanzi[ae]', 'bigliett[oi]', 'vol[oi]',
+    'coupon', 'promozion[ei]', 'sconti?', 'saldi', 'abbonament[oi]', 'tesser[ae]',
+    'iscrizion[ei]', 'cors[oi]', 'event[oi]', 'sdi', 'pratic[ah]e?', 'tracciamento',
+  ].join('|');
   const CODICE_INNOCUO = new RegExp([
     `codic[ei]\\s+${PRIMA_DEL_QUALIFICATORE}(?:${QUALIFICATORE_INNOCUO})`,
     'numero (?:di|d\')\\s*(?:serie|seriale|ordine|pratica|prenotazione|spedizione|tracciamento|fattura|cliente|biglietto)',
-    `\\b(?:${COSA_FISICA})\\b`,
-    `\\b(?:${QUALIFICATORE_INNOCUO})\\b`,
+    `\\b(?:${COSA_NON_IDENTITA})\\b`,
   ].join('|'), 'i');
   const PAROLE_RECUPERO = /(recuper|recovery|backup code|codici di ripristino|ripristin)/i;
   // «password» e i suoi sinonimi stanno già in CODICE_GENERICO: valgono come
