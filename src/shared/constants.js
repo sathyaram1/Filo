@@ -85,6 +85,14 @@
     FILO_TIMERS: 'filo_timers',
     // Notifiche live nella colonna destra. Array di {id, ts, kind, text, action?, dismissed?}.
     FILO_NOTIFICATIONS: 'filo_notifications',
+    // #536 — registro dei blocchi del guardiano: array di
+    // {id, ts, estratto, fonte, motivo, regola, classe}. Si legge in
+    // Preferenze → Sicurezza e serve a capire se il guardiano grida al lupo.
+    FILO_GUARD_BLOCKS: 'filo_guard_blocks',
+    // #536 — avvisi in attesa del controllo (il guardiano non ha risposto):
+    // array di {id, ts, tentativi, ultimoTentativo, richiesta}. Ripartono al
+    // giro dopo; l'avviso non compare e non si perde.
+    FILO_GUARD_QUEUE: 'filo_guard_queue',
     // Stato sessione corrente dashboard: ultima interazione, contatori, ecc.
     FILO_SESSION: 'filo_session',
     // Flag "già accolto": true quando la micro-intervista di benvenuto è
