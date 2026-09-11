@@ -298,7 +298,12 @@
   // conteneva (#496, giro 12); nella chat del feedback la stessa citazione
   // faceva nascere una bolla di Filo dentro il messaggio di una persona.
   function markerOpensTurn(lines, i) {
-    return i === 0 || !String(lines[i - 1] || '').trim();
+    if (i === 0) return true;
+    const prima = String(lines[i - 1] || '');
+    if (!prima.trim()) return true;
+    // Due marcatori di fila: il primo apre un turno rimasto vuoto. Non è prosa,
+    // quindi il secondo apre il suo.
+    return USER_TURN_RE.test(prima) || MODEL_TURN_RE.test(prima);
   }
 
   function splitNotes(notes) {
