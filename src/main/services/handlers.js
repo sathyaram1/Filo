@@ -2372,7 +2372,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     if (!canPush) return;
     try { wc.send(channel, { reqId: reasoningReqId, ...payload }); } catch (_) {}
   };
-  const onReasoning = canPush ? (text) => push('filo:reasoning', { text }) : null;
+  // #536 — il ragionamento è testo verso l'utente quanto la risposta: la riga
+  // «Sta ragionando» sotto la domanda ne mostra l'ultima frase mentre arriva, e
+  // il blocco di attività lo conserva per intero. Dopo che il turno ha letto
+  // roba scritta da altri quel testo è scelto da loro, e il guardiano non lo
+  // vede mai: guarda la risposta finale. Bastava chiedere al modello di
+  // scrivere la truffa nel ragionamento invece che nella risposta per
+  // consegnarla due centimetri sopra la riga «Ho fermato un avviso». Da qui in
+  // poi non parte più niente, e la scheda butta quello che aveva già.
+  const onReasoning = canPush ? (text) => {
+    if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno)) { fermaScorrimento(); return; }
+    push('filo:reasoning', { text });
+  } : null;
   // #536 — la fiducia di QUESTO turno. Parte pulita e scende appena il modello
   // esegue un'azione che porta dentro testo scritto da altri (una ricerca, un
   // documento, l'uscita di un comando). Una volta scesa non risale: la classe
