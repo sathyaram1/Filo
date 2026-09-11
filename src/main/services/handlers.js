@@ -2466,6 +2466,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           roundRendered.push(rendered);
         }
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        // #536 — questa azione ha letto roba di altri? Da qui in poi il turno è
+        // contaminato: niente più testo in diretta, e a fine turno il guardiano.
+        try {
+          const Gd = globalThis.SN_GUARDIANO;
+          const fonte = Gd && res.executed ? Gd.fonteDiAzione(a) : null;
+          if (fonte) { fontiTurno.push(fonte); contaminato = true; }
+        } catch (_) {}
         results.push({ action: a, res, rendered });
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
