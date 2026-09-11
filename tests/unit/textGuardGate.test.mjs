@@ -139,7 +139,7 @@ test('gli avvisi non si leggono, né si tolgono, da una pagina web', () => {
 // pulite dove il secondo modello non gira nemmeno.
 
 test('ogni azione dice cosa lascia scritto: l’elenco copre il registro intero', () => {
-  require(join(ROOT, 'src', 'shared', 'theme-tokens.js'));
+  require(join(ROOT, 'src', 'shared', 'themeTokens.js'));
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
   require(join(ROOT, 'src', 'shared', 'textGuard.js'));
@@ -171,12 +171,17 @@ test('la regola fissata in memoria, l’appunto e lo stile di Filo sono sorvegli
 });
 
 test('una preferenza a testo libero lo dichiara, altrimenti nessuno la sorveglia', () => {
-  require(join(ROOT, 'src', 'shared', 'theme-tokens.js'));
+  require(join(ROOT, 'src', 'shared', 'themeTokens.js'));
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   const P = globalThis.SN_PREF;
   // La sonda: una stringa che nessun setter può produrre da sé. Se riesce ad
   // arrivare INTERA dentro l'impostazione, quel valore è testo libero, e dopo
-  // una pagina avvelenata lo sceglie la pagina.
+  // una pagina avvelenata lo sceglie la pagina. Da lì in poi va DECISO se quel
+  // testo sono parole che l'utente leggerà (`testoLibero: true`, e allora passa
+  // dal guardiano) oppure no (`testoLibero: false`, dichiarato, come per una
+  // chiave di accesso che nessuno legge e che ogni controllo fermerebbe). Quello
+  // che non si può fare è non decidere: è così che «stile dell'agente», cioè le
+  // istruzioni di ogni conversazione futura, è rimasto fuori per tre giri.
   const SONDA = 'zqxsonda-testo-libero-536';
   const scoperte = [];
   for (const setter of P.PREF_SETTERS) {
@@ -184,10 +189,10 @@ test('una preferenza a testo libero lo dichiara, altrimenti nessuno la sorveglia
     try { built = setter.build(SONDA); } catch (_) { built = null; }
     if (!built) continue;
     if (!JSON.stringify(built.partial || {}).includes(SONDA)) continue;
-    if (!built.testoLibero) scoperte.push(setter.keys[0]);
+    if (typeof built.testoLibero !== 'boolean') scoperte.push(setter.keys[0]);
   }
   assert.deepEqual(scoperte, [],
-    'queste preferenze scrivono testo libero senza dichiararlo, quindi il guardiano non le guarda (#536): '
+    'queste preferenze scrivono testo libero e non dicono se il guardiano deve guardarlo (#536): '
     + scoperte.join(', '));
 });
 
