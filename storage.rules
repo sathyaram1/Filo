@@ -8,13 +8,21 @@ rules_version = '2';
 //   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
 //   i feedback con allegati fuori allowlist: questa regola è la cintura,
 //   quello le bretelle.
-// - Read: aperto (la dashboard mostra immagini e file via link diretto).
+// - Get: aperto (la dashboard mostra immagini e file via link diretto, e quei
+//   link portano già il loro token di download).
+// - List: NEGATO (#583). Un elenco è una cosa diversa da un file: chiedendolo,
+//   chiunque si portava via il nome di ogni allegato mai caricato e poi il
+//   contenuto, senza sapere niente di nessun feedback. Il resto dell'audit ha
+//   chiuso la lettura dei documenti, che era l'altra strada per arrivarci: se
+//   il bucket resta elencabile, quella chiusura vale la metà. Gli allegati dal
+//   25 giugno 2026 sono cifrati, ma i più vecchi no.
 
 service firebase.storage {
   match /b/{bucket}/o {
 
     match /feedback/{file=**} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow write: if
         request.resource.size < 4 * 1024 * 1024
         && (
