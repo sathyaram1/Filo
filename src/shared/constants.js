@@ -85,6 +85,14 @@
     FILO_TIMERS: 'filo_timers',
     // Notifiche live nella colonna destra. Array di {id, ts, kind, text, action?, dismissed?}.
     FILO_NOTIFICATIONS: 'filo_notifications',
+    // #536 — avvisi nati da contenuto non fidato che il guardiano ha FERMATO.
+    // Array di {id, ts, origine, motivo, regola, testo}: è il registro che
+    // l'utente legge in Preferenze per capire se il guardiano grida al lupo.
+    FILO_GUARD_BLOCKS: 'filo_guard_blocks',
+    // #536 — avvisi in attesa del controllo (guardiano irraggiungibile). Non
+    // compaiono e non si perdono: ripartono al giro dopo. Array di voci
+    // {id, ts, testo, kind, action?, color?, origine, fiducia, ...}.
+    FILO_GUARD_PENDING: 'filo_guard_pending',
     // Stato sessione corrente dashboard: ultima interazione, contatori, ecc.
     FILO_SESSION: 'filo_session',
     // Flag "già accolto": true quando la micro-intervista di benvenuto è
