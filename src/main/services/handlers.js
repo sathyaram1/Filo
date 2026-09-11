@@ -2737,16 +2737,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
     }
     if (verdetto.esito === 'blocca') {
+      let blocco = null;
       try {
-        await FiloMem.addGuardBlock({
+        blocco = await FiloMem.addGuardBlock({
           origine, motivo: verdetto.motivo, regola: verdetto.regola,
           testo: textReply, fonte: internal ? '' : String(userMessage || ''),
         });
       } catch (_) {}
-      // Nella colonna degli avvisi al registro ci si arriva con un pulsante; qui
-      // no, quindi la strada si dice a parole: chi ha appena letto che Filo gli
-      // ha nascosto qualcosa vorrà vedere cos'era.
-      textReply = `${G.frasediBlocco({ origine, motivo: verdetto.motivo })}\n\n${G.DOVE_SONO_I_BLOCCHI}`;
+      // Alla cosa fermata ci si arriva con un pulsante, come dalla colonna degli
+      // avvisi: le due strade portano allo stesso posto e devono comportarsi
+      // allo stesso modo. Se il registro non ha potuto scrivere la voce non c'è
+      // niente da aprire, e allora la strada si dice a parole.
+      guardBlockId = (blocco && blocco.id) || '';
+      textReply = guardBlockId
+        ? G.frasediBlocco({ origine, motivo: verdetto.motivo })
+        : `${G.frasediBlocco({ origine, motivo: verdetto.motivo })}\n\n${G.DOVE_SONO_I_BLOCCHI}`;
     } else if (verdetto.esito === 'in-attesa') {
       // Il controllo non si è potuto fare: la risposta NON si mostra e NON si
       // perde. Va nella stessa coda degli avvisi e ricompare, come notifica,
