@@ -51,6 +51,23 @@
   // e ogni scrittura passa comunque dal main process che rifiuta i non-admin.
   let isAdmin = false;
 
+  // Chi guarda cambia: l'unica porta per dirlo, e l'unico posto dove si buttano
+  // via le risposte tenute da parte.
+  //
+  // Gli allegati si chiedono una volta per indirizzo e la risposta resta in
+  // memoria, anche quando è un no. Quel no però dipende da CHI sta guardando, e
+  // il pulsante per farsi riconoscere sta in questa stessa pagina: senza
+  // svuotare, chi lo premeva continuava a vedere segnaposti al posto degli
+  // allegati finché non riapriva la pagina (#582, giro 3). Vale nei due sensi:
+  // anche uscendo, gli allegati già decifrati non devono restare a schermo.
+  function setIsAdmin(v) {
+    const nuovo = Boolean(v);
+    if (nuovo === isAdmin) return;
+    isAdmin = nuovo;
+    fbImgCache.clear();
+    fbFileWhyCache.clear();
+  }
+
   // Invia un messaggio al main process. Su pagine filo:// è sempre presente.
   function sendToMain(msg) {
     if (window.filo?.message) return window.filo.message(msg);
