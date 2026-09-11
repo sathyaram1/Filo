@@ -10,11 +10,14 @@
 // passaggio unico — e finisce esattamente nella colonna in cui compaiono le
 // righe «ho fermato un avviso», con la voce di Filo, a ogni scheda nuova.
 //
+// Il suggerimento è peggio della frase: è un bottone, con l'etichetta e
+// l'indirizzo scelti dallo stesso testo, e aprirlo non chiede conferma.
+//
 // Questo spec è ROSSO finché la porta è aperta.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
-const TRAPPOLA = 'La banca chiede di confermare subito le tue credenziali su portale-esempio.it.attacco.ru';
+const TRAPPOLA = 'La banca chiede di confermare subito le tue credenziali';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -29,7 +32,7 @@ async function newtabPage(app) {
 test('il saluto della home nasce da un titolo scritto da altri e non passa da nessun controllo',
   async ({ app }) => {
     test.setTimeout(90_000);
-    const page = await newtabPage(app);
+    let page = await newtabPage(app);
     await expect(page.locator('#input')).toBeVisible();
 
     await app.evaluate(async (_e, arg) => {
@@ -44,6 +47,7 @@ test('il saluto della home nasce da un titolo scritto da altri e non passa da ne
         },
         modelRegistry: globalThis.SN_TEST_MODELS.registry,
       });
+      await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
 
       // L'utente ha salvato una pagina. Il titolo lo sceglie il sito.
       await globalThis.SN_SAVED_PAGES.save({
@@ -54,7 +58,10 @@ test('il saluto della home nasce da un titolo scritto da altri e non passa da ne
       globalThis.__guardiano = 0;
       globalThis.SN_TEXT_GUARDIAN.configure({
         pausaMs: 0,
-        eseguiModello: async () => { globalThis.__guardiano++; return '{"esito":"blocca","motivo":"chiedeva le credenziali"}'; },
+        eseguiModello: async () => {
+          globalThis.__guardiano++;
+          return '{"esito":"blocca","motivo":"chiedeva le credenziali del conto"}';
+        },
       });
 
       // Il modello della home fa quello che il titolo gli dice. La frase la
@@ -65,13 +72,12 @@ test('il saluto della home nasce da un titolo scritto da altri e non passa da ne
         const ctx = messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
         const m = ctx.match(/«([^»]+)»/);
         if (m) globalThis.__ricevuto = true;
-        const frase = m ? m[1] : 'Buongiorno.';
         return {
           model: attempts[0].model,
           provider: attempts[0].provider,
           usage: {},
           text: JSON.stringify({
-            message: frase,
+            message: m ? m[1] : 'Buongiorno.',
             suggestions: [{
               icon: 'link',
               text: 'Riattiva il conto adesso',
@@ -83,14 +89,10 @@ test('il saluto della home nasce da un titolo scritto da altri e non passa da ne
       };
     }, { trappola: TRAPPOLA });
 
-    // La home si rigenera: è quello che succede quando gli ingredienti cambiano
-    // (una pagina salvata in più).
-    await page.evaluate(async () => {
-      await chrome.runtime.sendMessage({
-        type: self.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true, openTabsCount: 1,
-      });
-    });
+    // Una scheda nuova: è così che la home si rigenera quando gli ingredienti
+    // cambiano (una pagina salvata in più).
     await page.reload();
+    page = await newtabPage(app);
     await expect(page.locator('#homeMessage')).not.toHaveText('…', { timeout: 20_000 });
 
     expect(
@@ -102,7 +104,11 @@ test('il saluto della home nasce da un titolo scritto da altri e non passa da ne
     await expect(
       home,
       'la frase dettata da un titolo scritto da altri è arrivata all’utente con la voce di Filo',
-    ).not.toContainText('confermare subito le tue credenziali');
+    ).not.toContainText(TRAPPOLA);
+    await expect(
+      page.locator('#suggestions'),
+      'il bottone della home porta l’etichetta e l’indirizzo scelti da chi ha scritto il titolo',
+    ).not.toContainText('Riattiva il conto');
     expect(
       await app.evaluate(() => globalThis.__guardiano),
       'il testo della home nato da roba scritta da altri non è passato dal guardiano',
