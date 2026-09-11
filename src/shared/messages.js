@@ -574,6 +574,11 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // #536 — il registro dei blocchi del guardiano (Preferenze → Sicurezza):
+    // cosa ha fermato, quando, da quale fonte, con che motivo. Solo pagine
+    // filo:// (ci sono dentro estratti di testi fermati).
+    GUARD_LIST_BLOCKS: 'guard_list_blocks',
+    GUARD_CLEAR_BLOCKS: 'guard_clear_blocks',
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',

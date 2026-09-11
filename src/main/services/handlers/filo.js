@@ -251,9 +251,15 @@ module.exports = function register(on, ctx) {
   // #536 — il registro dei blocchi (Preferenze → Sicurezza): cosa il guardiano
   // ha fermato, quando, da quale fonte, con che motivo. Serve a capire se
   // grida al lupo: un guardiano che blocca troppo viene spento.
-  on(MSG.GUARD_LIST_BLOCKS, async () => ({ ok: true, blocchi: await FiloMem.listGuardBlocks() }));
+  // Il registro non è roba da pagine web: ci sono dentro estratti di quello che
+  // Filo stava per mostrare, e la lista di cosa lo inganna.
+  on(MSG.GUARD_LIST_BLOCKS, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    return { ok: true, blocchi: await FiloMem.listGuardBlocks() };
+  });
 
-  on(MSG.GUARD_CLEAR_BLOCKS, async () => {
+  on(MSG.GUARD_CLEAR_BLOCKS, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     await FiloMem.clearGuardBlocks();
     return { ok: true, blocchi: [] };
   });
