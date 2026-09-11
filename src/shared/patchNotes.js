@@ -16,6 +16,14 @@
   const NOTES = [
     // ↓ Nuove versioni in cima.
     {
+      version: '0.2.228', date: '2026-09-11',
+      features: [
+        'Quando Filo legge una mail, una pagina o un documento e poi ti scrive qualcosa, quel testo lo guarda prima un secondo modello, diverso da quello che l\'ha scritto. Se sembra spingerti a dare credenziali, codici o soldi, o ad aprire un link che porta altrove rispetto a quello che dice, l\'avviso non ti arriva: al suo posto una riga che ti dice cosa ha visto e da chi veniva. In Impostazioni → Sicurezza trovi tutto quello che è stato fermato.',
+        'I collegamenti dentro un avviso dicono sempre dove portano davvero, prima che tu clicchi.',
+        'Se il controllo non risponde, l\'avviso non si perde: resta in attesa, lo vedi, e compare appena il controllo torna.',
+      ],
+    },
+    {
       version: '0.2.225', date: '2026-09-10',
       features: [
         'Quando riscatti l\'invito, i crediti che avevi già li ritrovi sommati a quelli d\'ingresso: nessuno riparte da zero.',
