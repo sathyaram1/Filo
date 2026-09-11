@@ -829,7 +829,6 @@ module.exports = function register(on, ctx) {
       };
       await Promise.all(Array.from({ length: DECRYPT_CONCURRENCY }, worker));
 
-      const published = await publicCards({ fresh: true });
       // `complete`: il caricamento PER DATA D'INVIO non ha toccato il tetto,
       // quindi questi sono TUTTI i feedback che esistono, e solo allora una
       // scheda senza feedback è un orfano (feedback cancellato) da togliere.
