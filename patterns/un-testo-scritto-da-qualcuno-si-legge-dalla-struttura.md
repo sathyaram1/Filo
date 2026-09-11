@@ -154,11 +154,13 @@ per cui la difesa vera sta alla scrittura.
 Sbagliare per eccesso qui costa più che sbagliare per difetto: un giro inventato
 sposta il lavoro nella fetta sbagliata, e chi guarda non ha modo di accorgersene.
 
-**Dove:** `readRounds()`, `verbaleConRilievi()` e `notesTruncated()` in
-`src/shared/feedbackStats.js`, che leggono i verbali scritti da
-`SN_VERIFIER_ROUND.roundNote` e appesi da `SN_FEEDBACK_THREAD.appendModelTurn`;
-`turnOpeners()`, `markerOpensTurn()` e `markerIsQuoted()` in
-`src/shared/feedbackThread.js` per il contenitore.
+**Dove:** `neutralizzaMarcatori()` in `src/shared/feedbackThread.js`, chiamata da
+`appendUserTurn()`, `appendModelTurn()` e `composeNotes()`, cioè le tre porte da
+cui il testo di qualcuno entra nelle note; `turnOpeners()`, `markerOpensTurn()`
+e `catenaVera()` nello stesso file per le note già salvate; `readRounds()`,
+`verbaleConRilievi()` e `notesTruncated()` in `src/shared/feedbackStats.js`, che
+leggono i verbali scritti da `SN_VERIFIER_ROUND.roundNote` e appesi da
+`SN_FEEDBACK_THREAD.appendModelTurn`.
 Le prove per porta: `tests/unit/feedbackStats.test.mjs`, sezioni «Il conto dei
 giri non si fida della prosa», «La quinta porta della stessa famiglia», «il
 report di chi corregge non diventa un giro, per quanto citi il verbale», «La
