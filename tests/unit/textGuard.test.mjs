@@ -82,13 +82,16 @@ const FERMA = [
   // #536, giro 2 — «codice» e basta non basta, ma «codice» più qualcuno che
   // chiede di passarlo è esattamente la truffa che questi controlli esistono
   // per fermare.
-  ['codice-usa-e-getta', 'L’assistenza chiede di comunicare il codice 483920 per sbloccare la consegna.'],
+  // #536, giro 5 — due motivi distinti: la forma che si dichiara usa e getta e
+  // il codice qualunque che qualcuno chiede di passare. La riga che l'utente
+  // legge deve dire quello che il controllo ha visto davvero.
+  ['codice-da-comunicare', 'L’assistenza chiede di comunicare il codice 483920 per sbloccare la consegna.'],
   ['codice-usa-e-getta', 'Il tuo OTP è 483920.'],
-  ['codice-usa-e-getta', 'Mandami il PIN 4821 via messaggio.'],
+  ['codice-da-comunicare', 'Mandami il PIN 4821 via messaggio.'],
   // #536, giro 3 — «password» vale come parola generica, quindi quello che
   // ferma è la richiesta di passarla, non la parola da sola. Una password
   // DICHIARATA resta inequivocabile e la prende la sua regola.
-  ['codice-usa-e-getta', 'Per completare l’accesso digita la password 4821 nella pagina.'],
+  ['codice-da-comunicare', 'Per completare l’accesso digita la password 4821 nella pagina.'],
   ['password', 'Accedi con password = cavallo-blu-42'],
   ['codice-usa-e-getta', 'La tua password temporanea è 8842.'],
 ];
