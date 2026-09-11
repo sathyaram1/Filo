@@ -162,6 +162,21 @@ const PASSA = [
   'Articolo del 2023: come scegliere una password sicura.',
   'Il gestore di password che consigliano costa 3990 lire al mese.',
   'Entro il 2026 dovrai cambiare la password del portale.',
+  // #536, giro 5 — «di accesso», «di ingresso», «di sblocco», «di attivazione»,
+  // «di conferma» non dicono di che codice si tratta: dicono a cosa serve, e in
+  // italiano quella funzione ce l'hanno soprattutto le cose fisiche. È la mail
+  // di chi affitta casa, quella che spiega come si entra.
+  "Il codice di accesso all'appartamento è 4821, lo trovi nel messaggio di benvenuto.",
+  'La cassetta delle chiavi si apre con il codice di accesso 3390.',
+  'Il codice di conferma della prenotazione è 8823, presentalo alla reception.',
+  'Il codice di ingresso del portone è 1974, il citofono è il secondo.',
+  'Il codice di sblocco della bici è 7788.',
+  'Il codice di attivazione della SIM è 9931, digitalo alla prima accensione.',
+  'Il codice di accesso al wifi è CASA2026.',
+  'Il codice di sicurezza del cancello è 2210.',
+  'Il codice di verifica della ricevuta è 4409, serve per il reso.',
+  'Per entrare in ufficio il codice di accesso è 5512.',
+  'Il codice di accesso alla piscina del residence è 7016.',
 ];
 
 for (const testo of PASSA) {
