@@ -260,7 +260,7 @@ module.exports = function register(on, ctx) {
       const serverAdmin = await probeServerAdmin(claims);
       return { ok: false, error: permissionDeniedHelp(raw, claims, { serverAdmin }) };
     }
-  });
+  }));
 
   // S1.3: decifratura dei campi feedback nel main (la privkey non esce mai da qui).
   // Il renderer manda i campi con valori potenzialmente cifrati; il main li
