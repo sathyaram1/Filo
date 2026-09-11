@@ -93,8 +93,8 @@ test('il documento che il mittente ha allegato dice che è partito, invece di sc
   // Ma il collegamento non porta ai byte grezzi, che sono il testo cifrato.
   expect(await pillola.getAttribute('href')).not.toMatch(/firebasestorage\.googleapis\.com|storage\.googleapis\.com/);
   // E chi l'ha mandato lo legge senza doverci cliccare sopra.
-  await expect(pillola.locator('.fb-file-note')).toHaveText('(consegnato)', { timeout: 10_000 });
-  expect(await pillola.getAttribute('title')).toMatch(/consegnat/i);
+  await expect(pillola.locator('.fb-file-note')).toHaveText('(riservato)', { timeout: 10_000 });
+  expect(await pillola.getAttribute('title')).toMatch(/lo apre solo chi riceve le segnalazioni/i);
 });
 
 test('chi riceve le segnalazioni l’allegato lo apre: il clic lo chiede decifrato, col suo tipo', async ({ app, openTab }) => {
