@@ -36,7 +36,15 @@ chi non sta verbalizzando:
    marcatore di avere sopra una riga vuota, e questo chiude la citazione
    infilata dentro un capoverso. Ma un blocco incollato lo si stacca proprio
    con una riga vuota: sei strade, dal verbale di un'altra segnalazione
-   riportato in una risposta alla riga del taglio del tetto scritta a mano.
+   riportato in una risposta alla riga del taglio del tetto scritta a mano;
+9. con la stessa riga, staccata da una riga vuota e datata DOPO. Il giro 13
+   aveva chiesto ai marcatori di non tornare indietro nel tempo. Ma si risponde
+   a una segnalazione ferma da giorni riportando un pezzo di una lavorata ieri,
+   e allora l'istante citato è più recente dell'ultimo turno vero: l'ordine
+   cresce, la difesa non morde. Sei strade ancora, fra cui una nel verso
+   opposto (un pezzo copiato da un computer con l'orologio avanti si prendeva
+   l'istante di riferimento e faceva sparire tutti i turni veri che seguivano,
+   pass compreso).
 
 Ogni giro chiudeva la porta trovata e ne lasciava aperta un'altra. Un lavoro
 costato cinque critiche finiva nella fetta verde «passata subito», che è il
