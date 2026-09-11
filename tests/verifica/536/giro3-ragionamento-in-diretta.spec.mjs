@@ -40,7 +40,7 @@ test('il ragionamento di un turno contaminato arriva all’utente senza controll
       apiKeys: { openrouter: 'k-test' },
       models: {
         [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
-        [C.ACTIONS.GUARD_TEXT]: 'kimi-vision',
+        [C.ACTIONS.GUARD_TEXT]: 'glm',
       },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
