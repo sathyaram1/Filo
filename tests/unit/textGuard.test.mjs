@@ -553,7 +553,22 @@ test('un’azione che finisce male ha portato dentro le stesse parole di una riu
     G.haPortatoTestoDiAltri({ type: 'ESEGUI_COMANDO', output: { ...uscita, code: 124, timedOut: true } }),
     true,
   );
-  assert.equal(G.haPortatoTestoDiAltri({ type: 'CERCA_WEB', output: { search: 'x', results: [] } }), true);
+  assert.equal(
+    G.haPortatoTestoDiAltri({ type: 'CERCA_WEB', output: { search: 'x', results: [{ title: 'a' }] } }),
+    true,
+  );
+  // E all'incontrario: quando non è entrato NIENTE di nessuno (una ricerca senza
+  // risultati, un documento illeggibile, un comando muto) il turno resta pulito
+  // e non si paga un secondo modello per una riga scritta da Filo.
+  assert.equal(G.haPortatoTestoDiAltri({ type: 'CERCA_WEB', output: { search: 'x', results: [] } }), false);
+  assert.equal(
+    G.haPortatoTestoDiAltri({ type: 'LEGGI_DOCUMENTO', output: { ok: false, text: '', error: 'unreadable' } }),
+    false,
+  );
+  assert.equal(
+    G.haPortatoTestoDiAltri({ type: 'LEGGI_DOCUMENTO', output: { ok: true, text: 'roba scritta da altri' } }),
+    true,
+  );
   // Il comando non è nemmeno partito (terminale spento): non c'è niente di
   // nessuno, e infatti non entra nemmeno nel contesto del modello.
   assert.equal(G.haPortatoTestoDiAltri({ type: 'ESEGUI_COMANDO', output: { blocked: 'disabled' } }), false);
