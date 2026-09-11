@@ -583,7 +583,14 @@ service cloud.firestore {
           && request.resource.data.steps is list
           && request.resource.data.steps.size() <= 30
           && request.resource.data.success is bool
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          // La data la scrive chi manda, e decide chi sta in CIMA ai «percorsi
+          // già riusciti» che l'assistente si mette nelle istruzioni prima di
+          // cliccare da solo sulla pagina di qualcun altro. Senza questa riga
+          // un percorso datato 2099 restava primo per sempre: una postazione
+          // fissa per un testo messo lì apposta (#584, terzo giro). Il client
+          // scrive il giorno corrente arrotondato, che è sempre nel passato.
+          && request.resource.data.createdAt <= request.time;
 
         allow update, delete: if false;
       }
