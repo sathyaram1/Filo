@@ -27,7 +27,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'paths.js'));
 const P = globalThis.SN_PATHS;
 
-const BASE = P.rest.FIRESTORE_BASE;
+const BASE = (P.rest && P.rest.FIRESTORE_BASE)
+  // Il ripiego serve alla CONTROPROVA (tests/verifica/584): col client di
+  // prima `rest` non esiste, e senza questo il file morirebbe al caricamento
+  // invece di far vedere QUALI asserzioni diventano rosse.
+  || 'https://firestore.googleapis.com/v1/projects/filo-8b9cb/databases/(default)/documents';
+const MAX_PAGE_SIZE = (P.rest && P.rest.MAX_PAGE_SIZE) || 200;
 
 function fsDoc(id, { initialUrl, intent, steps, success, createdAt }) {
   return {
