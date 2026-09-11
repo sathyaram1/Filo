@@ -2670,8 +2670,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     let produttore = '';
     let verdetto;
     try {
-      const s = await getEffectiveSettings();
-      produttore = modelForAction(s, ACTIONS.FILO_CHAT);
+      produttore = await produttoreDellaChat();
       verdetto = await TG.controllaTesto({
         testo: textReply,
         fiducia: fiduciaTurno,
