@@ -157,7 +157,40 @@
     'u', 'user', 'users', 'utente', 'utenti', 'profile', 'profil', 'profilo',
     'profili', 'member', 'members', 'membro', 'membri', 'people', 'persone',
     'usuario', 'usuarios', 'benutzer', 'utilisateur',
+    // Aggiunti al terzo giro di #584: il nome dopo queste parole è un nome di
+    // persona tanto quanto dopo `/u/`. `in` è la forma dei profili
+    // professionali, `c`/`channel` quella dei canali, `clienti`/`customers`
+    // quella dei gestionali.
+    'in', 'c', 'channel', 'author', 'autore', 'autori', 'cliente', 'clienti',
+    'customer', 'customers', 'perfil', 'membres', 'mitglied',
   ]);
+
+  // I siti dove il nome utente è il PRIMO pezzo dell'indirizzo, senza nessuna
+  // parola davanti che lo annunci (#584, terzo giro). Lì `/mariorossi/progetto`
+  // esce come una parola qualunque, perché una parola è: nessuna regola di
+  // forma distingue un nome utente da una sezione del sito. Su questi siti il
+  // primo pezzo è sempre una persona, quindi si tratta come tale.
+  //
+  // Sono i casi che si vedono, non tutti quelli che esistono: la rete generale
+  // resta il modello che giudica il percorso prima che parta, e che dal terzo
+  // giro vede davvero l'indirizzo (prima gli arrivava vuoto).
+  const SITI_COL_NOME_IN_TESTA = new Set([
+    'github.com', 'gitlab.com', 'codeberg.org', 'gitee.com',
+    'x.com', 'twitter.com', 'threads.net', 'bsky.app',
+    'instagram.com', 'tiktok.com', 'facebook.com', 'snapchat.com',
+    'medium.com', 'dev.to', 'hashnode.com', 'behance.net', 'dribbble.com',
+    'soundcloud.com', 'patreon.com', 'ko-fi.com', 'twitch.tv', 'kick.com',
+    'vimeo.com', 'deviantart.com', 'pinterest.com', 'about.me', 'linktr.ee',
+    't.me', 'telegram.me', 'paypal.me', 'venmo.com', 'cash.app',
+  ]);
+
+  function nomeInTesta(hostname) {
+    const h = String(hostname || '').toLowerCase();
+    for (const sito of SITI_COL_NOME_IN_TESTA) {
+      if (h === sito || h.endsWith(`.${sito}`)) return true;
+    }
+    return false;
+  }
 
   // Un segmento accentato arriva codificato (`privacit%C3%A0`): si guarda la
   // forma decodificata, se no una parola come «privacità» finirebbe fra i
