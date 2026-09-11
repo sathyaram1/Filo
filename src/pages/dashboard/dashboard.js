@@ -559,8 +559,12 @@
     // Notifiche per prime (avvisi), poi timer (processi).
     for (const n of notifications) {
       liveEl.appendChild(renderLiveCard({
-        kind: n.kind === 'alert' ? 'alert' : (n.kind || 'info'),
+        kind: n.stato === 'in_attesa' ? 'attesa' : (n.kind === 'alert' ? 'alert' : (n.kind || 'info')),
         text: n.text,
+        // #536 — dove portano DAVVERO i collegamenti dell'avviso: il dominio si
+        // vede prima di aprire, sempre. Un avviso nato da una mail può scrivere
+        // "vai sulla tua banca" e portare altrove.
+        link: Array.isArray(n.link) ? n.link : [],
         onDismiss: () => send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(refreshLive),
       }));
     }
