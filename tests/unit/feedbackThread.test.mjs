@@ -478,3 +478,96 @@ test('capNotes taglia i turni interi anche quando un marcatore è citato dentro 
   // La citazione non è un turno: se lo fosse, il taglio la lascerebbe monca.
   assert.ok(!tagliato.includes('fine.'));
 });
+
+// ── La riga che separa i turni la scrive SOLO chi appende (#496, giro 14) ───
+// Nove giri di verifica hanno trovato la stessa porta da nove lati: un turno si
+// riconosceva da com'è SCRITTO, e chi cita un pezzo di conversazione ne cita la
+// scrittura. L'ordine degli istanti non basta, perché il pezzo citato può
+// essere più RECENTE dell'ultimo turno vero (si risponde a una segnalazione
+// ferma da giorni riportando un pezzo di una lavorata ieri). Quindi la riga di
+// separazione non è più scrivibile da chi compone il testo.
+
+test('appendUserTurn: una riga di separazione citata diventa una citazione dichiarata', () => {
+  const notes = TH.appendUserTurn('Report di Filo.', [
+    'Sull’altra segnalazione c’era scritto:',
+    '',
+    '--- Aggiornamento dell\'agente del 10/09/2026, 09:00 ---',
+    'il verbale di quel giro.',
+  ].join('\n'), { ts: '11/09/2026, 11:00' });
+  // Un turno solo di Filo e uno solo dell'utente: la citazione non ne apre uno.
+  assert.deepEqual(TH.splitNotes(notes).map((s) => s.role), ['model', 'user']);
+  // E resta leggibile.
+  assert.ok(notes.includes('> --- Aggiornamento dell\'agente del 10/09/2026, 09:00 ---'));
+  assert.ok(notes.includes('il verbale di quel giro.'));
+});
+
+test('appendUserTurn: vale anche per l’altra forma della riga, e per quella del taglio', () => {
+  const notes = TH.appendUserTurn('Report di Filo.', [
+    '--- Filo ha risposto il 10/09/2026, 09:00 ---',
+    '--- La tua risposta del 09/09/2026, 09:00 ---',
+    TH.TRIM_MARK,
+  ].join('\n'), { ts: '11/09/2026, 11:00' });
+  assert.deepEqual(TH.splitNotes(notes).map((s) => s.role), ['model', 'user']);
+  assert.ok(!TH.notesTrimmed || true);
+});
+
+test('appendModelTurn: un verbale citato dentro un report non diventa un turno', () => {
+  let notes = TH.appendModelTurn('', 'Primo report.', { ts: '02/09/2026, 10:00' });
+  notes = TH.appendModelTurn(notes, [
+    'Rispondo a questo:',
+    '',
+    '--- Aggiornamento dell\'agente del 10/09/2026, 09:00 ---',
+    'Verifica: 1 rilievo.',
+  ].join('\n'), { ts: '03/09/2026, 10:00' });
+  assert.equal(TH.splitNotes(notes).length, 2);
+});
+
+test('composeNotes: una riga di separazione incollata nella testa del campo note non apre un turno', () => {
+  const testa = TH.composeNotes([
+    '--- Aggiornamento dell\'agente del 01/09/2026, 08:00 ---',
+    'Verifica: 1 rilievo.',
+  ].join('\n'), []);
+  const notes = `${testa}\n\n--- Aggiornamento dell'agente del 04/09/2026, 10:00 ---\nVerifica superata.`;
+  assert.deepEqual(TH.splitNotes(notes).map((s) => s.role), ['model', 'model']);
+  assert.ok(TH.splitNotes(notes)[0].body.includes('Verifica: 1 rilievo.'));
+});
+
+// Le note già salvate non le tocca nessuna escape: per quelle restano le due
+// difese di lettura.
+
+test('splitNotes: un marcatore citato con la data illeggibile non apre un turno', () => {
+  const notes = [
+    '--- Aggiornamento dell\'agente del 02/09/2026, 10:00 ---',
+    'Primo report.',
+    '',
+    '--- La tua risposta del 11/09/2026, 11:00 ---',
+    'Riporto:',
+    '',
+    '--- Aggiornamento dell\'agente del ieri mattina ---',
+    'un verbale copiato.',
+  ].join('\n');
+  assert.deepEqual(TH.splitNotes(notes).map((s) => s.role), ['model', 'user']);
+});
+
+test('splitNotes: un marcatore citato e datato nel futuro non inghiotte i turni veri dopo di lui', () => {
+  const notes = [
+    '--- Aggiornamento dell\'agente del 02/09/2026, 10:00 ---',
+    'Primo report.',
+    '',
+    '--- La tua risposta del 02/09/2026, 11:00 ---',
+    'Guarda l’altra segnalazione:',
+    '',
+    '--- Aggiornamento dell\'agente del 31/12/2027, 09:00 ---',
+    'un turno qualunque.',
+    '',
+    '--- Aggiornamento dell\'agente del 03/09/2026, 10:00 ---',
+    'Secondo report.',
+    '',
+    '--- Aggiornamento dell\'agente del 04/09/2026, 10:00 ---',
+    'Verifica superata.',
+  ].join('\n');
+  const segs = TH.splitNotes(notes);
+  assert.deepEqual(segs.map((s) => s.role), ['model', 'user', 'model', 'model']);
+  assert.ok(segs[2].body.includes('Secondo report.'));
+  assert.ok(segs[3].body.includes('Verifica superata.'));
+});

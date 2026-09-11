@@ -379,16 +379,42 @@
   // quelli che spezzano le note (la chat a bolle, il taglio del tetto, i conti
   // della scheda delle statistiche): se divergessero, una citazione sarebbe un
   // turno per uno e prosa per l'altro.
+  //
+  // ⚠️ L'ORDINE SI GUARDA SULLA CATENA INTERA, NON SUL VICINO DI PRIMA.
+  // Confrontare ogni marcatore con quello che lo precede sembra la stessa cosa
+  // e non lo è: una citazione datata avanti diventa il metro di paragone, e da
+  // lì in poi TUTTI i turni veri risultano «più vecchi del turno prima» e
+  // spariscono — pass compreso (#496, giro 14, porta 5). Con la catena intera
+  // non serve scegliere una direzione: i turni veri sono appesi in ordine,
+  // quindi la catena più lunga che non torna mai indietro è la loro, e la
+  // citazione è quello che ne resta fuori — che sia datata prima o dopo.
+  function catenaVera(cand) {
+    const n = cand.length;
+    if (n < 2) return cand;
+    const lung = new Array(n).fill(1);
+    const prima = new Array(n).fill(-1);
+    let fine = 0;
+    for (let k = 0; k < n; k += 1) {
+      for (let j = 0; j < k; j += 1) {
+        if (cand[j].ms <= cand[k].ms + MARKER_SKEW_MS && lung[j] + 1 > lung[k]) {
+          lung[k] = lung[j] + 1;
+          prima[k] = j;
+        }
+      }
+      if (lung[k] > lung[fine]) fine = k;
+    }
+    const out = [];
+    for (let k = fine; k >= 0; k = prima[k]) out.push(cand[k]);
+    return out.reverse();
+  }
+
   function turnOpeners(lines) {
     const apre = new Array(lines.length).fill(false);
-    // Prima passata, in avanti: l'istante di un turno vero non torna indietro.
-    const candidati = [];
-    const ultimoTs = { user: null, model: null };
-    // Un turno vero porta sempre un istante che si legge (lo scrivono i due
-    // `*TurnMarker`, e chi appende dal server passa una data vera). Una riga
-    // che ne porta uno illeggibile — «ieri mattina» — l'ha scritta una persona
-    // raccontando: senza istante il confronto sull'ordine non partirebbe
-    // nemmeno, e la citazione passerebbe sempre (#496, giro 14).
+    // Le righe che, per posizione, POTREBBERO aprire un turno, divise per tipo:
+    // i due orologi che le scrivono non si confrontano fra loro (il server per
+    // i turni di Filo, il computer di chi risponde per i suoi, che può essere
+    // avanti di giorni).
+    const cand = { user: [], model: [] };
     for (let i = 0; i < lines.length; i += 1) {
       const mu = USER_TURN_RE.exec(lines[i]);
       const mm = mu ? null : MODEL_TURN_RE.exec(lines[i]);
@@ -396,25 +422,20 @@
       if (!m) continue;
       if (!markerOpensTurn(lines, i)) continue;
       const chi = mu ? 'user' : 'model';
-      const ts = (m[1] || '').trim() || null;
-      const ms = markerMs(ts);
-      if (!Number.isFinite(ms) && Number.isFinite(markerMs(ultimoTs[chi]))) continue;
-      if (markerIsQuoted(ts, ultimoTs[chi])) continue;
-      candidati.push({ i, chi, ms });
-      if (ts) ultimoTs[chi] = ts;
+      cand[chi].push({ i, ms: markerMs((m[1] || '').trim() || null) });
     }
-    // Seconda passata, all'indietro: un turno vero non è mai più recente di
-    // quelli che gli vengono DOPO. Un pezzo di conversazione datato avanti —
-    // incollato da chi l'ha copiato da un computer con l'orologio storto — si
-    // prendeva l'istante di riferimento e faceva sparire tutti i turni veri
-    // successivi, pass compreso (#496, giro 14, porta 5).
-    const successivoMs = { user: NaN, model: NaN };
-    for (let k = candidati.length - 1; k >= 0; k -= 1) {
-      const c = candidati[k];
-      const dopo = successivoMs[c.chi];
-      if (Number.isFinite(c.ms) && Number.isFinite(dopo) && c.ms > dopo + MARKER_SKEW_MS) continue;
-      apre[c.i] = true;
-      if (Number.isFinite(c.ms)) successivoMs[c.chi] = c.ms;
+    for (const chi of ['user', 'model']) {
+      const lista = cand[chi];
+      // Un turno vero porta sempre un istante che si legge: lo scrivono i due
+      // `*TurnMarker`, e chi appende dal server passa una data vera. Una riga
+      // che ne porta uno illeggibile — «ieri mattina» — l'ha scritta una
+      // persona raccontando, e senza istante non entrerebbe in nessun
+      // confronto: passerebbe sempre (#496, giro 14, porta 3). Se però NESSUNO
+      // si legge, la conversazione è di un formato che non conosciamo e si
+      // tengono tutti: meglio dei turni in più che una chat che sparisce.
+      const leggibili = lista.filter((c) => Number.isFinite(c.ms));
+      const usati = leggibili.length ? catenaVera(leggibili) : lista;
+      for (const c of usati) apre[c.i] = true;
     }
     return apre;
   }
