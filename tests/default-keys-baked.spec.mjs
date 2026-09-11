@@ -83,3 +83,27 @@ test('default-keys: senza file e senza env, tutte vuote', () => {
   });
   expect(keys).toEqual({ openrouter: '', tavily: '' });
 });
+
+// #581 — la chiave Google Safe Browsing fa la stessa strada. Prima la leggeva a
+// runtime chi era loggato, dal documento Firestore dei segreti: e per tenerlo
+// leggibile bastava un account Google qualsiasi, quindi le chiavi che pagano le
+// chiamate di tutti erano scaricabili con una GET. Ora il documento è admin-only
+// e questa è l'unica strada verso gli utenti: se si rompe, il primo stadio del
+// rilevamento siti pericolosi si spegne senza che nessuno se ne accorga.
+test('default-keys: la chiave Safe Browsing del file generato vince sull’env', () => {
+  writeFileSync(
+    GEN_PATH,
+    JSON.stringify({ apiKeys: { tavily: 'tav-baked' }, safeBrowsingKey: 'gsb-baked' }),
+    'utf8'
+  );
+  expect(loadSafeBrowsing({ FILO_DEFAULT_SAFEBROWSING_KEY: 'gsb-env' })).toBe('gsb-baked');
+  // E non si intrufola fra le chiavi passate ai provider di modelli.
+  expect(loadKeys({ FILO_DEFAULT_SAFEBROWSING_KEY: 'gsb-env' })).toEqual({
+    openrouter: '', tavily: 'tav-baked',
+  });
+});
+
+test('default-keys: chiave Safe Browsing assente dal file generato → si ricade sull’env', () => {
+  writeFileSync(GEN_PATH, JSON.stringify({ apiKeys: { tavily: 'tav-baked' } }), 'utf8');
+  expect(loadSafeBrowsing({ FILO_DEFAULT_SAFEBROWSING_KEY: 'gsb-env' })).toBe('gsb-env');
+});
