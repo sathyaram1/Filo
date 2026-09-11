@@ -184,6 +184,35 @@
     return card;
   }
 
+  /**
+   * I voti e le riaperture che stanno ancora sul DOCUMENTO e che la scheda non
+   * ha. PURA.
+   *
+   * Serve una volta sola, al passaggio: prima di questa vista i voti della
+   * bacheca e il segnale «ancora rotto» si scrivevano sul feedback, e la
+   * bacheca li leggeva da lì. Adesso li legge dalla scheda — e senza portarli
+   * dentro, il giorno in cui le regole vanno in produzione ogni conteggio
+   * riparte da zero e un fix già segnalato come rotto torna in bacheca
+   * riapribile una seconda volta, cioè il doppione che quel segnale doveva
+   * impedire.
+   *
+   * Si portano solo le chiavi che la scheda NON ha: chi ha votato dopo il
+   * passaggio ha ragione lui, e una ripubblicazione non gli cancella il voto.
+   * Quando non c'è più niente da portare torna `{}`, e il travaso smette da sé.
+   */
+  function carryUserFields(fb, before) {
+    const out = {};
+    for (const f of USER_FIELDS) {
+      const fromDoc = (fb && typeof fb[f] === 'object' && fb[f]) || null;
+      if (!fromDoc) continue;
+      const fromCard = (before && typeof before[f] === 'object' && before[f]) || {};
+      const mancanti = Object.keys(fromDoc).filter((k) => !(k in fromCard));
+      if (!mancanti.length) continue;
+      out[f] = { ...fromDoc, ...fromCard };
+    }
+    return out;
+  }
+
   /** Le due schede dicono la stessa cosa? PURA (confronto campo per campo). */
   function sameCard(a, b) {
     if (!a || !b) return false;
