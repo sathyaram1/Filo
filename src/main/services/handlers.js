@@ -2024,6 +2024,58 @@ function fontiContaminantiInContesto(history) {
   return fonti;
 }
 
+// #536 — QUELLO CHE UN TURNO CONTAMINATO LASCIA SCRITTO PER DOPO.
+//
+// Il guardiano guarda la frase che compare adesso. Ma un turno può anche
+// lasciare in giro testo che comparirà PIÙ TARDI, quando non lo sta guardando
+// nessuno: l'etichetta di un timer o di una sveglia arriva nella colonna degli
+// avvisi al momento della scadenza, e in una notifica di sistema che si vede
+// con Filo ridotto a icona e l'utente che sta facendo altro. Una pagina
+// avvelenata non ha bisogno di far dire niente a Filo: le basta fargli mettere
+// un promemoria chiamato «La banca chiede di confermare le credenziali su …»,
+// e avviare un timer non chiede conferma a nessuno.
+//
+// Quindi quelle etichette passano dallo stesso punto di passaggio della
+// risposta, PRIMA che l'azione parta. Se non passano — o se il controllo non si
+// può fare, che non è un controllo superato — l'azione si fa lo stesso senza le
+// parole di nessun altro: un timer che si chiama «Timer» resta un timer utile.
+// Il testo fermato non si perde: va nel registro degli avvisi fermati.
+const ETICHETTE_SORVEGLIATE = {
+  TIMER: ['label', 'etichetta'],
+  SVEGLIA: ['label', 'etichetta'],
+};
+
+async function sorvegliaEtichette(a, ctx) {
+  const G = globalThis.SN_TEXT_GUARD;
+  const campi = ETICHETTE_SORVEGLIATE[String((a && a.type) || '').toUpperCase()];
+  if (!G || !campi) return;
+  const TG = globalThis.SN_TEXT_GUARDIAN || require('./textGuardian');
+  for (const campo of campi) {
+    const testo = String(a[campo] == null ? '' : a[campo]).trim();
+    if (!testo) continue;
+    let verdetto;
+    try {
+      verdetto = await TG.controllaTesto({
+        testo,
+        fiducia: ctx.fiducia,
+        origine: ctx.origine,
+        richiestaUtente: ctx.richiestaUtente,
+        produttore: ctx.produttore,
+      });
+    } catch (_) {
+      verdetto = { esito: 'in-attesa', motivo: 'controllo non riuscito', regola: '' };
+    }
+    if (verdetto.esito === 'passa') continue;
+    try {
+      await FiloMem.addGuardBlock({
+        origine: ctx.origine, motivo: verdetto.motivo, regola: verdetto.regola,
+        testo, fonte: ctx.richiestaUtente || '',
+      });
+    } catch (_) {}
+    a[campo] = '';
+  }
+}
+
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
