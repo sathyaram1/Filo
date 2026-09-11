@@ -116,16 +116,8 @@ async function main() {
     return r || envKey(envName);
   };
 
-  // La chiave OpenRouter NON si incastona più (#598): ogni utente riceve una
-  // chiave personale dal server al riscatto di un invito, col tetto di spesa
-  // pari ai suoi crediti. Una chiave di fabbrica nell'installer la apriva
-  // chiunque scaricasse il pacchetto. Le installazioni vecchie continuano a
-  // usare la loro finché l'owner non la ruota dal pannello OpenRouter.
-  // Restano incastonate le chiavi dei servizi di contorno (ricerca web).
-  const apiKeys = {
-    gemini: pick('gemini', 'FILO_DEFAULT_GEMINI_KEY'),
-    tavily: pick('tavily', 'FILO_DEFAULT_TAVILY_KEY'),
-  };
+  const apiKeys = {};
+  for (const c of CHIAVI_DEL_PACCHETTO) apiKeys[c.nome] = pick(c.nome, c.env);
 
   // Chiave Google Safe Browsing (#581). Non è una chiave di modelli, quindi sta
   // fuori da `apiKeys`, ma viaggia per la stessa strada: finché la leggeva a
