@@ -702,7 +702,10 @@
     return includeDismissed ? list : list.filter((n) => !n.dismissed);
   }
 
-  async function addNotification({ kind, text, action, color }) {
+  // NON chiamare da fuori: ogni avviso passa dal guardiano
+  // (src/main/services/textGuardian.js), che è il punto di passaggio unico
+  // (#536). Una sentinella negli unit test tiene questa porta chiusa.
+  async function addNotification({ kind, text, action, color, origine, guardiano }) {
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     const entry = {
       id: uuid(),
@@ -711,6 +714,13 @@
       text: String(text || ''),
       action: action || null,
       color: color || null, // override del colore della barra laterale
+      // Da dove viene l'avviso (mittente della mail, sito): la colonna live lo
+      // mostra sempre, così l'utente sa di chi si sta fidando.
+      origine: String(origine || ''),
+      // Come ci è arrivato: 'pulito' (nessun controllo, compito non contaminato),
+      // 'passato' (il guardiano l'ha visto e lasciato passare) o 'blocco' (è la
+      // riga che rimpiazza un avviso fermato).
+      guardiano: String(guardiano || ''),
       dismissed: false,
     };
     list.unshift(entry);
