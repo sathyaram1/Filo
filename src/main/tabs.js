@@ -85,30 +85,12 @@ function tabDiWebContents(wc) {
   return null;
 }
 
-// #514 — l'Esc NON è un gesto con cui una pagina può prendersi lo schermo.
-// Da quando il tasto arriva al documento (serve: è quello che chiude i riquadri
-// aperti sopra la pagina, e prendercelo prima li scavalcava), il browser lo
-// conta come gesto dell'utente. Una pagina che chiede lo schermo pieno dentro
-// il proprio gestore dell'Esc lo otteneva senza che nessuno avesse cliccato
-// niente: da lì il tasto di questa segnalazione diventava un testa o croce —
-// un Esc esce, il successivo rientra — perché la modalità tornava "della
-// pagina" e l'Esc dopo era suo. Si rifiuta qui, prima che succeda qualsiasi
-// cosa: un evento di uscita non può essere il permesso per entrare. Su ogni
-// altro permesso si resta al comportamento di prima (senza gestore, Electron
-// concede), e questo è il motivo del `callback(true)` finale.
-function installaPermessi(ses) {
-  if (!ses || ses._filoPermessi) return;
-  ses._filoPermessi = true;
-  try {
-    ses.setPermissionRequestHandler((wc, permission, callback) => {
-      if (permission === 'fullscreen') {
-        const t = tabDiWebContents(wc);
-        if (t && t._ultimoInputEsc) { callback(false); return; }
-      }
-      callback(true);
-    });
-  } catch (_) {}
-}
+// Il gestore dei permessi (schermo pieno compreso, con la regola dell'Esc del
+// #514) vive in src/main/services/permessiSito.js: da lì passa OGNI richiesta
+// di un sito, e la sua installazione su ogni sessione la fa
+// `app.on('session-created')` in src/main/main.js (#586). Qui resta solo la
+// chiamata sulla sessione della vista appena creata: è idempotente e copre il
+// caso in cui la vista nasca prima che l'evento abbia fatto il giro.
 
 // #252 — pagina interna filo:// "singleton": ne ha senso UNA sola scheda alla
 // volta (le liste "Aperti per dopo"/Cronologia/Archivio/Scaricamenti, le
