@@ -19,8 +19,8 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
-        'Gli allegati che mandi con una segnalazione, quando la riapri, dicono «consegnato» invece di sembrare rotti. Partono cifrati e li apre solo chi riceve le segnalazioni, e vale sia per gli screenshot sia per i file.',
-        'Nell\'elenco dei feedback si aprono solo gli allegati veri, e solo quelli si dichiarano consegnati. Prima una segnalazione poteva dichiarare un finto allegato, mandarti sul sito scelto da chi l\'aveva scritta e farselo pure presentare da Filo come arrivato.',
+        'Gli allegati che mandi con una segnalazione, quando la riapri, dicono che li apre solo chi riceve le segnalazioni, invece di sembrare rotti. Vale sia per gli screenshot sia per i file.',
+        'Nell\'elenco dei feedback si aprono solo gli allegati veri, e Filo non dichiara arrivato niente che non abbia visto. Prima una segnalazione poteva dichiarare un finto allegato, mandarti sul sito scelto da chi l\'aveva scritta e farselo pure presentare da Filo come consegnato.',
         'Nell\'elenco dei feedback l\'indirizzo della pagina segnalata dice su che sito porta, anche quando è lungo. Prima si leggevano i primi caratteri e basta, e un indirizzo scritto apposta poteva sembrare di Filo e portare altrove.',
       ],
     },
