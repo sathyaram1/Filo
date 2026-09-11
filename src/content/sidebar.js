@@ -396,7 +396,7 @@
     // modello guarda il resto e blocca tutto il percorso se ci riconosce una
     // persona. Prometteva «senza il tuo nome» quando quel modello, di fatto,
     // non vedeva niente di quello che stava per uscire (#584, terzo giro).
-    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Senza l’ora: Filo toglie i dati personali e, se restasse qualcosa che dice chi sei, non lo manda affatto.';
+    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Filo toglie prima i dati personali e non manda l’ora. Se resta qualcosa che dice chi sei, il percorso non parte.';
     wrap.appendChild(nota);
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
