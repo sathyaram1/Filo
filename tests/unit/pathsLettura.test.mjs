@@ -249,7 +249,7 @@ test('un percorso ostile non può forgiare blocchi nel prompt: niente a capo, ni
     'un percorso deve restare un blocco solo: con un a capo se ne forgiano altri');
   assert.ok(!righe.some((r) => r.trim().startsWith('# Sistema')),
     'una riga di testo del percorso è diventata un’intestazione del prompt');
-  assert.ok(!/[ -	-  ​-‏]/.test(prompt),
+  assert.ok(!/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029]/.test(prompt.replace(/\n/g, '')),
     'nel prompt sono passati caratteri di controllo o invisibili');
   // il contenuto però resta leggibile: non si censura, si appiattisce
   assert.ok(prompt.includes('cosa buona'));
