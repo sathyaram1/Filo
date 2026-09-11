@@ -33,6 +33,17 @@ function loadKeys(env) {
   return JSON.parse(out.trim());
 }
 
+// Come sopra, ma per la chiave Google Safe Browsing (#581): sta nel file
+// generato FUORI da `apiKeys`, perché non è una chiave di provider.
+function loadSafeBrowsing(env) {
+  const code = `console.log(JSON.stringify(require(${JSON.stringify(MODULE_PATH)}).getBuildSafeBrowsingKey()))`;
+  const out = execFileSync(process.execPath, ['-e', code], {
+    env: { ...process.env, ...env },
+    encoding: 'utf8',
+  });
+  return JSON.parse(out.trim());
+}
+
 test.afterEach(() => {
   try { rmSync(GEN_PATH, { force: true }); } catch (_) {}
 });
