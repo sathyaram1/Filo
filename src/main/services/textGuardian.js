@@ -190,9 +190,16 @@ async function proponiNotifica(proposta = {}) {
 // Rientrante per finta: se un giro è già in corso, il secondo aspetta quello
 // invece di raddoppiare le chiamate al modello.
 let _giroInCorso = null;
+let _ultimoGiro = 0;
 
-async function riprendiInAttesa() {
+async function riprendiInAttesa({ force = false } = {}) {
   if (_giroInCorso) return _giroInCorso;
+  if (!force && _ultimoGiro && Date.now() - _ultimoGiro < RIPRESA_MIN_MS) {
+    const M = Mem();
+    const restano = M ? (await M.listPendingNotifications()).length : 0;
+    return { mostrati: 0, bloccati: 0, restano, rimandato: true };
+  }
+  _ultimoGiro = Date.now();
   _giroInCorso = (async () => {
     const M = Mem();
     const G = TG();
