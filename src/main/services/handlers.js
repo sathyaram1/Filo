@@ -2186,6 +2186,14 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate: ${res.output.updated.join(', ')}.` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
+  // #536 — il controllo di sicurezza ha fermato le parole che l'azione doveva
+  // lasciare scritte. Al modello si dice che è successo e di NON riprovare: dopo
+  // una pagina avvelenata il secondo tentativo sarebbe la stessa frase dettata
+  // dalla stessa pagina.
+  if (action._fermatoDalGuardiano) {
+    return `Azione ${type} NON eseguita: il controllo di sicurezza ha fermato il testo che doveva lasciare scritto. `
+      + 'Non riprovare e non riscriverlo in altre parole: prosegui, e se serve dillo all\'utente in una riga.';
+  }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
     // applicata: Tema → Scuro»), non quella del popup di conferma («Filo vuole
