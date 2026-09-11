@@ -357,13 +357,23 @@
   //   • oppure la parola generica PIÙ la richiesta di farne qualcosa
   //     (comunicarlo, inoltrarlo, digitarlo). È quello che distingue una truffa:
   //     non che un codice esista, ma che qualcuno chieda di passarlo.
-  // E in ogni caso un qualificatore innocuo («codice sconto») chiude la
-  // questione: quello non è mai un codice d'accesso.
+  // E in ogni caso, se lì vicino c'è scritto A COSA SERVE quel codice e non è
+  // un'identità, la questione è chiusa: quello non apre nessun conto.
+  //
+  // «Inequivocabile» vuol dire che la parola nomina la NATURA del codice: usa e
+  // getta, monouso, temporaneo, otp. «Di accesso», «di ingresso», «di sblocco»,
+  // «di attivazione», «di conferma» non nominano la natura, nominano una
+  // funzione, e in italiano quella funzione ce l'hanno soprattutto le cose
+  // fisiche: il portone, il cancello, la cassetta delle chiavi, la SIM, la
+  // prenotazione. Tenerle qui dentro faceva sparire la mail di chi affitta casa,
+  // cioè una delle mail per cui questa funzione esiste. Ora valgono come la
+  // parola generica: fermano qualcosa solo se qualcuno chiede anche di passare
+  // il codice.
   const CODICE_FORTE = new RegExp([
     '\\botp\\b', '\\b2fa\\b', 'one[- ]time', 'usa e getta', 'monouso',
     'password temporane', 'codice temporane', 'codice segreto',
-    'codic[ei] (?:di |d\')?(?:verific|sicurezza|accesso|autentic|attivazione|sblocco|ingresso|conferma)',
-    'verification code', 'security code', 'access code',
+    'codic[ei] (?:di |d\')?(?:verific|sicurezza|autentic)',
+    'verification code', 'security code',
   ].join('|'), 'i');
   const CODICE_GENERICO = /(codic|\bpin\b|\btoken\b|password|passcode|parola d'ordine|\bpwd\b|passphrase)/i;
   // Chi chiede di passare il codice a qualcuno: il verbo che fa la truffa.
