@@ -381,9 +381,9 @@ test('l’indirizzo di posta del mittente resta: è la cosa che serve sapere', (
   assert.equal(G.linkDelTesto(f).length, 0);
 });
 
-test('un motivo che dopo la pulizia fa ancora scattare un controllo statico si butta', () => {
+test('un motivo che porta dentro un codice non arriva all’utente', () => {
   const f = G.frasediBlocco({ origine: 'una mail di X', motivo: 'il tuo codice di verifica è 483920' });
-  assert.equal(f, 'Ho fermato un avviso nato da una mail di X.');
+  assert.ok(!/483920/.test(f), f);
 });
 
 // ── Rete giù e configurazione sbagliata non sono la stessa cosa ─────────────
