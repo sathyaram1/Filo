@@ -103,6 +103,9 @@ test('una segnalazione vecchia risolta oggi paga chi l\'ha mandata', async ({ ap
 
   expect(out.r.ok).toBe(true);
   const miei = (out.r.rewards || []).map((x) => x.id);
+  // Il controllo: la mia segnalazione recente paga. Senza questa riga un rosso
+  // qui sotto potrebbe voler dire tutt'altro.
+  expect(miei, 'l\'annuncio non paga più nemmeno una segnalazione recente: il rosso qui sotto non parla della finestra').toContain('la-mia-recente');
   expect(
     miei,
     'la segnalazione vecchia è stata risolta e la sua scheda è in bacheca, ma chi l\'aveva mandata non riceve né l\'annuncio né i crediti: il popup guarda solo le schede più recenti per data d\'invio',
