@@ -362,9 +362,13 @@
       const quando = fmtQuando(b.ts);
       if (quando) meta.appendChild(Object.assign(document.createElement('span'), { textContent: quando }));
       if (b.origine) meta.appendChild(Object.assign(document.createElement('span'), { textContent: `da ${b.origine}` }));
+      // Chi l'ha fermato, in italiano. La sigla interna della regola non ci va:
+      // la riga qui sopra dice già in parole cosa è stato visto, e «fermato da
+      // link-ingannevole» davanti a chi sta valutando se il controllo esagera è
+      // solo codice uscito allo scoperto.
       if (b.regola) {
         meta.appendChild(Object.assign(document.createElement('span'), {
-          textContent: b.regola === 'guardiano' ? 'controllo del modello' : `controllo automatico: ${b.regola}`,
+          textContent: b.regola === 'guardiano' ? 'fermato dal secondo modello' : 'fermato da un controllo automatico',
         }));
       }
       item.appendChild(meta);
