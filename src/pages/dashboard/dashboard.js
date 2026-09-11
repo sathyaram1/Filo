@@ -574,6 +574,9 @@
         kind: 'background',
         text: p.text,
         guardiano: 'attesa',
+        // Si può togliere: un avviso che aspetta un controllo che non arriva
+        // non deve restare lì per sempre senza una via d'uscita.
+        onDismiss: () => send({ type: MSG.FILO_DISMISS_PENDING_GUARD, id: p.id }).then(refreshLive),
       }));
     }
     for (const t of timers) {
