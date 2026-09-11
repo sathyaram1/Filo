@@ -240,6 +240,7 @@
     } catch (_) { iconLayoutCache = DEFAULT_ICON_LAYOUT; }
   }
   loadIconLayout();
+  refreshOwner();
 
   function getIconLayout() {
     return iconLayoutCache || DEFAULT_ICON_LAYOUT;
