@@ -37,9 +37,14 @@
 // dell'owner. Al primo passaggio (2026-09-11) è stato così: 23/23.
 //
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
-// `main` (`git show main:storage.rules`, via STORAGE_RULES_FILE). Lì l'anonimo
-// scarica l'allegato di un altro, ELENCA il bucket e sovrascrive un file
-// esistente. Una prova che passa su entrambe le versioni non prova niente.
+// PRIMA (`git show main:storage.rules > vecchie.rules`, poi
+// `STORAGE_RULES_FILE=vecchie.rules`). Fatta il 2026-09-11: 10/23, e i tredici
+// rossi dicono esattamente il danno — senza nessun login si scaricava
+// l'allegato di un altro, si ELENCAVA feedback/ intero, si sovrascriveva un
+// file esistente, e passavano i nomi indovinabili (`screenshot.png`) e le
+// sottocartelle. Passava anche una cosa che non doveva: un allegato da 4 MB
+// tondi, una volta cifrato, veniva RIFIUTATO. Una prova che resta verde su
+// entrambe le versioni non prova niente.
 
 import {
   initializeTestEnvironment,
