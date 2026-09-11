@@ -371,6 +371,16 @@
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
     FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride? }
+    // #583 — LETTURA dei feedback per le superfici dell'owner. La collezione
+    // non è più pubblica: leggono solo l'admin e il server. L'ID token vive nel
+    // main e non deve arrivare in una pagina, quindi la pagina CHIEDE la
+    // lettura e il main la esegue col token. Solo origini filo://, solo admin.
+    // La risposta unisce a ogni feedback i voti e le riaperture della scheda
+    // pubblica, che è dove quei due campi vengono scritti oggi.
+    //   { op: 'list', pageSize?, fields?, timeoutMs? }  → { ok, rows }
+    //   { op: 'getMany', ids: [...], timeoutMs? }       → { ok, rows }
+    //   → { ok:false, error } se non sei admin o la lettura fallisce.
+    FEEDBACK_FETCH: 'feedback_fetch',
     // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
     // mai il main process). Il renderer manda i campi con valori potenzialmente
     // cifrati; il main li decifra e torna il plaintext. Owner-only.
