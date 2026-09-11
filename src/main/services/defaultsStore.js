@@ -174,8 +174,12 @@ function get() {
     providerSort: '',
     apiKeys: getBuildKeys(),
     // Chiave Google Safe Browsing condivisa (rilevamento siti pericolosi).
-    // Non è una chiave di build: l'unica fonte è l'override admin via Firestore.
-    safeBrowsingKey: '',
+    // Viaggia col build come le altre (#581): prima l'unica fonte era l'override
+    // Firestore, che però imponeva di tenere aperto a chiunque avesse un account
+    // Google il documento con dentro TUTTE le chiavi. Ora il documento è
+    // admin-only e la chiave arriva incastonata nell'installer, quindi la
+    // protezione si accende anche per chi non fa login — prima restava spenta.
+    safeBrowsingKey: getBuildSafeBrowsingKey(),
   };
 
   if (remoteModels) {
