@@ -97,7 +97,7 @@ function syncNativeTheme(theme) {
 // Su macOS la chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
 function configureSpellchecker() {
   try {
-    const ses = session.defaultSession;
+    const ses = require('./sessioni').sessionePredefinita();
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
