@@ -402,7 +402,7 @@
     let m;
     FORMA_RECUPERO.lastIndex = 0;
     while ((m = FORMA_RECUPERO.exec(s))) {
-      if (vicino(s, m.index, PAROLE_RECUPERO) || vicino(s, m.index, PAROLE_CODICE)) {
+      if (vicino(s, m.index, PAROLE_RECUPERO) || vicino(s, m.index, CODICE_FORTE)) {
         return esito('codice-di-recupero', m[0]);
       }
     }
@@ -410,9 +410,15 @@
     FORMA_OTP.lastIndex = 0;
     while ((m = FORMA_OTP.exec(s))) {
       if (!codiceUsaEGetta(m[0], s.slice(m.index + m[0].length, m.index + m[0].length + 2))) continue;
-      if (vicino(s, m.index, PAROLE_CODICE) || vicino(s, m.index, PAROLE_PASSWORD)) {
-        return esito('codice-usa-e-getta', m[0]);
-      }
+      // Un qualificatore innocuo («codice sconto») chiude la questione prima di
+      // ogni altra considerazione.
+      if (vicino(s, m.index, CODICE_INNOCUO)) continue;
+      const forte = vicino(s, m.index, CODICE_FORTE) || vicino(s, m.index, PAROLE_PASSWORD);
+      // La parola generica conta solo se qualcuno chiede di passare il codice.
+      // Il raggio è più largo perché la richiesta sta spesso nella frase dopo.
+      const generico = vicino(s, m.index, CODICE_GENERICO)
+        && vicino(s, m.index, CHIEDE_DI_PASSARLO, 100);
+      if (forte || generico) return esito('codice-usa-e-getta', m[0]);
     }
 
     FORMA_IBAN.lastIndex = 0;
