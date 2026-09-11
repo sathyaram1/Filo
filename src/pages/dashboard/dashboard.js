@@ -555,13 +555,25 @@
     ]);
     const timers = (timersR?.ok && timersR.timers) || [];
     const notifications = (notiR?.ok && notiR.notifications) || [];
+    // #536 — avvisi che aspettano il controllo del guardiano: esistono, non si
+    // sono persi, e il loro testo non compare finché non è stato guardato.
+    const pendingGuard = (notiR?.ok && notiR.pending) || [];
     liveEl.innerHTML = '';
     // Notifiche per prime (avvisi), poi timer (processi).
     for (const n of notifications) {
       liveEl.appendChild(renderLiveCard({
         kind: n.kind === 'alert' ? 'alert' : (n.kind || 'info'),
         text: n.text,
+        origine: n.origine || '',
+        guardiano: n.guardiano || '',
         onDismiss: () => send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(refreshLive),
+      }));
+    }
+    for (const p of pendingGuard) {
+      liveEl.appendChild(renderLiveCard({
+        kind: 'background',
+        text: p.text,
+        guardiano: 'attesa',
       }));
     }
     for (const t of timers) {
