@@ -443,9 +443,9 @@
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
-          // Niente clientId per ora (anonimo). Se in futuro ne servisse uno
-          // stabile, lo si genera in pageBootstrap o storage.local.
-          clientId: '',
+          // Niente identificativo di chi sta mandando: questa conoscenza finisce
+          // in una raccolta che legge chiunque, e chi la legge non ha bisogno di
+          // sapere da quale installazione arriva (#583).
           session: {
             rawUrl: session.initialUrl,
             rawSteps: session.executedSteps,

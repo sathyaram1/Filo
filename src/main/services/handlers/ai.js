@@ -608,11 +608,11 @@ module.exports = function register(on, ctx) {
       try {
         const settings = await getEffectiveSettings();
         if (!settings.apiKeys?.[settings.provider]) return;
-        const ua = process.versions ? `Filo/${process.versions.electron || ''} Node/${process.version}` : '';
-        const cid = msg.payload?.clientId || '';
         const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        // #583: user agent e clientId non partono più. Finivano in una raccolta
+        // che legge chiunque senza credenziali, e a chi la legge non servono.
         const r = await PathsCollector.collectAndSave({
-          session: msg.payload?.session, invokeAI, userAgent: ua, clientId: cid,
+          session: msg.payload?.session, invokeAI,
         });
         if (r?.saved) console.info('[Filo] path salvato:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }

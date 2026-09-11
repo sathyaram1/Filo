@@ -692,10 +692,16 @@ service cloud.firestore {
     match /paths/{doc} {
       allow read: if true;
 
+      // #583 — `userAgent` e `clientId` NON sono più ammessi. Questa raccolta si
+      // legge senza credenziali (ogni installazione la interroga per il dominio
+      // che ha sotto gli occhi: è una conoscenza condivisa, ed è il motivo per
+      // cui è aperta), quindi tutto quello che c'è dentro è pubblico. Il
+      // dominio, il percorso e la riga d'intento sono la conoscenza; l'impronta
+      // di chi era e il suo user agent no: erano solo un modo per legare quelle
+      // righe a un'installazione. Chi scrive non li manda più.
       allow create: if
         request.resource.data.keys().hasOnly(
-          ['domain', 'initialUrl', 'intent', 'steps', 'success',
-           'userAgent', 'clientId', 'createdAt']
+          ['domain', 'initialUrl', 'intent', 'steps', 'success', 'createdAt']
         )
         && request.resource.data.domain is string
         && request.resource.data.domain.size() > 0
@@ -706,11 +712,7 @@ service cloud.firestore {
         && request.resource.data.intent.size() <= 500
         && request.resource.data.steps is list
         && request.resource.data.steps.size() <= 30
-        && request.resource.data.success is bool
-        && request.resource.data.get('userAgent', '') is string
-        && request.resource.data.get('userAgent', '').size() <= 500
-        && request.resource.data.get('clientId', '') is string
-        && request.resource.data.get('clientId', '').size() <= 100;
+        && request.resource.data.success is bool;
 
       allow update: if false;
       allow delete: if false;

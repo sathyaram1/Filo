@@ -147,7 +147,7 @@
   // Ritorna { saved: bool, reason: string }. Non lancia: i fallimenti sono
   // reportati come reason testuale così il chiamante può loggare senza che
   // l'utente veda errori (è una pipeline best-effort di telemetria).
-  async function collectAndSave({ session, invokeAI, userAgent, clientId }) {
+  async function collectAndSave({ session, invokeAI }) {
     if (!session || typeof session !== 'object') {
       return { saved: false, reason: 'session vuota' };
     }
@@ -188,14 +188,14 @@
 
     // 3. write
     try {
+      // #583: niente userAgent e niente clientId. Vanno in una raccolta che
+      // legge chiunque, e a chi la legge non servono.
       const { id } = await Paths.submit({
         domain,
         initialUrl,
         intent: guessedIntent,
         steps: sanitizedSteps,
         success: !!session.success,
-        userAgent: userAgent || '',
-        clientId: clientId || '',
       });
       return { saved: true, id, intent: guessedIntent };
     } catch (e) {
