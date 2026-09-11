@@ -454,6 +454,44 @@
     return turns;
   }
 
+  // ── LA RIGA CHE SEPARA I TURNI LA SCRIVE SOLO CHI APPENDE ────────────────
+  //
+  // ⚠️ NOVE GIRI DI VERIFICA HANNO TROVATO LA STESSA PORTA DA NOVE LATI, e la
+  // causa non è mai cambiata: un turno si riconosceva da com'è SCRITTO, e chi
+  // cita un pezzo di conversazione ne cita la scrittura, riga di separazione
+  // compresa. Ogni giro ha stretto l'àncora — la frase, poi la struttura del
+  // verbale, poi la posizione della riga, poi l'ordine degli istanti — e ogni
+  // giro quello dopo ha trovato la citazione successiva. L'ultimo (#496, giro
+  // 14) ha aperto sei porte in un colpo, fra cui quella che chiude la rincorsa:
+  // l'ordine degli istanti non dice niente quando il pezzo citato è più
+  // RECENTE dell'ultimo turno vero, e succede ogni volta che si risponde a una
+  // segnalazione ferma da giorni riportando un pezzo di una lavorata ieri.
+  //
+  // Quindi la riga di separazione smette di essere scrivibile da chi compone il
+  // testo: qui, alla porta, ogni riga del testo in arrivo che somigli a una
+  // separazione (o alla riga del taglio) diventa una citazione dichiarata,
+  // «> …». Resta leggibile, non apre più niente, e la conversazione torna a
+  // dire la verità su di chi è ogni turno — che è il fatto da cui la scheda
+  // «Statistiche feedback» ricava TUTTI i suoi numeri, e le bolle della
+  // conversazione il loro colore.
+  //
+  // Vale per le due porte da cui il testo di qualcuno entra nelle note: i due
+  // `append*Turn` (la risposta dalla dashboard, la riapertura, il report che
+  // una routine appende) e `composeNotes` (la testa del campo note, che si
+  // modifica a mano in una casella di testo). Le note già salvate non le tocca:
+  // per quelle restano le difese di lettura in `turnOpeners`, che sono un
+  // ripiego e non una regola.
+  const QUOTE_PREFIX = '> ';
+  function neutralizzaMarcatori(text) {
+    const s = String(text == null ? '' : text);
+    if (!s) return s;
+    return s.split('\n').map((line) => {
+      if (USER_TURN_RE.test(line) || MODEL_TURN_RE.test(line)) return QUOTE_PREFIX + line;
+      if (line.trim() === TRIM_MARK) return QUOTE_PREFIX + line;
+      return line;
+    }).join('\n');
+  }
+
   // Marcatore da APPENDERE alle note quando l'utente risponde dal tab
   // Chiarimenti (o riapre). Centralizzato qui così il parser e chi scrive
   // restano allineati su una sola forma.
