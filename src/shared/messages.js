@@ -582,6 +582,9 @@
     // solo pagine filo://.
     FILO_GET_GUARD_BLOCKS: 'filo_get_guard_blocks',     // → { ok, blocks }
     FILO_CLEAR_GUARD_BLOCKS: 'filo_clear_guard_blocks', // → { ok, blocks: [] }
+    // Togliere un avviso che aspetta il controllo: se si può mettere in coda si
+    // deve poter togliere, anche quando il guardiano non torna. { id }
+    FILO_DISMISS_PENDING_GUARD: 'filo_dismiss_pending_guard',
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
