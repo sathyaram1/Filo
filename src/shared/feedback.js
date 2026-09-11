@@ -129,6 +129,11 @@
     const limite = Number.isFinite(max) && max >= 8 ? Math.floor(max) : LINK_LABEL_MAX;
     let u;
     try { u = new URL(String(rawUrl || '')); } catch (_) { return ''; }
+    // Solo indirizzi che portano su un sito. `javascript:alert(1)` si parsa
+    // benissimo, ha host vuoto, e l'etichetta diventerebbe `alert(1)`: una
+    // scritta che non dice dove si va, che è esattamente ciò che questa
+    // funzione esiste per evitare.
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
     const host = u.host; // host = dominio + porta, senza credenziali davanti
     const resto = `${u.pathname}${u.search}${u.hash}`;
     if (host.length >= limite) return `…${host.slice(host.length - (limite - 1))}`;
