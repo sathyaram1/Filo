@@ -41,7 +41,12 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const OUT_PATH = resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
+// `FILO_BAKE_OUT` esiste SOLO per gli unit test (che scrivono in una cartella
+// usa-e-getta invece di calpestare il file vero), come `FILO_UNIT_DIR` per il
+// lanciatore dei test: non è un'opzione d'uso, e la CI non la passa mai.
+const OUT_PATH = process.env.FILO_BAKE_OUT
+  ? resolve(process.env.FILO_BAKE_OUT)
+  : resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
 // Chiede al server le chiavi di default. Ritorna
 // { openrouter?, gemini?, tavily?, safeBrowsing? } oppure {} se non disponibili.
