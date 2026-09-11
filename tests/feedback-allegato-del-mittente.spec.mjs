@@ -58,3 +58,53 @@ test('il mittente vede che il suo screenshot è partito, non un errore di permes
   expect(motivo).not.toMatch(/amministrat/i);
   expect(motivo).not.toMatch(/riservata/i);
 });
+
+const DOCUMENTO = 'https://firebasestorage.googleapis.com/v0/b/filo-8b9cb.firebasestorage.app/o/feedback%2F1788891497001_3f2a1b0c-2222-4222-8333-444455556666.pdf?alt=media&token=def';
+const ESCA = 'https://sito-di-un-estraneo.invalid/accedi';
+
+/** Mette in elenco una sola segnalazione con l'allegato dato. */
+async function elencoCon(page, allegato) {
+  await page.evaluate(({ f }) => {
+    window.SN_FEEDBACK.list = async () => [{
+      _id: 'allegato-582',
+      status: 'open',
+      text: 'guarda l’allegato',
+      images: [],
+      files: [f],
+      createdAt: new Date().toISOString(),
+    }];
+  }, { f: allegato });
+  await page.locator('#refresh').click();
+  const pillola = page.locator('.fb-file').first();
+  await expect(pillola).toBeVisible({ timeout: 10_000 });
+  return pillola;
+}
+
+test('il documento che il mittente ha allegato dice che è partito, invece di scaricarsi rotto', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  const pillola = await elencoCon(page, { url: DOCUMENTO, name: 'registro.pdf', type: 'application/pdf' });
+
+  // Il nome resta quello vero: serve a capire quale allegato è.
+  await expect(pillola.locator('.fb-file-name')).toHaveText('registro.pdf');
+  // Ma il collegamento non porta ai byte grezzi, che sono il testo cifrato.
+  expect(await pillola.getAttribute('href')).not.toMatch(/firebasestorage\.googleapis\.com|storage\.googleapis\.com/);
+  // E chi l'ha mandato lo legge senza doverci cliccare sopra.
+  await expect(pillola.locator('.fb-file-note')).toHaveText('(inviato)', { timeout: 10_000 });
+  expect(await pillola.getAttribute('title')).toMatch(/inviat/i);
+});
+
+test('un «allegato» che punta fuori dal deposito di Filo non porta da nessuna parte', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  const pillola = await elencoCon(page, { url: ESCA, name: 'schermata.png', type: 'image/png' });
+
+  // L'indirizzo scritto da chi ha mandato la segnalazione non diventa un href…
+  expect(await pillola.getAttribute('href')).not.toContain('sito-di-un-estraneo.invalid');
+
+  // …e nemmeno il clic ci porta: nessuna scheda finisce su quell'indirizzo.
+  await pillola.click();
+  await page.waitForTimeout(1500);
+  const aperte = await app.evaluate(async ({ webContents }) => webContents.getAllWebContents().map((w) => {
+    try { return w.getURL(); } catch (_) { return ''; }
+  }));
+  expect(aperte.join(' '), 'il clic sull’esca ha aperto l’indirizzo di un estraneo').not.toContain('sito-di-un-estraneo');
+});
