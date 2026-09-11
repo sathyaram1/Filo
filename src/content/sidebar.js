@@ -391,7 +391,7 @@
     // sceglie, non solo nella pagina che spiega la privacy (#584).
     const nota = document.createElement('div');
     nota.className = 'sn-sidebar-feedback-nota';
-    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Senza il tuo nome, senza l’ora e senza i dati della pagina.';
+    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Senza il tuo nome e senza l’ora.';
     wrap.appendChild(nota);
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
