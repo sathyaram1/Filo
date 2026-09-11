@@ -323,6 +323,12 @@
    * tagliate sono soltanto le conversazioni lunghe, cioè le segnalazioni con
    * molti giri: proprio la coda della distribuzione che la torta esiste per
    * mostrare. Quindi non si contano affatto, e la pagina scrive quante sono.
+   *
+   * ⚠️ SI GUARDA LA PRIMA RIGA, NON TUTTE. Il taglio mette la sua riga IN CIMA
+   * al blob (`capNotes`), sempre e solo lì. Cercarla ovunque vuol dire trovarla
+   * anche quando è qualcuno ad averla scritta o incollata raccontando una
+   * conversazione tagliata, e allora una lavorazione buona esce dai conti della
+   * torta per una riga di prosa (#496, giro 13).
    */
   function notesTruncated(fb) {
     const notes = fb && fb.notes;
@@ -330,7 +336,9 @@
     if (MR().valueUnreadable(notes)) return false;
     const mark = String((TH().TRIM_MARK) || '').trim();
     if (!mark) return false;
-    return notes.replace(/\r\n?/g, '\n').split('\n').some((l) => l.trim() === mark);
+    const righe = notes.replace(/\r\n?/g, '\n').split('\n');
+    const prima = righe.find((l) => l.trim()) || '';
+    return prima.trim() === mark;
   }
 
   /**
