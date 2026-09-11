@@ -1771,6 +1771,15 @@
         .filter((fb) => ST.inRange(ST.createdMs(fb), range)
           && !ST.creatorUnreadable(fb) && ST.creatorOf(fb) === valore);
     }
+    // Le tre scorciatoie: stesso conto delle pastiglie singole, sommate.
+    if (tipo === 'gruppo') {
+      const chiavi = valore === 'persone' ? ST.CREATORS_PEOPLE
+        : valore === 'routine' ? ST.CREATORS_ROUTINE
+        : ST.creatorKeys();
+      return (dataLoaded ? allFeedbacks : [])
+        .filter((fb) => ST.inRange(ST.createdMs(fb), range)
+          && !ST.creatorUnreadable(fb) && chiavi.includes(ST.creatorOf(fb)));
+    }
     if (tipo === 'misura') {
       const lavorate = base.filter((fb) => ST.isWorked(fb) && ST.inRange(ST.movedMs(fb), range));
       if (valore === 'lavorate') return lavorate;
