@@ -705,6 +705,79 @@
     return out;
   }
 
+  // ── La vista pubblica (#583) ──────────────────────────────────────────────
+  // `feedback-public/{id}`: una scheda per feedback chiuso, con i soli campi
+  // pubblici (src/shared/feedbackPublicView.js decide quali e per quali
+  // feedback). È ciò che leggono la bacheca e il popup delle ricompense: niente
+  // token, niente ponte col main: qui dentro non c'è nulla da proteggere.
+
+  // Le schede pubbliche, dalla più recente. Stesso tetto e stesso ordinamento
+  // della lista vera, così chi la mostra non cambia ragionamento.
+  async function listPublic({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0 } = {}) {
+    return listDirect(VIEW_COLLECTION, { pageSize, timeoutMs });
+  }
+
+  // UNA scheda pubblica (per id). Torna null se non c'è: un feedback che non è
+  // in bacheca semplicemente non ha scheda.
+  async function getPublic(id, { idToken = '' } = {}) {
+    const key = String(id || '');
+    if (!key) return null;
+    const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?key=${API_KEY}`;
+    const headers = idToken ? { Authorization: `Bearer ${idToken}` } : undefined;
+    const res = await fetch(url, headers ? { headers } : undefined);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`firestore vista pubblica fallita (${res.status})`);
+    return fsDocToObject(await res.json());
+  }
+
+  // Scrive (o aggiorna) la scheda pubblica di un feedback. La maschera elenca
+  // SOLO i campi della scheda: `votes` e `reopenRequests` li scrivono gli
+  // utenti e non devono essere cancellati da una ripubblicazione.
+  // Serve il token dell'owner (o del server): le regole non ammettono altri.
+  async function publishPublicCard(id, card, opts = {}) {
+    const key = String(id || '');
+    if (!key) throw new Error('id mancante');
+    const V = global.SN_FEEDBACK_PUBLIC_VIEW;
+    const names = (V && V.CARD_FIELDS) ? V.CARD_FIELDS : Object.keys(card || {});
+    const fields = {};
+    const mask = [];
+    for (const f of names) {
+      if (f === 'publishedAt') continue;
+      const v = (card || {})[f];
+      fields[f] = toFsValue(v === undefined ? '' : v);
+      mask.push(f);
+    }
+    fields.publishedAt = toFsValue(new Date().toISOString());
+    mask.push('publishedAt');
+    const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
+    const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?${qs}&key=${API_KEY}`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const res = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify({ fields }) });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore pubblicazione scheda fallita (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return true;
+  }
+
+  // Toglie la scheda pubblica: un fix riaperto o riclassificato esce dalla
+  // bacheca perché la sua scheda non c'è più, non perché la pagina la nasconde.
+  async function unpublishPublicCard(id, opts = {}) {
+    const key = String(id || '');
+    if (!key) throw new Error('id mancante');
+    const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?key=${API_KEY}`;
+    const headers = {};
+    if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
+    const res = await fetch(url, { method: 'DELETE', headers });
+    // 404 = già tolta: l'esito voluto è lo stesso.
+    if (!res.ok && res.status !== 404) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`firestore rimozione scheda fallita (${res.status}): ${t.slice(0, 300)}`);
+    }
+    return true;
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
