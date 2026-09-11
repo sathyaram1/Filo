@@ -643,7 +643,10 @@ module.exports = function register(on, ctx) {
     // battito. La lista intera invece sì — ed è anche il momento buono per
     // rimettere in pari la vista pubblica.
     if (fields) return { ok: true, rows };
-    scheduleViewSync();
+    // Le righe appena lette sono le stesse che servirebbero alla
+    // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
+    // un attimo dopo.
+    scheduleViewSync({ rows });
     return { ok: true, rows: await mergeCardFields(rows) };
   }));
 
