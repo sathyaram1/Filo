@@ -234,6 +234,7 @@ async function riprendiInAttesa({ force = false } = {}) {
         await M.updatePendingNotification(voce.id, {
           tentativi: (voce.tentativi || 0) + 1,
           ultimoMotivo: verdetto.motivo,
+          ultimaCausa: verdetto.causa || '',
           ultimoTentativo: new Date().toISOString(),
         });
         continue;
