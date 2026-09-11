@@ -82,15 +82,20 @@ async function avvisaSeAggiornamentoBloccato(versione) {
   if (process.platform !== 'darwin' || !versione) return;
   try {
     const FiloMem = globalThis.SN_FILO_MEMORY;
-    if (!FiloMem?.addNotification) return;
+    if (!FiloMem?.listNotifications) return;
     // Il riconoscimento passa da `action`, che la scheda NON mostra: un
     // marcatore dentro al testo lo leggerebbe l'utente.
     const gia = await FiloMem.listNotifications({ includeDismissed: true });
     if (gia.some((n) => n.action?.tipo === 'aggiornamento-mac' && n.action?.versione === versione)) return;
-    await FiloMem.addNotification({
+    // Anche questo avviso passa dal guardiano (#536): è il punto di passaggio
+    // unico, e il fatto che qui il testo lo scriva Filo non è una ragione per
+    // avere una seconda porta. Compito PULITO — nessuna mail, nessuna pagina di
+    // mezzo — quindi passa senza chiamare nessun modello.
+    await require('./services/textGuardian').proponiNotifica({
       kind: 'alert',
+      fiducia: 'pulito',
       action: { tipo: 'aggiornamento-mac', versione },
-      text: `C'è la versione ${versione} di Filo, ma su Mac non riesce a installarsi da sola.\n`
+      testo: `C'è la versione ${versione} di Filo, ma su Mac non riesce a installarsi da sola.\n`
         + 'Scaricala da filo.red e sostituisci l\'app. Ci vuole un minuto.',
     });
   } catch (e) {
