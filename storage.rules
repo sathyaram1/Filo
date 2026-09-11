@@ -1,35 +1,112 @@
 rules_version = '2';
 
-// Storage rules per l'alpha test.
-// Gli allegati dei feedback vivono in /feedback/*.
-// - Upload: chiunque, fino a 4 MB, SOLO tipi passivi in allowlist esplicita.
-//   ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
-//   attivi (`text/html` con script, `image/svg+xml`). Il gate deterministico
-//   lato pipeline (filo-security, L0 fileGate) marca comunque `suspicious_file`
-//   i feedback con allegati fuori allowlist: questa regola è la cintura,
-//   quello le bretelle.
-// - Read: aperto (la dashboard mostra immagini e file via link diretto).
+// Regole Storage degli ALLEGATI dei feedback (audit pre-alpha, #582).
+//
+// Cosa c'era prima, e perché non reggeva. Su `feedback/{file=**}` la lettura
+// era `if true` e la scrittura chiedeva solo dimensione e content-type:
+// nessun controllo di identità, in nessuna direzione.
+// - In Storage `read` comprende `list`: col nome del bucket (che sta nel repo,
+//   accanto alla chiave web di Firebase) si ELENCAVA il bucket e si scaricava
+//   tutto — cioè gli screenshot dello schermo dei tester, uno dopo l'altro,
+//   senza sapere niente di nessun feedback.
+// - `write` comprende `update` e `delete`: chi conosceva il nome di un allegato
+//   ci scriveva sopra (uno screenshot sostituito dopo che il giudice l'ha
+//   visto) o lo cancellava.
+// - E un bucket aperto in lettura è hosting gratuito sul dominio dell'owner.
+//
+// Il confine ora:
+// - LEGGE l'owner, provando di esserlo (allowlist `admins` di Firestore, la
+//   stessa di firestore.rules, letta con le regole cross-service: una fonte
+//   sola, aggiungere un collaboratore resta una cosa da fare in un posto).
+//   Il server dei giudici legge con l'Admin SDK, che le regole non le guarda.
+// - ELENCARE non si può, per NESSUNO: `list` non è concesso da nessuna riga,
+//   nemmeno all'owner (la dashboard non elenca il bucket: apre gli allegati che
+//   il documento del feedback nomina). Un permesso che nessuno usa è solo una
+//   porta in più.
+// - SCRIVE chiunque mandi un feedback, anche senza login — l'invio anonimo è
+//   voluto, e resta — ma SOLO in CREAZIONE, su un nome che ancora non esiste.
+//   Niente `update`, niente `delete`: un allegato, una volta scritto, è
+//   immutabile. Il `resource == null` è ciò che lo dice, ed è anche ciò che
+//   rende la cancellazione impossibile (in una delete `resource` c'è).
+// - Il nome deve portare ENTROPIA (un uuid), così non lo si indovina e non lo
+//   si riusa: il pattern è quello che genera `SN_FEEDBACK.attachmentPath`
+//   (src/shared/feedback.js), e una sentinella negli unit test
+//   (tests/unit/storageRulesAllegati.test.mjs) confronta i due e diventa rossa
+//   se divergono.
+//
+// LA CAPACITÀ CHE RESTA, dichiarata. Una strada per leggere un allegato senza
+// essere l'owner esiste ed è una sola: il download token che Storage assegna
+// all'oggetto quando viene creato e che finisce nell'URL salvato nel feedback
+// (`?alt=media&token=…`). Quei link scavalcano queste regole per costruzione —
+// è il loro mestiere — e servono al server dei giudici, che le immagini le
+// passa a un modello con ingresso visivo. Quindi l'URL col token vale quanto
+// l'allegato: vive dentro il documento del feedback, e chiudere la lettura di
+// quei documenti è l'ALTRA METÀ di questo confine (il feedback gemello sulla
+// lettura dei documenti feedback). Senza token, `?alt=media` passa di qui e a
+// un anonimo risponde 403.
 
 service firebase.storage {
   match /b/{bucket}/o {
 
-    match /feedback/{file=**} {
-      allow read: if true;
-      allow write: if
-        request.resource.size < 4 * 1024 * 1024
-        && (
-          request.resource.contentType.matches('image/(png|jpeg|jpg|gif|webp|bmp)')
-          || request.resource.contentType == 'text/plain'
-          || request.resource.contentType == 'text/markdown'
-          || request.resource.contentType == 'text/csv'
-          || request.resource.contentType == 'application/pdf'
-          || request.resource.contentType == 'application/json'
-          // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
-          || request.resource.contentType == 'application/octet-stream'
-        );
+    // Owner/amministratore: loggato, email verificata, e presente
+    // nell'allowlist `admins` di Firestore — la stessa che comanda in
+    // firestore.rules. Cross-service: se la lettura non riesce la regola nega
+    // (e l'owner vede comunque gli allegati dai link col token: si degrada
+    // verso il chiuso, non verso l'aperto).
+    function eAmministratore() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.token.email));
     }
 
-    // Tutto il resto è chiuso.
+    // Tipi PASSIVI, allowlist esplicita, allineata a
+    // src/shared/feedbackAttachTypes.js.
+    // ⚠️ NIENTE wildcard `text/.*` o `image/.*`: lasciavano passare content-type
+    // attivi (`text/html` con script, `image/svg+xml`), eseguibili nel dominio
+    // di Google Storage quando chi fa triage apre il link.
+    function tipoPassivo() {
+      return request.resource.contentType.matches('image/(png|jpeg|jpg|gif|webp|bmp)')
+        || request.resource.contentType == 'text/plain'
+        || request.resource.contentType == 'text/markdown'
+        || request.resource.contentType == 'text/csv'
+        || request.resource.contentType == 'application/pdf'
+        || request.resource.contentType == 'application/json'
+        // blob cifrati S1.2 (maybeEncryptBlob) viaggiano come octet-stream
+        || request.resource.contentType == 'application/octet-stream';
+    }
+
+    // Il tetto è il limite del client (4 MB per allegato, misurato sul file
+    // COM'È) più il gonfiore della cifratura S1.2. Senza quel margine un
+    // allegato da 4 MB tondi passava il controllo dell'app e veniva respinto
+    // qui, cifrato: un rifiuto che nasce dalla differenza fra due misure della
+    // stessa cosa, e che l'utente legge come "caricamento non riuscito".
+    function dimensioneAmmessa() {
+      return request.resource.size <= 4 * 1024 * 1024 + 64 * 1024;
+    }
+
+    // Nome con entropia: <etichetta_>?<millisecondi>_<uuid>.<estensione>.
+    // L'uuid è la parte che non si indovina; l'etichetta facoltativa distingue
+    // la provenienza (`agent_` per i ritrovamenti dell'agente esploratore).
+    function nomeConEntropia(file) {
+      return file.matches('^([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\\.[A-Za-z0-9]{1,12}$');
+    }
+
+    match /feedback/{file} {
+      allow get: if eAmministratore();
+      // `list` non compare: elencare il bucket non si può, per nessuno.
+
+      allow create: if resource == null
+        && dimensioneAmmessa()
+        && tipoPassivo()
+        && nomeConEntropia(file);
+
+      // Un allegato non si sovrascrive e non si cancella: quello che il
+      // mittente ha spedito resta quello che l'owner e i giudici leggono.
+      allow update, delete: if false;
+    }
+
+    // Tutto il resto è chiuso — comprese le sottocartelle di feedback/, che il
+    // blocco qui sopra (un solo segmento) non copre.
     match /{path=**} {
       allow read, write: if false;
     }
