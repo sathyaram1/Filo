@@ -142,13 +142,14 @@ test('nel menu App le voci riservate tornano a chi gestisce, e spariscono quando
       `«${voce}» non c'è più nemmeno per chi gestisce i feedback`,
     ).toBeVisible({ timeout: 5000 });
   }
+  const primo = popup;
   await shell.evaluate(() => document.getElementById('nav-apps')?.click());
-  await new Promise((r) => setTimeout(r, 400));
+  await new Promise((r) => setTimeout(r, 600));
 
   // Fine sessione: le due voci se ne vanno senza riavviare Filo.
   await fingiOwner(app, false);
   await annunciaSessione(app, { signedIn: false, isAdmin: false });
-  popup = await apriMenuApp(shell, app);
+  popup = await apriMenuApp(shell, app, primo);
   for (const voce of ['Feedback', 'Gestione']) {
     await expect(popup.getByText(voce, { exact: true })).toHaveCount(0);
   }
