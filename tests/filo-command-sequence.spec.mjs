@@ -39,8 +39,15 @@ async function stubSequence(app, turns) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      // #536 — un turno che legge roba scritta da altri (una ricerca, l'uscita di
+      // un comando) passa dal guardiano prima di rispondere: senza un modello suo
+      // la risposta finirebbe in coda, e questo spec non parla di quello.
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.GUARD_TEXT]: 'glm' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.SN_TEXT_GUARDIAN.configure({
+      pausaMs: 0,
+      eseguiModello: async () => '{"esito":"passa"}',
     });
     globalThis.__filoTurnCount = 0;
     // Tieni la sequenza su globalThis: lo stub la legge da lì (un closure sul
