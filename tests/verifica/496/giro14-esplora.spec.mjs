@@ -78,7 +78,7 @@ test('aspetto della scheda nei due temi, col caricamento al tetto', async ({ ope
   await page.waitForTimeout(200);
   mkdirSync('tests/.shots', { recursive: true });
   for (const tema of ['light', 'dark']) {
-    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, tema);
+    await page.evaluate((t) => { document.documentElement.setAttribute('data-sn-theme', t); }, tema);
     await page.waitForTimeout(120);
     await page.screenshot({ path: `tests/.shots/496-giro14-${tema}.png`, fullPage: true });
   }
