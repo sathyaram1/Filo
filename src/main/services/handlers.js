@@ -3384,7 +3384,13 @@ async function segretiCustoditi() {
 
 function wireTextGuardian() {
   const TG = require('./textGuardian');
-  TG.configure({ eseguiModello: runGuardiano, segreti: segretiCustoditi });
+  TG.configure({
+    eseguiModello: runGuardiano,
+    segreti: segretiCustoditi,
+    // Un avviso che compare solo al prossimo giro della colonna è attesa
+    // gratuita: appena il guardiano decide, la colonna live si aggiorna.
+    avvisaCambio: broadcastLiveUpdate,
+  });
   globalThis.SN_TEXT_GUARDIAN = TG;
   return TG;
 }
