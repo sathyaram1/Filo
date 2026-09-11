@@ -194,8 +194,6 @@
         intent: guessedIntent,
         steps: sanitizedSteps,
         success: !!session.success,
-        userAgent: userAgent || '',
-        clientId: clientId || '',
       });
       return { saved: true, id, intent: guessedIntent };
     } catch (e) {
