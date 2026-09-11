@@ -560,7 +560,9 @@
   }
 
   function composeNotes(text, attachments) {
-    const base = String(text == null ? '' : text);
+    // La testa del campo note è testo libero: una riga di separazione lì dentro
+    // è arrivata incollata, e apriva un turno che nessuno ha mai appeso.
+    const base = neutralizzaMarcatori(String(text == null ? '' : text));
     const attBlock = attachmentsBlock(attachments);
     if (!attBlock) return base;
     const trimmed = base.replace(/\s+$/, '');
