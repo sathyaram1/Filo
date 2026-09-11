@@ -14,6 +14,17 @@
 // e la risposta arriva dal main vero. È l'unico modo di provare le due metà
 // insieme (il main che distingue il caso, la pagina che lo scrive).
 
+// Gli altri due casi (trovati nella verifica #582, giro 2) riguardano gli
+// allegati che immagini non sono, nella stessa bolla:
+//   · l'indirizzo di un allegato lo scrive chi manda la segnalazione, e una
+//     segnalazione la manda chiunque senza account: se diventa un collegamento
+//     cliccabile, una segnalazione con un finto allegato «schermata.png» che
+//     punta al sito di un estraneo è un'esca dentro una pagina di Filo, davanti
+//     a ogni tester che apre l'elenco;
+//   · il documento che il mittente ha allegato parte cifrato come lo screenshot,
+//     quindi il collegamento diretto ai byte gli consegnava un file col nome
+//     giusto e il contenuto illeggibile, senza dire niente.
+
 import { test, expect } from './fixtures/electron.mjs';
 
 const FEEDBACK_URL = 'filo://feedback/feedback.html';
