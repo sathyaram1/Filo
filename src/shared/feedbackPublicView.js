@@ -212,6 +212,7 @@
       // popup delle ricompense riconosce i propri.
       clientIdTag: CIH().cardTagSync(fb._id, fb.clientIdHash),
       userNote: str(fb.userNote, 500),
+      reward: rewardFor(fb.priority),
     };
     // Un titolo che è rimasto cifrato (chiave assente su quel campo) non si
     // pubblica: meglio una scheda senza nome che un blob in bacheca.
