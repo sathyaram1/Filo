@@ -1,10 +1,18 @@
-// Client Firestore REST per la collection `paths` (raccolta percorsi
-// dell'Aiuto). Stesso progetto Firebase usato dai feedback.
+// Raccolta percorsi dell'Aiuto (`paths`): lettura diretta da Firestore REST,
+// scrittura SOLO attraverso il server.
 //
-// Pattern uguale a SN_FEEDBACK ma molto più ridotto: niente upload immagini,
-// solo create + list. Funziona sia da service worker sia da pagina.
+// Perché le due strade non sono simmetriche. La lettura è pubblica per
+// costruzione (i percorsi servono all'agente Aiuto di chiunque). La scrittura
+// no: è l'unico contenuto di Filo che un utente scrive e un ALTRO utente si
+// ritrova nel prompt. Finché si scriveva di qui con la chiave pubblica del
+// repo, chiunque poteva depositare un "percorso" per un dominio a scelta
+// saltando la pulizia dell'app (audit pre-alpha, #585). Ora le regole non
+// lasciano scrivere nessun client (firestore.rules → match /paths) e l'invio
+// passa dalla callable `pathSubmit` del backend di sicurezza, che riapplica la
+// pulizia condivisa (SN_PATHS_SAFETY.sanitizeSubmission) e tiene i limiti di
+// frequenza per identità.
 //
-// Espone SN_PATHS = { submit, list }.
+// Espone SN_PATHS = { submit, listByDomain }.
 
 (function (global) {
   'use strict';
@@ -14,6 +22,13 @@
   const COLLECTION = 'paths';
 
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+
+  // Base delle Cloud Function callable del backend di sicurezza (filo-security):
+  // stessa region/progetto degli altri canali (auth, wallet, redteam). Override
+  // per i test via env, come là.
+  const FUNCTIONS_BASE = (typeof process !== 'undefined' && process.env && process.env.FILO_FUNCTIONS_BASE)
+    || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
+  const SUBMIT_FUNCTION = 'pathSubmit';
 
   function toFsValue(v) {
     if (v === null || v === undefined) return { nullValue: null };
