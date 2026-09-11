@@ -2560,8 +2560,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // le AZIONI che il modello emette possono essere state dettate da quella
         // roba. Il guardiano sorveglia la frase; questo marchio serve al registro
         // dei livelli per sorvegliare il gesto. Lo mette il main, mai il modello.
-        if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno)) a._contaminato = true;
-        else delete a._contaminato;
+        if (globalThis.SN_TEXT_GUARD.vaControllato(fiduciaTurno)) {
+          a._contaminato = true;
+          // …e quello che l'azione lascia scritto per comparire più tardi passa
+          // dal controllo adesso, prima che l'azione parta.
+          await sorvegliaEtichette(a, {
+            fiducia: fiduciaTurno,
+            origine: origineTurno(),
+            richiestaUtente: internal ? '' : String(userMessage || ''),
+            produttore: await produttoreDellaChat(),
+          });
+        } else delete a._contaminato;
         const res = a._argsError
           ? { executed: false, kept: false, rejected: true, error: a._argsError }
           : await executeFiloAction(a, { sender });
