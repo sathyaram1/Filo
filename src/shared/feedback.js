@@ -757,6 +757,18 @@
     }
     fields.publishedAt = toFsValue(new Date().toISOString());
     mask.push('publishedAt');
+    // I voti e le riaperture li scrivono gli UTENTI, quindi di norma non
+    // entrano nella maschera: una ripubblicazione li cancellerebbe. L'unica
+    // volta che ci entrano è il travaso dal documento alla scheda (#583,
+    // SN_FEEDBACK_PUBLIC_VIEW.carryUserFields), e in quel caso il valore che
+    // arriva qui ha già dentro anche quello che c'era sulla scheda.
+    const userFields = (V && V.USER_FIELDS) ? V.USER_FIELDS : ['votes', 'reopenRequests'];
+    for (const f of userFields) {
+      const v = (card || {})[f];
+      if (!v || typeof v !== 'object') continue;
+      fields[f] = toFsValue(v);
+      mask.push(f);
+    }
     const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
     const url = `${FIRESTORE_BASE}/${VIEW_COLLECTION}/${encodeURIComponent(key)}?${qs}&key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
