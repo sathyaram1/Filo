@@ -213,7 +213,30 @@ async function carteInAttesa() {
  * nel registro, chi ancora non riceve risposta resta in coda.
  * Best-effort: non lancia mai (lo chiama il giro delle notifiche).
  */
+let ultimoGiroCoda = 0;
+let giroInCorso = false;
+
 async function riprocessaCoda(deps = {}) {
+  const M = Mem();
+  if (!M) return { trattati: 0 };
+  // Il giro delle notifiche può arrivare una volta al secondo (c'è un timer che
+  // scorre): un ripasso per ogni disegno della colonna sarebbe una lettura
+  // dello storage al secondo per niente. Una volta ogni dieci secondi basta —
+  // quanto aspetta davvero un avviso lo decide `RITENTA_DOPO_MS`.
+  const adesso = (deps && typeof deps.ora === 'function') ? deps.ora() : Date.now();
+  if (!deps.forza) {
+    if (giroInCorso || adesso - ultimoGiroCoda < 10_000) return { trattati: 0, saltato: true };
+    giroInCorso = true;
+    ultimoGiroCoda = adesso;
+  }
+  try {
+    return await giroCoda(deps);
+  } finally {
+    if (!deps.forza) giroInCorso = false;
+  }
+}
+
+async function giroCoda(deps = {}) {
   const M = Mem();
   if (!M) return { trattati: 0 };
   let coda = [];
