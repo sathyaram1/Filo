@@ -280,6 +280,7 @@
     cardFor,
     sameCard,
     planSync,
+    mergeUserFields,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
