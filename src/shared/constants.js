@@ -241,6 +241,12 @@
     SAFEBROWSE_JUDGE: 'safebrowse_judge',
     // Classificatore della coda ambigua del rilevamento geo-block.
     GEOBLOCK_CLASSIFY: 'geoblock_classify',
+    // #536 — il guardiano: secondo giudizio su ogni testo che Filo mostra
+    // all'utente dopo aver letto contenuto di terzi. DEVE girare su un modello
+    // diverso da quello che ha scritto il testo (due contesti sullo stesso
+    // modello cadono insieme): il codice toglie dalla catena del guardiano i
+    // nickname del produttore, e una sentinella negli unit test lo verifica.
+    GUARDIAN_CHECK: 'guardian_check',
     // Titolo breve generato all'invio di un feedback.
     FEEDBACK_TITLE: 'feedback_title',
     // === Editor ===
