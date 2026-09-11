@@ -387,6 +387,10 @@
 
   async function accoda(percorso) {
     await carica();
+    if (coda.length >= MAX_IN_CODA) {
+      console.warn(`[Filo] coda percorsi: piena (${coda.length} in attesa), il percorso nuovo non entra`);
+      return { id: '', piena: true };
+    }
     const ora = Date.now();
     const voce = {
       id: `p_${ora}_${Math.random().toString(36).slice(2, 8)}`,
