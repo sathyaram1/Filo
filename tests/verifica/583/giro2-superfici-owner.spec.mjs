@@ -144,7 +144,12 @@ test('nel menu App le voci riservate tornano a chi gestisce, e spariscono quando
   }
   const primo = popup;
   await shell.evaluate(() => document.getElementById('nav-apps')?.click());
-  await new Promise((r) => setTimeout(r, 600));
+  // Il menu vive in una finestra a parte: finché quella di prima è ancora
+  // aperta, riaprire darebbe la vecchia lista (o una finestra che sta morendo).
+  const chiusa = Date.now() + 5000;
+  while (Date.now() < chiusa && !primo.isClosed()) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
 
   // Fine sessione: le due voci se ne vanno senza riavviare Filo.
   await fingiOwner(app, false);
