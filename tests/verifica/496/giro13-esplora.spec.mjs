@@ -127,6 +127,15 @@ test('ogni superficie della scheda risponde al tasto destro', async ({ openTab }
     esiti.push(`fetta (punto vero, sopra=${punto.sopra}): ${voci === null ? 'NESSUN MENU' : voci}`);
   }
   console.log('TASTO DESTRO\n' + esiti.join('\n'));
+
+  // Le superfici che portano un numero devono offrire qualcosa di LORO: le
+  // altre finiscono sul menu generale della pagina, quello che esce anche su
+  // uno spazio bianco.
+  for (const nome of ['tessera', 'pastiglia finestra', 'riga altre misure', 'voce di legenda',
+    'barretta', 'frase sotto la torta', 'frase sotto il grafico', 'riga di avviso']) {
+    const riga = esiti.find((r) => r.startsWith(`${nome}:`)) || '';
+    expect(riga, riga).toMatch(/Copia|Mostra|Restringi/);
+  }
 });
 
 test('la scheda con molti giri, fotografata', async ({ openTab }) => {
