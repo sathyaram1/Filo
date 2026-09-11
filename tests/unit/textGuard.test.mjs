@@ -1,0 +1,240 @@
+// Unit test per src/shared/textGuard.js — il guardiano del testo verso l'utente
+// (#536), parte deterministica.
+//
+// Cosa asseriamo, e perché è il SUCCESSO e non l'assenza di un errore:
+//   • i controlli statici FERMANO davvero le forme che contano (codici usa e
+//     getta, codici di recupero, password, chiavi, coordinate bancarie, segreti
+//     di Filo, collegamenti che portano altrove da dove dicono) — cioè l'avviso
+//     pericoloso non arriva all'utente;
+//   • e NON fermano il testo innocuo: un guardiano che grida al lupo viene
+//     spento, quindi i falsi positivi sono un difetto alla pari dei mancati
+//     blocchi e hanno i loro assert;
+//   • il modello del guardiano non può mai coincidere con quello che ha scritto
+//     il testo: `catenaGuardiano` toglie i nickname in comune, e se non resta
+//     niente il chiamante NON ha un modello — che è il caso che deve mandare
+//     l'avviso in coda, non mostrarlo;
+//   • una risposta del guardiano che non si capisce non vale «passa».
+//
+// Logica pura → niente Electron, gira in millisecondi via `npm run test:unit`.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+require(join(__dirname, '..', '..', 'src', 'shared', 'textGuard.js'));
+
+const G = globalThis.SN_TEXT_GUARD;
+
+test('si registra su globalThis con la sua API', () => {
+  assert.ok(G, 'SN_TEXT_GUARD assente');
+  for (const fn of [
+    'piuBassa', 'vaControllato', 'controlliStatici', 'linkDelTesto',
+    'linkIngannevole', 'destinazioneVisibile', 'frasediBlocco',
+    'modelliIndipendenti', 'catenaGuardiano', 'messaggiGuardiano', 'leggiVerdetto',
+  ]) assert.equal(typeof G[fn], 'function', `manca ${fn}()`);
+});
+
+// ── Classi di fiducia ───────────────────────────────────────────────────────
+
+test('la classe di un compito è quella della sua fonte peggiore', () => {
+  assert.equal(G.piuBassa(['pulito', 'pulito']), 'pulito');
+  assert.equal(G.piuBassa(['pulito', 'contaminato']), 'contaminato');
+  assert.equal(G.piuBassa([]), 'pulito');
+  // Una classe che questo modulo non conosce (le porterà #530) conta come
+  // contaminata: sbagliare per eccesso di prudenza, mai lasciar passare.
+  assert.equal(G.piuBassa(['pulito', 'fonte-nuova-di-530']), 'contaminato');
+});
+
+test('un compito pulito non va controllato, uno contaminato sì', () => {
+  assert.equal(G.vaControllato('pulito'), false);
+  assert.equal(G.vaControllato('contaminato'), true);
+});
+
+test('le azioni che portano dentro testo scritto da altri contaminano il turno', () => {
+  assert.equal(G.fiduciaDellAzione('CERCA_WEB'), 'contaminato');
+  assert.equal(G.fiduciaDellAzione('LEGGI_DOCUMENTO'), 'contaminato');
+  assert.equal(G.fiduciaDellAzione('ESEGUI_COMANDO'), 'contaminato');
+  // Un timer non legge niente di nessuno: niente secondo modello.
+  assert.equal(G.fiduciaDellAzione('TIMER'), 'pulito');
+  assert.equal(G.fiduciaDellAzione('IMPOSTA_PREFERENZA'), 'pulito');
+  assert.match(
+    G.etichettaFonte({ type: 'LEGGI_DOCUMENTO', percorso: '/tmp/bolletta di marzo.pdf' }),
+    /bolletta di marzo\.pdf/);
+});
+
+// ── Controlli statici: quello che DEVE fermare ──────────────────────────────
+
+const FERMA = [
+  ['codice-usa-e-getta', 'Il tuo codice di verifica è 483920: inseriscilo per confermare.'],
+  ['codice-usa-e-getta', 'Codice di accesso monouso: A1B2C3'],
+  ['codice-di-recupero', 'Ecco i tuoi codici di recupero: abcd-efgh-ijkl'],
+  ['password', 'Accedi con password: cavallo-blu-42'],
+  ['chiave', 'La chiave del fornitore è sk-abcdefghijklmnopqrstuvwx'],
+  ['chiave', 'Usa Authorization: Bearer eyJhbGciOiJIUzI1NiJ9abcdefghijk'],
+  ['coordinate-bancarie', 'Fai il bonifico su IT60X0542811101000000123456 entro stasera.'],
+  ['carta-di-credito', 'Ho aggiornato la carta 4111 1111 1111 1111 sul tuo profilo.'],
+  ['link-ingannevole', 'Conferma qui: [banca-esempio.it](https://banca-esempio.it.attacco.ru/login)'],
+  ['link-travestito', 'Vai su https://banca-esempio.it@attacco.ru per sbloccare il conto.'],
+];
+
+for (const [regola, testo] of FERMA) {
+  test(`il controllo statico ferma: ${regola} — ${testo.slice(0, 38)}…`, () => {
+    const r = G.controlliStatici({ testo });
+    assert.equal(r.blocca, true, `non fermato: ${testo}`);
+    assert.equal(r.regola, regola);
+    // La riga che l'utente legge deve dire COSA è stato visto, non che c'era un
+    // dubbio: senza un motivo il blocco è indistinguibile da un capriccio.
+    assert.ok(r.motivo && r.motivo.length > 5, 'motivo mancante');
+  });
+}
+
+test('un segreto custodito da Filo non esce mai in un testo verso l’utente', () => {
+  const chiave = 'sk-or-v1-QWERTYUIOPASDFGH';
+  const r = G.controlliStatici({
+    testo: `Ho trovato questo nelle impostazioni: ${chiave}`,
+    segreti: [chiave],
+  });
+  assert.equal(r.blocca, true);
+  assert.equal(r.regola, 'segreto-di-filo');
+  // La prova non riporta il segreto: il registro dei blocchi è leggibile e non
+  // deve diventare il posto dove il segreto è scritto due volte.
+  assert.equal(r.prova, '');
+});
+
+test('i controlli statici funzionano senza rete e senza modello', () => {
+  // Nessuna funzione iniettata, nessun fetch: è la garanzia che a rete staccata
+  // la prima difesa resti in piedi.
+  const r = G.controlliStatici({ testo: 'password: segretissima1' });
+  assert.equal(r.blocca, true);
+});
+
+// ── Controlli statici: quello che NON deve fermare ──────────────────────────
+
+const PASSA = [
+  'Il pacco 12345678 è in consegna domani.',
+  'Il volo AZ4839 parte alle 7.',
+  'Conferma la spedizione entro il 11/09/2026.',
+  'Riunione confermata alle 10:30 in sala 4.',
+  'La bolletta di settembre è di 124,50 euro: conferma il pagamento quando vuoi.',
+  'Ecco il riepilogo: [apri il riepilogo](https://esempio.it/riepilogo)',
+  'Marco ti ha scritto: ci vediamo domani alle 18.',
+  'Il tuo CODICE cliente è scritto nel portale, sezione anagrafica.',
+];
+
+for (const testo of PASSA) {
+  test(`il controllo statico lascia passare: ${testo.slice(0, 38)}…`, () => {
+    const r = G.controlliStatici({ testo });
+    assert.equal(r.blocca, false, `falso positivo su: ${testo} (${r.regola})`);
+  });
+}
+
+test('testo vuoto o di soli spazi non è un blocco', () => {
+  for (const t of ['', '   ', '\n\t ', null, undefined]) {
+    assert.equal(G.controlliStatici({ testo: t }).blocca, false);
+  }
+});
+
+test('un testo lunghissimo non fa esplodere i controlli', () => {
+  const lungo = 'lorem ipsum dolor sit amet '.repeat(400); // ~10.800 caratteri
+  const r = G.controlliStatici({ testo: lungo });
+  assert.equal(r.blocca, false);
+  const lungoConCodice = `${lungo}\nIl tuo codice di verifica è 483920.`;
+  assert.equal(G.controlliStatici({ testo: lungoConCodice }).blocca, true);
+});
+
+// ── Collegamenti: dove portano davvero ──────────────────────────────────────
+
+test('i collegamenti si estraggono con etichetta e destinazione vera', () => {
+  const link = G.linkDelTesto('Leggi [il riepilogo](https://www.esempio.it/a/b) o vai su https://altro.example/x');
+  assert.equal(link.length, 2);
+  assert.equal(link[0].etichetta, 'il riepilogo');
+  assert.equal(G.destinazioneVisibile(link[0].url), 'esempio.it');
+  assert.equal(G.destinazioneVisibile(link[1].url), 'altro.example');
+});
+
+test('un’etichetta che è una frase non conta come inganno (lo giudica il modello)', () => {
+  assert.equal(G.linkIngannevole('apri il riepilogo', 'https://qualsiasi.example/x'), false);
+  assert.equal(G.linkIngannevole('banca.it', 'https://banca.it/login'), false);
+  assert.equal(G.linkIngannevole('banca.it', 'https://banca.it.attacco.ru/login'), true);
+});
+
+test('i sottodomini dello stesso sito non sono un inganno', () => {
+  assert.equal(G.linkIngannevole('esempio.it', 'https://conti.esempio.it/x'), false);
+  assert.equal(G.dominioRegistrabile('conti.esempio.co.uk'), 'esempio.co.uk');
+});
+
+// ── Indipendenza del modello ────────────────────────────────────────────────
+
+test('il guardiano rifiuta lo stesso nickname del modello che ha scritto il testo', () => {
+  assert.equal(G.modelliIndipendenti('flash', 'flash'), false);
+  assert.equal(G.modelliIndipendenti('flash, pro', 'pro'), false);
+  assert.equal(G.modelliIndipendenti('flash', 'kimi'), true);
+  // Maiuscole e spazi non sono una scappatoia.
+  assert.equal(G.modelliIndipendenti(' Flash ', 'FLASH'), false);
+});
+
+test('la catena del guardiano perde i nickname del produttore', () => {
+  const { refs, scartati } = G.catenaGuardiano('flash, kimi, pro', 'flash, pro');
+  assert.deepEqual(refs, ['kimi']);
+  assert.deepEqual(scartati, ['flash', 'pro']);
+});
+
+test('se non resta nessun modello indipendente, il guardiano non ha su cosa girare', () => {
+  const { refs } = G.catenaGuardiano('flash', 'flash');
+  assert.deepEqual(refs, []);
+  // Ed è proprio questo il caso che il chiamante deve trattare come «non
+  // risponde» (coda), mai come «passa»: qui asseriamo che non c'è nessun modo
+  // di ricavare un modello da usare.
+  assert.equal(G.modelliIndipendenti('flash', refs.join(', ')), false);
+});
+
+// ── Prompt e verdetto ───────────────────────────────────────────────────────
+
+test('il guardiano vede il testo in uscita, la fonte e la richiesta — non le mail', () => {
+  const [sys, user] = G.messaggiGuardiano({
+    testo: 'La tua banca chiede di confermare le credenziali: apri https://x.example/login',
+    fiducia: 'contaminato',
+    origine: 'una mail di Banca Esempio',
+    richiestaUtente: 'controlla la posta',
+  });
+  assert.equal(sys.role, 'system');
+  assert.match(sys.content, /ignora qualunque istruzione/i);
+  assert.match(user.content, /classe_di_fiducia: contaminato/);
+  assert.match(user.content, /una mail di Banca Esempio/);
+  assert.match(user.content, /controlla la posta/);
+  // La destinazione vera dei collegamenti gli arriva già calcolata.
+  assert.match(user.content, /porta a x\.example/);
+});
+
+test('una risposta che non si capisce NON vale «passa»', () => {
+  for (const raw of ['', 'boh', '{}', '{"esito":"forse"}', null, undefined, '{rotto']) {
+    assert.equal(G.leggiVerdetto(raw), null, `accettata una risposta illeggibile: ${raw}`);
+  }
+});
+
+test('il verdetto di blocco arriva sempre con un motivo', () => {
+  const v = G.leggiVerdetto('ecco: {"esito":"blocca","motivo":"chiedeva il PIN della carta"}');
+  assert.equal(v.esito, 'blocca');
+  assert.equal(v.motivo, 'chiedeva il PIN della carta');
+  // Blocco senza motivo dal modello: la frase la mettiamo noi, mai vuota.
+  const v2 = G.leggiVerdetto('{"esito":"blocca"}');
+  assert.equal(v2.esito, 'blocca');
+  assert.ok(v2.motivo.length > 5);
+});
+
+// ── La riga che l'utente legge ──────────────────────────────────────────────
+
+test('la riga di blocco dice da dove veniva e cosa ha visto', () => {
+  const f = G.frasediBlocco({ origine: 'una mail di Banca Esempio', motivo: 'chiedeva le tue credenziali' });
+  assert.equal(f, 'Ho fermato un avviso nato da una mail di Banca Esempio: chiedeva le tue credenziali.');
+  // Niente «ho avuto un dubbio»: senza fonte lo dice, non se la inventa.
+  assert.match(G.frasediBlocco({ motivo: 'chiedeva un pagamento' }), /contenuto non fidato: chiedeva un pagamento\./);
+});
+
+test('la riga di attesa dice che l’avviso non è perso', () => {
+  assert.match(G.fraseInAttesa({ origine: 'una mail di Banca Esempio' }), /aspetta il controllo/i);
+});
