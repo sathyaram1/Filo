@@ -39,12 +39,32 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const OUT_PATH = resolve(__dirname, '..', 'src', 'main', 'config', 'default-keys.generated.json');
 
-// Chiede al server le chiavi di default. Ritorna { openrouter?, gemini?, tavily? }
-// oppure {} se non disponibili. Non lancia: in caso di problemi degrada ai
-// segreti del job, perché una versione con quelle chiavi è meglio di nessuna
-// versione. Se non resta nemmeno quello, decide main — e si ferma.
+// Chiede al server le chiavi di default. Ritorna
+// { openrouter?, gemini?, tavily?, safeBrowsing? } oppure {} se non disponibili.
+// Non lancia: in caso di problemi degrada ai segreti del job, perché una
+// versione con quelle chiavi è meglio di nessuna versione. Se non resta nemmeno
+// quello, decide main — e si ferma.
 const CANALE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
+
+// La chiave Safe Browsing sta in `config/secrets` FUORI dalla mappa `apiKeys`
+// (campo `safeBrowsingKey`). La risposta del server può quindi portarla in due
+// posti a seconda di come la funzione è fatta: accettiamo entrambi invece di
+// scommettere su uno solo — sbagliare significherebbe spegnere in silenzio il
+// primo stadio del rilevamento siti pericolosi per tutti.
+function pickSafeBrowsing(json) {
+  if (!json || typeof json !== 'object') return '';
+  const candidati = [
+    json.safeBrowsingKey,
+    json.safeBrowsing,
+    json.apiKeys && json.apiKeys.safeBrowsingKey,
+    json.apiKeys && json.apiKeys.safeBrowsing,
+  ];
+  for (const c of candidati) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+  }
+  return '';
+}
 
 async function fetchRemoteKeys(passphrase) {
   if (!passphrase) return {};
@@ -59,7 +79,10 @@ async function fetchRemoteKeys(passphrase) {
       return {};
     }
     const j = await res.json();
-    return (j && j.apiKeys && typeof j.apiKeys === 'object') ? j.apiKeys : {};
+    const apiKeys = (j && j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
+    const sb = pickSafeBrowsing(j);
+    if (sb) apiKeys.safeBrowsing = sb;
+    return apiKeys;
   } catch (e) {
     console.warn(`[bake] server non raggiungibile (${e.message}); uso i secret d'ambiente.`);
     return {};
