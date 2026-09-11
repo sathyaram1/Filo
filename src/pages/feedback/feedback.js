@@ -1057,6 +1057,8 @@
       });
     });
 
+    resolveFileLinks(listEl);
+
     bindCardActions(listEl);
 
     // Riseleziona la casella che aveva il fuoco prima del re-render (vedi
