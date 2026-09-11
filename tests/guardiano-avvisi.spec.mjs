@@ -205,7 +205,8 @@ test('il registro degli avvisi fermati si legge, e si svuota, dalle Preferenze',
   await pref.locator('#clearGuardBlocks').click();
   expect(await confirmText(pref)).toContain('non si può annullare');
   await clickConfirm(pref, 'cancel');
-  await expect(voci).toHaveCount(1, 'annullare non deve cancellare niente');
+  // Annullare non cancella niente.
+  await expect(voci).toHaveCount(1);
 
   await pref.locator('#clearGuardBlocks').click();
   await clickConfirm(pref, 'ok');
