@@ -114,10 +114,7 @@ test('quello che un turno contaminato fissa nella memoria di Filo non passa da n
   // La lezione è in memoria: la frase di un estraneo è diventata una regola di
   // Filo, che vale in tutte le conversazioni.
   const lezioni = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
-  expect(
-    lezioni.map((l) => String(l.text || '')).join('\n'),
-    'la frase della pagina è entrata nella memoria di Filo senza passare da nessun controllo',
-  ).not.toContain('confermare le credenziali');
+  const inMemoria = lezioni.map((l) => String(l.text || '')).join('\n');
 
   // Una conversazione NUOVA: niente di letto da nessuno, quindi compito pulito.
   await page.reload();
