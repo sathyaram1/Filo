@@ -190,14 +190,16 @@ async function proponiNotifica(proposta = {}) {
 // Rientrante per finta: se un giro è già in corso, il secondo aspetta quello
 // invece di raddoppiare le chiamate al modello.
 let _giroInCorso = null;
-let _ultimoGiro = 0;
 
 async function riprendiInAttesa({ force = false } = {}) {
   if (_giroInCorso) return _giroInCorso;
+  const Mem0 = Mem();
+  const coda = Mem0 ? await Mem0.listPendingNotifications() : [];
+  // Coda vuota: niente da fare, e niente che consumi il freno — così il primo
+  // avviso che finisce in coda ha subito la sua occasione.
+  if (!coda.length) return { mostrati: 0, bloccati: 0, restano: 0 };
   if (!force && _ultimoGiro && Date.now() - _ultimoGiro < RIPRESA_MIN_MS) {
-    const M = Mem();
-    const restano = M ? (await M.listPendingNotifications()).length : 0;
-    return { mostrati: 0, bloccati: 0, restano, rimandato: true };
+    return { mostrati: 0, bloccati: 0, restano: coda.length, rimandato: true };
   }
   _ultimoGiro = Date.now();
   _giroInCorso = (async () => {
@@ -206,7 +208,6 @@ async function riprendiInAttesa({ force = false } = {}) {
     if (!M || !G) return { mostrati: 0, bloccati: 0, restano: 0 };
     let mostrati = 0;
     let bloccati = 0;
-    const coda = await M.listPendingNotifications();
     for (const voce of coda) {
       const verdetto = await controllaTesto({
         testo: voce.testo,
