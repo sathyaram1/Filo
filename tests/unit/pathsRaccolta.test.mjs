@@ -185,6 +185,30 @@ test('la sezione del sito resta leggibile: si toglie chi sei, non dove sei', () 
   assert.equal(redactPath('/a/b%2Fc'), '/a/[ID]', 'un segmento che nasconde una barra non si tiene');
 });
 
+// Il nome utente scritto a lettere, cioè quello che nessuna regola di forma
+// distingue da una parola (#584, terzo giro). Si riconosce da DOVE sta: dopo
+// una parola che annuncia una persona, o in testa all'indirizzo sui siti dove
+// lì ci va sempre qualcuno. Senza queste due regole `/mariorossi/progetto`
+// usciva intero, e un nome utente è lo stesso su più siti.
+test('il nome utente in testa all’indirizzo non esce, sui siti dove lì ci va una persona', () => {
+  const { normalizedPath } = Collector._internal;
+  assert.equal(normalizedPath('https://github.com/mariorossi/progetto'), '/[ID]/progetto');
+  assert.equal(normalizedPath('https://x.com/mariorossi'), '/[ID]');
+  assert.equal(normalizedPath('https://medium.com/mariorossi/come-fare'), '/[ID]/come-fare');
+  assert.equal(normalizedPath('https://www.instagram.com/mariorossi/'), '/[ID]/');
+  // sugli altri siti il primo pezzo è una sezione e resta leggibile
+  assert.equal(normalizedPath('https://negozio.it/account/ordini'), '/account/ordini');
+  assert.equal(normalizedPath('https://github.com/'), '/');
+});
+
+test('anche le parole che annunciano una persona coprono le forme comuni', () => {
+  const { redactPath } = Collector._internal;
+  assert.equal(redactPath('/in/mario-rossi'), '/in/[ID]', 'profili professionali');
+  assert.equal(redactPath('/c/MarioRossi/video'), '/c/[ID]/video', 'canali');
+  assert.equal(redactPath('/clienti/MarioRossi/fatture'), '/clienti/[ID]/fatture', 'gestionali');
+  assert.equal(redactPath('/author/mariorossi'), '/author/[ID]');
+});
+
 test('il giudice vede quello che verrebbe pubblicato, non solo la frase', async () => {
   await withFetch(async () => {
     const invoke = invokeAIFinto();
