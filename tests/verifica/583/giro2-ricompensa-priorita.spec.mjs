@@ -15,11 +15,11 @@
 // l'owner aveva messo in cima e una qualunque. Se le due ricompense sono
 // identiche, l'importanza è andata persa per strada.
 //
-// NOTA per chi corregge: la prova rappresenta l'importanza con il campo
-// `priority` sulla scheda, che è la strada più breve. Se la correzione sceglie
-// di portare sulla scheda i crediti già calcolati (o un'altra forma), cambia il
-// finto elenco qui sotto di conseguenza: quello che deve restare vero è che due
-// segnalazioni di peso diverso non valgono lo stesso.
+// NOTA per chi corregge: la scheda la costruisce il codice vero del publisher,
+// quindi la prova diventa verde appena la ricompensa torna a seguire
+// l'importanza — qualunque strada si scelga (portare l'importanza sulla scheda,
+// portarci i crediti già calcolati, o farli dire al server). Quello che deve
+// restare vero è che due segnalazioni di peso diverso non valgono lo stesso.
 
 import { test, expect } from './../../fixtures/electron.mjs';
 
