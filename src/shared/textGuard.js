@@ -74,12 +74,32 @@
   // dai siti. Considerarli contaminanti vorrebbe dire un secondo modello a ogni
   // «che ore sono» — lo spreco che il feedback dice espressamente di evitare.
   // Quel confine lo sposterà #530, che sa dire quanto vale ogni singola fonte.
+  // `portaDentro` dice DOVE, nell'esito dell'azione, finiscono le parole degli
+  // altri. Non è «l'azione è riuscita»: una ricerca senza risultati e un
+  // documento illeggibile non portano dentro niente (nel contesto entra solo una
+  // riga scritta da Filo), mentre un comando che stampa quello che ha letto e poi
+  // esce con un errore porta dentro esattamente quanto uno riuscito.
   const FONTE_AZIONE = {
-    CERCA_WEB: { fiducia: FIDUCIA.CONTAMINATO, etichetta: 'una ricerca sul web' },
-    LEGGI_DOCUMENTO: { fiducia: FIDUCIA.CONTAMINATO, etichetta: 'un documento letto' },
+    CERCA_WEB: {
+      fiducia: FIDUCIA.CONTAMINATO,
+      etichetta: 'una ricerca sul web',
+      portaDentro: (out) => Array.isArray(out.results) && out.results.length > 0,
+    },
+    LEGGI_DOCUMENTO: {
+      fiducia: FIDUCIA.CONTAMINATO,
+      etichetta: 'un documento letto',
+      portaDentro: (out) => !!String(out.text || '').trim(),
+    },
     // L'uscita di un comando può contenere qualunque cosa, compreso quello che
-    // un `curl` ha appena scaricato.
-    ESEGUI_COMANDO: { fiducia: FIDUCIA.CONTAMINATO, etichetta: 'l\'uscita di un comando' },
+    // un `curl` ha appena scaricato. Conta quello che ha STAMPATO, non il codice
+    // di uscita: `cat questo-c-è questo-non-c-è` stampa il primo e poi esce con
+    // un errore, e un comando interrotto perché ci metteva troppo consegna lo
+    // stesso quello che aveva già scritto.
+    ESEGUI_COMANDO: {
+      fiducia: FIDUCIA.CONTAMINATO,
+      etichetta: 'l\'uscita di un comando',
+      portaDentro: (out) => !!String(out.stdout || '').trim() || !!String(out.stderr || '').trim(),
+    },
   };
 
   function fiduciaDellAzione(tipo) {
