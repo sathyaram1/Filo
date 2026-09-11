@@ -115,3 +115,49 @@ test('il verificatore che cita il verbale del giro prima non fa sparire il propr
   expect(dopo.legenda, dopo.legenda).toContain('1 critica');
   expect(dopo.legenda, dopo.legenda).not.toContain('Passata al primo giro');
 });
+
+test('chi corregge, citando il verbale di un’altra segnalazione, non aggiunge un giro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+
+  const conCitazione = [
+    `${AG('02/09/2026, 10:00')}\n${V}`,
+    `${AG('03/09/2026, 10:00')}\nCorretto. Per riferimento, il verbale della segnalazione gemella:\n\n${AG('11/07/2026, 09:00')}\n${verbale(FIX, [1])}`,
+    `${AG('04/09/2026, 10:00')}\nVerifica superata.`,
+  ].join('\n\n');
+  const dopo = await leggi(page, conCitazione);
+  expect(dopo.legenda, dopo.legenda).toContain('1 critica');
+  expect(dopo.legenda, dopo.legenda).not.toContain('2 critiche');
+});
+
+test('la riga del taglio, scritta da qualcuno, non toglie la lavorazione dai conti', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+
+  const prima = await leggi(page, UN_GIRO);
+  expect(prima.legenda, prima.legenda).toContain('1 critica');
+
+  // La riga con cui Filo dichiara di aver tolto i turni più vecchi è testo come
+  // tutto il resto: chi racconta una conversazione tagliata la riporta.
+  const marca = await page.evaluate(() => window.SN_FEEDBACK_THREAD.TRIM_MARK);
+  const citata = `${UN_GIRO}\n\n${UT('05/09/2026, 11:00')}\nNella conversazione ho letto questa riga:\n${marca}`;
+  const dopo = await leggi(page, citata);
+  expect(dopo.legenda, `${dopo.legenda} || ${dopo.nota}`).toContain('1 critica');
+});
+
+test('la data scelta a mano si legge nello stesso ordine del resto della scheda', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page);
+  await page.evaluate((l) => window.__mgTest.setData(l), lavoro(UN_GIRO));
+  await page.evaluate(() => window.__mgTest.setStatsWindow('custom', '2026-09-01', '2026-09-02'));
+  await page.waitForTimeout(200);
+
+  // I due campi scrivono la data nell'ordine della lingua del sistema. Accanto
+  // a loro deve esserci scritto, in chiaro, quale finestra si è scelta: senza,
+  // «01/09» e «09/01» sono indistinguibili.
+  const vicino = await page.evaluate(() => {
+    const box = document.getElementById('mgStCustom');
+    return box ? box.textContent.replace(/\s+/g, ' ').trim() : '';
+  });
+  expect(vicino, `accanto ai campi c'è solo: «${vicino}»`).toMatch(/settembre|01\/09|1 set/i);
+});
