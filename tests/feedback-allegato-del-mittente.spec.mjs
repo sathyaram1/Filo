@@ -190,5 +190,30 @@ test('uno screenshot che punta fuori dal deposito di Filo non si dichiara conseg
 
   const segnaposto = page.locator('.fb-img-broken');
   await expect(segnaposto).toHaveText('(immagine non disponibile)', { timeout: 10_000 });
-  expect(await segnaposto.getAttribute('title')).not.toMatch(/consegnat/i);
+  const motivo = await segnaposto.getAttribute('title');
+  expect(motivo).not.toMatch(/consegnat/i);
+  expect(motivo).not.toMatch(/lo apre solo chi riceve le segnalazioni/i);
+});
+
+// #582, giro 5 — l'altra metà della stessa causa. Il controllo del giro 4
+// guarda la FORMA dell'indirizzo, non se quell'oggetto sia mai arrivato: da
+// questo lato l'esistenza non si può controllare (senza download token il
+// deposito risponde 403 sia per un file che c'è sia per uno che non c'è).
+// Bastava quindi scrivere un indirizzo fatto come quelli del deposito di Filo,
+// senza caricare niente e senza account, perché Filo dichiarasse quel file
+// consegnato e cifrato con la chiave di chi riceve le segnalazioni.
+// Senza il fix questa è rossa: diceva «(riservato)» ma con la vecchia frase
+// «allegato consegnato: … perché viaggia cifrato con la sua chiave».
+test('di un allegato che non ha aperto, Filo dice chi lo apre e nient’altro', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  const pillola = await elencoCon(page, { url: DOCUMENTO, name: 'istruzioni.pdf', type: 'application/pdf' });
+
+  await expect(pillola.locator('.fb-file-note')).toHaveText('(riservato)', { timeout: 10_000 });
+  const motivo = await pillola.getAttribute('title');
+  // Quello che serve sapere, e che è vero davanti a un allegato vero come a uno
+  // inventato, resta detto.
+  expect(motivo).toMatch(/lo apre solo chi riceve le segnalazioni/i);
+  // Quello che Filo non ha guardato, non lo dichiara.
+  expect(motivo, 'Filo dichiara arrivato un allegato che non ha aperto').not.toMatch(/consegnat|arrivat|ricevut/i);
+  expect(motivo, 'Filo descrive la cifratura di un allegato che non ha aperto').not.toMatch(/cifrat/i);
 });
