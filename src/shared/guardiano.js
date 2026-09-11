@@ -191,6 +191,21 @@
     return out;
   }
 
+  // I domini NOMINATI nel testo: «apri banca.example», «vai su corriere.test».
+  // Sono promesse anche senza essere link — è così che si scrive un inganno:
+  // il nome giusto nel testo, l'indirizzo sbagliato sotto il clic.
+  function promesseNelTesto(testo) {
+    const s = String(testo == null ? '' : testo);
+    const out = [];
+    const re = /(?:^|[\s<("'])((?:https?:\/\/)?[a-z0-9][a-z0-9.-]{1,200}\.[a-z]{2,24})(?=$|[\s>)"'.,;:!?])/gi;
+    let m;
+    while ((m = re.exec(s))) {
+      const h = etichettaComeHost(m[1]);
+      if (h && !out.includes(h)) out.push(h);
+    }
+    return out;
+  }
+
   // I link da MOSTRARE sotto una notifica: etichetta, indirizzo e host vero.
   // «dominio visibile, sempre»: se il link non si può leggere, si dice anche
   // quello invece di tacere.
