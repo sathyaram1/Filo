@@ -118,6 +118,14 @@ async function main() {
     tavily: pick('tavily', 'FILO_DEFAULT_TAVILY_KEY'),
   };
 
+  // Chiave Google Safe Browsing (#581). Non è una chiave di modelli, quindi sta
+  // fuori da `apiKeys`, ma viaggia per la stessa strada: finché la leggeva a
+  // runtime chi era loggato, il documento dei segreti doveva restare aperto a
+  // qualunque account Google. Ora la lettura del documento è solo admin e
+  // l'unica via verso gli utenti è questa — la stessa che serviva già chi non
+  // faceva login, cioè la maggioranza.
+  const safeBrowsingKey = pick('safeBrowsing', 'FILO_DEFAULT_SAFEBROWSING_KEY');
+
   // ⚠️ La domanda "resta qualcosa?" si fa PRIMA di scrivere.
   //
   // Metterla dopo la scrittura lasciava una scappatoia: se la scrittura falliva
