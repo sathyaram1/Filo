@@ -59,6 +59,32 @@ function bloccoFeedback(testo) {
   throw new Error('blocco match /feedback/ non chiuso');
 }
 
+/**
+ * Le funzioni dichiarate nelle regole, nome → corpo. Servono a leggere una
+ * condizione per quello che FA: `allow get: if eAmministratore()` non dice
+ * niente finché non si guarda dentro la funzione.
+ */
+function funzioni(testo) {
+  const out = new Map();
+  const re = /function\s+(\w+)\s*\(([^)]*)\)\s*\{\s*return\s+([\s\S]*?);\s*\n\s*\}/g;
+  let m;
+  while ((m = re.exec(testo)) !== null) out.set(m[1], m[3].replace(/\s+/g, ' ').trim());
+  return out;
+}
+
+const FUNZIONI = funzioni(RULES.replace(/\/\/[^\n]*/g, ' '));
+
+/** Una condizione con le chiamate alle funzioni delle regole sostituite dal corpo. */
+function espandi(cond) {
+  let out = cond;
+  for (let giro = 0; giro < 3; giro++) {
+    for (const [nome, corpo] of FUNZIONI) {
+      out = out.split(`${nome}()`).join(`( ${corpo} )`).split(`${nome}(file)`).join(`( ${corpo} )`);
+    }
+  }
+  return out;
+}
+
 /** Le `allow <verbi>: if <condizione>;` di un pezzo di regole. */
 function permessi(corpo) {
   const out = [];
