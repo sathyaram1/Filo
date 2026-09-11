@@ -92,7 +92,8 @@
   // identità si passa solo col download token dentro l'URL. Chi ce l'ha,
   // l'identità, la manda — così la dashboard vede gli allegati anche quando il
   // token non c'è (allegati storici) o viene revocato. Il token dell'owner esce
-  // SOLO verso il bucket: su qualunque altro URL queste intestazioni sono vuote.
+  // SOLO verso il bucket di Filo (isAttachmentUrl lo confronta per intero): su
+  // qualunque altro URL queste intestazioni sono vuote.
   function attachmentFetchHeaders(url, idToken) {
     const t = String(idToken || '');
     if (!t || !isAttachmentUrl(url)) return {};
