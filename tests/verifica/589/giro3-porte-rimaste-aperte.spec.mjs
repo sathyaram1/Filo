@@ -215,8 +215,16 @@ test('una scheda di sfondo non fotografa la scheda che l\'utente sta guardando',
     { timeout: 8000 },
   ).not.toBe(sitoUrl);
 
+  // La scheda appena passata in primo piano ha bisogno di un istante per
+  // essere disegnata: una foto scattata prima torna vuota e non proverebbe
+  // niente, né in un senso né nell'altro.
   const suSito = `(u) => String(u) === ${JSON.stringify(sitoUrl)}`;
-  const scatto = await chiediDaQuellaPagina(app, suSito)({ type: 'capture_visible_tab' });
+  const scatta = chiediDaQuellaPagina(app, suSito);
+  let scatto = null;
+  await expect.poll(async () => {
+    scatto = await scatta({ type: 'capture_visible_tab' });
+    return (scatto?.risposta?.dataUrl || '').length;
+  }, { timeout: 15000 }).toBeGreaterThan(1000);
   expect(scatto.nonTrovata, 'la scheda del sito non è stata trovata: la prova non guarda quello che deve').toBeFalsy();
 
   const dataUrl = scatto.risposta?.dataUrl || '';
