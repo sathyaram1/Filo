@@ -20,6 +20,7 @@
       features: [
         'Nessun sito accende più la fotocamera o il microfono da solo. Quando un sito chiede fotocamera, microfono, posizione, notifiche, appunti o schermo, sotto le schede compare una pastiglia col suo nome: Consenti o Nega. Se non rispondi non ottiene niente. La risposta vale per quel sito, e la cambi in Impostazioni → Sicurezza o col tasto destro sulla scheda.',
         'Quando condividi lo schermo scegli tu cosa far vedere: tutto lo schermo o una finestra sola. E lo schermo Filo non lo ricorda mai: un sito che l\'ha già ripreso te lo richiede la volta dopo.',
+        'Finché un sito può vedere il tuo schermo, sotto le schede resta scritto che può vederlo, col suo nome. Accanto c\'è «Interrompi», che chiude la ripresa.',
       ],
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
