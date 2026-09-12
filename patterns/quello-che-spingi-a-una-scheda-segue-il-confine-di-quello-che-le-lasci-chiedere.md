@@ -66,7 +66,28 @@ Se un sito non lo può **chiedere**, non glielo si può nemmeno **mandare**.
   l'uscita dall'account. Oggi la lista dei messaggi che una pagina web può
   mandare è dichiarata in `src/shared/webMessageScope.js` e applicata una volta
   sola in `handleMessage`; la sentinella in `tests/unit/webMessageScope.test.mjs`
-  la confronta con quello che i file dentro le pagine mandano davvero. Il
-  confine è l'origine **http/https**, non «tutto ciò che non è `filo://`»: i
-  menu nativi del tasto destro vivono su un indirizzo `data:` e le chiamate
-  interne del main non hanno origine, e non sono la pagina di un sito.
+  la confronta con quello che i file dentro le pagine mandano davvero.
+- **«È un sito» si riconosce al contrario: interne sono `filo://` e il main.**
+  Il terzo giro di verifica del #589 ha scavalcato tutto da qui. Il confine
+  cercava «l'indirizzo comincia per http», e trattava come superficie di Filo
+  tutto il resto. Ma una pagina sa uscire da quella forma restando sua: si
+  compone una pagina e ci si porta sopra (l'indirizzo comincia per `blob:`,
+  ed è una navigazione ammessa), oppure apre una scheda vuota (`about:blank`).
+  Lì dentro il nostro codice si monta come su ogni altra pagina, e da lì il
+  canale tornava a rispondere a tutto. `isInternalSurface` ammette le sole
+  pagine `filo://` e le chiamate che il main fa a se stesso, cioè senza
+  mittente: una pagina viva senza indirizzo non è interna, perché durante un
+  caricamento l'indirizzo manca per un istante. Vale ovunque si decida «da chi
+  arriva questa richiesta», compresa la difesa anti-esfiltrazione di NAVIGA.
+- **Ammettere un messaggio non è ammettere tutto quello che può toccare.** La
+  lista dei tipi non basta: va guardato anche il raggio di ciascuno.
+  `_storage:get` è ammesso perché i pezzi di Filo dentro le pagine tengono lì
+  il dizionario personale, la bozza del feedback e la disposizione delle icone
+  — ma non guardava QUALE scomparto gli si chiedeva, e chiedendoli per nome
+  uscivano (e si riscrivevano) la memoria dell'utente, le pagine salvate, la
+  cronologia dei modelli, gli scaricamenti col percorso su disco. Da qui la
+  seconda lista, `WEB_STORAGE_KEYS`, con la sua sentinella gemella. Stessa
+  storia per la fotografia della scheda: tornava sempre quella ATTIVA, quindi
+  un sito in una scheda di sfondo si faceva dare l'immagine della pagina che
+  l'utente stava guardando. Un messaggio da una pagina agisce su **chi lo
+  manda**, come già facevano indietro, avanti, ricarica e chiudi scheda.
