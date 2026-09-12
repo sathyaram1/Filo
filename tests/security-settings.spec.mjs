@@ -164,8 +164,22 @@ test('blacklist siti: un sito con estensione non latina si salva davvero (#590)'
 
   await page.reload();
   await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  // E torna scritta come l'utente l'ha scritta (#590, terzo giro). Sulla rete
+  // quel nome viaggia come "xn--80aswg.xn--p1ai", ed è così che Filo lo salva e
+  // lo confronta; rimandarglielo in quella forma gli faceva trovare al posto
+  // della sua riga una stringa che non somiglia a niente.
   const saved = await page.locator('#sec-siteblock-blacklist').inputValue();
-  expect(saved.trim()).toBe('xn--80aswg.xn--p1ai');
+  expect(saved.trim()).toBe('сайт.рф');
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+
+  // E il salvataggio regge un secondo giro: quello che si vede si risalva uguale.
+  await page.locator('#sec-siteblock-blacklist').fill('сайт.рф\nesempio.com');
+  await page.locator('#sec-siteblock-blacklist').blur();
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  await page.reload();
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  expect((await page.locator('#sec-siteblock-blacklist').inputValue()).trim().split('\n'))
+    .toEqual(['сайт.рф', 'esempio.com']);
 });
 
 test('popup blocker: window.open() automatico viene bloccato', async ({ openTab, testServer, shell }) => {
