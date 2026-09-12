@@ -478,7 +478,7 @@
       count.style.color = check.ok ? '' : 'var(--sn-error,#b91c1c)';
     }
     if (err) {
-      err.textContent = check.ok ? '' : `${check.error} Finché è più lungo, resta in vigore lo stile salvato prima.`;
+      err.textContent = check.ok ? '' : `${check.error} Finché resta più lungo, vale lo stile salvato prima.`;
       err.hidden = check.ok;
     }
     return check;
