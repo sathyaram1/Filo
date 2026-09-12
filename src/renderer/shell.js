@@ -1043,6 +1043,11 @@
           if (a && a.openAnywayUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openSiteAnyway(a.openAnywayUrl) };
           }
+          // - restoreBlockHost → la marcia indietro su quel permesso (#590).
+          if (a && a.restoreBlockHost && !a.onClick) {
+            const host = a.restoreBlockHost;
+            return { label: a.label, onClick: () => api.tabs.restoreSiteBlock(host) };
+          }
           if (a && a.openUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl) };
           }
