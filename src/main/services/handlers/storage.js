@@ -81,11 +81,8 @@ module.exports = function register(on, ctx) {
     // sarebbe ricomparso proprio nei siti esclusi.
     const pageUrl = String(sender?.tab?.url || '');
     // Le pagine web (content script) leggono tema/spellcheck/ecc., ma non devono
-    // ricevere le chiavi API: le richieste AI girano nel main, che le allega.
-    if (!isFilo(origin) && settings && settings.apiKeys) {
-      return { ok: true, pageUrl, settings: { ...settings, apiKeys: undefined } };
-    }
-    return { ok: true, pageUrl, settings };
+    // ricevere i segreti: le richieste AI girano nel main, che allega la chiave.
+    return { ok: true, pageUrl, settings: Scope.settingsForOrigin(settings, origin) };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
