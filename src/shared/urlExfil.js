@@ -349,21 +349,26 @@
   function taintSpedizione(carichi, corpus) {
     const pezzi = (carichi || []).filter(Boolean);
     if (pezzi.length < 2) return null;
-    const ultimo = pezzi[pezzi.length - 1];
     const forme = pezzi.concat(pezzi.map(rovescia));
+    // Il prefiltro gira su OGNI parola del corpus, che col registro pieno sono
+    // decine di migliaia: cercare in ognuno dei carichi a uno a uno costava due
+    // decimi di secondo per link, cioè un'attesa che si sente su ogni apertura.
+    // I carichi sono di soli caratteri alfanumerici, quindi incollarli con un
+    // separatore che lì dentro non può comparire fa una sola stringa da cercare
+    // senza creare vicinanze che non c'erano.
+    const pagliaio = forme.join(' ');
+    const codaUltimo = [pezzi[pezzi.length - 1], rovescia(pezzi[pezzi.length - 1])].join(' ');
     const candidati = [];
     for (const t of corpusTokens(corpus)) {
       if (t.length < STRONG_TOKEN || t.length > SPED_MAX_TOKEN) continue;
       if (STOPWORDS.has(t)) continue;
-      // Prefiltro a due confronti: la testa e la coda del dato devono stare da
-      // qualche parte, e l'ULTIMO link deve portarne un pezzo — se no non è lui
-      // a completare la spedizione e l'avviso arriverebbe sul link sbagliato.
+      // Prefiltro: la testa e la coda del dato devono stare da qualche parte, e
+      // l'ULTIMO link deve portarne un pezzo — se no non è lui a completare la
+      // spedizione e l'avviso arriverebbe sul link sbagliato.
       const testa = t.slice(0, SPED_MIN_PEZZO);
       const coda = t.slice(-SPED_MIN_PEZZO);
-      if (!forme.some((f) => f.includes(testa))) continue;
-      if (!forme.some((f) => f.includes(coda))) continue;
-      if (!ultimo.includes(testa) && !ultimo.includes(coda)
-        && !rovescia(ultimo).includes(testa) && !rovescia(ultimo).includes(coda)) continue;
+      if (!pagliaio.includes(testa) || !pagliaio.includes(coda)) continue;
+      if (!codaUltimo.includes(testa) && !codaUltimo.includes(coda)) continue;
       candidati.push(t);
       if (candidati.length >= SPED_MAX_CANDIDATI) break;
     }
