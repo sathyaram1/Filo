@@ -71,9 +71,38 @@ const SEARCH_ENGINE_PATTERNS = [
   engineOnPublicSuffix('searx'),
 ];
 
+// FORMA UNICA DI UN NOME DI HOST (#590). Lo stesso sito si scrive in più modi e
+// la rete li risolve tutti uguali: la lista deve confrontarli tutti uguali, o
+// basta un carattere di troppo per scavalcarla.
+//   - minuscole: "EVIL.example" è "evil.example";
+//   - PUNTO FINALE: "evil.example." è la forma ASSOLUTA del nome (la radice del
+//     DNS scritta per esteso). Ogni browser apre la stessa pagina, ma senza
+//     toglierlo il confronto con la lista falliva e il sito si apriva — su
+//     tutte le strade insieme, perché tutte chiedono a questa funzione;
+//   - ALFABETI NON LATINI: un indirizzo scritto in unicode viaggia sulla rete
+//     nella forma punycode (xn--…), che è quella che arriva qui da `new URL`.
+//     Una voce di lista scritta a mano in unicode va portata nella stessa
+//     forma, altrimenti non combacia mai (e prima veniva pure scartata in
+//     silenzio, perché l'unicode non passa il controllo di validità).
+function canonicalHost(raw) {
+  let h = String(raw || '').trim().toLowerCase();
+  if (!h) return '';
+  h = h.replace(/\.+$/, ''); // punto (o punti) finali: forma assoluta del nome
+  if (!h) return '';
+  // Punycode: lo fa l'URL parser, che è la stessa strada da cui arrivano gli
+  // host da bloccare. Su un host che non parsa teniamo quello che avevamo.
+  if (/[^\x00-\x7f]/.test(h)) {
+    try {
+      const p = new URL(`http://${h}`).hostname.toLowerCase();
+      if (p) h = p.replace(/\.+$/, '');
+    } catch (_) { /* host non parsabile: resta com'era */ }
+  }
+  return h;
+}
+
 function hostnameOf(url) {
   try {
-    return new URL(url).hostname.toLowerCase();
+    return canonicalHost(new URL(url).hostname);
   } catch (_) {
     return '';
   }
@@ -90,7 +119,7 @@ function normalizeDomain(raw) {
   s = s.split('#')[0];
   s = s.split(':')[0]; // porta
   s = s.replace(/^www\./, '');
-  return s;
+  return canonicalHost(s);
 }
 
 // Un dominio è valido come voce di blacklist solo se ha un'estensione (almeno
