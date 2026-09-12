@@ -107,6 +107,15 @@ test.describe('#587 — dove il comando legge davvero', () => {
     }
   });
 
+  // ── La terza porta: un comando che non nomina niente legge dove si trova ────
+  test('un comando senza percorso viene misurato sulla cartella in cui si trova', () => {
+    expect(C.classify('ls', dove('/etc')), 'elencare /etc').toBe(2);
+    expect(C.classify('ls -la', dove('/root')), 'elencare /root').toBe(2);
+    expect(C.classify('ls', dove('/home/mario/.ssh')), 'elencare le chiavi').toBe(2);
+    expect(C.classify('ls', dove()), 'la cartella dell’utente resta libera').toBe(1);
+    expect(C.classify('ls Documenti', dove()), 'e anche le sue sottocartelle').toBe(1);
+  });
+
   test('la spiegazione dice perché, in una frase che si capisce', () => {
     const motivo = C.readReason('cd ~/.ssh && cat config', dove());
     expect(motivo, 'senza il motivo il popup mostra un `cat` e basta').toBeTruthy();
