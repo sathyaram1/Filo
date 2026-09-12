@@ -110,8 +110,12 @@ test.describe('#587 — un percorso scritto in un’altra forma', () => {
     expect(C.classify('cd .ss\\h ; cat known_hosts', dove())).toBe(2);
     expect(C.classify('ls .ss\\h', dove())).toBe(2);
     expect(C.classify('grep -r PRIVATE .ss\\h', dove())).toBe(2);
+    // Anche la cartella dove l'assistente si trova va letta come la legge la
+    // shell: con bash dichiarata, una barra rovesciata dentro il nome è un
+    // escape. (Nei turni veri la cartella arriva già sciolta dalla shell, che la
+    // riporta dopo ogni comando: questa prova copre la lettura, non il giro.)
     expect(
-      C.classify('cat config', dove('/home/mario/.ss\\h')),
+      C.classify('cat config', { perimetro: HOME, home: HOME, cwd: '/home/mario/.ss\\h', shell: 'bash' }),
       'spostamento del turno prima',
     ).toBe(2);
   });
