@@ -69,6 +69,15 @@ E poi il contorno, che è quello che si dimentica:
   ripulisce i marcatori e scarta un valore oltre il tetto invece di
   accorciarlo.
 
+**Non sono solo le preferenze.** Le **lezioni** che Filo si appunta da sé
+(`SALVA_LEZIONE`) hanno la stessa portata: valgono da subito in ogni
+conversazione e sopravvivono al riavvio, e ci si arriva dalle stesse vie
+ordinarie. Hanno il loro tetto (`LESSON_MAX`, con rifiuto spiegato che torna al
+modello) e il loro recinto nel prompt (`lessonsBlock`, in `filoChatContext` e
+`filoDashboard`). Il livello resta 1, e di proposito: una conferma qui
+confermerebbe chiunque sia alla tastiera in quel momento, che è proprio chi la
+lezione di protezione vuole tenere fuori.
+
 **Regola operativa.** Prima di aggiungere una preferenza a testo libero,
 chiediti se quel testo finisce in un prompt. Se sì, le quattro cose qui sopra
 valgono tutte. La sentinella `tests/unit/preferences.test.mjs`
