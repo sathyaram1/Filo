@@ -151,18 +151,23 @@ test('le azioni che lo stile non lo ricevono restano pulite: nessun recinto, nes
 
 // ── il tetto vive solo in scrittura ─────────────────────────────────────────
 
-test('uno stile più lungo del tetto già in memoria entra ancora intero nel prompt', () => {
-  // Il tetto lo fanno rispettare le tre strade di SCRITTURA. In lettura non
-  // c'è: uno stile lasciato lì da una versione precedente (quando la pagina
-  // web poteva scriverlo e il modello non chiedeva niente) continua a entrare
-  // per intero in ogni prompt.
+test('uno stile più lungo del tetto già in memoria resta comunque dentro il recinto', () => {
+  // Il tetto lo fanno rispettare le tre strade di SCRITTURA. In lettura oggi
+  // non c'è, quindi uno stile lasciato lì da una versione precedente (quando
+  // la pagina web poteva scriverlo e il modello non chiedeva niente) entra
+  // ancora per intero: la cosa che DEVE reggere comunque è il recinto, ed è
+  // quella che si asserisce qui — non la lunghezza, che può solo migliorare.
   const vecchio = `${'x'.repeat(C.AGENT_STYLE_MAX * 3)} coda riconoscibile`;
   const messaggi = C.injectAgentStyle(
     [{ role: 'system', content: `ISTRUZIONI\n${SLOT}FINE` }], C.ACTIONS.HELP, vecchio);
   const prompt = messaggi[0].content;
-  // Resta recintato — quella parte tiene — ma il tetto non lo tocca.
-  expect(dentroIlRecinto(prompt)).toContain('coda riconoscibile');
-  expect(dentroIlRecinto(prompt).length).toBeGreaterThan(C.AGENT_STYLE_MAX);
+  expect(prompt.split(CLOSE).length - 1).toBe(1);
+  const dentro = dentroIlRecinto(prompt);
+  // O è stato accorciato in lettura, o è entrato intero: in tutti e due i casi
+  // niente di quel testo deve stare FUORI dal recinto.
+  const fuori = prompt.split(CLOSE)[1] || '';
+  expect(fuori).not.toContain('coda riconoscibile');
+  expect(dentro.length).toBeGreaterThan(0);
 });
 
 // ── input limite ────────────────────────────────────────────────────────────
