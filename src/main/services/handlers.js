@@ -1797,7 +1797,8 @@ function releaseOnboardingResume() { onbResumeClaimedAt = 0; }
 // Vale per tutte e tre le strade che la chiudono: il modello che dichiara
 // `fine`, la parola di stop riconosciuta dall'app, il pulsante «Salta».
 function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true } = {}) {
-  const done = (d) => broadcastToTabs({
+  // La prima home personale la legge la home, non i siti visitati (#589).
+  const done = (d) => broadcastToFiloPages({
     type: MSG.FILO_ONBOARDING_DONE,
     message: d?.message || '', suggestions: d?.suggestions || [], ts: d?.ts || new Date().toISOString(),
   });
