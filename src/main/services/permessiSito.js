@@ -315,11 +315,10 @@ function installaSuSessione(ses) {
     ses.setDisplayMediaRequestHandler(async (richiesta, callback) => {
       const nega = () => { try { callback({}); } catch (_) {} };
       try {
-        const frame = richiesta && richiesta.frame;
-        const wc = frame && frame.__wc ? frame.__wc : null;
-        // La richiesta porta il frame, non la WebContents: risaliamo dalla
+        // La richiesta porta il frame, non la WebContents: risaliamo alla
         // scheda che possiede quel frame.
-        const bersaglio = wc || trovaWcDelFrame(frame) || null;
+        const frame = richiesta && richiesta.frame;
+        const bersaglio = trovaWcDelFrame(frame);
         if (!bersaglio) { nega(); return; }
         const ok = await decidi(bersaglio, 'display-capture', {
           requestingUrl: (frame && frame.url) || richiesta.securityOrigin || '',

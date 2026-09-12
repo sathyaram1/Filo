@@ -53,6 +53,14 @@ export const test = base.extend({
       args: [
         ...argomentiScala,
         '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9',
+        // Fotocamera e microfono FINTI, uguali ovunque (#586). Nel contenitore
+        // delle routine non c'è nessun dispositivo: getUserMedia fallirebbe con
+        // NotFoundError PRIMA di arrivare al permesso, mentre sulla macchina di
+        // chi sviluppa (che la webcam ce l'ha) la stessa riga chiede davvero —
+        // due comportamenti diversi per la stessa prova. NB: è
+        // `use-fake-device`, non `use-fake-ui`: il dispositivo è finto, la
+        // DOMANDA del permesso resta vera e passa dal gestore di Filo.
+        '--use-fake-device-for-media-stream',
         '.',
       ],
       cwd: APP_ROOT,
