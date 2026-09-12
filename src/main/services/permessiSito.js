@@ -505,6 +505,7 @@ function _reset() {
   mappa = {};
   attese.clear();
   unaTantum.clear();
+  scelteFonte.clear();
 }
 
 module.exports = {
@@ -514,6 +515,8 @@ module.exports = {
   configureFromSettings,
   concessioneUnaTantum,
   rispondi,
+  contesto,
+  scegliFonteRisposta,
   elenco,
   perOrigine,
   revoca,
