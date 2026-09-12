@@ -204,7 +204,14 @@
     const sblk = sec.siteBlock || {};
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
-    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
+    // #590 — le voci si mostrano come l'utente le scrive. Un sito in cirillico
+    // o in giapponese viene salvato nella forma con cui viaggia sulla rete
+    // ("xn--…"), che è quella giusta per il confronto: rimandargliela indietro
+    // così gli faceva trovare al posto della sua riga una stringa che non
+    // somiglia a niente, con il rischio che la cancellasse.
+    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : [])
+      .map((d) => UrlNav.hostLeggibile(d))
+      .join('\n');
     // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
     // subito che non bloccheranno nulla invece di lasciarle passare mute.
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
