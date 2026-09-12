@@ -76,7 +76,7 @@
       kind: 'scoprire',
       label: 'Come vuole che Filo gli parli',
       detail: 'Breve o dettagliato, «tu» o «lei», formale o no.',
-      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così.',
+      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Il valore deve essere solo la descrizione dello stile (tono, lunghezza, come dargli del tu o del lei), breve: è il sistema a mostrarglielo e a chiedergli l’OK, quindi tu non chiedere conferma a parole e non dire di averlo già impostato.',
     },
     {
       id: 'estetica',
