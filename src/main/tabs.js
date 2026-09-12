@@ -1688,6 +1688,15 @@ class TabManager {
     let current = '';
     try { current = tab.view.webContents.getURL() || ''; } catch (_) {}
     const target = NE && NE.targetOf(current);
+    // SICUREZZA (#590, quarto giro) — ricaricare è ricaricare un INDIRIZZO, e
+    // quell'indirizzo può essere finito in lista dopo che la pagina era già a
+    // schermo. È il caso normale: un sito lo si mette in lista proprio mentre
+    // ce l'hai davanti. Il tasto indietro, che è la strada gemella, lo ferma
+    // dal giro prima; qui non lo fermava nessuno, quindi le due strade
+    // raccontavano due cose diverse e la lista sembrava non funzionare.
+    // Vale sia per la pagina mostrata sia per il sito che la pagina d'errore
+    // sta per ritentare.
+    if (this._maybeBlockNavigation(target || current)) return;
     if (target) {
       try { tab.view.webContents.loadURL(target); } catch (_) {}
       return;
