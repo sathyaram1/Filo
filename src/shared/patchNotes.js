@@ -19,6 +19,7 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
+        'Quando salvi una preferenza, alle pagine dei siti che visiti arrivano solo le poche impostazioni che servono a Filo per lavorare lì (tema, correttore, voce): le tue chiavi dei servizi AI e le credenziali del proxy restano dentro Filo.',
       ],
     },
     {
