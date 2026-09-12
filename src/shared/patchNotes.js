@@ -29,6 +29,10 @@
         'I video non si fermano più davanti a una domanda: tenere acceso lo schermo mentre guardi non te lo chiede nessuno, come in ogni altro browser.',
         'Le domande sui permessi sono scritte in italiano anche quando riguardano cose poco comuni. Prima capitava di leggere il nome tecnico in inglese e di non capire cosa si stava per dare.',
         'I siti che ti fanno scegliere un carattere del tuo computer (gli editor grafici sul web) ora te lo possono chiedere, e tu puoi dire di sì. Prima ricevevano sempre un elenco vuoto e non c\'era modo di rimediare.',
+        'Togliere un permesso a un sito non ti porta più via la pagina. Prima Filo la ricaricava per chiudere il microfono o la fotocamera, e quello che stavi scrivendo lì spariva: adesso chiude quello che il sito ha in mano e lascia la pagina dov\'è.',
+        'Nessun sito ti fa più comparire una domanda solo perché ha guardato cosa può fare. E se ne fa una e tu la chiudi tre volte senza rispondere, su quella pagina smette di chiedere: prima poteva tenerla lì finché non te ne andavi.',
+        'Una scheda non muore più da sola quando un sito prova a condividere lo schermo e il microfono insieme alla vecchia maniera. Perdevi quello che avevi aperto lì, senza un avviso.',
+        'Quando un sito ti chiede dove sei e Filo non riesce a calcolarlo, adesso te lo dice: prima restavi con una mappa vuota e la colpa sembrava del sito.',
       ],
     },
     {
