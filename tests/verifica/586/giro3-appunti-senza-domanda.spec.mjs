@@ -41,7 +41,8 @@ test('un sito non deve potersi leggere gli appunti aprendo da solo il menu di Fi
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
 
   const page = await testServer.openReady(openTab, HTML);
-  const esito = await page.evaluate(() => window.__rubaAppunti());
+  // Nessun gesto da fuori: si aspetta e si guarda cosa si è preso il sito.
+  const esito = await page.evaluate(() => window.__bottino);
   console.log('[586 g3] furto appunti:', JSON.stringify(esito));
   const domande = await shell.locator('.perm-chip').count();
   console.log('[586 g3] domande comparse:', domande);
