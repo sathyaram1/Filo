@@ -23,6 +23,19 @@
 //   è quindi una prova che l'abbia voluto l'utente. L'unico scavalco resta
 //   quello che l'utente sceglie a mano: "Apri comunque" sulla notifica.
 //
+//   E QUEL SÌ SI RICORDA (#590, secondo giro). Prima valeva per la sola
+//   richiesta che partiva in quell'istante, e bastava che il server
+//   rispondesse "vai qui" (il salto da http a https, la barra iniziale che
+//   porta alla home: quasi ogni sito vero) perché il rimbalzo trovasse un
+//   controllo che del sì non sapeva niente e lo fermasse. L'utente si trovava
+//   una scheda vuota e nessun altro modo di aprire il sito. Stessa cosa al
+//   primo link cliccato dentro il sito, o a una ricarica. Il sì vale quindi
+//   per tutta la sessione e per il nome di sito a cui l'utente l'ha dato,
+//   sottodomini compresi: è la stessa unità che l'utente ha scritto in lista.
+//   Si azzera quando l'utente cambia la lista (è così che si torna indietro) e
+//   quando Filo si chiude. Darlo può solo una persona che clicca la notifica:
+//   il modello non ha nessuna strada per arrivarci.
+//
 //   Quando invece blocca, il chiamante (tabs.js) mostra una notifica in basso a
 //   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
 //
