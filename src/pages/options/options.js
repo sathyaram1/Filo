@@ -843,18 +843,23 @@
     // evidenziate sul posto e la conferma sotto NON dice più "Salvato" senza
     // qualificarlo, altrimenti l'utente crede (a torto, #216) che sia stato
     // salvato tutto.
-    const { registry, missingNickRows, dupRows } = collectModelRegistry();
+    const { valori, registry, missingNickRows, dupRows } = raccogli();
 
-    const partial = {
-      useDefaultModels: $('useDefaultModels').checked,
-      openWeightsOnly: $('openWeightsOnly').checked,
-      apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
-      modelRegistry: registry,
-      models: ModelChain.collect(modelChains),
-      monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
-    };
+    // Solo i campi cambiati da quando la pagina li ha letti (o li ha scritti
+    // l'ultima volta): il resto può essere cambiato altrove mentre la pagina
+    // era aperta, e riscriverlo col valore vecchio disferebbe una scelta già
+    // presa. Le chiavi API sono il caso che conta: sono un segreto, e tornare
+    // a quella di prima significa spendere sul conto sbagliato.
+    const partial = {};
+    for (const [chiave, valore] of Object.entries(valori)) {
+      const prima = ultimoInviato ? ultimoInviato[chiave] : undefined;
+      if (JSON.stringify(prima) !== JSON.stringify(valore)) partial[chiave] = valore;
+    }
 
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    if (Object.keys(partial).length) {
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+      ultimoInviato = { ...(ultimoInviato || {}), ...partial };
+    }
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
