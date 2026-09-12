@@ -1633,6 +1633,9 @@ test('in incognito le Impostazioni elencano anche le risposte delle finestre nor
   await riga.locator('button').nth(1).click();
   await sicurezza.waitForTimeout(1500);
   console.log('[586] elenco dopo il togli:', await sicurezza.locator('#perms-list li').allTextContents());
+  console.log('[586] su disco dopo il togli:', JSON.stringify(await app.evaluate(
+    async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions,
+  )));
   await expect.poll(async () => {
     const s = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions);
     return Object.keys(s || {}).length;
