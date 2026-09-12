@@ -485,10 +485,15 @@
   // Le protezioni possono cambiare mentre questa pagina è aperta. Se l'utente
   // non sta scrivendo la pagina si rilegge; se sta scrivendo non si tocca
   // niente, e il confronto dentro `save` basta a non disfare l'altrui lavoro.
+  //
+  // L'annuncio torna indietro anche per i salvataggi di questa pagina: quelli
+  // si saltano, se no rileggere cancellerebbe l'avviso appena mostrato (le
+  // righe scartate della blacklist).
   function ascoltaCambiamentiAltrove() {
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
+      if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       const el = document.activeElement;
       if (el && el !== document.body && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
       load().catch(() => {});
