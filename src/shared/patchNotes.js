@@ -20,6 +20,8 @@
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
         'Le tue chiavi dei servizi AI e i dati del proxy non arrivano più alle pagine dei siti che visiti. Quando salvi una preferenza, a quelle pagine Filo manda solo quello che gli serve per lavorare lì: tema, correttore, voce.',
+        'Stessa cosa per il tuo account: l\'indirizzo con cui accedi e il tuo nome restano nelle pagine di Filo e non entrano più nei siti che apri.',
+        'Escludere un sito dall\'elenco dei domini esclusi vale subito, anche sulla scheda che hai già aperta su quel sito: prima Filo restava acceso lì finché non ricaricavi la pagina. Vale anche al contrario, quando togli un sito dall\'elenco.',
       ],
     },
     {
