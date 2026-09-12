@@ -1069,10 +1069,39 @@
   // `ricorsivo` dice che il bersaglio non è un file ma tutto ciò che sta sotto:
   // allora non basta che il percorso scritto sia pulito, deve essere anche
   // abbastanza stretto da non contenere i bersagli riservati.
-  function operandReason(op, cwd, perim, home, soloRiservati, ricorsivo) {
+  // Un "drive" di PowerShell non è una cartella: `Env:` sono le variabili
+  // d'ambiente, `HKCU:`/`HKLM:` il registro di sistema (dove diversi programmi
+  // tengono le password salvate), `Cert:`, `Variable:`, `Function:`, `WSMan:`
+  // altre parti interne del sistema. Nessuna di queste sta nel perimetro, e
+  // misurarle come se fossero una cartella dentro la home le faceva passare
+  // senza chiedere niente (#587, giro 3). Un disco vero — `C:\…` — ha UNA
+  // lettera sola e non passa di qui.
+  const PROVIDER_NOTI = {
+    env: AMBIENTE,
+    hkcu: REGISTRO, hklm: REGISTRO, hkcr: REGISTRO, hku: REGISTRO, hkcc: REGISTRO,
+    hkey_current_user: REGISTRO, hkey_local_machine: REGISTRO,
+    hkey_classes_root: REGISTRO, hkey_users: REGISTRO, registry: REGISTRO,
+  };
+  function providerReason(raw, soloRiservati) {
+    const m = String(raw || '').match(/^([A-Za-z][A-Za-z0-9_]*):(.*)$/);
+    if (!m) return '';
+    const nome = m[1].toLowerCase();
+    if (PROVIDER_NOTI[nome]) return PROVIDER_NOTI[nome];
+    if (soloRiservati) return '';       // qui il perimetro non si applica
+    if (nome.length < 2) return '';     // `C:` è un disco, non un provider
+    // Provider sconosciuto (`Cert:\…`, `Variable:\…`, `Temp:\…`): non è la
+    // cartella dell'utente. Un file con i due punti nel nome (`nota:2026`) NON
+    // combacia: lì dopo i due punti non c'è un separatore.
+    return (m[2] === '' || /^[\\/]/.test(m[2])) ? FUORI : '';
+  }
+
+  // Il motivo di UN operando in UNA lettura. Chi chiama passa tutte le letture
+  // che la shell potrebbe darne (vedi `lettureDi`).
+  function operandReasonUno(op, cwd, perim, home, soloRiservati, ricorsivo) {
     const raw = String(op || '');
-    // Drive PowerShell dell'ambiente: `Get-ChildItem Env:`, `Get-Item Env:\PATH`.
-    if (/^env:/i.test(raw)) return AMBIENTE;
+    // Drive PowerShell: ambiente, registro di sistema, altri provider interni.
+    const prov = providerReason(raw, soloRiservati);
+    if (prov) return prov;
     const target = resolveTarget(raw, cwd, home);
     // I modelli che prendono tutto quello che c'è lì (`*`, `*.*`) si potano
     // PRIMA di cercare i bersagli riservati: non allargano niente, e trattarli
