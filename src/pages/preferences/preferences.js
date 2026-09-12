@@ -726,7 +726,10 @@
     const theme = $('theme').value;
     const textScale = parseFloat($('textScale').value) || 1;
     const showHomeMessage = $('showHomeMessage').checked;
-    const agentStyle = currentStyleText().trim();
+    // Oltre il tetto non si salva e non si taglia: resta quello di prima, e il
+    // perché è già scritto sotto il textarea (refreshStyleLimit).
+    const styleCheck = refreshStyleLimit();
+    const agentStyle = styleCheck.ok ? styleCheck.value : savedAgentStyle;
     const timerRingtone = $('timerRingtone').value || 'default';
     const terminal = {
       enabled: $('terminalEnabled').checked,
