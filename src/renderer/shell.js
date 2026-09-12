@@ -2009,6 +2009,23 @@
         chip.appendChild(testo);
         chip.setAttribute('aria-label', info.testo || '');
 
+        // Una riga può portare con sé un modo per rimediare. Oggi è il
+        // «Chiedimelo di nuovo» del «ho smesso di chiedere per questo sito»:
+        // senza, Filo smetteva di chiedere in silenzio e l'unica via d'uscita
+        // era ricaricare la pagina, che nessuno può indovinare (#586).
+        if (info.azione && info.azione.testo && api.permissions.noticeAction) {
+          const fai = document.createElement('button');
+          fai.type = 'button';
+          fai.className = 'perm-chip-btn perm-chip-allow';
+          fai.textContent = info.azione.testo;
+          if (info.azione.tip) fai.dataset.tip = info.azione.tip;
+          fai.addEventListener('click', () => {
+            try { api.permissions.noticeAction(id); } catch (_) {}
+            togliNotizia(id);
+          });
+          chip.appendChild(fai);
+        }
+
         const via = document.createElement('button');
         via.type = 'button';
         via.className = 'perm-chip-x';
