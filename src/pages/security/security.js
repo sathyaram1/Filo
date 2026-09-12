@@ -253,11 +253,17 @@
   // vuota: la scelta appena fatta non c'era, e chi la cercava qui trovava un
   // elenco che sembrava completo e non lo era.
   let righePermessi = [];
+  // Aperta da una finestra in incognito, questa pagina elenca DUE memorie: le
+  // risposte date in quella finestra, che muoiono con lei, e quelle di sempre.
+  // Prima ne mostrava una sola e scriveva «Nessun sito ha ancora ricevuto una
+  // risposta» a chi ne aveva date dieci (#586, giro 7).
+  let inIncognito = false;
 
   async function caricaPermessi() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.PERMESSI_SITI_LISTA });
       righePermessi = (r && Array.isArray(r.voci)) ? r.voci : [];
+      inIncognito = !!(r && r.incognito);
     } catch (_) { righePermessi = []; }
     renderPermessi();
   }
