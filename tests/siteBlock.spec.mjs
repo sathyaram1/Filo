@@ -1,12 +1,15 @@
-// Blocco apertura siti in blacklist (#170.3) — e2e.
+// Blocco apertura siti in blacklist (#170.3, #590) — e2e.
 //
 // Assertiamo il COMPORTAMENTO, non un messaggio:
 //   1) cliccare un link verso un sito in blacklist (referrer NON di ricerca)
 //      → la navigazione è bloccata (la tab NON cambia URL) e compare la
 //        notifica "Sito bloccato" con l'azione "Apri comunque";
 //   2) "Apri comunque" apre davvero il sito (bypassa il blocco);
-//   3) un'apertura ORIGINATA DA FILO (programmatica, come l'azione NAVIGA) verso
-//      lo stesso sito in blacklist è CONSENTITA.
+//   3) #590 — la lista vale su TUTTE le strade: indirizzo scritto dall'utente
+//      nella home, azione NAVIGA del modello, link. Prima valeva solo per le
+//      ultime due (will-navigate / setWindowOpenHandler), quindi bastava che
+//      una pagina ostile convincesse il modello a emettere NAVIGA — livello 1,
+//      nessuna conferma — per aprire qualunque sito della lista.
 //
 // L'eccezione "referrer di motore di ricerca" (caso 2 della spec) è coperta in
 // modo esaustivo dallo unit test tests/unit/siteBlock.test.mjs.
