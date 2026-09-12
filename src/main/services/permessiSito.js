@@ -518,11 +518,11 @@ function revoca(origine, chiave, ctx) {
 // Cambia una scelta ricordata senza passare da una richiesta del sito: è la
 // simmetria della pastiglia (se si può consentire si può negare, e viceversa)
 // pretesa dalle Impostazioni.
-function imposta(origine, chiave, scelta) {
+function imposta(origine, chiave, scelta, ctx) {
   if (scelta !== 'allow' && scelta !== 'deny') return false;
-  const nuova = P().conScelta(mappa, origine, [chiave], scelta);
-  mappa = nuova;
-  salva(nuova);
+  const c = ctx || {};
+  const nuova = P().conScelta(memoriaDi(c), origine, [chiave], scelta);
+  scriviMappa(c.incognito ? c.ses : null, !!c.incognito, nuova);
   return true;
 }
 
