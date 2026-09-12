@@ -215,8 +215,23 @@
       },
     },
     CERCA_WEB: {
-      level: 1,
-      describe: (a) => `Cercare sul web "${a.query || ''}"`,
+      // Cercare sul web è di norma innocuo → livello 1. ECCEZIONE
+      // anti-esfiltrazione, la stessa di NAVIGA (#587): il testo della ricerca
+      // esce dal computer verso un servizio esterno, e a dettarlo è il modello.
+      // Se dentro c'è un dato riconoscibile di quelli che Filo ha appena letto
+      // — una chiave, una password, un token — è la stessa catena di NAVIGA con
+      // un'uscita diversa, e sale a 2: l'utente vede la ricerca per intero e
+      // conferma. Il flag `_exfil` lo calcola il main; mai l'LLM.
+      level: (a) => (a && a._exfil ? 2 : 1),
+      describe: (a) => {
+        const q = a.query || a.q || a.testo || a.text || '';
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return `Filo sta per cercare sul web un testo che${why}:\n${q}\n\n`
+            + 'La ricerca esce dal tuo computer verso un servizio esterno. Cerca solo se l\'hai chiesto tu.';
+        }
+        return `Cercare sul web "${q}"`;
+      },
     },
     ONBOARDING: {
       // Filo tiene il conto della micro-intervista di benvenuto (#524): spunta
