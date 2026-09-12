@@ -139,7 +139,7 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     const P = permessiSito();
     const ctx = P.contesto(sender && sender.wc);
-    const ok = P.imposta(msg && msg.origine, msg && msg.chiave, msg && msg.scelta, ctx);
+    const ok = P.imposta(msg && msg.origine, msg && msg.chiave, msg && msg.scelta, ctx, msg && msg.effimera);
     return { ok, voci: P.elenco(ctx), incognito: !!ctx.incognito };
   });
 
