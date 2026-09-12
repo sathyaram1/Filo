@@ -511,9 +511,7 @@ function perOrigine(origine, ctx) {
 function revoca(origine, chiave, ctx) {
   const c = ctx || {};
   const nuova = P().senza(memoriaDi(c), origine, chiave || null);
-  if (c.incognito) { scriviMappa(c.ses, true, nuova); return true; }
-  mappa = nuova;
-  salva(nuova);
+  scriviMappa(c.incognito ? c.ses : null, !!c.incognito, nuova);
   return true;
 }
 
