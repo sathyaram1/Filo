@@ -12,12 +12,16 @@
 //   - una blacklist DEDICATA dell'utente (domini aggiunti a mano nelle
 //     Preferenze).
 //
-//   ECCEZIONI (l'apertura è consentita anche se il sito è in blacklist):
-//   a) la navigazione proviene da un MOTORE DI RICERCA (referrer Google/Bing/…):
-//      l'utente l'ha cercato apposta, non lo intercettiamo;
-//   b) la navigazione è ORIGINATA DA FILO (azione NAVIGA dell'assistente o
-//      navigazione interna filo://): è Filo stesso ad aprire, su richiesta
-//      esplicita dell'utente.
+//   ECCEZIONE (l'apertura è consentita anche se il sito è in blacklist):
+//   la navigazione proviene da un MOTORE DI RICERCA (referrer Google/Bing/…):
+//   l'utente l'ha cercato apposta, non lo intercettiamo.
+//
+//   NON è più un'eccezione l'apertura ORIGINATA DA FILO (#590). L'azione
+//   NAVIGA è di livello 1: la propone il MODELLO, senza conferma, e una
+//   pagina ostile che lo convince (prompt injection) aprirebbe qualunque
+//   indirizzo della lista senza incontrare un controllo. "Lo apre Filo" non
+//   è quindi una prova che l'abbia voluto l'utente. L'unico scavalco resta
+//   quello che l'utente sceglie a mano: "Apri comunque" sulla notifica.
 //
 //   Quando invece blocca, il chiamante (tabs.js) mostra una notifica in basso a
 //   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
