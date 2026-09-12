@@ -40,6 +40,9 @@ require(path.join(SHARED, 'storage.js'));
 // ammessi, usata sia dalle letture (handlers/storage.js) sia dalla spinta verso
 // le schede (handlers.js → broadcastSettingsUpdated).
 require(path.join(SHARED, 'settingsScope.js'));
+// Quali messaggi può mandare al main la pagina di un sito: stessa forma, una
+// lista di ciò che passa. Applicata in handlers.js → handleMessage.
+require(path.join(SHARED, 'webMessageScope.js'));
 require(path.join(SHARED, 'themeTokens.js'));
 require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
