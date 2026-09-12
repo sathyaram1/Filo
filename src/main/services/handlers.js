@@ -1218,10 +1218,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     } catch (_) {}
   }
 
-  // LEGGI_DOCUMENTO: stesso perimetro di lettura del terminale (#587). Questa
-  // azione apre dal disco gli stessi file che aprirebbe un `cat`, quindi non può
-  // avere un livello diverso: confinare il terminale e lasciare questa a 1
-  // sposterebbe la porta invece di chiuderla. Il percorso si misura nella forma
+  // LEGGI_DOCUMENTO: stessa regola di lettura del terminale sui BERSAGLI
+  // RISERVATI (#587). Questa azione apre dal disco gli stessi file che aprirebbe
+  // un `cat`, quindi chiavi, credenziali e `.env` non possono costare meno di
+  // qui: confinare il terminale e lasciare questa a 1 sposterebbe la porta
+  // invece di chiuderla. Il perimetro geografico invece qui non si applica —
+  // vedi il commento su `soloRiservati`. Il percorso si misura nella forma
   // ESATTA in cui verrà aperto (la stessa normalizzazione di documentRead), così
   // il livello non giudica un file diverso da quello che poi si legge. Calcolato
   // qui dal main, mai dall'LLM.
