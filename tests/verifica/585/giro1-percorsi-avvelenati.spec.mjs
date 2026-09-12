@@ -53,13 +53,15 @@ function corpoDi(blocco) {
   return blocco.slice(Safety.FENCE_START.length, blocco.length - Safety.FENCE_END.length);
 }
 
-// Dentro il blocco esistono solo due forme di riga, e le scriviamo noi:
-// l'intestazione di un percorso e un passo numerato. Qualunque altra riga è
-// una riga che è arrivata dal contenuto.
+// Dentro il blocco esistono solo tre forme di riga, e le scriviamo noi:
+// l'intestazione di un percorso, un passo numerato, e la riga che dichiara un
+// percorso accorciato perché più lungo della sua fetta di tetto (aggiunta al
+// giro 2, quando si è visto che un percorso lungo cacciava fuori tutti gli
+// altri). Qualunque altra riga è una riga arrivata dal contenuto.
 function soloRigheNostre(corpo) {
   for (const riga of corpo.split('\n').filter((r) => r.trim())) {
     expect(riga, `riga non nostra dentro il blocco: ${JSON.stringify(riga)}`)
-      .toMatch(/^(## "|\s+\d+\. )/);
+      .toMatch(/^(## "|\s+\d+\. |\s+\(percorso più lungo: il resto dei passi non è riportato\)$)/);
   }
 }
 

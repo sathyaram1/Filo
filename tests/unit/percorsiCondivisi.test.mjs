@@ -288,3 +288,109 @@ test('quello che la pulizia scarta non parte nemmeno', async () => {
   }
   assert.equal(chiamato, false);
 });
+
+// ── Dati personali: ogni campo che esce, non solo gli elementi (#585, giro 2) ──
+//
+// La cancellazione conosceva gli indirizzi email e le cifre attaccate, e la
+// applicava ai soli elementi toccati. Bastava un IBAN, un codice fiscale o un
+// telefono scritto con gli spazi per uscire intero, e la sezione di partenza e
+// la frase dell'intento non passavano di lì affatto: sono le pagine di banche e
+// operatori telefonici, cioè quelle dove l'Aiuto serve di più. Senza il fix
+// ognuno di questi tre casi è rosso.
+
+test('IBAN, codice fiscale e telefoni con gli spazi non escono dagli elementi toccati', () => {
+  const r = Safety.sanitizeSubmission({
+    domain: 'banca.it', intent: 'aprire l’estratto conto',
+    steps: [
+      { selector: '[title="Conto IT60X0542811101000000123456"]', action: 'click' },
+      { selector: '[data-cf="RSSMRA85M01H501Z"]', action: 'click' },
+      { selector: '[aria-label="Chiama 333 123 456"]', action: 'click' },
+      { selector: '[aria-label="carta 4111 1111 1111 1111"]', action: 'click' },
+    ],
+  });
+  assert.equal(r.ok, true);
+  const tutti = r.doc.steps.map((s) => s.selector).join(' | ');
+  assert.ok(!tutti.includes('IT60X0542811101000000123456'), 'un IBAN è uscito nella raccolta pubblica');
+  assert.ok(!tutti.includes('RSSMRA85M01H501Z'), 'un codice fiscale è uscito nella raccolta pubblica');
+  assert.ok(!tutti.includes('333 123 456'), 'un telefono è uscito nella raccolta pubblica');
+  assert.ok(!tutti.includes('4111 1111 1111 1111'), 'un numero di carta è uscito nella raccolta pubblica');
+  assert.match(tutti, /\[IBAN\]/);
+  assert.match(tutti, /\[CODICE\]/);
+});
+
+test('un selettore normale resta intero: la cancellazione non mangia i numeri di struttura', () => {
+  const r = Safety.sanitizeSubmission({
+    domain: 'esempio.it', intent: 'aprire il menu',
+    steps: [
+      { selector: 'li:nth-child(2) > div:nth-child(3)', action: 'click' },
+      { selector: '.grid-2-4 .col-3', action: 'click' },
+    ],
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.doc.steps[0].selector, 'li:nth-child(2) > div:nth-child(3)');
+  assert.equal(r.doc.steps[1].selector, '.grid-2-4 .col-3');
+});
+
+test('la sezione di partenza e la frase dell’intento perdono anche loro i dati personali', () => {
+  const r = Safety.sanitizeSubmission({
+    domain: 'banca.it',
+    initialUrl: 'https://banca.it/clienti/IT60X0542811101000000123456/estratto?token=x',
+    intent: 'pagare la bolletta del numero 333 123 456 per mario.rossi@x.it',
+    steps: PERCORSO_OK.steps,
+  });
+  assert.equal(r.ok, true);
+  assert.ok(!r.doc.initialUrl.includes('IT60X0542811101000000123456'), 'un IBAN è rimasto nell’indirizzo di partenza');
+  assert.match(r.doc.initialUrl, /^\/clienti\/\[IBAN\]\/estratto$/);
+  assert.ok(!r.doc.intent.includes('333 123 456'), 'un telefono è rimasto nella frase dell’intento');
+  assert.ok(!r.doc.intent.includes('mario.rossi@x.it'), 'un indirizzo email è rimasto nella frase dell’intento');
+});
+
+test('in lettura la cancellazione si rifà: i documenti vecchi non sono ripuliti', () => {
+  const blocco = Safety.formatKnownPathsForPrompt([{
+    intent: 'estratto conto di mario.rossi@x.it',
+    initialUrl: '/clienti/IT60X0542811101000000123456',
+    steps: [{ selector: '[aria-label="Chiama 333 123 456"]', action: 'click' }],
+  }]);
+  assert.ok(!blocco.includes('mario.rossi@x.it'));
+  assert.ok(!blocco.includes('IT60X0542811101000000123456'));
+  assert.ok(!blocco.includes('333 123 456'));
+});
+
+// ── Il tetto dei percorsi nel prompt (#585, giro 2) ────────────────────────
+//
+// Il tetto complessivo c'era, ma ci si fermava al PRIMO percorso che non ci
+// stava, buttando via anche tutti quelli dopo che invece ci stavano; e un solo
+// percorso lungo (trenta passi con etichette lunghe) poteva prendersi quasi
+// tutto il tetto da solo. Senza il fix questo test è rosso da tutte e due le
+// parti.
+
+test('un percorso lungo non caccia gli altri dal prompt', () => {
+  const lungo = (n) => ({
+    intent: `percorso lungo ${n}`,
+    initialUrl: `/lungo${n}`,
+    steps: Array.from({ length: 40 }, (_, i) => ({ action: 'click', selector: `#${'a'.repeat(600)}${i}-${n}` })),
+  });
+  const corti = Array.from({ length: 10 }, (_, i) => ({
+    intent: `cosa utile ${i}`, initialUrl: `/corto${i}`,
+    steps: [{ action: 'click', selector: `#b${i}` }],
+  }));
+
+  for (const quanti of [1, 2, 5]) {
+    const lunghi = Array.from({ length: quanti }, (_, i) => lungo(i));
+    const blocco = Safety.formatKnownPathsForPrompt([...lunghi, ...corti]);
+    const passati = corti.filter((c) => blocco.includes(c.intent)).length;
+    assert.equal(passati, corti.length,
+      `con ${quanti} percorsi lunghi davanti, ${corti.length - passati} percorsi corti non arrivano più al modello`);
+    assert.ok(blocco.length <= Safety.LIMITI.KNOWN_PATHS_BUDGET_CHARS + 200, 'il tetto complessivo va rispettato');
+  }
+});
+
+test('un percorso accorciato lo dice, invece di sparire a metà in silenzio', () => {
+  const blocco = Safety.formatKnownPathsForPrompt([{
+    intent: 'percorso lunghissimo', initialUrl: '/x',
+    steps: Array.from({ length: 40 }, (_, i) => ({ action: 'click', selector: `#${'a'.repeat(600)}${i}` })),
+  }]);
+  assert.ok(blocco.length <= Safety.LIMITI.MAX_PATH_CHARS + Safety.FENCE_START.length + Safety.FENCE_END.length + 200,
+    'un solo percorso si è preso più della sua fetta');
+  assert.match(blocco, /percorso più lungo/, 'il taglio deve essere dichiarato, non silenzioso');
+});
