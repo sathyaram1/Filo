@@ -27,18 +27,6 @@ const HTML = `<!doctype html><html><body style="margin:0"><p>prova</p>
 test('esplorazione: forme di richiesta e cosa arriva', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(180_000);
 
-  // Registriamo cosa arriva al gestore dei permessi: solo per capire.
-  await app.evaluate(() => {
-    globalThis.__spiaPermessi = [];
-    const { session } = require('electron');
-    const ses = session.defaultSession;
-    const vero = ses.setPermissionRequestHandler.bind(ses);
-    // Il gestore vero di Filo è già installato: lo avvolgiamo.
-    const attuale = ses._filoHandlerSpia;
-    void attuale;
-    void vero;
-  });
-
   const page = await testServer.openReady(openTab, HTML);
   const chip = shell.locator('.perm-chip');
 
