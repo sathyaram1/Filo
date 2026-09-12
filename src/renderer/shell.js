@@ -1728,72 +1728,32 @@
       return chip;
     }
 
-    // Solo le domande della scheda che si sta guardando. Quelle delle altre
-    // restano in coda e compaiono quando si passa su quella scheda: è lì che
-    // hanno un senso, ed è lì che chi risponde sa a cosa sta rispondendo. Una
-    // domanda senza scheda (arriva dalla cornice, non da un sito) vale sempre.
-    function suaVolta(riga) {
-      const t = riga.info.tabId;
-      return t === null || t === undefined || t === state.activeId;
-    }
+    const filaDomande = filaPerScheda(disegna);
 
-    function mostraProssima() {
-      if (mostrata) return;
-      const prossima = coda.find(suaVolta);
-      if (!prossima) { sincronizzaRiserva(); return; }
-      mostrata = { id: prossima.id, tabId: prossima.info.tabId, nodo: disegna(prossima.info) };
-      sincronizzaRiserva();
-    }
-
-    // Cambio scheda: la domanda di prima torna in coda (non si risponde, non si
-    // perde) e prende il posto quella della scheda su cui si è appena arrivati.
-    function riallinea() {
-      if (mostrata && !suaVolta({ info: { tabId: mostrata.tabId } })) {
-        rimuoviNodo(mostrata.nodo);
-        mostrata = null;
-      }
-      mostraProssima();
-    }
-    api.tabs.onUpdate(() => { try { riallinea(); } catch (_) {} });
-    window.addEventListener('resize', () => { try { sincronizzaRiserva(); } catch (_) {} });
-
-    api.permissions.onClosed((info) => { if (info && info.id) chiudiPastiglia(info.id); });
-
-    api.permissions.onRequest((info) => {
-      if (!info || !info.id) return;
-      const id = String(info.id);
-      if (coda.some((r) => r.id === id)) return;
-      coda.push({ id, info });
-      mostraProssima();
-    });
+    api.permissions.onClosed((info) => { if (info && info.id) filaDomande.chiudi(info.id); });
+    api.permissions.onRequest((info) => filaDomande.aggiungi(info));
 
     // ── Che cosa si condivide ──────────────────────────────────────────────
     // Dopo il «Consenti» sulla cattura dello schermo: tutto lo schermo, o una
     // finestra sola. Consegnare sempre lo schermo intero vuol dire mostrare
     // anche le notifiche che arrivano e tutto ciò che c'è aperto dietro, a chi
     // voleva far vedere una diapositiva.
+    //
+    // Sta nella stessa fila per scheda della domanda, e per le stesse ragioni:
+    // restava sopra la scheda su cui si passava, col nome di un sito che non
+    // era quello che si stava guardando (e un clic lì consegnava lo schermo a
+    // quell'altro sito); e ce n'era una sola per tutta la finestra, così la
+    // seconda scalzava la prima senza risponderle e chi aveva già detto sì
+    // restava ad aspettare due minuti prima di vedersi negare.
+    let filaFonti = null;
     if (api.permissions.onPickSource) {
-      let scelta = null; // { id, nodo }
-
-      function chiudiScelta(id) {
-        if (!scelta || (id !== undefined && scelta.id !== String(id))) return;
-        rimuoviNodo(scelta.nodo);
-        scelta = null;
-        riservaTop('fonte-schermo', 0);
-      }
-
       function rispondiScelta(id, fonteId) {
-        chiudiScelta(id);
+        filaFonti.chiudi(id);
         try { api.permissions.pickSource(id, fonteId); } catch (_) {}
       }
 
-      api.permissions.onSourceClosed((info) => { if (info && info.id) chiudiScelta(info.id); });
-
-      api.permissions.onPickSource((info) => {
-        if (!info || !info.id || !Array.isArray(info.voci) || !info.voci.length) return;
+      function disegnaScelta(info) {
         const id = String(info.id);
-        chiudiScelta();
-
         const box = document.createElement('div');
         box.className = 'perm-source';
         box.setAttribute('role', 'dialog');
@@ -1836,13 +1796,90 @@
         box.appendChild(annulla);
 
         permHost.appendChild(box);
-        scelta = { id, nodo: box };
-        requestAnimationFrame(() => {
-          if (!scelta) return;
-          riservaTop('fonte-schermo', Math.ceil(box.getBoundingClientRect().bottom) + 6);
-        });
+        return box;
+      }
+
+      filaFonti = filaPerScheda(disegnaScelta);
+      api.permissions.onSourceClosed((info) => { if (info && info.id) filaFonti.chiudi(info.id); });
+      api.permissions.onPickSource((info) => {
+        if (!info || !Array.isArray(info.voci) || !info.voci.length) return;
+        filaFonti.aggiungi(info);
       });
     }
+
+    // ── «Questo sito può vedere il tuo schermo» ────────────────────────────
+    // Una webcam accesa si vede, un microfono aperto prima o poi si sente; uno
+    // schermo ripreso non lascia nessun segno. Senza questo, dato il sì, il
+    // sito continuava a filmare e non c'era niente che lo dicesse né un modo
+    // di fermarlo che non fosse chiudere la scheda (e sapere quale).
+    //
+    // Dice «può vedere», non «sta vedendo»: quando il sito smette da solo
+    // nessuno ce lo dice, e l'unica cosa vera è che finché quella pagina è lì
+    // il permesso ce l'ha ancora. «Interrompi» ricarica la pagina, che è
+    // l'unico modo di chiudere la ripresa per davvero.
+    const riprese = new Map(); // id → { tabId, nodo }
+    if (api.permissions.onCaptureStart) {
+      function allineaRiprese() {
+        for (const r of riprese.values()) {
+          const sua = r.tabId === null || r.tabId === undefined || r.tabId === state.activeId;
+          r.nodo.style.display = sua ? '' : 'none';
+        }
+        sincronizzaRiserva();
+      }
+
+      api.permissions.onCaptureEnd((info) => {
+        const r = info && riprese.get(String(info.id));
+        if (!r) return;
+        riprese.delete(String(info.id));
+        rimuoviNodo(r.nodo);
+        sincronizzaRiserva();
+      });
+
+      api.permissions.onCaptureStart((info) => {
+        if (!info || !info.id || riprese.has(String(info.id))) return;
+        const id = String(info.id);
+        const host = info.host || 'Questo sito';
+
+        const chip = document.createElement('div');
+        chip.className = 'perm-chip perm-live';
+        chip.setAttribute('role', 'status');
+        chip.dataset.id = id;
+        chip.setAttribute('aria-label', `${host} può vedere il tuo schermo`);
+
+        const testo = document.createElement('span');
+        testo.className = 'perm-chip-text';
+        const sito = document.createElement('strong');
+        sito.textContent = host;
+        testo.appendChild(sito);
+        testo.appendChild(document.createTextNode(' può vedere il tuo schermo'));
+        testo.dataset.tip = `${host} può vedere il tuo schermo`;
+        chip.appendChild(testo);
+
+        const stop = document.createElement('button');
+        stop.type = 'button';
+        stop.className = 'perm-chip-btn';
+        stop.textContent = 'Interrompi';
+        stop.dataset.tip = 'Ricarica la pagina e chiude la ripresa';
+        stop.addEventListener('click', () => {
+          try { api.permissions.stopCapture(id); } catch (_) {}
+        });
+        chip.appendChild(stop);
+
+        permHost.appendChild(chip);
+        riprese.set(id, { tabId: info.tabId, nodo: chip });
+        allineaRiprese();
+      });
+
+      api.tabs.onUpdate(() => { try { allineaRiprese(); } catch (_) {} });
+    }
+
+    api.tabs.onUpdate(() => {
+      try {
+        filaDomande.riallinea();
+        if (filaFonti) filaFonti.riallinea();
+      } catch (_) {}
+    });
+    window.addEventListener('resize', () => { try { sincronizzaRiserva(); } catch (_) {} });
   }
 
   // ─── Chip "popup bloccato" ─────────────────────────────────────────────
