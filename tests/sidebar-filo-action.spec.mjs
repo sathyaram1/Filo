@@ -88,3 +88,25 @@ test('dalla sidebar: il popup di conferma compare; Annulla NON invia; OK invia d
   // Ripristina il submit reale.
   await app.evaluate(() => { globalThis.SN_FEEDBACK.submit = globalThis.__origFbSubmit; });
 });
+
+// #590 — PARITÀ DI RACCONTO fra le due chat. La chat della home diceva già
+// quale sito la lista aveva fermato; questa, che si apre sopra una pagina
+// qualsiasi, scriveva solo "non riuscita" e il nome arrivava soltanto dalla
+// notifica in basso a destra. Stessa azione, stesso esito, due racconti diversi.
+test('#590 dalla sidebar: un\'apertura fermata dalla lista dei siti dice QUALE sito', async ({ shell, openTab }) => {
+  const HOST = 'bloccato.lan';
+  await shell.evaluate((h) => window.filoShell.message({
+    type: 'update_settings',
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: [h] } } },
+  }), HOST);
+  await shell.evaluate(() => new Promise((r) => setTimeout(r, 300)));
+
+  const page = await openTab(NEWTAB);
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  await page.evaluate((u) => window.__filoSidebarTest.runFiloAction({ type: 'NAVIGA', url: u }),
+    `http://${HOST}/pagina`);
+
+  const riga = page.locator('.sn-sidebar-log').last();
+  await expect(riga).toContainText('non riuscita');
+  await expect(riga).toContainText(`sito bloccato: ${HOST}`);
+});

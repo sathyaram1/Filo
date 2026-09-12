@@ -19,7 +19,8 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
-        'I siti che metti fra quelli da bloccare ora restano chiusi da ogni strada: anche se scrivi tu l\'indirizzo, anche se chiedi a Filo di aprirli. Prima quelle due strade passavano, e Filo ti apriva un sito che gli avevi detto di bloccare.',
+        'I siti che metti fra quelli da bloccare ora restano chiusi da ogni strada: se scrivi tu l\'indirizzo, se chiedi a Filo di aprirli, se ci arrivi da un link accorciato che rimbalza lì, e anche se l\'indirizzo ha un punto in fondo al nome. Prima bastava una di queste per ritrovarsi davanti un sito che avevi detto di bloccare.',
+        'Quando chiedi a Filo di aprire una pagina e l\'indirizzo arriva senza "https://" davanti, adesso la pagina si apre davvero: prima nasceva una scheda bianca e la chat diceva di averla aperta.',
       ],
     },
     {
