@@ -994,5 +994,19 @@
     return classifyOne(trimmed);
   }
 
-  global.SN_CMD_CLASSIFY = { classify, readReason, programOf, subcommandOf };
+  // Il perimetro di lettura di UN percorso, fuori dal terminale. Stessa regola,
+  // stesso file: LEGGI_DOCUMENTO apre file dal disco esattamente come `cat`, e
+  // due strade per la stessa cosa devono avere lo stesso livello — altrimenti
+  // chiudere il terminale sposta solo la porta. Ritorna '' se il percorso è
+  // dentro il perimetro e non è un bersaglio riservato.
+  function pathReason(percorso, opts) {
+    const p = String(percorso || '').trim();
+    if (!p) return '';
+    const o = opts || {};
+    const perim = o.perimetro ? pathParts(o.perimetro) : null;
+    const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
+    return operandReason(p, o.cwd || o.perimetro || '', perimOk, o.home || o.perimetro || '');
+  }
+
+  global.SN_CMD_CLASSIFY = { classify, readReason, pathReason, programOf, subcommandOf };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

