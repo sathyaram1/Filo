@@ -812,6 +812,79 @@
     + ')$', 'i',
   );
 
+  // Caratteri che fanno di un segmento un MODELLO invece che un nome. La shell li
+  // espande prima di eseguire, quindi quello che il comando aprirà non è scritto
+  // da nessuna parte nel comando.
+  const JOLLY_RE = /[*?[\]{}]/;
+
+  // Un modello che prende TUTTO quello che c'è lì dentro (`*`, `*.*`): non allarga
+  // il bersaglio oltre la cartella in cui sta, quindi vale come quella cartella.
+  const JOLLY_TUTTO_RE = /^\*+(\.\*+)?$/;
+  function potaJolly(segs) {
+    const out = segs.slice();
+    while (out.length && JOLLY_TUTTO_RE.test(String(out[out.length - 1]))) out.pop();
+    return out;
+  }
+
+  // Nomi concreti che rappresentano i bersagli riservati. SENSITIVE_SEG_RE
+  // risponde a «questo nome è riservato?»; un modello con i caratteri jolly
+  // pretende la domanda opposta — «questo modello può ACCHIAPPARE un nome
+  // riservato?» — e per rispondere serve l'elenco, non l'espressione.
+  const NOMI_RISERVATI = [
+    '.ssh', '.aws', '.gnupg', '.gpg', '.docker', '.kube', '.azure', '.config',
+    '.local', '.password-store', '.mozilla', '.thunderbird', '.filo', 'appdata',
+    'ntuser.dat', '.netrc', '_netrc', '.npmrc', '.pypirc', '.pgpass',
+    '.git-credentials', '.htpasswd', '.env', '.envrc', 'credentials', 'shadow',
+    'passwd', 'id_rsa', 'id_ed25519', 'id_ecdsa', 'id_dsa', '.bash_history',
+    '.zsh_history', '.psql_history',
+  ];
+
+  // Un modello di shell tradotto in espressione regolare. `*` e `?` non
+  // attraversano i separatori di percorso (come in ogni shell), le graffe sono
+  // un'alternativa, le parentesi quadre una classe di caratteri. Se ne esce
+  // qualcosa che non si compila, chi chiama sta dalla parte prudente.
+  function globRe(pat) {
+    let out = '';
+    let graffe = 0;
+    let classe = false;
+    for (const ch of String(pat)) {
+      if (classe) { out += ch; if (ch === ']') classe = false; continue; }
+      if (ch === '*') out += '[^/\\\\]*';
+      else if (ch === '?') out += '[^/\\\\]';
+      else if (ch === '{') { out += '('; graffe++; }
+      else if (ch === '}') { out += graffe ? ')' : '\\}'; if (graffe) graffe--; }
+      else if (ch === ',' && graffe) out += '|';
+      else if (ch === '[') { out += ch; classe = true; }
+      else out += ch.replace(/[.+^$()|\\\]{}]/g, '\\$&');
+    }
+    if (graffe || classe) return null; // modello monco: prudenza a chi chiama
+    try { return new RegExp(`^${out}$`, 'i'); } catch (_) { return null; }
+  }
+
+  // Questo modello può acchiappare un bersaglio riservato?
+  function modelloPrendeRiservato(pat) {
+    const re = globRe(pat);
+    if (!re) return true; // modello che non sappiamo leggere → cauti
+    return NOMI_RISERVATI.some((nome) => re.test(nome));
+  }
+
+  // Il percorso VERO su disco, quando il processo principale ha passato il modo
+  // di chiederlo (`setRealPath`). Serve ai COLLEGAMENTI: `scorciatoia/config` non
+  // porta il nome `.ssh` addosso, ma è lo stesso file. Fuori dal main (renderer,
+  // classificatore usato da solo) non c'è filesystem e il gancio resta vuoto: il
+  // livello però lo decide sempre il main, dove il gancio c'è.
+  let risolviReale = null;
+  function setRealPath(fn) { risolviReale = typeof fn === 'function' ? fn : null; }
+  function segmentiReali(target) {
+    if (!risolviReale || !target) return null;
+    try {
+      const p = `${target.root || ''}/${target.segs.join('/')}`;
+      const vero = risolviReale(p);
+      if (!vero || String(vero) === p) return null;
+      return pathParts(String(vero)).segs;
+    } catch (_) { return null; }
+  }
+
   // Un token è un FLAG (non un percorso)? Oltre a `-x`/`--x`, gli switch in stile
   // Windows `/S`, `/I`, `/C:"x"` — che su Unix sembrerebbero percorsi assoluti.
   function isFlagToken(tok) {
