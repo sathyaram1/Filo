@@ -58,11 +58,16 @@ for (const tema of ['light', 'dark']) {
         env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
       });
       try {
-        // Il tema della cornice segue il tema di sistema: lo forziamo di là,
-        // altrimenti le due fotografie uscirebbero identiche.
-        await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
         const shell = await app.firstWindow();
         await shell.waitForLoadState('domcontentloaded');
+        // Il tema della cornice segue il tema di sistema: lo forziamo di là
+        // (dopo che le impostazioni sono state lette, o le ribalterebbero),
+        // altrimenti le due fotografie uscirebbero identiche.
+        await shell.waitForTimeout(800);
+        await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
+        await shell.waitForTimeout(400);
+        console.log(`[586 g3] tema ${tema} → scuro in pagina:`,
+          await shell.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches));
         const page = await apriScheda(app, shell, url);
         await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 15_000 });
 
