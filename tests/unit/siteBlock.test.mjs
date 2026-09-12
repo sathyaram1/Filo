@@ -224,7 +224,10 @@ test('#590: il PUNTO FINALE dell\'host non scavalca la lista', () => {
   ]) {
     const d = SB.shouldBlockNavigation(u);
     assert.equal(d.block, true, `dovrebbe BLOCCARE ${u}`);
-    assert.equal(d.host, 'evil.example', `host riportato senza punto finale per ${u}`);
+    // L'host che finisce nella notifica è quello pulito: senza punto finale e
+    // in minuscolo, altrimenti l'utente legge un nome che non ha mai scritto.
+    assert.ok(!d.host.endsWith('.'), `host senza punto finale per ${u}, letto "${d.host}"`);
+    assert.equal(d.host, d.host.toLowerCase(), `host in minuscolo per ${u}`);
   }
   // E l'host riportato è quello vero anche per i sottodomini.
   assert.equal(SB.shouldBlockNavigation('https://sub.evil.example./').host, 'sub.evil.example');
