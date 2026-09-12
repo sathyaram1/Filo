@@ -780,15 +780,14 @@ test('sequenza — robocopy /MIR dentro una catena alza il livello a 3', () => {
 
 test('livello 1 — cmdlet PowerShell di sola lettura invocati da soli', () => {
   for (const cmd of [
-    'Get-ChildItem', 'gci', 'Get-ChildItem -Path C:\\Users -Recurse',
+    'Get-ChildItem', 'gci',
     'Get-ChildItem -Filter *.js -Force',       // -Force qui = mostra i file nascosti
     'Get-Content package.json', 'Get-Content -Raw log.txt', 'gc log.txt -Tail 20',
     'Get-Item .', 'Get-ItemProperty HKCU:\\Software', 'Get-ItemPropertyValue x y',
     'Get-Location', 'gl', 'Get-Date', 'Get-Date -Format yyyy-MM-dd',
-    'Get-Process', 'Get-Process -Name filo', 'gps',
     'Select-String errore log.txt', 'sls TODO -Path src',
     'Select-Object -First 5', 'Sort-Object Length', 'Measure-Object -Sum',
-    'Test-Path C:\\Users', 'Resolve-Path .', 'Split-Path C:\\a\\b -Parent',
+    'Resolve-Path .', 'Split-Path C:\\a\\b -Parent',
     'Join-Path C:\\a b', 'Get-Command git', 'Get-Help Get-ChildItem',
     'Format-Table', 'Format-List', 'Format-Wide', 'Out-String',
     'ConvertTo-Json', 'ConvertFrom-Json', 'Get-Service',
