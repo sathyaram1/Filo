@@ -697,6 +697,181 @@
     return parts;
   }
 
+  // ── Perimetro di lettura (#587) ───────────────────────────────────────────
+  //
+  // Una lettura non modifica niente, ma fa ENTRARE il contenuto nel contesto del
+  // modello: da lì una pagina ostile che lo pilota può farglielo riscrivere in un
+  // URL. Il freno non è vietare la lettura — è chiedere un OK quando esce dal
+  // perimetro dichiarato o punta a un bersaglio riservato.
+
+  // Programmi che leggono (o elencano) un PERCORSO passato come operando. Solo
+  // questi vengono misurati sul perimetro: `echo`, `basename`, `dirname`,
+  // `Split-Path`, `Join-Path` fanno aritmetica sulle stringhe e non aprono niente,
+  // `where`/`which` cercano un NOME nel PATH.
+  const READS_PATHS = new Set([
+    'cat', 'tac', 'type', 'more', 'less', 'head', 'tail', 'grep', 'findstr',
+    'wc', 'nl', 'cut', 'uniq', 'column', 'file', 'stat', 'du', 'df', 'tree',
+    'ls', 'dir', 'md5sum', 'sha1sum', 'sha256sum', 'cksum', 'readlink', 'realpath',
+    'get-content', 'gc', 'get-item', 'gi', 'get-itemproperty', 'gp',
+    'get-itempropertyvalue', 'get-childitem', 'gci', 'get-filehash',
+    'select-string', 'sls', 'test-path', 'resolve-path', 'convert-path',
+  ]);
+
+  // Letture che non hanno un percorso ma espongono comunque materiale personale:
+  // l'ambiente (token, chiavi, percorsi del profilo) e la tabella dei processi,
+  // dove le righe di comando altrui portano spesso password e token in chiaro.
+  // `ps`/`Get-Process` stanno insieme di proposito: due strade per la stessa cosa
+  // devono avere lo stesso livello.
+  const READS_SENSITIVE = new Set([
+    'printenv', 'ps', 'get-process', 'gps', 'get-variable',
+  ]);
+
+  // Comandi che spostano la cartella di lavoro: dentro una sequenza li SEGUIAMO,
+  // così `cd /etc && cat passwd` misura `passwd` in `/etc` e non nella cartella di
+  // partenza. Non alzano il livello da soli (spostarsi non legge niente).
+  const CHDIR = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd']);
+
+  // Riferimento a una variabile d'ambiente: `$HOME`, `${HOME}`, `$env:APPDATA`,
+  // `%APPDATA%`. `$_` di PowerShell (l'oggetto della pipeline) NON combacia — il
+  // nome deve iniziare con una lettera — così le pipeline di lettura restano 1.
+  const ENV_REF_RE = /\$env:[A-Za-z_]|\$\{?[A-Za-z][A-Za-z0-9_]*|%[A-Za-z_][A-Za-z0-9_]+%/i;
+
+  // Segmenti di percorso che valgono "riservato" ovunque si trovino, perimetro
+  // compreso: il perimetro dichiarato è la home, e dentro la home stanno chiavi,
+  // credenziali e profili. Elencare qui costa al massimo un OK su una cartella che
+  // si chiama come una di queste; non elencarli costa le chiavi.
+  const SENSITIVE_SEG_RE = new RegExp(
+    '^('
+    + '\\.ssh|\\.aws|\\.gnupg|\\.gpg|\\.docker|\\.kube|\\.azure|\\.config|\\.local'
+    + '|\\.password-store|\\.mozilla|\\.thunderbird|\\.filo|appdata|ntuser\\.dat'
+    + '|\\.netrc|_netrc|\\.npmrc|\\.pypirc|\\.pgpass|\\.git-credentials|\\.htpasswd'
+    + '|\\.env(\\..+)?|\\.envrc|credentials|shadow|passwd'
+    + '|id_rsa(\\.pub)?|id_ed25519(\\.pub)?|id_ecdsa(\\.pub)?|id_dsa(\\.pub)?'
+    + '|\\.[a-z]*_history'
+    + ')$', 'i',
+  );
+
+  // Un token è un FLAG (non un percorso)? Oltre a `-x`/`--x`, gli switch in stile
+  // Windows `/S`, `/I`, `/C:"x"` — che su Unix sembrerebbero percorsi assoluti.
+  function isFlagToken(tok) {
+    const t = String(tok || '');
+    if (t.startsWith('-')) return true;
+    return /^\/[A-Za-z](:.*)?$/.test(t); // `/S`, `/C:"testo"`; `/etc` NON combacia
+  }
+
+  // Operandi (non-flag) di un comando, già senza virgolette.
+  function operandsOf(cmd) {
+    return tokens(cmd).slice(1).map(unquote).filter((t) => t && !isFlagToken(t));
+  }
+
+  // Percorso spezzato in { root, segs }: `root` è '' su Unix, `c:` per un disco
+  // Windows, `//server` per un percorso di rete. Non è `path.resolve` (questo
+  // modulo gira anche nel renderer): serve solo a dire "dentro" o "fuori".
+  function pathParts(p) {
+    let s = String(p || '').replace(/\\/g, '/');
+    let root = null;
+    if (/^\/\//.test(s)) { const m = s.match(/^\/\/[^/]*/); root = m[0]; s = s.slice(root.length); }
+    else if (/^[A-Za-z]:/.test(s)) { root = s.slice(0, 2).toLowerCase(); s = s.slice(2); }
+    else if (s.startsWith('/')) { root = ''; }
+    const segs = s.split('/').filter((x) => x && x !== '.');
+    return { root, segs }; // root === null → percorso relativo
+  }
+
+  function collapse(segs) {
+    const out = [];
+    for (const s of segs) {
+      if (s === '..') { if (out.length) out.pop(); else out.push('..'); }
+      else out.push(s);
+    }
+    return out;
+  }
+
+  // Percorso dell'operando risolto contro la cartella di lavoro. `~` diventa la
+  // home quando il main ce l'ha passata; senza home resta "non risolvibile".
+  function resolveTarget(op, cwd, home) {
+    let raw = String(op || '');
+    if (/^~($|[/\\])/.test(raw)) {
+      if (!home) return null; // non sappiamo dov'è: fuori per prudenza
+      raw = String(home).replace(/\\/g, '/') + '/' + raw.slice(1).replace(/^[/\\]+/, '');
+    }
+    const t = pathParts(raw);
+    if (t.root !== null) return { root: t.root, segs: collapse(t.segs) };
+    const b = pathParts(cwd || '');
+    if (b.root === null) return null; // cartella di lavoro ignota → relativo non risolvibile
+    return { root: b.root, segs: collapse(b.segs.concat(t.segs)) };
+  }
+
+  function insidePerimeter(target, perim) {
+    if (!target || !perim) return false;
+    if (target.root !== perim.root) return false;
+    if (target.segs.length < perim.segs.length) return false;
+    for (let i = 0; i < perim.segs.length; i++) {
+      if (target.segs[i] !== perim.segs[i]) return false;
+    }
+    return true;
+  }
+
+  // Perché questo operando non è una lettura di livello 1? '' = lo è.
+  function operandReason(op, cwd, perim, home) {
+    const raw = String(op || '');
+    // Drive PowerShell dell'ambiente: `Get-ChildItem Env:`, `Get-Item Env:\PATH`.
+    if (/^env:/i.test(raw)) return 'legge le variabili d’ambiente';
+    for (const seg of raw.replace(/\\/g, '/').split('/')) {
+      if (seg && SENSITIVE_SEG_RE.test(unquote(seg))) return `punta a “${seg}”, che contiene dati riservati`;
+    }
+    const target = resolveTarget(raw, cwd, home);
+    if (!perim) {
+      // Nessun perimetro dichiarato (classificatore usato da solo): resta la
+      // lettura strutturale — assoluto, risalita con `..`, o `~` = fuori.
+      const t = pathParts(raw);
+      if (/^~($|[/\\])/.test(raw)) return 'esce dalla cartella di lavoro';
+      if (t.root !== null) return 'esce dalla cartella di lavoro';
+      if (collapse(t.segs)[0] === '..') return 'esce dalla cartella di lavoro';
+      return '';
+    }
+    if (!target) return 'esce dalla cartella di lavoro';
+    if (!insidePerimeter(target, perim)) return 'esce dalla cartella dell’utente';
+    return '';
+  }
+
+  // Perché un comando altrimenti di livello 1 deve comunque chiedere un OK?
+  // Ritorna '' se non deve. Segue i `cd` dentro la sequenza, così il bersaglio
+  // misurato è quello vero.
+  function readReason(raw, opts) {
+    const o = opts || {};
+    const perim = o.perimetro ? pathParts(o.perimetro) : null;
+    const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
+    const home = o.home || o.perimetro || '';
+    let cwd = o.cwd || o.perimetro || '';
+    const parts = splitSafeSequence(raw) || splitSafePipeline(raw) || [raw];
+    for (const part of parts) {
+      const t = dequote(part);
+      if (!t) continue;
+      if (isVersionQuery(t)) continue; // `ps --version` è lettura pura
+      const prog = programOf(t);
+      if (ENV_REF_RE.test(t)) return 'usa una variabile d’ambiente (il bersaglio vero non si legge nel comando)';
+      if (READS_SENSITIVE.has(prog)) {
+        return prog === 'ps' || prog === 'get-process' || prog === 'gps'
+          ? 'elenca i processi con le loro righe di comando'
+          : 'legge le variabili d’ambiente';
+      }
+      if (CHDIR.has(prog)) {
+        const dest = operandsOf(t)[0];
+        if (dest) {
+          const moved = resolveTarget(dest, cwd, home);
+          if (moved) cwd = (moved.root || '') + '/' + moved.segs.join('/');
+        }
+        continue;
+      }
+      if (!READS_PATHS.has(prog)) continue;
+      for (const op of operandsOf(t)) {
+        const why = operandReason(op, cwd, perimOk, home);
+        if (why) return why;
+      }
+    }
+    return '';
+  }
+
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
   function classifyOne(raw) {
     // Valuta sempre la forma senza virgolette: `git push "--force"`,
