@@ -2857,7 +2857,12 @@ async function handleMessage(msg, sender = {}) {
   // dall'account. Rumoroso di proposito: un messaggio che serve davvero e
   // finisse fuori lista spegnerebbe una funzione dentro le pagine.
   const W = globalThis.SN_WEB_MESSAGE_SCOPE;
-  if (W && !W.allowed(msg?.type, origin)) {
+  // C'è una pagina viva dietro questa richiesta? Le chiamate che il main fa a
+  // se stesso (una scorciatoia da tastiera che salva la pagina) arrivano senza
+  // mittente: quelle sì che sono interne. Una pagina che parla mentre il suo
+  // indirizzo non c'è ancora, no.
+  const daUnaPagina = !!(sender && (sender.tab || sender.wc || sender.frame));
+  if (W && !W.allowed(msg?.type, origin, { fromPage: daUnaPagina })) {
     console.warn(
       `[Filo] messaggio "${msg?.type}" rifiutato a un'origine web (${origin}). `
       + 'Se serve al codice che gira dentro le pagine, va aggiunto a WEB_MESSAGE_TYPES '
