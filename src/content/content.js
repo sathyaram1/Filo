@@ -433,6 +433,11 @@
     // (il tasto destro sulle pagine interne apriva solo il menu di Filo). In
     // bubble l'handler della pagina scatta per primo: se ha già gestito il
     // click (e.preventDefault()), il menu di Filo si fa da parte.
+    // #586 — i gesti finti del sito sulla UI di Filo non contano come gesti
+    // dell'utente: senza questo un sito apriva da solo il menu del tasto destro
+    // e premeva «Incolla» o «Detta», cioè le due voci che saltano la domanda del
+    // permesso perché a chiederle è l'utente. Vedi SN_FILO_UI.guardiaGesti.
+    try { self.SN_FILO_UI?.guardiaGesti?.(document); } catch (_) {}
     if (typeof self.__snSetContextMenuHandler === 'function') {
       self.__snSetContextMenuHandler(onContextMenu);
     } else {
