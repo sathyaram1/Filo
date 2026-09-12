@@ -1008,14 +1008,117 @@
   // livello però lo decide sempre il main, dove il gancio c'è.
   let risolviReale = null;
   function setRealPath(fn) { risolviReale = typeof fn === 'function' ? fn : null; }
+  // Le due domande al filesystem costano una syscall l'una e si ripetono: lo
+  // stesso operando viene misurato in più letture e contro più cartelle di
+  // lavoro. La memoria dura una classificazione (la svuotano readReason e
+  // pathReason), quindi non invecchia mai.
+  let memoria = new Map();
+  function ricordato(chiave, calcola) {
+    if (memoria.has(chiave)) return memoria.get(chiave);
+    const v = calcola();
+    if (memoria.size < 4000) memoria.set(chiave, v);
+    return v;
+  }
+  function unisciSegs(root, segs) { return `${root || ''}/${segs.join('/')}`; }
   function segmentiReali(target) {
     if (!risolviReale || !target) return null;
-    try {
-      const p = `${target.root || ''}/${target.segs.join('/')}`;
-      const vero = risolviReale(p);
-      if (!vero || String(vero) === p) return null;
-      return pathParts(String(vero)).segs;
-    } catch (_) { return null; }
+    const p = unisciSegs(target.root, target.segs);
+    return ricordato(`r:${p}`, () => {
+      try {
+        const vero = risolviReale(p);
+        if (!vero || String(vero) === p) return null;
+        return pathParts(String(vero)).segs;
+      } catch (_) { return null; }
+    });
+  }
+
+  // ── Dove punta DAVVERO quello che il comando aprirà (#587, giro 6) ─────────
+  //
+  // Un collegamento non porta addosso il nome di dove punta: la cura del giro 2
+  // è misurare anche il percorso reale. Quel percorso però si può chiedere solo
+  // a un nome che ESISTE su disco, e con un carattere jolly il nome scritto non
+  // esiste: `pacco/*.txt` non è un file, quindi il collegamento tornava
+  // invisibile e `cat pacco/*.txt` stampava `~/.ssh/config` senza un clic. Una
+  // ricerca ricorsiva ha lo stesso problema al contrario: i collegamenti li
+  // attraversa senza nominarli.
+  //
+  // Chi mette il collegamento lì non deve nemmeno essere l'utente: scompattare
+  // un archivio o clonare un deposito costano UN OK, e dentro ci sta quello che
+  // vuole chi li ha preparati.
+  //
+  // Qui si chiede al processo principale l'elenco dei nomi (`setListDir`) e si
+  // guarda dove puntano. Si giudica SOLO ciò che è davvero un collegamento: un
+  // nome normale lo misura già la regola di prima, e rimisurarlo qui farebbe
+  // chiedere un OK a chi legge i propri file con un jolly.
+  let elencaNomi = null;
+  function setListDir(fn) { elencaNomi = typeof fn === 'function' ? fn : null; }
+  const MAX_NOMI = 200;      // nomi guardati dentro una cartella
+  const MAX_NODI = 400;      // nodi visitati da una lettura ricorsiva
+  const MAX_PROFONDITA = 6;
+
+  function nomiDi(root, segs) {
+    if (!elencaNomi) return null;
+    const p = unisciSegs(root, segs);
+    return ricordato(`l:${p}`, () => {
+      try {
+        const l = elencaNomi(p);
+        return Array.isArray(l) ? l.slice(0, MAX_NOMI) : null;
+      } catch (_) { return null; }
+    });
+  }
+
+  // Come la shell: `*` e `?` non acchiappano i nomi che iniziano con un punto,
+  // a meno che il punto sia scritto nel modello.
+  function nomeVisibile(nome, modello) {
+    return String(nome)[0] !== '.' || String(modello)[0] === '.';
+  }
+
+  // I percorsi CONCRETI che un modello acchiappa, espandendo un livello per volta.
+  function espandiJolly(root, segs) {
+    let vive = [[]];
+    for (const seg of segs) {
+      const s = unquote(String(seg));
+      const prossime = [];
+      if (JOLLY_RE.test(s)) {
+        const re = globRe(s);
+        if (!re) return [];
+        for (const base of vive) {
+          const nomi = nomiDi(root, base);
+          if (!nomi) continue;
+          for (const n of nomi) if (nomeVisibile(n, s) && re.test(n)) prossime.push(base.concat(n));
+        }
+      } else {
+        for (const base of vive) prossime.push(base.concat(s));
+      }
+      vive = prossime.slice(0, MAX_NOMI);
+      if (!vive.length) return [];
+    }
+    return vive;
+  }
+
+  // I collegamenti che si incontrano scendendo sotto una cartella, col loro
+  // percorso vero. Ci si ferma ai tetti: è una manciata di letture di cartella
+  // dentro una lettura che ne farà molte di più.
+  function collegamentiSotto(root, segs) {
+    const fuori = [];
+    let coda = [segs];
+    let nodi = 0;
+    for (let d = 0; d < MAX_PROFONDITA && coda.length && nodi < MAX_NODI; d++) {
+      const prossima = [];
+      for (const base of coda) {
+        const nomi = nomiDi(root, base);
+        if (!nomi) continue;
+        for (const n of nomi) {
+          if (++nodi > MAX_NODI) break;
+          const p = base.concat(n);
+          const vero = segmentiReali({ root, segs: p });
+          if (vero) fuori.push(vero);
+          else prossima.push(p);
+        }
+      }
+      coda = prossima;
+    }
+    return fuori;
   }
 
   // ── Come la SHELL legge un percorso (#587, giro 3) ────────────────────────
