@@ -346,9 +346,13 @@
   }
   // `carichi` = il CARICO di ogni link (vedi caricoUnito), il più recente per
   // ultimo. Ritorna il motivo se, messi insieme, portano fuori un dato intero.
-  function taintSpedizione(carichi, corpus) {
+  function taintSpedizione(carichi, corpus, letto) {
     const pezzi = (carichi || []).filter(Boolean);
     if (pezzi.length < 2) return null;
+    // Le parole del corpus arrivano già contate quando chi chiama le ha (vedi
+    // assess): ricontarle qui costava un terzo del tempo di ogni link.
+    const toks = corpus instanceof Set ? corpus : corpusTokens(corpus);
+    const altri = letto instanceof Set ? letto : corpusTokens(letto || '');
     const forme = pezzi.concat(pezzi.map(rovescia));
     // Il prefiltro gira su OGNI parola del corpus, che col registro pieno sono
     // decine di migliaia: cercare in ognuno dei carichi a uno a uno costava due
