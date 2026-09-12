@@ -103,7 +103,7 @@ test('chat della home: il riordino non ha perso informazioni', () => {
   // ordinarie, quindi nel prompt sono materiale, non istruzioni.
   assert.ok(p.includes(C.LESSONS_OPEN) && p.includes(C.LESSONS_CLOSE), 'le lezioni non sono recintate');
   const dentro = p.split(C.LESSONS_OPEN)[1].split(C.LESSONS_CLOSE)[0];
-  assert.ok(dentro.includes('Risposte brevi'), 'la lezione deve stare dentro il recinto');
+  assert.ok(dentro.includes('Preferisce il tema scuro'), 'la lezione deve stare dentro il recinto');
   // I rimandi interni non devono più mandare il modello a cercare "sopra" un
   // blocco che ora sta sotto.
   assert.ok(!/STATO sopra/.test(p), 'rimando posizionale rimasto indietro: "STATO sopra"');
