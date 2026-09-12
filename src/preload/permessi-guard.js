@@ -191,7 +191,19 @@ function buildCatturaSicuraSource() {
   return `(() => {
   try {
     const md = navigator.mediaDevices;
-    if (!md || typeof md.getUserMedia !== 'function') return;
+    // Il posto dove si avvolge è lo STAMPO, non l'oggetto. Avvolgendo l'oggetto,
+    // la funzione originale restava lì accanto sullo stampo, raggiungibile con
+    // una riga, e un sito che ne prendeva una seconda per quella via si teneva
+    // il microfono aperto a permesso tolto: il conto non era a zero (la prima
+    // era passata di qui), quindi la strada dura non partiva (#586, giro 7).
+    // Sostituendo la funzione sullo stampo, l'originale non è più raggiungibile
+    // da nessuna parte in questa pagina: la teniamo solo noi, in questa
+    // chiusura. Resta scrivibile e riconfigurabile di proposito: le librerie
+    // che avvolgono a loro volta il microfono (quelle delle videochiamate lo
+    // fanno quasi tutte) si prendono la NOSTRA e la richiamano, e vietare la
+    // scrittura le farebbe morire con un errore.
+    const stampo = window.MediaDevices && window.MediaDevices.prototype;
+    if (!md || !stampo || typeof stampo.getUserMedia !== 'function') return;
     const desktop = (v) => {
       try {
         if (!v || typeof v !== 'object') return false;
