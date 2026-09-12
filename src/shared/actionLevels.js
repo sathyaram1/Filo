@@ -60,7 +60,7 @@
     return action.dominio ?? action.domain ?? action.sito;
   }
 
-  // Perimetro di lettura di un ESEGUI_COMANDO: i tre campi che il main inietta
+  // Perimetro di lettura di un ESEGUI_COMANDO: i campi che il main inietta
   // prima del gate (mai l'LLM). Senza di loro il classificatore usa comunque il
   // freno strutturale (percorsi assoluti e risalite con `..`).
   function cmdScope(a) {
