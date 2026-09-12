@@ -14,6 +14,17 @@ affermazioni restino vere a ogni stato.
 
 ## Come si lancia
 
+Un comando, che apre Filo e gli lancia addosso Bombadil:
+
+```bash
+cd tests/bombadil && npm install          # una volta
+node tests/bombadil/gira.mjs filo://preferences/preferences.html 5m
+```
+
+Esce 0 se nessuna proprietà è stata violata, 2 se qualcuna sì.
+
+### A mano, nei due pezzi
+
 Due terminali. Nel primo, Filo:
 
 ```bash
