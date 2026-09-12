@@ -35,7 +35,7 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
   gira();
 </script></body></html>`;
 
-test('un sito che chiede gli appunti in continuazione non deve prendersi la concessione dell\'Incolla di Filo', async ({ app, page: _p, shell, openTab, testServer }) => {
+test('un sito che chiede gli appunti in continuazione non deve prendersi la concessione dell\'Incolla di Filo', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(240_000);
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
 
