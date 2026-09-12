@@ -20,14 +20,21 @@ module.exports = function register(on, ctx) {
   // solo da origine filo://; ciò che i content script fanno davvero (leggere le
   // impostazioni, salvare dizionario/draft/layout) resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
-  const isFilo = (origin) => String(origin || '').startsWith('filo://');
-  // Le chiavi web non devono MAI vedere i segreti dentro `settings.apiKeys`: il
-  // renderer non ne ha bisogno (le richieste AI allegano la chiave nel main).
+  // Che cosa può vedere una pagina web delle impostazioni: la lista dei campi
+  // ammessi vive in src/shared/settingsScope.js ed è la STESSA che usa la
+  // spinta verso le schede (handlers.js → broadcastSettingsUpdated). Prima
+  // erano due strade diverse, e la spinta mandava tutto.
+  const Scope = globalThis.SN_SETTINGS_SCOPE;
+  const isFilo = (origin) => Scope.isFiloOrigin(origin);
+  // Una lettura dello storage verso un'origine web: le impostazioni si
+  // riducono ai campi ammessi (fuori restano chiavi API, credenziali del
+  // proxy, chiave di Safe Browsing…). Le altre chiavi dello storage non le
+  // tocchiamo qui: hanno i loro gate sui rispettivi handler.
   function redactForWeb(value) {
-    if (!value || typeof value !== 'object' || !value[SETTINGS_KEY]) return value;
+    if (!value || typeof value !== 'object') return value;
     const s = value[SETTINGS_KEY];
-    if (!s || typeof s !== 'object' || !s.apiKeys) return value;
-    return { ...value, [SETTINGS_KEY]: { ...s, apiKeys: undefined } };
+    if (!s || typeof s !== 'object') return value;
+    return { ...value, [SETTINGS_KEY]: Scope.settingsForWeb(s) };
   }
   // Una richiesta tocca la chiave `settings`? (set: oggetto; remove: lista chiavi)
   const touchesSettings = (keys) =>
