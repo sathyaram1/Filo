@@ -1590,10 +1590,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           const r = await WS.search({ query, tavilyKey, maxResults: 5 });
           const results = Array.isArray(r?.results) ? r.results : [];
           // Titoli e frammenti arrivano da pagine che non controlliamo: da qui in
-          // poi il contesto contiene materiale non fidato (#587).
+          // poi il contesto contiene materiale non fidato (#587). Ma NON sono dati
+          // dell'utente da proteggere: sono testo pubblico, e soprattutto ci sono
+          // dentro gli indirizzi dei risultati. Proteggendoli, il link che l'utente
+          // chiede di aprire subito dopo («aprimi il primo») combaciava con se
+          // stesso e faceva comparire un avviso di furto di dati su ogni ricerca.
           try {
             require('./contextTaint').record(sender, 'ricerca web',
-              results.map((x) => `${x?.title || ''} ${x?.url || ''} ${x?.snippet || ''}`).join('\n'));
+              results.map((x) => `${x?.title || ''} ${x?.url || ''} ${x?.snippet || ''}`).join('\n'),
+              { proteggi: false });
           } catch (_) {}
           return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
         } catch (e) {
