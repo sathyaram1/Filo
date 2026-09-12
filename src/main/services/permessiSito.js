@@ -440,20 +440,50 @@ function trovaWcDelFrame(frame) {
 
 // ─── lettura / revoca (Impostazioni, menu del tasto destro) ─────────────────
 
-function elenco() { return P().elenco(mappa); }
+// Da una shell (la finestra che chiede) alla memoria giusta. In incognito le
+// scelte vivono in RAM e muoiono con la finestra, ma si devono poter RIVEDERE e
+// TOGLIERE finché la finestra è aperta: se si può dare si può togliere, anche
+// quando la scelta dura una sessione sola. Prima leggevano tutte la memoria su
+// disco, e in incognito l'elenco tornava vuoto: l'unico modo di disdire era
+// chiudere la finestra.
+function contesto(wc) {
+  try {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.isDestroyed()) continue;
+      if (w.webContents !== wc) continue;
+      const incognito = !!w._filoIncognito;
+      if (!incognito) return { ses: null, incognito: false };
+      const tm = w._filoTabs;
+      const t = tm && Array.isArray(tm.tabs)
+        ? (tm.tabs.find((x) => x.id === tm.activeId) || tm.tabs[0]) : null;
+      const c = t && t.view && t.view.webContents;
+      return { ses: c && !c.isDestroyed() ? c.session : null, incognito: true };
+    }
+  } catch (_) {}
+  return { ses: null, incognito: false };
+}
 
-function perOrigine(origine) {
+function memoriaDi(ctx) {
+  const c = ctx || {};
+  return c.incognito ? mappaDi(c.ses, true) : mappa;
+}
+
+function elenco(ctx) { return P().elenco(memoriaDi(ctx)); }
+
+function perOrigine(origine, ctx) {
   const Pp = P();
   const o = Pp.origineDi(origine);
   if (!o) return [];
-  const voci = (Pp.normalizza(mappa)[o]) || {};
+  const voci = (Pp.normalizza(memoriaDi(ctx))[o]) || {};
   return Object.keys(voci).map((chiave) => ({ chiave, nome: Pp.nome(chiave), scelta: voci[chiave] }));
 }
 
 // Toglie una scelta ricordata (o tutte quelle del sito): la prossima volta il
 // sito richiede, e l'utente risceglie.
-function revoca(origine, chiave) {
-  const nuova = P().senza(mappa, origine, chiave || null);
+function revoca(origine, chiave, ctx) {
+  const c = ctx || {};
+  const nuova = P().senza(memoriaDi(c), origine, chiave || null);
+  if (c.incognito) { scriviMappa(c.ses, true, nuova); return true; }
   mappa = nuova;
   salva(nuova);
   return true;
