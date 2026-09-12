@@ -424,6 +424,31 @@ test('senza perimetro dichiarato resta il freno strutturale (#587)', () => {
   assert.equal(lvl('grep foo src/app.js'), 1);
 });
 
+test('il perimetro regge i casi limite (#587)', () => {
+  const scope = { perimetro: '/home/mario', cwd: '/home/mario', home: '/home/mario' };
+  // Confronto per SEGMENTI, non per prefisso di stringa: una cartella che inizia
+  // con lo stesso testo non è dentro.
+  assert.equal(C.classify('cat /home/mario2/x', scope), 2);
+  assert.equal(C.classify('cat /home/mario', scope), 1);
+  assert.equal(C.classify('cat ~', scope), 1);
+  // `..` in mezzo che NON esce resta dentro; quello che esce no.
+  assert.equal(C.classify('cat ./sub/../note.txt', scope), 1);
+  assert.equal(C.classify('cat sub/../../fuori.txt', scope), 2);
+  // Nomi non ASCII, nomi con spazi, comandi lunghissimi: nessun errore, nessun
+  // livello inventato.
+  assert.equal(C.classify('cat 文書/メモ.txt', scope), 1);
+  assert.equal(C.classify('cat "file con spazi.txt"', scope), 1);
+  assert.equal(C.classify(`cat ${'a'.repeat(10000)}`, scope), 1);
+  assert.equal(C.classify(`cat ${'../'.repeat(3000)}etc/passwd`, scope), 2);
+  // Un `$` che non nomina una variabile (regex di ricerca) non deve alzare.
+  assert.equal(C.classify('grep $ file', scope), 1);
+  assert.equal(C.classify('echo costo$', scope), 1);
+  // Comando vuoto o assente: resta il 3 di massima cautela di sempre.
+  assert.equal(C.classify('', scope), 3);
+  assert.equal(C.classify('   ', scope), 3);
+  assert.equal(C.classify(null, scope), 3);
+});
+
 test('il motivo della conferma è leggibile (finisce nel popup) (#587)', () => {
   const scope = { perimetro: '/home/mario', cwd: '/home/mario', home: '/home/mario' };
   assert.match(C.readReason('tail -n 50 /var/log/syslog', scope), /fuori dalla tua cartella/);
