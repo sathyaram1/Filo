@@ -54,14 +54,39 @@ Due dettagli che al primo giro mancavano e si vedono solo provando:
   righe scartate della blacklist dei siti). L'eco del proprio salvataggio si
   salta, per un attimo dopo aver scritto.
 
-E la rilettura si fa solo se l'utente non sta scrivendo in un campo: altrimenti
-si ferma lì. Il confronto in scrittura basta già a non disfare niente, e
-riscrivere un campo sotto le dita è peggio del valore vecchio a schermo.
+## Il secondo giro: il campo accanto
+
+Il confronto per chiave chiudeva la porta solo quando l'altro campo stava in un
+gruppo diverso. Le impostazioni però sono annidate, e i pezzi che si aprono a
+vicenda stanno spesso nello stesso gruppo: modalità terminale e shell; le due
+chiavi API; velocità, tono e voce della lettura; il rilevamento dei siti
+pericolosi e le sue sotto-opzioni; la modalità dei cookie e i siti fidati. Un
+confronto fermo al gruppo vede «il gruppo è cambiato» e rimanda anche il
+fratello, col valore vecchio. Cinque porte, tutte con lo stesso finale del giro
+prima: cambi la shell e il permesso della shell torna acceso; finisci di
+scrivere la chiave di ricerca e la chiave che paga torna quella di prima.
+
+Quindi il confronto scende fino alla foglia (`SN_STORAGE.partialCambiato`), con
+un'eccezione dichiarata: le mappe il cui contratto è «questa è la lista
+completa, chi manca è stato rimosso» (`REPLACE_KEYS`) viaggiano intere, perché
+mandarne un pezzo cancellerebbe il resto.
+
+Il secondo pezzo del giro 3 è la rilettura. Saltarla quando il cursore sta in un
+campo sembrava prudente, ma il cursore resta appiccicato all'ultimo controllo
+toccato, anche mentre l'utente è in un'altra scheda a parlare con Filo: da lì in
+poi la pagina mostrava per sempre valori che non erano più veri. Adesso si
+rilegge sempre, e si rimette al suo posto solo il **testo che l'utente stava
+scrivendo** (`SN_PAGE_BOOTSTRAP.ricaricaSenzaDisturbare`): spunte, tendine e
+pulsanti non hanno niente in corso da salvare.
 
 ## Dove sta
 
+- `src/shared/storage.js` — `partialCambiato`, il confronto fino alla foglia
+- `src/shared/pageBootstrap.js` — `ricaricaSenzaDisturbare`
 - `src/pages/preferences/preferences.js` — `raccogli`, `ribasa`, `persist`
 - `src/pages/options/options.js` — stesse tre funzioni
-- `src/pages/security/security.js` — stesse tre funzioni
-- `tests/impostazioni-pagina-aperta.spec.mjs` — le tre porte, più la controprova
-  che quello che tocchi tu si salva ancora
+- `src/pages/security/security.js` — stesse tre funzioni, più `saveCookies`
+- `tests/impostazioni-pagina-aperta.spec.mjs` — le porte, più la controprova che
+  quello che tocchi tu si salva ancora
+- `tests/unit/settingsPartial.test.mjs` — il confronto fino alla foglia, senza
+  Electron
