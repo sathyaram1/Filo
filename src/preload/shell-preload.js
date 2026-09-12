@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     // "Apri comunque" sulla notifica "Sito bloccato": l'unico scavalco della
     // lista dei siti bloccati, su un canale suo (#590).
     openSiteAnyway: (url) => ipcRenderer.invoke('tabs:open-site-anyway', { url }),
+    // "Rimetti il blocco": toglie il sì appena dato su quel sito.
+    restoreSiteBlock: (host) => ipcRenderer.invoke('tabs:restore-site-block', { host }),
     // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
     setProxy: (id, country, tier) => ipcRenderer.invoke('tabs:set-proxy', { id, country, tier }),
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
