@@ -77,17 +77,17 @@ test('un sito a cui il microfono è stato NEGATO non deve prenderselo con la det
   console.log('[586 g8] esito della prima richiesta, dopo il Nega:', JSON.stringify(await primo));
   await page.evaluate(() => { window.__preso = null; });
 
-  // 2. Il sito insiste piano: ogni quattro secondi, senza fare comparire niente.
-  await page.evaluate(() => window.__avvia(4000));
+  // 2. Il sito insiste piano: ogni cinque secondi, senza fare comparire niente.
+  await page.evaluate(() => window.__avvia(5000));
 
   // 3. L'utente detta. Più volte, come farebbe chi usa la dettatura su una
   //    pagina lunga: basta che una volta cada nel momento giusto.
   for (let giro = 0; giro < 4; giro++) {
     await subitoDopoUnaRichiesta(page);
-    await page.waitForTimeout(400);
-    await detta(page);
+    await page.waitForTimeout(2000);
+    const voci = await detta(page);
     const preso = await page.evaluate(() => window.__preso);
-    console.log(`[586 g8] tentativo ${giro + 1} — il sito ha in mano:`, JSON.stringify(preso));
+    console.log(`[586 g8] tentativo ${giro + 1} — voce «Detta» trovata: ${voci} — il sito ha in mano:`, JSON.stringify(preso));
     if (preso) break;
   }
 
