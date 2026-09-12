@@ -164,10 +164,12 @@ function annunciaAiSiti() {
 // (settings.security.sitePermissions), così è esportabile, importabile e
 // modificabile dalla pagina Sicurezza come ogni altra scelta di Filo.
 async function salva(nuova) {
+  globalThis.__diagSalva = (globalThis.__diagSalva || []).concat([{ n: Object.keys(nuova||{}).length, fase: 'entra' }]);
   try {
     const Storage = globalThis.SN_STORAGE;
     if (!Storage) return;
     const merged = await Storage.updateSettings({ security: { sitePermissions: nuova } });
+    globalThis.__diagSalva.push({ fase: 'scritto', n: Object.keys((merged.security||{}).sitePermissions||{}).length });
     // La pagina Sicurezza aperta si riallinea da sola (stesso canale di ogni
     // altra impostazione).
     try {

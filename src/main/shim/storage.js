@@ -115,6 +115,21 @@ function runIncognito(fn) {
   return als.run({ incognito: true }, fn);
 }
 
+// L'unica uscita dal contesto incognito, e serve a UNA cosa sola: una scrittura
+// che riguarda il profilo NORMALE, chiesta dall'utente da dentro una finestra
+// in incognito. Oggi è la revoca di un permesso dato in una finestra normale,
+// che dalla pagina Sicurezza si può togliere anche da lì (#586, giro 7): senza
+// questa uscita la revoca spariva dall'elenco e restava sul disco, e tornava al
+// riavvio.
+//
+// Non è un buco nella garanzia: qui dentro si LEGGE il disco e si riscrive il
+// disco, quindi niente dell'incognito passa di là. Chi la usa deve passare dati
+// che vengono dal profilo normale, mai dall'overlay: una `set` con dentro roba
+// della sessione in incognito la porterebbe su disco.
+function runFuoriIncognito(fn) {
+  return als.run({ incognito: false }, fn);
+}
+
 // Azzera l'overlay incognito. Chiamato dalla chiusura dell'ultima finestra
 // incognito: nulla di ciò che è stato navigato/scritto sopravvive.
 function resetIncognito() {
