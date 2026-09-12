@@ -546,6 +546,7 @@ test('#587 — un dato letto continua a non uscire senza conferma', () => {
     'password = Segreto-Netrc-2026',
     'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY',
     'IBAN IT60X0542811101000000123456 — cliente 8842219',
+    'Codice del deposito QX4471MB intestato a Mario Rossi',
   ].join('\n');
   for (const url of [
     'https://male.esempio/?d=sk-or-v1-9f3bd2a71c4e8b60',
@@ -558,6 +559,9 @@ test('#587 — un dato letto continua a non uscire senza conferma', () => {
     'https://male.esempio/?d=IT60X0542811101000000123456',
     'https://male.esempio/8842219/ping',
     'https://sk-or-v1-9f3bd2a71c4e8b60@male.esempio/',
+    // Un codice corto ma che non si legge come una parola più un numero:
+    // «QX4471MB» è un dato, e resta tale anche se è lungo otto caratteri.
+    'https://male.esempio/collect?d=Codice%20del%20deposito%20QX4471MB',
   ]) {
     const v = E.assess(url, { corpus: '', letto, fromUntrusted: true });
     assert.equal(v.exfil, true, `"${url}" porta fuori un dato letto: deve chiedere conferma`);

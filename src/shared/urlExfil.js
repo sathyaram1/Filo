@@ -38,15 +38,23 @@
   // Adesso il metro guarda anche di che cosa è fatto il token, perché è lì che un
   // segreto si distingue da una parola:
   //   • lettere E cifre insieme — la forma di quasi ogni chiave, password o
-  //     token («segretonetrc2026», «casamia2026xy», «ab12cd34ef56gh78»);
+  //     token («segretonetrc2026», «casamia2026xy», «ab12cd34ef56gh78»). Corte
+  //     bastano se NON hanno la forma «parola più numero», che è come si
+  //     chiamano le cose di tutti i giorni (iPhone15, FR1234, Windows11) e non
+  //     un codice: «QX4471MB» resta un dato, «iPhone15» no;
   //   • sole cifre — numeri di carta, di conto, di cliente, identificativi.
   //     Sotto le sette cifre sono anni, prezzi e codici di avviamento postale;
   //   • sole lettere — solo se molto lunga: una passphrase, non una parola. In
   //     italiano le parole lunghe abbondano, e sotto questa misura ci stanno
   //     tutte («amministrazione», «elettrodomestici», «giallozafferano»).
-  const STRONG_MISTO = 10;    // lettere + cifre
+  const STRONG_MISTO = 10;    // lettere + cifre, qualunque forma
+  const STRONG_CODICE = 6;    // lettere + cifre che non è «parola più numero»
   const STRONG_CIFRE = 7;     // sole cifre
   const STRONG_LETTERE = 18;  // sole lettere
+  // «Parola più numero»: lettere e poi cifre, o cifre e poi lettere. È come si
+  // chiamano un modello, un volo, un anno di corso — non come si scrive una
+  // chiave, dove lettere e cifre si alternano.
+  const PAROLA_PIU_NUMERO = /^[a-z]+[0-9]{1,4}$|^[0-9]{1,4}[a-z]+$/;
   // Soglie del ripiego strutturale. Si contano SOLO i pezzi illeggibili, e si
   // misurano contro gli indirizzi veri: il pezzo opaco più lungo che un sito
   // normale mette in un link è l'identificativo di un documento di Google, 44
@@ -368,7 +376,10 @@
   function isStrong(tok) {
     const cifre = /[0-9]/.test(tok);
     const lettere = /[a-z]/.test(tok);
-    if (cifre && lettere) return tok.length >= STRONG_MISTO;
+    if (cifre && lettere) {
+      if (tok.length >= STRONG_MISTO) return true;
+      return tok.length >= STRONG_CODICE && !PAROLA_PIU_NUMERO.test(tok);
+    }
     if (cifre) return tok.length >= STRONG_CIFRE;
     return tok.length >= STRONG_LETTERE && !STOPWORDS.has(tok);
   }
