@@ -654,6 +654,8 @@ function _reset() {
   attese.clear();
   unaTantum.clear();
   scelteFonte.clear();
+  preamboli.clear();
+  for (const id of [...riprese.keys()]) fineRipresa(id);
 }
 
 module.exports = {
@@ -665,6 +667,7 @@ module.exports = {
   rispondi,
   contesto,
   scegliFonteRisposta,
+  interrompiRipresa,
   elenco,
   perOrigine,
   revoca,
