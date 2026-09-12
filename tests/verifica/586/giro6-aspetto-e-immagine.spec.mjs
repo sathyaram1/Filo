@@ -53,10 +53,20 @@ test('un\'immagine negli appunti si incolla anche dove il sito è severo', async
 });
 
 for (const tema of ['light', 'dark']) {
-  test(`la riga «ho smesso di chiedere» si legge col tema ${tema}`, async ({ shell, openTab, testServer }) => {
+  test(`la riga «ho smesso di chiedere» si legge col tema ${tema}`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(180_000);
-    await shell.evaluate((t) => window.filoShell.settings.update({ theme: t }), tema);
-    await shell.waitForTimeout(600);
+    // Il tema si cambia per la strada vera, il canale delle impostazioni. Qui
+    // c'era una funzione della cornice che non esiste, quindi questa prova era
+    // rossa da quando è stata scritta e non ha mai guardato niente (#586,
+    // giro 7).
+    await app.evaluate(async (_e, t) => {
+      await globalThis.SN_HANDLE_MESSAGE(
+        { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } },
+        { url: 'filo://security/security.html' },
+      );
+    }, tema);
+    await shell.emulateMedia({ colorScheme: tema }).catch(() => {});
+    await shell.waitForTimeout(800);
 
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0">
 <script>
