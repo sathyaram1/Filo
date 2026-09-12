@@ -487,3 +487,61 @@ test('la shell fa scendere la pagina sotto quello che disegna in alto', () => {
     'il layout deve tenere il pavimento anche a contenuto a tutto schermo',
   );
 });
+
+// ─── il conto delle tracce sta sullo stampo, non sull'oggetto (#586, giro 7) ─
+//
+// Il difetto: avvolgendo la funzione sull'OGGETTO (navigator.mediaDevices), la
+// funzione originale restava sullo stampo (MediaDevices.prototype), a portata
+// di una riga. Un sito prendeva la prima traccia dalla via normale, così il
+// conto non era a zero e la strada dura non partiva, e la seconda dallo stampo:
+// tolto il permesso, quella continuava ad ascoltare, senza cartello e senza
+// niente da togliere in Impostazioni.
+
+test('la guardia della cattura si mette sullo stampo, e l\'originale non resta raggiungibile', () => {
+  const { buildCatturaSicuraSource } = require_(join(RADICE, 'src', 'preload', 'permessi-guard.js'));
+
+  // Un mondo di pagina finto, quanto basta a far girare la sorgente.
+  const chiamate = [];
+  class MediaDevices {
+    getUserMedia(v) { chiamate.push(['gum', v]); return Promise.resolve({ getTracks: () => [] }); }
+    getDisplayMedia(v) { chiamate.push(['gdm', v]); return Promise.resolve({ getTracks: () => [] }); }
+  }
+  const originale = MediaDevices.prototype.getUserMedia;
+  const mediaDevices = new MediaDevices();
+  const finto = {
+    MediaDevices,
+    MediaStreamTrack: class { clone() { return this; } },
+    MediaStream: class { clone() { return this; } },
+    navigator: { mediaDevices },
+    document: { addEventListener() {}, dispatchEvent() {} },
+    DOMException: class extends Error { constructor(m, n) { super(m); this.name = n; } },
+    CustomEvent: class { constructor(t, i) { this.type = t; Object.assign(this, i); } },
+  };
+  finto.window = finto;
+  const vm = require_('node:vm');
+  vm.createContext(finto);
+  vm.runInContext(buildCatturaSicuraSource(), finto);
+
+  assert.notEqual(
+    MediaDevices.prototype.getUserMedia, originale,
+    'la funzione dello stampo dev\'essere quella di Filo: lasciando lì l\'originale, un sito se ne '
+    + 'prende una traccia che Filo non conta e che la revoca non chiude',
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(mediaDevices, 'getUserMedia'), undefined,
+    'la guardia non va messa sull\'oggetto: lì lascia scoperta quella dello stampo',
+  );
+  assert.notEqual(MediaDevices.prototype.getDisplayMedia, MediaDevices.prototype.constructor.prototype.getUserMedia);
+
+  // Resta scrivibile: le librerie delle videochiamate avvolgono a loro volta il
+  // microfono, e un divieto di scrittura le farebbe morire con un errore.
+  const d = Object.getOwnPropertyDescriptor(MediaDevices.prototype, 'getUserMedia');
+  assert.equal(d.writable, true);
+  assert.equal(d.configurable, true);
+
+  // E chiamata dallo stampo con l'oggetto vero, la richiesta arriva comunque
+  // alla funzione originale.
+  return MediaDevices.prototype.getUserMedia.call(mediaDevices, { audio: true }).then(() => {
+    assert.deepEqual(chiamate, [['gum', { audio: true }]]);
+  });
+});
