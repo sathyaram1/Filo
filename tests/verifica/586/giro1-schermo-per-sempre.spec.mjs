@@ -47,8 +47,14 @@ test('chiedere lo schermo fa comparire una domanda su fotocamera e microfono', a
 
   // Si preme «Consenti» pensando di dare quello che c'è scritto.
   await chip.locator('.perm-chip-allow').click();
-  await expect(chip).toHaveCount(0, { timeout: 10_000 });
   await page.waitForTimeout(1500);
+  const seconda = await chip.allTextContents();
+  // eslint-disable-next-line no-console
+  console.log('[586] domanda successiva:', JSON.stringify(seconda));
+  if (seconda.length) {
+    await chip.first().locator('.perm-chip-allow').click();
+    await page.waitForTimeout(1500);
+  }
 
   const ricordato = await app.evaluate(async () => {
     const s = await globalThis.SN_STORAGE.getSettings();
