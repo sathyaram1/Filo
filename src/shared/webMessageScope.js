@@ -78,21 +78,59 @@
 
   const SET = new Set(WEB_MESSAGE_TYPES);
 
-  // L'origine è la pagina di un sito? (http/https: quello che un sito può
-  // davvero essere). `filo://`, `data:` delle finestre disegnate da Filo e
-  // l'origine vuota delle chiamate interne restano fuori di qui.
-  function isWebOrigin(origin) {
-    return /^https?:\/\//i.test(String(origin || ''));
+  // Gli scomparti del magazzino dei dati che il codice dentro le pagine web
+  // apre DAVVERO (lo shim chrome.storage). Stessa forma della lista qui sopra:
+  // il nome che manca resta fuori. Senza, la domanda «dammi lo scomparto X»
+  // era ammessa senza guardare quale X: chiedendoli per nome uno alla volta un
+  // sito si portava via la memoria che Filo si è costruito sull'utente, le
+  // pagine messe da parte, la cronologia delle richieste ai modelli, gli
+  // scaricamenti col percorso su disco, i crediti — e li riscriveva.
+  // `settings` resta qui perché la lettura passa comunque dalla riduzione di
+  // src/shared/settingsScope.js e la scrittura ha il suo divieto.
+  const WEB_STORAGE_KEYS = Object.freeze([
+    'settings',                   // ridotto ai campi ammessi (settingsScope)
+    'sn_personal_dict',           // spellcheck.js → dizionario personale
+    'sn_autocorrect',             // spellcheck.js → correzioni automatiche
+    'sn_icon_layout',             // menuIcons.js → disposizione delle icone
+    'sn_qr_in_primary_migrated',  // menuIcons.js → migrazione fatta una volta
+    'sn_feedback_client_id',      // feedback.js → chi sta segnalando
+    'sn_feedback_draft_text',     // feedback.js → bozza del feedback
+    'sn_redteam_attack_draft',    // redteamAttack.js → bozza dell'attacco
+    'sn_redteam_desc_draft',      // redteamAttack.js → bozza della descrizione
+  ]);
+
+  const STORAGE_SET = new Set(WEB_STORAGE_KEYS);
+
+  // Una superficie INTERNA di Filo: le pagine `filo://` e le chiamate che il
+  // main fa a se stesso (nessuna origine, e nessuna pagina viva dietro). Una
+  // pagina viva senza indirizzo non è interna: durante un caricamento
+  // l'indirizzo può mancare per un istante, e quell'istante non deve valere
+  // come lasciapassare.
+  function isInternalSurface(origin, { fromPage = false } = {}) {
+    const s = String(origin || '');
+    if (s) return /^filo:\/\//i.test(s);
+    return !fromPage;
   }
 
   function isWebMessage(type) {
     return SET.has(String(type || ''));
   }
 
-  // Questo messaggio, da questa origine, si può fare?
-  function allowed(type, origin) {
-    return !isWebOrigin(origin) || isWebMessage(type);
+  function isWebStorageKey(key) {
+    return STORAGE_SET.has(String(key || ''));
   }
 
-  global.SN_WEB_MESSAGE_SCOPE = { WEB_MESSAGE_TYPES, isWebOrigin, isWebMessage, allowed };
+  // Questo messaggio, da questa origine, si può fare?
+  function allowed(type, origin, opts) {
+    return isInternalSurface(origin, opts) || isWebMessage(type);
+  }
+
+  global.SN_WEB_MESSAGE_SCOPE = {
+    WEB_MESSAGE_TYPES,
+    WEB_STORAGE_KEYS,
+    isInternalSurface,
+    isWebMessage,
+    isWebStorageKey,
+    allowed,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
