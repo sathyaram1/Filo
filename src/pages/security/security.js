@@ -467,6 +467,9 @@
 
   function ribasa() {
     try { ultimoInviato = raccogli().valori; } catch (_) { ultimoInviato = null; }
+    try {
+      ultimiCookie = { mode: currentMode(), trustedSites: cookieWhitelist.slice() };
+    } catch (_) { ultimiCookie = null; }
   }
 
   async function save() {
