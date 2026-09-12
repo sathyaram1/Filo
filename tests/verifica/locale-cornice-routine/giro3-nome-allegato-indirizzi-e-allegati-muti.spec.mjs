@@ -84,7 +84,8 @@ test.describe('parole del mittente ancora fuori cornice', () => {
   });
 
   test('un ordine scritto nel nome dell\'oggetto di un\'immagine passa il controllo dello storage e arriva fuori cornice', () => {
-    test.fail(true, 'giro 3: il controllo accetta qualunque nome di oggetto sotto feedback/, mentre il client produce solo <numero>_<uuid>.<ext>');
+    // Trovato aperto nel giro 3 e chiuso nella sua correzione: il nome
+    // dell'oggetto deve avere la forma dei caricamenti del client.
     const img = STORAGE_BASE + encodeURIComponent('feedback/' + ORDINE + '.png') + '?alt=media';
     const fb = { ...BASE(), images: [img] };
     for (const role of RUOLI) {
