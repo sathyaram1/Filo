@@ -970,22 +970,19 @@
 
   // Un'impostazione può cambiare mentre questa pagina è aperta: da Filo in
   // chat (dopo una conferma), da un'altra scheda, dal menu del tasto destro.
-  // Se l'utente non sta scrivendo, la pagina si rilegge, così non mostra un
-  // valore che non è più vero. Se sta scrivendo non si tocca niente: il
-  // confronto in `persist` basta già a non disfare quello che è cambiato.
-  function staScrivendo() {
-    const el = document.activeElement;
-    if (!el || el === document.body) return false;
-    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
-  }
-
+  // La pagina si rilegge sempre, così non mostra un valore che non è più vero;
+  // l'unica cosa che si rimette al suo posto è il testo che l'utente stava
+  // scrivendo in quel momento.
   function ascoltaCambiamentiAltrove() {
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
       if (Date.now() - ecoDaIgnorare < ECO_MS) return;
-      if (staScrivendo()) return;
-      load().catch(() => {});
+      Bootstrap.ricaricaSenzaDisturbare(load, (el) => {
+        // Il riquadro dello stile ha due cose appese al testo: il conteggio
+        // col tetto e la tendina dei preset. Rimesso il testo, vanno rifatti.
+        if (el.id === 'agentStyleText') { syncPresetSelect(); refreshStyleLimit(); }
+      }).catch(() => {});
     });
   }
 
