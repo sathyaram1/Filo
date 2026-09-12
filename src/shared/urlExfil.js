@@ -45,7 +45,7 @@
   //     italiano le parole lunghe abbondano, e sotto questa misura ci stanno
   //     tutte («amministrazione», «elettrodomestici», «giallozafferano»).
   const STRONG_MISTO = 10;    // lettere + cifre
-  const STRONG_CIFRE = 10;    // sole cifre
+  const STRONG_CIFRE = 7;     // sole cifre
   const STRONG_LETTERE = 18;  // sole lettere
   // Soglie del ripiego strutturale. Si contano SOLO i pezzi illeggibili, e si
   // misurano contro gli indirizzi veri: il pezzo opaco più lungo che un sito
@@ -83,7 +83,7 @@
   const MAX_INCOLLATO = 200;   // oltre non è più una cosa che sta in un indirizzo
   const SOLO_CIFRE_MIN = 12;   // sotto, un numero incollato è una data
 
-  // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
+  // Parole comuni (it/en) abbastanza lunghe da superare la soglia ma innocue:
   // evitano che un URL legittimo che le contiene scateni il match a token singolo.
   const STOPWORDS = new Set([
     'preferenze', 'preferences', 'informazioni', 'information', 'impostazioni',
