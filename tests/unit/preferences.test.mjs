@@ -19,6 +19,10 @@ require(join(__dirname, '..', '..', 'src', 'shared', 'tabColor.js'));
 // constants.js prima di preferences.js: il setter `stile_agente` chiede a
 // SN_CONST il tetto di lunghezza e la ripulitura dei marcatori (#592).
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+// ttsVoices.js: il setter `voce_modello` cerca il nome nel catalogo delle voci
+// (come nell'app, dove il loader lo carica sempre). Senza, ripiegherebbe su
+// «prendi la stringa così com'è» e sembrerebbe una preferenza a testo libero.
+require(join(__dirname, '..', '..', 'src', 'shared', 'ttsVoices.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 
 const P = globalThis.SN_PREF;
