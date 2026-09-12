@@ -1457,7 +1457,9 @@ export function checkEnvelope(w) {
   // guasto silenzioso di prima, entrata dalla porta del server invece che da
   // quella di casa.
   if (RUOLI_CON_FEEDBACK.includes(role)) {
-    const testo = String(((w && w.payload && w.payload.feedback) || {}).text || '').trim();
+    // Il testo arriva dentro la cornice del server: una cornice attorno a
+    // niente è ancora niente.
+    const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text).trim();
     if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
   }
   return null;
