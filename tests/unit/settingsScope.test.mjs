@@ -130,11 +130,28 @@ test('input limite: niente impostazioni, oggetto vuoto, valori strani', () => {
 });
 
 // ── Sentinella: la lista ammette tutto ciò che i content script usano ───────
-test('ogni campo delle impostazioni usato dai content script è ammesso', () => {
-  const dir = join(ROOT, 'src', 'content');
+// Ogni file che finisce dentro una pagina web: i content script, più i moduli
+// condivisi che page-preload.js carica insieme a loro (letti da lì, non da un
+// elenco a mano).
+function fileCheGiranoNellePagine() {
+  const dirContent = join(ROOT, 'src', 'content');
+  const elenco = readdirSync(dirContent)
+    .filter((n) => n.endsWith('.js'))
+    .map((n) => ({ etichetta: `src/content/${n}`, percorso: join(dirContent, n) }));
+  const preload = readFileSync(join(ROOT, 'src', 'preload', 'page-preload.js'), 'utf8');
+  const condivisi = new Set();
+  for (const m of preload.matchAll(/SHARED_DIR\s*,\s*'([^']+\.js)'/g)) condivisi.add(m[1]);
+  assert.ok(condivisi.size > 0, 'nessun modulo condiviso trovato in page-preload.js: è cambiato come li carica?');
+  for (const n of condivisi) {
+    elenco.push({ etichetta: `src/shared/${n}`, percorso: join(ROOT, 'src', 'shared', n) });
+  }
+  return elenco;
+}
+
+test('ogni campo delle impostazioni usato dentro una pagina web è ammesso', () => {
   const usati = new Map(); // campo → file dove si vede
-  for (const f of readdirSync(dir).filter((n) => n.endsWith('.js'))) {
-    const src = readFileSync(join(dir, f), 'utf8')
+  for (const { etichetta, percorso } of fileCheGiranoNellePagine()) {
+    const src = readFileSync(percorso, 'utf8')
       // via i commenti: lì un `settings.security` è una spiegazione, non un uso
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^[ \t]*\/\/.*$/gm, '');
