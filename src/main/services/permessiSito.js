@@ -1191,14 +1191,16 @@ function revoca(origine, chiave, ctx, effimera) {
 // Cambia una scelta ricordata senza passare da una richiesta del sito: è la
 // simmetria della pastiglia (se si può consentire si può negare, e viceversa)
 // pretesa dalle Impostazioni.
-function imposta(origine, chiave, scelta, ctx) {
+function imposta(origine, chiave, scelta, ctx, effimera) {
   if (scelta !== 'allow' && scelta !== 'deny') return false;
   const c = ctx || {};
-  const nuova = P().conScelta(memoriaDi(c), origine, [chiave], scelta);
-  scriviMappa(c.incognito ? c.ses : null, !!c.incognito, nuova);
+  const suEffimera = !!c.incognito && effimera !== false;
+  const ses = suEffimera ? c.ses : null;
+  const nuova = P().conScelta(mappaDi(ses, suEffimera), origine, [chiave], scelta);
+  scriviMappa(ses, suEffimera, nuova);
   // Ribaltare a «negato» vale quanto togliere: se il sito lo sta usando adesso,
   // gli si chiude.
-  if (scelta === 'deny') chiudiUsi(origine, chiave, !!c.incognito);
+  if (scelta === 'deny') chiudiUsi(origine, chiave, suEffimera);
   return true;
 }
 
