@@ -182,6 +182,43 @@ test('G2 — un link cliccato su una PAGINA ospitata dal dominio del motore', as
   expect(quanteSu(await urlSchede(), LISTA), 'il sito della lista non deve aprirsi').toBe(0);
 });
 
+test('G3 — dalla stessa pagina, un link che apre una SCHEDA NUOVA', async () => {
+  // La strada gemella della G2. Qui la pagina di partenza non arriva dalla
+  // scheda ma dal referrer della richiesta, che fuori dal proprio dominio è
+  // ridotto alla sola origine: senza quella domanda dentro, "sto sul motore"
+  // diventava di nuovo abbastanza per aprire qualunque sito della lista.
+  await metti(LISTA);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${MOTORE}:${srv.porta}/pagina`);
+  await shell.waitForTimeout(2000);
+  const pagine = app.windows().filter((w) => {
+    try { return new URL(w.url()).hostname === MOTORE; } catch (_) { return false; }
+  });
+  expect(pagine.length, 'la pagina di partenza deve essersi aperta').toBeGreaterThan(0);
+  const p = pagine[pagine.length - 1];
+  await p.waitForSelector('#nuova', { timeout: 8000 });
+  await p.click('#nuova');
+  await shell.waitForTimeout(2000);
+  expect(quanteSu(await urlSchede(), LISTA), 'il sito della lista non deve aprirsi').toBe(0);
+});
+
+test('G4 — da una pagina di RISULTATI, invece, l\'eccezione vale ancora', async () => {
+  // L'eccezione serve: se l'utente ha cercato quel sito apposta, Filo non si
+  // mette in mezzo. Va tolta alle pagine di chiunque, non ai risultati.
+  await metti(LISTA);
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://${MOTORE}:${srv.porta}/search?q=x`);
+  await shell.waitForTimeout(2000);
+  const pagine = app.windows().filter((w) => {
+    try { return new URL(w.url()).hostname === MOTORE; } catch (_) { return false; }
+  });
+  expect(pagine.length, 'la pagina dei risultati deve essersi aperta').toBeGreaterThan(0);
+  const p = pagine[pagine.length - 1];
+  await p.waitForSelector('#go', { timeout: 8000 });
+  await p.evaluate(() => document.getElementById('go').click());
+  const page = await paginaSuHost();
+  expect(page, 'da un risultato di ricerca il sito deve aprirsi').not.toBeNull();
+  await expect(page.locator('#t')).toBeVisible({ timeout: 8000 });
+});
+
 // ─── Porta H: i tasti avanti/indietro ────────────────────────────────────────
 
 test('H — il tasto indietro riporta su un sito messo in lista nel frattempo', async () => {
