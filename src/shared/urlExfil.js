@@ -320,29 +320,43 @@
   //
   // Il rimedio è ricordare cosa hanno già portato via i link di questa scheda
   // (il registro sta in src/main/services/contextTaint.js) e chiedersi se, messi
-  // insieme, coprono un dato intero. Il confronto qui è più stretto di quello su
-  // un indirizzo solo, perché su una stringa lunga la tolleranza costa falsi
-  // allarmi: si pretende che il dato sia LUNGO e che si ricomponga in pochi pezzi
-  // interi, ognuno abbastanza lungo da non essere un caso.
-  const SPED_MIN_PEZZO = 4;   // ogni pezzo ritrovato, almeno tanti caratteri
-  const SPED_MAX_PEZZI = 4;   // il dato ricomposto in non più di tanti pezzi
-  const SPED_MAX_TOKEN = 200; // oltre non è più una cosa che sta in un indirizzo
+  // insieme, coprono un dato intero. Il dato deve essere LUNGO e ricomporsi in
+  // pezzi interi, ognuno abbastanza lungo da non essere un caso: su una stringa
+  // lunga la tolleranza costa falsi allarmi.
+  //
+  // Come si ricompone, però, decideva il risultato più di quanto dovesse. La
+  // prima versione partiva dall'inizio del dato e prendeva ogni volta il pezzo
+  // più lungo che trovava, con al massimo quattro pezzi: bastava tagliare il dato
+  // in modo che al primo link ne toccassero solo tre caratteri, o spedirlo in
+  // cinque pezzi invece che in quattro, e non lo riconosceva più (#587, giro 6).
+  // Dove tagliare lo sceglie la pagina ostile, quindi la domanda non può essere
+  // «si ricompone COSÌ?» ma «si ricompone in QUALCHE modo?». Adesso si prova ogni
+  // taglio possibile, e i pezzi possono essere quanti servono.
+  const SPED_MIN_PEZZO = 3;   // ogni pezzo ritrovato, almeno tanti caratteri
+  const SPED_MAX_TOKEN = 96;  // oltre non è più una cosa che sta in un indirizzo
   const SPED_MAX_CANDIDATI = 200;
+  // Si ricompone il dato intero con pezzi presi dai carichi, in ordine? Ogni
+  // taglio viene provato una volta sola (la risposta per una coda non cambia).
   function copertoDaPezzi(carichi, tok) {
-    let i = 0;
-    let pezzi = 0;
-    while (i < tok.length) {
-      if (pezzi >= SPED_MAX_PEZZI) return false;
-      let preso = 0;
-      for (let len = tok.length - i; len >= SPED_MIN_PEZZO; len--) {
-        const frammento = tok.slice(i, i + len);
-        if (carichi.some((c) => c.includes(frammento))) { preso = len; break; }
+    const n = tok.length;
+    const dentro = (f) => carichi.some((c) => c.includes(f));
+    // `copre[i]` = la coda che parte da i si ricompone; `pezzi[i]` = con quanti.
+    const copre = new Array(n + 1).fill(false);
+    const pezzi = new Array(n + 1).fill(0);
+    copre[n] = true;
+    for (let i = n - 1; i >= 0; i--) {
+      // I pezzi sono annidati: se il pezzo lungo non c'è, quelli più lunghi
+      // ancora nemmeno. Si cresce finché si trova, e ci si ferma al primo buco.
+      for (let len = SPED_MIN_PEZZO; i + len <= n; len++) {
+        if (!dentro(tok.slice(i, i + len))) break;
+        if (copre[i + len]) {
+          copre[i] = true;
+          pezzi[i] = pezzi[i + len] + 1;
+          break;
+        }
       }
-      if (!preso) return false;
-      i += preso;
-      pezzi++;
     }
-    return pezzi >= 2; // un pezzo solo l'ha già visto il confronto normale
+    return copre[0] && pezzi[0] >= 2; // un pezzo solo l'ha già visto il confronto normale
   }
   // `carichi` = il CARICO di ogni link (vedi caricoUnito), il più recente per
   // ultimo. Ritorna il motivo se, messi insieme, portano fuori un dato intero.
