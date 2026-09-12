@@ -758,10 +758,13 @@
       settings: { theme, textScale, showHomeMessage, agentStyle, timerRingtone, terminal, tts, autoArchive, notifications },
     });
 
+    savedAgentStyle = agentStyle;
     window.SN_PAGE_THEME = theme;
     Bootstrap.applyTheme(theme);
     Bootstrap.applyTextScale(textScale);
-    flashSaved();
+    // Il "Salvato" mentirebbe su uno stile che non è stato salvato: lì parla
+    // il messaggio rosso sotto il textarea.
+    if (styleCheck.ok) flashSaved();
   }
 
   function persistDebounced() {
