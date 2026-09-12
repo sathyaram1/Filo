@@ -73,10 +73,50 @@ function buildPermessiGuardSource(noti) {
       return !!k && !noti[k];
     };
 
+    // I permessi che Filo chiede partendo da una LETTURA di stato, e non da una
+    // richiesta del sito (oggi: l'elenco dei caratteri installati). Per questi
+    // la lettura la serviamo qui, senza disturbare il cancello: altrimenti una
+    // pagina che si limita a guardare cosa può fare — la riga più educata che un
+    // sito possa scrivere — faceva comparire una domanda col nome del sito,
+    // senza che nessuno avesse cliccato niente, a ogni caricamento (#586,
+    // giro 5). La domanda resta legata alla richiesta vera, che è l'unica cosa
+    // che il cancello vede ancora passare.
+    const DA_LETTURA = { 'local-fonts': 'local-fonts' };
+    const statoNoto = (k) => (noti[k] === 'allow' ? 'granted' : (noti[k] === 'deny' ? 'denied' : 'prompt'));
+    // Le risposte che serviamo noi restano vive: quando l'utente risponde alla
+    // pastiglia, un sito iscritto ai cambi lo sente, come con quelle vere.
+    const nostre = new Set();
+    const rispostaNostra = (nome, k) => {
+      const t = new EventTarget();
+      let corrente = statoNoto(k);
+      Object.defineProperties(t, {
+        name: { get: () => nome, enumerable: true },
+        state: { get: () => corrente, enumerable: true },
+        onchange: { value: null, writable: true, enumerable: true },
+      });
+      t.__aggiorna = () => {
+        const nuovo = statoNoto(k);
+        if (nuovo === corrente) return;
+        corrente = nuovo;
+        const ev = new Event('change');
+        try { if (typeof t.onchange === 'function') t.onchange.call(t, ev); } catch (_) {}
+        try { t.dispatchEvent(ev); } catch (_) {}
+      };
+      nostre.add(t);
+      return t;
+    };
+    document.addEventListener(${canale}, () => {
+      for (const t of nostre) { try { t.__aggiorna(); } catch (_) {} }
+    }, true);
+
     const P = window.Permissions && window.Permissions.prototype;
     if (P && typeof P.query === 'function') {
       const vera = P.query;
       P.query = function query(desc) {
+        try {
+          const k = DA_LETTURA[String((desc && desc.name) || '')];
+          if (k) return Promise.resolve(rispostaNostra(String(desc.name), k));
+        } catch (_) {}
         return vera.call(this, desc).then((stato) => {
           try {
             const nome = desc && desc.name;
