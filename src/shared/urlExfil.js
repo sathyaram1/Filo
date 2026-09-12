@@ -298,6 +298,14 @@
     const caricoForme = carico ? [carico, rovescia(carico)] : [];
     const dentro = (t) => forme.some((f) => f.includes(t));
     const nelCarico = (t) => caricoForme.some((f) => f.includes(t));
+    let scorse = null;
+    const dentroScorso = (t) => {
+      if (!scorse) {
+        scorse = [];
+        for (const f of forme) for (let k = 1; k < 26; k++) scorse.push(scorri(f, k));
+      }
+      return scorse.some((f) => f.includes(t));
+    };
     const toks = corpusTokens(corpus);
     let hits = 0;
     let strong = false;
