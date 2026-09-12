@@ -1,0 +1,146 @@
+// #589 — che cosa può CHIEDERE al cuore di Filo la pagina di un sito.
+//
+// Il canale verso il main è uno solo, condiviso fra le pagine di Filo e il
+// codice che Filo carica dentro ogni pagina visitata. Senza un confine unico,
+// un sito che chiedeva otteneva la memoria che Filo si è costruito
+// sull'utente, l'elenco delle pagine messe da parte, lo stato della home e
+// perfino l'uscita dall'account.
+//
+// Qui si asserisce la difesa dal punto di vista dell'utente: quelle domande da
+// un sito non ottengono risposta, e tutto ciò che serve al codice dentro le
+// pagine continua a passare. L'ultima prova è la sentinella nell'altro verso:
+// legge tutto il codice che gira dentro una pagina web e pretende che ogni
+// messaggio che manda sia fra quelli ammessi, così stringere la lista non può
+// spegnere una funzione in silenzio.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+
+const require = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '..', '..');
+require(join(ROOT, 'src', 'shared', 'webMessageScope.js'));
+require(join(ROOT, 'src', 'shared', 'messages.js'));
+
+const W = globalThis.SN_WEB_MESSAGE_SCOPE;
+const { MSG } = globalThis.SN_MSG;
+
+const SITO = 'https://esempio.test/pagina';
+
+test('da un sito non si chiedono i dati personali dell\'utente', () => {
+  for (const tipo of [
+    MSG.FILO_GET_MEMORY,      // quello che Filo ha imparato sull'utente
+    MSG.FILO_GET_STATE,       // messaggio della home, suggerimenti, crediti, schede aperte
+    MSG.GET_SAVED_PAGES,      // le pagine messe da parte
+    MSG.GET_ARCHIVED_TABS,
+    MSG.SEARCH_ARCHIVED_TABS,
+    MSG.GET_CATEGORIES,
+    MSG.DECKS_LIST,
+    MSG.GET_HISTORY,
+    MSG.EXPORT_DATA,
+    MSG.FILO_GET_TIMERS,
+    MSG.FILO_GET_NOTIFICATIONS,
+  ]) {
+    assert.equal(W.allowed(tipo, SITO), false, `un sito può ancora chiedere ${tipo}`);
+  }
+});
+
+test('da un sito non si chiude la sessione dell\'account', () => {
+  assert.equal(W.allowed(MSG.AUTH_SIGNOUT, SITO), false);
+  // L'accesso invece lo propone il modulo del red team, che vive dentro le pagine.
+  assert.equal(W.allowed(MSG.AUTH_SIGNIN, SITO), true);
+  assert.equal(W.allowed(MSG.AUTH_STATUS, SITO), true);
+});
+
+test('quello che serve al codice dentro le pagine continua a passare', () => {
+  for (const tipo of [
+    MSG.GET_SETTINGS, MSG.UPDATE_SETTINGS, MSG.AI_REQUEST, MSG.WEB_SEARCH,
+    MSG.GET_CLIPBOARD_HISTORY, MSG.PUSH_CLIPBOARD_ENTRY, MSG.SAVE_PAGE,
+    MSG.CAPTURE_VISIBLE_TAB, MSG.SUBMIT_FEEDBACK, MSG.FILO_RUN_ACTION,
+    MSG.TTS_SYNTH, MSG.OPEN_URL, MSG.NAV_BACK, MSG.TAB_ACTIVITY,
+    '_storage:get', '_storage:set', '_tabs:create', 'fetch_link_meta',
+  ]) {
+    assert.equal(W.allowed(tipo, SITO), true, `il codice dentro le pagine non può più mandare ${tipo}`);
+  }
+});
+
+test('il confine è la pagina di un sito: le superfici di Filo e le chiamate interne restano intere', () => {
+  for (const origine of [
+    'filo://newtab/',
+    'filo://shell/shell.html',
+    // I menu nativi del tasto destro sono finestre disegnate da Filo su un
+    // indirizzo `data:`: non sono la pagina di un sito.
+    'data:text/html;charset=utf-8,%3Ch1%3Emenu%3C/h1%3E',
+    '',            // chiamata interna del main (una scorciatoia da tastiera)
+    undefined,
+  ]) {
+    assert.equal(W.allowed(MSG.FILO_GET_MEMORY, origine), true, `origine ${String(origine)} trattata come un sito`);
+  }
+});
+
+test('un\'origine che imita filo:// resta un sito', () => {
+  for (const finta of ['https://filo.example/filo://', 'http://filo/newtab', 'https://filo://x']) {
+    assert.equal(W.allowed(MSG.FILO_GET_MEMORY, finta), false, `${finta} è passata per interna`);
+  }
+});
+
+test('è una lista di ciò che passa: il messaggio aggiunto domani resta fuori da solo', () => {
+  assert.equal(W.allowed('sincronizza_tutto_il_disco', SITO), false);
+  assert.equal(W.isWebMessage('sincronizza_tutto_il_disco'), false);
+});
+
+// ── Sentinella: la lista ammette tutto ciò che le pagine mandano davvero ────
+// Ogni file che finisce dentro una pagina web: i content script, i moduli
+// condivisi che page-preload.js carica insieme a loro e il preload stesso (lo
+// shim chrome.* parla sullo stesso canale). L'elenco dei condivisi si ricava
+// da page-preload.js, non si scrive a mano.
+function fileCheGiranoNellePagine() {
+  const dirContent = join(ROOT, 'src', 'content');
+  const elenco = readdirSync(dirContent)
+    .filter((n) => n.endsWith('.js'))
+    .map((n) => ({ etichetta: `src/content/${n}`, percorso: join(dirContent, n) }));
+  const percorsoPreload = join(ROOT, 'src', 'preload', 'page-preload.js');
+  const preload = readFileSync(percorsoPreload, 'utf8');
+  const condivisi = new Set();
+  for (const m of preload.matchAll(/SHARED_DIR\s*,\s*'([^']+\.js)'/g)) condivisi.add(m[1]);
+  assert.ok(condivisi.size > 0, 'nessun modulo condiviso trovato in page-preload.js: è cambiato come li carica?');
+  for (const n of condivisi) {
+    elenco.push({ etichetta: `src/shared/${n}`, percorso: join(ROOT, 'src', 'shared', n) });
+  }
+  elenco.push({ etichetta: 'src/preload/page-preload.js', percorso: percorsoPreload });
+  return elenco;
+}
+
+test('ogni messaggio mandato da dentro una pagina web è ammesso', () => {
+  const noti = new Set(Object.values(MSG));
+  const usati = new Map(); // tipo → file dove si vede
+  for (const { etichetta, percorso } of fileCheGiranoNellePagine()) {
+    const src = readFileSync(percorso, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '');
+    for (const m of src.matchAll(/\btype:\s*MSG\.([A-Z_0-9]+)/g)) {
+      const tipo = MSG[m[1]];
+      assert.ok(tipo, `${etichetta} manda MSG.${m[1]}, che non esiste in src/shared/messages.js`);
+      if (!usati.has(tipo)) usati.set(tipo, etichetta);
+    }
+    // Tipi scritti come stringa: contano solo quelli che sono davvero messaggi
+    // (nel registro, o i canali interni dello shim che iniziano con `_`).
+    for (const m of src.matchAll(/\btype:\s*'([^']+)'/g)) {
+      const tipo = m[1];
+      if (!noti.has(tipo) && !tipo.startsWith('_') && tipo !== 'fetch_link_meta') continue;
+      if (!usati.has(tipo)) usati.set(tipo, etichetta);
+    }
+  }
+  assert.ok(usati.size > 10, 'la sentinella non ha letto nulla: percorso sbagliato?');
+  for (const [tipo, file] of usati) {
+    assert.ok(
+      W.isWebMessage(tipo),
+      `${file} manda "${tipo}" dalla pagina di un sito, ma il messaggio non è fra quelli ammessi `
+      + '(aggiungilo a WEB_MESSAGE_TYPES in src/shared/webMessageScope.js, oppure smetti di mandarlo da lì)',
+    );
+  }
+});
