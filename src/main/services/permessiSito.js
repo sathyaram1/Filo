@@ -330,14 +330,30 @@ async function decidi(wc, permesso, dettagli) {
 // Chi ha appena detto sì alla domanda dello schermo, per pochi secondi: il
 // gestore della cattura schermo lo consuma e va dritto alla scelta della fonte
 // invece di richiedere la stessa cosa due volte di fila.
-const preamboli = new Map(); // wcId → { fino, ripresaId }
+const preamboli = new Map(); // wcId → { fino, timer, ripresaId }
 const PREAMBOLO_MS = 20_000;
+
+// Passato questo tempo dal sì, se il gestore della cattura schermo non si è
+// fatto vivo la strada era quella vecchia: lo schermo è già stato consegnato
+// senza passare da nessuna scelta della fonte, e il segno «può vedere il tuo
+// schermo» va acceso lo stesso — altrimenti proprio la strada silenziosa
+// resterebbe l'unica senza nemmeno un segno.
+const SENZA_GESTORE_MS = 1500;
 
 function segnaPreambolo(wc, origine) {
   if (!wc) return;
   const ora = Date.now();
-  for (const [k, v] of preamboli) if (v.fino <= ora) preamboli.delete(k);
-  preamboli.set(wc.id, { fino: ora + PREAMBOLO_MS, ripresaId: iniziaRipresa(wc, origine) });
+  for (const [k, v] of preamboli) {
+    if (v.fino <= ora) { clearTimeout(v.timer); preamboli.delete(k); }
+  }
+  const voce = { fino: ora + PREAMBOLO_MS, timer: null, ripresaId: null };
+  voce.timer = setTimeout(() => {
+    const attuale = preamboli.get(wc.id);
+    if (attuale !== voce || voce.ripresaId) return;
+    voce.ripresaId = iniziaRipresa(wc, origine);
+  }, SENZA_GESTORE_MS);
+  if (voce.timer.unref) voce.timer.unref();
+  preamboli.set(wc.id, voce);
 }
 
 function consumaPreambolo(wc) {
@@ -345,7 +361,10 @@ function consumaPreambolo(wc) {
   const v = preamboli.get(wc.id);
   if (!v) return null;
   preamboli.delete(wc.id);
-  return v.fino > Date.now() ? v : (fineRipresa(v.ripresaId), null);
+  clearTimeout(v.timer);
+  if (v.fino > Date.now()) return v;
+  if (v.ripresaId) fineRipresa(v.ripresaId);
+  return null;
 }
 
 // Riprese dello schermo in corso. Una webcam accesa si vede e un microfono
