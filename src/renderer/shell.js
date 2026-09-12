@@ -1683,11 +1683,34 @@
       return chip;
     }
 
-    function mostraProssima() {
-      if (mostrata || !coda.length) return;
-      const prossima = coda[0];
-      mostrata = { id: prossima.id, nodo: disegna(prossima.info) };
+    // Solo le domande della scheda che si sta guardando. Quelle delle altre
+    // restano in coda e compaiono quando si passa su quella scheda: è lì che
+    // hanno un senso, ed è lì che chi risponde sa a cosa sta rispondendo. Una
+    // domanda senza scheda (arriva dalla cornice, non da un sito) vale sempre.
+    function suaVolta(riga) {
+      const t = riga.info.tabId;
+      return t === null || t === undefined || t === state.activeId;
     }
+
+    function mostraProssima() {
+      if (mostrata) return;
+      const prossima = coda.find(suaVolta);
+      if (!prossima) { sincronizzaRiserva(); return; }
+      mostrata = { id: prossima.id, tabId: prossima.info.tabId, nodo: disegna(prossima.info) };
+      sincronizzaRiserva();
+    }
+
+    // Cambio scheda: la domanda di prima torna in coda (non si risponde, non si
+    // perde) e prende il posto quella della scheda su cui si è appena arrivati.
+    function riallinea() {
+      if (mostrata && !suaVolta({ info: { tabId: mostrata.tabId } })) {
+        rimuoviNodo(mostrata.nodo);
+        mostrata = null;
+      }
+      mostraProssima();
+    }
+    api.tabs.onUpdate(() => { try { riallinea(); } catch (_) {} });
+    window.addEventListener('resize', () => { try { sincronizzaRiserva(); } catch (_) {} });
 
     api.permissions.onClosed((info) => { if (info && info.id) chiudiPastiglia(info.id); });
 
@@ -1698,6 +1721,83 @@
       coda.push({ id, info });
       mostraProssima();
     });
+
+    // ── Che cosa si condivide ──────────────────────────────────────────────
+    // Dopo il «Consenti» sulla cattura dello schermo: tutto lo schermo, o una
+    // finestra sola. Consegnare sempre lo schermo intero vuol dire mostrare
+    // anche le notifiche che arrivano e tutto ciò che c'è aperto dietro, a chi
+    // voleva far vedere una diapositiva.
+    if (api.permissions.onPickSource) {
+      let scelta = null; // { id, nodo }
+
+      function chiudiScelta(id) {
+        if (!scelta || (id !== undefined && scelta.id !== String(id))) return;
+        rimuoviNodo(scelta.nodo);
+        scelta = null;
+        riservaTop('fonte-schermo', 0);
+      }
+
+      function rispondiScelta(id, fonteId) {
+        chiudiScelta(id);
+        try { api.permissions.pickSource(id, fonteId); } catch (_) {}
+      }
+
+      api.permissions.onSourceClosed((info) => { if (info && info.id) chiudiScelta(info.id); });
+
+      api.permissions.onPickSource((info) => {
+        if (!info || !info.id || !Array.isArray(info.voci) || !info.voci.length) return;
+        const id = String(info.id);
+        chiudiScelta();
+
+        const box = document.createElement('div');
+        box.className = 'perm-source';
+        box.setAttribute('role', 'dialog');
+        box.dataset.id = id;
+
+        const titolo = document.createElement('div');
+        titolo.className = 'perm-source-title';
+        const sito = document.createElement('strong');
+        sito.textContent = info.host || 'Questo sito';
+        titolo.appendChild(sito);
+        titolo.appendChild(document.createTextNode(' vedrà quello che scegli qui'));
+        box.appendChild(titolo);
+
+        const griglia = document.createElement('div');
+        griglia.className = 'perm-source-grid';
+        for (const v of info.voci) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'perm-source-item' + (v.schermo ? ' schermo' : '');
+          if (v.anteprima) {
+            const img = document.createElement('img');
+            img.src = v.anteprima;
+            img.alt = '';
+            b.appendChild(img);
+          }
+          const n = document.createElement('span');
+          n.textContent = v.nome;
+          n.dataset.tip = v.nome;
+          b.appendChild(n);
+          b.addEventListener('click', () => rispondiScelta(id, v.id));
+          griglia.appendChild(b);
+        }
+        box.appendChild(griglia);
+
+        const annulla = document.createElement('button');
+        annulla.type = 'button';
+        annulla.className = 'perm-chip-btn perm-source-cancel';
+        annulla.textContent = 'Annulla';
+        annulla.addEventListener('click', () => rispondiScelta(id, null));
+        box.appendChild(annulla);
+
+        permHost.appendChild(box);
+        scelta = { id, nodo: box };
+        requestAnimationFrame(() => {
+          if (!scelta) return;
+          riservaTop('fonte-schermo', Math.ceil(box.getBoundingClientRect().bottom) + 6);
+        });
+      });
+    }
   }
 
   // ─── Chip "popup bloccato" ─────────────────────────────────────────────
