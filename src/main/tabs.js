@@ -2320,7 +2320,16 @@ class TabManager {
       // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
+      // #590 (quarto giro) — prima di riconoscere un login si chiede alla
+      // lista. "Somiglia a un accesso" lo decide l'indirizzo che la pagina
+      // scrive (basta un percorso /login, /signin, /oauth), quindi qualunque
+      // pagina poteva far comparire un sito della lista dentro una finestrella.
+      // Il giro prima aveva chiuso gli spostamenti DENTRO quella finestrella,
+      // non il suo primo indirizzo: la finestra nasceva, il primo caricamento
+      // veniva fermato, e all'utente restava a schermo un rettangolo vuoto da
+      // chiudere a mano. Chiedendo qui la finestra non nasce affatto.
       if (tab.isInternal === false && isAuthPopup(url)) {
+        if (this._maybeBlockNavigation(url, { fromUrl: wc.getURL() })) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
       const isAdLikePopup = disposition === 'new-window';
