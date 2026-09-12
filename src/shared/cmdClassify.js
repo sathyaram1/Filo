@@ -1058,7 +1058,10 @@
   // Restano fuori le opzioni il cui valore è un MODELLO DA CERCARE e non un file
   // (`-e`, `--regexp=`, `-Pattern:`, `/C:`): misurarlo faceva chiedere un OK
   // spiegando una cosa falsa, che è il rilievo chiuso al giro 2.
-  const FLAG_MODELLO_RE = /^(e|regexp|pattern|c|color|colour|include|exclude|filter|encoding|delim|sep|format)/i;
+  // (`--grep=`, `--author=`, `--message=` di git portano un TESTO da cercare o da
+  // scrivere, non un file: misurarli farebbe chiedere un OK a chi cerca la parola
+  // «passwd» nel proprio diario dei commit, spiegandolo con una frase falsa.)
+  const FLAG_MODELLO_RE = /^(e|regexp|pattern|c|color|colour|include|exclude|filter|encoding|delim|sep|format|grep|author|committer|message|msg|since|until|search|query|sort|pretty)/i;
   function valoreDiFlag(tok) {
     const t = unquote(String(tok || ''));
     const m = t.match(/^-{1,2}([A-Za-z][A-Za-z0-9_-]*)[:=](.+)$/) || t.match(/^\/([A-Za-z]+):(.+)$/)
