@@ -845,7 +845,7 @@ class TabManager {
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
     this._maybeApplyDomainRule(tab, url);
     this._broadcast();
-    return id;
+    return { id, blocked: '', host: '' };
   }
 
   closeTab(id) {
