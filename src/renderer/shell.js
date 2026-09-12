@@ -1937,15 +1937,14 @@
   if (api.tabs.onPopupBlocked) {
     const chipHost = document.createElement('div');
     chipHost.id = 'popup-chips';
-    chipHost.style.position = 'fixed';
-    chipHost.style.top = '52px';
-    chipHost.style.right = '12px';
-    chipHost.style.zIndex = '1000';
     chipHost.style.display = 'flex';
     chipHost.style.flexDirection = 'column';
+    chipHost.style.alignItems = 'flex-end';
     chipHost.style.gap = '6px';
     chipHost.style.pointerEvents = 'auto';
-    document.body.appendChild(chipHost);
+    // Nella colonna degli avvisi della scheda, sotto la domanda di un permesso:
+    // prima si risponde a chi aspetta una risposta. Vedi `fasciaAvvisi`.
+    fasciaAvvisi().appendChild(chipHost);
 
     api.tabs.onPopupBlocked((info) => {
       if (!info) return;
