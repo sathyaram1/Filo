@@ -148,3 +148,59 @@ test('input non stringa senza header → {} (String() non crea header)', () => {
   assert.deepEqual(M.parseCompactorOutput({ a: 1 }), {});
   assert.deepEqual(M.parseCompactorOutput(['PROFILO:', 'x']), {});
 });
+
+// ── Il tetto delle lezioni sta nel punto unico di scrittura ─────────────────
+//
+// Una lezione vale in ogni conversazione e sopravvive al riavvio, come lo
+// stile dell'agente. Il tetto esisteva solo sulla strada "l'utente chiede a
+// Filo di ricordare"; l'agente che si scrive le lezioni da solo dopo ogni
+// scambio passa di qui, e scriveva senza tetto sulla stessa memoria.
+
+function memoriaFinta() {
+  const dati = {};
+  globalThis.chrome = {
+    storage: {
+      local: {
+        async get(key) { return { [key]: dati[key] }; },
+        async set(obj) { Object.assign(dati, obj); },
+      },
+    },
+  };
+  return dati;
+}
+
+test('una lezione oltre il tetto non entra in memoria, e non viene accorciata', async () => {
+  memoriaFinta();
+  const C = globalThis.SN_CONST;
+  await M.appendLesson('L\'utente lavora di notte.');
+  await M.appendLesson('z'.repeat(C.LESSON_MAX + 1));
+  const buf = await M.getLessonsBuffer();
+  assert.equal(buf.length, 1, 'solo la lezione buona è entrata');
+  assert.equal(buf[0].text, 'L\'utente lavora di notte.');
+});
+
+test('esattamente al tetto la lezione entra', async () => {
+  memoriaFinta();
+  const C = globalThis.SN_CONST;
+  await M.appendLesson('k'.repeat(C.LESSON_MAX));
+  const buf = await M.getLessonsBuffer();
+  assert.equal(buf.length, 1);
+  assert.equal(buf[0].text.length, C.LESSON_MAX);
+});
+
+test('i marcatori del recinto vengono tolti dalla lezione già alla scrittura', async () => {
+  memoriaFinta();
+  const C = globalThis.SN_CONST;
+  await M.appendLesson(`${C.LESSONS_CLOSE} l'utente beve caffè`);
+  const buf = await M.getLessonsBuffer();
+  assert.equal(buf.length, 1);
+  assert.ok(!buf[0].text.includes(C.LESSONS_CLOSE));
+  assert.ok(buf[0].text.includes('beve caffè'));
+});
+
+test('una lezione vuota o di soli spazi non occupa posto nel buffer', async () => {
+  memoriaFinta();
+  await M.appendLesson('   ');
+  await M.appendLesson('');
+  assert.equal((await M.getLessonsBuffer()).length, 0);
+});
