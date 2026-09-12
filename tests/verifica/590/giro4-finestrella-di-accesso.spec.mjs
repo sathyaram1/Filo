@@ -234,18 +234,22 @@ test('N — ricaricare una scheda ferma su un sito messo in lista nel frattempo'
   expect(p, 'con la lista vuota il sito si apre').not.toBeNull();
   await expect(p.locator('#t')).toBeVisible({ timeout: 8000 });
 
+  // Un segno che solo un caricamento nuovo può cancellare: se dopo la ricarica
+  // c'è ancora, la pagina non e' stata richiesta di nuovo.
+  await p.evaluate(() => { window.__segno = 'vecchio'; });
+
   await metti(LISTA); // adesso l'utente lo mette in lista
+  await shell.evaluate(() => document.querySelectorAll('.shell-notif').forEach((n) => n.remove()));
 
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
   const id = snap.tabs[snap.tabs.length - 1].id;
   await shell.evaluate((i) => window.filoShell.tabs.reload(i), id);
   await shell.waitForTimeout(2500);
 
-  const ancora = finestreSu(LISTA);
-  const viva = ancora.length
-    ? await ancora[ancora.length - 1].evaluate(() => !!document.getElementById('t')).catch(() => false)
-    : false;
-  expect(viva, 'ricaricare non deve ricaricare un sito che adesso è in lista').toBe(false);
+  const segno = await p.evaluate(() => window.__segno).catch(() => null);
+  expect(segno, 'la pagina non deve essere stata richiesta di nuovo').toBe('vecchio');
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }))
+    .toBeVisible({ timeout: 4000 });
 });
 
 test('N2 — la pagina che si ricarica DA SOLA non deve scavalcare la lista', async () => {
