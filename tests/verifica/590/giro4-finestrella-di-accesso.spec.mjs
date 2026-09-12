@@ -205,6 +205,20 @@ test('L2 — la stessa cosa con i parametri OAuth invece del percorso', async ()
   expect(caricata, 'il sito della lista non deve comparire in una finestrella di accesso').toBe(false);
 });
 
+test('L3 — la finestrella fermata non deve restare lì vuota', async () => {
+  // Il sito non si apre, ed è giusto. Ma la finestrella è già NATA: resta a
+  // schermo senza indirizzo, senza titolo e senza contenuto, e l'utente la deve
+  // chiudere a mano. È lo stesso prezzo già pagato (e già tolto) per la scheda
+  // rimasta vuota dopo un rimbalzo fermato.
+  await metti(LISTA);
+  await apriEClicca('/apri-login');
+  await shell.waitForTimeout(3000);
+  const vuote = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w.webContents.getURL())
+    .length);
+  expect(vuote, 'non deve restare aperta una finestra senza indirizzo').toBe(0);
+});
+
 // ─── Porta M: la finestrella che ne apre un'altra ────────────────────────────
 
 test('M — da dentro la finestrella, una seconda finestrella sullo stesso sito', async () => {
