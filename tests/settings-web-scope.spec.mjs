@@ -139,7 +139,12 @@ test('anche la lettura a richiesta da una pagina web è ridotta ai campi ammessi
   expect(rispostaInterna?.settings?.apiKeys?.openrouter).toBe(CHIAVE);
 });
 
-test('da una pagina web non si può chiedere TUTTO lo storage in un colpo solo', async ({ app, openTab, testServer }) => {
+test('da una pagina web non si può chiedere TUTTO lo storage in un colpo solo', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate((chiave) => window.filoShell.message({
+    type: 'update_settings',
+    settings: { apiKeys: { openrouter: chiave } },
+  }), CHIAVE);
+
   const web = await testServer.openReady(openTab, '<h1>pagina esterna</h1>');
   const url = web.url();
 
