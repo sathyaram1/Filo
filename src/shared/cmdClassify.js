@@ -72,6 +72,30 @@
 //     -c/--cookie-jar, --etag-save, --trace/--trace-ascii, --stderr, --libcurl,
 //     --hsts, --alt-svc, --metalink, `-w '%output{...}'`) e -K/--config, che nasconde
 //     l'output dentro un file di opzioni.
+//   • LEGGERE NON È GRATIS (#587). Una lettura non modifica niente, ma mette il
+//     contenuto nel contesto del modello — e da lì una pagina ostile che pilota
+//     il modello può portarlo fuori (vedi src/shared/urlExfil.js). Quindi la sola
+//     lettura è livello 1 solo DENTRO UN PERIMETRO DICHIARATO: la cartella da cui
+//     l'assistente parte (`perimetro`, iniettata dal main = home dell'utente).
+//     Fuori di lì — `/etc/passwd`, `C:\Windows\...`, un percorso che risale con
+//     `..` — la lettura chiede un OK (livello 2). Il perimetro NON è la cartella
+//     di lavoro corrente: quella la sposta l'assistente da sé con `cd` (livello 1,
+//     nessuna conferma, persistente), quindi un perimetro agganciato a `cd` si
+//     sposterebbe da solo e non sarebbe un perimetro. Per lo stesso motivo un
+//     `cd` DENTRO una sequenza viene seguito (`cd /etc && cat passwd` risolve
+//     `passwd` in `/etc`) e la cartella corrente vera arriva dal main (`cwd`),
+//     così `cd /etc` in un turno e `cat passwd` in quello dopo danno lo stesso
+//     esito dello stesso comando concatenato.
+//   • DENTRO il perimetro restano fuori dal livello 1 i BERSAGLI RISERVATI —
+//     `.ssh`, `.aws`, `.gnupg`, `.config`, `AppData`, `.env`, `id_rsa`,
+//     `.git-credentials`, cronologie della shell… — perché il perimetro dichiarato
+//     È la home: senza questa regola «dentro la home» vorrebbe dire «ovunque
+//     contino i segreti».
+//   • VARIABILI D'AMBIENTE: `printenv`, `ps`, `Get-Process`, `Get-ChildItem Env:` e
+//     qualunque comando che nomini una variabile (`$HOME`, `$env:USERPROFILE`,
+//     `%APPDATA%`) non sono livello 1. Contengono token e percorsi personali, e
+//     una variabile nasconde al classificatore il bersaglio vero del comando.
+//     L'interrogazione di versione (`ps --version`) resta lettura pura → 1.
 
 (function (global) {
   'use strict';
