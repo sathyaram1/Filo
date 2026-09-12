@@ -835,6 +835,7 @@
 
     if (!Object.keys(partial).length) return;
 
+    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
     ultimoInviato = { ...(ultimoInviato || {}), ...partial };
 
@@ -973,6 +974,7 @@
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
+      if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       if (staScrivendo()) return;
       load().catch(() => {});
     });

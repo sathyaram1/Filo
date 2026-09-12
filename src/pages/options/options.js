@@ -419,6 +419,7 @@
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
+      if (Date.now() - ecoDaIgnorare < ECO_MS) return;
       const el = document.activeElement;
       if (el && el !== document.body && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
       load().catch(() => {});
@@ -826,6 +827,11 @@
   // quello che era cambiato altrove mentre restava aperta — la chiave API
   // sostituita in chat tornava quella di prima cliccando una spunta.
   let ultimoInviato = null;
+  // Quando abbiamo salvato noi: l'annuncio che rimbalza indietro subito dopo è
+  // il nostro, non una modifica arrivata da fuori, e rileggere la pagina in
+  // quel momento cancellerebbe gli avvisi appena mostrati.
+  let ecoDaIgnorare = 0;
+  const ECO_MS = 1500;
 
   function raccogli() {
     const apiKey = $('apiKey').value.trim();
@@ -872,6 +878,7 @@
     }
 
     if (Object.keys(partial).length) {
+      ecoDaIgnorare = Date.now();
       await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
       ultimoInviato = { ...(ultimoInviato || {}), ...partial };
     }
