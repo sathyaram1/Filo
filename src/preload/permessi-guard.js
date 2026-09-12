@@ -155,21 +155,39 @@ function buildPermessiGuardSource(noti) {
 })();`;
 }
 
-// ── La richiesta che ammazza la scheda (#586) ───────────────────────────────
+// ── La richiesta che ammazza la scheda, e la roba già consegnata (#586) ──────
 //
-// Chiedere l'audio del computer con la strada vecchia della cattura schermo
-// (`chromeMediaSource: 'desktop'` fra i vincoli) SENZA chiedere anche
-// l'immagine dallo stesso posto non è una richiesta valida, e Chromium non la
-// rifiuta: chiude il processo della pagina. Per chi naviga la scheda muore
-// all'istante e al suo posto compare la pagina di errore di Filo, senza che
-// abbia toccato niente e senza una riga che lo spieghi. Basta una riga di una
-// pagina qualunque, anche per sbaglio.
+// Due cose nello stesso pezzo di codice, perché tutt'e due hanno bisogno di
+// stare dentro il mondo della pagina, dove vivono le tracce che il sito ha in
+// mano.
 //
-// Qui la richiesta impossibile viene rifiutata come la rifiuterebbe un browser,
-// con un errore che il sito può gestire, prima che Chromium la veda. Non è un
-// cancello di sicurezza (una pagina ostile può sempre far fuori il proprio
-// processo in altri modi): è la differenza fra un errore e una scheda morta.
+// 1. LA RICHIESTA CHE AMMAZZA LA SCHEDA. La strada vecchia della cattura
+//    schermo (`chromeMediaSource: 'desktop'` fra i vincoli) non si mescola: o
+//    viene dal desktop tutto quello che si chiede, o non è una richiesta
+//    valida. Chromium non la rifiuta, chiude il processo della pagina. Per chi
+//    naviga la scheda muore all'istante e al suo posto compare la pagina di
+//    errore di Filo, senza che abbia toccato niente. Le forme che ammazzano
+//    sono due e sono speculari:
+//      · l'audio del computer senza l'immagine dello schermo (#586, giro 4);
+//      · l'immagine dello schermo insieme a un microfono o a una webcam veri
+//        (#586, giro 5), che è quello che fanno i siti di videochiamata
+//        rimasti indietro quando condividono schermo e voce insieme.
+//    Qui tutt'e due tornano un errore che il sito sa gestire, prima che
+//    Chromium le veda. Non è un cancello di sicurezza (una pagina ostile può
+//    far fuori il proprio processo in altri modi): è la differenza fra un
+//    errore e una scheda morta.
+//
+// 2. CHIUDERE QUELLO CHE IL SITO HA GIÀ IN MANO. Togliere un permesso deve
+//    togliere anche la traccia già consegnata (#586, giro 4). L'unica strada
+//    che c'era era ricaricare la pagina, e ricaricare butta via quello che chi
+//    naviga stava scrivendo lì: il commento a metà, il modulo compilato, il
+//    punto in cui era arrivato a leggere (#586, giro 5). Qui teniamo il conto
+//    delle tracce consegnate e le fermiamo su richiesta, senza toccare la
+//    pagina. Filo ricarica solo se qualcosa resta vivo lo stesso, che è il caso
+//    di una pagina che ha fatto di tutto per non passare di qui.
 function buildCatturaSicuraSource() {
+  const ferma = JSON.stringify(CANALE_FERMA);
+  const fermato = JSON.stringify(CANALE_FERMATO);
   return `(() => {
   try {
     const md = navigator.mediaDevices;
@@ -184,25 +202,133 @@ function buildCatturaSicuraSource() {
         return false;
       } catch (_) { return false; }
     };
+    const chiesto = (v) => v !== undefined && v !== null && v !== false;
+
+    // Le tracce consegnate, con la chiave di Filo che le copre. Un insieme
+    // debole non va bene: qui ci serve scorrerle.
+    const consegnate = new Set(); // { traccia, chiave }
+    const registra = (stream, chiave) => {
+      try {
+        for (const t of stream.getTracks()) {
+          const k = chiave || (t.kind === 'audio' ? 'microfono' : 'fotocamera');
+          consegnate.add({ t, k });
+          try { t.addEventListener('ended', () => { for (const v of consegnate) if (v.t === t) consegnate.delete(v); }); } catch (_) {}
+        }
+      } catch (_) {}
+      return stream;
+    };
+    document.addEventListener(${ferma}, (e) => {
+      let vive = 0;
+      try {
+        const chiavi = (e && e.detail && Array.isArray(e.detail.chiavi)) ? e.detail.chiavi : null;
+        for (const v of [...consegnate]) {
+          if (v.t.readyState !== 'live') { consegnate.delete(v); continue; }
+          if (chiavi && !chiavi.includes(v.k)) { vive++; continue; }
+          try { v.t.stop(); } catch (_) {}
+          if (v.t.readyState === 'live') vive++; else consegnate.delete(v);
+        }
+      } catch (_) {}
+      try {
+        document.dispatchEvent(new CustomEvent(${fermato}, {
+          detail: { id: (e && e.detail && e.detail.id) || null, vive },
+        }));
+      } catch (_) {}
+    }, true);
+
     const vera = md.getUserMedia.bind(md);
     Object.defineProperty(md, 'getUserMedia', {
       configurable: true,
       writable: true,
       value: function getUserMedia(vincoli) {
+        const c = vincoli || {};
+        let schermo = false;
         try {
-          const c = vincoli || {};
-          if (desktop(c.audio) && !desktop(c.video)) {
+          const aD = desktop(c.audio);
+          const vD = desktop(c.video);
+          schermo = aD || vD;
+          if (aD && !vD) {
             return Promise.reject(new DOMException(
               "L'audio del computer si può chiedere solo insieme all'immagine dello schermo.",
               'NotSupportedError',
             ));
           }
+          if (vD && chiesto(c.audio) && !aD) {
+            return Promise.reject(new DOMException(
+              "L'immagine dello schermo si può chiedere da sola o insieme all'audio del computer, non insieme al microfono.",
+              'NotSupportedError',
+            ));
+          }
         } catch (_) {}
-        return vera(vincoli);
+        return vera(vincoli).then((s) => registra(s, schermo ? 'schermo' : null));
       },
     });
+
+    if (typeof md.getDisplayMedia === 'function') {
+      const veraD = md.getDisplayMedia.bind(md);
+      Object.defineProperty(md, 'getDisplayMedia', {
+        configurable: true,
+        writable: true,
+        value: function getDisplayMedia(vincoli) {
+          return veraD(vincoli).then((s) => registra(s, 'schermo'));
+        },
+      });
+    }
   } catch (_) {}
 })();`;
 }
 
-module.exports = { buildPermessiGuardSource, buildCatturaSicuraSource, CANALE, NOMI };
+// ── La posizione che non arriva mai (#586) ──────────────────────────────────
+//
+// Il motore su cui Filo è costruito chiede dove sei a un servizio di rete, e
+// quel servizio vuole una chiave che nelle versioni pubbliche del motore non
+// c'è. Risultato: chi risponde «Consenti» a «vuole sapere dove sei» dà via una
+// cosa delicata e al sito non arriva nessuna coordinata, solo un errore di
+// rete. Il sito mostra una mappa rotta e chi naviga dà la colpa al sito.
+//
+// Filo la posizione non la sa produrre da sé: quello che può fare è non far
+// finta. Qui il fallimento smette di essere silenzioso e diventa una riga che
+// lo dice, una volta per scheda.
+function buildPosizioneSinceraSource() {
+  const canale = JSON.stringify(CANALE_POSIZIONE_KO);
+  return `(() => {
+  try {
+    const g = navigator.geolocation;
+    if (!g || typeof g.getCurrentPosition !== 'function') return;
+    let detto = false;
+    // Codice 2 = POSITION_UNAVAILABLE: il sistema non ha saputo dire dove sei.
+    // Il 1 (negato) e il 3 (tempo scaduto) non c'entrano: quelli li ha decisi
+    // qualcuno.
+    const segnala = (err) => {
+      try {
+        if (detto || !err || err.code !== 2) return;
+        detto = true;
+        document.dispatchEvent(new CustomEvent(${canale}, { detail: {} }));
+      } catch (_) {}
+    };
+    const avvolgi = (nome) => {
+      const vera = g[nome] && g[nome].bind(g);
+      if (!vera) return;
+      Object.defineProperty(g, nome, {
+        configurable: true,
+        writable: true,
+        value: function (ok, ko, opzioni) {
+          return vera(ok, (err) => { segnala(err); if (typeof ko === 'function') ko(err); }, opzioni);
+        },
+      });
+    };
+    avvolgi('getCurrentPosition');
+    avvolgi('watchPosition');
+  } catch (_) {}
+})();`;
+}
+
+module.exports = {
+  buildPermessiGuardSource,
+  buildCatturaSicuraSource,
+  buildPosizioneSinceraSource,
+  CANALE,
+  CANALE_FERMA,
+  CANALE_FERMATO,
+  CANALE_POSIZIONE_KO,
+  NOMI,
+};
