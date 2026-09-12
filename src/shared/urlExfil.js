@@ -426,11 +426,16 @@
       return scorse.some((f) => f.includes(t));
     };
     const toks = corpusTokens(corpus);
+    const soloForti = new Set();
+    for (const t of corpusTokens(letto || '')) if (!toks.has(t)) soloForti.add(t);
     let hits = 0;
     let strong = false;
     let sample = '';
-    for (const t of toks) {
+    for (const t of [...toks, ...soloForti]) {
       if (t.length < MIN_TOKEN) continue;
+      // Del materiale letto contano solo i dati riconoscibili, mai le parole
+      // comuni: quelle sono l'argomento del documento, non un dato di nessuno.
+      const debolePermesso = !soloForti.has(t);
       if (!dentro(t)) {
         if (!isStrong(t)) continue;
         if (forme.some((f) => combaciaSpezzato(f, t))) {
