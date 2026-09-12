@@ -1030,6 +1030,7 @@
   // chi deve decidere in due secondi se cliccare OK.
   const FUORI = 'È fuori dalla tua cartella.';
   const AMBIENTE = 'Legge le variabili d’ambiente, dove spesso stanno chiavi e password.';
+  const REGISTRO = 'Legge il registro di sistema, dove diversi programmi tengono password salvate.';
   const PROCESSI = 'Elenca i programmi aperti e i comandi con cui sono partiti, che a volte contengono password.';
   const VARIABILE = 'Usa una variabile d’ambiente, quindi dal comando non si vede quale file apre.';
   const TUTTA = 'Passa in rassegna tutta la tua cartella, chiavi e password comprese.';
