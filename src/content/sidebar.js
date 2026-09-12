@@ -443,8 +443,11 @@
       await chrome.runtime.sendMessage({
         type: MSG.SAVE_PATH,
         payload: {
-          // Niente clientId per ora (anonimo). Se in futuro ne servisse uno
-          // stabile, lo si genera in pageBootstrap o storage.local.
+          // Vuoto di proposito: da #585 il mittente si presenta al server con
+          // il token dell'identità dell'installazione, che il server verifica,
+          // e che il main allega alla richiesta. Un identificativo generato
+          // qui sarebbe autodichiarato, e chi attacca ne scriverebbe un altro
+          // a ogni invio.
           clientId: '',
           session: {
             rawUrl: session.initialUrl,

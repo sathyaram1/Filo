@@ -1,10 +1,18 @@
-// Client Firestore REST per la collection `paths` (raccolta percorsi
-// dell'Aiuto). Stesso progetto Firebase usato dai feedback.
+// Raccolta percorsi dell'Aiuto (`paths`): lettura diretta da Firestore REST,
+// scrittura SOLO attraverso il server.
 //
-// Pattern uguale a SN_FEEDBACK ma molto più ridotto: niente upload immagini,
-// solo create + list. Funziona sia da service worker sia da pagina.
+// Perché le due strade non sono simmetriche. La lettura è pubblica per
+// costruzione (i percorsi servono all'agente Aiuto di chiunque). La scrittura
+// no: è l'unico contenuto di Filo che un utente scrive e un ALTRO utente si
+// ritrova nel prompt. Finché si scriveva di qui con la chiave pubblica del
+// repo, chiunque poteva depositare un "percorso" per un dominio a scelta
+// saltando la pulizia dell'app (audit pre-alpha, #585). Ora le regole non
+// lasciano scrivere nessun client (firestore.rules → match /paths) e l'invio
+// passa dalla callable `pathSubmit` del backend di sicurezza, che riapplica la
+// pulizia condivisa (SN_PATHS_SAFETY.sanitizeSubmission) e tiene i limiti di
+// frequenza per identità.
 //
-// Espone SN_PATHS = { submit, list }.
+// Espone SN_PATHS = { submit, listByDomain }.
 
 (function (global) {
   'use strict';
@@ -15,23 +23,12 @@
 
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-  function toFsValue(v) {
-    if (v === null || v === undefined) return { nullValue: null };
-    if (typeof v === 'string') return { stringValue: v };
-    if (typeof v === 'boolean') return { booleanValue: v };
-    if (typeof v === 'number') {
-      return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-    }
-    if (Array.isArray(v)) {
-      return { arrayValue: { values: v.map(toFsValue) } };
-    }
-    if (typeof v === 'object') {
-      const fields = {};
-      for (const [k, vv] of Object.entries(v)) fields[k] = toFsValue(vv);
-      return { mapValue: { fields } };
-    }
-    return { stringValue: String(v) };
-  }
+  // Base delle Cloud Function callable del backend di sicurezza (filo-security):
+  // stessa region/progetto degli altri canali (auth, wallet, redteam). Override
+  // per i test via env, come là.
+  const FUNCTIONS_BASE = (typeof process !== 'undefined' && process.env && process.env.FILO_FUNCTIONS_BASE)
+    || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
+  const SUBMIT_FUNCTION = 'pathSubmit';
 
   function fromFsValue(val) {
     if (!val) return null;
@@ -58,33 +55,47 @@
     return out;
   }
 
-  // Crea un documento `paths`. I campi corrispondono allo schema di
-  // firestore.rules. `steps` è un array di {selector, action, retracted}.
-  async function submit({ domain, initialUrl, intent, steps, success, userAgent, clientId }) {
-    const doc = {
-      fields: {
-        domain: toFsValue(domain || ''),
-        initialUrl: toFsValue(initialUrl || ''),
-        intent: toFsValue(intent || ''),
-        steps: toFsValue(Array.isArray(steps) ? steps : []),
-        success: toFsValue(!!success),
-        userAgent: toFsValue(userAgent || ''),
-        clientId: toFsValue(clientId || ''),
-        createdAt: { timestampValue: new Date().toISOString() },
-      },
-    };
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
-    const res = await fetch(endpoint, {
+  // Invia un percorso al server, che lo ripulisce di nuovo e lo scrive.
+  //
+  // `idToken` è l'identità su cui il server tiene i limiti di frequenza, e la
+  // manda OGNI installazione: è il token dell'account anonimo che Filo si crea
+  // da sé (quello di crediti e portafoglio), non quello del login Google, che
+  // è opzionale. Il mittente resta anonimo lo stesso: l'identità viaggia
+  // ACCANTO al documento e non ci entra, perché la raccolta la legge chiunque.
+  //
+  // `clientId` è il ripiego dichiarato nel contratto della callable (vedi
+  // SECURITY.md §8) per una richiesta che arrivasse senza token: oggi Filo non
+  // ne genera uno e lo manda vuoto, perché un identificativo che si dichiara
+  // da solo non regge un limite di frequenza — chi attacca ne scrive un altro.
+  async function submit({ domain, initialUrl, intent, steps, success, userAgent, clientId, idToken }) {
+    const Safety = global.SN_PATHS_SAFETY;
+    // Senza il modulo di pulizia non si spedisce: un ripiego che manda il
+    // percorso così com'è sarebbe la porta di prima, aperta da un errore di
+    // caricamento invece che da una regola.
+    if (!Safety) throw new Error('SN_PATHS_SAFETY non caricato: percorso non inviato');
+    // La stessa pulizia che rifarà il server: quello che non passa di qui non
+    // vale la pena spedirlo.
+    const pulito = Safety.sanitizeSubmission({ domain, initialUrl, intent, steps, success, userAgent });
+    if (!pulito.ok) throw new Error(`percorso scartato prima dell'invio: ${pulito.reason}`);
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const res = await fetch(`${FUNCTIONS_BASE}/${SUBMIT_FUNCTION}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
+      headers,
+      body: JSON.stringify({ data: { ...pulito.doc, clientId: clientId || '' } }),
     });
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`firestore create paths fallito (${res.status}): ${errText.slice(0, 300)}`);
+      let detail = '';
+      try { detail = (await res.text()).slice(0, 300); } catch (_) {}
+      throw new Error(`pathSubmit ${res.status}${detail ? ': ' + detail : ''}`);
     }
-    const json = await res.json();
-    return { id: json.name?.split('/').pop() || '' };
+    const body = await res.json().catch(() => null);
+    const r = body && body.result;
+    if (!r || r.saved === false) {
+      throw new Error(`pathSubmit ha rifiutato il percorso: ${(r && r.reason) || 'motivo non dichiarato'}`);
+    }
+    return { id: (r && r.id) || '' };
   }
 
   // Lista i path di un dominio specifico, ordinati per recency. Usata in

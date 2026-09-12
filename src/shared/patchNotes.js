@@ -19,6 +19,7 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
+        'L\'Aiuto tratta le tracce di navigazione lasciate da altri come indizi da verificare sulla pagina, non come istruzioni da eseguire. E nessuno può più aggiungerne una senza passare da Filo. Quelle che mandi tu partono senza i tuoi dati: indirizzi email, IBAN, codici fiscali e numeri di telefono vengono cancellati prima.',
       ],
     },
     {

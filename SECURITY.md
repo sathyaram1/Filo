@@ -34,6 +34,10 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
 - **I feedback che invii** (testo + eventuali screenshot) vengono salvati sui
   nostri server per permetterci di correggere i bug. Non includere in un
   feedback informazioni che non vuoi condividere.
+- **Quando l'Aiuto ti guida su un sito** e alla fine dici che ha funzionato,
+  salviamo la traccia della navigazione (il sito, i passaggi, una frase
+  sull'obiettivo) perché aiuti anche gli altri. Non ci finiscono i tuoi
+  messaggi, né niente che ti identifichi.
 - **Trasparenza:** questa pagina elenca esattamente cosa raccogliamo e cosa
   no. Se qualcosa cambia, cambia anche qui.
 
@@ -219,7 +223,77 @@ rotazione è da rifare da capo.
 
 ---
 
-## 8. Aggiornamenti automatici
+## 8. I percorsi condivisi dell'Aiuto
+
+**Stato: 🔜 — la porta è chiusa, la strada nuova non è ancora aperta.** Le
+regole non lasciano più scrivere nessun client, e in lettura i percorsi sono
+già trattati come contenuto esterno. Manca la callable `pathSubmit`: oggi
+l'indirizzo risponde che non esiste, quindi nessun percorso entra più nella
+raccolta e ogni invio fallisce senza lasciare traccia fuori dalla console.
+Va sciolto prima di pubblicare una versione, o la raccolta resta ferma e non
+se ne accorge nessuno.
+
+Quando l'Aiuto ti accompagna passo passo su un sito e alla fine rispondi «ha
+funzionato», Filo può salvare la traccia di quella navigazione. Dentro ci sono
+il dominio, la sezione di partenza, la sequenza di elementi toccati e una frase
+che riassume l'obiettivo, scritta da un modello che vede solo dati
+programmatici. Serve a far partire avvantaggiato chi cercherà la stessa cosa su
+quel sito.
+
+Prima di partire, da tutti e tre (elementi toccati, sezione di partenza, frase
+dell'obiettivo) vengono cancellati i dati che identificano una persona:
+indirizzi email, IBAN, codici fiscali, numeri lunghi e numeri scritti con spazi
+o trattini, come i telefoni e le carte. Al loro posto resta un segnaposto. La
+stessa cancellazione si rifà in lettura, perché nella raccolta ci sono anche
+documenti nati prima.
+
+È l'unico dato di Filo che attraversa il confine fra utenti. Quello che salvi tu
+finisce nel prompt dell'Aiuto di un altro, quindi valgono due regole insieme.
+
+**In scrittura non scrive nessun client.** Le regole Firestore negano create,
+update e delete su `paths` a chiunque. Un percorso entra solo attraverso la
+Cloud Function `pathSubmit` del backend di sicurezza, che riapplica la pulizia
+condivisa e tiene i limiti di frequenza. Prima bastavano dei vincoli di forma, e
+la chiave web di Firebase è pubblica per design: chiunque poteva depositare un
+«percorso» per il dominio che voleva, saltando i due modelli che nell'app
+ripuliscono i percorsi. Nessuna regola se ne può accorgere, perché quei modelli
+girano sulla macchina di chi naviga.
+
+Il contratto della callable, per chi la implementa nel backend:
+
+- accetta anche richieste **senza login**, così il mittente resta anonimo.
+  L'identità arriva come `Authorization: Bearer <ID token>` e c'è sempre: è
+  quella dell'installazione, l'account anonimo che Filo si crea da sé (lo
+  stesso di crediti e portafoglio), non il login Google, che è opzionale. Il
+  server la verifica. Se per un guasto non arrivasse, restano il `clientId`
+  della richiesta e l'IP, ma sono ripieghi: il primo se lo dichiara il
+  mittente, il secondo cambia da solo;
+- riapplica `sanitizeSubmission` di `src/shared/pathsSafety.js`. È il modulo
+  condiviso che il backend incorpora al deploy, e la pulizia deve restare la
+  stessa dalle due parti. Una copia scritta a mano diverge in silenzio;
+- tiene un **limite di frequenza per identità**, e anche per dominio di
+  destinazione. Un attacco rende avvelenando lo stesso dominio molte volte;
+- scrive con l'Admin SDK e mette lui il `createdAt` (timestamp). La lettura
+  ordina per quel campo, un documento senza quel campo resta invisibile. Il
+  `clientId` invece **non entra nel documento**, perché la raccolta è leggibile
+  da chiunque e un identificativo stabile lì dentro legherebbe fra loro le
+  navigazioni di una stessa installazione;
+- risponde `{ result: { saved: true, id } }` oppure `{ result: { saved: false,
+  reason } }`. Un rifiuto non è un errore dell'utente e non gli viene mostrato:
+  la raccolta è best-effort.
+
+**In lettura sono contenuto esterno.** I percorsi restano leggibili da chiunque,
+perché servono anche all'Aiuto di chi non ha un account. Chi li mette in un
+prompt però li ripulisce di nuovo e li chiude fra due marcature, sotto
+un'intestazione che dice da dove vengono e che sono dati, non ordini. Il
+promemoria in fondo al prompt li cita insieme alla pagina, all'outline e
+all'llms.txt del sito. Questo vale anche adesso che la scrittura passa dal
+server, perché un percorso mandato in buona fede può contenere il testo di una
+pagina ostile.
+
+---
+
+## 9. Aggiornamenti automatici
 
 **Stato: 🔜**
 
@@ -238,5 +312,5 @@ segnalazioni di sicurezza con priorità.
 
 ---
 
-*Ultimo aggiornamento: 2026-05-29. Questo documento evolve insieme all'app;
+*Ultimo aggiornamento: 2026-09-11. Questo documento evolve insieme all'app;
 le voci 🔜 e 💭 verranno aggiornate a ✅ quando le misure entrano in funzione.*
