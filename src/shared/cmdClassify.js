@@ -1228,7 +1228,17 @@
       // è quella del TESTO del comando (percorso assoluto, risalita con `..`), e
       // una cartella corrente non è testo del comando.
       let scritti = operandsOf(t);
-      if (CERCA_PRIMA.has(prog) && scritti.length && !CERCA_DA_FLAG_RE.test(t)) scritti = scritti.slice(1);
+      if (CERCA_PRIMA.has(prog)) {
+        // Il modello cercato non è un file: o è il primo operando, o arriva dal
+        // token che segue `-e`/`--regexp`/`-Pattern`.
+        const dopoFlag = [];
+        const toks = tokens(t).slice(1).map(unquote);
+        for (let i = 0; i < toks.length - 1; i++) {
+          if (CERCA_MODELLO_FLAG_RE.test(toks[i]) && !isFlagToken(toks[i + 1])) dopoFlag.push(toks[i + 1]);
+        }
+        if (dopoFlag.length) scritti = scritti.filter((x) => !dopoFlag.includes(x));
+        else if (scritti.length && !CERCA_DA_FLAG_RE.test(t)) scritti = scritti.slice(1);
+      }
       // Un percorso può stare attaccato al nome di un'opzione (`-Path:…`,
       // `--file=…`): vale come un operando scritto a parte.
       scritti = scritti.concat(valoriDeiFlag(t));
