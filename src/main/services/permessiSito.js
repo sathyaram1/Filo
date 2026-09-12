@@ -1202,6 +1202,7 @@ module.exports = {
   rispostaFermata,
   posizioneNonDisponibile,
   chiudiNotizia,
+  riprendiAChiedere,
   contesto,
   scegliFonteRisposta,
   interrompiUso,
