@@ -1165,7 +1165,15 @@
     const perim = o.perimetro ? pathParts(o.perimetro) : null;
     const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
     const home = o.home || o.perimetro || '';
-    let cwd = o.cwd || o.perimetro || '';
+    const esc = barraEscape(o.shell);
+    // Le cartelle di lavoro possibili. Si parte da UNA — quella vera, che il main
+    // legge dalla shell dopo ogni comando, quindi già sciolta — e se ne aggiungono
+    // solo quando uno spostamento dentro questa stessa sequenza si può leggere in
+    // più modi. Con una shell Unix dichiarata anche la cartella di partenza si
+    // legge in entrambi i modi: lì una barra rovesciata in un nome è un escape,
+    // non un separatore.
+    const partenza = o.cwd || o.perimetro || '';
+    let cwds = esc === true ? lettureDi(partenza, true) : [partenza];
     const parts = splitSafeSequence(raw) || splitSafePipeline(raw) || [raw];
     for (const part of parts) {
       const t = dequote(part);
@@ -1177,10 +1185,18 @@
         return (prog === 'ps' || prog === 'get-process' || prog === 'gps') ? PROCESSI : AMBIENTE;
       }
       if (CHDIR.has(prog)) {
-        const dest = operandsOf(t)[0];
+        const dest = operandsOf(t)[0] || valoriDeiFlag(t)[0];
         if (dest) {
-          const moved = resolveTarget(dest, cwd, home);
-          if (moved) cwd = (moved.root || '') + '/' + moved.segs.join('/');
+          const nuove = [];
+          for (const base of cwds) {
+            for (const lettura of lettureDi(dest, esc)) {
+              const moved = resolveTarget(lettura, base, home);
+              if (!moved) continue;
+              const s = (moved.root || '') + '/' + moved.segs.join('/');
+              if (!nuove.includes(s)) nuove.push(s);
+            }
+          }
+          if (nuove.length) cwds = nuove.slice(0, 4);
         }
         continue;
       }
