@@ -86,6 +86,26 @@ test('anche svuotando il testo a mano lo stile sparisce davvero', async ({ openT
   await expect(page.locator('#agentStyleText')).toHaveValue('');
 });
 
+test('«normale» scritto a mano resta uno stile, mentre detto a Filo cancella', async ({ app, openTab }) => {
+  // Le due strade per la stessa cosa non fanno la stessa cosa. In chat una
+  // manciata di parole («nessuno», «normale», «standard», «no») vogliono dire
+  // «togli lo stile»; nel textarea sono testo come un altro.
+  const page = await apriPreferenze(openTab);
+  await page.fill('#agentStyleText', 'normale');
+  await page.waitForTimeout(1500);
+  await page.reload();
+  await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
+  const daPagina = await page.locator('#agentStyleText').inputValue();
+
+  const daChat = await app.evaluate(() => {
+    const b = globalThis.SN_PREF.buildPreferencePartial('stile_agente', 'normale');
+    return b && b.partial ? b.partial.agentStyle : null;
+  });
+
+  console.log('«normale» → dalla pagina:', JSON.stringify(daPagina), '| dalla chat:', JSON.stringify(daChat));
+  expect(daPagina).toBe(daChat);
+});
+
 test('il messaggio di rifiuto si legge su tema chiaro e su tema scuro', async ({ openTab }) => {
   const page = await apriPreferenze(openTab);
   const max = await page.evaluate(() => window.SN_CONST.AGENT_STYLE_MAX);
