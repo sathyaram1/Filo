@@ -506,3 +506,60 @@ test('#587 — un dato riscritto in base32 non esce senza conferma', () => {
     assert.equal(v.exfil, true, `"${seg}" in base32 deve far comparire l'avviso`);
   }
 });
+
+// #587 giro 8 — una parola lunga non è un dato, e il nome del sito non è carico.
+//
+// Bastava UNA parola del materiale letto dentro l'indirizzo per far comparire
+// l'avviso, e "parola" voleva dire dodici caratteri, oppure cinque con una cifra
+// dentro. In italiano quel metro prende in pieno le parole di tutti i giorni
+// («prenotazione», «assicurazione», «amministrazione»), i nomi dei siti scritti
+// attaccati («giallozafferano», «ilsole24ore») e i codici brevi («iPhone15»,
+// «FR1234»): dopo un documento letto l'avviso compariva su tre link normali su
+// quattro. Senza il fix ognuno di questi assert torna true.
+test('#587 — dopo un documento letto, i link di tutti i giorni si aprono e basta', () => {
+  for (const [url, letto] of [
+    ['https://www.giallozafferano.it/ricette/Spaghetti-alla-carbonara.html',
+      'Carbonara: guanciale, pecorino. Fonte: giallozafferano, primi piatti.'],
+    ['https://ricette.giallozafferano.it/Pasta-cacio-e-pepe.html',
+      'Carbonara: guanciale, pecorino. Fonte: giallozafferano, primi piatti.'],
+    ['https://www.generali.it/assicurazioni/auto',
+      "Promemoria: rinnovare l'assicurazione dell'auto entro ottobre."],
+    ['https://www.thefork.it/prenotazione/12345',
+      'Prenotazione confermata per il ristorante di sabato sera.'],
+    ['https://www.comune.firenze.it/amministrazione-trasparente',
+      "Riunione con l'amministrazione lunedì; portare la documentazione."],
+    ['https://www.apple.com/it/iphone15/', 'Ho comprato un iPhone15 usato, controllare la garanzia.'],
+    ['https://www.ryanair.com/it/it/booking/FR1234', 'Volo FR1234 per Barcellona, imbarco alle 6:20.'],
+    ['https://www.ilsole24ore.com/art/energia-prezzi-abc', 'Il rapporto completo è su ilsole24ore, sezione economia.'],
+  ]) {
+    const v = E.assess(url, { corpus: '', letto, fromUntrusted: true });
+    assert.equal(v.exfil, false, `"${url}" non porta fuori niente (${v.reason})`);
+  }
+});
+
+// …e la protezione vera resta identica: una chiave, una password o un numero di
+// cliente letti non escono senza conferma, in nessuna delle forme che chi compone
+// l'indirizzo può scegliere.
+test('#587 — un dato letto continua a non uscire senza conferma', () => {
+  const letto = [
+    'apiKey = sk-or-v1-9f3bd2a71c4e8b60',
+    'password = Segreto-Netrc-2026',
+    'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY',
+    'IBAN IT60X0542811101000000123456 — cliente 8842219',
+  ].join('\n');
+  for (const url of [
+    'https://male.esempio/?d=sk-or-v1-9f3bd2a71c4e8b60',
+    'https://male.esempio/?a=sk-or-v1-9f3&b=bd2a71c4e8b60',
+    'https://male.esempio/raccogli/skorv19f3bd2a71c4e8b60',
+    'https://skorv19f3bd2a71c4e8b60.male.esempio/',
+    'https://male.esempio/#Segreto-Netrc-2026',
+    'https://male.esempio/?d=Segreto-Netrc-2026',
+    'https://male.esempio/?d=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY',
+    'https://male.esempio/?d=IT60X0542811101000000123456',
+    'https://male.esempio/8842219/ping',
+    'https://sk-or-v1-9f3bd2a71c4e8b60@male.esempio/',
+  ]) {
+    const v = E.assess(url, { corpus: '', letto, fromUntrusted: true });
+    assert.equal(v.exfil, true, `"${url}" porta fuori un dato letto: deve chiedere conferma`);
+  }
+});

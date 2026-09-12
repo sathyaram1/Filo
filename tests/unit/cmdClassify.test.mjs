@@ -1693,3 +1693,59 @@ test('#587 — «cd -» e «popd» non fanno perdere di vista dove si legge', ()
     assert.equal(C.classify(cmd, dove()), 1, `"${cmd}" resta fra i file dell'utente`);
   }
 });
+
+// #587 giro 8 — la ricerca col testo cercato VUOTO.
+//
+// Per una ricerca il primo operando è il testo cercato e va scartato (giro 2).
+// Se quel testo è la stringa vuota — `grep "" file`, cioè «stampami tutte le
+// righe» — togliendo le virgolette non restava niente, il conto degli operandi
+// si spostava di uno e a essere scartato era IL FILE. Senza il fix ognuno di
+// questi comandi torna 1: stampa la chiave privata, o il file di sistema delle
+// password, senza chiedere niente.
+test('#587 — cercare a vuoto dentro un file riservato chiede un OK', () => {
+  const casa = '/home/mario';
+  const dove = { perimetro: casa, home: casa, cwd: casa, shell: 'bash' };
+  for (const cmd of [
+    'grep "" .ssh/config',
+    "grep '' .ssh/id_rsa",
+    'grep "" .netrc',
+    'grep "" .config/Filo/storage.json',
+    'grep -i "" .ssh/config',
+    'grep -n "" .config/Filo/storage.json',
+    'grep -e "" .ssh/config',
+    'grep -- "" .ssh/config',
+    'grep --regexp "" .ssh/config',
+    'grep "" ~/.ssh/config',
+    'grep "" .ssh/*',
+    'grep "" .ssh/config | head -3',
+  ]) {
+    assert.equal(C.classify(cmd, dove), 2, `"${cmd}" apre un file riservato`);
+  }
+  // Cade anche il confine della cartella dell'utente.
+  for (const cmd of ['grep "" /etc/shadow', 'grep "" /etc/passwd', 'grep "" ../../etc/passwd']) {
+    assert.equal(C.classify(cmd, dove), 2, `"${cmd}" legge fuori dal perimetro`);
+  }
+  // Le due ricerche di Windows si comportano allo stesso modo.
+  const win = {
+    perimetro: 'C:\\Users\\mario', home: 'C:\\Users\\mario', cwd: 'C:\\Users\\mario', shell: 'powershell',
+  };
+  for (const cmd of [
+    'findstr "" .ssh\\config',
+    'findstr "" NTUSER.DAT',
+    'Select-String "" .ssh\\config',
+    'sls "" AppData\\Roaming\\Filo\\storage.json',
+  ]) {
+    assert.equal(C.classify(cmd, win), 2, `"${cmd}" apre un file riservato`);
+  }
+  // E quello che deve restare gratis: cercare nei propri file, anche a vuoto.
+  for (const cmd of [
+    'grep "" appunti.txt',
+    'grep "" Documenti/spesa.csv',
+    'grep pane Documenti/spesa.csv',
+    'grep credentials appunti.txt',
+    'grep -r pane Documenti',
+    'cat appunti.txt',
+  ]) {
+    assert.equal(C.classify(cmd, dove), 1, `"${cmd}" legge i file dell'utente`);
+  }
+});

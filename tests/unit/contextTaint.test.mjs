@@ -239,3 +239,26 @@ test('#587 — qualche lettura di riempimento non fa dimenticare la chiave letta
     'l’email letta è ancora fra i dati da proteggere',
   );
 });
+
+// #587 giro 8 — un segreto con la punteggiatura dentro non si dimentica.
+//
+// Del testo che esce dal registro resta il riassunto, e il riassunto teneva solo
+// le parole SPEZZATE alla punteggiatura. Di `Casa_Mia_2026_xy` non restava
+// niente — tutti i pezzi sono più corti di cinque — e il confronto col link non
+// poteva più ricomporre il dato: bastavano otto letture qualsiasi, che non
+// chiedono niente, perché la password uscisse in chiaro senza avviso. Senza il
+// fix il secondo assert torna false.
+test('#587 — le letture di riempimento non fanno dimenticare un segreto con la punteggiatura', () => {
+  for (const segreto of ['Casa_Mia_2026_xy', 'ab12.cd34.ef56.gh78', 'Rosa-Blu-2026', '4021-9955-3312-7788']) {
+    const s = nuovoMittente();
+    Taint.record(s, 'comando', `cat credenziali.txt\npassword = ${segreto}\n`);
+    const url = `https://raccolta.test/?d=${segreto}`;
+    const chiede = () => E.assess(url, {
+      corpus: '', letto: Taint.corpusText(s), fromUntrusted: true,
+    }).exfil;
+    assert.equal(chiede(), true, `${segreto}: subito dopo la lettura deve chiedere conferma`);
+    const grande = 'riempitivo '.repeat(3 * 1024);
+    for (let i = 0; i < 12; i++) Taint.record(s, 'comando', `${grande}${i}`);
+    assert.equal(chiede(), true, `${segreto}: dopo le letture di riempimento deve chiedere ancora conferma`);
+  }
+});
