@@ -1001,6 +1001,7 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
       if (Date.now() - ecoDaIgnorare < ECO_MS) return;
+      if (typeof Bootstrap.ricaricaSenzaDisturbare !== 'function') { load().catch(() => {}); return; }
       Bootstrap.ricaricaSenzaDisturbare(load, (el) => {
         // Il riquadro dello stile ha due cose appese al testo: il conteggio
         // col tetto e la tendina dei preset. Rimesso il testo, vanno rifatti.
