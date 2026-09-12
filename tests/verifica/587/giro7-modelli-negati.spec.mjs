@@ -136,7 +136,7 @@ test.describe('#587 — i modelli che dicono «tutto tranne»', () => {
       }
       // Elencare la cartella delle chiavi non stampa i file, ma è la stessa
       // lettura che scritta `.ssh` chiede un OK.
-      for (const cmd of ['ls .[!x]sh', 'ls -la .[!x]sh', 'tree .[!x]sh']) {
+      for (const cmd of ['ls .[!x]sh', 'ls -la .[!x]sh', 'tree .[!x]sh', 'wc -c .[!x]sh/id_rsa']) {
         expect(C.classify(cmd, dove(casa)), `«${cmd}» punta alla cartella delle chiavi: deve chiedere un OK`).toBeGreaterThan(1);
       }
     } finally { rmSync(casa, { recursive: true, force: true }); }
