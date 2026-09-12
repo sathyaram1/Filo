@@ -58,9 +58,11 @@ async function detta(page) {
   await page.click('#ta', { button: 'right' });
   await page.waitForTimeout(700);
   const voce = page.locator('button, .sn-menu-item, .sn-menu-row-btn').filter({ hasText: /🎤/ }).first();
-  if (await voce.count()) await voce.click();
+  const c = await voce.count();
+  if (c) await voce.click();
   await page.waitForTimeout(2600);
   await page.keyboard.press('Escape').catch(() => {});
+  return c;
 }
 
 test('un sito a cui il microfono è stato NEGATO non deve prenderselo con la dettatura di Filo', async ({ shell, openTab, testServer }) => {
