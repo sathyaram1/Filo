@@ -176,6 +176,22 @@ test('D3 — dopo «Apri comunque», un link che apre una nuova scheda dentro il
   }
 });
 
+test('F — un rimbalzo fermato non deve lasciare una scheda bianca e muta', async ({ shell }) => {
+  await abilitaBlocco(shell, HOST);
+  const s = await sitoConRimbalzo();
+  try {
+    // Filo apre un indirizzo innocuo (un accorciatore) che rimbalza sul sito
+    // della lista: il blocco è giusto, ma la scheda è già nata.
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://127.0.0.1:${s.porta}/rimbalza`);
+    await shell.evaluate(() => new Promise((r) => setTimeout(r, 3000)));
+    const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+    const bianche = snap.tabs.filter((t) => !t.url);
+    expect(bianche.length, 'nessuna scheda vuota deve restare in giro').toBe(0);
+  } finally {
+    await s.chiudi();
+  }
+});
+
 test('E — un indirizzo senza schema davanti si apre ancora (non solo si controlla)', async ({ app, shell, testServer }) => {
   await abilitaBlocco(shell, 'altro.esempio');
   const url = testServer.html('<!doctype html><meta charset="utf-8"><h1 id="ok">APERTA</h1>');
