@@ -268,7 +268,16 @@ function configureFromSettings(settings) {
   enabled = sb.enabled !== false;
   useAdblockLists = sb.useAdblockLists !== false;
   const list = Array.isArray(sb.blacklist) ? sb.blacklist : [];
-  userBlacklist = toBlacklistSet(list);
+  const nuova = toBlacklistSet(list);
+  // Cambiare la lista è il modo di TORNARE INDIETRO su un "Apri comunque": chi
+  // ci ha ripensato rimette mano all'elenco e i sì di questa sessione cadono.
+  // Solo se le voci cambiano davvero: queste impostazioni si riscrivono a ogni
+  // salvataggio delle Preferenze, e azzerare a ogni giro renderebbe il sì
+  // buono per pochi secondi.
+  if (nuova.size !== userBlacklist.size || [...nuova].some((d) => !userBlacklist.has(d))) {
+    allowedBySite = new Set();
+  }
+  userBlacklist = nuova;
 }
 
 // Per i test: imposta stato senza passare da settings.
