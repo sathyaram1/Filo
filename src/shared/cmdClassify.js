@@ -812,13 +812,18 @@
   }
 
   // Perché questo operando non è una lettura di livello 1? '' = lo è.
-  function operandReason(op, cwd, perim, home) {
+  // `soloRiservati` salta il confronto col perimetro e tiene solo i bersagli
+  // riservati: serve a chi legge documenti per mestiere (LEGGI_DOCUMENTO), dove
+  // "fuori dalla home" è il caso normale (una chiavetta, un disco esterno, il
+  // NAS) e non un segnale di niente.
+  function operandReason(op, cwd, perim, home, soloRiservati) {
     const raw = String(op || '');
     // Drive PowerShell dell'ambiente: `Get-ChildItem Env:`, `Get-Item Env:\PATH`.
     if (/^env:/i.test(raw)) return 'legge le variabili d’ambiente';
     for (const seg of raw.replace(/\\/g, '/').split('/')) {
       if (seg && SENSITIVE_SEG_RE.test(unquote(seg))) return `punta a “${seg}”, che contiene dati riservati`;
     }
+    if (soloRiservati) return '';
     const target = resolveTarget(raw, cwd, home);
     if (!perim) {
       // Nessun perimetro dichiarato (classificatore usato da solo): resta la
