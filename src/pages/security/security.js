@@ -281,6 +281,7 @@
       li.style.flexWrap = 'wrap';
       li.style.alignItems = 'center';
       li.style.gap = '8px';
+      li.style.padding = '6px 0';
 
       const host = document.createElement('span');
       host.textContent = riga.host;

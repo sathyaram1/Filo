@@ -275,6 +275,33 @@ test('dalle Impostazioni la risposta si cambia e si toglie', async ({ app, openT
   }, { timeout: 8_000 }).toBe(0);
 });
 
+test('una pagina web non può scriversi da sola la risposta che non ha ottenuto', async ({ app, shell }) => {
+  void shell; // attende il boot: il gestore dei messaggi dev'essere montato
+  // Il canale delle impostazioni serve anche ai content script (il modello
+  // della dettatura si sceglie dal menu del tasto destro su una pagina), quindi
+  // non è chiuso in blocco: chiuse sono le chiavi API e, da qui, le risposte sui
+  // permessi. Senza questa serratura una pagina ostile si darebbe la fotocamera
+  // scrivendosi un "allow" invece di chiederlo.
+  const esito = await app.evaluate(async () => {
+    const MSG = globalThis.SN_MSG.MSG;
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: MSG.UPDATE_SETTINGS, settings: { security: { sitePermissions: { 'https://ostile.test': { fotocamera: 'allow' } } } } },
+      { url: 'https://ostile.test/pagina' },
+    );
+    const dopoWeb = (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions || {};
+    // La stessa scrittura da una pagina di Filo (le Impostazioni) passa: la
+    // serratura è sull'origine, non sulla funzione.
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: MSG.UPDATE_SETTINGS, settings: { security: { sitePermissions: { 'https://ostile.test': { fotocamera: 'allow' } } } } },
+      { url: 'filo://security/security.html' },
+    );
+    const dopoFilo = (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions || {};
+    return { web: dopoWeb['https://ostile.test'] || null, filo: dopoFilo['https://ostile.test'] || null };
+  });
+  expect(esito.web).toBeNull();
+  expect(esito.filo).toEqual({ fotocamera: 'allow' });
+});
+
 test('ogni partizione nuova nasce col gestore dei permessi addosso', async ({ app, shell }) => {
   void shell; // attende il boot
   // Comprese quelle che Electron crea da sé (incognito, jar per-sito della

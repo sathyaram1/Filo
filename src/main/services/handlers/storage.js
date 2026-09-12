@@ -93,6 +93,16 @@ module.exports = function register(on, ctx) {
       incoming = { ...incoming };
       delete incoming.apiKeys;
     }
+    // #586 — e nemmeno i permessi che i siti hanno chiesto: sono le risposte
+    // dell'utente, e una pagina che potesse scriverle si darebbe da sola la
+    // fotocamera scavalcando la domanda. Il mondo isolato del preload già non
+    // fa arrivare questo canale al codice della pagina: questa è la seconda
+    // serratura, sulla porta che conta.
+    if (!isFilo(origin) && incoming && typeof incoming === 'object' && incoming.security
+        && typeof incoming.security === 'object' && 'sitePermissions' in incoming.security) {
+      incoming = { ...incoming, security: { ...incoming.security } };
+      delete incoming.security.sitePermissions;
+    }
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
