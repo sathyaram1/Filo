@@ -18,12 +18,21 @@
     // conteggio globale e ribroadcast TTS_GLOBAL_READING a TUTTE le schede, così
     // anche una scheda diversa da quella che legge mostra "Interrompi lettura".
     // #586 — Filo si annuncia PRIMA di chiedere un permesso dentro una pagina
-    // web: il microfono della dettatura, gli appunti dell'Incolla. Senza,
-    // all'utente comparirebbe "esempio.it vuole usare il microfono" per una
-    // cosa che ha chiesto lui a Filo, col nome del sito sbagliato sopra — e un
-    // "Nega" spegnerebbe la funzione di Filo su quel sito. Vale una volta sola
-    // e per pochi secondi. { chiave: 'microfono' | 'appunti' } → { ok }
+    // web: il microfono della dettatura. Senza, all'utente comparirebbe
+    // "esempio.it vuole usare il microfono" per una cosa che ha chiesto lui a
+    // Filo, col nome del sito sbagliato sopra — e un "Nega" spegnerebbe la
+    // funzione di Filo su quel sito. Vale una volta sola e per pochi secondi.
+    // { chiave: 'microfono' } → { ok }
     PERMESSO_DI_FILO: 'permesso_di_filo',
+    // #586 — gli appunti per l'Incolla del menu di Filo, letti DAL MAIN.
+    // Prima li leggeva la pagina, con una concessione al volo che saltava la
+    // domanda: quella concessione però valeva per la prima richiesta di appunti
+    // che arrivava in quella scheda, e un sito che li chiedeva in continuazione
+    // se la prendeva lui, portandosi via quello che l'utente aveva copiato.
+    // Da qui gli appunti non passano mai per il mondo della pagina: li legge
+    // Filo, che è l'applicazione, e li consegna a chi ha premuto "Incolla".
+    // {} → { ok, testo, immagine }
+    APPUNTI_DI_FILO: 'appunti_di_filo',
     // #586 — le scelte sui permessi dei siti, come le vede e le cambia la
     // pagina Sicurezza. Passano dal main invece di leggere e riscrivere le
     // impostazioni, perché in incognito quelle scelte NON stanno nelle
