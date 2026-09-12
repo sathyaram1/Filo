@@ -1048,6 +1048,7 @@ function _reset() {
   mappa = {};
   attese.clear();
   unaTantum.clear();
+  ultimaRichiesta.clear();
   scelteFonte.clear();
   preamboli.clear();
   senzaRisposta.clear();
