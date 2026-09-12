@@ -15,11 +15,8 @@
 //           la lista, e la finestra si apre. Il giro 3 aveva chiuso gli
 //           spostamenti INTERNI a quella finestra, non il suo primo indirizzo.
 //
-// Porta M — la stessa cosa ripetuta: da dentro la finestrella di accesso si
-//           apre una seconda finestrella, con la stessa scorciatoia.
-//
-// Porta N — il tasto RICARICA su una scheda ferma su un sito appena messo in
-//           lista.
+// Porta N — la RICARICA di una scheda ferma su un sito appena messo in lista,
+//           sia comandata dall'utente sia fatta dalla pagina da sola.
 //
 // Porta O — la pagina che torna indietro DA SOLA (history.back() scritto nella
 //           pagina) verso un sito messo in lista nel frattempo.
@@ -73,11 +70,6 @@ async function alzaServer() {
       res.end(pagina(`<button id="b" onclick="window.open('${bloccato}/qualsiasi?client_id=1&redirect_uri=http%3A%2F%2Fx','_blank','width=500,height=400')">continua</button>`));
       return;
     }
-    if (path === '/apri-secondo-livello') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(pagina(`<button id="b" onclick="window.open('${bloccato}/apri-secondo','_blank','width=500,height=400')">accedi</button>`));
-      return;
-    }
     if (path === '/incorpora') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(pagina(`<iframe id="f" src="${bloccato}/arrivo" style="width:100%;height:600px;border:0"></iframe>`));
@@ -86,13 +78,6 @@ async function alzaServer() {
     if (path === '/torna') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(pagina('<h1 id="altrove">ALTROVE</h1><button id="b" onclick="history.back()">indietro</button>'));
-      return;
-    }
-    if (path === '/da-solo') {
-      // La pagina che si ricarica da sola: mezzo web lo fa (cruscotti,
-      // risultati sportivi, caselle di posta).
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(pagina('<h1 id="t">SONO IL SITO DELLA LISTA</h1><button id="b" onclick="location.reload()">ricarica</button>'));
       return;
     }
     if (path === '/altrove') {
