@@ -838,11 +838,15 @@
     Bootstrap.applyTheme(valori.theme);
     Bootstrap.applyTextScale(valori.textScale);
 
+    // Il riferimento è sempre quello che la pagina MOSTRA adesso: così un
+    // valore rimasto indietro non viene scambiato per una modifica dell'utente
+    // al tocco successivo.
+    ultimoInviato = valori;
+
     if (!Object.keys(partial).length) return;
 
     ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
-    ultimoInviato = { ...(ultimoInviato || {}), ...partial };
 
     // Il "Salvato" mentirebbe su uno stile che non è stato salvato: lì parla
     // il messaggio rosso sotto il textarea.
