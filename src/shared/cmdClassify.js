@@ -1394,6 +1394,8 @@
       if (CHDIR.has(prog)) {
         const dest = operandsOf(t)[0] || valoriDeiFlag(t)[0];
         if (dest) {
+          const tl = formaTilde(dest);
+          if (tl === 'salto' || tl === 'altrove') { cwdIgnota = tl === 'salto' ? SALTO : FUORI; continue; }
           const nuove = [];
           for (const base of cwds) {
             for (const lettura of lettureDi(dest, esc)) {
