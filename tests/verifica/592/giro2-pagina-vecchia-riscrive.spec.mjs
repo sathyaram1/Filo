@@ -76,7 +76,9 @@ test('la pagina Opzioni aperta da prima non deve rimettere una chiave API tolta'
   }
   await opzioni.waitForSelector('#apiKey', { timeout: 20_000 });
 
-  await opzioni.fill('#apiKey', 'sk-or-v1-CHIAVE-DI-PROVA-0001');
+  await opzioni.click('#apiKey');
+  await opzioni.type('#apiKey', 'sk-or-v1-CHIAVE-DI-PROVA-0001');
+  await opzioni.locator('#apiKey').blur();
   await opzioni.waitForTimeout(1500);
   expect((await impostazioni(opzioni)).apiKeys?.openrouter).toBe('sk-or-v1-CHIAVE-DI-PROVA-0001');
 
