@@ -436,9 +436,9 @@
     options_security_siteblock_desc:
       'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità). Se provi ' +
       'ad aprire un sito bloccato compare una notifica con “Apri comunque”. ' +
-      'Vale da ogni strada: indirizzo scritto da te, link, o apertura chiesta a ' +
-      'Filo. Unica eccezione: se arrivi da un motore di ricerca l’hai cercato tu, ' +
-      'e passa. Puoi aggiungere domini tuoi qui sotto (uno per riga).',
+      'Vale da ogni strada: un link, l’indirizzo scritto da te, un’apertura ' +
+      'chiesta a Filo. Unica eccezione, se arrivi da un motore di ricerca l’hai ' +
+      'cercato tu e passa. Puoi aggiungere domini tuoi qui sotto (uno per riga).',
     options_security_siteblock_lists: 'Usa anche le liste pubbliche (pubblicità/tracker) come blacklist',
     options_security_siteblock_blacklist_label: 'Domini in blacklist (uno per riga)',
     options_security_siteblock_blacklist_invalid:
