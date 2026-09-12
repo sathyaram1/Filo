@@ -1405,12 +1405,18 @@
               if (!nuove.includes(s)) nuove.push(s);
             }
           }
-          if (nuove.length) cwds = nuove.slice(0, 4);
+          if (nuove.length) { cwds = nuove.slice(0, 4); cwdIgnota = ''; }
         }
         continue;
       }
-      if (!READS_PATHS.has(prog)) continue;
-      const ricorsivo = isRecursive(prog, t);
+      // Si misura tutto tranne chi non può aprire un percorso (#587, giro 5).
+      if (NON_APRE_PERCORSI.has(prog)) continue;
+      // Il sotto-comando è una parola, non un file: `git diff`, `pip config`.
+      const sub = CON_SOTTOCOMANDO.has(prog) ? subcommandOf(t) : '';
+      if (CONFIG_SEGRETA[prog] && sub === CONFIG_SEGRETA[prog]) return CONFIGURAZIONE;
+      if (cwdIgnota) return cwdIgnota;
+      const ricorsivo = isRecursive(prog, t)
+        || !!(sub && SOTTO_RICORSIVI[prog] && SOTTO_RICORSIVI[prog].has(sub));
       // Un comando che non nomina nessun percorso legge DOVE SI TROVA: `ls` e
       // `grep -r chiave` dicono la stessa cosa di `ls .` e `grep -r chiave .`,
       // e vanno misurati sulla cartella corrente. Senza questo, spostarsi e
