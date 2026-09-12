@@ -49,9 +49,10 @@ async function alzaServer() {
       return;
     }
     if (host === MOTORE && path === '/pagina') {
-      // Una pagina OSPITATA sul dominio del motore con un link al sito in lista.
+      // Una pagina OSPITATA sul dominio del motore, con un link al sito in
+      // lista nella stessa scheda e uno che apre una scheda nuova.
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(`<!doctype html><meta charset="utf-8"><a id="go" href="http://${LISTA}:${porta}/arrivo">vai</a>`);
+      res.end(`<!doctype html><meta charset="utf-8"><a id="go" href="http://${LISTA}:${porta}/arrivo">vai</a><a id="nuova" target="_blank" href="http://${LISTA}:${porta}/arrivo">scheda nuova</a>`);
       return;
     }
     if (path === '/arrivo') {

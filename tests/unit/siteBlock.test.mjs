@@ -66,8 +66,8 @@ test('#590: searx solo come dominio registrabile, non come label iniziale', () =
       `dovrebbe BLOCCARE con referrer-civetta ${ref}`,
     );
   }
-  // Le istanze vere restano riconosciute.
-  for (const ref of ['https://searx.be/', 'https://searx.info/search?q=x', 'https://www.searx.co.uk/']) {
+  // Le istanze vere restano riconosciute, sulla loro pagina di risultati.
+  for (const ref of ['https://searx.be/search', 'https://searx.info/search?q=x', 'https://www.searx.co.uk/search?q=x']) {
     assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è un motore`);
     assert.equal(
       SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
@@ -119,7 +119,7 @@ test('#230: i motori multi-TLD legittimi restano riconosciuti', () => {
     'https://www.google.com.au/search?q=x',
     'https://search.yahoo.com/search?p=x',
     'https://es.search.yahoo.com/search?p=x',
-    'https://yahoo.co.jp/',
+    'https://yahoo.co.jp/search?p=x',
     'https://yandex.ru/search/?text=x',
     'https://yandex.com.tr/search/?text=x',
   ]) {
@@ -383,4 +383,44 @@ test('#590: l\'eccezione vale per una pagina di RISULTATI, non per tutto ciò ch
       `dovrebbe consentire da ${ref}`,
     );
   }
+});
+
+test('#590: la PAGINA INIZIALE di un motore non è un risultato di ricerca', () => {
+  reset();
+  // È anche la forma in cui arriva un referrer ridotto alla sola origine, che
+  // è come quasi tutti i siti lo mandano fuori dal proprio dominio: se bastasse
+  // quello, l'eccezione varrebbe per ogni pagina del motore, comprese quelle
+  // che ci pubblica chiunque.
+  for (const ref of [
+    'https://www.google.com/',
+    'https://duckduckgo.com/',
+    'https://searx.be/',
+    'https://yahoo.co.jp/',
+    'https://www.google.com/?hl=it',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è una pagina di risultati`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      true,
+      `dovrebbe BLOCCARE partendo da ${ref}`,
+    );
+  }
+  // La domanda scritta nell'indirizzo invece sì, anche sulla radice.
+  for (const ref of ['https://duckduckgo.com/?q=x', 'https://www.qwant.com/?q=x&t=web']) {
+    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è una pagina di risultati`);
+  }
+});
+
+test('#590: «Apri comunque» si può togliere senza rimettere mano alla lista', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['evil.example'] });
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/x').block, true);
+  const sito = SB.allowHost('www.evil.example');
+  assert.equal(sito, 'evil.example', 'il sì vale per la voce di lista, non per il solo sottodominio');
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/x').block, false);
+  assert.equal(SB.revokeHost(sito), true);
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/x').block, true, 'tolto il sì, torna bloccato');
+  assert.equal(SB.status().allowedSize, 0);
+  // Togliere un sì che non c'è non rompe niente e non concede niente.
+  assert.equal(SB.revokeHost('mai.dato.example'), false);
+  assert.equal(SB.revokeHost(''), false);
 });
