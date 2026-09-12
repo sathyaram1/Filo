@@ -40,6 +40,39 @@ module.exports = function register(on, ctx) {
   const touchesSettings = (keys) =>
     (Array.isArray(keys) ? keys : [keys]).some((k) => k === SETTINGS_KEY);
 
+  // ── Quali SCOMPARTI del magazzino può aprire una pagina web ────────────
+  // Il divieto di chiedere tutto in un colpo non bastava: chiedendo gli
+  // scomparti per nome, uno alla volta, ne usciva la stessa roba (la memoria
+  // che Filo si è costruito sull'utente, le pagine messe da parte, la
+  // cronologia delle richieste ai modelli, gli scaricamenti col percorso su
+  // disco, i crediti) e dalla stessa porta si riscriveva. L'elenco di ciò che
+  // passa vive accanto a quello dei messaggi (src/shared/webMessageScope.js) e
+  // una sentinella lo tiene allineato a quello che i content script aprono
+  // davvero.
+  const WebScope = globalThis.SN_WEB_MESSAGE_SCOPE;
+  const comeLista = (keys) => {
+    if (keys === null || keys === undefined) return [];
+    if (Array.isArray(keys)) return keys;
+    if (typeof keys === 'object') return Object.keys(keys);
+    return [keys];
+  };
+  // Rifiuta e lo DICE: uno scomparto che serve davvero e finisse fuori lista
+  // spegnerebbe una funzione dentro le pagine, e un taglio silenzioso lo si
+  // scopre settimane dopo.
+  function scompartiVietati(origin, keys) {
+    if (isFilo(origin) || !WebScope) return null;
+    const fuori = comeLista(keys)
+      .map((k) => String(k))
+      .filter((k) => !WebScope.isWebStorageKey(k));
+    if (!fuori.length) return null;
+    console.warn(
+      `[Filo] dati "${fuori.join('", "')}" rifiutati a un'origine web (${origin}). `
+      + 'Se servono al codice che gira dentro le pagine, vanno aggiunti a WEB_STORAGE_KEYS '
+      + '(src/shared/webMessageScope.js).',
+    );
+    return { ok: false, error: 'forbidden' };
+  }
+
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
     // "Dammi TUTTO lo storage" (keys assenti o null) è la stessa operazione
