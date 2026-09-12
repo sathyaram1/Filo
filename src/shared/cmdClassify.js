@@ -1000,17 +1000,27 @@
   }
 
   // Il perimetro di lettura di UN percorso, fuori dal terminale. Stessa regola,
-  // stesso file: LEGGI_DOCUMENTO apre file dal disco esattamente come `cat`, e
-  // due strade per la stessa cosa devono avere lo stesso livello — altrimenti
+  // stesso file: LEGGI_DOCUMENTO apre dal disco gli stessi file di un `cat`, e
+  // due strade per la stessa cosa non possono avere livelli diversi — altrimenti
   // chiudere il terminale sposta solo la porta. Ritorna '' se il percorso è
   // dentro il perimetro e non è un bersaglio riservato.
+  //
+  // `soloRiservati` tiene i soli bersagli riservati e lascia cadere il perimetro:
+  // per l'azione che esiste APPOSTA per leggere documenti («leggi questa
+  // bolletta»), "fuori dalla cartella dell'utente" è il caso normale — la
+  // chiavetta, il disco esterno, la cartella del NAS — e chiedere un OK a ogni
+  // documento sarebbe una conferma che si accetta sempre, cioè un controllo che
+  // smette di esserlo. Quello che resta è il controllo che conta: `.ssh`,
+  // `.aws`, `.env`, le credenziali e le cronologie non sono documenti da leggere,
+  // e il contenuto di ciò che si legge entra comunque nel corpus
+  // anti-esfiltrazione, dove ferma il link che proverebbe a portarlo fuori.
   function pathReason(percorso, opts) {
     const p = String(percorso || '').trim();
     if (!p) return '';
     const o = opts || {};
     const perim = o.perimetro ? pathParts(o.perimetro) : null;
     const perimOk = perim && perim.root !== null ? { root: perim.root, segs: collapse(perim.segs) } : null;
-    return operandReason(p, o.cwd || o.perimetro || '', perimOk, o.home || o.perimetro || '');
+    return operandReason(p, o.cwd || o.perimetro || '', perimOk, o.home || o.perimetro || '', !!o.soloRiservati);
   }
 
   global.SN_CMD_CLASSIFY = { classify, readReason, pathReason, programOf, subcommandOf };
