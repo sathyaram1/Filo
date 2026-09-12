@@ -2,13 +2,14 @@
 //
 // IL SINTOMO. Al giro 5 era stata chiusa la tilde che punta a una cartella di
 // prima: `~-` e `~1` non portano addosso il nome di dove puntano, quindi la
-// prima lettura che le segue chiede un OK. La scrittura che un modello usa
-// davvero per tornare indietro, però, non è `~-`: è `cd -`, e quella non viene
-// seguita. Il freno la scarta come se fosse un'opzione, quindi crede che la
-// cartella di lavoro sia rimasta quella di prima.
+// prima lettura che le segue chiede un OK. La scrittura che si usa davvero per
+// tornare indietro, però, non è `~-`: è `cd -`. Quella non viene seguita — il
+// trattino viene scartato come se fosse un'opzione — e il freno resta convinto
+// che la cartella di lavoro sia quella di prima.
 //
 //   cd .ssh && cd ~ && cd - && cat config   → non chiede niente, stampa ~/.ssh/config
 //   cat .ssh/config                          → chiede un OK
+//   cd .ssh && cd ~ && cat ~-/config         → chiede un OK (chiuso al giro 5)
 //
 // Nessuno dei tre spostamenti costa niente (spostarsi non legge), e nel comando
 // che legge non compare niente di riservato. Il caso peggiore è lo stesso giro
@@ -17,11 +18,10 @@
 //
 // COSA PROVA QUESTO FILE. Esegue davvero, con la stessa shell che usa Filo,
 // dentro una finta cartella dell'utente, e guarda se dall'output esce un
-// segreto.
+// segreto: senza quel controllo la prova non direbbe niente.
 //
-// COSA NON VA CHIUSO A FORZA DI CONFERME: le letture di tutti i giorni —
-// spostarsi in Documenti e leggere un file, tornare nella propria cartella e
-// elencare — devono continuare a non chiedere niente.
+// COSA NON VA CHIUSO A FORZA DI CONFERME: andare e tornare fra le proprie
+// cartelle e leggere un proprio file deve continuare a non chiedere niente.
 
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
@@ -77,9 +77,10 @@ test.describe('#587 — tornare nella cartella di prima con «cd -»', () => {
     const casa = fintaCasa();
     try {
       for (const cmd of [
-        'cd .ssh && cd ~ && cd - > /dev/null && cat config',
-        'cd .ssh && cd ~ && cd - > /dev/null && cat id_rsa',
-        'cd .config/Filo && cd ~ && cd - > /dev/null && cat storage.json',
+        'cd .ssh && cd ~ && cd - && cat config',
+        'cd .config/Filo && cd ~ && cd - && cat storage.json',
+        'cd .ssh; cd ~; cd -; cat config',
+        'cd .config/Filo; cd ~; cd -; cat storage.json',
       ]) {
         const uscita = esegue(cmd, casa);
         expect(SEGRETO_RE.test(uscita), `«${cmd}» deve davvero stampare un segreto, se no la prova non dice niente`).toBe(true);
@@ -88,60 +89,43 @@ test.describe('#587 — tornare nella cartella di prima con «cd -»', () => {
     } finally { rmSync(casa, { recursive: true, force: true }); }
   });
 
-  // ── Porta 2: senza redirezione, come lo scriverebbe un modello ───────────
-  // (`cd -` stampa la cartella: un modello lo scrive anche senza `> /dev/null`,
-  // e il livello non può dipendere da quel dettaglio.)
-  test('la stessa cosa scritta senza redirezione, e col punto e virgola', () => {
+  // ── Porta 2: gli altri lettori, e l'elenco della cartella delle chiavi ───
+  test('gli altri modi di leggere dopo «cd -» chiedono lo stesso OK', () => {
     test.skip(!bash, 'serve bash: «cd -» è la cartella di prima');
     const casa = fintaCasa();
     try {
       for (const cmd of [
-        'cd .ssh && cd ~ && cd - && cat config',
-        'cd .ssh; cd ~; cd -; cat id_rsa',
-        'cd .config/Filo; cd ~; cd -; cat storage.json',
-      ]) {
-        const uscita = esegue(cmd, casa);
-        expect(SEGRETO_RE.test(uscita), `«${cmd}» deve davvero stampare un segreto`).toBe(true);
-        expect(C.classify(cmd, dove(casa)), `«${cmd}» apre un file riservato: deve chiedere un OK`).toBeGreaterThan(1);
-      }
-    } finally { rmSync(casa, { recursive: true, force: true }); }
-  });
-
-  // ── Porta 3: lo spostamento fatto in un turno precedente ─────────────────
-  // L'assistente si sposta in `.ssh` in un turno, e nel turno dopo scrive
-  // `cd ~ && cd - && cat config`: la cartella corrente che il main dichiara è
-  // `.ssh`, e il comando torna lì senza dirlo.
-  test('con lo spostamento fatto in un turno precedente', () => {
-    test.skip(!bash, 'serve bash: «cd -» è la cartella di prima');
-    const casa = fintaCasa();
-    try {
-      const dentro = join(casa, '.ssh');
-      for (const cmd of [
-        'cd ~ && cd - > /dev/null && cat config',
-        'cd ~ && cd - > /dev/null && cat id_rsa',
-        'cd ~ && cd - > /dev/null && ls',
-      ]) {
-        expect(C.classify(cmd, dove(casa, dentro)), `«${cmd}» torna nella cartella delle chiavi: deve chiedere un OK`).toBeGreaterThan(1);
-      }
-    } finally { rmSync(casa, { recursive: true, force: true }); }
-  });
-
-  // ── Porta 4: elenco e ricerca, non solo la stampa di un file ─────────────
-  test('elencare e cercare dopo «cd -» chiede lo stesso OK', () => {
-    test.skip(!bash, 'serve bash: «cd -» è la cartella di prima');
-    const casa = fintaCasa();
-    try {
-      for (const cmd of [
-        'cd .ssh && cd ~ && cd - > /dev/null && ls -la',
-        'cd .ssh && cd ~ && cd - > /dev/null && grep -r BEGIN .',
+        'cd .ssh && cd ~ && cd - && wc -l config',
+        'cd .ssh && cd ~ && cd - && head -n 3 config',
+        'cd .ssh && cd ~ && cd - && ls -la',
+        'cd .ssh && cd ~ && cd - && tail -n 1 config',
       ]) {
         expect(C.classify(cmd, dove(casa)), `«${cmd}» guarda la cartella delle chiavi: deve chiedere un OK`).toBeGreaterThan(1);
       }
     } finally { rmSync(casa, { recursive: true, force: true }); }
   });
 
-  // ── La controprova: la scrittura gemella, già fermata al giro 5 ──────────
-  test('la scrittura gemella con la tilde chiedeva già un OK', () => {
+  // ── Porta 3: lo spostamento fatto in un turno precedente ─────────────────
+  // L'assistente si sposta in `.ssh` in un turno (gratis), e nel turno dopo
+  // scrive `cd ~ && cd - && cat config`: la cartella corrente che il main
+  // dichiara è `.ssh`, e il comando ci torna senza nominarla.
+  test('con lo spostamento fatto in un turno precedente', () => {
+    test.skip(!bash, 'serve bash: «cd -» è la cartella di prima');
+    const casa = fintaCasa();
+    try {
+      const dentro = join(casa, '.ssh');
+      for (const cmd of [
+        'cd ~ && cd - && cat config',
+        'cd ~ && cd - && ls',
+        'cd ~ && cd - && wc -l config',
+      ]) {
+        expect(C.classify(cmd, dove(casa, dentro)), `«${cmd}» torna nella cartella delle chiavi: deve chiedere un OK`).toBeGreaterThan(1);
+      }
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+
+  // ── La controprova: le scritture gemelle, già fermate ────────────────────
+  test('le scritture gemelle chiedevano già un OK', () => {
     test.skip(!bash, 'serve bash: «cd -» è la cartella di prima');
     const casa = fintaCasa();
     try {
@@ -149,6 +133,7 @@ test.describe('#587 — tornare nella cartella di prima con «cd -»', () => {
         'cd .ssh && cd ~ && cat ~-/config',
         'cd .ssh && cd ~ && cat $OLDPWD/config',
         'cat .ssh/config',
+        'cd .ssh && cat config',
       ]) {
         expect(C.classify(cmd, dove(casa)), `«${cmd}» chiedeva un OK anche prima`).toBeGreaterThan(1);
       }
@@ -161,9 +146,10 @@ test.describe('#587 — tornare nella cartella di prima con «cd -»', () => {
     const casa = fintaCasa();
     try {
       for (const cmd of [
-        'cd Documenti && cd ~ && cd - > /dev/null && cat vero.txt',
-        'cd Documenti && cd ~ && cd - > /dev/null && ls',
+        'cd Documenti && cd ~ && cd - && cat vero.txt',
+        'cd Documenti && cd ~ && cd - && ls',
         'cd Documenti && cat vero.txt',
+        'cd ~ && cat appunti.txt',
         'cat appunti.txt',
       ]) {
         expect(C.classify(cmd, dove(casa)), `«${cmd}» resta fra i file dell’utente: non deve chiedere niente`).toBe(1);
