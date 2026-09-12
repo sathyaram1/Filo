@@ -444,6 +444,11 @@
     options_security_siteblock_blacklist_invalid:
       'Queste righe non sono domini validi e non bloccheranno nulla (usa un dominio ' +
       'con estensione, es. facebook.com — niente IP o nomi senza punto): %s',
+    // #590 — i siti sbloccati a mano con "Apri comunque". Il permesso vale fino
+    // alla chiusura di Filo: qui si vede e si toglie.
+    options_security_siteblock_allowed_label:
+      'Sbloccati a mano, fino alla chiusura di Filo',
+    options_security_siteblock_allowed_restore: 'Rimetti il blocco',
     options_security_p2p_box_title: 'Cosa succede ai servizi P2P se attivi la protezione IP',
     options_security_p2p_box_body:
       'Servizi tipo Snapdrop, ToffeeShare, alcuni giochi browser e alcune feature di scoperta dispositivi ' +
