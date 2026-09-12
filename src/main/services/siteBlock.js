@@ -193,6 +193,17 @@ function isAllowedHost(rawHost) {
   return matchesSuffix(host, allowedBySite);
 }
 
+// #590 (terzo giro) — si torna indietro. Un permesso che dura tutta la sessione
+// e non si può togliere è mezzo permesso: chi clicca "Apri comunque" per
+// guardare una pagina non sta dicendo "tieni quel sito aperto fino a stasera".
+// Rimettere mano all'elenco dei siti bloccati li azzera tutti, ma è una strada
+// che nessuno indovina e che colpisce anche i sì che si volevano tenere.
+function revokeHost(rawHost) {
+  const host = canonicalHost(rawHost);
+  if (!host) return false;
+  return allowedBySite.delete(host);
+}
+
 function isSearchEngineHost(host) {
   if (!host) return false;
   return SEARCH_ENGINE_PATTERNS.some((re) => re.test(host));
