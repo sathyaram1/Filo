@@ -241,7 +241,7 @@ function scompartiApertiDa(src) {
   const re = /chrome\.storage\.local\.(?:get|set|remove)\s*\(/g;
   let m;
   while ((m = re.exec(src))) {
-    const arg = dentroLeParentesi(src, re.lastIndex - 1);
+    const arg = primoArgomento(dentroLeParentesi(src, re.lastIndex - 1));
     for (const q of arg.matchAll(/'([^']+)'/g)) chiavi.add(q[1]);
     for (const q of arg.matchAll(/STORAGE_KEYS\.([A-Z_0-9]+)/g)) {
       const valore = STORAGE_KEYS[q[1]];

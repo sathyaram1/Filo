@@ -1178,7 +1178,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
       if (Exfil && url) {
         const origin = sender?.tab?.url || sender?.url || '';
-        const fromUntrusted = /^https?:/i.test(origin);
+        // Non fidata è ogni superficie che non sia Filo, non solo quelle che
+        // cominciano per http: una pagina che si porta su un indirizzo
+        // fabbricato da lei resta la pagina di un sito (stesso confine del
+        // canale dei messaggi).
+        const fromUntrusted = !daSuperficieInterna(sender, origin);
         const corpus = await navExfilCorpus();
         const v = Exfil.assess(url, { corpus, fromUntrusted });
         if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }

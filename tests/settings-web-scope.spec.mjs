@@ -339,3 +339,154 @@ test('un sito non ottiene memoria, pagine salvate e stato, e non può far uscire
   expect(daFilo?.ok, 'le pagine di Filo devono continuare a vedere la memoria').toBe(true);
   expect(JSON.stringify(daFilo)).toContain('MILANO-SENTINELLA-589');
 });
+
+// ── Gli indirizzi che una pagina si dà da sola ─────────────────────────────
+// Il confine riconosceva un sito dall'indirizzo che comincia per http, e
+// trattava tutto il resto come una superficie di Filo. Ma una pagina sa uscire
+// da quella forma senza smettere di essere sua: si compone una pagina e ci si
+// porta sopra (l'indirizzo comincia per `blob:`), oppure apre una scheda vuota
+// (`about:blank`). Senza il fix di qui il canale torna a rispondere a tutto.
+test('dagli indirizzi che una pagina si dà da sola il canale resta chiuso', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate(async () => {
+    const m = (x) => window.filoShell.message(x);
+    await m({ type: '_storage:set', obj: { filo_memory: { PROFILO: 'Vive a MILANO-INDIRIZZI-589', PREFERENZE: '' } } });
+  });
+  const web = await testServer.openReady(openTab, '<h1>sito</h1>');
+
+  // La pagina si fabbrica una pagina sua e ci si porta sopra.
+  await web.evaluate(() => {
+    const html = '<!doctype html><meta charset="utf-8"><h1>pagina del sito</h1>';
+    location.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  });
+  await expect.poll(
+    () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .flatMap((w) => (w._filoTabs?.tabs || []).map((t) => String(t.url || '')))
+      .find((u) => u.startsWith('blob:')) || ''),
+    { timeout: 10000 },
+  ).toContain('blob:');
+
+  const risposte = await app.evaluate(async ({ BrowserWindow }) => {
+    const H = globalThis.__filoHandlers;
+    let wc = null; let win = null; let tab = null;
+    for (const w of BrowserWindow.getAllWindows()) {
+      for (const t of (w._filoTabs?.tabs || [])) {
+        let u = ''; try { u = t.view.webContents.getURL(); } catch (_) {}
+        if (String(u).startsWith('blob:')) { wc = t.view.webContents; win = w; tab = t; }
+      }
+    }
+    if (!wc) return { nonTrovata: true };
+    const sender = {
+      tab: { id: tab.id, url: tab.url, title: tab.title },
+      url: wc.getURL(), isShell: false, win, wc, frame: wc.mainFrame || null,
+    };
+    return {
+      dentroGiraFilo: await wc.executeJavaScript('document.documentElement.dataset.filoContentReady || ""'),
+      memoria: await H.handleMessage({ type: 'filo_get_memory' }, sender),
+      uscita: await H.handleMessage({ type: 'auth_signout' }, sender),
+    };
+  });
+
+  expect(risposte.nonTrovata, 'la pagina fabbricata dal sito non è stata trovata').toBeFalsy();
+  expect(risposte.dentroGiraFilo, 'lì dentro il codice di Filo gira come su ogni pagina: è il motivo del confine').toBe('1');
+  expect(JSON.stringify(risposte.memoria), 'la memoria di Filo è uscita da un indirizzo fabbricato dal sito')
+    .not.toContain('MILANO-INDIRIZZI-589');
+  expect(risposte.memoria?.ok).not.toBe(true);
+  expect(risposte.uscita?.ok, 'da lì il sito ha potuto chiudere la sessione dell\'account').not.toBe(true);
+});
+
+// ── Il magazzino dei dati, scomparto per scomparto ─────────────────────────
+// Chiedere tutto in un colpo era già vietato; chiedere gli scomparti per nome
+// no, e il risultato era lo stesso. Dalla stessa porta si scriveva.
+test('un sito non apre per nome gli scomparti dei dati personali, e non li riscrive', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate(async () => {
+    const m = (x) => window.filoShell.message(x);
+    await m({ type: '_storage:set', obj: { filo_memory: { PROFILO: 'Vive a MILANO-MAGAZZINO-589', PREFERENZE: '' } } });
+    await m({ type: 'save_page', page: { url: 'https://banca.example/conto', title: 'CONTO-MAGAZZINO-589', text: 'saldo' } });
+  });
+  const web = await testServer.openReady(openTab, '<h1>sito</h1>');
+  const url = web.url();
+
+  const risposte = await app.evaluate(async ({}, u) => {
+    const H = globalThis.__filoHandlers;
+    const chiedi = (msg) => H.handleMessage(msg, { url: u, tab: { url: u } }).catch((e) => ({ errore: String(e) }));
+    return {
+      lettura: await chiedi({
+        type: '_storage:get',
+        keys: ['filo_memory', 'savedPages', 'aiHistory', 'downloads', 'costs', 'credits'],
+      }),
+      scrittura: await chiedi({ type: '_storage:set', obj: { filo_memory: { PROFILO: 'DETTATO-DAL-SITO-589' } } }),
+      cancellazione: await chiedi({ type: '_storage:remove', keys: ['savedPages'] }),
+      // Quello che il codice dentro le pagine tiene nel magazzino resta suo.
+      dizionario: await chiedi({ type: '_storage:get', keys: ['sn_personal_dict', 'sn_autocorrect'] }),
+      bozza: await chiedi({ type: '_storage:set', obj: { sn_feedback_draft_text: 'una bozza' } }),
+    };
+  }, url);
+
+  const dump = JSON.stringify(risposte.lettura);
+  expect(dump, 'la memoria di Filo è uscita verso il sito passando dal magazzino').not.toContain('MILANO-MAGAZZINO-589');
+  expect(dump, 'le pagine salvate sono uscite verso il sito passando dal magazzino').not.toContain('CONTO-MAGAZZINO-589');
+  expect(risposte.lettura?.ok, 'un sito ha aperto per nome gli scomparti dei dati personali').not.toBe(true);
+  expect(risposte.dizionario?.ok, 'il dizionario personale deve restare leggibile dentro le pagine').toBe(true);
+  expect(risposte.bozza?.ok, 'la bozza del feedback deve restare scrivibile dentro le pagine').toBe(true);
+
+  const dopo = await shell.evaluate(async () => {
+    const m = (x) => window.filoShell.message(x);
+    const mem = await m({ type: '_storage:get', keys: ['filo_memory'] });
+    const sal = await m({ type: 'get_saved_pages' });
+    const pagine = sal?.pages || sal?.items || sal?.savedPages || [];
+    return { memoria: JSON.stringify(mem?.value?.filo_memory ?? null), quante: Array.isArray(pagine) ? pagine.length : -1 };
+  });
+  expect(dopo.memoria, 'un sito ha riscritto quello che Filo ha imparato sull\'utente').toContain('MILANO-MAGAZZINO-589');
+  expect(dopo.memoria).not.toContain('DETTATO-DAL-SITO-589');
+  expect(dopo.quante, 'un sito ha cancellato le pagine che l\'utente aveva messo da parte').toBeGreaterThan(0);
+});
+
+// ── La fotografia è di chi la chiede ───────────────────────────────────────
+// La foto tornava sempre dalla scheda ATTIVA: un sito lasciato aperto in una
+// scheda di sfondo si faceva dare l'immagine di quello che l'utente aveva
+// davanti in quel momento.
+test('la fotografia della scheda è di chi la chiede, non di quella che l\'utente guarda', async ({ app, openTab, testServer }) => {
+  const sito = await testServer.openReady(openTab, '<style>html,body{background:#0000ff;margin:0}</style><h1>sito</h1>');
+  const sitoUrl = sito.url();
+  await testServer.openReady(openTab, '<style>html,body{background:#ff0000;margin:0}</style><h1>banca</h1>');
+  await expect.poll(
+    () => app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0];
+      const t = (w._filoTabs?.tabs || []).find((x) => x.id === w._filoTabs.activeId);
+      return t ? String(t.url || '') : '';
+    }),
+    { timeout: 8000 },
+  ).not.toBe(sitoUrl);
+
+  let scatto = null;
+  await expect.poll(async () => {
+    scatto = await app.evaluate(async ({ BrowserWindow }, u) => {
+      const H = globalThis.__filoHandlers;
+      const win = BrowserWindow.getAllWindows()[0];
+      const tab = (win._filoTabs?.tabs || []).find((t) => String(t.url || '') === u);
+      if (!tab) return null;
+      const wc = tab.view.webContents;
+      const sender = {
+        tab: { id: tab.id, url: tab.url, title: tab.title },
+        url: wc.getURL(), isShell: false, win, wc, frame: wc.mainFrame || null,
+      };
+      return H.handleMessage({ type: 'capture_visible_tab' }, sender);
+    }, sitoUrl);
+    return (scatto?.dataUrl || '').length;
+  }, { timeout: 15000 }).toBeGreaterThan(0);
+
+  const colore = await app.evaluate(({ nativeImage }, u) => {
+    const img = nativeImage.createFromDataURL(u);
+    const { width, height } = img.getSize();
+    if (!width || !height) return null;
+    const bmp = img.toBitmap(); // BGRA
+    const i = ((Math.floor(height / 2) * width) + Math.floor(width / 2)) * 4;
+    return { r: bmp[i + 2], g: bmp[i + 1], b: bmp[i] };
+  }, scatto.dataUrl);
+  if (!colore) return;
+
+  expect(
+    colore.r > 200 && colore.g < 60 && colore.b < 60,
+    'la scheda di sfondo si è fatta dare la fotografia della pagina che l\'utente stava guardando',
+  ).toBe(false);
+});
