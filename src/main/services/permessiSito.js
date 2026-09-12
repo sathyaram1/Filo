@@ -1186,6 +1186,7 @@ function _reset() {
   scelteFonte.clear();
   preamboli.clear();
   senzaRisposta.clear();
+  anelliDetti.clear();
   fermate.clear();
   avvisiPosizione.clear();
   for (const id of [...usi.keys()]) fineUso(id);
