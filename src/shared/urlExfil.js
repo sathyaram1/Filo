@@ -183,6 +183,10 @@
       } catch (_) {}
       const frammento = String(u.hash || '').replace(/^#/, '');
       if (frammento) pezzi.push(frammento);
+      // La parte prima della chiocciola è carico a tutti gli effetti: il server
+      // la riceve e chi compone l'indirizzo la sceglie liberamente.
+      if (u.username) pezzi.push(u.username);
+      if (u.password) pezzi.push(u.password);
       const labels = String(u.hostname || '').split('.');
       for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) pezzi.push(lbl);
       // Anche i valori incollati fra loro: un dato spezzato fra due parametri è
@@ -520,7 +524,7 @@
     const codaUltimo = [pezzi[pezzi.length - 1], rovescia(pezzi[pezzi.length - 1])].join(' ');
     const candidati = [];
     for (const t of (altri.size ? [...toks, ...altri] : toks)) {
-      if (t.length < STRONG_TOKEN || t.length > SPED_MAX_TOKEN) continue;
+      if (!isStrong(t) || t.length > SPED_MAX_TOKEN) continue;
       if (STOPWORDS.has(t)) continue;
       if (dentroIncollati(uniti, t)) {
         // L'avviso va sul link che COMPLETA la spedizione: se il dato si

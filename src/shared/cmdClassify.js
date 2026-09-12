@@ -573,7 +573,7 @@
   // non può essere il nome di un file (il byte zero non è ammesso in un nome su
   // nessun sistema), quindi non fa salire niente da solo — tiene solo il posto
   // nel conto degli operandi.
-  const ARG_VUOTO = ' ';
+  const ARG_VUOTO = '\u0000';
   // Comando con le virgolette rimosse token per token: la forma su cui girano
   // tutti i controlli (whitelist di programmi, flag pericolosi, bersagli).
   function dequote(cmd) {
