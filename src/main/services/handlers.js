@@ -1218,6 +1218,30 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     } catch (_) {}
   }
 
+  // LEGGI_DOCUMENTO: stesso perimetro di lettura del terminale (#587). Questa
+  // azione apre dal disco gli stessi file che aprirebbe un `cat`, quindi non può
+  // avere un livello diverso: confinare il terminale e lasciare questa a 1
+  // sposterebbe la porta invece di chiuderla. Il percorso si misura nella forma
+  // ESATTA in cui verrà aperto (la stessa normalizzazione di documentRead), così
+  // il livello non giudica un file diverso da quello che poi si legge. Calcolato
+  // qui dal main, mai dall'LLM.
+  if (type === 'LEGGI_DOCUMENTO') {
+    action._motivoPerimetro = '';
+    try {
+      const C = globalThis.SN_CMD_CLASSIFY;
+      const DR = require('./documentRead');
+      const { defaultCwd } = require('./shell');
+      const grezzo = action.percorso ?? action.path ?? action.file ?? action.documento ?? action.nome;
+      const abs = DR.normalizePath(grezzo);
+      if (C && C.pathReason && abs) {
+        action._motivoPerimetro = C.pathReason(abs, {
+          perimetro: defaultCwd(),
+          home: require('node:os').homedir() || '',
+        }) || '';
+      }
+    } catch (_) { action._motivoPerimetro = ''; }
+  }
+
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
   // timer il riferimento dell'utente prende davvero — cosa che solo il main sa,
   // avendo la lista. Risolviamo il riferimento PRIMA del gate e iniettiamo
