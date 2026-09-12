@@ -189,14 +189,39 @@
     return [p];
   }
 
-  function etichetta(chiave) {
+  // Un permesso che Filo non sa nominare: il nome tecnico non va mostrato a
+  // chi deve rispondere, ma non va nemmeno perso.
+  function ignoto(chiave) {
     const k = String(chiave || '');
-    return ETICHETTE[k] || `usare «${k}»`;
+    return !ETICHETTE[k] && !NOMI[k];
   }
 
+  // I nomi tecnici delle chiavi che Filo non conosce, per chi ha un posto dove
+  // metterli senza sporcare la domanda (il suggerimento della pastiglia).
+  function tecnici(chiavi) {
+    return (Array.isArray(chiavi) ? chiavi : [chiavi])
+      .map((k) => String(k || '')).filter((k) => k && ignoto(k));
+  }
+
+  function etichetta(chiave) {
+    const k = String(chiave || '');
+    return ETICHETTE[k] || ETICHETTA_IGNOTA;
+  }
+
+  // Nelle Impostazioni due sconosciuti dello stesso sito vanno distinti, quindi
+  // lì il nome tecnico resta, fra parentesi e dopo le parole in italiano.
   function nome(chiave) {
     const k = String(chiave || '');
-    return NOMI[k] || k;
+    return NOMI[k] || (k ? `${NOME_IGNOTO} (${k})` : NOME_IGNOTO);
+  }
+
+  // Cosa un sito PUÒ fare, per il cartello che resta acceso finché ce l'ha.
+  // «può», non «sta»: quando il sito smette da solo nessuno ce lo dice, e la
+  // sola cosa certa è che finché quella pagina è lì il permesso ce l'ha ancora.
+  function frasePotere(chiavi, audioSistema) {
+    const base = etichettaRichiesta(chiavi);
+    if (!base) return '';
+    return audioSistema ? `${base} e sentire l'audio del computer` : base;
   }
 
   // "usare la fotocamera e il microfono" — una frase sola per una richiesta
