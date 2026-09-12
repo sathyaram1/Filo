@@ -177,6 +177,8 @@
       if (tok.length >= 16) {
         const b = tryBase64(tok);
         if (b) pieces.push(b);
+        const h = tryHex(tok);
+        if (h) pieces.push(h);
       }
     }
     return pieces.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
