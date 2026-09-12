@@ -1880,11 +1880,21 @@
       chip.appendChild(x);
 
       chipHost.appendChild(chip);
+      sincronizzaRiservaPopup();
       let timer = setTimeout(dismiss, 8000);
       function dismiss() {
         if (timer) { clearTimeout(timer); timer = null; }
         try { chip.remove(); } catch (_) {}
+        sincronizzaRiservaPopup();
       }
     });
+
+    function sincronizzaRiservaPopup() {
+      requestAnimationFrame(() => {
+        if (!chipHost.childElementCount) { riservaTop('popup', 0); return; }
+        riservaTop('popup', Math.ceil(chipHost.getBoundingClientRect().bottom) + 6);
+      });
+    }
+    window.addEventListener('resize', sincronizzaRiservaPopup);
   }
 })();
