@@ -625,13 +625,15 @@
         c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
       } catch (_) {}
       const done = !!(c && c.executed);
-      appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
-      return done;
+      if (!done) return esitoFallito(label, c);
+      appendActionLog(`${label}: fatto`);
+      return true;
     }
 
     const done = !!res.executed;
-    appendActionLog(done ? `${label}: fatto` : `${label}: non riuscita`);
-    return done;
+    if (!done) return esitoFallito(label, res);
+    appendActionLog(`${label}: fatto`);
+    return true;
   }
 
   // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------
