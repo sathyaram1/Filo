@@ -24,6 +24,18 @@
     // "Nega" spegnerebbe la funzione di Filo su quel sito. Vale una volta sola
     // e per pochi secondi. { chiave: 'microfono' | 'appunti' } → { ok }
     PERMESSO_DI_FILO: 'permesso_di_filo',
+    // #586 — le scelte sui permessi dei siti, come le vede e le cambia la
+    // pagina Sicurezza. Passano dal main invece di leggere e riscrivere le
+    // impostazioni, perché in incognito quelle scelte NON stanno nelle
+    // impostazioni: vivono in memoria e muoiono con la finestra. Leggendo lo
+    // storage, in incognito l'elenco tornava vuoto e chi cercava lì la scelta
+    // appena fatta trovava un elenco che sembrava completo e non lo era.
+    // LISTA {} → { ok, voci, incognito }
+    // IMPOSTA { origine, chiave, scelta } → { ok }
+    // REVOCA { origine?, chiave? } → { ok }   (senza origine: toglie tutto)
+    PERMESSI_SITI_LISTA: 'permessi_siti_lista',
+    PERMESSI_SITI_IMPOSTA: 'permessi_siti_imposta',
+    PERMESSI_SITI_REVOCA: 'permessi_siti_revoca',
     TTS_READING_STATE: 'tts_reading_state',        // content→main { reading: bool }
     // Richiesta di fermare la lettura attiva ovunque sia (anche in un'altra
     // scheda). Il main inoltra TTS_STOP a tutte le schede.
