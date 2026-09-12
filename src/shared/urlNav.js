@@ -194,8 +194,33 @@
     return raw;
   }
 
+  // #590 — UN NOME DI SITO CHE SI PUÒ METTERE IN UNA LISTA (siti bloccati, siti
+  // fidati). Deve avere un'estensione vera: "facebook" o un indirizzo numerico
+  // non sono nomi di sito, e accettarli darebbe una falsa sicurezza (in lista
+  // resterebbe una voce che non ferma niente).
+  //
+  // L'estensione può anche NON essere in caratteri latini. .рф, .中国, .テスト,
+  // .укр e le altre esistono davvero e sul filo viaggiano nella forma punycode
+  // "xn--…", che è quella che arriva qui da un URL già analizzato. La vecchia
+  // regola pretendeva solo lettere latine, quindi un sito russo o giapponese non
+  // si poteva mettere in lista per niente: la voce spariva e il sito si apriva.
+  //
+  // La regola sta qui, in un posto solo, perché la usano sia il controllo vero
+  // (nel motore di Filo) sia il campo delle Preferenze che avvisa quando una
+  // riga viene scartata. Quando divergevano, le Preferenze accettavano righe che
+  // il controllo buttava via.
+  const TLD_VALIDO = /^(?:[a-z]{2,}|xn--[a-z0-9]+(?:-[a-z0-9]+)*)$/i;
+  function isListableDomain(raw) {
+    const s = String(raw || '').trim().toLowerCase();
+    if (!s || !/^[a-z0-9.-]+$/.test(s)) return false;
+    const parti = s.split('.');
+    if (parti.length < 2) return false;
+    if (parti.some((p) => !p)) return false; // punti doppi, o in testa/coda
+    return TLD_VALIDO.test(parti[parti.length - 1]);
+  }
+
   global.SN_URL_NAV = {
     isLocalHost, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
-    canonicalizeFiloUrl, isShareableAddress,
+    canonicalizeFiloUrl, isShareableAddress, isListableDomain,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
