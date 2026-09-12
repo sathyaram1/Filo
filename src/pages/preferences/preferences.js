@@ -461,6 +461,29 @@
     return $('agentStyleText').value;
   }
 
+  // Ultimo stile SALVATO davvero. Serve perché un testo oltre il tetto non si
+  // salva e non si accorcia: resta scritto nel textarea (l'utente deve poterlo
+  // rileggere e tagliare lui) mentre in memoria resta quello di prima.
+  let savedAgentStyle = '';
+
+  // Conteggio + rifiuto spiegato sotto il textarea (#592). Lo stile finisce nel
+  // messaggio di sistema di ogni agente conversazionale: quanto è lungo e dov'è
+  // il tetto devono essere visibili PRIMA di scoprirlo con un errore.
+  function refreshStyleLimit() {
+    const check = validateAgentStyle(currentStyleText());
+    const count = $('agentStyleCount');
+    const err = $('agentStyleError');
+    if (count) {
+      count.textContent = `${check.length}/${AGENT_STYLE_MAX}`;
+      count.style.color = check.ok ? '' : 'var(--sn-error,#b91c1c)';
+    }
+    if (err) {
+      err.textContent = check.ok ? '' : `${check.error} Finché è più lungo, resta in vigore lo stile salvato prima.`;
+      err.hidden = check.ok;
+    }
+    return check;
+  }
+
   // Allinea la select dei preset al testo corrente: se combacia con un preset
   // noto seleziona quello, altrimenti "Personalizzato".
   function syncPresetSelect() {
