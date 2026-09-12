@@ -1366,7 +1366,7 @@
       panelOpen = false;
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
-      try { api.tabs.reserveTop && api.tabs.reserveTop(0); } catch (_) {}
+      riservaTop('download', 0);
     }
     function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
