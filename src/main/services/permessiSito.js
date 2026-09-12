@@ -803,7 +803,11 @@ function chiudiUsi(origine, chiave, incognito) {
 function controlla(wc, permesso, origineRichiedente, dettagli) {
   try {
     const Pp = P();
-    const url = origineRichiedente || urlRichiedente(wc, dettagli);
+    // Stesso ordine della richiesta: un riquadro senza indirizzo proprio vale
+    // come la pagina che lo ospita, e ciò che legge deve dire la stessa cosa.
+    const url = buonaPerChiedere(origineRichiedente)
+      ? origineRichiedente
+      : urlRichiedente(wc, dettagli);
     if (Pp.interno(url)) return true;
     if (Pp.innocuo(permesso)) return true;
     const origine = Pp.origineDi(url);
