@@ -136,6 +136,31 @@
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
 
-  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork };
+  // Perché un'azione di Filo NON è riuscita, in due o tre parole (#590).
+  //
+  // Il main sa già il motivo e lo manda insieme all'esito; a raccontarlo però
+  // erano due chat diverse, e una sola ce la faceva: la chat della home diceva
+  // "sito bloccato: <nome>", quella che si apre sopra una pagina qualsiasi
+  // diceva solo "non riuscita". Due strade equivalenti che raccontano la stessa
+  // cosa in modo diverso: il motivo si chiede qui, una volta sola.
+  //
+  // Torna '' quando il motivo non si sa: chi chiama mostra la sua frase
+  // generica ("non riuscita") senza aggiungere niente.
+  function actionFailure(output) {
+    const o = output;
+    if (!o || typeof o !== 'object') return '';
+    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    // La lista dei siti bloccati ha fermato un'apertura. Dirlo, col sito: un
+    // blocco muto sembra un guasto (#482).
+    if (o.blocked === 'site') return o.host ? `sito bloccato: ${o.host}` : 'sito bloccato';
+    if (o.blocked === 'address') return 'indirizzo non valido';
+    if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
+    if (o.found === false) return 'non trovato';
+    if (o.ok === false && o.detail) return String(o.detail);
+    if (o.error) return String(o.error);
+    return '';
+  }
+
+  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork, actionFailure };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
