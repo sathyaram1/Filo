@@ -240,6 +240,13 @@ che riassume l'obiettivo, scritta da un modello che vede solo dati
 programmatici. Serve a far partire avvantaggiato chi cercherà la stessa cosa su
 quel sito.
 
+Prima di partire, da tutti e tre (elementi toccati, sezione di partenza, frase
+dell'obiettivo) vengono cancellati i dati che identificano una persona:
+indirizzi email, IBAN, codici fiscali, numeri lunghi e numeri scritti con spazi
+o trattini, come i telefoni e le carte. Al loro posto resta un segnaposto. La
+stessa cancellazione si rifà in lettura, perché nella raccolta ci sono anche
+documenti nati prima.
+
 È l'unico dato di Filo che attraversa il confine fra utenti. Quello che salvi tu
 finisce nel prompt dell'Aiuto di un altro, quindi valgono due regole insieme.
 
