@@ -108,11 +108,13 @@ test.describe('#587 — un carattere jolly nasconde il bersaglio', () => {
     }
   });
 
-  // ── La prova che i file escono davvero ─────────────────────────────────────
-  // Qui non si giudica un livello: si lancia il comando con la stessa shell che
-  // usa Filo (`bash -c`) in una finta cartella dell'utente e si guarda cosa
-  // finisce nell'output, cioè nella conversazione col modello.
-  test('nella cartella vera quei comandi stampano chiavi e password', () => {
+  // ── Il legame fra il livello e ciò che esce davvero ────────────────────────
+  // Qui non si giudica il testo del comando: si esegue con la stessa shell che
+  // usa Filo (`bash -c`) dentro una finta cartella dell'utente e si guarda cosa
+  // finisce nell'output — cioè nella conversazione col modello. La regola che
+  // deve valere è una sola: se dall'output escono chiavi o password, quel
+  // comando non poteva partire senza un OK.
+  test('un comando che stampa chiavi e password non parte senza un OK', () => {
     test.skip(process.platform === 'win32', 'la prova usa bash; su Windows la shell è PowerShell');
     const casa = cartellaTemporanea('587-jolly-');
     try {
@@ -121,17 +123,18 @@ test.describe('#587 — un carattere jolly nasconde il bersaglio', () => {
       writeFileSync(join(casa, '.git-credentials'), 'https://mario:TokenGit123@github.com\n');
       writeFileSync(join(casa, '.ssh', 'id_rsa'), '-----BEGIN OPENSSH PRIVATE KEY-----\nCHIAVEPRIVATAFINTA\n');
       writeFileSync(join(casa, 'appunti.txt'), 'la lista della spesa\n');
+      const segreti = ['SegretoNetrc', 'TokenGit123', 'CHIAVEPRIVATAFINTA'];
 
-      const esegui = (cmd) => execFileSync('bash', ['-c', `${cmd} 2>/dev/null || true`], {
-        cwd: casa, encoding: 'utf8',
-      });
-
-      const nascosti = esegui('cat .*');
-      expect(nascosti, 'la password di ftp non deve finire nella conversazione').not.toContain('SegretoNetrc');
-      expect(nascosti, 'il token di git nemmeno').not.toContain('TokenGit123');
-
-      const chiavi = esegui('cat .s?h/*');
-      expect(chiavi, 'la chiave privata nemmeno').not.toContain('CHIAVEPRIVATAFINTA');
+      for (const cmd of ['cat .*', 'cat .s?h/*', 'cat .ss*/id_rsa', 'cat appunti.txt', 'cat *.txt']) {
+        const out = execFileSync('bash', ['-c', `${cmd} 2>/dev/null || true`], { cwd: casa, encoding: 'utf8' });
+        const uscito = segreti.find((s) => out.includes(s));
+        const livello = C.classify(cmd, { perimetro: casa, home: casa, cwd: casa });
+        if (uscito) {
+          expect(livello, `«${cmd}» stampa ${uscito}: non può partire senza un OK`).toBe(2);
+        } else {
+          expect(livello, `«${cmd}» non tira fuori niente di riservato: non deve chiedere niente`).toBe(1);
+        }
+      }
     } finally {
       rmSync(casa, { recursive: true, force: true });
     }
