@@ -990,6 +990,7 @@ function _reset() {
   preamboli.clear();
   senzaRisposta.clear();
   fermate.clear();
+  avvisiPosizione.clear();
   for (const id of [...usi.keys()]) fineUso(id);
 }
 
@@ -1001,6 +1002,8 @@ module.exports = {
   concessioneUnaTantum,
   rispondi,
   rispostaFermata,
+  posizioneNonDisponibile,
+  chiudiNotizia,
   contesto,
   scegliFonteRisposta,
   interrompiUso,

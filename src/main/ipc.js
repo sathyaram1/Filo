@@ -432,9 +432,9 @@ function registerIpcHandlers() {
     catch (_) { return { ok: false }; }
   });
   // «Interrompi» sul cartello che dice cosa un sito può fare adesso (vedere lo
-  // schermo, usare la fotocamera o il microfono). Da qui non si spegne una
-  // traccia già consegnata: si ricarica la pagina, che distrugge il documento e
-  // con lui la ripresa.
+  // schermo, usare la fotocamera o il microfono). Prima si chiede alla pagina
+  // di fermare quello che le è stato consegnato; la ricarica resta solo per chi
+  // non risponde o resta vivo lo stesso (#586, giro 5).
   ipcMain.handle('permissions:capture-stop', (event, { id } = {}) => {
     void event;
     try { return require('./services/permessiSito').interrompiUso(id); }
@@ -456,6 +456,12 @@ function registerIpcHandlers() {
       const P = require('./services/permessiSito');
       return { ok: true, voci: P.perOrigine(origine, P.contesto(event.sender)) };
     } catch (_) { return { ok: false, voci: [] }; }
+  });
+  // La × sull'avviso «Filo non riesce a sapere dove sei»: lo toglie di mezzo.
+  ipcMain.handle('permissions:notice-dismiss', (event, { id } = {}) => {
+    void event;
+    try { return require('./services/permessiSito').chiudiNotizia(id); }
+    catch (_) { return { ok: false }; }
   });
   // Revoca una scelta ricordata (o tutte quelle del sito): la prossima volta il
   // sito richiede e l'utente risceglie.

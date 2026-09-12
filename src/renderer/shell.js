@@ -1934,7 +1934,10 @@
         stop.type = 'button';
         stop.className = 'perm-chip-btn';
         stop.textContent = 'Interrompi';
-        stop.dataset.tip = 'Ricarica la pagina e chiude quello che il sito ha aperto';
+        // Non dice più «ricarica la pagina»: adesso Filo chiede prima alla
+        // pagina di chiudere quello che ha in mano, e ricarica solo se resta
+        // aperto lo stesso. Per un sito qualunque non si perde niente.
+        stop.dataset.tip = 'Chiude quello che il sito ha aperto';
         stop.addEventListener('click', () => {
           try { api.permissions.stopCapture(id); } catch (_) {}
         });

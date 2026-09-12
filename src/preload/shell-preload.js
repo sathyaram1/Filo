@@ -110,6 +110,19 @@ contextBridge.exposeInMainWorld('filoShell', {
     },
     stopCapture: (id) => ipcRenderer.invoke('permissions:capture-stop', { id }),
     dismissCapture: (id) => ipcRenderer.invoke('permissions:capture-dismiss', { id }),
+    // Una riga che Filo deve a chi naviga, senza niente da consentire: oggi
+    // solo «non riesco a sapere dove sei» (#586).
+    onNotice: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:notice', wrapped);
+      return () => ipcRenderer.removeListener('permissions:notice', wrapped);
+    },
+    onNoticeEnd: (fn) => {
+      const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+      ipcRenderer.on('permissions:notice-end', wrapped);
+      return () => ipcRenderer.removeListener('permissions:notice-end', wrapped);
+    },
+    dismissNotice: (id) => ipcRenderer.invoke('permissions:notice-dismiss', { id }),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
