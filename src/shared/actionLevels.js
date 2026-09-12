@@ -68,6 +68,10 @@
       cwd: String((a && a._cwdReale) || ''),
       perimetro: String((a && a._perimetro) || ''),
       home: String((a && a._home) || ''),
+      // Come la shell che eseguirà il comando legge una barra rovesciata:
+      // separatore (PowerShell, cmd) o escape (bash). Senza dichiarazione il
+      // classificatore misura entrambe le letture.
+      shell: String((a && a._shell) || ''),
     };
   }
 
