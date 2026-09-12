@@ -1448,6 +1448,43 @@
         || (reali ? riservatoSottoHome({ root: target.root, segs: potaJolly(reali) }, casa) : '');
       if (sotto) return riservatoPerche(sotto);
     }
+    // I COLLEGAMENTI che stanno dentro quello che il comando aprirà davvero: un
+    // jolly e una ricerca ricorsiva non nominano i file che toccano, quindi il
+    // percorso reale non si può chiedere a quello scritto (#587, giro 6). Si
+    // giudica solo ciò che È un collegamento; un nome normale l'ha già misurato
+    // la regola di sopra.
+    if (target && elencaNomi) {
+      const dove = (segs) => {
+        const t2 = { root: target.root, segs };
+        const ris = segRiservato(segs);
+        if (ris) return riservatoPerche(ris);
+        if (casa) { const s2 = riservatoSottoHome(t2, casa); if (s2) return riservatoPerche(s2); }
+        if (!soloRiservati && perim && !insidePerimeter(t2, perim)) return FUORI;
+        return '';
+      };
+      // Un `*` finale è stato potato: la lettura apre comunque i nomi che stanno
+      // in quella cartella, e fra quelli può esserci un collegamento.
+      const potato = target.segs.length !== segsTarget.length;
+      const conJolly = segsTarget.some((s) => JOLLY_RE.test(unquote(String(s))));
+      let concreti = [];
+      if (conJolly) concreti = espandiJolly(target.root, segsTarget);
+      else if (potato) {
+        const nomi = nomiDi(target.root, segsTarget) || [];
+        concreti = nomi.filter((n) => nomeVisibile(n, '*')).map((n) => segsTarget.concat(n));
+      }
+      for (const segs of concreti) {
+        const vero = segmentiReali({ root: target.root, segs });
+        if (!vero) continue; // non è un collegamento: lo misura già il suo nome
+        const why = dove(vero);
+        if (why) return why;
+      }
+      if (ricorsivo) {
+        for (const vero of collegamentiSotto(target.root, segsTarget)) {
+          const why = dove(vero);
+          if (why) return why;
+        }
+      }
+    }
     if (soloRiservati) return '';
     if (!perim) {
       // Nessun perimetro dichiarato (classificatore usato da solo): resta la
