@@ -812,7 +812,7 @@ test('livello 1 — cmdlet PowerShell di sola lettura invocati da soli', () => {
     'Get-ChildItem', 'gci',
     'Get-ChildItem -Filter *.js -Force',       // -Force qui = mostra i file nascosti
     'Get-Content package.json', 'Get-Content -Raw log.txt', 'gc log.txt -Tail 20',
-    'Get-Item .', 'Get-ItemProperty HKCU:\\Software', 'Get-ItemPropertyValue x y',
+    'Get-Item .', 'Get-ItemProperty progetto', 'Get-ItemPropertyValue x y',
     'Get-Location', 'gl', 'Get-Date', 'Get-Date -Format yyyy-MM-dd',
     'Select-String errore log.txt', 'sls TODO -Path src',
     'Select-Object -First 5', 'Sort-Object Length', 'Measure-Object -Sum',
