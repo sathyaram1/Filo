@@ -624,8 +624,8 @@
     let host = origine;
     try { host = new URL(origine).host; } catch (_) {}
     showToast(chiave
-      ? `Permesso tolto per ${host}: te lo richiederà`
-      : `Permessi tolti per ${host}: te li richiederà`);
+      ? `Permesso tolto per ${host}: se gli serve, tornerà a chiedere`
+      : `Permessi tolti per ${host}: se gli servono, tornerà a chiedere`);
   }
 
   // Secondo livello di "Apri da un altro paese": la lista delle location
@@ -1553,56 +1553,73 @@
     const permHost = document.createElement('div');
     permHost.id = 'permission-chips';
     document.body.appendChild(permHost);
-    const aperte = new Map(); // id → nodo
 
-    function chiudiPastiglia(id) {
-      const nodo = aperte.get(String(id));
-      if (!nodo) return;
-      aperte.delete(String(id));
+    // UNA domanda alla volta. Le altre aspettano in coda: la fascia sotto la
+    // barra è alta una pastiglia, e una pagina che chiede cinque permessi di
+    // fila ne impilerebbe cinque, spingendo le ultime dietro all'area della
+    // pagina, dove nessuno le vedrebbe né potrebbe rispondere (e una domanda
+    // invisibile, col default che nega, è un rifiuto muto).
+    const coda = [];
+    let mostrata = null; // { id, nodo }
+
+    function rimuoviNodo(nodo) {
       nodo.classList.add('uscita');
       setTimeout(() => { try { nodo.remove(); } catch (_) {} }, 140);
     }
 
-    api.permissions.onClosed((info) => { if (info && info.id) chiudiPastiglia(info.id); });
+    function chiudiPastiglia(id) {
+      const chiave = String(id);
+      const i = coda.findIndex((r) => r.id === chiave);
+      if (i >= 0) coda.splice(i, 1);
+      if (mostrata && mostrata.id === chiave) {
+        rimuoviNodo(mostrata.nodo);
+        mostrata = null;
+        mostraProssima();
+      }
+    }
 
-    api.permissions.onRequest((info) => {
-      if (!info || !info.id) return;
+    function disegna(info) {
       const id = String(info.id);
-      if (aperte.has(id)) return;
+      const host = info.host || 'Questo sito';
+      const cosa = info.testo || 'un permesso';
 
       const chip = document.createElement('div');
       chip.className = 'perm-chip';
       chip.setAttribute('role', 'alertdialog');
       chip.dataset.id = id;
+      chip.setAttribute('aria-label', `${host} vuole ${cosa}`);
 
       const testo = document.createElement('span');
       testo.className = 'perm-chip-text';
       const sito = document.createElement('strong');
-      sito.textContent = info.host || 'Questo sito';
+      sito.textContent = host;
       testo.appendChild(sito);
-      testo.appendChild(document.createTextNode(` vuole ${info.testo || 'un permesso'}`));
+      testo.appendChild(document.createTextNode(` vuole ${cosa}`));
+      // Se la finestra è stretta la frase si accorcia con i puntini: il testo
+      // intero resta leggibile passandoci sopra, perché quale permesso si sta
+      // per dare non può restare a metà.
+      testo.dataset.tip = `${host} vuole ${cosa}`;
       chip.appendChild(testo);
-      chip.setAttribute('aria-label', `${info.host || 'Questo sito'} vuole ${info.testo || 'un permesso'}`);
 
-      const rispondi = (scelta) => {
+      const rispondi = (scelta, ricorda) => {
         chiudiPastiglia(id);
-        try { api.permissions.answer(id, scelta, true); } catch (_) {}
+        try { api.permissions.answer(id, scelta, ricorda); } catch (_) {}
       };
 
       const consenti = document.createElement('button');
       consenti.type = 'button';
       consenti.className = 'perm-chip-btn perm-chip-allow';
       consenti.textContent = 'Consenti';
-      consenti.dataset.tip = `Sempre per ${info.host || 'questo sito'}`;
-      consenti.addEventListener('click', () => rispondi('allow'));
+      consenti.dataset.tip = `Sempre per ${host}`;
+      consenti.addEventListener('click', () => rispondi('allow', true));
       chip.appendChild(consenti);
 
       const nega = document.createElement('button');
       nega.type = 'button';
       nega.className = 'perm-chip-btn';
       nega.textContent = 'Nega';
-      nega.dataset.tip = `Sempre per ${info.host || 'questo sito'}`;
-      nega.addEventListener('click', () => rispondi('deny'));
+      nega.dataset.tip = `Sempre per ${host}`;
+      nega.addEventListener('click', () => rispondi('deny', true));
       chip.appendChild(nega);
 
       // La × chiude senza decidere per sempre: il permesso NON viene concesso
@@ -1614,14 +1631,27 @@
       x.textContent = '×';
       x.setAttribute('aria-label', 'Chiudi senza decidere');
       x.dataset.tip = 'Chiudi senza decidere';
-      x.addEventListener('click', () => {
-        chiudiPastiglia(id);
-        try { api.permissions.answer(id, 'deny', false); } catch (_) {}
-      });
+      x.addEventListener('click', () => rispondi('deny', false));
       chip.appendChild(x);
 
-      aperte.set(id, chip);
       permHost.appendChild(chip);
+      return chip;
+    }
+
+    function mostraProssima() {
+      if (mostrata || !coda.length) return;
+      const prossima = coda[0];
+      mostrata = { id: prossima.id, nodo: disegna(prossima.info) };
+    }
+
+    api.permissions.onClosed((info) => { if (info && info.id) chiudiPastiglia(info.id); });
+
+    api.permissions.onRequest((info) => {
+      if (!info || !info.id) return;
+      const id = String(info.id);
+      if (coda.some((r) => r.id === id)) return;
+      coda.push({ id, info });
+      mostraProssima();
     });
   }
 

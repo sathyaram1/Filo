@@ -446,7 +446,7 @@
     },
     {
       id: 'site-permissions', title: 'Permessi che i siti chiedono', category: 'settings',
-      desc: 'Fotocamera, microfono, posizione, notifiche, lettura degli appunti e cattura dello schermo: nessun sito li prende da solo. Quando un sito ne chiede uno compare una pastiglia in alto con il suo nome e cosa vuole, e decidi tu — "Consenti" o "Nega" — con la risposta ricordata per quel sito. Se non rispondi, il sito non ottiene niente. Le risposte ricordate si rivedono e si tolgono quando vuoi: chi la tolgli te la richiede la volta dopo. Nelle finestre in incognito le risposte valgono solo finché la finestra è aperta.',
+      desc: 'Fotocamera, microfono, posizione, notifiche, lettura degli appunti e cattura dello schermo: nessun sito li prende da solo. Quando un sito ne chiede uno, in alto compare una pastiglia col suo nome e con quello che vuole, e scegli tu fra Consenti e Nega. Se non rispondi, il sito non ottiene niente. Filo ricorda la risposta per quel sito; puoi cambiarla o toglierla quando vuoi, e il sito a cui la togli torna a chiedere. Nelle finestre in incognito le risposte valgono solo finché la finestra resta aperta.',
       invoke: 'La pastiglia compare da sola quando un sito chiede. Per rivedere le risposte: Impostazioni → Sicurezza → "Permessi dei siti", oppure il tasto destro sulla scheda → "Permessi del sito".',
       doesNot: 'Non concede nulla in silenzio, nemmeno ai siti che visiti spesso, e non chiede niente per le cose innocue (mettere un video a tutto schermo, incollare quello che ti ha copiato un bottone "copia").',
     },

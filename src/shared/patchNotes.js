@@ -18,7 +18,7 @@
     {
       version: '0.2.228', date: '2026-09-11',
       features: [
-        'Fotocamera, microfono, posizione, notifiche, appunti e schermo: adesso li decidi tu. Quando un sito ne chiede uno compare una pastiglia in alto con il suo nome, "Consenti" e "Nega"; se non rispondi, il sito non ottiene niente. La risposta resta ricordata per quel sito e la rivedi in Impostazioni → Sicurezza o col tasto destro sulla scheda.',
+        'Nessun sito accende più la fotocamera o il microfono da solo. Quando un sito chiede fotocamera, microfono, posizione, notifiche, appunti o schermo, in alto compare una pastiglia col suo nome: Consenti o Nega. Se non rispondi non ottiene niente. La risposta vale per quel sito, e la cambi in Impostazioni → Sicurezza o col tasto destro sulla scheda.',
       ],
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',

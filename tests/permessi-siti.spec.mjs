@@ -27,6 +27,10 @@ const HTML = `<!doctype html><html><body style="margin:0">
             (e) => e && e.name ? e.name : 'errore');
   };
   window.__chiediNotifiche = () => { window.__notif = Notification.requestPermission(); };
+  window.__chiediPosizione = () => {
+    window.__pos = new Promise((res) => navigator.geolocation.getCurrentPosition(
+      () => res('ok'), (e) => res('errore:' + e.code)));
+  };
   window.__stato = async (nome) => {
     try { return (await navigator.permissions.query({ name: nome })).state; }
     catch (_) { return 'non-supportato'; }
@@ -107,6 +111,168 @@ test('un sito non si prende fotocamera e notifiche da solo: decide chi naviga, e
     return (s.security && s.security.sitePermissions) || {};
   });
   expect(dopoLaX[origine]).toBeUndefined();
+});
+
+test('due richieste insieme: una domanda alla volta, e ognuna vale per sé', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML);
+  const origine = new URL(page.url()).origin;
+
+  // La fascia sotto la barra è alta una pastiglia: due domande impilate
+  // spingerebbero la seconda dietro all'area della pagina, dove nessuno può
+  // rispondere. Quindi si chiede una cosa alla volta.
+  await page.evaluate(() => { window.__chiediFotocamera(); window.__chiediPosizione(); });
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 10_000 });
+  // Quale delle due arrivi per prima al main non è deciso da noi (la fotocamera
+  // passa prima dall'apertura del dispositivo): la prova guarda l'ordine che
+  // vede, non uno che si aspetta.
+  const primo = await pastiglia(shell).innerText();
+  const primaLaFotocamera = /fotocamera/.test(primo);
+  expect(primaLaFotocamera || /dove sei/.test(primo)).toBe(true);
+
+  await shell.locator('.perm-chip .perm-chip-btn', { hasText: 'Nega' }).click();
+  // Risposta alla prima: la seconda prende il suo posto, con la sua domanda.
+  await expect(pastiglia(shell)).toHaveCount(1, { timeout: 10_000 });
+  await expect(pastiglia(shell)).toContainText(primaLaFotocamera ? 'dove sei' : 'fotocamera');
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  await expect(pastiglia(shell)).toHaveCount(0, { timeout: 8_000 });
+
+  const ricordate = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+  expect(ricordate[origine]).toEqual(primaLaFotocamera
+    ? { fotocamera: 'deny', posizione: 'allow' }
+    : { posizione: 'deny', fotocamera: 'allow' });
+  // Il no dato a una non è il no dell'altra, e viceversa.
+  expect(await page.evaluate(() => window.__cam)).toBe(primaLaFotocamera ? 'NotAllowedError' : 'ok');
+});
+
+// ── menu del tasto destro sulla scheda: la strada equivalente per revocare ──
+// Il popup del menu è una finestra a sé che su headless si chiude da sola al
+// primo soffio: si riapre finché l'esito osservabile non arriva (stessa tecnica
+// di proxy-tab-menu.spec.mjs).
+const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function apriMenuScheda(shell) {
+  await shell.evaluate(() => {
+    const el = document.querySelector('.tab.active') || document.querySelector('.tab');
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true,
+      clientX: Math.round(r.left + r.width / 2),
+      clientY: Math.round(r.top + r.height / 2),
+    }));
+  });
+}
+
+async function testoDelPopup(app, pezzo) {
+  for (const w of app.windows()) {
+    try {
+      const t = await w.evaluate((n) => (document.body && document.body.innerText.includes(n))
+        ? document.body.innerText : null, pezzo);
+      if (t != null) return t;
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function cliccaNelPopup(app, pezzo, etichetta) {
+  for (const w of app.windows()) {
+    try {
+      const r = await w.evaluate(({ n, l }) => {
+        if (!document.body || !document.body.innerText.includes(n)) return 'no';
+        const b = [...document.querySelectorAll('button.item')].find((x) => new RegExp(l).test(x.textContent));
+        if (!b) return 'no';
+        b.click();
+        return 'si';
+      }, { n: pezzo, l: etichetta });
+      if (r === 'si') return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
+test('la risposta si toglie anche dal tasto destro sulla scheda', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, HTML);
+  const origine = new URL(page.url()).origin;
+
+  // Una risposta già data (come se fosse arrivata dalla pastiglia).
+  await app.evaluate(async (_e, o) => {
+    // Dalla pagina Sicurezza: stesso canale, stesso choke point di scrittura.
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { security: { sitePermissions: { [o]: { fotocamera: 'allow' } } } } },
+      { url: 'filo://security/security.html' },
+    );
+  }, origine);
+  expect(await page.evaluate(() => window.__stato('camera'))).toBe('granted');
+
+  // Il menu del tasto destro sulla scheda mostra la voce…
+  await expect.poll(async () => {
+    const t = await testoDelPopup(app, 'Permessi del sito');
+    if (t) return true;
+    await apriMenuScheda(shell);
+    await attendi(150);
+    return !!(await testoDelPopup(app, 'Permessi del sito'));
+  }, { timeout: 20_000 }).toBe(true);
+
+  // …e da lì si toglie: l'esito osservabile è che la pagina non vede più il
+  // permesso concesso.
+  const tolto = async () => (await page.evaluate(() => window.__stato('camera'))) !== 'granted';
+  await expect.poll(async () => {
+    if (await tolto()) return true;
+    await apriMenuScheda(shell);
+    await attendi(150);
+    await cliccaNelPopup(app, 'Permessi del sito', 'Permessi del sito');
+    await attendi(200);
+    await cliccaNelPopup(app, 'Fotocamera', 'Fotocamera');
+    await attendi(250);
+    return await tolto();
+  }, { timeout: 40_000 }).toBe(true);
+
+  const ricordate = await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+  expect(ricordate[origine]).toBeUndefined();
+});
+
+test('dalle Impostazioni la risposta si cambia e si toglie', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const origine = 'https://esempio-permessi.test';
+  await app.evaluate(async (_e, o) => {
+    await globalThis.SN_HANDLE_MESSAGE(
+      { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { security: { sitePermissions: { [o]: { fotocamera: 'allow' } } } } },
+      { url: 'filo://security/security.html' },
+    );
+  }, origine);
+
+  const page = await openTab('filo://security/');
+  await page.waitForSelector('#perms-list', { timeout: 8_000 });
+  const riga = page.locator('#perms-list li').first();
+  await expect(riga).toContainText('esempio-permessi.test');
+  await expect(riga).toContainText('Fotocamera');
+  await expect(riga.locator('button').first()).toHaveText('Consentito');
+
+  // Il bottone dice lo stato e, premuto, lo ribalta: si nega senza aspettare
+  // che il sito richieda (l'altra metà dell'invariante "se si può dare si può
+  // togliere").
+  await riga.locator('button').first().click();
+  await expect(riga.locator('button').first()).toHaveText('Negato');
+  await expect.poll(async () => {
+    const s = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions);
+    return s[origine] && s[origine].fotocamera;
+  }, { timeout: 8_000 }).toBe('deny');
+
+  // La × toglie la risposta: la riga sparisce e lo storage resta senza il sito.
+  await riga.locator('button').nth(1).click();
+  await expect(page.locator('#perms-list li')).toHaveCount(1); // la riga "nessuna risposta"
+  await expect(page.locator('#perms-list li').first()).toContainText('Nessun sito');
+  await expect.poll(async () => {
+    const s = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions);
+    return Object.keys(s || {}).length;
+  }, { timeout: 8_000 }).toBe(0);
 });
 
 test('ogni partizione nuova nasce col gestore dei permessi addosso', async ({ app, shell }) => {
