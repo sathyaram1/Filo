@@ -79,9 +79,23 @@ function newLedger() {
 }
 
 // Le parole che rendono riconoscibile un testo: indirizzi email interi e parole
-// alfanumeriche di almeno cinque caratteri. È la stessa materia che il confronto
-// col link estrae dal corpus (src/shared/urlExfil.js → corpusTokens): tenere
-// questa vuol dire non perdere nessun confronto.
+// di almeno cinque caratteri utili. È la stessa materia che il confronto col
+// link estrae dal corpus (src/shared/urlExfil.js → corpusTokens): tenere questa
+// vuol dire non perdere nessun confronto.
+//
+// Le parole si tengono INTERE, con la punteggiatura che hanno dentro, e non
+// spezzate a ogni carattere che non sia una lettera o una cifra. Il confronto
+// col link non guarda solo le parole spezzate: di ogni parola guarda anche la
+// forma INCOLLATA, ed è quella che riconosce i segreti scritti come li scrive la
+// gente (`Casa_Mia_2026_xy`, `ab12.cd34.ef56.gh78`, `Rosa-Blu-2026`). Spezzando,
+// di quei segreti non restava niente — tutti i pezzi sono più corti di cinque —
+// e bastavano otto letture qualsiasi, che non chiedono niente, perché la
+// password letta prima uscisse dal registro e con lei ogni difesa: il link che
+// la portava fuori partiva in chiaro, senza avviso (#587, giro 8, che riapriva
+// la porta del giro 4 su metà dei segreti).
+// Tenere la parola intera non costa più della somma dei suoi pezzi ed è
+// l'unico modo di non dover ripetere QUI le regole del confronto: la parola
+// torna nel corpus e da lì passa dalla stessa porta di sempre.
 function paroleDi(text) {
   const s = String(text || '');
   const out = [];
@@ -91,8 +105,11 @@ function paroleDi(text) {
   const emailRe = /[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,255}\.[a-z]{2,24}/gi;
   let m;
   while ((m = emailRe.exec(s))) out.push(m[0]);
-  for (const w of s.split(/[^A-Za-z0-9]+/)) {
-    if (w.length >= 5 && w.length <= MAX_TOKEN_CHARS) out.push(w);
+  for (const w of s.split(/\s+/)) {
+    if (!w || w.length > MAX_TOKEN_CHARS) continue;
+    // Cinque caratteri utili: sotto quelli non c'è niente da riconoscere, né
+    // spezzato né incollato.
+    if (w.replace(/[^A-Za-z0-9]+/g, '').length >= 5) out.push(w);
   }
   return out;
 }
