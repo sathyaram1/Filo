@@ -60,6 +60,17 @@
     return action.dominio ?? action.domain ?? action.sito;
   }
 
+  // Perimetro di lettura di un ESEGUI_COMANDO: i tre campi che il main inietta
+  // prima del gate (mai l'LLM). Senza di loro il classificatore usa comunque il
+  // freno strutturale (percorsi assoluti e risalite con `..`).
+  function cmdScope(a) {
+    return {
+      cwd: String((a && a._cwdReale) || ''),
+      perimetro: String((a && a._perimetro) || ''),
+      home: String((a && a._home) || ''),
+    };
+  }
+
   // ── sveglie e timer: da cosa dipende il livello ───────────────────────────
   // `_targets` è l'elenco (già leggibile) di ciò che l'azione colpirebbe
   // DAVVERO: lo calcola il main leggendo la lista, mai l'LLM. Quando manca
