@@ -100,3 +100,34 @@ test('tolto il permesso, nessun microfono di quella pagina resta aperto', async 
     + 'c\'è più, quindi non resta niente da togliere e chi naviga crede di aver chiuso il microfono',
   ).toBe(true);
 });
+
+test('anche l\'«Interrompi» del cartello deve chiudere tutti i microfoni della pagina', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(240_000);
+
+  const page = await testServer.openReady(openTab, PAGINA);
+
+  const esito = page.evaluate(() => window.__apri());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  const r = await esito;
+  console.log('[586 g7] apertura del microfono (cartello):', r);
+  test.skip(r !== 'ok', `le due tracce non si sono aperte (${r}): la prova non direbbe niente`);
+
+  const cartello = shell.locator('.perm-live:not([data-notizia])').first();
+  await expect(cartello).toHaveCount(1, { timeout: 20_000 });
+  console.log('[586 g7] il cartello dice:', JSON.stringify(await cartello.innerText()));
+  await cartello.locator('.perm-chip-btn').first().click();
+  await page.waitForTimeout(4000);
+
+  const dopo = await page.evaluate(() => window.__stato()).catch(() => ({ errore: true }));
+  const cartelliRimasti = await shell.locator('.perm-live:not([data-notizia])').count();
+  console.log('[586 g7] dopo l\'Interrompi:', JSON.stringify(dopo), 'cartelli rimasti:', cartelliRimasti);
+
+  const ricaricata = !!(dopo && (dopo.ricaricata || dopo.errore));
+  expect(
+    ricaricata || dopo.nascosta !== 'live',
+    'premuto «Interrompi» sul cartello che dice «può usare il microfono», il cartello sparisce ma '
+    + 'il microfono che il sito aveva aperto per una seconda via continua ad ascoltare: dopo non '
+    + 'resta più nemmeno il cartello con cui riprovare',
+  ).toBe(true);
+});
