@@ -103,13 +103,14 @@
       <p class="sn-muted">Come deve scrivere Filo quando ti risponde (chat, Aiuto, spiegazioni, chat dell'editor). Scegli uno stile già pronto oppure scrivine uno tuo.</p>
       <select id="agentStylePreset"></select>
       <textarea id="agentStyleText" rows="4" placeholder="Es. Rispondi sempre in italiano, con un tono pacato e qualche esempio pratico." style="width:100%;margin-top:10px;"></textarea>
-      <div class="sn-row" style="align-items:center;justify-content:space-between;gap:10px;margin-top:6px;">
-        <!-- Il testo qui dentro entra nel prompt di ogni agente: l'utente deve
-             vedere quanto è lungo e che c'è un tetto, e il tetto non taglia
-             niente da solo (#592). Il conteggio lo scrive il JS. -->
-        <span id="agentStyleError" class="sn-muted" role="alert" style="color:var(--sn-error,#b91c1c);" hidden></span>
-        <span id="agentStyleCount" class="sn-muted" style="margin-left:auto;font-variant-numeric:tabular-nums;"></span>
+      <!-- Il testo qui dentro entra nel prompt di ogni agente e ci resta dopo
+           il riavvio: quanto è lungo e dov'è il tetto si vedono sempre, e il
+           tetto non taglia niente da solo — rifiuta e lo dice (#592). I due
+           testi li scrive il JS. -->
+      <div style="text-align:right;margin-top:4px;">
+        <span id="agentStyleCount" class="sn-muted" style="font-variant-numeric:tabular-nums;"></span>
       </div>
+      <p id="agentStyleError" class="sn-muted" role="alert" style="color:var(--sn-error,#b91c1c);margin:2px 0 0;" hidden></p>
     </section>
 
     <section>
