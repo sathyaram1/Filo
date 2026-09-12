@@ -58,6 +58,14 @@
           <label class="sn-muted" id="sec-siteblock-blacklist-label" for="sec-siteblock-blacklist" style="display: block; margin-bottom: 4px;"></label>
           <textarea id="sec-siteblock-blacklist" rows="4" style="width: 100%;"></textarea>
           <div id="sec-siteblock-blacklist-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px"></div>
+          <!-- #590: i siti che l'utente ha sbloccato a mano con "Apri comunque".
+               Compare solo quando ce n'è almeno uno: un permesso che dura tutta
+               la sessione deve potersi vedere e togliere anche dopo che la
+               notifica che lo annunciava se n'è andata. -->
+          <div id="sec-siteblock-allowed-box" style="display:none;margin-top:10px">
+            <div class="sn-muted" id="sec-siteblock-allowed-label" style="margin-bottom:4px"></div>
+            <ul id="sec-siteblock-allowed-list" class="sn-list"></ul>
+          </div>
         </div>
       </div>
 
