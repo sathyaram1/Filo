@@ -552,11 +552,21 @@
   // messaggio: una chat `filo://` con mezza pagina ostile davanti è tanto pilotabile
   // quanto un agente che gira sulla pagina (#587). Lo calcola il main con
   // src/main/services/contextTaint.js.
-  function assess(url, { corpus = '', fromUntrusted = false } = {}) {
+  // `letto` = il materiale che Filo ha aperto in questa scheda (documenti,
+  // appunti, file dell'editor, output dei comandi): conta solo per i dati
+  // riconoscibili, mai per le parole comuni (vedi taint).
+  // `carichiPrima` = il carico dei link già aperti in questa scheda, per
+  // riconoscere un dato spedito un pezzo per volta (vedi taintSpedizione).
+  function assess(url, { corpus = '', letto = '', fromUntrusted = false, carichiPrima = [] } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
-    const t = taint(link, corpus);
+    const t = taint(link, corpus, letto);
     if (t) return { exfil: true, reason: t.reason };
+    const prima = Array.isArray(carichiPrima) ? carichiPrima.filter(Boolean) : [];
+    if (prima.length) {
+      const s = taintSpedizione(prima.concat(caricoUnito(link)), `${corpus}\n${letto}`);
+      if (s) return { exfil: true, reason: s.reason };
+    }
     if (fromUntrusted) {
       const s = structural(link);
       if (s) return { exfil: true, reason: s.reason };
@@ -564,5 +574,7 @@
     return { exfil: false, reason: '' };
   }
 
-  global.SN_URL_EXFIL = { assess, taint, structural, exposedAlnum, corpusTokens };
+  global.SN_URL_EXFIL = {
+    assess, taint, structural, exposedAlnum, corpusTokens, caricoUnito, taintSpedizione,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
