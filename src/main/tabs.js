@@ -753,7 +753,18 @@ class TabManager {
     // assicurati che il percorso IPC → openTab(file://) resti bloccato.
     if (isWebUnsafeNav(url)) {
       openExternalScheme(url); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
-      return null;
+      return { id: null, blocked: 'scheme', host: '' };
+    }
+    // SICUREZZA (#590) — la LISTA DEI SITI BLOCCATI, sullo stesso cammino e per
+    // lo stesso motivo del gate qui sopra: will-navigate non scatta su un
+    // loadURL programmatico, quindi senza questo controllo la lista non valeva
+    // per l'indirizzo scritto dall'utente nella home, né per l'azione NAVIGA
+    // che propone il modello. Un controllo unico qui copre ogni chiamante
+    // presente e futuro. L'unico scavalco è quello che l'utente sceglie a mano
+    // sulla notifica ("Apri comunque" → openBlockedPopup).
+    if (!overrideSiteBlock) {
+      const blocco = this._maybeBlockNavigation(url, { fromUrl });
+      if (blocco) return { id: null, blocked: 'site', host: blocco.host };
     }
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
