@@ -1107,6 +1107,35 @@
     return '';
   }
 
+  // ── I nomi riservati SOLO subito sotto la cartella dell'utente (#587) ──────
+  //
+  // Su Linux e su Windows i segreti stanno in cartelle che si riconoscono dal
+  // nome ovunque si trovino (`.ssh`, `.config`, `AppData`). Su macOS no: stanno
+  // tutti dentro `~/Library`, che non è nemmeno nascosta — le chiavi API e il
+  // portafoglio di Filo (`~/Library/Application Support/Filo/storage.json`), il
+  // portachiavi, le password dei browser, la posta, i messaggi. Lo stesso file
+  // di Filo chiedeva un OK su Linux e su Windows e non chiedeva niente su un
+  // Mac: stessa lettura, tre risposte diverse (#587, giro 4).
+  //
+  // `Library` però non può stare nell'elenco generale: è un nome comune, e una
+  // cartella `progetto/Library` è una cartella qualunque. Vale solo nel punto in
+  // cui è la cassetta dei segreti, cioè come PRIMO segmento sotto la home.
+  const RISERVATI_SOTTO_HOME = ['library'];
+  function riservatoSottoHome(target, casa) {
+    if (!target || !casa || casa.root === null) return '';
+    if (!insidePerimeter(target, casa)) return '';
+    const seg = unquote(String(target.segs[casa.segs.length] || ''));
+    if (!seg) return '';
+    if (RISERVATI_SOTTO_HOME.includes(seg.toLowerCase())) return seg;
+    // Un modello con i caratteri jolly si misura sulla domanda opposta: può
+    // acchiapparla? (`Libr*`, `Li?rary`)
+    if (JOLLY_RE.test(seg)) {
+      const re = globRe(seg);
+      if (!re || RISERVATI_SOTTO_HOME.some((nome) => re.test(nome))) return seg;
+    }
+    return '';
+  }
+
   // Il motivo, nelle parole giuste per quello che è: un nome riservato È chiavi e
   // password, un modello PUÒ prenderle.
   function riservatoPerche(seg) {
