@@ -136,6 +136,14 @@ const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload
 // legittime navigano solo verso http(s); le interne verso filo://. La barra
 // indirizzi (navigazione esplicita dell'utente) NON passa da questo gate.
 const WEB_NAV_SCHEMES = new Set(['http:', 'https:', 'filo:', 'about:', 'blob:']);
+// L'indirizzo è già scritto per intero (schema compreso)? È la domanda che
+// separa "https://sito.esempio/x" da "sito.esempio/x": il secondo non è un URL
+// finché non gli si mette lo schema davanti, e prima di allora nessun controllo
+// che ragiona per host riesce a leggerlo (#590).
+function parsesAsUrl(rawUrl) {
+  try { new URL(String(rawUrl || '')); return true; } catch (_) { return false; }
+}
+
 function isWebUnsafeNav(rawUrl) {
   let proto = '';
   try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
