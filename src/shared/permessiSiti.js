@@ -31,7 +31,31 @@
     'clipboard-sanitized-write', // scrittura sanificata: non LEGGE nulla
     'mediaKeySystem',            // DRM: serve a far partire i video protetti
     'background-sync',
+    // Tenere acceso lo schermo mentre va un video: lo chiedono i lettori video,
+    // le mappe mentre guidi, le pagine di ricette. Non legge niente e non
+    // accende niente; lo fa perché l'utente ha premuto play, e nessun browser
+    // lo domanda. Chiederlo significava fermare ogni film con una domanda che
+    // nessuno capisce, e un «Nega» spegneva lo schermo a metà (#586, giro 4).
+    'screen-wake-lock',
+    // «Non buttarmi via i dati che ho già salvato qui». Non esce niente dal
+    // computer e non si accende niente: riguarda solo lo spazio che il sito
+    // occupa già. Anche questa nessun browser la domanda.
+    'persistent-storage',
+    'durable-storage',
   ]);
+
+  // Permessi che Chromium non CHIEDE mai: si limita a domandare a Filo cosa è
+  // già stato deciso, e con un no consegna al sito un risultato vuoto senza
+  // dire niente a nessuno. Senza una richiesta non compare nessuna pastiglia,
+  // quindi nessuna scelta viene mai registrata, quindi in Impostazioni quel
+  // sito non compare e non c'è niente da ribaltare: si poteva solo negare, mai
+  // consentire (#586, giro 4). Per questi la domanda la fa partire il
+  // CONTROLLO, che intanto risponde no.
+  const SOLO_CONTROLLO = new Set(['local-fonts']);
+
+  function soloControllo(permesso) {
+    return SOLO_CONTROLLO.has(String(permesso || ''));
+  }
 
   // Chiavi stabili della memoria: NON si cambiano (sono scritte nello storage
   // di chi usa Filo). 'media' si spacca in due perché fotocamera e microfono
