@@ -151,23 +151,18 @@ test('le azioni che lo stile non lo ricevono restano pulite: nessun recinto, nes
 
 // ── il tetto vive solo in scrittura ─────────────────────────────────────────
 
-test('uno stile più lungo del tetto già in memoria resta comunque dentro il recinto', () => {
-  // Il tetto lo fanno rispettare le tre strade di SCRITTURA. In lettura oggi
-  // non c'è, quindi uno stile lasciato lì da una versione precedente (quando
-  // la pagina web poteva scriverlo e il modello non chiedeva niente) entra
-  // ancora per intero: la cosa che DEVE reggere comunque è il recinto, ed è
-  // quella che si asserisce qui — non la lunghezza, che può solo migliorare.
+test('uno stile più lungo del tetto già in memoria non arriva al modello', () => {
+  // Le tre strade di scrittura rifiutano un testo oltre il tetto, ma uno stile
+  // lungo può essere rimasto in memoria da una versione precedente, quando una
+  // pagina web poteva scriverlo e il modello non chiedeva niente. Non si
+  // accorcia (sarebbe il taglio muto che il tetto vuole evitare): non si usa.
   const vecchio = `${'x'.repeat(C.AGENT_STYLE_MAX * 3)} coda riconoscibile`;
   const messaggi = C.injectAgentStyle(
     [{ role: 'system', content: `ISTRUZIONI\n${SLOT}FINE` }], C.ACTIONS.HELP, vecchio);
   const prompt = messaggi[0].content;
-  expect(prompt.split(CLOSE).length - 1).toBe(1);
-  const dentro = dentroIlRecinto(prompt);
-  // O è stato accorciato in lettura, o è entrato intero: in tutti e due i casi
-  // niente di quel testo deve stare FUORI dal recinto.
-  const fuori = prompt.split(CLOSE)[1] || '';
-  expect(fuori).not.toContain('coda riconoscibile');
-  expect(dentro.length).toBeGreaterThan(0);
+  expect(prompt).not.toContain('coda riconoscibile');
+  expect(prompt).not.toContain(OPEN);
+  expect(prompt).not.toContain(SLOT);
 });
 
 // ── input limite ────────────────────────────────────────────────────────────
