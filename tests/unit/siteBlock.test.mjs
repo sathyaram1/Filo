@@ -272,3 +272,66 @@ test('#590: canonicalHost è la forma unica di un nome di host', () => {
   assert.equal(SB.canonicalHost('.'), '');
   assert.equal(SB.canonicalHost(null), '');
 });
+
+// ─── #590 giro 2 — il sì dell'utente ("Apri comunque") si ricorda ────────────
+
+test('#590: dopo "Apri comunque" il sito si apre, e ci si può navigare dentro', () => {
+  reset();
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
+  SB.allowHost('evil.example');
+  // La prima pagina.
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+  // Dove il server rimbalza subito dopo (http→https, / → /home): è lo stesso
+  // sito, ed era la porta che lasciava una scheda vuota e nessun modo di aprirlo.
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/home').block, false);
+  // Un link cliccato dentro il sito, con la pagina del sito come partenza.
+  assert.equal(
+    SB.shouldBlockNavigation('https://evil.example/altra', { fromUrl: 'https://evil.example/' }).block,
+    false,
+  );
+  // E i sottodomini dello stesso sito (www → nome nudo e ritorno).
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example/').block, false);
+});
+
+test('#590: il sì vale per il sito che l\'utente ha messo in lista, non per gli altri', () => {
+  reset();
+  // Il blocco può scattare su un sottodominio: il sì si lega comunque alla voce
+  // di lista, altrimenti il primo salto fra www e nome nudo ricadrebbe nel blocco.
+  assert.equal(SB.allowHost('www.evil.example'), 'evil.example');
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+  // Gli altri siti della lista restano bloccati: il sì non è un interruttore.
+  assert.equal(SB.shouldBlockNavigation('https://ads.test/').block, true);
+  assert.equal(SB.isAllowedHost('ads.test'), false);
+  assert.equal(SB.isAllowedHost('evil.example'), true);
+});
+
+test('#590: cambiare la lista è il modo di tornare indietro su un "Apri comunque"', () => {
+  const impostazioni = (blacklist) => ({ security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist } } });
+  SB.configureFromSettings(impostazioni(['evil.example']));
+  SB.allowHost('evil.example');
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+
+  // Le Preferenze si risalvano a ogni modifica di QUALSIASI impostazione: se la
+  // lista non cambia, il sì deve reggere (altrimenti durerebbe pochi secondi).
+  SB.configureFromSettings(impostazioni(['evil.example']));
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, false);
+
+  // La lista cambia davvero → i sì di questa sessione cadono.
+  SB.configureFromSettings(impostazioni(['evil.example', 'ads.test']));
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
+  assert.equal(SB.status().allowedSize, 0);
+});
+
+test('#590: un sito con l\'estensione non latina si può mettere in lista', () => {
+  // .рф, .テスト, .中国, .укр esistono e si usano. Sulla rete viaggiano in
+  // punycode (xn--…), e la vecchia regola pretendeva solo lettere latine: la
+  // voce veniva scartata e quei siti non si potevano bloccare affatto.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['сайт.рф', '例え.テスト'] });
+  assert.equal(SB.status().blacklistSize, 2);
+  assert.equal(SB.shouldBlockNavigation('https://сайт.рф/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://xn--80aswg.xn--p1ai/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://例え.テスト/').block, true);
+  // E quello che non è un nome di sito resta fuori, come prima.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['facebook', '1.2.3.4', 'x..y.com'] });
+  assert.equal(SB.status().blacklistSize, 0);
+});
