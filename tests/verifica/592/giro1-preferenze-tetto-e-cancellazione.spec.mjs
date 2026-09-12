@@ -91,7 +91,9 @@ test('«normale» scritto a mano resta uno stile, mentre detto a Filo cancella',
   // manciata di parole («nessuno», «normale», «standard», «no») vogliono dire
   // «togli lo stile»; nel textarea sono testo come un altro.
   const page = await apriPreferenze(openTab);
-  await page.fill('#agentStyleText', 'normale');
+  await page.click('#agentStyleText');
+  await page.type('#agentStyleText', 'normale');
+  await page.click('h2'); // esce dal campo, come chi passa ad altro
   await page.waitForTimeout(1500);
   await page.reload();
   await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
