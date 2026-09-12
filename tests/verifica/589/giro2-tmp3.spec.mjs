@@ -12,16 +12,22 @@ test('raffica', async ({ app, shell, openTab, testServer }) => {
   const web = await testServer.openReady(openTab, '<h1>pagina</h1><textarea>scrivi</textarea>');
   await app.evaluate(({ BrowserWindow }) => {
     globalThis.__p = [];
+    globalThis.__dec = [];
+    const S = globalThis.SN_SETTINGS_SCOPE;
+    const orig = S.isFiloOrigin;
+    S.isFiloOrigin = function (u) {
+      const r = orig.call(this, u);
+      globalThis.__dec.push({ t: Date.now(), u: String(u), r });
+      return r;
+    };
     const nota = (via, url, m) => {
       if (!m || m.type !== 'settings_updated') return;
-      let alVolo = '';
-      try { alVolo = JSON.stringify(m.settings ?? null); } catch (_) { alVolo = '?'; }
+      let s = ''; try { s = JSON.stringify(m.settings ?? null); } catch (_) { s = '?'; }
       globalThis.__p.push({
-        via,
-        url: String(url || ''),
-        segAlVolo: alVolo.includes('VERIFICA589'),
-        chiaviAlVolo: Object.keys(m.settings || {}).join(','),
-        settings: m.settings, // per riferimento, come nella prova del giro 1
+        t: Date.now(), via, url: String(url || ''),
+        segAlVolo: s.includes('VERIFICA589'),
+        chiavi: Object.keys(m.settings || {}).join(','),
+        settings: m.settings,
       });
     };
     const win = BrowserWindow.getAllWindows()[0];
@@ -37,6 +43,7 @@ test('raffica', async ({ app, shell, openTab, testServer }) => {
       if (ch === 'filo:broadcast') { let u = ''; try { u = this.getURL(); } catch (_) {} nota('wc', u, a[0]); }
       return wcSend.call(this, ch, ...a);
     };
+    globalThis.__finestre = () => BrowserWindow.getAllWindows().map((w) => { try { return w.webContents.getURL(); } catch (_) { return '?'; } });
   });
 
   const lungo = 'x'.repeat(10000);
@@ -49,16 +56,25 @@ test('raffica', async ({ app, shell, openTab, testServer }) => {
     { themeTokens: { accent: '#112233' } },
   ];
   await Promise.all(cattivi.map((s) => salva(shell, s).catch(() => null)));
-  await web.waitForTimeout(1200);
+  await web.waitForTimeout(1000);
 
-  const tutte = await app.evaluate(() => (globalThis.__p || []).map((c) => ({
-    via: c.via, url: c.url, segAlVolo: c.segAlVolo, chiaviAlVolo: c.chiaviAlVolo,
-    segDopo: JSON.stringify(c.settings ?? null).includes('VERIFICA589'),
-    chiaviDopo: Object.keys(c.settings || {}).join(','),
-  })));
-  const web1 = tutte.filter((c) => /^https?:/.test(c.url));
+  const res = await app.evaluate(() => ({
+    finestre: globalThis.__finestre(),
+    dec: globalThis.__dec,
+    p: (globalThis.__p || []).map((c) => ({
+      t: c.t, via: c.via, url: c.url, segAlVolo: c.segAlVolo, chiavi: c.chiavi.slice(0, 60),
+      segDopo: JSON.stringify(c.settings ?? null).includes('VERIFICA589'),
+    })),
+  }));
+  const web1 = res.p.filter((c) => /^https?:/.test(c.url));
   const sospetti = web1.filter((c) => c.segAlVolo || c.segDopo);
-  console.log('>>> verso web', web1.length, 'sospetti', sospetti.length);
-  for (const c of sospetti) console.log('>>> SOSPETTO', JSON.stringify(c).slice(0, 400));
+  if (sospetti.length) {
+    console.log('>>> FINESTRE', JSON.stringify(res.finestre));
+    for (const c of sospetti) {
+      console.log('>>> SOSPETTO', JSON.stringify(c));
+      console.log('>>> DECISIONI VICINE', JSON.stringify(res.dec.filter((d) => Math.abs(d.t - c.t) <= 40)));
+    }
+  }
+  console.log('>>> web', web1.length, 'sospetti', sospetti.length);
   expect(sospetti.length).toBe(0);
 });
