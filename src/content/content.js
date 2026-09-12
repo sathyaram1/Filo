@@ -413,7 +413,32 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) return;
+    // Su un sito che l'utente ha escluso, Filo qui non c'è. Ma "qui Filo è
+    // spento" è una decisione che l'utente cambia mentre la scheda è già
+    // aperta (Opzioni → Altro): decidendola una volta sola, al caricamento, la
+    // scheda restava com'era e l'utente non vedeva succedere niente finché non
+    // ricaricava. Quindi: su una pagina esclusa restiamo in ascolto della sola
+    // cosa che ci riguarda — l'utente che ci riaccende — e non installiamo
+    // nient'altro. La strada opposta (acceso → spento) la chiude il controllo a
+    // ogni evento: il menu la interroga quando lo apri, il correttore la
+    // riceve col cambio di impostazioni.
+    let funzioniInstallate = false;
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!funzioniInstallate) {
+        if (msg?.type !== MSG.SETTINGS_UPDATED) return;
+        settings = msg.settings;
+        if (!isBlocked()) installaFunzioniDiPagina();
+        return;
+      }
+      onRuntimeMessage(msg, sender, sendResponse);
+      return true; // mantieni il canale aperto per sendResponse asincrono
+    });
+
+    if (!isBlocked()) installaFunzioniDiPagina();
+
+    function installaFunzioniDiPagina() {
+      if (funzioniInstallate) return;
+      funzioniInstallate = true;
 
     SpellCheck.init(settings);
 

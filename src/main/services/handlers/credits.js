@@ -12,7 +12,10 @@ const auth = require('../../auth/google-auth');
 require('../../../shared/feedbackThread.js');
 
 module.exports = function register(on, ctx) {
-  const { MSG, broadcastToTabs } = ctx;
+  // Questi due avvisi li legge solo la pagina Crediti (e la home): dentro un
+  // sito nessuno li ascolta, e il movimento del saldo dell'utente non è cosa
+  // che debba attraversare quel confine. Stessa regola delle impostazioni.
+  const { MSG, broadcastToFiloPages } = ctx;
   const Credits = globalThis.SN_CREDITS;
   const FB = globalThis.SN_FEEDBACK;
 
@@ -151,7 +154,7 @@ module.exports = function register(on, ctx) {
   async function maybeNotifyGift(uid, remote) {
     const amount = remote?.giftNotice && Math.round(Number(remote.giftNotice.amount) || 0);
     if (!amount || amount <= 0) return;
-    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+    broadcastToFiloPages({ type: MSG.GIFT_NOTICE, amount });
     const idToken = await auth.getIdToken();
     if (!idToken) return;
     const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?updateMask.fieldPaths=giftNotice&key=${FB.rest.API_KEY}`;
@@ -224,7 +227,7 @@ module.exports = function register(on, ctx) {
   // ricompensa). Non blocca mai il flusso chiamante.
   let pushTimer = null;
   Credits.onChange(() => {
-    broadcastToTabs({ type: MSG.CREDITS_CHANGED });
+    broadcastToFiloPages({ type: MSG.CREDITS_CHANGED });
     if (pushTimer) clearTimeout(pushTimer);
     pushTimer = setTimeout(async () => {
       pushTimer = null;
