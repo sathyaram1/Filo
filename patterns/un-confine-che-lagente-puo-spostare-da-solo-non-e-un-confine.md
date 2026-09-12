@@ -57,6 +57,50 @@ pezzo passava come livello 1. Quello che il modello ha appena letto è esattamen
 quello che una pagina ostile gli chiederà di riscrivere in un URL: se entra nel
 contesto, entra nel corpus.
 
+## Caso 3 — il bersaglio letto nel testo invece che nel percorso vero
+
+Il perimetro del caso 1 era dichiarato bene, e il confronto col perimetro girava
+già sul percorso RISOLTO. Ma il corollario — i bersagli riservati dentro la home
+— leggeva ancora il **testo dell'operando**. Basta che quella parola non ci sia:
+
+- `cd ~/.ssh && cat config` — nessun comando nomina `.ssh` mentre legge, e
+  `config` da solo non è in lista. Stessa cosa con `authorized_keys`,
+  `~/.gnupg/secring.gpg`, e soprattutto `~/.config/Filo/storage.json`, dove
+  stanno le chiavi API e il portafoglio dell'utente. Scritto per intero
+  (`cat .config/Filo/storage.json`) lo stesso identico file chiedeva un OK.
+- `grep -r chiave .` dalla home non nomina **niente**: il bersaglio è un
+  sottoalbero, e ci passa dentro tutto.
+- `ls` dopo un `cd /etc` non nomina niente nemmeno lui: il bersaglio è la
+  cartella corrente.
+
+La cura è una sola regola, applicata in tre punti di `readReason`: **il bersaglio
+è quello che il comando aprirà**. I bersagli riservati si cercano anche nel
+percorso risolto; un comando senza percorso si misura sulla cartella corrente;
+una lettura ricorsiva si misura sul sottoalbero, e se il sottoalbero è la
+cartella dichiarata chiede un OK (su una sottocartella no, altrimenti cercare nel
+proprio lavoro costerebbe una conferma).
+
+## Caso 4 — l'avviso che compare sempre
+
+L'altra faccia, ed è una falla di sicurezza quanto le altre. Il ripiego
+strutturale del caso 2 si accende adesso anche nella chat della home, e con due
+sviste è arrivato a scattare su quasi ogni link vero:
+
+- i risultati di una ricerca finivano fra i **dati da proteggere**. Sono testo
+  pubblico, e dentro ci sono gli indirizzi dei risultati: «cerca la carbonara e
+  aprimi il primo» faceva combaciare il link con se stesso e apriva un avviso di
+  furto di dati. Marcare il contesto come pilotabile e proteggere il contenuto
+  sono **due domande diverse**: la ricerca risponde sì alla prima e no alla
+  seconda, e la risposta la tiene `contextTaint` per provenienza, non ogni
+  chiamante;
+- il ripiego contava i caratteri senza guardare se si leggessero come parole, e
+  i separatori umani (`/`, `-`, `_`, `+`) restavano dentro il conteggio:
+  `/wiki/Storia_della_matematica` passava per «un blocco di dati codificato».
+
+Una conferma che compare su ogni link si clicca senza leggerla. A quel punto la
+difesa non c'è più, e in cambio si è pagato l'attrito: **un falso allarme sul
+cammino principale costa più di quanto rendeva l'allarme**.
+
 ## Regola operativa
 
 Quando aggiungi una difesa, scrivi accanto **a cosa è agganciata** e chiediti chi
