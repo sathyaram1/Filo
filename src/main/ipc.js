@@ -84,6 +84,20 @@ function registerIpcHandlers() {
     }
   });
 
+  // #586 — le scelte sui permessi già prese per questa origine. Sincrono per lo
+  // stesso motivo del fingerprint: il preload deve mettere a posto quello che il
+  // sito legge PRIMA che parta il codice della pagina. Torna solo le chiavi di
+  // QUESTA origine, niente dell'elenco degli altri siti.
+  ipcMain.on('filo:permessi-noti', (event, href) => {
+    try {
+      const P = require('./services/permessiSito');
+      const voci = P.perOrigine(href, P.contesto(event.sender));
+      const out = {};
+      for (const v of voci) out[v.chiave] = v.scelta;
+      event.returnValue = out;
+    } catch (_) { event.returnValue = {}; }
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel
