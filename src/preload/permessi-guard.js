@@ -312,8 +312,8 @@ function buildCatturaSicuraSource() {
       } catch (_) {}
     }, true);
 
-    const vera = md.getUserMedia.bind(md);
-    Object.defineProperty(md, 'getUserMedia', {
+    const vera = stampo.getUserMedia;
+    Object.defineProperty(stampo, 'getUserMedia', {
       configurable: true,
       writable: true,
       value: function getUserMedia(vincoli) {
