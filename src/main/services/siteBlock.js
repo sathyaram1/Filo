@@ -236,6 +236,7 @@ module.exports = {
   isSearchEngineUrl,
   isBlacklistedHost,
   normalizeDomain,
+  canonicalHost,
   setForTest,
   status,
 };
