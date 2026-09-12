@@ -27,7 +27,26 @@
   // Soglie (tarate per il caso realistico: il modello, istruito a "metti i dati
   // nell'URL", li mette in chiaro o base64; non in forme cifrate sofisticate).
   const MIN_TOKEN = 5;      // lunghezza minima di un token del corpus per contare
-  const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
+  // Un solo token che combacia basta a fermare un link: quel token dev'essere un
+  // DATO, non una parola. Il metro di prima — dodici caratteri, oppure cinque con
+  // una cifra dentro — prendeva in pieno le parole di tutti i giorni: in italiano
+  // «prenotazione», «assicurazione», «documentazione», «costituzione» passano i
+  // dodici caratteri, e con una cifra dentro bastavano cinque caratteri, cioè il
+  // modello di un telefono («iPhone15»), il numero di un volo («FR1234»), il nome
+  // di un giornale («ilsole24ore»). Dopo un documento letto l'avviso di furto di
+  // dati compariva su tre link di tutti i giorni su quattro (#587, giro 8).
+  // Adesso il metro guarda anche di che cosa è fatto il token, perché è lì che un
+  // segreto si distingue da una parola:
+  //   • lettere E cifre insieme — la forma di quasi ogni chiave, password o
+  //     token («segretonetrc2026», «casamia2026xy», «ab12cd34ef56gh78»);
+  //   • sole cifre — numeri di carta, di conto, identificativi lunghi. Sotto le
+  //     dieci cifre sono date, anni e codici di avviamento postale;
+  //   • sole lettere — solo se molto lunga: una passphrase, non una parola. In
+  //     italiano le parole lunghe abbondano, e sotto questa misura ci stanno
+  //     tutte («amministrazione», «elettrodomestici», «giallozafferano»).
+  const STRONG_MISTO = 10;    // lettere + cifre
+  const STRONG_CIFRE = 10;    // sole cifre
+  const STRONG_LETTERE = 18;  // sole lettere
   // Soglie del ripiego strutturale. Si contano SOLO i pezzi illeggibili, e si
   // misurano contro gli indirizzi veri: il pezzo opaco più lungo che un sito
   // normale mette in un link è l'identificativo di un documento di Google, 44
