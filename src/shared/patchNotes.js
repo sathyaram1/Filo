@@ -33,6 +33,7 @@
         'Nessun sito ti fa più comparire una domanda solo perché ha guardato cosa può fare. E se ne fa una e tu la chiudi tre volte senza rispondere, su quella pagina smette di chiedere: prima poteva tenerla lì finché non te ne andavi.',
         'Una scheda non muore più da sola quando un sito prova a condividere lo schermo e il microfono insieme alla vecchia maniera. Perdevi quello che avevi aperto lì, senza un avviso.',
         'Quando un sito ti chiede dove sei e Filo non riesce a calcolarlo, adesso te lo dice: prima restavi con una mappa vuota e la colpa sembrava del sito.',
+        'In una finestra in incognito, Impostazioni → Sicurezza elenca sia le risposte date lì sia quelle delle finestre normali, con scritto quali sono quali, e da lì le togli tutte. Prima diceva che nessun sito ne aveva mai ricevuta una.',
       ],
     },
     {
