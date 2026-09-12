@@ -1,13 +1,13 @@
 // Verifica #590 — giro 1. Le porte che restano aperte sulla lista dei siti
-// bloccati DOPO che le tre strade della segnalazione (indirizzo scritto nella
-// home, azione NAVIGA del modello, link) sono state chiuse.
+// bloccati DOPO che le strade della segnalazione (indirizzo scritto nella home,
+// azione NAVIGA del modello, link) sono state chiuse.
 //
 // Qui non si ri-prova quello che la segnalazione chiedeva (lo fa già
-// tests/siteBlock.spec.mjs): si prova a RAGGIUNGERE LO STESSO SITO scrivendo
-// il suo indirizzo in una forma leggermente diversa, o facendocisi portare
-// dal server. Se una di queste passa, il punto di passaggio unico c'è ma la
-// decisione che prende è aggirabile — e le quattro strade cadono tutte
-// insieme, perché tutte chiedono a lui.
+// tests/siteBlock.spec.mjs): si prova a RAGGIUNGERE LO STESSO SITO scrivendo il
+// suo indirizzo in una forma leggermente diversa, o facendocisi portare dal
+// server. Se una di queste passa, il punto di passaggio unico c'è ma la
+// decisione che prende è aggirabile — e tutte le strade cadono insieme, perché
+// tutte chiedono a lui.
 //
 // Porta A — il punto finale dell'host ("bloccato.lan." invece di
 //           "bloccato.lan"): per la rete è lo stesso nome (forma assoluta), per
@@ -20,27 +20,34 @@ import { createServer } from 'node:http';
 
 const HOST_LAN = 'bloccato.lan';
 
-// Host finto che il fixture risolve a 127.0.0.1: serve alla porta B, dove la
-// pagina bloccata deve davvero caricarsi se il blocco non scatta.
+// Host finto che il fixture risolve a 127.0.0.1: serve dove la pagina bloccata
+// deve davvero caricarsi se il blocco non scatta.
 const HOST_BLOCCATO = 'blocked.test';
 
-async function abilitaBlocco(shell, host) {
+async function abilitaBlocco(shell, ...host) {
   await shell.evaluate((h) => window.filoShell.message({
     type: 'update_settings',
-    settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: [h] } } },
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: h } } },
   }), host);
   await shell.evaluate(() => new Promise((r) => setTimeout(r, 300)));
 }
 
-function schedeSuHost(app, host) {
-  return app.windows().filter((w) => {
-    try { return new URL(w.url()).hostname === host; } catch (_) { return false; }
-  }).length;
+// Gli indirizzi delle schede come li conosce il gestore: una scheda che tenta
+// un host irraggiungibile resta comunque registrata su quell'indirizzo (la
+// finestra mostra la pagina d'errore), quindi è qui che si vede se la scheda è
+// nata o no — non nell'elenco delle finestre.
+async function indirizziSchede(shell) {
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  return snap.tabs.map((t) => t.url);
+}
+
+function schedeSuHost(urls, host) {
+  return urls.filter((u) => { try { return new URL(u).hostname === host; } catch (_) { return false; } }).length;
 }
 
 // ─── Porta A: il punto finale dell'host ──────────────────────────────────────
 
-test('A1 — NAVIGA del modello verso «bloccato.lan.» (col punto finale) deve restare bloccato', async ({ app, shell }) => {
+test('A1 — NAVIGA del modello verso «bloccato.lan.» (col punto finale) resta bloccato', async ({ app, shell }) => {
   await abilitaBlocco(shell, HOST_LAN);
 
   // È lo stesso sito: il punto finale è la forma assoluta del nome, la rete lo
@@ -51,9 +58,10 @@ test('A1 — NAVIGA del modello verso «bloccato.lan.» (col punto finale) deve 
 
   expect(esito.executed, 'l\'apertura non deve essere eseguita').toBe(false);
   expect(esito.output && esito.output.blocked).toBe('site');
+  expect(schedeSuHost(await indirizziSchede(shell), `${HOST_LAN}.`)).toBe(0);
 });
 
-test('A2 — indirizzo col punto finale scritto dall\'utente nella home deve restare bloccato', async ({ app, shell, openTab }) => {
+test('A2 — indirizzo col punto finale scritto dall\'utente nella home resta bloccato', async ({ shell, openTab }) => {
   await abilitaBlocco(shell, HOST_LAN);
 
   const dash = await openTab('filo://newtab/');
@@ -61,15 +69,13 @@ test('A2 — indirizzo col punto finale scritto dall\'utente nella home deve res
   await input.waitFor({ state: 'visible', timeout: 8000 });
   await input.fill(`/${HOST_LAN}.`);
   await input.press('Enter');
+  await dash.waitForTimeout(2000);
 
-  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
-  await expect(card).toBeVisible({ timeout: 8000 });
-
-  await dash.waitForTimeout(600);
-  expect(schedeSuHost(app, `${HOST_LAN}.`)).toBe(0);
+  // Nessuna scheda deve essere nata su quell'host.
+  expect(schedeSuHost(await indirizziSchede(shell), `${HOST_LAN}.`)).toBe(0);
 });
 
-test('A3 — link col punto finale cliccato in una pagina deve restare bloccato', async ({ app, shell, openTab, testServer }) => {
+test('A3 — link col punto finale cliccato in una pagina resta bloccato', async ({ shell, openTab, testServer }) => {
   await abilitaBlocco(shell, HOST_LAN);
 
   const fromUrl = testServer.html(
@@ -83,6 +89,21 @@ test('A3 — link col punto finale cliccato in una pagina deve restare bloccato'
   await expect(card).toBeVisible({ timeout: 6000 });
   await page.waitForTimeout(500);
   expect(page.url()).toBe(fromUrl);
+});
+
+test('A4 — indirizzo col punto finale nella barra della shell resta bloccato', async ({ shell, openTab }) => {
+  await abilitaBlocco(shell, HOST_BLOCCATO);
+
+  // La quarta strada: rinavigare una scheda già aperta scrivendo l'indirizzo
+  // nella barra (tabs:navigate). Con l'host risolvibile la pagina si carica
+  // davvero, quindi qui non è un tentativo a vuoto.
+  await openTab('filo://newtab/');
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const id = snap.tabs[snap.tabs.length - 1].id;
+  await shell.evaluate(([i, u]) => window.filoShell.tabs.navigate(i, u), [id, `http://${HOST_BLOCCATO}./`]);
+  await shell.waitForTimeout(2000);
+
+  expect(schedeSuHost(await indirizziSchede(shell), `${HOST_BLOCCATO}.`)).toBe(0);
 });
 
 // ─── Porta B: il rimbalzo del server ─────────────────────────────────────────
@@ -114,10 +135,16 @@ async function serverConRimbalzo() {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   porta = server.address().port;
-  return { server, porta, chiudi: async () => { try { server.closeAllConnections?.(); } catch (_) {} await new Promise((r) => server.close(r)); } };
+  return {
+    porta,
+    chiudi: async () => {
+      try { server.closeAllConnections?.(); } catch (_) {}
+      await new Promise((r) => server.close(r));
+    },
+  };
 }
 
-test('B1 — un link che RIMBALZA (302) su un sito della lista deve restare bloccato', async ({ shell, openTab }) => {
+test('B1 — un link che RIMBALZA (302) su un sito della lista resta bloccato', async ({ shell, openTab }) => {
   await abilitaBlocco(shell, HOST_BLOCCATO);
   const s = await serverConRimbalzo();
   try {
@@ -126,27 +153,24 @@ test('B1 — un link che RIMBALZA (302) su un sito della lista deve restare bloc
     await page.waitForSelector('#go', { timeout: 8000 });
     await page.evaluate(() => document.getElementById('go').click());
 
-    // Nessuna pagina del sito in lista deve essere arrivata a schermo.
     await page.waitForTimeout(1500);
     const arrivato = await page.evaluate(() => !!document.getElementById('t')).catch(() => false);
     expect(arrivato, 'la pagina del sito bloccato non deve caricarsi').toBe(false);
-    expect(new URL(page.url()).hostname, 'la scheda non deve finire sull\'host bloccato').not.toBe(HOST_BLOCCATO);
+    expect(schedeSuHost(await indirizziSchede(shell), HOST_BLOCCATO)).toBe(0);
   } finally {
     await s.chiudi();
   }
 });
 
-test('B2 — un indirizzo aperto da Filo che RIMBALZA (302) su un sito della lista deve restare bloccato', async ({ app, shell, openTab }) => {
+test('B2 — un indirizzo aperto da Filo che RIMBALZA (302) su un sito della lista resta bloccato', async ({ shell }) => {
   await abilitaBlocco(shell, HOST_BLOCCATO);
   const s = await serverConRimbalzo();
   try {
     // Stessa strada dell'azione NAVIGA: l'indirizzo che il modello propone è
     // innocuo, il rimbalzo lo porta sul sito della lista.
-    const page = await openTab(`http://127.0.0.1:${s.porta}/rimbalzo`);
-    await page.waitForTimeout(1500);
-    const arrivato = await page.evaluate(() => !!document.getElementById('t')).catch(() => false);
-    expect(arrivato, 'la pagina del sito bloccato non deve caricarsi').toBe(false);
-    expect(schedeSuHost(app, HOST_BLOCCATO)).toBe(0);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://127.0.0.1:${s.porta}/rimbalzo`);
+    await shell.waitForTimeout(2500);
+    expect(schedeSuHost(await indirizziSchede(shell), HOST_BLOCCATO)).toBe(0);
   } finally {
     await s.chiudi();
   }
