@@ -115,7 +115,7 @@
   // fa consentire due sensori che nessuno gli ha nominato, e glieli lascia
   // consentiti per sempre. La domanda vera arriva subito dopo, dal gestore
   // della cattura schermo, che sa cosa sta per essere consegnato.
-  function preambiloSchermo(permesso, dettagli) {
+  function preamboloSchermo(permesso, dettagli) {
     if (String(permesso || '') !== 'media') return false;
     const tipi = (dettagli || {}).mediaTypes;
     return Array.isArray(tipi) && tipi.length === 0;
