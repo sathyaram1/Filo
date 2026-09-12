@@ -23,6 +23,10 @@
 //   (senza marcatore di provider AI). Se la chat non interroga nient'altro,
 //   ometti l'opzione: l'errore diventa una frase generica.
 //
+//   SN_CHAT_ERRORS.actionFailure(output) → motivo breve del fallimento di
+//     un'azione di Filo ('sito bloccato: x', 'indirizzo non valido', …), '' se
+//     il motivo non si sa. Una sola volta per TUTTE le chat (#590).
+//
 //   SN_CHAT_ERRORS.isTransientNetwork(err) → bool
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
