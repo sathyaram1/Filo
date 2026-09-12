@@ -1535,8 +1535,8 @@
     // Creatore lezioni: dopo ogni scambio testuale.
     filoLesson: ({ profilo, preferenze, lezioni, interazione, stato }) =>
       `Fai parte di Filo, un assistente universale. Il tuo compito è analizzare l'ultima interazione e decidere se rivela qualcosa di utile da ricordare.\n\n` +
-      `LEZIONI ESISTENTI:\n${lezioni || '(nessuna)'}\n\n` +
-      `MODULI BASE:\nPROFILO:\n${profilo || '(vuoto)'}\n\nPREFERENZE:\n${preferenze || '(vuoto)'}\n\n` +
+      lessonsBlock(lezioni) +
+      memoryBlock({ profilo, preferenze }) +
       `INTERAZIONE:\n${interazione || '(vuota)'}\n\n` +
       `FILO STATE:\n${stato || '(vuoto)'}\n\n` +
       `Valuta se emergono:\n` +
