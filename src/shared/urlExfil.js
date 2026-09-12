@@ -168,8 +168,13 @@
   }
 
   // Verdetto: { exfil, reason }. corpus = materiale sensibile che era nel
-  // contesto del modello (memoria, appunti, output comandi). fromUntrusted =
-  // l'azione nasce da una superficie non fidata (agente su pagina web).
+  // contesto del modello (memoria, appunti, documenti aperti, output dei comandi
+  // appena eseguiti). fromUntrusted = nel contesto è entrato materiale NON
+  // FIDATO — testo di una pagina web, risultati di ricerca, llms.txt, l'output di
+  // un comando. Dipende da COSA è entrato nel contesto, non da CHI ha mandato il
+  // messaggio: una chat `filo://` con mezza pagina ostile davanti è tanto pilotabile
+  // quanto un agente che gira sulla pagina (#587). Lo calcola il main con
+  // src/main/services/contextTaint.js.
   function assess(url, { corpus = '', fromUntrusted = false } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
