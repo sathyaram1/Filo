@@ -8,6 +8,7 @@
   const { MSG } = window.SN_MSG;
   const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX } = window.SN_CONST;
   const validateAgentStyle = window.SN_CONST.validateAgentStyle;
+  const isAgentStyleRemoval = window.SN_CONST.isAgentStyleRemoval;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
