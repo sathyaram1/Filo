@@ -506,6 +506,9 @@
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    // Cambiare le voci della lista azzera i sì dati a mano: l'elenco qui sotto
+    // deve raccontarlo subito, non alla prossima apertura della pagina (#590).
+    renderAllowed();
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
