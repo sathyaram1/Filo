@@ -47,6 +47,21 @@ test('un riquadro senza indirizzo suo deve poter chiedere, non essere negato in 
   console.log('[586 g6] riquadro srcdoc — domande:', domandeScritto, 'esito:', esitoScritto);
   await shell.screenshot({ path: 'tests/.shots/586-giro6-riquadro-senza-indirizzo.png' });
 
+  // E nemmeno un sì già dato al sito lo sblocca: la pagina che lo ospita
+  // ottiene la fotocamera, il suo riquadro no.
+  if (domandeScritto) await shell.locator('.perm-chip .perm-chip-x').click();
+  const dellaPagina = page.evaluate(() => navigator.mediaDevices.getUserMedia({ video: true })
+    .then((s) => { try { s.getTracks().forEach((t) => t.stop()); } catch (_) {} return 'ok'; },
+      (e) => 'no:' + ((e && e.name) || '?')));
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  console.log('[586 g6] la PAGINA dopo il Consenti:', await dellaPagina);
+  const dopoIlSi = await Promise.race([
+    page.evaluate(() => window.__chiedi('scritto')),
+    new Promise((r) => setTimeout(() => r('appeso'), 6000)),
+  ]);
+  console.log('[586 g6] il riquadro srcdoc dopo il Consenti al sito:', dopoIlSi);
+
   expect(
     domandeVuoto + domandeScritto,
     'un riquadro incorporato scritto dalla pagina — il lettore video, il modulo di pagamento, la '
