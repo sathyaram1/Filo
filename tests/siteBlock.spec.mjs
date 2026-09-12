@@ -378,3 +378,109 @@ test('#590 anche la finestrella di accesso applica la lista dei siti bloccati', 
   expect(await popup.evaluate(() => !!document.getElementById('t')).catch(() => false)).toBe(false);
   expect(new URL(popup.url()).hostname).not.toBe(BLOCKED_HOST);
 });
+
+// ─── #590 giro 2 — il sì dell'utente vale oltre la prima richiesta ───────────
+
+// Sito della lista che si comporta come quasi ogni sito vero: la pagina chiesta
+// risponde "vai qui" (il salto da http a https, la barra iniziale che porta
+// alla home) invece di dare subito il contenuto.
+async function sitoCheRimbalza() {
+  const { createServer } = await import('node:http');
+  let porta = 0;
+  const server = createServer((req, res) => {
+    const path = req.url.split('?')[0];
+    if (path === '/rimbalza') {
+      res.writeHead(302, { Location: `http://${BLOCKED_HOST}:${porta}/dentro` });
+      res.end();
+      return;
+    }
+    const corpo = path === '/dentro'
+      ? '<h1 id="dentro">SONO DENTRO</h1>'
+      : `<h1 id="ingresso">INGRESSO</h1><a id="go" href="http://${BLOCKED_HOST}:${porta}/dentro">avanti</a>`;
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><meta charset="utf-8">${corpo}`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  porta = server.address().port;
+  return {
+    porta,
+    chiudi: async () => {
+      try { server.closeAllConnections?.(); } catch (_) {}
+      await new Promise((r) => server.close(r));
+    },
+  };
+}
+
+async function apriComunque(shell, url) {
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  const azione = shell.locator('.shell-notif-action', { hasText: 'Apri comunque' });
+  await expect(azione).toBeVisible({ timeout: 6000 });
+  await azione.click();
+}
+
+// La Page che contiene quell'elemento, fra i WebContentsView aperti.
+async function paginaCon(app, id) {
+  const fine = Date.now() + 10000;
+  while (Date.now() < fine) {
+    for (const w of app.windows()) {
+      try { if (await w.evaluate((s) => !!document.getElementById(s), id)) return w; } catch (_) {}
+    }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return null;
+}
+
+test('#590 "Apri comunque" apre anche un sito che rimbalza (e rimbalza quasi tutto)', async ({ app, shell }) => {
+  await enableBlock(shell);
+  const s = await sitoCheRimbalza();
+  try {
+    // Senza il sì registrato, il rimbalzo trovava un controllo che del sì non
+    // sapeva niente: la scheda restava vuota e il sito non si apriva più.
+    await apriComunque(shell, `http://${BLOCKED_HOST}:${s.porta}/rimbalza`);
+    expect(await paginaCon(app, 'dentro'), 'il sito deve aprirsi davvero').not.toBeNull();
+  } finally {
+    await s.chiudi();
+  }
+});
+
+test('#590 dopo "Apri comunque" si naviga dentro il sito: link, ricarica, scheda nuova', async ({ app, shell }) => {
+  await enableBlock(shell);
+  const s = await sitoCheRimbalza();
+  try {
+    await apriComunque(shell, `http://${BLOCKED_HOST}:${s.porta}/ingresso`);
+    const page = await paginaCon(app, 'ingresso');
+    expect(page).not.toBeNull();
+
+    // Un link interno al sito.
+    await page.evaluate(() => document.getElementById('go').click());
+    await expect(page.locator('#dentro')).toBeVisible({ timeout: 8000 });
+
+    // Ricaricare.
+    await page.evaluate(() => window.location.reload());
+    await expect(page.locator('#dentro')).toBeVisible({ timeout: 8000 });
+
+    // Un link che apre una scheda nuova dentro lo stesso sito.
+    await page.evaluate((p) => window.open(`http://blocked.test:${p}/ingresso`, '_blank'), s.porta);
+    expect(await paginaCon(app, 'ingresso'), 'la scheda nuova deve nascere').not.toBeNull();
+  } finally {
+    await s.chiudi();
+  }
+});
+
+test('#590 un rimbalzo fermato non lascia una scheda vuota da chiudere a mano', async ({ shell }) => {
+  await enableBlock(shell);
+  const s = await sitoCheRimbalza();
+  try {
+    // Filo apre un indirizzo innocuo (un accorciatore) che rimbalza sul sito
+    // della lista: il blocco è giusto, ma la scheda era già nata.
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), `http://127.0.0.1:${s.porta}/rimbalza`);
+    const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+    await expect(card).toBeVisible({ timeout: 6000 });
+    await expect.poll(async () => {
+      const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+      return snap.tabs.filter((t) => !t.url).length;
+    }, { timeout: 6000 }).toBe(0);
+  } finally {
+    await s.chiudi();
+  }
+});
