@@ -181,7 +181,7 @@ test('il veleno della raccolta arriva al modello dentro il recinto, e il recinto
   for (const riga of dentro.split('\n').slice(1)) {
     if (!riga.trim()) continue;
     expect(riga, `riga non scritta da Filo dentro il recinto: ${JSON.stringify(riga)}`)
-      .toMatch(/^(## "|\s+\d+\. (click|fill|reveal|hover) su )/);
+      .toMatch(/^(## "|\s+\d+\. (click|fill|reveal|hover) su |\s+\(percorso più lungo: il resto dei passi non è riportato\)$)/);
   }
 
   // I dati personali di chi aveva navigato non escono nel prompt di un altro.

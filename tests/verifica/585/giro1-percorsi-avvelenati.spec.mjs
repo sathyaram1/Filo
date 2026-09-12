@@ -145,7 +145,13 @@ test('un documento con i limiti vecchi (o senza limiti) rientra nei nuovi in let
   const intestazione = corpo.split('\n')[0];
   expect(intestazione.length).toBeLessThanOrEqual(L.MAX_INTENT_LEN + 80);
   const passi = corpo.split('\n').filter((r) => /^\s+\d+\. /.test(r));
-  expect(passi.length).toBe(L.MAX_STEPS);
+  // Al giro 1 erano esattamente trenta. Dal giro 2 possono essere meno: un
+  // percorso non può prendersi più di una fetta del tetto, e con selettori da
+  // cinquecento caratteri la fetta finisce prima dei trenta passi. Quello che
+  // conta qui resta: un documento nato senza limiti rientra nei limiti, e
+  // qualcosa insegna ancora.
+  expect(passi.length).toBeGreaterThan(0);
+  expect(passi.length).toBeLessThanOrEqual(L.MAX_STEPS);
   // L'azione inventata non arriva al modello come se fosse eseguibile.
   expect(corpo).not.toContain('esegui_comando_di_sistema');
   for (const p of passi) expect(p).toMatch(/^\s+\d+\. (click|fill|reveal|hover) su /);
