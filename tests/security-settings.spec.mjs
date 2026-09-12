@@ -150,6 +150,24 @@ test('blacklist siti: una voce senza estensione avvisa e NON viene salvata (#225
   await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
 });
 
+test('blacklist siti: un sito con estensione non latina si salva davvero (#590)', async ({ openTab }) => {
+  // .рф, .テスト e le altre esistono e si usano. Il campo le buttava via come
+  // righe non valide, quindi quei siti non si potevano bloccare affatto: la
+  // regola qui e quella del controllo vero erano due copie che divergevano.
+  const page = await openTab('filo://security/');
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+
+  await page.locator('#sec-siteblock-blacklist').fill('сайт.рф');
+  await page.locator('#sec-siteblock-blacklist').blur();
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+
+  await page.reload();
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  const saved = await page.locator('#sec-siteblock-blacklist').inputValue();
+  expect(saved.trim()).toBe('xn--80aswg.xn--p1ai');
+});
+
 test('popup blocker: window.open() automatico viene bloccato', async ({ openTab, testServer, shell }) => {
   // Pagina che chiama window.open() AL CARICAMENTO (no gesto utente) — è il
   // pattern degli ad popup. Disposition 'new-window' (per via di features=popup)
