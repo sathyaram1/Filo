@@ -274,9 +274,14 @@ test('O — history.back() scritto nella pagina riporta sul sito della lista', a
 
   await metti(LISTA); // l'utente mette in lista il sito che ha appena lasciato
 
+  await shell.evaluate(() => document.querySelectorAll('.shell-notif').forEach((n) => n.remove()));
   await q.click('#b'); // history.back()
   await shell.waitForTimeout(2500);
 
+  // Che il salto sia AVVENUTO e sia stato fermato lo dice la notifica: senza,
+  // questa prova sarebbe verde anche se history.back() non partisse affatto.
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }))
+    .toBeVisible({ timeout: 4000 });
   const ancora = finestreSu(LISTA);
   const viva = ancora.length
     ? await ancora[ancora.length - 1].evaluate(() => !!document.getElementById('t')).catch(() => false)
