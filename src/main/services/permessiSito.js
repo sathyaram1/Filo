@@ -164,12 +164,22 @@ function annunciaAiSiti() {
 // (settings.security.sitePermissions), così è esportabile, importabile e
 // modificabile dalla pagina Sicurezza come ogni altra scelta di Filo.
 async function salva(nuova) {
-  globalThis.__diagSalva = (globalThis.__diagSalva || []).concat([{ n: Object.keys(nuova||{}).length, fase: 'entra' }]);
   try {
     const Storage = globalThis.SN_STORAGE;
     if (!Storage) return;
-    const merged = await Storage.updateSettings({ security: { sitePermissions: nuova } });
-    globalThis.__diagSalva.push({ fase: 'scritto', n: Object.keys((merged.security||{}).sitePermissions||{}).length });
+    // Questa mappa è quella del profilo NORMALE, e va sul disco anche quando a
+    // chiederlo è la pagina Sicurezza aperta da una finestra in incognito: lì
+    // tutte le scritture finiscono in un deposito in memoria che muore con la
+    // finestra, quindi la revoca spariva dall'elenco e restava sul disco,
+    // tornando al riavvio (#586, giro 7). Dentro l'uscita si legge il disco e si
+    // riscrive il disco: niente della sessione in incognito passa di là.
+    const fuori = (fn) => {
+      try {
+        const shim = require('../shim/storage');
+        return shim.runFuoriIncognito ? shim.runFuoriIncognito(fn) : fn();
+      } catch (_) { return fn(); }
+    };
+    const merged = await fuori(() => Storage.updateSettings({ security: { sitePermissions: nuova } }));
     // La pagina Sicurezza aperta si riallinea da sola (stesso canale di ogni
     // altra impostazione).
     try {
