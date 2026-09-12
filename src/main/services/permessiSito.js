@@ -351,6 +351,71 @@ function installaSuSessione(ses) {
   return ses;
 }
 
+// ─── che cosa si condivide ──────────────────────────────────────────────────
+
+// Scelte della fonte in attesa: id → { risolvi }.
+const scelteFonte = new Map();
+let prossimaScelta = 1;
+
+// Dopo il «Consenti» arriva la seconda mezza domanda: tutto lo schermo, o una
+// finestra sola? Torna la fonte scelta, oppure null (annullato, nessuna fonte,
+// nessuna shell a cui chiedere, o due minuti senza risposta).
+async function scegliFonte(wc, frame) {
+  const { win } = posizione(wc);
+  const shell = win && !win.isDestroyed() ? win.webContents : null;
+  if (!shell || shell.isDestroyed()) return null;
+
+  let fonti = [];
+  try {
+    fonti = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 320, height: 200 },
+      fetchWindowIcons: false,
+    });
+  } catch (_) { return null; }
+  if (!fonti || !fonti.length) return null;
+
+  const Pp = P();
+  const url = (frame && frame.url) || (wc && !wc.isDestroyed() ? wc.getURL() : '');
+  const host = Pp.host(Pp.origineDi(url) || '');
+
+  const id = String(prossimaScelta++);
+  const voci = fonti.map((f) => ({
+    id: f.id,
+    nome: f.name || (f.id.startsWith('screen:') ? 'Tutto lo schermo' : 'Una finestra'),
+    schermo: f.id.startsWith('screen:'),
+    anteprima: (() => { try { return f.thumbnail.toDataURL(); } catch (_) { return ''; } })(),
+  }));
+
+  return new Promise((resolve) => {
+    let finito = false;
+    const finisci = (fonteId) => {
+      if (finito) return;
+      finito = true;
+      scelteFonte.delete(id);
+      clearTimeout(timer);
+      try { wc.off('destroyed', suMorte); } catch (_) {}
+      try { if (shell && !shell.isDestroyed()) shell.send('permissions:source-closed', { id }); } catch (_) {}
+      resolve(fonteId ? (fonti.find((f) => f.id === fonteId) || null) : null);
+    };
+    const suMorte = () => finisci(null);
+    try { wc.once('destroyed', suMorte); } catch (_) {}
+    const timer = setTimeout(() => finisci(null), ATTESA_MS);
+    scelteFonte.set(id, { finisci });
+    try {
+      shell.send('permissions:pick-source', { id, host, voci });
+    } catch (_) { finisci(null); }
+  });
+}
+
+// Risposta della shell: l'id della fonte scelta, o niente per annullare.
+function scegliFonteRisposta(id, fonteId) {
+  const att = scelteFonte.get(String(id));
+  if (!att) return { ok: false, error: 'scaduta' };
+  att.finisci(fonteId || null);
+  return { ok: true };
+}
+
 // Dalla WebFrameMain della richiesta di cattura schermo alla WebContents che la
 // possiede: la cerchiamo fra le schede aperte confrontando il processo/frame.
 function trovaWcDelFrame(frame) {
