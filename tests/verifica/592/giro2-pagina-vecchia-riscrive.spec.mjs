@@ -50,8 +50,8 @@ test('una pagina Preferenze aperta da prima non deve riaccendere la modalità te
 
 test('la pagina Opzioni aperta da prima non deve rimettere la chiave API di prima', async ({ openTab }) => {
   // Stessa forma, ma qui il campo è un segreto: se la pagina Opzioni riscrive
-  // quello che si era letta all'apertura, una chiave cancellata altrove torna
-  // al suo posto senza che nessuno l'abbia chiesto.
+  // quello che si era letta all'apertura, la chiave che l'utente ha appena
+  // approvato in chat sparisce e torna quella di prima, senza dirlo a nessuno.
   const opzioni = await openTab('filo://options/options.html');
   await opzioni.waitForSelector('#apiKey', { state: 'attached', timeout: 20_000 });
   // I campi delle chiavi si vedono solo con «usa i modelli predefiniti» spento.
