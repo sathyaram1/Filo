@@ -2660,6 +2660,21 @@ class TabManager {
     } catch (_) {}
   }
 
+  // #590 (quarto giro) — un RIQUADRO dentro la pagina, non la pagina. Qui non
+  // c'è "Apri comunque": l'utente non stava aprendo quel sito, e aprire in una
+  // scheda il pezzo che una pagina si incorpora (uno script, un widget) non è
+  // una cosa che qualcuno voglia. Il nome del sito però va detto, altrimenti la
+  // pagina sembra rotta invece che potata.
+  _notifyBlockedFrame(host) {
+    try {
+      const NAV = globalThis.SN_URL_NAV;
+      const label = (NAV && NAV.hostLeggibile(host)) || host;
+      this.win.webContents.send('shell:toast', {
+        text: `${label} è in lista: un riquadro di questa pagina non è stato caricato`,
+      });
+    } catch (_) {}
+  }
+
   // ─── rilevamento siti pericolosi ─────────────────────────────────────────
   // (vedi src/main/services/safebrowse/ e src/main/tabs/tabSafebrowse.js).
   // I metodi safebrowse (_sbState, _sbApplyState, _sbBroadcast, safebrowseGet,
