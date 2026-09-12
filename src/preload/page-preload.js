@@ -180,8 +180,40 @@ if (!IS_SUBFRAME) try {
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
-    const { buildCatturaSicuraSource } = require('./permessi-guard.js');
+    const {
+      buildCatturaSicuraSource, CANALE_FERMA, CANALE_FERMATO,
+    } = require('./permessi-guard.js');
     webFrame.executeJavaScript(buildCatturaSicuraSource(), true).catch(() => {});
+    // #586 — «togli il permesso» deve chiudere anche la traccia già consegnata,
+    // e chiuderla senza ricaricare la pagina: ricaricare butta via quello che
+    // chi naviga stava scrivendo lì. Il main chiede, la pagina ferma le sue
+    // tracce e risponde quante ne restano vive; con quella risposta il main
+    // decide se serve ancora la strada dura (vedi services/permessiSito.js).
+    ipcRenderer.on('filo:permessi-ferma', (_e, msg) => {
+      const id = (msg && msg.id) || null;
+      let risposto = false;
+      const rispondi = (vive) => {
+        if (risposto) return;
+        risposto = true;
+        try { ipcRenderer.send('filo:permessi-fermato', { id, vive }); } catch (_) {}
+      };
+      try {
+        const suRisposta = (e) => {
+          try {
+            if (!e || !e.detail || e.detail.id !== id) return;
+            document.removeEventListener(CANALE_FERMATO, suRisposta, true);
+            rispondi(Number(e.detail.vive) || 0);
+          } catch (_) {}
+        };
+        document.addEventListener(CANALE_FERMATO, suRisposta, true);
+        document.dispatchEvent(new CustomEvent(CANALE_FERMA, {
+          detail: { id, chiavi: (msg && msg.chiavi) || null },
+        }));
+        // La pagina risponde sull'istante. Se non risponde (il suo codice ha
+        // tolto di mezzo il nostro giro), vale come "è rimasto tutto vivo".
+        setTimeout(() => rispondi(1), 400);
+      } catch (_) { rispondi(1); }
+    });
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
