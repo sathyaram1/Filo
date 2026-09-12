@@ -2491,6 +2491,32 @@ class TabManager {
     return decision;
   }
 
+  // #590 — la scheda nata per un indirizzo che è rimbalzato su un sito della
+  // lista. Niente da archiviare (non è un sito che l'utente ha visitato: non ha
+  // mai caricato nulla), quindi non passa da closeTab. La chiusura è rimandata
+  // di un giro perché qui siamo dentro il gestore dell'evento di navigazione di
+  // questa stessa scheda: distruggerla mentre sta parlando fa cadere tutto.
+  _chiudiSchedaRimastaVuota(tab) {
+    if (!tab || tab._chiusuraVuotaInCorso) return;
+    tab._chiusuraVuotaInCorso = true;
+    setImmediate(() => {
+      const idx = this.tabs.findIndex((t) => t.id === tab.id);
+      if (idx < 0) return;
+      if (tab._everNavigated) return; // nel frattempo ha caricato qualcosa: non è più vuota
+      try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
+      try { tab.view.webContents.close(); } catch (_) {}
+      ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
+      this.tabs.splice(idx, 1);
+      if (this.activeId === tab.id) {
+        const next = this._mostRecentlyActiveTab() || this.tabs[idx] || this.tabs[idx - 1];
+        if (next) this.activate(next.id);
+        else this.openTab('filo://newtab/');
+      } else {
+        this._broadcast();
+      }
+    });
+  }
+
   // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
   // L'azione riusa il percorso openBlockedPopup (apertura programmatica, che
   // bypassa il blocco).
