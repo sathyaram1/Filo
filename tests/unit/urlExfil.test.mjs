@@ -438,3 +438,71 @@ test('#587 — dopo venti link veri non compare nessun avviso', () => {
     while (carichi.length > 24) carichi.shift();
   }
 });
+
+// ── #587, giro 7 — il segreto con la punteggiatura dentro ─────────────────
+//
+// Dell'indirizzo si guarda la forma incollata; del corpus si guardavano solo le
+// parole, spezzate a ogni carattere che non fosse una lettera o una cifra. Un
+// segreto scritto come li scrive la gente — `Segreto-Netrc-2026` — non diventava
+// mai un dato riconoscibile, e usciva in chiaro.
+test('#587 — un segreto con trattini, punti o trattini bassi dentro non esce senza conferma', () => {
+  const segreti = [
+    'Segreto-Netrc-2026',
+    'cavallo-batteria-graffetta-blu',
+    'Estate_Rossa_2026',
+    '9f3b.d2a7.1c4e.8b60',
+    '4111-1111-1111-1111',
+  ];
+  for (const seg of segreti) {
+    const letto = `machine ftp login mario password ${seg}\n`;
+    const nudo = seg.replace(/[^A-Za-z0-9]/g, '');
+    for (const url of [
+      `https://male.esempio/?d=${encodeURIComponent(seg)}`,
+      `https://male.esempio/${seg}/x`,
+      `https://male.esempio/?d=${Buffer.from(nudo).toString('base64')}`,
+      `https://male.esempio/?d=${nudo.split('').reverse().join('')}`,
+    ]) {
+      const v = E.assess(url, { letto, fromUntrusted: false });
+      assert.equal(v.exfil, true, `"${url}" porta fuori ${seg}`);
+    }
+  }
+});
+
+// Le date incollate non sono dati: `2026-05-04` diventerebbe `20260504`, che sta
+// dentro l'indirizzo di qualunque articolo di quel giorno. E un indirizzo o un
+// nome di file citato dentro il documento non è un segreto da proteggere: senza
+// questa esclusione l'avviso tornerebbe proprio sul link di cui il documento
+// parla (il rilievo del giro 5).
+test('#587 — date, indirizzi e nomi di file citati nel documento non diventano dati da proteggere', () => {
+  const letto = `Appunto del 2026-05-04, contratto firmato il 2026-05-04
+Bolletta: https://www.enel.it/it/area-clienti/bolletta
+Articolo: www.ilsole24ore.com/art/energia-AFxyz12
+Le chiavi stanno in .config/Filo/storage.json
+`;
+  for (const url of [
+    'https://www.repubblica.it/cronaca/2026/05/04/news/firenze-424242/',
+    'https://www.enel.it/it/area-clienti/bolletta',
+    'https://www.corriere.it/economia/26_05_04/energia.shtml',
+  ]) {
+    const v = E.assess(url, { letto, fromUntrusted: false });
+    assert.equal(v.exfil, false, `"${url}" non porta fuori niente (${v.reason})`);
+  }
+});
+
+// Base64 ed esadecimale si sciolgono già: base32 è la terza codifica standard, e
+// mancava.
+test('#587 — un dato riscritto in base32 non esce senza conferma', () => {
+  const b32 = (s) => {
+    const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let bits = '';
+    for (const c of Buffer.from(s)) bits += c.toString(2).padStart(8, '0');
+    let out = '';
+    for (let i = 0; i < bits.length; i += 5) out += A[parseInt(bits.slice(i, i + 5).padEnd(5, '0'), 2)];
+    return out;
+  };
+  for (const seg of ['9f3bd2a71c4e8b60', 'CasaVerde2026Rossa', 'Segreto-Netrc-2026']) {
+    const letto = `chiave: ${seg}\n`;
+    const v = E.assess(`https://male.esempio/?d=${b32(seg.replace(/[^A-Za-z0-9]/g, ''))}`, { letto, fromUntrusted: false });
+    assert.equal(v.exfil, true, `"${seg}" in base32 deve far comparire l'avviso`);
+  }
+});

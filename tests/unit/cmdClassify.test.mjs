@@ -1614,3 +1614,82 @@ test('#587 — un collegamento dietro un jolly (o sotto una ricorsiva) chiede un
     rmSync(casa, { recursive: true, force: true });
   }
 });
+
+// ── #587, giro 7 — i modelli che dicono «tutto tranne» ────────────────────
+//
+// La quadra col punto esclamativo dentro è la NEGAZIONE di una shell: `.[!x]sh`
+// è «un carattere qualsiasi tranne la x», quindi apre `.ssh`. Veniva letta come
+// il punto esclamativo alla lettera, e un bersaglio riservato scritto così non
+// somigliava a niente. Stessa cosa per le classi POSIX (`[[:lower:]]`). Le
+// scritture gemelle (`[^x]`, `[a-z]`) venivano già fermate: stessa lettura, due
+// risposte diverse.
+test('#587 — un modello negato o una classe POSIX non nascondono un bersaglio riservato', () => {
+  const dove = { perimetro: '/home/mario', home: '/home/mario', cwd: '/home/mario', shell: 'bash' };
+  for (const cmd of [
+    'cat .[!x]sh/config',
+    'cat .s[!x]h/id_rsa',
+    'cat .s[!a-r]h/config',
+    'cat .[!x]etrc',
+    'cat .[!x]onfig/Filo/storage.json',
+    'cat .s[[:lower:]]h/config',
+    'cat .s[[:alpha:]]h/config',
+    'cat .[[:lower:]]onfig/Filo/storage.json',
+    'ls .[!x]sh',
+    'cd .[!x]sh && cat config',
+    'grep -r chiave .[!x]sh',
+    'cat Li[!x]rary/Application Support/Filo/storage.json',
+    // Le forme che non sappiamo leggere (equivalenze, collazione, quadra monca)
+    // restano dalla parte prudente.
+    'cat .s[[=s=]]h/config',
+    'cat .[!x]sh/config[',
+  ]) {
+    assert.equal(C.classify(cmd, dove), 2, `"${cmd}" può aprire un bersaglio riservato: chiede un OK`);
+  }
+  for (const cmd of [
+    'cat Docum[!x]nti/vero.txt',
+    'cat Docum[[:lower:]]nti/vero.txt',
+    'cat Documenti/*.txt',
+    'cat nota[1].txt',
+    'cat foto[0-9].jpg',
+  ]) {
+    assert.equal(C.classify(cmd, dove), 1, `"${cmd}" legge i propri file: non chiede niente`);
+  }
+});
+
+// ── #587, giro 7 — «torna dov'eri» ────────────────────────────────────────
+//
+// `cd -` è la cartella di prima, come `~-` e `$OLDPWD`. Il trattino veniva
+// scartato come un'opzione, quindi lo spostamento non veniva seguito e la
+// lettura dopo risultava fatta nella cartella sbagliata. Lo stesso vale per
+// `popd`, che riporta dove `pushd` era partito senza nominarlo.
+test('#587 — «cd -» e «popd» non fanno perdere di vista dove si legge', () => {
+  const casa = '/home/mario';
+  const dove = (cwd) => ({ perimetro: casa, home: casa, cwd: cwd || casa, shell: 'bash' });
+  // Lo spostamento sta in questa sequenza: si segue, e si finisce nelle chiavi.
+  for (const cmd of [
+    'cd .ssh && cd ~ && cd - && cat config',
+    'cd .ssh; cd ~; cd -; cat config',
+    'cd .config/Filo && cd ~ && cd - && cat storage.json',
+    'cd .ssh && cd ~ && cd - && ls -la',
+    'cd .ssh && cd ~ && cd - && wc -l config',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" torna nella cartella delle chiavi`);
+  }
+  // Lo spostamento sta in un turno passato: dove porta non si vede.
+  for (const cmd of ['cd - && cat config', 'cd - && ls', 'popd && cat config', 'cd + && ls']) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" punta a una cartella che il comando non nomina`);
+  }
+  // La cartella corrente arriva dal main: «torna a casa e poi torna dov'eri»
+  // riporta nelle chiavi anche se il `cd` stava nel turno prima.
+  for (const cmd of ['cd ~ && cd - && cat config', 'cd ~ && cd - && ls']) {
+    assert.equal(C.classify(cmd, dove(`${casa}/.ssh`)), 2, `"${cmd}" torna nelle chiavi`);
+  }
+  // E quello che deve restare gratis: andare e tornare fra le proprie cartelle.
+  for (const cmd of [
+    'cd Documenti && cd ~ && cd - && cat vero.txt',
+    'cd Documenti && cd ~ && cd - && ls',
+    'pushd Documenti && cd ~ && popd && ls',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 1, `"${cmd}" resta fra i file dell'utente`);
+  }
+});

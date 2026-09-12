@@ -277,3 +277,24 @@ test('#587 — il perimetro del comando arriva dal main e cambia il livello', ()
   // E il popup continua a dire il comando e la cartella.
   assert.match(AL.describe({ ...fuori, _cwd: '~' }), /cat \/etc\/hosts/);
 });
+
+// ── #587, giro 7 — la ricerca sul web è l'altra uscita ────────────────────
+//
+// Aprire un link che porta fuori un dato letto chiede conferma; cercare sul web
+// lo stesso dato no, e la ricerca esce dal computer allo stesso modo. Il flag lo
+// calcola il main col confronto di NAVIGA, mai l'LLM: qui si controlla che il
+// registro lo traduca in un livello, e che il popup mostri la ricerca.
+test('#587 — CERCA_WEB sale a 2 quando la ricerca porta fuori un dato letto', () => {
+  const normale = { type: 'CERCA_WEB', query: 'la ricetta della carbonara' };
+  assert.equal(AL.levelFor(normale), 1);
+  assert.match(AL.describe(normale), /carbonara/);
+  const sospetta = {
+    type: 'CERCA_WEB',
+    query: 'sk-or-v1-9f3bd2a71c4e8b60',
+    _exfil: true,
+    _exfilReason: 'contiene un tuo dato ("9f3bd2a71c4e8b60…")',
+  };
+  assert.equal(AL.levelFor(sospetta), 2);
+  assert.match(AL.describe(sospetta), /sk-or-v1-9f3bd2a71c4e8b60/);
+  assert.match(AL.describe(sospetta), /servizio esterno/);
+});

@@ -313,3 +313,37 @@ test('#587 un percorso travestito non regala la lettura, e le letture normali re
     expect(ok.needsConfirm, `«${comando}» non deve chiedere niente`).toBeFalsy();
   }
 });
+
+// ── #587, giro 7: la ricerca sul web è l'altra uscita ───────────────────────
+// Aprire un link che porta fuori un dato letto chiede conferma. Cercare sul web
+// lo stesso dato usciva invece senza un clic: la ricerca lascia il computer e
+// arriva a un servizio esterno esattamente come una richiesta a un sito.
+test('#587 cercare sul web un dato appena letto chiede conferma, una ricerca normale no', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+
+  const dir = cartellaTemporanea('filo-587-cerca-');
+  const file = path.join(dir, 'chiavi.txt');
+  const chiave = 'sk-or-v1-9f3bd2a71c4e8b60';
+  fs.writeFileSync(file, `OPENROUTER_API_KEY=${chiave}\n`, 'utf8');
+
+  try {
+    const lettura = { type: 'ESEGUI_COMANDO', comando: `cat "${file}"` };
+    const letto = await confirmAction(page, lettura);
+    expect(letto.executed, 'il file deve essere letto davvero').toBe(true);
+    expect(String(letto.output?.stdout || '')).toContain(chiave);
+
+    // La chiave finisce nel testo di una ricerca: non parte da sola.
+    const sospetta = await runAction(page, { type: 'CERCA_WEB', query: `che cos'è ${chiave}` });
+    expect(sospetta.executed).toBe(false);
+    expect(sospetta.needsConfirm).toBe(2);
+    // Il popup mostra la ricerca per intero: è quella che sta per uscire.
+    expect(String(sospetta.describe || '')).toContain(chiave);
+
+    // E una ricerca che non porta fuori niente non chiede niente.
+    const normale = await runAction(page, { type: 'CERCA_WEB', query: 'la ricetta della carbonara' });
+    expect(normale.needsConfirm, 'una ricerca normale non deve chiedere conferma').toBeFalsy();
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
+});

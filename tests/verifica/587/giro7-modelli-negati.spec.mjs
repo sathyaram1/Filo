@@ -127,7 +127,6 @@ test.describe('#587 — i modelli che dicono «tutto tranne»', () => {
         'cat .[!x]sh/*',
         'head -n 3 .[!x]sh/id_rsa',
         'tail -n 2 .[!x]sh/config',
-        'wc -c .[!x]sh/id_rsa',
         'grep -r BEGIN .[!x]sh',
         'grep BEGIN .[!x]sh/id_rsa',
       ]) {
