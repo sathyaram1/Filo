@@ -1629,7 +1629,10 @@ test('in incognito le Impostazioni elencano anche le risposte delle finestre nor
   await expect(riga).toContainText('finestre normali');
 
   // E da lì si toglie davvero, dalla memoria giusta.
+  console.log('[586] bottoni della riga:', await riga.locator('button').allTextContents());
   await riga.locator('button').nth(1).click();
+  await sicurezza.waitForTimeout(1500);
+  console.log('[586] elenco dopo il togli:', await sicurezza.locator('#perms-list li').allTextContents());
   await expect.poll(async () => {
     const s = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.sitePermissions);
     return Object.keys(s || {}).length;
