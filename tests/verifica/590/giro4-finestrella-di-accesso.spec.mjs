@@ -261,16 +261,18 @@ test('N2 — la pagina che si ricarica DA SOLA non deve scavalcare la lista', as
   const p = await aspettaFinestraSu(LISTA);
   expect(p, 'con la lista vuota il sito si apre').not.toBeNull();
   await p.waitForSelector('#b', { timeout: 8000 });
+  await p.evaluate(() => { window.__segno = 'vecchio'; });
 
   await metti(LISTA);
+  await shell.evaluate(() => document.querySelectorAll('.shell-notif').forEach((n) => n.remove()));
 
-  await p.click('#b'); // location.reload()
+  await p.evaluate(() => { location.reload(); }).catch(() => {});
   await shell.waitForTimeout(2500);
-  const ancora = finestreSu(LISTA);
-  const viva = ancora.length
-    ? await ancora[ancora.length - 1].evaluate(() => !!document.getElementById('t')).catch(() => false)
-    : false;
-  expect(viva, 'una pagina in lista non deve potersi ricaricare da sola').toBe(false);
+
+  const segno = await p.evaluate(() => window.__segno).catch(() => null);
+  expect(segno, 'la pagina non deve potersi richiedere di nuovo da sola').toBe('vecchio');
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' }))
+    .toBeVisible({ timeout: 4000 });
 });
 
 // ─── Porta O: la pagina che torna indietro da sola ───────────────────────────
