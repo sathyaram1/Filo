@@ -379,13 +379,18 @@
   // Con un solo numero condiviso l'ultimo che chiude azzererebbe anche la
   // riserva di chi è ancora aperto. Qui ognuno tiene la sua, e al main va la
   // più alta.
+  //
+  // Il numero è il BORDO BASSO del riquadro nelle coordinate della shell, non
+  // "quanti pixel in più": chi disegna sa dove finisce il proprio riquadro, non
+  // quanto è alta la cornice sotto cui sta, e quel conto sbagliato lasciava
+  // metà riquadro dietro la pagina.
   const riserveTop = new Map();
-  function riservaTop(chi, px) {
-    const n = Math.max(0, Math.round(Number(px) || 0));
+  function riservaTop(chi, fondo) {
+    const n = Math.max(0, Math.round(Number(fondo) || 0));
     if (n) riserveTop.set(chi, n); else riserveTop.delete(chi);
     let massimo = 0;
     for (const v of riserveTop.values()) if (v > massimo) massimo = v;
-    try { api.tabs.reserveTop && api.tabs.reserveTop(massimo); } catch (_) {}
+    try { api.tabs.reserveFloor && api.tabs.reserveFloor(massimo); } catch (_) {}
   }
 
   // ── Drag & drop per riordinare le tab ─────────────────────────────────────
