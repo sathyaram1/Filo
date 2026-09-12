@@ -277,6 +277,24 @@
     return out;
   }
 
+  // Come si chiamano, in italiano, gli schermi fra cui scegliere quando si
+  // condivide. Il sistema li nomina in inglese («Entire screen», «Screen 1») e
+  // quei nomi finivano tali e quali nel riquadro della condivisione, sotto una
+  // frase italiana. Con un solo schermo la scelta è una sola e si chiama per
+  // quello che è; con più schermi si numerano nell'ordine in cui arrivano.
+  // Le FINESTRE restano col loro nome: quello è il titolo vero della finestra,
+  // ed è come la si riconosce.
+  // Torna una mappa { "<id della fonte>": "<nome>" } con dentro i soli schermi.
+  function nomiDegliSchermi(idFonti) {
+    const ids = (Array.isArray(idFonti) ? idFonti : []).map((x) => String(x || ''));
+    const schermi = ids.filter((x) => x.startsWith('screen:'));
+    const out = {};
+    schermi.forEach((x, i) => {
+      out[x] = schermi.length > 1 ? `Schermo ${i + 1}` : 'Tutto lo schermo';
+    });
+    return out;
+  }
+
   // Elenco ordinato per le liste (Impostazioni → Sicurezza, menu del tasto
   // destro): [{ origine, host, voci: [{ chiave, nome, scelta }] }].
   function elenco(mappa) {
