@@ -776,11 +776,14 @@ function perOrigine(origine, ctx) {
 }
 
 // Toglie una scelta ricordata (o tutte quelle del sito): la prossima volta il
-// sito richiede, e l'utente risceglie.
+// sito richiede, e l'utente risceglie. E, se il sito sta usando quella cosa
+// ADESSO, gliela chiude: prima la revoca valeva solo per la volta dopo, e un
+// microfono aperto restava aperto (#586, giro 4).
 function revoca(origine, chiave, ctx) {
   const c = ctx || {};
   const nuova = P().senza(memoriaDi(c), origine, chiave || null);
   scriviMappa(c.incognito ? c.ses : null, !!c.incognito, nuova);
+  chiudiUsi(origine, chiave || null, !!c.incognito);
   return true;
 }
 
