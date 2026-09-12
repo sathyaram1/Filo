@@ -412,17 +412,20 @@
   }
 
   // Un'impostazione può cambiare mentre questa pagina è aperta (Filo in chat,
-  // un'altra scheda). Se l'utente non sta scrivendo la pagina si rilegge, così
-  // non mostra un valore che non è più vero; se sta scrivendo non si tocca
-  // niente, e il confronto dentro `save` basta a non disfare l'altrui lavoro.
+  // un'altra scheda). La pagina si rilegge sempre, così non mostra un valore
+  // che non è più vero; l'unica cosa che si rimette al suo posto è il testo che
+  // l'utente stava scrivendo, per esempio una chiave API a metà.
   function ascoltaCambiamentiAltrove() {
     if (!chrome.runtime?.onMessage?.addListener) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
       if (Date.now() - ecoDaIgnorare < ECO_MS) return;
-      const el = document.activeElement;
-      if (el && el !== document.body && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
-      load().catch(() => {});
+      const Boot = window.SN_PAGE_BOOTSTRAP;
+      if (Boot && typeof Boot.ricaricaSenzaDisturbare === 'function') {
+        Boot.ricaricaSenzaDisturbare(load).catch(() => {});
+      } else {
+        load().catch(() => {});
+      }
     });
   }
 
