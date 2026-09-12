@@ -30,8 +30,11 @@ function caso() {
 }
 const scegli = (a) => a[Math.floor(caso() * a.length)];
 
+// Niente `undefined` né `NaN` fra le parole da digitare: la pagina le rimanda a
+// schermo (in una chat, per esempio) e la proprietà sul testo sporco si accende
+// su quello che ha scritto la scimmia. Un rilievo finto che costa un giro.
 const PAROLE = ['', ' ', 'aaaa', '0', '-1', '9999999999', 'à è ì', '<script>x</script>',
-  '%s %d', '"\'`', '\n', 'x'.repeat(10000), '🙂🙂', 'NaN', 'undefined'];
+  '%s %d', '"\'`', '\n', 'x'.repeat(10000), '🙂🙂', '0.0.0.0', '../../etc'];
 
 const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORTA}`);
 const pagina = browser.contexts()[0].pages()
