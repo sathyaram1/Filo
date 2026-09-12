@@ -10,7 +10,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 
 const HTML = `<!doctype html><html><body style="margin:0"><p>pagina</p>
 <script>
-  window.__apri = () => { try { window.open('https://esempio.invalido/x', '_blank'); } catch (_) {} };
+  window.__apri = () => { try { window.open('https://esempio.invalido/x', '_blank', 'width=420,height=320'); } catch (_) {} };
   window.__cam = () => navigator.mediaDevices.getUserMedia({ video: true }).then(
     () => 'ok', (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
 </script></body></html>`;
