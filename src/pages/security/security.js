@@ -594,6 +594,16 @@
     // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
     $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
     $('perms-clear-btn').addEventListener('click', clearPermessi);
+    // Le stesse risposte si cambiano anche dalla pastiglia mentre si naviga e
+    // dal menu del tasto destro sulla scheda: se succede mentre questa pagina è
+    // aperta, la lista si riallinea invece di restare una fotografia vecchia.
+    try {
+      chrome.runtime.onMessage.addListener((msg) => {
+        if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
+        permessi = Permessi.normalizza(((msg.settings || {}).security || {}).sitePermissions);
+        renderPermessi();
+      });
+    } catch (_) {}
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
   });
