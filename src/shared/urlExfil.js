@@ -211,6 +211,17 @@
     return String(s).split('').reverse().join('');
   }
 
+  // Lo stesso dato con l'alfabeto spostato di qualche lettera (rot13 e gli altri
+  // venticinque scorrimenti) è ancora lo stesso dato, e spostare l'alfabeto è la
+  // seconda cosa che prova chi ha letto come funziona il controllo. Le forme
+  // scorrite si guardano SOLO per i dati riconoscibili — lunghi o con cifre
+  // dentro — perché una parola comune scorsa di qualche lettera potrebbe
+  // ricomparire per caso dentro un indirizzo vero, e un avviso falso si clicca
+  // senza leggerlo.
+  function scorri(s, k) {
+    return String(s).replace(/[a-z]/g, (c) => String.fromCharCode(((c.charCodeAt(0) - 97 + k) % 26) + 97));
+  }
+
   // Un token combacia "forte" da solo? (lungo, NON stopword) oppure contiene una
   // cifra (nomi+numeri, token, id) → segnale specifico, non parola comune.
   function isStrong(tok) {
