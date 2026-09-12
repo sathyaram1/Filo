@@ -290,18 +290,45 @@ test('lo schermo non si ricorda mai: si richiede ogni volta', () => {
   assert.equal(P.decisione(vecchia, 'https://esempio.it', ['fotocamera']), 'allow');
 });
 
-test('il preambolo della cattura schermo passa senza chiedere fotocamera e microfono', async () => {
+// Il preambolo della cattura schermo (permesso «media» con la lista dei tipi
+// VUOTA) non è una richiesta di fotocamera e microfono: è la domanda dello
+// SCHERMO, e va fatta lì. Lasciarla passare per far arrivare `getDisplayMedia`
+// alla sua domanda apre anche la strada VECCHIA — `getUserMedia` con
+// `chromeMediaSource: 'desktop'` — che quella domanda non la incontra mai e si
+// prende lo schermo intero, e il suono del computer se lo chiede, in silenzio.
+// Le due arrivano identiche: l'unico momento in cui si può chiedere è questo.
+test('il preambolo della cattura schermo non concede niente da solo', async () => {
   const modulo = require_(join(RADICE, 'src', 'main', 'services', 'permessiSito.js'));
   modulo._reset();
   const wc = { id: 21, isDestroyed: () => false, getURL: () => 'https://esempio.it/x', session: {} };
-  // Passa (la domanda vera la fa il gestore della cattura schermo)...
-  assert.equal(await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: [] }), true);
-  // ...e non ha concesso niente alla webcam: senza nessuno a cui chiedere si nega.
+  // Qui non c'è nessuna finestra a cui mandare la domanda: una richiesta che
+  // nessuno può vedere non può essere concessa.
+  assert.equal(
+    await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: [] }),
+    false,
+    'il preambolo della cattura schermo è stato concesso senza chiedere niente a nessuno',
+  );
+  // E non ha concesso niente alla webcam.
   assert.equal(
     await modulo._decidi(wc, 'media', { requestingUrl: 'https://esempio.it/x', mediaTypes: ['video'] }),
     false,
   );
   modulo._reset();
+});
+
+// I nomi delle cose fra cui scegliere quando si condivide: gli SCHERMI si
+// chiamano in italiano (dal sistema arrivano «Entire screen», «Screen 1»), le
+// FINESTRE restano col loro titolo, che è come le si riconosce.
+test('gli schermi fra cui scegliere hanno un nome in italiano', () => {
+  assert.deepEqual(P.nomiDegliSchermi(['screen:0:0', 'window:12:0']), {
+    'screen:0:0': 'Tutto lo schermo',
+  });
+  assert.deepEqual(P.nomiDegliSchermi(['screen:0:0', 'screen:1:0', 'window:12:0']), {
+    'screen:0:0': 'Schermo 1',
+    'screen:1:0': 'Schermo 2',
+  });
+  assert.deepEqual(P.nomiDegliSchermi([]), {});
+  assert.deepEqual(P.nomiDegliSchermi(null), {});
 });
 
 // ─── quello che la shell disegna sotto le schede (giro di verifica 1) ───────
@@ -315,12 +342,19 @@ test('la shell fa scendere la pagina sotto quello che disegna in alto', () => {
   const shell = readFileSync(join(RADICE, 'src', 'renderer', 'shell.js'), 'utf8');
   // Una riserva sola, condivisa: chi chiude non azzera quella di chi resta.
   assert.match(shell, /function riservaTop\(/);
-  for (const chi of ['permessi', 'fonte-schermo', 'download', 'popup']) {
+  for (const chi of ['permessi', 'download', 'popup']) {
     assert.match(
       shell, new RegExp(`riservaTop\\('${chi}'`),
       `«${chi}» disegna sotto le schede e deve riservare lo spazio, o finisce dietro la pagina`,
     );
   }
+  // La riserva dei permessi si misura sul CONTENITORE, non su un nodo solo:
+  // domanda, scelta di cosa condividere e segno della ripresa possono essere
+  // lì insieme, e chi resta fuori dalla misura finisce dietro alla pagina.
+  assert.match(
+    shell, /for \(const n of permHost\.children\)/,
+    'la riserva dei permessi deve coprire tutto quello che c\'è nel contenitore',
+  );
   const tabs = readFileSync(join(RADICE, 'src', 'main', 'tabs.js'), 'utf8');
   assert.match(tabs, /setTopFloor\s*\(/);
   // La riserva vale ANCHE a tutto schermo: un sito che si prende lo schermo e

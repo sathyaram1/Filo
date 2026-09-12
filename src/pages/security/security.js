@@ -7,7 +7,6 @@
   const { MSG } = window.SN_MSG;
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
-  const Permessi = window.SN_PERMESSI_SITI;
   const ConfirmUi = window.SN_CONFIRM_UI;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
 
@@ -237,8 +236,7 @@
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
 
-    permessi = Permessi.normalizza(sec.sitePermissions);
-    renderPermessi();
+    caricaPermessi();
   }
 
   // ─── permessi dei siti (#586) ─────────────────────────────────────────────
@@ -249,23 +247,40 @@
   // può togliere". Salvare rimanda la mappa INTERA: la chiave è fra le
   // REPLACE_KEYS dello storage, quindi togliere una voce la cancella davvero.
 
-  let permessi = {};
+  // L'elenco arriva dal main, che sa quale memoria guardare: quella su disco
+  // per le finestre normali, quella che vive in RAM per le finestre in
+  // incognito. Leggendolo dalle impostazioni, in incognito questa lista era
+  // vuota: la scelta appena fatta non c'era, e chi la cercava qui trovava un
+  // elenco che sembrava completo e non lo era.
+  let righePermessi = [];
 
-  async function savePermessi() {
-    await chrome.runtime.sendMessage({
-      type: MSG.UPDATE_SETTINGS,
-      settings: { security: { sitePermissions: permessi } },
-    });
+  async function caricaPermessi() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.PERMESSI_SITI_LISTA });
+      righePermessi = (r && Array.isArray(r.voci)) ? r.voci : [];
+    } catch (_) { righePermessi = []; }
+    renderPermessi();
+  }
+
+  function segnalaSalvato() {
     const hint = $('savedHint');
     hint.classList.add('sn-show');
-    clearTimeout(savePermessi._t);
-    savePermessi._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+    clearTimeout(segnalaSalvato._t);
+    segnalaSalvato._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+  }
+
+  async function scriviPermessi(msg) {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    if (r && Array.isArray(r.voci)) righePermessi = r.voci;
+    renderPermessi();
+    segnalaSalvato();
   }
 
   function renderPermessi() {
     const list = $('perms-list');
     list.innerHTML = '';
-    const righe = Permessi.elenco(permessi);
+    const righe = righePermessi;
     $('perms-clear-btn').style.display = righe.length ? '' : 'none';
     if (!righe.length) {
       const li = document.createElement('li');
@@ -307,14 +322,12 @@
         stato.textContent = voce.scelta === 'allow'
           ? I18n.t('options_perms_allowed') : I18n.t('options_perms_denied');
         stato.title = I18n.t('options_perms_toggle_tip');
-        stato.addEventListener('click', () => {
-          permessi = Permessi.conScelta(
-            permessi, riga.origine, [voce.chiave],
-            voce.scelta === 'allow' ? 'deny' : 'allow',
-          );
-          renderPermessi();
-          savePermessi();
-        });
+        stato.addEventListener('click', () => scriviPermessi({
+          type: MSG.PERMESSI_SITI_IMPOSTA,
+          origine: riga.origine,
+          chiave: voce.chiave,
+          scelta: voce.scelta === 'allow' ? 'deny' : 'allow',
+        }));
         gruppo.appendChild(stato);
 
         const togli = document.createElement('button');
@@ -323,11 +336,11 @@
         togli.textContent = '×';
         togli.setAttribute('aria-label', I18n.t('options_perms_remove'));
         togli.title = I18n.t('options_perms_remove_tip');
-        togli.addEventListener('click', () => {
-          permessi = Permessi.senza(permessi, riga.origine, voce.chiave);
-          renderPermessi();
-          savePermessi();
-        });
+        togli.addEventListener('click', () => scriviPermessi({
+          type: MSG.PERMESSI_SITI_REVOCA,
+          origine: riga.origine,
+          chiave: voce.chiave,
+        }));
         gruppo.appendChild(togli);
 
         li.appendChild(gruppo);
@@ -344,9 +357,7 @@
       okLabel: I18n.t('options_perms_clear'),
     });
     if (!ok) return;
-    permessi = {};
-    renderPermessi();
-    savePermessi();
+    await scriviPermessi({ type: MSG.PERMESSI_SITI_REVOCA });
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
@@ -601,8 +612,7 @@
     try {
       chrome.runtime.onMessage.addListener((msg) => {
         if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
-        permessi = Permessi.normalizza(((msg.settings || {}).security || {}).sitePermissions);
-        renderPermessi();
+        caricaPermessi();
       });
     } catch (_) {}
     $('sec-export-btn').addEventListener('click', exportData);
