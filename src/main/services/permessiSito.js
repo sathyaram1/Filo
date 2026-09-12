@@ -660,6 +660,15 @@ function controlla(wc, permesso, origineRichiedente, dettagli) {
     // poteva solo negare, mai consentire (#586, giro 4). La domanda la facciamo
     // partire di qui, e intanto rispondiamo no: quando l'utente consente, il
     // controllo dopo dice sì e il sito, riprovando, ottiene la sua roba.
+    //
+    // Qui arriva anche la LETTURA di stato, che è tutt'altra cosa e non deve
+    // far comparire niente: una pagina che si limitava a guardare cosa può fare
+    // si vedeva comparire una domanda col nome del sito, senza che nessuno
+    // avesse cliccato (#586, giro 5). Le due sono indistinguibili da qui, e
+    // infatti la differenza la fa la pagina: la lettura non arriva più fin qui,
+    // se la serve il guardiano nel mondo del sito
+    // (src/preload/permessi-guard.js), che risponde «da chiedere» e non sveglia
+    // nessuno. Quello che resta a bussare è la richiesta vera.
     if (detto === null && Pp.soloControllo(permesso)) chiediDaControllo(wc, permesso, url, dettagli);
     return detto === 'allow';
   } catch (_) { return false; }
