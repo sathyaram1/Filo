@@ -344,6 +344,7 @@
           origine: riga.origine,
           chiave: voce.chiave,
           scelta: voce.scelta === 'allow' ? 'deny' : 'allow',
+          effimera: !!riga.effimera,
         }));
         gruppo.appendChild(stato);
 
