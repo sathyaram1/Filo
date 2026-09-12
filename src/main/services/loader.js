@@ -55,6 +55,21 @@ require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocab
 require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
+// Il classificatore misura DOVE un comando legge, ma vive in `shared/` e non ha
+// filesystem: senza aiuto un collegamento a `~/.ssh` chiamato `scorciatoia` non
+// somiglia a niente di riservato, e leggere dentro il collegamento costava zero
+// (#587, giro 2). Qui, nel main, il filesystem c'è: gli passiamo il modo di
+// chiedere il percorso VERO. `realpathSync.native` risolve anche i collegamenti
+// di Windows; su un percorso che non esiste (o che il sistema non sa risolvere)
+// si torna a quello dato, così un file assente non fa morire la classificazione.
+try {
+  const { realpathSync } = require('node:fs');
+  globalThis.SN_CMD_CLASSIFY.setRealPath((p) => {
+    try { return realpathSync.native(String(p)); } catch (_) {}
+    try { return realpathSync(String(p)); } catch (_) {}
+    return p;
+  });
+} catch (_) {}
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
