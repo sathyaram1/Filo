@@ -350,7 +350,13 @@ function segnaPreambolo(wc, origine) {
   voce.timer = setTimeout(() => {
     const attuale = preamboli.get(wc.id);
     if (attuale !== voce || voce.ripresaId) return;
-    voce.ripresaId = iniziaRipresa(wc, origine);
+    // Strada vecchia: non passa dalla scelta della fonte, quindi Filo non può
+    // sapere se il sito si è preso anche l'audio del computer né toglierglielo
+    // (la richiesta arriva identica a quella senza audio, e il permesso è uno
+    // solo: sì o no). Qui il segno dice la cosa più grande delle due, perché
+    // «può» al posto di «sta» è già il modo in cui questo segno parla: dire
+    // solo «vede» quando potrebbe anche sentire sarebbe la bugia peggiore.
+    voce.ripresaId = iniziaRipresa(wc, origine, { audio: 'forse' });
   }, SENZA_GESTORE_MS);
   if (voce.timer.unref) voce.timer.unref();
   preamboli.set(wc.id, voce);
