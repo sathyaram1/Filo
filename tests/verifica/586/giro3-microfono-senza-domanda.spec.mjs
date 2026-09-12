@@ -14,7 +14,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
 <textarea id="ta" rows="4" cols="50"></textarea>
 <script>
-  window.__accendiMicrofono = async () => {
+  const accendi = async () => {
     const t = document.getElementById('ta');
     t.focus();
     t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 80, clientY: 80 }));
@@ -26,6 +26,7 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
     await new Promise((r) => setTimeout(r, 2000));
     return { trovata: true };
   };
+  window.__acceso = new Promise((r) => setTimeout(() => accendi().then(r, () => r({ trovata: false })), 400));
   // Subito dopo, il sito prova a prendersi il microfono per sé: la concessione
   // che Filo si è appena dato vale per la prima richiesta che arriva.
   window.__microfonoPerSe = () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
@@ -37,7 +38,8 @@ test('un sito non deve poter accendere il microfono aprendo da solo il menu di F
   test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, HTML);
 
-  const esito = await page.evaluate(() => window.__accendiMicrofono());
+  // Nessun gesto da fuori: parte da solo al caricamento.
+  const esito = await page.evaluate(() => window.__acceso);
   console.log('[586 g3] dettatura fatta partire dal sito:', JSON.stringify(esito));
   const domande = await shell.locator('.perm-chip').count();
   console.log('[586 g3] domande comparse:', domande);
