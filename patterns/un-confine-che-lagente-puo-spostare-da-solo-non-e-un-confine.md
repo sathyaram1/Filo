@@ -252,6 +252,9 @@ lo stesso livello, oppure la più economica è l'unica che verrà usata.
 - `src/main/services/handlers.js` — `navExfilCorpus`, l'iniezione di
   `_perimetro`/`_cwdReale`/`_shell`/`_motivoPerimetro` prima del gate dei livelli.
 - `src/shared/urlExfil.js` — `valoriUniti` e `combaciaSpezzato` (il dato tagliato
-  dentro l'indirizzo), le soglie del ripiego strutturale.
+  dentro l'indirizzo), `rovescia`/`scorri`/`tryHex` (lo stesso dato travestito),
+  `caricoParole` (le parole comuni contano solo nel carico del link, e dentro una
+  parola sola: togliendo i separatori, `servizi-online` diventa `servizionline` e
+  contiene «servizio»), le soglie del ripiego strutturale.
 - `tests/unit/cmdClassify.test.mjs`, `tests/unit/contextTaint.test.mjs`,
   `tests/filo-naviga-exfil.spec.mjs`.
