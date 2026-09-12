@@ -136,7 +136,7 @@ test.describe('quello che regge', () => {
       buono + '#x',
     ] };
     const imgs = JSON.parse(stampaPerRuolo('verifier', fb)).payload.feedback.images;
-    expect(imgs[0]).toBe(buono.toLowerCase().replace('firebasestorage.googleapis.com', 'firebasestorage.googleapis.com').replace('%2f', '%2F'));
+    expect(imgs[0]).toBe(buono.replace('FIREBASESTORAGE', 'firebasestorage'));
     expect(imgs.slice(1).every((s) => /non ammessa/.test(s))).toBe(true);
     expect(imgs.join('\n')).not.toMatch(/u:p@|#x/);
   });
