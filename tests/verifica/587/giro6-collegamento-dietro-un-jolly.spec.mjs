@@ -47,6 +47,7 @@ C.setRealPath((p) => {
   try { return realpathSync(String(p)); } catch (_) {}
   return p;
 });
+if (C.setListDir) C.setListDir((p) => { try { return readdirSync(String(p)); } catch (_) { return []; } });
 
 const bash = process.platform !== 'win32';
 
