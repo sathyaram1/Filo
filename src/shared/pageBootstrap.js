@@ -317,5 +317,35 @@
     }
   }
 
-  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects };
+  // Ricarica una pagina di impostazioni quando qualcosa è cambiato altrove,
+  // senza buttare via quello che l'utente sta scrivendo in quel momento.
+  //
+  // Prima la rilettura si saltava del tutto se il cursore era dentro un campo,
+  // e il cursore ci resta appiccicato: basta aver cliccato una spunta, anche
+  // mentre sei in un'altra scheda a parlare con Filo. Da lì in poi la pagina
+  // mostrava valori che non erano più veri (#592, giro 3). Le spunte, le
+  // tendine e i pulsanti non hanno niente "in corso" da salvare: quello che
+  // l'utente ci ha fatto è già scritto. Il testo che sta digitando sì, quindi
+  // è l'unica cosa che si rimette al suo posto, col cursore dov'era.
+  async function ricaricaSenzaDisturbare(load, dopo) {
+    const TIPI_TESTO = ['text', 'password', 'search', 'url', 'email', 'tel', 'number'];
+    const el = document.activeElement;
+    const staScrivendo = !!(el && el.id && (el.tagName === 'TEXTAREA'
+      || (el.tagName === 'INPUT' && TIPI_TESTO.includes(String(el.type || 'text').toLowerCase()))));
+    const memo = staScrivendo
+      ? { id: el.id, value: el.value, start: el.selectionStart, end: el.selectionEnd }
+      : null;
+    await load();
+    if (!memo) return;
+    const ora = document.getElementById(memo.id);
+    if (!ora) return;
+    ora.value = memo.value;
+    try { ora.focus(); } catch (_) {}
+    try { if (memo.start != null) ora.setSelectionRange(memo.start, memo.end); } catch (_) {}
+    if (typeof dopo === 'function') dopo(ora);
+  }
+
+  window.SN_PAGE_BOOTSTRAP = {
+    applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects, ricaricaSenzaDisturbare,
+  };
 })();
