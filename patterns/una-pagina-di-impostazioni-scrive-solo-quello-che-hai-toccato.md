@@ -1,5 +1,7 @@
 # Una pagina di impostazioni scrive solo quello che hai toccato lì
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Una pagina che salva da sola manda al salvataggio soltanto i campi che
 l'utente ha cambiato su quella pagina, mai l'intero blocco letto all'apertura. E
 finché resta aperta si rilegge quando l'impostazione cambia altrove, così non
