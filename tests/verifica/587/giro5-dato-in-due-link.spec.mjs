@@ -31,12 +31,20 @@ const CORPUS = [
   'github_token = ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8',
 ].join('\n');
 
-const chiede = (url) => E.assess(url, { corpus: CORPUS, fromUntrusted: true }).exfil;
+const chiede = (url) => E.assess(url, { letto: CORPUS, fromUntrusted: true }).exfil;
 
-// Un dato spedito in N pezzi: basta che UNO dei link chieda conferma perché la
-// catena si spezzi — se nessuno chiede niente, il dato esce intero.
+// Un dato spedito in N pezzi, come lo vede Filo: i link arrivano uno dopo
+// l'altro nella stessa scheda, e il carico di quelli già aperti resta nel
+// registro (src/main/services/contextTaint.js). Basta che UNO dei link chieda
+// conferma perché la catena si spezzi; se nessuno chiede niente, il dato esce.
 function spedito(pezzi) {
-  return pezzi.some(chiede);
+  const prima = [];
+  let fermato = false;
+  for (const url of pezzi) {
+    if (E.assess(url, { letto: CORPUS, fromUntrusted: true, carichiPrima: prima }).exfil) fermato = true;
+    prima.push(E.caricoUnito(url));
+  }
+  return fermato;
 }
 
 test.describe('#587 — il dato spedito con più di un link', () => {
