@@ -2859,7 +2859,7 @@ require('./handlers/misc')(on, handlerCtx);
 function daSuperficieInterna(sender, origin) {
   const W = globalThis.SN_WEB_MESSAGE_SCOPE;
   const daUnaPagina = !!(sender && (sender.tab || sender.wc || sender.frame));
-  if (!W) return !daUnaPagina && !origin;
+  if (!W) return String(origin || '').startsWith('filo://') || (!daUnaPagina && !origin);
   return W.isInternalSurface(origin, { fromPage: daUnaPagina });
 }
 
