@@ -822,6 +822,11 @@ html[data-feedback-dim="1"] .shell {
 @media (prefers-reduced-motion: reduce) {
   .perm-live .perm-chip-text::before { animation: none; }
 }
+/* Una riga che Filo deve a chi naviga: niente da consentire, niente in corso.
+   Il pallino che pulsa vuol dire "sta succedendo adesso", e su un avviso di
+   una cosa che NON è riuscita direbbe il contrario (#586). */
+.perm-live[data-notizia] { border-left-color: var(--accent); }
+.perm-live[data-notizia] .perm-chip-text::before { display: none; }
 
 /* Che cosa si condivide: tutto lo schermo o una finestra sola. Compare dopo il
    «Consenti» sulla cattura dello schermo. */
