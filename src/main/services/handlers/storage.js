@@ -106,6 +106,8 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && touchesSettings(msg.keys)) {
       return { ok: false, error: 'forbidden' };
     }
+    const vietati = scompartiVietati(origin, msg.keys);
+    if (vietati) return vietati;
     await globalThis.chrome.storage.local.remove(msg.keys);
     return { ok: true };
   });
