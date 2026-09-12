@@ -2420,7 +2420,7 @@ class TabManager {
   // decisione ({ block, host, reason }) — truthy, così i chiamanti possono
   // usarla come booleano e chi deve SPIEGARE il rifiuto (la chat) ha l'host.
   // Ritorna null quando la navigazione è consentita.
-  _maybeBlockNavigation(url, { fromUrl = '', notify = true } = {}) {
+  _maybeBlockNavigation(url, { fromUrl = '' } = {}) {
     let decision;
     try {
       decision = require('./services/siteBlock').shouldBlockNavigation(url, { fromUrl });
@@ -2428,7 +2428,7 @@ class TabManager {
       return null;
     }
     if (!decision || !decision.block) return null;
-    if (notify) this._notifyBlocked(decision.host, url);
+    this._notifyBlocked(decision.host, url);
     return decision;
   }
 
