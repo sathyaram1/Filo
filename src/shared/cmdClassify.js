@@ -959,12 +959,25 @@
   const VARIABILE = 'Usa una variabile d’ambiente, quindi dal comando non si vede quale file apre.';
   const TUTTA = 'Passa in rassegna tutta la tua cartella, chiavi e password comprese.';
 
-  // Il primo segmento riservato di un percorso già spezzato, o ''.
+  // Il primo segmento riservato di un percorso già spezzato, o ''. Un segmento
+  // con un carattere jolly non è un nome: vale se PUÒ acchiappare un bersaglio
+  // riservato (`.s?h` prende `.ssh`, `.*` prende tutto quello che sta nascosto).
   function segRiservato(segs) {
-    for (const seg of segs) {
-      if (seg && SENSITIVE_SEG_RE.test(unquote(seg))) return seg;
+    for (const raw of segs) {
+      const seg = unquote(String(raw || ''));
+      if (!seg) continue;
+      if (SENSITIVE_SEG_RE.test(seg)) return seg;
+      if (JOLLY_RE.test(seg) && modelloPrendeRiservato(seg)) return seg;
     }
     return '';
+  }
+
+  // Il motivo, nelle parole giuste per quello che è: un nome riservato È chiavi e
+  // password, un modello PUÒ prenderle.
+  function riservatoPerche(seg) {
+    return JOLLY_RE.test(String(seg))
+      ? `“${seg}” può aprire le tue chiavi o le tue password.`
+      : `“${seg}” contiene chiavi o password.`;
   }
 
   // Perché questo bersaglio non è una lettura di livello 1? '' = lo è.
