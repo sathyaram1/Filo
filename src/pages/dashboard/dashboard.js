@@ -1213,6 +1213,9 @@
     const o = a && a._output;
     if (!o) return '';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    // #590 — la lista dei siti bloccati ha fermato un'apertura chiesta dal
+    // modello. Dirlo, col sito: un blocco muto sembra un guasto (#482).
+    if (o.blocked === 'site') return o.host ? `sito bloccato: ${o.host}` : 'sito bloccato';
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
     if (o.ok === false && o.detail) return String(o.detail);
