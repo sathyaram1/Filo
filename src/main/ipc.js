@@ -471,6 +471,14 @@ function registerIpcHandlers() {
     try { return require('./services/permessiSito').chiudiNotizia(id); }
     catch (_) { return { ok: false }; }
   });
+
+  // «Chiedimelo di nuovo» sull'avviso «ho smesso di chiedere per questo sito».
+  // Non concede niente: rimette solo il sito in condizione di poter chiedere.
+  ipcMain.handle('permissions:notice-action', (event, { id } = {}) => {
+    void event;
+    try { return require('./services/permessiSito').riprendiAChiedere(id); }
+    catch (_) { return { ok: false }; }
+  });
   // Revoca una scelta ricordata (o tutte quelle del sito): la prossima volta il
   // sito richiede e l'utente risceglie.
   ipcMain.handle('permissions:revoke', (event, { origine, chiave } = {}) => {
