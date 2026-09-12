@@ -22,6 +22,13 @@
 'use strict';
 
 // Dal nome che usa il sito alla chiave della memoria di Filo.
+//
+// `local-fonts` c'è per lo stesso motivo degli altri, e per uno in più: è
+// l'unico permesso che Filo chiede partendo da una lettura di stato, quindi è
+// proprio quello su cui un sito che guarda prima di chiedere si ferma. Senza
+// questa riga leggeva «negato» su una cosa che nessuno aveva negato, smetteva
+// lì, e la domanda comparsa nel frattempo non serviva più a niente (#586,
+// giro 5).
 const NOMI = {
   camera: 'fotocamera',
   microphone: 'microfono',
@@ -29,12 +36,23 @@ const NOMI = {
   notifications: 'notifiche',
   'clipboard-read': 'appunti',
   'display-capture': 'schermo',
+  'local-fonts': 'local-fonts',
 };
 
 // Evento privato con cui il preload passa e aggiorna l'elenco delle scelte già
 // prese per questa origine. Il DOM è condiviso col mondo della pagina anche a
 // contesti isolati: è la strada che non lascia niente su `window`.
 const CANALE = '__filo_permessi_noti';
+
+// Evento privato con cui Filo chiede alla pagina di CHIUDERE quello che le ha
+// già consegnato (una traccia del microfono, della fotocamera, dello schermo),
+// e quello con cui la pagina risponde quante ne restano vive. Vedi
+// `buildCatturaSicuraSource`.
+const CANALE_FERMA = '__filo_permessi_ferma';
+const CANALE_FERMATO = '__filo_permessi_fermato';
+
+// Evento privato con cui la pagina dice a Filo che la posizione non è arrivata.
+const CANALE_POSIZIONE_KO = '__filo_posizione_ko';
 
 function buildPermessiGuardSource(noti) {
   const iniziali = JSON.stringify(noti && typeof noti === 'object' ? noti : {});
