@@ -414,15 +414,16 @@ function consumaPreambolo(wc) {
 // lo dice, e la sola cosa certa è che finché quella pagina è lì il permesso ce
 // l'ha ancora. «Interrompi» ricarica la pagina, che è l'unico modo di chiudere
 // per davvero: da qui non si spegne una traccia già consegnata.
-const usi = new Map(); // id → { wc, shell, origine, chiavi, incognito, pulisci }
+const usi = new Map(); // id → { wc, shell, origine, chiavi, tipo, frase, incognito, pulisci }
 let prossimoUso = 1;
 
-// Un cartello per ogni combinazione scheda + sito + cosa: un sito che riapre il
-// microfono dieci volte non impila dieci cartelli identici.
-function usoEsistente(wc, origine, chiavi) {
-  const firma = chiavi.slice().sort().join(',');
+// Un cartello per scheda, sito e tipo: un sito che riapre il microfono dieci
+// volte non impila dieci cartelli identici, e uno che chiede prima il microfono
+// e poi anche la fotocamera si ritrova un cartello solo che le nomina tutte e
+// due invece di due cartelli accanto.
+function usoEsistente(wc, origine, tipo) {
   for (const [id, u] of usi) {
-    if (u.wc === wc && u.origine === origine && u.chiavi.slice().sort().join(',') === firma) return id;
+    if (u.wc === wc && u.origine === origine && u.tipo === tipo) return id;
   }
   return null;
 }
