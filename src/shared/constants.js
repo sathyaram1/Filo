@@ -2008,16 +2008,18 @@
   // riga e il resto del testo finiva FUORI, dove il modello lo legge come
   // istruzioni sue. Il ciclo termina sempre: ogni giro che cambia qualcosa
   // accorcia il testo di almeno un marcatore.
-  function sanitizeAgentStyle(raw) {
+  function togliMarcatori(raw, marcatori) {
     let s = typeof raw === 'string' ? raw : String(raw == null ? '' : raw);
     let prima;
     do {
       prima = s;
-      for (const marker of [AGENT_STYLE_OPEN, AGENT_STYLE_CLOSE, AGENT_STYLE_SLOT]) {
-        s = s.split(marker).join('');
-      }
+      for (const marker of marcatori) s = s.split(marker).join('');
     } while (s !== prima);
     return s.trim();
+  }
+
+  function sanitizeAgentStyle(raw) {
+    return togliMarcatori(raw, [AGENT_STYLE_OPEN, AGENT_STYLE_CLOSE, AGENT_STYLE_SLOT]);
   }
 
   // «Togli lo stile», detto in tutti i modi in cui lo si dice. Una di queste
