@@ -597,16 +597,19 @@ async function scegliFonte(wc, frame, audioChiesto) {
       // pastiglia. Senza, restava sopra la scheda su cui si passava, col nome
       // di un sito che non era quello che si stava guardando, e un clic lì
       // consegnava lo schermo a quell'altro sito.
-      shell.send('permissions:pick-source', { id, tabId: tab ? tab.id : null, host, voci });
+      shell.send('permissions:pick-source', {
+        id, tabId: tab ? tab.id : null, host, voci, audio: !!audioChiesto,
+      });
     } catch (_) { finisci(null); }
   });
 }
 
-// Risposta della shell: l'id della fonte scelta, o niente per annullare.
-function scegliFonteRisposta(id, fonteId) {
+// Risposta della shell: l'id della fonte scelta (o niente per annullare) e se
+// l'audio del computer va dato insieme all'immagine.
+function scegliFonteRisposta(id, fonteId, audio) {
   const att = scelteFonte.get(String(id));
   if (!att) return { ok: false, error: 'scaduta' };
-  att.finisci(fonteId || null);
+  att.finisci(fonteId || null, !!audio);
   return { ok: true };
 }
 
