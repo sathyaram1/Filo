@@ -862,11 +862,9 @@
       if (!t) continue;
       if (isVersionQuery(t)) continue; // `ps --version` è lettura pura
       const prog = programOf(t);
-      if (ENV_REF_RE.test(t)) return 'usa una variabile d’ambiente (il bersaglio vero non si legge nel comando)';
+      if (ENV_REF_RE.test(t)) return VARIABILE;
       if (READS_SENSITIVE.has(prog)) {
-        return prog === 'ps' || prog === 'get-process' || prog === 'gps'
-          ? 'elenca i processi con le loro righe di comando'
-          : 'legge le variabili d’ambiente';
+        return (prog === 'ps' || prog === 'get-process' || prog === 'gps') ? PROCESSI : AMBIENTE;
       }
       if (CHDIR.has(prog)) {
         const dest = operandsOf(t)[0];
