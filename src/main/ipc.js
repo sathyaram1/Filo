@@ -98,6 +98,24 @@ function registerIpcHandlers() {
     } catch (_) { event.returnValue = {}; }
   });
 
+  // #586 — la pagina risponde a «ferma quello che ti ho dato»: quante tracce le
+  // restano vive. Con zero Filo non tocca la pagina, e chi ci stava scrivendo
+  // non perde niente; con qualcosa di vivo resta la strada dura, la ricarica.
+  ipcMain.on('filo:permessi-fermato', (event, msg) => {
+    try {
+      require('./services/permessiSito').rispostaFermata(
+        (msg && msg.id) || '', (msg && msg.vive) || 0,
+      );
+    } catch (_) {}
+  });
+
+  // #586 — il sistema non ha saputo dire dove si è. Non è colpa del sito e non
+  // è una scelta di chi naviga: glielo diciamo noi, una volta per scheda,
+  // invece di lasciargli una mappa rotta e nessuna spiegazione.
+  ipcMain.on('filo:posizione-non-disponibile', (event) => {
+    try { require('./services/permessiSito').posizioneNonDisponibile(event.sender); } catch (_) {}
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel

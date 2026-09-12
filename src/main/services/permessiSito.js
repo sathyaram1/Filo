@@ -943,6 +943,8 @@ function _reset() {
   unaTantum.clear();
   scelteFonte.clear();
   preamboli.clear();
+  senzaRisposta.clear();
+  fermate.clear();
   for (const id of [...usi.keys()]) fineUso(id);
 }
 
@@ -953,6 +955,7 @@ module.exports = {
   configureFromSettings,
   concessioneUnaTantum,
   rispondi,
+  rispostaFermata,
   contesto,
   scegliFonteRisposta,
   interrompiUso,
