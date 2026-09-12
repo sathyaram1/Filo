@@ -779,6 +779,60 @@
     'select-string', 'sls', 'test-path', 'resolve-path', 'convert-path',
   ]);
 
+  // ── Chi NON apre percorsi (#587, giro 5) ──────────────────────────────────
+  //
+  // Il perimetro misurava il bersaglio solo per i programmi scritti in
+  // `READS_PATHS`. Tutti gli altri passavano senza che nessuno guardasse cosa
+  // aprivano, e fra quelli c'era `git`: `git diff --no-index /dev/null
+  // ~/.ssh/id_rsa` stampa la chiave privata, `git grep --no-index` cerca dentro
+  // tutti i file della cartella dell'utente, e nessuna delle due chiedeva niente.
+  // Un elenco di lettori è per forza incompleto: chi manca non è «non misurato
+  // con prudenza», è non misurato e basta.
+  //
+  // Quindi la domanda si rovescia, come già fa il resto del file: si misura tutto,
+  // e si tace solo su ciò che NON PUÒ aprire un percorso. Un programma nuovo
+  // sbaglia così dalla parte prudente (una conferma di troppo), non dalla parte
+  // delle chiavi. La lista qui sotto è fatta di comandi che stampano lo stato
+  // della macchina (`pwd`, `date`, `uname`), fanno aritmetica sulle stringhe
+  // (`basename`, `Split-Path`), cercano un NOME nel PATH (`where`, `which`) o
+  // danno forma a ciò che arriva da una pipeline (`Sort-Object`, `Format-Table`).
+  const NON_APRE_PERCORSI = new Set([
+    'pwd', 'echo', 'whoami', 'hostname', 'date', 'where', 'which', 'ver',
+    'uname', 'clear', 'cls', 'basename', 'dirname', 'uptime', 'id', 'groups',
+    'whatis', 'cal', 'nproc', 'arch', 'free', 'lscpu', 'lsblk', 'lsusb',
+    'whereis', 'who', 'w', 'vmstat',
+    'get-location', 'gl', 'get-date', 'get-service', 'get-help', 'get-member',
+    'get-alias', 'get-module', 'get-psdrive', 'get-host', 'get-command',
+    'get-history', 'get-computerinfo', 'get-culture', 'get-timezone',
+    'get-random', 'get-unique', 'select-object', 'select', 'sort-object',
+    'measure-object', 'measure', 'group-object', 'group', 'compare-object',
+    'split-path', 'join-path', 'format-table', 'ft', 'format-list', 'fl',
+    'format-wide', 'fw', 'out-string', 'out-host', 'out-null', 'write-output',
+    'write-host', 'convertto-json', 'convertfrom-json', 'convertto-csv',
+    'convertfrom-csv', 'convertfrom-stringdata', 'popd',
+    'where-object', 'foreach-object', 'foreach', '?', '%',
+  ]);
+
+  // Programmi il cui bersaglio sta DOPO il sotto-comando (`git diff …`,
+  // `pip config …`): il sotto-comando è una parola, non un file, e misurarlo come
+  // percorso direbbe una cosa falsa.
+  const CON_SOTTOCOMANDO = new Set(['git', 'npm', 'pip', 'pip3']);
+  // Sotto-comandi che camminano su TUTTO quello che sta sotto la cartella
+  // indicata (o, senza indicazioni, sotto quella corrente): stessa regola delle
+  // letture ricorsive, che `git grep` fa per natura senza nessun flag.
+  const SOTTO_RICORSIVI = { git: new Set(['grep']) };
+  // Sotto-comandi il cui primo operando è il TESTO CERCATO, non un file: la stessa
+  // regola di `grep` (vedi CERCA_PRIMA), altrimenti `git grep passwd` chiederebbe
+  // un OK spiegando una cosa falsa.
+  const SOTTO_CERCA = { git: new Set(['grep']) };
+  // Comandi che stampano la configurazione salvata di un gestore di pacchetti.
+  // Non nominano nessun percorso, ma quel file contiene l'indirizzo del
+  // repository privato con dentro utente e password: `pip config list` le stampa
+  // in chiaro, mentre aprire `.config/pip/pip.conf` col suo nome chiede un OK.
+  // npm non è qui perché i suoi segreti li nasconde da sé (li stampa come
+  // «protected»), quindi non c'è niente da fermare.
+  const CONFIG_SEGRETA = { pip: 'config', pip3: 'config' };
+
   // Letture che non hanno un percorso ma espongono comunque materiale personale:
   // l'ambiente (token, chiavi, percorsi del profilo) e la tabella dei processi,
   // dove le righe di comando altrui portano spesso password e token in chiaro.
