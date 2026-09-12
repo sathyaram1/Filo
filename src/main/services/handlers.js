@@ -1467,6 +1467,11 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
         if (!built) return { executed: false, kept: false };
+        // Il setter ha RIFIUTATO il valore con una spiegazione (#592: lo stile
+        // dell'agente oltre il tetto di lunghezza). La frase torna al modello
+        // come esito, così la riferisce all'utente invece di riprovare uguale:
+        // niente taglio muto, niente silenzio.
+        if (built.error) return { executed: false, kept: false, output: { rifiutata: built.error } };
         await applySettingsUpdate(built.partial);
         return { executed: true, kept: true };
       }
