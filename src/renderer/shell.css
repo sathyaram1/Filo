@@ -789,3 +789,63 @@ html[data-feedback-dim="1"] .shell {
   transition: background 0.12s ease, color 0.12s ease;
 }
 .perm-chip-x:hover { background: var(--border); color: var(--fg); }
+
+/* Che cosa si condivide: tutto lo schermo o una finestra sola. Compare dopo il
+   «Consenti» sulla cattura dello schermo. */
+.perm-source {
+  pointer-events: auto;
+  max-width: min(560px, calc(100vw - 24px));
+  padding: 10px 12px 12px;
+  background: var(--tab-active);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.2);
+  font-size: 12.5px;
+  animation: permChipIn 0.16s ease-out;
+}
+.perm-source.uscita { opacity: 0; transform: translateY(-4px); transition: opacity 0.14s ease, transform 0.14s ease; }
+.perm-source-title { margin-bottom: 8px; }
+.perm-source-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 44vh;
+  overflow-y: auto;
+}
+.perm-source-item {
+  flex: 0 0 auto;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: var(--tab-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+}
+.perm-source-item:hover {
+  background: var(--bg-deep);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  transform: translateY(-1px);
+}
+.perm-source-item img {
+  width: 100%;
+  height: 74px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg-deep);
+}
+.perm-source-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.perm-source-item.schermo { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.perm-source-cancel { margin-top: 10px; }
