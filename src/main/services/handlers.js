@@ -1543,6 +1543,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
           const tavilyKey = settings.apiKeys?.tavily || '';
           const r = await WS.search({ query, tavilyKey, maxResults: 5 });
           const results = Array.isArray(r?.results) ? r.results : [];
+          // Titoli e frammenti arrivano da pagine che non controlliamo: da qui in
+          // poi il contesto contiene materiale non fidato (#587).
+          try {
+            require('./contextTaint').record(sender, 'ricerca web',
+              results.map((x) => `${x?.title || ''} ${x?.url || ''} ${x?.snippet || ''}`).join('\n'));
+          } catch (_) {}
           return { executed: results.length > 0, kept: true, output: { search: query, results, provider: r?.provider || '', reason: r?.reason || '' } };
         } catch (e) {
           return { executed: false, kept: true, output: { search: query, results: [], error: e?.message || String(e) } };
