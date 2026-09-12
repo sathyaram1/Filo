@@ -418,6 +418,9 @@
   // cammino normale si clicca senza leggerlo, e con lui si perde la protezione
   // vera — che sui dati riconoscibili resta identica.
   function taint(url, corpus, letto) {
+    return taintCon(url, corpusTokens(corpus), corpusTokens(letto || ''));
+  }
+  function taintCon(url, tokCorpus, tokLetto) {
     const exposed = exposedAlnum(url);
     if (!exposed) return null;
     // Ogni forma in cui lo stesso dato può comparire nell'indirizzo: com'è, e
