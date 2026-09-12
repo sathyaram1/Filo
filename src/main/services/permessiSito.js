@@ -360,7 +360,14 @@ function segnaPreambolo(wc, origine) {
     // solo: sì o no). Qui il segno dice la cosa più grande delle due, perché
     // «può» al posto di «sta» è già il modo in cui questo segno parla: dire
     // solo «vede» quando potrebbe anche sentire sarebbe la bugia peggiore.
-    voce.ripresaId = iniziaRipresa(wc, origine, { audio: 'forse' });
+    //
+    // E non sa nemmeno se la cattura sia partita: se fallisce (su Mac basta che
+    // manchi il permesso di sistema) al sito non arriva niente e questo
+    // cartello resta acceso a dire il contrario. Per questo, e solo per questo,
+    // porta una × che lo chiude senza ricaricare la pagina (#586, giro 4).
+    voce.ripresaId = iniziaUso(wc, origine, [P().CHIAVI.SCHERMO], {
+      audioSistema: true, chiudibile: true,
+    });
   }, SENZA_GESTORE_MS);
   if (voce.timer.unref) voce.timer.unref();
   preamboli.set(wc.id, voce);
