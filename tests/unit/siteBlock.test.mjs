@@ -335,3 +335,52 @@ test('#590: un sito con l\'estensione non latina si può mettere in lista', () =
   SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['facebook', '1.2.3.4', 'x..y.com'] });
   assert.equal(SB.status().blacklistSize, 0);
 });
+
+test('#590: l\'eccezione vale per una pagina di RISULTATI, non per tutto ciò che sta sul motore', () => {
+  reset();
+  // Sui nomi dei motori si pubblicano anche pagine di chiunque: i siti fatti
+  // con lo strumento per siti di Google, le pagine servite dai suoi script, i
+  // documenti condivisi. Una di quelle apriva qualunque sito della lista senza
+  // un clic dell'utente e senza passare dal modello: le bastava cambiare da
+  // sola l'indirizzo della scheda.
+  for (const ref of [
+    'https://sites.google.com/view/qualcuno',
+    'https://sites.google.com/view/qualcuno/search?q=x',
+    'https://script.google.com/macros/s/ABC/exec',
+    'https://docs.google.com/document/d/ABC/edit',
+    'https://www.google.com/pagina',
+    'https://groups.google.com/g/tale/c/quale',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è una pagina di risultati`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      true,
+      `dovrebbe BLOCCARE partendo da ${ref}`,
+    );
+  }
+  // Le pagine di risultati vere restano l'eccezione, su ogni motore.
+  for (const ref of [
+    'https://www.google.com/search?q=x',
+    'https://www.bing.com/search?q=x',
+    'https://duckduckgo.com/?q=x',
+    'https://html.duckduckgo.com/html/?q=x',
+    'https://www.ecosia.org/search?q=x',
+    'https://www.startpage.com/sp/search',
+    'https://www.qwant.com/?q=x',
+    'https://search.yahoo.com/search?p=x',
+    'https://yandex.ru/search/?text=x',
+    'https://www.baidu.com/s?wd=x',
+    'https://search.brave.com/search?q=x',
+    'https://kagi.com/search?q=x',
+    'https://www.mojeek.com/search?q=x',
+    'https://www.ask.com/web?q=x',
+    'https://searx.be/search?q=x',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è una pagina di risultati`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      false,
+      `dovrebbe consentire da ${ref}`,
+    );
+  }
+});

@@ -484,3 +484,63 @@ test('#590 un rimbalzo fermato non lascia una scheda vuota da chiudere a mano', 
     await s.chiudi();
   }
 });
+
+// ─── #590 (terzo giro) — il permesso lo dà solo chi lo nomina ────────────────
+
+test('#590 «Apri» sulla chip dei popup NON toglie il sito dalla lista', async ({ app, shell, openTab, testServer }) => {
+  await enableBlock(shell);
+  const dentro = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">DENTRO</h1>');
+  const partenza = testServer.html(
+    `<!doctype html><meta charset="utf-8"><button id="b" onclick="window.open('${dentro}','_blank','width=500,height=400')">apri</button>`,
+  );
+  const page = await openTab(partenza);
+  await page.waitForSelector('#b', { timeout: 8000 });
+  await page.click('#b');
+
+  // La chip parla solo di popup: il sito che la fa comparire lo sceglie la
+  // pagina, non l'utente. Cliccandola l'utente autorizza QUELLA finestrella,
+  // non un permesso di sessione su tutto il sito.
+  const chip = shell.locator('.popup-chip');
+  await expect(chip).toBeVisible({ timeout: 6000 });
+  await chip.getByText('Apri', { exact: true }).first().click();
+  await shell.waitForTimeout(1500);
+
+  // La lista vale ancora: l'apertura chiesta dal modello resta fermata.
+  const esito = await app.evaluate((_e, u) =>
+    globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url: u }), dentro);
+  expect(esito.executed, 'la lista deve valere ancora dopo un clic sulla chip dei popup').toBe(false);
+  expect(esito.output && esito.output.blocked).toBe('site');
+});
+
+test('#590 il tasto indietro non riporta su un sito messo in lista dopo', async ({ shell, openTab, testServer }) => {
+  // Lista vuota: la prima pagina si apre normalmente.
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings',
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: [] } } },
+  }));
+  await shell.waitForTimeout(300);
+
+  const primo = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="primo">PRIMO</h1>');
+  const page = await openTab(primo);
+  await expect(page.locator('#primo')).toBeVisible({ timeout: 8000 });
+
+  // Stessa scheda, un'altra pagina: adesso nella cronologia c'è un "indietro".
+  const altrove = testServer.html('<!doctype html><meta charset="utf-8"><h1 id="altrove">ALTROVE</h1>');
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const id = snap.tabs[snap.tabs.length - 1].id;
+  await shell.evaluate(([i, u]) => window.filoShell.tabs.navigate(i, u), [id, altrove]);
+  await shell.waitForTimeout(1500);
+
+  // L'utente mette quel sito in lista proprio adesso, che è il caso normale.
+  await enableBlock(shell);
+
+  await shell.evaluate((i) => window.filoShell.tabs.back(i), id);
+  await shell.waitForTimeout(1500);
+
+  const dopo = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const suBloccato = dopo.tabs.filter((t) => {
+    try { return new URL(t.url).hostname === BLOCKED_HOST; } catch (_) { return false; }
+  });
+  expect(suBloccato.length, 'il tasto indietro non deve riportare sul sito della lista').toBe(0);
+  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toBeVisible({ timeout: 6000 });
+});
