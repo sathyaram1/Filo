@@ -619,6 +619,51 @@ function chiudiAvviso(id) {
   return fineUso(id);
 }
 
+// ─── la posizione che non arriva ────────────────────────────────────────────
+//
+// Chi risponde «Consenti» a «vuole sapere dove sei» dà via una cosa delicata, e
+// poi al sito non arriva nessuna coordinata: il motore su cui Filo è costruito
+// chiede dove sei a un servizio di rete che nelle versioni pubbliche del motore
+// non è raggiungibile. Il sito mostra una mappa rotta, e chi naviga dà la colpa
+// al sito o pensa di aver sbagliato qualcosa (#586, giro 5).
+//
+// Filo la posizione non la sa produrre da sé. Quello che può fare è dirlo: una
+// riga per scheda, che se ne va con la pagina o con la sua ×.
+const avvisiPosizione = new Map(); // wcId → id dell'avviso
+let prossimoAvviso = 1;
+
+function posizioneNonDisponibile(wc) {
+  try {
+    if (!wc || wc.isDestroyed() || avvisiPosizione.has(wc.id)) return { ok: false };
+    const { win, tab } = posizione(wc);
+    const shell = win && !win.isDestroyed() ? win.webContents : null;
+    if (!shell || shell.isDestroyed()) return { ok: false };
+    const id = `pos${prossimoAvviso++}`;
+    avvisiPosizione.set(wc.id, id);
+    const togli = () => {
+      if (avvisiPosizione.get(wc.id) !== id) return;
+      avvisiPosizione.delete(wc.id);
+      try { if (shell && !shell.isDestroyed()) shell.send('permissions:notice-end', { id }); } catch (_) {}
+    };
+    const suNavigazione = (_e, _url, inPlace, isMainFrame) => { if (isMainFrame && !inPlace) togli(); };
+    try { wc.on('did-start-navigation', suNavigazione); } catch (_) {}
+    try { wc.once('destroyed', togli); } catch (_) {}
+    shell.send('permissions:notice', {
+      id,
+      tabId: tab ? tab.id : null,
+      testo: 'Filo non riesce a sapere dove sei: a questo sito la tua posizione non arriverà.',
+    });
+    return { ok: true };
+  } catch (_) { return { ok: false }; }
+}
+
+function chiudiNotizia(id) {
+  for (const [wcId, v] of [...avvisiPosizione]) {
+    if (v === String(id)) { avvisiPosizione.delete(wcId); return { ok: true }; }
+  }
+  return { ok: false };
+}
+
 // Togliere il permesso deve togliere anche quello che il sito ha già in mano.
 // Prima la revoca valeva solo per la volta dopo: si toglieva la scelta dalle
 // Impostazioni, l'elenco si svuotava e il microfono restava aperto (#586,
