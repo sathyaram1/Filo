@@ -547,7 +547,11 @@ async function scegliFonte(wc, frame) {
     const timer = setTimeout(() => finisci(null), ATTESA_MS);
     scelteFonte.set(id, { finisci });
     try {
-      shell.send('permissions:pick-source', { id, host, voci });
+      // `tabId`: la scelta appartiene alla scheda che l'ha chiesta, come la
+      // pastiglia. Senza, restava sopra la scheda su cui si passava, col nome
+      // di un sito che non era quello che si stava guardando, e un clic lì
+      // consegnava lo schermo a quell'altro sito.
+      shell.send('permissions:pick-source', { id, tabId: tab ? tab.id : null, host, voci });
     } catch (_) { finisci(null); }
   });
 }
