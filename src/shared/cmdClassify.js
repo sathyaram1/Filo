@@ -956,8 +956,12 @@
       // `grep -r chiave` dicono la stessa cosa di `ls .` e `grep -r chiave .`,
       // e vanno misurati sulla cartella corrente. Senza questo, spostarsi e
       // basta bastava a leggere fuori dalla cartella dell'utente.
-      const bersagli = operandsOf(t);
-      for (const op of (bersagli.length ? bersagli : [cwd || '.'])) {
+      // Solo con un perimetro dichiarato, però: senza, l'unica lettura possibile
+      // è quella del TESTO del comando (percorso assoluto, risalita con `..`), e
+      // una cartella corrente non è testo del comando.
+      const scritti = operandsOf(t);
+      const bersagli = scritti.length ? scritti : (perimOk ? [cwd || '.'] : []);
+      for (const op of bersagli) {
         const why = operandReason(op, cwd, perimOk, home, false, ricorsivo);
         if (why) return why;
       }
