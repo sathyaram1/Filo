@@ -400,6 +400,52 @@
     $('sec-siteblock-blacklist').disabled = !on;
   }
 
+  // #590 — I SITI SBLOCCATI A MANO, quelli su cui l'utente ha detto "Apri
+  // comunque". Il permesso dura fino alla chiusura di Filo e vale su ogni
+  // strada, ma si vedeva solo nella notifica che lo annunciava: passata quella
+  // (se ne va da sola dopo pochi secondi) non restava modo di sapere che
+  // c'era, né di toglierlo se non riscrivendo l'elenco qui sopra, che li
+  // azzera tutti insieme. Se una cosa si può concedere, si deve poter vedere e
+  // revocare. L'elenco vive in memoria, non nelle impostazioni: si chiede a
+  // parte e sparisce quando Filo si chiude.
+  async function renderAllowed() {
+    const box = $('sec-siteblock-allowed-box');
+    const list = $('sec-siteblock-allowed-list');
+    if (!box || !list) return;
+    let hosts = [];
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.SITE_BLOCK_ALLOWED });
+      hosts = (res && Array.isArray(res.hosts)) ? res.hosts : [];
+    } catch (_) { hosts = []; }
+    list.innerHTML = '';
+    if (!hosts.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    for (const host of hosts) {
+      const li = document.createElement('li');
+      li.style.display = 'flex';
+      li.style.alignItems = 'center';
+      li.style.justifyContent = 'space-between';
+      li.style.gap = '8px';
+      li.style.padding = '4px 0';
+      const span = document.createElement('span');
+      // Il nome come l'utente lo scriverebbe: un indirizzo in cirillico o in
+      // giapponese viaggia come "xn--…", che qui non nomina niente.
+      span.textContent = UrlNav.hostLeggibile(host);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_security_siteblock_allowed_restore');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try { await chrome.runtime.sendMessage({ type: MSG.SITE_BLOCK_REVOKE, host }); } catch (_) {}
+        await renderAllowed();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
   // Mostra (o nasconde, con lista vuota) un avviso inline sotto la blacklist
   // che nomina le righe scartate perché non sono domini validi. Senza questo,
   // una voce tipo "facebook" veniva salvata muta ma non bloccava mai il sito.
