@@ -1087,3 +1087,82 @@ test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('comandoinventato'), 3, 'comando inventato → digita conferma');
   assert.equal(lvl('ls && rm -rf /'), 3, '&& → livello 3');
 });
+
+// ── #587, giro 1 — il bersaglio è quello che il comando aprirà ───────────────
+//
+// Il perimetro di lettura si misurava sul TESTO dell'operando. Bastavano due
+// comandi che non chiedono niente — spostarsi, poi leggere — per aprire un file
+// riservato senza che il suo nome comparisse nel comando che legge. Stessa cosa
+// per una lettura ricorsiva, che non nomina nessun bersaglio e li attraversa
+// tutti, e per un comando senza percorso, che legge dove si trova.
+//
+// Senza il fix ognuno di questi assert torna 1 al posto di 2.
+
+const HOME = '/home/mario';
+const WIN = 'C:\\Users\\mario';
+const dove = (cwd = HOME, home = HOME) => ({ perimetro: home, home, cwd });
+
+test('#587 — spostarsi in una cartella riservata e leggere lì chiede un OK', () => {
+  for (const cmd of [
+    'cd ~/.ssh && cat config',
+    'cd ~/.ssh && cat authorized_keys',
+    'cd ~/.ssh ; cat known_hosts',
+    'pushd ~/.aws && cat config',
+    'cd ~/.gnupg && cat secring.gpg',
+    'cd ~/.config/Filo && cat storage.json',
+    'cd .config/Filo && cat storage.json',
+    'cd ~/.ssh; Get-Content config',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" deve chiedere un OK`);
+  }
+  assert.equal(
+    C.classify('cd C:\\Users\\mario\\AppData\\Roaming\\Filo && type storage.json', dove(WIN, WIN)),
+    2, 'anche nella forma Windows',
+  );
+});
+
+test('#587 — lo spostamento vale anche fatto in un turno precedente', () => {
+  // La cartella corrente dell'assistente è persistente: il main la inietta, e
+  // `cd` in un turno + lettura in quello dopo devono valere quanto la sequenza.
+  assert.equal(C.classify('cat config', dove('/home/mario/.ssh')), 2);
+  assert.equal(C.classify('cat storage.json', dove('/home/mario/.config/Filo')), 2);
+  assert.equal(C.classify('type storage.json', dove('C:\\Users\\mario\\AppData\\Roaming\\Filo', WIN)), 2);
+});
+
+test('#587 — una lettura ricorsiva di tutta la cartella dell’utente chiede un OK', () => {
+  for (const cmd of [
+    'grep -r PRIVATE .',
+    'grep -r "PRIVATE KEY" .',
+    'grep -rn password /home/mario',
+    'grep -r AWS_SECRET ~',
+    'cd ~/.ssh && grep -r . .',
+    'ls -R',
+    'tree',
+    'du -sh',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" deve chiedere un OK`);
+  }
+});
+
+test('#587 — una ricorsiva su una sottocartella, o ristretta, resta senza attrito', () => {
+  for (const cmd of [
+    'grep -r errore progetti',
+    'grep -r errore ./progetti/app',
+    'cd progetti && grep -r errore .',
+    'tree progetti',
+    'du -sh Downloads',
+    'ls -lart',        // la `r` qui ordina al contrario, non ricorre
+    'grep -r chiave *.txt',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 1, `"${cmd}" non deve chiedere niente`);
+  }
+});
+
+test('#587 — un comando senza percorso si misura sulla cartella in cui si trova', () => {
+  assert.equal(C.classify('ls', dove('/etc')), 2, 'elencare /etc');
+  assert.equal(C.classify('ls -la', dove('/root')), 2, 'elencare /root');
+  assert.equal(C.classify('ls', dove('/home/mario/.ssh')), 2, 'elencare le chiavi');
+  assert.equal(C.classify('ls', dove()), 1, 'la cartella dell’utente resta libera');
+  assert.equal(C.classify('ls Documenti', dove()), 1, 'e le sue sottocartelle pure');
+  assert.equal(C.classify('cat appunti.txt', dove()), 1, 'come le letture normali');
+});
