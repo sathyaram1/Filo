@@ -49,3 +49,24 @@ Se un sito non lo può **chiedere**, non glielo si può nemmeno **mandare**.
   quello che riceve la pagina del mini server con quello che riceve la pagina
   `filo://` — e, nello stesso test, che la spinta continui a funzionare
   (altrimenti la difesa ha spento una funzione).
+- **Una finestra non è per forza una superficie di Filo.** Il secondo giro di
+  verifica del #589 ha trovato il riparo scavalcato da lì: i broadcast
+  sceglievano il payload per frame nelle schede, ma alla finestra mandavano
+  l'oggetto intero con un `win.webContents.send(...)` che dava per scontato di
+  parlare alla shell. I popup di accesso («Continua con Google») sono finestre
+  vere, ci gira dentro la pagina di un sito e Filo ci monta sopra il suo
+  preload apposta (`_allowAuthPopup` in `src/main/tabs.js`): con un accesso
+  aperto, il primo salvataggio di una preferenza ci portava chiavi e password
+  del proxy. Ogni giro su `BrowserWindow.getAllWindows()` guarda
+  `win.webContents.getURL()` come guarderebbe l'indirizzo di un frame.
+- **Dal verso della richiesta la lista è una sola, e sta in un posto solo.**
+  Finché il confine d'origine stava sui singoli handler, quelli aggiunti dopo
+  nascevano aperti: un sito che chiedeva otteneva la memoria che Filo si è
+  costruito sull'utente, le pagine messe da parte, lo stato della home e
+  l'uscita dall'account. Oggi la lista dei messaggi che una pagina web può
+  mandare è dichiarata in `src/shared/webMessageScope.js` e applicata una volta
+  sola in `handleMessage`; la sentinella in `tests/unit/webMessageScope.test.mjs`
+  la confronta con quello che i file dentro le pagine mandano davvero. Il
+  confine è l'origine **http/https**, non «tutto ciò che non è `filo://`»: i
+  menu nativi del tasto destro vivono su un indirizzo `data:` e le chiamate
+  interne del main non hanno origine, e non sono la pagina di un sito.

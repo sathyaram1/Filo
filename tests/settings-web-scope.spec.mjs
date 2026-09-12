@@ -251,3 +251,91 @@ test('un sito che chiede lo stato dell\'account sa solo se c\'è un accesso', as
   });
   expect(Object.keys(daFilo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
 });
+
+// ── Non tutte le finestre sono superfici di Filo ────────────────────────────
+// I popup di accesso («Continua con Google» e simili) sono finestre vere con
+// dentro la pagina di un sito, e ci gira il codice di Filo come su ogni altra
+// pagina. La spinta delle impostazioni sceglieva per riquadro nelle schede ma
+// mandava l'oggetto intero alla finestra, dando per scontato che ogni finestra
+// fosse la shell: bastava avere un accesso aperto mentre si salva una
+// preferenza perché in quella pagina finissero chiave e password del proxy.
+test('un popup di accesso aperto da un sito non riceve chiavi né credenziali del proxy', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate((s) => window.filoShell.message({ type: 'update_settings', settings: s }), {
+    apiKeys: { openrouter: CHIAVE },
+    proxy: { datacenter: PROXY_URL },
+  });
+
+  const web = await testServer.openReady(openTab, '<h1>sito con accesso</h1>');
+  const login = `${testServer.html('<h1>accedi</h1>')}?client_id=abc&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
+  await web.evaluate((u) => window.open(u, '_blank'), login);
+
+  await expect.poll(
+    () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => {
+      try { return w.webContents.getURL(); } catch (_) { return ''; }
+    })),
+    { timeout: 8000 },
+  ).toContain(login);
+
+  await installaSpia(app);
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  await expect.poll(async () => (await leggiSpia(app)).length, { timeout: 8000 }).toBeGreaterThan(0);
+
+  const versoIlSito = (await leggiSpia(app)).filter((c) => /^https?:/.test(c.url));
+  expect(versoIlSito.length, 'al popup non è arrivato niente: la prova non guarda dove deve').toBeGreaterThan(0);
+  for (const c of versoIlSito) {
+    const dump = JSON.stringify(c.settings ?? null);
+    expect(dump, `chiave consegnata a ${c.url}`).not.toContain(CHIAVE);
+    expect(dump, `password del proxy consegnata a ${c.url}`).not.toContain('SENTINELLA-589-PASSWORD');
+  }
+  // E la preferenza cambiata vale lo stesso, anche lì dentro.
+  expect(versoIlSito.some((c) => c.settings && c.settings.theme === 'dark'),
+    'il tema nuovo deve arrivare comunque alle pagine dei siti').toBe(true);
+});
+
+// ── Quello che un sito può CHIEDERE ────────────────────────────────────────
+// Stessa regola della spinta, dal verso opposto: verso una pagina di un sito
+// passa solo quello che il codice dentro le pagine usa davvero
+// (src/shared/webMessageScope.js). Prima rispondevano anche le domande che
+// consegnano i dati personali dell'utente.
+test('un sito non ottiene memoria, pagine salvate e stato, e non può far uscire dall\'account', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate(async () => {
+    const m = (x) => window.filoShell.message(x);
+    await m({ type: '_storage:set', obj: { filo_memory: { PROFILO: 'Vive a MILANO-SENTINELLA-589', PREFERENZE: '' } } });
+    await m({ type: 'save_page', page: { url: 'https://banca.example/conto', title: 'CONTO-SENTINELLA-589', text: 'saldo' } });
+  });
+  const web = await testServer.openReady(openTab, '<h1>sito</h1>');
+  const url = web.url();
+
+  const risposte = await app.evaluate(async ({}, u) => {
+    const H = globalThis.__filoHandlers;
+    const chiedi = (msg) => H.handleMessage(msg, { url: u, tab: { url: u } }).catch((e) => ({ errore: String(e) }));
+    return {
+      memoria: await chiedi({ type: 'filo_get_memory' }),
+      salvate: await chiedi({ type: 'get_saved_pages' }),
+      stato: await chiedi({ type: 'filo_get_state' }),
+      archiviate: await chiedi({ type: 'get_archived_tabs' }),
+      uscita: await chiedi({ type: 'auth_signout' }),
+      // Quello che il codice dentro le pagine usa davvero deve continuare a funzionare.
+      impostazioni: await chiedi({ type: 'get_settings' }),
+      appunti: await chiedi({ type: 'get_clipboard_history' }),
+    };
+  }, url);
+
+  for (const nome of ['memoria', 'salvate', 'stato', 'archiviate', 'uscita']) {
+    expect(risposte[nome]?.ok, `un sito ha ottenuto risposta a "${nome}"`).not.toBe(true);
+  }
+  const tutto = JSON.stringify(risposte);
+  expect(tutto, 'la memoria di Filo sull\'utente è uscita verso il sito').not.toContain('MILANO-SENTINELLA-589');
+  expect(tutto, 'le pagine salvate dall\'utente sono uscite verso il sito').not.toContain('CONTO-SENTINELLA-589');
+
+  expect(risposte.impostazioni?.ok, 'il content script deve continuare a leggere le impostazioni').toBe(true);
+  expect(risposte.appunti?.ok, 'il menu degli appunti dentro la pagina deve continuare a funzionare').toBe(true);
+
+  // Dalle pagine di Filo, invece, tutto come prima.
+  const daFilo = await app.evaluate(async () => {
+    const H = globalThis.__filoHandlers;
+    return H.handleMessage({ type: 'filo_get_memory' }, { url: 'filo://newtab/' });
+  });
+  expect(daFilo?.ok, 'le pagine di Filo devono continuare a vedere la memoria').toBe(true);
+  expect(JSON.stringify(daFilo)).toContain('MILANO-SENTINELLA-589');
+});
