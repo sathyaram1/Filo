@@ -1240,6 +1240,24 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     // fuori dalla firma dell'azione (actionSignature), così RUN e CONFIRM
     // continuano a combaciare.
     action._cwd = displayCwd(getAssistantCwd(sender));
+    // Perimetro di LETTURA (#587). Il livello di un comando di sola lettura non
+    // dipende più solo dal programma: dipende anche da DOVE legge. Il perimetro
+    // dichiarato è la cartella da cui l'assistente parte (la home), non quella
+    // corrente — quella la sposta lui da sé con `cd`, che è livello 1, quindi un
+    // perimetro agganciato alla cwd si sposterebbe da solo. `_cwdReale` serve
+    // solo a risolvere i percorsi relativi. Tutti e tre calcolati QUI, mai
+    // dall'LLM: l'assegnazione è incondizionata, quindi un valore che arrivasse
+    // dal modello per allargare il perimetro viene sovrascritto.
+    try {
+      const { defaultCwd } = require('./shell');
+      action._cwdReale = getAssistantCwd(sender);
+      action._perimetro = defaultCwd();
+      action._home = require('node:os').homedir() || '';
+    } catch (_) {
+      action._cwdReale = '';
+      action._perimetro = '';
+      action._home = '';
+    }
   }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
