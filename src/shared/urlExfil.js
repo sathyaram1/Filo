@@ -228,21 +228,32 @@
   // caso, separati da pochi caratteri. Le misure sono strette apposta: un dato
   // corto o tronconi minuscoli combacerebbero per sbaglio dentro un indirizzo
   // vero, e un avviso falso si clicca senza leggerlo.
+  // Le misure erano tarate su un dato tagliato in due o tre tronconi: tolleravano
+  // due tagli. Bastava allora infilare una lettera OGNI TRE O QUATTRO caratteri
+  // — `Segrxetoxnetxrc2x026` — perché i tagli diventassero cinque e il dato
+  // uscisse lo stesso (#587, giro 4). Adesso i tagli tollerati crescono col dato:
+  // quello che resta fisso è la lunghezza di ogni troncone (tre caratteri esatti,
+  // di fila) e il fatto che il dato sia lungo e riconoscibile — un dato corto o
+  // tronconi minuscoli combacerebbero per sbaglio dentro un indirizzo vero, e un
+  // avviso falso si clicca senza leggerlo.
   const SPEZZ_MIN = 10;   // solo per i dati abbastanza lunghi
-  const SPEZZ_RUN = 4;    // ogni troncone, almeno tanti caratteri di fila
-  const SPEZZ_BUCHI = 2;  // quanti tagli si tollerano
-  const SPEZZ_JUNK = 10;  // quanti caratteri estranei in tutto
+  const SPEZZ_RUN = 3;    // ogni troncone, almeno tanti caratteri di fila
+  const buchiMax = (len) => Math.max(2, Math.ceil(len / SPEZZ_RUN));
+  const junkMax = (len) => Math.max(10, len);
   function daPosizione(exposed, tok, p) {
+    const maxBuchi = buchiMax(tok.length);
+    const maxJunk = junkMax(tok.length);
     let i = 0;
     let j = p;
     let buchi = 0;
     let junk = 0;
     while (i < tok.length) {
       if (j < exposed.length && exposed[j] === tok[i]) { i++; j++; continue; }
-      if (buchi >= SPEZZ_BUCHI) return false;
+      if (buchi >= maxBuchi) return false;
       const prossimo = tok.slice(i, i + Math.min(SPEZZ_RUN, tok.length - i));
+      if (prossimo.length < SPEZZ_RUN) return false; // coda troppo corta per contare
       let salto = -1;
-      for (let k = 1; k <= SPEZZ_JUNK - junk; k++) {
+      for (let k = 1; k <= maxJunk - junk; k++) {
         if (exposed.startsWith(prossimo, j + k)) { salto = k; break; }
       }
       if (salto < 0) return false;
