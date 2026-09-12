@@ -1463,12 +1463,19 @@
         // Il modello cercato non è un file: o è il primo operando, o arriva dal
         // token che segue `-e`/`--regexp`/`-Pattern`.
         const dopoFlag = [];
+        const daPercorso = [];
         const toks = tokens(t).slice(1).map(unquote);
         for (let i = 0; i < toks.length - 1; i++) {
-          if (CERCA_MODELLO_FLAG_RE.test(toks[i]) && !isFlagToken(toks[i + 1])) dopoFlag.push(toks[i + 1]);
+          if (isFlagToken(toks[i + 1])) continue;
+          if (CERCA_MODELLO_FLAG_RE.test(toks[i])) dopoFlag.push(toks[i + 1]);
+          else if (CERCA_PERCORSO_FLAG_RE.test(toks[i])) daPercorso.push(toks[i + 1]);
         }
+        // Un percorso legato a `-Path` è un FILE: esce dal conto degli operandi
+        // prima della regola del primo operando, o sarebbe lui a essere scartato.
+        if (daPercorso.length) scritti = scritti.filter((x) => !daPercorso.includes(x));
         if (dopoFlag.length) scritti = scritti.filter((x) => !dopoFlag.includes(x));
         else if (scritti.length && !CERCA_DA_FLAG_RE.test(t)) scritti = scritti.slice(1);
+        if (daPercorso.length) scritti = scritti.concat(daPercorso);
       }
       // Un percorso può stare attaccato al nome di un'opzione (`-Path:…`,
       // `--file=…`): vale come un operando scritto a parte.
