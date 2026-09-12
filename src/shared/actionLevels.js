@@ -336,11 +336,16 @@
       // qualsiasi comando non riconosciuto (digita "conferma"). Una sequenza di
       // comandi (`&&`/`||`/`;`) prende il livello massimo dei suoi pezzi.
       // Comando assente o classificatore non caricato → 3 per massima cautela.
+      // Il PERIMETRO di lettura (#587) arriva col resto dei campi iniettati dal
+      // main: `_perimetro` (la cartella dichiarata, = home), `_cwdReale` (dove
+      // l'assistente si trova adesso, per risolvere i percorsi relativi) e
+      // `_home` (per sciogliere `~`). Mai dall'LLM: il main li sovrascrive
+      // sempre prima del gate.
       level: (a) => {
         const C = global.SN_CMD_CLASSIFY;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         if (!cmd || !C) return 3;
-        const lvl = C.classify(cmd);
+        const lvl = C.classify(cmd, cmdScope(a));
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       describe: (a) => {
