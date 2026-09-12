@@ -269,7 +269,7 @@
         const base = `Leggere il documento ${p || ''}`.trim();
         const perche = String((a && a._motivoPerimetro) || '').trim();
         return perche
-          ? `${base}\n\nQuesto file ${perche}: il contenuto entra nella conversazione con Filo.`
+          ? `${base}\n\n${perche} Quello che legge entra nella conversazione con Filo.`
           : base;
       },
     },
