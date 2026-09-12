@@ -1084,7 +1084,8 @@
       // Solo con un perimetro dichiarato, però: senza, l'unica lettura possibile
       // è quella del TESTO del comando (percorso assoluto, risalita con `..`), e
       // una cartella corrente non è testo del comando.
-      const scritti = operandsOf(t);
+      let scritti = operandsOf(t);
+      if (CERCA_PRIMA.has(prog) && scritti.length && !CERCA_DA_FLAG_RE.test(t)) scritti = scritti.slice(1);
       const bersagli = scritti.length ? scritti : (perimOk ? [cwd || '.'] : []);
       for (const op of bersagli) {
         const why = operandReason(op, cwd, perimOk, home, false, ricorsivo);
