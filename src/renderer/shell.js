@@ -1347,7 +1347,7 @@
       if (!panelOpen || !panel) return;
       requestAnimationFrame(() => {
         const h = Math.ceil(panel.getBoundingClientRect().height);
-        try { api.tabs.reserveTop && api.tabs.reserveTop(h + 6); } catch (_) {}
+        riservaTop('download', h + 6);
       });
     }
     function openPanel() {
