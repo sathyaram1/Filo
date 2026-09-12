@@ -512,9 +512,11 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED) return;
       if (Date.now() - ecoDaIgnorare < ECO_MS) return;
-      const el = document.activeElement;
-      if (el && el !== document.body && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
-      load().catch(() => {});
+      if (Bootstrap && typeof Bootstrap.ricaricaSenzaDisturbare === 'function') {
+        Bootstrap.ricaricaSenzaDisturbare(load).catch(() => {});
+      } else {
+        load().catch(() => {});
+      }
     });
   }
 
