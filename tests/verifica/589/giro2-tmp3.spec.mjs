@@ -8,34 +8,33 @@ const salva = (shell, settings) =>
   shell.evaluate((s) => window.filoShell.message({ type: 'update_settings', settings: s }), settings);
 
 test('raffica', async ({ app, shell, openTab, testServer }) => {
-  await salva(shell, { apiKeys: { openrouter: CHIAVE }, proxy: { datacenter: PROXY } });
-  const web = await testServer.openReady(openTab, '<h1>pagina</h1>');
+  await salva(shell, { apiKeys: { openrouter: CHIAVE, gemini: CHIAVE }, proxy: { datacenter: PROXY, residential: PROXY } });
+  const web = await testServer.openReady(openTab, '<h1>pagina</h1><textarea>scrivi</textarea>');
   await app.evaluate(({ BrowserWindow }) => {
     globalThis.__p = [];
-    globalThis.__dec = [];
-    const S = globalThis.SN_SETTINGS_SCOPE;
-    const orig = S.isFiloOrigin;
-    S.isFiloOrigin = function (u) { const r = orig.call(this, u); globalThis.__dec.push([String(u), r]); return r; };
+    const nota = (via, url, m) => {
+      if (!m || m.type !== 'settings_updated') return;
+      let alVolo = '';
+      try { alVolo = JSON.stringify(m.settings ?? null); } catch (_) { alVolo = '?'; }
+      globalThis.__p.push({
+        via,
+        url: String(url || ''),
+        segAlVolo: alVolo.includes('VERIFICA589'),
+        chiaviAlVolo: Object.keys(m.settings || {}).join(','),
+        settings: m.settings, // per riferimento, come nella prova del giro 1
+      });
+    };
     const win = BrowserWindow.getAllWindows()[0];
-    const fr = win.webContents.mainFrame;
-    const frP = Object.getPrototypeOf(fr);
+    const frP = Object.getPrototypeOf(win.webContents.mainFrame);
     const frSend = frP.send;
     frP.send = function (ch, ...a) {
-      if (ch === 'filo:broadcast' && a[0] && a[0].type === 'settings_updated') {
-        let u = ''; try { u = this.url; } catch (_) {}
-        const d = JSON.stringify(a[0].settings || null);
-        globalThis.__p.push({ via: 'frame', url: u, keys: Object.keys(a[0].settings || {}).length, seg: d.includes('VERIFICA589') });
-      }
+      if (ch === 'filo:broadcast') { let u = ''; try { u = this.url; } catch (_) {} nota('frame', u, a[0]); }
       return frSend.call(this, ch, ...a);
     };
     const wcP = Object.getPrototypeOf(win.webContents);
     const wcSend = wcP.send;
     wcP.send = function (ch, ...a) {
-      if (ch === 'filo:broadcast' && a[0] && a[0].type === 'settings_updated') {
-        let u = ''; try { u = this.getURL(); } catch (_) {}
-        const d = JSON.stringify(a[0].settings || null);
-        globalThis.__p.push({ via: 'wc', url: u, keys: Object.keys(a[0].settings || {}).length, seg: d.includes('VERIFICA589') });
-      }
+      if (ch === 'filo:broadcast') { let u = ''; try { u = this.getURL(); } catch (_) {} nota('wc', u, a[0]); }
       return wcSend.call(this, ch, ...a);
     };
   });
@@ -51,10 +50,15 @@ test('raffica', async ({ app, shell, openTab, testServer }) => {
   ];
   await Promise.all(cattivi.map((s) => salva(shell, s).catch(() => null)));
   await web.waitForTimeout(1200);
-  const { tutte, dec } = await app.evaluate(() => ({ tutte: globalThis.__p || [], dec: globalThis.__dec || [] }));
-  const colpevoli = tutte.filter((c) => /^https?:/.test(c.url) && c.seg);
-  console.log('>>> consegne', tutte.length, 'colpevoli', colpevoli.length);
-  for (const c of colpevoli) console.log('>>> COLPEVOLE', JSON.stringify(c));
-  if (colpevoli.length) console.log('>>> DECISIONI', JSON.stringify(dec.slice(0, 60)));
-  expect(colpevoli.length).toBe(0);
+
+  const tutte = await app.evaluate(() => (globalThis.__p || []).map((c) => ({
+    via: c.via, url: c.url, segAlVolo: c.segAlVolo, chiaviAlVolo: c.chiaviAlVolo,
+    segDopo: JSON.stringify(c.settings ?? null).includes('VERIFICA589'),
+    chiaviDopo: Object.keys(c.settings || {}).join(','),
+  })));
+  const web1 = tutte.filter((c) => /^https?:/.test(c.url));
+  const sospetti = web1.filter((c) => c.segAlVolo || c.segDopo);
+  console.log('>>> verso web', web1.length, 'sospetti', sospetti.length);
+  for (const c of sospetti) console.log('>>> SOSPETTO', JSON.stringify(c).slice(0, 400));
+  expect(sospetti.length).toBe(0);
 });
