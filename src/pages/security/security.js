@@ -356,11 +356,16 @@
   }
 
   async function saveCookies() {
-    const partial = {
-      security: {
-        cookies: { mode: currentMode(), trustedSites: cookieWhitelist.slice() },
-      },
-    };
+    // La modalità e la lista dei siti fidati sono lo stesso gruppo: mandarle
+    // sempre insieme voleva dire che aggiungere un sito fidato rimetteva la
+    // modalità cookie di prima, disfacendo la scelta appena confermata in chat
+    // (#592, giro 3). Si manda solo quella delle due che è cambiata.
+    const adesso = { mode: currentMode(), trustedSites: cookieWhitelist.slice() };
+    const cookies = Storage.partialCambiato(ultimiCookie || {}, adesso);
+    ultimiCookie = adesso;
+    if (!Object.keys(cookies).length) return;
+    const partial = { security: { cookies } };
+    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
     const hint = $('savedHint');
     hint.classList.add('sn-show');
