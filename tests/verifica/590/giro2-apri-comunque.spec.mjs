@@ -94,8 +94,13 @@ test('C — «Apri comunque» su un sito che rimbalza: il sito deve aprirsi', as
 
     // 3. il sito deve caricarsi davvero. Il rimbalzo porta alla pagina vera
     //    dello STESSO sito: è dove l'utente ha detto di voler andare.
+    await shell.evaluate(() => new Promise((r) => setTimeout(r, 2500)));
+    const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+    const scheda = snap.tabs.find((t) => { try { return new URL(t.url).hostname === HOST_ATTESO; } catch (_) { return false; } });
+    expect(scheda, 'la scheda dopo «Apri comunque» deve esistere').toBeTruthy();
+
     const page = await paginaSuHost(app, HOST);
-    expect(page, 'la scheda sul sito deve esistere').not.toBeNull();
+    expect(page, 'la scheda deve aver caricato una pagina del sito, non restare bianca').not.toBeNull();
     await expect(page.locator('#dentro')).toBeVisible({ timeout: 8000 });
   } finally {
     await s.chiudi();
