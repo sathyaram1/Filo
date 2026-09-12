@@ -79,10 +79,12 @@ module.exports = function register(on, ctx) {
   on(MSG.PERMESSO_DI_FILO, async (msg, sender) => {
     try {
       const chiave = String((msg && msg.chiave) || '');
-      // Solo le due cose che Filo chiede DAVVERO dentro una pagina web: il
-      // microfono della dettatura e gli appunti dell'Incolla. Tutto il resto
-      // resta una richiesta del sito, con la sua pastiglia.
-      if (chiave !== 'microfono' && chiave !== 'appunti') return { ok: false };
+      // Resta SOLO il microfono della dettatura. Gli appunti sono usciti di qui:
+      // li legge il main e li consegna a chi ha premuto Incolla (MSG.APPUNTI_DI_FILO),
+      // così non c'è più nessuna concessione che un sito in attesa possa
+      // intercettare. Tutto il resto è una richiesta del sito, con la sua
+      // pastiglia.
+      if (chiave !== 'microfono') return { ok: false };
       require('../permessiSito').concessioneUnaTantum(sender && sender.wc, chiave);
       return { ok: true };
     } catch (_) { return { ok: false }; }
