@@ -129,6 +129,63 @@ test('a un sito che chiede lo stato dell\'account resta solo "sei connesso o no"
   expect('isAdmin' in versoFilo, 'le pagine di Filo devono continuare a sapere se è amministratore').toBe(true);
 });
 
+// ── La stessa spinta, l'altra finestra ─────────────────────────────────────
+// Il riparo sceglie che cosa mandare guardando l'indirizzo di ogni riquadro
+// delle schede, ma alla finestra manda l'oggetto intero senza guardare niente,
+// dando per scontato che ogni finestra sia una superficie di Filo. Non lo è:
+// i popup di accesso ("Continua con Google") sono finestre vere, e dentro
+// girano le pagine di un sito con il codice di Filo montato sopra.
+test('un popup di accesso è una pagina di un sito: non deve ricevere chiavi e proxy', async ({ app, shell, openTab, testServer }) => {
+  const CHIAVE = 'sk-or-v1-GIRO2-589-POPUP';
+  const PWD = 'PWD-GIRO2-589-POPUP';
+  await shell.evaluate(({ k, p }) => window.filoShell.message({
+    type: 'update_settings',
+    settings: { apiKeys: { openrouter: k }, proxy: { datacenter: `socks5://utente:${p}@gate.example.com:7000` } },
+  }), { k: CHIAVE, p: PWD });
+
+  const web = await testServer.openReady(openTab, '<h1>sito con accesso</h1>');
+  // La pagina che il sito apre nel popup: un indirizzo che somiglia a un login
+  // OAuth, come quello di un "Continua con Google".
+  const login = `${testServer.html('<h1>accedi</h1>')}?client_id=abc&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
+  await web.evaluate((u) => window.open(u, '_blank'), login);
+
+  // Aspetta che la finestra del popup esista davvero.
+  await expect.poll(
+    () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => {
+      try { return w.webContents.getURL(); } catch (_) { return ''; }
+    })),
+    { timeout: 8000 },
+  ).toContain(login);
+
+  // Registra quello che arriva a ogni superficie, con l'indirizzo di chi riceve.
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__g2 = [];
+    const nota = (url, m) => {
+      if (!m || m.type !== 'settings_updated') return;
+      let dump = ''; try { dump = JSON.stringify(m.settings ?? null); } catch (_) { dump = ''; }
+      globalThis.__g2.push({ url: String(url || ''), dump });
+    };
+    const win = BrowserWindow.getAllWindows()[0];
+    const wcP = Object.getPrototypeOf(win.webContents);
+    const wcSend = wcP.send;
+    wcP.send = function (ch, ...a) {
+      if (ch === 'filo:broadcast') { let u = ''; try { u = this.getURL(); } catch (_) {} nota(u, a[0]); }
+      return wcSend.call(this, ch, ...a);
+    };
+  });
+
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  await expect.poll(() => app.evaluate(() => (globalThis.__g2 || []).length), { timeout: 8000 }).toBeGreaterThan(0);
+
+  const consegne = await app.evaluate(() => globalThis.__g2 || []);
+  const versoPopup = consegne.filter((c) => /^https?:/.test(c.url));
+  expect(versoPopup.length, 'il popup non ha ricevuto niente: la prova non ha guardato quello che doveva').toBeGreaterThan(0);
+  for (const c of versoPopup) {
+    expect(c.dump, `la chiave dei servizi a pagamento è finita nel popup aperto dal sito (${c.url})`).not.toContain(CHIAVE);
+    expect(c.dump, `la password del proxy è finita nel popup aperto dal sito (${c.url})`).not.toContain(PWD);
+  }
+});
+
 // ── Il lavoro chiesto, ri-provato dal verso dell'utente ────────────────────
 // Senza il fix questa è rossa: la preferenza salvata arrivava alla pagina con
 // dentro le chiavi. Qui si guarda anche che la difesa non abbia spento niente.
