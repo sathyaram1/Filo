@@ -75,16 +75,33 @@ test('la domanda di una scheda in secondo piano compare sopra la scheda che si s
   const chip = shell.locator('.perm-chip');
   await expect(chip).toHaveCount(1, { timeout: 10_000 });
 
-  // La pastiglia porta la scheda a cui appartiene? Se non la porta, chi naviga
-  // vede una domanda sul sito che NON sta guardando, senza alcun segno che
-  // arrivi da un'altra scheda.
-  const marcata = await chip.evaluate((el) => el.dataset.tab || el.getAttribute('data-tab-id') || null);
+  void pageB;
+  await shell.waitForTimeout(1500);
   expect(
-    marcata,
-    'la pastiglia non dice a quale scheda appartiene: la domanda della scheda in secondo piano '
-    + 'compare identica sopra la scheda che si sta guardando',
-  ).not.toBeNull();
+    await chip.count(),
+    'la domanda della scheda in secondo piano compare sopra la scheda che si sta guardando, '
+    + 'senza nessun segno che arrivi da un\'altra parte',
+  ).toBe(0);
+
+  // Passando su quella scheda, la domanda c'è: non è persa, aspetta il suo turno.
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), (await schedaDiUrl(app, urlA)));
+  await expect(chip).toHaveCount(1, { timeout: 10_000 });
+  await expect(chip).toContainText('fotocamera');
 });
+
+async function schedaDiUrl(app, url) {
+  return app.evaluate(({ BrowserWindow }, u) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm || !Array.isArray(tm.tabs)) continue;
+      const t = tm.tabs.find((x) => {
+        try { return x.view.webContents.getURL() === u; } catch (_) { return false; }
+      });
+      if (t) return t.id;
+    }
+    return null;
+  }, url);
+}
 
 test('la richiesta della scheda che si sta guardando resta invisibile dietro quella di un\'altra scheda', async ({ app, shell, testServer }) => {
   test.setTimeout(120_000);
