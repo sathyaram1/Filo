@@ -1521,6 +1521,13 @@ class TabManager {
       openExternalScheme(target);
       return;
     }
+    // SICUREZZA (#590) — e la lista dei siti bloccati, per lo stesso motivo:
+    // questa è la strada dell'indirizzo scritto a mano nella barra della shell
+    // (tabs:navigate), che prima non incontrava nessun controllo. Nessun
+    // fromUrl: la pagina su cui si trova la scheda non è il referrer di un
+    // indirizzo digitato, e non deve poter aprire l'eccezione "arrivo da un
+    // motore di ricerca" solo perché la scheda stava su Google.
+    if (this._maybeBlockNavigation(target)) return;
     // La WebContentsView va RICREATA (non basta un loadURL) quando cambia la
     // partizione (privacy, fra siti diversi) oppure quando si attraversa il
     // confine di fiducia interno↔esterno: il preload e contextIsolation sono
