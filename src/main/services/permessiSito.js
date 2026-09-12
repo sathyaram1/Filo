@@ -13,7 +13,7 @@
 // OGNI sessione — quella di default, le partizioni effimere dell'incognito, i
 // jar per-sito della modalità privacy, le schede proxate, la finestra isolata
 // del safebrowse. Una partizione nuova nasce già protetta senza che nessuno si
-// ricordi di chiamare niente. I punti che una sessione la creano a mano la
+// ricordi di chiamare niente. I punti che creano una sessione a mano la
 // chiedono comunque a src/main/sessioni.js, che ripassa di qui.
 //
 // Cosa NON passa dalla domanda:
