@@ -1568,6 +1568,33 @@
     });
   }
 
+  // ─── La fascia degli avvisi della scheda ────────────────────────────────
+  // Sotto la barra, a destra, Filo appoggia le cose che riguardano la scheda
+  // che si sta guardando: la domanda di un permesso, la scelta di cosa
+  // condividere, il segno che un sito sta riprendendo lo schermo, l'avviso che
+  // una finestra è stata bloccata. Nascevano tutte nello stesso angolo, a due
+  // pixel l'una dall'altra, e si coprivano: della finestra bloccata restava una
+  // striscia e il suo «Apri» non si poteva più premere (#586). Una colonna
+  // sola: chi arriva si mette sotto, e si vedono tutte.
+  function fasciaAvvisi() {
+    let f = document.getElementById('avvisi-scheda');
+    if (f) return f;
+    f = document.createElement('div');
+    f.id = 'avvisi-scheda';
+    f.style.position = 'fixed';
+    f.style.top = '50px';
+    f.style.right = '12px';
+    f.style.zIndex = '1001';
+    f.style.display = 'flex';
+    f.style.flexDirection = 'column';
+    f.style.alignItems = 'flex-end';
+    f.style.gap = '6px';
+    f.style.pointerEvents = 'none';
+    f.style.maxWidth = 'calc(100vw - 24px)';
+    document.body.appendChild(f);
+    return f;
+  }
+
   // ─── Pastiglia "il sito chiede un permesso" (#586) ──────────────────────
   // Il main manda qui ogni richiesta che non sia innocua (fotocamera,
   // microfono, posizione, notifiche, appunti, schermo…) e aspetta la risposta.
