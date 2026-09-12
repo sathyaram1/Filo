@@ -713,7 +713,8 @@ class TabManager {
 
   // Come openTab, ma ritorna l'esito per esteso: { id, blocked, host }.
   //   blocked: '' consentita | 'scheme' schema non-web | 'site' lista dei siti
-  //            bloccati (#590) — la chat lo dice invece di tacere (#482).
+  //            bloccati (#590) — la chat lo dice invece di tacere (#482) |
+  //            'address' non è un indirizzo apribile (#590).
   // Opzioni oltre a quelle di openTab:
   //   fromUrl:  pagina di partenza / referrer, per l'eccezione "arrivo da un
   //             motore di ricerca" (la passa chi quel referrer ce l'ha, cioè
