@@ -1645,11 +1645,17 @@
         try { api.permissions.answer(id, scelta, ricorda); } catch (_) {}
       };
 
+      // Lo schermo non si ricorda mai (una ripresa dello schermo non lascia
+      // segni, e un «sempre» lì vuol dire che il sito guarda quando gli pare):
+      // il suggerimento lo dice, invece di promettere un «sempre» che non c'è.
+      const durata = info.ricordabile === false
+        ? 'Solo per questa volta' : `Sempre per ${host}`;
+
       const consenti = document.createElement('button');
       consenti.type = 'button';
       consenti.className = 'perm-chip-btn perm-chip-allow';
       consenti.textContent = 'Consenti';
-      consenti.dataset.tip = `Sempre per ${host}`;
+      consenti.dataset.tip = durata;
       consenti.addEventListener('click', () => rispondi('allow', true));
       chip.appendChild(consenti);
 
@@ -1657,7 +1663,7 @@
       nega.type = 'button';
       nega.className = 'perm-chip-btn';
       nega.textContent = 'Nega';
-      nega.dataset.tip = `Sempre per ${host}`;
+      nega.dataset.tip = durata;
       nega.addEventListener('click', () => rispondi('deny', true));
       chip.appendChild(nega);
 
