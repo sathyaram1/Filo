@@ -1166,3 +1166,90 @@ test('#587 — un comando senza percorso si misura sulla cartella in cui si trov
   assert.equal(C.classify('ls Documenti', dove()), 1, 'e le sue sottocartelle pure');
   assert.equal(C.classify('cat appunti.txt', dove()), 1, 'come le letture normali');
 });
+
+// ── #587 giro 2: il jolly, il collegamento, il testo cercato ─────────────────
+// Stessa causa dei tre casi qui sopra — il bersaglio misurato non è quello che
+// il comando aprirà — su tre strade nuove. La shell espande un modello DOPO che
+// il livello è stato deciso: `cat .*` non nomina niente di riservato e apre
+// `.netrc`, `.git-credentials` e la cronologia della shell.
+
+test('#587 — un modello che può prendere i file nascosti chiede un OK', () => {
+  for (const cmd of [
+    'cat .*',
+    'cat ~/.*',
+    'cat /home/mario/.*',
+    'head -n 200 .*',
+    'wc -l .*',
+    'file .*',
+    'Get-Content .*',
+    'cat .en*',
+    'cat .{netrc,pgpass}',
+    'cat {.bashrc,.git-credentials}',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" deve chiedere un OK`);
+  }
+});
+
+test('#587 — una cartella riservata scritta con un jolly chiede un OK', () => {
+  for (const cmd of [
+    'cat .s?h/*',
+    'cat .ss*/config',
+    'cat .ss?/id_rsa',
+    'cat .??h/id_*',
+    'cat ./.s?h/config',
+    'cat .SS?/config',
+    'gc ~/.s?h/id*',
+    'md5sum .s?h/*',
+    'cat .a?s/*',
+    'cat .conf*/Filo/storage.json',
+    'Select-String PRIVATE .s?h/*',
+    'cat .s?h/* | grep PRIVATE',
+    'tree .s?h',
+    'Get-ChildItem .s?h',
+    'cd .s?h && cat config',
+    'cd .ss* ; cat known_hosts',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" deve chiedere un OK`);
+  }
+  assert.equal(C.classify('cat config', dove('/home/mario/.s?h')), 2, 'anche spostandosi nel turno prima');
+  assert.equal(C.classify('type AppDat?\\Roaming\\Filo\\storage.json', dove(WIN, WIN)), 2, 'anche su Windows');
+});
+
+test('#587 — un jolly che resta nel proprio lavoro non chiede niente', () => {
+  // Un modello è anche il modo normale di lavorare sui propri file: se ogni `*`
+  // costasse un OK, la conferma diventerebbe una cosa che si accetta sempre.
+  for (const cmd of [
+    'cat *.txt',
+    'head -5 Documenti/*.csv',
+    'wc -l progetto/*.js',
+    'ls *.pdf',
+    'cat *',
+    'ls Documenti/*',
+  ]) {
+    assert.equal(C.classify(cmd, dove()), 1, `"${cmd}" non deve chiedere niente`);
+  }
+});
+
+test('#587 — spostare o collegare un bersaglio riservato costa un "conferma"', () => {
+  // Un collegamento alla cartella delle chiavi sposta il bersaglio dove il freno
+  // sulla lettura non lo riconosce più: non può costare un OK su una frase che
+  // sembra innocua. Copiare da un disco esterno invece resta un OK.
+  for (const cmd of ['ln -s ~/.ssh scorciatoia', 'cp ~/.ssh/id_rsa copia', 'mv .aws/credentials qui', 'tar -cf chiavi.tar ~/.ssh']) {
+    assert.equal(C.classify(cmd, dove()), 3, `"${cmd}" deve far digitare "conferma"`);
+  }
+  assert.equal(C.classify('cp /mnt/chiavetta/foto.jpg .', dove()), 2, 'copiare da una chiavetta resta un OK');
+  assert.equal(C.classify('cp appunti.txt copia.txt', dove()), 2, 'e copiare un proprio file pure');
+});
+
+test('#587 — il testo cercato non è un file, e non deve far chiedere niente', () => {
+  // In `grep credentials appunti.txt` il file aperto è `appunti.txt`: misurare
+  // anche la parola cercata faceva chiedere un OK spiegando una cosa falsa.
+  for (const cmd of ['grep credentials appunti.txt', 'grep shadow appunti.txt', 'grep passwd note.txt', 'sls credentials appunti.txt']) {
+    assert.equal(C.classify(cmd, dove()), 1, `"${cmd}" non deve chiedere niente`);
+    assert.equal(C.readReason(cmd, dove()), '', `"${cmd}" non deve nemmeno avere un motivo`);
+  }
+  // Ma il FILE cercato continua a contare, comunque sia scritto il comando.
+  for (const cmd of ['grep credentials .ssh/config', 'grep -r chiave ~', 'grep -f modelli.txt .ssh/config']) {
+    assert.equal(C.classify(cmd, dove()), 2, `"${cmd}" deve chiedere un OK`);
+  }
+});
