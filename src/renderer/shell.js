@@ -1969,6 +1969,66 @@
       api.tabs.onUpdate(() => { try { allineaRiprese(); } catch (_) {} });
     }
 
+    // ─── una riga che Filo deve a chi naviga ──────────────────────────────
+    // Niente da consentire e niente da interrompere: una cosa che non ha
+    // funzionato e che non è colpa del sito. Oggi ce n'è una sola, «non
+    // riesco a sapere dove sei»: senza, chi aveva appena risposto «Consenti»
+    // vedeva una mappa rotta e dava la colpa al sito (#586).
+    const notizie = new Map(); // id → { tabId, nodo }
+    if (api.permissions.onNotice) {
+      function allineaNotizie() {
+        for (const n of notizie.values()) {
+          const sua = n.tabId === null || n.tabId === undefined || n.tabId === state.activeId;
+          n.nodo.style.display = sua ? '' : 'none';
+        }
+        sincronizzaRiserva();
+      }
+
+      function togliNotizia(id) {
+        const n = notizie.get(String(id));
+        if (!n) return;
+        notizie.delete(String(id));
+        rimuoviNodo(n.nodo);
+        sincronizzaRiserva();
+      }
+
+      api.permissions.onNoticeEnd((info) => { if (info && info.id) togliNotizia(info.id); });
+
+      api.permissions.onNotice((info) => {
+        if (!info || !info.id || notizie.has(String(info.id))) return;
+        const id = String(info.id);
+        const chip = document.createElement('div');
+        chip.className = 'perm-live';
+        chip.setAttribute('role', 'status');
+        chip.dataset.id = id;
+        chip.dataset.notizia = '1';
+        const testo = document.createElement('span');
+        testo.className = 'perm-chip-text';
+        testo.textContent = info.testo || '';
+        testo.dataset.tip = info.testo || '';
+        chip.appendChild(testo);
+        chip.setAttribute('aria-label', info.testo || '');
+
+        const via = document.createElement('button');
+        via.type = 'button';
+        via.className = 'perm-chip-x';
+        via.textContent = '×';
+        via.setAttribute('aria-label', 'Chiudi l\'avviso');
+        via.dataset.tip = 'Chiudi l\'avviso';
+        via.addEventListener('click', () => {
+          try { api.permissions.dismissNotice(id); } catch (_) {}
+          togliNotizia(id);
+        });
+        chip.appendChild(via);
+
+        permHost.appendChild(chip);
+        notizie.set(id, { tabId: info.tabId, nodo: chip });
+        allineaNotizie();
+      });
+
+      api.tabs.onUpdate(() => { try { allineaNotizie(); } catch (_) {} });
+    }
+
     api.tabs.onUpdate(() => {
       try {
         filaDomande.riallinea();
