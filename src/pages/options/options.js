@@ -802,6 +802,36 @@
     $('modelsStatus').textContent = errors.length ? errors.join(' · ') : `${total} modelli`;
   }
 
+  // Quello che questa pagina ha scritto per ultimo (all'apertura: quello che
+  // ci ha trovato). Da qui si capisce cosa l'utente ha toccato davvero: senza,
+  // la pagina rimandava tutto il blocco a ogni tocco e riportava indietro
+  // quello che era cambiato altrove mentre restava aperta — la chiave API
+  // sostituita in chat tornava quella di prima cliccando una spunta.
+  let ultimoInviato = null;
+
+  function raccogli() {
+    const apiKey = $('apiKey').value.trim();
+    const apiKeyTavily = $('apiKeyTavily').value.trim();
+    const { registry, missingNickRows, dupRows } = collectModelRegistry();
+    return {
+      valori: {
+        useDefaultModels: $('useDefaultModels').checked,
+        openWeightsOnly: $('openWeightsOnly').checked,
+        apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
+        modelRegistry: registry,
+        models: ModelChain.collect(modelChains),
+        monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
+      },
+      registry,
+      missingNickRows,
+      dupRows,
+    };
+  }
+
+  function ribasa() {
+    try { ultimoInviato = raccogli().valori; } catch (_) { ultimoInviato = null; }
+  }
+
   async function save() {
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
