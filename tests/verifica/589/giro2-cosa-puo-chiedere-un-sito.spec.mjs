@@ -177,6 +177,18 @@ test('un popup di accesso è una pagina di un sito: non deve ricevere chiavi e p
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
   await expect.poll(() => app.evaluate(() => (globalThis.__g2 || []).length), { timeout: 8000 }).toBeGreaterThan(0);
 
+  // Dentro quel popup il codice di Filo gira per intero, come su ogni pagina:
+  // quello che arriva lì non resta in un angolo, lo prende in mano lui.
+  const dentroIlPopup = await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => {
+      try { return x.webContents.getURL().includes('client_id'); } catch (_) { return false; }
+    });
+    if (!w) return '';
+    try { return await w.webContents.executeJavaScript('document.documentElement.dataset.filoContentReady || ""'); }
+    catch (_) { return ''; }
+  });
+  expect(dentroIlPopup, 'nel popup il codice di Filo dovrebbe essere montato come su ogni pagina').toBe('1');
+
   const consegne = await app.evaluate(() => globalThis.__g2 || []);
   const versoPopup = consegne.filter((c) => /^https?:/.test(c.url));
   expect(versoPopup.length, 'il popup non ha ricevuto niente: la prova non ha guardato quello che doveva').toBeGreaterThan(0);
