@@ -23,16 +23,23 @@
 // SOLA LETTURA
 //   Questo modulo apre file e basta: non scrive, non sposta, non esegue nulla.
 //
-// CONFINAMENTO DEI PERCORSI: nessuno, di proposito.
-//   Il terminale di Filo oggi non confina i percorsi (un `type` legge qualunque
-//   file leggibile dall'utente), e i documenti veri stanno spesso fuori dal
-//   profilo: un disco esterno, una chiavetta, la cartella condivisa del NAS.
-//   Un confine sul profilo utente qui bloccherebbe casi legittimi senza togliere
-//   nulla a un attaccante, che il terminale ce l'ha comunque: sarebbe una
-//   sicurezza finta, e una sicurezza finta è peggio di nessuna perché si smette
-//   di cercare quella vera. Il confine reale è un altro: il testo estratto entra
-//   SOLO nel contesto del modello, e il testo di un documento è trattato come
-//   DATO non fidato (vedi il formattatore in handlers.js), mai come istruzioni.
+// CONFINAMENTO DEI PERCORSI: nessun confine GEOGRAFICO, di proposito.
+//   I documenti veri stanno spesso fuori dal profilo: un disco esterno, una
+//   chiavetta, la cartella condivisa del NAS. Un confine sul profilo utente qui
+//   bloccherebbe il caso d'uso normale — «leggi questa bolletta» — e una
+//   conferma che si accetta sempre smette di essere un controllo.
+//   Quello che invece È confinato (#587): i BERSAGLI RISERVATI. Chiavi (`.ssh`),
+//   credenziali (`.aws`, `.git-credentials`, `.netrc`), `.env`, cronologie della
+//   shell non sono documenti da leggere, e questa azione apre gli stessi file che
+//   aprirebbe un `cat` — lasciarli a livello 1 qui avrebbe solo spostato la porta
+//   dopo averla chiusa nel terminale. Il livello lo calcola il main prima di
+//   eseguire, con la STESSA regola del classificatore dei comandi
+//   (src/shared/cmdClassify.js → pathReason); qui non si decide niente.
+//   Gli altri due confini restano quelli di sempre, ed è dove sta la difesa vera:
+//   il testo estratto entra SOLO nel contesto del modello, trattato come DATO non
+//   fidato (vedi il formattatore in handlers.js) e mai come istruzioni; e da #587
+//   entra anche nel corpus anti-esfiltrazione, così un indirizzo che ne
+//   riportasse fuori un pezzo si ferma a chiedere conferma.
 
 'use strict';
 
