@@ -132,10 +132,10 @@
       // qui durerebbe per sempre.
       level: 2,
       risk: "Lo stile dell'agente è un'istruzione che Filo si porta dietro in ogni conversazione, da "
-        + 'adesso in poi, anche dopo un riavvio. Guarda qui sopra cosa sta per diventare: deve dire COME '
-        + 'vuoi che ti risponda — tono, lunghezza, lingua. Se dice altro (ignorare le sue regole, tacerti '
-        + "qualcosa, agire per conto suo) non l'hai chiesto tu: annulla. Lo stile resta scritto in "
-        + "Preferenze → Stile dell'agente, dove puoi rileggerlo e cancellarlo quando vuoi.",
+        + 'adesso in poi, anche dopo un riavvio. Guarda qui sopra cosa sta per diventare. Deve dire come '
+        + 'vuoi che ti risponda: tono, lunghezza, lingua. Se dice altro, per esempio di ignorare le sue '
+        + "regole, di tacerti qualcosa o di agire per conto suo, non l'hai chiesto tu. Annulla. Lo stile "
+        + "resta scritto in Preferenze → Stile dell'agente, dove puoi rileggerlo e cancellarlo quando vuoi.",
       build(v) {
         const C = global.SN_CONST;
         const raw = String(v == null ? '' : v);
