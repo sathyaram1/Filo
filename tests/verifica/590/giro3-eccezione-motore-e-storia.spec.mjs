@@ -42,6 +42,12 @@ async function alzaServer() {
   const server = createServer((req, res) => {
     const host = String(req.headers.host || '').split(':')[0];
     const path = req.url.split('?')[0];
+    if (host === MOTORE && path === '/search') {
+      // La pagina di RISULTATI: l'eccezione deve valere ancora qui.
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><meta charset="utf-8"><a id="go" href="http://${LISTA}:${porta}/arrivo">risultato</a>`);
+      return;
+    }
     if (host === MOTORE && path === '/url') {
       // È esattamente quello che fa il redirect di un motore di ricerca.
       res.writeHead(302, { Location: `http://${LISTA}:${porta}/arrivo` });
