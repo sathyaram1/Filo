@@ -200,3 +200,64 @@ test('ogni messaggio mandato da dentro una pagina web è ammesso', () => {
     );
   }
 });
+
+// ── Sentinella gemella: gli scomparti che le pagine aprono davvero ─────────
+// Stessa idea, sull'altra lista: se domani un pezzo di Filo dentro le pagine
+// tiene una cosa sua in uno scomparto nuovo, questa diventa rossa invece di
+// lasciare che quella funzione si spenga in silenzio sui siti.
+require(join(ROOT, 'src', 'shared', 'constants.js'));
+const { STORAGE_KEYS } = globalThis.SN_CONST;
+
+// Il testo fra le parentesi della chiamata che comincia a `apertura`.
+function dentroLeParentesi(src, apertura) {
+  let profondita = 0;
+  for (let i = apertura; i < src.length; i += 1) {
+    if (src[i] === '(') profondita += 1;
+    else if (src[i] === ')') {
+      profondita -= 1;
+      if (profondita === 0) return src.slice(apertura + 1, i);
+    }
+  }
+  return '';
+}
+
+function scompartiApertiDa(src) {
+  const costanti = new Map();
+  for (const m of src.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*'([^']*)'/g)) costanti.set(m[1], m[2]);
+  const chiavi = new Set();
+  const re = /chrome\.storage\.local\.(?:get|set|remove)\s*\(/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const arg = dentroLeParentesi(src, re.lastIndex - 1);
+    for (const q of arg.matchAll(/'([^']+)'/g)) chiavi.add(q[1]);
+    for (const q of arg.matchAll(/STORAGE_KEYS\.([A-Z_0-9]+)/g)) {
+      const valore = STORAGE_KEYS[q[1]];
+      assert.ok(valore, `STORAGE_KEYS.${q[1]} non esiste in src/shared/constants.js`);
+      chiavi.add(valore);
+    }
+    for (const q of arg.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)) {
+      if (costanti.has(q[1])) chiavi.add(costanti.get(q[1]));
+    }
+  }
+  return chiavi;
+}
+
+test('ogni scomparto aperto da dentro una pagina web è ammesso', () => {
+  const usati = new Map(); // chiave → file dove si vede
+  for (const { etichetta, percorso } of fileCheGiranoNellePagine()) {
+    const src = readFileSync(percorso, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '');
+    for (const chiave of scompartiApertiDa(src)) {
+      if (!usati.has(chiave)) usati.set(chiave, etichetta);
+    }
+  }
+  assert.ok(usati.size >= 4, 'la sentinella non ha letto nulla: è cambiato il modo di aprire il magazzino?');
+  for (const [chiave, file] of usati) {
+    assert.ok(
+      W.isWebStorageKey(chiave),
+      `${file} apre "${chiave}" dalla pagina di un sito, ma quello scomparto non è fra quelli ammessi `
+      + '(aggiungilo a WEB_STORAGE_KEYS in src/shared/webMessageScope.js, oppure smetti di aprirlo da lì)',
+    );
+  }
+});
