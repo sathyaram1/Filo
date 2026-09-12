@@ -16,6 +16,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // tabColor.js prima di preferences.js: il setter `colore_tab` usa SN_TAB_COLOR
 // (defaultParams) per il preset "predefinito".
 require(join(__dirname, '..', '..', 'src', 'shared', 'tabColor.js'));
+// constants.js prima di preferences.js: il setter `stile_agente` chiede a
+// SN_CONST il tetto di lunghezza e la ripulitura dei marcatori (#592).
+require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 
 const P = globalThis.SN_PREF;
