@@ -159,12 +159,17 @@ function finestreSu(host) {
   });
 }
 
-async function aspettaFinestraSu(host, ms = 6000) {
+// La finestra/scheda su quell'host, VIVA e capace di rispondere. Filo ricrea la
+// view quando una scheda attraversa il confine fra due siti, quindi l'oggetto
+// pagina trovato un istante prima può già essere morto.
+async function aspettaFinestraSu(host, ms = 8000) {
   const fine = Date.now() + ms;
   while (Date.now() < fine) {
-    const f = finestreSu(host);
-    if (f.length) return f[f.length - 1];
-    await new Promise((r) => setTimeout(r, 100));
+    for (const w of finestreSu(host).reverse()) {
+      const viva = await w.evaluate(() => true).catch(() => false);
+      if (viva) return w;
+    }
+    await new Promise((r) => setTimeout(r, 150));
   }
   return null;
 }
