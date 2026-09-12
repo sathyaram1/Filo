@@ -24,6 +24,10 @@
         'Quando chiedi a Filo di aprire una pagina, a volte nasceva una scheda bianca e la chat diceva comunque di averla aperta. Ora la pagina si apre davvero, e se l\'indirizzo non sta in piedi Filo te lo dice.',
         '«Apri comunque», sulla notifica di un sito bloccato, ora apre il sito per davvero e ti lascia girarci dentro: link, ricarica, schede nuove. Prima quasi ogni sito ti lasciava una scheda vuota e non c\'era nessun altro modo di arrivarci.',
         'Anche i siti con l\'estensione in caratteri non latini (.рф, .テスト e le altre) si possono mettere fra quelli da bloccare, e nell\'elenco restano scritti come li hai scritti tu: prima la riga spariva e il sito si apriva lo stesso.',
+        'Un sito della lista non si vede più nemmeno dentro un riquadro che un\'altra pagina si incorpora: prima bastava che a mostrartelo fosse qualcun altro.',
+        'Ricaricare non riporta più su un sito che hai appena messo in lista, e non ce la fa nemmeno una pagina che si aggiorna da sola.',
+        'I siti che apri lo stesso con «Apri comunque» adesso si vedono in Sicurezza, con il bottone per rimettere il blocco. Prima quel permesso valeva fino alla chiusura di Filo e spariva dalla vista insieme alla notifica che lo annunciava.',
+        'Una finestrella di accesso («Continua con…») verso un sito della lista non si apre più. Prima si apriva vuota e restava lì da chiudere a mano.',
       ],
     },
     {
