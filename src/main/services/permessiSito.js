@@ -130,11 +130,30 @@ function annunciaAiSiti() {
       for (const t of tm.tabs) {
         const c = t && t.view && t.view.webContents;
         if (!c || c.isDestroyed()) continue;
+        // A OGNI riquadro, ciascuno con le scelte della SUA origine. Con un
+        // invio solo arrivava al riquadro principale e basta, e un widget dentro
+        // un riquadro incorporato restava con quello che aveva letto al
+        // caricamento (#586, giro 6).
         try {
-          const voci = perOrigine(c.getURL(), contesto(c));
-          const out = {};
-          for (const v of voci) out[v.chiave] = v.scelta;
-          c.send('filo:permessi-noti', out);
+          const ctx = contesto(c);
+          const mandaA = (frame, url) => {
+            try {
+              const voci = perOrigine(url, ctx);
+              const out = {};
+              for (const v of voci) out[v.chiave] = v.scelta;
+              frame.send('filo:permessi-noti', out);
+            } catch (_) {}
+          };
+          const principale = c.mainFrame;
+          const sopra = c.getURL();
+          const frames = (principale && principale.framesInSubtree)
+            ? principale.framesInSubtree.filter((f) => f && !f.detached)
+            : (principale ? [principale] : []);
+          for (const f of frames) {
+            // Un riquadro senza indirizzo suo eredita l'origine della pagina.
+            const suo = P().origineDi(f.url) ? f.url : sopra;
+            mandaA(f, suo);
+          }
         } catch (_) {}
       }
     }
