@@ -314,7 +314,9 @@
     for (const domain of cookieWhitelist) {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.textContent = domain;
+      // Come per la lista dei siti bloccati: si mostra il nome leggibile, si
+      // conserva e si confronta quello salvato (#590).
+      span.textContent = UrlNav.hostLeggibile(domain);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';
