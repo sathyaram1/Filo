@@ -188,9 +188,37 @@ function posizione(wc) {
   return { win: null, tab: null };
 }
 
+// Chi sta chiedendo, come indirizzo confrontabile.
+//
+// Un riquadro incorporato SCRITTO DALLA PAGINA (`about:blank`, `srcdoc`) non ha
+// un indirizzo suo: per il browser ha l'origine di chi lo ospita ed è lo stesso
+// sito. Prendendo alla lettera il suo indirizzo non ne usciva nessuna origine, e
+// la richiesta veniva negata in silenzio — nessuna domanda, nessuna scelta
+// registrata, quindi in Impostazioni niente da ribaltare e nessun punto in cui
+// rimediare. Il lettore video, il modulo di pagamento e la finestra della
+// videochiamata vivono proprio lì, e non funzionavano nemmeno dopo un sì dato
+// alla pagina che li ospita (#586, giro 6).
+//
+// Quindi si prova in ordine: l'indirizzo del riquadro, l'origine che il browser
+// gli attribuisce, e infine l'indirizzo della pagina. Un riquadro con
+// un'origine OPACA (un riquadro in sandbox, un `data:`) non ha né l'una né
+// l'altra e resta negato: quello non è lo stesso sito di nessuno.
+function buonaPerChiedere(url) {
+  const Pp = P();
+  const s = String(url || '');
+  if (!s || s === 'null') return false;
+  return Pp.interno(s) || !!Pp.origineDi(s);
+}
+
 function urlRichiedente(wc, dettagli) {
   const d = dettagli || {};
-  return d.requestingUrl || d.securityOrigin || (wc && !wc.isDestroyed() ? wc.getURL() : '');
+  const candidati = [
+    d.requestingUrl,
+    d.securityOrigin,
+    wc && !wc.isDestroyed() ? wc.getURL() : '',
+  ];
+  for (const c of candidati) if (buonaPerChiedere(c)) return c;
+  return candidati[0] || '';
 }
 
 function scadiUnaTantum() {
