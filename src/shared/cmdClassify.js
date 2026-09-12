@@ -1209,6 +1209,15 @@
       const vero = segRiservato(potaJolly(reali));
       if (vero) return riservatoPerche(vero);
     }
+    // La cassetta dei segreti che si riconosce dal POSTO e non dal nome
+    // (`~/Library` su macOS): vale anche per chi legge documenti per mestiere,
+    // perché è un bersaglio riservato, non un confine geografico.
+    const casa = perim || (home ? (() => { const h = pathParts(home); return h.root === null ? null : { root: h.root, segs: collapse(h.segs) }; })() : null);
+    if (casa) {
+      const sotto = riservatoSottoHome(target ? { root: target.root, segs: segsTarget } : null, casa)
+        || (reali ? riservatoSottoHome({ root: target.root, segs: potaJolly(reali) }, casa) : '');
+      if (sotto) return riservatoPerche(sotto);
+    }
     if (soloRiservati) return '';
     if (!perim) {
       // Nessun perimetro dichiarato (classificatore usato da solo): resta la
