@@ -572,11 +572,15 @@
   function assess(url, { corpus = '', letto = '', fromUntrusted = false, carichiPrima = [] } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
-    const t = taint(link, corpus, letto);
+    // Le parole del corpus si contano UNA volta per link e si passano a entrambi
+    // i confronti: su un registro pieno la conta è il pezzo più caro.
+    const tokCorpus = corpusTokens(corpus);
+    const tokLetto = corpusTokens(letto || '');
+    const t = taintCon(link, tokCorpus, tokLetto);
     if (t) return { exfil: true, reason: t.reason };
     const prima = Array.isArray(carichiPrima) ? carichiPrima.filter(Boolean) : [];
     if (prima.length) {
-      const s = taintSpedizione(prima.concat(caricoUnito(link)), `${corpus}\n${letto}`);
+      const s = taintSpedizione(prima.concat(caricoUnito(link)), tokCorpus, tokLetto);
       if (s) return { exfil: true, reason: s.reason };
     }
     if (fromUntrusted) {
