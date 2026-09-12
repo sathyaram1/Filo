@@ -103,7 +103,24 @@
 //     — una lettura RICORSIVA non ha un file per bersaglio, ha un sottoalbero:
 //       `grep -r chiave .` dalla home attraversa `.ssh`, `.aws` e la cartella di
 //       Filo senza nominarne nessuna. Se il sottoalbero è la cartella dichiarata
-//       (o qualcosa che la contiene) chiede un OK; su una sottocartella no.
+//       (o qualcosa che la contiene) chiede un OK; su una sottocartella no;
+//     — un CARATTERE JOLLY non è un nome, è tutto quello che può acchiappare. La
+//       shell lo espande DOPO che il livello è stato deciso, quindi `cat .*` apre
+//       `.netrc` e `.git-credentials` e `cat .s?h/*` apre la chiave privata, senza
+//       che nel comando compaia niente di riservato. Un modello si misura sulla
+//       domanda opposta a quella di un nome: non «è riservato?» ma «può prendere
+//       qualcosa di riservato?» (vedi `modelloPrendeRiservato`). Un modello che
+//       prende tutto quello che c'è lì (`*`, `*.*`) non allarga niente: vale come
+//       la cartella in cui sta, ed è misurato come quella;
+//     — un COLLEGAMENTO non porta il nome di dove punta: `scorciatoia/config` è
+//       `~/.ssh/config` se `scorciatoia` è un collegamento a `.ssh`. Il percorso
+//       si misura anche nella forma REALE, quando il processo principale sa
+//       risolverla (vedi `setRealPath`). Una COPIA invece è davvero un file nuovo
+//       e nessun controllo può riconoscerla dopo: per questo copiare, spostare o
+//       collegare un bersaglio riservato non costa più un OK ma un «conferma»;
+//     — il PRIMO OPERANDO DI UNA RICERCA è il testo cercato, non un file: in
+//       `grep credentials appunti.txt` il file aperto è `appunti.txt`, e misurare
+//       anche la parola cercata faceva chiedere un OK spiegando una cosa falsa.
 //   • VARIABILI D'AMBIENTE: `printenv`, `ps`, `Get-Process`, `Get-ChildItem Env:` e
 //     qualunque comando che nomini una variabile (`$HOME`, `$env:USERPROFILE`,
 //     `%APPDATA%`) non sono livello 1. Contengono token e percorsi personali, e
