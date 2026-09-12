@@ -1028,12 +1028,21 @@
     if (!info || !info.text) return;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
-    // - openUrl → apri quel sito bypassando il blocco (#170.3 "Apri comunque").
+    // - openUrl       → apri quell'indirizzo in una scheda, coi controlli soliti
+    //                   (es. "Riapri" sulla scheda-ponte richiusa).
+    // - openAnywayUrl → "Apri comunque" sulla notifica "Sito bloccato": l'unico
+    //                   bottone che scavalca la lista dei siti bloccati (#590).
+    //                   Sta su un'azione sua perché il permesso che concede
+    //                   vale per tutta la sessione, e nessun altro bottone deve
+    //                   poterlo dare per sbaglio.
     let opts = info.opts;
     if (opts && Array.isArray(opts.actions)) {
       opts = {
         ...opts,
         actions: opts.actions.map((a) => {
+          if (a && a.openAnywayUrl && !a.onClick) {
+            return { label: a.label, onClick: () => api.tabs.openSiteAnyway(a.openAnywayUrl) };
+          }
           if (a && a.openUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl) };
           }
