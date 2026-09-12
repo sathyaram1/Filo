@@ -1686,7 +1686,7 @@
       chip.appendChild(testo);
 
       const rispondi = (scelta, ricorda) => {
-        chiudiPastiglia(id);
+        filaDomande.chiudi(id);
         try { api.permissions.answer(id, scelta, ricorda); } catch (_) {}
       };
 
