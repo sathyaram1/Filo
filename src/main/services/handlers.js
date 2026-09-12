@@ -1016,15 +1016,29 @@ function refreshProxyRulesAllWindows() {
 // STESSA mostrata nella barra della home → percorso mostrato e cartella reale
 // coincidono. La shell PERSISTENTE della modalità terminale (src/main/services/
 // shell.js) resta separata e off-limits all'LLM: qui non la tocchiamo.
+//
+// Il "mittente" che arriva qui è un oggetto DESCRITTIVO ricostruito a ogni
+// messaggio (src/main/ipc.js → senderInfo): appendergli sopra la cartella
+// significava perderla al messaggio successivo, cioè `cd` che non teneva mai fra
+// un comando e l'altro. La cartella va appesa al webContents vero (`sender.wc`),
+// che vive quanto la scheda — lo stesso appiglio che usa il registro del
+// materiale non fidato (contextTaint.js), così perimetro e cartella reale non
+// possono divergere.
 let _assistantCwdFallback = '';
+function senderHost(sender) {
+  if (!sender) return null;
+  try { return sender.wc || sender; } catch (_) { return sender; }
+}
 function getAssistantCwd(sender) {
   const { defaultCwd } = require('./shell');
-  if (sender) return sender._filoAssistantCwd || defaultCwd();
+  const host = senderHost(sender);
+  if (host) return host._filoAssistantCwd || defaultCwd();
   return _assistantCwdFallback || defaultCwd();
 }
 function setAssistantCwd(sender, cwd) {
   if (!cwd) return;
-  if (sender) { try { sender._filoAssistantCwd = cwd; } catch (_) {} }
+  const host = senderHost(sender);
+  if (host) { try { host._filoAssistantCwd = cwd; } catch (_) {} }
   else _assistantCwdFallback = cwd;
 }
 
