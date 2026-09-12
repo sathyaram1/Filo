@@ -441,8 +441,14 @@
     },
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
-      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima) e lista dei siti fidati.',
+      desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti fidati e le risposte che hai dato ai siti su fotocamera, microfono, posizione, notifiche, appunti e schermo.',
       invoke: 'Pagina filo://security/security.html.',
+    },
+    {
+      id: 'site-permissions', title: 'Permessi che i siti chiedono', category: 'settings',
+      desc: 'Fotocamera, microfono, posizione, notifiche, lettura degli appunti e cattura dello schermo: nessun sito li prende da solo. Quando un sito ne chiede uno compare una pastiglia in alto con il suo nome e cosa vuole, e decidi tu — "Consenti" o "Nega" — con la risposta ricordata per quel sito. Se non rispondi, il sito non ottiene niente. Le risposte ricordate si rivedono e si tolgono quando vuoi: chi la tolgli te la richiede la volta dopo. Nelle finestre in incognito le risposte valgono solo finché la finestra è aperta.',
+      invoke: 'La pastiglia compare da sola quando un sito chiede. Per rivedere le risposte: Impostazioni → Sicurezza → "Permessi dei siti", oppure il tasto destro sulla scheda → "Permessi del sito".',
+      doesNot: 'Non concede nulla in silenzio, nemmeno ai siti che visiti spesso, e non chiede niente per le cose innocue (mettere un video a tutto schermo, incollare quello che ti ha copiato un bottone "copia").',
     },
     {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',

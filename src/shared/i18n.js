@@ -523,6 +523,22 @@
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato: in "Privacy massima" dovrai rifare il login a ogni avvio.',
+
+    // Permessi dei siti (#586): quello che i siti hanno chiesto e tu hai deciso.
+    options_perms_title: 'Permessi dei siti',
+    options_perms_desc:
+      'Fotocamera, microfono, posizione, notifiche, appunti e schermo li chiede il sito e li decidi tu, '
+      + 'sulla pastiglia che compare in alto. Qui ci sono le risposte che Filo ha ricordato: puoi cambiarle o toglierle. '
+      + 'Un sito senza risposta ricordata te lo richiede la prossima volta.',
+    options_perms_empty: 'Nessun sito ha ancora ricevuto una risposta.',
+    options_perms_allowed: 'Consentito',
+    options_perms_denied: 'Negato',
+    options_perms_toggle_tip: 'Cambia la risposta',
+    options_perms_remove: 'Togli',
+    options_perms_remove_tip: 'Togli la risposta: il sito te lo richiederà',
+    options_perms_clear: 'Togli tutte le risposte',
+    options_perms_clear_confirm:
+      'Vuoi togliere tutte le risposte che hai dato ai siti? I siti che le usavano te le richiederanno.',
     options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
