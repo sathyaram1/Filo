@@ -276,24 +276,36 @@
   function taint(url, corpus) {
     const exposed = exposedAlnum(url);
     if (!exposed) return null;
+    // Ogni forma in cui lo stesso dato può comparire nell'indirizzo: com'è, e
+    // scritto all'indietro.
+    const forme = [exposed, rovescia(exposed)];
+    const carico = caricoAlnum(url);
+    const caricoForme = carico ? [carico, rovescia(carico)] : [];
+    const dentro = (t) => forme.some((f) => f.includes(t));
+    const nelCarico = (t) => caricoForme.some((f) => f.includes(t));
     const toks = corpusTokens(corpus);
     let hits = 0;
     let strong = false;
     let sample = '';
     for (const t of toks) {
       if (t.length < MIN_TOKEN) continue;
-      if (!exposed.includes(t) && isStrong(t) && combaciaSpezzato(exposed, t)) {
-        return { reason: `contiene un tuo dato, spezzettato ("${t}…")` };
+      if (!dentro(t)) {
+        if (isStrong(t) && forme.some((f) => combaciaSpezzato(f, t))) {
+          return { reason: `contiene un tuo dato, spezzettato ("${t}…")` };
+        }
+        continue;
       }
-      if (exposed.includes(t)) {
+      if (isStrong(t)) { strong = true; sample = t; continue; }
+      // Una parola comune conta solo se sta nel CARICO del link: nel nome del
+      // sito non porta fuori niente (vedi caricoAlnum).
+      if (nelCarico(t)) {
         hits++;
         if (!sample) sample = t;
-        if (isStrong(t)) { strong = true; sample = t; }
       }
     }
-    // Un token forte da solo, oppure ≥2 token distinti (dump multi-parola).
+    // Un token forte da solo, oppure abbastanza parole comuni da essere un dump.
     if (strong) return { reason: `contiene un tuo dato ("${sample}…")` };
-    if (hits >= 2) return { reason: 'contiene più dati presi dalla tua memoria/contesto' };
+    if (hits >= HITS_DEBOLI) return { reason: 'contiene più dati presi dalla tua memoria/contesto' };
     return null;
   }
 
