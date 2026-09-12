@@ -68,6 +68,12 @@ test('la pagina Opzioni aperta da prima non deve rimettere una chiave API tolta'
   // quello che si era letta all'apertura, una chiave cancellata altrove torna
   // al suo posto senza che nessuno l'abbia chiesto.
   const opzioni = await openTab('filo://options/options.html');
+  await opzioni.waitForSelector('#apiKey', { state: 'attached', timeout: 20_000 });
+  // I campi delle chiavi si vedono solo con «usa i modelli predefiniti» spento.
+  if (await opzioni.isChecked('#useDefaultModels')) {
+    await opzioni.uncheck('#useDefaultModels');
+    await opzioni.waitForTimeout(800);
+  }
   await opzioni.waitForSelector('#apiKey', { timeout: 20_000 });
 
   await opzioni.fill('#apiKey', 'sk-or-v1-CHIAVE-DI-PROVA-0001');
