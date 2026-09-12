@@ -104,6 +104,37 @@ test('il microfono preso da un riquadro incorporato si chiude quando si toglie i
   ).toEqual([]);
 });
 
+test('anche l\'«Interrompi» del cartello deve chiudere la copia che il sito si è messa da parte', async ({ shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0"><p>pagina</p>
+<script>
+  window.__copia = null;
+  window.__microfono = () => navigator.mediaDevices.getUserMedia({ audio: true }).then(
+    (s) => { window.__copia = s.getTracks()[0].clone(); return s.getTracks().map((t) => t.kind + ':' + t.readyState); },
+    (e) => 'rifiutato:' + ((e && e.name) || 'errore'));
+  window.__statoCopia = () => (window.__copia ? window.__copia.kind + ':' + window.__copia.readyState : 'niente');
+</script></body></html>`);
+
+  const esito = page.evaluate(() => window.__microfono());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await esito).toEqual(['audio:live']);
+
+  const cartello = shell.locator('.perm-live');
+  await expect(cartello).toHaveCount(1, { timeout: 15_000 });
+  console.log('[586 g6] cartello:', JSON.stringify(await cartello.innerText()));
+  await cartello.locator('button').filter({ hasText: /interrompi/i }).first().click();
+  await page.waitForTimeout(3000);
+
+  const copia = await page.evaluate(() => window.__statoCopia());
+  console.log('[586 g6] la copia dopo l\'Interrompi:', JSON.stringify(copia));
+  expect(
+    copia,
+    'premuto «Interrompi» sul cartello, la copia della traccia che il sito si era messa da parte '
+    + 'continua ad ascoltare: è la stessa causa della revoca dalle Impostazioni',
+  ).not.toBe('audio:live');
+});
+
 test('il microfono clonato dal sito si chiude quando si toglie il permesso', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(240_000);
 
