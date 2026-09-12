@@ -231,6 +231,10 @@
 
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
+
+    // Punto di partenza del confronto: quello che le spunte mostrano adesso è
+    // quello che c'è in memoria.
+    ribasa();
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
