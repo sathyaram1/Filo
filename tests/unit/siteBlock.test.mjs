@@ -39,10 +39,42 @@ test('caso 2: apertura da un motore di ricerca (referrer Google) → consentita'
   assert.equal(d.block, false);
 });
 
-test('caso 3: apertura originata da Filo (viaFilo) → consentita', () => {
+test('#590: CHI apre non cambia la decisione — nessun parametro apre un varco', () => {
   reset();
+  // Il vecchio viaFilo:true consentiva l'apertura. Ora è un campo ignoto e
+  // ignorato: il sito resta bloccato anche quando ad aprirlo è Filo (azione
+  // NAVIGA proposta dal modello, indirizzo scritto dall'utente, link).
   const d = SB.shouldBlockNavigation('https://evil.example/page', { viaFilo: true });
-  assert.equal(d.block, false);
+  assert.equal(d.block, true);
+  assert.equal(d.host, 'evil.example');
+});
+
+test('#590: searx solo come dominio registrabile, non come label iniziale', () => {
+  reset();
+  // Il caso della spec: prima /(^|\.)searx\b/ non aveva ancora finale, quindi
+  // searx.esempio.com si spacciava per motore di ricerca e apriva l'eccezione.
+  for (const ref of [
+    'https://searx.esempio.com/',
+    'https://searx.evil.com/search?q=x',
+    'https://www.searx.phishing.io/',
+    'https://searx.com.evil.net/',
+  ]) {
+    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è un motore`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      true,
+      `dovrebbe BLOCCARE con referrer-civetta ${ref}`,
+    );
+  }
+  // Le istanze vere restano riconosciute.
+  for (const ref of ['https://searx.be/', 'https://searx.info/search?q=x', 'https://www.searx.co.uk/']) {
+    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è un motore`);
+    assert.equal(
+      SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref }).block,
+      false,
+      `dovrebbe consentire da ${ref}`,
+    );
+  }
 });
 
 test('referrer di ricerca robusto su TLD e sottodomini diversi', () => {
