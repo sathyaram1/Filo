@@ -142,6 +142,47 @@ test('REGOLA #183: ogni setter di livello 2 dichiara un messaggio di rischio non
   assert.deepEqual(senzaRischio, [], `setter di livello 2 senza messaggio di rischio (#183): ${senzaRischio.join(', ')}`);
 });
 
+// ── #592: le preferenze a TESTO LIBERO vanno censite una per una ────────────
+// Una preferenza che accetta una stringa qualunque e la salva com'è, se poi
+// finisce in un prompt, è un'istruzione permanente che chiunque scriva nel
+// contesto del modello può far salvare. La sentinella non può indovinare dove
+// va a finire un testo: quello che può fare è ACCORGERSI che ne è comparsa una
+// nuova, e obbligare chi la aggiunge a dichiararlo qui. Sonda ogni setter con
+// una stringa improbabile e guarda chi se la tiene identica.
+const TESTO_LIBERO = {
+  // chiave → dove finisce quel testo, e cosa lo tiene a bada.
+  stile_agente: 'ENTRA NEL PROMPT di ogni agente conversazionale → livello 2 (conferma col testo '
+    + 'esatto), tetto di lunghezza con rifiuto spiegato, recinto delimitato prima della riga anti-inganno.',
+  voce: 'Nome/URI di una voce del sistema operativo: viene confrontato con le voci installate al '
+    + 'momento della lettura. Non entra in nessun prompt.',
+  chiave_openrouter: 'Credenziale: viaggia negli header verso il provider, non nel prompt. Livello 2.',
+  chiave_tavily: 'Credenziale: viaggia negli header verso il provider, non nel prompt. Livello 2.',
+};
+
+test('REGOLA #592: ogni preferenza a testo libero è censita (e quella che entra nei prompt è protetta)', () => {
+  const sonda = 'zqxjkvsonda592testoarbitrario';
+  const libere = P.PREF_SETTERS.filter((s) => {
+    let r = null;
+    try { r = s.build(sonda); } catch (_) { return false; }
+    return !!(r && r.partial && JSON.stringify(r.partial).includes(sonda));
+  }).map((s) => s.keys[0]);
+
+  const nonCensite = libere.filter((k) => !(k in TESTO_LIBERO));
+  assert.deepEqual(
+    nonCensite, [],
+    'preferenza a testo libero nuova e non censita (#592): aggiungi una riga a TESTO_LIBERO che dica '
+    + `dove finisce quel testo. Se entra in un prompt, trattala come stile_agente. Mancano: ${nonCensite.join(', ')}`,
+  );
+
+  // Lo stile dell'agente è quello che entra nei prompt: le tre protezioni ci sono.
+  const stile = P.PREF_SETTERS.find((s) => s.keys[0] === 'stile_agente');
+  assert.equal(stile.level, 2, 'impostarlo dal modello deve passare da una conferma');
+  assert.ok(stile.risk && stile.risk.trim().length > 40);
+  const oltre = P.buildPreferencePartial('stile_agente', 'x'.repeat(globalThis.SN_CONST.AGENT_STYLE_MAX + 1));
+  assert.equal(oltre.partial, undefined, 'oltre il tetto non si salva niente');
+  assert.ok(oltre.error && oltre.error.length > 20, 'e il rifiuto è spiegato');
+});
+
 test('#183: il messaggio di rischio è esposto da buildPreferencePartial e parla del rischio', () => {
   const term = build('terminale', 'on');
   assert.equal(term.level, 2);
