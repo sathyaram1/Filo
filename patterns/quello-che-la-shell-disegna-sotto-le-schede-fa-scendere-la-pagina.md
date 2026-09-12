@@ -51,10 +51,26 @@ basso, e il conto lo fa chi il layout lo conosce.
 chiude azzera anche la riserva di quello ancora aperto. Ognuno tiene la sua in
 una mappa, e al processo principale va la più alta.
 
+**Una riserva per FASCIA, non per riquadro.** Nella fascia dei permessi
+possono esserci insieme la domanda, la scelta di cosa condividere e il segno
+che un sito sta vedendo lo schermo: un numero per ciascuno si scavalca a
+vicenda ed è facile dimenticarne uno. La fascia tiene UNA riserva e la misura
+sul proprio contenitore, saltando i nodi in uscita e quelli alti zero (una cosa
+nascosta perché appartiene a un'altra scheda non deve tenere giù la pagina).
+
+**Si misura subito, non solo al frame dopo.** La pagina deve scendere nello
+stesso istante in cui la domanda compare, e il nodo è già nel documento: il
+`requestAnimationFrame` serve solo a raccogliere ciò che cambia dopo il primo
+disegno (le anteprime della condivisione, una frase che va a capo). Da solo non
+basta: mentre i test tengono la finestra nascosta il frame può non arrivare per
+un pezzo, e in quel buco la domanda finisce dietro alla pagina — con un rosso
+che compare e sparisce a seconda di quanto è carica la macchina.
+
 ## Dove sta nel codice
 
 - `riservaTop` in `src/renderer/shell.js`: la mappa delle riserve e il massimo.
-  I nomi in uso sono `permessi`, `fonte-schermo`, `download`, `popup`.
+  I nomi in uso sono `permessi` (tutta la fascia: domanda, scelta della fonte,
+  segno della ripresa), `download`, `popup`.
 - `setTopFloor` e `layout()` in `src/main/tabs.js`: il pavimento entra nel
   calcolo con un `Math.max`, e vale anche quando `contentFullscreen` è acceso —
   senza, un sito che si prende lo schermo e poi chiede la fotocamera faceva
