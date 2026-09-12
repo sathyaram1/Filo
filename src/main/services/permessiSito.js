@@ -615,36 +615,63 @@ function fineUso(id) {
 // La ricarica resta per chi non risponde o resta vivo lo stesso, cioè per una
 // pagina che ha fatto di tutto per non passare di lì: la garanzia del giro 4
 // («togliere deve togliere anche quello che ha già in mano») non si scuce.
+// La domanda va a OGNI riquadro della pagina, non solo a quello principale. Una
+// traccia presa da un riquadro incorporato — il widget della videochiamata, il
+// lettore, il modulo dentro la pagina — vive lì dentro, e il riquadro principale
+// non ne sa niente: interrogando solo lui la risposta era «non è rimasto niente
+// di vivo», la ricarica non partiva e il sito continuava ad ascoltare a permesso
+// tolto (#586, giro 6).
+//
+// E non basta sommare i vivi: se NESSUN riquadro ha mai registrato niente,
+// mentre Filo sa di aver concesso quella cosa, vuol dire che la pagina non è
+// passata di qui, e allora non si crede a nessuno e si ricarica.
 const fermate = new Map(); // id richiesta → risolvi
 let prossimaFermata = 1;
 const FERMATA_MS = 900;
 
-function chiediAllaPaginaDiFermare(wc, chiavi) {
+function chiediAUnFrame(frame, chiavi) {
   return new Promise((resolve) => {
-    if (!wc || wc.isDestroyed()) { resolve(0); return; }
     const id = `f${prossimaFermata++}`;
     let finito = false;
-    const finisci = (vive) => {
+    const finisci = (vive, registrate) => {
       if (finito) return;
       finito = true;
       fermate.delete(id);
       clearTimeout(timer);
-      resolve(Number(vive) || 0);
+      resolve({ vive: Number(vive) || 0, registrate: Number(registrate) || 0 });
     };
     // Nessuna risposta entro la finestra = "è rimasto tutto vivo": si ricarica.
-    const timer = setTimeout(() => finisci(1), FERMATA_MS);
+    const timer = setTimeout(() => finisci(1, 0), FERMATA_MS);
     if (timer.unref) timer.unref();
     fermate.set(id, finisci);
-    try { wc.send('filo:permessi-ferma', { id, chiavi: chiavi && chiavi.length ? chiavi : null }); }
-    catch (_) { finisci(1); }
+    try { frame.send('filo:permessi-ferma', { id, chiavi: chiavi && chiavi.length ? chiavi : null }); }
+    catch (_) { finisci(1, 0); }
   });
 }
 
-// La risposta della pagina, inoltrata da src/main/ipc.js.
-function rispostaFermata(id, vive) {
+async function chiediAllaPaginaDiFermare(wc, chiavi) {
+  if (!wc || wc.isDestroyed()) return 0;
+  let frames = [];
+  try {
+    const main = wc.mainFrame;
+    frames = (main && main.framesInSubtree) ? main.framesInSubtree.filter((f) => f && !f.detached) : [];
+    if (!frames.length && main && !main.detached) frames = [main];
+  } catch (_) { frames = []; }
+  if (!frames.length) return 1; // non si sa a chi chiedere: strada dura
+  const esiti = await Promise.all(frames.map((f) => chiediAUnFrame(f, chiavi)));
+  const vive = esiti.reduce((n, e) => n + e.vive, 0);
+  const registrate = esiti.reduce((n, e) => n + e.registrate, 0);
+  // Nessuno ha mai visto passare una traccia: la pagina non è passata dal nostro
+  // giro (o se l'è tolto di mezzo). Non si conclude «è tutto a posto».
+  if (!registrate) return 1;
+  return vive;
+}
+
+// La risposta di un riquadro, inoltrata da src/main/ipc.js.
+function rispostaFermata(id, vive, registrate) {
   const f = fermate.get(String(id || ''));
   if (!f) return { ok: false };
-  f(vive);
+  f(vive, registrate);
   return { ok: true };
 }
 
