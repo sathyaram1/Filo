@@ -377,6 +377,10 @@ test('livello 2 — la lettura FUORI dal perimetro dichiarato chiede un OK (#587
     'cat /etc/passwd', 'head -n 5 /etc/shadow', 'grep -r token /var/log',
     'cat ../../../etc/hosts', 'Get-Content C:\\Windows\\System32\\drivers\\etc\\hosts',
     'ls /root', 'tail -f /var/log/syslog',
+    // vale identico per i cmdlet: due strade per la stessa cosa, stesso livello
+    'Get-ChildItem -Path C:\\Users -Recurse', 'Test-Path C:\\Users',
+    'Select-String password -Path /etc/apache2/apache2.conf',
+    'Get-Content /etc/passwd | Select-String root',   // la pipeline non è una scappatoia
   ]) {
     assert.equal(C.classify(cmd, dentro), 2, `"${cmd}" esce dal perimetro → livello 2`);
   }
