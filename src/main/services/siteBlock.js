@@ -40,11 +40,16 @@
 //   destra (#170.1) col sito bloccato e l'opzione "Apri comunque".
 //
 // API: configureFromSettings, shouldBlockNavigation, isSearchEngineUrl,
-//      isBlacklistedHost, canonicalHost, setForTest, status.
+//      isBlacklistedHost, canonicalHost, allowHost, isAllowedHost, setForTest,
+//      status.
+
+require('../../shared/urlNav'); // #590 — la regola di cosa è un nome di sito valido, in un posto solo
 
 let enabled = true;
 let useAdblockLists = true;
 let userBlacklist = new Set(); // domini extra inseriti dall'utente
+// I sì dati a mano dall'utente su "Apri comunque", per questa sessione.
+let allowedBySite = new Set();
 
 // Second-level public suffix usati dai motori multi-TLD (co.uk, com.au,
 // co.jp, com.tr, …): la label del motore può stare subito prima di questi.
