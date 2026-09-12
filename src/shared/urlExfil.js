@@ -40,15 +40,15 @@
   const STRUCT_TESTO = 16;  // pezzo illeggibile che però si RIAPRE come testo
   const STRUCT_HOST_BLOB = 24; // etichetta opaca nel sottodominio: nessun sito vero
 
-  // Quante parole comuni servono perché un indirizzo sia un "dump" di dati. Erano
-  // due, e una delle due era gratis: se il materiale protetto conteneva un link —
-  // cioè quasi sempre, appena Filo legge un documento o un appunto — fra le
-  // parole protette finiva «https», che sta dentro ogni indirizzo. Da lì bastava
-  // una parola qualunque in comune col link e l'avviso compariva su sei link
-  // veri su venti (#587, giro 4). Adesso «https» non conta più (vedi
-  // PAROLE_DI_OGNI_INDIRIZZO), le parole comuni contano solo se stanno nel
-  // CARICO del link e non nel nome del sito, e ne servono tre.
-  const HITS_DEBOLI = 3;
+  // Quante parole comuni servono perché un indirizzo sia un "dump" di dati: due,
+  // come sempre. Erano due, però, con una delle due gratis: se il materiale
+  // protetto conteneva un link — cioè quasi sempre, appena Filo legge un
+  // documento o un appunto — fra le parole protette finiva «https», che sta
+  // dentro ogni indirizzo, e da lì bastava una parola qualunque in comune col
+  // link perché l'avviso comparisse su sei link veri su venti (#587, giro 4).
+  // Adesso «https» non conta più (vedi PAROLE_DI_OGNI_INDIRIZZO) e le parole
+  // comuni contano solo se stanno nel CARICO del link, non nel nome del sito.
+  const HITS_DEBOLI = 2;
 
   // Le parole che stanno dentro QUALUNQUE indirizzo: non sono dati di nessuno,
   // e nel corpus ci finiscono appena il materiale protetto cita un link.
