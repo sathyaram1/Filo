@@ -122,17 +122,106 @@ test('Sicurezza: il toggle e la blacklist dedicata persistono', async ({ openTab
   await expect(page.locator('#sec-siteblock-blacklist')).toHaveValue('cattivo.example\naltro.test');
 });
 
-test('apertura via Filo (programmatica) verso sito in blacklist → consentita', async ({ shell, openTab, testServer }) => {
+test('#590 apertura PROGRAMMATICA (lo stesso percorso di NAVIGA) verso un sito in blacklist → bloccata', async ({ app, shell, testServer }) => {
   await enableBlock(shell);
 
-  const targetUrl = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">APERTO DA FILO</h1>');
+  const targetUrl = blockedUrl(testServer, '<!doctype html><meta charset="utf-8"><h1 id="t">NON DEVE APRIRSI</h1>');
 
-  // openTab usa window.filoShell.tabs.open → apertura programmatica, lo stesso
-  // percorso dell'azione NAVIGA di Filo. Non passa da will-navigate, quindi NON
-  // viene bloccata anche se l'host è in blacklist.
-  const page = await openTab(targetUrl);
-  await expect(page.locator('#t')).toHaveText('APERTO DA FILO', { timeout: 8000 });
+  // window.filoShell.tabs.open → openTab del main: lo stesso percorso
+  // dell'azione NAVIGA e dell'indirizzo scritto nella home. Prima di #590 qui
+  // non c'era nessun controllo e la scheda si apriva.
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), targetUrl);
 
-  // Nessuna notifica di blocco.
-  await expect(shell.locator('.shell-notif', { hasText: 'Sito bloccato' })).toHaveCount(0);
+  // Compare la notifica di blocco, con lo scavalco esplicito.
+  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await expect(card).toBeVisible({ timeout: 6000 });
+  await expect(card.locator('.shell-notif-action', { hasText: 'Apri comunque' })).toBeVisible();
+
+  // E nessuna scheda è nata su quell'host.
+  await shell.waitForTimeout(800);
+  expect(schedeSuHost(app, BLOCKED_HOST)).toBe(0);
+});
+
+// ─── #590: la lista vale su TUTTE le strade ──────────────────────────────────
+//
+// Host della lista per questo blocco: un nome di RETE LOCALE (.lan). Il campo
+// della home, prima di navigare, chiede al sistema se l'host esiste (#433) e i
+// nomi di rete locale sono esentati da quel controllo — così lo spec non
+// dipende dal DNS della macchina che lo lancia (su "blocco.test" la risposta
+// cambia da un contenitore all'altro). Bloccato, la scheda non nasce comunque:
+// nessuna richiesta parte davvero.
+const HOST_LAN = 'bloccato.lan';
+const URL_LAN = `http://${HOST_LAN}/pagina`;
+
+function schedeSuHost(app, host) {
+  return app.windows().filter((w) => {
+    try { return new URL(w.url()).hostname === host; } catch (_) { return false; }
+  }).length;
+}
+
+async function abilitaBloccoLan(shell) {
+  await shell.evaluate((host) => window.filoShell.message({
+    type: 'update_settings',
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: [host] } } },
+  }), HOST_LAN);
+  await shell.evaluate(() => new Promise((r) => setTimeout(r, 300)));
+}
+
+test('#590 strada 1 — indirizzo scritto dall’utente nella home → bloccato', async ({ app, shell, openTab }) => {
+  await abilitaBloccoLan(shell);
+
+  const dash = await openTab('filo://newtab/');
+  const input = dash.locator('#input');
+  await input.waitFor({ state: 'visible', timeout: 8000 });
+  await input.fill(`/${HOST_LAN}`);
+  await input.press('Enter');
+
+  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await expect(card).toBeVisible({ timeout: 8000 });
+  await expect(card.locator('.shell-notif-action', { hasText: 'Apri comunque' })).toBeVisible();
+
+  // Nessuna scheda su quell'host: prima di #590 ne nasceva una.
+  await dash.waitForTimeout(800);
+  expect(schedeSuHost(app, HOST_LAN)).toBe(0);
+});
+
+test('#590 strada 2 — azione NAVIGA del modello → bloccata, e la chat lo dice', async ({ app, shell }) => {
+  await abilitaBloccoLan(shell);
+
+  // Lo stesso ingresso che usa il modello quando emette NAVIGA (livello 1,
+  // nessuna conferma): è il caso della segnalazione — una pagina ostile che
+  // convince il modello ad aprire un indirizzo della lista.
+  const esito = await app.evaluate((_electron, url) =>
+    globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url }), URL_LAN);
+
+  // L'azione NON è stata eseguita, e l'esito PORTA il motivo: la chat mostra
+  // "Link non aperto · sito bloccato: …" invece di tacere (#482).
+  expect(esito.executed).toBe(false);
+  expect(esito.output && esito.output.blocked).toBe('site');
+  expect(esito.output && esito.output.host).toBe(HOST_LAN);
+
+  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await expect(card).toBeVisible({ timeout: 6000 });
+
+  await shell.waitForTimeout(800);
+  expect(schedeSuHost(app, HOST_LAN)).toBe(0);
+});
+
+test('#590 strada 3 — link cliccato in una pagina → bloccato', async ({ app, shell, openTab, testServer }) => {
+  await abilitaBloccoLan(shell);
+
+  const fromUrl = testServer.html(
+    `<!doctype html><meta charset="utf-8"><a id="go" href="${URL_LAN}">vai</a>`,
+  );
+  const page = await openTab(fromUrl);
+  await page.waitForSelector('#go', { timeout: 8000 });
+  await page.evaluate(() => document.getElementById('go').click());
+
+  const card = shell.locator('.shell-notif', { hasText: 'Sito bloccato' });
+  await expect(card).toBeVisible({ timeout: 6000 });
+
+  // La scheda è rimasta dov'era e nessuna è nata sull'host bloccato.
+  await page.waitForTimeout(500);
+  expect(page.url()).toBe(fromUrl);
+  expect(schedeSuHost(app, HOST_LAN)).toBe(0);
 });
