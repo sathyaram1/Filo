@@ -173,7 +173,12 @@
   // giro 4). Le parole comuni si confrontano quindi dentro una parola sola del
   // carico; i dati riconoscibili no, per quelli l'incollato serve (è così che si
   // ritrova un dato tagliato fra due parametri).
-  function caricoParole(url) {
+  // I PEZZI del carico: quello che chi compone l'indirizzo sceglie liberamente e
+  // il server riceve — segmenti del percorso, valori dei parametri, frammento,
+  // parte prima della chiocciola, etichette del sottodominio. Fuori resta il NOME
+  // DEL SITO (le ultime due etichette): quello non lo sceglie chi compone il
+  // link, e un dato non ci può uscire dentro.
+  function caricoPezzi(url) {
     try {
       const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`);
       const pezzi = [];
@@ -190,10 +195,28 @@
       const labels = String(u.hostname || '').split('.');
       for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) pezzi.push(lbl);
       // Anche i valori incollati fra loro: un dato spezzato fra due parametri è
-      // una parola sola, e deve poter combaciare come tale.
+      // una cosa sola, e deve poter combaciare come tale.
       if (pezzi.length > 1) pezzi.push(pezzi.join(''));
-      return sciogli(pezzi).join(' ').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+      return pezzi;
     } catch (_) { return []; }
+  }
+  function caricoParole(url) {
+    return sciogli(caricoPezzi(url)).join(' ').toLowerCase().split(/[^a-z0-9]+/)
+      .filter(Boolean);
+  }
+  // Il carico in forma INCOLLATA, un pezzo per volta. Serve ai dati
+  // riconoscibili, che nel corpus stanno già incollati (`Segreto-Netrc-2026` →
+  // `segretonetrc2026`) e nel carico vanno ritrovati allo stesso modo. Si incolla
+  // dentro un pezzo solo, e in più il tutto-attaccato che caricoPezzi aggiunge in
+  // coda: incollare due pezzi vicini a caso inventerebbe vicinanze che nel link
+  // non ci sono.
+  function caricoAlnum(url) {
+    const out = [];
+    for (const p of sciogli(caricoPezzi(url))) {
+      const nudo = String(p).toLowerCase().replace(/[^a-z0-9]+/g, '');
+      if (nudo) out.push(nudo);
+    }
+    return out;
   }
 
   // Tutto il testo "esposto" da un URL: stringa grezza + urldecode (anche doppio)
