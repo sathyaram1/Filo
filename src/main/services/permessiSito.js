@@ -493,13 +493,15 @@ function installaSuSessione(ses) {
         // che c'è aperto dietro, a chi voleva far vedere una diapositiva.
         const scelta = await scegliFonte(bersaglio, frame);
         if (!scelta) {
-          // Annullato qui: il sì di un attimo fa non vale più niente, e il
-          // segno della ripresa va tolto o resterebbe a mentire.
-          if (pre) fineRipresa(pre.ripresaId);
+          // Annullato qui: il sì di un attimo fa non vale più niente, e un
+          // eventuale segno della ripresa va tolto o resterebbe a mentire.
+          if (pre && pre.ripresaId) fineRipresa(pre.ripresaId);
           nega();
           return;
         }
-        if (!pre) iniziaRipresa(bersaglio, P().origineDi(url) || url);
+        // Il segno parte ADESSO, che è quando il sito comincia davvero a
+        // vedere: prima della scelta della fonte non vede ancora niente.
+        if (!pre || !pre.ripresaId) iniziaRipresa(bersaglio, P().origineDi(url) || url);
         callback({ video: scelta, ...(richiesta && richiesta.audioRequested ? { audio: 'loopback' } : {}) });
       } catch (_) { nega(); }
     });
