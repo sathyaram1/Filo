@@ -160,9 +160,26 @@ test('quello che Filo impara lo applica subito, lo spunta, e riprende da lì', a
     ],
   });
 
+  // #592 — lo stile dell'agente è un'istruzione che Filo si porta dietro in
+  // ogni conversazione futura: da quando è di livello 2, il popup si apre da sé
+  // con il testo esatto e l'utente dice sì. Il popup vive in uno shadow root
+  // chiuso (scelta di sicurezza): qui sostituiamo il modulo di conferma e
+  // catturiamo ciò che l'utente avrebbe letto. Va messo PRIMA dell'invio.
+  await page.evaluate(() => {
+    window.__confirmSeen = [];
+    window.SN_CONFIRM_UI = {
+      confirm: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
+      confirmTyped: async (opts) => { window.__confirmSeen.push(opts && opts.text); return true; },
+    };
+  });
+
   await page.locator('#input').fill('sono Anna, insegnante — scrivimi breve e dammi del tu');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Piacere Anna' })).toBeVisible({ timeout: 30_000 });
+
+  // Il consenso è passato dal testo ESATTO, non da un'etichetta generica.
+  await expect.poll(() => page.evaluate(() => (window.__confirmSeen || []).join('\n')), { timeout: 15_000 })
+    .toContain('Risposte brevi, dà del tu.');
 
   // Applicato DAVVERO, non promesso: lo stile dell'agente è nelle impostazioni.
   await expect.poll(
