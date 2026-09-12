@@ -283,12 +283,18 @@
     //     è `20260504`, che sta dentro l'indirizzo di qualunque articolo di quel
     //     giorno. Sopra i dodici caratteri restano dentro, perché lì non sono
     //     più date: sono numeri di carta e di conto.
+    // Entra solo la forma incollata che DIFFERISCE dalla parola (se no l'ha già
+    // presa il giro di sopra) e che è un dato RICONOSCIBILE: una forma incollata
+    // corta e tutta di lettere non farebbe scattare niente, e tenerla
+    // raddoppierebbe il lavoro del confronto su ogni link.
     for (const parola of text.toLowerCase().split(/\s+/)) {
-      if (!parola || SEMBRA_INDIRIZZO.test(parola)) continue;
+      if (!parola || parola.length > MAX_INCOLLATO) continue;
       const nudo = parola.replace(/[^a-z0-9]+/g, '');
-      if (nudo.length < MIN_TOKEN || nudo.length > MAX_INCOLLATO) continue;
+      if (nudo === parola || nudo.length < MIN_TOKEN || nudo.length > MAX_INCOLLATO) continue;
       if (!/[a-z]/.test(nudo) && nudo.length < SOLO_CIFRE_MIN) continue;
-      if (!PAROLE_DI_OGNI_INDIRIZZO.has(nudo)) out.add(nudo);
+      if (!isStrong(nudo) || PAROLE_DI_OGNI_INDIRIZZO.has(nudo)) continue;
+      if (SEMBRA_INDIRIZZO.test(parola)) continue;
+      out.add(nudo);
     }
     return out;
   }
