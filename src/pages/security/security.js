@@ -284,7 +284,12 @@
       s = s.split('/')[0].split('?')[0];
     }
     s = s.replace(/^www\./, '');
-    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
+    // #590 — la stessa regola che usa il controllo vero, chiesta all'unico
+    // posto in cui è scritta. Quando qui c'era una copia, le due divergevano:
+    // un sito con l'estensione in caratteri non latini (.рф, .テスト, e le
+    // altre, che esistono e si usano) veniva accettato da una e buttato
+    // dall'altra, quindi restava in elenco senza bloccare niente.
+    return SN_URL_NAV.isListableDomain(s) ? s : '';
   }
 
   function renderWhitelist() {
