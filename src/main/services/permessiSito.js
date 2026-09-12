@@ -241,7 +241,9 @@ function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true
     }
 
     const id = String(prossimoId++);
-    const att = { chiave: chiaveAttesa, callbacks: [resolve], chiudi: null, salva: salvaScelta };
+    const att = {
+      chiave: chiaveAttesa, chiavi: chiavi.slice(), callbacks: [resolve], chiudi: null, salva: salvaScelta,
+    };
     attese.set(id, att);
 
     let finito = false;
