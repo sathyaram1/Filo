@@ -10,7 +10,10 @@
 // newtab), e da quel momento Bombadil proverebbe un'altra pagina credendo di
 // provare questa: i rilievi che trovasse non sarebbero attribuibili.
 
-import { extract, always } from "@antithesishq/bombadil";
+import { always } from "@antithesishq/bombadil";
+// `extract` dalla porta del driver browser, non dalla radice: quella radice è
+// generica sul driver e lascia lo stato senza tipo.
+import { extract } from "@antithesishq/bombadil/browser";
 
 export {
   noUncaughtExceptions,
