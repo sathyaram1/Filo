@@ -906,6 +906,60 @@
     } catch (_) { return null; }
   }
 
+  // ── Come la SHELL legge un percorso (#587, giro 3) ────────────────────────
+  //
+  // La barra rovesciata non vuol dire la stessa cosa dappertutto: su Windows
+  // separa le cartelle, in bash (la shell di Filo su Mac e Linux) annulla il
+  // carattere che segue. `cat .ss\h/config` apre `~/.ssh/config` in bash e una
+  // cartella `.ss` su Windows. Il controllo leggeva sempre e solo la forma
+  // Windows: bastava una barra rovesciata in mezzo a un nome riservato
+  // (`.netr\c`, `.git-credential\s`, `.confi\g/Filo/storage.json`) perché il
+  // bersaglio sparisse e la lettura passasse senza chiedere niente.
+  //
+  // Quale shell eseguirà il comando lo sa il main, che lo dichiara insieme al
+  // perimetro (`shell`). Senza dichiarazione si misurano ENTRAMBE le letture:
+  // una conferma di troppo costa attrito, una di meno costa le chiavi.
+  const SHELL_UNIX_RE = /^(bash|sh|zsh|fish|dash|ash|ksh)$/i;
+  const SHELL_WIN_RE = /^(powershell|pwsh|cmd|command)$/i;
+  function barraEscape(shell) {
+    const s = String(shell || '').trim();
+    if (!s) return null;                 // non dichiarata → entrambe le letture
+    if (SHELL_WIN_RE.test(s)) return false;
+    if (SHELL_UNIX_RE.test(s)) return true;
+    return null;
+  }
+  // Le letture possibili di un percorso scritto dentro un comando.
+  function lettureDi(raw, esc) {
+    const a = String(raw || '');
+    const out = [a];
+    if (esc !== false && a.indexOf('\\') !== -1) {
+      const sciolto = a.replace(/\\(.)/g, '$1');
+      if (sciolto && sciolto !== a) out.push(sciolto);
+    }
+    return out;
+  }
+
+  // Un percorso può viaggiare ATTACCATO al nome di un'opzione: PowerShell lega i
+  // parametri anche coi due punti (`Get-Content -Path:.ssh\config`, e accetta le
+  // abbreviazioni: `-Pa:`, `-P:`), le opzioni lunghe di Unix con l'uguale
+  // (`--file=…`), findstr con `/G:`. Scartare ogni token che inizia con un
+  // trattino voleva dire non misurare affatto quel percorso (#587, giro 3).
+  // Restano fuori le opzioni il cui valore è un MODELLO DA CERCARE e non un file
+  // (`-e`, `--regexp=`, `-Pattern:`, `/C:`): misurarlo faceva chiedere un OK
+  // spiegando una cosa falsa, che è il rilievo chiuso al giro 2.
+  const FLAG_MODELLO_RE = /^(e|regexp|pattern|c|color|colour|include|exclude|filter|encoding|delim|sep|format)/i;
+  function valoreDiFlag(tok) {
+    const t = unquote(String(tok || ''));
+    const m = t.match(/^-{1,2}([A-Za-z][A-Za-z0-9_-]*)[:=](.+)$/) || t.match(/^\/([A-Za-z]+):(.+)$/);
+    if (!m) return '';
+    if (FLAG_MODELLO_RE.test(m[1])) return '';
+    return m[2];
+  }
+  // I valori di percorso nascosti nelle opzioni di un comando.
+  function valoriDeiFlag(cmd) {
+    return tokens(cmd).slice(1).map(valoreDiFlag).filter(Boolean);
+  }
+
   // Un token è un FLAG (non un percorso)? Oltre a `-x`/`--x`, gli switch in stile
   // Windows `/S`, `/I`, `/C:"x"` — che su Unix sembrerebbero percorsi assoluti.
   function isFlagToken(tok) {
