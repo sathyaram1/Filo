@@ -697,7 +697,21 @@ class TabManager {
     return view;
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false } = {}) {
+  // Apre una scheda e ritorna il solo id (null se l'apertura è stata negata).
+  // È la forma usata ovunque; chi deve SPIEGARE un rifiuto usa openTabResult.
+  openTab(url = 'filo://newtab/', opts = {}) {
+    return this.openTabResult(url, opts).id;
+  }
+
+  // Come openTab, ma ritorna l'esito per esteso: { id, blocked, host }.
+  //   blocked: '' consentita | 'scheme' schema non-web | 'site' lista dei siti
+  //            bloccati (#590) — la chat lo dice invece di tacere (#482).
+  // Opzioni oltre a quelle di openTab:
+  //   fromUrl:  pagina di partenza / referrer, per l'eccezione "arrivo da un
+  //             motore di ricerca" (la passa chi quel referrer ce l'ha, cioè
+  //             setWindowOpenHandler).
+  //   overrideSiteBlock: scavalco VOLUTO DALL'UTENTE ("Apri comunque").
+  openTabResult(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, fromUrl = '', overrideSiteBlock = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
