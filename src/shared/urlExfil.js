@@ -624,6 +624,11 @@
     const parole = caricoParole(url);
     const dentro = (t) => forme.some((f) => f.includes(t));
     const nelCarico = (t) => parole.some((p) => p.includes(t) || rovescia(p).includes(t));
+    let incollatiCarico = null;
+    const nelCaricoIncollato = (t) => {
+      if (!incollatiCarico) incollatiCarico = caricoAlnum(url);
+      return incollatiCarico.some((p) => p.includes(t) || rovescia(p).includes(t));
+    };
     let scorse = null;
     const dentroScorso = (t) => {
       if (!scorse) {
