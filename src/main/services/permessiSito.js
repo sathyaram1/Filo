@@ -338,9 +338,12 @@ function installaSuSessione(ses) {
           requestingUrl: (frame && frame.url) || richiesta.securityOrigin || '',
         });
         if (!ok) { nega(); return; }
-        const fonti = await desktopCapturer.getSources({ types: ['screen'] });
-        if (!fonti || !fonti.length) { nega(); return; }
-        callback({ video: fonti[0], ...(richiesta && richiesta.audioRequested ? { audio: 'loopback' } : {}) });
+        // Consentito: ora CHE COSA. Consegnare sempre lo schermo intero
+        // significa mostrare anche le notifiche che arrivano e tutto quello
+        // che c'è aperto dietro, a chi voleva far vedere una diapositiva.
+        const scelta = await scegliFonte(bersaglio, frame);
+        if (!scelta) { nega(); return; }
+        callback({ video: scelta, ...(richiesta && richiesta.audioRequested ? { audio: 'loopback' } : {}) });
       } catch (_) { nega(); }
     });
   } catch (_) {}
