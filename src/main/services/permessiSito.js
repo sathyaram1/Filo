@@ -209,6 +209,7 @@ function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true
         chiavi,
         testo: Pp.etichettaRichiesta(chiavi),
         nomi: chiavi.map((k) => Pp.nome(k)),
+        ricordabile,
       });
     } catch (_) { finisci(false); }
   });
