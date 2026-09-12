@@ -248,6 +248,11 @@ function shouldBlockNavigation(targetUrl, { fromUrl = '' } = {}) {
   const host = canonicalHost(u.hostname);
   res.host = host;
 
+  // L'utente ha già detto di sì a questo sito, a mano, in questa sessione.
+  // Vale per ogni strada e per ogni passo che viene dopo: il rimbalzo del
+  // server, il link cliccato dentro il sito, la ricarica, la scheda nuova.
+  if (matchesSuffix(host, allowedBySite)) return res;
+
   // Unica eccezione — la navigazione proviene da un motore di ricerca.
   if (fromUrl && isSearchEngineHost(hostnameOf(fromUrl))) return res;
 
