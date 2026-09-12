@@ -58,11 +58,19 @@ test('la shell toccata non deve riaccendere la modalità terminale spenta altrov
 
   // 4. torna sulla pagina e cambia solo la SHELL — non ha chiesto di
   //    riaccendere niente.
-  await pagina.selectOption('#terminalShell', 'cmd');
+  // Le shell offerte cambiano col sistema: si prende la prima diversa da
+  // quella selezionata adesso.
+  const altra = await pagina.evaluate(() => {
+    const sel = document.getElementById('terminalShell');
+    const opt = [...sel.options].find((o) => o.value !== sel.value);
+    return opt ? opt.value : '';
+  });
+  expect(altra).not.toBe('');
+  await pagina.selectOption('#terminalShell', altra);
   await pagina.waitForTimeout(1800);
 
   const dopo = (await impostazioni(pagina)).terminal || {};
-  expect(dopo.shell).toBe('cmd');
+  expect(dopo.shell).toBe(altra);
   expect(dopo.enabled).toBe(false);
 });
 
