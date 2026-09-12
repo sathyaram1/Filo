@@ -2564,7 +2564,14 @@ class TabManager {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
       urls.forEach((url, i) => {
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true });
+        // overrideSiteBlock (#590): il ripristino non è una NAVIGAZIONE nuova,
+        // è la sessione di prima che torna com'era. Bloccarlo qui toglierebbe
+        // all'utente schede che aveva già aperte, e lo farebbe MUTO: al boot
+        // la shell non è ancora in ascolto, quindi la notifica "Apri comunque"
+        // non arriverebbe a nessuno — esattamente il blocco silenzioso che
+        // sembra un guasto (#482). La lista torna a valere al primo
+        // spostamento di quelle schede.
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, overrideSiteBlock: true });
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la
