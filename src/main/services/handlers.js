@@ -1594,6 +1594,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         } catch (e) {
           console.warn('[Filo] lettura file editor fallita', e?.message || e);
         }
+        // Il testo entra nel contesto → entra nel corpus anti-esfiltrazione
+        // (#587). È un documento SCRITTO DALL'UTENTE, quindi non lo marchiamo
+        // come non fidato: va protetto, non sospettato.
+        try {
+          require('./contextTaint').record(sender, 'file editor', (r && r.text) || '', { untrusted: false });
+        } catch (_) {}
         return {
           executed: !!(r && r.ok),
           kept: true,
