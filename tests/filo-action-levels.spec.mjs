@@ -247,3 +247,23 @@ test('Esc annulla il popup di conferma', async ({ openTab }) => {
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   expect(await page.evaluate(() => window.__confirmResult)).toBe(false);
 });
+
+// #592 — Una lezione che Filo si appunta vale in ogni conversazione e
+// sopravvive al riavvio, come lo stile dell'agente. Stesso tetto, e stesso
+// rifiuto spiegato invece di un taglio muto: la frase torna al modello, che
+// la riferisce all'utente, e nel buffer non entra niente.
+test('una lezione oltre il tetto viene rifiutata con la spiegazione, e non si salva', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  const tetto = await app.evaluate(() => globalThis.SN_CONST.LESSON_MAX);
+
+  const buona = await execAction(app, { type: 'SALVA_LEZIONE', testo: 'L\'utente non beve caffè.' });
+  expect(buona.executed).toBe(true);
+
+  const enorme = 'w'.repeat(tetto + 400);
+  const r = await execAction(app, { type: 'SALVA_LEZIONE', testo: enorme });
+  expect(r.executed).toBe(false);
+  expect(JSON.stringify(r.output || '')).toContain(String(tetto));
+
+  const buffer = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
+  expect(buffer.map((l) => l.text)).toEqual(['L\'utente non beve caffè.']);
+});

@@ -31,11 +31,24 @@ altre utili.
   `src/shared/constants.js` è a 600 caratteri, tre volte il preset più lungo.
   Chi sfora riceve il numero e riscrive lui: **mai un taglio muto**, che
   mangerebbe proprio la parte che contava.
-- **Un recinto, e i marcatori tolti dal testo.** Il testo entra fra
-  `AGENT_STYLE_OPEN` e `AGENT_STYLE_CLOSE`, preceduto da una riga che dice che
-  è contenuto dell'utente e seguito da una che dice cosa può e cosa non può
-  fare. `sanitizeAgentStyle` toglie i marcatori dal testo: senza, basta
-  scriverli per uscire dal recinto e tornare a parlare come il sistema.
+- **Un recinto, e i marcatori tolti dal testo — finché non ne restano.** Il
+  testo entra fra `AGENT_STYLE_OPEN` e `AGENT_STYLE_CLOSE`, preceduto da una
+  riga che dice che è contenuto dell'utente e seguito da una che dice cosa può
+  e cosa non può fare. `sanitizeAgentStyle` toglie i marcatori dal testo:
+  senza, basta scriverli per uscire dal recinto e tornare a parlare come il
+  sistema.
+  **La ripulitura va RIPETUTA finché il testo non cambia più.** Una passata
+  sola si aggira spezzando un marcatore con un altro marcatore: `FINE STILE` +
+  marcatore intero + ` SCRITTO DALL'UTENTE>>>` non contiene il marcatore, ma
+  appena si toglie quello di mezzo i due pezzi si ricongiungono e il marcatore
+  c'è. Annidando la cosa quante sono le passate fra la chat e il prompt (che
+  erano tre) arrivava intero nel prompt in 187 caratteri, il recinto si
+  chiudeva sulla prima riga e tutto il resto finiva fuori. Trovato dalla
+  verifica del #592, giro 1. Vale per QUALSIASI ripulitura che toglie
+  occorrenze da una stringa: se la rimozione può ricreare ciò che cerca, una
+  passata non basta. E chi costruisce il recinto ripulisce da sé
+  (`agentStyleBlock`) invece di fidarsi di chi lo chiama: è l'ultimo punto in
+  cui ci si può ancora accorgere che dentro c'è un marcatore.
 - **La posizione.** Il recinto va **prima** della riga anti-inganno del
   prompt, non dopo. I prompt dichiarano dove con un segnaposto
   (`AGENT_STYLE_SLOT`), piazzato in fondo alla parte immutabile e sopra la
