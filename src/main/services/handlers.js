@@ -942,6 +942,24 @@ async function applySettingsUpdate(partial) {
   if (partial && partial.themeTokens && globalThis.SN_THEME_TOKENS) {
     partial = { ...partial, themeTokens: globalThis.SN_THEME_TOKENS.sanitize(partial.themeTokens).clean };
   }
+  // Stesso ragionamento per lo stile dell'agente (#592): è testo libero che
+  // finisce nel messaggio di sistema di ogni agente conversazionale, quindi il
+  // choke point delle scritture è l'ultimo posto in cui può ancora passare
+  // qualcosa che le due strade normali (pagina Preferenze e azione della chat)
+  // avrebbero già fermato. Qui si tolgono i marcatori del recinto; un testo
+  // oltre il tetto NON viene accorciato — si scarta la modifica e resta quello
+  // di prima, perché tagliarlo di nascosto sarebbe peggio che rifiutarlo.
+  if (partial && typeof partial.agentStyle === 'string' && globalThis.SN_CONST
+      && typeof globalThis.SN_CONST.validateAgentStyle === 'function') {
+    const check = globalThis.SN_CONST.validateAgentStyle(partial.agentStyle);
+    partial = { ...partial };
+    if (check.ok) partial.agentStyle = check.value;
+    else {
+      console.warn('[Filo] stile dell\'agente scartato: %d caratteri, il tetto è %d',
+        check.length, globalThis.SN_CONST.AGENT_STYLE_MAX);
+      delete partial.agentStyle;
+    }
+  }
   const merged = await Storage.updateSettings(partial);
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   try {
