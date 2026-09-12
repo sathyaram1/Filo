@@ -1450,6 +1450,24 @@
         || (reali ? riservatoSottoHome({ root: target.root, segs: potaJolly(reali) }, casa) : '');
       if (sotto) return riservatoPerche(sotto);
     }
+    if (soloRiservati) return '';
+    if (!perim) {
+      // Nessun perimetro dichiarato (classificatore usato da solo): resta la
+      // lettura strutturale — assoluto, risalita con `..`, o `~` = fuori.
+      const t = pathParts(raw);
+      if (/^~($|[/\\])/.test(raw)) return FUORI;
+      if (t.root !== null) return FUORI;
+      if (collapse(t.segs)[0] === '..') return FUORI;
+      return '';
+    }
+    if (!target) return FUORI;
+    if (!insidePerimeter(target, perim)) return FUORI;
+    // Dentro il perimetro, ma ricorsivo: se il sottoalbero È la cartella
+    // dichiarata, sotto ci stanno tutti i bersagli riservati. Un `*` finale non
+    // restringe niente (`grep -r chiave *` parte dalla stessa cartella di
+    // `grep -r chiave .`), mentre un modello vero — `*.txt` — sì: quello lascia
+    // fuori le chiavi e non deve costare un OK.
+    if (ricorsivo && segsTarget.length <= perim.segs.length) return TUTTA;
     // I COLLEGAMENTI che stanno dentro quello che il comando aprirà davvero: un
     // jolly e una ricerca ricorsiva non nominano i file che toccano, quindi il
     // percorso reale non si può chiedere a quello scritto (#587, giro 6). Si
@@ -1487,24 +1505,6 @@
         }
       }
     }
-    if (soloRiservati) return '';
-    if (!perim) {
-      // Nessun perimetro dichiarato (classificatore usato da solo): resta la
-      // lettura strutturale — assoluto, risalita con `..`, o `~` = fuori.
-      const t = pathParts(raw);
-      if (/^~($|[/\\])/.test(raw)) return FUORI;
-      if (t.root !== null) return FUORI;
-      if (collapse(t.segs)[0] === '..') return FUORI;
-      return '';
-    }
-    if (!target) return FUORI;
-    if (!insidePerimeter(target, perim)) return FUORI;
-    // Dentro il perimetro, ma ricorsivo: se il sottoalbero È la cartella
-    // dichiarata, sotto ci stanno tutti i bersagli riservati. Un `*` finale non
-    // restringe niente (`grep -r chiave *` parte dalla stessa cartella di
-    // `grep -r chiave .`), mentre un modello vero — `*.txt` — sì: quello lascia
-    // fuori le chiavi e non deve costare un OK.
-    if (ricorsivo && segsTarget.length <= perim.segs.length) return TUTTA;
     return '';
   }
 
