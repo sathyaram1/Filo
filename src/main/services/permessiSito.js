@@ -462,15 +462,25 @@ function installaSuSessione(ses) {
         const frame = richiesta && richiesta.frame;
         const bersaglio = trovaWcDelFrame(frame);
         if (!bersaglio) { nega(); return; }
-        const ok = await decidi(bersaglio, 'display-capture', {
-          requestingUrl: (frame && frame.url) || richiesta.securityOrigin || '',
-        });
+        const url = (frame && frame.url) || richiesta.securityOrigin || '';
+        // La domanda l'ha già fatta il preambolo, un attimo fa: richiedere la
+        // stessa cosa due volte di fila è attrito, e la seconda domanda
+        // sembrerebbe una cosa diversa dalla prima.
+        const pre = consumaPreambolo(bersaglio);
+        const ok = pre ? true : await decidi(bersaglio, 'display-capture', { requestingUrl: url });
         if (!ok) { nega(); return; }
         // Consentito: ora CHE COSA. Consegnare sempre lo schermo intero
         // significa mostrare anche le notifiche che arrivano e tutto quello
         // che c'è aperto dietro, a chi voleva far vedere una diapositiva.
         const scelta = await scegliFonte(bersaglio, frame);
-        if (!scelta) { nega(); return; }
+        if (!scelta) {
+          // Annullato qui: il sì di un attimo fa non vale più niente, e il
+          // segno della ripresa va tolto o resterebbe a mentire.
+          if (pre) fineRipresa(pre.ripresaId);
+          nega();
+          return;
+        }
+        if (!pre) iniziaRipresa(bersaglio, P().origineDi(url) || url);
         callback({ video: scelta, ...(richiesta && richiesta.audioRequested ? { audio: 'loopback' } : {}) });
       } catch (_) { nega(); }
     });
