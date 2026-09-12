@@ -24,9 +24,9 @@ const HTML = `<!doctype html><html><body style="margin:0;padding:20px">
     t.focus();
     t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 80, clientY: 80 }));
     await new Promise((r) => setTimeout(r, 500));
-    const voci = [...document.querySelectorAll('.sn-menu-item, .sn-menu-paste, .sn-menu-row-btn')];
-    const incolla = voci.find((n) => /incolla|paste/i.test(n.textContent || '')
-      || /paste/i.test(n.className || ''));
+    const incolla = document.querySelector('.sn-menu-paste-main')
+      || [...document.querySelectorAll('.sn-menu-item, .sn-menu-row-btn')]
+        .find((n) => /incolla|paste/i.test(n.textContent || ''));
     if (!incolla) return { trovata: false, testo: t.value };
     incolla.click();
     await new Promise((r) => setTimeout(r, 1500));
