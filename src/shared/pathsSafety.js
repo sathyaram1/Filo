@@ -51,9 +51,10 @@
   const IBAN_RE = /\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/gi;
   const CF_RE = /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/gi;
   // Cifre separate da spazi, punti o trattini: «333 123 456», «4111 1111 1111
-  // 1111», «06.1234.5678». Chiede almeno sei cifre in tutto, così un «div:nth
-  // 2» non diventa un numero e un telefono sì.
-  const NUM_SPEZZATO_RE = /\d(?:[\d  .\-/]{4,})\d/g;
+  // 1111», «06.1234.5678». Il conteggio delle cifre lo fa chi sostituisce: qui
+  // si prende il candidato e passa solo se di cifre ce ne sono almeno sei, così
+  // «riga 2 di 3» resta com'è e un telefono no.
+  const NUM_SPEZZATO_RE = /\d[\d \u00A0.\-/]{3,}\d/g;
   const AZIONI = ['click', 'fill', 'reveal', 'hover'];
 
   // Un dominio è un hostname: lettere, cifre, punti e trattini. Niente spazi,
@@ -73,13 +74,36 @@
       .replace(/PERCORSI_CONDIVISI/gi, 'percorsi-condivisi');
   }
 
-  // I selettori prodotti dall'LLM possono contenere stringhe sensibili (es.
-  // [aria-label="Profilo di mario.rossi@x.it"]): le redaction sostituiscono i
-  // pattern sensibili con placeholder generici, così il selettore resta
-  // leggibile per chi lo consuma ma non porta dati identificabili.
+  // Cancella i dati personali da un testo diretto alla raccolta pubblica.
+  //
+  // Passa di qui OGNI campo che esce dal computer di chi naviga: gli elementi
+  // toccati (un'etichetta come [aria-label="Profilo di mario.rossi@x.it"]), la
+  // sezione di partenza (/clienti/IT60X.../estratto) e la frase dell'intento,
+  // che la scrive un modello ma leggendo gli altri due. Prima la cancellazione
+  // valeva solo per gli elementi, e solo per gli indirizzi email e le cifre
+  // attaccate: bastava un IBAN, un codice fiscale o un telefono scritto con gli
+  // spazi per uscire intero, e quelle sono proprio le etichette delle pagine
+  // dove l'Aiuto serve di più (banca, operatore telefonico).
+  //
+  // L'ordine conta: prima le forme che contengono lettere e cifre insieme
+  // (IBAN, codice fiscale), poi le cifre, altrimenti la regola delle cifre
+  // spezzerebbe l'IBAN a metà e quel che resta non lo riconoscerebbe più
+  // nessuno.
+  function redigiDatiPersonali(testo) {
+    if (typeof testo !== 'string' || !testo) return '';
+    return testo
+      .replace(EMAIL_RE, '[EMAIL]')
+      .replace(IBAN_RE, '[IBAN]')
+      .replace(CF_RE, '[CODICE]')
+      .replace(LONG_NUM_RE, '[NUMERO]')
+      .replace(NUM_SPEZZATO_RE, (m) => ((m.match(/\d/g) || []).length >= 6 ? '[NUMERO]' : m));
+  }
+
+  // Un elemento toccato, pronto per la raccolta: senza dati personali, senza
+  // niente che imiti la struttura del prompt, e dentro al tetto.
   function redactSelector(selector) {
     if (typeof selector !== 'string' || !selector) return '';
-    let s = selector.replace(EMAIL_RE, '[EMAIL]').replace(LONG_NUM_RE, '[NUMERO]');
+    let s = redigiDatiPersonali(selector);
     s = neutralizzaMarcature(s).trim();
     if (s.length > MAX_SELECTOR_LEN) s = s.slice(0, MAX_SELECTOR_LEN);
     return s;
