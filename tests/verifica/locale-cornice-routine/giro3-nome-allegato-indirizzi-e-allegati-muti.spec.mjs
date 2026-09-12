@@ -100,7 +100,8 @@ test.describe('parole del mittente ancora fuori cornice', () => {
   });
 
   test('un allegato che non è testo sparisce dal fascicolo senza una riga che lo dica', async () => {
-    test.fail(true, 'giro 3: un PDF allegato non lascia traccia nel fascicolo: il lavoratore non sa che c\'era');
+    // Trovato aperto nel giro 3 e chiuso nella sua correzione: il PDF arriva
+    // come cornice vuota col motivo, senza essere scaricato.
     const url = STORAGE_BASE + encodeURIComponent('feedback/1757700000000_abc.pdf') + '?alt=media';
     let scaricato = 0;
     const docs = await attachments.readDocuments(
