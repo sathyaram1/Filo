@@ -473,6 +473,7 @@
     }
     if (!Object.keys(security).length) return;
 
+    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security } });
     ultimoInviato = { ...(ultimoInviato || {}), ...security };
     const hint = $('savedHint');
