@@ -1351,8 +1351,7 @@
     function reserveForPanel() {
       if (!panelOpen || !panel) return;
       requestAnimationFrame(() => {
-        const h = Math.ceil(panel.getBoundingClientRect().height);
-        riservaTop('download', h + 6);
+        riservaTop('download', Math.ceil(panel.getBoundingClientRect().bottom) + 6);
       });
     }
     function openPanel() {
