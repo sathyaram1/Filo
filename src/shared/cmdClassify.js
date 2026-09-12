@@ -121,6 +121,29 @@
 //     — il PRIMO OPERANDO DI UNA RICERCA è il testo cercato, non un file: in
 //       `grep credentials appunti.txt` il file aperto è `appunti.txt`, e misurare
 //       anche la parola cercata faceva chiedere un OK spiegando una cosa falsa.
+//       Vale anche per il token che segue `-e`/`--regexp`/`-Pattern`.
+//     Al giro 3 sono arrivate altre tre strade, sempre la stessa causa:
+//     — LA BARRA ROVESCIATA NON VUOL DIRE LA STESSA COSA SU OGNI SHELL: su
+//       Windows separa le cartelle, in bash (la shell di Filo su Mac e Linux)
+//       annulla il carattere dopo. Leggendo sempre e solo la forma Windows,
+//       `cat .ss\h/config` — che in bash apre `~/.ssh/config` — non somigliava a
+//       niente di riservato, e lo stesso valeva per `.netr\c`,
+//       `.git-credential\s`, `.confi\g/Filo/storage.json`. Quale shell eseguirà
+//       il comando lo dichiara il main (`shell`); senza dichiarazione si misurano
+//       ENTRAMBE le letture, ma quella alternativa vota solo sui bersagli
+//       riservati e mai sul perimetro (vedi `operandReason`), altrimenti un
+//       percorso Windows normale risulterebbe fuori dalla cartella dell'utente.
+//       Stesso discorso per `$'...'`, che in bash è un altro modo di scrivere la
+//       stessa stringa (vedi `unquote`);
+//     — UN PERCORSO PUÒ VIAGGIARE ATTACCATO AL NOME DI UN'OPZIONE
+//       (`Get-Content -Path:.ssh\config`, `grep --file=…`, `grep -f…`): scartare
+//       ogni token che inizia con un trattino voleva dire non misurarlo affatto
+//       (vedi `valoreDiFlag`);
+//     — UN "DRIVE" DI POWERSHELL NON È UNA CARTELLA: `HKCU:`/`HKLM:` sono il
+//       registro di sistema, dove diversi programmi tengono password salvate;
+//       `Cert:`, `Variable:`, `Function:` altre parti interne. Venivano scambiati
+//       per una cartella dentro la home e passavano senza chiedere niente (vedi
+//       `providerReason`).
 //   • VARIABILI D'AMBIENTE: `printenv`, `ps`, `Get-Process`, `Get-ChildItem Env:` e
 //     qualunque comando che nomini una variabile (`$HOME`, `$env:USERPROFILE`,
 //     `%APPDATA%`) non sono livello 1. Contengono token e percorsi personali, e
