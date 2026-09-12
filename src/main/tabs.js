@@ -2420,11 +2420,35 @@ class TabManager {
   // niente: la scheda restava vuota e il sito non si apriva più in nessun modo.
   // Lo stesso al primo link cliccato dentro il sito, alla ricarica, e a una
   // scheda nuova aperta da lì.
+  // E si torna indietro (#590, terzo giro): il sì dura tutta la sessione, e un
+  // permesso che dura va detto a chi lo dà e tolto quando ci ripensa. Chi
+  // clicca "Apri comunque" per guardare una pagina non sta dicendo "tieni quel
+  // sito aperto fino a stasera", e l'unica marcia indietro era rimettere mano
+  // all'elenco dei siti bloccati, che li azzera tutti e che nessuno indovina.
   apriSitoComunque(url) {
+    let sito = '';
     try {
-      require('./services/siteBlock').allowHost(new URL(url).hostname);
+      sito = require('./services/siteBlock').allowHost(new URL(url).hostname);
     } catch (_) { /* indirizzo non analizzabile: resta il solo scavalco qui sotto */ }
     this.openTab(url, { activate: true, overrideSiteBlock: true });
+    if (sito) this._notifyAllowed(sito);
+  }
+
+  // Il permesso appena dato, a parole, con la strada per toglierlo.
+  _notifyAllowed(sito) {
+    try {
+      const NAV = globalThis.SN_URL_NAV;
+      const label = (NAV && NAV.hostLeggibile(sito)) || sito;
+      this.win.webContents.send('shell:toast', {
+        text: `${label} resta aperto fino alla chiusura di Filo`,
+        opts: { actions: [{ label: 'Rimetti il blocco', restoreBlockHost: sito }] },
+      });
+    } catch (_) {}
+  }
+
+  // L'utente ci ha ripensato: quel sito torna a valere come gli altri in lista.
+  rimettiIlBlocco(sito) {
+    try { require('./services/siteBlock').revokeHost(sito); } catch (_) {}
   }
 
   // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
