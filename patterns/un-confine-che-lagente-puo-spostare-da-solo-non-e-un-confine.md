@@ -146,6 +146,61 @@ basta, si cerca un segnale di qualità invece che di quantità: un blocco che **
 riapre come testo** non è il modo in cui un sito nomina le sue cose — nessuno dei
 venti indirizzi veri si riapre, e un payload impacchettato sì.
 
+## Caso 7 — il bersaglio letto con la grammatica sbagliata
+
+Il caso 5 aveva spostato la misura sul percorso che il comando aprirà davvero,
+espansione dei modelli e collegamenti compresi. Restava un passaggio prima
+ancora: **chi scioglie il testo del comando è la shell**, e il classificatore
+leggeva tutto con la grammatica di Windows.
+
+- **La barra rovesciata non vuol dire la stessa cosa dappertutto.** Su Windows
+  separa le cartelle; in bash — la shell di Filo su Mac e Linux — annulla il
+  carattere che segue. `cat .ss\h/config` apre `~/.ssh/config`, `cat .netr\c`
+  apre `~/.netrc`, `cat .confi\g/Filo/storage.json` apre il file con le chiavi
+  API: il controllo vedeva due segmenti innocui e lasciava passare. Stessa cosa
+  per `$'…'`, che in bash è solo un altro modo di scrivere la stessa stringa.
+  Quale shell eseguirà il comando lo sa **il main**, che lo dichiara come tutto
+  il resto del perimetro (`_shell`). Senza dichiarazione si misurano entrambe le
+  letture, ma quella alternativa vota **solo sui bersagli riservati e mai sul
+  perimetro**: se votasse anche lì, un percorso Windows normalissimo
+  (`C:\Users\mario\note.txt`, che sciolto diventa una parola sola) risulterebbe
+  fuori dalla cartella dell'utente e ogni lettura chiederebbe un OK — il caso 4
+  che rientra dalla finestra.
+- **Un percorso può viaggiare attaccato al nome di un'opzione.** PowerShell lega
+  i parametri anche coi due punti (`Get-Content -Path:.ssh\config`, e accetta le
+  abbreviazioni: `-Pa:`, `-P:`), Unix con l'uguale o incollato (`--file=…`,
+  `-f…`). Scartare ogni token che inizia con un trattino significa non misurare
+  affatto quel percorso. La simmetria del caso 5 vale anche qui: il valore di
+  un'opzione che porta un **modello da cercare** (`-e`, `--regexp`, `-Pattern`,
+  `/C:`) non è un file, e nemmeno il token che segue.
+- **Un "drive" di PowerShell non è una cartella.** `HKCU:`/`HKLM:` sono il
+  registro di sistema, dove diversi programmi tengono le password salvate;
+  `Cert:`, `Variable:`, `Function:` altre parti interne. Venivano risolti come
+  una cartella relativa dentro la home e passavano senza chiedere niente.
+
+## Caso 8 — il dato tagliato in due
+
+L'altro anello, con la stessa forma: chi compone l'indirizzo è la pagina ostile
+che detta al modello cosa aprire, quindi **il formato del payload lo sceglie chi
+attacca**. Il confronto col materiale letto funzionava in chiaro, in base64, nel
+sottodominio e dentro il percorso, e si svuotava con una riga: tagliare il dato
+in due e rimetterlo in due parametri (`?a=Segreto&b=Netrc2026`). In mezzo ci
+finisce il nome del secondo parametro, il confronto non trova più niente, e i
+pezzi presi da soli si leggono come parole, quindi nemmeno il ripiego
+strutturale dice niente.
+
+Due cure, tutte e due in `src/shared/urlExfil.js`: si confrontano anche i **soli
+valori incollati** (senza nomi di parametri né separatori), che rimettono insieme
+il dato tagliato — e con lui un base64 spezzato a metà; e per la spazzatura
+infilata **dentro** un valore il confronto tollera un dato lungo ritrovato in due
+o tre tronconi, ognuno abbastanza lungo da non essere un caso. Le misure restano
+strette per il motivo del caso 4: un avviso falso sul cammino principale costa
+più di quanto rende.
+
+Quello che resta fuori è dichiarato, non dimenticato: un dato **cifrato o in
+esadecimale** non lo riconosce nessun confronto: lì la difesa è il ripiego
+strutturale, che guarda quanta roba illeggibile porta il link.
+
 ## Regola operativa
 
 Quando aggiungi una difesa, scrivi accanto **a cosa è agganciata** e chiediti chi

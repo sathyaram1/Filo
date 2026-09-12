@@ -285,3 +285,31 @@ test('#587 un collegamento alla cartella delle chiavi non regala la lettura', as
 
   try { fs.rmSync(casa, { recursive: true, force: true }); } catch (_) {}
 });
+
+// ── #587 giro 3 ─────────────────────────────────────────────────────────────
+// Stessa causa, altra forma: il percorso scritto in un modo che la SHELL scioglie
+// e il controllo no. In bash una barra rovesciata annulla il carattere dopo, e
+// `cat ~/.ss\h/config` apre la cartella delle chiavi. Questo caso passa dal gate
+// vero dell'app perché è lì che si vede se il main dichiara la shell: senza quella
+// dichiarazione il controllo legge solo la forma Windows e la lettura passa.
+
+test('#587 un percorso travestito non regala la lettura, e le letture normali restano libere', async ({ openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+
+  for (const comando of [
+    'cat ~/.ss\\h/config',
+    'cat ~/.netr\\c',
+    "cat $'.ssh/id_rsa'",
+    'cat ~/.confi\\g/Filo/storage.json',
+  ]) {
+    const r = await runAction(page, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.executed, `«${comando}» non deve partire da solo`).toBe(false);
+    expect(r.needsConfirm, `«${comando}» deve chiedere un OK`).toBe(2);
+  }
+
+  for (const comando of ['ls ~/*.txt', 'cat appunti.txt', 'grep credentials appunti.txt']) {
+    const ok = await runAction(page, { type: 'ESEGUI_COMANDO', comando });
+    expect(ok.needsConfirm, `«${comando}» non deve chiedere niente`).toBeFalsy();
+  }
+});
