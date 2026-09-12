@@ -1767,7 +1767,9 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
 // diversi.
 async function saveOnboarding(state) {
   const next = await FiloMem.setOnboarding(state);
-  try { broadcastToTabs({ type: MSG.FILO_ONBOARDING_UPDATED, onboarding: next }); } catch (_) {}
+  // Solo alle superfici interne: lo stato dell'intervista è la conversazione di
+  // benvenuto dell'utente, e l'unica a leggerlo è la home (#589).
+  try { broadcastToFiloPages({ type: MSG.FILO_ONBOARDING_UPDATED, onboarding: next }); } catch (_) {}
   return next;
 }
 
