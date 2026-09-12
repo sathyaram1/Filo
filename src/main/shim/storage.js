@@ -389,6 +389,7 @@ module.exports = {
   maxFlushOverlap,
   setSync,
   runIncognito,
+  runFuoriIncognito,
   resetIncognito,
   inIncognito,
 };
