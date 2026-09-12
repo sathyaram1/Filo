@@ -525,8 +525,27 @@ function controlla(wc, permesso, origineRichiedente, dettagli) {
     const { win } = posizione(wc);
     const incognito = !!(win && win._filoIncognito);
     const ses = wc && !wc.isDestroyed() ? wc.session : null;
-    return Pp.decisione(mappaDi(ses, incognito), origine, chiavi) === 'allow';
+    const detto = Pp.decisione(mappaDi(ses, incognito), origine, chiavi);
+    // Permessi che arrivano SOLO da qui: Chromium non fa mai la richiesta, e
+    // con un no consegna al sito un risultato vuoto senza dire niente a
+    // nessuno. Senza richiesta non compariva nessuna pastiglia, quindi nessuna
+    // scelta veniva registrata, quindi in Impostazioni quel sito non c'era e
+    // non c'era niente da ribaltare: l'elenco dei caratteri installati si
+    // poteva solo negare, mai consentire (#586, giro 4). La domanda la facciamo
+    // partire di qui, e intanto rispondiamo no: quando l'utente consente, il
+    // controllo dopo dice sì e il sito, riprovando, ottiene la sua roba.
+    if (detto === null && Pp.soloControllo(permesso)) chiediDaControllo(wc, permesso, dettagli);
+    return detto === 'allow';
   } catch (_) { return false; }
+}
+
+// La domanda fatta partire da un CONTROLLO. Non aspetta nessuno (il controllo è
+// sincrono e ha già risposto no) e non si ripete: finché la pastiglia è aperta
+// `chiedi` riconosce la richiesta gemella e non ne impila un'altra.
+function chiediDaControllo(wc, permesso, dettagli) {
+  Promise.resolve()
+    .then(() => decidi(wc, permesso, dettagli))
+    .catch(() => {});
 }
 
 function installaSuSessione(ses) {
