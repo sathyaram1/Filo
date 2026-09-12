@@ -100,6 +100,28 @@
     });
   }
 
+  // Da un data URL a un Blob, senza rete. `fetch('data:…')` sarebbe più corto ma
+  // passa dalla politica di sicurezza del sito: dove `connect-src` è stretto
+  // viene bloccata, e l'immagine incollata non arriverebbe proprio sui siti più
+  // severi.
+  function dataUrlToBlob(dataUrl) {
+    try {
+      const s = String(dataUrl || '');
+      const virgola = s.indexOf(',');
+      if (virgola < 0) return null;
+      const testa = s.slice(0, virgola);
+      const corpo = s.slice(virgola + 1);
+      const tipo = (testa.match(/^data:([^;,]+)/) || [])[1] || 'application/octet-stream';
+      if (!/;base64$/i.test(testa)) {
+        return new Blob([decodeURIComponent(corpo)], { type: tipo });
+      }
+      const grezzo = atob(corpo);
+      const byte = new Uint8Array(grezzo.length);
+      for (let i = 0; i < grezzo.length; i++) byte[i] = grezzo.charCodeAt(i);
+      return new Blob([byte], { type: tipo });
+    } catch (_) { return null; }
+  }
+
   // Descrizione provvisoria per un'immagine prima che arrivi quella generata
   // dall'AI (o il perché non arriverà: vedi imagePlaceholderLabel).
   async function describeImage(_blob) {
