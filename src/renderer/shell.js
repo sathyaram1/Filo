@@ -1724,7 +1724,15 @@
       // Se la finestra è stretta la frase si accorcia con i puntini: il testo
       // intero resta leggibile passandoci sopra, perché quale permesso si sta
       // per dare non può restare a metà.
-      testo.dataset.tip = `${host} vuole ${cosa}`;
+      //
+      // Qui finisce anche il nome tecnico dei permessi che Filo non sa
+      // nominare. Nella domanda non ci va: «vuole usare «screen-wake-lock»» non
+      // la capisce nessuno, e chi la legge non sa cosa sta per dare. Chi quei
+      // nomi li sa leggere li trova passandoci sopra.
+      const tecnici = Array.isArray(info.tecnici) ? info.tecnici : [];
+      testo.dataset.tip = tecnici.length
+        ? `${host} vuole ${cosa} (${tecnici.join(', ')})`
+        : `${host} vuole ${cosa}`;
       chip.appendChild(testo);
 
       const rispondi = (scelta, ricorda) => {
