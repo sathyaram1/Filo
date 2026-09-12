@@ -347,6 +347,16 @@ function registerIpcHandlers() {
     win._filoTabs.openBlockedPopup(url);
     return { ok: true };
   });
+  // #590 — lo scavalco della lista dei siti bloccati ha un canale SUO, separato
+  // da quello dei popup: sono due permessi diversi, e finché passavano dalla
+  // stessa porta un clic su "Apri" della chip dei popup toglieva il sito dalla
+  // lista per tutta la sessione.
+  ipcMain.handle('tabs:open-site-anyway', (event, { url } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs || !url) return { ok: false };
+    win._filoTabs.apriSitoComunque(url);
+    return { ok: true };
+  });
   // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola
   // tab attraverso un endpoint in un altro paese. La lista location curate
   // serve al menu tasto destro sulla tab (feedback UI separato).
