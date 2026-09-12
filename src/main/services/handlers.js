@@ -1241,6 +1241,34 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
     } catch (_) {}
   }
 
+  // CERCA_WEB: la stessa difesa di NAVIGA, sull'altra uscita (#587, giro 7).
+  // Una ricerca esce dal computer verso un servizio esterno, e che cosa ci
+  // finisca dentro lo detta il modello: «cerca su internet <la chiave appena
+  // letta>» porta fuori lo stesso dato di un link, e non chiedeva niente.
+  // Due differenze volute rispetto a NAVIGA, perché una ricerca è testo scritto
+  // da qualcuno, non un carico:
+  //   • niente ripiego strutturale (`fromUntrusted: false`): una ricerca lunga
+  //     non è un payload, e misurarla così farebbe chiedere un OK a chi cerca
+  //     una frase;
+  //   • conta solo il materiale RICONOSCIBILE, non le parole comuni della
+  //     memoria — per questo il profilo entra come `letto`, dove valgono solo i
+  //     dati lunghi o con cifre. Cercare il proprio nome resta un gesto gratis;
+  //     cercare la propria chiave API no.
+  if (type === 'CERCA_WEB') {
+    try {
+      const Exfil = globalThis.SN_URL_EXFIL;
+      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
+      if (Exfil && query) {
+        const { memoria, letto } = await navExfilCorpus(sender);
+        const finta = `https://ricerca.filo.invalid/?q=${encodeURIComponent(query)}`;
+        const v = Exfil.assess(finta, {
+          corpus: '', letto: `${memoria}\n${letto}`, fromUntrusted: false, carichiPrima: [],
+        });
+        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
+      }
+    } catch (_) {}
+  }
+
   // LEGGI_DOCUMENTO: stessa regola di lettura del terminale sui BERSAGLI
   // RISERVATI (#587). Questa azione apre dal disco gli stessi file che aprirebbe
   // un `cat`, quindi chiavi, credenziali e `.env` non possono costare meno di
