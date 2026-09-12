@@ -12,6 +12,10 @@
   --tab-active: #fdf6ec;
   --border: #e2d3b5;
   --radius: 10px;
+  /* Le cose in corso che si possono fermare (la ripresa dello schermo di un
+     sito). Rosso caldo, non il rosso di sistema: resta dentro la tavolozza di
+     Filo, e come ogni altro colore si può cambiare. */
+  --pericolo: #c0553f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,6 +27,7 @@
     --tab-bg: #2a241d;
     --tab-active: #1d1a16;
     --border: #3b332a;
+    --pericolo: #e0765c;
   }
 }
 
@@ -535,6 +540,7 @@ html[data-incognito="1"] {
   --tab-bg: #342c47;
   --tab-active: #2a2438;
   --border: #46395f;
+  --pericolo: #e0765c;
 }
 
 /* ── Penombra "modalità annotazione" del box feedback ──────────────────────
@@ -795,7 +801,7 @@ html[data-feedback-dim="1"] .shell {
    che chiede: un rosso caldo, lo stesso che Filo usa per le cose in corso da
    fermare, e un punto che pulsa piano. */
 .perm-chip.perm-live {
-  border-left-color: var(--danger, #c0553f);
+  border-left-color: var(--pericolo);
 }
 .perm-chip.perm-live .perm-chip-text::before {
   content: '';
@@ -804,7 +810,7 @@ html[data-feedback-dim="1"] .shell {
   height: 7px;
   margin-right: 7px;
   border-radius: 50%;
-  background: var(--danger, #c0553f);
+  background: var(--pericolo);
   vertical-align: middle;
   animation: permLivePulse 1.8s ease-in-out infinite;
 }
