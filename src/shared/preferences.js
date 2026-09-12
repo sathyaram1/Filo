@@ -148,10 +148,12 @@
         const s = check.value;
         // «togli lo stile», «nessuno», o un valore vuoto: si CANCELLA. Se si
         // può mettere si deve poter togliere, anche a voce e non solo dalla
-        // pagina Preferenze.
-        const removal = ['', 'nessuno', 'nessuna', 'niente', 'togli', 'toglilo', 'rimuovi', 'cancella',
-          'default', 'predefinito', 'normale', 'standard', 'nulla', 'none', 'no'];
-        if (removal.includes(s.toLowerCase())) {
+        // pagina Preferenze. L'elenco delle parole sta in SN_CONST perché la
+        // stessa lettura vale anche nel riquadro delle Preferenze.
+        const rimozione = C && typeof C.isAgentStyleRemoval === 'function'
+          ? C.isAgentStyleRemoval(s)
+          : s.trim() === '';
+        if (rimozione) {
           return { partial: { agentStyle: '' }, label: "Stile dell'agente → nessuno (predefinito)" };
         }
         // L'etichetta porta il testo INTERO: è quello che il popup di conferma
