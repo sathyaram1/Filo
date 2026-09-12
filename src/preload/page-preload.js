@@ -192,17 +192,20 @@ try {
     ipcRenderer.on('filo:permessi-ferma', (_e, msg) => {
       const id = (msg && msg.id) || null;
       let risposto = false;
-      const rispondi = (vive) => {
+      // `viste`: quante tracce questo riquadro ha visto passare da sempre. Zero
+      // vuol dire che la pagina non è passata dal nostro giro, e chi chiede non
+      // deve concludere che sia tutto a posto (#586, giro 6).
+      const rispondi = (vive, viste) => {
         if (risposto) return;
         risposto = true;
-        try { ipcRenderer.send('filo:permessi-fermato', { id, vive }); } catch (_) {}
+        try { ipcRenderer.send('filo:permessi-fermato', { id, vive, viste: Number(viste) || 0 }); } catch (_) {}
       };
       try {
         const suRisposta = (e) => {
           try {
             if (!e || !e.detail || e.detail.id !== id) return;
             document.removeEventListener(CANALE_FERMATO, suRisposta, true);
-            rispondi(Number(e.detail.vive) || 0);
+            rispondi(Number(e.detail.vive) || 0, e.detail.viste);
           } catch (_) {}
         };
         document.addEventListener(CANALE_FERMATO, suRisposta, true);
@@ -211,8 +214,8 @@ try {
         }));
         // La pagina risponde sull'istante. Se non risponde (il suo codice ha
         // tolto di mezzo il nostro giro), vale come "è rimasto tutto vivo".
-        setTimeout(() => rispondi(1), 400);
-      } catch (_) { rispondi(1); }
+        setTimeout(() => rispondi(1, 0), 400);
+      } catch (_) { rispondi(1, 0); }
     });
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
