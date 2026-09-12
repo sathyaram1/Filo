@@ -160,7 +160,8 @@ function isSearchEngineUrl(url) {
 
 // L'host è in blacklist? (blacklist dedicata dell'utente, oppure — se
 // abilitato — le liste pubbliche dell'ad-blocker.)
-function isBlacklistedHost(host) {
+function isBlacklistedHost(rawHost) {
+  const host = canonicalHost(rawHost);
   if (!host) return false;
   if (matchesSuffix(host, userBlacklist)) return true;
   if (useAdblockLists) {
