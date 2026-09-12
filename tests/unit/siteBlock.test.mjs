@@ -203,3 +203,69 @@ test('configureFromSettings scarta le voci non valide dalla blacklist salvata', 
   assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
   assert.equal(SB.shouldBlockNavigation('https://ads.test/').block, true);
 });
+
+// ─── #590 giro 2: lo STESSO sito scritto in un'altra forma ───────────────────
+//
+// La rete risolve identici nomi che il confronto con la lista trattava come
+// diversi: bastava scriverne uno e la lista non valeva più, su tutte le strade
+// insieme (tutte chiedono a questa funzione).
+
+test('#590: il PUNTO FINALE dell\'host non scavalca la lista', () => {
+  reset();
+  // "evil.example." è la forma assoluta di "evil.example": stessa pagina, in
+  // qualunque browser. Prima passava: il confronto falliva su quel carattere.
+  for (const u of [
+    'https://evil.example./',
+    'https://evil.example./pagina?x=1',
+    'https://deep.sub.evil.example./',
+    'https://evil.example../', // più punti: comunque lo stesso nome
+    'https://EVIL.EXAMPLE./',
+    'https://evil.example.:8443/',
+  ]) {
+    const d = SB.shouldBlockNavigation(u);
+    assert.equal(d.block, true, `dovrebbe BLOCCARE ${u}`);
+    assert.equal(d.host, 'evil.example', `host riportato senza punto finale per ${u}`);
+  }
+  // E l'host riportato è quello vero anche per i sottodomini.
+  assert.equal(SB.shouldBlockNavigation('https://sub.evil.example./').host, 'sub.evil.example');
+  // Un sito fuori lista resta fuori: la pulizia non allarga il blocco.
+  assert.equal(SB.shouldBlockNavigation('https://wikipedia.org./').block, false);
+});
+
+test('#590: il punto finale vale anche nella voce scritta dall\'utente e nel referrer', () => {
+  // Voce della lista scritta con il punto finale: deve bloccare l'una e l'altra forma.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['evil.example.'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://evil.example./').block, true);
+
+  // Un motore di ricerca col punto finale resta un motore di ricerca: la
+  // pulizia non deve trasformare l'eccezione in un blocco a sorpresa.
+  reset();
+  assert.equal(SB.isSearchEngineUrl('https://www.google.com./search?q=x'), true);
+  assert.equal(
+    SB.shouldBlockNavigation('https://evil.example/', { fromUrl: 'https://www.google.com./search?q=x' }).block,
+    false,
+  );
+});
+
+test('#590: una voce scritta in alfabeto non latino entra nella lista e blocca davvero', () => {
+  // L'indirizzo viaggia sulla rete in punycode: se la voce resta in unicode non
+  // combacia mai — e prima veniva anche scartata in silenzio come "non valida",
+  // lasciando l'utente convinto di aver bloccato qualcosa.
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['münchen.example'] });
+  assert.equal(SB.status().blacklistSize, 1);
+  assert.equal(SB.shouldBlockNavigation('https://münchen.example/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://xn--mnchen-3ya.example/pagina').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://altro.example/').block, false);
+});
+
+test('#590: canonicalHost è la forma unica di un nome di host', () => {
+  assert.equal(SB.canonicalHost('EVIL.Example.'), 'evil.example');
+  assert.equal(SB.canonicalHost('evil.example...'), 'evil.example');
+  assert.equal(SB.canonicalHost('  evil.example  '), 'evil.example');
+  assert.equal(SB.canonicalHost('münchen.example'), 'xn--mnchen-3ya.example');
+  assert.equal(SB.canonicalHost(''), '');
+  assert.equal(SB.canonicalHost('.'), '');
+  assert.equal(SB.canonicalHost(null), '');
+});
