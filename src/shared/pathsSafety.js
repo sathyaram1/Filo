@@ -44,6 +44,16 @@
 
   const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
   const LONG_NUM_RE = /\b\d{6,}\b/g;
+  // Un IBAN e un codice fiscale non sono fatti di sole cifre: due lettere e due
+  // cifre davanti al primo, lettere e cifre alternate nel secondo. La regola
+  // delle cifre attaccate non li vedeva, e uscivano interi in una raccolta che
+  // legge chiunque.
+  const IBAN_RE = /\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/gi;
+  const CF_RE = /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/gi;
+  // Cifre separate da spazi, punti o trattini: «333 123 456», «4111 1111 1111
+  // 1111», «06.1234.5678». Chiede almeno sei cifre in tutto, così un «div:nth
+  // 2» non diventa un numero e un telefono sì.
+  const NUM_SPEZZATO_RE = /\d(?:[\d  .\-/]{4,})\d/g;
   const AZIONI = ['click', 'fill', 'reveal', 'hover'];
 
   // Un dominio è un hostname: lettere, cifre, punti e trattini. Niente spazi,
