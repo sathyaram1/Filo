@@ -235,6 +235,10 @@ function chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile = true
         chiavi,
         testo: Pp.etichettaRichiesta(chiavi),
         nomi: chiavi.map((k) => Pp.nome(k)),
+        // I nomi tecnici dei permessi che Filo non sa nominare. Nella domanda
+        // non ci vanno (chi la legge non li capisce), nel suggerimento sì: chi
+        // li sa leggere li trova passandoci sopra.
+        tecnici: Pp.tecnici(chiavi),
         ricordabile,
       });
     } catch (_) { finisci(false); }
