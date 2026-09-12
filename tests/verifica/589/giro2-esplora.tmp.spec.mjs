@@ -10,19 +10,6 @@ test('sweep: cosa ottiene una pagina web chiedendo', async ({ app, shell, openTa
   const web = await testServer.openReady(openTab, '<h1>sito</h1>');
   const url = web.url();
 
-  // Un utente connesso, simulato nel main: l'accesso Google vero non si fa qui.
-  await app.evaluate(() => {
-    const req = process.mainModule.require.bind(process.mainModule);
-    const cache = req('node:module')._cache || {};
-    const k = Object.keys(cache).find((p) => p.includes('google-auth'));
-    const m = cache[k].exports;
-    globalThis.__origAuth = { isSignedIn: m.isSignedIn, getProfile: m.getProfile, isAdmin: m.isAdmin, getUid: m.getUid };
-    m.isSignedIn = () => true;
-    m.getProfile = () => ({ email: 'ANNA@example.com', name: 'Anna Verifica', picture: 'https://x/foto.png' });
-    m.isAdmin = () => true;
-    m.getUid = async () => 'UID-FIREBASE-589';
-  });
-
   const tipi = [
     'auth_status', 'get_history', 'get_clipboard_history', 'get_saved_pages', 'get_costs',
     'filo_get_memory', 'filo_get_state', 'export_data', 'get_archived_tabs', 'get_categories',
