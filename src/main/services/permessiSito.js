@@ -461,6 +461,8 @@ function iniziaUso(wc, origine, chiavi, opzioni) {
       wc,
       shell,
       origine,
+      tipo,
+      frase,
       chiavi: chiavi.slice(),
       incognito: !!(win && win._filoIncognito),
       pulisci: () => {
@@ -472,7 +474,7 @@ function iniziaUso(wc, origine, chiavi, opzioni) {
       id,
       tabId: tab ? tab.id : null,
       host: P().host(origine),
-      frase: P().frasePotere(chiavi, !!o.audioSistema),
+      frase,
       chiudibile: !!o.chiudibile,
     });
     return id;
