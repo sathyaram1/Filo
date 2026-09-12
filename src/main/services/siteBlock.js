@@ -64,7 +64,11 @@ const SEARCH_ENGINE_PATTERNS = [
   /(^|\.)kagi\.com$/,
   /(^|\.)mojeek\.com$/,
   /(^|\.)ask\.com$/,
-  /(^|\.)searx\b/, // istanze SearXNG (searx.*)
+  // Istanze SearX (searx.be, searx.info, searx.co.uk…). Ancorata al dominio
+  // registrabile come le altre (#590): la vecchia /(^|\.)searx\b/ non aveva
+  // ancora finale, quindi bastava una label iniziale — searx.qualunque.com
+  // apriva l'eccezione a un dominio di chiunque.
+  engineOnPublicSuffix('searx'),
 ];
 
 function hostnameOf(url) {
