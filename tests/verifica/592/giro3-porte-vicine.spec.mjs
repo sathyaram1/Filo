@@ -141,3 +141,81 @@ test('la voce scelta nella pagina non deve rimettere la velocità di lettura di 
 
   expect((await impostazioni(pagina)).tts?.rate).toBeCloseTo(1.6, 2);
 });
+
+// ── la pagina Sicurezza: le protezioni dentro lo stesso insieme ─────────────
+
+const SICUREZZA = 'filo://security/security.html';
+
+test('una sotto-opzione toccata non deve riaccendere il rilevamento siti pericolosi', async ({ openTab }) => {
+  const pagina = await openTab(SICUREZZA);
+  await pagina.waitForSelector('#sec-safebrowse', { timeout: 25_000 });
+
+  // Il rilevamento è acceso: le sue sotto-opzioni si vedono.
+  if (!(await pagina.isChecked('#sec-safebrowse'))) {
+    await pagina.click('#sec-safebrowse');
+    await pagina.waitForTimeout(1200);
+  }
+  await pagina.click('#sec-safebrowse-network');
+  await pagina.waitForTimeout(1200);
+  expect(await chiHaIlFuoco(pagina)).toBe('sec-safebrowse-network');
+
+  // L'utente lo spegne parlando con Filo (livello 2, con conferma).
+  await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'navigazione_sicura', valore: 'no' });
+  await pagina.waitForTimeout(1200);
+  expect((await impostazioni(pagina)).security?.safeBrowse?.enabled).toBe(false);
+
+  // Poi tocca un'altra SOTTO-opzione del rilevamento nella pagina.
+  await pagina.click('#sec-safebrowse-llm');
+  await pagina.waitForTimeout(1800);
+
+  expect((await impostazioni(pagina)).security?.safeBrowse?.enabled).toBe(false);
+});
+
+test('un sito aggiunto ai fidati non deve rimettere la gestione cookie di prima', async ({ openTab }) => {
+  const pagina = await openTab(SICUREZZA);
+  await pagina.waitForSelector('#cookie-wl-input', { timeout: 25_000 });
+
+  // I siti fidati si scrivono solo in "Privacy massima": è da lì che si parte.
+  await pagina.click('#cookie-mode-privacy');
+  await pagina.waitForTimeout(1200);
+  expect((await impostazioni(pagina)).security?.cookies?.mode).toBe('privacy');
+
+  // L'utente scrive un sito fidato e lascia il cursore nel campo.
+  await pagina.click('#cookie-wl-input');
+  await pagina.type('#cookie-wl-input', 'esempio.it');
+  expect(await chiHaIlFuoco(pagina)).toBe('cookie-wl-input');
+
+  // Nel mentre cambia la gestione dei cookie parlando con Filo, e conferma.
+  await confermaInChat(pagina, { type: 'IMPOSTA_PREFERENZA', chiave: 'gestione_cookie', valore: 'manuale' });
+  await pagina.waitForTimeout(1200);
+  expect((await impostazioni(pagina)).security?.cookies?.mode).toBe('manual');
+
+  // Finisce di aggiungere il sito fidato.
+  await pagina.click('#cookie-wl-add-btn');
+  await pagina.waitForTimeout(1800);
+
+  expect((await impostazioni(pagina)).security?.cookies?.mode).toBe('manual');
+});
+
+// ── il riquadro dello stile dice una cosa e in memoria ce n'è un'altra ──────
+
+test('«normale» scritto nel riquadro: quello che si vede e quello che è salvato devono coincidere', async ({ openTab }) => {
+  const pagina = await apriPreferenze(openTab);
+
+  // Prima uno stile vero, così c'è qualcosa da cancellare.
+  await pagina.click('#agentStyleText');
+  await pagina.type('#agentStyleText', 'Rispondi con frasi brevi.');
+  await pagina.waitForTimeout(1500);
+  expect((await impostazioni(pagina)).agentStyle).toBe('Rispondi con frasi brevi.');
+
+  // Poi l'utente lo sostituisce con la parola «normale» e resta nel riquadro
+  // (non clicca altrove: legge quello che ha scritto).
+  await pagina.fill('#agentStyleText', 'normale');
+  await pagina.waitForTimeout(1500);
+
+  const salvato = (await impostazioni(pagina)).agentStyle;
+  const mostrato = await pagina.inputValue('#agentStyleText');
+  // O si salva quello che si vede, o si vede quello che si è salvato: le due
+  // cose non possono divergere senza dirlo.
+  expect({ salvato, mostrato }).toEqual({ salvato, mostrato: salvato });
+});
