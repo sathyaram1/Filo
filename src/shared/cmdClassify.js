@@ -754,7 +754,7 @@
   // `ls -lR`), `--recursive`, `-Recurse` di PowerShell. La minuscola `-r` NON
   // conta qui, altrimenti `ls -lart` (ordina al contrario) passerebbe per una
   // ricorsiva e chiederebbe un OK a chi elenca la sua cartella.
-  const RECURSE_GENERIC_RE = /(^|\s)(-[A-Za-z]*R[A-Za-z]*|--recursive|-recurse)(\s|$)/i;
+  const RECURSE_GENERIC_RE = /(^|\s)(-[A-Za-z]*R[A-Za-z]*(\s|$)|--[Rr]ecursive(\s|$)|-[Rr]ecurse(\s|$))/;
   function isRecursive(prog, cmd) {
     if (RECURSE_SEMPRE.has(prog)) return true;
     const re = RECURSE_RE[prog];
