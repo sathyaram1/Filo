@@ -500,9 +500,10 @@
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  // Le protezioni possono cambiare mentre questa pagina è aperta. Se l'utente
-  // non sta scrivendo la pagina si rilegge; se sta scrivendo non si tocca
-  // niente, e il confronto dentro `save` basta a non disfare l'altrui lavoro.
+  // Le protezioni possono cambiare mentre questa pagina è aperta. La pagina si
+  // rilegge sempre, così non mostra una difesa accesa che è stata spenta;
+  // l'unica cosa che si rimette al suo posto è il testo che l'utente stava
+  // scrivendo, per esempio un sito fidato a metà.
   //
   // L'annuncio torna indietro anche per i salvataggi di questa pagina: quelli
   // si saltano, se no rileggere cancellerebbe l'avviso appena mostrato (le
