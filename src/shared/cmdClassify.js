@@ -868,15 +868,26 @@
   const CERCA_PRIMA = new Set(['grep', 'egrep', 'fgrep', 'findstr', 'select-string', 'sls', 'rg']);
   // …ma solo quando il modello è DAVVERO il primo operando. Con `-e`/`-f` (anche
   // dentro un gruppo di flag corti), `--regexp`/`--file` o gli switch `/G:`,
-  // `/F:` di findstr, il modello arriva da un flag e il primo operando è già un
-  // file da misurare. Le maiuscole no: `-E`/`-F` di grep sono il tipo di
+  // `/F:`, `/C:` di findstr, il modello arriva da un flag e il primo operando è
+  // già un file da misurare. Le maiuscole no: `-E`/`-F` di grep sono il tipo di
   // espressione, non un modello che arriva da fuori.
-  const CERCA_DA_FLAG_RE = /(^|\s)(--regexp|--file|\/[A-Za-z]*[gGfF]:|-[a-z]*[ef])(=|:|\s|$)/;
+  // `/C:` è il modo NORMALE di cercare una frase con findstr, e senza di lui
+  // `findstr /C:BEGIN .ssh\id_rsa` scartava il file come se fosse il testo
+  // cercato e stampava la chiave privata senza chiedere niente (#587, giro 6).
+  const CERCA_DA_FLAG_RE = /(^|\s)(--regexp|--file|\/[A-Za-z]*[gGfFcC]:|-[a-z]*[ef])(=|:|\s|$)/;
   // Le opzioni che portano il MODELLO come token successivo (`grep -e credentials
   // appunti.txt`, `Select-String -Pattern shadow appunti.txt`): quel token è il
   // testo cercato, non un file, e va saltato. `-f`/`--file` NON stanno qui: lì il
   // token dopo è un file vero, che si apre e si misura.
   const CERCA_MODELLO_FLAG_RE = /^(-[A-Za-z]*e|--regexp?|-{1,2}pattern|-{1,2}simplematch)$/i;
+  // Il rovescio: le opzioni che portano il PERCORSO come token successivo. In
+  // PowerShell il file di una ricerca si lega con `-Path`/`-LiteralPath`, e allora
+  // la prima parola scritta è già il testo cercato: scartandola si scartava
+  // PROPRIO IL FILE, e `Select-String -Path .ssh\config Host` stampava la
+  // configurazione SSH senza chiedere niente (#587, giro 6). Questi token escono
+  // dal conto degli operandi prima della regola del primo operando e rientrano
+  // dopo, come bersagli da misurare.
+  const CERCA_PERCORSO_FLAG_RE = /^-{1,2}(path|literalpath|lp|pspath)$/i;
 
   // Comandi che spostano la cartella di lavoro: dentro una sequenza li SEGUIAMO,
   // così `cd /etc && cat passwd` misura `passwd` in `/etc` e non nella cartella di
