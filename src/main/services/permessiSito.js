@@ -348,6 +348,64 @@ function consumaPreambolo(wc) {
   return v.fino > Date.now() ? v : (fineRipresa(v.ripresaId), null);
 }
 
+// Riprese dello schermo in corso. Una webcam accesa si vede e un microfono
+// aperto prima o poi si sente; lo schermo ripreso non lascia nessun segno, e
+// senza questo un sito continua a filmare e chi usa Filo non ha modo di
+// saperlo né di fermarlo. Il segno dice «può vedere», non «sta vedendo»,
+// perché quando il sito smette da solo nessuno ce lo dice: la sola cosa certa
+// è che finché quella pagina è lì il permesso ce l'ha ancora. «Interrompi»
+// ricarica la pagina, che è l'unico modo di chiudere la ripresa per davvero.
+const riprese = new Map(); // id → { wc, shell, pulisci }
+let prossimaRipresa = 1;
+
+function iniziaRipresa(wc, origine) {
+  try {
+    const { win, tab } = posizione(wc);
+    const shell = win && !win.isDestroyed() ? win.webContents : null;
+    if (!shell || shell.isDestroyed()) return null;
+    const id = String(prossimaRipresa++);
+    const suNavigazione = (_e, _url, inPlace, isMainFrame) => {
+      if (isMainFrame && !inPlace) fineRipresa(id);
+    };
+    const suMorte = () => fineRipresa(id);
+    try { wc.on('did-start-navigation', suNavigazione); } catch (_) {}
+    try { wc.once('destroyed', suMorte); } catch (_) {}
+    riprese.set(id, {
+      wc,
+      shell,
+      pulisci: () => {
+        try { wc.off('did-start-navigation', suNavigazione); } catch (_) {}
+        try { wc.off('destroyed', suMorte); } catch (_) {}
+      },
+    });
+    shell.send('permissions:capture-start', {
+      id,
+      tabId: tab ? tab.id : null,
+      host: P().host(origine),
+    });
+    return id;
+  } catch (_) { return null; }
+}
+
+function fineRipresa(id) {
+  const r = riprese.get(String(id));
+  if (!r) return { ok: false };
+  riprese.delete(String(id));
+  try { r.pulisci(); } catch (_) {}
+  try { if (r.shell && !r.shell.isDestroyed()) r.shell.send('permissions:capture-end', { id: String(id) }); } catch (_) {}
+  return { ok: true };
+}
+
+// «Interrompi»: ricaricare la pagina distrugge il documento e con lui la
+// ripresa. È brutale e lo dice il suggerimento del bottone, ma è l'unica via
+// che chiude davvero: da qui non si può spegnere una traccia già consegnata.
+function interrompiRipresa(id) {
+  const r = riprese.get(String(id));
+  if (!r) return { ok: false, error: 'finita' };
+  try { if (r.wc && !r.wc.isDestroyed()) r.wc.reload(); } catch (_) {}
+  return fineRipresa(id);
+}
+
 // Controllo SINCRONO (navigator.permissions.query, Notification.permission,
 // enumerateDevices): può solo rispondere con ciò che già si sa. Mai "sì" per
 // una richiesta mai concessa — è esattamente il buco del default di Electron.
