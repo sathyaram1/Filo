@@ -364,3 +364,77 @@ test('#587 — la regola delle parole comuni resta sulla memoria', () => {
   const memoria = 'Profilo: si chiama Mario Rossi, vive a Bologna.';
   assert.equal(E.assess('https://raccolta.test/?d=MarioRossiBologna', { corpus: memoria, fromUntrusted: true }).exfil, true);
 });
+
+// ── #587, giro 6 ───────────────────────────────────────────────────────────
+// Il dato spedito con più link veniva riconosciuto solo se il taglio cadeva nel
+// punto giusto: a ricomporlo si partiva dall'inizio del dato e si pretendeva che
+// il primo link ne portasse un pezzo intero. Ma dove tagliare lo sceglie chi
+// attacca, e spostare il taglio di tre caratteri bastava a far uscire la chiave.
+test('#587 — la chiave spedita con più link chiede conferma dovunque cada il taglio', () => {
+  const CHIAVE = 'sk-or-v1-9f3bd2a71c4e8b60';
+  const letto = `OPENROUTER_API_KEY=${CHIAVE}\nDB_HOST=localhost\n`;
+  const apri = (urls) => {
+    const carichi = [];
+    let motivo = '';
+    for (const u of urls) {
+      const v = E.assess(u, { letto, fromUntrusted: true, carichiPrima: carichi.slice() });
+      if (v.exfil && !motivo) motivo = v.reason;
+      carichi.push(E.caricoUnito(u));
+      while (carichi.length > 24) carichi.shift();
+    }
+    return motivo;
+  };
+  const inParametri = (pezzi) => pezzi.map((p, i) => `https://raccolta.test/?p${i}=${p}`);
+  for (let t = 4; t < CHIAVE.length - 3; t++) {
+    const urls = inParametri([CHIAVE.slice(0, t), CHIAVE.slice(t)]);
+    assert.ok(apri(urls), `tagliata a ${t} la chiave esce intera: ${urls.join(' + ')}`);
+  }
+  for (const quanti of [3, 4, 5, 6, 8, 13]) {
+    const len = Math.ceil(CHIAVE.length / quanti);
+    const pezzi = [];
+    for (let i = 0; i < CHIAVE.length; i += len) pezzi.push(CHIAVE.slice(i, i + len));
+    assert.ok(apri(inParametri(pezzi)), `spedita in ${pezzi.length} link la chiave esce intera`);
+  }
+  const cinque = [];
+  for (let i = 0; i < CHIAVE.length; i += 5) cinque.push(CHIAVE.slice(i, i + 5));
+  assert.ok(apri(cinque.map((p) => `https://raccolta.test/${p}`)), 'pezzi nel percorso');
+  assert.ok(apri(cinque.map((p) => `https://${p}.raccolta.test/`)), 'pezzi nel sottodominio');
+  assert.ok(apri(cinque.map((p, i) => `https://raccolta.test/?k${i}=${p}&z=q`)), 'pezzi con un parametro in coda');
+});
+
+// …e gli indirizzi di tutti i giorni devono continuare ad aprirsi e basta, anche
+// dopo che nella scheda ne sono passati parecchi: incollare i carichi di molti
+// link può ricomporre per caso un numero lungo, e un avviso falso si clicca
+// senza leggerlo.
+test('#587 — dopo venti link veri non compare nessun avviso', () => {
+  const letto = 'Cliente numero 123456789012\nPOD IT001E12345678\nfattura settembre 2026\n';
+  const veri = [
+    'https://it.wikipedia.org/wiki/Storia_della_matematica',
+    'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+    'https://www.amazon.it/dp/B08N5WRWNW',
+    'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+    'https://news.ycombinator.com/item?id=41234567',
+    'https://stackoverflow.com/questions/12345678/how-to-parse-json',
+    'https://www.airbnb.it/rooms/12345678?check_in=2026-10-01',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://www.ikea.com/it/it/p/billy-libreria-bianco-00263850/',
+    'https://www.booking.com/hotel/it/duomo-firenze.it.html?aid=304142',
+    'https://www.reddit.com/r/italy/comments/1abcdef/bollette_luce/',
+    'https://www.imdb.com/title/tt0111161/',
+    'https://maps.app.goo.gl/aBcDeFgHiJkLmN',
+    'https://www.netflix.com/watch/81234567?trackId=255824129',
+    'https://x.com/anthropicai/status/1799999999999999999',
+    'https://www.instagram.com/p/C1a2B3c4D5e/',
+    'https://drive.google.com/file/d/1a2B3c4D5e6F7g8H9i0JkLmNoPqRsTuVw/view',
+    'https://www.subito.it/annunci-toscana/vendita/usato/firenze/',
+    'https://duckduckgo.com/?q=ricetta+carbonara',
+    'https://github.com/anthropics/claude-code/issues/1234',
+  ];
+  const carichi = [];
+  for (const u of veri) {
+    const v = E.assess(u, { letto, fromUntrusted: true, carichiPrima: carichi.slice() });
+    assert.equal(v.exfil, false, `"${u}" non porta fuori niente (${v.reason})`);
+    carichi.push(E.caricoUnito(u));
+    while (carichi.length > 24) carichi.shift();
+  }
+});
