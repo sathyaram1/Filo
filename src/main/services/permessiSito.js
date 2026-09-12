@@ -446,19 +446,21 @@ function trovaWcDelFrame(frame) {
 // quando la scelta dura una sessione sola. Prima leggevano tutte la memoria su
 // disco, e in incognito l'elenco tornava vuoto: l'unico modo di disdire era
 // chiudere la finestra.
+// Vale sia per la shell di una finestra (il tasto destro sulla scheda) sia per
+// una pagina dentro una scheda (il preload che chiede cosa è già stato deciso).
 function contesto(wc) {
   try {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (w.isDestroyed()) continue;
-      if (w.webContents !== wc) continue;
-      const incognito = !!w._filoIncognito;
-      if (!incognito) return { ses: null, incognito: false };
-      const tm = w._filoTabs;
+    const { win, tab } = posizione(wc);
+    if (!win) return { ses: null, incognito: false };
+    if (!win._filoIncognito) return { ses: null, incognito: false };
+    let c = tab && tab.view && tab.view.webContents;
+    if (!c || c.isDestroyed()) {
+      const tm = win._filoTabs;
       const t = tm && Array.isArray(tm.tabs)
         ? (tm.tabs.find((x) => x.id === tm.activeId) || tm.tabs[0]) : null;
-      const c = t && t.view && t.view.webContents;
-      return { ses: c && !c.isDestroyed() ? c.session : null, incognito: true };
+      c = t && t.view && t.view.webContents;
     }
+    return { ses: c && !c.isDestroyed() ? c.session : null, incognito: true };
   } catch (_) {}
   return { ses: null, incognito: false };
 }
