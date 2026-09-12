@@ -32,6 +32,28 @@ niente marcature scritte dal contenuto. Un intento che scrive la riga di
 chiusura farebbe credere al modello che quello che segue non è più contenuto
 esterno. Il contenuto non deve poter produrre nemmeno una riga della struttura.
 
+**La cancellazione dei dati personali vale per ogni campo che esce, e riconosce
+più di un numero.** Un dato che cambia proprietario porta con sé quello che
+c'era scritto sulla pagina di chi l'ha raccolto. Nel #585 la cancellazione
+copriva il campo più ovvio (gli elementi toccati) e conosceva due forme: gli
+indirizzi email e le cifre attaccate. Fuori restavano il percorso della pagina
+di partenza, che spesso contiene chi sei (`/clienti/IT60…/estratto`), la frase
+riassuntiva, che la scrive un modello ma leggendo gli altri due, e tutto quello
+che personale è senza essere una fila di cifre: IBAN, codice fiscale, telefoni e
+carte scritti con gli spazi. Una cancellazione che copre un campo su tre è una
+cancellazione che non c'è. Falla passare a ogni campo, e provala sul contrario:
+un selettore normale, con i suoi `nth-child(2)`, deve uscirne intero.
+
+**Uno non si prende il posto di tutti.** Quando più contributi condividono un
+tetto di caratteri dentro il prompt, servono due cose che sembrano una sola: un
+tetto per il singolo, e il fatto che chi non ci sta venga SALTATO invece di
+chiudere la fila. Nel #585 mancavano tutte e due: un percorso poteva pesare tre
+quarti del tetto, e ci si fermava al primo che non ci stava, buttando via anche
+quelli dopo che ci stavano. Due contributi lunghi, e tutto quello che il dominio
+aveva imparato spariva dal prompt. Se il singolo va accorciato, il taglio si
+dichiara nel testo: un contributo che finisce a metà senza dirlo è una bugia
+detta al modello.
+
 E il promemoria in fondo al prompt va aggiornato. È l'elenco di cosa non è un
 ordine, e un elenco che ne nomina tre su quattro insegna al modello che il
 quarto è diverso. Se aggiungi una fonte al prompt, la aggiungi lì dentro nello
