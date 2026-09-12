@@ -496,8 +496,19 @@
 
   // Allinea la select dei preset al testo corrente: se combacia con un preset
   // noto seleziona quello, altrimenti "Personalizzato".
+  //
+  // «normale», «nessuno», «no» e le altre parole di rimozione valgono
+  // "nessuno stile", ed è già quello che finisce in memoria appena le scrivi.
+  // Quindi la tendina dice «Nessuno (predefinito)» da subito: prima il riquadro
+  // mostrava la parola come se fosse uno stile in vigore, mentre in memoria non
+  // c'era più niente, e chi chiudeva la scheda lì si portava via l'idea di
+  // avere uno stile che non aveva (#592, giro 3).
   function syncPresetSelect() {
     const text = currentStyleText().trim();
+    if (isAgentStyleRemoval(text)) {
+      $('agentStylePreset').value = '';
+      return;
+    }
     const match = AGENT_STYLE_PRESETS.find((p) => p.text.trim() === text);
     $('agentStylePreset').value = match ? match.key : CUSTOM_KEY;
   }
