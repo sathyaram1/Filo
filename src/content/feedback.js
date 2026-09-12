@@ -673,7 +673,14 @@
     // "Allega": apre il selettore file. Si possono allegare immagini E altri
     // file (pdf, txt, md, json…), oltre a incolla/trascina. Parità tra i
     // cammini equivalenti.
-    attachBtn.addEventListener('click', () => { try { fileInput.click(); } catch (_) {} });
+    // `premi` e non `click()`: il selettore di file sta dentro la UI di Filo, e
+    // il guardiano dei gesti finti (#586) butta via i click che non vengono da
+    // una persona. Questo viene da noi, e va dichiarato.
+    attachBtn.addEventListener('click', () => {
+      try {
+        if (!global.SN_FILO_UI?.premi(fileInput)) fileInput.click();
+      } catch (_) {}
+    });
     fileInput.addEventListener('change', async () => {
       const picked = Array.from(fileInput.files || []);
       for (const f of picked) await addAttachment(f);
