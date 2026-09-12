@@ -491,6 +491,18 @@
       err.textContent = check.ok ? '' : `${check.error} ${coda}`;
       err.hidden = check.ok;
     }
+    // Una parola di rimozione scritta nel riquadro vuol dire "nessuno stile", e
+    // in memoria è già così: qui si dice, invece di lasciar credere che quella
+    // parola sia lo stile in vigore.
+    const nota = $('agentStyleNote');
+    if (nota) {
+      const parola = currentStyleText().trim();
+      const rimuove = check.ok && !!parola && isAgentStyleRemoval(parola);
+      nota.textContent = rimuove
+        ? `«${parola}» vuol dire «nessuno stile»: Filo adesso non ne sta usando nessuno. Uscendo dal riquadro la parola sparisce.`
+        : '';
+      nota.hidden = !rimuove;
+    }
     return check;
   }
 
