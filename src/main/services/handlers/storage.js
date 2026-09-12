@@ -320,6 +320,35 @@ module.exports = function register(on, ctx) {
     return { ok: true, items: Array.isArray(list) ? list : [] };
   });
 
+  // #586 — l'Incolla del menu di Filo. Gli appunti li legge il main, mai la
+  // pagina.
+  //
+  // Prima li leggeva il mondo della pagina, con una concessione al volo che
+  // saltava la domanda del permesso: l'utente aveva premuto "Incolla" nel menu
+  // di Filo, quindi a chiedere era lui e non il sito. La concessione però non
+  // portava il nome di chi l'aveva chiesta: valeva per la PRIMA richiesta di
+  // appunti che arrivava in quella scheda, e un sito che li chiedeva in
+  // continuazione se la prendeva lui. Circa una volta su tre quello che l'utente
+  // aveva copiato (una password, un codice) finiva al sito invece che nel campo,
+  // senza lasciare traccia da nessuna parte.
+  //
+  // Qui la corsa non esiste: il contenuto non passa mai dagli appunti del sito,
+  // lo legge Filo e lo consegna a chi ha premuto Incolla. Un sito che chiede gli
+  // appunti per conto suo passa dalla domanda come tutti, sempre.
+  on(MSG.APPUNTI_DI_FILO, async () => {
+    try {
+      const { clipboard } = require('electron');
+      let immagine = '';
+      try {
+        const img = clipboard.readImage();
+        if (img && !img.isEmpty()) immagine = img.toDataURL();
+      } catch (_) {}
+      let testo = '';
+      try { testo = clipboard.readText() || ''; } catch (_) {}
+      return { ok: true, testo, immagine };
+    } catch (_) { return { ok: false, testo: '', immagine: '' }; }
+  });
+
   on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg) => {
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
