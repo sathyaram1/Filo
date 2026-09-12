@@ -203,8 +203,19 @@
         if (/^https?$/i.test(p)) continue;
         carrier += p.length;
         if (p.length > piuLungo.length) piuLungo = p;
+        // Un pezzo illeggibile che si RIAPRE come testo non è il modo in cui un
+        // sito nomina le sue cose: è qualcosa che qualcuno ha impacchettato. È
+        // la riga di taglio che separa davvero i due mondi — provata su una
+        // ventina di indirizzi veri, nessun identificativo di sito si riapre
+        // (quello di un documento di Google, di un brano di Spotify, di una
+        // sessione di Booking danno tutti rumore) — e costa poco anche sbagliata.
+        if (p.length >= STRUCT_TESTO && tryBase64(p)) {
+          return { reason: 'contiene un blocco di dati codificato' };
+        }
       }
     }
+    // Illeggibile e che non si riapre: può essere testo cifrato. Qui il metro è
+    // largo, perché sotto ci sono gli identificativi veri dei siti.
     if (piuLungo.length >= STRUCT_BLOB) {
       return { reason: 'contiene un blocco di dati codificato' };
     }
