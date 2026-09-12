@@ -1278,6 +1278,14 @@
     // Drive PowerShell: ambiente, registro di sistema, altri provider interni.
     const prov = providerReason(raw, soloRiservati);
     if (prov) return prov;
+    // Una tilde che non è la cartella dell'utente: dove punta non sta scritto nel
+    // comando (vedi formaTilde). Non si applica a chi legge documenti per
+    // mestiere, dove il percorso arriva già risolto e una tilde non c'è.
+    if (!soloRiservati) {
+      const tl = formaTilde(raw);
+      if (tl === 'salto') return SALTO;
+      if (tl === 'altrove') return FUORI;
+    }
     const target = resolveTarget(raw, cwd, home);
     // I modelli che prendono tutto quello che c'è lì (`*`, `*.*`) si potano
     // PRIMA di cercare i bersagli riservati: non allargano niente, e trattarli
