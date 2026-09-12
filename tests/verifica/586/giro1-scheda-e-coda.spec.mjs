@@ -146,13 +146,7 @@ test('la pastiglia chiede spazio alla view della pagina, come fa il pannello dei
     return null;
   });
 
-  const prima = await inset();
-  await page.evaluate(() => window.__chiediFotocamera());
-  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 10_000 });
-  await shell.waitForTimeout(400);
-  const dopo = await inset();
-  const box = await shell.locator('.perm-chip').boundingBox();
-  const cimaPagina = await app.evaluate(({ BrowserWindow }) => {
+  const cimaPagina = () => app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
       const tm = w._filoTabs;
       if (!tm) continue;
@@ -162,13 +156,26 @@ test('la pastiglia chiede spazio alla view della pagina, come fa il pannello dei
     return null;
   });
 
+  const prima = await inset();
+  const cimaPrima = await cimaPagina();
+  await page.evaluate(() => window.__chiediFotocamera());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 10_000 });
+  await shell.waitForTimeout(500);
+  const box = await shell.locator('.perm-chip').boundingBox();
+  const cimaDopo = await cimaPagina();
+
   // eslint-disable-next-line no-console
-  console.log('[586] inset prima', JSON.stringify(prima), 'dopo', JSON.stringify(dopo),
-    'pastiglia', JSON.stringify(box), 'cima pagina', cimaPagina);
+  console.log('[586] inset prima', JSON.stringify(prima), 'pastiglia', JSON.stringify(box),
+    'cima pagina prima', cimaPrima, 'dopo', cimaDopo);
 
   expect(
-    dopo.topInset,
-    `la pastiglia occupa y ${box && box.y}..${box && (box.y + box.height)} mentre l'area pagina parte a y ${cimaPagina}: `
-    + 'per non finire sotto la view nativa dovrebbe farla scendere, come fa il pannello dei download',
-  ).toBeGreaterThan(prima.topInset);
+    cimaDopo,
+    `la pastiglia occupa y ${box && box.y}..${box && (box.y + box.height)}: l'area pagina deve scendere sotto di lei, `
+    + 'come fa col pannello dei download, altrimenti la view nativa la copre',
+  ).toBeGreaterThanOrEqual(box.y + box.height);
+
+  // E torna su quando si risponde: la riserva non resta appesa.
+  await shell.locator('.perm-chip .perm-chip-x').click();
+  await expect(shell.locator('.perm-chip')).toHaveCount(0, { timeout: 8_000 });
+  await expect.poll(cimaPagina, { timeout: 8_000 }).toBe(cimaPrima);
 });
