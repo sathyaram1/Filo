@@ -437,7 +437,12 @@
     // dell'utente: senza questo un sito apriva da solo il menu del tasto destro
     // e premeva «Incolla» o «Detta», cioè le due voci che saltano la domanda del
     // permesso perché a chiederle è l'utente. Vedi SN_FILO_UI.guardiaGesti.
-    try { self.SN_FILO_UI?.guardiaGesti?.(document); } catch (_) {}
+    //
+    // Solo sulle pagine del web: dentro una pagina filo:// il codice che gira è
+    // nostro, e lì un gesto fabbricato è una cosa che facciamo noi.
+    try {
+      if (/^https?:/i.test(location.href)) self.SN_FILO_UI?.guardiaGesti?.(document);
+    } catch (_) {}
     if (typeof self.__snSetContextMenuHandler === 'function') {
       self.__snSetContextMenuHandler(onContextMenu);
     } else {
