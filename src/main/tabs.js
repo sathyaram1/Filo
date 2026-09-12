@@ -2444,7 +2444,11 @@ class TabManager {
         openExternalScheme(url);
         return { action: 'deny' };
       }
+      // #590 (quarto giro) — anche qui la lista viene prima del riconoscimento
+      // del login, come nel gate delle schede: una finestrella che ne apre
+      // un'altra non deve essere la strada che scavalca la lista.
       if (isAuthPopup(url)) {
+        if (this._maybeBlockNavigation(url, { fromUrl: pwc.getURL() })) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
       this.openTab(url, { activate: true });
