@@ -955,6 +955,17 @@
       refreshStyleLimit();
       persistDebounced();
     });
+    // «normale», «nessuno», «togli»: da sole vogliono dire "nessuno stile", ed
+    // è già quello che Filo capisce quando gliele dici a voce. Qui la lettura
+    // è la stessa, ma solo quando si esce dal campo: applicarla a ogni tasto
+    // svuoterebbe il riquadro a metà di una frase che comincia per «no».
+    $('agentStyleText').addEventListener('change', () => {
+      if (!isAgentStyleRemoval(currentStyleText())) return;
+      $('agentStyleText').value = '';
+      syncPresetSelect();
+      refreshStyleLimit();
+      persist();
+    });
 
     // Token estetici: reset globale ai predefiniti.
     $('resetAllTokens').addEventListener('click', resetAllTokens);
