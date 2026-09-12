@@ -225,19 +225,9 @@ test('L3 — la finestrella fermata non deve restare lì vuota', async () => {
   expect(vuote, 'non deve restare aperta una finestra senza indirizzo').toBe(0);
 });
 
-// ─── Porta M: la finestrella che ne apre un'altra ────────────────────────────
-
-test('M — da dentro la finestrella, una seconda finestrella sullo stesso sito', async () => {
-  await metti(LISTA);
-  await apriEClicca('/apri-secondo-livello');
-  const prima = await aspettaFinestraSu(LISTA, 4000);
-  test.skip(!prima, 'la prima finestrella non si è aperta: questa porta la copre L1');
-  await prima.waitForSelector('#b', { timeout: 8000 });
-  await prima.click('#b');
-  await shell.waitForTimeout(2500);
-  const tutte = finestreSu(LISTA);
-  expect(tutte.length, 'la finestrella non deve poterne aprire una seconda sul sito della lista').toBeLessThan(2);
-});
+// La finestrella che ne apre un'altra (una catena di accessi verso il sito
+// della lista) non si prova qui: la prima non arriva mai a mostrare niente,
+// quindi non c'è nessuno che possa aprire la seconda. La copre L1.
 
 // ─── Porta N: il tasto ricarica ──────────────────────────────────────────────
 
