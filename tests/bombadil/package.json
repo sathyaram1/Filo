@@ -1,0 +1,9 @@
+{
+  "name": "filo-bombadil",
+  "private": true,
+  "type": "module",
+  "description": "Esperimento: Bombadil (property-based testing per UI web) contro le pagine interne di Filo. Vive in una cartella sua per non toccare il package.json di Filo.",
+  "devDependencies": {
+    "@antithesishq/bombadil": "0.7.4"
+  }
+}
