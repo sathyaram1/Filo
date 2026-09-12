@@ -1488,9 +1488,7 @@
       (modelName
         ? `Il modello che ti sta eseguendo è ${modelName}. Se l'utente ti chiede quale modello o IA sei, rispondi con questo nome esatto — è il nome con cui il codice ti invoca — senza inventarne altri né dare soprannomi.\n\n`
         : '') +
-      `PROFILO UTENTE:\n${profilo || '(vuoto)'}\n\n` +
-      `PREFERENZE:\n${preferenze || '(vuoto)'}\n\n` +
-      (espansioni ? `${espansioni}\n\n` : '') +
+      PROMPTS.memoriaBlocco({ profilo, preferenze, espansioni }) +
       lessonsBlock(lezioni) +
       `STATO:\n${stato || '(vuoto)'}\n\n` +
       `FILE DELL'EDITOR (riassunti — gli appunti sono file come gli altri):\n${files || '(nessuno)'}\n` +
