@@ -109,6 +109,7 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('permissions:capture-end', wrapped);
     },
     stopCapture: (id) => ipcRenderer.invoke('permissions:capture-stop', { id }),
+    dismissCapture: (id) => ipcRenderer.invoke('permissions:capture-dismiss', { id }),
   },
   popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
