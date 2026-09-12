@@ -37,22 +37,48 @@ test('i caratteri del computer: o il sito li ottiene, o almeno la domanda arriva
   const esito = await page.evaluate(() => window.__esito);
   console.log('[586 g4] caratteri col gestore di Filo:', JSON.stringify(esito), 'domande:', JSON.stringify(domande));
 
-  // Ora la stessa pagina con un gestore che dice sempre sì: è la prova che i
-  // caratteri ci sono, e che a tenerli fuori è la risposta di Filo.
-  await app.evaluate(({ session }) => {
-    session.defaultSession.setPermissionCheckHandler(() => true);
-  });
-  await page.reload();
-  await page.waitForTimeout(1000);
+  expect(
+    domande.length,
+    'nessuna domanda: senza domanda nessuna scelta viene registrata, quindi in Impostazioni '
+    + 'quel sito non compare e non c\'è niente da ribaltare. Si può solo negare, mai consentire',
+  ).toBe(1);
+
+  // Consentito: il sito, riprovando, deve ottenere i caratteri. Senza questo la
+  // domanda sarebbe una finta.
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  await shell.waitForTimeout(800);
   await page.click('#b');
   await page.waitForTimeout(2000);
-  const conSi = await page.evaluate(() => window.__esito);
-  console.log('[586 g4] caratteri con un gestore che dice sì:', JSON.stringify(conSi));
-
+  const dopoIlSi = await page.evaluate(() => window.__esito);
+  console.log('[586 g4] caratteri dopo il Consenti:', JSON.stringify(dopoIlSi));
   expect(
-    { domandeComparse: domande.length, caratteriOttenuti: (esito && esito.n) || 0 },
-    'sulla macchina ci sono ' + ((conSi && conSi.n) || 0) + ' caratteri: col gestore di Filo il sito '
-    + 'ne riceve zero e non compare nessuna domanda. Nessuna scelta viene registrata, quindi in '
-    + 'Impostazioni quel sito non c\'è e non c\'è niente da ribaltare: si può solo negare, mai consentire',
-  ).toEqual({ domandeComparse: 1, caratteriOttenuti: 0 });
+    (dopoIlSi && dopoIlSi.n) || 0,
+    'dopo il Consenti il sito deve ricevere i caratteri: una domanda che non cambia niente '
+    + 'è peggio di nessuna domanda',
+  ).toBeGreaterThan(0);
+
+  // E la scelta deve comparire in Impostazioni, come ogni altra.
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  const sicurezza = await aspetta(async () => app.windows().find((w) => {
+    try { return w.url().includes('security.html'); } catch (_) { return false; }
+  }) || null);
+  expect(sicurezza, 'pagina Sicurezza non trovata').toBeTruthy();
+  await sicurezza.waitForLoadState('domcontentloaded').catch(() => {});
+  await sicurezza.waitForTimeout(1200);
+  const righe = await sicurezza.locator('#perms-list li').allTextContents();
+  console.log('[586 g4] elenco in Impostazioni:', JSON.stringify(righe));
+  expect(
+    righe.join(' '),
+    'la scelta sui caratteri deve comparire in Impostazioni, o non si può più ribaltare',
+  ).toContain('Caratteri installati');
 });
+
+async function aspetta(fn, ms = 15_000) {
+  const fine = Date.now() + ms;
+  while (Date.now() < fine) {
+    const v = await fn();
+    if (v) return v;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return null;
+}
