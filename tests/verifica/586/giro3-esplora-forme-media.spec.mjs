@@ -24,64 +24,69 @@ const HTML = `<!doctype html><html><body style="margin:0"><p>prova</p>
   );
 </script></body></html>`;
 
-test('esplorazione: forme di richiesta e cosa arriva', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(180_000);
+async function memoria(app) {
+  return app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return (s.security && s.security.sitePermissions) || {};
+  });
+}
 
+test('esplorazione: audio del computer + webcam nella stessa chiamata', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
   const page = await testServer.openReady(openTab, HTML);
   const chip = shell.locator('.perm-chip');
 
-  // 1 — solo audio del computer, strada vecchia
-  const p1 = page.evaluate(() => window.__soloAudioDesktop());
-  await page.waitForTimeout(2500);
-  const c1 = await chip.count();
-  const t1 = c1 ? (await chip.allTextContents())[0] : '(nessuna domanda)';
-  if (c1) await chip.first().locator('.perm-chip-allow').click();
-  const e1 = await p1;
-  console.log('[586 g3] SOLO AUDIO DESKTOP → domanda:', JSON.stringify(t1), 'esito:', JSON.stringify(e1));
+  const p = page.evaluate(() => window.__audioDesktopPiuWebcam()).catch((e) => 'esploso:' + e.message);
+  await shell.waitForTimeout(3000);
+  const c = await chip.count();
+  const t = c ? (await chip.allTextContents())[0] : '(nessuna domanda)';
+  if (c) await chip.first().locator('.perm-chip-allow').click();
+  const e = await p;
+  console.log('[586 g3] AUDIO DESKTOP + WEBCAM → domanda:', JSON.stringify(t), 'esito:', JSON.stringify(e));
+  await shell.waitForTimeout(800);
+  console.log('[586 g3] memoria:', JSON.stringify(await memoria(app)));
+  expect(true).toBe(true);
+});
 
-  await page.waitForTimeout(500);
-  const dopo1 = await app.evaluate(async () => {
-    const s = await globalThis.SN_STORAGE.getSettings();
-    return (s.security && s.security.sitePermissions) || {};
-  });
-  console.log('[586 g3] memoria dopo solo-audio:', JSON.stringify(dopo1));
+test('esplorazione: getDisplayMedia chiedendo anche l\'audio', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML);
+  const chip = shell.locator('.perm-chip');
 
-  // Ripuliamo la memoria per la prova dopo.
-  await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ security: { sitePermissions: {} } });
-  }).catch(() => {});
-
-  // 2 — audio del computer + webcam nella stessa chiamata
-  const p2 = page.evaluate(() => window.__audioDesktopPiuWebcam());
-  await page.waitForTimeout(2500);
-  const c2 = await chip.count();
-  const t2 = c2 ? (await chip.allTextContents())[0] : '(nessuna domanda)';
-  if (c2) await chip.first().locator('.perm-chip-allow').click();
-  const e2 = await p2;
-  console.log('[586 g3] AUDIO DESKTOP + WEBCAM → domanda:', JSON.stringify(t2), 'esito:', JSON.stringify(e2));
-
-  const dopo2 = await app.evaluate(async () => {
-    const s = await globalThis.SN_STORAGE.getSettings();
-    return (s.security && s.security.sitePermissions) || {};
-  });
-  console.log('[586 g3] memoria dopo audio+webcam:', JSON.stringify(dopo2));
-
-  // 3 — getDisplayMedia con audio: cosa dice il riquadro della scelta, e cosa
-  // arriva (una traccia audio di sistema sarebbe "anche ti ascolto").
-  const p3 = page.evaluate(() => window.__displayConAudio());
-  await page.waitForTimeout(2500);
-  const c3 = await chip.count();
-  const t3 = c3 ? (await chip.allTextContents())[0] : '(nessuna domanda)';
-  if (c3) await chip.first().locator('.perm-chip-allow').click();
+  const p = page.evaluate(() => window.__displayConAudio()).catch((e) => 'esploso:' + e.message);
+  await shell.waitForTimeout(3000);
+  const c = await chip.count();
+  const t = c ? (await chip.allTextContents())[0] : '(nessuna domanda)';
+  if (c) await chip.first().locator('.perm-chip-allow').click();
   const box = shell.locator('.perm-source');
   let testoBox = '(nessun riquadro)';
+  await shell.waitForTimeout(1500);
   if (await box.count()) {
     testoBox = (await box.first().textContent()) || '';
     await box.first().locator('.perm-source-item').first().click();
   }
-  const e3 = await p3;
-  console.log('[586 g3] DISPLAY CON AUDIO → domanda:', JSON.stringify(t3),
-    'riquadro:', JSON.stringify(testoBox), 'esito:', JSON.stringify(e3));
+  const e = await p;
+  console.log('[586 g3] DISPLAY CON AUDIO → domanda:', JSON.stringify(t),
+    'riquadro:', JSON.stringify(testoBox), 'esito:', JSON.stringify(e));
+  await shell.waitForTimeout(800);
+  console.log('[586 g3] memoria:', JSON.stringify(await memoria(app)));
+  console.log('[586 g3] segno ripresa:', await shell.locator('.perm-live').count());
+  expect(true).toBe(true);
+});
 
+test('esplorazione: solo audio del computer, strada vecchia', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  const page = await testServer.openReady(openTab, HTML);
+  const chip = shell.locator('.perm-chip');
+
+  const p = page.evaluate(() => window.__soloAudioDesktop()).catch((e) => 'esploso:' + e.message);
+  await shell.waitForTimeout(3000);
+  const c = await chip.count();
+  const t = c ? (await chip.allTextContents())[0] : '(nessuna domanda)';
+  if (c) await chip.first().locator('.perm-chip-allow').click();
+  const e = await p;
+  console.log('[586 g3] SOLO AUDIO DESKTOP → domanda:', JSON.stringify(t), 'esito:', JSON.stringify(e));
+  await shell.waitForTimeout(800);
+  console.log('[586 g3] memoria:', JSON.stringify(await memoria(app)));
   expect(true).toBe(true);
 });
