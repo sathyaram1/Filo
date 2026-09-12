@@ -11,6 +11,8 @@ affermazioni restino vere a ogni stato.
 - `pagina-interna.ts` — la specifica: proprietà di serie più tre di Filo (pagina
   non vuota, nessun valore di servizio a schermo, tema dichiarato).
 - `package.json` — cartella sua, così il `package.json` di Filo non si sporca.
+- `scimmia.mjs` — il ripiego: clicca e digita a caso controllando le stesse tre
+  proprietà, senza Bombadil. Serve finché Bombadil non ha un Linux sotto.
 
 ## Come si lancia
 
