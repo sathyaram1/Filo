@@ -75,9 +75,39 @@
   // forma alfanumerica minuscola, così "Mario_Rossi", "mario.rossi" e
   // "MarioRossi" collassano sulla stessa chiave e i separatori non aiutano a
   // evadere il match.
+  // I soli VALORI di un indirizzo, incollati fra loro: i pezzi del percorso, i
+  // valori dei parametri, il frammento — senza i nomi dei parametri e senza i
+  // separatori. Serve perché chi compone l'indirizzo può TAGLIARE il dato e
+  // rimetterlo in due parametri: `?a=Segreto&b=Netrc2026` porta fuori la stessa
+  // password di `?d=SegretoNetrc2026`, ma in mezzo ci finisce la `b` del secondo
+  // nome e il confronto non trovava più niente (#587, giro 3). Incollando i soli
+  // valori il dato torna intero — e con lui torna leggibile anche un base64
+  // spezzato a metà fra due parametri.
+  function valoriUniti(url) {
+    try {
+      const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`);
+      const pezzi = [];
+      for (const seg of String(u.pathname || '').split('/')) if (seg) pezzi.push(seg);
+      try {
+        for (const [, v] of u.searchParams) if (v) pezzi.push(v);
+      } catch (_) {}
+      const frammento = String(u.hash || '').replace(/^#/, '');
+      if (frammento) pezzi.push(frammento);
+      return pezzi.join('');
+    } catch (_) { return ''; }
+  }
+
   function exposedAlnum(url) {
     const raw = String(url || '');
     const pieces = [raw];
+    const valori = valoriUniti(raw);
+    if (valori) {
+      pieces.push(valori);
+      try {
+        const dec = decodeURIComponent(valori.replace(/\+/g, ' '));
+        if (dec !== valori) pieces.push(dec);
+      } catch (_) {}
+    }
     let cur = raw;
     for (let i = 0; i < 3; i++) {
       let dec = cur;
