@@ -1439,7 +1439,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null } = 
         // stesso che l'agente-lezioni riempie da solo — e da subito compare in
         // LEZIONI RECENTI di ogni conversazione. Visibile e cancellabile
         // dall'utente fra le memorie, come tutte le lezioni.
-        const lezione = String(action.testo ?? action.text ?? action.lezione ?? '').trim();
+        // Una lezione vale in ogni conversazione e sopravvive al riavvio, come
+        // lo stile dell'agente: stesso tetto, e stesso rifiuto spiegato invece
+        // di un taglio muto. La frase torna al modello, che la riferisce.
+        const grezza = String(action.testo ?? action.text ?? action.lezione ?? '').trim();
+        const controllo = globalThis.SN_CONST && typeof globalThis.SN_CONST.validateLesson === 'function'
+          ? globalThis.SN_CONST.validateLesson(grezza)
+          : { ok: true, value: grezza };
+        if (!controllo.ok) return { executed: false, kept: false, output: { rifiutata: controllo.error } };
+        const lezione = controllo.value;
         let fissata = false;
         if (lezione) {
           try {
