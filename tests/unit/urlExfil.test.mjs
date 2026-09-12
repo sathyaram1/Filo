@@ -154,3 +154,48 @@ test('#587 — un carico di dati vero resta sospetto anche senza combaciare con 
     assert.equal(E.assess(url, { corpus: '', fromUntrusted: true }).exfil, true, `"${url}" deve chiedere conferma`);
   }
 });
+
+// ── #587, giro 3 — il dato tagliato dentro l'indirizzo ──────────────────────
+//
+// Chi compone l'indirizzo è la pagina ostile che detta al modello cosa aprire:
+// le bastava tagliare il dato in due e rimetterlo in due parametri perché il
+// confronto non trovasse più niente (in mezzo ci finisce il nome del secondo
+// parametro). I pezzi, presi da soli, si leggono come parole, quindi nemmeno il
+// controllo di riserva sulla forma diceva niente: la password usciva intera,
+// senza avvisi. Senza il fix i primi assert tornano false.
+const LETTO = [
+  'machine ftp.esempio.it login mario password SegretoNetrc2026',
+  'token github ghp_A1b2C3d4E5f6G7h8I9j0',
+].join('\n');
+const chiede = (url) => E.assess(url, { corpus: LETTO, fromUntrusted: true }).exfil;
+
+test('#587 — il dato tagliato in due esce lo stesso, quindi chiede conferma', () => {
+  for (const url of [
+    'https://raccolta.test/?a=SegretoN&b=etrc2026',
+    'https://raccolta.test/?a=Segret&b=oNetr&c=c2026',
+    'https://raccolta.test/?t1=ghp_A1b2C3&t2=d4E5f6G7h8I9j0',
+    'https://raccolta.test/xSegretoNyetrc2026z',
+    // lo stesso taglio fatto sul base64 invece che sul testo
+    'https://raccolta.test/?a=U2VncmV0&b=b05ldHJjMjAyNg==',
+  ]) {
+    assert.equal(chiede(url), true, `"${url}" porta fuori il dato: deve chiedere conferma`);
+  }
+  // e il dato intero continua a chiederla
+  assert.equal(chiede('https://raccolta.test/?d=SegretoNetrc2026'), true);
+});
+
+test('#587 — il confronto più largo non accende avvisi sugli indirizzi veri', () => {
+  for (const url of [
+    'https://it.wikipedia.org/wiki/Storia_della_matematica',
+    'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+    'https://www.amazon.it/dp/B08N5WRWNW/ref=sr_1_3?keywords=cuffie&qid=1699999999&sr=8-3',
+    'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf',
+    'https://stackoverflow.com/questions/1234567/how-to-do-a-thing-in-javascript',
+    'https://www.ikea.com/it/it/p/billy-libreria-bianco-00263850/',
+    'https://duckduckgo.com/?q=ricetta+carbonara&t=h_&ia=web',
+    'https://calendar.google.com/calendar/u/0/r/week/2026/9/12',
+  ]) {
+    assert.equal(chiede(url), false, `"${url}" non deve chiedere niente`);
+  }
+});
