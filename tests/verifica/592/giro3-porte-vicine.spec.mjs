@@ -222,7 +222,7 @@ test('«normale» scritto nel riquadro: quello che si vede e quello che è salva
   // lo schermo deve dire che in vigore non c'è nessuno stile. Altrimenti chi
   // chiude la scheda qui se ne va convinto di avere uno stile che non ha.
   expect(salvato).toBe('');
-  expect(await pagina.inputValue('#agentStylePreset')).toBe('');
+  expect(await pagina.evaluate(() => document.getElementById('agentStylePreset').value)).toBe('');
   await expect(pagina.locator('#agentStyleNote')).toBeVisible();
   expect(await pagina.textContent('#agentStyleNote')).toContain('nessuno stile');
 });
