@@ -1,5 +1,7 @@
 # Due strade e una richiesta identica: si chiede alla porta, non dopo
 
+[← Tutti i pattern](../PATTERNS.md)
+
 **Regola.** Quando due cammini diversi arrivano al nostro gestore con una
 richiesta indistinguibile, e solo uno dei due passa poi da un secondo controllo
 dove chiediamo davvero, quella prima richiesta NON si lascia passare per
