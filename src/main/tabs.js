@@ -718,6 +718,22 @@ class TabManager {
     // ingresso convergono su un solo URL, qualunque chiamante li apra.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
 
+    // #590 — INDIRIZZO "NUDO" (senza schema davanti). navigate() lo riduceva già
+    // alla sua forma navigabile prima di ogni controllo; qui no, e la differenza
+    // costava due cose: la scheda nasceva BIANCA (loadURL non sa che farsene di
+    // "sito.esempio/pagina") mentre la chat raccontava di averla aperta, e i
+    // controlli qui sotto — schemi non-web e lista dei siti bloccati — lo
+    // vedevano come un indirizzo che non parsa e lo lasciavano passare senza
+    // guardarlo. Un modello che propone l'indirizzo senza "https://" davanti
+    // (capita, soprattutto coi modelli piccoli) bastava a scavalcare la lista.
+    // Se non parsa e NON somiglia a un indirizzo, non c'è niente da aprire:
+    // meglio dirlo che aprire una scheda bianca e chiamarla successo.
+    if (typeof url === 'string' && !parsesAsUrl(url)) {
+      const NAV = globalThis.SN_URL_NAV;
+      if (NAV && NAV.looksLikeAddress(url)) url = normalizeUrl(url);
+      else return { id: null, blocked: 'address', host: '' };
+    }
+
     // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
     // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
     // in primo piano volute dall'utente (click su menu/link) e non quando si
