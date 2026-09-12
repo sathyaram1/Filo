@@ -175,7 +175,7 @@
     const s = String(raw || '').trim();
     if (!s) return '/';
     if (/^https?:\/\//i.test(s)) return normalizedPath(s) || '/';
-    const ripulito = neutralizzaMarcature(s).trim().replace(/\s+/g, '');
+    const ripulito = neutralizzaMarcature(redigiDatiPersonali(s)).trim().replace(/\s+/g, '');
     if (!ripulito.startsWith('/')) return '/';
     return ripulito.slice(0, MAX_URL_LEN);
   }
