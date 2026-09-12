@@ -1634,23 +1634,47 @@ class TabManager {
     this._broadcast();
   }
 
+  // SICUREZZA (#590, terzo giro) — avanti e indietro sono un cambio di
+  // indirizzo della scheda come gli altri, e non passavano dal punto unico:
+  // né will-navigate né will-redirect scattano su una navigazione di
+  // cronologia. Un sito visitato prima e messo in lista dopo tornava a schermo
+  // al primo clic su "indietro", senza nemmeno la notifica. È il caso normale:
+  // un sito lo si mette in lista proprio mentre ce l'hai davanti.
+  // L'indirizzo della voce di cronologia si chiede PRIMA di muoversi.
+  _urlVoceCronologia(wc, delta) {
+    try {
+      const h = wc.navigationHistory;
+      if (!h || typeof h.getActiveIndex !== 'function') return '';
+      const voce = h.getEntryAtIndex(h.getActiveIndex() + delta);
+      return (voce && voce.url) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
-    if (tab.view.webContents.navigationHistory?.canGoBack()) {
-      tab.view.webContents.navigationHistory.goBack();
-    } else if (tab.view.webContents.canGoBack?.()) {
-      tab.view.webContents.goBack();
+    const wc = tab.view.webContents;
+    if (wc.navigationHistory?.canGoBack()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, -1))) return;
+      wc.navigationHistory.goBack();
+    } else if (wc.canGoBack?.()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, -1))) return;
+      wc.goBack();
     }
   }
 
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
-    if (tab.view.webContents.navigationHistory?.canGoForward()) {
-      tab.view.webContents.navigationHistory.goForward();
-    } else if (tab.view.webContents.canGoForward?.()) {
-      tab.view.webContents.goForward();
+    const wc = tab.view.webContents;
+    if (wc.navigationHistory?.canGoForward()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, 1))) return;
+      wc.navigationHistory.goForward();
+    } else if (wc.canGoForward?.()) {
+      if (this._maybeBlockNavigation(this._urlVoceCronologia(wc, 1))) return;
+      wc.goForward();
     }
   }
 
