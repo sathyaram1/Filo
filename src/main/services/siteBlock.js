@@ -206,9 +206,35 @@ function isSearchEngineHost(host) {
   return SEARCH_ENGINE_PATTERNS.some((re) => re.test(host));
 }
 
-// Il referrer (o la pagina di partenza) è un motore di ricerca?
+// I PERCORSI DI RICERCA dei motori. Sul nome di un motore non ci sono solo i
+// risultati: ci sono pagine che può pubblicare chiunque (i siti fatti con lo
+// strumento per siti di Google, le pagine servite dai suoi script, i documenti
+// condivisi). Il nome da solo quindi non basta, ed è la stessa forma del
+// difetto che il #590 chiedeva di chiudere ancorando la regex: lì un sito di
+// chiunque si spacciava per motore, qui una pagina di chiunque sta sul motore
+// vero. L'eccezione deve valere per una pagina di RISULTATI.
+//   /search          google, bing, ecosia, brave, kagi, mojeek, searx, yahoo
+//   /search/         yandex
+//   /sp/search       startpage (la domanda viaggia nel corpo, non nell'indirizzo)
+//   /web             ask
+//   /s               baidu
+//   /html            la versione leggera di duckduckgo
+//   /                duckduckgo e qwant mettono i risultati sulla radice (?q=)
+// Nessuno di questi è un percorso su cui si possa pubblicare una pagina propria.
+const SEARCH_PATHS = /^\/(?:search|sp\/search|web|s|html)?\/?$/;
+
+// La pagina da cui si parte è una pagina di RISULTATI di un motore di ricerca?
+// (È l'unica eccezione alla lista dei siti bloccati che non passi dall'utente.)
 function isSearchEngineUrl(url) {
-  return isSearchEngineHost(hostnameOf(url));
+  let u;
+  try {
+    u = new URL(url);
+  } catch (_) {
+    return false;
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  if (!isSearchEngineHost(canonicalHost(u.hostname))) return false;
+  return SEARCH_PATHS.test(u.pathname);
 }
 
 // L'host è in blacklist? (blacklist dedicata dell'utente, oppure — se
