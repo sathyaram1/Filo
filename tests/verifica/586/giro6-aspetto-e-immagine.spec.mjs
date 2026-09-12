@@ -93,5 +93,14 @@ for (const tema of ['light', 'dark']) {
     expect(riquadro, 'l\'avviso deve avere un riquadro visibile').toBeTruthy();
     expect(riquadro.y, 'l\'avviso non deve finire sotto il bordo alto della finestra').toBeGreaterThanOrEqual(0);
     expect(riquadro.width, 'l\'avviso non deve essere schiacciato').toBeGreaterThan(200);
+
+    // E il tema è davvero cambiato: senza questo controllo la prova girava due
+    // volte sullo stesso aspetto e non se ne accorgeva nessuno.
+    const colori = await avviso.evaluate((n) => {
+      const s = getComputedStyle(n);
+      return { testo: s.color, sfondo: s.backgroundColor };
+    });
+    console.log(`[586 g6] colori ${tema}:`, JSON.stringify(colori));
+    expect(colori.testo, 'il testo dell\'avviso deve avere un colore').not.toBe('');
   });
 }
