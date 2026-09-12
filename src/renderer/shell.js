@@ -1604,7 +1604,7 @@
   if (api.permissions && api.permissions.onRequest) {
     const permHost = document.createElement('div');
     permHost.id = 'permission-chips';
-    document.body.appendChild(permHost);
+    fasciaAvvisi().appendChild(permHost);
 
     function rimuoviNodo(nodo) {
       nodo.classList.add('uscita');
