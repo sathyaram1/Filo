@@ -576,14 +576,17 @@ async function scegliFonte(wc, frame, audioChiesto) {
 
   return new Promise((resolve) => {
     let finito = false;
-    const finisci = (fonteId) => {
+    const finisci = (fonteId, audio) => {
       if (finito) return;
       finito = true;
       scelteFonte.delete(id);
       clearTimeout(timer);
       try { wc.off('destroyed', suMorte); } catch (_) {}
       try { if (shell && !shell.isDestroyed()) shell.send('permissions:source-closed', { id }); } catch (_) {}
-      resolve(fonteId ? (fonti.find((f) => f.id === fonteId) || null) : null);
+      const fonte = fonteId ? (fonti.find((f) => f.id === fonteId) || null) : null;
+      // L'audio si dà solo se il sito l'ha chiesto E l'utente l'ha acceso: una
+      // spunta che nessuno ha visto non è un consenso.
+      resolve(fonte ? { fonte, audio: !!(audioChiesto && audio) } : null);
     };
     const suMorte = () => finisci(null);
     try { wc.once('destroyed', suMorte); } catch (_) {}
