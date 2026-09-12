@@ -246,6 +246,7 @@
 
   async function saveFingerprint() {
     const partial = { security: { fingerprint: { mode: currentFpMode() } } };
+    ecoDaIgnorare = Date.now();
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
     const hint = $('savedHint');
     hint.classList.add('sn-show');
