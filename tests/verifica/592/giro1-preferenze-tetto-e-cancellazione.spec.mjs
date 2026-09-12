@@ -78,7 +78,9 @@ test('anche svuotando il testo a mano lo stile sparisce davvero', async ({ openT
   await page.fill('#agentStyleText', 'Tono formale.');
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 6_000 });
   await page.fill('#agentStyleText', '');
-  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 6_000 });
+  // Il salvataggio è ritardato di qualche decimo: la spia «Salvato» è già
+  // accesa dal salvataggio di prima, quindi non basta guardare lei.
+  await page.waitForTimeout(1500);
   await page.reload();
   await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
   await expect(page.locator('#agentStyleText')).toHaveValue('');
