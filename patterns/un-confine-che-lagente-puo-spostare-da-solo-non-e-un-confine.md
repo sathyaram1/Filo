@@ -101,6 +101,51 @@ Una conferma che compare su ogni link si clicca senza leggerla. A quel punto la
 difesa non c'è più, e in cambio si è pagato l'attrito: **un falso allarme sul
 cammino principale costa più di quanto rendeva l'allarme**.
 
+## Caso 5 — il testo del comando non è ancora il bersaglio
+
+Il caso 3 aveva spostato la misura dal testo dell'operando al percorso risolto.
+Non basta: fra il testo e il file che si apre ci sono altri due passaggi, e tutti
+e due li fa qualcun altro dopo che il livello è già stato deciso.
+
+- **La shell espande i modelli.** `cat .*` non nomina niente di riservato e apre
+  `.netrc`, `.git-credentials`, `.pgpass` e la cronologia della shell; `cat .s?h/*`
+  apre la chiave privata; `cd .s?h && cat config` aggira il caso 3 riscrivendone
+  il bersaglio con un punto interrogativo. Vale con ogni programma che legge, con
+  le graffe (`cat .{netrc,pgpass}`), su Windows (`AppDat?`), dentro una pipeline.
+  Un modello pretende la domanda **opposta** a quella di un nome: non «è
+  riservato?» ma «**può prenderne uno**?» (`modelloPrendeRiservato`, che traduce
+  il modello in un'espressione regolare e la prova contro l'elenco dei nomi).
+- **Il filesystem segue i collegamenti.** `scorciatoia/config` non porta addosso
+  il nome `.ssh`. Il classificatore vive in `shared/` e non ha filesystem: il
+  percorso vero glielo passa il main (`setRealPath`, montato in
+  `src/main/services/loader.js`). Una **copia** invece è un file nuovo davvero, e
+  nessun controllo può riconoscerla dopo: perciò copiare, spostare o collegare un
+  bersaglio riservato è salito a livello 3 — il prezzo si paga prima, quando la
+  cosa è ancora riconoscibile.
+
+Corollario del caso 4, che qui torna: la cura non può essere «nel dubbio chiedi».
+Un modello è anche il modo normale di lavorare sui propri file, e `cat *.txt`
+deve restare gratis; un modello che prende tutto quello che c'è lì (`*`, `*.*`)
+non allarga niente rispetto alla cartella in cui sta, quindi si misura come
+quella. E la simmetria opposta: il **primo operando di una ricerca è il testo
+cercato, non un file** — misurarlo faceva chiedere un OK a chi cercava la parola
+«credentials» nei propri appunti, spiegandolo per giunta con una frase falsa.
+
+## Caso 6 — la soglia tarata sul nulla
+
+Sempre il caso 4, un giro dopo. Tolto il conteggio dei caratteri leggibili, il
+ripiego strutturale guardava ancora un tratto illeggibile qualsiasi lungo 24
+caratteri — cioè l'identificativo che **ogni** sito mette nei suoi indirizzi. Su
+venti link veri ne fermava otto: un documento di Google, una scheda di Amazon, un
+brano di Spotify, un post su X, un articolo del Corriere.
+
+Quando una soglia separa «normale» da «sospetto», va **misurata sul normale**,
+non scelta a mente: il pezzo illeggibile più lungo che un sito vero usa è
+l'identificativo di un documento di Google, 44 caratteri. E dove una soglia non
+basta, si cerca un segnale di qualità invece che di quantità: un blocco che **si
+riapre come testo** non è il modo in cui un sito nomina le sue cose — nessuno dei
+venti indirizzi veri si riapre, e un payload impacchettato sì.
+
 ## Regola operativa
 
 Quando aggiungi una difesa, scrivi accanto **a cosa è agganciata** e chiediti chi
