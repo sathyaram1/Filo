@@ -155,6 +155,49 @@
     return tok.length >= STRONG_TOKEN && !STOPWORDS.has(tok);
   }
 
+  // ── Il dato spezzettato dentro l'indirizzo ────────────────────────────────
+  //
+  // Incollare i soli valori (vedi valoriUniti) rimette insieme il dato tagliato
+  // fra due parametri. Resta l'altro modo di spezzarlo: infilare qualche
+  // carattere IN MEZZO a un valore solo — `/xSegretoNyetrc2026z`. Per quello il
+  // confronto deve tollerare un po' di spazzatura: si accetta un dato lungo
+  // ritrovato in due o tre tronconi, ognuno abbastanza lungo da non essere un
+  // caso, separati da pochi caratteri. Le misure sono strette apposta: un dato
+  // corto o tronconi minuscoli combacerebbero per sbaglio dentro un indirizzo
+  // vero, e un avviso falso si clicca senza leggerlo.
+  const SPEZZ_MIN = 10;   // solo per i dati abbastanza lunghi
+  const SPEZZ_RUN = 4;    // ogni troncone, almeno tanti caratteri di fila
+  const SPEZZ_BUCHI = 2;  // quanti tagli si tollerano
+  const SPEZZ_JUNK = 10;  // quanti caratteri estranei in tutto
+  function daPosizione(exposed, tok, p) {
+    let i = 0;
+    let j = p;
+    let buchi = 0;
+    let junk = 0;
+    while (i < tok.length) {
+      if (j < exposed.length && exposed[j] === tok[i]) { i++; j++; continue; }
+      if (buchi >= SPEZZ_BUCHI) return false;
+      const prossimo = tok.slice(i, i + Math.min(SPEZZ_RUN, tok.length - i));
+      let salto = -1;
+      for (let k = 1; k <= SPEZZ_JUNK - junk; k++) {
+        if (exposed.startsWith(prossimo, j + k)) { salto = k; break; }
+      }
+      if (salto < 0) return false;
+      j += salto;
+      junk += salto;
+      buchi++;
+    }
+    return true;
+  }
+  function combaciaSpezzato(exposed, tok) {
+    if (tok.length < SPEZZ_MIN) return false;
+    const testa = tok.slice(0, SPEZZ_RUN);
+    for (let da = exposed.indexOf(testa); da >= 0; da = exposed.indexOf(testa, da + 1)) {
+      if (daPosizione(exposed, tok, da)) return true;
+    }
+    return false;
+  }
+
   // Taint-match: l'URL contiene dati del corpus sensibile?
   function taint(url, corpus) {
     const exposed = exposedAlnum(url);
@@ -165,6 +208,9 @@
     let sample = '';
     for (const t of toks) {
       if (t.length < MIN_TOKEN) continue;
+      if (!exposed.includes(t) && isStrong(t) && combaciaSpezzato(exposed, t)) {
+        return { reason: `contiene un tuo dato, spezzettato ("${t}…")` };
+      }
       if (exposed.includes(t)) {
         hits++;
         if (!sample) sample = t;
