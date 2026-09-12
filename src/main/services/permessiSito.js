@@ -383,7 +383,7 @@ function consumaPreambolo(wc) {
 const riprese = new Map(); // id → { wc, shell, pulisci }
 let prossimaRipresa = 1;
 
-function iniziaRipresa(wc, origine) {
+function iniziaRipresa(wc, origine, opzioni) {
   try {
     const { win, tab } = posizione(wc);
     const shell = win && !win.isDestroyed() ? win.webContents : null;
