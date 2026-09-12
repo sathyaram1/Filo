@@ -454,30 +454,23 @@
     try { ultimoInviato = raccogli().valori; } catch (_) { ultimoInviato = null; }
   }
 
-  async function saveVecchia() {
-    const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
+  async function save() {
+    const { valori, invalid } = raccogli();
     setBlacklistError(invalid);
-    const partial = {
-      security: {
-        protectIpLeak: !!$('sec-protect-ip').checked,
-        blockPopups: !!$('sec-block-popups').checked,
-        adblock: { enabled: !!$('sec-adblock').checked },
-        siteBlock: {
-          enabled: !!$('sec-siteblock').checked,
-          useAdblockLists: !!$('sec-siteblock-lists').checked,
-          blacklist,
-        },
-        safeBrowse: {
-          enabled: !!$('sec-safebrowse').checked,
-          networkSignals: !!$('sec-safebrowse-network').checked,
-          llmJudge: !!$('sec-safebrowse-llm').checked,
-          sandbox: !!$('sec-safebrowse-sandbox').checked,
-        },
-        // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
-        autoFeedback: !!$('sec-auto-feedback').checked,
-      },
-    };
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+
+    // Solo le protezioni che l'utente ha davvero toccato. Le altre possono
+    // essere state cambiate altrove mentre la pagina era aperta: rimandarle
+    // col valore vecchio riaccenderebbe o spegnerebbe una difesa senza che
+    // nessuno l'abbia chiesto.
+    const security = {};
+    for (const [chiave, valore] of Object.entries(valori)) {
+      const prima = ultimoInviato ? ultimoInviato[chiave] : undefined;
+      if (JSON.stringify(prima) !== JSON.stringify(valore)) security[chiave] = valore;
+    }
+    if (!Object.keys(security).length) return;
+
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security } });
+    ultimoInviato = { ...(ultimoInviato || {}), ...security };
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
