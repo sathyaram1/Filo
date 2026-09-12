@@ -86,9 +86,10 @@ la tengono identica sono le preferenze a testo libero, e devono essere censite
 una per una con la riga che dice dove va a finire quel testo. Una preferenza a
 testo libero nuova e non censita fa diventare rossa la sentinella.
 
-Codice: `src/shared/constants.js` (`AGENT_STYLE_MAX`, `sanitizeAgentStyle`,
-`validateAgentStyle`, `agentStyleBlock`, `injectAgentStyle`, e i segnaposto
-dentro `PROMPTS.helpStatic` / `PROMPTS.filoChatStatic`),
+Codice: `src/shared/constants.js` (`AGENT_STYLE_MAX`, `togliMarcatori`,
+`sanitizeAgentStyle`, `validateAgentStyle`, `agentStyleBlock`,
+`injectAgentStyle`, `LESSON_MAX`, `validateLesson`, `lessonsBlock`, e i
+segnaposto dentro `PROMPTS.helpStatic` / `PROMPTS.filoChatStatic`),
 `src/shared/preferences.js` (setter `stile_agente`),
 `src/shared/actionLevels.js` (il rifiuto non apre popup),
 `src/main/services/handlers.js` (`applySettingsUpdate`, dispatch di
