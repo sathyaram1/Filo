@@ -172,6 +172,18 @@ test('un popup di accesso è una pagina di un sito: non deve ricevere chiavi e p
       if (ch === 'filo:broadcast') { let u = ''; try { u = this.getURL(); } catch (_) {} nota(u, a[0]); }
       return wcSend.call(this, ch, ...a);
     };
+    // La consegna può passare dal singolo riquadro invece che dalla finestra:
+    // guardiamo tutte e due le strade, altrimenti si rischia di non vedere
+    // proprio quella che porta il carico.
+    const fr = win.webContents.mainFrame;
+    if (fr) {
+      const frP = Object.getPrototypeOf(fr);
+      const frSend = frP.send;
+      frP.send = function (ch, ...a) {
+        if (ch === 'filo:broadcast') { let u = ''; try { u = this.url; } catch (_) {} nota(u, a[0]); }
+        return frSend.call(this, ch, ...a);
+      };
+    }
   });
 
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
