@@ -364,34 +364,90 @@ function rispondi(id, scelta, { ricorda = true } = {}) {
 // sito su QUELLA pagina. Non è un «no per sempre»: niente resta scritto, e la
 // pagina che riparte (un ricaricamento, un link) ricomincia da capo. È la via
 // d'uscita, ed è quella che si trova da sé.
-const senzaRisposta = new Map(); // `${wcId}|${origine}` → numero
+// Il conto è per COSA CHIESTA, non per sito: chi ha chiuso tre volte la domanda
+// della fotocamera non deve ritrovarsi zittita anche la posizione, che è
+// un'altra cosa e che magari ha appena chiesto lui premendo «trovami» (#586,
+// giro 6).
+//
+// E quando Filo smette, lo DICE: una riga sulla scheda con un modo per tornare
+// indietro. Prima non compariva niente, il gesto appena fatto non produceva
+// nulla e l'unica via d'uscita era ricaricare la pagina, che nessuno può
+// indovinare.
+const senzaRisposta = new Map(); // `${wcId}|${origine}|${chiave}` → numero
 const SENZA_RISPOSTA_MAX = 3;
+// Le righe «ho smesso di chiedere» aperte adesso: id → { wc, origine, chiavi }.
+const anelliDetti = new Map();
 
-function chiaveAnello(wc, origine) { return `${wc.id}|${origine}`; }
+function chiaveAnello(wc, origine, chiave) { return `${wc.id}|${origine}|${chiave}`; }
 
-function segnaSenzaRisposta(wc, origine) {
-  const k = chiaveAnello(wc, origine);
-  senzaRisposta.set(k, (senzaRisposta.get(k) || 0) + 1);
+function dimenticaAnello(wc, chiave) {
+  const prefisso = chiave === undefined ? `${wc.id}|` : null;
+  for (const key of [...senzaRisposta.keys()]) {
+    if (prefisso ? key.startsWith(prefisso) : key === chiave) senzaRisposta.delete(key);
+  }
+}
+
+function segnaSenzaRisposta(wc, origine, chiavi) {
+  for (const c of chiavi) {
+    const k = chiaveAnello(wc, origine, c);
+    senzaRisposta.set(k, (senzaRisposta.get(k) || 0) + 1);
+  }
   if (wc._filoPermessiAnello) return;
   wc._filoPermessiAnello = true;
   const pulisci = (_e, _url, inPlace, isMainFrame) => {
     if (!isMainFrame || inPlace) return;
-    for (const key of [...senzaRisposta.keys()]) {
-      if (key.startsWith(`${wc.id}|`)) senzaRisposta.delete(key);
-    }
+    dimenticaAnello(wc);
   };
   try { wc.on('did-start-navigation', pulisci); } catch (_) {}
+  try { wc.once('destroyed', () => dimenticaAnello(wc)); } catch (_) {}
+}
+
+function troppeSenzaRisposta(wc, origine, chiavi) {
+  return chiavi.every((c) => (senzaRisposta.get(chiaveAnello(wc, origine, c)) || 0) >= SENZA_RISPOSTA_MAX);
+}
+
+function scordaRisposte(wc, origine, chiavi) {
+  for (const c of chiavi) senzaRisposta.delete(chiaveAnello(wc, origine, c));
+}
+
+// La riga che dice che Filo ha smesso di chiedere, con il modo per tornare
+// indietro. Una per scheda e sito: un sito che insiste non deve impilarne dieci.
+function diciCheHoSmesso(wc, origine, chiavi) {
   try {
-    wc.once('destroyed', () => {
-      for (const key of [...senzaRisposta.keys()]) {
-        if (key.startsWith(`${wc.id}|`)) senzaRisposta.delete(key);
-      }
+    for (const v of anelliDetti.values()) {
+      if (v.wc === wc && v.origine === origine) return;
+    }
+    const { win, tab } = posizione(wc);
+    const shell = win && !win.isDestroyed() ? win.webContents : null;
+    if (!shell || shell.isDestroyed()) return;
+    const Pp = P();
+    const id = `anello${prossimoAvviso++}`;
+    anelliDetti.set(id, { wc, origine, chiavi: chiavi.slice() });
+    const togli = () => {
+      if (!anelliDetti.has(id)) return;
+      anelliDetti.delete(id);
+      try { if (shell && !shell.isDestroyed()) shell.send('permissions:notice-end', { id }); } catch (_) {}
+    };
+    const suNavigazione = (_e, _url, inPlace, isMainFrame) => { if (isMainFrame && !inPlace) togli(); };
+    try { wc.on('did-start-navigation', suNavigazione); } catch (_) {}
+    try { wc.once('destroyed', togli); } catch (_) {}
+    shell.send('permissions:notice', {
+      id,
+      tabId: tab ? tab.id : null,
+      testo: `Ho smesso di chiedere per ${Pp.host(origine)}: le ultime domande le hai chiuse senza rispondere.`,
+      azione: { testo: 'Chiedimelo di nuovo', tip: 'Le prossime richieste di questo sito tornano a comparire' },
     });
   } catch (_) {}
 }
 
-function troppeSenzaRisposta(wc, origine) {
-  return (senzaRisposta.get(chiaveAnello(wc, origine)) || 0) >= SENZA_RISPOSTA_MAX;
+// «Chiedimelo di nuovo»: il conto torna a zero e la riga se ne va. Non concede
+// niente a nessuno, riapre solo la possibilità di essere chiesti.
+function riprendiAChiedere(id) {
+  const v = anelliDetti.get(String(id));
+  if (!v) return { ok: false };
+  anelliDetti.delete(String(id));
+  try { dimenticaAnello(v.wc); } catch (_) {}
+  return { ok: true };
 }
 
 // ─── il gestore ─────────────────────────────────────────────────────────────
