@@ -93,6 +93,36 @@ test('Filo cambia lo stile mentre le Preferenze sono aperte: la pagina non lo di
   expect((await impostazioni(pagina)).agentStyle).toBe(nuovo);
 });
 
+test('«normale» scritto nel riquadro: se sparisce, l\'utente deve capire perché', async ({ openTab }) => {
+  // Una parola come «normale», «standard» o «no» vuol dire «nessuno stile»:
+  // giusto, ed è quello che Filo capisce anche a voce. Ma nel riquadro il
+  // testo si cancella da solo appena si clicca altrove, e chi l'ha scritto non
+  // riceve nessuna spiegazione: vede solo le sue parole sparire.
+  const pagina = await apriPreferenze(openTab);
+  await pagina.click('#agentStyleText');
+  await pagina.type('#agentStyleText', 'standard');
+  await pagina.click('h2');
+  await pagina.waitForTimeout(1200);
+
+  expect(await pagina.locator('#agentStyleText').inputValue()).toBe('');
+  // Qualcosa deve dire che è stato inteso come «nessuno stile»: la tendina che
+  // si sposta su «Nessuno (predefinito)» basta e avanza.
+  await expect(pagina.locator('#agentStylePreset')).toHaveValue('');
+});
+
+test('«normale» scritto e lasciato lì senza uscire dal campo non resta salvato come stile', async ({ openTab }) => {
+  // La lettura delle parole di rimozione scatta solo all'uscita dal campo,
+  // mentre il salvataggio parte a ogni tasto: chi scrive «normale» e chiude la
+  // scheda senza cliccare altrove si ritrova salvato uno stile che dice
+  // «normale» al modello — cioè esattamente la cosa che si voleva togliere.
+  const pagina = await apriPreferenze(openTab);
+  await pagina.click('#agentStyleText');
+  await pagina.type('#agentStyleText', 'normale');
+  await pagina.waitForTimeout(1500);
+
+  expect((await impostazioni(pagina)).agentStyle || '').toBe('');
+});
+
 test('la sezione dello stile si legge su tema chiaro e su tema scuro', async ({ openTab }) => {
   const pagina = await apriPreferenze(openTab);
   const max = await pagina.evaluate(() => window.SN_CONST.AGENT_STYLE_MAX);
