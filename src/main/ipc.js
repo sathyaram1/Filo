@@ -357,6 +357,15 @@ function registerIpcHandlers() {
     win._filoTabs.apriSitoComunque(url);
     return { ok: true };
   });
+  // La marcia indietro sullo stesso permesso (#590): il sì dura tutta la
+  // sessione, quindi deve esistere il modo di toglierlo senza rimettere mano
+  // all'elenco dei siti bloccati.
+  ipcMain.handle('tabs:restore-site-block', (event, { host } = {}) => {
+    const win = winFor(event);
+    if (!win?._filoTabs || !host) return { ok: false };
+    win._filoTabs.rimettiIlBlocco(host);
+    return { ok: true };
+  });
   // Proxy per-tab ("Apri da un altro paese"): instrada/de-instrada una singola
   // tab attraverso un endpoint in un altro paese. La lista location curate
   // serve al menu tasto destro sulla tab (feedback UI separato).
