@@ -1030,11 +1030,7 @@
     // restringe niente (`grep -r chiave *` parte dalla stessa cartella di
     // `grep -r chiave .`), mentre un modello vero — `*.txt` — sì: quello lascia
     // fuori le chiavi e non deve costare un OK.
-    if (ricorsivo) {
-      const segs = target.segs.slice();
-      while (segs.length && /^\*+(\.\*+)?$/.test(segs[segs.length - 1])) segs.pop();
-      if (segs.length <= perim.segs.length) return TUTTA;
-    }
+    if (ricorsivo && segsTarget.length <= perim.segs.length) return TUTTA;
     return '';
   }
 
