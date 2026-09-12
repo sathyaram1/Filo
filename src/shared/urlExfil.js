@@ -254,6 +254,34 @@
     for (const w of text.toLowerCase().split(/[^a-z0-9]+/)) {
       if (w.length >= MIN_TOKEN && !PAROLE_DI_OGNI_INDIRIZZO.has(w)) out.add(w);
     }
+    // ── Il segreto con la punteggiatura dentro (#587, giro 7) ───────────────
+    //
+    // Dell'indirizzo si guarda la forma INCOLLATA (vedi exposedAlnum): via
+    // trattini, punti e separatori. Del corpus si guardavano invece le parole,
+    // spezzate a ogni carattere che non fosse una lettera o una cifra. Le due
+    // materie non combaciavano mai su un segreto scritto come li scrive la
+    // gente: `Segreto-Netrc-2026` nel corpus diventava tre parole corte, nessuna
+    // delle quali è un dato riconoscibile, e la password usciva in un link in
+    // chiaro senza nessun avviso — insieme a tutte le sue forme travestite, che
+    // partono dallo stesso confronto.
+    //
+    // Si incolla SOLO dentro una parola, cioè fra gli spazi: incollare oltre lo
+    // spazio inventerebbe dati che nel testo non c'erano. E si lascia fuori:
+    //   • quello che è un INDIRIZZO o un nome di file (`www.enel.it`,
+    //     `https://…/area-clienti`, `storage.json`): un documento che ne cita
+    //     uno non sta proteggendo un dato, e incollarlo farebbe ricomparire
+    //     l'avviso proprio sul link di cui il documento parla (#587, giro 5);
+    //   • le sequenze di sole cifre corte, cioè le date: `2026-05-04` incollato
+    //     è `20260504`, che sta dentro l'indirizzo di qualunque articolo di quel
+    //     giorno. Sopra i dodici caratteri restano dentro, perché lì non sono
+    //     più date: sono numeri di carta e di conto.
+    for (const parola of text.toLowerCase().split(/\s+/)) {
+      if (!parola || SEMBRA_INDIRIZZO.test(parola)) continue;
+      const nudo = parola.replace(/[^a-z0-9]+/g, '');
+      if (nudo.length < MIN_TOKEN || nudo.length > MAX_INCOLLATO) continue;
+      if (!/[a-z]/.test(nudo) && nudo.length < SOLO_CIFRE_MIN) continue;
+      if (!PAROLE_DI_OGNI_INDIRIZZO.has(nudo)) out.add(nudo);
+    }
     return out;
   }
 
