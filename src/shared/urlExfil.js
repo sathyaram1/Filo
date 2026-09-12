@@ -86,6 +86,44 @@
     } catch (_) { return ''; }
   }
 
+  // Decodifica un blob ESADECIMALE che si riapre come testo stampabile. È il
+  // travestimento più a portata di mano dopo il base64 — `?d=5365677265746f…` —
+  // e sotto i 56 caratteri il ripiego strutturale non lo vedeva nemmeno, quindi
+  // una password corta usciva in chiaro sotto mentite spoglie (#587, giro 4).
+  function tryHex(tok) {
+    if (tok.length < 16 || tok.length % 2 !== 0) return '';
+    if (!/^[0-9a-fA-F]+$/.test(tok)) return '';
+    let out = '';
+    let printable = 0;
+    for (let i = 0; i < tok.length; i += 2) {
+      const c = parseInt(tok.slice(i, i + 2), 16);
+      if (Number.isNaN(c)) return '';
+      out += String.fromCharCode(c);
+      if (c >= 32 && c < 127) printable++;
+    }
+    return printable / (tok.length / 2) > 0.85 ? out : '';
+  }
+
+  // Il CARICO di un indirizzo: quello che il link PORTA, senza il nome del sito
+  // verso cui va. I pezzi del percorso, i valori dei parametri, il frammento e
+  // le etichette del sottodominio (dove un dato si può nascondere), ma non lo
+  // schema né il dominio: che un articolo di giornale si chiami «energia» come
+  // la bolletta che Filo ha appena letto non vuol dire che la stia portando
+  // fuori. Serve alla regola delle parole comuni, non a quella dei dati forti:
+  // un dato riconoscibile va fermato dovunque stia nell'indirizzo.
+  function caricoAlnum(url) {
+    try {
+      const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`);
+      const pezzi = [valoriUniti(url)];
+      const labels = String(u.hostname || '').split('.');
+      for (const lbl of labels.slice(0, Math.max(0, labels.length - 2))) pezzi.push(lbl);
+      const testo = pezzi.filter(Boolean).join(' ');
+      let dec = testo;
+      try { dec = decodeURIComponent(testo.replace(/\+/g, ' ')); } catch (_) {}
+      return `${testo} ${dec}`.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    } catch (_) { return ''; }
+  }
+
   // Tutto il testo "esposto" da un URL: stringa grezza + urldecode (anche doppio)
   // + decodifica dei segmenti base64 lunghi. Lo restituiamo normalizzato in sola
   // forma alfanumerica minuscola, così "Mario_Rossi", "mario.rossi" e
