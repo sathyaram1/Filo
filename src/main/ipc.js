@@ -413,12 +413,20 @@ function registerIpcHandlers() {
     try { return require('./services/permessiSito').scegliFonteRisposta(id, fonteId || null, !!audio); }
     catch (_) { return { ok: false }; }
   });
-  // «Interrompi» sul segno che dice che un sito può vedere lo schermo. Da qui
-  // non si spegne una traccia già consegnata: si ricarica la pagina, che
-  // distrugge il documento e con lui la ripresa.
+  // «Interrompi» sul cartello che dice cosa un sito può fare adesso (vedere lo
+  // schermo, usare la fotocamera o il microfono). Da qui non si spegne una
+  // traccia già consegnata: si ricarica la pagina, che distrugge il documento e
+  // con lui la ripresa.
   ipcMain.handle('permissions:capture-stop', (event, { id } = {}) => {
     void event;
-    try { return require('./services/permessiSito').interrompiRipresa(id); }
+    try { return require('./services/permessiSito').interrompiUso(id); }
+    catch (_) { return { ok: false }; }
+  });
+  // La × sul cartello della strada vecchia dello schermo, l'unico che Filo
+  // accende tirando a indovinare: toglie l'avviso e non tocca la pagina.
+  ipcMain.handle('permissions:capture-dismiss', (event, { id } = {}) => {
+    void event;
+    try { return require('./services/permessiSito').chiudiAvviso(id); }
     catch (_) { return { ok: false }; }
   });
   // Cosa si è già deciso per un sito: serve al menu del tasto destro sulla
