@@ -1272,5 +1272,5 @@
     return operandReason(p, o.cwd || o.perimetro || '', perimOk, o.home || o.perimetro || '', !!o.soloRiservati);
   }
 
-  global.SN_CMD_CLASSIFY = { classify, readReason, pathReason, programOf, subcommandOf };
+  global.SN_CMD_CLASSIFY = { classify, readReason, pathReason, programOf, subcommandOf, setRealPath };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
