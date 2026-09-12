@@ -66,8 +66,16 @@ const MAX_TOKEN_CHARS = 512;
 
 let fallback = null; // registro condiviso quando non c'è un mittente
 
+// Quanti link indietro si guarda per riconoscere un dato spedito un pezzo per
+// volta. Chi attacca può spezzare il dato in più richieste; noi ne teniamo
+// abbastanza da ricomporlo, e ognuna pesa il carico di un indirizzo.
+const MAX_LINK = 24;
+const MAX_LINK_CHARS = 4096;
+
 function newLedger() {
-  return { entries: [], chars: 0, sources: new Set(), digest: new Set() };
+  return {
+    entries: [], chars: 0, sources: new Set(), digest: new Set(), links: [],
+  };
 }
 
 // Le parole che rendono riconoscibile un testo: indirizzi email interi e parole
