@@ -470,6 +470,9 @@ test('in incognito la scelta si può anche togliere ─────────�
     if (!shellIncognito) await new Promise((r) => setTimeout(r, 200));
   }
   expect(shellIncognito).toBeTruthy();
+  // La cornice deve aver finito di montarsi: è lei che riceve la domanda.
+  await shellIncognito.waitForLoadState('domcontentloaded').catch(() => {});
+  await shellIncognito.waitForFunction(() => !!window.filoShell, null, { timeout: 8000 });
   await shellIncognito.evaluate((u) => window.filoShell.tabs.open(u), url);
   let page = null;
   const fine2 = Date.now() + 15_000;
