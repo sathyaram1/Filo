@@ -2369,21 +2369,34 @@ class TabManager {
     } catch (_) {}
   }
 
-  // Chiamato da IPC quando l'utente clicca "Apri" sulla chip — il popup era
-  // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
+  // Chiamato da IPC quando l'utente clicca "Apri" sulla chip del BLOCCO POPUP
+  // — il popup era legittimo (es. share dialog, OAuth) e va aperto come scheda.
+  //
+  // Qui NON si scavalca la lista dei siti bloccati (#590, terzo giro). Per un
+  // giro questo metodo è stato l'unico ingresso di tutti i bottoni "apri lo
+  // stesso", e il permesso che concede è cresciuto: da "questa apertura" a
+  // "questo sito, per tutta la sessione, su ogni strada". La chip dei popup
+  // però chiede un'altra cosa ("fai passare questa finestrella") e il sito che
+  // la fa comparire lo sceglie la pagina, non l'utente: un clic lì smontava la
+  // lista che l'utente aveva scritto, e da quel momento nemmeno l'apertura
+  // chiesta dal modello incontrava più un controllo. Il permesso grande lo dà
+  // solo il bottone che lo nomina: apriSitoComunque, qui sotto.
   openBlockedPopup(url) {
-    // overrideSiteBlock (#590): è l'UNICO scavalco della lista dei siti
-    // bloccati, e lo sceglie l'utente cliccando "Apri comunque" sulla
-    // notifica. Senza, openTab ribloccherebbe l'apertura e il bottone non
-    // farebbe niente.
-    //
-    // E il sì si REGISTRA (#590, secondo giro), non vale solo per la richiesta
-    // che parte adesso. Un sito che risponde "vai qui" invece di dare la
-    // pagina — il salto da http a https, la barra iniziale che porta alla
-    // home: quasi ogni sito vero — finiva contro il controllo del rimbalzo,
-    // che del sì non sapeva niente: la scheda restava vuota e il sito non si
-    // apriva più in nessun modo. Lo stesso al primo link cliccato dentro il
-    // sito, alla ricarica, e a una scheda nuova aperta da lì.
+    this.openTab(url, { activate: true });
+  }
+
+  // Chiamato da IPC quando l'utente clicca "Apri comunque" sulla notifica
+  // "Sito bloccato". È l'UNICO scavalco della lista dei siti bloccati, e lo
+  // sceglie una persona che sta guardando il nome del sito che ha fermato.
+  //
+  // Il sì si REGISTRA (#590, secondo giro), non vale solo per la richiesta che
+  // parte adesso. Un sito che risponde "vai qui" invece di dare la pagina (il
+  // salto da http a https, la barra iniziale che porta alla home: quasi ogni
+  // sito vero) finiva contro il controllo del rimbalzo, che del sì non sapeva
+  // niente: la scheda restava vuota e il sito non si apriva più in nessun modo.
+  // Lo stesso al primo link cliccato dentro il sito, alla ricarica, e a una
+  // scheda nuova aperta da lì.
+  apriSitoComunque(url) {
     try {
       require('./services/siteBlock').allowHost(new URL(url).hostname);
     } catch (_) { /* indirizzo non analizzabile: resta il solo scavalco qui sotto */ }
