@@ -2711,8 +2711,10 @@ function dashboardScheduler() {
       // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
       if (cached && cached.signature === inputs.signature) return;
       const result = await generateDashboardFromInputs(inputs);
-      // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
-      broadcastToTabs({
+      // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare
+      // l'LLM. Solo alle pagine interne — il messaggio nasce dalla memoria
+      // dell'utente e nessun content script lo usa (#589).
+      broadcastToFiloPages({
         type: MSG.FILO_DASHBOARD_UPDATED,
         message: result.message, suggestions: result.suggestions, ts: result.ts,
       });
