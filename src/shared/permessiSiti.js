@@ -295,6 +295,9 @@
   global.SN_PERMESSI_SITI = {
     CHIAVI,
     INNOCUI,
+    SOLO_UNA_VOLTA,
+    siRicorda,
+    preamboloSchermo,
     innocuo,
     chiaviRichieste,
     etichetta,
