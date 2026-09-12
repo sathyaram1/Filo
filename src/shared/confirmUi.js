@@ -321,7 +321,10 @@
       if (!active) return false;
       const btn = active.root.querySelector('.sn-confirm-btn-' + which);
       if (!btn || btn.disabled) return false;
-      btn.click();
+      // `premi` e non `click()`: sulle pagine web il guardiano dei gesti finti
+      // (#586) butta via i click che non vengono da una persona, e questo
+      // arriva da qui dentro, dal mondo isolato, dove la pagina non arriva.
+      if (!(global.SN_FILO_UI && global.SN_FILO_UI.premi(btn))) btn.click();
       return true;
     },
     // Scrive nel campo del dialogo livello 3 (dispatch dell'evento input).
