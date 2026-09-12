@@ -129,8 +129,11 @@
     const dataUrl = String(appunti.immagine || '');
 
     if (dataUrl) {
-      let blob = null;
-      try { blob = await (await fetch(dataUrl)).blob(); } catch (_) {}
+      // Il data URL si apre a mano e non con `fetch`: su un sito con un
+      // `connect-src` stretto una fetch verso `data:` la blocca la sua politica
+      // di sicurezza, e l'immagine non arriverebbe proprio dove il sito è più
+      // severo.
+      const blob = dataUrlToBlob(dataUrl);
       deps.restorePasteContext();
       const ctx = deps.getPasteContext();
       const targetKind = ctx?.kind;
