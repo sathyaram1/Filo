@@ -479,7 +479,16 @@
       count.style.color = check.ok ? '' : 'var(--sn-error,#b91c1c)';
     }
     if (err) {
-      err.textContent = check.ok ? '' : `${check.error} Finché resta più lungo, vale lo stile salvato prima.`;
+      // Due situazioni diverse, due frasi diverse. Se il testo troppo lungo è
+      // una modifica in corso, resta valido lo stile di prima. Se invece è
+      // proprio quello salvato (può esserci rimasto da una versione
+      // precedente, quando il tetto non c'era), Filo non lo sta usando: dirgli
+      // che «vale lo stile salvato prima» sarebbe falso.
+      const eQuelloSalvato = currentStyleText() === savedAgentStyle;
+      const coda = eQuelloSalvato
+        ? 'Finché resta così lungo Filo non lo usa: accorcialo o cancellalo.'
+        : 'Finché resta più lungo, vale lo stile salvato prima.';
+      err.textContent = check.ok ? '' : `${check.error} ${coda}`;
       err.hidden = check.ok;
     }
     return check;
