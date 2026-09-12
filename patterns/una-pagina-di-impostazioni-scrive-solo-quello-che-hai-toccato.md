@@ -2,10 +2,11 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-**Regola.** Una pagina che salva da sola manda al salvataggio soltanto i campi che
-l'utente ha cambiato su quella pagina, mai l'intero blocco letto all'apertura. E
-finché resta aperta si rilegge quando l'impostazione cambia altrove, così non
-mostra un valore che non è più vero.
+**Regola.** Una pagina che salva da sola manda al salvataggio soltanto i valori
+che l'utente ha cambiato su quella pagina, mai l'intero blocco letto
+all'apertura, e il confronto scende fino alla **singola manopola**, non si ferma
+al gruppo che la contiene. Finché resta aperta si rilegge quando l'impostazione
+cambia altrove, così non mostra un valore che non è più vero.
 
 ## Il caso
 
