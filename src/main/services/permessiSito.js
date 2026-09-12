@@ -407,6 +407,9 @@ function iniziaRipresa(wc, origine, opzioni) {
       id,
       tabId: tab ? tab.id : null,
       host: P().host(origine),
+      // 'no' = solo l'immagine; 'si' = anche l'audio del computer, e l'utente
+      // l'ha scelto; 'forse' = strada vecchia, dove non si può sapere.
+      audio: (opzioni && opzioni.audio) || 'no',
     });
     return id;
   } catch (_) { return null; }
