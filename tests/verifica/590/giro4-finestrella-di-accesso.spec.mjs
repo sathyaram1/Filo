@@ -88,6 +88,13 @@ async function alzaServer() {
       res.end(pagina('<h1 id="altrove">ALTROVE</h1><button id="b" onclick="history.back()">indietro</button>'));
       return;
     }
+    if (path === '/da-solo') {
+      // La pagina che si ricarica da sola: mezzo web lo fa (cruscotti,
+      // risultati sportivi, caselle di posta).
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(pagina('<h1 id="t">SONO IL SITO DELLA LISTA</h1><button id="b" onclick="location.reload()">ricarica</button>'));
+      return;
+    }
     if (path === '/altrove') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(pagina('<h1 id="altrove">ALTROVE</h1>'));
