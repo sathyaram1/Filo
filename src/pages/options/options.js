@@ -922,6 +922,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
+    ascoltaCambiamentiAltrove();
     // Niente pulsante "Salva": ogni modifica viene applicata e persistita
     // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
     // altri (select/checkbox) immediatamente.
