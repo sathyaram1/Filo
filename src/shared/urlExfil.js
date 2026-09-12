@@ -169,7 +169,7 @@
   // sola forma alfanumerica minuscola. Vale sia per l'indirizzo intero sia per il
   // solo carico: lo stesso travestimento va sciolto dalle due parti, o un dato in
   // base64 dentro un parametro sparirebbe dal conto delle parole comuni.
-  function sciogliEUnisci(pezzi) {
+  function sciogli(pezzi) {
     const out = [];
     for (const p of pezzi) {
       if (!p) continue;
