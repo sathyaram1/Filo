@@ -314,7 +314,38 @@ async function decidi(wc, permesso, dettagli) {
       scriviMappa(ses, incognito, Pp.conScelta(mappaDi(ses, incognito), origine, memorizzabili, scelta));
     } catch (_) {}
   } : null;
-  return chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile: !!salvaScelta });
+  const ok = await chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile: !!salvaScelta });
+
+  // Il sì al preambolo vale per la cattura schermo che segue, qualunque delle
+  // due strade prenda: la moderna passa dal gestore qui sotto e lì non si
+  // richiede (`consumaPreambolo`), la vecchia consegna e basta. In tutti e due
+  // i casi da qui parte il segno che la ripresa è in corso: è l'unica cosa che
+  // la strada vecchia lascia vedere a chi usa Filo.
+  if (preambolo && ok) segnaPreambolo(wc, origine);
+  return ok;
+}
+
+// ─── il preambolo consentito, e il segno che lo schermo è ripreso ───────────
+
+// Chi ha appena detto sì alla domanda dello schermo, per pochi secondi: il
+// gestore della cattura schermo lo consuma e va dritto alla scelta della fonte
+// invece di richiedere la stessa cosa due volte di fila.
+const preamboli = new Map(); // wcId → { fino, ripresaId }
+const PREAMBOLO_MS = 20_000;
+
+function segnaPreambolo(wc, origine) {
+  if (!wc) return;
+  const ora = Date.now();
+  for (const [k, v] of preamboli) if (v.fino <= ora) preamboli.delete(k);
+  preamboli.set(wc.id, { fino: ora + PREAMBOLO_MS, ripresaId: iniziaRipresa(wc, origine) });
+}
+
+function consumaPreambolo(wc) {
+  if (!wc) return null;
+  const v = preamboli.get(wc.id);
+  if (!v) return null;
+  preamboli.delete(wc.id);
+  return v.fino > Date.now() ? v : (fineRipresa(v.ripresaId), null);
 }
 
 // Controllo SINCRONO (navigator.permissions.query, Notification.permission,
