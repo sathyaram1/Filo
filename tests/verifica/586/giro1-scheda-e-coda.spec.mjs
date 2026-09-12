@@ -1,19 +1,20 @@
 // Verifica #586, giro 1 — la domanda del permesso e la SCHEDA che l'ha fatta.
 //
-// Il processo principale manda alla shell anche `tabId`: la domanda nasce da
-// una scheda precisa. Qui si controlla cosa succede quando le schede sono due:
+// Il difetto trovato: la fila delle domande era una sola per tutta la finestra
+// e non guardava da quale scheda venisse la richiesta. Due conseguenze, tutte e
+// due provate qui:
 //
-//  a) una scheda in secondo piano chiede un permesso mentre chi naviga sta
-//     guardando un altro sito: la domanda compare comunque sopra la scheda
-//     sbagliata, e un «Consenti» dato guardando il sito B finisce al sito A;
-//  b) la coda è una sola per tutta la finestra: finché la domanda della scheda
-//     in secondo piano è lì, la richiesta della scheda che si sta guardando
-//     non compare — resta invisibile fino a due minuti, e poi viene negata;
-//  c) cambiando scheda la domanda della scheda di prima resta appesa lì.
+//  a) una scheda lasciata in secondo piano faceva comparire la sua domanda
+//     sopra il sito che si stava leggendo, senza nessun segno che venisse da
+//     un'altra parte;
+//  b) tenendo occupato l'unico posto, la richiesta della scheda che si stava
+//     GUARDANDO non compariva: chi premeva «trovami» non otteneva niente, e
+//     dopo due minuti gli veniva negato.
 //
-// Più il confronto con l'unico altro pannello della shell che si apre sopra
-// l'area pagina (quello dei download): quello chiede spazio alla view nativa
-// prima di mostrarsi, la pastiglia no.
+// Più la misura che conta per farsi vedere: la domanda cade dentro l'area della
+// pagina, che il sistema disegna sopra la cornice di Filo, quindi deve far
+// scendere la pagina finché è aperta (come il pannello dei download) e
+// rimetterla a posto quando si chiude.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -59,36 +60,6 @@ async function schedaAttiva(app) {
   });
 }
 
-test('la domanda di una scheda in secondo piano compare sopra la scheda che si sta guardando', async ({ app, shell, testServer }) => {
-  test.setTimeout(120_000);
-  const urlA = testServer.html(html('SITO A'));
-  const urlB = testServer.html(html('SITO B'));
-  const pageA = await apriPerUrl(app, shell, urlA);
-  const pageB = await apriPerUrl(app, shell, urlB);
-
-  // Chi naviga sta guardando B.
-  const attiva = await schedaAttiva(app);
-  expect(attiva.url, 'la scheda appena aperta dovrebbe essere quella attiva').toBe(urlB);
-
-  // A, in secondo piano, chiede la fotocamera.
-  await pageA.evaluate(() => window.__chiediFotocamera());
-  const chip = shell.locator('.perm-chip');
-  await expect(chip).toHaveCount(1, { timeout: 10_000 });
-
-  void pageB;
-  await shell.waitForTimeout(1500);
-  expect(
-    await chip.count(),
-    'la domanda della scheda in secondo piano compare sopra la scheda che si sta guardando, '
-    + 'senza nessun segno che arrivi da un\'altra parte',
-  ).toBe(0);
-
-  // Passando su quella scheda, la domanda c'è: non è persa, aspetta il suo turno.
-  await shell.evaluate((id) => window.filoShell.tabs.activate(id), (await schedaDiUrl(app, urlA)));
-  await expect(chip).toHaveCount(1, { timeout: 10_000 });
-  await expect(chip).toContainText('fotocamera');
-});
-
 async function schedaDiUrl(app, url) {
   return app.evaluate(({ BrowserWindow }, u) => {
     for (const w of BrowserWindow.getAllWindows()) {
@@ -103,48 +74,62 @@ async function schedaDiUrl(app, url) {
   }, url);
 }
 
-test('la richiesta della scheda che si sta guardando resta invisibile dietro quella di un\'altra scheda', async ({ app, shell, testServer }) => {
+test('la domanda di una scheda in secondo piano aspetta il suo turno', async ({ app, shell, testServer }) => {
+  test.setTimeout(120_000);
+  const urlA = testServer.html(html('SITO A'));
+  const urlB = testServer.html(html('SITO B'));
+  const pageA = await apriPerUrl(app, shell, urlA);
+  await apriPerUrl(app, shell, urlB);
+
+  // Chi naviga sta guardando B.
+  const attiva = await schedaAttiva(app);
+  expect(attiva.url, 'la scheda appena aperta dovrebbe essere quella attiva').toBe(urlB);
+
+  // A, in secondo piano, chiede la fotocamera.
+  await pageA.evaluate(() => window.__chiediFotocamera());
+  const chip = shell.locator('.perm-chip');
+  await shell.waitForTimeout(2000);
+  expect(
+    await chip.count(),
+    'la domanda della scheda in secondo piano compare sopra il sito che si sta leggendo, '
+    + 'senza nessun segno che venga da un\'altra parte',
+  ).toBe(0);
+
+  // Passando su quella scheda la domanda c'è: non è persa, aspettava il turno.
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), await schedaDiUrl(app, urlA));
+  await expect(chip).toHaveCount(1, { timeout: 10_000 });
+  await expect(chip).toContainText('fotocamera');
+});
+
+test('la richiesta della scheda che si sta guardando compare anche se un\'altra scheda ha una domanda in sospeso', async ({ app, shell, testServer }) => {
   test.setTimeout(120_000);
   const urlA = testServer.html(html('SITO A'));
   const urlB = testServer.html(html('SITO B'));
   const pageA = await apriPerUrl(app, shell, urlA);
   const pageB = await apriPerUrl(app, shell, urlB);
 
-  const hostA = new URL(urlA).host;
-
-  // A (in secondo piano) chiede per primo e occupa l'unica pastiglia.
+  // A, in secondo piano, chiede per primo.
   await pageA.evaluate(() => window.__chiediFotocamera());
-  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 10_000 });
+  await shell.waitForTimeout(1500);
 
   // Ora chi naviga, su B, preme il bottone «trovami»: B chiede la posizione.
   await pageB.evaluate(() => window.__chiediPosizione());
-  await shell.locator('.perm-chip').first().waitFor({ timeout: 2000 }).catch(() => {});
-  await shell.waitForTimeout(1500);
-
-  const testi = await shell.locator('.perm-chip').allTextContents();
+  const chip = shell.locator('.perm-chip');
+  await expect(chip).toHaveCount(1, { timeout: 10_000 });
+  const testi = await chip.allTextContents();
   // eslint-disable-next-line no-console
   console.log('[586] pastiglie visibili:', JSON.stringify(testi));
 
-  const chiedeLaPosizione = testi.some((t) => /dove sei/i.test(t));
   expect(
-    chiedeLaPosizione,
-    `chi naviga è su ${new URL(urlB).host} e ha appena chiesto di essere trovato: la domanda non compare, `
-    + `perché la fila è una sola per tutta la finestra e la tiene occupata ${hostA}, che sta in un'altra scheda. `
-    + 'Il gesto non produce niente, e dopo due minuti viene negato da solo.',
+    testi.some((t) => /dove sei/i.test(t)),
+    `chi naviga è su ${new URL(urlB).host} e ha appena chiesto di essere trovato: la domanda deve comparire, `
+    + 'non restare dietro a quella di una scheda che non sta guardando',
   ).toBe(true);
 });
 
-test('la pastiglia chiede spazio alla view della pagina, come fa il pannello dei download', async ({ app, shell, openTab, testServer }) => {
+test('la pastiglia fa scendere la pagina, e la rimette a posto quando si chiude', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const page = await testServer.openReady(openTab, html('SITO'));
-
-  const inset = () => app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      const tm = w._filoTabs;
-      if (tm) return { topInset: tm.topInset, chromeCompact: !!tm.chromeCompact };
-    }
-    return null;
-  });
 
   const cimaPagina = () => app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
@@ -156,7 +141,6 @@ test('la pastiglia chiede spazio alla view della pagina, come fa il pannello dei
     return null;
   });
 
-  const prima = await inset();
   const cimaPrima = await cimaPagina();
   await page.evaluate(() => window.__chiediFotocamera());
   await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 10_000 });
@@ -165,16 +149,14 @@ test('la pastiglia chiede spazio alla view della pagina, come fa il pannello dei
   const cimaDopo = await cimaPagina();
 
   // eslint-disable-next-line no-console
-  console.log('[586] inset prima', JSON.stringify(prima), 'pastiglia', JSON.stringify(box),
-    'cima pagina prima', cimaPrima, 'dopo', cimaDopo);
+  console.log('[586] pastiglia', JSON.stringify(box), 'cima pagina prima', cimaPrima, 'dopo', cimaDopo);
 
   expect(
     cimaDopo,
     `la pastiglia occupa y ${box && box.y}..${box && (box.y + box.height)}: l'area pagina deve scendere sotto di lei, `
-    + 'come fa col pannello dei download, altrimenti la view nativa la copre',
+    + 'come fa col pannello dei download, altrimenti la vista nativa la copre',
   ).toBeGreaterThanOrEqual(box.y + box.height);
 
-  // E torna su quando si risponde: la riserva non resta appesa.
   await shell.locator('.perm-chip .perm-chip-x').click();
   await expect(shell.locator('.perm-chip')).toHaveCount(0, { timeout: 8_000 });
   await expect.poll(cimaPagina, { timeout: 8_000 }).toBe(cimaPrima);
