@@ -518,10 +518,16 @@ async function scegliFonte(wc, frame) {
   const host = Pp.host(Pp.origineDi(url) || '');
 
   const id = String(prossimaScelta++);
+  // I nomi degli SCHERMI arrivano dal sistema in inglese («Entire screen»,
+  // «Screen 1») e restavano così dentro una Filo tutta in italiano, sotto una
+  // frase italiana. Li scriviamo noi. I nomi delle FINESTRE no: quelli sono il
+  // titolo vero della finestra (un documento, un programma) e tradurli
+  // significherebbe non farla più riconoscere.
+  const nomiSchermi = Pp.nomiDegliSchermi(fonti.map((f) => f.id));
   const voci = fonti.map((f) => ({
     id: f.id,
-    nome: f.name || (f.id.startsWith('screen:') ? 'Tutto lo schermo' : 'Una finestra'),
-    schermo: f.id.startsWith('screen:'),
+    nome: nomiSchermi[f.id] || f.name || 'Una finestra',
+    schermo: !!nomiSchermi[f.id],
     anteprima: (() => { try { return f.thumbnail.toDataURL(); } catch (_) { return ''; } })(),
   }));
 
