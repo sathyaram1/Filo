@@ -560,10 +560,24 @@
     return String(tok).replace(/\$(?=['"])/g, '').replace(/['"]/g, '');
   }
 
+  // Un argomento VUOTO (`""`, `''`, `$''`) è un argomento a tutti gli effetti:
+  // la shell lo passa al programma e il programma lo conta. Togliendogli le
+  // virgolette però non resta niente, e ricomponendo il comando l'argomento
+  // SPARIVA — il conto degli operandi si spostava di uno. Su una ricerca, dove
+  // il primo operando è il testo cercato e va scartato, a essere scartato
+  // diventava il FILE: `grep "" .ssh/id_rsa` — cioè «stampami tutte le righe»,
+  // il modo normale di leggere un file con una ricerca — stampava la chiave
+  // privata senza chiedere niente, e allo stesso modo cadeva il confine della
+  // cartella dell'utente (`grep "" /etc/shadow`) (#587, giro 8).
+  // Al posto del vuoto resta un segnaposto: non è un percorso, non è una flag e
+  // non può essere il nome di un file (il byte zero non è ammesso in un nome su
+  // nessun sistema), quindi non fa salire niente da solo — tiene solo il posto
+  // nel conto degli operandi.
+  const ARG_VUOTO = ' ';
   // Comando con le virgolette rimosse token per token: la forma su cui girano
   // tutti i controlli (whitelist di programmi, flag pericolosi, bersagli).
   function dequote(cmd) {
-    return tokens(cmd).map(unquote).join(' ');
+    return tokens(cmd).map((t) => unquote(t) || ARG_VUOTO).join(' ');
   }
 
   function programOf(cmd) {
