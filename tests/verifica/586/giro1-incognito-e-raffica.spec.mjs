@@ -33,22 +33,30 @@ test('in incognito la scelta si può dare ma non togliere', async ({ app, shell,
 
   // Finestra in incognito, con dentro la pagina di prova.
   const url = testServer.html(HTML);
-  const info = await app.evaluate(async ({ BrowserWindow }, u) => {
-    const { createIncognitoWindow } = require('./src/main/window.js');
-    const w = await createIncognitoWindow();
-    await new Promise((r) => setTimeout(r, 600));
-    w._filoTabs.openTab(u);
-    await new Promise((r) => setTimeout(r, 1500));
-    void BrowserWindow;
-    return { id: w.id, incognito: !!w._filoIncognito, schede: w._filoTabs.tabs.length };
-  }, url);
-  expect(info.incognito).toBe(true);
+  void openTab;
+  await shell.evaluate(() => window.filoShell.openIncognito());
 
-  const shellIncognito = app.windows().find((w) => {
-    try { return w.url().includes('shell.html?incognito=1'); } catch (_) { return false; }
-  });
+  let shellIncognito = null;
+  const fine = Date.now() + 15_000;
+  while (Date.now() < fine && !shellIncognito) {
+    shellIncognito = app.windows().find((w) => {
+      try { return w.url().includes('shell.html?incognito=1'); } catch (_) { return false; }
+    }) || null;
+    if (!shellIncognito) await new Promise((r) => setTimeout(r, 200));
+  }
   expect(shellIncognito, 'shell della finestra incognito non trovata').toBeTruthy();
-  const page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+  await shellIncognito.waitForLoadState('domcontentloaded').catch(() => {});
+  const incognito = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().some((w) => !!w._filoIncognito));
+  expect(incognito).toBe(true);
+
+  await shellIncognito.evaluate((u) => window.filoShell.tabs.open(u), url);
+  let page = null;
+  const fine2 = Date.now() + 15_000;
+  while (Date.now() < fine2 && !page) {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+    if (!page) await new Promise((r) => setTimeout(r, 200));
+  }
   expect(page, 'pagina nella finestra incognito non trovata').toBeTruthy();
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
