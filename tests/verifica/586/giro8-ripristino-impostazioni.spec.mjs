@@ -72,3 +72,34 @@ test('«ripristina tutte le impostazioni» toglie la scelta: deve chiudere anche
     + 'resta nemmeno la riga da cui toglierglielo, quindi non c\'è più nessun punto in cui rimediare',
   ).toEqual([]);
 });
+
+// Il bottone accanto, sulla stessa pagina, fa la cosa giusta: è il confronto che
+// dice che il ripristino è una dimenticanza e non una scelta.
+test('«cancella tutte le scelte» della pagina Sicurezza chiude il microfono aperto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await testServer.openReady(openTab, HTML);
+
+  const esito = page.evaluate(() => window.__microfono());
+  await expect(shell.locator('.perm-chip')).toHaveCount(1, { timeout: 20_000 });
+  await shell.locator('.perm-chip .perm-chip-allow').click();
+  expect(await esito).toEqual(['audio:live']);
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
+  const sicurezza = await aspetta(async () => app.windows().find((w) => {
+    try { return w.url().includes('security.html'); } catch (_) { return false; }
+  }) || null);
+  await sicurezza.waitForLoadState('domcontentloaded').catch(() => {});
+  await sicurezza.waitForTimeout(1000);
+
+  const risposta = await sicurezza.evaluate(() => window.chrome.runtime
+    .sendMessage({ type: 'permessi_siti_revoca' }).then((r) => !!(r && r.ok), (e) => 'errore:' + e));
+  console.log('[586 g8] cancella tutte le scelte:', risposta);
+  await sicurezza.waitForTimeout(2000);
+  console.log('[586 g8] elenco dopo il cancella tutto:',
+    JSON.stringify(await sicurezza.locator('#perms-list li').allTextContents()));
+
+  await page.waitForTimeout(1500);
+  const stato = await page.evaluate(() => window.__stato());
+  console.log('[586 g8] il microfono dopo il cancella tutto:', JSON.stringify(stato));
+  expect(stato.filter((s) => s.endsWith(':live'))).toEqual([]);
+});
