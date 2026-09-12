@@ -154,6 +154,7 @@ async function chiudiTutteLeSchede() {
 // contenitore: una finestrella di accesso NON compare fra le schede.
 function finestreSu(host) {
   return app.windows().filter((w) => {
+    if (w.isClosed()) return false; // le schede chiuse restano nell'elenco un po'
     try { return new URL(w.url()).hostname === host; } catch (_) { return false; }
   });
 }
