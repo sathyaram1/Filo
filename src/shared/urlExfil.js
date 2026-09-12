@@ -445,6 +445,7 @@
         continue;
       }
       if (isStrong(t)) { strong = true; sample = t; continue; }
+      if (!debolePermesso) continue;
       // Una parola comune conta solo se sta nel CARICO del link: nel nome del
       // sito non porta fuori niente (vedi caricoAlnum).
       if (nelCarico(t)) {
