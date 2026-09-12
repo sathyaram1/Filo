@@ -1579,46 +1579,87 @@
     permHost.id = 'permission-chips';
     document.body.appendChild(permHost);
 
-    // UNA domanda alla volta PER SCHEDA. Le altre aspettano in coda: la fascia
-    // sotto la barra è alta una pastiglia, e una pagina che chiede cinque
-    // permessi di fila ne impilerebbe cinque, spingendo le ultime dietro
-    // all'area della pagina, dove nessuno le vedrebbe né potrebbe rispondere
-    // (e una domanda invisibile, col default che nega, è un rifiuto muto).
-    //
-    // "Per scheda" non è un dettaglio. Con una fila sola per tutta la finestra,
-    // una scheda lasciata in secondo piano teneva il posto e la richiesta della
-    // scheda che si stava guardando non compariva: chi premeva «trovami» non
-    // otteneva niente, e dopo due minuti gli veniva negato. E una domanda nata
-    // altrove compariva sopra il sito che si stava leggendo, senza un segno che
-    // venisse da un'altra parte.
-    const coda = [];
-    let mostrata = null; // { id, nodo, tabId }
-
     function rimuoviNodo(nodo) {
       nodo.classList.add('uscita');
       setTimeout(() => { try { nodo.remove(); } catch (_) {} }, 140);
     }
 
-    // La pastiglia cade nell'area della pagina, che il sistema disegna sopra la
-    // cornice: senza riserva non la vedrebbe nessuno. Vedi `riservaTop`.
+    // Tutto quello che compare qui cade nell'area della pagina, che il sistema
+    // disegna sopra la cornice: senza riserva non lo vedrebbe nessuno. Si
+    // misura il contenitore intero, perché le cose che ci stanno dentro
+    // (domanda, scelta della fonte, segno della ripresa) possono essere più
+    // d'una insieme e la riserva deve coprirle tutte. Vedi `riservaTop`.
     function sincronizzaRiserva() {
-      if (!mostrata) { riservaTop('permessi', 0); return; }
       requestAnimationFrame(() => {
-        if (!mostrata) { riservaTop('permessi', 0); return; }
-        const r = mostrata.nodo.getBoundingClientRect();
-        riservaTop('permessi', Math.ceil(r.bottom) + 6);
+        const vive = [...permHost.children].filter((n) => !n.classList.contains('uscita'));
+        if (!vive.length) { riservaTop('permessi', 0); return; }
+        let fondo = 0;
+        for (const n of vive) fondo = Math.max(fondo, n.getBoundingClientRect().bottom);
+        riservaTop('permessi', Math.ceil(fondo) + 6);
       });
     }
 
-    function chiudiPastiglia(id) {
-      const chiave = String(id);
-      const i = coda.findIndex((r) => r.id === chiave);
-      if (i >= 0) coda.splice(i, 1);
-      if (mostrata && mostrata.id === chiave) {
-        rimuoviNodo(mostrata.nodo);
-        mostrata = null;
-        mostraProssima();
+    // Una fila PER SCHEDA. Le domande e le scelte di una scheda compaiono solo
+    // quando si sta guardando quella scheda; le altre aspettano.
+    //
+    // "Per scheda" non è un dettaglio. Con una fila sola per tutta la finestra,
+    // una scheda lasciata in secondo piano teneva il posto e la richiesta della
+    // scheda che si stava guardando non compariva: chi premeva «trovami» non
+    // otteneva niente, e dopo due minuti gli veniva negato. E una cosa nata
+    // altrove compariva sopra il sito che si stava leggendo, col nome di un
+    // sito che non era quello davanti agli occhi: un clic lì rispondeva per
+    // conto di una pagina che non si stava nemmeno guardando.
+    //
+    // E una alla volta: la fascia sotto la barra è alta una pastiglia, e una
+    // pagina che chiede cinque permessi di fila ne impilerebbe cinque,
+    // spingendo le ultime dietro all'area della pagina, dove nessuno le
+    // vedrebbe né potrebbe rispondere (e una domanda invisibile, col default
+    // che nega, è un rifiuto muto). Chi aspetta non viene scartato: resta in
+    // fila e tocca a lui appena il posto si libera.
+    function filaPerScheda(disegnaNodo) {
+      const coda = [];
+      let mostrata = null; // { id, tabId, nodo }
+
+      // Una cosa senza scheda (arriva dalla cornice, non da un sito) vale
+      // sempre; le altre solo sulla scheda che le ha chieste.
+      const suaVolta = (tabId) => tabId === null || tabId === undefined || tabId === state.activeId;
+
+      function mostraProssima() {
+        if (mostrata) { sincronizzaRiserva(); return; }
+        const prossima = coda.find((r) => suaVolta(r.info.tabId));
+        if (!prossima) { sincronizzaRiserva(); return; }
+        mostrata = { id: prossima.id, tabId: prossima.info.tabId, nodo: disegnaNodo(prossima.info) };
+        sincronizzaRiserva();
       }
+
+      return {
+        aggiungi(info) {
+          if (!info || !info.id) return;
+          const id = String(info.id);
+          if (coda.some((r) => r.id === id)) return;
+          coda.push({ id, info });
+          mostraProssima();
+        },
+        chiudi(id) {
+          const chiave = String(id);
+          const i = coda.findIndex((r) => r.id === chiave);
+          if (i >= 0) coda.splice(i, 1);
+          if (mostrata && mostrata.id === chiave) {
+            rimuoviNodo(mostrata.nodo);
+            mostrata = null;
+          }
+          mostraProssima();
+        },
+        // Cambio scheda: quella di prima torna in coda (non si risponde, non si
+        // perde) e prende il posto quella della scheda su cui si è arrivati.
+        riallinea() {
+          if (mostrata && !suaVolta(mostrata.tabId)) {
+            rimuoviNodo(mostrata.nodo);
+            mostrata = null;
+          }
+          mostraProssima();
+        },
+      };
     }
 
     function disegna(info) {
