@@ -2321,21 +2321,23 @@ class TabManager {
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
       );
     } catch (_) { /* policy non supportata in qualche build */ }
-    pwc.on('will-navigate', (event, url) => {
+    // #590 — la finestrella di accesso era l'ultima superficie rimasta fuori dal
+    // passaggio unico: applicava le difese sugli schemi ma non la lista dei
+    // siti bloccati, quindi dentro quella finestra un sito della lista si
+    // apriva. Qui le due difese vanno insieme, come in una scheda normale.
+    const gatePopup = (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
         openExternalScheme(url);
+        return;
       }
-    });
+      if (this._maybeBlockNavigation(url, { fromUrl: pwc.getURL() })) event.preventDefault();
+    };
+    pwc.on('will-navigate', gatePopup);
     // SICUREZZA (#309) — come per le tab: will-navigate non copre i redirect
     // lato server, e un IdP compromesso/ostile potrebbe rimbalzare il popup
     // verso file:// (leak hash NTLM) o data:/javascript:. Stesso gate esplicito.
-    pwc.on('will-redirect', (event, url) => {
-      if (isWebUnsafeNav(url)) {
-        event.preventDefault();
-        openExternalScheme(url);
-      }
-    });
+    pwc.on('will-redirect', gatePopup);
     pwc.setWindowOpenHandler(({ url }) => {
       if (isWebUnsafeNav(url)) {
         openExternalScheme(url);
