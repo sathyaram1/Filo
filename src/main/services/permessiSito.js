@@ -388,6 +388,10 @@ async function decidi(wc, permesso, dettagli) {
   // La dettatura di Filo dentro una pagina web (vedi concessioneUnaTantum).
   if (consumaUnaTantum(wc, chiavi)) return true;
 
+  // Da qui in giù la richiesta è del sito: si segna, così se Filo si annuncia
+  // mentre il sito sta chiedendo la stessa cosa la concessione non si arma.
+  segnaRichiesta(wc, chiavi);
+
   const { win, tab } = posizione(wc);
   const incognito = !!(win && win._filoIncognito);
   const ses = wc && !wc.isDestroyed() ? wc.session : null;
