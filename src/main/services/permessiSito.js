@@ -266,12 +266,15 @@ async function decidi(wc, permesso, dettagli) {
 
   // La scrittura della memoria passa da qui: una risposta "solo per stavolta"
   // (la × della pastiglia, o l'attesa scaduta) non lascia niente nello storage.
-  const salvaScelta = (scelta) => {
+  // I permessi che non si ricordano (lo schermo) non hanno niente da scrivere:
+  // lì la pastiglia lo dice, così chi risponde sa che vale per questa volta.
+  const memorizzabili = chiavi.filter((k) => Pp.siRicorda(k));
+  const salvaScelta = memorizzabili.length ? (scelta) => {
     try {
-      scriviMappa(ses, incognito, Pp.conScelta(mappaDi(ses, incognito), origine, chiavi, scelta));
+      scriviMappa(ses, incognito, Pp.conScelta(mappaDi(ses, incognito), origine, memorizzabili, scelta));
     } catch (_) {}
-  };
-  return chiedi({ wc, win, tab, origine, chiavi, salvaScelta });
+  } : null;
+  return chiedi({ wc, win, tab, origine, chiavi, salvaScelta, ricordabile: !!salvaScelta });
 }
 
 // Controllo SINCRONO (navigator.permissions.query, Notification.permission,
