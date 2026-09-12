@@ -16,10 +16,13 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { CONFIRM_HOST, confirmState } from './helpers/confirm.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
+import { mkdirSync } from 'node:fs';
 
 const NEWTAB = 'filo://newtab/';
+const SHOTS = 'tests/.shots';
 
 const execAction = (app, action, opts) =>
   app.evaluate((_electron, { action, opts }) =>
