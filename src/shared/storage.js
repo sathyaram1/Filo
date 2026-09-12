@@ -30,6 +30,38 @@
     return out;
   }
 
+  // Confronta due fotografie delle impostazioni e restituisce SOLO le foglie
+  // cambiate, con la loro nidificazione. Serve alle pagine delle impostazioni:
+  // una pagina deve poter dire "ho toccato questa manopola" e non "ecco tutto
+  // il blocco com'era quando ti ho aperto", se no una scelta fatta altrove
+  // mentre la pagina restava aperta torna indietro al primo tocco.
+  //
+  // Perché fino alla FOGLIA e non al gruppo: modalità terminale e shell sono
+  // un gruppo solo, le due chiavi API sono un gruppo solo, velocità e tono
+  // della voce sono un gruppo solo. Fermarsi al gruppo vuol dire che toccare
+  // la shell rimanda anche il permesso della shell, col valore vecchio (#592,
+  // giro 3: cinque porte, tutte così).
+  //
+  // Le chiavi di REPLACE_KEYS restano INTERE: il loro contratto è "questa è la
+  // lista completa, chi manca è stato rimosso", quindi mandarne un pezzo
+  // cancellerebbe il resto invece di aggiornarlo.
+  function partialCambiato(prima, adesso) {
+    const isMappa = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+    if (!isMappa(adesso)) return {};
+    const out = {};
+    for (const k of Object.keys(adesso)) {
+      const nuovo = adesso[k];
+      const vecchio = isMappa(prima) ? prima[k] : undefined;
+      if (!REPLACE_KEYS.has(k) && isMappa(nuovo) && isMappa(vecchio)) {
+        const sotto = partialCambiato(vecchio, nuovo);
+        if (Object.keys(sotto).length) out[k] = sotto;
+      } else if (JSON.stringify(vecchio) !== JSON.stringify(nuovo)) {
+        out[k] = nuovo;
+      }
+    }
+    return out;
+  }
+
   async function getSettings() {
     const res = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
     const stored = res[STORAGE_KEYS.SETTINGS] || {};
