@@ -19,6 +19,7 @@
       version: '0.2.228', date: '2026-09-11',
       fixes: [
         'L\'avviso sui siti pericolosi ora protegge anche chi non ha fatto il login: prima quel controllo si accendeva solo per chi aveva un profilo, cioè quasi per nessuno.',
+        'I siti che metti fra quelli da bloccare ora restano chiusi da ogni strada: anche scrivendo l\'indirizzo a mano e anche quando è Filo ad aprirli per te. Prima bastava quello per entrarci lo stesso.',
       ],
     },
     {
