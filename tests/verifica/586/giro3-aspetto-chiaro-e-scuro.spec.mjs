@@ -69,6 +69,7 @@ for (const tema of ['light', 'dark']) {
         await shell.waitForTimeout(400);
         await shell.screenshot({ path: `tests/.shots/586-giro3-domanda-${tema}.png` });
         await shell.locator('.perm-chip .perm-chip-x').click();
+        await expect(shell.locator('.perm-chip')).toHaveCount(0, { timeout: 10_000 });
 
         // 2 — la scelta della fonte
         page.evaluate(() => window.__schermo()).catch(() => {});
