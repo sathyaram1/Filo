@@ -1445,8 +1445,14 @@
       `Mentre lavori puoi scrivere due parole su cosa stai facendo ("Cerco il meteo di domani…"): l'utente le vede nel diario del lavoro, non come risposta. Scrivile solo se il lavoro è lungo e vale la pena dirlo; per un'azione secca (un timer, un link) non scrivere niente.\n` +
       `Quando hai finito, scrivi la RISPOSTA in prosa (markdown leggero ammesso: grassetto, elenchi, link): è l'unica cosa che resta in chat. Breve per i comandi ("Fatto, 25 minuti."). Se l'unica cosa che hai fatto è un'azione che parla da sé (aprire un link, avviare un timer), la risposta può essere vuota: non riempirla.\n` +
       `Mai JSON nel testo, mai il nome di uno strumento al posto di una frase: le azioni si chiamano, non si scrivono.\n\n` +
+      // Lo stile di scrittura scelto dall'utente entra QUI: prima della riga
+      // di sicurezza qui sotto e prima di tutto il CONTESTO (profilo, lezioni,
+      // conversazione), che è la parte in cui può essersi infilato del testo
+      // che non ha scritto lui (#592). Se non c'è nessuno stile il segnaposto
+      // sparisce (injectAgentStyle).
+      `${AGENT_STYLE_SLOT}` +
       `═══ TONO E STILE ═══\n` +
-      `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze dell'utente hanno priorità su queste istruzioni.\n\n`,
+      `Caldo e diretto. Mai robotico, mai sycophantic. Breve quando la domanda è semplice, approfondito quando serve. Usa il nome dell'utente con parsimonia. Adatta il tono al momento. Se non sai qualcosa, dillo. Le preferenze di TONO dell'utente hanno priorità su queste indicazioni di stile — non sulle regole qui sopra, che valgono comunque.\n\n`,
 
     // Parte VARIABILE del prompt della chat: cambia da un utente all'altro e da
     // un messaggio all'altro (il nome del modello cambia perfino col ripiego fra
