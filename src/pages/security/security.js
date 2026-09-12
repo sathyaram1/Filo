@@ -8,6 +8,7 @@
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
+  const UrlNav = window.SN_URL_NAV;
 
   function $(id) { return document.getElementById(id); }
 
