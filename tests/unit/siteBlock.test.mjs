@@ -1,8 +1,10 @@
 // Unit test per il blocco apertura siti in blacklist (#170.3,
-// src/main/services/siteBlock.js). Assertano i TRE CASI richiesti dalla spec:
+// src/main/services/siteBlock.js). Assertano i DUE CASI della spec:
 //   1) apertura diretta di un sito in blacklist  → BLOCCATO
 //   2) stessa apertura ma con referrer di un motore di ricerca → CONSENTITA
-//   3) stessa apertura ma originata da Filo (viaFilo) → CONSENTITA
+// #590 ha tolto il terzo caso ("originata da Filo → consentita"): la decisione
+// non guarda più CHI apre, perché l'azione NAVIGA la propone il modello e una
+// pagina ostile poteva usarla per scavalcare la lista.
 // più i bordi: schemi non-web, host non in lista, blocco disattivato, match per
 // suffisso/sottodominio. electron è richiesto in modo pigro (solo da adblock),
 // e qui usiamo useAdblockLists:false, quindi il modulo gira senza Electron.
