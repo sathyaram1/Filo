@@ -437,9 +437,9 @@
       }
       return scorse.some((f) => f.includes(t));
     };
-    const toks = corpusTokens(corpus);
+    const toks = tokCorpus;
     const soloForti = new Set();
-    for (const t of corpusTokens(letto || '')) if (!toks.has(t)) soloForti.add(t);
+    for (const t of tokLetto) if (!toks.has(t)) soloForti.add(t);
     let hits = 0;
     let strong = false;
     let sample = '';
