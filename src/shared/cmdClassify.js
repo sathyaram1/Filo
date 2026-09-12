@@ -950,7 +950,11 @@
   const FLAG_MODELLO_RE = /^(e|regexp|pattern|c|color|colour|include|exclude|filter|encoding|delim|sep|format)/i;
   function valoreDiFlag(tok) {
     const t = unquote(String(tok || ''));
-    const m = t.match(/^-{1,2}([A-Za-z][A-Za-z0-9_-]*)[:=](.+)$/) || t.match(/^\/([A-Za-z]+):(.+)$/);
+    const m = t.match(/^-{1,2}([A-Za-z][A-Za-z0-9_-]*)[:=](.+)$/) || t.match(/^\/([A-Za-z]+):(.+)$/)
+      // `-fFILE` incollato, senza separatore: è un percorso solo se ne ha la
+      // forma (una barra, `~`, un punto iniziale), se no è il valore di un
+      // qualunque flag corto (`-n5`, `-la`) e non c'è niente da misurare.
+      || t.match(/^-([A-Za-z])((?=[~.\\/])[^\s]+|[^\s]*[\\/][^\s]*)$/);
     if (!m) return '';
     if (FLAG_MODELLO_RE.test(m[1])) return '';
     return m[2];
