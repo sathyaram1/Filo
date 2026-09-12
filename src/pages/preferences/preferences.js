@@ -815,16 +815,21 @@
     const { valori, styleCheck } = raccogli();
     const presenti = await chiaviGiaInMemoria();
 
-    // Solo i campi che l'utente ha davvero cambiato da quando la pagina li ha
-    // letti (o li ha scritti l'ultima volta). Tutto il resto non si tocca:
-    // potrebbe essere cambiato altrove mentre questa pagina stava aperta, e
-    // riscriverlo col valore vecchio disferebbe una scelta già confermata.
-    const partial = {};
+    // Solo i valori che l'utente ha davvero cambiato da quando la pagina li ha
+    // letti. Tutto il resto non si tocca: potrebbe essere cambiato altrove
+    // mentre questa pagina stava aperta, e riscriverlo col valore vecchio
+    // disferebbe una scelta già confermata.
+    //
+    // Il confronto scende fino alla SINGOLA manopola, non si ferma al gruppo:
+    // modalità terminale e shell stanno nello stesso gruppo, e così velocità,
+    // tono e voce. Fermandosi al gruppo, cambiare la shell riaccendeva il
+    // permesso della shell spento un minuto prima (#592, giro 3).
+    const partial = Storage.partialCambiato(ultimoInviato || {}, valori);
+    // Le impostazioni MAI scritte in memoria si mandano intere: non c'è
+    // nessuna scelta altrui da disfare, e senza questo un campo rimesso a mano
+    // sul suo predefinito non verrebbe mai salvato.
     for (const [chiave, valore] of Object.entries(valori)) {
-      const prima = ultimoInviato ? ultimoInviato[chiave] : undefined;
-      const cambiato = JSON.stringify(prima) !== JSON.stringify(valore);
-      const maiScritto = !!presenti && !presenti.has(chiave);
-      if (cambiato || maiScritto) partial[chiave] = valore;
+      if (presenti && !presenti.has(chiave) && partial[chiave] === undefined) partial[chiave] = valore;
     }
 
     // La resa a schermo è locale e non dipende dal salvataggio.
